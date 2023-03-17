@@ -56,7 +56,8 @@ module GHC.Hs.Type (
 
         FieldOcc(..), LFieldOcc, mkFieldOcc,
         AmbiguousFieldOcc(..), LAmbiguousFieldOcc, mkAmbiguousFieldOcc,
-        rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
+        ambiguousFieldOccRdrName, ambiguousFieldOccLRdrName,
+        selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
         mkAnonWildCardTy, pprAnonWildCard,
@@ -104,7 +105,7 @@ import GHC.Parser.Annotation
 import GHC.Types.Fixity ( LexicalFixity(..) )
 import GHC.Types.Id ( Id )
 import GHC.Types.SourceText
-import GHC.Types.Name( Name, NamedThing(getName), tcName, dataName )
+import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
@@ -915,11 +916,11 @@ type instance XAmbiguous GhcTc = Id
 type instance XXAmbiguousFieldOcc (GhcPass _) = DataConCantHappen
 
 instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
-  ppr = ppr . rdrNameAmbiguousFieldOcc
+  ppr = ppr . ambiguousFieldOccRdrName
 
 instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
-  pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
-  pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
+  pprInfixOcc  = pprInfixOcc . ambiguousFieldOccRdrName
+  pprPrefixOcc = pprPrefixOcc . ambiguousFieldOccRdrName
 
 instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
   pprInfixOcc  = pprInfixOcc . unLoc
@@ -928,9 +929,12 @@ instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
 mkAmbiguousFieldOcc :: LocatedN RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
-rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
-rdrNameAmbiguousFieldOcc (Unambiguous _ (L _ rdr)) = rdr
-rdrNameAmbiguousFieldOcc (Ambiguous   _ (L _ rdr)) = rdr
+ambiguousFieldOccRdrName :: AmbiguousFieldOcc (GhcPass p) -> RdrName
+ambiguousFieldOccRdrName = unLoc . ambiguousFieldOccLRdrName
+
+ambiguousFieldOccLRdrName :: AmbiguousFieldOcc (GhcPass p) -> LocatedN RdrName
+ambiguousFieldOccLRdrName (Unambiguous _ rdr) = rdr
+ambiguousFieldOccLRdrName (Ambiguous   _ rdr) = rdr
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
 selectorAmbiguousFieldOcc (Unambiguous sel _) = sel

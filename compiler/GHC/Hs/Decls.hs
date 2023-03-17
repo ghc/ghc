@@ -124,7 +124,6 @@ import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Core.Type
-import GHC.Core.TyCon (TyConFlavour(NewtypeFlavour,DataTypeFlavour))
 import GHC.Types.ForeignCall
 import GHC.Unit.Module.Warnings (WarningTxt(..))
 
@@ -704,7 +703,7 @@ ppDataDefnHeader pp_hdr HsDataDefn
       | isTypeDataDefnCons condecls = text "type"
       | otherwise = empty
     pp_ct = case mb_ct of
-               Nothing   -> empty
+               Nothing -> empty
                Just ct -> ppr ct
     pp_sig = case mb_sig of
                Nothing   -> empty
@@ -935,7 +934,7 @@ instDeclDataFamInsts inst_decls
     do_one (L _ (TyFamInstD {}))                              = []
 
 -- | Convert a 'NewOrData' to a 'TyConFlavour'
-newOrDataToFlavour :: NewOrData -> TyConFlavour
+newOrDataToFlavour :: NewOrData -> TyConFlavour tc
 newOrDataToFlavour NewType  = NewtypeFlavour
 newOrDataToFlavour DataType = DataTypeFlavour
 

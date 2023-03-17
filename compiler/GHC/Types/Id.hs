@@ -480,15 +480,15 @@ isRecordSelector id = case Var.idDetails id of
 
 isDataConRecordSelector id = case Var.idDetails id of
                         RecSelId {sel_tycon = RecSelData _} -> True
-                        _               -> False
+                        _                                   -> False
 
 isPatSynRecordSelector id = case Var.idDetails id of
                         RecSelId {sel_tycon = RecSelPatSyn _} -> True
-                        _               -> False
+                        _                                     -> False
 
 isNaughtyRecordSelector id = case Var.idDetails id of
                         RecSelId { sel_naughty = n } -> n
-                        _                               -> False
+                        _                            -> False
 
 isClassOpId id = case Var.idDetails id of
                         ClassOpId {} -> True
@@ -527,8 +527,8 @@ isDataConWorkId_maybe id = case Var.idDetails id of
                         _                 -> Nothing
 
 isDataConWrapId id = case Var.idDetails id of
-                       DataConWrapId _ -> True
-                       _               -> False
+                        DataConWrapId _ -> True
+                        _               -> False
 
 isDataConWrapId_maybe id = case Var.idDetails id of
                         DataConWrapId con -> Just con
@@ -832,15 +832,15 @@ asNonWorkerLikeId :: Id -> Id
 asNonWorkerLikeId id =
   let details = case idDetails id of
         WorkerLikeId{}      -> Just $ VanillaId
-        JoinId arity Just{}   -> Just $ JoinId arity Nothing
-        _                     -> Nothing
+        JoinId arity Just{} -> Just $ JoinId arity Nothing
+        _                   -> Nothing
   in maybeModifyIdDetails details id
 
 -- | Turn this id into a WorkerLikeId if possible.
 asWorkerLikeId :: Id -> Id
 asWorkerLikeId id =
   let details = case idDetails id of
-        WorkerLikeId{}      -> Nothing
+        WorkerLikeId{}        -> Nothing
         JoinId _arity Just{}  -> Nothing
         JoinId arity Nothing  -> Just (JoinId arity (Just []))
         VanillaId             -> Just $ WorkerLikeId []

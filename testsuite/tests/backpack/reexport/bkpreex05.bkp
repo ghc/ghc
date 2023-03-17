@@ -1,28 +1,28 @@
 unit bar where
-    signature A(bar) where
-        data A = A { foo :: Int, bar :: Bool }
+    signature H1(bar) where
+        data A = MkA { foo :: Int, bar :: Bool }
 
 unit foo where
-    signature A(foo) where
-        data A = A { foo :: Int, bar :: Bool }
+    signature H2(foo) where
+        data A = MkA { foo :: Int, bar :: Bool }
 
 unit impl where
-    module A1 where
-        data A = A { foo :: Int, bar :: Bool }
-    module A2 where
-        data A = A { foo :: Int, bar :: Bool }
-    module A(foo, bar) where
-        import A1(foo)
-        import A2(bar)
+    module M1 where
+        data A = MkA { foo :: Int, bar :: Bool }
+    module M2 where
+        data A = MkA { foo :: Int, bar :: Bool }
+    module M(foo, bar) where
+        import M1(foo)
+        import M2(bar)
 
 -- Kind of boring test now haha
 
 unit barimpl where
-    dependency bar[A=impl:A]
+    dependency bar[H1=impl:M]
 
 unit fooimpl where
-    dependency foo[A=impl:A]
+    dependency foo[H2=impl:M]
 
 unit foobarimpl where
-    dependency foo[A=impl:A]
-    dependency bar[A=impl:A]
+    dependency foo[H2=impl:M]
+    dependency bar[H1=impl:M]

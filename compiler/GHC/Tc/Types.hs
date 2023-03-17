@@ -145,7 +145,6 @@ import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Types.CostCentre.State
 import GHC.Types.HpcInfo
-import GHC.Types.ConInfo (ConFieldEnv)
 
 import GHC.Data.IOEnv
 import GHC.Data.Bag
@@ -442,11 +441,7 @@ data TcGblEnv
         tcg_default :: Maybe [Type],
           -- ^ Types used for defaulting. @Nothing@ => no @default@ decl
 
-        tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
-        tcg_con_env :: ConFieldEnv,
-          -- ^ Just for things in this module
-          -- For information on why this is necessary, see Note [Local constructor info in the renamer]
-          -- See Note [The interactive package] in "GHC.Runtime.Context"
+        tcg_fix_env :: FixityEnv,      -- ^ Just for things in this module
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All

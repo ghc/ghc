@@ -1,4 +1,6 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE TupleSections   #-}
+
 {-|
 Module      : GHC.Hs.Utils
 Description : Generic helpers for the HsSyn type.
@@ -97,6 +99,7 @@ module GHC.Hs.Utils(
   collectLStmtBinders, collectStmtBinders,
   CollectPass(..), CollectFlag(..),
 
+  TyDeclBinders(..), LConsWithFields(..),
   hsLTyClDeclBinders, hsTyClForeignBinders,
   hsPatSynSelectors, getPatSynBinds,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
@@ -113,6 +116,7 @@ import GHC.Hs.Expr
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
+import Language.Haskell.Syntax.Decls
 import Language.Haskell.Syntax.Extension
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
@@ -146,12 +150,17 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import Data.Either
+import Control.Arrow ( first )
+import Data.Either ( partitionEithers )
 import Data.Foldable ( toList )
-import Data.Function
-import Data.List ( partition, deleteBy )
+import Data.List ( partition )
 import Data.List.NonEmpty ( nonEmpty )
 import qualified Data.List.NonEmpty as NE
+
+import Data.IntMap ( IntMap )
+import qualified Data.IntMap.Strict as IntMap
+import Data.Map ( Map )
+import qualified Data.Map.Strict as Map
 
 {-
 ************************************************************************
@@ -1356,17 +1365,31 @@ hsTyClForeignBinders :: [TyClGroup GhcRn]
 hsTyClForeignBinders tycl_decls foreign_decls
   =    map unLoc (hsForeignDeclsBinders foreign_decls)
     ++ getSelectorNames
-         (foldMap (foldMap hsLTyClDeclBinders . group_tyclds) tycl_decls
+         (foldMap (foldMap (tyDeclBinders . hsLTyClDeclBinders) . group_tyclds) tycl_decls
          `mappend`
-         foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
+         (foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls))
   where
     getSelectorNames :: ([LocatedA Name], [LFieldOcc GhcRn]) -> [Name]
     getSelectorNames (ns, fs) = map unLoc ns ++ map (foExt . unLoc) fs
 
 -------------------
-hsLTyClDeclBinders :: IsPass p
+
+data TyDeclBinders p
+  = TyDeclBinders
+  { tyDeclMainBinder     :: !(LocatedA (IdP (GhcPass p)), TyConFlavour ())
+  , tyDeclATs            :: ![(LocatedA (IdP (GhcPass p)), TyConFlavour ())]
+  , tyDeclOpSigs         :: ![LocatedA (IdP (GhcPass p))]
+  , tyDeclConsWithFields :: !(LConsWithFields p) }
+
+tyDeclBinders :: TyDeclBinders p -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
+tyDeclBinders (TyDeclBinders main ats sigs consWithFields)
+  = (fst main : (fmap fst ats ++ sigs ++ cons), flds)
+  where
+    (cons, flds) = lconsWithFieldsBinders consWithFields
+
+hsLTyClDeclBinders :: (IsPass p, OutputableBndrId p)
                    => LocatedA (TyClDecl (GhcPass p))
-                   -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
+                   -> TyDeclBinders p
 -- ^ Returns all the /binding/ names of the decl.  The first one is
 -- guaranteed to be the name of the decl. The first component
 -- represents all binding names except record fields; the second
@@ -1377,27 +1400,40 @@ hsLTyClDeclBinders :: IsPass p
 -- See Note [SrcSpan for binders]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl
-                                            { fdLName = (L _ name) } }))
-  = ([L loc name], [])
+                                            { fdLName = (L _ name)
+                                            , fdInfo  = fd_info } }))
+  = TyDeclBinders
+  { tyDeclMainBinder = (L loc name, familyInfoTyConFlavour Nothing fd_info)
+  , tyDeclATs = [], tyDeclOpSigs = []
+  , tyDeclConsWithFields = emptyLConsWithFields }
 hsLTyClDeclBinders (L loc (SynDecl
                                { tcdLName = (L _ name) }))
-  = ([L loc name], [])
+  = TyDeclBinders
+  { tyDeclMainBinder = (L loc name, TypeSynonymFlavour)
+  , tyDeclATs = [], tyDeclOpSigs = []
+  , tyDeclConsWithFields = emptyLConsWithFields }
 hsLTyClDeclBinders (L loc (ClassDecl
                                { tcdLName = (L _ cls_name)
                                , tcdSigs  = sigs
                                , tcdATs   = ats }))
-  = (L loc cls_name :
-     [ L fam_loc fam_name | (L fam_loc (FamilyDecl
-                                        { fdLName = L _ fam_name })) <- ats ]
-     ++
-     [ L mem_loc mem_name
-                          | (L mem_loc (ClassOpSig _ False ns _)) <- sigs
-                          , (L _ mem_name) <- ns ]
-    , [])
+  = TyDeclBinders
+  { tyDeclMainBinder = (L loc cls_name, ClassFlavour)
+  , tyDeclATs = [ (L fam_loc fam_name, familyInfoTyConFlavour (Just ()) fd_info)
+                | (L fam_loc (FamilyDecl { fdLName = L _ fam_name
+                                         , fdInfo = fd_info })) <- ats ]
+  , tyDeclOpSigs = [ L mem_loc mem_name
+                   | (L mem_loc (ClassOpSig _ False ns _)) <- sigs
+                   , (L _ mem_name) <- ns ]
+  , tyDeclConsWithFields = emptyLConsWithFields }
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
                                        , tcdDataDefn = defn }))
-  = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
-
+  = TyDeclBinders
+  { tyDeclMainBinder = (L loc name, flav )
+  , tyDeclATs = []
+  , tyDeclOpSigs = []
+  , tyDeclConsWithFields = hsDataDefnBinders defn }
+  where
+    flav = newOrDataToFlavour $ dataDefnConsNewOrData $ dd_cons defn
 
 -------------------
 hsForeignDeclsBinders :: forall p a. (UnXRec (GhcPass p), IsSrcSpanAnn p a)
@@ -1430,94 +1466,170 @@ getPatSynBinds binds
           , (unXRec @id -> (PatSynBind _ psb)) <- bagToList lbinds ]
 
 -------------------
-hsLInstDeclBinders :: IsPass p
+hsLInstDeclBinders :: (IsPass p, OutputableBndrId p)
                    => LInstDecl (GhcPass p)
-                   -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
+                   -> ([(LocatedA (IdP (GhcPass p)))], [LFieldOcc (GhcPass p)])
 hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
                                           { cid_datafam_insts = dfis }}))
-  = foldMap (hsDataFamInstBinders . unLoc) dfis
+  = foldMap (lconsWithFieldsBinders . hsDataFamInstBinders . unLoc) dfis
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
-  = hsDataFamInstBinders fi
+  = lconsWithFieldsBinders $ hsDataFamInstBinders fi
 hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- | the 'SrcLoc' returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: IsPass p
+hsDataFamInstBinders :: (IsPass p, OutputableBndrId p)
                      => DataFamInstDecl (GhcPass p)
-                     -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
+                     -> LConsWithFields p
 hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = FamEqn { feqn_rhs = defn }})
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
 -- | the 'SrcLoc' returned are for the whole declarations, not just the names
-hsDataDefnBinders :: IsPass p
+hsDataDefnBinders :: (IsPass p, OutputableBndrId p)
                   => HsDataDefn (GhcPass p)
-                  -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
+                  -> LConsWithFields p
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders (toList cons)
   -- See Note [Binders in family instances]
 
 -------------------
-type Seen p = [LFieldOcc (GhcPass p)] -> [LFieldOcc (GhcPass p)]
-                 -- Filters out ones that have already been seen
 
-hsConDeclsBinders :: forall p. IsPass p
+{- Note [Collecting record fields in data declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When renaming a data declaration that includes record constructors, we are, in
+the end, going to to create a mapping from constructor to its field labels,
+to store in 'GREInfo' (see 'IAmConLike'). This allows us to know, in the renamer,
+which constructor has what fields.
+
+In order to achieve this, we return the constructor and field information from
+hsConDeclsBinders in the following format:
+
+  - [(ConRdrName, [Located Int])], a list of the constructors, each associated
+    with its record fields, in the form of a list of Int indices into...
+  - IntMap FieldOcc, an IntMap of record fields.
+
+(In actual fact, we use [(ConRdrName, Maybe [Located Int])], with Nothing indicating
+that the constructor has unlabelled fields: see Note [Local constructor info in the renamer]
+in GHC.Types.GREInfo.)
+
+This allows us to do the following (see GHC.Rename.Names.getLocalNonValBinders.new_tc):
+
+  - create 'Name's for each of the record fields, to get IntMap FieldLabel,
+  - create 'Name's for each of the constructors, to get [(ConName, [Int])],
+  - look up the FieldLabels of each constructor, to get [(ConName, [FieldLabel])].
+
+NB: This can be a bit tricky to get right in the presence of data types with
+duplicate constructors or fields. Storing locations allows us to report an error
+for duplicate field declarations, see test cases T9156 T9156_DF.
+Other relevant test cases: rnfail015.
+
+-}
+
+-- | A mapping from constructors to all of their fields.
+--
+-- See Note [Collecting record fields in data declarations].
+data LConsWithFields p =
+  LConsWithFields
+    { consWithFieldIndices :: [(LocatedA (IdP (GhcPass p)), Maybe [Located Int])]
+    , consFields :: IntMap (LFieldOcc (GhcPass p))
+    }
+
+lconsWithFieldsBinders :: LConsWithFields p
+                       -> ([(LocatedA (IdP (GhcPass p)))], [LFieldOcc (GhcPass p)])
+lconsWithFieldsBinders (LConsWithFields cons fields)
+  = (map fst cons, IntMap.elems fields)
+
+emptyLConsWithFields :: LConsWithFields p
+emptyLConsWithFields = LConsWithFields [] IntMap.empty
+
+hsConDeclsBinders :: forall p. (IsPass p, OutputableBndrId p)
                   => [LConDecl (GhcPass p)]
-                  -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-   -- See hsLTyClDeclBinders for what this does
-   -- The function is boringly complicated because of the records
-   -- And since we only have equality, we have to be a little careful
-hsConDeclsBinders cons
-  = go id cons
+                  -> LConsWithFields p
+  -- The function is boringly complicated because of the records
+  -- And since we only have equality, we have to be a little careful
+hsConDeclsBinders cons = go emptyFieldIndices cons
   where
-    go :: Seen p -> [LConDecl (GhcPass p)]
-       -> ([LocatedA (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-    go _ [] = ([], [])
-    go remSeen (r:rs)
+    go :: FieldIndices p -> [LConDecl (GhcPass p)] -> LConsWithFields p
+    go seen [] = LConsWithFields [] (fields seen)
+    go seen (r:rs)
       -- Don't re-mangle the location of field names, because we don't
       -- have a record of the full location of the field declaration anyway
       = let loc = getLoc r
         in case unLoc r of
-           -- remove only the first occurrence of any seen field in order to
-           -- avoid circumventing detection of duplicate fields (#9156)
            ConDeclGADT { con_names = names, con_g_args = args }
-             -> (toList (L loc . unLoc <$> names) ++ ns, flds ++ fs)
+             -> LConsWithFields (cons ++ ns) fs
              where
-                (remSeen', flds) = get_flds_gadt remSeen args
-                (ns, fs) = go remSeen' rs
+                cons = map ( , con_flds ) $ toList (L loc . unLoc <$> names)
+                (con_flds, seen') = get_flds_gadt seen args
+                LConsWithFields ns fs = go seen' rs
 
            ConDeclH98 { con_name = name, con_args = args }
-             -> ([L loc (unLoc name)] ++ ns, flds ++ fs)
+             -> LConsWithFields ([(L loc (unLoc name), con_flds)] ++ ns) fs
              where
-                (remSeen', flds) = get_flds_h98 remSeen args
-                (ns, fs) = go remSeen' rs
+                (con_flds, seen') = get_flds_h98 seen args
+                LConsWithFields ns fs = go seen' rs
 
-    get_flds_h98 :: Seen p -> HsConDeclH98Details (GhcPass p)
-                 -> (Seen p, [LFieldOcc (GhcPass p)])
-    get_flds_h98 remSeen (RecCon flds) = get_flds remSeen flds
-    get_flds_h98 remSeen _ = (remSeen, [])
+    get_flds_h98 :: FieldIndices p -> HsConDeclH98Details (GhcPass p)
+                 -> (Maybe [Located Int], FieldIndices p)
+    get_flds_h98 seen (RecCon flds) = first Just $ get_flds seen flds
+    get_flds_h98 seen (PrefixCon _ []) = (Just [], seen)
+    get_flds_h98 seen _ = (Nothing, seen)
 
-    get_flds_gadt :: Seen p -> HsConDeclGADTDetails (GhcPass p)
-                  -> (Seen p, [LFieldOcc (GhcPass p)])
-    get_flds_gadt remSeen (RecConGADT flds _) = get_flds remSeen flds
-    get_flds_gadt remSeen _ = (remSeen, [])
+    get_flds_gadt :: FieldIndices p -> HsConDeclGADTDetails (GhcPass p)
+                  -> (Maybe [Located Int], FieldIndices p)
+    get_flds_gadt seen (RecConGADT flds _) = first Just $ get_flds seen flds
+    get_flds_gadt seen (PrefixConGADT []) = (Just [], seen)
+    get_flds_gadt seen _ = (Nothing, seen)
 
-    get_flds :: Seen p -> LocatedL [LConDeclField (GhcPass p)]
-             -> (Seen p, [LFieldOcc (GhcPass p)])
-    get_flds remSeen flds = (remSeen', fld_names)
-       where
-          fld_names = remSeen (concatMap (cd_fld_names . unLoc) (unLoc flds))
-          remSeen' = foldr (.) remSeen
-                               [deleteBy ((==) `on` unLoc . foLabel . unLoc) v
-                               | v <- fld_names]
+    get_flds :: FieldIndices p -> LocatedL [LConDeclField (GhcPass p)]
+             -> ([Located Int], FieldIndices p)
+    get_flds seen flds =
+      foldr add_fld ([], seen) fld_names
+      where
+        add_fld fld (is, ixs) =
+          let (i, ixs') = insertField fld ixs
+          in  (i:is, ixs')
+        fld_names = concatMap (cd_fld_names . unLoc) (unLoc flds)
+
+-- | A bijection between record fields of a datatype and integers,
+-- used to implement Note [Collecting record fields in data declarations].
+data FieldIndices p =
+  FieldIndices
+    { fields       :: IntMap (LFieldOcc (GhcPass p))
+        -- ^ Look up a field from its index.
+    , fieldIndices :: Map RdrName Int
+        -- ^ Look up the index of a field label in the previous 'IntMap'.
+    , newInt       :: !Int
+        -- ^ An integer @i@ such that no integer @i' >= i@ appears in the 'IntMap'.
+    }
+
+emptyFieldIndices :: FieldIndices p
+emptyFieldIndices =
+  FieldIndices { fields       = IntMap.empty
+               , fieldIndices = Map.empty
+               , newInt       = 0 }
+
+insertField :: LFieldOcc (GhcPass p) -> FieldIndices p -> (Located Int, FieldIndices p)
+insertField new_fld fi@(FieldIndices flds idxs new_idx)
+  | Just i <- Map.lookup rdr idxs
+  = (L loc i, fi)
+  | otherwise
+  = (L loc new_idx,
+      FieldIndices (IntMap.insert new_idx new_fld flds)
+                   (Map.insert rdr new_idx idxs)
+                   (new_idx + 1))
+  where
+    loc = getLocA new_fld
+    rdr = unLoc . foLabel . unLoc $ new_fld
 
 {-
 
 Note [SrcSpan for binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-When extracting the (Located RdrNme) for a binder, at least for the
+When extracting the (Located RdrName) for a binder, at least for the
 main name (the TyCon of a type declaration etc), we want to give it
 the @SrcSpan@ of the whole /declaration/, not just the name itself
 (which is how it appears in the syntax tree).  This SrcSpan (for the

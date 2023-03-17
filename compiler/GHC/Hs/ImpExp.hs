@@ -21,25 +21,26 @@ module GHC.Hs.ImpExp
     , module GHC.Hs.ImpExp
     ) where
 
+import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Module.Name
+import Language.Haskell.Syntax.ImpExp
+
 import GHC.Prelude
 
 import GHC.Types.SourceText   ( SourceText(..) )
-import GHC.Types.FieldLabel   ( FieldLabel )
+import GHC.Types.SrcLoc
+import GHC.Types.Name
+import GHC.Types.PkgQual
+
+import GHC.Parser.Annotation
+import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc
-import GHC.Parser.Annotation
-import GHC.Hs.Extension
-import GHC.Types.Name
-import GHC.Types.PkgQual
 
 import Data.Data
 import Data.Maybe
 
-import Language.Haskell.Syntax.Extension
-import Language.Haskell.Syntax.Module.Name
-import Language.Haskell.Syntax.ImpExp
 
 {-
 ************************************************************************
@@ -203,11 +204,7 @@ type instance XIEVar             GhcTc = NoExtField
 
 type instance XIEThingAbs        (GhcPass _) = EpAnn [AddEpAnn]
 type instance XIEThingAll        (GhcPass _) = EpAnn [AddEpAnn]
-
--- See Note [IEThingWith]
-type instance XIEThingWith       (GhcPass 'Parsed)      = EpAnn [AddEpAnn]
-type instance XIEThingWith       (GhcPass 'Renamed)     = [Located FieldLabel]
-type instance XIEThingWith       (GhcPass 'Typechecked) = NoExtField
+type instance XIEThingWith       (GhcPass _) = EpAnn [AddEpAnn]
 
 type instance XIEModuleContents  GhcPs = EpAnn [AddEpAnn]
 type instance XIEModuleContents  GhcRn = NoExtField
@@ -219,32 +216,6 @@ type instance XIEDocNamed        (GhcPass _) = NoExtField
 type instance XXIE               (GhcPass _) = DataConCantHappen
 
 type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
-
-{-
-Note [IEThingWith]
-~~~~~~~~~~~~~~~~~~
-A definition like
-
-    {-# LANGUAGE DuplicateRecordFields #-}
-    module M ( T(MkT, x) ) where
-      data T = MkT { x :: Int }
-
-gives rise to this in the output of the parser:
-
-    IEThingWith NoExtField T [MkT, x] NoIEWildcard
-
-But in the renamer we need to attach the correct field label,
-because the selector Name is mangled (see Note [FieldLabel] in
-GHC.Types.FieldLabel).  Hence we change this to:
-
-    IEThingWith [FieldLabel "x" True $sel:x:MkT)] T [MkT] NoIEWildcard
-
-using the TTG extension field to store the list of fields in renamed syntax
-only.  (Record fields always appear in this list, regardless of whether
-DuplicateRecordFields was in use at the definition site or not.)
-
-See Note [Representing fields in AvailInfo] in GHC.Types.Avail for more details.
--}
 
 ieName :: IE (GhcPass p) -> IdP (GhcPass p)
 ieName (IEVar _ (L _ n))            = ieWrappedName n
@@ -292,9 +263,8 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEVar       _     var) = ppr (unLoc var)
     ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
     ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
-    ppr (IEThingWith flds thing wc withs)
-        = ppr (unLoc thing) <> parens (fsep (punctuate comma
-                                              (ppWiths ++ ppFields) ))
+    ppr (IEThingWith _ thing wc withs)
+        = ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))
       where
         ppWiths =
           case wc of
@@ -303,10 +273,6 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
-        ppFields =
-          case ghcPass @p of
-            GhcRn -> map ppr flds
-            _     -> []
     ppr (IEModuleContents _ mod')
         = text "module" <+> ppr mod'
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")

@@ -92,7 +92,6 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Core.DataCon as DataCon
 
-import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -131,7 +130,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe( MaybeErr(..) )
 import qualified GHC.Data.EnumSet as EnumSet
 
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
 import qualified Language.Haskell.TH.Syntax as TH
@@ -145,7 +143,7 @@ import Unsafe.Coerce    ( unsafeCoerce )
 import Control.Monad
 import Data.Binary
 import Data.Binary.Get
-import Data.List        ( find )
+import qualified Data.List.NonEmpty as NE ( singleton )
 import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
@@ -1938,8 +1936,8 @@ lookupName :: Bool      -- True  <=> type namespace
                         -- False <=> value namespace
            -> String -> TcM (Maybe TH.Name)
 lookupName is_type_name s
-  = do { mb_nm <- lookupOccRn_maybe rdr_name
-       ; return (fmap reifyName mb_nm) }
+  = do { mb_gre <- lookupSameOccRn_maybe rdr_name
+       ; return (fmap (reifyName . greName) mb_gre) }
   where
     th_name = TH.mkName s       -- Parses M.x into a base of 'x' and a module of 'M'
 
@@ -1975,9 +1973,10 @@ getThing th_name
         -- ToDo: this tcLookup could fail, which would give a
         --       rather unhelpful error message
   where
-    ppr_ns (TH.Name _ (TH.NameG TH.DataName  _pkg _mod)) = text "data"
-    ppr_ns (TH.Name _ (TH.NameG TH.TcClsName _pkg _mod)) = text "tc"
-    ppr_ns (TH.Name _ (TH.NameG TH.VarName   _pkg _mod)) = text "var"
+    ppr_ns (TH.Name _ (TH.NameG TH.DataName     _pkg _mod)) = text "data"
+    ppr_ns (TH.Name _ (TH.NameG TH.TcClsName    _pkg _mod)) = text "tc"
+    ppr_ns (TH.Name _ (TH.NameG TH.VarName      _pkg _mod)) = text "var"
+    ppr_ns (TH.Name _ (TH.NameG (TH.FldName {}) _pkg _mod)) = text "fld"
     ppr_ns _ = panic "reify/ppr_ns"
 
 reify :: TH.Name -> TcM TH.Info
@@ -1996,10 +1995,17 @@ lookupThName th_name = do
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 lookupThName_maybe th_name
-  =  do { names <- mapMaybeM lookupOccRn_maybe (thRdrNameGuesses th_name)
+  =  do { let guesses = thRdrNameGuesses th_name
+        ; case guesses of
+        { [for_sure] -> get_name $ lookupSameOccRn_maybe for_sure
+        ; _ ->
+     do { names <- mapMaybeM (get_name . lookupOccRn_maybe) guesses
           -- Pick the first that works
           -- E.g. reify (mkName "A") will pick the class A in preference to the data constructor A
-        ; return (listToMaybe names) }
+        ; return (listToMaybe names) } } }
+  where
+    get_name :: TcM (Maybe GlobalRdrElt) -> TcM (Maybe Name)
+    get_name = fmap (fmap greName)
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of GHC.Tc.Utils.Env.tcLookup; specialised mainly in that
@@ -2058,9 +2064,7 @@ reifyThing (AGlobal (AnId id))
         ; let v = reifyName id
         ; case idDetails id of
             ClassOpId cls _ -> return (TH.ClassOpI v ty (reifyName cls))
-            RecSelId{sel_tycon=RecSelData tc}
-                          -> return (TH.VarI (reifySelector id tc) ty Nothing)
-            _             -> return (TH.VarI     v ty Nothing)
+            _               -> return (TH.VarI     v ty Nothing)
     }
 
 reifyThing (AGlobal (ATyCon tc))   = reifyTyCon tc
@@ -2231,8 +2235,8 @@ reifyDataCon isGadtDataCon tys dc
                                          dcdBangs r_arg_tys)
               | not (null fields) -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.RecGadtC [name]
-                                     (zip3 (map (reifyName . flSelector) fields)
+                  ; return $ TH.RecGadtC (NE.singleton name)
+                                     (zip3 (map reifyFieldLabel fields)
                                       dcdBangs r_arg_tys) res_ty }
                 -- We need to check not isGadtDataCon here because GADT
                 -- constructors can be declared infix.
@@ -2244,7 +2248,8 @@ reifyDataCon isGadtDataCon tys dc
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
               | isGadtDataCon -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.GadtC [name] (dcdBangs `zip` r_arg_tys) res_ty }
+                  ; return $ TH.GadtC (NE.singleton name)
+                                 (dcdBangs `zip` r_arg_tys) res_ty }
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
@@ -2734,26 +2739,12 @@ reifyName thing
     mk_varg | OccName.isDataOcc occ = TH.mkNameG_d
             | OccName.isVarOcc  occ = TH.mkNameG_v
             | OccName.isTcOcc   occ = TH.mkNameG_tc
+            | Just con_fs <- OccName.fieldOcc_maybe occ
+            = \ pkg mod occ -> TH.mkNameG_fld pkg mod (unpackFS con_fs) occ
             | otherwise             = pprPanic "reifyName" (ppr name)
 
--- See Note [Reifying field labels]
 reifyFieldLabel :: FieldLabel -> TH.Name
-reifyFieldLabel fl
-  | flIsOverloaded fl
-              = TH.Name (TH.mkOccName occ_str) (TH.NameQ (TH.mkModName mod_str))
-  | otherwise = TH.mkNameG_v pkg_str mod_str occ_str
-  where
-    name    = flSelector fl
-    mod     = assert (isExternalName name) $ nameModule name
-    pkg_str = unitString (moduleUnit mod)
-    mod_str = moduleNameString (moduleName mod)
-    occ_str = unpackFS (field_label $ flLabel fl)
-
-reifySelector :: Id -> TyCon -> TH.Name
-reifySelector id tc
-  = case find ((idName id ==) . flSelector) (tyConFieldLabels tc) of
-      Just fl -> reifyFieldLabel fl
-      Nothing -> pprPanic "reifySelector: missing field" (ppr id $$ ppr tc)
+reifyFieldLabel fl = reifyName $ flSelector fl
 
 ------------------------------
 reifyFixity :: Name -> TcM (Maybe TH.Fixity)
@@ -2856,34 +2847,6 @@ noTH s d = failWithTc $ TcRnCannotRepresentType s d
 
 ppr_th :: TH.Ppr a => a -> SDoc
 ppr_th x = text (TH.pprint x)
-
-{-
-Note [Reifying field labels]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When reifying a datatype declared with DuplicateRecordFields enabled, we want
-the reified names of the fields to be labels rather than selector functions.
-That is, we want (reify ''T) and (reify 'foo) to produce
-
-    data T = MkT { foo :: Int }
-    foo :: T -> Int
-
-rather than
-
-    data T = MkT { $sel:foo:MkT :: Int }
-    $sel:foo:MkT :: T -> Int
-
-because otherwise TH code that uses the field names as strings will silently do
-the wrong thing.  Thus we use the field label (e.g. foo) as the OccName, rather
-than the selector (e.g. $sel:foo:MkT).  Since the Orig name M.foo isn't in the
-environment, NameG can't be used to represent such fields.  Instead,
-reifyFieldLabel uses NameQ.
-
-However, this means that extracting the field name from the output of reify, and
-trying to reify it again, may fail with an ambiguity error if there are multiple
-such fields defined in the module (see the test case
-overloadedrecflds/should_fail/T11103.hs).  The "proper" fix requires changes to
-the TH AST to make it able to represent duplicate record fields.
--}
 
 tcGetInterp :: TcM Interp
 tcGetInterp = do

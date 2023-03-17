@@ -1,8 +1,6 @@
--- When using DuplicateRecordFields with TemplateHaskell, it is not possible to
--- reify ambiguous names that are output by reifying field labels.
--- See also overloadedrecflds/should_run/overloadedrecfldsrun04.hs
-
 {-# LANGUAGE DuplicateRecordFields, TemplateHaskell #-}
+
+module T11103 where
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax

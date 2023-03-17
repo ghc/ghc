@@ -186,14 +186,14 @@
      (L
       (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-15 })
       (IEThingWith
-       [(L
-         { T14189.hs:3:11 }
-         (FieldLabel
-          (FieldLabelString
-           {FastString: "f"})
-          (NoDuplicateRecordFields)
-          (FieldSelectors)
-          {Name: T14189.f}))]
+       (EpAnn
+        (Anchor
+         { T14189.hs:3:3-8 }
+         (UnchangedAnchor))
+        [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
+        ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
+        (EpaComments
+         []))
        (L
         (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
         (IEName
@@ -203,6 +203,21 @@
           {Name: T14189.MyType})))
        (NoIEWildcard)
        [(L
+         (SrcSpanAnn (EpAnn
+                      (Anchor
+                       { T14189.hs:3:11 }
+                       (UnchangedAnchor))
+                      (AnnListItem
+                       [(AddCommaAnn
+                         (EpaSpan { T14189.hs:3:12 }))])
+                      (EpaComments
+                       [])) { T14189.hs:3:11 })
+         (IEName
+          (NoExtField)
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:11 })
+           {Name: T14189.f})))
+       ,(L
          (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:13-14 })
          (IEName
           (NoExtField)
@@ -211,17 +226,9 @@
            {Name: T14189.NT})))]))
      [(AvailTC
        {Name: T14189.MyType}
-       [(NormalGreName
-         {Name: T14189.MyType})
-       ,(NormalGreName
-         {Name: T14189.NT})
-       ,(FieldGreName
-         (FieldLabel
-          (FieldLabelString
-           {FastString: "f"})
-          (NoDuplicateRecordFields)
-          (FieldSelectors)
-          {Name: T14189.f}))])])])
+       [{Name: T14189.MyType}
+       ,{Name: T14189.f}
+       ,{Name: T14189.NT}])])])
   (Nothing)))
 
 

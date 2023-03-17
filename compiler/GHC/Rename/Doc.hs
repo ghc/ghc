@@ -8,7 +8,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Monad (getGblEnv)
-import GHC.Types.Avail
 import GHC.Rename.Env
 
 rnLHsDoc :: LHsDoc GhcPs -> RnM (LHsDoc GhcRn)
@@ -37,10 +36,10 @@ rnHsDoc (WithHsDocIdentifiers s ids) = do
   pure (WithHsDocIdentifiers s (rnHsDocIdentifiers gre ids))
 
 rnHsDocIdentifiers :: GlobalRdrEnv
-                  -> [Located RdrName]
-                  -> [Located Name]
-rnHsDocIdentifiers gre ns = concat
-  [ map (L l . greNamePrintableName . gre_name) (lookupGRE_RdrName c gre)
+                   -> [Located RdrName]
+                   -> [Located Name]
+rnHsDocIdentifiers gre_env ns = concat
+  [ map (L l . greName) (lookupGRE_RdrName (IncludeFields WantNormal) gre_env c)
   | L l rdr_name <- ns
   , c <- dataTcOccs rdr_name
   ]

@@ -22,7 +22,7 @@ module GHC.Core.DataCon (
         eqSpecPair, eqSpecPreds,
 
         -- ** Field labels
-        FieldLabel(..), FieldLabelString,
+        FieldLabel(..), flLabel, FieldLabelString,
 
         -- ** Type construction
         mkDataCon, fIRST_TAG,

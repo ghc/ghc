@@ -35,6 +35,7 @@ module GHC.Iface.Syntax (
 
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
+        freeNamesIfConDecls,
 
         -- Pretty printing
         pprIfaceExpr,
@@ -79,8 +80,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith,
                        seqList, zipWithEqual )
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
 import System.IO.Unsafe
@@ -385,7 +384,11 @@ data IfGuidance
 data IfaceIdDetails
   = IfVanillaId
   | IfWorkerLikeId [CbvMark]
-  | IfRecSelId (Either IfaceTyCon IfaceDecl) Bool
+  | IfRecSelId
+    { ifRecSelIdParent     :: Either IfaceTyCon IfaceDecl
+    , ifRecSelFirstCon     :: IfaceTopBndr
+    , ifRecSelIdIsNaughty  :: Bool
+    , ifRecSelIdFieldLabel :: FieldLabel }
   | IfDFunId
 
 -- | Iface type for LambdaFormInfo. Fields not relevant for imported Ids are
@@ -1299,7 +1302,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | otherwise      = Nothing
       where
         sel = flSelector lbl
-        occ = mkVarOccFS (field_label $ flLabel lbl)
+        occ = nameOccName sel
 
     mk_user_con_res_ty :: IfaceEqSpec -> SDoc
     -- See Note [Result type of a data family GADT]
@@ -1504,10 +1507,10 @@ instance Outputable IfaceConAlt where
 instance Outputable IfaceIdDetails where
   ppr IfVanillaId       = Outputable.empty
   ppr (IfWorkerLikeId dmd) = text "StrWork" <> parens (ppr dmd)
-  ppr (IfRecSelId tc b) = text "RecSel" <+> ppr tc
-                          <+> if b
-                                then text "<naughty>"
-                                else Outputable.empty
+  ppr (IfRecSelId tc _c b _fl) = text "RecSel" <+> ppr tc
+                            <+> if b
+                                  then text "<naughty>"
+                                  else Outputable.empty
   ppr IfDFunId          = text "DFunId"
 
 instance Outputable IfaceInfoItem where
@@ -1623,9 +1626,13 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
     freeNamesIfType rhs
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
-freeNamesIfIdDetails (IfRecSelId tc _) =
-  either freeNamesIfTc freeNamesIfDecl tc
-freeNamesIfIdDetails _                 = emptyNameSet
+freeNamesIfIdDetails (IfRecSelId tc first_con _ fl) =
+  either freeNamesIfTc freeNamesIfDecl tc &&&
+  unitFV first_con &&&
+  unitFV (flSelector fl)
+freeNamesIfIdDetails IfVanillaId         = emptyNameSet
+freeNamesIfIdDetails (IfWorkerLikeId {}) = emptyNameSet
+freeNamesIfIdDetails IfDFunId            = emptyNameSet
 
 -- All other changes are handled via the version info on the tycon
 freeNamesIfFamFlav :: IfaceFamTyConFlav -> NameSet
@@ -1657,7 +1664,7 @@ freeNamesDM _                     = emptyNameSet
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
 freeNamesIfConDecls (IfDataTyCon _ cs) = fnList freeNamesIfConDecl cs
 freeNamesIfConDecls (IfNewTyCon    c)  = freeNamesIfConDecl c
-freeNamesIfConDecls _                   = emptyNameSet
+freeNamesIfConDecls _                  = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
 freeNamesIfConDecl (IfCon { ifConExTCvs  = ex_tvs, ifConCtxt = ctxt
@@ -2264,16 +2271,25 @@ instance Binary IfaceAnnotation where
         return (IfaceAnnotation a1 a2)
 
 instance Binary IfaceIdDetails where
-    put_ bh IfVanillaId      = putByte bh 0
-    put_ bh (IfRecSelId a b) = putByte bh 1 >> put_ bh a >> put_ bh b
+    put_ bh IfVanillaId           = putByte bh 0
+    put_ bh (IfRecSelId a b c d)  = do { putByte bh 1
+                                       ; put_ bh a
+                                       ; put_ bh b
+                                       ; put_ bh c
+                                       ; put_ bh d }
     put_ bh (IfWorkerLikeId dmds) = putByte bh 2 >> put_ bh dmds
-    put_ bh IfDFunId         = putByte bh 3
+    put_ bh IfDFunId              = putByte bh 3
     get bh = do
         h <- getByte bh
         case h of
             0 -> return IfVanillaId
-            1 -> do { a <- get bh; b <- get bh; return (IfRecSelId a b) }
-            2 -> do { dmds <- get bh; return (IfWorkerLikeId dmds) }
+            1 -> do { a <- get bh
+                    ; b <- get bh
+                    ; c <- get bh
+                    ; d <- get bh
+                    ; return (IfRecSelId a b c d) }
+            2 -> do { dmds <- get bh
+                    ; return (IfWorkerLikeId dmds) }
             _ -> return IfDFunId
 
 instance Binary IfaceInfoItem where
@@ -2693,8 +2709,8 @@ instance NFData IfaceIdDetails where
   rnf = \case
     IfVanillaId -> ()
     IfWorkerLikeId dmds -> dmds `seqList` ()
-    IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
-    IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
+    IfRecSelId (Left tycon) b c d -> rnf tycon `seq` rnf b `seq` rnf c `seq` rnf d
+    IfRecSelId (Right decl) b c d -> rnf decl `seq` rnf b `seq` rnf c `seq` rnf d
     IfDFunId -> ()
 
 instance NFData IfaceInfoItem where

@@ -201,7 +201,6 @@ GHC.Types.Avail
 GHC.Types.Basic
 GHC.Types.BreakInfo
 GHC.Types.CompleteMatch
-GHC.Types.ConInfo
 GHC.Types.CostCentre
 GHC.Types.CostCentre.State
 GHC.Types.Cpr
@@ -213,6 +212,7 @@ GHC.Types.Fixity
 GHC.Types.Fixity.Env
 GHC.Types.ForeignCall
 GHC.Types.ForeignStubs
+GHC.Types.GREInfo
 GHC.Types.Hint
 GHC.Types.Hint.Ppr
 GHC.Types.HpcInfo

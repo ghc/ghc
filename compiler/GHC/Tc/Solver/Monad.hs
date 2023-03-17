@@ -1448,7 +1448,7 @@ recordUsedGREs gres
   = do { wrapTcS $ TcM.addUsedGREs gre_list
          -- If a newtype constructor was imported, don't warn about not
          -- importing it...
-       ; wrapTcS $ traverse_ (TcM.keepAlive . greMangledName) gre_list }
+       ; wrapTcS $ traverse_ (TcM.keepAlive . greName) gre_list }
          -- ...and similarly, if a newtype constructor was defined in the same
          -- module, don't warn about it being unused.
          -- See Note [Tracking unused binding and imports] in GHC.Tc.Utils.

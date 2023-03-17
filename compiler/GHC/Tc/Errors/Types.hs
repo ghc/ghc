@@ -15,6 +15,7 @@ module GHC.Tc.Errors.Types (
   , ShadowedNameProvenance(..)
   , RecordFieldPart(..)
   , IllegalNewtypeReason(..)
+  , BadRecordUpdateReason(..)
   , InjectivityErrReason(..)
   , HasKinds(..)
   , hasKinds
@@ -114,6 +115,7 @@ import GHC.Types.Avail (AvailInfo)
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.ForeignCall (CLabelString)
+import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (Name, OccName, getSrcLoc, getSrcSpan)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
@@ -132,7 +134,7 @@ import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
-import GHC.Core.TyCon (TyCon, TyConFlavour)
+import GHC.Core.TyCon (TyCon)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
@@ -327,15 +329,15 @@ data TcRnMessage where
   -}
   TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
   {-| TcRnDodgyImports is a warning (controlled with -Wdodgy-imports) that occurs when
-      a datatype 'T' is imported with all constructors, i.e. 'T(..)', but has been exported
-      abstractly, i.e. 'T'.
+      an import of the form 'T(..)' or 'f(..)' does not actually import anything beside
+      'T'/'f' itself.
 
      Test cases: rename/should_compile/T7167
   -}
-  TcRnDodgyImports :: RdrName -> TcRnMessage
-  {-| TcRnDodgyExports is a warning (controlled by -Wdodgy-exports) that occurs when a datatype
-      'T' is exported with all constructors, i.e. 'T(..)', but is it just a type synonym or a
-      type/data family.
+  TcRnDodgyImports :: GlobalRdrElt -> TcRnMessage
+  {-| TcRnDodgyExports is a warning (controlled by -Wdodgy-exports) that occurs when
+      an export of the form 'T(..)' for a type constructor 'T' does not actually export anything
+      beside 'T' itself.
 
      Example:
        module Foo (
@@ -350,7 +352,7 @@ data TcRnMessage where
 
      Test cases: warnings/should_compile/DodgyExports01
   -}
-  TcRnDodgyExports :: Name -> TcRnMessage
+  TcRnDodgyExports :: GlobalRdrElt -> TcRnMessage
   {-| TcRnMissingImportList is a warning (controlled by -Wmissing-import-lists) that occurs when
       an import declaration does not explicitly list all the names brought into scope.
 
@@ -577,13 +579,15 @@ data TcRnMessage where
     -> !BadAnonWildcardContext
     -> TcRnMessage
 
-
   {-| TcRnDuplicateFieldName is an error that occurs whenever
-      there are duplicate field names in a record.
+      there are duplicate field names in a single record.
 
-      Examples(s): None.
+      Examples(s):
 
-     Test cases: None.
+        data R = MkR { x :: Int, x :: Bool }
+        f r = r { x = 3, x = 4 }
+
+     Test cases: T21959.
   -}
   TcRnDuplicateFieldName :: !RecordFieldPart -> NE.NonEmpty RdrName -> TcRnMessage
 
@@ -1040,7 +1044,7 @@ data TcRnMessage where
 
       Test cases: polykinds/T13267
   -}
-  TcRnIllegalClassInst :: !TyConFlavour -> TcRnMessage
+  TcRnIllegalClassInst :: !(TyConFlavour TyCon) -> TcRnMessage
 
   {-| TcRnOversaturatedVisibleKindArg is an error that occurs whenever an illegal oversaturated
       visible kind argument is specified.
@@ -1342,7 +1346,7 @@ data TcRnMessage where
                  overloadedrecflds/should_fail/DuplicateExports
                  patsyn/should_compile/T11959
   -}
-  TcRnDuplicateExport :: GreName -> IE GhcPs -> IE GhcPs -> TcRnMessage
+  TcRnDuplicateExport :: GlobalRdrElt -> IE GhcPs -> IE GhcPs -> TcRnMessage
 
   {-| TcRnExportedParentChildMismatch is an error that occurs when an export is
       bundled with a parent that it does not belong to
@@ -1358,7 +1362,10 @@ data TcRnMessage where
                  module/mod3
                  overloadedrecflds/should_fail/NoParent
   -}
-  TcRnExportedParentChildMismatch :: Name -> TyThing -> GreName -> [Name] -> TcRnMessage
+  TcRnExportedParentChildMismatch :: Name -- ^ parent
+                                  -> TyThing
+                                  -> GlobalRdrElt -- ^ child
+                                  -> [Name] -> TcRnMessage
 
   {-| TcRnConflictingExports is an error that occurs when different identifiers that
       have the same name are being exported by a module.
@@ -1385,29 +1392,50 @@ data TcRnMessage where
                  typecheck/should_fail/tcfail026
   -}
   TcRnConflictingExports
-    :: OccName -- ^ Occurrence name shared by both exports
-    -> GreName -- ^ Name of first export
-    -> GlobalRdrElt -- ^ Provenance for definition site of first export
-    -> IE GhcPs -- ^ Export decl of first export
-    -> GreName -- ^ Name of second export
-    -> GlobalRdrElt -- ^ Provenance for definition site of second export
-    -> IE GhcPs -- ^ Export decl of second export
+    :: OccName      -- ^ Occurrence name shared by both exports
+    -> GlobalRdrElt -- ^ First export
+    -> IE GhcPs     -- ^ Export decl of first export
+    -> GlobalRdrElt -- ^ Second export
+    -> IE GhcPs     -- ^ Export decl of second export
     -> TcRnMessage
 
-  {-| TcRnAmbiguousField is a warning controlled by -Wambiguous-fields occurring
-      when a record update's type cannot be precisely determined. This will not
-      be supported by -XDuplicateRecordFields in future releases.
+  {-| TcRnDuplicateFieldExport is an error that occurs when a module exports
+      multiple record fields with the same name, without enabling
+      DuplicateRecordFields.
+
+      Example:
+
+      module M1 where
+        data D1 = MkD1 { foo :: Int }
+      module M2 where
+        data D2 = MkD2 { foo :: Int }
+      module M ( D1(..), D2(..) ) where
+        import module M1
+        import module M2
+
+     Test case: overloadedrecflds/should_fail/overloadedrecfldsfail10
+  -}
+  TcRnDuplicateFieldExport
+    :: (GlobalRdrElt, IE GhcPs)
+    -> NE.NonEmpty (GlobalRdrElt, IE GhcPs)
+    -> TcRnMessage
+
+  {-| TcRnAmbiguousRecordUpdate is a warning, controlled by -Wambiguous-fields,
+      which occurs when a user relies on the type-directed disambiguation
+      mechanism to disambiguate a record update. This will not be supported by
+      -XDuplicateRecordFields in future releases.
 
       Example(s):
-      data Person  = MkPerson  { personId :: Int, name :: String }
-      data Address = MkAddress { personId :: Int, address :: String }
-      bad1 x = x { personId = 4 } :: Person -- ambiguous
-      bad2 (x :: Person) = x { personId = 4 } -- ambiguous
-      good x = (x :: Person) { personId = 4 } -- not ambiguous
+
+        data Person  = MkPerson  { personId :: Int, name :: String }
+        data Address = MkAddress { personId :: Int, address :: String }
+        bad1 x = x { personId = 4 } :: Person -- ambiguous
+        bad2 (x :: Person) = x { personId = 4 } -- ambiguous
+        good x = (x :: Person) { personId = 4 } -- not ambiguous
 
      Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail06
   -}
-  TcRnAmbiguousField
+  TcRnAmbiguousRecordUpdate
     :: HsExpr GhcRn -- ^ Field update
     -> TyCon -- ^ Record type
     -> TcRnMessage
@@ -1442,38 +1470,6 @@ data TcRnMessage where
   -}
   TcRnFieldUpdateInvalidType :: [(FieldLabelString,TcType)] -> TcRnMessage
 
-  {-| TcRnNoConstructorHasAllFields is an error that occurs when a record update
-      has fields that no single constructor encompasses.
-
-      Example(s):
-      data Foo = A { x :: Bool }
-               | B { y :: Int }
-      foo = (A False) { x = True, y = 5 }
-
-     Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail08
-                 patsyn/should_fail/mixed-pat-syn-record-sels
-                 typecheck/should_fail/T7989
-  -}
-  TcRnNoConstructorHasAllFields :: [FieldLabelString] -> TcRnMessage
-
-  {- TcRnMixedSelectors is an error for when a mixture of pattern synonym and
-      record selectors are used in the same record update block.
-
-      Example(s):
-      data Rec = Rec { foo :: Int, bar :: String }
-      pattern Pat { f1, f2 } = Rec { foo = f1, bar = f2 }
-      illegal :: Rec -> Rec
-      illegal r = r { f1 = 1, bar = "two" }
-
-     Test cases: patsyn/should_fail/records-mixing-fields
-  -}
-  TcRnMixedSelectors
-    :: Name -- ^ Record
-    -> [Id] -- ^ Record selectors
-    -> Name -- ^ Pattern synonym
-    -> [Id] -- ^ Pattern selectors
-    -> TcRnMessage
-
   {- TcRnMissingStrictFields is an error occurring when a record field marked
      as strict is omitted when constructing said record.
 
@@ -1487,30 +1483,54 @@ data TcRnMessage where
   -}
   TcRnMissingStrictFields :: ConLike -> [(FieldLabelString, TcType)] -> TcRnMessage
 
-  {- TcRnNoPossibleParentForFields is an error thrown when the fields used in a
-     record update block do not all belong to any one type.
+  {-| TcRnAmbiguousFieldInUpdate is an error that occurs when a field in a
+      record update clashes with another field or top-level function of the
+      same name, and the user hasn't enabled -XDisambiguateRecordFields.
+
+      Example:
+
+        {-# LANGUAGE NoFieldSelectors #-}
+        {-# LANGUAGE NoDisambiguateRecordFields #-}
+        module M where
+
+          data A = MkA { fld :: Int }
+
+          fld :: Bool
+          fld = False
+
+          f r = r { fld = 3 }
+
+  -}
+  TcRnAmbiguousFieldInUpdate :: (GlobalRdrElt, GlobalRdrElt, [GlobalRdrElt])
+                                -> TcRnMessage
+
+  {-| TcRnBadRecordUpdate is an error when a regular (non-overloaded)
+     record update cannot be pinned down to any one parent.
+
+     The problem with the record update is stored in the 'BadRecordUpdateReason'
+     field.
 
      Example(s):
-     data R1 = R1 { x :: Int, y :: Int }
-     data R2 = R2 { y :: Int, z :: Int }
-     update r = r { x = 1, y = 2, z = 3 }
+
+       data R1 = R1 { x :: Int }
+       data R2 = R2 { x :: Int }
+       update r = r { x = 1 }
+         -- ambiguous
+
+       data R1 = R1 { x :: Int, y :: Int }
+       data R2 = R2 { y :: Int, z :: Int }
+       update r = r { x = 1, y = 2, z = 3 }
+         -- no parent has all the fields
 
     Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail01
+                overloadedrecflds/should_fail/overloadedrecfldsfail01
                 overloadedrecflds/should_fail/overloadedrecfldsfail14
   -}
-  TcRnNoPossibleParentForFields :: [LHsRecUpdField GhcRn] -> TcRnMessage
-
-  {- TcRnBadOverloadedRecordUpdate is an error for a record update that cannot
-     be pinned down to any one constructor and thus must be given a type signature.
-
-     Example(s):
-     data R1 = R1 { x :: Int }
-     data R2 = R2 { x :: Int }
-     update r = r { x = 1 } -- needs a type signature
-
-    Test cases: overloadedrecflds/should_fail/overloadedrecfldsfail01
-  -}
-  TcRnBadOverloadedRecordUpdate :: [LHsRecUpdField GhcRn] -> TcRnMessage
+  TcRnBadRecordUpdate :: [RdrName]
+                         -- ^ the fields of the record update
+                      -> BadRecordUpdateReason
+                         -- ^ the reason this record update was rejected
+                      -> TcRnMessage
 
   {- TcRnStaticFormNotClosed is an error pertaining to terms that are marked static
      using the -XStaticPointers extension but which are not closed terms.
@@ -1932,19 +1952,6 @@ data TcRnMessage where
   -}
   TcRnExpectedValueId :: !TcTyThing -> TcRnMessage
 
-  {- TcRnNotARecordSelector is an error for when something that is not a record
-     selector is used in a record pattern.
-
-     Example(s):
-     data Rec = MkRec { field :: Int }
-     r = Mkrec 1
-     r' = r { notAField = 2 }
-
-    Test cases: rename/should_fail/rnfail054
-                typecheck/should_fail/tcfail114
-  -}
-  TcRnNotARecordSelector :: !Name -> TcRnMessage
-
   {- TcRnRecSelectorEscapedTyVar is an error indicating that a record field selector
      containing an existential type variable is used as a function rather than in
      a pattern match.
@@ -2011,7 +2018,7 @@ data TcRnMessage where
     Test cases: rename/should_fail/T7943
                 rename/should_fail/T9077
   -}
-  TcRnIllegalRecordSyntax :: !(HsType GhcRn) -> TcRnMessage
+  TcRnIllegalRecordSyntax :: Either (HsType GhcPs) (HsType GhcRn) -> TcRnMessage
 
   {- TcRnUnexpectedTypeSplice is an error for a typed template haskell splice
      appearing unexpectedly.
@@ -2568,8 +2575,6 @@ data TcRnMessage where
                  th/T16895c
                  th/T16895d
                  th/T16895e
-                 th/T17379a
-                 th/T17379b
                  th/T18740d
                  th/T2597b
                  th/T2674
@@ -3401,8 +3406,6 @@ data ConversionFailReason
   | CasesExprWithoutAlts
   | ImplicitParamsWithOtherBinds
   | InvalidCCallImpent !String -- ^ Source
-  | RecGadtNoCons
-  | GadtNoCons
   | InvalidTypeInstanceHeader !TH.Type
   | InvalidTyFamInstLHS !TH.Type
   | InvalidImplicitParamBinding
@@ -3438,9 +3441,29 @@ data ArgOrResult
 
 -- | Which parts of a record field are affected by a particular error or warning.
 data RecordFieldPart
-  = RecordFieldConstructor !Name
+  = RecordFieldDecl !Name
+  | RecordFieldConstructor !Name
   | RecordFieldPattern !Name
   | RecordFieldUpdate
+
+-- | Why did we reject a record update?
+data BadRecordUpdateReason
+   -- | No constructor has all of the required fields.
+   = NoConstructorHasAllFields
+       { conflictingFields :: [FieldLabelString] }
+
+   -- | There are several possible parents which have all of the required fields,
+   -- and we weren't able to disambiguate in any way.
+   | MultiplePossibleParents
+       (RecSelParent, RecSelParent, [RecSelParent])
+         -- ^ The possible parents (at least 2)
+
+   -- | We used type-directed disambiguation, but this resulted in
+   -- an invalid parent (the type-directed parent is not among the
+   -- parents we computed from the field labels alone).
+   | InvalidTyConParent TyCon (NE.NonEmpty RecSelParent)
+
+  deriving Generic
 
 -- | Where a shadowed name comes from
 data ShadowedNameProvenance
@@ -4288,6 +4311,11 @@ data NotInScopeError
 
   -- | A run-of-the-mill @"not in scope"@ error.
   = NotInScope
+
+  -- | Something used in record syntax, but it isn't a record field.
+  | NotARecordField
+    -- TODO: this could be folded into NotInScope were there
+    -- a separate namespace for record fields.
 
   -- | An exact 'Name' was not in scope.
   --

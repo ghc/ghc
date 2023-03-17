@@ -4,3 +4,4 @@ test('T13438', [expect_broken(13438), combined_output], ghci_script, ['T13438.sc
 test('GHCiDRF', [extra_files(['GHCiDRF.hs']), combined_output], ghci_script, ['GHCiDRF.script'])
 test('T19322', combined_output, ghci_script, ['T19322.script'])
 test('T19314', combined_output, ghci_script, ['T19314.script'])
+test('T19664', [ignore_stdout, extra_files(['T19664.hs'])], ghci_script, ['T19664.script'])

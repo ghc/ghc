@@ -194,7 +194,7 @@ nameToCLabel n suffix = mkFastString label
         mod -> mod
     packagePart = encodeZ (unitFS pkgKey)
     modulePart  = encodeZ (moduleNameFS modName)
-    occPart     = encodeZ (occNameFS (nameOccName n))
+    occPart     = encodeZ $ occNameMangledFS (nameOccName n)
 
     label = concat
         [ if pkgKey == mainUnit then "" else packagePart ++ "_"

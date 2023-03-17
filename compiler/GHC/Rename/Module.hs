@@ -52,7 +52,6 @@ import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Types.Avail
 import GHC.Utils.Outputable
 import GHC.Data.Bag
 import GHC.Types.Basic  ( TypeOrKind(..) )
@@ -77,7 +76,7 @@ import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), head )
 import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
-import GHC.Types.ConInfo (ConInfo, mkConInfo, conInfoFields)
+import GHC.Types.GREInfo (ConInfo, mkConInfo, conInfoFields)
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -154,7 +153,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                     -- Excludes pattern-synonym binders
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
-   tc_envs <- extendGlobalRdrEnvRn (map avail id_bndrs) local_fix_env ;
+   tc_envs <- extendGlobalRdrEnvRn (map (localVanillaGRE NoParent) id_bndrs) local_fix_env ;
    restoreEnvs tc_envs $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
@@ -188,6 +187,8 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- Rename fixity declarations and error if we try to
    -- fix something from another module (duplicates were checked in (A))
    let { all_bndrs = tc_bndrs `unionNameSet` val_bndr_set } ;
+   traceRn "rnSrcDecls fixity" $
+     vcat [ text "all_bndrs:" <+> ppr all_bndrs ] ;
    rn_fix_decls <- mapM (mapM (rnSrcFixityDecl (TopSigCtxt all_bndrs)))
                         fix_decls ;
 
@@ -1489,12 +1490,17 @@ rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declarations
        ; tycls_w_fvs <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
+       ; traceRn "rnTyClDecls" $
+           vcat [ text "tyClGroupTyClDecls:" <+> ppr tycls_w_fvs
+                , text "tc_names:" <+> ppr tc_names ]
        ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstMA rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
+       ; traceRn "rnTyClDecls SCC analysis" $
+           vcat [ text "rdr_env:" <+> ppr rdr_env ]
        ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
              role_annot_env = mkRoleAnnotEnv role_annots
              (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
@@ -1586,7 +1592,7 @@ rnStandaloneKindSignature
 rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
         ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
-        ; new_v <- lookupSigCtxtOccRnN (TopSigCtxt tc_names) (text "standalone kind signature") v
+        ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
@@ -1654,9 +1660,9 @@ rnRoleAnnots tc_names role_annots
     rn_role_annot1 (RoleAnnotDecl _ tycon roles)
       = do {  -- the name is an *occurrence*, but look it up only in the
               -- decls defined in this group (see #10263)
-             tycon' <- lookupSigCtxtOccRnN (RoleAnnotCtxt tc_names)
-                                           (text "role annotation")
-                                           tycon
+             tycon' <- lookupSigCtxtOccRn (RoleAnnotCtxt tc_names)
+                                          (text "role annotation")
+                                          tycon
            ; return $ RoleAnnotDecl noExtField tycon' roles }
 
 dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
@@ -2563,44 +2569,40 @@ extendPatSynEnv :: DuplicateRecordFields -> FieldSelectors -> HsValBinds GhcPs -
                 -> ([Name] -> TcRnIf TcGblEnv TcLclEnv a) -> TcM a
 extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
      names_with_fls <- new_ps val_decls
-   ; let pat_syn_bndrs = concat [ name : map flSelector (conInfoFields fields)
-                                | (name, fields) <- names_with_fls ]
-   ; let avails = map avail (map fst names_with_fls)
-               ++ map availField (concatMap (conInfoFields  . snd) names_with_fls)
-   ; (gbl_env, lcl_env) <- extendGlobalRdrEnvRn avails local_fix_env
-
-   ; let field_env' = extendNameEnvList (tcg_con_env gbl_env) names_with_fls
-         final_gbl_env = gbl_env { tcg_con_env = field_env' }
-   ; restoreEnvs (final_gbl_env, lcl_env) (thing pat_syn_bndrs) }
+   ; let pat_syn_bndrs = concat [ conLikeName_Name name : map flSelector flds
+                                | (name, con_info) <- names_with_fls
+                                , let flds = conInfoFields con_info ]
+   ; let gres =  map (localConLikeGRE NoParent) names_with_fls
+              ++ localFieldGREs NoParent names_with_fls
+      -- Recall Note [Parents] in GHC.Types.Name.Reader:
+      --
+      -- pattern synonym constructors and their record fields have no parent
+      -- in the module in which they are defined.
+   ; (gbl_env, lcl_env) <- extendGlobalRdrEnvRn gres local_fix_env
+   ; restoreEnvs (gbl_env, lcl_env) (thing pat_syn_bndrs) }
   where
-    new_ps :: HsValBinds GhcPs -> TcM [(Name, ConInfo)]
+
+    new_ps :: HsValBinds GhcPs -> TcM [(ConLikeName, ConInfo)]
     new_ps (ValBinds _ binds _) = foldrM new_ps' [] binds
     new_ps _ = panic "new_ps"
 
     new_ps' :: LHsBindLR GhcPs GhcPs
-            -> [(Name, ConInfo)]
-            -> TcM [(Name, ConInfo)]
+            -> [(ConLikeName, ConInfo)]
+            -> TcM [(ConLikeName, ConInfo)]
     new_ps' bind names
       | (L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
                                        , psb_args = RecCon as }))) <- bind
       = do
           bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
           let field_occs = map ((\ f -> L (noAnnSrcSpan $ getLocA (foLabel f)) f) . recordPatSynField) as
-          flds <- mapM (newRecordSelector dup_fields_ok has_sel [bnd_name]) field_occs
-          let conInfo =
-                mkConInfo
-                  (conDetailsArity length (RecCon as))
-                  flds
-          return ((bnd_name, conInfo): names)
-      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n
-                                      , psb_args})) <- bind
+          flds <- mapM (newRecordFieldLabel dup_fields_ok has_sel [bnd_name]) field_occs
+          let con_info = mkConInfo (conDetailsArity length (RecCon as)) flds
+          return ((PatSynName bnd_name, con_info) : names)
+      | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do
         bnd_name <- newTopSrcBinder (L (la2na bind_loc) n)
-        let conInfo =
-              mkConInfo
-                (conDetailsArity length psb_args)
-                []
-        return ((bnd_name, conInfo): names)
+        let con_info = mkConInfo (conDetailsArity length as) []
+        return ((PatSynName bnd_name, con_info) : names)
       | otherwise
       = return names
 

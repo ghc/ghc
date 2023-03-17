@@ -111,7 +111,7 @@ makeIdentForId i num id_type current_module = TxtI ident
       = current_module
 
     !ident   = mkFastStringByteString $ mconcat
-      [ mkJsSymbolBS exported mod (occNameFS (nameOccName name))
+      [ mkJsSymbolBS exported mod (occNameMangledFS (nameOccName name))
 
         -------------
         -- suffixes

@@ -72,7 +72,7 @@ emptyUniqSet = UniqSet emptyUFM
 unitUniqSet :: Uniquable a => a -> UniqSet a
 unitUniqSet x = UniqSet $ unitUFM x x
 
-mkUniqSet :: Uniquable a => [a]  -> UniqSet a
+mkUniqSet :: Uniquable a => [a] -> UniqSet a
 mkUniqSet = foldl' addOneToUniqSet emptyUniqSet
 
 addOneToUniqSet :: Uniquable a => UniqSet a -> a -> UniqSet a
@@ -186,7 +186,7 @@ getUniqSet = getUniqSet'
 -- | 'unsafeUFMToUniqSet' converts a @'UniqFM' a@ into a @'UniqSet' a@
 -- assuming, without checking, that it maps each 'Unique' to a value
 -- that has that 'Unique'. See Note [UniqSet invariant].
-unsafeUFMToUniqSet :: UniqFM  a a -> UniqSet a
+unsafeUFMToUniqSet :: UniqFM a a -> UniqSet a
 unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where

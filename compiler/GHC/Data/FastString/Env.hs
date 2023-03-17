@@ -18,7 +18,8 @@ module GHC.Data.FastString.Env (
         filterFsEnv,
         plusFsEnv, plusFsEnv_C, alterFsEnv,
         lookupFsEnv, lookupFsEnv_NF, delFromFsEnv, delListFromFsEnv,
-        elemFsEnv, mapFsEnv,
+        elemFsEnv, mapFsEnv, strictMapFsEnv, mapMaybeFsEnv,
+        nonDetFoldFsEnv,
 
         -- * Deterministic FastString environments (maps)
         DFastStringEnv,
@@ -60,6 +61,7 @@ lookupFsEnv        :: FastStringEnv a -> FastString -> Maybe a
 lookupFsEnv_NF     :: FastStringEnv a -> FastString -> a
 filterFsEnv        :: (elt -> Bool) -> FastStringEnv elt -> FastStringEnv elt
 mapFsEnv           :: (elt1 -> elt2) -> FastStringEnv elt1 -> FastStringEnv elt2
+mapMaybeFsEnv      :: (elt1 -> Maybe elt2) -> FastStringEnv elt1 -> FastStringEnv elt2
 
 emptyFsEnv                = emptyUFM
 unitFsEnv x y             = unitUFM x y
@@ -78,8 +80,19 @@ extendFsEnvList_C x y z   = addListToUFM_C x y z
 delFromFsEnv x y          = delFromUFM x y
 delListFromFsEnv x y      = delListFromUFM x y
 filterFsEnv x y           = filterUFM x y
+mapMaybeFsEnv f x         = mapMaybeUFM f x
 
 lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
+
+strictMapFsEnv :: (a -> b) -> FastStringEnv a -> FastStringEnv b
+strictMapFsEnv = strictMapUFM
+
+-- | Fold over a 'FastStringEnv'.
+--
+-- Non-deterministic, unless the folding function is commutative
+-- (i.e. @a1 `f` ( a2 `f` b ) == a2 `f` ( a1 `f` b )@ for all @a1@, @a2@, @b@).
+nonDetFoldFsEnv :: (a -> b -> b) -> b -> FastStringEnv a -> b
+nonDetFoldFsEnv = nonDetFoldUFM
 
 -- Deterministic FastStringEnv
 -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why we need

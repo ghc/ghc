@@ -68,7 +68,7 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkNamePprCtx :: PromotionTickContext -> UnitEnv -> GlobalRdrEnv -> NamePprCtx
+mkNamePprCtx :: Outputable info => PromotionTickContext -> UnitEnv -> GlobalRdrEnvX info -> NamePprCtx
 mkNamePprCtx ptc unit_env env
  = QueryQualify
       (mkQualName env)
@@ -79,7 +79,7 @@ mkNamePprCtx ptc unit_env env
   unit_state = ue_units unit_env
   home_unit  = ue_homeUnit unit_env
 
-mkQualName :: GlobalRdrEnv -> QueryQualifyName
+mkQualName :: Outputable info => GlobalRdrEnvX info -> QueryQualifyName
 mkQualName env = qual_name where
   qual_name mod occ
         | [gre] <- unqual_gres
@@ -97,7 +97,7 @@ mkQualName env = qual_name where
         = NameQual (greQualModName gre)
 
         | null qual_gres
-        = if null (lookupGRE_RdrName (mkRdrQual (moduleName mod) occ) env)
+        = if null (lookupGRE_RdrName SameOccName env (mkRdrQual (moduleName mod) occ))
           then NameNotInScope1
           else NameNotInScope2
 
@@ -127,14 +127,14 @@ mkQualName env = qual_name where
 
         right_name gre = greDefinitionModule gre == Just mod
 
-        unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
-        qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
+        unqual_gres = lookupGRE_RdrName SameOccName env (mkRdrUnqual occ)
+        qual_gres   = filter right_name (lookupGRE_OccName SameOccName env occ)
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the
     -- current package we can just assume it is unqualified).
 
-mkPromTick :: PromotionTickContext -> GlobalRdrEnv -> QueryPromotionTick
+mkPromTick :: PromotionTickContext -> GlobalRdrEnvX info -> QueryPromotionTick
 mkPromTick ptc env
   | ptcPrintRedundantPromTicks ptc = alwaysPrintPromTick
   | otherwise                      = print_prom_tick
@@ -150,7 +150,7 @@ mkPromTick ptc env
       = ptcListTuplePuns ptc
 
       | Just occ' <- promoteOccName occ
-      , [] <- lookupGRE_RdrName (mkRdrUnqual occ') env
+      , [] <- lookupGRE_RdrName SameOccName env (mkRdrUnqual occ')
       = -- Could not find a corresponding type name in the environment,
         -- so the data name is unambiguous. Promotion tick not needed.
         False

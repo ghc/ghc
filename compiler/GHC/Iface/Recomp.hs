@@ -56,7 +56,6 @@ import GHC.Types.Annotations
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
-import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Fixity.Env
 import GHC.Unit.External
@@ -979,8 +978,8 @@ addFingerprints hsc_env iface0
        -- This is computed by finding the free external names of each
        -- declaration, including IfaceDeclExtras (things that a
        -- declaration implicitly depends on).
-       edges :: [ Node Unique IfaceDeclABI ]
-       edges = [ DigraphNode abi (getUnique (getOccName decl)) out
+       edges :: [ Node OccName IfaceDeclABI ]
+       edges = [ DigraphNode abi (getOccName decl) out
                | decl <- decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi
@@ -988,7 +987,7 @@ addFingerprints hsc_env iface0
 
        name_module n = assertPpr (isExternalName n) (ppr n) (nameModule n)
        localOccs =
-         map (getUnique . getParent . getOccName)
+         map (getParent . getOccName)
                         -- NB: names always use semantic module, so
                         -- filtering must be on the semantic module!
                         -- See Note [Identity versus semantic module]
@@ -1013,7 +1012,7 @@ addFingerprints hsc_env iface0
 
         -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups = stronglyConnCompFromEdgedVerticesUniq edges
+       groups = stronglyConnCompFromEdgedVerticesOrd edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
@@ -1205,7 +1204,11 @@ addFingerprints hsc_env iface0
 
        -- This key is safe because mi_extra_decls contains tidied things.
        getOcc (IfGblTopBndr b) = getOccName b
-       getOcc (IfLclTopBndr fs _ _ _) = mkVarOccFS fs
+       getOcc (IfLclTopBndr fs _ _ details) =
+        case details of
+          IfRecSelId { ifRecSelFirstCon = first_con }
+            -> mkRecFieldOccFS (getOccFS first_con) fs
+          _ -> mkVarOccFS fs
 
        binding_key (IfaceNonRec b _) = IfaceNonRec (getOcc b) ()
        binding_key (IfaceRec bs) = IfaceRec (map (\(b, _) -> (getOcc b, ())) bs)

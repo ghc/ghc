@@ -10,6 +10,8 @@ Type checking of type signatures in interface files
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# LANGUAGE RecursiveDo #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -699,7 +701,7 @@ tc_iface_decl :: Maybe Class  -- ^ For associated type/data family declarations
 tc_iface_decl _ ignore_prags (IfaceId {ifName = name, ifType = iface_type,
                                        ifIdDetails = details, ifIdInfo = info})
   = do  { ty <- tcIfaceType iface_type
-        ; details <- tcIdDetails ty details
+        ; details <- tcIdDetails name ty details
         ; info <- tcIdInfo ignore_prags TopLevel name ty info
         ; return (AnId (mkGlobalId details name ty info)) }
 
@@ -955,10 +957,15 @@ mk_top_id (IfGblTopBndr gbl_name)
         return $ mkExportedVanillaId gbl_name (mkTyConApp ioTyCon [unitTy])
   | otherwise = tcIfaceExtId gbl_name
 mk_top_id (IfLclTopBndr raw_name iface_type info details) = do
-   name <- newIfaceName (mkVarOccFS raw_name)
    ty <- tcIfaceType iface_type
+   rec { details' <- tcIdDetails name ty details
+       ; let occ = case details' of
+                 RecSelId { sel_tycon = parent }
+                   -> let con_fs = getOccFS $ recSelFirstConName parent
+                      in mkRecFieldOccFS con_fs raw_name
+                 _ -> mkVarOccFS raw_name
+       ; name <- newIfaceName occ }
    info' <- tcIdInfo False TopLevel name ty info
-   details' <- tcIdDetails ty details
    let new_id = mkGlobalId details' name ty info'
    return new_id
 
@@ -1691,19 +1698,19 @@ tcIfaceDataAlt mult con inst_tys arg_strs rhs
 ************************************************************************
 -}
 
-tcIdDetails :: Type -> IfaceIdDetails -> IfL IdDetails
-tcIdDetails _  IfVanillaId = return VanillaId
-tcIdDetails _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
-tcIdDetails ty IfDFunId
+tcIdDetails :: Name -> Type -> IfaceIdDetails -> IfL IdDetails
+tcIdDetails _ _  IfVanillaId = return VanillaId
+tcIdDetails _ _  (IfWorkerLikeId dmds) = return $ WorkerLikeId dmds
+tcIdDetails _ ty IfDFunId
   = return (DFunId (isNewTyCon (classTyCon cls)))
   where
     (_, _, cls, _) = tcSplitDFunTy ty
 
-tcIdDetails _ (IfRecSelId tc naughty)
+tcIdDetails nm _ (IfRecSelId tc _first_con naughty fl)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
                        (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
                        tc
-       ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty }) }
+       ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty, sel_fieldLabel = fl { flSelector = nm } }) }
   where
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"

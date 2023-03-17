@@ -492,10 +492,7 @@ hard_hole_fits.hs:38:33: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
     • In an equation for ‘testMe’: testMe (RecordUpd xru gl gls) = _
     • Relevant bindings include
-        gls :: Either
-                 [Language.Haskell.Syntax.Pat.LHsRecUpdField GhcPs]
-                 [LHsRecUpdProj GhcPs]
-          (bound at hard_hole_fits.hs:38:26)
+        gls :: LHsRecUpdFields GhcPs (bound at hard_hole_fits.hs:38:26)
         gl :: LHsExpr GhcPs (bound at hard_hole_fits.hs:38:23)
         xru :: Language.Haskell.Syntax.Extension.XRecordUpd GhcPs
           (bound at hard_hole_fits.hs:38:19)

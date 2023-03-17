@@ -868,10 +868,10 @@ r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
 prodDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
 comp1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Comp1")
 
-unPar1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unPar1")
-unRec1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unRec1")
-unK1_RDR    = varQual_RDR gHC_GENERICS (fsLit "unK1")
-unComp1_RDR = varQual_RDR gHC_GENERICS (fsLit "unComp1")
+unPar1_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "Par1")  (fsLit "unPar1")
+unRec1_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "Rec1")  (fsLit "unRec1")
+unK1_RDR    = fieldQual_RDR gHC_GENERICS (fsLit "K1")    (fsLit "unK1")
+unComp1_RDR = fieldQual_RDR gHC_GENERICS (fsLit "Comp1") (fsLit "unComp1")
 
 from_RDR  = varQual_RDR gHC_GENERICS (fsLit "from")
 from1_RDR = varQual_RDR gHC_GENERICS (fsLit "from1")
@@ -900,12 +900,12 @@ uFloatDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "UFloat")
 uIntDataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "UInt")
 uWordDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UWord")
 
-uAddrHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uAddr#")
-uCharHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uChar#")
-uDoubleHash_RDR = varQual_RDR gHC_GENERICS (fsLit "uDouble#")
-uFloatHash_RDR  = varQual_RDR gHC_GENERICS (fsLit "uFloat#")
-uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
-uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
+uAddrHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UAddr")   (fsLit "uAddr#")
+uCharHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UChar")   (fsLit "uChar#")
+uDoubleHash_RDR = fieldQual_RDR gHC_GENERICS (fsLit "UDouble") (fsLit "uDouble#")
+uFloatHash_RDR  = fieldQual_RDR gHC_GENERICS (fsLit "UFloat")  (fsLit "uFloat#")
+uIntHash_RDR    = fieldQual_RDR gHC_GENERICS (fsLit "UInt")    (fsLit "uInt#")
+uWordHash_RDR   = fieldQual_RDR gHC_GENERICS (fsLit "UWord")   (fsLit "uWord#")
 
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
@@ -930,6 +930,9 @@ varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
 tcQual_RDR   mod str = mkOrig mod (mkOccNameFS tcName str)
 clsQual_RDR  mod str = mkOrig mod (mkOccNameFS clsName str)
 dataQual_RDR mod str = mkOrig mod (mkOccNameFS dataName str)
+
+fieldQual_RDR :: Module -> FastString -> FastString -> RdrName
+fieldQual_RDR mod con str = mkOrig mod (mkOccNameFS (fieldName con) str)
 
 {-
 ************************************************************************

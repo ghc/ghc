@@ -23,6 +23,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
+import GHC.Stg.InferTags.TagSig (StgCgInfos)
 import GHC.StgToCmm.Types (CmmCgInfos (..))
 
 import GHC.Tc.Utils.TcType
@@ -98,7 +99,6 @@ import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Stg.InferTags.TagSig (StgCgInfos)
 
 
 {-
@@ -307,6 +307,7 @@ mkIface_ hsc_env
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_matches = map mkIfaceCompleteMatch complete_matches
+        !rdrs = maybeGlobalRdrEnv rdr_env
 
     ModIface {
           mi_module      = this_mod,
@@ -329,7 +330,7 @@ mkIface_ hsc_env
           mi_fixities    = fixities,
           mi_warns       = warns,
           mi_anns        = annotations,
-          mi_globals     = maybeGlobalRdrEnv rdr_env,
+          mi_globals     = rdrs,
           mi_used_th     = used_th,
           mi_decls       = decls,
           mi_extra_decls = extra_decls,
@@ -357,10 +358,13 @@ mkIface_ hsc_env
      -- Desugar.addExportFlagsAndRules).  The mi_globals field is used
      -- by GHCi to decide whether the module has its full top-level
      -- scope available. (#5534)
-     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
+     maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe IfGlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | backendWantsGlobalBindings (backend dflags) = Just rdr_env
-         | otherwise                                  = Nothing
+        | backendWantsGlobalBindings (backend dflags)
+        = Just $! forceGlobalRdrEnv rdr_env
+          -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+        | otherwise
+        = Nothing
 
      ifFamInstTcName = ifFamInstFam
 
@@ -402,8 +406,10 @@ mkIfaceExports exports
     sort_subs (Avail n) = Avail n
     sort_subs (AvailTC n []) = AvailTC n []
     sort_subs (AvailTC n (m:ms))
-       | NormalGreName n==m  = AvailTC n (m:sortBy stableGreNameCmp ms)
-       | otherwise = AvailTC n (sortBy stableGreNameCmp (m:ms))
+       | n == m
+       = AvailTC n (m:sortBy stableNameCmp ms)
+       | otherwise
+       = AvailTC n (sortBy stableNameCmp (m:ms))
        -- Maintain the AvailTC Invariant
 
 {-

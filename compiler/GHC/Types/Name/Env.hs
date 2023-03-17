@@ -19,7 +19,9 @@ module GHC.Types.Name.Env (
         unitNameEnv, nonDetNameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
-        filterNameEnv, mapMaybeNameEnv, anyNameEnv,
+        filterNameEnv, anyNameEnv,
+        mapMaybeNameEnv,
+        extendNameEnvListWith,
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
@@ -113,6 +115,7 @@ plusNameEnv_C      :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_CD     :: (a->a->a) -> NameEnv a -> a -> NameEnv a -> a -> NameEnv a
 plusNameEnv_CD2    :: (Maybe a->Maybe a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnvList  :: NameEnv a -> [(Name,a)] -> NameEnv a
+extendNameEnvListWith :: (a -> Name) -> NameEnv a -> [a] -> NameEnv a
 extendNameEnvList_C :: (a->a->a) -> NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv     :: NameEnv a -> Name -> NameEnv a
 delListFromNameEnv :: NameEnv a -> [Name] -> NameEnv a
@@ -133,6 +136,7 @@ isEmptyNameEnv        = isNullUFM
 unitNameEnv x y       = unitUFM x y
 extendNameEnv x y z   = addToUFM x y z
 extendNameEnvList x l = addListToUFM x l
+extendNameEnvListWith f x l = addListToUFM x (map (\a -> (f a, a)) l)
 lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
 mkNameEnv     l       = listToUFM l
@@ -151,7 +155,7 @@ delFromNameEnv x y      = delFromUFM x y
 delListFromNameEnv x y  = delListFromUFM x y
 filterNameEnv x y       = filterUFM x y
 mapMaybeNameEnv x y     = mapMaybeUFM x y
-anyNameEnv f x          = foldUFM ((||) . f) False x
+anyNameEnv f x          = nonDetFoldUFM ((||) . f) False x
 disjointNameEnv x y     = disjointUFM x y
 seqEltsNameEnv seqElt x = seqEltsUFM seqElt x
 

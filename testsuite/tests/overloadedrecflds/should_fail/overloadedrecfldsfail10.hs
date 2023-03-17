@@ -1,8 +1,8 @@
--- Modules A and B both declare F(foo)
--- Module C declares F($sel:foo:MkFChar) but exports A.F(foo) as well
--- Thus we can't export F(..) even with DuplicateRecordFields enabled
+-- Module A exports $fld:MkFInt:foo
+-- Module B exports $fld:MkFBool:foo
+-- Module C exports $fld:MkFChar:foo and re-exports $fld:MkFInt:foo
+-- Thus we can't export F(..) without -XDuplicateRecordFields
 
-{-# LANGUAGE DuplicateRecordFields #-}
 module Main (main, F(..)) where
 
 import OverloadedRecFldsFail10_B

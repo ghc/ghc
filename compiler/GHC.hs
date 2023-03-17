@@ -1,7 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
 -- -----------------------------------------------------------------------------
@@ -342,7 +341,7 @@ import GHC.Builtin.Types.Prim ( alphaTyVars )
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Rename.Names (renamePkgQual, renameRawPkgQual)
+import GHC.Rename.Names (renamePkgQual, renameRawPkgQual, gresFromAvails)
 
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Tc.Types
@@ -353,6 +352,7 @@ import GHC.Tc.Instance.Family
 
 import GHC.Utils.TmpFs
 import GHC.Utils.Error
+import GHC.Utils.Exception
 import GHC.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -372,6 +372,8 @@ import GHC.Core.DataCon
 import GHC.Core.FamInstEnv ( FamInst, famInstEnvElts, orphNamesOfFamInst )
 import GHC.Core.InstEnv
 import GHC.Core
+
+import GHC.Data.Maybe
 
 import GHC.Types.Id
 import GHC.Types.Name      hiding ( varName )
@@ -405,29 +407,26 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Graph
 import GHC.Unit.Home.ModInfo
 
+import Control.Applicative ((<|>))
+import Control.Concurrent
+import Control.Monad
+import Control.Monad.Catch as MC
 import Data.Foldable
-import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Sequence as Seq
-import Data.Maybe
+import Data.IORef
+import Data.List (isPrefixOf)
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )
-import Control.Monad
-import System.Exit      ( exitWith, ExitCode(..) )
-import GHC.Utils.Exception
-import Data.IORef
-import System.FilePath
-import Control.Concurrent
-import Control.Applicative ((<|>))
-import Control.Monad.Catch as MC
 
-import GHC.Data.Maybe
-import System.IO.Error  ( isDoesNotExistError )
-import System.Environment ( getEnv, getProgName )
-import System.Directory
-import Data.List (isPrefixOf)
+import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Sequence as Seq
 
+import System.Directory
+import System.Environment ( getEnv, getProgName )
+import System.Exit      ( exitWith, ExitCode(..) )
+import System.FilePath
+import System.IO.Error  ( isDoesNotExistError )
 
 -- %************************************************************************
 -- %*                                                                      *
@@ -1201,6 +1200,9 @@ typecheckModule pmod = do
    details <- makeSimpleDetails lcl_logger tc_gbl_env
    safe    <- finalSafeMode lcl_dflags tc_gbl_env
 
+   let !rdr_env = forceGlobalRdrEnv $ tcg_rdr_env tc_gbl_env
+   -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+
    return $
      TypecheckedModule {
        tm_internals_          = (tc_gbl_env, details),
@@ -1211,7 +1213,7 @@ typecheckModule pmod = do
          ModuleInfo {
            minf_type_env  = md_types details,
            minf_exports   = md_exports details,
-           minf_rdr_env   = Just (tcg_rdr_env tc_gbl_env),
+           minf_rdr_env   = Just rdr_env,
            minf_instances = fixSafeInstances safe $ instEnvElts $ md_insts details,
            minf_iface     = Nothing,
            minf_safe      = safe,
@@ -1364,7 +1366,7 @@ getNamePprCtx = withSession $ \hsc_env -> do
 data ModuleInfo = ModuleInfo {
         minf_type_env  :: TypeEnv,
         minf_exports   :: [AvailInfo],
-        minf_rdr_env   :: Maybe GlobalRdrEnv,   -- Nothing for a compiled/package mod
+        minf_rdr_env   :: Maybe IfGlobalRdrEnv, -- Nothing for a compiled/package mod
         minf_instances :: [ClsInst],
         minf_iface     :: Maybe ModIface,
         minf_safe      :: SafeHaskellMode,
@@ -1390,40 +1392,45 @@ getPackageModuleInfo hsc_env mdl
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
-        --
+
+        let !rdr_env = availsToGlobalRdrEnv hsc_env (moduleName mdl) avails
+        -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+
         return (Just (ModuleInfo {
                         minf_type_env  = mkTypeEnv tys,
                         minf_exports   = avails,
-                        minf_rdr_env   = Just $! availsToGlobalRdrEnv (moduleName mdl) avails,
+                        minf_rdr_env   = Just rdr_env,
                         minf_instances = error "getModuleInfo: instances for package module unimplemented",
                         minf_iface     = Just iface,
                         minf_safe      = getSafeMode $ mi_trust iface,
                         minf_modBreaks = emptyModBreaks
                 }))
 
-availsToGlobalRdrEnv :: ModuleName -> [AvailInfo] -> GlobalRdrEnv
-availsToGlobalRdrEnv mod_name avails
-  = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) avails)
+availsToGlobalRdrEnv :: HasDebugCallStack => HscEnv -> ModuleName -> [AvailInfo] -> IfGlobalRdrEnv
+availsToGlobalRdrEnv hsc_env mod avails
+  = forceGlobalRdrEnv rdr_env
+    -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
   where
+    rdr_env = mkGlobalRdrEnv (gresFromAvails hsc_env (Just imp_spec) avails)
       -- We're building a GlobalRdrEnv as if the user imported
       -- all the specified modules into the global interactive module
     imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
-    decl = ImpDeclSpec { is_mod = mod_name, is_as = mod_name,
+    decl = ImpDeclSpec { is_mod = mod, is_as = mod,
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
-
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
   case lookupHugByModule mdl (hsc_HUG hsc_env) of
     Nothing  -> return Nothing
     Just hmi -> do
-      let details = hm_details hmi
-          iface   = hm_iface hmi
+      let details  = hm_details hmi
+          iface    = hm_iface hmi
       return (Just (ModuleInfo {
                         minf_type_env  = md_types details,
                         minf_exports   = md_exports details,
-                        minf_rdr_env   = mi_globals $! hm_iface hmi,
+                        minf_rdr_env   = mi_globals $ hm_iface hmi,
+                         -- NB: already forced. See Note [Forcing GREInfo] in GHC.Types.GREInfo.
                         minf_instances = instEnvElts $ md_insts details,
                         minf_iface     = Just iface,
                         minf_safe      = getSafeMode $ mi_trust iface
@@ -1436,13 +1443,15 @@ modInfoTyThings minf = typeEnvElts (minf_type_env minf)
 
 modInfoTopLevelScope :: ModuleInfo -> Maybe [Name]
 modInfoTopLevelScope minf
-  = fmap (map greMangledName . globalRdrEnvElts) (minf_rdr_env minf)
+  = fmap (map greName . globalRdrEnvElts) (minf_rdr_env minf)
+  -- NB: no need to force this again.
+  -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
 
 modInfoExports :: ModuleInfo -> [Name]
 modInfoExports minf = concatMap availNames $! minf_exports minf
 
 modInfoExportsWithSelectors :: ModuleInfo -> [Name]
-modInfoExportsWithSelectors minf = concatMap availNamesWithSelectors $! minf_exports minf
+modInfoExportsWithSelectors minf = concatMap availNames $! minf_exports minf
 
 -- | Returns the instances defined by the specified module.
 -- Warning: currently unimplemented for package modules.
@@ -1472,7 +1481,7 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
 
-modInfoRdrEnv :: ModuleInfo -> Maybe GlobalRdrEnv
+modInfoRdrEnv :: ModuleInfo -> Maybe IfGlobalRdrEnv
 modInfoRdrEnv = minf_rdr_env
 
 -- | Retrieve module safe haskell mode

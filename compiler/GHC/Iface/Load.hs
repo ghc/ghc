@@ -1160,7 +1160,7 @@ pprExport :: IfaceExport -> SDoc
 pprExport (Avail n)      = ppr n
 pprExport (AvailTC _ []) = Outputable.empty
 pprExport avail@(AvailTC n _) =
-    ppr n <> mark <> pp_export (availSubordinateGreNames avail)
+    ppr n <> mark <> pp_export (availSubordinateNames avail)
   where
     mark | availExportsDecl avail = Outputable.empty
          | otherwise              = vbar

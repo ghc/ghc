@@ -11,9 +11,9 @@ import GHC.Prelude ()
 import GHC.Builtin.Names( mk_known_key_name )
 import GHC.Unit.Types
 import GHC.Types.Name( Name )
-import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
+import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName, fieldName )
 import GHC.Types.Name.Reader( RdrName, nameRdrName )
-import GHC.Types.Unique
+import GHC.Types.Unique ( Unique )
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 
@@ -31,7 +31,8 @@ templateHaskellNames :: [Name]
 
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
-    mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
+    mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameG_fldName,
+    mkNameLName,
     mkNameSName, mkNameQName,
     mkModNameName,
     liftStringName,
@@ -174,14 +175,19 @@ qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 mkTHModule :: FastString -> Module
 mkTHModule m = mkModule thUnit (mkModuleNameFS m)
 
-libFun, libTc, thFun, thTc, thCls, thCon, qqFun :: FastString -> Unique -> Name
+libFun, libTc, thFun, thTc, thCls, thCon :: FastString -> Unique -> Name
 libFun = mk_known_key_name varName  thLib
 libTc  = mk_known_key_name tcName   thLib
 thFun  = mk_known_key_name varName  thSyn
 thTc   = mk_known_key_name tcName   thSyn
 thCls  = mk_known_key_name clsName  thSyn
 thCon  = mk_known_key_name dataName thSyn
-qqFun  = mk_known_key_name varName  qqLib
+
+thFld :: FastString -> FastString -> Unique -> Name
+thFld con = mk_known_key_name (fieldName con) thSyn
+
+qqFld :: FastString -> Unique -> Name
+qqFld = mk_known_key_name (fieldName (fsLit "QuasiQuoter")) qqLib
 
 -------------------- TH.Syntax -----------------------
 liftClassName :: Name
@@ -214,7 +220,7 @@ overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
-    mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
+    mkNameName, mkNameG_vName, mkNameG_fldName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
     unsafeCodeCoerceName, liftTypedName, mkModNameName, mkNameQName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
@@ -227,11 +233,12 @@ mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
 mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
 mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
+mkNameG_fldName= thFun (fsLit "mkNameG_fld") mkNameG_fldIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameQName    = thFun (fsLit "mkNameQ")    mkNameQIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
-unTypeName     = thFun (fsLit "unType")     unTypeIdKey
+unTypeName     = thFld (fsLit "TExp") (fsLit "unType") unTypeIdKey
 unTypeCodeName    = thFun (fsLit "unTypeCode") unTypeCodeIdKey
 unsafeCodeCoerceName = thFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
 liftTypedName = thFun (fsLit "liftTyped") liftTypedIdKey
@@ -593,10 +600,10 @@ derivStrategyTyConName = thTc (fsLit "DerivStrategy") derivStrategyTyConKey
 
 -- quasiquoting
 quoteExpName, quotePatName, quoteDecName, quoteTypeName :: Name
-quoteExpName        = qqFun (fsLit "quoteExp")  quoteExpKey
-quotePatName        = qqFun (fsLit "quotePat")  quotePatKey
-quoteDecName        = qqFun (fsLit "quoteDec")  quoteDecKey
-quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
+quoteExpName  = qqFld (fsLit "quoteExp")  quoteExpKey
+quotePatName  = qqFld (fsLit "quotePat")  quotePatKey
+quoteDecName  = qqFld (fsLit "quoteDec")  quoteDecKey
+quoteTypeName = qqFld (fsLit "quoteType") quoteTypeKey
 
 -- data Inline = ...
 noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
@@ -741,7 +748,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 -- If you want to change this, make sure you check in GHC.Builtin.Names
 
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
-    mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
+    mkNameIdKey, mkNameG_vIdKey, mkNameG_fldIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
     unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey, mkNameQIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
@@ -761,6 +768,7 @@ liftTypedIdKey        = mkPreludeMiscIdUnique 214
 mkModNameIdKey        = mkPreludeMiscIdUnique 215
 unsafeCodeCoerceIdKey = mkPreludeMiscIdUnique 216
 mkNameQIdKey         = mkPreludeMiscIdUnique 217
+mkNameG_fldIdKey     = mkPreludeMiscIdUnique 218
 
 
 -- data Lit = ...
@@ -1114,12 +1122,14 @@ inferredSpecKey  = mkPreludeMiscIdUnique 499
 ************************************************************************
 -}
 
-lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, unsafeCodeCoerce_RDR :: RdrName
+lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, mkNameG_fldRDR,
+  unsafeCodeCoerce_RDR :: RdrName
 lift_RDR     = nameRdrName liftName
 liftTyped_RDR = nameRdrName liftTypedName
 unsafeCodeCoerce_RDR = nameRdrName unsafeCodeCoerceName
 mkNameG_dRDR = nameRdrName mkNameG_dName
 mkNameG_vRDR = nameRdrName mkNameG_vName
+mkNameG_fldRDR = nameRdrName mkNameG_fldName
 
 -- data Exp = ...
 conE_RDR, litE_RDR, appE_RDR, infixApp_RDR :: RdrName

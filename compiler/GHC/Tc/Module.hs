@@ -96,6 +96,7 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Module
 import GHC.Rename.Doc
+import GHC.Rename.Utils ( mkNameClashErr )
 
 import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
 import GHC.Iface.Type     ( ShowForAllFlag(..) )
@@ -110,7 +111,7 @@ import GHC.Builtin.Utils
 import GHC.Hs
 import GHC.Hs.Dump
 
-import GHC.Core.PatSyn    ( pprPatSynType )
+import GHC.Core.PatSyn
 import GHC.Core.Predicate ( classMethodTy )
 import GHC.Core.InstEnv
 import GHC.Core.TyCon
@@ -157,7 +158,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
 import GHC.Types.PkgQual
-import GHC.Types.ConInfo (mkConInfo)
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Unit.External
@@ -177,15 +177,18 @@ import GHC.Data.List.SetOps
 import GHC.Data.Bag
 import qualified GHC.Data.BooleanFormula as BF
 
+import Control.DeepSeq
+import Control.Monad
+import Data.Data ( Data )
 import Data.Functor.Classes ( liftEq )
 import Data.List ( sortBy, sort )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord
-import Data.Data ( Data )
 import qualified Data.Set as S
-import Control.DeepSeq
-import Control.Monad
+import Data.Traversable ( for )
+
+
 
 {-
 ************************************************************************
@@ -343,7 +346,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- boot_dfuns, which may be mentioned in imported
                         -- unfoldings.
                       ; -- Report unused names
-                        -- Do this /after/ typeinference, so that when reporting
+                        -- Do this /after/ type inference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
                       ; reportUnusedNames tcg_env hsc_src
@@ -786,17 +789,21 @@ checkHiBootIface tcg_env boot_info
              , tcg_type_env = local_type_env
              , tcg_exports  = local_exports } <- tcg_env
   = do  { -- This code is tricky, see Note [DFun knot-tying]
-        ; dfun_prs <- checkHiBootIface' local_insts local_type_env
-                                        local_exports boot_details
+        ; imp_prs <- checkHiBootIface' local_insts local_type_env
+                                       local_exports boot_details
 
-        -- Now add the boot-dfun bindings  $fxblah = $fblah
+        -- Now add the impedance-matching boot bindings:
+        --
+        --  - dfun bindings  $fxblah = $fblah
+        --  - record bindings fld{var} = fld{rec field of ..}
+        --
         -- to (a) the type envt, and (b) the top-level bindings
-        ; let boot_dfuns = map fst dfun_prs
-              type_env'  = extendTypeEnvWithIds local_type_env boot_dfuns
-              dfun_binds = listToBag [ mkVarBind boot_dfun (nlHsVar dfun)
-                                     | (boot_dfun, dfun) <- dfun_prs ]
+        ; let boot_impedance_bds = map fst imp_prs
+              type_env'          = extendTypeEnvWithIds local_type_env boot_impedance_bds
+              impedance_binds    = listToBag [ mkVarBind boot_id (nlHsVar id)
+                                             | (boot_id, id) <- imp_prs ]
               tcg_env_w_binds
-                = tcg_env { tcg_binds = binds `unionBags` dfun_binds }
+                = tcg_env { tcg_binds = binds `unionBags` impedance_binds }
 
         ; type_env' `seq`
              -- Why the seq?  Without, we will put a TypeEnv thunk in
@@ -827,6 +834,62 @@ at the hi-boot file itself.
 In fact, the names will always differ because we always pick names
 prefixed with "$fx" for boot dfuns, and "$f" for real dfuns
 (so that this impedance matching is always possible).
+
+Note [Record field impedance matching]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When a hs-boot file defines a function whose implementation in the hs file
+is a record selector, we have to do something similar to Note [DFun impedance matching].
+
+Example:
+
+  -- M.hs-boot
+  module M where
+    data A
+    fld :: A -> ()
+
+  -- M.hs
+  module M where
+    data A = MkA { fld :: () }
+
+Recall from Note [Record field namespacing] in GHC.Types.Name.Occurrence that
+record fields have their own namespaces. This means that M.hs exports the Id
+fld{record selector of MkA} :: A -> (), while M.hs-boot exports the Id
+fld{variable} :: A -> ().
+
+To remedy this, we add an impedance-matching binding in M.hs:
+
+  fld{variable} :: A -> ()
+  fld{variable} = fld{record selector of MkA}
+
+Note that we imperatively need to add a binding for fld{variable} in M.hs, as we
+might have an exact Name reference to it (e.g. in a module that imports M.hs-boot).
+Not doing so would cause Core Lint errors, at the very least.
+
+These bindings are returned by the check_export in checkHiBootIface', and
+added to the DFun impedance-matching bindings.
+
+[Wrinkle: exports]
+
+  We MUST NOT add fld{variable} to the export list of M.hs, as this
+  would mean that M.hs exports both a record field and variable with the same
+  occNameFS, which would cause ambiguity errors at use-sites.
+  It's OK to only export the field name even though the boot-file exported
+  the variable: name resolution will take care of that.
+
+Another situation is that we are re-exporting, e.g. (with M as above):
+
+  -- N.hs-boot
+  module N ( module M ) where
+    import {-# SOURCE #-} M
+
+  -- N.hs
+  module N ( module M where )
+    import M
+
+In this case, N.hs-boot re-exports the variable fld, and N re-exports the
+record field fld, but not the variable fld. We don't need to do anything in
+this situation; in particular, don't re-export the variable name from N.hs,
+as per [Wrinkle: exports] above.
 
 Note [DFun knot-tying]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -860,10 +923,12 @@ checkHiBootIface'
                     , md_fam_insts = boot_fam_insts
                     , md_exports = boot_exports })
   = do  { traceTc "checkHiBootIface" $ vcat
-             [ ppr boot_type_env, ppr boot_exports]
+             [ ppr boot_type_env, ppr boot_exports ]
+
+        ; gre_env <- getGlobalRdrEnv
 
                 -- Check the exports of the boot module, one by one
-        ; mapM_ check_export boot_exports
+        ; fld_prs <- mapMaybeM (check_export gre_env) boot_exports
 
                 -- Check for no family instances
         ; unless (null boot_fam_insts) $
@@ -875,11 +940,11 @@ checkHiBootIface'
 
                 -- Check instance declarations
                 -- and generate an impedance-matching binding
-        ; mb_dfun_prs <- mapM check_cls_inst boot_dfuns
+        ; dfun_prs <- mapMaybeM check_cls_inst boot_dfuns
 
         ; failIfErrsM
 
-        ; return (catMaybes mb_dfun_prs) }
+        ; return (fld_prs ++ dfun_prs) }
 
   where
     boot_dfun_names = map idName boot_dfuns
@@ -888,46 +953,96 @@ checkHiBootIface'
        --     We don't want to look at md_insts!
        --     Why not?  See Note [DFun knot-tying]
 
-    check_export boot_avail     -- boot_avail is exported by the boot iface
-      | name `elem` boot_dfun_names = return ()
+    check_export gre_env boot_avail     -- boot_avail is exported by the boot iface
+      | name `elem` boot_dfun_names
+      = return Nothing
 
         -- Check that the actual module exports the same thing
       | missing_name:_ <- missing_names
-      = addErrAt (nameSrcSpan missing_name)
-                 (missingBootThing True missing_name "exported by")
+      = -- Lookup might have failed because the hs-boot file defines a variable
+        -- that is implemented in the hs file as a record selector, which
+        -- lives in a different namespace.
+        --
+        -- See Note [Record field impedance matching].
+        let missing_occ = nameOccName missing_name
+            mb_ok :: GlobalRdrElt -> Maybe (GlobalRdrElt, Maybe Id)
+            mb_ok gre
+              -- Ensure that this GRE refers to an Id that is exported.
+              | isNothing $ lookupNameEnv local_export_env (greName gre)
+              = Nothing
+              -- We locally define the field: create an impedance-matching
+              -- binding for the variable.
+              | Just (AnId id) <- lookupTypeEnv local_type_env (greName gre)
+              = Just (gre, Just id)
+              -- We are re-exporting the field but not the variable: not a problem,
+              -- as per [Wrinkle: exports] in Note [Record field impedance matching].
+              | otherwise
+              = Just (gre, Nothing)
+            matching_flds
+              | isVarOcc missing_occ -- (This only applies to variables.)
+              = lookupGRE_OccName (IncludeFields WantField) gre_env missing_occ
+              | otherwise
+              = []
+
+        in case mapMaybe mb_ok $ matching_flds of
+
+          -- At least 2 matches: report an ambiguity error.
+          (gre1,_):(gre2,_):gres_ids -> do
+           addErrAt (nameSrcSpan missing_name) $
+             mkNameClashErr missing_name (gre1 NE.:| gre2 : map fst gres_ids)
+           return Nothing
+
+          -- Single match: resolve the issue.
+          [(_,mb_fld_id)] ->
+            -- See Note [Record field impedance matching].
+            for mb_fld_id $ \ fld_id -> do
+              let local_boot_var =
+                    Id.mkExportedVanillaId missing_name (idType fld_id)
+              return (local_boot_var, fld_id)
+
+          -- Otherwise: report that the hs file does not export something
+          -- that the hs-boot file exports.
+          [] -> do
+           addErrAt (nameSrcSpan missing_name)
+             (missingBootThing True missing_name "exported by")
+           return Nothing
 
         -- If the boot module does not *define* the thing, we are done
         -- (it simply re-exports it, and names match, so nothing further to do)
-      | isNothing mb_boot_thing = return ()
+      | isNothing mb_boot_thing
+      = return Nothing
 
         -- Check that the actual module also defines the thing, and
         -- then compare the definitions
       | Just real_thing <- lookupTypeEnv local_type_env name,
         Just boot_thing <- mb_boot_thing
-      = checkBootDeclM True boot_thing real_thing
+      = do checkBootDeclM True boot_thing real_thing
+           return Nothing
 
       | otherwise
-      = addErrTc (missingBootThing True name "defined in")
+      = do addErrTc (missingBootThing True name "defined in")
+           return Nothing
       where
         name          = availName boot_avail
         mb_boot_thing = lookupTypeEnv boot_type_env name
         missing_names = case lookupNameEnv local_export_env name of
                           Nothing    -> [name]
-                          Just avail -> availNames boot_avail `minusList` availNames avail
+                          Just avail -> availNames boot_avail
+                            `minusList` availNames avail
 
     local_export_env :: NameEnv AvailInfo
     local_export_env = availsToNameEnv local_exports
 
-    check_cls_inst :: DFunId -> TcM (Maybe (Id, Id))
+    check_cls_inst :: DFunId -> TcM (Maybe (Id,Id))
         -- Returns a pair of the boot dfun in terms of the equivalent
         -- real dfun. Delicate (like checkBootDecl) because it depends
         -- on the types lining up precisely even to the ordering of
         -- the type variables in the foralls.
     check_cls_inst boot_dfun
       | (real_dfun : _) <- find_real_dfun boot_dfun
-      , let local_boot_dfun = Id.mkExportedVanillaId
-                                  (idName boot_dfun) (idType real_dfun)
-      = return (Just (local_boot_dfun, real_dfun))
+      , let dfun_name = idName boot_dfun
+            local_boot_dfun = Id.mkExportedVanillaId dfun_name (idType real_dfun)
+      = return $ Just (local_boot_dfun, real_dfun)
           -- Two tricky points here:
           --
           --  * The local_boot_fun should have a Name from the /boot-file/,
@@ -943,6 +1058,8 @@ checkHiBootIface'
           --    otherwise dependency analysis fails (#16038). This
           --    is another reason for using mkExportedVanillaId, rather
           --    that modifying boot_dfun, to make local_boot_fun.
+          --
+          -- See Note [DFun impedance matching].
 
       | otherwise
       = setSrcSpan (nameSrcSpan (getName boot_dfun)) $
@@ -1545,7 +1662,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                           foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` greMangledName gre)
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` (greName gre))
                                 emptyFVs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders CollNoDictBinders hs_val_binds)
@@ -1613,11 +1730,11 @@ tcPreludeClashWarn warnFlag name = do
             where
               isLocalDef = gre_lcl x == True
               -- Names are identical ...
-              nameClashes = nameOccName (greMangledName x) == nameOccName name
+              nameClashes = nameOccName (greName x) == nameOccName name
               -- ... but not the actual definitions, because we don't want to
               -- warn about a bad definition of e.g. <> in Data.Semigroup, which
               -- is the (only) proper place where this should be defined
-              isNotInProperModule = greMangledName x /= name
+              isNotInProperModule = greName x /= name
 
           -- List of all offending definitions
           clashingElts :: [GlobalRdrElt]
@@ -1626,11 +1743,11 @@ tcPreludeClashWarn warnFlag name = do
     ; traceTc "tcPreludeClashWarn/prelude_functions"
                 (hang (ppr name) 4 (sep [ppr clashingElts]))
 
-    ; let warn_msg x = addDiagnosticAt (nameSrcSpan (greMangledName x)) $
+    ; let warn_msg x = addDiagnosticAt (nameSrcSpan (greName x)) $
             mkTcRnUnknownMessage $
             mkPlainDiagnostic (WarningWithFlag warnFlag) noHints $ (hsep
               [ text "Local definition of"
-              , (quotes . ppr . nameOccName . greMangledName) x
+              , (quotes . ppr . nameOccName . greName) x
               , text "clashes with a future Prelude name." ]
               $$
               text "This will become an error in a future release." )
@@ -1813,13 +1930,13 @@ checkMainType tcg_env
     do { rdr_env <- getGlobalRdrEnv
        ; let dflags    = hsc_dflags hsc_env
              main_occ  = getMainOcc dflags
-             main_gres = lookupGlobalRdrEnv rdr_env main_occ
+             main_gres = lookupGRE_OccName SameOccName rdr_env main_occ
        ; case filter isLocalGRE main_gres of {
             []         -> return emptyWC ;
             (_:_:_)    -> return emptyWC ;
             [main_gre] ->
 
-    do { let main_name = greMangledName main_gre
+    do { let main_name = greName main_gre
              ctxt      = FunSigCtxt main_name NoRRC
        ; main_id   <- tcLookupId main_name
        ; (io_ty,_) <- getIOType
@@ -2091,23 +2208,21 @@ runTcInteractive hsc_env thing_inside
        ; let imports = emptyImportAvails { imp_orphs = orphs }
 
              upd_envs (gbl_env, lcl_env) = (gbl_env', lcl_env')
-               where
-                 gbl_env' = gbl_env { tcg_rdr_env      = icReaderEnv icxt
-                                    , tcg_type_env     = type_env
 
-                                    , tcg_inst_env     = tcg_inst_env gbl_env `unionInstEnv` ic_insts `unionInstEnv` home_insts
-                                    , tcg_fam_inst_env = extendFamInstEnvList
-                                               (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
-                                                                     ic_finsts)
-                                               home_fam_insts
-                                    , tcg_con_env    = mkNameEnv con_fields
-                                         -- setting tcg_con_env is necessary
-                                         -- to make RecordWildCards work (test: ghci049)
-                                    , tcg_fix_env      = ic_fix_env icxt
-                                    , tcg_default      = ic_default icxt
-                                         -- must calculate imp_orphs of the ImportAvails
-                                         -- so that instance visibility is done correctly
-                                    , tcg_imports      = imports }
+               where
+                 gbl_env' = gbl_env
+                   { tcg_rdr_env      = icReaderEnv icxt
+                   , tcg_type_env     = type_env
+                   , tcg_inst_env     = tcg_inst_env gbl_env `unionInstEnv` ic_insts `unionInstEnv` home_insts
+                   , tcg_fam_inst_env = extendFamInstEnvList
+                              (extendFamInstEnvList (tcg_fam_inst_env gbl_env)
+                                                    ic_finsts)
+                              home_fam_insts
+                   , tcg_fix_env      = ic_fix_env icxt
+                   , tcg_default      = ic_default icxt
+                        -- must calculate imp_orphs of the ImportAvails
+                        -- so that instance visibility is done correctly
+                   , tcg_imports      = imports }
 
                  lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
 
@@ -2132,14 +2247,10 @@ runTcInteractive hsc_env thing_inside
       = Right thing
 
     type_env1 = mkTypeEnvWithImplicits top_ty_things
-    type_env  = extendTypeEnvWithIds type_env1 (map instanceDFunId (instEnvElts ic_insts))
+    type_env  = extendTypeEnvWithIds type_env1
+              $ map instanceDFunId (instEnvElts ic_insts)
                 -- Putting the dfuns in the type_env
                 -- is just to keep Core Lint happy
-
-    con_fields = [ (dataConName c, mkConInfo (dataConSourceArity c) (dataConFieldLabels c))
-                 | ATyCon t <- top_ty_things
-                 , c <- tyConDataCons t ]
-
 
 {- Note [Initialising the type environment for GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2551,7 +2662,7 @@ isGHCiMonad hsc_env ty
         let occIO = lookupOccEnv rdrEnv (mkOccName tcName ty)
         case occIO of
             Just [n] -> do
-                let name = greMangledName n
+                let name = greName n
                 ghciClass <- tcLookupClass ghciIoClassName
                 userTyCon <- tcLookupTyCon name
                 let userTy = mkTyConApp userTyCon []
@@ -2955,7 +3066,7 @@ loadUnqualIfaces hsc_env ictxt
 
     unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (icReaderEnv ictxt)
-                  , let name = greMangledName gre
+                  , let name = greName gre
                   , nameIsFromExternalPackage home_unit name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
@@ -3037,12 +3148,12 @@ ppr_types debug type_env
       | debug     = True
       | otherwise = hasTopUserName id
                     && case idDetails id of
-                         VanillaId    -> True
-                         WorkerLikeId{} -> True
-                         RecSelId {}  -> True
-                         ClassOpId {} -> True
-                         FCallId {}   -> True
-                         _            -> False
+                         VanillaId              -> True
+                         WorkerLikeId {}        -> True
+                         RecSelId {}            -> True
+                         ClassOpId {}           -> True
+                         FCallId {}             -> True
+                         _                      -> False
              -- Data cons (workers and wrappers), pattern synonyms,
              -- etc are suppressed (unless -dppr-debug),
              -- because they appear elsewhere

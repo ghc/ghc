@@ -6,6 +6,7 @@ module GHC.Unit.Module.Env
    , extendModuleEnvList_C, plusModuleEnv_C
    , delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv
    , lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv
+   , alterModuleEnv
    , partitionModuleEnv
    , moduleEnvKeys, moduleEnvElts, moduleEnvToList
    , unitModuleEnv, isEmptyModuleEnv
@@ -146,6 +147,9 @@ partitionModuleEnv :: (a -> Bool) -> ModuleEnv a -> (ModuleEnv a, ModuleEnv a)
 partitionModuleEnv f (ModuleEnv e) = (ModuleEnv a, ModuleEnv b)
   where
     (a,b) = Map.partition f e
+
+alterModuleEnv :: (Maybe a -> Maybe a) -> Module -> ModuleEnv a -> ModuleEnv a
+alterModuleEnv f m (ModuleEnv e) = ModuleEnv (Map.alter f (NDModule m) e)
 
 mkModuleEnv :: [(Module, a)] -> ModuleEnv a
 mkModuleEnv xs = ModuleEnv (Map.fromList [(NDModule k, v) | (k,v) <- xs])

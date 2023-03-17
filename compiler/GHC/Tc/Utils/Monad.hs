@@ -55,7 +55,7 @@ module GHC.Tc.Utils.Monad(
   getIsGHCi, getGHCiMonad, getInteractivePrintName,
   tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
-  getFixityEnv, extendFixityEnv, getConEnv,
+  getFixityEnv, extendFixityEnv,
   getDeclaredDefaultTys,
   addDependentFiles,
 
@@ -209,7 +209,6 @@ import GHC.Types.Annotations
 import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
 import GHC.Types.CostCentre.State
 import GHC.Types.SourceFile
-import GHC.Types.ConInfo (ConFieldEnv)
 
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -301,7 +300,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
-                tcg_con_env        = emptyNameEnv,
                 tcg_default        = if moduleUnit mod == primUnit
                                      || moduleUnit mod == bignumUnit
                                      then Just []  -- See Note [Default types]
@@ -942,9 +940,6 @@ extendFixityEnv :: [(Name,FixItem)] -> RnM a -> RnM a
 extendFixityEnv new_bit
   = updGblEnv (\env@(TcGblEnv { tcg_fix_env = old_fix_env }) ->
                 env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})
-
-getConEnv :: TcRn ConFieldEnv
-getConEnv = do { env <- getGblEnv; return (tcg_con_env env) }
 
 getDeclaredDefaultTys :: TcRn (Maybe [Type])
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }

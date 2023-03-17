@@ -237,4 +237,4 @@ nonDetEltsUniqMap :: UniqMap k a -> [(k, a)]
 nonDetEltsUniqMap (UniqMap m) = nonDetEltsUFM m
 
 nonDetFoldUniqMap :: ((k, a) -> b -> b) -> b -> UniqMap k a -> b
-nonDetFoldUniqMap go z (UniqMap m) = foldUFM go z m
+nonDetFoldUniqMap go z (UniqMap m) = nonDetFoldUFM go z m

@@ -93,4 +93,3 @@ extendTypeEnvWithIds env ids
 
 plusTypeEnv :: TypeEnv -> TypeEnv -> TypeEnv
 plusTypeEnv env1 env2 = plusNameEnv env1 env2
-

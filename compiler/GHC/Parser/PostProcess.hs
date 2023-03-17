@@ -2523,7 +2523,7 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
   -- overloaded_on) is in effect because it affects the Left/Right nature
   -- of the RecordUpd value we calculate.
   let (fs, ps) = partitionEithers fbinds
-      fs' :: [LHsRecUpdField GhcPs]
+      fs' :: [LHsRecUpdField GhcPs GhcPs]
       fs' = map (fmap mk_rec_upd_field) fs
   case overloaded_on of
     False | not $ null ps ->
@@ -2534,19 +2534,27 @@ mkRdrRecordUpd overloaded_on exp@(L loc _) fbinds anns = do
       return RecordUpd {
         rupd_ext = anns
       , rupd_expr = exp
-      , rupd_flds = Left fs' }
+      , rupd_flds =
+          RegularRecUpdFields
+            { xRecUpdFields = noExtField
+            , recUpdFields  = fs' } }
+    -- This is a RecordDotSyntax update.
     True -> do
       let qualifiedFields =
             [ L l lbl | L _ (HsFieldBind _ (L l lbl) _ _) <- fs'
-                      , isQual . rdrNameAmbiguousFieldOcc $ lbl
+                      , isQual . ambiguousFieldOccRdrName $ lbl
             ]
       case qualifiedFields of
           qf:_ -> addFatalError $ mkPlainErrorMsgEnvelope (getLocA qf) $
-            PsErrOverloadedRecordUpdateNoQualifiedFields
-          _ -> return RecordUpd -- This is a RecordDotSyntax update.
-             { rupd_ext = anns
-             , rupd_expr = exp
-             , rupd_flds = Right (toProjUpdates fbinds) }
+                  PsErrOverloadedRecordUpdateNoQualifiedFields
+          _ -> return $
+               RecordUpd
+                { rupd_ext = anns
+                , rupd_expr = exp
+                , rupd_flds =
+                   OverloadedRecUpdFields
+                     { xOLRecUpdFields = noExtField
+                     , olRecUpdFields  = toProjUpdates fbinds } }
   where
     toProjUpdates :: [Fbind (HsExpr GhcPs)] -> [LHsRecUpdProj GhcPs]
     toProjUpdates = map (\case { Right p -> p; Left f -> recFieldToProjUpdate f })
@@ -2578,7 +2586,7 @@ mk_rec_fields fs Nothing = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
                                      , rec_dotdot = Just (L s (RecFieldsDotDot $ length fs)) }
 
-mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
+mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs GhcPs
 mk_rec_upd_field (HsFieldBind noAnn (L loc (FieldOcc _ rdr)) arg pun)
   = HsFieldBind noAnn (L loc (Unambiguous noExtField rdr)) arg pun
 

@@ -48,6 +48,7 @@ import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
 import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE ( singleton )
 import Data.Void        ( Void, absurd )
 import Data.Word
 import Data.Ratio
@@ -1498,8 +1499,9 @@ dataToExpQ = dataToQa varOrConE litE (foldl appE)
           -- See #10796.
           varOrConE s =
             case nameSpace s of
-                 Just VarName  -> return (VarE s)
-                 Just DataName -> return (ConE s)
+                 Just VarName      -> return (VarE s)
+                 Just (FldName {}) -> return (VarE s)
+                 Just DataName     -> return (ConE s)
                  _ -> error $ "Can't construct an expression from name "
                            ++ showName s
           appE x y = do { a <- x; b <- y; return (AppE a b)}
@@ -1675,6 +1677,14 @@ data NameSpace = VarName        -- ^ Variables
                | DataName       -- ^ Data constructors
                | TcClsName      -- ^ Type constructors and classes; Haskell has them
                                 -- in the same name space for now.
+               | FldName
+                 { fldParent :: !String
+                   -- ^ The textual name of the parent of the field.
+                   --
+                   --   - For a field of a datatype, this is the name of the first constructor
+                   --     of the datatype (regardless of whether this constructor has this field).
+                   --   - For a field of a pattern synonym, this is the name of the pattern synonym.
+                 }
                deriving( Eq, Ord, Show, Data, Generic )
 
 -- | @Uniq@ is used by GHC to distinguish names from each other.
@@ -1834,6 +1844,13 @@ mkNameG_v  = mkNameG VarName
 mkNameG_tc = mkNameG TcClsName
 mkNameG_d  = mkNameG DataName
 
+mkNameG_fld :: String -- ^ package
+            -> String -- ^ module
+            -> String -- ^ parent (first constructor of parent type)
+            -> String -- ^ field name
+            -> Name
+mkNameG_fld pkg modu con occ = mkNameG (FldName con) pkg modu occ
+
 data NameIs = Alone | Applied | Infix
 
 showName :: Name -> String
@@ -1857,11 +1874,11 @@ showName' ni nm
         -- We may well want to distinguish them in the end.
         -- Ditto NameU and NameL
         nms = case nm of
-                    Name occ NameS         -> occString occ
-                    Name occ (NameQ m)     -> modString m ++ "." ++ occString occ
-                    Name occ (NameG _ _ m) -> modString m ++ "." ++ occString occ
-                    Name occ (NameU u)     -> occString occ ++ "_" ++ show u
-                    Name occ (NameL u)     -> occString occ ++ "_" ++ show u
+          Name occ NameS          -> occString occ
+          Name occ (NameQ m)      -> modString m ++ "." ++ occString occ
+          Name occ (NameG _ _ m) -> modString m ++ "." ++ occString occ
+          Name occ (NameU u)      -> occString occ ++ "_" ++ show u
+          Name occ (NameL u)      -> occString occ ++ "_" ++ show u
 
         pnam = classify nms
 
@@ -2705,10 +2722,10 @@ data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
          | ForallC [TyVarBndr Specificity] Cxt Con -- ^ @forall a. Eq a => C [a]@
-         | GadtC [Name] [BangType]
+         | GadtC (NonEmpty Name) [BangType]
                  Type                    -- See Note [GADT return type]
                                          -- ^ @C :: a -> b -> T b Int@
-         | RecGadtC [Name] [VarBangType]
+         | RecGadtC (NonEmpty Name) [VarBangType]
                     Type                 -- See Note [GADT return type]
                                          -- ^ @C :: { v :: Int } -> T b Int@
         deriving (Show, Eq, Ord, Data, Generic)
@@ -2907,3 +2924,15 @@ cmpEq _  = False
 thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
 thenCmp o1 _  = o1
+
+get_cons_names :: Con -> NonEmpty Name
+get_cons_names (NormalC n _)     = NE.singleton n
+get_cons_names (RecC n _)        = NE.singleton n
+get_cons_names (InfixC _ n _)    = NE.singleton n
+get_cons_names (ForallC _ _ con) = get_cons_names con
+-- GadtC can have multiple names, e.g
+-- > data Bar a where
+-- >   MkBar1, MkBar2 :: a -> Bar a
+-- Will have one GadtC with [MkBar1, MkBar2] as names
+get_cons_names (GadtC ns _ _)    = ns
+get_cons_names (RecGadtC ns _ _) = ns

@@ -11,6 +11,7 @@ module GHC.Utils.Monad
         , MonadIO(..)
 
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
+        , zipWith3MNE
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
         , mapSndM
@@ -96,6 +97,15 @@ zipWithAndUnzipM f (x:xs) (y:ys)
        ; (cs, ds) <- zipWithAndUnzipM f xs ys
        ; return (c:cs, d:ds) }
 zipWithAndUnzipM _ _ _ = return ([], [])
+
+-- | 'zipWith3M' for 'NonEmpty' lists.
+zipWith3MNE :: Monad m
+            => (a -> b -> c -> m d)
+            -> NonEmpty a -> NonEmpty b -> NonEmpty c -> m (NonEmpty d)
+zipWith3MNE f ~(x :| xs) ~(y :| ys) ~(z :| zs)
+  = do { w  <- f x y z
+       ; ws <- zipWith3M f xs ys zs
+       ; return $ w :| ws }
 
 {-
 

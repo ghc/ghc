@@ -31,9 +31,11 @@ module GHC.Builtin.Uniques
     , mkPreludeMiscIdUnique, mkPreludeDataConUnique
     , mkPreludeTyConUnique, mkPreludeClassUnique
 
-    , mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique
     , mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique
     , mkCostCentreUnique
+
+    , varNSUnique, dataNSUnique, tvNSUnique, tcNSUnique
+    , mkFldNSUnique, isFldNSUnique
 
     , mkBuiltinUnique
     , mkPseudoUniqueE
@@ -378,12 +380,18 @@ mkRegClassUnique  = mkUnique 'L'
 mkCostCentreUnique :: Int -> Unique
 mkCostCentreUnique = mkUnique 'C'
 
-mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
--- See Note [The Unique of an OccName] in GHC.Types.Name.Occurrence
-mkVarOccUnique  fs = mkUnique 'i' (uniqueOfFS fs)
-mkDataOccUnique fs = mkUnique 'd' (uniqueOfFS fs)
-mkTvOccUnique   fs = mkUnique 'v' (uniqueOfFS fs)
-mkTcOccUnique   fs = mkUnique 'c' (uniqueOfFS fs)
+varNSUnique, dataNSUnique, tvNSUnique, tcNSUnique :: Unique
+varNSUnique    = mkUnique 'i' 0
+dataNSUnique   = mkUnique 'd' 0
+tvNSUnique     = mkUnique 'v' 0
+tcNSUnique     = mkUnique 'c' 0
+
+mkFldNSUnique :: FastString -> Unique
+mkFldNSUnique fs = mkUnique 'f' (uniqueOfFS fs)
+
+isFldNSUnique :: Unique -> Bool
+isFldNSUnique uniq = case unpkUnique uniq of
+  (tag, _) -> tag == 'f'
 
 initExitJoinUnique :: Unique
 initExitJoinUnique = mkUnique 's' 0

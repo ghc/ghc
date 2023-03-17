@@ -27,7 +27,10 @@ module GHC.Tc.Gen.Expr
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Splice( tcTypedSplice, tcTypedBracket, tcUntypedBracket )
+import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
+import {-# SOURCE #-} GHC.Tc.Gen.Splice
+  ( tcTypedSplice, tcTypedBracket, tcUntypedBracket )
 
 import GHC.Hs
 import GHC.Hs.Syn.Type
@@ -38,7 +41,9 @@ import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.FieldLabel
-import GHC.Types.Unique.Map ( UniqMap, listToUniqMap, lookupUniqMap )
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Map
+import GHC.Types.Unique.Set
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Tc.Errors.Types
@@ -50,7 +55,7 @@ import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Expr        ( mkExpandedExpr )
-import GHC.Rename.Env         ( addUsedGRE )
+import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match
@@ -62,11 +67,11 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Core.PatSyn
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
+import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion( mkSymCo )
@@ -77,22 +82,15 @@ import GHC.Builtin.Uniques ( mkBuiltinUnique )
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
+import GHC.Data.Bag ( unitBag )
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
 import Control.Monad
-import GHC.Core.Class(classTyCon)
-import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
-
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-
-import Data.Function
-import Data.List (partition, sortBy, intersect)
 import qualified Data.List.NonEmpty as NE
-
-import GHC.Data.Bag ( unitBag )
 
 {-
 ************************************************************************
@@ -515,10 +513,17 @@ tcExpr expr@(RecordCon { rcon_con = L loc con_name
 -- in the renamer. See Note [Overview of record dot syntax] in
 -- GHC.Hs.Expr. This is why we match on 'rupd_flds = Left rbnds' here
 -- and panic otherwise.
-tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_ty
+tcExpr expr@(RecordUpd { rupd_expr = record_expr
+                       , rupd_flds =
+                           RegularRecUpdFields
+                             { xRecUpdFields = possible_parents
+                             , recUpdFields  = rbnds }
+                       })
+       res_ty
   = assert (notNull rbnds) $
     do  { -- Desugar the record update. See Note [Record Updates].
-        ; (ds_expr, ds_res_ty, err_ctxt) <- desugarRecordUpd record_expr rbnds res_ty
+        ; (ds_expr, ds_res_ty, err_ctxt)
+            <- desugarRecordUpd record_expr possible_parents rbnds res_ty
 
           -- Typecheck the desugared expression.
         ; expr' <- addErrCtxt err_ctxt $
@@ -534,7 +539,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds }) res_
             -- Test case: T10808.
         }
 
-tcExpr (RecordUpd {}) _ = panic "tcExpr: unexpected overloaded-dot RecordUpd"
+tcExpr e@(RecordUpd { rupd_flds = OverloadedRecUpdFields {}}) _
+  = pprPanic "tcExpr: unexpected overloaded-dot RecordUpd" $ ppr e
 
 {-
 ************************************************************************
@@ -888,141 +894,8 @@ in the other order, the extra signature in f2 is reqd.
 *                                                                      *
 ********************************************************************* -}
 
-{-
-Note [Type of a record update]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The main complication with RecordUpd is that we need to explicitly
-handle the *non-updated* fields.  Consider:
-
-        data T a b c = MkT1 { fa :: a, fb :: (b,c) }
-                     | MkT2 { fa :: a, fb :: (b,c), fc :: c -> c }
-                     | MkT3 { fd :: a }
-
-        upd :: T a b c -> (b',c) -> T a b' c
-        upd t x = t { fb = x}
-
-The result type should be (T a b' c)
-not (T a b c),   because 'b' *is not* mentioned in a non-updated field
-not (T a b' c'), because 'c' *is*     mentioned in a non-updated field
-NB that it's not good enough to look at just one constructor; we must
-look at them all; cf #3219
-
-After all, upd should be equivalent to:
-        upd t x = case t of
-                        MkT1 p q -> MkT1 p x
-                        MkT2 a b -> MkT2 p b
-                        MkT3 d   -> error ...
-
-So we need to give a completely fresh type to the result record,
-and then constrain it by the fields that are *not* updated ("p" above).
-We call these the "fixed" type variables, and compute them in getFixedTyVars.
-
-Note that because MkT3 doesn't contain all the fields being updated,
-its RHS is simply an error, so it doesn't impose any type constraints.
-Hence the use of 'relevant_cont'.
-
-Note [Implicit type sharing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We also take into account any "implicit" non-update fields.  For example
-        data T a b where { MkT { f::a } :: T a a; ... }
-So the "real" type of MkT is: forall ab. (a~b) => a -> T a b
-
-Then consider
-        upd t x = t { f=x }
-We infer the type
-        upd :: T a b -> a -> T a b
-        upd (t::T a b) (x::a)
-           = case t of { MkT (co:a~b) (_:a) -> MkT co x }
-We can't give it the more general type
-        upd :: T a b -> c -> T c b
-
-Note [Criteria for update]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to allow update for existentials etc, provided the updated
-field isn't part of the existential. For example, this should be ok.
-  data T a where { MkT { f1::a, f2::b->b } :: T a }
-  f :: T a -> b -> T b
-  f t b = t { f1=b }
-
-The criterion we use is this:
-
-  The types of the updated fields
-  mention only the universally-quantified type variables
-  of the data constructor
-
-NB: this is not (quite) the same as being a "naughty" record selector
-(See Note [Naughty record selectors]) in GHC.Tc.TyCl), at least
-in the case of GADTs. Consider
-   data T a where { MkT :: { f :: a } :: T [a] }
-Then f is not "naughty" because it has a well-typed record selector.
-But we don't allow updates for 'f'.  (One could consider trying to
-allow this, but it makes my head hurt.  Badly.  And no one has asked
-for it.)
-
-In principle one could go further, and allow
-  g :: T a -> T a
-  g t = t { f2 = \x -> x }
-because the expression is polymorphic...but that seems a bridge too far.
-
-Note [Data family example]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-    data instance T (a,b) = MkT { x::a, y::b }
-  --->
-    data :TP a b = MkT { a::a, y::b }
-    coTP a b :: T (a,b) ~ :TP a b
-
-Suppose r :: T (t1,t2), e :: t3
-Then  r { x=e } :: T (t3,t1)
-  --->
-      case r |> co1 of
-        MkT x y -> MkT e y |> co2
-      where co1 :: T (t1,t2) ~ :TP t1 t2
-            co2 :: :TP t3 t2 ~ T (t3,t2)
-The wrapping with co2 is done by the constructor wrapper for MkT
-
-Outgoing invariants
-~~~~~~~~~~~~~~~~~~~
-In the outgoing (HsRecordUpd scrut binds cons in_inst_tys out_inst_tys):
-
-  * cons are the data constructors to be updated
-
-  * in_inst_tys, out_inst_tys have same length, and instantiate the
-        *representation* tycon of the data cons.  In Note [Data
-        family example], in_inst_tys = [t1,t2], out_inst_tys = [t3,t2]
-
-Note [Mixed Record Field Updates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following pattern synonym.
-
-  data MyRec = MyRec { foo :: Int, qux :: String }
-
-  pattern HisRec{f1, f2} = MyRec{foo = f1, qux=f2}
-
-This allows updates such as the following
-
-  updater :: MyRec -> MyRec
-  updater a = a {f1 = 1 }
-
-It would also make sense to allow the following update (which we reject).
-
-  updater a = a {f1 = 1, qux = "two" } ==? MyRec 1 "two"
-
-This leads to confusing behaviour when the selectors in fact refer the same
-field.
-
-  updater a = a {f1 = 1, foo = 2} ==? ???
-
-For this reason, we reject a mixture of pattern synonym and normal record
-selectors in the same update block. Although of course we still allow the
-following.
-
-  updater a = (a {f1 = 1}) {foo = 2}
-
-  > updater (MyRec 0 "str")
-  MyRec 2 "str"
-
-Note [Record Updates]
-~~~~~~~~~~~~~~~~~~~~~
+{- Note [Record Updates]
+~~~~~~~~~~~~~~~~~~~~~~~~
 To typecheck a record update, we desugar it first.  Suppose we have
     data T p q = T1 { x :: Int, y :: Bool, z :: Char }
                | T2 { v :: Char }
@@ -1041,74 +914,114 @@ T2, T3 and T5 should not occur, so we omit them from the match.
 The critical part of desugaring is to identify T and then T1/T4.
 
 Wrinkle [Disambiguating fields]
-As outlined above, to typecheck a record update via desugaring, we first need
-to identify the parent record `TyCon` (`T` above). This can be tricky when several
-record types share the same field (with `-XDuplicateRecordFields`).
 
-Currently, we use the inferred type of the record to help disambiguate the record
-fields. For example, in
+  As explained in Note [Disambiguating record updates] in GHC.Rename.Pat,
+  to typecheck a record update we first need to disambiguate the field labels,
+  in order to find a parent which has at least one constructor with all of the fields
+  being updated.
 
-  ( mempty :: T a b ) { x = 3 }
+  As mentioned in Note [Type-directed record disambiguation], we sometimes use
+  type-directed disambiguation, although this mechanism is deprecated and
+  scheduled for removal via the implementation of GHC proposal #366
+  https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst.
 
-the type signature on `mempty` allows us to disambiguate the record `TyCon` to `T`,
-when there might be other datatypes with field `x :: Int`.
-This complexity is scheduled for removal via the implementation of GHC proposal #366
-https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst
 
-However, for the time being, we still need to disambiguate record fields using the
-inferred types. This means that, when typechecking a record update via desugaring,
-we need to do the following:
+All in all, this means that when typechecking a record update via desugaring,
+we take the following steps:
 
-  D1. Perform a first typechecking pass on the record expression (`e` in the example above),
+  (0) Perform a first typechecking pass on the record expression (`e` in the example above),
       to infer the type of the record being updated.
-  D2. Desugar the record update as described above, using an HsExpansion.
-  D3. Typecheck the desugared code.
+  (1) Disambiguate the record fields (potentially using the type obtained in (0)).
+  (2) Desugar the record update as described above, using an HsExpansion.
+      (a) Create a let-binding to share the record update right-hand sides.
+      (b) Desugar the record update to a case expression updating all the
+          relevant constructors (those that have all of the fields being updated).
+  (3) Typecheck the desugared code.
 
-In (D1), we call inferRho to infer the type of the record being updated. This returns the
+In (0), we call inferRho to infer the type of the record being updated. This returns the
 inferred type of the record, together with a typechecked expression (of type HsExpr GhcTc)
 and a collection of residual constraints.
 We have no need for the latter two, because we will typecheck again in (D3). So, for
 the time being (and until GHC proposal #366 is implemented), we simply drop them.
 
 Wrinkle [Using IdSig]
-As noted above, we want to let-bind the updated fields to avoid code duplication:
 
-  let { x' = e1; y' = e2 } in
-  case e of
-     T1 _ _ z -> T1 x' y' z
-     T4 p _ _ -> T4 p y' x'
+  As noted above, we want to let-bind the updated fields to avoid code duplication:
 
-However, doing so in a naive way would cause difficulties for type inference.
-For example:
+    let { x' = e1; y' = e2 } in
+    case e of
+       T1 _ _ z -> T1 x' y' z
+       T4 p _ _ -> T4 p y' x'
 
-  data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
-  foo r = r { f = \ k -> (k 3, k 'x') }
+  However, doing so in a naive way would cause difficulties for type inference.
+  For example:
 
-If we desugar to:
+    data R b = MkR { f :: (forall a. a -> a) -> (Int,b), c :: Int }
+    foo r = r { f = \ k -> (k 3, k 'x') }
 
-  ds_foo r =
-    let f' = \ k -> (k 3, k 'x')
-    in case r of
-      MkR _ b -> MkR f' b
+  If we desugar to:
 
-then we are unable to infer an appropriately polymorphic type for f', because we
-never infer higher-rank types. To circumvent this problem, we proceed as follows:
+    ds_foo r =
+      let f' = \ k -> (k 3, k 'x')
+      in case r of
+        MkR _ b -> MkR f' b
 
-  1. Obtain general field types by instantiating any of the constructors
-     that contain all the necessary fields. (Note that the field type must be
-     identical across different constructors of a given data constructor).
-  2. Let-bind an 'IdSig' with this type. This amounts to giving the let-bound
-     'Id's a partial type signature.
+  then we are unable to infer an appropriately polymorphic type for f', because we
+  never infer higher-rank types. To circumvent this problem, we proceed as follows:
 
-In the above example, it's as if we wrote:
+    1. Obtain general field types by instantiating any of the constructors
+       that contain all the necessary fields. (Note that the field type must be
+       identical across different constructors of a given data constructor).
+    2. Let-bind an 'IdSig' with this type. This amounts to giving the let-bound
+       'Id's a partial type signature.
 
-  ds_foo r =
-    let f' :: (forall a. a -> a) -> (Int, _b)
-        f' = \ k -> (k 3, k 'x')
-    in case r of
-      MkR _ b -> MkR f' b
+  In the above example, it's as if we wrote:
 
-This allows us to compute the right type for f', and thus accept this record update.
+    ds_foo r =
+      let f' :: (forall a. a -> a) -> (Int, _b)
+          f' = \ k -> (k 3, k 'x')
+      in case r of
+        MkR _ b -> MkR f' b
+
+  This allows us to compute the right type for f', and thus accept this record update.
+
+Note [Type-directed record disambiguation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC currently supports an additional type-directed disambiguation
+mechanism, which is deprecated and scheduled for removal as part of
+GHC proposal #366 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0366-no-ambiguous-field-access.rst.
+
+To perform this disambiguation, when there are multiple possible parents for
+a record update, the renamer defers to the typechecker.
+See GHC.Tc.Gen.Expr.disambiguateRecordBinds, and in particular the auxiliary
+function identifyParentLabels, which picks a parent for the record update
+using the following additional mechanisms:
+
+  (a) Use the type being pushed in, if it is already a TyConApp. The
+      following are valid updates at type `R`:
+
+        g :: R -> R
+        g x = x { fld1 = 3 }
+
+        g' x = x { fld1 = 3 } :: R
+
+  (b) Use the type signature of the record expression, if it exists and
+      is a TyConApp. Thus this is valid update at type `R`:
+
+        h x = (x :: R) { fld1 = 3 }
+
+Note that this type-directed disambiguation mechanism isn't very robust,
+as it doesn't properly integrate with the rest of the typechecker.
+For example, the following updates will all be rejected as ambiguous:
+
+    let r :: R
+        r = blah
+    in r { foo = 3 }
+
+    \r. (r { foo = 3 }, r :: R)
+
+Record updates which require constraint-solving should instead use the
+-XOverloadedRecordUpdate extension, as described in Note [Overview of record dot syntax].
 
 Note [Unifying result types in tcRecordUpd]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1165,7 +1078,10 @@ Wrinkle [GADT result type in tcRecordUpd]
 -- result type of this desugared record update.
 desugarRecordUpd :: LHsExpr GhcRn
                       -- ^ @record_expr@: expression to which the record update is applied
-                 -> [LHsRecUpdField GhcRn]
+                 -> NE.NonEmpty (HsRecUpdParent GhcRn)
+                      -- ^ Possible parent 'TyCon'/'PatSyn's for the record update,
+                      -- with the associated constructors and field labels
+                 -> [LHsRecUpdField GhcRn GhcRn]
                       -- ^ the record update fields
                  -> ExpRhoType
                       -- ^ the expected result type of the record update
@@ -1177,8 +1093,9 @@ desugarRecordUpd :: LHsExpr GhcRn
                            -- error context to push when typechecking
                            -- the desugared code
                         )
-desugarRecordUpd record_expr rbnds res_ty
-  = do {  -- STEP -2: typecheck the record_expr, the record to be updated
+desugarRecordUpd record_expr possible_parents rbnds res_ty
+  = do {  -- STEP 0: typecheck the record_expr, the record to be updated.
+          --
           -- Until GHC proposal #366 is implemented, we still use the type of
           -- the record to disambiguate its fields, so we must infer the record
           -- type here before we can desugar. See Wrinkle [Disambiguating fields]
@@ -1209,73 +1126,36 @@ desugarRecordUpd record_expr rbnds res_ty
             --
             -- This should definitely *not* typecheck.
 
-       -- STEP -1  See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
-       -- After this we know that rbinds is unambiguous
-       ; rbinds <- disambiguateRecordBinds record_expr record_rho rbnds res_ty
+       -- STEP 1: disambiguate the record update by computing a single parent
+       --         which has a constructor with all of the fields being updated.
+       --
+       -- See Note [Disambiguating record updates] in GHC.Rename.Pat.
+       ; (cons, rbinds)
+           <- disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
        ; let upd_flds = map (unLoc . hfbLHS . unLoc) rbinds
-             upd_fld_occs = map (FieldLabelString . occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
              sel_ids      = map selectorAmbiguousFieldOcc upd_flds
              upd_fld_names = map idName sel_ids
+             relevant_cons = nonDetEltsUniqSet cons
+             relevant_con = head relevant_cons
 
-       -- STEP 0
-       -- Check that the field names are really field names
-       -- and they are all field names for proper records or
-       -- all field names for pattern synonyms.
-       ; let bad_guys = [ setSrcSpan loc $ addErrTc (notSelector fld_name)
-                        | fld <- rbinds,
-                          -- Excludes class ops
-                          let L loc sel_id = hsRecUpdFieldId (unLoc fld),
-                          not (isRecordSelector sel_id),
-                          let fld_name = idName sel_id ]
-       ; unless (null bad_guys) (sequence bad_guys >> failM)
-       -- See Note [Mixed Record Field Updates]
-       ; let (data_sels, pat_syn_sels) =
-               partition isDataConRecordSelector sel_ids
-       ; massert (all isPatSynRecordSelector pat_syn_sels)
-       ; checkTc ( null data_sels || null pat_syn_sels )
-                 ( mixedSelectors data_sels pat_syn_sels )
-
-       -- STEP 1
-       -- Figure out the tycon and data cons from the first field name
-       ; let   -- It's OK to use the non-tc splitters here (for a selector)
-             sel_id : _  = sel_ids
-             con_likes :: [ConLike]
-             con_likes = case idDetails sel_id of
-                            RecSelId (RecSelData tc) _
-                               -> map RealDataCon (tyConDataCons tc)
-                            RecSelId (RecSelPatSyn ps) _
-                               -> [PatSynCon ps]
-                            _  -> panic "tcRecordUpd"
-               -- NB: for a data type family, the tycon is the instance tycon
-             relevant_cons = conLikesWithFields con_likes upd_fld_occs
-               -- A constructor is only relevant to this process if
-               -- it contains *all* the fields that are being updated
-               -- Other ones will cause a runtime error if they occur
-
-       -- STEP 2
-       -- Check that at least one constructor has all the named fields
-       -- i.e. has an empty set of bad fields returned by badFields
-       ; case relevant_cons of
-         { [] -> failWithTc (badFieldsUpd rbinds con_likes)
-         ; relevant_con : _ ->
-
-      -- STEP 3
-      -- Create new variables for the fields we are updating,
-      -- so that we can share them across constructors.
+      -- STEP 2: desugar the record update.
       --
-      -- Example:
+      --  (a) Create new variables for the fields we are updating,
+      --      so that we can share them across constructors.
       --
-      --   e { x=e1, y=e2 }
+      --      Example:
       --
-      -- We want to let-bind variables to `e1` and `e2`:
+      --          e { x=e1, y=e2 }
       --
-      --   let x' :: Int
-      --       x' = e1
-      --       y' :: Bool
-      --       y' = e2
-      --   in ...
+      --        We want to let-bind variables to `e1` and `e2`:
+      --
+      --          let x' :: Int
+      --              x' = e1
+      --              y' :: Bool
+      --              y' = e2
+      --          in ...
 
-    do { -- Instantiate the type variables of any relevant constuctor
+         -- Instantiate the type variables of any relevant constuctor
          -- with metavariables to obtain a type for each 'Id'.
          -- This will allow us to have 'Id's with polymorphic types
          -- by using 'IdSig'. See Wrinkle [Using IdSig] in Note [Record Updates].
@@ -1317,6 +1197,10 @@ desugarRecordUpd record_expr rbnds res_ty
                         $ zipWith (\ lbl arg_ty -> (flSelector lbl, arg_ty))
                             (conLikeFieldLabels relevant_con)
                             arg_tys
+
+       ; traceTc "tcRecordUpd" $
+           vcat [ text "upd_fld_names:" <+> ppr upd_fld_names
+                , text "relevant_cons:" <+> ppr relevant_cons ]
 
        ; upd_ids <- zipWithM mk_upd_id upd_fld_names rbinds
        ; let updEnv :: UniqMap Name (Id, LHsExpr GhcRn)
@@ -1360,12 +1244,11 @@ desugarRecordUpd record_expr rbnds res_ty
                  Just (upd_id, _) -> (genWildPat, genLHsVar (idName upd_id))
                  -- Field is not being updated: LHS = variable pattern, RHS = that same variable.
                  _  -> let fld_nm = mkInternalName (mkBuiltinUnique i)
-                                      (mkVarOccFS (field_label $ flLabel fld_lbl))
+                                      (nameOccName $ flSelector $ fld_lbl)
                                       generatedSrcSpan
                        in (genVarPat fld_nm, genLHsVar fld_nm)
 
-       -- STEP 4
-       -- Desugar to HsCase, as per note [Record Updates]
+       -- STEP 2 (b): desugar to HsCase, as per note [Record Updates]
        ; let ds_expr :: HsExpr GhcRn
              ds_expr = HsLet noExtField noHsTok let_binds noHsTok (L gen case_expr)
 
@@ -1407,7 +1290,7 @@ desugarRecordUpd record_expr rbnds res_ty
                    else [ text "existential variable" <> plural ex_tvs <+> pprQuotedList ex_tvs ]
               err_ctxt = make_lines_msg err_lines
 
-        ; return (ds_expr, ds_res_ty, err_ctxt) } } }
+        ; return (ds_expr, ds_res_ty, err_ctxt) }
 
 -- | Pretty-print a collection of lines, adding commas at the end of each line,
 -- and adding "and" to the start of the last line.
@@ -1421,118 +1304,144 @@ make_lines_msg (l:ls)  = l <> comma $$ make_lines_msg ls
 *                                                                      *
                  Record bindings
 *                                                                      *
-********************************************************************* -}
+**********************************************************************-}
 
--- Disambiguate the fields in a record update.
--- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
+-- | Disambiguate the fields in a record update.
+--
+-- Most of the disambiguation has been done by the renamer; this function
+-- performs a final type-directed disambiguation pass, as explained in
+-- Note [Type-directed record disambiguation].
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
-                 -> [LHsRecUpdField GhcRn] -> ExpRhoType
-                 -> TcM [LHsFieldBind GhcTc (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
-disambiguateRecordBinds record_expr record_rho rbnds res_ty
-    -- Are all the fields unambiguous?
-  = case mapM isUnambiguous rbnds of
-                     -- If so, just skip to looking up the Ids
-                     -- Always the case if DuplicateRecordFields is off
-      Just rbnds' -> mapM lookupSelector rbnds'
-      Nothing     -> -- If not, try to identify a single parent
-        do { fam_inst_envs <- tcGetFamInstEnvs
-             -- Look up the possible parents for each field
-           ; rbnds_with_parents <- getUpdFieldsParents
-           ; let possible_parents = map (map fst . snd) rbnds_with_parents
-             -- Identify a single parent
-           ; p <- identifyParent fam_inst_envs possible_parents
-             -- Pick the right selector with that parent for each field
-           ; checkNoErrs $ mapM (pickParent p) rbnds_with_parents }
+                        -> NE.NonEmpty (HsRecUpdParent GhcRn)
+                        -> [LHsRecUpdField GhcRn GhcRn] -> ExpRhoType
+                        -> TcM (UniqSet ConLike, [LHsRecUpdField GhcTc GhcRn])
+disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
+  = do { fam_inst_envs <- tcGetFamInstEnvs
+         -- Identify a single parent, using type-directed disambiguation
+         -- if necessary. (Note that type-directed disambiguation of
+         -- record field updates is is scheduled for removal, as per
+         -- Note [Type-directed record disambiguation].)
+       ; TcRecUpdParent
+           { tcRecUpdLabels = lbls
+           , tcRecUpdCons   = cons }
+             <- identifyParentLabels fam_inst_envs possible_parents
+         -- Pick the right selector with that parent for each field
+       ; rbnds' <- zipWithM lookupField (NE.toList lbls) rbnds
+       ; return (cons, rbnds') }
   where
-    -- Extract the selector name of a field update if it is unambiguous
-    isUnambiguous :: LHsRecUpdField GhcRn -> Maybe (LHsRecUpdField GhcRn,Name)
-    isUnambiguous x = case unLoc (hfbLHS (unLoc x)) of
-                        Unambiguous sel_name _ -> Just (x, sel_name)
-                        Ambiguous{}            -> Nothing
 
-    -- Look up the possible parents and selector GREs for each field
-    getUpdFieldsParents :: TcM [(LHsRecUpdField GhcRn
-                                , [(RecSelParent, GlobalRdrElt)])]
-    getUpdFieldsParents
-      = fmap (zip rbnds) $ mapM
-          (lookupParents False . unLoc . hsRecUpdFieldRdr . unLoc)
-          rbnds
+    -- Try to identify a single parent, using type-directed disambiguation.
+    --
+    -- Any non-type-directed disambiguation will have been done already.
+    -- See GHC.Rename.Env.lookupRecUpdFields.
+    identifyParentLabels :: FamInstEnvs
+                         -> NE.NonEmpty (HsRecUpdParent GhcRn)
+                         -> TcM (HsRecUpdParent GhcTc)
+    identifyParentLabels fam_inst_envs possible_parents
+      = case possible_parents of
 
-    -- Given a the lists of possible parents for each field,
-    -- identify a single parent
-    identifyParent :: FamInstEnvs -> [[RecSelParent]] -> TcM RecSelParent
-    identifyParent fam_inst_envs possible_parents
-      = case foldr1 intersect possible_parents of
-        -- No parents for all fields: record update is ill-typed
-        []  -> failWithTc (TcRnNoPossibleParentForFields rbnds)
+        -- Exactly one possible parent for the record update!
+        p NE.:| [] -> lookup_parent_flds p
 
-        -- Exactly one datatype with all the fields: use that
-        [p] -> return p
-
-        -- Multiple possible parents: try harder to disambiguate
+        -- Multiple possible parents: try harder to disambiguate.
         -- Can we get a parent TyCon from the pushed-in type?
-        _:_ | Just p <- tyConOfET fam_inst_envs res_ty ->
-              do { reportAmbiguousField p
-                 ; return (RecSelData p) }
+        --
+        -- See (a) in Note [Type-directed record disambiguation] in GHC.Rename.Pat.
+        _ NE.:| _ : _
+          | Just tc <- tyConOfET fam_inst_envs res_ty
+          -> do { reportAmbiguousUpdate possible_parents tc
+                ; try_disambiguated_tycon tc possible_parents }
 
         -- Does the expression being updated have a type signature?
-        -- If so, try to extract a parent TyCon from it
-            | Just {} <- obviousSig (unLoc record_expr)
-            , Just tc <- tyConOf fam_inst_envs record_rho
-            -> do { reportAmbiguousField tc
-                  ; return (RecSelData tc) }
+        -- If so, try to extract a parent TyCon from it.
+        --
+        -- See (b) inNote [Type-directed record disambiguation] in GHC.Rename.Pat.
+          | Just {} <- obviousSig (unLoc record_expr)
+          , Just tc <- tyConOf fam_inst_envs record_rho
+          -> do { reportAmbiguousUpdate possible_parents tc
+                ; try_disambiguated_tycon tc possible_parents }
 
         -- Nothing else we can try...
-        _ -> failWithTc (TcRnBadOverloadedRecordUpdate rbnds)
+        p1 NE.:| p2 : ps
+          -> do { p1 <- tcLookupRecSelParent p1
+                ; p2 <- tcLookupRecSelParent p2
+                ; ps <- mapM tcLookupRecSelParent ps
+                ; failWithTc $ TcRnBadRecordUpdate (getUpdFieldLbls rbnds)
+                             $ MultiplePossibleParents (p1, p2, ps) }
 
-    -- Make a field unambiguous by choosing the given parent.
-    -- Emits an error if the field cannot have that parent,
-    -- e.g. if the user writes
-    --     r { x = e } :: T
-    -- where T does not have field x.
-    pickParent :: RecSelParent
-               -> (LHsRecUpdField GhcRn, [(RecSelParent, GlobalRdrElt)])
-               -> TcM (LHsFieldBind GhcTc (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
-    pickParent p (upd, xs)
-      = case lookup p xs of
-                      -- Phew! The parent is valid for this field.
-                      -- Previously ambiguous fields must be marked as
-                      -- used now that we know which one is meant, but
-                      -- unambiguous ones shouldn't be recorded again
-                      -- (giving duplicate deprecation warnings).
-          Just gre -> do { unless (null (tail xs)) $ do
-                             let L loc _ = hfbLHS (unLoc upd)
-                             setSrcSpanA loc $ addUsedGRE True gre
-                         ; lookupSelector (upd, greMangledName gre) }
-                      -- The field doesn't belong to this parent, so report
-                      -- an error but keep going through all the fields
-          Nothing  -> do { addErrTc (fieldNotInType p
-                                      (unLoc (hsRecUpdFieldRdr (unLoc upd))))
-                         ; lookupSelector (upd, greMangledName (snd (head xs))) }
+    -- Try to use the 'TyCon' we learned from type-directed disambiguation.
+    -- This might not work, if it doesn't match up with any of the parents we had
+    -- computed on the basis of the field labels.
+    -- (See test cases overloadedrecfields01 and T21946.)
+    try_disambiguated_tycon :: TyCon
+                            -> NE.NonEmpty (HsRecUpdParent GhcRn)
+                            -> TcM (HsRecUpdParent GhcTc)
+    try_disambiguated_tycon tc pars
+      = do { pars <- mapMaybeM (fmap (guard_parent tc) . lookup_parent_flds) (NE.toList pars)
+           ; case pars of
+               [par] -> return par
+               []    -> do { pars <- mapM tcLookupRecSelParent possible_parents
+                           ; failWithTc $ TcRnBadRecordUpdate (getUpdFieldLbls rbnds)
+                                        $ InvalidTyConParent tc pars }
+               _     -> pprPanic "try_disambiguated_tycon: more than 1 valid parent"
+                          (ppr $ map tcRecUpdParent pars) }
 
-    -- Given a (field update, selector name) pair, look up the
-    -- selector to give a field update with an unambiguous Id
-    lookupSelector :: (LHsRecUpdField GhcRn, Name)
-                 -> TcM (LHsFieldBind GhcRn (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn))
-    lookupSelector (L l upd, n)
-      = do { i <- tcLookupId n
+    guard_parent :: TyCon -> HsRecUpdParent GhcTc -> Maybe (HsRecUpdParent GhcTc)
+    guard_parent disamb_tc cand_parent@(TcRecUpdParent { tcRecUpdParent = cand_tc })
+      = do { guard (RecSelData disamb_tc == cand_tc)
+           ; return cand_parent }
+
+    lookup_parent_flds :: HsRecUpdParent GhcRn
+                       -> TcM (HsRecUpdParent GhcTc)
+    lookup_parent_flds par@(RnRecUpdParent { rnRecUpdLabels = lbls, rnRecUpdCons = cons })
+      = do { let cons' :: NonDetUniqFM ConLike ConLikeName
+                 cons' = NonDetUniqFM $ unsafeCastUFMKey $ getUniqSet cons
+           ; cons <- traverse (tcLookupConLike . conLikeName_Name) cons'
+           ; tc   <- tcLookupRecSelParent par
+           ; return $
+               TcRecUpdParent
+                 { tcRecUpdParent = tc
+                 , tcRecUpdLabels = lbls
+                 , tcRecUpdCons   = unsafeUFMToUniqSet $ getNonDet cons } }
+
+    lookupField :: FieldGlobalRdrElt
+                -> LHsRecUpdField GhcRn GhcRn
+                -> TcM (LHsRecUpdField GhcTc GhcRn)
+    lookupField fl (L l upd)
+      = do { let L loc af = hfbLHS upd
+                 rdr      = ambiguousFieldOccRdrName af
+                 mb_gre   = pickGREs rdr [fl]
+                   -- NB: this GRE can be 'Nothing' when in GHCi.
+                   -- See test T10439.
+
+             -- Mark the record fields as used, now that we have disambiguated.
+             -- There is no risk of duplicate deprecation warnings, as we have
+             -- not marked the GREs as used previously.
+           ; setSrcSpanA loc $ mapM_ (addUsedGRE True) mb_gre
+           ; sel <- tcLookupId $ flSelector $ fieldGRELabel fl
            ; let L loc af = hfbLHS upd
-                 lbl      = rdrNameAmbiguousFieldOcc af
+                 lbl      = ambiguousFieldOccRdrName af
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
-               , hfbLHS
-                       = L (l2l loc) (Unambiguous i (L (l2l loc) lbl))
+               , hfbLHS = L (l2l loc) $ Unambiguous sel (L (l2l loc) lbl)
                , hfbRHS = hfbRHS upd
                , hfbPun = hfbPun upd
-               }
-           }
+               } }
 
-    -- See Note [Deprecating ambiguous fields] in GHC.Tc.Gen.Head
-    reportAmbiguousField :: TyCon -> TcM ()
-    reportAmbiguousField parent_type =
-        setSrcSpan loc $ addDiagnostic $ TcRnAmbiguousField rupd parent_type
+    -- The type-directed disambiguation mechanism is scheduled for removal,
+    -- as per Note [Type-directed record disambiguation].
+    -- So we emit a warning whenever the user relies on it.
+    reportAmbiguousUpdate :: NE.NonEmpty (HsRecUpdParent GhcRn)
+                          -> TyCon -> TcM ()
+    reportAmbiguousUpdate parents parent_type =
+        setSrcSpan loc $ addDiagnostic $ TcRnAmbiguousRecordUpdate rupd parent_type
       where
-        rupd = RecordUpd { rupd_expr = record_expr, rupd_flds = Left rbnds, rupd_ext = noExtField }
+        rupd = RecordUpd { rupd_expr = record_expr
+                         , rupd_flds =
+                             RegularRecUpdFields
+                              { xRecUpdFields = parents
+                              , recUpdFields  = rbnds }
+                         , rupd_ext = noExtField }
         loc  = getLocA (head rbnds)
 
 {-
@@ -1574,14 +1483,15 @@ tcRecordBinds con_like arg_tys (HsRecFields rbinds dd)
       = do { mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
-               -- Just (f', rhs') -> return (Just (L l (fld { hfbLHS = f'
-               --                                            , hfbRHS = rhs' }))) }
                Just (f', rhs') -> return (Just (L l (HsFieldBind
                                                      { hfbAnn = hfbAnn fld
                                                      , hfbLHS = f'
                                                      , hfbRHS = rhs'
                                                      , hfbPun = hfbPun fld}))) }
 
+fieldCtxt :: FieldLabelString -> SDoc
+fieldCtxt field_name
+  = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
 
 tcRecordField :: ConLike -> Assoc Name Type
               -> LFieldOcc GhcRn -> LHsExpr GhcRn
@@ -1659,103 +1569,6 @@ checkMissingFields con_like rbinds arg_tys
     field_strs = conLikeImplBangs con_like
 
     fl `elemField` flds = any (\ fl' -> flSelector fl == fl') flds
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Errors and contexts}
-*                                                                      *
-************************************************************************
-
-Boring and alphabetical:
--}
-
-fieldCtxt :: FieldLabelString -> SDoc
-fieldCtxt field_name
-  = text "In the" <+> quotes (ppr field_name) <+> text "field of a record"
-
-badFieldsUpd
-  :: [LHsFieldBind GhcTc (LAmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]
-               -- Field names that don't belong to a single datacon
-  -> [ConLike] -- Data cons of the type which the first field name belongs to
-  -> TcRnMessage
-badFieldsUpd rbinds data_cons
-  = TcRnNoConstructorHasAllFields conflictingFields
-          -- See Note [Finding the conflicting fields]
-  where
-    -- A (preferably small) set of fields such that no constructor contains
-    -- all of them.  See Note [Finding the conflicting fields]
-    conflictingFields = case nonMembers of
-        -- nonMember belongs to a different type.
-        (nonMember, _) : _ -> [aMember, nonMember]
-        [] -> let
-            -- All of rbinds belong to one type. In this case, repeatedly add
-            -- a field to the set until no constructor contains the set.
-
-            -- Each field, together with a list indicating which constructors
-            -- have all the fields so far.
-            growingSets :: [(FieldLabelString, [Bool])]
-            growingSets = scanl1 combine membership
-            combine (_, setMem) (field, fldMem)
-              = (field, zipWith (&&) setMem fldMem)
-            in
-            -- Fields that don't change the membership status of the set
-            -- are redundant and can be dropped.
-            map (fst . NE.head) $ NE.groupWith snd growingSets
-
-    aMember = assert (not (null members) ) fst (head members)
-    (members, nonMembers) = partition (or . snd) membership
-
-    -- For each field, which constructors contain the field?
-    membership :: [(FieldLabelString, [Bool])]
-    membership = sortMembership $
-        map (\fld -> (fld, map (fld `elementOfUniqSet`) fieldLabelSets)) $
-          map (FieldLabelString . occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) rbinds
-
-    fieldLabelSets :: [UniqSet FieldLabelString]
-    fieldLabelSets = map (mkUniqSet . map flLabel . conLikeFieldLabels) data_cons
-
-    -- Sort in order of increasing number of True, so that a smaller
-    -- conflicting set can be found.
-    sortMembership =
-      map snd .
-      sortBy (compare `on` fst) .
-      map (\ item@(_, membershipRow) -> (countTrue membershipRow, item))
-
-    countTrue = count id
-
-{-
-Note [Finding the conflicting fields]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-  data A = A {a0, a1 :: Int}
-         | B {b0, b1 :: Int}
-and we see a record update
-  x { a0 = 3, a1 = 2, b0 = 4, b1 = 5 }
-Then we'd like to find the smallest subset of fields that no
-constructor has all of.  Here, say, {a0,b0}, or {a0,b1}, etc.
-We don't really want to report that no constructor has all of
-{a0,a1,b0,b1}, because when there are hundreds of fields it's
-hard to see what was really wrong.
-
-We may need more than two fields, though; eg
-  data T = A { x,y :: Int, v::Int }
-          | B { y,z :: Int, v::Int }
-          | C { z,x :: Int, v::Int }
-with update
-   r { x=e1, y=e2, z=e3 }, we
-
-Finding the smallest subset is hard, so the code here makes
-a decent stab, no more.  See #7989.
--}
-
-mixedSelectors :: [Id] -> [Id] -> TcRnMessage
-mixedSelectors data_sels@(dc_rep_id:_) pat_syn_sels@(ps_rep_id:_)
-  = TcRnMixedSelectors (tyConName rep_dc) data_sels (patSynName rep_ps) pat_syn_sels
-  where
-    RecSelPatSyn rep_ps = recordSelectorTyCon ps_rep_id
-    RecSelData rep_dc = recordSelectorTyCon dc_rep_id
-mixedSelectors _ _ = panic "GHC.Tc.Gen.Expr: mixedSelectors emptylists"
 
 {-
 ************************************************************************

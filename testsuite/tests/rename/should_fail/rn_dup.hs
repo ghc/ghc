@@ -12,7 +12,7 @@ data P = MkP { rf :: Int, rf :: Int }
 data Q = MkQ { rf :: Int }
 
 class C a where
-  data CT a 
+  data CT a
   f :: CT a -> a
   data CT a
   f :: CT a -> a

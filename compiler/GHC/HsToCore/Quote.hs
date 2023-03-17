@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiWayIf             #-}
 {-# LANGUAGE PatternSynonyms        #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
@@ -98,7 +99,6 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
-import Data.Foldable ( toList )
 import GHC.Types.Name.Reader (RdrName(..))
 
 data MetaWrappers = MetaWrappers {
@@ -1608,15 +1608,15 @@ repE (RecordCon { rcon_con = c, rcon_flds = flds })
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd { rupd_expr = e, rupd_flds = Left flds })
+repE (RecordUpd { rupd_expr = e, rupd_flds = RegularRecUpdFields { recUpdFields = flds } })
  = do { x <- repLE e;
         fs <- repUpdFields flds;
         repRecUpd x fs }
-repE (RecordUpd { rupd_flds = Right _ })
+repE e@(RecordUpd { rupd_flds = OverloadedRecUpdFields {} })
   = do
       -- Not possible due to elimination in the renamer. See Note
       -- [Handling overloaded and rebindable constructs]
-      panic "The impossible has happened!"
+      pprPanic "repE: unexpected overloaded record update" $ ppr e
 
 repE (ExprWithTySig _ e wc_ty)
   = addSimpleTyVarBinds FreshNamesOnly (get_scoped_tvs_from_sig sig_ty) $
@@ -1745,10 +1745,10 @@ repFields (HsRecFields { rec_flds = flds })
                            ; e  <- repLE (hfbRHS fld)
                            ; repFieldExp fn e }
 
-repUpdFields :: [LHsRecUpdField GhcRn] -> MetaM (Core [M TH.FieldExp])
+repUpdFields :: [LHsRecUpdField GhcRn GhcRn] -> MetaM (Core [M TH.FieldExp])
 repUpdFields = repListM fieldExpTyConName rep_fld
   where
-    rep_fld :: LHsRecUpdField GhcRn -> MetaM (Core (M TH.FieldExp))
+    rep_fld :: LHsRecUpdField GhcRn GhcRn -> MetaM (Core (M TH.FieldExp))
     rep_fld (L l fld) = case unLoc (hfbLHS fld) of
       Unambiguous sel_name _ -> do { fn <- lookupLOcc (L l sel_name)
                                    ; e  <- repLE (hfbRHS fld)
@@ -2217,20 +2217,24 @@ globalVarLocal unique name
 
 globalVarExternal :: Module -> OccName -> DsM (Core TH.Name)
 globalVarExternal mod name_occ
-  = do  {
-
-        ; MkC mod <- coreStringLit name_mod
+  = do  { MkC mod <- coreStringLit name_mod
         ; MkC pkg <- coreStringLit name_pkg
         ; MkC occ <- occNameLit name_occ
-        ; rep2_nwDsM mk_varg [pkg,mod,occ] }
+        ; if | isDataOcc name_occ
+             -> rep2_nwDsM mkNameG_dName [pkg,mod,occ]
+             | isVarOcc  name_occ
+             -> rep2_nwDsM mkNameG_vName [pkg,mod,occ]
+             | isTcOcc   name_occ
+             -> rep2_nwDsM mkNameG_tcName [pkg,mod,occ]
+             | Just con_fs <- fieldOcc_maybe name_occ
+             -> do { MkC con <- coreStringLit con_fs
+                   ; rep2_nwDsM mkNameG_fldName [pkg,mod,con,occ] }
+             | otherwise
+             -> pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name_occ)
+        }
   where
     name_mod = moduleNameFS (moduleName mod)
     name_pkg = unitFS (moduleUnit mod)
-    mk_varg | isDataOcc name_occ = mkNameG_dName
-            | isVarOcc  name_occ = mkNameG_vName
-            | isTcOcc   name_occ = mkNameG_tcName
-            | otherwise          = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name_occ)
-
 
 lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
            -> MetaM Type  -- The type
@@ -2738,16 +2742,19 @@ repGadtDataCons :: NonEmpty (LocatedN Name)
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
 repGadtDataCons cons details res_ty
-    = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
+    = do ne_tycon   <- lift $ dsLookupTyCon nonEmptyTyConName
+         name_tycon <- lift $ dsLookupTyCon nameTyConName
+         let mk_nonEmpty = coreListNonEmpty ne_tycon (mkTyConTy name_tycon)
+         cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT ps -> do
              arg_tys <- repPrefixConArgs ps
              res_ty' <- repLTy res_ty
-             rep2 gadtCName [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
+             rep2 gadtCName [unC (mk_nonEmpty cons'), unC arg_tys, unC res_ty']
            RecConGADT ips _ -> do
              arg_vtys <- repRecConArgs ips
              res_ty'  <- repLTy res_ty
-             rep2 recGadtCName [unC (nonEmptyCoreList' cons'), unC arg_vtys,
+             rep2 recGadtCName [unC (mk_nonEmpty cons'), unC arg_vtys,
                                 unC res_ty']
 
 -- TH currently only supports linear constructors.
@@ -3052,9 +3059,6 @@ nonEmptyCoreList :: [Core a] -> Core [a]
   -- Otherwise use coreList
 nonEmptyCoreList []           = panic "coreList: empty argument"
 nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
-
-nonEmptyCoreList' :: NonEmpty (Core a) -> Core [a]
-nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap unC xs))
 
 coreStringLit :: MonadThings m => FastString -> m (Core String)
 coreStringLit s = do { z <- mkStringExprFS s; return (MkC z) }

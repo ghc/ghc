@@ -244,8 +244,8 @@ data ConPatTc
 hsRecFieldId :: HsRecField GhcTc arg -> Id
 hsRecFieldId = hsRecFieldSel
 
-hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) -> Located RdrName
-hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . reLoc . hfbLHS
+hsRecUpdFieldRdr :: HsRecUpdField (GhcPass p) q -> Located RdrName
+hsRecUpdFieldRdr = fmap ambiguousFieldOccRdrName . reLoc . hfbLHS
 
 hsRecUpdFieldId :: HsFieldBind (LAmbiguousFieldOcc GhcTc) arg -> Located Id
 hsRecUpdFieldId = fmap foExt . reLoc . hsRecUpdFieldOcc

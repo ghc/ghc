@@ -33,9 +33,10 @@ import GHC.Linker.Loader       ( loadModule, loadName )
 import GHC.Runtime.Interpreter ( wormhole )
 import GHC.Runtime.Interpreter.Types
 
+import GHC.Rename.Names ( gresFromAvails )
+
 import GHC.Tc.Utils.Monad      ( initTcInteractive, initIfaceTcRn )
 import GHC.Iface.Load          ( loadPluginInterface, cannotFindModule )
-import GHC.Rename.Names ( gresFromAvails )
 import GHC.Builtin.Names ( pluginTyConName, frontendPluginTyConName )
 
 import GHC.Driver.Env
@@ -49,10 +50,7 @@ import GHC.Types.Name    ( Name, nameModule_maybe )
 import GHC.Types.Id      ( idType )
 import GHC.Types.TyThing
 import GHC.Types.Name.Occurrence ( OccName, mkVarOccFS )
-import GHC.Types.Name.Reader   ( RdrName, ImportSpec(..), ImpDeclSpec(..)
-                               , ImpItemSpec(..), mkGlobalRdrEnv, lookupGRE_RdrName
-                               , greMangledName, mkRdrQual )
-
+import GHC.Types.Name.Reader
 import GHC.Unit.Finder         ( findPluginModule, FindResult(..) )
 import GHC.Driver.Config.Finder ( initFinderOpts )
 import GHC.Unit.Module   ( Module, ModuleName )
@@ -61,6 +59,7 @@ import GHC.Unit.Env
 
 import GHC.Utils.Panic
 import GHC.Utils.Logger
+import GHC.Utils.Misc ( HasDebugCallStack )
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Exception
@@ -298,7 +297,8 @@ lessUnsafeCoerce logger context what = do
 -- being compiled.  This was introduced by 57d6798.
 --
 -- Need the module as well to record information in the interface file
-lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
+lookupRdrNameInModuleForPlugins :: HasDebugCallStack
+                                => HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     let dflags     = hsc_dflags hsc_env
@@ -321,9 +321,10 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                     let decl_spec = ImpDeclSpec { is_mod = mod_name, is_as = mod_name
                                                 , is_qual = False, is_dloc = noSrcSpan }
                         imp_spec = ImpSpec decl_spec ImpAll
-                        env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
-                    case lookupGRE_RdrName rdr_name env of
-                        [gre] -> return (Just (greMangledName gre, iface))
+                        env = mkGlobalRdrEnv
+                            $ gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
+                    case lookupGRE_RdrName (IncludeFields WantNormal) env rdr_name of
+                        [gre] -> return (Just (greName gre, iface))
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 

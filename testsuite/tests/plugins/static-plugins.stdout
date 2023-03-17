@@ -5,9 +5,9 @@ interfacePlugin: GHC.Base
 interfacePlugin: GHC.Float
 interfacePlugin: GHC.Prim.Ext
 interfacePlugin: System.IO
-typeCheckPlugin (rn)
 interfacePlugin: GHC.Types
 interfacePlugin: GHC.Show
+typeCheckPlugin (rn)
 interfacePlugin: GHC.TopHandler
 typeCheckPlugin (tc)
 interfacePlugin: GHC.CString

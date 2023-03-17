@@ -5,6 +5,7 @@
 module Main (main) where
 
 import Language.Haskell.TH
+import qualified Data.List.NonEmpty as NE ( singleton )
 
 infixr 7 :***:
 data GADT a where
@@ -16,11 +17,11 @@ $(do gadtName   <- newName "GADT2"
      infixName  <- newName ":****:"
      a          <- newName "a"
      return [ DataD [] gadtName [KindedTV a () StarT] Nothing
-              [ GadtC [prefixName]
+              [ GadtC (NE.singleton prefixName)
                 [ (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 , (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 ] (AppT (ConT gadtName) (ConT ''Int))
-              , GadtC [infixName]
+              , GadtC (NE.singleton infixName)
                 [ (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 , (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 ] (AppT (ConT gadtName) (ConT ''Int))

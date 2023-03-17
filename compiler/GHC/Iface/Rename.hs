@@ -231,14 +231,14 @@ rnModule mod = do
     return (renameHoleModule unit_state hmap mod)
 
 rnAvailInfo :: Rename AvailInfo
-rnAvailInfo (Avail c) = Avail <$> rnGreName c
+rnAvailInfo (Avail c) = Avail <$> rnIfaceGlobal c
 rnAvailInfo (AvailTC n ns) = do
     -- Why don't we rnIfaceGlobal the availName itself?  It may not
     -- actually be exported by the module it putatively is from, in
     -- which case we won't be able to tell what the name actually
     -- is.  But for the availNames they MUST be exported, so they
     -- will rename fine.
-    ns' <- mapM rnGreName ns
+    ns' <- mapM rnIfaceGlobal ns
     case ns' of
         [] -> panic "rnAvailInfoEmpty AvailInfo"
         (rep:rest) -> assertPpr (all ((== childModule rep) . childModule) rest)
@@ -246,18 +246,12 @@ rnAvailInfo (AvailTC n ns) = do
                          n' <- setNameModule (Just (childModule rep)) n
                          return (AvailTC n' ns')
   where
-    childModule = nameModule . greNameMangledName
-
-rnGreName :: Rename GreName
-rnGreName (NormalGreName n) = NormalGreName <$> rnIfaceGlobal n
-rnGreName (FieldGreName fl) = FieldGreName  <$> rnFieldLabel fl
+    childModule = nameModule
 
 rnFieldLabel :: Rename FieldLabel
 rnFieldLabel fl = do
     sel' <- rnIfaceGlobal (flSelector fl)
     return (fl { flSelector = sel' })
-
-
 
 
 -- | The key function.  This gets called on every Name embedded
@@ -704,9 +698,12 @@ rnIfaceExprs :: Rename [IfaceExpr]
 rnIfaceExprs = mapM rnIfaceExpr
 
 rnIfaceIdDetails :: Rename IfaceIdDetails
-rnIfaceIdDetails (IfRecSelId (Left tc) b) = IfRecSelId <$> fmap Left (rnIfaceTyCon tc) <*> pure b
-rnIfaceIdDetails (IfRecSelId (Right decl) b) = IfRecSelId <$> fmap Right (rnIfaceDecl decl) <*> pure b
-rnIfaceIdDetails details = pure details
+rnIfaceIdDetails (IfRecSelId (Left tc) con naughty fl)
+  = IfRecSelId <$> fmap Left (rnIfaceTyCon tc) <*> rnIfaceGlobal con <*> pure naughty <*> rnFieldLabel fl
+rnIfaceIdDetails (IfRecSelId (Right decl) con naughty fl)
+  = IfRecSelId <$> fmap Right (rnIfaceDecl decl) <*> rnIfaceGlobal con <*> pure naughty <*> rnFieldLabel fl
+rnIfaceIdDetails details
+  = pure details
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)

@@ -1260,16 +1260,6 @@ instance Binary ModuleName where
   put_ bh (ModuleName fs) = put_ bh fs
   get bh = do fs <- get bh; return (ModuleName fs)
 
--- instance Binary FunctionOrData where
---     put_ bh IsFunction = putByte bh 0
---     put_ bh IsData     = putByte bh 1
---     get bh = do
---         h <- getByte bh
---         case h of
---           0 -> return IsFunction
---           1 -> return IsData
---           _ -> panic "Binary FunctionOrData"
-
 -- instance Binary TupleSort where
 --     put_ bh BoxedTuple      = putByte bh 0
 --     put_ bh UnboxedTuple    = putByte bh 1

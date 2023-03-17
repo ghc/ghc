@@ -1144,7 +1144,7 @@ tc_hs_type _ ty@(HsBangTy _ bang _) _
 tc_hs_type _ ty@(HsRecTy {})      _
       -- Record types (which only show up temporarily in constructor
       -- signatures) should have been removed by now
-    = failWithTc $ TcRnIllegalRecordSyntax ty
+    = failWithTc $ TcRnIllegalRecordSyntax (Right ty)
 
 -- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
@@ -2315,11 +2315,11 @@ instance Outputable SAKS_or_CUSK where
 -- See Note [kcCheckDeclHeader vs kcInferDeclHeader]
 kcDeclHeader
   :: InitialKindStrategy
-  -> Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind
-  -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
+  -> Name               -- ^ of the thing being checked
+  -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
+  -> LHsQTyVars GhcRn   -- ^ Binders in the header
+  -> TcM ContextKind    -- ^ The result kind
+  -> TcM TcTyCon        -- ^ A suitably-kinded TcTyCon
 kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
 kcDeclHeader InitialKindInfer = kcInferDeclHeader
 
@@ -2342,20 +2342,20 @@ of a type constructor.
 ------------------------------
 kcCheckDeclHeader
   :: SAKS_or_CUSK
-  -> Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
-  -> TcM PolyTcTyCon   -- ^ A suitably-kinded generalized TcTyCon
+  -> Name               -- ^ of the thing being checked
+  -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
+  -> LHsQTyVars GhcRn   -- ^ Binders in the header
+  -> TcM ContextKind    -- ^ The result kind. AnyKind == no result signature
+  -> TcM PolyTcTyCon    -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
 kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
 
 kcCheckDeclHeader_cusk
-  :: Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind
-  -> TcM PolyTcTyCon   -- ^ A suitably-kinded generalized TcTyCon
+  :: Name               -- ^ of the thing being checked
+  -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
+  -> LHsQTyVars GhcRn   -- ^ Binders in the header
+  -> TcM ContextKind    -- ^ The result kind
+  -> TcM PolyTcTyCon    -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader_cusk name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) kc_res_ki
@@ -2441,11 +2441,11 @@ kcCheckDeclHeader_cusk name flav
 --
 -- This function does not do telescope checking.
 kcInferDeclHeader
-  :: Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
+  :: Name               -- ^ of the thing being checked
+  -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
   -> LHsQTyVars GhcRn
-  -> TcM ContextKind   -- ^ The result kind
-  -> TcM MonoTcTyCon   -- ^ A suitably-kinded non-generalized TcTyCon
+  -> TcM ContextKind    -- ^ The result kind
+  -> TcM MonoTcTyCon    -- ^ A suitably-kinded non-generalized TcTyCon
 kcInferDeclHeader name flav
               (HsQTvs { hsq_ext = kv_ns
                       , hsq_explicit = hs_tvs }) kc_res_ki
@@ -2494,12 +2494,12 @@ kcInferDeclHeader name flav
 -- | Kind-check a declaration header against a standalone kind signature.
 -- See Note [kcCheckDeclHeader_sig]
 kcCheckDeclHeader_sig
-  :: Kind              -- ^ Standalone kind signature, fully zonked! (zonkTcTypeToType)
-  -> Name              -- ^ of the thing being checked
-  -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
-  -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
-  -> TcM PolyTcTyCon   -- ^ A suitably-kinded, fully generalised TcTyCon
+  :: Kind               -- ^ Standalone kind signature, fully zonked! (zonkTcTypeToType)
+  -> Name               -- ^ of the thing being checked
+  -> TyConFlavour TyCon -- ^ What sort of 'TyCon' is being checked
+  -> LHsQTyVars GhcRn   -- ^ Binders in the header
+  -> TcM ContextKind    -- ^ The result kind. AnyKind == no result signature
+  -> TcM PolyTcTyCon    -- ^ A suitably-kinded, fully generalised TcTyCon
 -- Postcondition to (kcCheckDeclHeader_sig sig_kind n f hs_tvs kc_res_ki):
 --   kind(returned PolyTcTyCon) = sig_kind
 --
@@ -3660,7 +3660,7 @@ Hence using zonked_kinds when forming tvs'.
 -}
 
 -----------------------------------
-etaExpandAlgTyCon :: TyConFlavour -> SkolemInfo
+etaExpandAlgTyCon :: TyConFlavour tc  -> SkolemInfo
                   -> [TcTyConBinder] -> Kind
                   -> TcM ([TcTyConBinder], Kind)
 etaExpandAlgTyCon flav skol_info tcbs res_kind
@@ -3673,7 +3673,7 @@ etaExpandAlgTyCon flav skol_info tcbs res_kind
     in_scope   = mkInScopeSetList tyvars
     avoid_occs = map getOccName tyvars
 
-needsEtaExpansion :: TyConFlavour -> Bool
+needsEtaExpansion :: TyConFlavour tc -> Bool
 needsEtaExpansion NewtypeFlavour  = True
 needsEtaExpansion DataTypeFlavour = True
 needsEtaExpansion ClassFlavour    = True
@@ -4337,7 +4337,7 @@ funAppCtxt fun arg arg_no
        2 (quotes (ppr arg))
 
 -- | Add a "In the data declaration for T" or some such.
-addTyConFlavCtxt :: Name -> TyConFlavour -> TcM a -> TcM a
+addTyConFlavCtxt :: Name -> TyConFlavour tc -> TcM a -> TcM a
 addTyConFlavCtxt name flav
   = addErrCtxt $ hsep [ text "In the", ppr flav
                       , text "declaration for", quotes (ppr name) ]

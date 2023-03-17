@@ -280,7 +280,7 @@ data SkolemInfoAnon
   | UnifyForAllSkol     -- We are unifying two for-all types
        TcType           -- The instantiated type *inside* the forall
 
-  | TyConSkol TyConFlavour Name  -- bound in a type declaration of the given flavour
+  | TyConSkol (TyConFlavour TyCon) Name -- bound in a type declaration of the given flavour
 
   | DataConSkol Name    -- bound as an existential in a Haskell98 datacon decl or
                         -- as any variable in a GADT datacon decl

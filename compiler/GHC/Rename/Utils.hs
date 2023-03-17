@@ -17,7 +17,6 @@ module GHC.Rename.Utils (
         warnUnusedTopBinds, warnUnusedLocalBinds,
         warnForallIdentifier,
         checkUnusedRecordWildcard,
-        mkFieldEnv,
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
         genHsIntegralLit, genHsTyLit, genSimpleConPat,
@@ -28,7 +27,7 @@ module GHC.Rename.Utils (
 
         bindLocalNames, bindLocalNamesFV,
 
-        addNameClashErrRn,
+        addNameClashErrRn, mkNameClashErr,
 
         checkInferredVars,
         noNestedForallsContextsErr, addNoNestedForallsContextsErr
@@ -171,7 +170,7 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
         where
           (loc,occ) = get_loc_occ n
           mb_local  = lookupLocalRdrOcc local_env occ
-          gres      = lookupGRE_RdrName (mkRdrUnqual occ) global_env
+          gres      = lookupGRE_RdrName (AllNameSpaces WantBoth) global_env (mkRdrUnqual occ)
                 -- Make an Unqualified RdrName and look that up, so that
                 -- we don't find any GREs that are in scope qualified-only
 
@@ -450,13 +449,13 @@ warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 -- NB the Names must not be the names of record fields!
 warnUnused :: WarningFlag -> [Name] -> RnM ()
 warnUnused flag names =
-    mapM_ (warnUnused1 flag . NormalGreName) names
+    mapM_ (\ nm -> warnUnused1 flag nm (nameOccName nm)) names
 
-warnUnused1 :: WarningFlag -> GreName -> RnM ()
-warnUnused1 flag child
-  = when (reportable child) $
+warnUnused1 :: WarningFlag -> Name -> OccName -> RnM ()
+warnUnused1 flag child child_occ
+  = when (reportable child child_occ) $
     addUnusedWarning flag
-                     (occName child) (greNameSrcSpan child)
+                     child_occ (nameSrcSpan child)
                      (text $ "Defined but not used" ++ opt_str)
   where
     opt_str = case flag of
@@ -465,35 +464,28 @@ warnUnused1 flag child
 
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
 warnUnusedGRE gre@(GRE { gre_lcl = lcl, gre_imp = is })
-  | lcl       = warnUnused1 Opt_WarnUnusedTopBinds (gre_name gre)
-  | otherwise = when (reportable (gre_name gre)) (mapM_ warn is)
+  | lcl       = warnUnused1 Opt_WarnUnusedTopBinds nm occ
+  | otherwise = when (reportable nm occ) (mapM_ warn is)
   where
     occ = greOccName gre
+    nm = greName gre
     warn spec = addUnusedWarning Opt_WarnUnusedTopBinds occ span msg
         where
            span = importSpecLoc spec
            pp_mod = quotes (ppr (importSpecModule spec))
            msg = text "Imported from" <+> pp_mod <+> text "but not used"
 
--- | Make a map from selector names to field labels and parent tycon
--- names, to be used when reporting unused record fields.
-mkFieldEnv :: GlobalRdrEnv -> NameEnv (FieldLabelString, Parent)
-mkFieldEnv rdr_env = mkNameEnv [ (greMangledName gre, (flLabel fl, gre_par gre))
-                               | gres <- nonDetOccEnvElts rdr_env
-                               , gre <- gres
-                               , Just fl <- [greFieldLabel gre]
-                               ]
-
 -- | Should we report the fact that this 'Name' is unused? The
 -- 'OccName' may differ from 'nameOccName' due to
 -- DuplicateRecordFields.
-reportable :: GreName -> Bool
-reportable child
-  | NormalGreName name <- child
-  , isWiredInName name = False    -- Don't report unused wired-in names
-                                  -- Otherwise we get a zillion warnings
-                                  -- from Data.Tuple
-  | otherwise = not (startsWithUnderscore (occName child))
+reportable :: Name -> OccName -> Bool
+reportable child child_occ
+  | isWiredInName child
+  = False    -- Don't report unused wired-in names
+             -- Otherwise we get a zillion warnings
+             -- from Data.Tuple
+  | otherwise
+  = not (startsWithUnderscore child_occ)
 
 addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
 addUnusedWarning flag occ span msg = do
@@ -555,45 +547,8 @@ addNameClashErrRn rdr_name gres
   -- already, and we don't want an error cascade.
   = return ()
   | otherwise
-  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
-                 , text "It could refer to"
-                 , nest 3 (vcat (msg1 : msgs)) ])
+  = addErr $ mkNameClashErr rdr_name gres
   where
-    np1 NE.:| nps = gres
-    msg1 =  text "either" <+> ppr_gre np1
-    msgs = [text "    or" <+> ppr_gre np | np <- nps]
-    ppr_gre gre = sep [ pp_greMangledName gre <> comma
-                      , pprNameProvenance gre]
-
-    -- When printing the name, take care to qualify it in the same
-    -- way as the provenance reported by pprNameProvenance, namely
-    -- the head of 'gre_imp'.  Otherwise we get confusing reports like
-    --   Ambiguous occurrence ‘null’
-    --   It could refer to either ‘T15487a.null’,
-    --                            imported from ‘Prelude’ at T15487.hs:1:8-13
-    --                     or ...
-    -- See #15487
-    pp_greMangledName gre@(GRE { gre_name = child, gre_par = par
-                         , gre_lcl = lcl, gre_imp = iss }) =
-      case child of
-        FieldGreName fl  -> text "the field" <+> quotes (ppr fl) <+> parent_info
-        NormalGreName name -> quotes (pp_qual name <> dot <> ppr (nameOccName name))
-      where
-        parent_info = case par of
-          NoParent -> empty
-          ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
-        pp_qual name
-                | lcl
-                = ppr (nameModule name)
-                | Just imp  <- headMaybe iss  -- This 'imp' is the one that
-                                  -- pprNameProvenance chooses
-                , ImpDeclSpec { is_as = mod } <- is_decl imp
-                = ppr mod
-                | otherwise
-                = pprPanic "addNameClassErrRn" (ppr gre $$ ppr iss)
-                  -- Invariant: either 'lcl' is True or 'iss' is non-empty
-
     -- If all the GREs are defined locally, can we skip reporting an ambiguity
     -- error at use sites, because it will have been reported already? See
     -- Note [Skipping ambiguity errors at use sites of local declarations]
@@ -604,6 +559,50 @@ addNameClashErrRn rdr_name gres
     (flds, non_flds) = NE.partition isRecFldGRE gres
     num_flds     = length flds
     num_non_flds = length non_flds
+
+mkNameClashErr :: Outputable a
+               => a -> NE.NonEmpty GlobalRdrElt -> TcRnMessage
+mkNameClashErr rdr_name gres =
+  mkTcRnUnknownMessage $ mkPlainError noHints $
+    (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
+                 , text "It could refer to"
+                 , nest 3 (vcat (msg1 : msgs)) ])
+  where
+    np1 NE.:| nps = gres
+    msg1 =  text "either" <+> ppr_gre np1
+    msgs = [text "    or" <+> ppr_gre np | np <- nps]
+    ppr_gre gre = sep [ pp_gre_name gre <> comma
+                      , pprNameProvenance gre]
+
+    -- When printing the name, take care to qualify it in the same
+    -- way as the provenance reported by pprNameProvenance, namely
+    -- the head of 'gre_imp'.  Otherwise we get confusing reports like
+    --   Ambiguous occurrence ‘null’
+    --   It could refer to either ‘T15487a.null’,
+    --                            imported from ‘Prelude’ at T15487.hs:1:8-13
+    --                     or ...
+    -- See #15487
+    pp_gre_name gre
+      | isRecFldGRE gre
+      = text "the field" <+> quotes (ppr occ) <+> parent_info
+      | otherwise
+      = quotes (pp_qual <> dot <> ppr occ)
+      where
+        occ = greOccName gre
+        parent_info = case gre_par gre of
+          NoParent -> empty
+          ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
+        pp_qual
+            | gre_lcl gre
+            = ppr (nameModule $ greName gre)
+            | Just imp  <- headMaybe $ gre_imp gre
+                -- This 'imp' is the one that
+                -- pprNameProvenance chooses
+            , ImpDeclSpec { is_as = mod } <- is_decl imp
+            = ppr mod
+            | otherwise
+            = pprPanic "addNameClassErrRn" (ppr gre)
+              -- Invariant: either 'lcl' is True or 'iss' is non-empty
 
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()

@@ -1,15 +1,20 @@
 True
+type S :: *
+data S = MkS {foo :: Int}
+  	-- Defined at <interactive>:3:16
+
 type T :: * -> *
 data T a = MkT {foo :: Bool, ...}
   	-- Defined at <interactive>:4:18
-foo :: T a -> Bool
-
-<interactive>:9:6: error: [GHC-83865]
-    • Couldn't match expected type ‘T a0’ with actual type ‘S’
-    • In the first argument of ‘foo’, namely ‘(MkS 42)’
-      In the expression: foo (MkS 42)
-      In an equation for ‘it’: it = foo (MkS 42)
 True
-foo :: T a -> Bool
+
+<interactive>:1:1: error:
+    Ambiguous occurrence ‘foo’
+    It could refer to
+       either the field ‘foo’ of record ‘S’, defined at <interactive>:3:16
+           or the field ‘foo’ of record ‘T’, defined at <interactive>:4:18
+type U :: *
+data U = MkU {foo :: Int}
+  	-- Defined at <interactive>:12:16
 foo :: U -> Int
 42

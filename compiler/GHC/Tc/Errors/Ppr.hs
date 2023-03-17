@@ -58,15 +58,15 @@ import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Error
-import GHC.Types.FieldLabel (flIsOverloaded)
 import GHC.Types.Hint (UntickedPromotedThing(..), pprUntickedConstructor, isBareSymbol)
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
 import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Id
+import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( GreName(..), pprNameProvenance
-                             , RdrName, rdrNameOcc, greMangledName, grePrintableName )
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
@@ -99,7 +99,6 @@ import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
-import GHC.Types.Name.Env
 import qualified Language.Haskell.TH as TH
 import {-# SOURCE #-} GHC.Tc.Types (pprTcTyThingCategory)
 
@@ -150,10 +149,10 @@ instance Diagnostic TcRnMessage where
            ) : [errInfoContext, errInfoSupplementary]
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
-    TcRnDodgyImports name
-      -> mkDecorated [dodgy_msg (text "import") name (dodgy_msg_insert name :: IE GhcPs)]
-    TcRnDodgyExports name
-      -> mkDecorated [dodgy_msg (text "export") name (dodgy_msg_insert name :: IE GhcRn)]
+    TcRnDodgyImports gre
+      -> mkDecorated [dodgy_msg (text "import") gre (dodgy_msg_insert gre)]
+    TcRnDodgyExports gre
+      -> mkDecorated [dodgy_msg (text "export") gre (dodgy_msg_insert gre)]
     TcRnMissingImportList ie
       -> mkDecorated [ text "The import item" <+> quotes (ppr ie) <+>
                        text "does not have an explicit import list"
@@ -250,9 +249,9 @@ instance Diagnostic TcRnMessage where
                , nest 2 (text "e.g., deriving instance _ => Eq (Foo a)") ]
     TcRnDuplicateFieldName fld_part dups
       -> mkSimpleDecorated $
-           hsep [text "duplicate field name",
-                 quotes (ppr (NE.head dups)),
-                 text "in record", pprRecordFieldPart fld_part]
+           hsep [ text "Duplicate field name"
+                , quotes (ppr (rdrNameOcc $ NE.head dups))
+                , text "in record", pprRecordFieldPart fld_part ]
     TcRnIllegalViewPattern pat
       -> mkSimpleDecorated $ vcat [text "Illegal view pattern: " <+> ppr pat]
     TcRnCharLiteralOutOfRange c
@@ -535,9 +534,9 @@ instance Diagnostic TcRnMessage where
        $ formatExportItemError
            (ppr export_item)
            "attempts to export constructors or class methods that are not visible here"
-    TcRnDuplicateExport child ie1 ie2
+    TcRnDuplicateExport gre ie1 ie2
       -> mkSimpleDecorated $
-           hsep [ quotes (ppr child)
+           hsep [ quotes (ppr $ greName gre)
                 , text "is exported by", quotes (ppr ie1)
                 , text "and",            quotes (ppr ie2) ]
     TcRnExportedParentChildMismatch parent_name ty_thing child parent_names
@@ -557,33 +556,60 @@ instance Diagnostic TcRnMessage where
           | isRecordSelector i = "record selector"
         pp_category i = tyThingCategory i
         what_is = pp_category ty_thing
-        thing = ppr child
+        thing = ppr $ greOccName child
         parents = map ppr parent_names
-    TcRnConflictingExports occ child1 gre1 ie1 child2 gre2 ie2
+    TcRnConflictingExports occ child_gre1 ie1 child_gre2 ie2
       -> mkSimpleDecorated $
            vcat [ text "Conflicting exports for" <+> quotes (ppr occ) <> colon
-                , ppr_export child1 gre1 ie1
-                , ppr_export child2 gre2 ie2
+                , ppr_export child_gre1 ie1
+                , ppr_export child_gre2 ie2
                 ]
       where
-        ppr_export child gre ie = nest 3 (hang (quotes (ppr ie) <+> text "exports" <+>
-                                                quotes (ppr_name child))
-                                            2 (pprNameProvenance gre))
-
-        -- DuplicateRecordFields means that nameOccName might be a
-        -- mangled $sel-prefixed thing, in which case show the correct OccName
-        -- alone (but otherwise show the Name so it will have a module
-        -- qualifier)
-        ppr_name (FieldGreName fl) | flIsOverloaded fl = ppr fl
-                                   | otherwise         = ppr (flSelector fl)
-        ppr_name (NormalGreName name) = ppr name
-    TcRnAmbiguousField rupd parent_type
+        ppr_export gre ie =
+          nest 3 $
+            hang (quotes (ppr ie) <+> text "exports" <+> quotes (ppr $ greName gre))
+               2 (pprNameProvenance gre)
+    TcRnDuplicateFieldExport (gre, ie1) gres_ies ->
+      mkSimpleDecorated $
+           vcat ( hsep [ text "Duplicate record field"
+                       , quotes (ppr $ greOccName gre)
+                       , text "in export list" <> colon ]
+                : map ppr_export ((gre,ie1) : NE.toList gres_ies)
+                )
+      where
+        ppr_export (gre,ie) =
+          nest 3 $
+            hang (sep [ quotes (ppr ie) <+> text "exports the field" <+> quotes (ppr $ greName gre)
+                       , text "belonging to the constructor" <> plural fld_cons <+> pprQuotedList fld_cons ])
+               2 (pprNameProvenance gre)
+          where
+            fld_cons :: [ConLikeName]
+            fld_cons = nonDetEltsUniqSet $ recFieldCons $ fieldGREInfo gre
+    TcRnAmbiguousFieldInUpdate (gre1, gre2, gres)
       -> mkSimpleDecorated $
-          vcat [ text "The record update" <+> ppr rupd
-                   <+> text "with type" <+> ppr parent_type
-                   <+> text "is ambiguous."
-               , text "This will not be supported by -XDuplicateRecordFields in future releases of GHC."
+          vcat [ text "Ambiguous record field" <+> fld <> dot
+               , hang (text "It could refer to any of the following:")
+                  2 $ vcat (map pprSugg (gre1 : gre2 : gres))
                ]
+        where
+          fld = quotes $ ppr (occNameFS $ greOccName gre1)
+          pprSugg gre = vcat [ bullet <+> pprGRE gre <> comma
+                             , nest 2 (pprNameProvenance gre) ]
+          pprGRE gre = case gre_info gre of
+            IAmRecField {}
+              -> let parent = par_is $ gre_par gre
+                 in text "record field" <+> fld <+> text "of" <+> quotes (ppr parent)
+            _ -> text "variable" <+> fld
+    TcRnAmbiguousRecordUpdate _rupd tc
+      -> mkSimpleDecorated $
+          vcat [ text "Ambiguous record update with parent" <+> what <> dot
+               , hsep [ text "This type-directed disambiguation mechanism"
+                      , text "will not be supported by -XDuplicateRecordFields in future releases of GHC." ]
+               , text "Consider disambiguating using module qualification instead."
+               ]
+        where
+          what :: SDoc
+          what = text "type constructor" <+> quotes (ppr $ RecSelData tc)
     TcRnMissingFields con fields
       -> mkSimpleDecorated $ vcat [header, nest 2 rest]
          where
@@ -597,21 +623,6 @@ instance Diagnostic TcRnMessage where
            hang (text "Record update for insufficiently polymorphic field"
                    <> plural prs <> colon)
               2 (vcat [ ppr f <+> dcolon <+> ppr ty | (f,ty) <- prs ])
-    TcRnNoConstructorHasAllFields conflictingFields
-      -> mkSimpleDecorated $
-           hang (text "No constructor has all these fields:")
-              2 (pprQuotedList conflictingFields)
-    TcRnMixedSelectors data_name data_sels pat_name pat_syn_sels
-      -> mkSimpleDecorated $
-           text "Cannot use a mixture of pattern synonym and record selectors" $$
-           text "Record selectors defined by"
-             <+> quotes (ppr data_name)
-             <> colon
-             <+> pprWithCommas ppr data_sels $$
-           text "Pattern synonym selectors defined by"
-             <+> quotes (ppr pat_name)
-             <> colon
-             <+> pprWithCommas ppr pat_syn_sels
     TcRnMissingStrictFields con fields
       -> mkSimpleDecorated $ vcat [header, nest 2 rest]
          where
@@ -622,14 +633,51 @@ instance Diagnostic TcRnMessage where
            header = text "Constructor" <+> quotes (ppr con) <+>
                     text "does not have the required strict field(s)" <>
                     if null fields then empty else colon
-    TcRnNoPossibleParentForFields rbinds
-      -> mkSimpleDecorated $
-           hang (text "No type has all these fields:")
-              2 (pprQuotedList fields)
-         where fields = map (hfbLHS . unLoc) rbinds
-    TcRnBadOverloadedRecordUpdate _rbinds
-      -> mkSimpleDecorated $
-           text "Record update is ambiguous, and requires a type signature"
+    TcRnBadRecordUpdate upd_flds reason
+      -> case reason of
+          NoConstructorHasAllFields { conflictingFields = conflicts }
+            | [fld] <- conflicts
+            -> mkSimpleDecorated $
+                vcat [ header
+                     , text "No constructor in scope has the field" <+> quotes (ppr fld) ]
+            | otherwise
+            ->
+              mkSimpleDecorated $
+                vcat [ header
+                     , hang (text "No constructor in scope has all of the following fields:")
+                        2 (pprQuotedList conflicts) ]
+            where
+              header :: SDoc
+              header = text "Invalid record update."
+          MultiplePossibleParents (par1, par2, pars) ->
+            mkSimpleDecorated $
+              vcat [ hang (text "Ambiguous record update with field" <> plural upd_flds)
+                       2 ppr_flds
+                   , hang (thisOrThese upd_flds <+> text "field" <> plural upd_flds <+> what_parent)
+                       2 (quotedListWithAnd (map ppr (par1:par2:pars))) ]
+            where
+              ppr_flds, what_parent, which :: SDoc
+              ppr_flds = quotedListWithAnd $ map ppr upd_flds
+              what_parent = case par1 of
+                RecSelData   {} -> text "appear" <> singular upd_flds
+                                <+> text "in" <+> which <+> text "datatypes"
+                RecSelPatSyn {} -> isOrAre upd_flds <+> text "associated with"
+                                <+> which <+> text "pattern synonyms"
+              which = case pars of
+                [] -> text "both"
+                _  -> text "all of the"
+          InvalidTyConParent tc pars ->
+            mkSimpleDecorated $
+              vcat [ hang (text "No data constructor of" <+> what $$ text "has all of the fields:")
+                      2 (pprQuotedList upd_flds)
+                   , pat_syn_msg ]
+            where
+              what = text "type constructor" <+> quotes (ppr (RecSelData tc))
+              pat_syn_msg
+                | any (\case { RecSelPatSyn {} -> True; _ -> False}) pars
+                = text "NB: type-directed disambiguation is not supported for pattern synonym record fields."
+                | otherwise
+                = empty
     TcRnStaticFormNotClosed name reason
       -> mkSimpleDecorated $
            quotes (ppr name)
@@ -861,9 +909,6 @@ instance Diagnostic TcRnMessage where
     TcRnExpectedValueId thing
       -> mkSimpleDecorated $
            ppr thing <+> text "used where a value identifier was expected"
-    TcRnNotARecordSelector field
-      -> mkSimpleDecorated $
-           hsep [quotes (ppr field), text "is not a record selector"]
     TcRnRecSelectorEscapedTyVar lbl
       -> mkSimpleDecorated $
            text "Cannot use record selector" <+> quotes (ppr lbl) <+>
@@ -887,9 +932,9 @@ instance Diagnostic TcRnMessage where
                  HsSrcBang _ _ _                   -> "strictness"
             in text "Unexpected" <+> text err <+> text "annotation:" <+> ppr ty $$
                text err <+> text "annotation cannot appear nested inside a type"
-    TcRnIllegalRecordSyntax ty
+    TcRnIllegalRecordSyntax either_ty_ty
       -> mkSimpleDecorated $
-           text "Record syntax is illegal here:" <+> ppr ty
+           text "Record syntax is illegal here:" <+> either ppr ppr either_ty_ty
     TcRnUnexpectedTypeSplice ty
       -> mkSimpleDecorated $
            text "Unexpected type splice:" <+> ppr ty
@@ -1281,7 +1326,7 @@ instance Diagnostic TcRnMessage where
           text "This is not forward-compatible with a planned GHC extension, RequiredTypeArguments."
         where
           var_names = case shadowed_term_names of
-              Left gbl_names -> vcat (map (\name -> quotes (ppr $ grePrintableName name) <+> pprNameProvenance name) gbl_names)
+              Left gbl_names -> vcat (map (\name -> quotes (ppr $ greName name) <+> pprNameProvenance name) gbl_names)
               Right lcl_name -> quotes (ppr lcl_name) <+> text "defined at"
                 <+> ppr (nameSrcLoc lcl_name)
     TcRnBindingOfExistingName name -> mkSimpleDecorated $
@@ -1681,21 +1726,19 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnConflictingExports{}
       -> ErrorWithoutFlag
-    TcRnAmbiguousField{}
+    TcRnDuplicateFieldExport {}
+      -> ErrorWithoutFlag
+    TcRnAmbiguousFieldInUpdate {}
+      -> ErrorWithoutFlag
+    TcRnAmbiguousRecordUpdate{}
       -> WarningWithFlag Opt_WarnAmbiguousFields
     TcRnMissingFields{}
       -> WarningWithFlag Opt_WarnMissingFields
     TcRnFieldUpdateInvalidType{}
       -> ErrorWithoutFlag
-    TcRnNoConstructorHasAllFields{}
-      -> ErrorWithoutFlag
-    TcRnMixedSelectors{}
-      -> ErrorWithoutFlag
     TcRnMissingStrictFields{}
       -> ErrorWithoutFlag
-    TcRnNoPossibleParentForFields{}
-      -> ErrorWithoutFlag
-    TcRnBadOverloadedRecordUpdate{}
+    TcRnBadRecordUpdate{}
       -> ErrorWithoutFlag
     TcRnStaticFormNotClosed{}
       -> ErrorWithoutFlag
@@ -1787,8 +1830,6 @@ instance Diagnostic TcRnMessage where
     TcRnInvalidCIdentifier{}
       -> ErrorWithoutFlag
     TcRnExpectedValueId{}
-      -> ErrorWithoutFlag
-    TcRnNotARecordSelector{}
       -> ErrorWithoutFlag
     TcRnRecSelectorEscapedTyVar{}
       -> ErrorWithoutFlag
@@ -2195,21 +2236,19 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnConflictingExports{}
       -> noHints
-    TcRnAmbiguousField{}
+    TcRnDuplicateFieldExport {}
+      -> [suggestExtension LangExt.DuplicateRecordFields]
+    TcRnAmbiguousFieldInUpdate {}
+      -> [suggestExtension LangExt.DisambiguateRecordFields]
+    TcRnAmbiguousRecordUpdate{}
       -> noHints
     TcRnMissingFields{}
       -> noHints
     TcRnFieldUpdateInvalidType{}
       -> noHints
-    TcRnNoConstructorHasAllFields{}
-      -> noHints
-    TcRnMixedSelectors{}
-      -> noHints
     TcRnMissingStrictFields{}
       -> noHints
-    TcRnNoPossibleParentForFields{}
-      -> noHints
-    TcRnBadOverloadedRecordUpdate{}
+    TcRnBadRecordUpdate{}
       -> noHints
     TcRnStaticFormNotClosed{}
       -> noHints
@@ -2284,8 +2323,6 @@ instance Diagnostic TcRnMessage where
     TcRnInvalidCIdentifier{}
       -> noHints
     TcRnExpectedValueId{}
-      -> noHints
-    TcRnNotARecordSelector{}
       -> noHints
     TcRnRecSelectorEscapedTyVar{}
       -> [SuggestPatternMatchingSyntax]
@@ -2623,19 +2660,27 @@ messageWithInfoDiagnosticMessage unit_state ErrInfo{..} show_ctxt important =
       in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
          mkDecorated err_info'
 
-dodgy_msg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
+dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> SDoc
 dodgy_msg kind tc ie
-  = sep [ text "The" <+> kind <+> text "item"
-                     <+> quotes (ppr ie)
-                <+> text "suggests that",
-          quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
-          text "but it has none" ]
-
-dodgy_msg_insert :: forall p . (Anno (IdP (GhcPass p)) ~ SrcSpanAnnN) => IdP (GhcPass p) -> IE (GhcPass p)
-dodgy_msg_insert tc = IEThingAll noAnn ii
+  = vcat [ text "The" <+> kind <+> text "item" <+> quotes (ppr ie) <+> text "suggests that"
+         , quotes (ppr $ greName tc) <+> text "has" <+> sep rest ]
   where
-    ii :: LIEWrappedName (GhcPass p)
-    ii = noLocA (IEName noExtField $ noLocA tc)
+    rest :: [SDoc]
+    rest =
+      case gre_info tc of
+        IAmTyCon ClassFlavour
+          -> [ text "(in-scope) class methods or associated types" <> comma
+             , text "but it has none" ]
+        IAmTyCon _
+          -> [ text "(in-scope) constructors or record fields" <> comma
+             , text "but it has none" ]
+        _ -> [ text "children" <> comma
+             , text "but it is not a type constructor or a class" ]
+
+dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
+dodgy_msg_insert tc_gre = IEThingAll noAnn ii
+  where
+    ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
 
 pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
 pprTypeDoesNotHaveFixedRuntimeRep ty prov =
@@ -2656,6 +2701,7 @@ pprField (f,ty) = ppr f <+> dcolon <+> ppr ty
 
 pprRecordFieldPart :: RecordFieldPart -> SDoc
 pprRecordFieldPart = \case
+  RecordFieldDecl {}       -> text "declaration"
   RecordFieldConstructor{} -> text "construction"
   RecordFieldPattern{}     -> text "pattern"
   RecordFieldUpdate        -> text "update"
@@ -3951,6 +3997,9 @@ pprScopeError rdr_name scope_err =
     NotInScope {} ->
       hang (text "Not in scope:")
         2 (what <+> quotes (ppr rdr_name))
+    NotARecordField {} ->
+      hang (text "Not in scope:")
+        2 (text "record field" <+> quotes (ppr rdr_name))
     NoExactName name ->
       text "The Name" <+> quotes (ppr name) <+> text "is not in scope."
     SameName gres ->
@@ -3958,7 +4007,8 @@ pprScopeError rdr_name scope_err =
       $ hang (text "Same Name in multiple name-spaces:")
            2 (vcat (map pp_one sorted_names))
       where
-        sorted_names = sortBy (leftmost_smallest `on` nameSrcSpan) (map greMangledName gres)
+        sorted_names = sortBy (leftmost_smallest `on` nameSrcSpan)
+                     $ map greName gres
         pp_one name
           = hang (pprNameSpace (occNameSpace (getOccName name))
                   <+> quotes (ppr name) <> comma)
@@ -3983,6 +4033,7 @@ scopeErrorHints :: NotInScopeError -> [GhcHint]
 scopeErrorHints scope_err =
   case scope_err of
     NotInScope             -> noHints
+    NotARecordField        -> noHints
     NoExactName {}         -> [SuggestDumpSlices]
     SameName {}            -> [SuggestDumpSlices]
     MissingBinding _ hints -> hints
@@ -4553,10 +4604,6 @@ pprConversionFailReason = \case
     text "Implicit parameters mixed with other bindings"
   InvalidCCallImpent from ->
     text (show from) <+> text "is not a valid ccall impent"
-  RecGadtNoCons ->
-    text "RecGadtC must have at least one constructor name"
-  GadtNoCons ->
-    text "GadtC must have at least one constructor name"
   InvalidTypeInstanceHeader tys ->
     text "Invalid type instance header:"
     <+> text (show tys)

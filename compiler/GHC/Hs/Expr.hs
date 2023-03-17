@@ -44,6 +44,7 @@ import GHC.Parser.Annotation
 
 -- others:
 import GHC.Tc.Types.Evidence
+import GHC.Types.Id.Info ( RecSelParent )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
@@ -52,7 +53,8 @@ import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish (CoreTickish)
-import GHC.Core.ConLike
+import GHC.Types.Unique.Set (UniqSet)
+import GHC.Core.ConLike ( conLikeName, ConLike )
 import GHC.Unit.Module (ModuleName)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -74,6 +76,7 @@ import qualified Data.Kind
 import Data.Maybe (isJust)
 import Data.Foldable ( toList )
 import Data.List (uncons)
+import Data.List.NonEmpty (NonEmpty)
 import Data.Bifunctor (first)
 
 {- *********************************************************************
@@ -323,6 +326,31 @@ type instance XRecordUpd     GhcTc = DataConCantHappen
   -- We desugar record updates in the typechecker.
   -- See [Handling overloaded and rebindable constructs],
   -- and [Record Updates] in GHC.Tc.Gen.Expr.
+
+-- | Information about the parent of a record update:
+--
+--  - the parent type constructor or pattern synonym,
+--  - the relevant con-likes,
+--  - the field labels.
+data family HsRecUpdParent x
+
+data instance HsRecUpdParent GhcPs
+data instance HsRecUpdParent GhcRn
+  = RnRecUpdParent
+  { rnRecUpdLabels :: NonEmpty FieldGlobalRdrElt
+  , rnRecUpdCons   :: UniqSet ConLikeName }
+data instance HsRecUpdParent GhcTc
+  = TcRecUpdParent
+  { tcRecUpdParent :: RecSelParent
+  , tcRecUpdLabels :: NonEmpty FieldGlobalRdrElt
+  , tcRecUpdCons   :: UniqSet ConLike }
+
+type instance XLHsRecUpdLabels GhcPs = NoExtField
+type instance XLHsRecUpdLabels GhcRn = NonEmpty (HsRecUpdParent GhcRn)
+                                      -- Possible parents for the record update.
+type instance XLHsRecUpdLabels GhcTc = DataConCantHappen
+
+type instance XLHsOLRecUpdLabels p = NoExtField
 
 type instance XGetField     GhcPs = EpAnnCO
 type instance XGetField     GhcRn = NoExtField
@@ -625,8 +653,10 @@ ppr_expr (RecordCon { rcon_con = con, rcon_flds = rbinds })
 
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = flds })
   = case flds of
-      Left rbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
-      Right pbinds -> hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
+      RegularRecUpdFields { recUpdFields= rbinds } ->
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+      OverloadedRecUpdFields { olRecUpdFields = pbinds } ->
+        hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr pbinds))))
 
 ppr_expr (HsGetField { gf_expr = L _ fexp, gf_field = field })
   = ppr fexp <> dot <> ppr field

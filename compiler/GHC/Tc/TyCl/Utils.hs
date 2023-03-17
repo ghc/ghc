@@ -72,7 +72,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Reader ( mkVarUnqual )
+import GHC.Types.Name.Reader ( mkRdrUnqual )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Var.Env
@@ -896,7 +896,9 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     sel_name = flSelector fl
 
     sel_id = mkExportedLocalId rec_details sel_name sel_ty
-    rec_details = RecSelId { sel_tycon = idDetails, sel_naughty = is_naughty }
+    rec_details = RecSelId { sel_tycon      = idDetails
+                           , sel_naughty    = is_naughty
+                           , sel_fieldLabel = fl }
 
     -- Find a representative constructor, con1
     cons_w_field = conLikesWithFields all_cons [lbl]
@@ -954,7 +956,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                         { hfbAnn = noAnn
                         , hfbLHS
                            = L locc (FieldOcc sel_name
-                                      (L locn $ mkVarUnqual (field_label lbl)))
+                                      (L locn $ mkRdrUnqual (nameOccName sel_name)))
                         , hfbRHS
                            = L loc' (VarPat noExtField (L locn field_var))
                         , hfbPun = False })

@@ -17,9 +17,7 @@ import GHC.Driver.Env
 
 import GHC.Unit.Module
 
-import GHC.Types.Unique.FM
 import GHC.Types.Avail
-import GHC.Types.FieldLabel
 import GHC.Types.Name
 import GHC.Types.Name.Env
 
@@ -87,7 +85,7 @@ mkNameShape :: ModuleName -> [AvailInfo] -> NameShape
 mkNameShape mod_name as =
     NameShape mod_name as $ mkOccEnv $ do
         a <- as
-        n <- availName a : availNamesWithSelectors a
+        n <- availName a : availNames a
         return (occName n, n)
 
 -- | Given an existing 'NameShape', merge it with a list of 'AvailInfo's
@@ -180,24 +178,14 @@ substName env n | Just n' <- lookupNameEnv env n = n'
 -- for type constructors, where it is sufficient to substitute the 'availName'
 -- to induce a substitution on 'availNames'.
 substNameAvailInfo :: HscEnv -> ShNameSubst -> AvailInfo -> IO AvailInfo
-substNameAvailInfo _ env (Avail (NormalGreName n)) = return (Avail (NormalGreName (substName env n)))
-substNameAvailInfo _ env (Avail (FieldGreName fl)) =
-    return (Avail (FieldGreName fl { flSelector = substName env (flSelector fl) }))
+substNameAvailInfo _ env (Avail gre) =
+    return $ Avail (substName env gre)
 substNameAvailInfo hsc_env env (AvailTC n ns) =
     let mb_mod = fmap nameModule (lookupNameEnv env n)
-    in AvailTC (substName env n) <$> mapM (setNameGreName hsc_env mb_mod) ns
+    in AvailTC (substName env n) <$> mapM (setName hsc_env mb_mod) ns
 
-setNameGreName :: HscEnv -> Maybe Module -> GreName -> IO GreName
-setNameGreName hsc_env mb_mod gname = case gname of
-    NormalGreName n -> NormalGreName <$> initIfaceLoad hsc_env (setNameModule mb_mod n)
-    FieldGreName fl -> FieldGreName  <$> setNameFieldSelector hsc_env mb_mod fl
-
--- | Set the 'Module' of a 'FieldSelector'
-setNameFieldSelector :: HscEnv -> Maybe Module -> FieldLabel -> IO FieldLabel
-setNameFieldSelector _ Nothing f = return f
-setNameFieldSelector hsc_env mb_mod (FieldLabel l b has_sel sel) = do
-    sel' <- initIfaceLoad hsc_env $ setNameModule mb_mod sel
-    return (FieldLabel l b has_sel sel')
+setName :: HscEnv -> Maybe Module -> Name -> IO Name
+setName hsc_env mb_mod nm = initIfaceLoad hsc_env (setNameModule mb_mod nm)
 
 {-
 ************************************************************************
@@ -226,19 +214,19 @@ mergeAvails as1 as2 =
 -- with only name holes from @flexi@ unifiable (all other name holes rigid.)
 uAvailInfos :: ModuleName -> [AvailInfo] -> [AvailInfo] -> Either HsigShapeMismatchReason ShNameSubst
 uAvailInfos flexi as1 as2 = -- pprTrace "uAvailInfos" (ppr as1 $$ ppr as2) $
-    let mkOE as = listToUFM $ do a <- as
-                                 n <- availNames a
-                                 return (nameOccName n, a)
+    let mkOE as = mkOccEnv [(nameOccName n, a) | a <- as, n <- availNames a]
     in foldM (\subst (a1, a2) -> uAvailInfo flexi subst a1 a2) emptyNameEnv
-             (nonDetEltsUFM (intersectUFM_C (,) (mkOE as1) (mkOE as2)))
+             (nonDetOccEnvElts $ intersectOccEnv_C (,) (mkOE as1) (mkOE as2))
              -- Edward: I have to say, this is pretty clever.
 
 -- | Unify two 'AvailInfo's, given an existing substitution @subst@,
 -- with only name holes from @flexi@ unifiable (all other name holes rigid.)
 uAvailInfo :: ModuleName -> ShNameSubst -> AvailInfo -> AvailInfo
            -> Either HsigShapeMismatchReason ShNameSubst
-uAvailInfo flexi subst (Avail (NormalGreName n1)) (Avail (NormalGreName n2)) = uName flexi subst n1 n2
-uAvailInfo flexi subst (AvailTC n1 _) (AvailTC n2 _) = uName flexi subst n1 n2
+uAvailInfo flexi subst (Avail n1) (Avail n2)
+  = uName flexi subst n1 n2
+uAvailInfo flexi subst (AvailTC n1 _) (AvailTC n2 _)
+  = uName flexi subst n1 n2
 uAvailInfo _ _ a1 a2 = Left $ HsigShapeSortMismatch a1 a2
 
 -- | Unify two 'Name's, given an existing substitution @subst@,

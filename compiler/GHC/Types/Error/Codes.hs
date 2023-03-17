@@ -403,14 +403,12 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDuplicateExport"                           = 47854
   GhcDiagnosticCode "TcRnExportedParentChildMismatch"               = 88993
   GhcDiagnosticCode "TcRnConflictingExports"                        = 69158
-  GhcDiagnosticCode "TcRnAmbiguousField"                            = 02256
+  GhcDiagnosticCode "TcRnDuplicateFieldExport"                      = 97219
+  GhcDiagnosticCode "TcRnAmbiguousFieldInUpdate"                    = 56428
+  GhcDiagnosticCode "TcRnAmbiguousRecordUpdate"                     = 02256
   GhcDiagnosticCode "TcRnMissingFields"                             = 20125
   GhcDiagnosticCode "TcRnFieldUpdateInvalidType"                    = 63055
-  GhcDiagnosticCode "TcRnNoConstructorHasAllFields"                 = 14392
-  GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
   GhcDiagnosticCode "TcRnMissingStrictFields"                       = 95909
-  GhcDiagnosticCode "TcRnNoPossibleParentForFields"                 = 33238
-  GhcDiagnosticCode "TcRnBadOverloadedRecordUpdate"                 = 99339
   GhcDiagnosticCode "TcRnStaticFormNotClosed"                       = 88431
   GhcDiagnosticCode "TcRnUselessTypeable"                           = 90584
   GhcDiagnosticCode "TcRnDerivingDefaults"                          = 20042
@@ -448,7 +446,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnsupportedCallConv"                       = 01245
   GhcDiagnosticCode "TcRnInvalidCIdentifier"                        = 95774
   GhcDiagnosticCode "TcRnExpectedValueId"                           = 01570
-  GhcDiagnosticCode "TcRnNotARecordSelector"                        = 47535
   GhcDiagnosticCode "TcRnRecSelectorEscapedTyVar"                   = 55876
   GhcDiagnosticCode "TcRnPatSynNotBidirectional"                    = 16444
   GhcDiagnosticCode "TcRnSplicePolymorphicLocalVar"                 = 06568
@@ -557,6 +554,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "HasExistentialTyVar"                           = 07525
   GhcDiagnosticCode "HasStrictnessAnnotation"                       = 04049
 
+  -- TcRnBadRecordUpdate
+  GhcDiagnosticCode "NoConstructorHasAllFields"                     = 14392
+  GhcDiagnosticCode "MultiplePossibleParents"                       = 99339
+  GhcDiagnosticCode "InvalidTyConParent"                            = 33238
+
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394
   GhcDiagnosticCode "DeprecatedTxt"                                 = 68441
@@ -577,8 +579,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "CasesExprWithoutAlts"                          = 91745
   GhcDiagnosticCode "ImplicitParamsWithOtherBinds"                  = 42974
   GhcDiagnosticCode "InvalidCCallImpent"                            = 60220
-  GhcDiagnosticCode "RecGadtNoCons"                                 = 18816
-  GhcDiagnosticCode "GadtNoCons"                                    = 38140
   GhcDiagnosticCode "InvalidTypeInstanceHeader"                     = 37056
   GhcDiagnosticCode "InvalidTyFamInstLHS"                           = 78486
   GhcDiagnosticCode "InvalidImplicitParamBinding"                   = 51603
@@ -603,6 +603,7 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   -- Out of scope errors
   GhcDiagnosticCode "NotInScope"                                    = 76037
+  GhcDiagnosticCode "NotARecordField"                               = 22385
   GhcDiagnosticCode "NoExactName"                                   = 97784
   GhcDiagnosticCode "SameName"                                      = 81573
   GhcDiagnosticCode "MissingBinding"                                = 44432
@@ -658,9 +659,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- and this includes outdated diagnostic codes for errors that GHC
   -- no longer reports. These are collected below.
 
-  GhcDiagnosticCode "Example outdated error"                        = 00000
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
+  GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
+  GhcDiagnosticCode "RecGadtNoCons"                                 = 18816
+  GhcDiagnosticCode "GadtNoCons"                                    = 38140
 
 {- *********************************************************************
 *                                                                      *
@@ -718,6 +721,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason
   ConRecursInto "TcRnHsigShapeMismatch"    = 'Just HsigShapeMismatchReason
   ConRecursInto "TcRnPatSynInvalidRhs"     = 'Just PatSynInvalidRhsReason
+  ConRecursInto "TcRnBadRecordUpdate"      = 'Just BadRecordUpdateReason
 
     --
     -- TH errors

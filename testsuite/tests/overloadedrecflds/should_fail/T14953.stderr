@@ -4,10 +4,10 @@
 
 T14953.hs:2:33: error: [GHC-69158]
     Conflicting exports for ‘unR’:
-       ‘module T14953_A’ exports ‘unR’
+       ‘module T14953_A’ exports ‘T14953_A.unR’
          imported from ‘T14953_A’ at T14953.hs:3:1-15
          (and originally defined at T14953_A.hs:3:13-15)
-       ‘module T14953_B’ exports ‘unR’
+       ‘module T14953_B’ exports ‘T14953_B.unR’
          imported from ‘T14953_B’ at T14953.hs:4:1-15
          (and originally defined at T14953_B.hs:3:13-15)
 

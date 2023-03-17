@@ -45,7 +45,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyDecl(..), LFamilyDecl,
 
   -- ** Instance declarations
-  InstDecl(..), LInstDecl, FamilyInfo(..),
+  InstDecl(..), LInstDecl, FamilyInfo(..), familyInfoTyConFlavour,
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
@@ -99,12 +99,14 @@ import Language.Haskell.Syntax.Extension
 import Language.Haskell.Syntax.Type
 import Language.Haskell.Syntax.Basic (Role)
 
-import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation)
+import GHC.Types.Basic (TopLevelFlag, OverlapMode, RuleName, Activation
+                       ,TyConFlavour(..), TypeOrData(..))
 import GHC.Types.ForeignCall (CType, CCallConv, Safety, Header, CLabelString, CCallTarget, CExportSpec)
 import GHC.Types.Fixity (LexicalFixity)
 
 import GHC.Core.Type (Specificity)
 import GHC.Unit.Module.Warnings (WarningTxt)
+import GHC.Utils.Panic.Plain ( assert )
 
 import GHC.Hs.Doc (LHsDoc) -- ROMES:TODO Discuss in #21592 whether this is parsed AST or base AST
 
@@ -863,6 +865,28 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
+familyInfoTyConFlavour
+  :: Maybe tc    -- ^ Just cls <=> this is an associated family of class cls
+  -> FamilyInfo pass
+  -> TyConFlavour tc
+familyInfoTyConFlavour mb_parent_tycon info =
+  case info of
+    DataFamily         -> OpenFamilyFlavour IAmData mb_parent_tycon
+    OpenTypeFamily     -> OpenFamilyFlavour IAmType mb_parent_tycon
+    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon)
+                          -- See Note [Closed type family mb_parent_tycon]
+                          ClosedTypeFamilyFlavour
+
+{- Note [Closed type family mb_parent_tycon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no way to write a closed type family inside a class declaration:
+
+  class C a where
+    type family F a where  -- error: parse error on input ‘where’
+
+In fact, it is not clear what the meaning of such a declaration would be.
+Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
+-}
 
 {- *********************************************************************
 *                                                                      *

@@ -100,7 +100,7 @@ extendTyConEnvList_C x y z = addListToUFM_C x y z
 delFromTyConEnv x y      = delFromUFM x y
 delListFromTyConEnv x y  = delListFromUFM x y
 filterTyConEnv x y       = filterUFM x y
-anyTyConEnv f x          = foldUFM ((||) . f) False x
+anyTyConEnv f x          = nonDetFoldUFM ((||) . f) False x
 disjointTyConEnv x y     = disjointUFM x y
 
 lookupTyConEnv_NF env n = expectJust "lookupTyConEnv_NF" (lookupTyConEnv env n)

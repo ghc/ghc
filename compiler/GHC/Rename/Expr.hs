@@ -54,6 +54,7 @@ import GHC.Rename.HsType
 import GHC.Rename.Pat
 import GHC.Driver.Session
 import GHC.Builtin.Names
+import GHC.Builtin.Types ( nilDataConName )
 
 import GHC.Types.FieldLabel
 import GHC.Types.Fixity
@@ -63,22 +64,22 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Unique.Set
 import GHC.Types.SourceText
+import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDupsOn )
+import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable as Outputable
-import GHC.Types.SrcLoc
-import Control.Monad
-import GHC.Builtin.Types ( nilDataConName )
+
 import qualified GHC.LanguageExtensions as LangExt
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
+import Control.Monad
 import Data.List (unzip4, minimumBy)
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
-import Data.Maybe (isJust, isNothing)
 import Control.Arrow (first)
 import Data.Ord
 import Data.Array
@@ -254,28 +255,31 @@ rnUnboundVar v = do
 
 rnExpr (HsVar _ (L l v))
   = do { dflags <- getDynFlags
-       ; mb_name <- lookupExprOccRn v
-
-       ; case mb_name of {
+       ; mb_gre <- lookupExprOccRn v
+       ; case mb_gre of {
            Nothing -> rnUnboundVar v ;
-           Just (NormalGreName name)
-              | name == nilDataConName -- Treat [] as an ExplicitList, so that
-                                       -- OverloadedLists works correctly
-                                       -- Note [Empty lists] in GHC.Hs.Expr
-              , xopt LangExt.OverloadedLists dflags
-              -> rnExpr (ExplicitList noAnn [])
+           Just gre ->
+    do { if | Just fl <- recFieldLabel <$> recFieldInfo_maybe gre
+            -- Since GHC 9.4, such occurrences of record fields must be
+            -- unambiguous. For ambiguous occurrences, we arbitrarily pick one
+            -- matching GRE and add a name clash error
+            -- (see lookupGlobalOccRn_overloaded, called by lookupExprOccRn).
+            -> do { let sel_name = flSelector fl
+                  ; this_mod <- getModule
+                  ; when (nameIsLocalOrFrom this_mod sel_name) $
+                      checkThLocalName sel_name
+                  ; return (HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
+                  }
+            | greName gre == nilDataConName
+              -- Treat [] as an ExplicitList, so that
+              -- OverloadedLists works correctly
+              -- Note [Empty lists] in GHC.Hs.Expr
+            , xopt LangExt.OverloadedLists dflags
+            -> rnExpr (ExplicitList noAnn [])
 
-              | otherwise
-              -> finishHsVar (L (na2la l) name) ;
-            Just (FieldGreName fl)
-              -> do { let sel_name = flSelector fl
-                    ; this_mod <- getModule
-                    ; when (nameIsLocalOrFrom this_mod sel_name) $
-                        checkThLocalName sel_name
-                    ; return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
-                    }
-         }
-       }
+            | otherwise
+            -> finishHsVar (L (na2la l) $ greName gre)
+        }}}
 
 rnExpr (HsIPVar x v)
   = return (HsIPVar x v, emptyFVs)
@@ -477,29 +481,40 @@ rnExpr (RecordCon { rcon_con = con_id
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hfbRHS fld)
                             ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
-rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
-  = case rbinds of
-      Left flds -> -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
-        do  { ; (e, fv_e) <- rnLExpr expr
-              ; (rs, fv_rs) <- rnHsRecUpdFields flds
-              ; return ( RecordUpd noExtField e (Left rs), fv_e `plusFV` fv_rs )
-            }
-      Right flds ->  -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
-        do { ; unlessXOptM LangExt.RebindableSyntax $
-                 addErr TcRnNoRebindableSyntaxRecordDot
-             ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
-             ; punsEnabled <-xoptM LangExt.NamedFieldPuns
-             ; unless (null punnedFields || punsEnabled) $
-                 addErr TcRnNoFieldPunsRecordDot
-             ; (getField, fv_getField) <- lookupSyntaxName getFieldName
-             ; (setField, fv_setField) <- lookupSyntaxName setFieldName
-             ; (e, fv_e) <- rnLExpr expr
-             ; (us, fv_us) <- rnHsUpdProjs flds
-             ; return ( mkExpandedExpr
-                          (RecordUpd noExtField e (Right us))
-                          (mkRecordDotUpd getField setField e us)
-                         , plusFVs [fv_getField, fv_setField, fv_e, fv_us] )
-             }
+rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
+  = setSrcSpanA l $
+    case rbinds of
+
+      -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
+      RegularRecUpdFields { recUpdFields = flds } ->
+        do  { (e, fv_e) <- rnExpr expr
+            ; (parents, flds, fv_flds) <- rnHsRecUpdFields flds
+            ; let upd_flds =
+                    RegularRecUpdFields
+                    { xRecUpdFields = parents
+                    , recUpdFields  = flds }
+            ; return ( RecordUpd noExtField (L l e) upd_flds
+                     , fv_e `plusFV` fv_flds ) }
+
+      -- 'OverloadedRecordUpdate' is in effect. Record dot update desugaring.
+      OverloadedRecUpdFields { olRecUpdFields = flds } ->
+        do { unlessXOptM LangExt.RebindableSyntax $
+               addErr TcRnNoRebindableSyntaxRecordDot
+           ; let punnedFields = [fld | (L _ fld) <- flds, hfbPun fld]
+           ; punsEnabled <- xoptM LangExt.NamedFieldPuns
+           ; unless (null punnedFields || punsEnabled) $
+               addErr TcRnNoFieldPunsRecordDot
+           ; (getField, fv_getField) <- lookupSyntaxName getFieldName
+           ; (setField, fv_setField) <- lookupSyntaxName setFieldName
+           ; (e, fv_e) <- rnExpr expr
+           ; (us, fv_us) <- rnHsUpdProjs flds
+            ; let upd_flds = OverloadedRecUpdFields
+                            { xOLRecUpdFields = noExtField
+                            , olRecUpdFields  = us }
+            ; return ( mkExpandedExpr
+                         (RecordUpd noExtField (L l e) upd_flds)
+                         (mkRecordDotUpd getField setField (L l e) us)
+                        , plusFVs [fv_getField, fv_setField, fv_e, fv_us] ) }
 
 rnExpr (HsRecSel x _) = dataConCantHappen x
 
@@ -2775,4 +2790,4 @@ rnHsUpdProjs us = do
                          hfbAnn = noAnn
                        , hfbLHS = fmap rnFieldLabelStrings fs
                        , hfbRHS = arg
-                       , hfbPun = pun}), fv ) }
+                       , hfbPun = pun }), fv ) }

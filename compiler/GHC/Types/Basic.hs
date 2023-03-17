@@ -16,6 +16,7 @@ types that
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable PromotionFlag, Binary PromotionFlag, Outputable Boxity, Binay Boxity
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -109,6 +110,8 @@ module GHC.Types.Basic (
         Levity(..), mightBeLifted, mightBeUnlifted,
         TypeOrConstraint(..),
 
+        TyConFlavour(..), TypeOrData(..), tyConFlavourAssoc_maybe,
+
         NonStandardDefaultingStrategy(..),
         DefaultingStrategy(..), defaultNonStandardTyVars,
 
@@ -124,12 +127,16 @@ import GHC.Utils.Panic
 import GHC.Utils.Binary
 import GHC.Types.SourceText
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Data
-import qualified Data.Semigroup as Semi
 import {-# SOURCE #-} Language.Haskell.Syntax.Type (PromotionFlag(..), isPromoted)
 import Language.Haskell.Syntax.Basic (Boxity(..), isBoxed, ConTag)
 
-{- *********************************************************************
+import Control.DeepSeq ( NFData(..) )
+import Data.Data
+import Data.Maybe
+import qualified Data.Semigroup as Semi
+
+{-
+************************************************************************
 *                                                                      *
           Binary choice
 *                                                                      *
@@ -1967,6 +1974,77 @@ data TypeOrConstraint
   = TypeLike | ConstraintLike
   deriving( Eq, Ord, Data )
 
+
+{- *********************************************************************
+*                                                                      *
+                          TyConFlavour
+*                                                                      *
+********************************************************************* -}
+
+-- | Paints a picture of what a 'TyCon' represents, in broad strokes.
+-- This is used towards more informative error messages.
+data TyConFlavour tc
+  = ClassFlavour
+  | TupleFlavour Boxity
+  | SumFlavour
+  | DataTypeFlavour
+  | NewtypeFlavour
+  | AbstractTypeFlavour
+  | OpenFamilyFlavour TypeOrData (Maybe tc) -- Just tc <=> (tc == associated class)
+  | ClosedTypeFamilyFlavour
+  | TypeSynonymFlavour
+  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
+  | PromotedDataConFlavour
+  deriving (Eq, Data, Functor)
+
+instance Outputable (TyConFlavour tc) where
+  ppr = text . go
+    where
+      go ClassFlavour = "class"
+      go (TupleFlavour boxed) | isBoxed boxed = "tuple"
+                              | otherwise     = "unboxed tuple"
+      go SumFlavour              = "unboxed sum"
+      go DataTypeFlavour         = "data type"
+      go NewtypeFlavour          = "newtype"
+      go AbstractTypeFlavour     = "abstract type"
+      go (OpenFamilyFlavour type_or_data mb_par)
+        = assoc ++ t_or_d ++ " family"
+        where
+          assoc = if isJust mb_par then "associated " else ""
+          t_or_d = case type_or_data of { IAmType -> "type"; IAmData -> "data" }
+      go ClosedTypeFamilyFlavour = "type family"
+      go TypeSynonymFlavour      = "type synonym"
+      go BuiltInTypeFlavour      = "built-in type"
+      go PromotedDataConFlavour  = "promoted data constructor"
+
+instance NFData tc => NFData (TyConFlavour tc) where
+  rnf ClassFlavour = ()
+  rnf (TupleFlavour !_) = ()
+  rnf SumFlavour = ()
+  rnf DataTypeFlavour = ()
+  rnf NewtypeFlavour = ()
+  rnf AbstractTypeFlavour = ()
+  rnf (OpenFamilyFlavour !_ mb_tc) = rnf mb_tc
+  rnf ClosedTypeFamilyFlavour = ()
+  rnf TypeSynonymFlavour = ()
+  rnf BuiltInTypeFlavour = ()
+  rnf PromotedDataConFlavour = ()
+
+-- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
+tyConFlavourAssoc_maybe :: TyConFlavour tc -> Maybe tc
+tyConFlavourAssoc_maybe (OpenFamilyFlavour _ mb_parent) = mb_parent
+tyConFlavourAssoc_maybe _                               = Nothing
+
+-- | Whether something is a type or a data declaration,
+-- e.g. a type family or a data family.
+data TypeOrData
+  = IAmData
+  | IAmType
+  deriving (Eq, Data)
+
+instance Outputable TypeOrData where
+  ppr IAmData = text "data"
+  ppr IAmType = text "type"
 
 {- *********************************************************************
 *                                                                      *

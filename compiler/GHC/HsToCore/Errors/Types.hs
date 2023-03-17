@@ -154,7 +154,7 @@ newtype DsArgNum = DsArgNum Int
 -- | Why TemplateHaskell rejected the splice. Used in the 'DsNotYetHandledByTH'
 -- constructor of a 'DsMessage'.
 data ThRejectionReason
-  = ThAmbiguousRecordUpdates !(HsRecUpdField GhcRn)
+  = ThAmbiguousRecordUpdates !(HsRecUpdField GhcRn GhcRn)
   | ThAbstractClosedTypeFamily !(LFamilyDecl GhcRn)
   | ThForeignLabel !CLabelString
   | ThForeignExport !(LForeignDecl GhcRn)

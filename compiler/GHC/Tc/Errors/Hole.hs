@@ -42,8 +42,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.DataCon
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( pprNameProvenance , GlobalRdrElt (..)
-                             , globalRdrEnvElts, greMangledName, grePrintableName )
+import GHC.Types.Name.Reader
 import GHC.Builtin.Names ( gHC_ERR )
 import GHC.Types.Id
 import GHC.Types.Var.Set
@@ -527,7 +526,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
        holeDisp = if sMs then holeVs
                   else sep $ replicate (length hfMatches) $ text "_"
        occDisp = case hfCand of
-                   GreHFCand gre   -> pprPrefixOcc (grePrintableName gre)
+                   GreHFCand gre   -> pprPrefixOcc (greName gre)
                    NameHFCand name -> pprPrefixOcc name
                    IdHFCand id_    -> pprPrefixOcc id_
        tyDisp = ppWhen sTy $ dcolon <+> ppr hfType
@@ -832,9 +831,9 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                        _ -> Nothing }
             where name = case hfc of
 #if __GLASGOW_HASKELL__ < 901
-                           IdHFCand id -> idName id
+                           IdHFCand id     -> idName id
 #endif
-                           GreHFCand gre -> greMangledName gre
+                           GreHFCand gre   -> greName gre
                            NameHFCand name -> name
           discard_it = go subs seen maxleft ty elts
           keep_it eid eid_ty wrp ms = go (fit:subs) (extendVarSet seen eid)

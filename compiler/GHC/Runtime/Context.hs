@@ -8,6 +8,7 @@ module GHC.Runtime.Context
    , substInteractiveContext
    , replaceImportEnv
    , icReaderEnv
+   , icExtendGblRdrEnv
    , icInteractiveModule
    , icInScopeTTs
    , icNamePprCtx
@@ -30,7 +31,6 @@ import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv
 import GHC.Core.Type
 
-import GHC.Types.Avail
 import GHC.Types.Fixity.Env
 import GHC.Types.Id.Info ( IdDetails(..) )
 import GHC.Types.Name
@@ -94,7 +94,7 @@ The details are a bit tricky though:
    call to initTc in initTcInteractive, which in turn get the module
    from it 'icInteractiveModule' field of the interactive context.
 
-   The 'homeUnitId' field stays as 'main' (or whatever -this-unit-id says.
+   The 'homeUnitId' field stays as 'main' (or whatever -this-unit-id says).
 
  * The main trickiness is that the type environment (tcg_type_env) and
    fixity envt (tcg_fix_env), now contain entities from all the
@@ -185,9 +185,12 @@ It's exactly the same for type-family instances.  See #7102
 Note [icReaderEnv recalculation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The GlobalRdrEnv describing what’s in scope at the prompts consists
-of all the imported things, followed by all the things defined on the prompt, with
-shadowing. Defining new things on the prompt is easy: we shadow as needed and then extend the environment.  But changing the set of imports, which can happen later as well,
-is tricky: we need to re-apply the shadowing from all the things defined at the prompt!
+of all the imported things, followed by all the things defined on the prompt,
+with shadowing. Defining new things on the prompt is easy: we shadow as needed,
+and then extend the environment.
+
+But changing the set of imports, which can happen later as well, is tricky
+we need to re-apply the shadowing from all the things defined at the prompt!
 
 For example:
 
@@ -196,22 +199,21 @@ For example:
     ghci> empty   -- Still gets the 'empty' defined at the prompt
     True
 
-
-It would be correct ot re-construct the env from scratch based on
+It would be correct to re-construct the env from scratch based on
 `ic_tythings`, but that'd be quite expensive if there are many entries in
 `ic_tythings` that shadow each other.
 
-Therefore we keep around a that `GlobalRdrEnv` in `igre_prompt_env` that
-contians _just_ the things defined at the prompt, and use that in
-`replaceImportEnv` to rebuild the full env.  Conveniently, `shadowNames` takes
-such an `OccEnv` to denote the set of names to shadow.
+Therefore we keep around a `GlobalRdrEnv` in `igre_prompt_env` that contains
+_just_ the things defined at the prompt, and use that in `replaceImportEnv` to
+rebuild the full env.  Conveniently, `shadowNames` takes such an `OccEnv`
+to denote the set of names to shadow.
 
 INVARIANT: Every `OccName` in `igre_prompt_env` is present unqualified as well
-(else it would not be right to use pass `igre_prompt_env` to `shadowNames`.)
+(else it would not be right to pass `igre_prompt_env` to `shadowNames`.)
 
-The definition of the IcGlobalRdrEnv type should conceptually be in this module, and
-made abstract, but it’s used in `Resume`, so it lives in GHC.Runtime.Eval.Type.
--
+The definition of the IcGlobalRdrEnv type should conceptually be in this module,
+and made abstract, but it’s used in `Resume`, so it lives in GHC.Runtime.Eval.Type.
+
 -}
 
 -- | Interactive context, recording information about the state of the
@@ -343,11 +345,10 @@ icInScopeTTs ictxt = filter in_scope_unqualified (ic_tythings ictxt)
   where
     in_scope_unqualified thing = or
         [ unQualOK gre
-        | avail <- tyThingAvailInfo thing
-        , name <- availNames avail
+        | gre <- tyThingLocalGREs thing
+        , let name = greName gre
         , Just gre <- [lookupGRE_Name (icReaderEnv ictxt) name]
         ]
-
 
 -- | Get the NamePprCtx function based on the flags and this InteractiveContext
 icNamePprCtx :: UnitEnv -> InteractiveContext -> NamePprCtx
@@ -412,8 +413,8 @@ replaceImportEnv igre import_env = igre { igre_env = new_env }
     import_env_shadowed = import_env `shadowNames` igre_prompt_env igre
     new_env = import_env_shadowed `plusGlobalRdrEnv` igre_prompt_env igre
 
--- | Add TyThings to the GlobalRdrEnv, earlier ones in the list shadowing
--- later ones, and shadowing existing entries in the GlobalRdrEnv.
+-- | Add 'TyThings' to the 'GlobalRdrEnv', earlier ones in the list shadowing
+-- later ones, and shadowing existing entries in the 'GlobalRdrEnv'.
 icExtendGblRdrEnv :: GlobalRdrEnv -> [TyThing] -> GlobalRdrEnv
 icExtendGblRdrEnv env tythings
   = foldr add env tythings  -- Foldr makes things in the front of
@@ -424,12 +425,10 @@ icExtendGblRdrEnv env tythings
        | is_sub_bndr thing
        = env
        | otherwise
-       = foldl' extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
+       = foldl' extendGlobalRdrEnv env1 new_gres
        where
-          new_gres = concatMap availGreNames avail
-          new_occs = occSetToEnv (mkOccSet (map occName new_gres))
-          env1  = shadowNames env new_occs
-          avail = tyThingAvailInfo thing
+          new_gres = tyThingLocalGREs thing
+          env1     = shadowNames env $ mkGlobalRdrEnv new_gres
 
     -- Ugh! The new_tythings may include record selectors, since they
     -- are not implicit-ids, and must appear in the TypeEnv.  But they

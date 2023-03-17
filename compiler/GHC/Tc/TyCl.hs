@@ -62,7 +62,7 @@ import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
 import GHC.Rename.Env( lookupConstructorFields )
 
 import GHC.Core.Multiplicity
-import GHC.Core.FamInstEnv
+import GHC.Core.FamInstEnv ( mkBranchedCoAxiom, mkCoAxBranch )
 import GHC.Core.Coercion
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
@@ -1390,7 +1390,7 @@ getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
              , fdTyVars    = ktvs
              , fdResultSig = unLoc -> resultSig
              , fdInfo      = info } } )
-  = do { let flav = getFamFlav Nothing info
+  = do { let flav = familyInfoTyConFlavour Nothing info
              ctxt = TyFamResKindCtxt name
        ; tc <- kcDeclHeader (InitialKindCheck msig) name flav ktvs $
                case famResultKindSignature resultSig of
@@ -1431,7 +1431,7 @@ get_fam_decl_initial_kind mb_parent_tycon
                -- by default
         | otherwise                         -> return AnyKind
   where
-    flav = getFamFlav mb_parent_tycon info
+    flav = familyInfoTyConFlavour mb_parent_tycon info
     ctxt = TyFamResKindCtxt name
 
 -- See Note [Standalone kind signatures for associated types]
@@ -1451,7 +1451,7 @@ check_initial_kind_assoc_fam cls
       Nothing -> return (TheKind liftedTypeKind)
   where
     ctxt = TyFamResKindCtxt name
-    flav = getFamFlav (Just cls) info
+    flav = familyInfoTyConFlavour (Just cls) info
 
 {- Note [Standalone kind signatures for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1534,29 +1534,6 @@ However, there are two twists:
     Otherwise, it would be impossible to declare unlifted data types in H98
     syntax (which doesn't allow specification of a result kind).
 
--}
-
----------------------------------
-getFamFlav
-  :: Maybe TcTyCon    -- ^ Just cls <=> this is an associated family of class cls
-  -> FamilyInfo pass
-  -> TyConFlavour
-getFamFlav mb_parent_tycon info =
-  case info of
-    DataFamily         -> DataFamilyFlavour mb_parent_tycon
-    OpenTypeFamily     -> OpenTypeFamilyFlavour mb_parent_tycon
-    ClosedTypeFamily _ -> assert (isNothing mb_parent_tycon) -- See Note [Closed type family mb_parent_tycon]
-                          ClosedTypeFamilyFlavour
-
-{- Note [Closed type family mb_parent_tycon]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's no way to write a closed type family inside a class declaration:
-
-  class C a where
-    type family F a where  -- error: parse error on input ‘where’
-
-In fact, it is not clear what the meaning of such a declaration would be.
-Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
 -}
 
 ------------------------------------------------------------------------
@@ -4337,8 +4314,9 @@ checkPartialRecordField all_cons fld
           sep [text "Use of partial record field selector" <> colon,
                 nest 2 $ quotes (ppr occ_name)])
   where
-    loc = getSrcSpan (flSelector fld)
-    occ_name = occName fld
+    sel = flSelector fld
+    loc = getSrcSpan sel
+    occ_name = nameOccName sel
 
     (cons_with_field, cons_without_field) = partition has_field all_cons
     has_field con = fld `elem` (dataConFieldLabels con)

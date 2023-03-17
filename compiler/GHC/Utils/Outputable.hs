@@ -31,7 +31,8 @@ module GHC.Utils.Outputable (
         SDoc, runSDoc, PDoc(..),
         docToSDoc,
         interppSP, interpp'SP, interpp'SP',
-        pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
+        pprQuotedList, pprWithCommas,
+        quotedListWithOr, quotedListWithNor, quotedListWithAnd,
         pprWithBars,
         spaceIfSingleQuote,
         isEmpty, nest,
@@ -150,6 +151,7 @@ import Numeric (showFFloat)
 import Data.Graph (SCC(..))
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
+import Data.Semigroup (Arg(..))
 import qualified Data.List.NonEmpty as NEL
 import Data.Time
 import Data.Time.Format.ISO8601
@@ -949,6 +951,9 @@ instance (Outputable a) => Outputable [a] where
 instance (Outputable a) => Outputable (NonEmpty a) where
     ppr = ppr . NEL.toList
 
+instance (Outputable a, Outputable b) => Outputable (Arg a b) where
+    ppr (Arg a b) = text "Arg" <+> ppr a <+> ppr b
+
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (pprWithCommas ppr (Set.toList s))
 
@@ -1382,6 +1387,11 @@ quotedListWithNor :: [SDoc] -> SDoc
 -- [x,y,z]  ==>  `x', `y' nor `z'
 quotedListWithNor xs@(_:_:_) = quotedList (init xs) <+> text "nor" <+> quotes (last xs)
 quotedListWithNor xs = quotedList xs
+
+quotedListWithAnd :: [SDoc] -> SDoc
+-- [x,y,z]  ==>  `x', `y' and `z'
+quotedListWithAnd xs@(_:_:_) = quotedList (init xs) <+> text "and" <+> quotes (last xs)
+quotedListWithAnd xs = quotedList xs
 
 {-
 ************************************************************************

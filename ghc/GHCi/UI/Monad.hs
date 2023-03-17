@@ -51,7 +51,7 @@ import GHC.Types.SafeHaskell
 import GHC.Driver.Make (ModIfaceCache(..))
 import GHC.Unit
 import GHC.Types.Name.Reader as RdrName (mkOrig)
-import qualified GHC.Types.Name.Ppr as Ppr (mkNamePprCtx )
+import qualified GHC.Types.Name.Ppr as Ppr (mkNamePprCtx)
 import GHC.Builtin.Names (gHC_GHCI_HELPERS)
 import GHC.Runtime.Interpreter
 import GHC.Runtime.Context
@@ -367,10 +367,11 @@ printForUserNeverQualify doc = do
 printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
 printForUserModInfo info = printForUserGlobalRdrEnv (GHC.modInfoRdrEnv info)
 
-printForUserGlobalRdrEnv :: GhcMonad m => Maybe GlobalRdrEnv -> SDoc -> m ()
+printForUserGlobalRdrEnv :: (GhcMonad m, Outputable info)
+                         => Maybe (GlobalRdrEnvX info) -> SDoc -> m ()
 printForUserGlobalRdrEnv mb_rdr_env doc = do
   dflags <- GHC.getInteractiveDynFlags
-  name_ppr_ctx  <- mkNamePprCtxFromGlobalRdrEnv dflags mb_rdr_env
+  name_ppr_ctx <- mkNamePprCtxFromGlobalRdrEnv dflags mb_rdr_env
   liftIO $ Ppr.printForUser dflags stdout name_ppr_ctx AllTheWay doc
     where
       mkNamePprCtxFromGlobalRdrEnv _ Nothing = GHC.getNamePprCtx

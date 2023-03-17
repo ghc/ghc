@@ -9,6 +9,8 @@ unbound variables.
 module GHC.Rename.Unbound
    ( mkUnboundName
    , mkUnboundNameRdr
+   , mkUnboundGRE
+   , mkUnboundGRERdr
    , isUnboundName
    , reportUnboundName
    , reportUnboundName'
@@ -102,6 +104,12 @@ data IsTermInTypes = UnknownTermInTypes RdrName | TermInTypes RdrName | NoTermIn
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
+mkUnboundGRE :: OccName -> GlobalRdrElt
+mkUnboundGRE occ = localVanillaGRE NoParent $ mkUnboundName occ
+
+mkUnboundGRERdr :: RdrName -> GlobalRdrElt
+mkUnboundGRERdr rdr = localVanillaGRE NoParent $ mkUnboundNameRdr rdr
+
 reportUnboundName' :: WhatLooking -> RdrName -> RnM Name
 reportUnboundName' what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
 
@@ -165,11 +173,17 @@ notInScopeErr where_look rdr_name
   = NotInScope
 
 -- | Called from the typechecker ("GHC.Tc.Errors") when we find an unbound variable
-unknownNameSuggestions :: WhatLooking -> DynFlags
-                       -> HomePackageTable -> Module
-                       -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
-                       -> RdrName -> ([ImportError], [GhcHint])
-unknownNameSuggestions what_look = unknownNameSuggestions_ (LF what_look WL_Anywhere)
+unknownNameSuggestions :: LocalRdrEnv -> WhatLooking -> RdrName -> RnM ([ImportError], [GhcHint])
+unknownNameSuggestions lcl_env what_look tried_rdr_name =
+  do { dflags  <- getDynFlags
+     ; hpt     <- getHpt
+     ; rdr_env <- getGlobalRdrEnv
+     ; imp_info <- getImports
+     ; curr_mod <- getModule
+     ; return $
+        unknownNameSuggestions_
+          (LF what_look WL_Anywhere)
+          dflags hpt curr_mod rdr_env lcl_env imp_info tried_rdr_name }
 
 unknownNameSuggestions_ :: LookingFor -> DynFlags
                        -> HomePackageTable -> Module
@@ -197,8 +211,8 @@ fieldSelectorSuggestions global_env tried_rdr_name
   | null gres = []
   | otherwise = [RemindFieldSelectorSuppressed tried_rdr_name parents]
   where
-    gres = filter isNoFieldSelectorGRE $
-               lookupGRE_RdrName' tried_rdr_name global_env
+    gres = filter isNoFieldSelectorGRE
+         $ lookupGRE_RdrName (IncludeFields WantField) global_env tried_rdr_name
     parents = [ parent | ParentIs parent <- map gre_par gres ]
 
 similarNameSuggestions :: LookingFor -> DynFlags
@@ -341,7 +355,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
             = any (isGreOk looking_for) $
-              lookupGlobalRdrEnv (imv_all_exports imv) occ_name
+              lookupGRE_OccName (AllNameSpaces WantNormal) (imv_all_exports imv) occ_name
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list
@@ -359,9 +373,9 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
       hpt_uniques = map fst (udfmToList hpt)
       is_last_loaded_mod modnam uniqs = lastMaybe uniqs == Just (getUnique modnam)
       glob_mods = nub [ mod
-                     | gre <- globalRdrEnvElts global_env
-                     , (mod, _) <- qualsInScope gre
-                     ]
+                      | gre <- globalRdrEnvElts global_env
+                      , (mod, _) <- qualsInScope gre
+                      ]
 
 extensionSuggestions :: RdrName -> [GhcHint]
 extensionSuggestions rdrName
@@ -403,12 +417,15 @@ nameSpacesRelated :: DynFlags    -- ^ to find out whether -XDataKinds is enabled
                   -> NameSpace   -- ^ Name space of a name that might have been meant
                   -> Bool
 nameSpacesRelated dflags what_looking ns ns'
-  = ns' `elem` ns : [ other_ns
-                    | (orig_ns, others) <- other_namespaces
-                    , ns == orig_ns
-                    , (other_ns, wls) <- others
-                    , what_looking `elem` WL_Anything : wls
-                    ]
+  | ns == ns'
+  = True
+  | otherwise
+  = or [ other_ns ns'
+       | (orig_ns, others) <- other_namespaces
+       , orig_ns ns
+       , (other_ns, wls) <- others
+       , what_looking `elem` WL_Anything : wls
+       ]
   where
     -- explanation:
     -- [(orig_ns, [(other_ns, what_looking_possibilities)])]
@@ -416,19 +433,21 @@ nameSpacesRelated dflags what_looking ns ns'
     -- and what_looking is either WL_Anything or is one of
     -- what_looking_possibilities
     other_namespaces =
-      [ (varName  , [(dataName, [WL_Constructor])])
-      , (dataName , [(varName , [WL_RecField])])
-      , (tvName   , (tcClsName, [WL_Constructor]) : promoted_datacons)
-      , (tcClsName, (tvName   , []) : promoted_datacons)
+      [ (isVarNameSpace     , [(isFieldNameSpace  , [WL_RecField])
+                              ,(isDataConNameSpace, [WL_Constructor])])
+      , (isDataConNameSpace , [(isVarNameSpace    , [WL_RecField])])
+      , (isTvNameSpace      , (isTcClsNameSpace   , [WL_Constructor])
+                              : promoted_datacons)
+      , (isTcClsNameSpace   , (isTvNameSpace     , [])
+                              : promoted_datacons)
       ]
     -- If -XDataKinds is enabled, the data constructor name space is also
     -- related to the type-level name spaces
     data_kinds = xopt LangExt.DataKinds dflags
-    promoted_datacons = [(dataName, [WL_Constructor]) | data_kinds]
+    promoted_datacons = [(isDataConNameSpace, [WL_Constructor]) | data_kinds]
 
-{-
-Note [Related name spaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Related name spaces]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Name spaces are related if there is a chance to mean the one when one writes
 the other, i.e. variables <-> data constructors and type variables <-> type
 constructors.

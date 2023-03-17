@@ -2,10 +2,10 @@
 T13132_duplicaterecflds.hs:7:16: error:
     Ambiguous occurrence ‘runContT’
     It could refer to
-       either the field ‘runContT’ of record ‘ContT2’,
-              defined at T13132_duplicaterecflds.hs:5:33
-           or the field ‘runContT’ of record ‘ContT’,
+       either the field ‘runContT’ of record ‘ContT’,
               defined at T13132_duplicaterecflds.hs:4:31
+           or the field ‘runContT’ of record ‘ContT2’,
+              defined at T13132_duplicaterecflds.hs:5:33
 
 T13132_duplicaterecflds.hs:9:11: error:
     The operator ‘runContT’ [infixl 9] of a section
@@ -16,7 +16,7 @@ T13132_duplicaterecflds.hs:9:11: error:
 T13132_duplicaterecflds.hs:9:12: error:
     Ambiguous occurrence ‘runContT’
     It could refer to
-       either the field ‘runContT’ of record ‘ContT2’,
-              defined at T13132_duplicaterecflds.hs:5:33
-           or the field ‘runContT’ of record ‘ContT’,
+       either the field ‘runContT’ of record ‘ContT’,
               defined at T13132_duplicaterecflds.hs:4:31
+           or the field ‘runContT’ of record ‘ContT2’,
+              defined at T13132_duplicaterecflds.hs:5:33

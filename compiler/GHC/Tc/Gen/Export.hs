@@ -3,17 +3,18 @@
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
 
-module GHC.Tc.Gen.Export (rnExports, exports_from_avail) where
+module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Types.FieldLabel
 import GHC.Builtin.Names
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
+    ( TyThing(AConLike, AnId), tcLookupGlobal, tcLookupTyCon )
 import GHC.Tc.Utils.TcType
+import GHC.Rename.Doc
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
@@ -28,6 +29,9 @@ import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Env
+import GHC.Driver.Session
+import GHC.Parser.PostProcess ( setRdrNameSpace )
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc as SrcLoc
@@ -40,11 +44,10 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name.Reader
 
-import Control.Monad
-import GHC.Driver.Session
-import GHC.Parser.PostProcess ( setRdrNameSpace )
-import Data.Either            ( partitionEithers )
-import GHC.Rename.Doc
+import Control.Arrow ( first )
+import Control.Monad ( when )
+import qualified Data.List.NonEmpty as NE
+import Data.Traversable   ( for )
 
 {-
 ************************************************************************
@@ -147,7 +150,7 @@ accumExports f = fmap (catMaybes . snd) . mapAccumLM f' emptyExportAccum
             Just (Just (acc', y)) -> (acc', Just y)
             _                     -> (acc, Nothing)
 
-type ExportOccMap = OccEnv (GreName, IE GhcPs)
+type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName
         --   in an export list refers to, and which item
         --   it came from.  It's illegal to export two distinct things
@@ -206,7 +209,7 @@ rnExports explicit_mod exports
                 else checkNoErrs do_it
 
         -- Final processing
-        ; let final_ns = availsToNameSetWithSelectors final_avails
+        ; let final_ns = availsToNameSet final_avails
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
 
@@ -249,8 +252,10 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     -- only data families can locally define subordinate things (`ns` here)
     -- without locally defining (and instead importing) the parent (`n`)
     fix_faminst avail@(AvailTC n ns)
-      | availExportsDecl avail = avail
-      | otherwise = AvailTC n (NormalGreName n:ns)
+      | availExportsDecl avail
+      = avail
+      | otherwise
+      = AvailTC n (n:ns)
     fix_faminst avail = avail
 
 
@@ -270,8 +275,11 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -- See Note [Avails of associated data families]
     expand_tyty_gre :: GlobalRdrElt -> [GlobalRdrElt]
     expand_tyty_gre (gre@GRE { gre_par = ParentIs p })
-      | isTyConName p, isTyConName (greMangledName gre) = [gre, gre{ gre_par = NoParent }]
-    expand_tyty_gre gre = [gre]
+      | isTyConName p
+      , isTyConName (greName gre)
+      = [gre, gre{ gre_par = NoParent }]
+    expand_tyty_gre gre
+      = [gre]
 
     imported_modules = [ imv_name imv
                        | xs <- moduleEnvElts $ imp_mods imports
@@ -281,120 +289,133 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                       -> RnM (Maybe (ExportAccum, (LIE GhcRn, Avails)))
     exports_from_item (ExportAccum occs earlier_mods)
                       (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
-        | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
-        = do { addDiagnostic (TcRnDupeModuleExport mod) ;
-               return Nothing }
+      | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
+      = do { addDiagnostic (TcRnDupeModuleExport mod)
+           ; return Nothing}
 
-        | otherwise
-        = do { let { exportValid = (mod `elem` imported_modules)
-                                || (moduleName this_mod == mod)
-                   ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
-                   ; new_exports = [ availFromGRE gre'
-                                   | (gre, _) <- gre_prs
-                                   , gre' <- expand_tyty_gre gre ]
-                   ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
-                   ; mods        = addOneToUniqSet earlier_mods mod
-                   }
+      | otherwise
+      = do { let { exportValid = (mod `elem` imported_modules)
+                               || (moduleName this_mod == mod)
+                 ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
+                 ; new_gres    = [ gre'
+                                 | (gre, _) <- gre_prs
+                                 , gre' <- expand_tyty_gre gre ]
+                 ; new_exports = map availFromGRE new_gres
+                 ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
+                 ; mods        = addOneToUniqSet earlier_mods mod
+                 }
 
-             ; checkErr exportValid (TcRnExportedModNotImported mod)
-             ; warnIf (exportValid && null gre_prs) (TcRnNullExportedModule mod)
+            ; checkErr exportValid (TcRnExportedModNotImported mod)
+            ; warnIf (exportValid && null gre_prs) (TcRnNullExportedModule mod)
 
-             ; traceRn "efa" (ppr mod $$ ppr all_gres)
-             ; addUsedGREs all_gres
+            ; traceRn "efa" (ppr mod $$ ppr all_gres)
+            ; addUsedGREs all_gres
 
-             ; occs' <- check_occs ie occs new_exports
-                      -- This check_occs not only finds conflicts
-                      -- between this item and others, but also
-                      -- internally within this item.  That is, if
-                      -- 'M.x' is in scope in several ways, we'll have
-                      -- several members of mod_avails with the same
-                      -- OccName.
-             ; traceRn "export_mod"
-                       (vcat [ ppr mod
-                             , ppr new_exports ])
-
-             ; return (Just ( ExportAccum occs' mods
-                            , ( L loc (IEModuleContents noExtField lmod)
-                              , new_exports))) }
+            ; occs' <- check_occs occs ie new_gres
+                          -- This check_occs not only finds conflicts
+                          -- between this item and others, but also
+                          -- internally within this item.  That is, if
+                          -- 'M.x' is in scope in several ways, we'll have
+                          -- several members of mod_avails with the same
+                          -- OccName.
+            ; traceRn "export_mod"
+                      (vcat [ ppr mod
+                            , ppr new_exports ])
+            ; return $ Just $
+                ( ExportAccum occs' mods
+                , ( L loc (IEModuleContents noExtField lmod)
+                , new_exports) ) }
 
     exports_from_item acc@(ExportAccum occs mods) (L loc ie) = do
         m_new_ie <- lookup_doc_ie ie
         case m_new_ie of
-          Just new_ie -> return (Just (acc, (L loc new_ie, [])))
+          Just new_ie -> return $ Just (acc, (L loc new_ie, []))
           Nothing -> do
-             (new_ie, avail) <- lookup_ie ie
-             if isUnboundName (ieName new_ie)
-                  then return Nothing    -- Avoid error cascade
-                  else do
-
-                    occs' <- check_occs ie occs [avail]
-
-                    return (Just ( ExportAccum occs' mods
-                                 , (L loc new_ie, [avail])))
+            let finish (occs', new_ie, avail) = (ExportAccum occs' mods, (L loc new_ie, [avail]))
+            fmap finish <$> lookup_ie occs ie
 
     -------------
-    lookup_ie :: IE GhcPs -> RnM (IE GhcRn, AvailInfo)
-    lookup_ie (IEVar _ (L l rdr))
-        = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEVar noExtField (L l (replaceWrappedName rdr name)), avail)
+    lookup_ie :: ExportOccMap -> IE GhcPs -> RnM (Maybe (ExportOccMap, IE GhcRn, AvailInfo))
+    lookup_ie occs ie@(IEVar ann (L l rdr))
+        = do mb_gre <- lookupGreAvailRn $ ieWrappedName rdr
+             for mb_gre $ \ gre -> do
+               let avail = availFromGRE gre
+                   name = greName gre
+               occs' <- check_occs occs ie [gre]
+               return (occs', IEVar ann (L l (replaceWrappedName rdr name)), avail)
 
-    lookup_ie (IEThingAbs _ (L l rdr))
-        = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEThingAbs noAnn (L l (replaceWrappedName rdr name))
-                    , avail)
+    lookup_ie occs ie@(IEThingAbs ann (L l rdr))
+        = do mb_gre <- lookupGreAvailRn $ ieWrappedName rdr
+             for mb_gre $ \ gre -> do
+               let avail = availFromGRE gre
+                   name = greName gre
+               occs' <- check_occs occs ie [gre]
+               return ( occs'
+                      , IEThingAbs ann (L l (replaceWrappedName rdr name))
+                      , avail)
 
-    lookup_ie ie@(IEThingAll _ n')
+    lookup_ie occs ie@(IEThingAll ann n')
         = do
-            (n, avail, flds) <- lookup_ie_all ie n'
+            (n, kids) <- lookup_ie_all ie n'
             let name = unLoc n
-            return (IEThingAll noAnn (replaceLWrappedName n' (unLoc n))
-                   , availTC name (name:avail) flds)
+                avails = map greName kids
+            occs' <- check_occs occs ie kids
+            return $ Just
+              ( occs'
+              , IEThingAll ann (replaceLWrappedName n' (unLoc n))
+              , AvailTC name (name:avails))
 
-
-    lookup_ie ie@(IEThingWith _ l wc sub_rdrs)
+    lookup_ie occs ie@(IEThingWith ann l wc sub_rdrs)
         = do
-            (lname, subs, avails, flds)
+            (lname, subs, with_gres)
               <- addExportErrCtxt ie $ lookup_ie_with l sub_rdrs
-            (_, all_avail, all_flds) <-
+
+            (_, wc_gres) <-
               case wc of
-                NoIEWildcard -> return (lname, [], [])
+                NoIEWildcard -> return (lname, [])
                 IEWildcard _ -> lookup_ie_all ie l
+
             let name = unLoc lname
-            let flds' = flds ++ (map noLoc all_flds)
-            return (IEThingWith flds' (replaceLWrappedName l name) wc subs,
-                    availTC name (name : avails ++ all_avail)
-                                 (map unLoc flds ++ all_flds))
+                all_names = name : map greName (with_gres ++ wc_gres)
+                gres = localVanillaGRE NoParent name
+                         -- localVanillaGRE might not be correct here,
+                         -- but these GREs are only passed to check_occs
+                         -- which only needs the correct Name for the GREs...
+                     :  with_gres ++ wc_gres
 
+            occs' <- check_occs occs ie gres
+            return $ Just $
+              ( occs'
+              , IEThingWith ann (replaceLWrappedName l name) wc subs
+              , AvailTC name all_names)
 
-    lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
+    lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
 
     lookup_ie_with :: LIEWrappedName GhcPs -> [LIEWrappedName GhcPs]
-                   -> RnM (Located Name, [LIEWrappedName GhcRn], [Name],
-                           [Located FieldLabel])
-    lookup_ie_with (L l rdr) sub_rdrs
-        = do name <- lookupGlobalOccRn $ ieWrappedName rdr
-             (non_flds, flds) <- lookupChildrenExport name sub_rdrs
-             if isUnboundName name
-                then return (L (locA l) name, [], [name], [])
-                else return (L (locA l) name, non_flds
-                            , map (ieWrappedName . unLoc) non_flds
-                            , flds)
+                   -> RnM (Located Name, [LIEWrappedName GhcRn], [GlobalRdrElt])
+    lookup_ie_with (L l rdr) sub_rdrs =
+      do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
+         ; let name = greName gre
+         ; kids <- lookupChildrenExport name sub_rdrs
+         ; if isUnboundName name
+           then return (L (locA l) name, [], [gre])
+           else return (L (locA l) name, map fst kids, map snd kids) }
 
     lookup_ie_all :: IE GhcPs -> LIEWrappedName GhcPs
-                  -> RnM (Located Name, [Name], [FieldLabel])
+                  -> RnM (Located Name, [GlobalRdrElt])
     lookup_ie_all ie (L l rdr) =
-          do name <- lookupGlobalOccRn $ ieWrappedName rdr
-             let gres = findChildren kids_env name
-                 (non_flds, flds) = classifyGREs gres
-             addUsedKids (ieWrappedName rdr) gres
-             when (null gres) $
-                  if isTyConName name
-                  then addTcRnDiagnostic (TcRnDodgyExports name)
-                  else -- This occurs when you export T(..), but
-                       -- only import T abstractly, or T is a synonym.
-                       addErr (TcRnExportHiddenComponents ie)
-             return (L (locA l) name, non_flds, flds)
+      do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
+         ; let name = greName gre
+               gres = findChildren kids_env name
+         ; addUsedKids (ieWrappedName rdr) gres
+         ; when (null gres) $
+            if isTyConName name
+            then addTcRnDiagnostic (TcRnDodgyExports gre)
+            else -- This occurs when you export T(..), but
+                 -- only import T abstractly, or T is a synonym.
+                 addErr (TcRnExportHiddenComponents ie)
+         ; return (L (locA l) name, gres) }
 
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (Maybe (IE GhcRn))
@@ -412,9 +433,6 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -- Happily pickGREs does just the right thing
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
     addUsedKids parent_rdr kid_gres = addUsedGREs (pickGREs parent_rdr kid_gres)
-
-classifyGREs :: [GlobalRdrElt] -> ([Name], [FieldLabel])
-classifyGREs = partitionGreNames . map gre_name
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
@@ -477,11 +495,8 @@ If the module has NO main function:
 
 
 lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
-                     -> RnM ([LIEWrappedName GhcRn], [Located FieldLabel])
-lookupChildrenExport spec_parent rdr_items =
-  do
-    xs <- mapAndReportM doOne rdr_items
-    return $ partitionEithers xs
+                     -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
+lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
     where
         -- Pick out the possible namespaces in order of priority
         -- This is a consequence of how the parser parses all
@@ -489,11 +504,13 @@ lookupChildrenExport spec_parent rdr_items =
         choosePossibleNamespaces :: NameSpace -> [NameSpace]
         choosePossibleNamespaces ns
           | ns == varName = [varName, tcName]
+            -- NB: for varName, we will also end up looking in the
+            -- record field namespaces.
           | ns == tcName  = [dataName, tcName]
           | otherwise = [ns]
         -- Process an individual child
         doOne :: LIEWrappedName GhcPs
-              -> RnM (Either (LIEWrappedName GhcRn) (Located FieldLabel))
+              -> RnM (LIEWrappedName GhcRn, GlobalRdrElt)
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
@@ -507,18 +524,20 @@ lookupChildrenExport spec_parent rdr_items =
           -- messages
           let unboundName :: RdrName
               unboundName = if rdrNameSpace bareName == varName
-                                then bareName
-                                else setRdrNameSpace bareName dataName
+                            then bareName
+                            else setRdrNameSpace bareName dataName
 
           case name of
-            NameNotFound -> do { ub <- reportUnboundName unboundName
-                               ; let l = getLoc n
-                               ; return (Left (L l (IEName noExtField (L (la2na l) ub))))}
-            FoundChild par child -> do { checkPatSynParent spec_parent par child
-                                       ; return $ case child of
-                                           FieldGreName fl   -> Right (L (getLocA n) fl)
-                                           NormalGreName  name -> Left (replaceLWrappedName n name)
-                                       }
+            NameNotFound ->
+              do { ub <- reportUnboundName unboundName
+                 ; let l = getLoc n
+                       gre = localVanillaGRE NoParent ub
+                 ; return (L l (IEName noExtField (L (la2na l) ub)), gre)}
+            FoundChild child@(GRE { gre_par = par }) ->
+              do { checkPatSynParent spec_parent par child
+                 ; let child_nm = greName child
+                 ; return (replaceLWrappedName n child_nm, child)
+                 }
             IncorrectParent p c gs -> failWithDcErr p c gs
 
 
@@ -582,30 +601,32 @@ lookupChildrenExport spec_parent rdr_items =
 checkPatSynParent :: Name    -- ^ Alleged parent type constructor
                              -- User wrote T( P, Q )
                   -> Parent  -- The parent of P we discovered
-                  -> GreName   -- ^ Either a
-                             --   a) Pattern Synonym Constructor
-                             --   b) A pattern synonym selector
+                  -> GlobalRdrElt
+                       -- ^ Either a
+                       --   a) Pattern Synonym Constructor
+                       --   b) A pattern synonym selector
                   -> TcM ()  -- Fails if wrong parent
 checkPatSynParent _ (ParentIs {}) _
   = return ()
 
-checkPatSynParent parent NoParent gname
+checkPatSynParent parent NoParent gre
   | isUnboundName parent -- Avoid an error cascade
   = return ()
 
   | otherwise
-  = do { parent_ty_con  <- tcLookupTyCon parent
-       ; mpat_syn_thing <- tcLookupGlobal (greNameMangledName gname)
+  = do { parent_ty_con  <- tcLookupTyCon  parent
+       ; let nm = greName gre
+       ; mpat_syn_thing <- tcLookupGlobal nm
 
         -- 1. Check that the Id was actually from a thing associated with patsyns
        ; case mpat_syn_thing of
             AnId i | isId i
                    , RecSelId { sel_tycon = RecSelPatSyn p } <- idDetails i
-                   -> handle_pat_syn (selErr gname) parent_ty_con p
+                   -> handle_pat_syn (selErr nm) parent_ty_con p
 
             AConLike (PatSynCon p) -> handle_pat_syn (psErr p) parent_ty_con p
 
-            _ -> failWithDcErr parent gname [] }
+            _ -> failWithDcErr parent gre [] }
   where
     psErr  = exportErrCtxt "pattern synonym"
     selErr = exportErrCtxt "pattern synonym record selector"
@@ -641,73 +662,65 @@ checkPatSynParent parent NoParent gname
 
 
 {-===========================================================================-}
-check_occs :: IE GhcPs -> ExportOccMap -> [AvailInfo]
-           -> RnM ExportOccMap
-check_occs ie occs avails
-  -- 'avails' are the entities specified by 'ie'
-  = foldlM check occs children
+
+-- | Check that the each of the given 'GlobalRdrElt's does not appear multiple
+-- times in the 'ExportOccMap', as per Note [Exporting duplicate declarations].
+check_occs :: ExportOccMap -> IE GhcPs -> [GlobalRdrElt] -> RnM ExportOccMap
+check_occs occs ie gres
+  -- 'gres' are the entities specified by 'ie'
+  = do { drf <- xoptM LangExt.DuplicateRecordFields
+       ; foldlM (check drf) occs gres }
   where
-    children = concatMap availGreNames avails
 
     -- Check for distinct children exported with the same OccName (an error) or
     -- for duplicate exports of the same child (a warning).
-    check :: ExportOccMap -> GreName -> RnM ExportOccMap
-    check occs child
-      = case try_insert occs child of
-          Right occs' -> return occs'
+    --
+    -- See Note [Exporting duplicate declarations].
+    check :: Bool -> ExportOccMap -> GlobalRdrElt -> RnM ExportOccMap
+    check drf_enabled occs gre
+      = case try_insert occs gre of
+          Right occs'
+            -- If DuplicateRecordFields is not enabled, also make sure
+            -- that we are not exporting two fields with the same occNameFS
+            -- under different namespaces.
+            --
+            -- See Note [Exporting duplicate record fields].
+            | drf_enabled || not (isFieldOcc child_occ)
+            -> return occs'
+            | otherwise
+            -> do { let flds = filter (\(_,ie') -> not $ dupFieldExport_ok ie ie')
+                             $ lookupFieldsOccEnv occs (occNameFS child_occ)
+                  ; case flds of { [] -> return occs'; clash1:clashes ->
+               do { addDuplicateFieldExportErr (gre,ie) (clash1 NE.:| clashes)
+                  ; return occs } } }
 
           Left (child', ie')
-            | greNameMangledName child == greNameMangledName child'   -- Duplicate export
-            -- But we don't want to warn if the same thing is exported
-            -- by two different module exports. See ticket #4478.
-            -> do { warnIf (not (dupExport_ok child ie ie')) (TcRnDuplicateExport child ie ie')
+            | child == child' -- Duplicate export of a single Name: a warning.
+            -> do { warnIf (not (dupExport_ok child ie ie')) (TcRnDuplicateExport gre ie ie')
                   ; return occs }
 
-            | otherwise    -- Same occ name but different names: an error
-            ->  do { global_env <- getGlobalRdrEnv ;
-                     addErr (exportClashErr global_env child' child ie' ie) ;
-                     return occs }
+            | otherwise       -- Same OccName but different Name: an error.
+            ->  do { global_env <- getGlobalRdrEnv
+                   ; addErr (exportClashErr global_env child' child ie' ie)
+                   ; return occs }
+      where
+        child = greName gre
+        child_occ = occName child
 
     -- Try to insert a child into the map, returning Left if there is something
-    -- already exported with the same OccName
-    try_insert :: ExportOccMap -> GreName -> Either (GreName, IE GhcPs) ExportOccMap
+    -- already exported with the same OccName.
+    try_insert :: ExportOccMap -> GlobalRdrElt -> Either (Name, IE GhcPs) ExportOccMap
     try_insert occs child
-      = case lookupOccEnv occs name_occ of
-          Nothing -> Right (extendOccEnv occs name_occ (child, ie))
+      = case lookupOccEnv occs occ of
+          Nothing -> Right (extendOccEnv occs occ (greName child, ie))
           Just x  -> Left x
       where
-        -- For fields, we check for export clashes using the (OccName of the)
-        -- selector Name
-        name_occ = nameOccName (greNameMangledName child)
+        occ = greOccName child
 
-
-dupExport_ok :: GreName -> IE GhcPs -> IE GhcPs -> Bool
--- The GreName is exported by both IEs. Is that ok?
--- "No"  iff the name is mentioned explicitly in both IEs
---        or one of the IEs mentions the name *alone*
--- "Yes" otherwise
+-- | Is it OK for the given name to be exported by both export items?
 --
--- Examples of "no":  module M( f, f )
---                    module M( fmap, Functor(..) )
---                    module M( module Data.List, head )
---
--- Example of "yes"
---    module M( module A, module B ) where
---        import A( f )
---        import B( f )
---
--- Example of "yes" (#2436)
---    module M( C(..), T(..) ) where
---         class C a where { data T a }
---         instance C Int where { data T Int = TInt }
---
--- Example of "yes" (#2436)
---    module Foo ( T ) where
---      data family T a
---    module Bar ( T(..), module Foo ) where
---        import Foo
---        data instance T Int = TInt
-
+-- See Note [Exporting duplicate declarations].
+dupExport_ok :: Name -> IE GhcPs -> IE GhcPs -> Bool
 dupExport_ok child ie1 ie2
   = not (  single ie1 || single ie2
         || (explicit_in ie1 && explicit_in ie2) )
@@ -719,8 +732,7 @@ dupExport_ok child ie1 ie2
 
     single IEVar {}      = True
     single IEThingAbs {} = True
-    single _               = False
-
+    single _             = False
 
 exportErrCtxt :: Outputable o => String -> o -> SDoc
 exportErrCtxt herald exp =
@@ -734,18 +746,18 @@ addExportErrCtxt ie = addErrCtxt exportCtxt
     exportCtxt = text "In the export:" <+> ppr ie
 
 
-failWithDcErr :: Name -> GreName -> [Name] -> TcM a
+failWithDcErr :: Name -> GlobalRdrElt -> [Name] -> TcM a
 failWithDcErr parent child parents = do
-  ty_thing <- tcLookupGlobal (greNameMangledName child)
+  ty_thing <- tcLookupGlobal (greName child)
   failWithTc $ TcRnExportedParentChildMismatch parent ty_thing child parents
 
 
 exportClashErr :: GlobalRdrEnv
-               -> GreName -> GreName
+               -> Name -> Name
                -> IE GhcPs -> IE GhcPs
                -> TcRnMessage
 exportClashErr global_env child1 child2 ie1 ie2
-  = TcRnConflictingExports occ child1' gre1' ie1' child2' gre2' ie2'
+  = TcRnConflictingExports occ gre1' ie1' gre2' ie2'
   where
     occ = occName child1
     -- get_gre finds a GRE for the Name, so that we can show its provenance
@@ -753,9 +765,127 @@ exportClashErr global_env child1 child2 ie1 ie2
     gre2 = get_gre child2
     get_gre child
         = fromMaybe (pprPanic "exportClashErr" (ppr child))
-                    (lookupGRE_GreName global_env child)
-    (child1', gre1', ie1', child2', gre2', ie2') =
+                    (lookupGRE_Name global_env child)
+    (gre1', ie1', gre2', ie2') =
       case SrcLoc.leftmost_smallest (greSrcSpan gre1) (greSrcSpan gre2) of
-        LT -> (child1, gre1, ie1, child2, gre2, ie2)
-        GT -> (child2, gre2, ie2, child1, gre1, ie1)
+        LT -> (gre1, ie1, gre2, ie2)
+        GT -> (gre2, ie2, gre1, ie1)
         EQ -> panic "exportClashErr: clashing exports have identical location"
+
+addDuplicateFieldExportErr :: (GlobalRdrElt, IE GhcPs)
+                           -> NE.NonEmpty (Name, IE GhcPs)
+                           -> RnM ()
+addDuplicateFieldExportErr gre others
+  = do { rdr_env <- getGlobalRdrEnv
+       ; let lkup = expectJust "addDuplicateFieldExportErr" . lookupGRE_Name rdr_env
+             other_gres = fmap (first lkup) others
+       ; addErr (TcRnDuplicateFieldExport gre other_gres) }
+
+-- | Is it OK to export two clashing duplicate record fields coming from the
+-- given export items, with @-XDisambiguateRecordFields@ disabled?
+--
+-- See Note [Exporting duplicate record fields].
+dupFieldExport_ok :: IE GhcPs -> IE GhcPs -> Bool
+dupFieldExport_ok ie1 ie2
+  | IEModuleContents {} <- ie1
+  , ie2 == ie1
+  = True
+  | otherwise
+  = False
+
+{- Note [Exporting duplicate declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to check that two different export items don't have both attempt to export
+the same thing. What do we mean precisely? There are three main situations to consider:
+
+  1. We export two distinct Names with identical OccNames. This is an error.
+  2. We export the same Name in two different export items. This is usually
+     a warning, but see below.
+  3. We export a duplicate record field, and DuplicateRecordFields is not enabled.
+     See Note [Exporting duplicate record fields].
+
+Concerning (2), we sometimes want to allow a duplicate export of a given Name,
+as #4478 points out. The logic, as implemented in dupExport_ok, is that we
+do not allow a given Name to be exported by two IEs iff either:
+
+  - the Name is mentioned explicitly in both IEs, or
+  - one of the IEs mentions the name *alone*.
+
+Examples:
+
+  NOT OK: module M( f, f )
+
+    f is mentioned explicitly in both
+
+  NOT OK: module M( fmap, Functor(..) )
+  NOT OK: module M( module Data.Functor, fmap )
+
+    One of the import items mentions fmap alone, which is also
+    exported by the other export item.
+
+  OK:
+    module M( module A, module B ) where
+      import A( f )
+      import B( f )
+
+  OK: (#2436)
+    module M( C(..), T(..) ) where
+      class C a where { data T a }
+      instance C Int where { data T Int = TInt }
+
+  OK: (#2436)
+    module Foo ( T ) where
+      data family T a
+    module Bar ( T(..), module Foo ) where
+      import Foo
+      data instance T Int = TInt
+
+Note [Exporting duplicate record fields]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Record fields belonging to different datatypes belong to different namespaces,
+as explained in Note [Record field namespacing] in GHC.Types.Name.Occurrence.
+However, when the DuplicateRecordFields extension is NOT enabled, we want to
+prevent users from exporting record fields that share the same underlying occNameFS.
+
+To enforce this, in check_occs, when inserting a new record field into the ExportOccMap
+and DuplicateRecordFields is not enabled, we also look up any clashing record fields,
+and report an error.
+
+Note however that the clash check has an extra wrinkle, similar to dupExport_ok,
+as we want to allow the following:
+
+  {-# LANGUAGE DuplicateRecordFields #-}
+  module M1 where
+    data D1 = MkD1 { foo :: Int }
+    data D2 = MkD2 { foo :: Bool }
+
+  ---------------------------------------------
+
+   module M2 ( module M1 ) where
+     import M1
+
+That is, we should be allowed to re-export the whole module M1, without reporting
+any nameclashes, even though M1 exports duplicate record fields and we have not
+enabled -XDuplicateRecordFields in M2. This logic is implemented in
+dupFieldExport_ok. See test case NoDRFModuleExport.
+
+Note that this logic only applies to whole-module imports, as we don't want
+to allow the following:
+
+  module N0 where
+    data family D a
+  module N1 where
+    import N0
+    data instance D Int = MkDInt { foo :: Int }
+  module N2 where
+    import N0
+    data instance D Bool = MkDBool { foo :: Int }
+
+  module N (D(..)) where
+    import N1
+    import N2
+
+Here, the single export item D(..) of N exports both record fields,
+`$fld:MkDInt:foo` and `$fld:MkDBool:foo`, so we have to reject the program.
+See test overloadedrecfldsfail10.
+-}

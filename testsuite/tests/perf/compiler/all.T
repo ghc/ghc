@@ -660,3 +660,12 @@ test ('InfiniteListFusion',
       [collect_stats('bytes allocated',2), when(arch('i386'), skip), js_broken(22576)],
       compile_and_run,
       ['-O2 -package ghc'])
+
+# Track performance of record update renaming/typechecking
+test('RecordUpdPerf',
+     [ collect_compiler_stats('bytes allocated',2),
+       pre_cmd('./genRecordUpdPerf'),
+       extra_files(['genRecordUpdPerf']),
+     ],
+     multimod_compile,
+     ['RecordUpdPerf', '-fno-code -v0'])

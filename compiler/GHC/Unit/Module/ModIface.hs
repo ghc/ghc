@@ -206,7 +206,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- combined with mi_decls allows us to restart code generation.
                 -- See Note [Interface Files with Core Definitions] and Note [Interface File with Core: Sharing RHSs]
 
-        mi_globals  :: !(Maybe GlobalRdrEnv),
+        mi_globals  :: !(Maybe IfGlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
                 -- the /original source/ code for this module. which
                 -- is NOT the same as mi_exports, nor mi_decls (which
@@ -558,7 +558,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
                , mi_decls, mi_extra_decls, mi_globals, mi_insts
                , mi_fam_insts, mi_rules, mi_hpc, mi_trust, mi_trust_pkg
                , mi_complete_matches, mi_docs, mi_final_exts
-               , mi_ext_fields, mi_src_hash})
+               , mi_ext_fields, mi_src_hash })
     =     rnf mi_module
     `seq` rnf mi_sig_of
     `seq`     mi_hsc_src
@@ -572,6 +572,10 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
     `seq`     mi_globals
+    -- NB: we already removed any potential space leaks in 'mi_globals' by
+    -- dehydrating, that is, by turning the 'GlobalRdrEnv' into a 'IfGlobalRdrEnv'.
+    -- This means we don't need to use 'rnf' here.
+    -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
     `seq` rnf mi_insts
     `seq` rnf mi_fam_insts
     `seq` rnf mi_rules

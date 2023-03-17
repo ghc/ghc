@@ -48,7 +48,7 @@ data HoleFitCandidate = IdHFCand Id             -- An id, like locals.
 instance Eq HoleFitCandidate where
   IdHFCand i1 == IdHFCand i2 = i1 == i2
   NameHFCand n1 == NameHFCand n2 = n1 == n2
-  GreHFCand gre1 == GreHFCand gre2 = gre_name gre1 == gre_name gre2
+  GreHFCand gre1 == GreHFCand gre2 = greName gre1 == greName gre2
   _ == _ = False
 
 instance Outputable HoleFitCandidate where
@@ -63,11 +63,11 @@ instance NamedThing HoleFitCandidate where
   getName hfc = case hfc of
                      IdHFCand cid -> idName cid
                      NameHFCand cname -> cname
-                     GreHFCand cgre -> greMangledName cgre
+                     GreHFCand cgre -> greName cgre
   getOccName hfc = case hfc of
                      IdHFCand cid -> occName cid
                      NameHFCand cname -> occName cname
-                     GreHFCand cgre -> occName (greMangledName cgre)
+                     GreHFCand cgre -> occName $ greName cgre
 
 instance HasOccName HoleFitCandidate where
   occName = getOccName

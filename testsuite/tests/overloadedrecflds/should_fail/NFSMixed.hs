@@ -1,3 +1,5 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
+
 module NFSMixed where
 
 import NFSMixedA

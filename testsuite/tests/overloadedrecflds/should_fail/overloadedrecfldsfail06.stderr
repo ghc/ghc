@@ -4,14 +4,14 @@ OverloadedRecFldsFail06_A.hs:9:15: warning: [-Wunused-top-binds (in -Wextra, -Wu
     Defined but not used: data constructor ‘MkUnused’
 
 OverloadedRecFldsFail06_A.hs:9:42: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘unused2’
+    Defined but not used: record field of MkUnused ‘unused2’
 
 OverloadedRecFldsFail06_A.hs:9:59: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
-    Defined but not used: ‘used_locally’
+    Defined but not used: record field of MkUnused ‘used_locally’
 [2 of 3] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 
 overloadedrecfldsfail06.hs:7:1: error: [-Wunused-imports (in -Wextra), Werror=unused-imports]
-    The import of ‘Unused(unused), V(x), U(y), MkV, Unused’
+    The import of ‘MkV, Unused, Unused(unused), V(x), U(y)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
 overloadedrecfldsfail06.hs:8:1: error: [-Wunused-imports (in -Wextra), Werror=unused-imports]
@@ -24,13 +24,15 @@ overloadedrecfldsfail06.hs:9:1: error: [-Wunused-imports (in -Wextra), Werror=un
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
 overloadedrecfldsfail06.hs:10:1: error: [-Wunused-imports (in -Wextra), Werror=unused-imports]
-    The qualified import of ‘U(x), U’
+    The qualified import of ‘U, U(x)’
     from module ‘OverloadedRecFldsFail06_A’ is redundant
 
 overloadedrecfldsfail06.hs:15:22: error: [GHC-02256] [-Wambiguous-fields (in -Wdefault), Werror=ambiguous-fields]
-    The record update u {x = True} with type U is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+    Ambiguous record update with parent type constructor ‘U’.
+    This type-directed disambiguation mechanism will not be supported by -XDuplicateRecordFields in future releases of GHC.
+    Consider disambiguating using module qualification instead.
 
 overloadedrecfldsfail06.hs:18:28: error: [GHC-02256] [-Wambiguous-fields (in -Wdefault), Werror=ambiguous-fields]
-    The record update v {P.x = 3} with type V is ambiguous.
-    This will not be supported by -XDuplicateRecordFields in future releases of GHC.
+    Ambiguous record update with parent type constructor ‘V’.
+    This type-directed disambiguation mechanism will not be supported by -XDuplicateRecordFields in future releases of GHC.
+    Consider disambiguating using module qualification instead.

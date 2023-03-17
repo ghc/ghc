@@ -2,6 +2,8 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TypeFamilies      #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-} -- instance NFData FieldLabel
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -63,7 +65,7 @@ module GHC.Types.Name (
         -- ** Predicates on 'Name's
         isSystemName, isInternalName, isExternalName,
         isTyVarName, isTyConName, isDataConName,
-        isValName, isVarName, isDynLinkName,
+        isValName, isVarName, isDynLinkName, isFieldName,
         isWiredInName, isWiredIn, isBuiltInSyntax, isTupleTyConName,
         isHoleName,
         wiredInNameTyThing_maybe,
@@ -91,6 +93,7 @@ import GHC.Platform
 import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Unit.Home
+import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Utils.Misc
@@ -158,6 +161,10 @@ instance Outputable NameSort where
 
 instance NFData Name where
   rnf Name{..} = rnf n_sort `seq` rnf n_occ `seq` n_uniq `seq` rnf n_loc
+
+-- Needs NFData Name, so the instance is here to avoid cyclic imports.
+instance NFData FieldLabel where
+  rnf (FieldLabel a b c) = rnf a `seq` rnf b `seq` rnf c
 
 instance NFData NameSort where
   rnf (External m) = rnf m
@@ -436,6 +443,9 @@ isValName name = isValOcc (nameOccName name)
 isVarName :: Name -> Bool
 isVarName = isVarOcc . nameOccName
 
+isFieldName :: Name -> Bool
+isFieldName = isFieldOcc . nameOccName
+
 isSystemName (Name {n_sort = System}) = True
 isSystemName _                        = False
 
@@ -642,13 +652,14 @@ pprName name@(Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = docWithStyle codeDoc normalDoc
   where
    codeDoc = case sort of
-               WiredIn mod _ _ -> pprModule mod <> char '_' <> ppr_z_occ_name occ
-               External mod    -> pprModule mod <> char '_' <> ppr_z_occ_name occ
+               WiredIn mod _ _ -> pprModule mod <> char '_' <> z_occ
+               External mod    -> pprModule mod <> char '_' <> z_occ
                                   -- In code style, always qualify
                                   -- ToDo: maybe we could print all wired-in things unqualified
                                   --       in code style, to reduce symbol table bloat?
                System          -> pprUniqueAlways uniq
                Internal        -> pprUniqueAlways uniq
+   z_occ = ztext $ zEncodeFS $ occNameMangledFS occ
 
    normalDoc sty =
      getPprDebug $ \debug ->
@@ -760,11 +771,6 @@ ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)
         -- Don't use pprOccName; instead, just print the string of the OccName;
         -- we print the namespace in the debug stuff above
-
--- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
--- cached behind the scenes in the FastString implementation.
-ppr_z_occ_name :: IsLine doc => OccName -> doc
-ppr_z_occ_name occ = ztext (zEncodeFS (occNameFS occ))
 
 -- Prints (if mod information is available) "Defined at <loc>" or
 --  "Defined in <mod>" information for a Name.

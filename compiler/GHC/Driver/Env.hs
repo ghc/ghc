@@ -327,20 +327,23 @@ lookupType :: HscEnv -> Name -> IO (Maybe TyThing)
 lookupType hsc_env name = do
    eps <- liftIO $ hscEPS hsc_env
    let pte = eps_PTE eps
-       hpt = hsc_HUG hsc_env
+   return $ lookupTypeInPTE hsc_env pte name
 
-       mod = assertPpr (isExternalName name) (ppr name) $
-             if isHoleName name
-               then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
-               else nameModule name
+lookupTypeInPTE :: HscEnv -> PackageTypeEnv -> Name -> Maybe TyThing
+lookupTypeInPTE hsc_env pte name = ty
+  where
+    hpt = hsc_HUG hsc_env
+    mod = assertPpr (isExternalName name) (ppr name) $
+          if isHoleName name
+            then mkHomeModule (hsc_home_unit hsc_env) (moduleName (nameModule name))
+            else nameModule name
 
-       !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
-               -- in one-shot, we don't use the HPT
-               then lookupNameEnv pte name
-               else case lookupHugByModule mod hpt of
-                Just hm -> lookupNameEnv (md_types (hm_details hm)) name
-                Nothing -> lookupNameEnv pte name
-   pure ty
+    !ty = if isOneShot (ghcMode (hsc_dflags hsc_env))
+            -- in one-shot, we don't use the HPT
+            then lookupNameEnv pte name
+            else case lookupHugByModule mod hpt of
+             Just hm -> lookupNameEnv (md_types (hm_details hm)) name
+             Nothing -> lookupNameEnv pte name
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information

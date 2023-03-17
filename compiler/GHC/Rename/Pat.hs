@@ -56,33 +56,35 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
-import GHC.Types.Avail ( greNameMangledName )
+
 import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
+import GHC.Types.Unique.Set
+
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import GHC.Utils.Misc
+import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
+import GHC.Types.GREInfo   ( ConInfo(..), conInfoFields )
 import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
-import GHC.Driver.Session ( getDynFlags, xopt_DuplicateRecordFields )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, ap, guard, unless )
 import Data.Foldable
+import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
-import GHC.Types.FieldLabel (DuplicateRecordFields(..))
-import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-import GHC.Types.ConInfo (ConInfo(..), conInfoFields)
+
 
 {-
 *********************************************************
@@ -778,23 +780,24 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            -> RnM (LHsRecField GhcRn (LocatedA arg))
     rn_fld pun_ok parent (L l
                            (HsFieldBind
-                              { hfbLHS =
-                                  (L loc (FieldOcc _ (L ll lbl)))
+                              { hfbLHS = L loc (FieldOcc _ (L ll lbl))
                               , hfbRHS = arg
-                              , hfbPun      = pun }))
+                              , hfbPun = pun }))
       = do { sel <- setSrcSpanA loc $ lookupRecFieldOcc parent lbl
+           ; let arg_rdr = mkRdrUnqual $ recFieldToVarOcc $ occName sel
+                 -- Discard any module qualifier (#11662)
            ; arg' <- if pun
-                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
-                               -- Discard any module qualifier (#11662)
-                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L (l2l loc) (mk_arg (locA loc) arg_rdr)) }
+                     then do { checkErr pun_ok $
+                                TcRnIllegalFieldPunning (L (locA loc) arg_rdr)
+                             ; return $ L (l2l loc) $
+                                 mk_arg (locA loc) arg_rdr }
                      else return arg
-           ; return (L l (HsFieldBind
-                             { hfbAnn = noAnn
-                             , hfbLHS = (L loc (FieldOcc sel (L ll lbl)))
-                             , hfbRHS = arg'
-                             , hfbPun      = pun })) }
-
+           ; return $ L l $
+               HsFieldBind
+                 { hfbAnn = noAnn
+                 , hfbLHS = L loc (FieldOcc sel (L ll arg_rdr))
+                 , hfbRHS = arg'
+                 , hfbPun = pun } }
 
     rn_dotdot :: Maybe (Located RecFieldsDotDot)      -- See Note [DotDot fields] in GHC.Hs.Pat
               -> Maybe Name -- The constructor (Nothing for an
@@ -821,16 +824,16 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
                  arg_in_scope lbl = mkRdrUnqual lbl `elemLocalRdrEnv` lcl_env
 
-                 (dot_dot_fields, dot_dot_gres)
-                        = unzip [ (fl, gre)
-                                | fl <- conInfoFields conInfo
-                                , let lbl = mkVarOccFS (field_label $ flLabel fl)
-                                , not (lbl `elemOccSet` present_flds)
-                                , Just gre <- [lookupGRE_FieldLabel rdr_env fl]
-                                              -- Check selector is in scope
-                                , case ctxt of
-                                    HsRecFieldCon {} -> arg_in_scope lbl
-                                    _other           -> True ]
+                 (dot_dot_fields, dot_dot_gres) =
+                   unzip [ (fl, gre)
+                         | fl <- conInfoFields conInfo
+                         , let lbl = recFieldToVarOcc $ occName $ flSelector fl
+                         , not (lbl `elemOccSet` present_flds)
+                         , Just gre <- [lookupGRE_FieldLabel rdr_env fl]
+                                       -- Check selector is in scope
+                         , case ctxt of
+                             HsRecFieldCon {} -> arg_in_scope lbl
+                             _other           -> True ]
 
            ; addUsedGREs dot_dot_gres
            ; let locn = noAnnSrcSpan loc
@@ -839,10 +842,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                         , hfbLHS
                            = L (noAnnSrcSpan loc) (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
                         , hfbRHS = L locn (mk_arg loc arg_rdr)
-                        , hfbPun      = False })
+                        , hfbPun = False })
                     | fl <- dot_dot_fields
                     , let sel     = flSelector fl
-                    , let arg_rdr = mkVarUnqual (field_label $ flLabel fl) ] }
+                          arg_rdr = mkRdrUnqual
+                                  $ recFieldToVarOcc
+                                  $ nameOccName sel ] }
 
     rn_dotdot _dotdot _mb_con _flds
       = return []
@@ -854,67 +859,102 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
-    (_, dup_flds) = removeDups compare (getFieldLbls flds)
+    (_, dup_flds) = removeDups (uniqCompareFS `on` (occNameFS . rdrNameOcc)) (getFieldLbls flds)
+      -- See the same duplicate handling logic in rnHsRecUpdFields below for further context.
 
-
--- NB: Consider this:
---      module Foo where { data R = R { fld :: Int } }
---      module Odd where { import Foo; fld x = x { fld = 3 } }
--- Arguably this should work, because the reference to 'fld' is
--- unambiguous because there is only one field id 'fld' in scope.
--- But currently it's rejected.
-
+-- | Rename a regular (non-overloaded) record field update,
+-- disambiguating the fields if necessary.
 rnHsRecUpdFields
-    :: [LHsRecUpdField GhcPs]
-    -> RnM ([LHsRecUpdField GhcRn], FreeVars)
+    :: [LHsRecUpdField GhcPs GhcPs]
+    -> RnM (XLHsRecUpdLabels GhcRn, [LHsRecUpdField GhcRn GhcRn], FreeVars)
 rnHsRecUpdFields flds
-  = do { pun_ok        <- xoptM LangExt.NamedFieldPuns
-       ; dup_fields_ok <- xopt_DuplicateRecordFields <$> getDynFlags
-       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok dup_fields_ok) flds
-       ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
+  = do { pun_ok <- xoptM LangExt.NamedFieldPuns
 
-       -- Check for an empty record update  e {}
+       -- Check for an empty record update:  e {}
        -- NB: don't complain about e { .. }, because rn_dotdot has done that already
-       ; when (null flds) $ addErr TcRnEmptyRecordUpdate
+       ; case flds of
+          { [] -> failWithTc TcRnEmptyRecordUpdate
+          ; fld:other_flds ->
+    do { let dup_lbls :: [NE.NonEmpty RdrName]
+             (_, dup_lbls) = removeDups (uniqCompareFS `on` (occNameFS . rdrNameOcc))
+                              (fmap (unLoc . getFieldUpdLbl) flds)
+               -- NB: we compare using the underlying field label FastString,
+               -- in order to catch duplicates involving qualified names,
+               -- as in the record update `r { fld = x, Mod.fld = y }`.
+               -- See #21959.
+               -- Note that this test doesn't correctly handle exact Names, but those
+               -- aren't handled properly by the rest of the compiler anyway. See #22122.
+       ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_lbls
 
-       ; return (flds1, plusFVs fvss) }
-  where
-    rn_fld :: Bool -> DuplicateRecordFields -> LHsRecUpdField GhcPs
-           -> RnM (LHsRecUpdField GhcRn, FreeVars)
-    rn_fld pun_ok dup_fields_ok (L l (HsFieldBind { hfbLHS = L loc f
-                                                  , hfbRHS = arg
-                                                  , hfbPun      = pun }))
-      = do { let lbl = rdrNameAmbiguousFieldOcc f
-           ; mb_sel <- setSrcSpanA loc $
-                      -- Defer renaming of overloaded fields to the typechecker
-                      -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Head
-                      lookupRecFieldOcc_update dup_fields_ok lbl
-           ; arg' <- if pun
-                     then do { checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
-                               -- Discard any module qualifier (#11662)
-                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L (l2l loc) (HsVar noExtField
-                                              (L (l2l loc) arg_rdr))) }
-                     else return arg
-           ; (arg'', fvs) <- rnLExpr arg'
+         -- See Note [Disambiguating record updates]
+       ; possible_parents <- lookupRecUpdFields (fld NE.:| other_flds)
+       ; let  mb_unambig_lbls :: Maybe [FieldLabel]
+              fvs :: FreeVars
+              (mb_unambig_lbls, fvs) =
+               case possible_parents of
+                  RnRecUpdParent { rnRecUpdLabels = gres } NE.:| []
+                    | let lbls = map fieldGRELabel $ NE.toList gres
+                    -> ( Just lbls, mkFVs $ map flSelector lbls)
+                  _ -> ( Nothing
+                       , plusFVs $ map (plusFVs . map pat_syn_free_vars . NE.toList . rnRecUpdLabels)
+                                 $ NE.toList possible_parents
+                         -- See Note [Using PatSyn FreeVars]
+                       )
 
-           ; let (lbl', fvs') = case mb_sel of
-                   UnambiguousGre gname -> let sel_name = greNameMangledName gname
-                                           in (Unambiguous sel_name (L (l2l loc) lbl), fvs `addOneFV` sel_name)
-                   AmbiguousFields       -> (Ambiguous   noExtField (L (l2l loc) lbl), fvs)
+        -- Rename each field.
+        ; (upd_flds, fvs') <- rn_flds pun_ok mb_unambig_lbls flds
+        ; let all_fvs = fvs `plusFV` fvs'
+        ; return (possible_parents, upd_flds, all_fvs) } } }
 
-           ; return (L l (HsFieldBind { hfbAnn = noAnn
-                                      , hfbLHS = L loc lbl'
-                                      , hfbRHS = arg''
-                                      , hfbPun = pun }), fvs') }
+    where
 
-    dup_flds :: [NE.NonEmpty RdrName]
-        -- Each list represents a RdrName that occurred more than once
-        -- (the list contains all occurrences)
-        -- Each list in dup_fields is non-empty
-    (_, dup_flds) = removeDups compare (getFieldUpdLbls flds)
+      -- For an ambiguous record update involving pattern synonym record fields,
+      -- we must add all the possibly-relevant field selector names to ensure that
+      -- we typecheck the record update **after** we typecheck the pattern synonym
+      -- definition. See Note [Using PatSyn FreeVars].
+      pat_syn_free_vars :: FieldGlobalRdrElt -> FreeVars
+      pat_syn_free_vars (GRE { gre_info = info })
+        | IAmRecField fld_info <- info
+        , RecFieldInfo { recFieldLabel = fl, recFieldCons = cons } <- fld_info
+        , uniqSetAny is_PS cons
+        = unitFV (flSelector fl)
+      pat_syn_free_vars _
+        = emptyFVs
 
+      is_PS :: ConLikeName -> Bool
+      is_PS (PatSynName  {}) = True
+      is_PS (DataConName {}) = False
 
+      rn_flds :: Bool -> Maybe [FieldLabel]
+              -> [LHsRecUpdField GhcPs GhcPs]
+              -> RnM ([LHsRecUpdField GhcRn GhcRn], FreeVars)
+      rn_flds _ _ [] = return ([], emptyFVs)
+      rn_flds pun_ok mb_unambig_lbls
+              ((L l (HsFieldBind { hfbLHS = L loc f
+                                 , hfbRHS = arg
+                                 , hfbPun = pun })):flds)
+        = do { let lbl = ambiguousFieldOccRdrName f
+             ; (arg' :: LHsExpr GhcPs) <- if pun
+                       then do { setSrcSpanA loc $
+                                 checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
+                                 -- Discard any module qualifier (#11662)
+                               ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
+                               ; return (L (l2l loc) (HsVar noExtField (L (l2l loc) arg_rdr))) }
+                       else return arg
+             ; (arg'', fvs) <- rnLExpr arg'
+             ; let lbl' :: AmbiguousFieldOcc GhcRn
+                   lbl' = case mb_unambig_lbls of
+                            { Just (fl:_) ->
+                                let sel_name = flSelector fl
+                                in Unambiguous sel_name   (L (l2l loc) lbl)
+                            ; _ ->   Ambiguous noExtField (L (l2l loc) lbl) }
+                   fld' :: LHsRecUpdField GhcRn GhcRn
+                   fld' = L l (HsFieldBind { hfbAnn = noAnn
+                                           , hfbLHS = L loc lbl'
+                                           , hfbRHS = arg''
+                                           , hfbPun = pun })
+             ; (flds', fvs') <- rn_flds pun_ok (tail <$> mb_unambig_lbls) flds
+             ; return (fld' : flds', fvs `plusFV` fvs') }
 
 getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
 getFieldIds flds = map (hsRecFieldSel . unLoc) flds
@@ -922,9 +962,6 @@ getFieldIds flds = map (hsRecFieldSel . unLoc) flds
 getFieldLbls :: forall p arg . UnXRec p => [LHsRecField p arg] -> [RdrName]
 getFieldLbls flds
   = map (unXRec @p . foLabel . unXRec @p . hfbLHS . unXRec @p) flds
-
-getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
-getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hfbLHS . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> TcRnMessage
 needFlagDotDot = TcRnIllegalWildcardsInRecord . toRecordFieldPart
@@ -937,7 +974,59 @@ toRecordFieldPart (HsRecFieldCon n)  = RecordFieldConstructor n
 toRecordFieldPart (HsRecFieldPat n)  = RecordFieldPattern     n
 toRecordFieldPart (HsRecFieldUpd {}) = RecordFieldUpdate
 
-{-
+{- Note [Disambiguating record updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the -XDuplicateRecordFields extension is used, to rename and typecheck
+a non-overloaded record update, we might need to disambiguate the field labels.
+
+Consider the following definitions:
+
+   {-# LANGUAGE DuplicateRecordFields #-}
+
+    data R = MkR1 { fld1 :: Int, fld2 :: Char }
+           | MKR2 { fld1 :: Int, fld2 :: Char, fld3 :: Bool }
+    data S = MkS1 { fld1 :: Int } | MkS2 { fld2 :: Char }
+
+In a record update, the `lookupRecUpdFields` function tries to determine
+the parent datatype by computing the parents (TyCon/PatSyn) which have
+at least one constructor (DataCon/PatSyn) with all of the fields.
+
+For example, in the (non-overloaded) record update
+
+    r { fld1 = 3, fld2 = 'x' }
+
+only the TyCon R contains at least one DataCon which has both of the fields
+being updated: in this case, MkR1 and MkR2 have both of the updated fields.
+The TyCon S also has both fields fld1 and fld2, but no single constructor
+has both of those fields, so S is not a valid parent for this record update.
+
+Note that this check is namespace-aware, so that a record update such as
+
+    import qualified M ( R (fld1, fld2) )
+    f r = r { M.fld1 = 3 }
+
+is unambiguous, as only R contains the field fld1 in the M namespace.
+(See however #22122 for issues relating to the usage of exact Names in
+record fields.)
+
+See also Note [Type-directed record disambiguation] in GHC.Tc.Gen.Expr.
+
+Note [Using PatSyn FreeVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we are disambiguating a non-overloaded record update, as per
+Note [Disambiguating record updates], and have determined that this
+record update might involve pattern synonym record fields, it is important
+to declare usage of all these pattern synonyms record fields in the returned
+FreeVars of rnHsRecUpdFields. This ensures that the typechecker sees
+that the typechecking of the record update depends on the typechecking
+of the pattern synonym, and typechecks the pattern synonyms first.
+Not doing so caused #21898.
+
+Note that this can be removed once GHC proposal #366 is implemented,
+as we will be able to fully disambiguate the record update in the renamer,
+and can immediately declare the correct used FreeVars instead of having
+to over-estimate in case of ambiguity.
+
 ************************************************************************
 *                                                                      *
 \subsubsection{Literals}

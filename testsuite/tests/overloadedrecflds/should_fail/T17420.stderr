@@ -4,9 +4,9 @@
 T17420.hs:6:17: error:
     Ambiguous occurrence ‘name’
     It could refer to
-       either the field ‘name’ of record ‘Human’,
-              imported from ‘T17420A’ at T17420.hs:4:1-14
-              (and originally defined at T17420A.hs:5:22-25)
-           or the field ‘name’ of record ‘Dog’,
+       either the field ‘name’ of record ‘Dog’,
               imported from ‘T17420A’ at T17420.hs:4:1-14
               (and originally defined at T17420A.hs:4:18-21)
+           or the field ‘name’ of record ‘Human’,
+              imported from ‘T17420A’ at T17420.hs:4:1-14
+              (and originally defined at T17420A.hs:5:22-25)

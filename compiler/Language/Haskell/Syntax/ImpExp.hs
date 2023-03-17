@@ -127,7 +127,7 @@ data IE pass
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
-        -- methods/constructors and record fields; see Note [IEThingWith]
+        -- its children.
         -- - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen',
         --                                   'GHC.Parser.Annotation.AnnClose',
         --                                   'GHC.Parser.Annotation.AnnComma',

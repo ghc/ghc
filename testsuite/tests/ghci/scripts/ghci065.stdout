@@ -9,13 +9,13 @@ Data3 :: * 	-- Type constructor defined at ghci065.hs:20:1
 Data4 :: Int -> Data4
   	-- Data constructor defined at ghci065.hs:25:3
 -- | This is the haddock comment of a data constructor for Data4.
-dupeField :: DupeFields2 -> Int
-  	-- Identifier defined at ghci065.hs:32:9
--- ^ This is the second haddock comment of a duplicate record field.
-
 dupeField :: DupeFields1 -> Int
   	-- Identifier defined at ghci065.hs:28:9
 -- ^ This is the first haddock comment of a duplicate record field.
+
+dupeField :: DupeFields2 -> Int
+  	-- Identifier defined at ghci065.hs:32:9
+-- ^ This is the second haddock comment of a duplicate record field.
 func1 :: Int -> Int -> Int
   	-- Identifier defined at ghci065.hs:41:1
 -- | This is the haddock comment of a function declaration for func1.

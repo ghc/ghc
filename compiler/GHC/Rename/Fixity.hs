@@ -24,7 +24,6 @@ import GHC.Unit.Module.ModIface
 import GHC.Types.Fixity.Env
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Reader
 import GHC.Types.Fixity
 import GHC.Types.SourceText
 import GHC.Types.SrcLoc
@@ -107,10 +106,7 @@ lookupFixity is a bit strange.
 -}
 
 lookupFixityRn :: Name -> RnM Fixity
-lookupFixityRn name = lookupFixityRn' name (nameOccName name)
-
-lookupFixityRn' :: Name -> OccName -> RnM Fixity
-lookupFixityRn' name = fmap snd . lookupFixityRn_help' name
+lookupFixityRn = fmap snd . lookupFixityRn_help
 
 -- | 'lookupFixityRn_help' returns @(True, fixity)@ if it finds a 'Fixity'
 -- in a local environment or from an interface file. Otherwise, it returns
@@ -118,13 +114,7 @@ lookupFixityRn' name = fmap snd . lookupFixityRn_help' name
 -- user-supplied fixity declarations).
 lookupFixityRn_help :: Name
                     -> RnM (Bool, Fixity)
-lookupFixityRn_help name =
-    lookupFixityRn_help' name (nameOccName name)
-
-lookupFixityRn_help' :: Name
-                     -> OccName
-                     -> RnM (Bool, Fixity)
-lookupFixityRn_help' name occ
+lookupFixityRn_help name
   | isUnboundName name
   = return (False, Fixity NoSourceText minPrecedence InfixL)
     -- Minimise errors from unbound names; eg
@@ -144,6 +134,7 @@ lookupFixityRn_help' name occ
          then return (False, defaultFixity)
          else lookup_imported } } }
   where
+    occ = nameOccName name
     lookup_imported
       -- For imported names, we have to get their fixities by doing a
       -- loadInterfaceForName, and consulting the Ifaces that comes back
@@ -180,10 +171,5 @@ lookupFixityRn_help' name occ
 lookupTyFixityRn :: LocatedN Name -> RnM Fixity
 lookupTyFixityRn = lookupFixityRn . unLoc
 
--- | Look up the fixity of an occurrence of a record field selector.
--- We use 'lookupFixityRn'' so that we can specify the 'OccName' as
--- the field label, which might be different to the 'OccName' of the
--- selector 'Name' if @DuplicateRecordFields@ is in use (#1173).
 lookupFieldFixityRn :: FieldOcc GhcRn -> RnM Fixity
-lookupFieldFixityRn (FieldOcc n lrdr)
-  = lookupFixityRn' n (rdrNameOcc (unLoc lrdr))
+lookupFieldFixityRn (FieldOcc n _) = lookupFixityRn n

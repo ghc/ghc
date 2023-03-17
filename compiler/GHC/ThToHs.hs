@@ -60,6 +60,7 @@ import Control.Monad( unless, ap )
 import Control.Applicative( (<|>) )
 import Data.Bifunctor (first)
 import Data.Foldable (for_)
+import Data.List (head)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
@@ -68,6 +69,7 @@ import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
+
 
 -------------------------------------------------------------------
 --              The external interface
@@ -275,7 +277,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
-        ; con' <- cvtConstr cNameN constr
+        ; con' <- cvtConstr (NE.head $ get_cons_names constr) cNameN constr
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_cType = Nothing
@@ -347,7 +349,9 @@ cvtDec (DataFamilyD tc tvs kind)
 cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-       ; cons' <- mapM (cvtConstr cNameN) constrs
+
+       ; let first_datacon = NE.head $ get_cons_names $ head constrs
+       ; cons' <- mapM (cvtConstr first_datacon cNameN) constrs
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_cType = Nothing
@@ -369,7 +373,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
 cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-       ; con' <- cvtConstr cNameN constr
+       ; con' <- cvtConstr (NE.head $ get_cons_names $ constr) cNameN constr
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_cType = Nothing
@@ -440,7 +444,8 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon noTypeArgs <$> mapM vNameN args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameN a1 <*> vNameN a2
     cvtArgs (TH.RecordPatSyn sels)
-      = do { sels' <- mapM (fmap (\ (L li i) -> FieldOcc noExtField (L li i)) . vNameN) sels
+      = do { let mk_fld = fldNameN (nameBase nm)
+           ; sels' <- mapM (fmap (\ (L li i) -> FieldOcc noExtField (L li i)) . mk_fld) sels
            ; vars' <- mapM (vNameN . mkNameS . nameBase) sels
            ; return $ Hs.RecCon $ zipWith RecordPatSynField sels' vars' }
 
@@ -502,7 +507,10 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
                  (failWith KindSigsOnlyAllowedOnGADTs)
         ; (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
-        ; cons' <- mapM (cvtConstr con_name) constrs
+
+        ; let first_datacon = NE.head $ get_cons_names $ head constrs
+        ; cons' <- mapM (cvtConstr first_datacon con_name) constrs
+
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_cType = Nothing
@@ -649,31 +657,32 @@ is_ip_bind decl             = Right decl
 --      Data types
 ---------------------------------------------------
 
-cvtConstr :: (TH.Name -> CvtM (LocatedN RdrName)) -- ^ convert constructor name
-    -> TH.Con -> CvtM (LConDecl GhcPs)
+cvtConstr :: TH.Name -- ^ name of first constructor of parent type
+          -> (TH.Name -> CvtM (LocatedN RdrName)) -- ^ convert constructor name
+          -> TH.Con -> CvtM (LConDecl GhcPs)
 
-cvtConstr con_name (NormalC c strtys)
-  = do  { c'   <- con_name c
+cvtConstr _ do_con_name (NormalC c strtys)
+  = do  { c'   <- do_con_name c
         ; tys' <- mapM cvt_arg strtys
         ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing (PrefixCon noTypeArgs (map hsLinear tys')) }
 
-cvtConstr con_name (RecC c varstrtys)
-  = do  { c'    <- con_name c
-        ; args' <- mapM cvt_id_arg varstrtys
+cvtConstr parent_con do_con_name (RecC c varstrtys)
+  = do  { c'    <- do_con_name c
+        ; args' <- mapM (cvt_id_arg parent_con) varstrtys
         ; con_decl <- wrapParLA (mkConDeclH98 noAnn c' Nothing Nothing . RecCon) args'
         ; returnLA con_decl }
 
-cvtConstr con_name (InfixC st1 c st2)
-  = do  { c'   <- con_name c
+cvtConstr _ do_con_name (InfixC st1 c st2)
+  = do  { c'   <- do_con_name c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
         ; returnLA $ mkConDeclH98 noAnn c' Nothing Nothing
                        (InfixCon (hsLinear st1') (hsLinear st2')) }
 
-cvtConstr con_name (ForallC tvs ctxt con)
+cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
         ; ctxt'     <- cvtContext funPrec ctxt
-        ; L _ con'  <- cvtConstr con_name con
+        ; L _ con'  <- cvtConstr parent_con do_con_name con
         ; returnLA $ add_forall tvs' ctxt' con' }
   where
     add_cxt lcxt         Nothing           = mkHsContextMaybe lcxt
@@ -701,22 +710,18 @@ cvtConstr con_name (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
-cvtConstr con_name (GadtC c strtys ty) = case nonEmpty c of
-    Nothing -> failWith GadtNoCons
-    Just c -> do
-        { c'      <- mapM con_name c
-        ; args    <- mapM cvt_arg strtys
-        ; ty'     <- cvtType ty
-        ; mk_gadt_decl c' (PrefixConGADT $ map hsLinear args) ty'}
+cvtConstr _ do_con_name (GadtC cs strtys ty)
+  = do { cs'     <- mapM do_con_name cs
+       ; args    <- mapM cvt_arg strtys
+       ; ty'     <- cvtType ty
+       ; mk_gadt_decl cs' (PrefixConGADT $ map hsLinear args) ty'}
 
-cvtConstr con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
-    Nothing -> failWith RecGadtNoCons
-    Just c -> do
-        { c'       <- mapM con_name c
-        ; ty'      <- cvtType ty
-        ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; lrec_flds <- returnLA rec_flds
-        ; mk_gadt_decl c' (RecConGADT lrec_flds noHsUniTok) ty' }
+cvtConstr parent_con do_con_name (RecGadtC cs varstrtys ty)
+  = do { cs'      <- mapM do_con_name cs
+       ; ty'      <- cvtType ty
+       ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
+       ; lrec_flds <- returnLA rec_flds
+       ; mk_gadt_decl cs' (RecConGADT lrec_flds noHsUniTok) ty' }
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)
@@ -750,9 +755,10 @@ cvt_arg (Bang su ss, ty)
              ss' = cvtSrcStrictness ss
        ; returnLA $ HsBangTy noAnn (HsSrcBang NoSourceText su' ss') ty' }
 
-cvt_id_arg :: (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
-cvt_id_arg (i, str, ty)
-  = do  { L li i' <- vNameN i
+cvt_id_arg :: TH.Name -- ^ parent constructor name
+           -> (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
+cvt_id_arg parent_con (i, str, ty)
+  = do  { L li i' <- fldNameN (nameBase parent_con) i
         ; ty' <- cvt_arg (str,ty)
         ; returnLA $ ConDeclField
                           { cd_fld_ext = noAnn
@@ -1115,7 +1121,10 @@ cvtl e = wrapLA (cvt e)
                               ; flds'
                                   <- mapM (cvtFld (wrapParLA mkAmbiguousFieldOcc))
                                            flds
-                              ; return $ RecordUpd noAnn e' (Left flds') }
+                              ; return $ RecordUpd noAnn e' $
+                                         RegularRecUpdFields
+                                           { xRecUpdFields = noExtField
+                                           , recUpdFields  = flds' } }
     cvt (StaticE e)      = fmap (HsStatic noAnn) $ cvtl e
     cvt (UnboundVarE s)  = do -- Use of 'vcName' here instead of 'vName' is
                               -- important, because UnboundVarE may contain
@@ -2052,6 +2061,13 @@ tName n = cvtName OccName.tvName n
 tconNameN n = wrapLN (tconName n)
 tconName n = cvtName OccName.tcClsName n
 
+-- Field names
+fldName :: String -> TH.Name -> CvtM RdrName
+fldName con n = cvtName (OccName.fieldName $ fsLit con) n
+
+fldNameN :: String -> TH.Name -> CvtM (LocatedN RdrName)
+fldNameN con n = wrapLN (fldName con n)
+
 ipName :: String -> CvtM HsIPName
 ipName n
   = do { unless (okVarOcc n) (failWith (IllegalOccName OccName.varName n))
@@ -2140,9 +2156,10 @@ mk_occ :: OccName.NameSpace -> String -> OccName.OccName
 mk_occ ns occ = OccName.mkOccName ns occ
 
 mk_ghc_ns :: TH.NameSpace -> OccName.NameSpace
-mk_ghc_ns TH.DataName  = OccName.dataName
-mk_ghc_ns TH.TcClsName = OccName.tcClsName
-mk_ghc_ns TH.VarName   = OccName.varName
+mk_ghc_ns TH.DataName      = OccName.dataName
+mk_ghc_ns TH.TcClsName     = OccName.tcClsName
+mk_ghc_ns TH.VarName       = OccName.varName
+mk_ghc_ns (TH.FldName con) = OccName.fieldName (fsLit con)
 
 mk_mod :: TH.ModName -> ModuleName
 mk_mod mod = mkModuleName (TH.modString mod)

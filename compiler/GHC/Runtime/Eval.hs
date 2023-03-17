@@ -66,12 +66,13 @@ import GHC.Linker.Loader as Loader
 
 import GHC.Hs
 
-import GHC.Core.Predicate
-import GHC.Core.InstEnv
+import GHC.Core.Class (classTyCon)
 import GHC.Core.FamInstEnv ( FamInst, orphNamesOfFamInst )
+import GHC.Core.InstEnv
+import GHC.Core.Predicate
+import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCon
 import GHC.Core.Type       hiding( typeKind )
-import GHC.Core.TyCo.Ppr
 import qualified GHC.Core.Type as Type
 
 import GHC.Iface.Env       ( newInteractiveBinder )
@@ -85,12 +86,13 @@ import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Data.Bag
 
-import GHC.Utils.Monad
-import GHC.Utils.Panic
 import GHC.Utils.Error
-import GHC.Utils.Outputable
-import GHC.Utils.Misc
+import GHC.Utils.Exception
 import GHC.Utils.Logger
+import GHC.Utils.Misc
+import GHC.Utils.Monad
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Types.RepType
 import GHC.Types.Fixity.Env
@@ -114,28 +116,26 @@ import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
 
-import System.Directory
+import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
+import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
+import GHC.Tc.Utils.Env (tcGetInstEnvs, lookupGlobal)
+import GHC.Tc.Utils.Instantiate (instDFunType)
+import GHC.Tc.Solver (simplifyWantedsTcM)
+import GHC.Tc.Utils.Monad
+import GHC.Unit.Env
+import GHC.IfaceToCore
+
+import Control.Monad
+import Control.Monad.Catch as MC
+import Data.Array
 import Data.Dynamic
 import Data.Either
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
 import Data.List.NonEmpty (NonEmpty)
-import Control.Monad
-import Control.Monad.Catch as MC
-import Data.Array
-import GHC.Utils.Exception
+import System.Directory
 import Unsafe.Coerce ( unsafeCoerce )
-
-import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
-import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
-import GHC.Tc.Utils.Env (tcGetInstEnvs)
-import GHC.Tc.Utils.Instantiate (instDFunType)
-import GHC.Tc.Solver (simplifyWantedsTcM)
-import GHC.Tc.Utils.Monad
-import GHC.Core.Class (classTyCon)
-import GHC.Unit.Env
-import GHC.IfaceToCore
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -819,8 +819,14 @@ findGlobalRdrEnv hsc_env imports
   = do { idecls_env <- hscRnImportDecls hsc_env idecls
                     -- This call also loads any orphan modules
        ; return $ case partitionEithers (map mkEnv imods) of
-           ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
-           (err : _, _)    -> Left err }
+         (err : _, _)     -> Left err
+         ([], imods_env0) ->
+            -- Need to rehydrate the 'GlobalRdrEnv' to recover the 'GREInfo's.
+            -- This is done in order to avoid space leaks.
+            -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
+            let imods_env = map (hydrateGlobalRdrEnv get_GRE_info) imods_env0
+            in Right (foldr plusGlobalRdrEnv idecls_env imods_env)
+       }
   where
     idecls :: [LImportDecl GhcPs]
     idecls = [noLocA d | IIDecl d <- imports]
@@ -832,7 +838,9 @@ findGlobalRdrEnv hsc_env imports
       Left err -> Left (mod, err)
       Right env -> Right env
 
-mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String GlobalRdrEnv
+    get_GRE_info nm = tyThingGREInfo <$> lookupGlobal hsc_env nm
+
+mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String IfGlobalRdrEnv
 mkTopLevEnv hpt modl
   = case lookupHpt hpt modl of
       Nothing -> Left "not a home module"
@@ -840,6 +848,9 @@ mkTopLevEnv hpt modl
          case mi_globals (hm_iface details) of
                 Nothing  -> Left "not interpreted"
                 Just env -> Right env
+    -- It's OK to be lazy here; we force the GlobalRdrEnv before storing it
+    -- in ModInfo; see GHCi.UI.Info.
+    -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
 
 -- | Get the interactive evaluation context, consisting of a pair of the
 -- set of modules from which we take the full top-level scope, and the set
@@ -895,7 +906,7 @@ getInfo allInfo name
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: GhcMonad m => m [Name]
 getNamesInScope = withSession $ \hsc_env ->
-  return (map greMangledName (globalRdrEnvElts (icReaderEnv (hsc_IC hsc_env))))
+  return $ map greName $ globalRdrEnvElts (icReaderEnv (hsc_IC hsc_env))
 
 -- | Returns all 'RdrName's in scope in the current interactive
 -- context, excluding any that are internally-generated.

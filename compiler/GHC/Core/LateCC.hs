@@ -117,7 +117,7 @@ doBndr env bndr rhs
   | otherwise = doBndr' env bndr rhs
 
 
--- We want to put the cost centra below the lambda as we only care about executions of the RHS.
+-- We want to put the cost centre below the lambda as we only care about executions of the RHS.
 doBndr' :: Env -> Id -> CoreExpr -> State LateCCState CoreExpr
 doBndr' env bndr (Lam b rhs) = Lam b <$> doBndr' env bndr rhs
 doBndr' env bndr rhs = do

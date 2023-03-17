@@ -631,11 +631,17 @@ rnHsTyKi env ty@(HsRecTy _ flds)
        ; return (HsRecTy noExtField flds', fvs) }
   where
     get_fields (ConDeclCtx names)
-      = concatMapM (lookupConstructorFields . unLoc) names
-    get_fields _
-      = do { addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-               (hang (text "Record syntax is illegal here:") 2 (ppr ty))
-           ; return [] }
+      = do res <- concatMapM (lookupConstructorFields . unLoc) names
+           if equalLength res names
+           -- Lookup can fail when the record syntax is incorrect, e.g.
+           -- data D = D Int { fld :: Bool }. See T7943.
+           then return res
+           else err
+    get_fields _ = err
+
+    err =
+      do { addErr $ TcRnIllegalRecordSyntax (Left ty)
+         ; return [] }
 
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
@@ -1159,7 +1165,7 @@ warn_term_var_capture lVar = do
     case demoteRdrNameTv $ unLoc lVar of
       Nothing           -> return ()
       Just demoted_name -> do
-        let global_vars = lookupGRE_RdrName demoted_name gbl_env
+        let global_vars = lookupGRE_RdrName SameOccName gbl_env demoted_name
         let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
         case mlocal_var of
           Just name -> warnCapturedTerm lVar (Right name)
@@ -1284,10 +1290,12 @@ rnField fl_env env (L l (ConDeclField _ names ty haddock_doc))
 
 lookupField :: FastStringEnv FieldLabel -> FieldOcc GhcPs -> FieldOcc GhcRn
 lookupField fl_env (FieldOcc _ (L lr rdr)) =
-    FieldOcc (flSelector fl) (L lr rdr)
+    FieldOcc sel (L lr $ mkRdrUnqual $ occName sel)
   where
     lbl = occNameFS $ rdrNameOcc rdr
-    fl  = expectJust "lookupField" $ lookupFsEnv fl_env lbl
+    sel = flSelector
+        $ expectJust "lookupField"
+        $ lookupFsEnv fl_env lbl
 
 {-
 ************************************************************************
@@ -1585,8 +1593,7 @@ checkSectionPrec direction section op arg
                  (sectionPrecErr (get_op op, op_fix)
                                  (arg_op, arg_fix) section)
 
--- | Look up the fixity for an operator name.  Be careful to use
--- 'lookupFieldFixityRn' for record fields (see #13132).
+-- | Look up the fixity for an operator name.
 lookupFixityOp :: OpName -> RnM Fixity
 lookupFixityOp (NormalOp n)  = lookupFixityRn n
 lookupFixityOp NegateOp      = lookupFixityRn negateName

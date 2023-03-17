@@ -4,5 +4,8 @@ T10279.hs:10:9: error: [GHC-52243]
       no unit id matching ‘rts-1.0.2’ was found
       (This unit ID looks like the source package ID;
        the real unit ID is ‘rts’)
-    • In the expression: rts-1.0.2:A.Foo
-      In an equation for ‘blah’: blah = (rts-1.0.2:A.Foo)
+    • In the untyped splice:
+        $(conE
+            (Name
+               (mkOccName "Foo")
+               (NameG VarName (mkPkgName "rts-1.0.2") (mkModName "A"))))

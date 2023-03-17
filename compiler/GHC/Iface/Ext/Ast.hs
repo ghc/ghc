@@ -41,6 +41,7 @@ import GHC.Utils.Monad            ( concatMapM, MonadIO(liftIO) )
 import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
+import GHC.Types.Name.Reader      ( RecFieldInfo(..) )
 import GHC.Types.SrcLoc
 import GHC.Core.Type              ( Type )
 import GHC.Core.Predicate
@@ -1182,11 +1183,13 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
           con_name = case hiePass @p of       -- Like ConPat
                        HieRn -> con
                        HieTc -> fmap conLikeName con
-      RecordUpd {rupd_expr = expr, rupd_flds = Left upds}->
+      RecordUpd { rupd_expr = expr
+                , rupd_flds = RegularRecUpdFields { recUpdFields = upds } }->
         [ toHie expr
         , toHie $ map (RC RecFieldAssign) upds
         ]
-      RecordUpd {rupd_expr = expr, rupd_flds = Right _}->
+      RecordUpd { rupd_expr = expr
+                , rupd_flds = OverloadedRecUpdFields {} }->
         [ toHie expr
         ]
       ExprWithTySig _ expr sig ->
@@ -2111,10 +2114,9 @@ instance ToHie (IEContext (LocatedA (IE GhcRn))) where
       IEThingAll _ n ->
         [ toHie $ IEC c n
         ]
-      IEThingWith flds n _ ns ->
+      IEThingWith _ n _ ns ->
         [ toHie $ IEC c n
         , toHie $ map (IEC c) ns
-        , toHie $ map (IEC c) flds
         ]
       IEModuleContents _ n ->
         [ toHie $ IEC c n
@@ -2135,10 +2137,10 @@ instance ToHie (IEContext (LocatedA (IEWrappedName GhcRn))) where
         [ toHie $ C (IEThing c) (L l n)
         ]
 
-instance ToHie (IEContext (Located FieldLabel)) where
-  toHie (IEC c (L span lbl)) = concatM
-      [ makeNode lbl span
-      , toHie $ C (IEThing c) $ L span (flSelector lbl)
+instance ToHie (IEContext (Located RecFieldInfo)) where
+  toHie (IEC c (L span info)) = concatM
+      [ makeNode info span
+      , toHie $ C (IEThing c) $ L span (flSelector $ recFieldLabel info)
       ]
 
 instance ToHie (LocatedA (DocDecl GhcRn)) where
@@ -2149,4 +2151,5 @@ instance ToHie (LocatedA (DocDecl GhcRn)) where
     DocGroup _ d -> [ toHie d ]
 
 instance ToHie (LHsDoc GhcRn) where
-  toHie (L span d@(WithHsDocIdentifiers _ ids)) = concatM $ makeNode d span : [toHie $ map (C Use) ids]
+  toHie (L span d@(WithHsDocIdentifiers _ ids)) =
+    concatM $ makeNode d span : [toHie $ map (C Use) ids]

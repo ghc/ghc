@@ -30,7 +30,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
 import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader( lookupGRE_FieldLabel, greMangledName )
+import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name )
 import GHC.Types.Var.Env ( VarEnv )
@@ -949,7 +949,7 @@ matchHasField dflags short_cut clas tys
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
                      then do { -- See Note [Unused name reporting and HasField]
                                addUsedGRE True gre
-                             ; keepAlive (greMangledName gre)
+                             ; keepAlive (greName gre)
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev
                                               , cir_coherence   = IsCoherent

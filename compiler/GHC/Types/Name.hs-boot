@@ -3,7 +3,7 @@ module GHC.Types.Name (
     module GHC.Types.Name.Occurrence
 ) where
 
-import GHC.Prelude (Eq)
+import GHC.Prelude (Eq, Bool)
 import {-# SOURCE #-} GHC.Types.Name.Occurrence
 import GHC.Types.Unique
 import GHC.Utils.Outputable
@@ -28,3 +28,4 @@ nameUnique :: Name -> Unique
 setNameUnique :: Name -> Unique -> Name
 nameOccName :: Name -> OccName
 tidyNameOcc :: Name -> OccName -> Name
+isFieldName :: Name -> Bool

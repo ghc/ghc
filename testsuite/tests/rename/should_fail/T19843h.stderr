@@ -2,7 +2,7 @@
 T19843h.hs:14:7: error: [GHC-39999]
     • No instance for ‘GHC.Records.HasField "mup" r4 a4’
         arising from selecting the field ‘mup’
-      Perhaps use ‘mop’ (line 11)
+      Perhaps use record field of A ‘mop’ (line 11)
     • In the expression: undefined.mup
       In an equation for ‘foo’: foo = undefined.mup
 
@@ -27,7 +27,7 @@ T19843h.hs:20:8: error: [GHC-39999]
 T19843h.hs:24:8: error: [GHC-39999]
     • No instance for ‘GHC.Records.HasField "getAll" r0 a0’
         arising from selecting the field ‘getAll’
-      Perhaps use ‘getAlt’ (imported from Data.Monoid)
+      Perhaps use record field of Alt ‘getAlt’ (imported from Data.Monoid)
       Perhaps you want to add ‘getAll’ to the import list
       in the import of ‘Data.Monoid’ (T19843h.hs:9:1-28).
     • In the expression: undefined.getAll

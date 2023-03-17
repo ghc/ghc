@@ -46,6 +46,20 @@ Compiler
   A new warning group :ghc-flag:`-Wextended-warnings` includes all such warnings
   regardless of category.  See :ref:`warning-deprecated-pragma`.
 
+- GHC is now better at disambiguating record updates in the presence of duplicate
+  record fields. The following program is now accepted ::
+
+     {-# LANGUAGE DuplicateRecordFields #-}
+
+     data R = MkR1 { foo :: Int }
+            | MkR2 { bar :: Int }
+
+     data S = MkS { foo :: Int, bar :: Int }
+
+     blah x = x { foo = 5, bar = 6 }
+
+  The point is that only the type S has a constructor with both fields "foo"
+  and "bar", so this record update is unambiguous.
 
 GHCi
 ~~~~
@@ -82,6 +96,17 @@ Runtime system
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+``template-haskell`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The ``GadtC`` and ``RecGadtC`` constructors of the ``Con`` datatype now take
+  non-empty lists of constructors. This means that the ``gadtC`` and ``recGadtC``
+  smart constructors also expect non-empty lists as arguments.
+
+- Record fields now belong to separate ``NameSpace``s, keyed by the parent of
+  the record field. This is the name of the first constructor of the parent type,
+  even if this constructor does not have the field in question.
+  This change enables TemplateHaskell support for ``DuplicateRecordFields``.
 
 Included libraries
 ------------------

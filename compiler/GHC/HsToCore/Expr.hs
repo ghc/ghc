@@ -34,6 +34,7 @@ import GHC.Types.SourceText
 import GHC.Types.Name
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
+import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
 import GHC.Hs
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -66,7 +67,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
-import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
 
 {-
 ************************************************************************
@@ -559,7 +559,7 @@ dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel
   = [hfbRHS fld | L _ fld <- rbinds
-                       , sel == idName (hsRecFieldId fld) ]
+                , sel == idName (hsRecFieldId fld) ]
 
 {-
 %--------------------------------------------------------------------

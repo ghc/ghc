@@ -239,10 +239,10 @@ sense of them in interface pragmas. It's cool, though they all have
 
 ghcPrimExports :: [IfaceExport]
 ghcPrimExports
- = map (avail . idName) ghcPrimIds ++
-   map (avail . idName) allThePrimOpIds ++
-   [ availTC n [n] []
-   | tc <- exposedPrimTyCons, let n = tyConName tc  ]
+ = map (Avail . idName) ghcPrimIds ++
+   map (Avail . idName) allThePrimOpIds ++
+   [ AvailTC n [n]
+   | tc <- exposedPrimTyCons, let n = tyConName tc ]
 
 ghcPrimDeclDocs :: Docs
 ghcPrimDeclDocs = emptyDocs { docs_decls = listToUniqMap $ mapMaybe findName primOpDocs }

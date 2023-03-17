@@ -4,12 +4,11 @@ T20113.hs:7:35: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         a :: TYPE rep
-    • In the pattern: MkY {y_fld = $sel:y_fld:MkY}
-      In an equation for ‘T20113.$sel:y_fld:MkY’:
-          T20113.$sel:y_fld:MkY MkY {y_fld = $sel:y_fld:MkY} = $sel:y_fld:MkY
+    • In the pattern: MkY {y_fld = y_fld}
+      In an equation for ‘y_fld’: y_fld MkY {y_fld = y_fld} = y_fld
 
 T20113.hs:7:35: error: [GHC-55287]
-    The first pattern in the equation for ‘$sel:y_fld:MkY’
+    The first pattern in the equation for ‘y_fld’
     does not have a fixed runtime representation.
     Its type is:
       Y a :: TYPE rep

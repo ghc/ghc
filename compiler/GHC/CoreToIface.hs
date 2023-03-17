@@ -452,14 +452,15 @@ toIfaceTopBndr id
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
-toIfaceIdDetails (WorkerLikeId dmds)          = IfWorkerLikeId dmds
+toIfaceIdDetails (WorkerLikeId dmds)            = IfWorkerLikeId dmds
 toIfaceIdDetails (DFunId {})                    = IfDFunId
 toIfaceIdDetails (RecSelId { sel_naughty = n
-                           , sel_tycon = tc })  =
-  let iface = case tc of
-                RecSelData ty_con -> Left (toIfaceTyCon ty_con)
-                RecSelPatSyn pat_syn -> Right (patSynToIfaceDecl pat_syn)
-  in IfRecSelId iface n
+                           , sel_tycon = tc
+                           , sel_fieldLabel = fl }) =
+  let (iface, first_con) = case tc of
+                RecSelData ty_con    -> ( Left (toIfaceTyCon ty_con), dataConName $ head $ tyConDataCons ty_con)
+                RecSelPatSyn pat_syn -> ( Right (patSynToIfaceDecl pat_syn), patSynName pat_syn)
+  in IfRecSelId iface first_con n fl
 
   -- The remaining cases are all "implicit Ids" which don't
   -- appear in interface files at all
@@ -661,7 +662,7 @@ toIfaceVar v
                                       -- Foreign calls have special syntax
 
     | isExternalName name             = IfaceExt name
-    | otherwise                       = IfaceLcl (getOccFS name)
+    | otherwise                       = IfaceLcl (occNameFS $ nameOccName name)
   where
     name = idName v
     ty   = idType v

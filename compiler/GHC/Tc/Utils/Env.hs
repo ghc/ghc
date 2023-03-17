@@ -22,6 +22,7 @@ module GHC.Tc.Utils.Env(
         tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
+        tcLookupRecSelParent,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, lookupGlobal_maybe, ioLookupDataCon,
@@ -74,6 +75,7 @@ module GHC.Tc.Utils.Env(
 import GHC.Prelude
 
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.Session
 
 import GHC.Builtin.Names
@@ -96,13 +98,14 @@ import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
 
 import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
-import GHC.Core.DataCon ( DataCon, flSelector )
+import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
 import GHC.Core.PatSyn  ( PatSyn )
 import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
+
 
 import GHC.Unit.Module
 import GHC.Unit.Home
@@ -126,17 +129,18 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Id
+import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Name.Reader
 import GHC.Types.TyThing
+import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Tc.Errors.Ppr (pprTyThingUsedWrong)
 
 import Data.IORef
-import Data.List (intercalate)
+import Data.List          ( intercalate )
 import Control.Monad
-import GHC.Driver.Env.KnotVars
 
 {- *********************************************************************
 *                                                                      *
@@ -291,6 +295,17 @@ tcLookupConLike name = do
     case thing of
         AConLike cl -> return cl
         _           -> wrongThingErr WrongThingConLike (AGlobal thing) name
+
+tcLookupRecSelParent :: HsRecUpdParent GhcRn -> TcM RecSelParent
+tcLookupRecSelParent (RnRecUpdParent { rnRecUpdCons = cons })
+  = case any_con of
+      PatSynName ps ->
+        RecSelPatSyn <$> tcLookupPatSyn ps
+      DataConName dc ->
+        RecSelData . dataConTyCon <$> tcLookupDataCon dc
+  where
+    any_con = head $ nonDetEltsUniqSet cons
+      -- Any constructor will give the same result here.
 
 tcLookupClass :: Name -> TcM Class
 tcLookupClass name = do
@@ -507,6 +522,7 @@ tcLookupTcTyCon name = do
     case thing of
         ATcTyCon tc -> return tc
         _           -> pprPanic "tcLookupTcTyCon" (ppr name)
+
 
 getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv
@@ -1064,7 +1080,7 @@ newDFunName clas tys loc
   = do  { is_boot <- tcIsHsBootOrSig
         ; mod     <- getModule
         ; let info_string = occNameString (getOccName clas) ++
-                            concatMap (occNameString.getDFunTyKey) tys
+                            concatMap (occNameString . getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
 

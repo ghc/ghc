@@ -5,6 +5,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -39,7 +40,6 @@ import GHC.Data.FastString (FastString)
 -- libraries:
 import Data.Data hiding (Fixity(..))
 import Data.Bool
-import Data.Either
 import Data.Eq
 import Data.Maybe
 import Data.List.NonEmpty ( NonEmpty )
@@ -146,6 +146,19 @@ type LHsRecProj p arg = XRec p (RecProj p arg)
 -- below.
 type RecUpdProj p = RecProj p (LHsExpr p)
 type LHsRecUpdProj p = XRec p (RecUpdProj p)
+
+-- | Haskell Record Update Fields.
+data LHsRecUpdFields p where
+  -- | A regular (non-overloaded) record update.
+  RegularRecUpdFields
+    :: { xRecUpdFields :: XLHsRecUpdLabels p
+       , recUpdFields  :: [LHsRecUpdField p p] }
+    -> LHsRecUpdFields p
+  -- | An overloaded record update.
+  OverloadedRecUpdFields
+    :: { xOLRecUpdFields :: XLHsOLRecUpdLabels p
+       , olRecUpdFields  :: [LHsRecUpdProj p] }
+    -> LHsRecUpdFields p
 
 {-
 ************************************************************************
@@ -463,7 +476,7 @@ data HsExpr p
   | RecordUpd
       { rupd_ext  :: XRecordUpd p
       , rupd_expr :: LHsExpr p
-      , rupd_flds :: Either [LHsRecUpdField p] [LHsRecUpdProj p]
+      , rupd_flds :: LHsRecUpdFields p
       }
   -- For a type family, the arg types are of the *instance* tycon,
   -- not the family tycon

@@ -370,6 +370,8 @@ test('T21110', [extra_files(['T21110A.hs'])], ghci_script,
 test('T17830', [filter_stdout_lines(r'======.*')], ghci_script, ['T17830.script'])
 test('T21294a', normal, ghci_script, ['T21294a.script'])
 test('T21507', normal, ghci_script, ['T21507.script'])
+test('T22125', normal, ghci_script, ['T22125.script'])
 test('T22695', normal, ghci_script, ['T22695.script'])
 test('T22817', normal, ghci_script, ['T22817.script'])
 test('T22908', normal, ghci_script, ['T22908.script'])
+test('T23062', normal, ghci_script, ['T23062.script'])

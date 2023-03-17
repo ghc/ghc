@@ -4,7 +4,6 @@ import GHC.Prelude
 import GHC.Types.Unique
 import {-# SOURCE #-} GHC.Types.Name
 import GHC.Types.Basic
-import GHC.Data.FastString
 
 -- Needed by GHC.Builtin.Types
 knownUniqueName :: Unique -> Maybe Name
@@ -27,7 +26,6 @@ mkPreludeMiscIdUnique  :: Int -> Unique
 mkPseudoUniqueE, mkBuiltinUnique :: Int -> Unique
 
 mkRegSingleUnique, mkRegPairUnique, mkRegSubUnique, mkRegClassUnique :: Int -> Unique
-mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique :: FastString -> Unique
 
 initExitJoinUnique :: Unique
 

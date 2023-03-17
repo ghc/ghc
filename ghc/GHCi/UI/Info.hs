@@ -59,7 +59,7 @@ data ModInfo = ModInfo
       -- ^ Generated set of information about all spans in the
       -- module that correspond to some kind of identifier for
       -- which there will be type info and/or location info.
-    , modinfoRdrEnv     :: !(Strict.Maybe GlobalRdrEnv)
+    , modinfoRdrEnv     :: !(Strict.Maybe IfGlobalRdrEnv)
       -- ^ What's in scope in the module.
     , modinfoLastUpdate :: !UTCTime
       -- ^ The timestamp of the file used to generate this record.
@@ -316,6 +316,8 @@ getModInfo name = do
         module_info = tm_checked_module_info typechecked
         !rdr_env = case modInfoRdrEnv module_info of
           Just rdrs -> Strict.Just rdrs
+            -- NB: this has already been deeply forced; no need to do that again.
+            -- See test case T15369 and Note [Forcing GREInfo] in GHC.Types.GREInfo.
           Nothing   -> Strict.Nothing
     ts <- liftIO $ getModificationTime $ srcFilePath m
     return $
@@ -331,7 +333,7 @@ modInfo_rdrs :: ModInfo -> [Name]
 modInfo_rdrs mi =
   case modinfoRdrEnv mi of
     Strict.Nothing  -> []
-    Strict.Just env -> map greMangledName $ globalRdrEnvElts env
+    Strict.Just env -> map greName $ globalRdrEnvElts env
 
 -- | Get ALL source spans in the module.
 processAllTypeCheckedModule :: TypecheckedModule -> [SpanInfo]

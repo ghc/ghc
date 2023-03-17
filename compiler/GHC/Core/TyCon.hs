@@ -899,7 +899,7 @@ data TyConDetails =
         tctc_is_poly :: Bool, -- ^ Is this TcTyCon already generalized?
                               -- Used only to make zonking more efficient
 
-        tctc_flavour :: TyConFlavour
+        tctc_flavour :: TyConFlavour TyCon
                            -- ^ What sort of 'TyCon' this represents.
       }
 
@@ -1845,7 +1845,7 @@ mkTcTyCon :: Name
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
                                  -- see Note [How TcTyCons work] in GHC.Tc.TyCl
           -> Bool                -- ^ Is this TcTyCon generalised already?
-          -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
+          -> TyConFlavour TyCon  -- ^ What sort of 'TyCon' this represents
           -> TyCon
 mkTcTyCon name binders res_kind scoped_tvs poly flav
   = mkTyCon name binders res_kind (constRoles binders Nominal) $
@@ -2178,12 +2178,6 @@ isTyConAssoc = isJust . tyConAssoc_maybe
 tyConAssoc_maybe :: TyCon -> Maybe TyCon
 tyConAssoc_maybe = tyConFlavourAssoc_maybe . tyConFlavour
 
--- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
-tyConFlavourAssoc_maybe :: TyConFlavour -> Maybe TyCon
-tyConFlavourAssoc_maybe (DataFamilyFlavour mb_parent)     = mb_parent
-tyConFlavourAssoc_maybe (OpenTypeFamilyFlavour mb_parent) = mb_parent
-tyConFlavourAssoc_maybe _                                 = Nothing
-
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it
 -- If it can't be for some reason, it should be a AlgTyCon
@@ -2363,7 +2357,7 @@ isConcreteTyCon = isConcreteTyConFlavour . tyConFlavour
 -- | Is this 'TyConFlavour' concrete (i.e. not a synonym/type family)?
 --
 -- Used for representation polymorphism checks.
-isConcreteTyConFlavour :: TyConFlavour -> Bool
+isConcreteTyConFlavour :: TyConFlavour tc -> Bool
 isConcreteTyConFlavour = \case
   ClassFlavour             -> True
   TupleFlavour {}          -> True
@@ -2371,8 +2365,7 @@ isConcreteTyConFlavour = \case
   DataTypeFlavour          -> True
   NewtypeFlavour           -> True
   AbstractTypeFlavour      -> True  -- See Note [Concrete types] in GHC.Tc.Utils.Concrete
-  DataFamilyFlavour {}     -> False
-  OpenTypeFamilyFlavour {} -> False
+  OpenFamilyFlavour {}     -> False
   ClosedTypeFamilyFlavour  -> False
   TypeSynonymFlavour       -> False
   BuiltInTypeFlavour       -> True
@@ -2725,43 +2718,7 @@ instance Outputable TyCon where
                   then text "[tc]"
                   else empty
 
--- | Paints a picture of what a 'TyCon' represents, in broad strokes.
--- This is used towards more informative error messages.
-data TyConFlavour
-  = ClassFlavour
-  | TupleFlavour Boxity
-  | SumFlavour
-  | DataTypeFlavour
-  | NewtypeFlavour
-  | AbstractTypeFlavour
-  | DataFamilyFlavour (Maybe TyCon)     -- Just tc <=> (tc == associated class)
-  | OpenTypeFamilyFlavour (Maybe TyCon) -- Just tc <=> (tc == associated class)
-  | ClosedTypeFamilyFlavour
-  | TypeSynonymFlavour
-  | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
-  | PromotedDataConFlavour
-  deriving Eq
-
-instance Outputable TyConFlavour where
-  ppr = text . go
-    where
-      go ClassFlavour = "class"
-      go (TupleFlavour boxed) | isBoxed boxed = "tuple"
-                              | otherwise     = "unboxed tuple"
-      go SumFlavour              = "unboxed sum"
-      go DataTypeFlavour         = "data type"
-      go NewtypeFlavour          = "newtype"
-      go AbstractTypeFlavour     = "abstract type"
-      go (DataFamilyFlavour (Just _))  = "associated data family"
-      go (DataFamilyFlavour Nothing)   = "data family"
-      go (OpenTypeFamilyFlavour (Just _)) = "associated type family"
-      go (OpenTypeFamilyFlavour Nothing)  = "type family"
-      go ClosedTypeFamilyFlavour = "type family"
-      go TypeSynonymFlavour      = "type synonym"
-      go BuiltInTypeFlavour      = "built-in type"
-      go PromotedDataConFlavour  = "promoted data constructor"
-
-tyConFlavour :: TyCon -> TyConFlavour
+tyConFlavour :: TyCon -> TyConFlavour TyCon
 tyConFlavour (TyCon { tyConDetails = details })
   | AlgTyCon { algTcFlavour = parent, algTcRhs = rhs } <- details
   = case parent of
@@ -2776,8 +2733,8 @@ tyConFlavour (TyCon { tyConDetails = details })
 
   | FamilyTyCon { famTcFlav = flav, famTcParent = parent } <- details
   = case flav of
-      DataFamilyTyCon{}            -> DataFamilyFlavour parent
-      OpenSynFamilyTyCon           -> OpenTypeFamilyFlavour parent
+      DataFamilyTyCon{}            -> OpenFamilyFlavour IAmData parent
+      OpenSynFamilyTyCon           -> OpenFamilyFlavour IAmType parent
       ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
       BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour
@@ -2788,24 +2745,22 @@ tyConFlavour (TyCon { tyConDetails = details })
   | TcTyCon { tctc_flavour = flav } <-details   = flav
 
 -- | Can this flavour of 'TyCon' appear unsaturated?
-tcFlavourMustBeSaturated :: TyConFlavour -> Bool
+tcFlavourMustBeSaturated :: TyConFlavour tc -> Bool
 tcFlavourMustBeSaturated ClassFlavour            = False
 tcFlavourMustBeSaturated DataTypeFlavour         = False
 tcFlavourMustBeSaturated NewtypeFlavour          = False
-tcFlavourMustBeSaturated DataFamilyFlavour{}     = False
 tcFlavourMustBeSaturated TupleFlavour{}          = False
 tcFlavourMustBeSaturated SumFlavour              = False
 tcFlavourMustBeSaturated AbstractTypeFlavour {}  = False
 tcFlavourMustBeSaturated BuiltInTypeFlavour      = False
 tcFlavourMustBeSaturated PromotedDataConFlavour  = False
+tcFlavourMustBeSaturated (OpenFamilyFlavour td _)= case td of { IAmData -> False; IAmType -> True }
 tcFlavourMustBeSaturated TypeSynonymFlavour      = True
-tcFlavourMustBeSaturated OpenTypeFamilyFlavour{} = True
 tcFlavourMustBeSaturated ClosedTypeFamilyFlavour = True
 
 -- | Is this flavour of 'TyCon' an open type family or a data family?
-tcFlavourIsOpen :: TyConFlavour -> Bool
-tcFlavourIsOpen DataFamilyFlavour{}     = True
-tcFlavourIsOpen OpenTypeFamilyFlavour{} = True
+tcFlavourIsOpen :: TyConFlavour tc -> Bool
+tcFlavourIsOpen OpenFamilyFlavour{}     = True
 tcFlavourIsOpen ClosedTypeFamilyFlavour = False
 tcFlavourIsOpen ClassFlavour            = False
 tcFlavourIsOpen DataTypeFlavour         = False

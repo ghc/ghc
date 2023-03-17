@@ -9,9 +9,11 @@
 
 module GHC.Core.ConLike (
           ConLike(..)
+        , conLikeConLikeName
         , isVanillaConLike
         , conLikeArity
         , conLikeFieldLabels
+        , conLikeConInfo
         , conLikeInstOrigArgTys
         , conLikeUserTyVarBinders
         , conLikeExTyCoVars
@@ -29,16 +31,19 @@ module GHC.Core.ConLike (
 import GHC.Prelude
 
 import GHC.Core.DataCon
-import GHC.Core.PatSyn
-import GHC.Utils.Outputable
-import GHC.Types.Unique
-import GHC.Utils.Misc
-import GHC.Types.Name
-import GHC.Types.Basic
-import GHC.Core.TyCo.Rep (Type, ThetaType)
-import GHC.Types.Var
-import GHC.Core.Type(mkTyConApp)
 import GHC.Core.Multiplicity
+import GHC.Core.PatSyn
+import GHC.Core.TyCo.Rep (Type, ThetaType)
+import GHC.Core.Type(mkTyConApp)
+import GHC.Types.Unique
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Basic
+
+import GHC.Types.GREInfo
+import GHC.Types.Var
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 
 import Data.Maybe( isJust )
 import qualified Data.Data as Data
@@ -60,6 +65,10 @@ data ConLike = RealDataCon DataCon
 isVanillaConLike :: ConLike -> Bool
 isVanillaConLike (RealDataCon con) = isVanillaDataCon con
 isVanillaConLike (PatSynCon   ps ) = isVanillaPatSyn  ps
+
+conLikeConLikeName :: ConLike -> ConLikeName
+conLikeConLikeName (RealDataCon dc) = DataConName (dataConName dc)
+conLikeConLikeName (PatSynCon   ps) = PatSynName  (patSynName  ps)
 
 {-
 ************************************************************************
@@ -112,6 +121,11 @@ conLikeArity (PatSynCon pat_syn)    = patSynArity pat_syn
 conLikeFieldLabels :: ConLike -> [FieldLabel]
 conLikeFieldLabels (RealDataCon data_con) = dataConFieldLabels data_con
 conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
+
+-- | The 'ConInfo' (arity and field labels) associated to a 'ConLike'.
+conLikeConInfo :: ConLike -> ConInfo
+conLikeConInfo con =
+  mkConInfo (conLikeArity con) (conLikeFieldLabels con)
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)

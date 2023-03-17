@@ -26,8 +26,8 @@ module GHC.Tc.Gen.Head
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
        , obviousSig
-       , tyConOf, tyConOfET, lookupParents, fieldNotInType
-       , notSelector, nonBidirectionalErr
+       , tyConOf, tyConOfET, fieldNotInType
+       , nonBidirectionalErr
 
        , addHeadCtxt, addExprCtxt, addFunResCtxt ) where
 
@@ -47,7 +47,8 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
-import GHC.Unit.Module        ( getModule )
+import GHC.Core.FamInstEnv    ( FamInstEnvs )
+import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
@@ -57,8 +58,6 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Types.Evidence
 import GHC.Hs.Syn.Type
 
-import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( unitUE )
 import GHC.Core.PatSyn( PatSyn )
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Core.DataCon
@@ -860,34 +859,10 @@ tyConOf fam_inst_envs ty0
 tyConOfET :: FamInstEnvs -> ExpRhoType -> Maybe TyCon
 tyConOfET fam_inst_envs ty0 = tyConOf fam_inst_envs =<< checkingExpType_maybe ty0
 
-
--- For an ambiguous record field, find all the candidate record
--- selectors (as GlobalRdrElts) and their parents.
-lookupParents :: Bool -> RdrName -> RnM [(RecSelParent, GlobalRdrElt)]
-lookupParents is_selector rdr
-  = do { env <- getGlobalRdrEnv
-        -- Filter by isRecFldGRE because otherwise a non-selector variable with
-        -- an overlapping name can get through when NoFieldSelectors is enabled.
-        -- See Note [NoFieldSelectors] in GHC.Rename.Env.
-       ; let all_gres = lookupGRE_RdrName' rdr env
-       ; let gres | is_selector = filter isFieldSelectorGRE all_gres
-                  | otherwise   = filter isRecFldGRE all_gres
-       ; mapM lookupParent gres }
-  where
-    lookupParent :: GlobalRdrElt -> RnM (RecSelParent, GlobalRdrElt)
-    lookupParent gre = do { id <- tcLookupId (greMangledName gre)
-                          ; case recordSelectorTyCon_maybe id of
-                              Just rstc -> return (rstc, gre)
-                              Nothing -> failWithTc (notSelector (greMangledName gre)) }
-
-
 fieldNotInType :: RecSelParent -> RdrName -> TcRnMessage
 fieldNotInType p rdr
   = mkTcRnNotInScope rdr $
     UnknownSubordinate (text "field of type" <+> quotes (ppr p))
-
-notSelector :: Name -> TcRnMessage
-notSelector = TcRnNotARecordSelector
 
 
 {- *********************************************************************
@@ -1108,14 +1083,8 @@ tc_infer_id id_name
 
     get_suggestions ns = do
        let occ = mkOccNameFS ns (occNameFS (occName id_name))
-       dflags  <- getDynFlags
-       rdr_env <- getGlobalRdrEnv
        lcl_env <- getLocalRdrEnv
-       imp_info <- getImports
-       curr_mod <- getModule
-       hpt <- getHpt
-       return $ unknownNameSuggestions WL_Anything dflags hpt curr_mod rdr_env
-         lcl_env imp_info (mkRdrUnqual occ)
+       unknownNameSuggestions lcl_env WL_Anything (mkRdrUnqual occ)
 
     return_id id = return (HsVar noExtField (noLocA id), idType id)
 

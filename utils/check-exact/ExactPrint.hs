@@ -3136,6 +3136,7 @@ instance (ExactPrint body)
 
 -- ---------------------------------------------------------------------
 
+-- instance ExactPrint (HsRecUpdField GhcPs q) where
 instance (ExactPrint (LocatedA body))
     => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
@@ -3151,17 +3152,18 @@ instance (ExactPrint (LocatedA body))
     return (HsFieldBind an0 f' arg' isPun)
 
 -- ---------------------------------------------------------------------
-instance
-    (ExactPrint (HsFieldBind (LocatedAn NoEpAnns (a GhcPs)) body),
-     ExactPrint (HsFieldBind (LocatedAn NoEpAnns (b GhcPs)) body))
-    => ExactPrint
-         (Either [LocatedA (HsFieldBind (LocatedAn NoEpAnns (a GhcPs)) body)]
-                 [LocatedA (HsFieldBind (LocatedAn NoEpAnns (b GhcPs)) body)]) where
+instance ExactPrint (LHsRecUpdFields GhcPs) where
   getAnnotationEntry = const NoEntryVal
   setAnnotationAnchor a _ _ = a
 
-  exact (Left rbinds) = Left <$> markAnnotated rbinds
-  exact (Right pbinds) = Right <$> markAnnotated pbinds
+  exact flds@(RegularRecUpdFields    { recUpdFields  = rbinds }) = do
+    debugM $ "RegularRecUpdFields"
+    rbinds' <- markAnnotated rbinds
+    return $ flds { recUpdFields = rbinds' }
+  exact flds@(OverloadedRecUpdFields { olRecUpdFields = pbinds }) = do
+    debugM $ "OverloadedRecUpdFields"
+    pbinds' <- markAnnotated pbinds
+    return $ flds { olRecUpdFields = pbinds' }
 
 -- ---------------------------------------------------------------------
 

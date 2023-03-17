@@ -1,5 +1,17 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.21.0.0
+
+  * The `GadtC` and `RecGadtC` constructors of the `Con` datatype now take
+    non-empty lists of constructors. This means that the `gadtC` and `recGadtC`
+    smart constructors also expect non-empty lists as arguments.
+
+  * Record fields now belong to separate `NameSpace`s, keyed by the parent of
+    the record field. This is the name of the first constructor of the parent type,
+    even if this constructor does not have the field in question.  
+
+    This change enables TemplateHaskell support for `DuplicateRecordFields`.
+
 ## 2.20.0.0
 
   * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 

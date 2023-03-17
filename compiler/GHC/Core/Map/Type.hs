@@ -397,7 +397,7 @@ xtTyLit l f m =
     CharTyLit n -> m { tlm_char = Map.alter f n (tlm_char m) }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
-foldTyLit l m = flip (foldUFM l) (tlm_string m)
+foldTyLit l m = flip (nonDetFoldUFM l) (tlm_string m)
               . flip (Map.foldr l) (tlm_number m)
               . flip (Map.foldr l) (tlm_char m)
 

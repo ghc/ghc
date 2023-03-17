@@ -287,6 +287,14 @@ deriving instance Data (FieldLabelStrings GhcPs)
 deriving instance Data (FieldLabelStrings GhcRn)
 deriving instance Data (FieldLabelStrings GhcTc)
 
+deriving instance Data (HsRecUpdParent GhcPs)
+deriving instance Data (HsRecUpdParent GhcRn)
+deriving instance Data (HsRecUpdParent GhcTc)
+
+deriving instance Data (LHsRecUpdFields GhcPs)
+deriving instance Data (LHsRecUpdFields GhcRn)
+deriving instance Data (LHsRecUpdFields GhcTc)
+
 deriving instance Data (DotFieldOcc GhcPs)
 deriving instance Data (DotFieldOcc GhcRn)
 deriving instance Data (DotFieldOcc GhcTc)

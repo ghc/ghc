@@ -1,4 +1,5 @@
 
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ParallelListComp    #-}
@@ -40,8 +41,7 @@ import GHC.Tc.Utils.Instantiate
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits, getHoleFitDispConfig, pprHoleFit )
 
 import GHC.Types.Name
-import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual
-                             , emptyLocalRdrEnv, lookupGlobalRdrEnv , lookupLocalRdrOcc )
+import GHC.Types.Name.Reader
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -81,7 +81,7 @@ import Data.Function      ( on )
 import Data.List          ( partition, sort, sortBy )
 import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
-import Data.Ord           ( comparing )
+import Data.Ord         ( comparing )
 import qualified Data.Semigroup as S
 
 {-
@@ -1303,15 +1303,9 @@ See also 'reportUnsolved'.
 mkHoleError :: NameEnv Type -> [ErrorItem] -> SolverReportErrCtxt -> Hole -> TcM (MsgEnvelope TcRnMessage)
 mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc })
   | isOutOfScopeHole hole
-  = do { dflags  <- getDynFlags
-       ; rdr_env <- getGlobalRdrEnv
-       ; imp_info <- getImports
-       ; curr_mod <- getModule
-       ; hpt <- getHpt
-       ; let (imp_errs, hints)
-                = unknownNameSuggestions WL_Anything
-                    dflags hpt curr_mod rdr_env
-                    (tcl_rdr lcl_env) imp_info occ
+  = do { (imp_errs, hints)
+           <- unknownNameSuggestions (tcl_rdr lcl_env) WL_Anything occ
+       ; let
              err    = SolverReportWithCtxt ctxt (ReportHoleError hole $ OutOfScopeHole imp_errs)
              report = SolverReport err [] hints
 
@@ -2212,15 +2206,10 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
           ; lcl_env <- getLocalRdrEnv
           ; if occ_name_in_scope glb_env lcl_env name
             then return ([], noHints)
-            else do { dflags   <- getDynFlags
-                    ; imp_info <- getImports
-                    ; curr_mod <- getModule
-                    ; hpt      <- getHpt
-                    ; return (unknownNameSuggestions WL_RecField dflags hpt curr_mod
-                        glb_env emptyLocalRdrEnv imp_info (mkRdrUnqual name)) } }
+            else unknownNameSuggestions emptyLocalRdrEnv WL_RecField (mkRdrUnqual name) }
 
     occ_name_in_scope glb_env lcl_env occ_name = not $
-      null (lookupGlobalRdrEnv glb_env occ_name) &&
+      null (lookupGRE_OccName (IncludeFields WantNormal) glb_env occ_name) &&
       isNothing (lookupLocalRdrOcc lcl_env occ_name)
 
     record_field = case orig of

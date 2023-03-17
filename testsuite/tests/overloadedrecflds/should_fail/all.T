@@ -1,4 +1,6 @@
-test('overloadedrecfldsfail01', normal, compile_fail, [''])
+test('overloadedrecfldsfail01a', normal, compile_fail, [''])
+test('overloadedrecfldsfail01b', normal, compile_fail, [''])
+test('overloadedrecfldsfail01c', normal, compile_fail, [''])
 test('overloadedrecfldsfail02', normal, compile_fail, [''])
 test('overloadedrecfldsfail03', normal, compile_fail, [''])
 test('overloadedrecfldsfail04', [extra_files(['OverloadedRecFldsFail04_A.hs'])], multimod_compile_fail,
@@ -20,7 +22,6 @@ test('overloadedrecfldsfail14', normal, compile_fail, [''])
 test('overloadedlabelsfail01', normal, compile_fail, [''])
 test('overloadedlabelsfail02', normal, compile_fail, [''])
 test('overloadedlabelsfail03', normal, compile_fail, [''])
-test('T11103', req_th, compile_fail, [''])
 test('T11167_ambiguous_fixity', [], multimod_compile_fail,
      ['T11167_ambiguous_fixity', ''])
 test('T13132_duplicaterecflds', normal, compile_fail, [''])
@@ -37,7 +38,7 @@ test('T17420', [extra_files(['T17420A.hs'])], multimod_compile_fail,
 test('T17469', [extra_files(['T17469A.hs'])], multimod_compile_fail,
      ['T17469', ''])
 test('T17965', normal, compile_fail, [''])
-test('DRFHoleFits', extra_files(['DRFHoleFits_A.hs']), multimod_compile_fail, ['DRFHoleFits', ''])
+test('DRFHoleFits', extra_files(['DRFHoleFits_A.hs']), multimod_compile_fail, ['DRFHoleFits', '-v0'])
 test('DRFPartialFields', normal, compile_fail, [''])
 test('T16745', extra_files(['T16745C.hs', 'T16745B.hs']), multimod_compile_fail, ['T16745A', ''])
 test('FieldSelectors', normal, compile_fail, [''])
@@ -52,3 +53,9 @@ test('T18999_NoDisambiguateRecordFields', normal, compile_fail, [''])
 test('DRFUnused', normal, compile_fail, [''])
 test('T19287', normal, compile_fail, [''])
 test('overloadedrecfldswasrunnowfail06', normal, compile_fail, [''])
+test('T21946', normal, compile_fail, [''])
+test('T21959', normal, compile_fail, [''])
+test('T23010_fail', [extra_files(['T23010_fail.hs-boot', 'T23010_fail_aux.hs'])]
+                  , multimod_compile_fail
+                  , ['T23010_fail T23010_fail_aux', '-v0'])
+test('T23063', extra_files(['T23063_aux.hs']), multimod_compile_fail, ['T23063', '-v0'])
