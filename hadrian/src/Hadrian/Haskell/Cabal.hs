@@ -10,7 +10,7 @@
 -- Cabal files.
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
-    pkgVersion, pkgSimpleIdentifier, pkgUnitId, pkgSynopsis, pkgDescription,
+    pkgVersion, pkgUnitId, pkgSynopsis, pkgDescription,
     pkgDependencies, pkgGenericDescription, cabalArchString, cabalOsString
     ) where
 
@@ -26,18 +26,6 @@ import {-# SOURCE #-} Hadrian.Haskell.Hash (pkgUnitId)
 -- | Read a Cabal file and return the package version. The Cabal file is tracked.
 pkgVersion :: Package -> Action String
 pkgVersion = fmap version . readPackageData
-
-
--- | Read a Cabal file and return the package identifier without a hash, e.g. @base-4.10.0.0@.
--- The Cabal file is tracked.
---
--- For an identifier complete with the hash use 'pkgUnitId'
-pkgSimpleIdentifier :: Package -> Action String
-pkgSimpleIdentifier package = do
-    cabal <- readPackageData package
-    return $ if null (version cabal)
-        then name cabal
-        else name cabal ++ "-" ++ version cabal
 
 -- | Read a Cabal file and return the package synopsis. The Cabal file is tracked.
 pkgSynopsis :: Package -> Action String
