@@ -149,11 +149,6 @@ Compiler
 
 - The :ghc-flag:`-Wstar-is-type` warning is now enabled by default.
 
-- The ``-Wno-⟨wflag⟩``, ``-Werror=⟨wflag⟩`` and ``-Wwarn=⟨wflag⟩`` options are
-  now defined systematically for all warning groups (for example,
-  ``-Wno-default``, ``-Werror=unused-binds`` and ``-Wwarn=all`` are now
-  accepted). See :ref:`options-sanity`.
-
 GHCi
 ~~~~
 
