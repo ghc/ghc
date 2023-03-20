@@ -1,0 +1,13 @@
+
+RepPolyPartialSig.hs:8:7: error: [GHC-55287]
+    • The first pattern in the equation for ‘f’
+      does not have a fixed runtime representation.
+      Its type is:
+        p :: TYPE c0
+      Cannot unify ‘A’ with the type variable ‘c0’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the expression: x :: (_ :: TYPE A)
+      In an equation for ‘f’: f x = x :: (_ :: TYPE A)
+    • Relevant bindings include
+        x :: p (bound at RepPolyPartialSig.hs:8:3)
+        f :: p -> w (bound at RepPolyPartialSig.hs:8:1)

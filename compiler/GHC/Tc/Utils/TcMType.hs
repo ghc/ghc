@@ -115,6 +115,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad        -- TcType, amongst others
 import GHC.Tc.Utils.TcType
+import {-# SOURCE #-} GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 
@@ -556,7 +557,7 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
-                      , ir_ref = ref })
+                      , ir_ref = ref, ir_frr = mb_frr })
   = do { mb_inferred_ty <- readTcRef ref
        ; tau <- case mb_inferred_ty of
             Just ty -> do { ensureMonoType ty
@@ -564,6 +565,9 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                           ; return ty }
             Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
                           ; tau <- newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr)
+                          ; case mb_frr of
+                              Nothing -> return ()
+                              Just reason -> hasFixedRuntimeRep_syntactic reason tau
                             -- See Note [TcLevel of ExpType]
                           ; writeMutVar ref (Just tau)
                           ; return tau }
