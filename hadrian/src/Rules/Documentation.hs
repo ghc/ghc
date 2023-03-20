@@ -293,7 +293,7 @@ parsePkgDocTarget root = do
   _ <- Parsec.string root *> Parsec.optional (Parsec.char '/')
   _ <- Parsec.string (htmlRoot ++ "/")
   _ <- Parsec.string "libraries/"
-  (pkgname, _) <- parsePkgId <* Parsec.char '/'
+  (pkgname, _, _) <- parsePkgId <* Parsec.char '/'
   Parsec.choice
     [ Parsec.try (Parsec.string "haddock-prologue.txt")
         *> pure (HaddockPrologue pkgname)

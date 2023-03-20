@@ -15,7 +15,6 @@ import Oracles.ModuleFiles
 import Oracles.Setting
 import Hadrian.Haskell.Cabal.Type (PackageData(version))
 import Hadrian.Haskell.Cabal
-import Hadrian.Haskell.Hash
 import Hadrian.Oracles.Cabal (readPackageData)
 import Packages
 import Rules.Libffi
@@ -496,7 +495,7 @@ generateConfigHs = do
     -- part of the WiringMap, so we don't to go back and forth between the
     -- unit-id and the unit-key -- we take care that they are the same by using
     -- 'pkgUnitId' to create the unit-id in both situations.
-    cProjectUnitId <- expr . pkgUnitId =<< getContext
+    cProjectUnitId <- expr . (`pkgUnitId` ghc) =<< getContext
     return $ unlines
         [ "module GHC.Settings.Config"
         , "  ( module GHC.Version"
