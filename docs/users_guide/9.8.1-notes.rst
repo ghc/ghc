@@ -35,6 +35,11 @@ Compiler
 - Fix a bug in TH causing excessive calls to ``setNumCapabilities`` when ``-j`` is greater than ``-N``.
   See GHC ticket #23049.
 
+- The ``-Wno-⟨wflag⟩``, ``-Werror=⟨wflag⟩`` and ``-Wwarn=⟨wflag⟩`` options are
+  now defined systematically for all warning groups (for example,
+  ``-Wno-default``, ``-Werror=unused-binds`` and ``-Wwarn=all`` are now
+  accepted). See :ref:`options-sanity`.
+
 - ``WARNING`` pragmas may now be annotated with a category, following
   `GHC proposal #541 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0541-warning-pragmas-with-categories.rst>`_, in which case they are controlled with new
   ``-Wx-⟨category⟩`` flags rather than :ghc-flag:`-Wdeprecations`.
