@@ -345,7 +345,7 @@ registerPackage rs context = do
     pd <- packageDescription <$> readContextData context
     db_path <- packageDbPath (PackageDbLoc (stage context) (iplace context))
     dist_dir <- Context.buildPath context
-    pid <- pkgUnitId context (package context)
+    pid <- pkgUnitId context
     -- Note: the @cPath@ is ignored. The path that's used is the 'buildDir' path
     -- from the local build info @lbi@.
     lbi <- liftIO $ C.getPersistBuildConfig cPath

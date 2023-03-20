@@ -6,7 +6,7 @@ module Hadrian.Haskell.Hash (pkgUnitId, pkgHashOracle) where
 
 import Development.Shake
 
-import Hadrian.Haskell.Cabal.Type as C
+import Hadrian.Haskell.Cabal.Type
 import Hadrian.Haskell.Cabal
 import Hadrian.Oracles.Cabal
 import Hadrian.Package
@@ -35,9 +35,8 @@ import Control.Monad
 
 -- | Read a Cabal file and return the package identifier, e.g. @base-4.10.0.0-abcd@.
 -- This needs to be an oracle so it's cached
-pkgUnitId :: Context -> Package -> Action String
-pkgUnitId ctx' pkg = do
-  let ctx = ctx'{package = pkg}
+pkgUnitId :: Context -> Action String
+pkgUnitId ctx = do
   pid   <- pkgSimpleIdentifier (package ctx)
   phash <- pkgHash ctx
   -- Other boot packages still hardcode their unit-id to just <name>, but we
@@ -51,16 +50,6 @@ pkgUnitId ctx' pkg = do
     truncateHash :: Int -> String -> String
     truncateHash = take
 
--- | Read a Cabal file and return the package identifier without a hash, e.g. @base-4.10.0.0@.
--- The Cabal file is tracked.
---
--- For an identifier complete with the hash use 'pkgUnitId'
-pkgSimpleIdentifier :: Package -> Action String
-pkgSimpleIdentifier package = do
-    cabal <- readPackageData package
-    return $ if null (version cabal)
-        then C.name cabal
-        else C.name cabal ++ "-" ++ version cabal
 
 data PackageHashInputs = PackageHashInputs {
        pkgHashPkgId         :: String, -- ^ name-version
@@ -117,7 +106,7 @@ pkgHash = askOracle . PkgHashKey
 -- TODO: Needs to be oracle to be cached? Called lots of times
 pkgHashOracle :: Rules ()
 pkgHashOracle = void $ addOracleCache $ \(PkgHashKey ctx) -> do
-  -- RECURSIVE ORACLE: ctx_data <- readContextData ctx
+  ctx_data <- readContextData ctx
   pkg_data <- readPackageData (package ctx)
   name <- pkgSimpleIdentifier (package ctx)
   let stag = stage ctx
@@ -152,10 +141,8 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey ctx) -> do
       pkgHashStripLibs = False
       pkgHashDebugInfo = undefined
 
-  liftIO $ print "HI"
-  -- ghcArgs <- interpret (target ctx (Cabal Setup stag) [] []) flavourArgs
-  liftIO $ print "HI"
-  let pkgHashProgramArgs = mempty -- Map.singleton "ghc" ghcArgs
+  ghcArgs <- interpret (target ctx (Cabal Setup stag) [] []) flavourArgs
+  let pkgHashProgramArgs = Map.singleton "ghc" ghcArgs
       pkgHashExtraLibDirs = []
       pkgHashExtraLibDirsStatic = []
       pkgHashExtraFrameworkDirs = []

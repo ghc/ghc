@@ -3,6 +3,7 @@
 module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
 
 import Hadrian.Haskell.Cabal
+import Hadrian.Haskell.Hash
 import Hadrian.Haskell.Cabal.Type
 
 import Flavour
@@ -14,6 +15,7 @@ import Rules.Libffi (libffiName)
 import qualified Data.Set as Set
 import System.Directory
 import Data.Version.Extra
+import Hadrian.Haskell.Hash
 
 ghcBuilderArgs :: Args
 ghcBuilderArgs = mconcat
@@ -260,7 +262,7 @@ packageGhcArgs = do
     -- building stage0 because we have a flag in compiler/ghc.cabal.in that is
     -- sets `-this-unit-id ghc` when hadrian is building stage0, which will
     -- overwrite this one.
-    pkgId   <- expr $ pkgUnitId ctx package
+    pkgId   <- expr $ pkgUnitId ctx
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , arg "-package-env -"

@@ -112,18 +112,15 @@ parseWayUnit = Parsec.choice
 
 -- | Parse a @"pkgname-pkgversion"@ string into the package name and the
 -- integers that make up the package version.
-parsePkgId :: Parsec.Parsec String () (String, [Integer], String)
+parsePkgId :: Parsec.Parsec String () (String, [Integer])
 parsePkgId = parsePkgId' "" Parsec.<?> "package identifier (<name>-<version>)"
   where
     parsePkgId' currName = do
         s <- Parsec.many1 Parsec.alphaNum
         _ <- Parsec.char '-'
         let newName = if null currName then s else currName ++ "-" ++ s
-        Parsec.choice [ (,,) newName <$> parsePkgVersion <*> (Parsec.char '-' *> parsePkgHash)
+        Parsec.choice [ (newName,) <$> parsePkgVersion
                       , parsePkgId' newName ]
-
-parsePkgHash :: Parsec.Parsec String () String
-parsePkgHash = Parsec.many1 Parsec.alphaNum
 
 -- | Parse "."-separated integers that describe a package's version.
 parsePkgVersion :: Parsec.Parsec String () [Integer]
