@@ -297,6 +297,45 @@ printClosure( const StgClosure *obj )
             break;
         }
 
+    case ATOMICALLY_FRAME:
+        {
+            StgAtomicallyFrame* u = (StgAtomicallyFrame*)obj;
+            debugBelch("ATOMICALLY_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
+            debugBelch(",");
+            printPtr((StgPtr)u->code);
+            debugBelch(",");
+            printPtr((StgPtr)u->result);
+            debugBelch(")\n");
+            break;
+        }
+
+    case CATCH_RETRY_FRAME:
+        {
+            StgCatchRetryFrame* u = (StgCatchRetryFrame*)obj;
+            debugBelch("CATCH_RETRY_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
+            debugBelch(",");
+            printPtr((StgPtr)u->first_code);
+            debugBelch(",");
+            printPtr((StgPtr)u->alt_code);
+            debugBelch(")\n");
+            break;
+        }
+
+    case CATCH_STM_FRAME:
+        {
+            StgCatchSTMFrame* u = (StgCatchSTMFrame*)obj;
+            debugBelch("CATCH_STM_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
+            debugBelch(",");
+            printPtr((StgPtr)u->code);
+            debugBelch(",");
+            printPtr((StgPtr)u->handler);
+            debugBelch(")\n");
+            break;
+        }
+
     case ARR_WORDS:
         {
             StgWord i;
@@ -319,6 +358,10 @@ printClosure( const StgClosure *obj )
         debugBelch("MUT_ARR_PTRS_FROZEN_CLEAN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
         break;
 
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+        debugBelch("MUT_ARR_PTRS_FROZEN_DIRTY(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
+        break;
+
     case SMALL_MUT_ARR_PTRS_CLEAN:
         debugBelch("SMALL_MUT_ARR_PTRS_CLEAN(size=%" FMT_Word ")\n",
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
@@ -331,6 +374,11 @@ printClosure( const StgClosure *obj )
 
     case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
         debugBelch("SMALL_MUT_ARR_PTRS_FROZEN_CLEAN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+        break;
+
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+        debugBelch("SMALL_MUT_ARR_PTRS_FROZEN_DIRTY(size=%" FMT_Word ")\n",
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
         break;
 
@@ -533,6 +581,9 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
         case CATCH_FRAME:
         case UNDERFLOW_FRAME:
         case STOP_FRAME:
+        case ATOMICALLY_FRAME:
+        case CATCH_RETRY_FRAME:
+        case CATCH_STM_FRAME:
             printClosure((StgClosure*)sp);
             continue;
 

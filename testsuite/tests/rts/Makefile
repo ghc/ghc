@@ -147,3 +147,13 @@ EventlogOutput_IPE:
 	"$(TEST_HC)" -debug -finfo-table-map -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -va 2> EventlogOutput_IPE.stderr.log
 	grep "IPE:" EventlogOutput_IPE.stderr.log
+
+.PHONY: T23142
+T23142:
+	# Test that the -Di output contains different frames
+	"$(TEST_HC)" --run -ignore-dot-ghci T23142.hs +RTS -Di -RTS 2> T23142.log
+	grep -m1 -c "ATOMICALLY_FRAME" T23142.log
+	grep -m1 -c "CATCH_RETRY_FRAME" T23142.log
+	grep -m1 -c "CATCH_STM_FRAME" T23142.log
+	grep -m1 -c "MUT_ARR_PTRS_FROZEN_DIRTY" T23142.log
+	grep -m1 -c "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY" T23142.log

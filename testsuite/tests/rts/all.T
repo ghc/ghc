@@ -575,3 +575,5 @@ test('T22795b', [only_ways(['normal']), js_skip], compile_and_run, ['-single-thr
 test('T22795c', [only_ways(['normal']), js_skip], compile_and_run, ['-threaded -single-threaded'])
 
 test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
+
+test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])
