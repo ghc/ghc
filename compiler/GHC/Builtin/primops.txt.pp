@@ -933,26 +933,75 @@ primop   PopCntOp   "popCnt#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in a word.}
 
 primop   Pdep8Op   "pdep8#"   GenPrimOp   Word# -> Word# -> Word#
-    {Deposit bits to lower 8 bits of a word at locations specified by a mask.}
+    {Deposit bits to lower 8 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pdep16Op   "pdep16#"   GenPrimOp   Word# -> Word# -> Word#
-    {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
+    {Deposit bits to lower 16 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pdep32Op   "pdep32#"   GenPrimOp   Word# -> Word# -> Word#
-    {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
+    {Deposit bits to lower 32 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pdep64Op   "pdep64#"   GenPrimOp   Word64# -> Word64# -> Word64#
-    {Deposit bits to a word at locations specified by a mask.}
+    {Deposit bits to a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   PdepOp   "pdep#"   GenPrimOp   Word# -> Word# -> Word#
-    {Deposit bits to a word at locations specified by a mask.}
+    {Deposit bits to a word at locations specified by a mask, aka
+    [parallel bit deposit](https://en.wikipedia.org/wiki/Bit_Manipulation_Instruction_Sets#Parallel_bit_deposit_and_extract).
+
+    Software emulation:
+
+    > pdep :: Word -> Word -> Word
+    > pdep src mask = go 0 src mask
+    >   where
+    >     go :: Word -> Word -> Word -> Word
+    >     go result _ 0 = result
+    >     go result src mask = go newResult newSrc newMask
+    >       where
+    >         maskCtz   = countTrailingZeros mask
+    >         newResult = if testBit src 0 then setBit result maskCtz else result
+    >         newSrc    = src `shiftR` 1
+    >         newMask   = clearBit mask maskCtz
+
+    @since 0.5.2.0}
 
 primop   Pext8Op   "pext8#"   GenPrimOp   Word# -> Word# -> Word#
-    {Extract bits from lower 8 bits of a word at locations specified by a mask.}
+    {Extract bits from lower 8 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pext16Op   "pext16#"   GenPrimOp   Word# -> Word# -> Word#
-    {Extract bits from lower 16 bits of a word at locations specified by a mask.}
+    {Extract bits from lower 16 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pext32Op   "pext32#"   GenPrimOp   Word# -> Word# -> Word#
-    {Extract bits from lower 32 bits of a word at locations specified by a mask.}
+    {Extract bits from lower 32 bits of a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   Pext64Op   "pext64#"   GenPrimOp   Word64# -> Word64# -> Word64#
-    {Extract bits from a word at locations specified by a mask.}
+    {Extract bits from a word at locations specified by a mask.
+
+    @since 0.5.2.0}
 primop   PextOp   "pext#"   GenPrimOp   Word# -> Word# -> Word#
-    {Extract bits from a word at locations specified by a mask.}
+    {Extract bits from a word at locations specified by a mask, aka
+    [parallel bit extract](https://en.wikipedia.org/wiki/Bit_Manipulation_Instruction_Sets#Parallel_bit_deposit_and_extract).
+
+    Software emulation:
+
+    > pext :: Word -> Word -> Word
+    > pext src mask = loop 0 0 0
+    >   where
+    >     loop i count result
+    >       | i >= finiteBitSize (0 :: Word)
+    >       = result
+    >       | testBit mask i
+    >       = loop (i + 1) (count + 1) (if testBit src i then setBit result count else result)
+    >       | otherwise
+    >       = loop (i + 1) count result
+
+    @since 0.5.2.0}
 
 primop   Clz8Op   "clz8#" GenPrimOp   Word# -> Word#
     {Count leading zeros in the lower 8 bits of a word.}
