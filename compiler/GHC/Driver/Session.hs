@@ -3330,6 +3330,7 @@ fFlagsDeps = [
   flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
+  flagSpec "enable-builtin-rules"             Opt_EnableBuiltinRules,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
   flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,
   flagSpec "error-spans"                      Opt_ErrorSpans,
@@ -3894,7 +3895,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
     , ([2],     Opt_StgLiftLams)
-
+    , ([0,1,2], Opt_EnableBuiltinRules)
     , ([1,2],   Opt_EnableRewriteRules)
           -- Off for -O0.   Otherwise we desugar list literals
           -- to 'build' but don't run the simplifier passes that

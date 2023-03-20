@@ -2248,7 +2248,7 @@ tryRules env rules fn args call_cont
 -}
 
   | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
-                                        (activeRule (getMode env)) fn
+                                        (activeRule (getMode env)) (sm_builtin_rules (getMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
   = do { checkedTick (RuleFired (ruleName rule))
@@ -4202,4 +4202,3 @@ for the RHS as well as the LHS, but that seems more conservative
 than necesary.  Allowing some inlining might, for example, eliminate
 a binding.
 -}
-

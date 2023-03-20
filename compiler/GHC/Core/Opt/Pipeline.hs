@@ -148,6 +148,7 @@ getCoreToDo logger dflags
     late_dmd_anal = gopt Opt_LateDmdAnal                  dflags
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
+    builtin_rules_on = gopt Opt_EnableBuiltinRules        dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     pre_inline_on = gopt Opt_SimplPreInlining             dflags
@@ -168,6 +169,7 @@ getCoreToDo logger dflags
                           , sm_logger       = logger
                           , sm_uf_opts      = unfoldingOpts dflags
                           , sm_rules        = rules_on
+                          , sm_builtin_rules = builtin_rules_on
                           , sm_eta_expand   = eta_expand_on
                           , sm_cast_swizzle = True
                           , sm_inline       = True

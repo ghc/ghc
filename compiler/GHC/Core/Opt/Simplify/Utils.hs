@@ -868,6 +868,7 @@ simplEnvForGHCi logger dflags
                            , sm_dflags = dflags
                            , sm_uf_opts = uf_opts
                            , sm_rules  = rules_on
+                           , sm_builtin_rules = builtin_rules_on
                            , sm_inline = False
                               -- Do not do any inlining, in case we expose some
                               -- unboxed tuple stuff that confuses the bytecode
@@ -878,10 +879,11 @@ simplEnvForGHCi logger dflags
                            , sm_pre_inline = pre_inline_on
                            }
   where
-    rules_on      = gopt Opt_EnableRewriteRules   dflags
-    eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
-    pre_inline_on = gopt Opt_SimplPreInlining     dflags
-    uf_opts       = unfoldingOpts                 dflags
+    builtin_rules_on = gopt Opt_EnableBuiltinRules dflags
+    rules_on         = gopt Opt_EnableRewriteRules   dflags
+    eta_expand_on    = gopt Opt_DoLambdaEtaExpansion dflags
+    pre_inline_on    = gopt Opt_SimplPreInlining     dflags
+    uf_opts          = unfoldingOpts                 dflags
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 updModeForStableUnfoldings unf_act current_mode

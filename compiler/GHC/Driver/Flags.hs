@@ -181,6 +181,7 @@ data GeneralFlag
    | Opt_UnboxStrictFields
    | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
+   | Opt_EnableBuiltinRules
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
    | Opt_EnableThSpliceWarnings         -- Enable warnings for TH splices
    | Opt_RegsGraph                      -- do graph coloring register allocation
@@ -399,6 +400,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_UnboxStrictFields
    , Opt_UnboxSmallStrictFields
    , Opt_DictsCheap
+   , Opt_EnableBuiltinRules
    , Opt_EnableRewriteRules
    , Opt_RegsGraph
    , Opt_RegsIterative
@@ -543,4 +545,3 @@ data Language = Haskell98 | Haskell2010 | GHC2021
 
 instance Outputable Language where
     ppr = text . show
-
