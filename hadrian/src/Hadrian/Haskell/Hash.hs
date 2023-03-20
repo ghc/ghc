@@ -40,12 +40,17 @@ pkgUnitId ctx' pkg = do
   let ctx = ctx'{package = pkg}
   pid   <- pkgSimpleIdentifier (package ctx)
   phash <- pkgHash ctx
-  -- Other boot packages still hardcode their unit-id to just <name>, but we
-  -- can have hadrian generate a different unit-id for them just as cabal does
-  -- because the boot packages unit-ids are overriden by setting -this-unit-id
-  -- in the cabal file
-  liftIO $ print $ pid <> "-" <> truncateHash 4 phash
-  pure $ pid <> "-" <> truncateHash 4 phash
+  if pkgName pkg == "rts"
+     -- The Unit-id will change depending on the way... rTS BReaks. At some
+     -- point it's not even clear which way we're building
+     then pure pid
+     else do
+        -- Other boot packages still hardcode their unit-id to just <name>, but we
+        -- can have hadrian generate a different unit-id for them just as cabal does
+        -- because the boot packages unit-ids are overriden by setting -this-unit-id
+        -- in the cabal file
+        liftIO $ print $ pid <> "-" <> truncateHash 4 phash
+        pure $ pid <> "-" <> truncateHash 4 phash
 
   where
     truncateHash :: Int -> String -> String

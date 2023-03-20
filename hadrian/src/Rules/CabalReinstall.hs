@@ -54,8 +54,8 @@ cabalBuildRules = do
         need (lib_targets ++ (map (\(_, p) -> p) (bin_targets ++ iserv_targets)))
 
         distDir        <- Context.distDir Stage1
-        -- rtsDir         <- pkgUnitId (vanillaContext Stage1 rts) rts
-        let rtsDir = "rts"
+        rtsDir         <- pkgUnitId (vanillaContext Stage1 rts) rts
+        -- let rtsDir = "rts"
 
         let ghcBuildDir      = root -/- stageString Stage1
             rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir

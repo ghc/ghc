@@ -102,7 +102,7 @@ commonCabalArgs stage = do
             , arg "--cabal-file"
             , arg $ pkgCabalFile pkg
             , arg "--ipid"
-            , arg "$pkg-$version"
+            , arg package_id
             , arg "--prefix"
             , arg prefix
 
