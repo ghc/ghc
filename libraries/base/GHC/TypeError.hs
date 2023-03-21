@@ -12,7 +12,7 @@ This module exports the TypeError family, which is used to provide custom type
 errors, and the ErrorMessage kind used to define these custom error messages.
 This is a type-level analogue to the term level error function.
 
-@since 4.16.0.0
+@since 4.17.0.0
 -}
 
 module GHC.TypeError
@@ -132,7 +132,7 @@ equation of Assert kicks in, and
 -- where @NotPError@ reduces to a @TypeError@ which is reported if the
 -- assertion fails.
 --
--- @since 4.16.0.0
+-- @since 4.17.0.0
 --
 type Assert :: Bool -> Constraint -> Constraint
 type family Assert check errMsg where
