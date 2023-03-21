@@ -480,8 +480,6 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnHsigFixityMismatch"                        = 93007
-  GhcDiagnosticCode "HsigShapeSortMismatch"                         = 93008
-  GhcDiagnosticCode "HsigShapeNotUnifiable"                         = 93009
   GhcDiagnosticCode "TcRnHsigNoIface"                               = 93010
   GhcDiagnosticCode "TcRnHsigMissingModuleExport"                   = 93011
   GhcDiagnosticCode "TcRnBadGenericMethod"                          = 59794
@@ -551,8 +549,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
   GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
   GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
-  GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
-  GhcDiagnosticCode "PatSynUnboundVar"                              = 28572
+  GhcDiagnosticCode "TcRnCannotDefaultConcrete"                     = 52083
   GhcDiagnosticCode "TcRnMultiAssocTyFamDefaults"                   = 59128
   GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
   GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
@@ -580,6 +577,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
   GhcDiagnosticCode "TcRnTypeSynonymCycle"                          = 97522
 
+  -- PatSynInvalidRhsReason
+  GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
+  GhcDiagnosticCode "PatSynUnboundVar"                              = 28572
+
   -- TcRnBadFieldAnnotation/BadFieldAnnotationReason
   GhcDiagnosticCode "LazyFieldsDisabled"                            = 81601
   GhcDiagnosticCode "UnpackWithoutStrictness"                       = 10107
@@ -600,6 +601,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TyFamsDisabledInstance"                        = 06206
   GhcDiagnosticCode "TcRnPrecedenceParsingError"                    = 88747
   GhcDiagnosticCode "TcRnSectionPrecedenceError"                    = 46878
+
+  -- HsigShapeMismatchReason
+  GhcDiagnosticCode "HsigShapeSortMismatch"                         = 93008
+  GhcDiagnosticCode "HsigShapeNotUnifiable"                         = 93009
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

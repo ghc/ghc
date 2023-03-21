@@ -1728,6 +1728,11 @@ instance Diagnostic TcRnMessage where
             in ppr (getSrcSpan n) <> colon <+> ppr (tyConName tc)
                    <+> text "from external module"
 
+    TcRnCannotDefaultConcrete frr
+      -> mkSimpleDecorated $
+         ppr (frr_context frr) $$
+         text "cannot be assigned a fixed runtime representation," <+>
+         text "not even by defaulting."
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2299,6 +2304,8 @@ instance Diagnostic TcRnMessage where
     TcRnDataKindsError{}
       -> ErrorWithoutFlag
     TcRnTypeSynonymCycle{}
+      -> ErrorWithoutFlag
+    TcRnCannotDefaultConcrete{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2899,6 +2906,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.DataKinds]
     TcRnTypeSynonymCycle{}
       -> noHints
+    TcRnCannotDefaultConcrete{}
+      -> [SuggestAddTypeSignatures UnnamedBinding]
 
   diagnosticCode = constructorCode
 

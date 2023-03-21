@@ -116,3 +116,4 @@ test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 
 
 test('T23051', normal, compile_fail, [''])
+test('T23153', normal, compile_fail, [''])
