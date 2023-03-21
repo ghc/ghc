@@ -168,6 +168,9 @@
     errors. `TypeError` is re-exported from `GHC.TypeLits` for backwards
     compatibility.
 
+  * Comparison constraints in `Data.Type.Ord` (e.g. `<=`) now use the new
+    `GHC.TypeError.Assert` type family instead of type equality with `~`.
+
 ## 4.16.3.0 *May 2022*
 
   * Shipped with GHC 9.2.4
@@ -244,9 +247,6 @@
 
   * `fromInteger :: Integer -> Float/Double` now consistently round to the
     nearest value, with ties to even.
-
-  * Comparison constraints in `Data.Type.Ord` (e.g. `<=`) now use the new
-    `GHC.TypeError.Assert` type family instead of type equality with `~`.
 
   * Additions to `Data.Bits`:
 
