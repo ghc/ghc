@@ -1238,6 +1238,11 @@ instance Diagnostic TcRnMessage where
           = vcat [ text "Starting from GHC 9.10, this warning will turn into an error." ]
         user_manual =
           vcat [ text "See the user manual, § Undecidable instances and loopy superclasses." ]
+    TcRnCannotDefaultConcrete frr
+      -> mkSimpleDecorated $
+         ppr (frr_context frr) $$
+         text "cannot be assigned a fixed runtime representation," <+>
+         text "not even by defaulting."
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1646,6 +1651,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnLoopySuperclassSolve{}
       -> WarningWithFlag Opt_WarnLoopySuperclassSolve
+    TcRnCannotDefaultConcrete{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2064,6 +2071,8 @@ instance Diagnostic TcRnMessage where
         cls_or_qc = case ctLocOrigin wtd_loc of
           ScOrigin c_or_q _ -> c_or_q
           _                 -> IsClsInst -- shouldn't happen
+    TcRnCannotDefaultConcrete{}
+      -> [SuggestAddTypeSignatures UnnamedBinding]
 
   diagnosticCode = constructorCode
 
