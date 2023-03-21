@@ -598,6 +598,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "EmptyStmtsGroupInDoNotation"                   = 82311
   GhcDiagnosticCode "EmptyStmtsGroupInArrowNotation"                = 19442
 
+  GhcDiagnosticCode "TcRnCannotDefaultConcrete"                     = 52083
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --

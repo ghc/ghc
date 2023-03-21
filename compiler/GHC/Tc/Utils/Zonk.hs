@@ -56,6 +56,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Errors.Types
 
 import GHC.Core.TyCo.Ppr     ( pprTyVar )
 import GHC.Core.TyCon
@@ -1806,6 +1807,9 @@ commitFlexi flexi tv zonked_kind
         | isMultiplicityTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
               ; return manyDataConTy }
+        | Just (ConcreteFRR origin) <- isConcreteTyVar_maybe tv
+        -> do { addErr $ TcRnCannotDefaultConcrete origin
+              ; return (anyTypeOfKind zonked_kind) }
         | otherwise
         -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
               ; return (anyTypeOfKind zonked_kind) }

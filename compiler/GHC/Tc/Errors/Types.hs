@@ -2793,6 +2793,17 @@ data TcRnMessage where
                            -> PredType -- ^ Wanted 'PredType'
                            -> TcRnMessage
 
+  {- TcRnCannotDefaultConcrete is an error occurring when a concrete
+    type variable cannot be defaulted.
+
+    Test cases:
+      T23153
+  -}
+  TcRnCannotDefaultConcrete
+    :: !FixedRuntimeRepOrigin
+    -> TcRnMessage
+
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.

@@ -113,3 +113,4 @@ test('RepPolyTuple2', normal, compile_fail, ['']) ## see #21683              ##
 test('T21650_a', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 ###############################################################################
+test('T23153', normal, compile_fail, [''])
