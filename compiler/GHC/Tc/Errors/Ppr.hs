@@ -799,6 +799,11 @@ instance Diagnostic TcRnMessage where
     TcRnInvalidCIdentifier target
       -> mkSimpleDecorated $
            sep [quotes (ppr target) <+> text "is not a valid C identifier"]
+    TcRnCannotDefaultConcrete frr
+      -> mkSimpleDecorated $
+         ppr (frr_context frr) $$
+         text "cannot be assigned a fixed runtime representation," <+>
+         text "not even by defaulting."
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1059,6 +1064,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInvalidCIdentifier{}
       -> ErrorWithoutFlag
+    TcRnCannotDefaultConcrete{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -1318,6 +1325,9 @@ instance Diagnostic TcRnMessage where
            _ -> noHints
     TcRnInvalidCIdentifier{}
       -> noHints
+    TcRnCannotDefaultConcrete{}
+      -> [SuggestAddTypeSignatures UnnamedBinding]
+
 
 deriveInstanceErrReasonHints :: Class
                              -> UsingGeneralizedNewtypeDeriving

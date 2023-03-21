@@ -1790,6 +1790,16 @@ data TcRnMessage where
   -}
   TcRnInvalidCIdentifier :: !CLabelString -> TcRnMessage
 
+  {- TcRnCannotDefaultConcrete is an error occurring when a concrete
+    type variable cannot be defaulted.
+
+    Test cases:
+      T23153
+  -}
+  TcRnCannotDefaultConcrete
+    :: !FixedRuntimeRepOrigin
+    -> TcRnMessage
+
 -- | Specifies which backend code generators where expected for an FFI declaration
 data ExpectedBackends
   = COrAsmOrLlvm         -- ^ C, Asm, or LLVM
