@@ -868,15 +868,23 @@ addCoreCt nabla x e = do
           -- Otherwise we alternate endlessly between [] and ""
           [] -> data_con_app x emptyInScopeSet nilDataCon []
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
+
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
+
       | Just (in_scope, _empty_floats@[], dc, _arg_tys, args)
             <- exprIsConApp_maybe in_scope_env e
       = data_con_app x in_scope dc args
-      -- See Note [Detecting pattern synonym applications in expressions]
-      | Var y <- e, Nothing <- isDataConId_maybe x
-      -- We don't consider DataCons flexible variables
+          -- See Note [Detecting pattern synonym applications in expressions]
+
+      | (Var y, args) <- collectArgs e
+          -- This catches the case of a variable constraints `x ~ y`
+      , all isTypeArg args
+          -- See Note [Identify VarInfo modulo type arguments]
+      , Nothing <- isDataConId_maybe x
+          -- We don't consider DataCons flexible variables
       = modifyT (\nabla -> addVarCt nabla x y)
+
       | otherwise
       -- Any other expression. Try to find other uses of a semantically
       -- equivalent expression and represent them by the same variable!
@@ -1059,10 +1067,41 @@ In the end, replacing dictionaries with an error value in the pattern-match
 checker was the most self-contained, although we might want to revisit once
 we implement a more robust approach to computing equality in the pattern-match
 checker (see #19272).
--}
 
-{- Note [The Pos/Neg invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Identify VarInfo modulo type arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#23145)
+
+  f :: (forall a. Maybe a) -> Maybe b
+  f (Just x) = Just x
+  f Nothing  = Nothing
+
+this desugars to
+
+  f = \ @b (ds :: forall a. Maybe a) ->
+        case ds @b of {
+          Just x  -> Just @b x;
+          Nothing ->
+            case ds @Any of {
+              Just ipv -> patError ...
+              Nothing -> Nothing @b
+            }
+        }
+
+Note we match on `ds` twice with different type arguments applied, but since the
+type arguments are erased both matches must yield the same value. Hence we should
+not warn about `f` having an incomplete match.
+A good way to achieve that is discard the type arguments in the constraint `pm
+~ ds @b` (where `pm` is the match variable of the outermost Case) so that we
+get `pm ~ ds`, with the outcome of giving both match variables the same VarInfo
+as `ds`. Long distance information will sort out the rest and we the checker
+detects `f` as exhaustive.
+
+Note that the potential type confusion is harmless as the TyCon of `ds` and `pm`
+must be the same (if it exists).
+
+Note [The Pos/Neg invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Invariant applying to each VarInfo: Whenever we have @C @tvs args@ in 'vi_pos',
 any entry in 'vi_neg' must be incomparable to C (return Nothing) according to
 'eqPmAltCons'. Those entries that are comparable either lead to a refutation
