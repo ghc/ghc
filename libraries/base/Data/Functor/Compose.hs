@@ -27,13 +27,11 @@ module Data.Functor.Compose (
   ) where
 
 import Data.Functor.Classes
-import Data.Functor.Utils (Max(..), Min(..))
 
 import Control.Applicative
 import Data.Coerce (coerce)
 import Data.Data (Data)
 import Data.Foldable (Foldable(..))
-import Data.Maybe (fromMaybe)
 import Data.Monoid (Sum(..), All(..), Any(..), Product(..))
 import Data.Type.Equality (TestEquality(..), (:~:)(..))
 import GHC.Generics (Generic, Generic1)
@@ -127,10 +125,8 @@ instance (Foldable f, Foldable g) => Foldable (Compose f g) where
     length (Compose t) = getSum (foldMap' (Sum . length) t)
     elem x (Compose t) = getAny (foldMap (Any . elem x) t)
 
-    minimum (Compose fga) =
-      fromMaybe (error "minimum: empty structure") $ getMin $ foldMap' (\ga -> if null ga then Min Nothing else Min $ Just $ minimum ga) fga
-    maximum (Compose fga) =
-      fromMaybe (error "maximum: empty structure") $ getMax $ foldMap' (\ga -> if null ga then Max Nothing else Max $ Just $ maximum ga) fga
+    minimum (Compose fga) = minimum $ map minimum $ filter (not . null) $ toList fga
+    maximum (Compose fga) = maximum $ map maximum $ filter (not . null) $ toList fga
 
     sum (Compose t) = getSum (foldMap' (Sum . sum) t)
     product (Compose t) = getProduct (foldMap' (Product . product) t)
