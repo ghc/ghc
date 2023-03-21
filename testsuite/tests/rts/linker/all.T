@@ -28,7 +28,9 @@ test('T23066',
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
-       js_broken(22374),
+       # JavaScript linker doesn't support linker scripts
+       js_skip,
+       # Windows linker doesn't seem to support linker scripts
        when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
        when(opsys('darwin'), skip),
