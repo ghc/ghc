@@ -305,10 +305,10 @@ rtsCabalFlags = mconcat
     flag = interpolateCabalFlag
 
 packageVersions :: Interpolations
-packageVersions = foldMap f [ base, ghcPrim, ghc, cabal, templateHaskell, ghcCompact, array ]
+packageVersions = foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaskell, ghcCompact, array ]
   where
     f :: Package -> Interpolations
-    f pkg = interpolateVar var $ show . version <$> readPackageData pkg
+    f pkg = interpolateVar var $ version <$> readPackageData pkg
       where var = "LIBRARY_" <> pkgName pkg <> "_VERSION"
 
 templateRule :: FilePath -> Interpolations -> Rules ()
@@ -335,6 +335,7 @@ templateRules = do
   templateRule "utils/ghc-pkg/ghc-pkg.cabal" $ projectVersion
   templateRule "libraries/template-haskell/template-haskell.cabal" $ projectVersion
   templateRule "libraries/prologue.txt" $ packageVersions
+  templateRule "docs/index.html" $ packageVersions
 
 
 -- Generators
