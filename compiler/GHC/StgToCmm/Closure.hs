@@ -266,8 +266,10 @@ mkLFImported id =
       Nothing
         -- Interface doesn't have a LambdaFormInfo, make a conservative one from
         -- the type.
-        | Just con <- isDataConWorkId_maybe id
+        | Just con <- isDataConId_maybe id
         , isNullaryRepDataCon con
+            -- See Note [Imported nullary datacon wrappers must have correct LFInfo]
+            -- in GHC.StgToCmm.Types
         -> LFCon con   -- An imported nullary constructor
                        -- We assume that the constructor is evaluated so that
                        -- the id really does point directly to the constructor
