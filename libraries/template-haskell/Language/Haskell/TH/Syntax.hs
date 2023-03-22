@@ -335,39 +335,9 @@ type role TExp nominal   -- See Note [Role of TExp]
 newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
   { unType :: Exp -- ^ Underlying untyped Template Haskell expression
   }
--- ^ Represents an expression which has type @a@. Built on top of 'Exp', typed
--- expressions allow for type-safe splicing via:
+-- ^ Typed wrapper around an 'Exp'.
 --
---   - typed quotes, written as @[|| ... ||]@ where @...@ is an expression; if
---     that expression has type @a@, then the quotation has type
---     @'Q' ('TExp' a)@
---
---   - typed splices inside of typed quotes, written as @$$(...)@ where @...@
---     is an arbitrary expression of type @'Q' ('TExp' a)@
---
--- Traditional expression quotes and splices let us construct ill-typed
--- expressions:
---
--- >>> fmap ppr $ runQ [| True == $( [| "foo" |] ) |]
--- GHC.Types.True GHC.Classes.== "foo"
--- >>> GHC.Types.True GHC.Classes.== "foo"
--- <interactive> error:
---     • Couldn't match expected type ‘Bool’ with actual type ‘[Char]’
---     • In the second argument of ‘(==)’, namely ‘"foo"’
---       In the expression: True == "foo"
---       In an equation for ‘it’: it = True == "foo"
---
--- With typed expressions, the type error occurs when /constructing/ the
--- Template Haskell expression:
---
--- >>> fmap ppr $ runQ [|| True == $$( [|| "foo" ||] ) ||]
--- <interactive> error:
---     • Couldn't match type ‘[Char]’ with ‘Bool’
---       Expected type: Q (TExp Bool)
---         Actual type: Q (TExp [Char])
---     • In the Template Haskell quotation [|| "foo" ||]
---       In the expression: [|| "foo" ||]
---       In the Template Haskell splice $$([|| "foo" ||])
+-- This is the typed representation of terms produced by typed quotes.
 --
 -- Representation-polymorphic since /template-haskell-2.16.0.0/.
 
@@ -395,13 +365,13 @@ unsafeTExpCoerce m = do { e <- m
 TExp's argument must have a nominal role, not phantom as would
 be inferred (#8459).  Consider
 
-  e :: TExp Age
-  e = MkAge 3
+  e :: Code Q Age
+  e = [|| MkAge 3 ||]
 
   foo = $(coerce e) + 4::Int
 
 The splice will evaluate to (MkAge 3) and you can't add that to
-4::Int. So you can't coerce a (TExp Age) to a (TExp Int). -}
+4::Int. So you can't coerce a (Code Q Age) to a (Code Q Int). -}
 
 -- Code constructor
 
@@ -409,6 +379,40 @@ type role Code representational nominal   -- See Note [Role of TExp]
 newtype Code m (a :: TYPE (r :: RuntimeRep)) = Code
   { examineCode :: m (TExp a) -- ^ Underlying monadic value
   }
+-- ^ Represents an expression which has type @a@, built in monadic context @m@. Built on top of 'TExp', typed
+-- expressions allow for type-safe splicing via:
+--
+--   - typed quotes, written as @[|| ... ||]@ where @...@ is an expression; if
+--     that expression has type @a@, then the quotation has type
+--     @Quote m => Code m a@
+--
+--   - typed splices inside of typed quotes, written as @$$(...)@ where @...@
+--     is an arbitrary expression of type @Quote m => Code m a@
+--
+-- Traditional expression quotes and splices let us construct ill-typed
+-- expressions:
+--
+-- >>> fmap ppr $ runQ (unTypeCode [| True == $( [| "foo" |] ) |])
+-- GHC.Types.True GHC.Classes.== "foo"
+-- >>> GHC.Types.True GHC.Classes.== "foo"
+-- <interactive> error:
+--     • Couldn't match expected type ‘Bool’ with actual type ‘[Char]’
+--     • In the second argument of ‘(==)’, namely ‘"foo"’
+--       In the expression: True == "foo"
+--       In an equation for ‘it’: it = True == "foo"
+--
+-- With typed expressions, the type error occurs when /constructing/ the
+-- Template Haskell expression:
+--
+-- >>> fmap ppr $ runQ (unTypeCode [|| True == $$( [|| "foo" ||] ) ||])
+-- <interactive> error:
+--     • Couldn't match type ‘[Char]’ with ‘Bool’
+--       Expected type: Code Q Bool
+--         Actual type: Code Q [Char]
+--     • In the Template Haskell quotation [|| "foo" ||]
+--       In the expression: [|| "foo" ||]
+--       In the Template Haskell splice $$([|| "foo" ||])
+
 
 -- | Unsafely convert an untyped code representation into a typed code
 -- representation.
@@ -958,7 +962,7 @@ sequenceQ = sequence
 -- Haskell quotation is bound outside the Oxford brackets (@[| ... |]@ or
 -- @[|| ... ||]@) but not at the top level. As an example:
 --
--- > add1 :: Int -> Q (TExp Int)
+-- > add1 :: Int -> Code Q Int
 -- > add1 x = [|| x + 1 ||]
 --
 -- Template Haskell has no way of knowing what value @x@ will take on at
@@ -966,7 +970,7 @@ sequenceQ = sequence
 --
 -- A 'Lift' instance must satisfy @$(lift x) ≡ x@ and @$$(liftTyped x) ≡ x@
 -- for all @x@, where @$(...)@ and @$$(...)@ are Template Haskell splices.
--- It is additionally expected that @'lift' x ≡ 'unTypeQ' ('liftTyped' x)@.
+-- It is additionally expected that @'lift' x ≡ 'unTypeCode' ('liftTyped' x)@.
 --
 -- 'Lift' instances can be derived automatically by use of the @-XDeriveLift@
 -- GHC language extension:
