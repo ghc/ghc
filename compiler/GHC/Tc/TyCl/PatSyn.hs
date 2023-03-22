@@ -41,7 +41,6 @@ import GHC.Core.TyCo.Subst( extendTvSubstWithClone )
 import GHC.Core.Predicate
 
 import GHC.Builtin.Types.Prim
-import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
@@ -68,6 +67,7 @@ import GHC.Driver.Session ( getDynFlags, xopt_FieldSelectors )
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )
+import Data.List.NonEmpty (NonEmpty, nonEmpty)
 
 {-
 ************************************************************************
@@ -185,10 +185,11 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        -- Report coercions that escape
        -- See Note [Coercions that escape]
        ; args <- mapM zonkId args
-       ; let bad_args = [ (arg, bad_cos) | arg <- args ++ prov_dicts
-                              , let bad_cos = filterDVarSet isId $
-                                              (tyCoVarsOfTypeDSet (idType arg))
-                              , not (isEmptyDVarSet bad_cos) ]
+       ; let bad_arg arg = fmap (\bad_cos -> (arg, bad_cos)) $
+                           nonEmpty $
+                           dVarSetElems $
+                           filterDVarSet isId (tyCoVarsOfTypeDSet (idType arg))
+             bad_args = mapMaybe bad_arg (args ++ prov_dicts)
        ; mapM_ dependentArgErr bad_args
 
        -- Report un-quantifiable type variables:
@@ -236,22 +237,11 @@ mkProvEvidence ev_id
     pred = evVarPred ev_id
     eq_con_args = [evId ev_id]
 
-dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
+dependentArgErr :: (Id, NonEmpty CoVar) -> TcM ()
 -- See Note [Coercions that escape]
 dependentArgErr (arg, bad_cos)
   = failWithTc $  -- fail here: otherwise we get downstream errors
-    mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ text "Iceland Jack!  Iceland Jack! Stop torturing me!"
-         , hang (text "Pattern-bound variable")
-              2 (ppr arg <+> dcolon <+> ppr (idType arg))
-         , nest 2 $
-           hang (text "has a type that mentions pattern-bound coercion"
-                 <> plural bad_co_list <> colon)
-              2 (pprWithCommas ppr bad_co_list)
-         , text "Hint: use -fprint-explicit-coercions to see the coercions"
-         , text "Probable fix: add a pattern signature" ]
-  where
-    bad_co_list = dVarSetElems bad_cos
+    TcRnPatSynEscapedCoercion arg bad_cos
 
 {- Note [Type variables whose kind is captured]
 ~~-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -405,11 +395,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- The existential 'x' should not appear in the result type
        -- Can't check this until we know P's arity (decl_arity above)
        ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) $ binderVars explicit_ex_bndrs
-       ; checkTc (null bad_tvs) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-         hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
-                   , text "namely" <+> quotes (ppr pat_ty) ])
-            2 (text "mentions existential type variable" <> plural bad_tvs
-               <+> pprQuotedList bad_tvs)
+       ; checkTc (null bad_tvs) $ TcRnPatSynExistentialInResult name pat_ty bad_tvs
 
          -- See Note [The pattern-synonym signature splitting rule] in GHC.Tc.Gen.Sig
        ; let univ_fvs = closeOverKinds $
@@ -679,10 +665,7 @@ collectPatSynArgInfo details =
 
 wrongNumberOfParmsErr :: Name -> Arity -> Arity -> TcM a
 wrongNumberOfParmsErr name decl_arity missing
-  = failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
-          <+> speakNOf decl_arity (text "argument"))
-       2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
+  = failWithTc $ TcRnPatSynArityMismatch name decl_arity missing
 
 -------------------------
 -- Shared by both tcInferPatSyn and tcCheckPatSyn
@@ -921,11 +904,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
   = return emptyBag
 
   | Left why <- mb_match_group       -- Can't invert the pattern
-  = setSrcSpan (getLocA lpat) $ failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
-                 <+> quotes (ppr ps_name) <> colon)
-              2 why
-         , text "RHS pattern:" <+> ppr lpat ]
+  = setSrcSpan (getLocA lpat) $ failWithTc $ TcRnPatSynInvalidRhs ps_name lpat args why
 
   | Right match_group <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn ps_name
@@ -975,7 +954,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mb_match_group
        = case dir of
            ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr ps_name args lpat)
+           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
@@ -1019,8 +998,8 @@ add_void need_dummy_arg ty
   | need_dummy_arg = mkVisFunTyMany unboxedUnitTy ty
   | otherwise      = ty
 
-tcPatToExpr :: Name -> [LocatedN Name] -> LPat GhcRn
-            -> Either SDoc (LHsExpr GhcRn)
+tcPatToExpr :: [LocatedN Name] -> LPat GhcRn
+            -> Either PatSynInvalidRhsReason (LHsExpr GhcRn)
 -- Given a /pattern/, return an /expression/ that builds a value
 -- that matches the pattern.  E.g. if the pattern is (Just [x]),
 -- the expression is (Just [x]).  They look the same, but the
@@ -1029,13 +1008,13 @@ tcPatToExpr :: Name -> [LocatedN Name] -> LPat GhcRn
 --
 -- Returns (Left r) if the pattern is not invertible, for reason r.
 -- See Note [Builder for a bidirectional pattern synonym]
-tcPatToExpr name args pat = go pat
+tcPatToExpr args pat = go pat
   where
     lhsVars = mkNameSet (map unLoc args)
 
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: LocatedN Name -> [LPat GhcRn]
-                    -> Either SDoc (HsExpr GhcRn)
+                    -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
            ; let con = L (l2l loc) (HsVar noExtField lcon)
@@ -1043,18 +1022,18 @@ tcPatToExpr name args pat = go pat
            }
 
     mkRecordConExpr :: LocatedN Name -> HsRecFields GhcRn (LPat GhcRn)
-                    -> Either SDoc (HsExpr GhcRn)
+                    -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     mkRecordConExpr con (HsRecFields fields dd)
       = do { exprFields <- mapM go' fields
            ; return (RecordCon noExtField con (HsRecFields exprFields dd)) }
 
-    go' :: LHsRecField GhcRn (LPat GhcRn) -> Either SDoc (LHsRecField GhcRn (LHsExpr GhcRn))
+    go' :: LHsRecField GhcRn (LPat GhcRn) -> Either PatSynInvalidRhsReason (LHsRecField GhcRn (LHsExpr GhcRn))
     go' (L l rf) = L l <$> traverse go rf
 
-    go :: LPat GhcRn -> Either SDoc (LHsExpr GhcRn)
+    go :: LPat GhcRn -> Either PatSynInvalidRhsReason (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
 
-    go1 :: Pat GhcRn -> Either SDoc (HsExpr GhcRn)
+    go1 :: Pat GhcRn -> Either PatSynInvalidRhsReason (HsExpr GhcRn)
     go1 (ConPat NoExtField con info)
       = case info of
           PrefixCon _ ps -> mkPrefixConExpr con ps
@@ -1068,7 +1047,7 @@ tcPatToExpr name args pat = go pat
         | var `elemNameSet` lhsVars
         = return $ HsVar noExtField (L l var)
         | otherwise
-        = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
+        = Left (PatSynUnboundVar var)
     go1 (ParPat _ lpar pat rpar) = fmap (\e -> HsPar noAnn lpar e rpar) $ go pat
     go1 (ListPat _ pats)
       = do { exprs <- mapM go pats
@@ -1105,19 +1084,7 @@ tcPatToExpr name args pat = go pat
     go1 p@(AsPat {})                         = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
 
-    notInvertible p = Left (not_invertible_msg p)
-
-    not_invertible_msg p
-      =   text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
-      $+$ hang (text "Suggestion: instead use an explicitly bidirectional"
-                <+> text "pattern synonym, e.g.")
-             2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
-                      <+> ppr pat <+> text "where")
-                   2 (pp_name <+> pp_args <+> equals <+> text "..."))
-      where
-        pp_name = ppr name
-        pp_args = hsep (map ppr args)
-
+    notInvertible p = Left (PatSynNotInvertible p)
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

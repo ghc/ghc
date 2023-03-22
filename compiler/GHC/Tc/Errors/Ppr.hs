@@ -1481,6 +1481,32 @@ instance Diagnostic TcRnMessage where
           , text "(Indeed, I sometimes struggle even printing this correctly,"
           , text " due to its ill-scoped nature.)"
           ]
+    TcRnPatSynEscapedCoercion arg bad_co_ne -> mkSimpleDecorated $
+      vcat [ text "Iceland Jack!  Iceland Jack! Stop torturing me!"
+           , hang (text "Pattern-bound variable")
+                2 (ppr arg <+> dcolon <+> ppr (idType arg))
+           , nest 2 $
+             hang (text "has a type that mentions pattern-bound coercion"
+                   <> plural bad_co_list <> colon)
+                2 (pprWithCommas ppr bad_co_list)
+           , text "Hint: use -fprint-explicit-coercions to see the coercions"
+           , text "Probable fix: add a pattern signature" ]
+      where
+        bad_co_list = NE.toList bad_co_ne
+    TcRnPatSynExistentialInResult name pat_ty bad_tvs -> mkSimpleDecorated $
+      hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
+                , text "namely" <+> quotes (ppr pat_ty) ])
+        2 (text "mentions existential type variable" <> plural bad_tvs
+           <+> pprQuotedList bad_tvs)
+    TcRnPatSynArityMismatch name decl_arity missing -> mkSimpleDecorated $
+      hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
+            <+> speakNOf decl_arity (text "argument"))
+         2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
+    TcRnPatSynInvalidRhs ps_name lpat args reason -> mkSimpleDecorated $
+      vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
+                   <+> quotes (ppr ps_name) <> colon)
+                2 (pprPatSynInvalidRhsReason ps_name lpat args reason)
+           , text "RHS pattern:" <+> ppr lpat ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1964,6 +1990,14 @@ instance Diagnostic TcRnMessage where
     TcRnUninferrableTyvar{}
       -> ErrorWithoutFlag
     TcRnSkolemEscape{}
+      -> ErrorWithoutFlag
+    TcRnPatSynEscapedCoercion{}
+      -> ErrorWithoutFlag
+    TcRnPatSynExistentialInResult{}
+      -> ErrorWithoutFlag
+    TcRnPatSynArityMismatch{}
+      -> ErrorWithoutFlag
+    TcRnPatSynInvalidRhs{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2466,6 +2500,14 @@ instance Diagnostic TcRnMessage where
     TcRnUninferrableTyvar{}
       -> noHints
     TcRnSkolemEscape{}
+      -> noHints
+    TcRnPatSynEscapedCoercion{}
+      -> noHints
+    TcRnPatSynExistentialInResult{}
+      -> noHints
+    TcRnPatSynArityMismatch{}
+      -> noHints
+    TcRnPatSynInvalidRhs{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -4561,3 +4603,18 @@ pprUninferrableTyvarCtx = \case
   UninfTyCtx_Sig exp_kind full_hs_ty ->
     hang (text "the kind" <+> ppr exp_kind) 2
          (text "of the type signature:" <+> ppr full_hs_ty)
+
+pprPatSynInvalidRhsReason :: Name -> LPat GhcRn -> [LIdP GhcRn] -> PatSynInvalidRhsReason -> SDoc
+pprPatSynInvalidRhsReason name pat args = \case
+  PatSynNotInvertible p ->
+    text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
+    $+$ hang (text "Suggestion: instead use an explicitly bidirectional"
+              <+> text "pattern synonym, e.g.")
+           2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
+                    <+> ppr pat <+> text "where")
+                 2 (pp_name <+> pp_args <+> equals <+> text "..."))
+    where
+      pp_name = ppr name
+      pp_args = hsep (map ppr args)
+  PatSynUnboundVar var ->
+    quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym"

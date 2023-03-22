@@ -542,6 +542,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnCannotDefaultKindVar"                      = 79924
   GhcDiagnosticCode "TcRnUninferrableTyvar"                         = 16220
   GhcDiagnosticCode "TcRnSkolemEscape"                              = 71451
+  GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
+  GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
+  GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
+  GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
+  GhcDiagnosticCode "PatSynUnboundVar"                              = 28572
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
@@ -711,6 +716,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnNotInScope"           = 'Just NotInScopeError
   ConRecursInto "TcRnIllegalNewtype"       = 'Just IllegalNewtypeReason
   ConRecursInto "TcRnHsigShapeMismatch"    = 'Just HsigShapeMismatchReason
+  ConRecursInto "TcRnPatSynInvalidRhs"     = 'Just PatSynInvalidRhsReason
 
     --
     -- TH errors

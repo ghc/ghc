@@ -1,5 +1,5 @@
 
-T14112.hs:5:21: error:
+T14112.hs:5:21: error: [GHC-69317]
     Invalid right-hand side of bidirectional pattern synonym ‘MyJust1’:
       Pattern ‘!a’ is not invertible
       Suggestion: instead use an explicitly bidirectional pattern synonym, e.g.

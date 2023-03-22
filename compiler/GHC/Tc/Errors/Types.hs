@@ -95,6 +95,7 @@ module GHC.Tc.Errors.Types (
   , WrongThingSort(..)
   , StageCheckReason(..)
   , UninferrableTyvarCtx(..)
+  , PatSynInvalidRhsReason(..)
   ) where
 
 import GHC.Prelude
@@ -108,7 +109,7 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType)
+import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType)
 import GHC.Types.Avail (AvailInfo)
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
@@ -118,7 +119,7 @@ import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
-import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar)
+import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
@@ -3293,6 +3294,52 @@ data TcRnMessage where
     -> !Type -- ^ The type in which they occur.
     -> TcRnMessage
 
+  {-| TcRnPatSynEscapedCoercion is an error indicating that a coercion escaped from
+    a pattern synonym into a type.
+    See Note [Coercions that escape] in GHC.Tc.TyCl.PatSyn
+
+    Test cases:
+      T14507
+  -}
+  TcRnPatSynEscapedCoercion :: !Id -- ^ The pattern-bound variable
+                            -> !(NE.NonEmpty CoVar) -- ^ The escaped coercions
+                            -> TcRnMessage
+
+  {-| TcRnPatSynExistentialInResult is an error indicating that the result type
+    of a pattern synonym mentions an existential type variable.
+
+    Test cases:
+      PatSynExistential
+  -}
+  TcRnPatSynExistentialInResult :: !Name -- ^ The name of the pattern synonym
+                                -> !TcSigmaType -- ^ The result type
+                                -> ![TyVar] -- ^ The escaped existential variables
+                                -> TcRnMessage
+
+  {-| TcRnPatSynArityMismatch is an error indicating that the number of arguments in a
+    pattern synonym's equation differs from the number of parameters in its
+    signature.
+
+    Test cases:
+      PatSynArity
+  -}
+  TcRnPatSynArityMismatch :: !Name -- ^ The name of the pattern synonym
+                          -> !Arity -- ^ The number of equation arguments
+                          -> !Arity -- ^ The difference
+                          -> TcRnMessage
+
+  {-| TcRnPatSynInvalidRhs is an error group indicating that the pattern on the
+    right hand side of a pattern synonym is invalid.
+
+    Test cases:
+      unidir, T14112
+  -}
+  TcRnPatSynInvalidRhs :: !Name -- ^ The name of the pattern synonym
+                       -> !(LPat GhcRn) -- ^ The pattern
+                       -> ![LIdP GhcRn] -- ^ The LHS args
+                       -> !PatSynInvalidRhsReason -- ^ The number of equation arguments
+                       -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -4582,3 +4629,8 @@ data UninferrableTyvarCtx
   | UninfTyCtx_TyfamRhs TcType
   | UninfTyCtx_TysynRhs TcType
   | UninfTyCtx_Sig TcType (LHsSigType GhcRn)
+
+data PatSynInvalidRhsReason
+  = PatSynNotInvertible !(Pat GhcRn)
+  | PatSynUnboundVar !Name
+  deriving (Generic)
