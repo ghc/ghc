@@ -83,8 +83,8 @@ mkRhsInit :: Platform -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
 mkRhsInit platform reg lf_info expr
   = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag platform lf_info))
 
+-- | Returns a 'CmmExpr' for the *tagged* pointer
 idInfoToAmode :: CgIdInfo -> CmmExpr
--- Returns a CmmExpr for the *tagged* pointer
 idInfoToAmode CgIdInfo { cg_loc = CmmLoc e } = e
 idInfoToAmode cg_info
   = pprPanic "idInfoToAmode" (ppr (cg_id cg_info))        -- LneLoc

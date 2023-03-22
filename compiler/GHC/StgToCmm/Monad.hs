@@ -188,9 +188,11 @@ type CgBindings = IdEnv CgIdInfo
 
 data CgIdInfo
   = CgIdInfo
-        { cg_id :: Id   -- Id that this is the info for
+        { cg_id  :: Id
+          -- ^ Id that this is the info for
         , cg_lf  :: LambdaFormInfo
-        , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
+        , cg_loc :: CgLoc
+          -- ^ 'CmmExpr' for the *tagged* value
         }
 
 instance OutputableP Platform CgIdInfo where
