@@ -702,11 +702,19 @@ emitBlackHoleCode node = do
 
   when eager_blackholing $ do
     whenUpdRemSetEnabled $ emitUpdRemSetPushThunk node
-    emitStore (cmmOffsetW platform node (fixedHdrSizeW profile)) (currentTSOExpr platform)
+    emitAtomicStore platform MemOrderSeqCst
+        (cmmOffsetW platform node (fixedHdrSizeW profile))
+        (currentTSOExpr platform)
     -- See Note [Heap memory barriers] in SMP.h.
-    let w = wordWidth platform
-    emitPrimCall [] (MO_AtomicWrite w MemOrderRelease)
-        [node, CmmReg (CmmGlobal $ GlobalRegUse EagerBlackholeInfo $ bWord platform)]
+    emitAtomicStore platform MemOrderRelaxed
+        node
+        (CmmReg (CmmGlobal $ GlobalRegUse EagerBlackholeInfo $ bWord platform))
+
+emitAtomicStore :: Platform -> MemoryOrdering -> CmmExpr -> CmmExpr -> FCode ()
+emitAtomicStore platform mord addr val =
+    emitPrimCall [] (MO_AtomicWrite w mord) [addr, val]
+  where
+    w = typeWidth $ cmmExprType platform val
 
 setupUpdate :: ClosureInfo -> LocalReg -> FCode () -> FCode ()
         -- Nota Bene: this function does not change Node (even if it's a CAF),

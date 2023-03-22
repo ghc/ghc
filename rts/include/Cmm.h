@@ -311,7 +311,7 @@
 #define ENTER(x) ENTER_(return,x)
 #endif
 
-#define ENTER_R1() ENTER_(RET_R1,R1)
+#define ENTER_R1() P_ _r1; _r1 = R1; ENTER_(RET_R1, _r1)
 
 #define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]
 
@@ -326,7 +326,7 @@
     IND,                                                \
     IND_STATIC:                                         \
    {                                                    \
-      x = StgInd_indirectee(x);                         \
+      x = %acquire StgInd_indirectee(x);                \
       goto again;                                       \
    }                                                    \
   case                                                  \
@@ -598,6 +598,7 @@
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
 #define SET_INFO_RELEASE(p,info) %release StgHeader_info(p) = info
+#define SET_INFO_RELAXED(p,info) %relaxed StgHeader_info(p) = info
 #define GET_INFO(p) StgHeader_info(p)
 #define GET_INFO_ACQUIRE(p) %acquire GET_INFO(p)
 
@@ -689,10 +690,18 @@
 #define RELEASE_FENCE prim %fence_release();
 #define ACQUIRE_FENCE prim %fence_acquire();
 
+// TODO
+#if 1
+#define ACQUIRE_FENCE_ON(x) if (1) { W_ tmp; (tmp) = prim %load_acquire64(x); }
+#else
+#define ACQUIRE_FENCE_ON(x) ACQUIRE_FENCE
+#endif
+
 #else
 
 #define RELEASE_FENCE /* nothing */
 #define ACQUIRE_FENCE /* nothing */
+#define ACQUIRE_FENCE_ON(x) /* nothing */
 #endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------

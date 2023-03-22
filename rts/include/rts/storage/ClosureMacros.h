@@ -47,6 +47,11 @@
 
 EXTERN_INLINE void SET_INFO(StgClosure *c, const StgInfoTable *info);
 EXTERN_INLINE void SET_INFO(StgClosure *c, const StgInfoTable *info) {
+    c->header.info = info;
+}
+
+EXTERN_INLINE void SET_INFO_RELAXED(StgClosure *c, const StgInfoTable *info);
+EXTERN_INLINE void SET_INFO_RELAXED(StgClosure *c, const StgInfoTable *info) {
     RELAXED_STORE(&c->header.info, info);
 }
 
