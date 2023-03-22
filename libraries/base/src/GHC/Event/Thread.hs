@@ -369,7 +369,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
         !mgr <- TM.new
         c_setTimerManagerControlFd
           (fromIntegral $ controlWriteFd $ TM.emControl mgr)
-        writeIORef timerManager $ Just mgr
+        atomicWriteIORef timerManager $ Just mgr
         !t <- forkIO $ TM.loop mgr
         labelThread t "TimerManager"
         return $ Just t
