@@ -1567,7 +1567,16 @@ primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s v -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by 'getSizeofSmallMutableArray#'.}
+    equal to the current size as reported by 'getSizeofSmallMutableArray#'.
+
+    Assuming the non-profiling RTS, for the copying garbage collector
+    (default) this primitive compiles to an O(1) operation in C--, modifying
+    the array in-place. For the non-moving garbage collector, however, the
+    time is proportional to the number of elements shrinked out. Backends
+    bypassing C-- representation (such as JavaScript) might behave
+    differently.
+
+    @since 0.6.1}
    with out_of_line = True
         has_side_effects = True
 
@@ -1591,14 +1600,17 @@ primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
 
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
    SmallMutableArray# s v -> Int#
-   {Return the number of elements in the array. Note that this is deprecated
-   as it is unsafe in the presence of shrink and resize operations on the
-   same small mutable array.}
+   {Return the number of elements in the array. __Deprecated__, it is
+   unsafe in the presence of 'shrinkSmallMutableArray#' and @resizeSmallMutableArray#@
+   operations on the same small mutable array.}
    with deprecated_msg = { Use 'getSizeofSmallMutableArray#' instead }
 
 primop  GetSizeofSmallMutableArrayOp "getSizeofSmallMutableArray#" GenPrimOp
    SmallMutableArray# s v -> State# s -> (# State# s, Int# #)
-   {Return the number of elements in the array.}
+   {Return the number of elements in the array, correctly accounting for
+   the effect of 'shrinkSmallMutableArray#' and @resizeSmallMutableArray#@.
+
+   @since 0.6.1}
 
 primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
    SmallArray# v -> Int# -> (# v #)
@@ -1807,13 +1819,19 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by 'getSizeofMutableByteArray#'.}
+    equal to the current size as reported by 'getSizeofMutableByteArray#'.
+
+    Assuming the non-profiling RTS, this primitive compiles to an O(1)
+    operation in C--, modifying the array in-place. Backends bypassing C--
+    representation (such as JavaScript) might behave differently.
+
+    @since 0.4.0.0}
    with out_of_line = True
         has_side_effects = True
 
 primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
-   {Resize (unpinned) mutable byte array to new specified size (in bytes).
+   {Resize mutable byte array to new specified size (in bytes), shrinking or growing it.
     The returned 'MutableByteArray#' is either the original
     'MutableByteArray#' resized in-place or, if not possible, a newly
     allocated (unpinned) 'MutableByteArray#' (with the original content
@@ -1823,7 +1841,9 @@ primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
     not be accessed anymore after a 'resizeMutableByteArray#' has been
     performed.  Moreover, no reference to the old one should be kept in order
     to allow garbage collection of the original 'MutableByteArray#' in
-    case a new 'MutableByteArray#' had to be allocated.}
+    case a new 'MutableByteArray#' had to be allocated.
+
+    @since 0.4.0.0}
    with out_of_line = True
         has_side_effects = True
 
@@ -1839,14 +1859,18 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
-   {Return the size of the array in bytes. Note that this is deprecated as it is
-   unsafe in the presence of shrink and resize operations on the same mutable byte
+   {Return the size of the array in bytes. __Deprecated__, it is
+   unsafe in the presence of 'shrinkMutableByteArray#' and 'resizeMutableByteArray#'
+   operations on the same mutable byte
    array.}
    with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 
 primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, Int# #)
-   {Return the number of elements in the array.}
+   {Return the number of elements in the array, correctly accounting for
+   the effect of 'shrinkMutableByteArray#' and 'resizeMutableByteArray#'.
+
+   @since 0.5.0.0}
 
 #include "bytearray-ops.txt.pp"
 
