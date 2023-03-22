@@ -68,7 +68,7 @@ module GHC.TypeLits
 
   ) where
 
-import GHC.Base ( Eq(..), Functor(..), Ord(..), Ordering(..), String
+import GHC.Base ( Bool(..), Eq(..), Functor(..), Ord(..), Ordering(..), String
                 , (.), otherwise, withDict, Void, (++)
                 , errorWithoutStackTrace)
 import GHC.Types(Symbol, Char, TYPE)
@@ -374,6 +374,14 @@ data KnownSymbolInstance (s :: Symbol) where
 knownSymbolInstance :: SSymbol s -> KnownSymbolInstance s
 knownSymbolInstance ss = withKnownSymbol ss KnownSymbolInstance
 
+-- | @since 4.19.0.0
+instance Eq (SSymbol s) where
+  _ == _ = True
+
+-- | @since 4.19.0.0
+instance Ord (SSymbol s) where
+  compare _ _ = EQ
+
 -- | @since 4.18.0.0
 instance Show (SSymbol s) where
   showsPrec p (UnsafeSSymbol s)
@@ -466,6 +474,14 @@ data KnownCharInstance (n :: Char) where
 -- synonym.
 knownCharInstance :: SChar c -> KnownCharInstance c
 knownCharInstance sc = withKnownChar sc KnownCharInstance
+
+-- | @since 4.19.0.0
+instance Eq (SChar c) where
+  _ == _ = True
+
+-- | @since 4.19.0.0
+instance Ord (SChar c) where
+  compare _ _ = EQ
 
 -- | @since 4.18.0.0
 instance Show (SChar c) where

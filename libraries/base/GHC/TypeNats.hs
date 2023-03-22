@@ -378,6 +378,14 @@ data KnownNatInstance (n :: Nat) where
 knownNatInstance :: SNat n -> KnownNatInstance n
 knownNatInstance sn = withKnownNat sn KnownNatInstance
 
+-- | @since 4.19.0.0
+instance Eq (SNat n) where
+  _ == _ = True
+
+-- | @since 4.19.0.0
+instance Ord (SNat n) where
+  compare _ _ = EQ
+
 -- | @since 4.18.0.0
 instance Show (SNat n) where
   showsPrec p (UnsafeSNat n)

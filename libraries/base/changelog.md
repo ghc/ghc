@@ -14,6 +14,8 @@
   * Add `Data.Functor.unzip` ([CLC proposal #88](https://github.com/haskell/core-libraries-committee/issues/88))
   * Implement more members of `instance Foldable (Compose f g)` explicitly.
       ([CLC proposal #57](https://github.com/haskell/core-libraries-committee/issues/57))
+  * Add `Eq` and `Ord` instances for `SSymbol`, `SChar`, and `SNat`.
+      ([CLC proposal #148](https://github.com/haskell/core-libraries-committee/issues/148))
 
 ## 4.18.0.0 *TBA*
 
