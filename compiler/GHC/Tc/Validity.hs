@@ -1713,34 +1713,165 @@ The usual functional dependency checks also apply.
 
 Note [Valid 'deriving' predicate]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-validDerivPred checks for OK 'deriving' context.
-See Note [Exotic derived instance contexts] in GHC.Tc.Deriv.Infer.  However the predicate is
-here because it is quite similar to checkInstTermination.
+In a 'derived' instance declaration, we *infer* the context. It's a bit unclear
+what rules we should apply for this; the Haskell report is silent. Obviously,
+constraints like `Eq a` are fine, but what about
 
-It checks for two things:
+  data T f a = MkT (f a) deriving Eq
 
-(VD1) The Paterson conditions; see Note [Paterson conditions]
-      Not on do we want to check for termination (of course), but it also
-      deals with a nasty corner case:
-         instance C a b => D (T a) where ...
-      Note that 'b' isn't a parameter of T.  This gives rise to all sorts of
-      problems; in particular, it's hard to compare solutions for equality
-      when finding the fixpoint, and that means the inferContext loop does
-      not converge.  See #5287, #21302
+where we'd get an `Eq (f a)` constraint. That's probably fine too.
 
-(VD2) No type constructors; no foralls, no equalities:
-      see Note [Exotic derived instance contexts] in GHC.Tc.Deriv.Infer
+On the other hand, we don't want to allow *every* inferred constraint, as there
+are some particularly complex constraints that are tricky to handle. If GHC
+encounters a constraint that is too complex, it will reject it, and you will
+have to use StandaloneDeriving to manually specify the instance context that
+you want.
 
-      We check the no-type-constructor bit using tyConsOfType.
-      Wrinkle: we look only at the /visible/ arguments of the class type
-      constructor. Including the non-visible arguments can cause the following,
-      perfectly valid instance to be rejected:
-         class Category (cat :: k -> k -> *) where ...
-         newtype T (c :: * -> * -> *) a b = MkT (c a b)
-         instance Category c => Category (T c) where ...
-      since the first argument to Category is a non-visible *, which has a
-      type constructor! See #11833.
+There are two criteria for a constraint inferred by a `deriving` clause to be
+considered valid, which are described below as (VD1) and (VD2). (Here, "VD"
+stands for "valid deriving".) `validDerivPred` implements these checks. While
+`validDerivPred` is similar to other things defined in GHC.Tc.Deriv.Infer, we
+define it here in GHC.Tc.Validity because it is quite similar to
+`checkInstTermination`.
 
+-----------------------------------
+-- (VD1) The Paterson conditions --
+-----------------------------------
+
+Constraints must satisfy the Paterson conditions (see Note [Paterson
+conditions]) to be valid. Not only does this check for termination (of course),
+but it also deals with a nasty corner case:
+
+  instance C a b => D (T a) where ...
+
+Note that `b` isn't a parameter of T.  This gives rise to all sorts of
+problems; in particular, it's hard to compare solutions for equality when
+finding the fixpoint, and that means the
+GHC.Tc.Deriv.Infer.simplifyInstanceContexts loop does not converge.
+See #5287 and #21302.
+
+Another common situation in which a derived instance's context fails to meet
+the Paterson conditions is when a constraint mentions a type variable more
+often than the instance head, e.g.,
+
+  data Fix f = In (f (Fix f)) deriving Eq
+
+This would result in the following derived `Eq` instance:
+
+  instance Eq (f (Fix f)) => Eq (Fix f)
+
+Because `f` is mentioned more often in the `Eq (f (Fix f))` constraint than in
+the instance head `Eq (Fix f)`, GHC rejects this instance.
+
+This is a somewhat contentious restriction, and some have suggested that
+instances like this one should be accepted if UndecidableInstances is enabled
+(see #15868 for one such discussion). If we *do* lift this restriction in the
+future, we should make sure to still meet the termination conditions. If not,
+the deriving mechanism generates larger and larger constraints. Example:
+
+  data Succ a = S a
+  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
+
+Note the lack of a Show instance for Succ.  First we'll generate:
+
+  instance (Show (Succ a), Show a) => Show (Seq a)
+
+and then:
+
+  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
+
+and so on. Instead we want to complain of no instance for (Show (Succ a)).
+
+---------------------------------
+-- (VD2) No exotic constraints --
+---------------------------------
+
+A constraint must satisfy one of the following properties in order to be valid:
+
+* It is a `ClassPred` of the form `C a_1 ... a_n`, where C is a type class
+  constructor and a_1, ..., a_n are either raw type variables or applications
+  of type variables (e.g., `f a`).
+* It is an `IrredPred` of the form `c a_1 ... a_n`, where `c` is a raw type
+  variable and a_1, ..., a_n are either raw type variables or applications of
+  type variables (e.g., `f a`).
+
+If a constraint does not meet either of these properties, it is considered
+*exotic*. A constraint will be exotic if it contains:
+
+* Other type constructors (besides the class in a `ClassPred`),
+* Foralls, or
+* Equalities
+
+A common form of exotic constraint is one that mentions another type
+constructor. For example, given the following:
+
+  data NotAShowInstance
+  data Foo = MkFoo Int NotAShowInstance deriving Show
+
+GHC would attempt to generate the following derived `Show` instance:
+
+  instance (Show Int, Show NotAShowInstance) => Show Foo
+
+Note that because there is a top-level `Show Int` instance, GHC is able to
+simplify away the inferred `Show Int` constraint. However, it cannot do the
+same for the `Show NotAShowInstance` constraint. One possibility would be to
+generate this instance:
+
+  instance Show NotAShowInstance => Show Foo
+
+But this is almost surely not what we want most of the time. For this reason,
+we reject the constraint above as being exotic.
+
+Here are some other interesting examples:
+
+* Derived instances whose instance context would mention TypeError, such as the
+  code from the deriving/should_fail/T14339 test case, are exotic. For example:
+
+    newtype Foo = Foo Int
+
+    class Bar a where
+      bar :: a
+
+    instance (TypeError (Text "Boo")) => Bar Foo where
+      bar = undefined
+
+    newtype Baz = Baz Foo
+      deriving Bar
+
+  The `deriving Bar` clause would generate this instance:
+
+    instance TypeError (Text "Boo") => Bar Baz
+
+  The instance context is exotic, as `TypeError` is not a type constructor, and
+  `Text "Boo"` is not an application of type variables. As such, GHC rejects
+  it. This has the desirable side effect of causing the TypeError to fire in
+  the resulting error message.
+
+* The following `IrredPred`s are not exotic:
+
+    instance c => C (T c a)
+    instance c a => C (T c a)
+
+  This `IrredPred`, however, *is* exotic:
+
+    instance c NotAShowInstance => C (T c)
+
+  This is rejected for the same reasons that we do not permit a `ClassPred`
+  with a type constructor argument, such as the `Show NotAShowInstance` example
+  above.
+
+As part of implementing this check, GHC calls `tyConsOfType` on the arguments
+of the constraint, ensuring that there are no other type constructors.
+Wrinkle: for `ClassPred`s, we look only at the /visible/ arguments of the class
+type constructor. Including the non-visible arguments can cause the following,
+perfectly valid instance to be rejected:
+
+  class Category (cat :: k -> k -> Type) where ...
+  newtype T (c :: Type -> Type -> Type) a b = MkT (c a b)
+  instance Category c => Category (T c) where ...
+
+since the first argument to `Category` is a non-visible `Type`, which has a type
+constructor! See #11833.
 
 Note [Equality class instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1753,23 +1884,17 @@ validDerivPred :: PatersonSize -> PredType -> Bool
 -- See Note [Valid 'deriving' predicate]
 validDerivPred head_size pred
   = case classifyPredType pred of
-            EqPred {}     -> False  -- Reject equality constraints
-            ForAllPred {} -> False  -- Rejects quantified predicates
+            EqPred {}     -> False  -- Reject equality constraints (VD2)
+            ForAllPred {} -> False  -- Rejects quantified predicates (VD2)
 
-            ClassPred cls tys -> check_size (pSizeClassPred cls tys)
-                              && isEmptyUniqSet (tyConsOfTypes visible_tys)
+            ClassPred cls tys -> check_size (pSizeClassPred cls tys)        -- (VD1)
+                              && isEmptyUniqSet (tyConsOfTypes visible_tys) -- (VD2)
                 where
-                  visible_tys = filterOutInvisibleTypes (classTyCon cls) tys  -- (VD2)
+                  -- See the wrinkle about visible arguments in (VD2)
+                  visible_tys = filterOutInvisibleTypes (classTyCon cls) tys
 
-            IrredPred {} -> check_size (pSizeType pred)
-                -- Very important that we do the "too many variable occurrences"
-                -- check here, via check_size.  Example (test T21302):
-                --     instance c Eq a => Eq (BoxAssoc a)
-                --     data BAD = BAD (BoxAssoc Int) deriving( Eq )
-                -- We don't want to accept an inferred predicate (c0 Eq Int)
-                --   from that `deriving(Eq)` clause, because the c0 is fresh,
-                --   so we'll think it's a "new" one, and loop in
-                --   GHC.Tc.Deriv.Infer.simplifyInstanceContexts
+            IrredPred {} -> check_size (pSizeType pred)        -- (VD1)
+                         && isEmptyUniqSet (tyConsOfType pred) -- (VD2)
 
   where
     check_size pred_size = isNothing (pred_size `ltPatersonSize` head_size)
