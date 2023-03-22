@@ -96,9 +96,10 @@ import CLOSURE stg_ret_p_info;
  * the stack is already too big.
  */
 
-#define PRE_RETURN(why,what_next)                       \
-  StgTSO_what_next(CurrentTSO) = what_next::I16;        \
-  StgRegTable_rRet(BaseReg) = why;                      \
+// N.B. the access to what_next may synchronize with throwToMsg
+#define PRE_RETURN(why,what_next)                           \
+  %relaxed StgTSO_what_next(CurrentTSO) = what_next::I16;   \
+  StgRegTable_rRet(BaseReg) = why;                          \
   R1 = BaseReg;
 
 /* Remember that the return address is *removed* when returning to a

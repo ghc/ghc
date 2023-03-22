@@ -2491,7 +2491,7 @@ suspendThread (StgRegTable *reg, bool interruptible)
   traceEventStopThread(cap, tso, THREAD_SUSPENDED_FOREIGN_CALL, 0);
 
   // XXX this might not be necessary --SDM
-  tso->what_next = ThreadRunGHC;
+  RELAXED_STORE(&tso->what_next, ThreadRunGHC);
 
   threadPaused(cap,tso);
 
