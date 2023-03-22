@@ -1,12 +1,12 @@
 
--- July 07: I'm changing this from "should_compile" to "should_fail".
--- It would generate an instance decl like
---      instance (Show (f a), Show (g a)) => Show (Pair1 f g a)
--- and that is not Haskell 98.
+-- This will generate an instance decl like:
 --
--- See Note [Exotic derived instance contexts] in GHC.Tc.Solver.
--- The rule is simple: the context of a derived instance decl must
--- contain constraints of form (C tyvar) only, just as H98.
+--      instance (Show (f a), Show (g a)) => Show (Pair1 f g a)
+--
+-- Although the Haskell Report would not permit this instance if written out
+-- explicitly, it does not say anything about whether it is acceptable for a
+-- *derived* instance to generate it. As such, we allow this in GHC.
+-- See Note [Valid 'deriving' predicate] in GHC.Tc.Validity.
 
 module ShouldCompile where
 

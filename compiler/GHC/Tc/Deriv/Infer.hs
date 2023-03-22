@@ -768,8 +768,8 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
              -- Returns @Just p@ (where @p@ is the type of the Ct) if a Ct is
              -- suitable to be inferred in the context of a derived instance.
              -- Returns @Nothing@ if the Ct is too exotic.
-             -- See Note [Exotic derived instance contexts] for what
-             -- constitutes an exotic constraint.
+             -- See (VD2) in Note [Valid 'deriving' predicate] in
+             -- GHC.Tc.Validity for what constitutes an exotic constraint.
              get_good :: Ct -> Maybe PredType
              get_good ct | validDerivPred head_size p = Just p
                          | otherwise                  = Nothing
@@ -798,8 +798,9 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
                                   min_theta_vars solved_wanteds
        -- This call to simplifyTop is purely for error reporting
        -- See Note [Error reporting for deriving clauses]
-       -- See also Note [Exotic derived instance contexts], which are caught
-       -- in this line of code.
+       -- See also Note [Valid 'deriving' predicate] in GHC.Tc.Validity, as this
+       -- line of code catches "exotic" constraints like the ones described in
+       -- (VD2) of that Note.
        ; simplifyTopImplic leftover_implic
 
        ; traceTc "GHC.Tc.Deriv" (ppr deriv_rhs $$ ppr min_theta)
@@ -807,7 +808,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
          -- Claim: the result instance declaration is guaranteed valid
          -- Hence no need to call:
          --     checkValidInstance tyvars theta clas inst_tys
-         -- See Note [Exotic derived instance contexts]
+         -- See Note [Valid 'deriving' predicate] in GHC.Tc.Validity
 
        ; return min_theta }
 
@@ -1008,7 +1009,8 @@ error messages. In particular, if simplifyDeriv reaches a constraint that it
 cannot solve, which might include:
 
 1. Insoluble constraints
-2. "Exotic" constraints (See Note [Exotic derived instance contexts])
+2. "Exotic" constraints (See Note [Valid 'deriving' predicate] in
+   GHC.Tc.Validity)
 
 Then we report an error immediately in simplifyDeriv.
 
@@ -1029,55 +1031,4 @@ And pass it to the simplifier. If the context (Foo a) is enough to discharge
 all the constraints in <residual_wanted_constraints>, then everything is
 hunky-dory. But if <residual_wanted_constraints> contains, say, an insoluble
 constraint, then (Foo a) won't be able to solve it, causing GHC to error.
-
-Note [Exotic derived instance contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a 'derived' instance declaration, we *infer* the context.  It's a
-bit unclear what rules we should apply for this; the Haskell report is
-silent.  Obviously, constraints like (Eq a) are fine, but what about
-        data T f a = MkT (f a) deriving( Eq )
-where we'd get an Eq (f a) constraint.  That's probably fine too.
-
-One could go further: consider
-        data T a b c = MkT (Foo a b c) deriving( Eq )
-        instance (C Int a, Eq b, Eq c) => Eq (Foo a b c)
-
-Notice that this instance (just) satisfies the Paterson termination
-conditions.  Then we *could* derive an instance decl like this:
-
-        instance (C Int a, Eq b, Eq c) => Eq (T a b c)
-even though there is no instance for (C Int a), because there just
-*might* be an instance for, say, (C Int Bool) at a site where we
-need the equality instance for T's.
-
-However, this seems pretty exotic, and it's quite tricky to allow
-this, and yet give sensible error messages in the (much more common)
-case where we really want that instance decl for C.
-
-So for now we simply require that the derived instance context
-should have only type-variable constraints.
-
-Here is another example:
-        data Fix f = In (f (Fix f)) deriving( Eq )
-Here, if we are prepared to allow -XUndecidableInstances we
-could derive the instance
-        instance Eq (f (Fix f)) => Eq (Fix f)
-but this is so delicate that I don't think it should happen inside
-'deriving'. If you want this, write it yourself!
-
-NB: if you want to lift this condition, make sure you still meet the
-termination conditions!  If not, the deriving mechanism generates
-larger and larger constraints.  Example:
-  data Succ a = S a
-  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
-
-Note the lack of a Show instance for Succ.  First we'll generate
-  instance (Show (Succ a), Show a) => Show (Seq a)
-and then
-  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
-and so on.  Instead we want to complain of no instance for (Show (Succ a)).
-
-The bottom line
-~~~~~~~~~~~~~~~
-Allow constraints which consist only of type variables, with no repeats.
 -}

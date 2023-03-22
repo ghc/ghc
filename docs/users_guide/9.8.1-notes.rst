@@ -61,6 +61,32 @@ Compiler
   The point is that only the type S has a constructor with both fields "foo"
   and "bar", so this record update is unambiguous.
 
+- Data types with ``deriving`` clauses now reject inferred instance contexts
+  that mention ``TypeError`` constraints (see :ref:`custom-errors`), such as
+  this one: ::
+
+      newtype Foo = Foo Int
+
+      class Bar a where
+        bar :: a
+
+      instance (TypeError (Text "Boo")) => Bar Foo where
+        bar = undefined
+
+      newtype Baz = Baz Foo
+        deriving Bar
+
+  Here, the derived ``Bar`` instance for ``Baz`` would look like this: ::
+
+      instance TypeError (Text "Boo") => Bar Baz
+
+  While GHC would accept this before, GHC 9.8 now rejects it, emitting "``Boo``"
+  in the resulting error message. If you really want to derive this instance and
+  defer the error to sites where the instance is used, you must do so manually
+  with :extension:`StandaloneDeriving`, e.g. ::
+
+      deriving instance TypeError (Text "Boo") => Bar Baz
+
 GHCi
 ~~~~
 

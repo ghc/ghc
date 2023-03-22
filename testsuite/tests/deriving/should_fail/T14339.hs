@@ -16,10 +16,10 @@ instance (TypeError (Text "Boo")) => Bar Foo where
 newtype Baz = Baz Foo
   deriving Bar
 
--- Apparently we derive
+-- We derive:
+--
 --  instance TypeError (Text "Boo") => Bar Baz
 --
--- Is that really what we want?  It defers the type
--- error... surely we should use standalone deriving
--- if that is what we want?
--- See GHC.Tc.Validity.validDerivPred and #22696.
+-- And error out due to the TypeError. See also
+-- deriving/should_compile/T22696a, which uses StandaloneDeriving to write a
+-- valid instance with a TypeError constraint in its instance context.
