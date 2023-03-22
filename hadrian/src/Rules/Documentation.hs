@@ -192,7 +192,7 @@ buildHtmlDocumentation = do
                              | SphinxHTML `Set.member` doctargets ]
         need $ map ((root -/-) . pathIndex) targets
 
-        copyFileUntracked "docs/index.html" file
+        copyFile "docs/index.html" file
 
 -- | Compile a Sphinx ReStructured Text package to HTML.
 buildSphinxHtml :: FilePath -> Rules ()
