@@ -70,6 +70,49 @@ moving parts are:
 * We don't absolutely guarantee to serialise the CgInfo: we won't if you have
   -fomit-interface-pragmas or -fno-code; and we won't read it in if you have
   -fignore-interface-pragmas.  (We could revisit this decision.)
+
+Note [Imported nullary datacon wrappers must have correct LFInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in `Note [Conveying CAF-info and LFInfo between modules]`,
+imported nullary datacons must have their LambdaFormInfo set to reflect the
+fact that they are evaluated . This is necessary are otherwise references
+to them may be passed untagged to code that expects tagged references.
+
+What may be less obvious is that this must be done for not only datacon
+workers but also *wrappers*. The reason is found in this program
+from #23146:
+
+    module B where
+
+    type NP :: [UnliftedType] -> UnliftedType
+    data NP xs where
+      UNil :: NP '[]
+
+
+    module A where
+    import B
+
+    fieldsSam :: NP xs -> NP xs -> Bool
+    fieldsSam UNil UNil = True
+
+    x = fieldsSam UNil UNil
+
+Due to its GADT nature, `B.UNil` produces a trivial wrapper
+
+    $WUNil :: NP '[]
+    $WUNil = UNil @'[] @~(<co:1>)
+
+which is referenced in the RHS of `A.x`. If we fail to give `$WUNil` the
+correct `LFCon 0` `LambdaFormInfo` then we will end up passing an untagged
+pointer to `fieldsSam`. This is problematic as `fieldsSam` may take advantage
+of the unlifted nature of its arguments by omitting handling of the zero
+tag when scrutinising them.
+
+The fix is straightforward: extend the logic in `mkLFImported` to cover
+(nullary) datacon wrappers as well as workers. This is safe because we
+know that the wrapper of a nullary datacon will be in WHNF, even if it
+includes equalities evidence (since such equalities are not runtime
+relevant). This fixed #23146.
 -}
 
 -- | Codegen-generated Id infos, to be passed to downstream via interfaces.
