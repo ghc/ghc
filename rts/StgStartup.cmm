@@ -77,9 +77,9 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
 
     Sp = Sp + SIZEOF_StgStopFrame - SIZEOF_StgDeadThreadFrame;
     SET_HDR(Sp, stg_dead_thread_info, CCS_SYSTEM);
-    StgDeadThreadFrame_result(Sp) = R1;
+    %release StgDeadThreadFrame_result(Sp) = R1;
 
-    StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
+    %relaxed StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
 
     SAVE_THREAD_STATE();
 
