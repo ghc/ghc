@@ -480,16 +480,12 @@ void LDV_recordDead (const StgClosure *c, uint32_t size);
 RTS_PRIVATE bool isInherentlyUsed ( StgHalfWord closure_type );
 #endif
 
-EXTERN_INLINE void
-zeroSlop (
-    StgClosure *p,
-    uint32_t offset, /*< offset to start zeroing at, in words */
-    uint32_t size,   /*< total closure size, in words */
-    bool known_mutable /*< is this a closure who's slop we can always zero? */
-    );
-
-EXTERN_INLINE void
-zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
+INLINE_HEADER void
+zeroSlop (StgClosure *p,
+          uint32_t offset,    /*< offset to start zeroing at, in words */
+          uint32_t size,      /*< total closure size, in words */
+          bool known_mutable  /*< is this a closure who's slop we can always zero? */
+         )
 {
     // see Note [zeroing slop when overwriting closures], also #8402
 
@@ -537,8 +533,10 @@ zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
     }
 }
 
-EXTERN_INLINE void overwritingClosure (StgClosure *p);
-EXTERN_INLINE void overwritingClosure (StgClosure *p)
+// N.B. the stg_* variants of the utilities below are only for calling from
+// Cmm. The INLINE_HEADER functions should be used when in C.
+void stg_overwritingClosure (StgClosure *p);
+INLINE_HEADER void overwritingClosure (StgClosure *p)
 {
     W_ size = closure_sizeW(p);
 #if defined(PROFILING)
@@ -548,15 +546,13 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
     zeroSlop(p, sizeofW(StgThunkHeader), size, /*known_mutable=*/false);
 }
 
+
 // Version of 'overwritingClosure' which overwrites only a suffix of a
 // closure.  The offset is expressed in words relative to 'p' and shall
 // be less than or equal to closure_sizeW(p), and usually at least as
 // large as the respective thunk header.
-EXTERN_INLINE void
-overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
-
-EXTERN_INLINE void
-overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
+void stg_overwritingMutableClosureOfs (StgClosure *p, uint32_t offset);
+INLINE_HEADER void overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 {
     // Since overwritingClosureOfs is only ever called by:
     //
@@ -573,8 +569,8 @@ overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
-EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
-EXTERN_INLINE void overwritingClosureSize (StgClosure *p, uint32_t size)
+void stg_OverwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
+INLINE_HEADER void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
     // This function is only called from stg_AP_STACK so we can assume it's not
     // inherently used.

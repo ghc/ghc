@@ -540,6 +540,7 @@ library
                TraverseHeapTest.c
                WSDeque.c
                Weak.c
+               ZeroSlop.c
                eventlog/EventLog.c
                eventlog/EventLogWriter.c
                hooks/FlagDefaults.c
