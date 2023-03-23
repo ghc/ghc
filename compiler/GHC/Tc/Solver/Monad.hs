@@ -1267,35 +1267,37 @@ instance Outputable TouchabilityTestResult where
   ppr (TouchableOuterLevel tvs lvl) = text "TouchableOuterLevel" <> parens (ppr lvl <+> ppr tvs)
   ppr Untouchable                   = text "Untouchable"
 
-touchabilityTest :: CtFlavour -> TcTyVar -> TcType -> TcS TouchabilityTestResult
--- This is the key test for untouchability:
+touchabilityTest :: CtFlavour -> TcTyVar -> TcType -> TcS (TouchabilityTestResult, TcType)
+-- ^ This is the key test for untouchability:
 -- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
 -- and Note [Solve by unification] in GHC.Tc.Solver.Interact
+--
+-- Returns a new rhs type, as this function can turn make some metavariables concrete.
 touchabilityTest flav tv1 rhs
   | flav /= Given  -- See Note [Do not unify Givens]
   , MetaTv { mtv_tclvl = tv_lvl, mtv_info = info } <- tcTyVarDetails tv1
-  = do { can_continue_solving <- wrapTcS $ startSolvingByUnification info rhs
-       ; if not can_continue_solving
-         then return Untouchable
-         else
-    do { ambient_lvl  <- getTcLevel
+  = do { continue_solving <- wrapTcS $ startSolvingByUnification info rhs
+       ; case continue_solving of
+       { Nothing -> return (Untouchable, rhs)
+       ; Just rhs ->
+    do { let (free_metas, free_skols) = partition isPromotableMetaTyVar $
+                                        nonDetEltsUniqSet               $
+                                        tyCoVarsOfType rhs
+       ; ambient_lvl  <- getTcLevel
        ; given_eq_lvl <- getInnermostGivenEqLevel
 
        ; if | tv_lvl `sameDepthAs` ambient_lvl
-            -> return TouchableSameLevel
+            -> return (TouchableSameLevel, rhs)
 
             | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
             , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
-            -> return (TouchableOuterLevel free_metas tv_lvl)
+            -> return (TouchableOuterLevel free_metas tv_lvl, rhs)
 
             | otherwise
-            -> return Untouchable } }
+            -> return (Untouchable, rhs) } } }
   | otherwise
-  = return Untouchable
+  = return (Untouchable, rhs)
   where
-     (free_metas, free_skols) = partition isPromotableMetaTyVar $
-                                nonDetEltsUniqSet               $
-                                tyCoVarsOfType rhs
 
      does_not_escape tv_lvl fv
        | isTyVar fv = tv_lvl `deeperThanOrSame` tcTyVarLevel fv
@@ -1940,23 +1942,21 @@ breakTyEqCycle_maybe ev cte_result lhs rhs
      -- See Detail (8) of the Note.
 
   = do { should_break <- final_check
-       ; if should_break then do { redn <- go rhs
-                                 ; return (Just redn) }
-                         else return Nothing }
+       ; mapM go should_break }
   where
     flavour = ctEvFlavour ev
     eq_rel  = ctEvEqRel ev
 
     final_check = case flavour of
-      Given  -> return True
+      Given  -> return $ Just rhs
       Wanted    -- Wanteds work only with a touchable tyvar on the left
                 -- See "Wanted" section of the Note.
         | TyVarLHS lhs_tv <- lhs ->
-          do { result <- touchabilityTest Wanted lhs_tv rhs
+          do { (result, rhs) <- touchabilityTest Wanted lhs_tv rhs
              ; return $ case result of
-                          Untouchable -> False
-                          _           -> True }
-        | otherwise -> return False
+                          Untouchable -> Nothing
+                          _           -> Just rhs }
+        | otherwise -> return Nothing
 
     -- This could be considerably more efficient. See Detail (5) of Note.
     go :: TcType -> TcS ReductionN
