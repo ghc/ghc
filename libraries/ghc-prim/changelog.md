@@ -14,6 +14,8 @@
     - `sameMutVar#`, `sameTVar#`, `sameMVar#`
     - `sameIOPort#`, `eqStableName#`.
 
+- `keepAlive#` and `touch#` are now polymorphic in their state token (#23163; [CLC#152](https://github.com/haskell/core-libraries-committee/issues/152))
+
 - Several new primops were added:
 
   - `copyMutableByteArrayNonOverlapping#`

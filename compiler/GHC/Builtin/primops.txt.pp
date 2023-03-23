@@ -3407,7 +3407,7 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
    out_of_line      = True
 
 primop TouchOp "touch#" GenPrimOp
-   v -> State# RealWorld -> State# RealWorld
+   v -> State# s -> State# s
    with
    code_size = { 0 }
    has_side_effects = True
@@ -3723,7 +3723,7 @@ section "Controlling object lifetime"
 -- and "p" is the same as "b" except representation-polymorphic.
 -- See Note [Levity and representation polymorphic primops]
 primop KeepAliveOp "keepAlive#" GenPrimOp
-   v -> State# RealWorld -> (State# RealWorld -> p) -> p
+   v -> State# s -> (State# s -> p) -> p
    { @'keepAlive#' x s k@ keeps the value @x@ alive during the execution
      of the computation @k@.
 
