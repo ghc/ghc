@@ -593,4 +593,6 @@ test('T23221', [js_skip, high_memory_usage, extra_run_opts('1500000'), unless(wo
 
 test('T23142', [unless(debug_rts(), skip), req_interp], makefile_test, ['T23142'])
 
+test('T23160', extra_ways(['nonmoving_thr']), compile_and_run, [''])
+
 test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
