@@ -497,13 +497,20 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
        | otherwise                = True
 
         -- Unconditionally safe to inline
-    safe_to_inline :: OccInfo -> Bool
-    safe_to_inline IAmALoopBreaker{}                  = False
-    safe_to_inline IAmDead                            = True
-    safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
-                         , occ_n_br = 1 }             = True
-    safe_to_inline OneOcc{}                           = False
-    safe_to_inline ManyOccs{}                         = False
+safe_to_inline :: OccInfo -> Bool
+safe_to_inline IAmALoopBreaker{}                  = False
+safe_to_inline IAmDead                            = True
+safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
+                     , occ_n_br = 1 }             = True
+safe_to_inline OneOcc{}                           = False
+safe_to_inline ManyOccs{}                         = False
+
+do_beta_by_substitution :: Id -> CoreExpr -> Bool
+-- True <=> you can inline (bndr = rhs) by substitution
+-- See Note [Exploit occ-info in exprIsConApp_maybe]
+do_beta_by_substitution bndr rhs
+  = exprIsTrivial rhs                   -- Can duplicate
+    || safe_to_inline (idOccInfo bndr)  -- Occurs at most once
 
 -------------------
 simple_out_bind :: TopLevelFlag
@@ -1078,6 +1085,45 @@ will happen the next time either.
 
 See test T16254, which checks the behavior of newtypes.
 
+Note [Exploit occ-info in exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose (#23159) we have a simple data constructor wrapper like this (this one
+might have come from a data family instance):
+   $WK x y = K x y |> co
+Now suppose the simplifier sees
+   case ($WK e1 e2) |> co2 of
+      K p q ->  case q of ...
+
+`exprIsConApp_maybe` expands the wrapper on the fly
+(see Note [beta-reduction in exprIsConApp_maybe]). It effectively expands
+that ($WK e1 e2) to
+   let x = e1; y = e2 in K x y |> co
+
+So the Simplifier might end up producing this:
+   let x = e1; y = e2
+   in case x of ...
+
+But suppose `q` was used just once in the body of the `K p q` alternative; we
+don't want to wait a whole Simplifier iteration to inline that `x`.  (e1 might
+be another constructor for example.)  This would happen if `exprIsConApp_maybe`
+we created a let for every (non-trivial) argument.  So let's not do that when
+the binder is used just once!
+
+Instead, take advantage of the occurrence-info on `x` and `y` in the unfolding
+of `$WK`.  Since in `$WK` both `x` and `y` occur once, we want to effectively
+expand `($WK e1 e2)` to `(K e1 e2 |> co)`.  Hence in
+`do_beta_by_substitution` we say "yes" if
+
+  (a) the RHS is trivial (so we can duplicate it);
+      see call to `exprIsTrivial`
+or
+  (b) the binder occurs at most once (so there is no worry about duplication);
+      see call to `safe_to_inline`.
+
+To see this in action, look at testsuite/tests/perf/compiler/T15703.  The
+initial Simlifier run takes 5 iterations without (b), but only 3 when we add
+(b).
+
 Note [Don't float join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 exprIsConApp_maybe should succeed on
@@ -1228,7 +1274,7 @@ exprIsConApp_maybe ise@(ISE in_scope id_unf) expr
        = go subst floats fun (CC (subst_expr subst arg : args) co)
 
     go subst floats (Lam bndr body) (CC (arg:args) co)
-       | exprIsTrivial arg          -- Don't duplicate stuff!
+       | do_beta_by_substitution bndr arg
        = go (extend subst bndr arg) floats body (CC args co)
        | otherwise
        = let (subst', bndr') = subst_bndr subst bndr
