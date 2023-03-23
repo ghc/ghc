@@ -69,7 +69,7 @@ module GHC.Types.Unique.FM (
         nonDetStrictFoldUFM_Directly,
         anyUFM, allUFM, seqEltsUFM,
         mapUFM, mapUFM_Directly, strictMapUFM,
-        mapMaybeUFM,
+        mapMaybeUFM, mapMaybeWithKeyUFM,
         elemUFM, elemUFM_Directly,
         filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
@@ -382,6 +382,9 @@ mapUFM f (UFM m) = UFM (M.map f m)
 
 mapMaybeUFM :: (elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapMaybeUFM f (UFM m) = UFM (M.mapMaybe f m)
+
+mapMaybeWithKeyUFM :: (Unique -> elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
+mapMaybeWithKeyUFM f (UFM m) = UFM (M.mapMaybeWithKey (f . getUnique) m)
 
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)

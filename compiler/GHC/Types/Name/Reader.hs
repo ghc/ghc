@@ -112,8 +112,10 @@ import GHC.Types.Name.Env
     ( NameEnv, nonDetNameEnvElts, emptyNameEnv, extendNameEnv_Acc )
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc as SrcLoc
+import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Builtin.Uniques ( isFldNSUnique )
 
 import GHC.Unit.Module
 
@@ -1413,29 +1415,42 @@ Wrinkle [Shadowing namespaces]
 shadowNames :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowNames env new_gres =
-  minusOccEnv_C_Ns (nonDetStrictFoldUFM shadow_many) env new_gres
+shadowNames env new_gres = minusOccEnv_C_Ns do_shadowing env new_gres
   where
 
-    shadow_many :: [GlobalRdrElt]
-                -> UniqFM NameSpace [GlobalRdrElt]
-                -> UniqFM NameSpace [GlobalRdrElt]
-    shadow_many news olds_map  =
-      ( `mapMaybeUFM` olds_map ) $ \ olds ->
-        case foldl' shadow_one olds news of
-          res | null res
-              -> Nothing
-              | otherwise
-              -> Just res
+    do_shadowing :: UniqFM NameSpace [GlobalRdrElt]
+                 -> UniqFM NameSpace [GlobalRdrElt]
+                 -> UniqFM NameSpace [GlobalRdrElt]
+    do_shadowing olds news =
+      -- Start off by accumulating all 'NameSpace's shadowed
+      -- by the entire collection of new GREs.
+      let shadowed_gres :: ShadowedGREs
+          shadowed_gres =
+            nonDetFoldUFM (\ gres shads -> foldMap greShadowedNameSpaces gres S.<> shads)
+              mempty news
 
-    shadow_one :: [GlobalRdrElt] -> GlobalRdrElt -> [GlobalRdrElt]
-    shadow_one olds new =
-      ( `mapMaybe` olds ) $ \ old ->
-        if new `greClashesWith` old
-        then shadow old
-        else Just old
+      -- Then shadow the old 'GlobalRdrElt's, now that we know which 'NameSpace's
+      -- should be shadowed.
+          shadow_list :: Unique -> [GlobalRdrElt] -> Maybe [GlobalRdrElt]
+          shadow_list old_ns old_gres =
+            case namespace_is_shadowed old_ns shadowed_gres of
+              IsNotShadowed -> Just old_gres
+              IsShadowed    -> guard_nonEmpty $ mapMaybe shadow old_gres
+              IsShadowedIfFieldSelector ->
+                guard_nonEmpty $
+                mapMaybe (\ old_gre -> if isFieldSelectorGRE old_gre then shadow old_gre else Just old_gre)
+                  old_gres
 
-    shadow :: GlobalRdrElt -> Maybe GlobalRdrElt
+      -- Now do all of the shadowing in a single go. This avoids traversing
+      -- the old GlobalRdrEnv multiple times over.
+      in mapMaybeWithKeyUFM shadow_list olds
+
+    guard_nonEmpty :: [a] -> Maybe [a]
+    guard_nonEmpty xs | null xs   = Nothing
+                      | otherwise = Just xs
+
+    -- Shadow a single GRE, by either qualifying it or removing it entirely.
+    shadow :: GlobalRdrElt-> Maybe GlobalRdrElt
     shadow old_gre@(GRE { gre_lcl = lcl, gre_imp = iss }) =
       case greDefinitionModule old_gre of
         Nothing -> Just old_gre   -- Old name is Internal; do not shadow
@@ -1463,29 +1478,125 @@ shadowNames env new_gres =
     set_qual :: ImportSpec -> ImportSpec
     set_qual is = is { is_decl = (is_decl is) { is_qual = True } }
 
-
--- | @greClashesWith gre old_gre@ computes whether @gre@ clashes with @old_gre@
--- (assuming they both have the same underlying 'occNameFS').
+-- | @greClashesWith new_gre old_gre@ computes whether @new_gre@ clashes
+-- with @old_gre@ (assuming they both have the same underlying 'occNameFS').
 greClashesWith :: GlobalRdrElt -> (GlobalRdrElt -> Bool)
-greClashesWith gre old_gre
-  | ns == old_ns
-  = True
+greClashesWith new_gre old_gre =
+  old_gre `greIsShadowed` greShadowedNameSpaces new_gre
 
-  -- A new variable shadows record fields with field selectors.
-  | ns == varName
-  = isFieldSelectorGRE old_gre
-
-  -- A new record field...
-  | isFieldNameSpace ns
-       -- ... shadows variables if it defines a field selector.
-  = ( old_ns == varName && isFieldSelectorGRE gre )
-       -- ... shadows record fields unless it is a duplicate record field.
-  || ( isFieldNameSpace old_ns && not (isDuplicateRecFldGRE gre) )
-  | otherwise
-  = False
+-- | Is the given 'GlobalRdrElt' shadowed, as specified by the 'ShadowedNameSpace's?
+greIsShadowed :: GlobalRdrElt -> ShadowedGREs -> Bool
+greIsShadowed old_gre shadowed =
+  case getUnique old_ns `namespace_is_shadowed` shadowed of
+    IsShadowed                -> True
+    IsNotShadowed             -> False
+    IsShadowedIfFieldSelector -> isFieldSelectorGRE old_gre
   where
-    ns     = occNameSpace $ greOccName gre
     old_ns = occNameSpace $ greOccName old_gre
+
+
+-- | Whether a 'GlobalRdrElt' is definitely shadowed, definitely not shadowed,
+-- or conditionally shadowed based on more information beyond the 'NameSpace'.
+data IsShadowed
+  = IsNotShadowed
+  | IsShadowed
+  | IsShadowedIfFieldSelector
+
+-- | Internal function: is a 'GlobalRdrElt' with the 'NameSpace' with given
+-- 'Unique' shadowed by the specified 'ShadowedGREs'?
+--
+--   - @Just b@ means: definitely @b@.
+--   - @Nothing@ means: the GRE is shadowed iff it is a record field GRE
+--     with FieldSelectors enabled.
+namespace_is_shadowed :: Unique -> ShadowedGREs -> IsShadowed
+namespace_is_shadowed old_ns (ShadowedGREs shadowed_nonflds shadowed_flds)
+  | isFldNSUnique old_ns
+  = case shadowed_flds of
+      ShadowAllFieldGREs -> IsShadowed
+      ShadowFieldSelectorsAnd shadowed
+        | old_ns `elemUniqSet_Directly` shadowed
+        -> IsShadowed
+        | otherwise
+        -> IsShadowedIfFieldSelector
+      ShadowFieldNameSpaces shadowed
+        | old_ns `elemUniqSet_Directly` shadowed
+        -> IsShadowed
+        | otherwise
+        -> IsNotShadowed
+  | old_ns `elemUniqSet_Directly` shadowed_nonflds
+  = IsShadowed
+  | otherwise
+  = IsNotShadowed
+
+-- | What are all the 'GlobalRdrElt's that are shadowed by this new 'GlobalRdrElt'?
+greShadowedNameSpaces :: GlobalRdrElt -> ShadowedGREs
+greShadowedNameSpaces gre = ShadowedGREs shadowed_nonflds shadowed_flds
+  where
+    ns = occNameSpace $ greOccName gre
+    !shadowed_nonflds
+      | isFieldNameSpace ns
+      -- A new record field shadows variables if it defines a field selector.
+      = if isFieldSelectorGRE gre
+        then unitUniqSet varName
+        else emptyUniqSet
+      | otherwise
+      = unitUniqSet ns
+    !shadowed_flds
+      | ns == varName
+      -- A new variable shadows record fields with field selectors.
+      = ShadowFieldSelectorsAnd emptyUniqSet
+      | isFieldNameSpace ns
+      -- A new record field shadows record fields unless it is a duplicate record field.
+      = if isDuplicateRecFldGRE gre
+        then ShadowFieldNameSpaces (unitUniqSet ns)
+        -- NB: we must still shadow fields with the same constructor name.
+        else ShadowAllFieldGREs
+      | otherwise
+      = ShadowFieldNameSpaces emptyUniqSet
+
+-- | A description of which 'GlobalRdrElt's are shadowed.
+data ShadowedGREs
+  = ShadowedGREs
+    { shadowedNonFieldNameSpaces :: !(UniqSet NameSpace)
+      -- ^ These specific non-field 'NameSpace's are shadowed.
+    , shadowedFieldGREs :: !ShadowedFieldGREs
+      -- ^ These field 'GlobalRdrElt's are shadowed.
+    }
+
+-- | A description of which record field 'GlobalRdrElt's are shadowed.
+data ShadowedFieldGREs
+  -- | All field 'GlobalRdrElt's are shadowed.
+  = ShadowAllFieldGREs
+  -- | Record field GREs defining field selectors, as well as those
+  -- with the explicitly specified field 'NameSpace's, are shadowed.
+  | ShadowFieldSelectorsAnd { shadowedFieldNameSpaces :: !(UniqSet NameSpace) }
+  -- | These specific field 'NameSpace's are shadowed.
+  | ShadowFieldNameSpaces { shadowedFieldNameSpaces :: !(UniqSet NameSpace) }
+
+instance Monoid ShadowedFieldGREs where
+  mempty = ShadowFieldNameSpaces { shadowedFieldNameSpaces = emptyUniqSet }
+
+instance Semigroup ShadowedFieldGREs where
+  ShadowAllFieldGREs <> _ = ShadowAllFieldGREs
+  _ <> ShadowAllFieldGREs = ShadowAllFieldGREs
+  ShadowFieldSelectorsAnd ns1 <> ShadowFieldSelectorsAnd ns2 =
+    ShadowFieldSelectorsAnd (ns1 S.<> ns2)
+  ShadowFieldSelectorsAnd ns1 <> ShadowFieldNameSpaces ns2 =
+    ShadowFieldSelectorsAnd (ns1 S.<> ns2)
+  ShadowFieldNameSpaces ns1 <> ShadowFieldSelectorsAnd ns2 =
+    ShadowFieldSelectorsAnd (ns1 S.<> ns2)
+  ShadowFieldNameSpaces ns1 <> ShadowFieldNameSpaces ns2 =
+    ShadowFieldNameSpaces (ns1 S.<> ns2)
+
+instance Monoid ShadowedGREs where
+  mempty =
+    ShadowedGREs
+      { shadowedNonFieldNameSpaces = emptyUniqSet
+      , shadowedFieldGREs = mempty }
+
+instance Semigroup ShadowedGREs where
+  ShadowedGREs nonflds1 flds1 <> ShadowedGREs nonflds2 flds2 =
+    ShadowedGREs (nonflds1 S.<> nonflds2) (flds1 S.<> flds2)
 
 {-
 ************************************************************************
