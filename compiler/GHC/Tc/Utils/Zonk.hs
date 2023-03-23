@@ -1734,7 +1734,7 @@ change.  But in some cases it makes a HUGE difference: see test
 T9198 and #19668.  So yes, it seems worth it.
 -}
 
-zonkTyVarOcc :: ZonkEnv -> TcTyVar -> TcM Type
+zonkTyVarOcc :: HasDebugCallStack => ZonkEnv -> TcTyVar -> TcM Type
 zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi
                           , ze_tv_env = tv_env
                           , ze_meta_tv_env = mtv_env_ref }) tv

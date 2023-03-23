@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf      #-}
+{-# LANGUAGE RecursiveDo     #-}
 {-# LANGUAGE TupleSections   #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -500,7 +501,16 @@ newInferExpType :: TcM ExpType
 newInferExpType = new_inferExpType Nothing
 
 newInferExpTypeFRR :: FixedRuntimeRepContext -> TcM ExpTypeFRR
-newInferExpTypeFRR frr_orig = new_inferExpType (Just frr_orig)
+newInferExpTypeFRR frr_orig
+  = do { th_stage <- getStage
+       ; if
+          -- See [Wrinkle: Typed Template Haskell]
+          -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+          | Brack _ (TcPending {}) <- th_stage
+          -> new_inferExpType Nothing
+
+          | otherwise
+          -> new_inferExpType (Just frr_orig) }
 
 new_inferExpType :: Maybe FixedRuntimeRepContext -> TcM ExpType
 new_inferExpType mb_frr_orig
@@ -556,20 +566,28 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
-                      , ir_ref = ref })
+                      , ir_ref = ref
+                      , ir_frr = mb_frr })
   = do { mb_inferred_ty <- readTcRef ref
        ; tau <- case mb_inferred_ty of
             Just ty -> do { ensureMonoType ty
                             -- See Note [inferResultToType]
                           ; return ty }
-            Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
-                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr)
-                            -- See Note [TcLevel of ExpType]
+            Nothing -> do { tau <- new_meta
                           ; writeMutVar ref (Just tau)
                           ; return tau }
        ; traceTc "Forcing ExpType to be monomorphic:"
                  (ppr u <+> text ":=" <+> ppr tau)
        ; return tau }
+  where
+    -- See Note [TcLevel of ExpType]
+    new_meta = case mb_frr of
+      Nothing  ->  do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+                      ; newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr) }
+      Just frr -> mdo { rr  <- newConcreteTyVarAtLevel conc_orig tc_lvl runtimeRepTy
+                      ; tau <- newMetaTyVarTyAtLevel tc_lvl (mkTYPEapp rr)
+                      ; let conc_orig = ConcreteFRR $ FixedRuntimeRepOrigin tau frr
+                      ; return tau }
 
 {- Note [inferResultToType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -892,6 +910,13 @@ newTauTvDetailsAtLevel tclvl
                         , mtv_ref   = ref
                         , mtv_tclvl = tclvl }) }
 
+newConcreteTvDetailsAtLevel :: ConcreteTvOrigin -> TcLevel -> TcM TcTyVarDetails
+newConcreteTvDetailsAtLevel conc_orig tclvl
+  = do { ref <- newMutVar Flexi
+       ; return (MetaTv { mtv_info  = ConcreteTv conc_orig
+                        , mtv_ref   = ref
+                        , mtv_tclvl = tclvl }) }
+
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
   = assert (isTcTyVar tv) $
@@ -937,7 +962,7 @@ isUnfilledMetaTyVar tv
 
 --------------------
 -- Works with both type and kind variables
-writeMetaTyVar :: TcTyVar -> TcType -> TcM ()
+writeMetaTyVar :: HasDebugCallStack => TcTyVar -> TcType -> TcM ()
 -- Write into a currently-empty MetaTyVar
 
 writeMetaTyVar tyvar ty
@@ -955,7 +980,7 @@ writeMetaTyVar tyvar ty
   = massertPpr False (text "Writing to non-meta tyvar" <+> ppr tyvar)
 
 --------------------
-writeMetaTyVarRef :: TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
+writeMetaTyVarRef :: HasDebugCallStack => TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
 -- Here the tyvar is for error checking only;
 -- the ref cell must be for the same tyvar
 writeMetaTyVarRef tyvar ref ty
@@ -1119,6 +1144,13 @@ newMetaTyVarTyAtLevel tc_lvl kind
   = do  { details <- newTauTvDetailsAtLevel tc_lvl
         ; name    <- newMetaTyVarName (fsLit "p")
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
+
+newConcreteTyVarAtLevel :: ConcreteTvOrigin -> TcLevel -> TcKind -> TcM TcType
+newConcreteTyVarAtLevel conc_orig tc_lvl kind
+  = do  { details <- newConcreteTvDetailsAtLevel conc_orig tc_lvl
+        ; name    <- newMetaTyVarName (fsLit "c")
+        ; return (mkTyVarTy (mkTcTyVar name kind details)) }
+
 
 {- *********************************************************************
 *                                                                      *
@@ -2237,7 +2269,7 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 *                                                                      *
 ********************************************************************* -}
 
-promoteMetaTyVarTo :: TcLevel -> TcTyVar -> TcM Bool
+promoteMetaTyVarTo :: HasDebugCallStack => TcLevel -> TcTyVar -> TcM Bool
 -- When we float a constraint out of an implication we must restore
 -- invariant (WantedInv) in Note [TcLevel invariants] in GHC.Tc.Utils.TcType
 -- Return True <=> we did some promotion
@@ -2255,7 +2287,7 @@ promoteMetaTyVarTo tclvl tv
    = return False
 
 -- Returns whether or not *any* tyvar is defaulted
-promoteTyVarSet :: TcTyVarSet -> TcM Bool
+promoteTyVarSet :: HasDebugCallStack => TcTyVarSet -> TcM Bool
 promoteTyVarSet tvs
   = do { tclvl <- getTcLevel
        ; bools <- mapM (promoteMetaTyVarTo tclvl)  $

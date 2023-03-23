@@ -114,3 +114,4 @@ test('T21650_a', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 ###############################################################################
 test('T23153', normal, compile_fail, [''])
+test('T23154', normal, compile_fail, [''])

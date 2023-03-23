@@ -2072,10 +2072,10 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
       , cterHasNoProblem (checkTyVarEq tv1 ty2)
            -- See Note [Prevent unification with type families]
-      = do { can_continue_solving <- startSolvingByUnification (metaTyVarInfo tv1) ty2
-           ; if not can_continue_solving
-             then not_ok_so_defer
-             else
+      = do { mb_continue_solving <- startSolvingByUnification (metaTyVarInfo tv1) ty2
+           ; case mb_continue_solving of
+           { Nothing -> not_ok_so_defer
+           ; Just ty2 ->
         do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -2089,9 +2089,9 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
              then do { writeMetaTyVar tv1 ty2
                      ; return (mkNomReflCo ty2) }
 
-             else defer }} -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
-                           -- Note [Equalities with incompatible kinds] for how
-                           -- this will be dealt with in the solver
+             else defer }}} -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
+                            -- Note [Equalities with incompatible kinds] for how
+                            -- this will be dealt with in the solver
 
       | otherwise
       = not_ok_so_defer
@@ -2111,39 +2111,38 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 -- | Checks (TYVAR-TV), (COERCION-HOLE) and (CONCRETE) of
 -- Note [Unification preconditions]; returns True if these conditions
 -- are satisfied. But see the Note for other preconditions, too.
-startSolvingByUnification :: MetaInfo -> TcType  -- zonked
-                          -> TcM Bool
+startSolvingByUnification :: MetaInfo -> TcType -- zonked
+                          -> TcM (Maybe TcType)
 startSolvingByUnification _ xi
   | hasCoercionHoleTy xi  -- (COERCION-HOLE) check
-  = return False
+  = return Nothing
 startSolvingByUnification info xi
   = case info of
-      CycleBreakerTv -> return False
+      CycleBreakerTv -> return Nothing
       ConcreteTv conc_orig ->
-        do { (_, not_conc_reasons) <- makeTypeConcrete conc_orig xi
+        do { (xi, not_conc_reasons) <- makeTypeConcrete conc_orig xi
                  -- NB: makeTypeConcrete has the side-effect of turning
                  -- some TauTvs into ConcreteTvs, e.g.
                  -- alpha[conc] ~# TYPE (TupleRep '[ beta[tau], IntRep ])
                  -- will write `beta[tau] := beta[conc]`.
                  --
-                 -- We don't need to track these unifications for the purposes
-                 -- of constraint solving (e.g. updating tcs_unified or tcs_unif_lvl),
-                 -- as they don't unlock any further progress.
+                 -- We return the new type, so that callers of this function
+                 -- aren't required to zonk.
            ; case not_conc_reasons of
-               [] -> return True
-               _  -> return False }
+               [] -> return $ Just xi
+               _  -> return Nothing }
       TyVarTv ->
         case getTyVar_maybe xi of
-           Nothing -> return False
+           Nothing -> return Nothing
            Just tv ->
              case tcTyVarDetails tv of -- (TYVAR-TV) wrinkle
-                SkolemTv {} -> return True
-                RuntimeUnk  -> return True
+                SkolemTv {} -> return $ Just xi
+                RuntimeUnk  -> return $ Just xi
                 MetaTv { mtv_info = info } ->
                   case info of
-                    TyVarTv -> return True
-                    _       -> return False
-      _ -> return True
+                    TyVarTv -> return $ Just xi
+                    _       -> return Nothing
+      _ -> return $ Just xi
 
 swapOverTyVars :: Bool -> TcTyVar -> TcTyVar -> Bool
 swapOverTyVars is_given tv1 tv2

@@ -1573,7 +1573,7 @@ tryToSolveByUnification :: Ct -> CtEvidence
                         -> TcType    -- RHS
                         -> TcS (StopOrContinue Ct)
 tryToSolveByUnification work_item ev tv rhs
-  = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv rhs
+  = do { (is_touchable, rhs) <- touchabilityTest (ctEvFlavour ev) tv rhs
        ; traceTcS "tryToSolveByUnification" (vcat [ ppr tv <+> char '~' <+> ppr rhs
                                                   , ppr is_touchable ])
 
