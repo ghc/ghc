@@ -1,5 +1,5 @@
 *** Core Lint errors : in result of Desugar (before optimization) ***
-T21115b.hs:9:1: warning:
+T21115b.hs:9:1: warning: [-Wunclassified (in -Wdefault)]
     Lint warning: Scrutinising floating-point expression with literal pattern in case analysis (see #9238).
     scrut ds
     In the RHS of foo :: Double# -> Int#

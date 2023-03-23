@@ -1,5 +1,5 @@
 
-TH_RichKinds.hs:12:2: warning: [GHC-39584]
+TH_RichKinds.hs:12:2: warning: [GHC-39584] [-Wunclassified (in -Wdefault)]
     forall a_0 . (a_0 :: GHC.Types.Bool)
 forall a_1 . (a_1 :: Constraint)
 forall a_2 . (a_2 :: [*])

@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
@@ -28,7 +29,7 @@ module GHC.Types.Error
    , Diagnostic (..)
    , UnknownDiagnostic (..)
    , DiagnosticMessage (..)
-   , DiagnosticReason (..)
+   , DiagnosticReason (WarningWithoutFlag, ..)
    , DiagnosticHint (..)
    , mkPlainDiagnostic
    , mkPlainError
@@ -322,14 +323,12 @@ mkDecoratedError hints docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutF
 -- can be completely statically-computed (i.e. this is an error or a warning
 -- no matter what), or influenced by the specific state of the 'DynFlags' at
 -- the moment of the creation of a new 'Diagnostic'. For example, a parsing
--- error is /always/ going to be an error, whereas a 'WarningWithoutFlag
+-- error is /always/ going to be an error, whereas a 'WarningWithFlag
 -- Opt_WarnUnusedImports' might turn into an error due to '-Werror' or
 -- '-Werror=warn-unused-imports'. Interpreting a 'DiagnosticReason' together
 -- with its associated 'Severity' gives us the full picture.
 data DiagnosticReason
-  = WarningWithoutFlag
-  -- ^ Born as a warning.
-  | WarningWithFlag !WarningFlag
+  = WarningWithFlag !WarningFlag
   -- ^ Warning was enabled with the flag.
   | WarningWithCategory !WarningCategory
   -- ^ Warning was enabled with a custom category.
@@ -339,10 +338,16 @@ data DiagnosticReason
 
 instance Outputable DiagnosticReason where
   ppr = \case
-    WarningWithoutFlag  -> text "WarningWithoutFlag"
     WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
     WarningWithCategory cat -> text "WarningWithCategory" <+> ppr cat
     ErrorWithoutFlag    -> text "ErrorWithoutFlag"
+
+-- | Warnings that do not otherwise have flags to control them are controlled by
+-- the @-Wunclassified@ flag.  In particular this means that @-w@ can be used to
+-- suppress unclassified warnings, as well as @-Werror@ or
+-- @-Werror=unclassified@ promoting them to errors.
+pattern WarningWithoutFlag :: DiagnosticReason
+pattern WarningWithoutFlag = WarningWithFlag Opt_WarnUnclassified
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
@@ -511,7 +516,6 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
             -- The above can happen when displaying an error message
             -- in a log file, e.g. with -ddump-tc-trace. It should not
             -- happen otherwise, though.
-          flag_msg SevError WarningWithoutFlag = Just (col "-Werror")
           flag_msg SevError (WarningWithFlag wflag) =
             let name = NE.head (warnFlagNames wflag) in
             Just $ col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag)
@@ -523,7 +527,6 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
                        <> comma
                        <+> coloured msg_colour (text "-Werror=" <> ppr cat)
           flag_msg SevError   ErrorWithoutFlag   = Nothing
-          flag_msg SevWarning WarningWithoutFlag = Nothing
           flag_msg SevWarning (WarningWithFlag wflag) =
             let name = NE.head (warnFlagNames wflag) in
             Just (col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag))

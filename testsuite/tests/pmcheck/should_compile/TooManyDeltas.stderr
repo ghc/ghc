@@ -3,7 +3,7 @@ TooManyDeltas.hs:14:1: warning: [GHC-62161] [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’: Patterns of type ‘T’, ‘T’ not matched: _ _
 
-TooManyDeltas.hs:14:1: warning: [GHC-61505]
+TooManyDeltas.hs:14:1: warning: [GHC-61505] [-Wunclassified (in -Wdefault)]
     Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
       • Redundant clauses might not be reported at all
       • Redundant clauses might be reported as inaccessible
@@ -11,7 +11,7 @@ TooManyDeltas.hs:14:1: warning: [GHC-61505]
     Suggested fix:
       Increase the limit or resolve the warnings to suppress this message.
 
-TooManyDeltas.hs:19:1: warning: [GHC-61505]
+TooManyDeltas.hs:19:1: warning: [GHC-61505] [-Wunclassified (in -Wdefault)]
     Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
       • Redundant clauses might not be reported at all
       • Redundant clauses might be reported as inaccessible

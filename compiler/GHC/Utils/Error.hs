@@ -142,9 +142,6 @@ diagReasonSeverity opts reason = case reason of
     | not (diag_wopt_custom wcat opts) -> SevIgnore
     | diag_fatal_wopt_custom wcat opts -> SevError
     | otherwise                        -> SevWarning
-  WarningWithoutFlag
-    | diag_warn_is_error opts -> SevError
-    | otherwise             -> SevWarning
   ErrorWithoutFlag
     -> SevError
 

@@ -2,6 +2,6 @@
 UnsafeWarn06.hs:4:17: warning: [-Wunsafe]
     ‘UnsafeWarn06’ has been inferred as unsafe!
     Reason:
-        UnsafeWarn06.hs:9:11: warning: [GHC-56147]
+        UnsafeWarn06.hs:9:11: warning: [GHC-56147] [-Wunclassified (in -Wdefault)]
             Rule "f" ignored
             Defining user rules is disabled under Safe Haskell

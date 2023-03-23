@@ -5,7 +5,7 @@
 SH_Overlap11.hs:2:17: warning: [-Wunsafe]
     ‘SH_Overlap11’ has been inferred as unsafe!
     Reason:
-        SH_Overlap11.hs:18:8: warning: [GHC-36705]
+        SH_Overlap11.hs:18:8: warning: [GHC-36705] [-Wunclassified (in -Wdefault)]
             • Unsafe overlapping instances for C [Int]
                 arising from a use of ‘f’
               The matching instance is:

@@ -1,6 +1,6 @@
 
-<no location info>: Warning:
+<no location info>: warning: [-Wunclassified (in -Wdefault)]
     -XTemplateHaskell is not allowed in Safe Haskell; ignoring -XTemplateHaskell
 
-<no location info>: Warning:
+<no location info>: warning: [-Wunclassified (in -Wdefault)]
     -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving

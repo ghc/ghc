@@ -2,5 +2,5 @@
 T19926.hs:3:17: warning: [-Wunsafe]
     ‘T19926’ has been inferred as unsafe!
     Reason:
-        <no location info>: warning: [GHC-01687]
+        <no location info>: warning: [GHC-01687] [-Wunclassified (in -Wdefault)]
             Use of plugins makes the module unsafe

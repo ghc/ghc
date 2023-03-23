@@ -78,6 +78,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
+        * :ghc-flag:`-Wunclassified`
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2396,6 +2397,20 @@ of ``-W(no-)*``.
 
     When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
     that would stop working under ``RequiredTypeArguments``.
+
+.. ghc-flag:: -Wunclassified
+    :shortdesc: warn about issues that are not controlled by another flag
+    :type: dynamic
+    :reverse: -Wno-unclassified
+
+    :since: 9.8.1
+
+    :default: on
+
+    There are a variety of warnings that are enabled by default and do not have
+    a more specific flag to control them.  These are grouped under the
+    :ghc-flag:`-Wunclassified` flag, primarily so that they can be silenced
+    or selectively promoted to errors.
 
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.

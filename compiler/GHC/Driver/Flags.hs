@@ -635,6 +635,7 @@ data WarningFlag =
    | Opt_WarnTypeEqualityRequiresOperators           -- Since 9.4
    | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
    | Opt_WarnTermVariableCapture                     -- Since 9.8
+   | Opt_WarnUnclassified                            -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -741,6 +742,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnTypeEqualityOutOfScope                  -> "type-equality-out-of-scope" :| []
   Opt_WarnLoopySuperclassSolve                    -> "loopy-superclass-solve" :| []
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
+  Opt_WarnUnclassified                            -> "unclassified" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -879,7 +881,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
         Opt_WarnLoopySuperclassSolve,
-        Opt_WarnTypeEqualityRequiresOperators
+        Opt_WarnTypeEqualityRequiresOperators,
+        Opt_WarnUnclassified
       ]
 
 -- | Things you get with -W

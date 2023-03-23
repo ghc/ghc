@@ -1,4 +1,4 @@
-<no location info>: warning:
+<no location info>: warning: [-Wunclassified (in -Wdefault)]
     Cannot eta expand ‘coerce’
     The following type does not have a fixed runtime representation:
       • a :: TYPE k
@@ -7,7 +7,7 @@
                    TvSubst   = []
                    CvSubst   = []>
 in coerce BAD 1
-<no location info>: warning:
+<no location info>: warning: [-Wunclassified (in -Wdefault)]
     Cannot eta expand ‘coerce’
     The following type does not have a fixed runtime representation:
       • a :: TYPE q

@@ -1,3 +1,3 @@
 
-SafeFlags18.hs:1:17: error: [-Werror]
+SafeFlags18.hs:1:17: error: [-Wunclassified (in -Wdefault), Werror=unclassified]
     -fpackage-trust ignored; must be specified with a Safe Haskell flag

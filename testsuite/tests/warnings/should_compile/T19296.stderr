@@ -25,7 +25,7 @@ T19296.hs:13:6: warning: [GHC-30606] [-Wredundant-constraints]
 13 | h :: (Eq a, Ord b) => a -> b -> b
    |      ^^^^^^^^^^^^^
 
-T19296.hs:21:1: warning: [GHC-40548]
+T19296.hs:21:1: warning: [GHC-40548] [-Wunclassified (in -Wdefault)]
     Forall'd constraint ‘Eq a’ is not bound in RULE lhs
       Orig bndrs: [a, $dEq]
       Orig lhs: let {

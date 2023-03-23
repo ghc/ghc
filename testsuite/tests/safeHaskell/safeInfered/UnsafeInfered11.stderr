@@ -2,7 +2,7 @@
 UnsafeInfered11_A.hs:2:17: warning: [-Wunsafe]
     ‘UnsafeInfered11_A’ has been inferred as unsafe!
     Reason:
-        UnsafeInfered11_A.hs:18:11: warning: [GHC-56147]
+        UnsafeInfered11_A.hs:18:11: warning: [GHC-56147] [-Wunclassified (in -Wdefault)]
             Rule "lookupx/T" ignored
             Defining user rules is disabled under Safe Haskell
 
