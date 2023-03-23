@@ -112,3 +112,4 @@ test('RepPolyCase2', normal, compile_fail, [''])                    ##
 test('RepPolyRule3', normal, compile_fail, [''])                    ##
 ######################################################################
 test('T23153', normal, compile_fail, [''])
+test('T23154', normal, compile_fail, [''])
