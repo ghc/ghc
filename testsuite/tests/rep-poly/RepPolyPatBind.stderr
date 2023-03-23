@@ -17,3 +17,36 @@ RepPolyPatBind.hs:18:5: error:
                 x, y :: a
                 (# x, y #) = undefined
               in x
+
+RepPolyPatBind.hs:18:8: error: [GHC-55287]
+    • The pattern binding does not have a fixed runtime representation.
+      Its type is:
+        (# a0, b0 #) :: TYPE (TupleRep [k00, k10])
+      Cannot unify ‘rep’ with the type variable ‘k00’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the pattern: (# x, y #)
+      In a pattern binding: (# x, y #) = undefined
+      In the expression:
+        let
+          x, y :: a
+          (# x, y #) = undefined
+        in x
+    • Relevant bindings include
+        foo :: () -> a (bound at RepPolyPatBind.hs:15:1)
+
+RepPolyPatBind.hs:18:11: error: [GHC-55287]
+    • The pattern binding does not have a fixed runtime representation.
+      Its type is:
+        (# a0, b0 #) :: TYPE (TupleRep [k00, k10])
+      Cannot unify ‘rep’ with the type variable ‘k10’
+      because it is not a concrete ‘RuntimeRep’.
+    • In the pattern: (# x, y #)
+      In a pattern binding: (# x, y #) = undefined
+      In the expression:
+        let
+          x, y :: a
+          (# x, y #) = undefined
+        in x
+    • Relevant bindings include
+        x :: a (bound at RepPolyPatBind.hs:18:8)
+        foo :: () -> a (bound at RepPolyPatBind.hs:15:1)
