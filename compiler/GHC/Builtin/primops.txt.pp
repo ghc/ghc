@@ -2608,7 +2608,6 @@ primop  AtomicSwapMutVarOp "atomicSwapMutVar#" GenPrimOp
    MutVar# s v -> v -> State# s -> (# State# s, v #)
    {Atomically exchange the value of a 'MutVar#'.}
    with
-   out_of_line = True
    has_side_effects = True
 
 -- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]

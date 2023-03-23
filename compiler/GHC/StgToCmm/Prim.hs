@@ -297,16 +297,12 @@ emitPrimOp cfg primop =
     -- MutVar's value.
     emitPrimCall [] (MO_AtomicWrite (wordWidth platform) MemOrderRelease)
         [ cmmOffsetW platform mutv (fixedHdrSizeW profile), var ]
+    emitDirtyMutVar mutv (CmmReg old_val)
 
-    platform <- getPlatform
-    mkdirtyMutVarCCall <- getCode $! emitCCall
-      [{-no results-}]
-      (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
-      [(baseExpr platform, AddrHint), (mutv, AddrHint), (CmmReg old_val, AddrHint)]
-    emit =<< mkCmmIfThen
-      (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel)
-       (closureInfoPtr platform (stgToCmmAlignCheck cfg) mutv))
-      mkdirtyMutVarCCall
+  AtomicSwapMutVarOp -> \[mutv, val] -> opIntoRegs $ \[res] -> do
+    let dst = cmmOffsetW platform mutv (fixedHdrSizeW profile)
+    emitPrimCall [res] (MO_Xchg (wordWidth platform)) [dst, val]
+    emitDirtyMutVar mutv (CmmReg (CmmLocal res))
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
@@ -1562,7 +1558,6 @@ emitPrimOp cfg primop =
   ResizeMutableByteArrayOp_Char -> alwaysExternal
   ShrinkSmallMutableArrayOp_Char -> alwaysExternal
   NewMutVarOp -> alwaysExternal
-  AtomicSwapMutVarOp -> alwaysExternal
   AtomicModifyMutVar2Op -> alwaysExternal
   AtomicModifyMutVar_Op -> alwaysExternal
   CasMutVarOp -> alwaysExternal
@@ -3331,6 +3326,21 @@ doByteArrayBoundsCheck idx arr idx_ty elem_ty = whenCheckBounds $ do
     if elem_w == idx_w
       then emitBoundsCheck idx effective_arr_sz  -- aligned => simpler check
       else assert (idx_w == W8) (emitRangeBoundsCheck idx elem_sz arr_sz)
+
+-- | Write barrier for @MUT_VAR@ modification.
+emitDirtyMutVar :: CmmExpr -> CmmExpr -> FCode ()
+emitDirtyMutVar mutvar old_val = do
+    cfg <- getStgToCmmConfig
+    platform <- getPlatform
+    mkdirtyMutVarCCall <- getCode $! emitCCall
+      [{-no results-}]
+      (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+      [(baseExpr platform, AddrHint), (mutvar, AddrHint), (old_val, AddrHint)]
+
+    emit =<< mkCmmIfThen
+      (cmmEqWord platform (mkLblExpr mkMUT_VAR_CLEAN_infoLabel)
+       (closureInfoPtr platform (stgToCmmAlignCheck cfg) mutvar))
+      mkdirtyMutVarCCall
 
 ---------------------------------------------------------------------------
 -- Pushing to the update remembered set
