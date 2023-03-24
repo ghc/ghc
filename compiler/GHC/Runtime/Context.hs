@@ -401,8 +401,11 @@ setInteractivePrintName ic n = ic{ic_int_print = n}
 
 icExtendIcGblRdrEnv :: IcGlobalRdrEnv -> [TyThing] -> IcGlobalRdrEnv
 icExtendIcGblRdrEnv igre tythings = IcGlobalRdrEnv
-    { igre_env = igre_env igre `icExtendGblRdrEnv` tythings
-    , igre_prompt_env = igre_prompt_env igre `icExtendGblRdrEnv` tythings
+    { igre_env        = icExtendGblRdrEnv False (igre_env igre)        tythings
+    , igre_prompt_env = icExtendGblRdrEnv True  (igre_prompt_env igre) tythings
+        -- Pass 'True' <=> drop names that are only available qualified.
+        -- This is done to maintain the invariant of Note [icReaderEnv recalculation]
+        -- that igre_prompt_env should only contain Names that are available unqualified.
     }
 
 -- This is used by setContext in GHC.Runtime.Eval when the set of imports
@@ -410,13 +413,14 @@ icExtendIcGblRdrEnv igre tythings = IcGlobalRdrEnv
 replaceImportEnv :: IcGlobalRdrEnv -> GlobalRdrEnv -> IcGlobalRdrEnv
 replaceImportEnv igre import_env = igre { igre_env = new_env }
   where
-    import_env_shadowed = import_env `shadowNames` igre_prompt_env igre
+    import_env_shadowed = shadowNames False import_env (igre_prompt_env igre)
     new_env = import_env_shadowed `plusGlobalRdrEnv` igre_prompt_env igre
 
 -- | Add 'TyThings' to the 'GlobalRdrEnv', earlier ones in the list shadowing
 -- later ones, and shadowing existing entries in the 'GlobalRdrEnv'.
-icExtendGblRdrEnv :: GlobalRdrEnv -> [TyThing] -> GlobalRdrEnv
-icExtendGblRdrEnv env tythings
+icExtendGblRdrEnv :: Bool -- ^ discard names that are only available qualified?
+                  -> GlobalRdrEnv -> [TyThing] -> GlobalRdrEnv
+icExtendGblRdrEnv drop_only_qualified env tythings
   = foldr add env tythings  -- Foldr makes things in the front of
                             -- the list shadow things at the back
   where
@@ -428,7 +432,7 @@ icExtendGblRdrEnv env tythings
        = foldl' extendGlobalRdrEnv env1 new_gres
        where
           new_gres = tyThingLocalGREs thing
-          env1     = shadowNames env $ mkGlobalRdrEnv new_gres
+          env1     = shadowNames drop_only_qualified env $ mkGlobalRdrEnv new_gres
 
     -- Ugh! The new_tythings may include record selectors, since they
     -- are not implicit-ids, and must appear in the TypeEnv.  But they

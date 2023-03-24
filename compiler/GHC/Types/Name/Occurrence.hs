@@ -88,6 +88,7 @@ module GHC.Types.Name.Occurrence (
         -- * The 'OccEnv' type
         OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
         mapOccEnv, strictMapOccEnv,
+        mapMaybeOccEnv,
         lookupOccEnv, lookupOccEnv_WithFields, lookupFieldsOccEnv,
         mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
         nonDetOccEnvElts, nonDetFoldOccEnv,
@@ -684,6 +685,16 @@ plusOccEnv_C f (MkOccEnv env1) (MkOccEnv env2)
 -- | Map over an 'OccEnv' ('Functor' instance).
 mapOccEnv :: (a->b) -> OccEnv a -> OccEnv b
 mapOccEnv = fmap
+
+-- | 'mapMaybe' for b 'OccEnv'.
+mapMaybeOccEnv :: (a -> Maybe b) -> OccEnv a -> OccEnv b
+mapMaybeOccEnv f (MkOccEnv env)
+  = MkOccEnv $ mapMaybeUFM g env
+    where
+      g as =
+        case mapMaybeUFM f as of
+          m' | isNullUFM m' -> Nothing
+             | otherwise    -> Just m'
 
 -- | Add a single element to an 'OccEnv', using a different function whether
 -- the 'OccName' already exists or not.

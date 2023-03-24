@@ -1412,10 +1412,11 @@ Wrinkle [Shadowing namespaces]
 
 -}
 
-shadowNames :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
+shadowNames :: Bool -- ^ discard names that are only available qualified?
+            -> GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
 -- Remove certain old GREs that share the same OccName as this new Name.
 -- See Note [GlobalRdrEnv shadowing] for details
-shadowNames env new_gres = minusOccEnv_C_Ns do_shadowing env new_gres
+shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env new_gres
   where
 
     do_shadowing :: UniqFM NameSpace [GlobalRdrElt]
@@ -1455,7 +1456,8 @@ shadowNames env new_gres = minusOccEnv_C_Ns do_shadowing env new_gres
       case greDefinitionModule old_gre of
         Nothing -> Just old_gre   -- Old name is Internal; do not shadow
         Just old_mod
-           | null iss'            -- Nothing remains
+           |  null iss'            -- Nothing remains
+           || drop_only_qualified
            -> Nothing
 
            | otherwise
