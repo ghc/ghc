@@ -479,11 +479,13 @@ EXTERN_INLINE StgWord8 *mutArrPtrsCard (StgMutArrPtrs *a, W_ n)
    memory we're about to zero.
 
    Thus, with the THREADED RTS and +RTS -N2 or greater we must not zero
-   immutable closure's slop.
+   immutable closure's slop. Similarly, the concurrent GC's mark thread
+   may race when a mutator during slop-zeroing. Consequently, we also disable
+   zeroing when the non-moving GC is in use.
 
    Hence, an immutable closure's slop is zeroed when either:
 
-    - PROFILING && era > 0 (LDV is on) or
+    - PROFILING && era > 0 (LDV is on) && !nonmoving-gc-enabled or
     - !THREADED && DEBUG
 
    Additionally:
@@ -541,7 +543,8 @@ zeroSlop (StgClosure *p, uint32_t offset, uint32_t size, bool known_mutable)
 
     const bool can_zero_immutable_slop =
         // Only if we're running single threaded.
-        RTS_DEREF(RtsFlags).ParFlags.nCapabilities <= 1;
+        RTS_DEREF(RtsFlags).ParFlags.nCapabilities <= 1
+        && !RTS_DEREF(RtsFlags).GcFlags.useNonmoving; // see #23170
 
     const bool zero_slop_immutable =
         want_to_zero_immutable_slop && can_zero_immutable_slop;
