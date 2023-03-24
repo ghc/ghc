@@ -7,8 +7,6 @@
   * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
   * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
     types significantly.
-  * Refactor `generalCategory` to stop very large literal string being inlined to call-sites.
-      ([CLC proposal #130](https://github.com/haskell/core-libraries-committee/issues/130))
   * Add INLINABLE pragmas to `generic*` functions in Data.OldList ([CLC proposal #129](https://github.com/haskell/core-libraries-committee/issues/130))
   * Export `getSolo` from `Data.Tuple`.
       ([CLC proposal #113](https://github.com/haskell/core-libraries-committee/issues/113))
@@ -23,7 +21,7 @@
       ([CLC proposal #149](https://github.com/haskell/core-libraries-committee/issues/149))
   * Make `($)` representation polymorphic ([CLC proposal #132](https://github.com/haskell/core-libraries-committee/issues/132))
 
-## 4.18.0.0 *TBA*
+## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
   * `Foreign.C.ConstPtr.ConstrPtr` was added to encode `const`-qualified
     pointer types in foreign declarations when using `CApiFFI` extension. ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
@@ -61,6 +59,9 @@
     ([CLC proposal #50](https://github.com/haskell/core-libraries-committee/issues/50),
     [the migration
     guide](https://github.com/haskell/core-libraries-committee/blob/main/guides/export-lifta2-prelude.md))
+  * Switch to a pure Haskell implementation of `GHC.Unicode`
+    ([CLC proposals #59](https://github.com/haskell/core-libraries-committee/issues/59)
+    and [#130](https://github.com/haskell/core-libraries-committee/issues/130))
   * Update to [Unicode 15.0.0](https://www.unicode.org/versions/Unicode15.0.0/).
   * Add standard Unicode case predicates `isUpperCase` and `isLowerCase` to
     `GHC.Unicode` and `Data.Char`. These predicates use the standard Unicode
