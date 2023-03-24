@@ -29,7 +29,7 @@ import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Typeable
 import GHC.Unit.Module (ModuleName, Module)
-import GHC.Hs.Extension (GhcTc)
+import GHC.Hs.Extension (GhcTc, GhcRn)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.Type (PredType)
@@ -43,6 +43,7 @@ import GHC.Parser.Errors.Basic
 import {-# SOURCE #-} Language.Haskell.Syntax.Expr
 import GHC.Unit.Module.Imported (ImportedModsVal)
 import GHC.Data.FastString (fsLit)
+import Language.Haskell.Syntax (LPat, LIdP)
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
@@ -432,6 +433,8 @@ data GhcHint
   | SuggestRenameTypeVariable
 
   | LoopySuperclassSolveHint PredType ClsInstOrQC
+
+  | SuggestExplicitBidiPatSyn Name (LPat GhcRn) [LIdP GhcRn]
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

@@ -502,7 +502,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
   GhcDiagnosticCode "TcRnIllegalFamilyInstance"                     = 06204
   GhcDiagnosticCode "TcRnMissingClassAssoc"                         = 06205
-  GhcDiagnosticCode "TcRnBadFamInstDecl"                            = 06206
   GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
   GhcDiagnosticCode "TcRnCapturedTermName"                          = 54201
   GhcDiagnosticCode "TcRnBindingOfExistingName"                     = 58805
@@ -538,13 +537,57 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnStageRestriction"                          = 18157
   GhcDiagnosticCode "TcRnTyThingUsedWrong"                          = 10969
   GhcDiagnosticCode "TcRnCannotDefaultKindVar"                      = 79924
-  GhcDiagnosticCode "TcRnUninferrableTyvar"                         = 16220
+  GhcDiagnosticCode "TcRnUninferrableTyVar"                         = 16220
   GhcDiagnosticCode "TcRnSkolemEscape"                              = 71451
   GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
   GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
   GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
   GhcDiagnosticCode "PatSynUnboundVar"                              = 28572
+  GhcDiagnosticCode "TcRnMultiAssocTyFamDefaults"                   = 59128
+  GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
+  GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
+  GhcDiagnosticCode "TcRnPartialFieldSelector"                      = 82712
+  GhcDiagnosticCode "TcRnSuperclassCycle"                           = 29210
+  GhcDiagnosticCode "TcRnDefaultSigMismatch"                        = 72771
+  GhcDiagnosticCode "TcRnTyFamResultDisabled"                       = 44012
+  GhcDiagnosticCode "TcRnCommonFieldResultTypeMismatch"             = 31004
+  GhcDiagnosticCode "TcRnCommonFieldTypeMismatch"                   = 91827
+  GhcDiagnosticCode "TcRnAssocNoClassTyVar"                         = 55912
+  GhcDiagnosticCode "TcRnDataConParentTypeMismatch"                 = 45219
+  GhcDiagnosticCode "TcRnGADTsDisabled"                             = 23894
+  GhcDiagnosticCode "TcRnExistentialQuantificationDisabled"         = 25709
+  GhcDiagnosticCode "TcRnGADTDataContext"                           = 61072
+  GhcDiagnosticCode "TcRnMultipleConForNewtype"                     = 16409
+  GhcDiagnosticCode "TcRnKindSignaturesDisabled"                    = 49378
+  GhcDiagnosticCode "TcRnEmptyDataDeclsDisabled"                    = 32478
+  GhcDiagnosticCode "TcRnFamilyCategoryMismatch"                    = 52347
+  GhcDiagnosticCode "TcRnFamilyArityMismatch"                       = 12985
+  GhcDiagnosticCode "TcRnRoleMismatch"                              = 29178
+  GhcDiagnosticCode "TcRnRoleCountMismatch"                         = 54298
+  GhcDiagnosticCode "TcRnIllegalRoleAnnotation"                     = 77192
+  GhcDiagnosticCode "TcRnRoleAnnotationsDisabled"                   = 17779
+  GhcDiagnosticCode "TcRnIncoherentRoles"                           = 18273
+  GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
+
+  -- TcRnBadFieldAnnotation/BadFieldAnnotationReason
+  GhcDiagnosticCode "LazyFieldsDisabled"                            = 81601
+  GhcDiagnosticCode "UnpackWithoutStrictness"                       = 10107
+  GhcDiagnosticCode "BackpackUnpackAbstractType"                    = 40091
+
+  -- TcRnRoleValidationFailed/RoleInferenceFailedReason
+  GhcDiagnosticCode "TyVarRoleMismatch"                             = 22221
+  GhcDiagnosticCode "TyVarMissingInEnv"                             = 99991
+  GhcDiagnosticCode "BadCoercionRole"                               = 92834
+
+  -- TcRnClassExtensionDisabled/DisabledClassExtension
+  GhcDiagnosticCode "MultiParamDisabled"                            = 28349
+  GhcDiagnosticCode "FunDepsDisabled"                               = 15708
+  GhcDiagnosticCode "ConstrainedClassMethodsDisabled"               = 25079
+
+  -- TcRnTyFamsDisabled/TyFamsDisabledReason
+  GhcDiagnosticCode "TyFamsDisabledFamily"                          = 39191
+  GhcDiagnosticCode "TyFamsDisabledInstance"                        = 06206
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517
@@ -722,6 +765,10 @@ type family ConRecursInto con where
   ConRecursInto "TcRnHsigShapeMismatch"    = 'Just HsigShapeMismatchReason
   ConRecursInto "TcRnPatSynInvalidRhs"     = 'Just PatSynInvalidRhsReason
   ConRecursInto "TcRnBadRecordUpdate"      = 'Just BadRecordUpdateReason
+  ConRecursInto "TcRnBadFieldAnnotation"   = 'Just BadFieldAnnotationReason
+  ConRecursInto "TcRnRoleValidationFailed" = 'Just RoleValidationFailedReason
+  ConRecursInto "TcRnClassExtensionDisabled" = 'Just DisabledClassExtension
+  ConRecursInto "TcRnTyFamsDisabled"       = 'Just TyFamsDisabledReason
 
     --
     -- TH errors

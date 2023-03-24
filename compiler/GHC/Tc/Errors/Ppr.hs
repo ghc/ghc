@@ -1268,9 +1268,6 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
         text "Associated type" <+> quotes (ppr name) <+>
         text "must be inside a class instance"
-    TcRnBadFamInstDecl tc_name
-      -> mkSimpleDecorated $
-        text "Illegal family instance for" <+> quotes (ppr tc_name)
     TcRnNotOpenFamily tc
       -> mkSimpleDecorated $
         text "Illegal instance for closed family" <+> quotes (ppr tc)
@@ -1508,14 +1505,14 @@ instance Diagnostic TcRnMessage where
       (vcat [ text "Cannot default kind variable" <+> quotes (ppr var)
             , text "of kind:" <+> ppr knd
             , text "Perhaps enable PolyKinds or add a kind signature" ])
-    TcRnUninferrableTyvar tidied_tvs context ->
+    TcRnUninferrableTyVar tidied_tvs context ->
       mkSimpleDecorated $
       pprWithExplicitKindsWhen True $
       vcat [ text "Uninferrable type variable"
               <> plural tidied_tvs
               <+> pprWithCommas pprTyVar tidied_tvs
               <+> text "in"
-            , pprUninferrableTyvarCtx context ]
+            , pprUninferrableTyVarCtx context ]
     TcRnSkolemEscape escapees tv orig_ty ->
       mkSimpleDecorated $
       pprWithExplicitKindsWhen True $
@@ -1552,11 +1549,118 @@ instance Diagnostic TcRnMessage where
       hang (text "Pattern synonym" <+> quotes (ppr name) <+> text "has"
             <+> speakNOf decl_arity (text "argument"))
          2 (text "but its type signature has" <+> int missing <+> text "fewer arrows")
-    TcRnPatSynInvalidRhs ps_name lpat args reason -> mkSimpleDecorated $
+    TcRnPatSynInvalidRhs ps_name lpat _ reason -> mkSimpleDecorated $
       vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
                    <+> quotes (ppr ps_name) <> colon)
-                2 (pprPatSynInvalidRhsReason ps_name lpat args reason)
+                2 (pprPatSynInvalidRhsReason reason)
            , text "RHS pattern:" <+> ppr lpat ]
+    TcRnMultiAssocTyFamDefaults name -> mkSimpleDecorated $
+      text "More than one default declaration for"
+      <+> ppr name
+    TcRnTyFamDepsDisabled -> mkSimpleDecorated $
+      text "Illegal injectivity annotation"
+    TcRnAbstractClosedTyFamDecl -> mkSimpleDecorated $
+      text "You may define an abstract closed type family" $$
+      text "only in a .hs-boot file"
+    TcRnPartialFieldSelector fld -> mkSimpleDecorated $
+      sep [text "Use of partial record field selector" <> colon,
+           nest 2 $ quotes (ppr (occName fld))]
+    TcRnBadFieldAnnotation n con reason -> mkSimpleDecorated $
+      hang (pprBadFieldAnnotationReason reason)
+         2 (text "on the" <+> speakNth n
+            <+> text "argument of" <+> quotes (ppr con))
+    TcRnSuperclassCycle (MkSuperclassCycle cls definite details) ->
+      let herald | definite  = text "Superclass cycle for"
+                 | otherwise = text "Potential superclass cycle for"
+      in mkSimpleDecorated $
+       vcat [ herald <+> quotes (ppr cls), nest 2 (vcat (pprSuperclassCycleDetail <$> details))]
+    TcRnDefaultSigMismatch sel_id dm_ty -> mkSimpleDecorated $
+      hang (text "The default type signature for"
+            <+> ppr sel_id <> colon)
+         2 (ppr dm_ty)
+      $$ (text "does not match its corresponding"
+          <+> text "non-default type signature")
+    TcRnTyFamsDisabled reason -> mkSimpleDecorated $
+      text "Illegal family" <+> text sort <+> text "for" <+> quotes name
+      where
+        (sort, name) = case reason of
+          TyFamsDisabledFamily n -> ("declaration", ppr n)
+          TyFamsDisabledInstance n -> ("instance", ppr n)
+    TcRnTyFamResultDisabled tc_name tvb -> mkSimpleDecorated $
+      text "Illegal result type variable" <+> ppr tvb <+> text "for" <+> quotes (ppr tc_name)
+    TcRnRoleValidationFailed role reason -> mkSimpleDecorated $
+      vcat [text "Internal error in role inference:",
+            pprRoleValidationFailedReason role reason,
+            text "Please report this as a GHC bug:  https://www.haskell.org/ghc/reportabug"]
+    TcRnCommonFieldResultTypeMismatch con1 con2 field_name -> mkSimpleDecorated $
+      vcat [sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
+                 text "have a common field" <+> quotes (ppr field_name) <> comma],
+            nest 2 $ text "but have different result types"]
+    TcRnCommonFieldTypeMismatch con1 con2 field_name -> mkSimpleDecorated $
+      sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
+           text "give different types for field", quotes (ppr field_name)]
+    TcRnClassExtensionDisabled cls reason -> mkSimpleDecorated $
+      pprDisabledClassExtension cls reason
+    TcRnAssocNoClassTyVar cls fam_tc -> mkSimpleDecorated $
+      sep [ text "The associated type" <+> quotes (ppr fam_tc <+> hsep (map ppr (tyConTyVars fam_tc)))
+          , text "mentions none of the type or kind variables of the class" <+>
+                  quotes (ppr cls <+> hsep (map ppr (classTyVars cls)))]
+    TcRnDataConParentTypeMismatch data_con res_ty_tmpl -> mkSimpleDecorated $
+      hang (text "Data constructor" <+> quotes (ppr data_con) <+>
+            text "returns type" <+> quotes (ppr actual_res_ty))
+         2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
+      where
+        actual_res_ty = dataConOrigResTy data_con
+    TcRnGADTsDisabled tc_name -> mkSimpleDecorated $
+      text "Illegal generalised algebraic data declaration for" <+> quotes (ppr tc_name)
+    TcRnExistentialQuantificationDisabled con -> mkSimpleDecorated $
+      sdocOption sdocLinearTypes (\show_linear_types ->
+        hang (text "Data constructor" <+> quotes (ppr con) <+>
+              text "has existential type variables, a context, or a specialised result type")
+           2 (ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con)))
+    TcRnGADTDataContext tc_name -> mkSimpleDecorated $
+      text "A data type declared in GADT style cannot have a context:" <+> quotes (ppr tc_name)
+    TcRnMultipleConForNewtype tycon n -> mkSimpleDecorated $
+      sep [text "A newtype must have exactly one constructor,",
+           nest 2 $ text "but" <+> quotes (ppr tycon) <+> text "has" <+> speakN n]
+    TcRnKindSignaturesDisabled thing -> mkSimpleDecorated $
+      text "Illegal kind signature" <+> quotes (either ppr with_sig thing)
+      where
+        with_sig (tc_name, ksig) = ppr tc_name <+> dcolon <+> ppr ksig
+    TcRnEmptyDataDeclsDisabled tycon -> mkSimpleDecorated $
+      quotes (ppr tycon) <+> text "has no constructors"
+    TcRnFamilyCategoryMismatch family -> mkSimpleDecorated $
+      text "Wrong category of family instance; declaration was for a"
+      <+> kindOfFamily
+      where
+        kindOfFamily | isTypeFamilyTyCon family = text "type family"
+                     | isDataFamilyTyCon family = text "data family"
+                     | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
+    TcRnFamilyArityMismatch _ max_args -> mkSimpleDecorated $
+      text "Number of parameters must match family declaration; expected"
+      <+> ppr max_args
+    TcRnRoleMismatch var annot inferred -> mkSimpleDecorated $
+      hang (text "Role mismatch on variable" <+> ppr var <> colon)
+         2 (sep [ text "Annotation says", ppr annot
+                , text "but role", ppr inferred
+                , text "is required" ])
+    TcRnRoleCountMismatch tyvars d@(L _ (RoleAnnotDecl _ _ annots)) -> mkSimpleDecorated $
+      hang (text "Wrong number of roles listed in role annotation;" $$
+            text "Expected" <+> (ppr tyvars) <> comma <+>
+            text "got" <+> (ppr $ length annots) <> colon)
+         2 (ppr d)
+    TcRnIllegalRoleAnnotation (RoleAnnotDecl _ tycon _) -> mkSimpleDecorated $
+      (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
+       text "they are allowed only for datatypes and classes.")
+    TcRnRoleAnnotationsDisabled  tc -> mkSimpleDecorated $
+      text "Illegal role annotation for" <+> ppr tc
+    TcRnIncoherentRoles _ -> mkSimpleDecorated $
+      (text "Roles other than" <+> quotes (text "nominal") <+>
+      text "for class parameters can lead to incoherence.")
+    TcRnTyFamNameMismatch fam_tc_name eqn_tc_name -> mkSimpleDecorated $
+      hang (text "Mismatched type name in type family instance.")
+         2 (vcat [ text "Expected:" <+> ppr fam_tc_name
+                 , text "  Actual:" <+> ppr eqn_tc_name ])
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1941,8 +2045,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnMissingClassAssoc{}
       -> ErrorWithoutFlag
-    TcRnBadFamInstDecl{}
-      -> ErrorWithoutFlag
     TcRnNotOpenFamily{}
       -> ErrorWithoutFlag
     TcRnNoRebindableSyntaxRecordDot{}
@@ -2035,7 +2137,7 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnCannotDefaultKindVar{}
       -> ErrorWithoutFlag
-    TcRnUninferrableTyvar{}
+    TcRnUninferrableTyVar{}
       -> ErrorWithoutFlag
     TcRnSkolemEscape{}
       -> ErrorWithoutFlag
@@ -2046,6 +2148,66 @@ instance Diagnostic TcRnMessage where
     TcRnPatSynArityMismatch{}
       -> ErrorWithoutFlag
     TcRnPatSynInvalidRhs{}
+      -> ErrorWithoutFlag
+    TcRnMultiAssocTyFamDefaults{}
+      -> ErrorWithoutFlag
+    TcRnTyFamDepsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnAbstractClosedTyFamDecl{}
+      -> ErrorWithoutFlag
+    TcRnPartialFieldSelector{}
+      -> WarningWithFlag Opt_WarnPartialFields
+    TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
+      -> ErrorWithoutFlag
+    TcRnBadFieldAnnotation{}
+      -> WarningWithoutFlag
+    TcRnSuperclassCycle{}
+      -> ErrorWithoutFlag
+    TcRnDefaultSigMismatch{}
+      -> ErrorWithoutFlag
+    TcRnTyFamsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnTyFamResultDisabled{}
+      -> ErrorWithoutFlag
+    TcRnRoleValidationFailed{}
+      -> ErrorWithoutFlag
+    TcRnCommonFieldResultTypeMismatch{}
+      -> ErrorWithoutFlag
+    TcRnCommonFieldTypeMismatch{}
+      -> ErrorWithoutFlag
+    TcRnClassExtensionDisabled{}
+      -> ErrorWithoutFlag
+    TcRnAssocNoClassTyVar{}
+      -> ErrorWithoutFlag
+    TcRnDataConParentTypeMismatch{}
+      -> ErrorWithoutFlag
+    TcRnGADTsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnExistentialQuantificationDisabled{}
+      -> ErrorWithoutFlag
+    TcRnGADTDataContext{}
+      -> ErrorWithoutFlag
+    TcRnMultipleConForNewtype{}
+      -> ErrorWithoutFlag
+    TcRnKindSignaturesDisabled{}
+      -> ErrorWithoutFlag
+    TcRnEmptyDataDeclsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnFamilyCategoryMismatch{}
+      -> ErrorWithoutFlag
+    TcRnFamilyArityMismatch{}
+      -> ErrorWithoutFlag
+    TcRnRoleMismatch{}
+      -> ErrorWithoutFlag
+    TcRnRoleCountMismatch{}
+      -> ErrorWithoutFlag
+    TcRnIllegalRoleAnnotation{}
+      -> ErrorWithoutFlag
+    TcRnRoleAnnotationsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnIncoherentRoles{}
+      -> ErrorWithoutFlag
+    TcRnTyFamNameMismatch{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2437,8 +2599,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMissingClassAssoc{}
       -> noHints
-    TcRnBadFamInstDecl{}
-      -> [suggestExtension LangExt.TypeFamilies]
     TcRnNotOpenFamily{}
       -> noHints
     TcRnNoRebindableSyntaxRecordDot{}
@@ -2543,7 +2703,7 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnCannotDefaultKindVar{}
       -> noHints
-    TcRnUninferrableTyvar{}
+    TcRnUninferrableTyVar{}
       -> noHints
     TcRnSkolemEscape{}
       -> noHints
@@ -2553,7 +2713,74 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnPatSynArityMismatch{}
       -> noHints
+    TcRnPatSynInvalidRhs name pat args (PatSynNotInvertible _)
+      -> [SuggestExplicitBidiPatSyn name pat args]
     TcRnPatSynInvalidRhs{}
+      -> noHints
+    TcRnMultiAssocTyFamDefaults{}
+      -> noHints
+    TcRnTyFamDepsDisabled{}
+      -> [suggestExtension LangExt.TypeFamilyDependencies]
+    TcRnAbstractClosedTyFamDecl{}
+      -> noHints
+    TcRnPartialFieldSelector{}
+      -> noHints
+    TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
+      -> [suggestExtension LangExt.StrictData]
+    TcRnBadFieldAnnotation{}
+      -> noHints
+    TcRnSuperclassCycle{}
+      -> [suggestExtension LangExt.UndecidableSuperClasses]
+    TcRnDefaultSigMismatch{}
+      -> noHints
+    TcRnTyFamsDisabled{}
+      -> [suggestExtension LangExt.TypeFamilies]
+    TcRnTyFamResultDisabled{}
+      -> [suggestExtension LangExt.TypeFamilyDependencies]
+    TcRnRoleValidationFailed{}
+      -> noHints
+    TcRnCommonFieldResultTypeMismatch{}
+      -> noHints
+    TcRnCommonFieldTypeMismatch{}
+      -> noHints
+    TcRnClassExtensionDisabled _ MultiParamDisabled{}
+      -> [suggestExtension LangExt.MultiParamTypeClasses]
+    TcRnClassExtensionDisabled _ FunDepsDisabled{}
+      -> [suggestExtension LangExt.FunctionalDependencies]
+    TcRnClassExtensionDisabled _ ConstrainedClassMethodsDisabled{}
+      -> [suggestExtension LangExt.ConstrainedClassMethods]
+    TcRnAssocNoClassTyVar{}
+      -> noHints
+    TcRnDataConParentTypeMismatch{}
+      -> noHints
+    TcRnGADTsDisabled{}
+      -> [suggestExtension LangExt.GADTs]
+    TcRnExistentialQuantificationDisabled{}
+      -> [suggestExtension LangExt.ExistentialQuantification,
+          suggestExtension LangExt.GADTs]
+    TcRnGADTDataContext{}
+      -> noHints
+    TcRnMultipleConForNewtype{}
+      -> noHints
+    TcRnKindSignaturesDisabled{}
+      -> [suggestExtension LangExt.KindSignatures]
+    TcRnEmptyDataDeclsDisabled{}
+      -> [suggestExtension LangExt.EmptyDataDecls]
+    TcRnFamilyCategoryMismatch{}
+      -> noHints
+    TcRnFamilyArityMismatch{}
+      -> noHints
+    TcRnRoleMismatch{}
+      -> noHints
+    TcRnRoleCountMismatch{}
+      -> noHints
+    TcRnIllegalRoleAnnotation{}
+      -> noHints
+    TcRnRoleAnnotationsDisabled{}
+      -> [suggestExtension LangExt.RoleAnnotations]
+    TcRnIncoherentRoles{}
+      -> [suggestExtension LangExt.IncoherentInstances]
+    TcRnTyFamNameMismatch{}
       -> noHints
 
   diagnosticCode = constructorCode
@@ -4644,33 +4871,70 @@ pprStageCheckReason = \case
   StageCheckSplice t ->
     quotes (ppr t)
 
-pprUninferrableTyvarCtx :: UninferrableTyvarCtx -> SDoc
-pprUninferrableTyvarCtx = \case
+pprUninferrableTyVarCtx :: UninferrableTyVarCtx -> SDoc
+pprUninferrableTyVarCtx = \case
   UninfTyCtx_ClassContext theta ->
     sep [ text "the class context:", pprTheta theta ]
   UninfTyCtx_DataContext theta ->
     sep [ text "the datatype context:", pprTheta theta ]
   UninfTyCtx_ProvidedContext theta ->
     sep [ text "the provided context:" , pprTheta theta ]
-  UninfTyCtx_TyfamRhs rhs_ty ->
+  UninfTyCtx_TyFamRhs rhs_ty ->
     sep [ text "the type family equation right-hand side:" , ppr rhs_ty ]
-  UninfTyCtx_TysynRhs rhs_ty ->
+  UninfTyCtx_TySynRhs rhs_ty ->
     sep [ text "the type synonym right-hand side:" , ppr rhs_ty ]
   UninfTyCtx_Sig exp_kind full_hs_ty ->
     hang (text "the kind" <+> ppr exp_kind) 2
          (text "of the type signature:" <+> ppr full_hs_ty)
 
-pprPatSynInvalidRhsReason :: Name -> LPat GhcRn -> [LIdP GhcRn] -> PatSynInvalidRhsReason -> SDoc
-pprPatSynInvalidRhsReason name pat args = \case
+pprPatSynInvalidRhsReason :: PatSynInvalidRhsReason -> SDoc
+pprPatSynInvalidRhsReason = \case
   PatSynNotInvertible p ->
     text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
-    $+$ hang (text "Suggestion: instead use an explicitly bidirectional"
-              <+> text "pattern synonym, e.g.")
-           2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
-                    <+> ppr pat <+> text "where")
-                 2 (pp_name <+> pp_args <+> equals <+> text "..."))
-    where
-      pp_name = ppr name
-      pp_args = hsep (map ppr args)
   PatSynUnboundVar var ->
     quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym"
+
+pprBadFieldAnnotationReason :: BadFieldAnnotationReason -> SDoc
+pprBadFieldAnnotationReason = \case
+  LazyFieldsDisabled ->
+    text "Lazy field annotations (~) are disabled"
+  UnpackWithoutStrictness ->
+    text "UNPACK pragma lacks '!'"
+  BackpackUnpackAbstractType ->
+    text "Ignoring unusable UNPACK pragma"
+
+pprSuperclassCycleDetail :: SuperclassCycleDetail -> SDoc
+pprSuperclassCycleDetail = \case
+  SCD_HeadTyVar pred ->
+    hang (text "one of whose superclass constraints is headed by a type variable:")
+       2 (quotes (ppr pred))
+  SCD_HeadTyFam pred ->
+    hang (text "one of whose superclass constraints is headed by a type family:")
+       2 (quotes (ppr pred))
+  SCD_Superclass cls ->
+    text "one of whose superclasses is" <+> quotes (ppr cls)
+
+pprRoleValidationFailedReason :: Role -> RoleValidationFailedReason -> SDoc
+pprRoleValidationFailedReason role = \case
+  TyVarRoleMismatch tv role' ->
+    text "type variable" <+> quotes (ppr tv) <+>
+    text "cannot have role" <+> ppr role <+>
+    text "because it was assigned role" <+> ppr role'
+  TyVarMissingInEnv tv ->
+    text "type variable" <+> quotes (ppr tv) <+> text "missing in environment"
+  BadCoercionRole co ->
+    text "coercion" <+> ppr co <+> text "has bad role" <+> ppr role
+
+pprDisabledClassExtension :: Class -> DisabledClassExtension -> SDoc
+pprDisabledClassExtension cls = \case
+  MultiParamDisabled n ->
+    text howMany <+> text "parameters for class" <+> quotes (ppr cls)
+    where
+      howMany | n == 0 = "No"
+              | otherwise = "Too many"
+  FunDepsDisabled ->
+    text "Fundeps in class" <+> quotes (ppr cls)
+  ConstrainedClassMethodsDisabled sel_id pred ->
+    vcat [ hang (text "Constraint" <+> quotes (ppr pred)
+                 <+> text "in the type of" <+> quotes (ppr sel_id))
+              2 (text "constrains only the class type variables")]

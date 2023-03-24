@@ -1,5 +1,5 @@
 
-T16002.hs:6:3: error:
+T16002.hs:6:3: error: [GHC-88221]
     • Mismatched type name in type family instance.
         Expected: B
           Actual: A

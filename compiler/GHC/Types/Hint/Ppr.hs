@@ -223,6 +223,15 @@ instance Outputable GhcHint where
           what = case cls_or_qc of
             IsClsInst -> text "instance context"
             IsQC {}   -> text "context of the quantified constraint"
+    SuggestExplicitBidiPatSyn name pat args
+      -> hang (text "Instead use an explicitly bidirectional"
+               <+> text "pattern synonym, e.g.")
+            2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
+                     <+> ppr pat <+> text "where")
+                  2 (pp_name <+> pp_args <+> equals <+> text "..."))
+         where
+           pp_name = ppr name
+           pp_args = hsep (map ppr args)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

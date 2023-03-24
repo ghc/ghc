@@ -1,5 +1,5 @@
 
-T11623.hs:5:23: error:
+T11623.hs:5:23: error: [GHC-88221]
     • Mismatched type name in type family instance.
         Expected: T
           Actual: Maybe

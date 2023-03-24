@@ -1,5 +1,5 @@
 
-T7437.hs:14:13: error:
+T7437.hs:14:13: error: [GHC-72771]
     • The default type signature for put:
         forall t. (Generic t, GPut (Rep t)) => t -> [()]
       does not match its corresponding non-default type signature

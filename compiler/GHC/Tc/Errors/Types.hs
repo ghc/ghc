@@ -95,8 +95,14 @@ module GHC.Tc.Errors.Types (
   , HsigShapeMismatchReason(..)
   , WrongThingSort(..)
   , StageCheckReason(..)
-  , UninferrableTyvarCtx(..)
+  , UninferrableTyVarCtx(..)
   , PatSynInvalidRhsReason(..)
+  , BadFieldAnnotationReason(..)
+  , SuperclassCycle(..)
+  , SuperclassCycleDetail(..)
+  , RoleValidationFailedReason(..)
+  , DisabledClassExtension(..)
+  , TyFamsDisabledReason(..)
   ) where
 
 import GHC.Prelude
@@ -110,7 +116,7 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType)
+import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType, TcPredType)
 import GHC.Types.Avail (AvailInfo)
 import GHC.Types.Error
 import GHC.Types.Hint (UntickedPromotedThing(..))
@@ -127,14 +133,15 @@ import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
 import GHC.Core.Class (Class, ClassMinimalDef)
+import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
-import GHC.Core.DataCon (DataCon)
+import GHC.Core.DataCon (DataCon, FieldLabel)
 import GHC.Core.FamInstEnv (FamInst)
 import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
-import GHC.Core.TyCon (TyCon)
+import GHC.Core.TyCon (TyCon, Role)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
@@ -2682,13 +2689,6 @@ data TcRnMessage where
        testsuite/tests/indexed-types/should_fail/SimpleFail7
   -}
   TcRnMissingClassAssoc :: TyCon -> TcRnMessage
-  {- | 'TcRnBadFamInstDecl' is an error that is triggered by a type or data family
-       instance without the @TypeFamilies@ extension.
-
-       Test case:
-       testsuite/tests/indexed-types/should_fail/BadFamInstDecl
-  -}
-  TcRnBadFamInstDecl :: TyCon -> TcRnMessage
   {- | 'TcRnNotOpenFamily' is an error that is triggered by attempting to give
        a top-level (open) type family instance for a closed type family.
 
@@ -3291,15 +3291,15 @@ data TcRnMessage where
     -> !Kind -- ^ Kind of the variable.
     -> TcRnMessage
 
-  {-| TcRnUninferrableTyvar is an error that occurs when metavariables
+  {-| TcRnUninferrableTyVar is an error that occurs when metavariables
     in a type could not be defaulted.
 
     Test cases:
       T17301, T17562, T17567, T17567StupidTheta, T15474, T21479
   -}
-  TcRnUninferrableTyvar
+  TcRnUninferrableTyVar
     :: ![TyCoVar] -- ^ The variables that could not be defaulted.
-    -> !UninferrableTyvarCtx -- ^ Description of the surrounding context.
+    -> !UninferrableTyVarCtx -- ^ Description of the surrounding context.
     -> TcRnMessage
 
   {-| TcRnSkolemEscape is an error that occurs when type variables from an
@@ -3360,6 +3360,283 @@ data TcRnMessage where
                        -> ![LIdP GhcRn] -- ^ The LHS args
                        -> !PatSynInvalidRhsReason -- ^ The number of equation arguments
                        -> TcRnMessage
+
+  {-| TcRnMultiAssocTyFamDefaults is an error indicating that multiple default
+    declarations were specified for an associated type family.
+
+    Test cases:
+      none
+  -}
+  TcRnMultiAssocTyFamDefaults :: !(IdP GhcRn) -- ^ Name of the associated type
+                              -> TcRnMessage
+
+  {-| TcRnTyFamDepsDisabled is an error indicating that a type family injectivity
+    annotation was used without enabling the extension TypeFamilyDependencies.
+
+    Test cases:
+      T11381
+  -}
+  TcRnTyFamDepsDisabled :: TcRnMessage
+
+  {-| TcRnAbstractClosedTyFamDecl is an error indicating that an abstract closed
+    type family was declared in a regular source file, while it is only allowed
+    in hs-boot files.
+
+    Test cases:
+      ClosedFam4
+  -}
+  TcRnAbstractClosedTyFamDecl :: TcRnMessage
+
+  {-| TcRnPartialFieldSelector is a warning indicating that a record selector
+    was not defined for all constructors of a data type.
+
+    Test cases:
+      DRFPartialFields, T7169
+  -}
+  TcRnPartialFieldSelector :: !FieldLabel -- ^ The selector
+                           -> TcRnMessage
+
+  {-| TcRnBadFieldAnnotation is an error/warning group indicating that a
+    strictness/unpack related data type field annotation is invalid.
+  -}
+  TcRnBadFieldAnnotation :: !Int -- ^ The index of the field
+                         -> !DataCon -- ^ The constructor in which the field is defined
+                         -> !BadFieldAnnotationReason -- ^ The error specifics
+                         -> TcRnMessage
+
+  {-| TcRnSuperclassCycle is an error indicating that a class has a superclass
+    cycle.
+
+    Test cases:
+      mod40, tcfail027, tcfail213, tcfail216, tcfail217, T9415, T9739
+  -}
+  TcRnSuperclassCycle :: !SuperclassCycle -- ^ The details of the cycle
+                      -> TcRnMessage
+
+  {-| TcRnDefaultSigMismatch is an error indicating that a default method
+    signature doesn't match the regular method signature.
+
+    Test cases:
+      T7437, T12918a, T12918b, T12151
+  -}
+  TcRnDefaultSigMismatch :: !Id -- ^ The name of the method
+                         -> !Type -- ^ The type of the default signature
+                         -> TcRnMessage
+
+  {-| TcRnTyFamsDisabled is an error indicating that a type family or instance
+    was declared while the extension TypeFamilies was disabled.
+
+    Test cases:
+      TyFamsDisabled
+  -}
+  TcRnTyFamsDisabled :: !TyFamsDisabledReason -- ^ The name of the family or instance
+                     -> TcRnMessage
+
+  {-| TcRnTyFamResultDisabled is an error indicating that a result variable
+    was used on a type family while the extension TypeFamilyDependencies was
+    disabled.
+
+    Test cases:
+      T13571, T13571a
+  -}
+  TcRnTyFamResultDisabled :: !Name -- ^ The name of the type family
+                          -> !(LHsTyVarBndr () GhcRn) -- ^ Name of the result variable
+                          -> TcRnMessage
+
+  {-| TcRnRoleValidationFailed is an error indicating that a variable was
+    assigned an invalid role by the inference algorithm.
+    This is only performed with -dcore-lint.
+  -}
+  TcRnRoleValidationFailed :: !Role -- ^ The validated role
+                           -> !RoleValidationFailedReason -- ^ The failure reason
+                           -> TcRnMessage
+
+  {-| TcRnCommonFieldResultTypeMismatch is an error indicating that a sum type
+    declares the same field name in multiple constructors, but the constructors'
+    result types differ.
+
+    Test cases:
+      CommonFieldResultTypeMismatch
+  -}
+  TcRnCommonFieldResultTypeMismatch :: !DataCon -- ^ First constructor
+                                    -> !DataCon -- ^ Second constructor
+                                    -> !FieldLabelString -- ^ Field name
+                                    -> TcRnMessage
+
+  {-| TcRnCommonFieldTypeMismatch is an error indicating that a sum type
+    declares the same field name in multiple constructors, but their types
+    differ.
+
+    Test cases:
+      CommonFieldTypeMismatch
+  -}
+  TcRnCommonFieldTypeMismatch :: !DataCon -- ^ First constructor
+                              -> !DataCon -- ^ Second constructor
+                              -> !FieldLabelString -- ^ Field name
+                              -> TcRnMessage
+
+  {-| TcRnClassExtensionDisabled is an error indicating that a class
+    was declared with an extension feature while the extension was disabled.
+  -}
+  TcRnClassExtensionDisabled :: !Class -- ^ The class
+                             -> !DisabledClassExtension -- ^ The extension
+                             -> TcRnMessage
+
+  {-| TcRnAssocNoClassTyVar is an error indicating that no class parameters
+    are used in an associated type family.
+
+    Test cases:
+      T2888, T9167, T12867
+  -}
+  TcRnAssocNoClassTyVar :: !Class -- ^ The class
+                        -> !TyCon -- ^ The associated family
+                        -> TcRnMessage
+
+  {-| TcRnDataConParentTypeMismatch is an error indicating that a data
+    constructor was declared with a type that doesn't match its type
+    constructor (i.e. a GADT result type and its data name).
+
+    Test cases:
+      T7175, T13300, T14719, T18357, T18357b, gadt11, tcfail155, tcfail176
+  -}
+  TcRnDataConParentTypeMismatch :: !DataCon -- ^ The data constructor
+                                -> !Type -- ^ The parent type
+                                -> TcRnMessage
+
+  {-| TcRnGADTsDisabled is an error indicating that a GADT was declared
+    while the extension GADTs was disabled.
+
+    Test cases:
+      ghci057, T9293
+  -}
+  TcRnGADTsDisabled :: !Name -- ^ The name of the GADT
+                    -> TcRnMessage
+
+  {-| TcRnExistentialQuantificationDisabled is an error indicating that
+    a data constructor was declared with existential features while the
+    extension ExistentialQuantification was disabled.
+
+    Test cases:
+      ghci057, T9293, gadtSyntaxFail001, gadtSyntaxFail002, gadtSyntaxFail003,
+      prog006, rnfail053, T12083a
+  -}
+  TcRnExistentialQuantificationDisabled :: !DataCon -- ^ The constructor
+                                        -> TcRnMessage
+
+  {-| TcRnGADTDataContext is an error indicating that a GADT was declared with a
+    data type context.
+    This error is emitted in the tc, but it is also caught in the renamer.
+  -}
+  TcRnGADTDataContext :: !Name -- ^ The data type name
+                      -> TcRnMessage
+
+  {-| TcRnMultipleConForNewtype is an error indicating that a newtype was
+    declared with multiple constructors.
+    This error is caught by the parser.
+  -}
+  TcRnMultipleConForNewtype :: !Name -- ^ The newtype name
+                            -> !Int -- ^ The number of constructors
+                            -> TcRnMessage
+
+  {-| TcRnKindSignaturesDisabled is an error indicating that a kind signature
+    was used in a data type declaration while the extension KindSignatures was
+    disabled.
+
+    Test cases:
+      T20873c, readFail036
+  -}
+  TcRnKindSignaturesDisabled :: !(Either (HsType GhcPs) (Name, HsType GhcRn))
+                                -- ^ The data type name
+                             -> TcRnMessage
+
+  {-| TcRnEmptyDataDeclsDisabled is an error indicating that a data type
+    was declared with no constructors while the extension EmptyDataDecls was
+    disabled.
+
+    Test cases:
+      readFail035
+  -}
+  TcRnEmptyDataDeclsDisabled :: !Name -- ^ The data type name
+                             -> TcRnMessage
+
+  {-| TcRnFamilyCategoryMismatch is an error indicating that a family instance
+    was declared for a family of a different kind, i.e. data vs type family.
+
+    Test cases:
+      T9896, SimpleFail3a
+  -}
+  TcRnFamilyCategoryMismatch :: !TyCon -- ^ The family tycon
+                             -> TcRnMessage
+
+  {-| TcRnFamilyArityMismatch is an error indicating that a family instance
+    was declared with a different number of arguments than the family.
+    See Note [Oversaturated type family equations] in "GHC.Tc.Validity".
+
+    Test cases:
+      TyFamArity1, TyFamArity2, T11136, Overlap4, AssocTyDef05, AssocTyDef06,
+      T14110
+  -}
+  TcRnFamilyArityMismatch :: !TyCon -- ^ The family tycon
+                          -> !Arity -- ^ The right number of parameters
+                          -> TcRnMessage
+
+  {-| TcRnRoleMismatch is an error indicating that the role specified
+    in an annotation differs from its inferred role.
+
+    Test cases:
+      T7253, Roles11
+  -}
+  TcRnRoleMismatch :: !Name -- ^ The type variable
+                   -> !Role -- ^ The annotated role
+                   -> !Role -- ^ The inferred role
+                   -> TcRnMessage
+
+  {-| TcRnRoleCountMismatch is an error indicating that the number of
+    roles in an annotation doesn't match the number of type parameters.
+
+    Test cases:
+      Roles6
+  -}
+  TcRnRoleCountMismatch :: !Int -- ^ The number of type variables
+                        -> !(LRoleAnnotDecl GhcRn) -- ^ The role annotation
+                        -> TcRnMessage
+
+  {-| TcRnIllegalRoleAnnotation is an error indicating that a role
+    annotation was attached to a decl that doesn't allow it.
+
+    Test cases:
+      Roles5
+  -}
+  TcRnIllegalRoleAnnotation :: !(RoleAnnotDecl GhcRn) -- ^ The role annotation
+                            -> TcRnMessage
+
+  {-| TcRnRoleAnnotationsDisabled is an error indicating that a role
+    annotation was declared while the extension RoleAnnotations was disabled.
+
+    Test cases:
+      Roles5, TH_Roles1
+  -}
+  TcRnRoleAnnotationsDisabled :: !TyCon -- ^ The annotated type
+                              -> TcRnMessage
+
+  {-| TcRnIncoherentRoles is an error indicating that a role
+    annotation for a class parameter was declared as not nominal.
+
+    Test cases:
+      T8773
+  -}
+  TcRnIncoherentRoles :: !TyCon -- ^ The class tycon
+                      -> TcRnMessage
+
+  {-| TcRnIncoherentRoles is an error indicating that a type family equation
+    used a different name than the family.
+
+    Test cases:
+      Overlap5, T15362, T16002, T20260, T11623
+  -}
+  TcRnTyFamNameMismatch :: !Name -- ^ The family name
+                        -> !Name -- ^ The name used in the equation
+                        -> TcRnMessage
 
   deriving Generic
 
@@ -4666,15 +4943,81 @@ data StageCheckReason
   = StageCheckInstance !InstanceWhat !PredType
   | StageCheckSplice !Name
 
-data UninferrableTyvarCtx
+data UninferrableTyVarCtx
   = UninfTyCtx_ClassContext [TcType]
   | UninfTyCtx_DataContext [TcType]
   | UninfTyCtx_ProvidedContext [TcType]
-  | UninfTyCtx_TyfamRhs TcType
-  | UninfTyCtx_TysynRhs TcType
+  | UninfTyCtx_TyFamRhs TcType
+  | UninfTyCtx_TySynRhs TcType
   | UninfTyCtx_Sig TcType (LHsSigType GhcRn)
 
 data PatSynInvalidRhsReason
   = PatSynNotInvertible !(Pat GhcRn)
   | PatSynUnboundVar !Name
+  deriving (Generic)
+
+data BadFieldAnnotationReason where
+  {-| A lazy data type field annotation (~) was used without enabling the
+    extension StrictData.
+
+    Test cases:
+    LazyFieldsDisabled
+  -}
+  LazyFieldsDisabled :: BadFieldAnnotationReason
+  {-| An UNPACK pragma was applied to a field without strictness annotation (!).
+
+    Test cases:
+    T14761a, T7562
+  -}
+  UnpackWithoutStrictness :: BadFieldAnnotationReason
+  {-| An UNPACK pragma was applied to an abstract type in an indefinite package
+    in Backpack.
+
+    Test cases:
+    unpack_sums_5, T3966, T7050
+  -}
+  BackpackUnpackAbstractType :: BadFieldAnnotationReason
+  deriving (Generic)
+
+data SuperclassCycle =
+  MkSuperclassCycle { cls :: Class, definite :: Bool, reasons :: [SuperclassCycleDetail] }
+
+data SuperclassCycleDetail
+  = SCD_HeadTyVar !PredType
+  | SCD_HeadTyFam !PredType
+  | SCD_Superclass !Class
+
+data RoleValidationFailedReason
+  = TyVarRoleMismatch !TyVar !Role
+  | TyVarMissingInEnv !TyVar
+  | BadCoercionRole !Coercion
+  deriving (Generic)
+
+data DisabledClassExtension where
+  {-| MultiParamTypeClasses is required.
+
+    Test cases:
+    readFail037, TcNoNullaryTC
+  -}
+  MultiParamDisabled :: !Int -- ^ The arity
+                     -> DisabledClassExtension
+  {-| FunctionalDependencies is required.
+
+    Test cases:
+    readFail041
+  -}
+  FunDepsDisabled :: DisabledClassExtension
+  {-| ConstrainedClassMethods is required.
+
+    Test cases:
+    mod39, tcfail150
+  -}
+  ConstrainedClassMethodsDisabled :: !Id
+                                  -> !TcPredType
+                                  -> DisabledClassExtension
+  deriving (Generic)
+
+data TyFamsDisabledReason
+  = TyFamsDisabledFamily !Name
+  | TyFamsDisabledInstance !TyCon
   deriving (Generic)

@@ -1,7 +1,9 @@
 
-Boot.hs:6:13: error:
+Boot.hs:6:13: error: [GHC-25709]
     • Data constructor ‘D’ has existential type variables, a context, or a specialised result type
         D :: forall n. Class n => n -> Data
-        (Enable ExistentialQuantification or GADTs to allow this)
     • In the definition of data constructor ‘D’
       In the data type declaration for ‘Data’
+    Suggested fixes:
+       Perhaps you intended to use ExistentialQuantification
+       Perhaps you intended to use GADTs

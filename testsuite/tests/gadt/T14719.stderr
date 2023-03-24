@@ -1,5 +1,5 @@
 
-T14719.hs:5:3: error:
+T14719.hs:5:3: error: [GHC-45219]
     • Data constructor ‘MkFoo1’ returns type ‘Bool’
         instead of an instance of its parent type ‘Foo1’
     • In the definition of data constructor ‘MkFoo1’

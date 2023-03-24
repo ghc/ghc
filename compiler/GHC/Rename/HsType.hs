@@ -1653,9 +1653,7 @@ badKindSigErr :: HsDocContext -> LHsType GhcPs -> TcM ()
 badKindSigErr doc (L loc ty)
   = setSrcSpanA loc $ addErr $
     TcRnWithHsDocContext doc $
-    mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Illegal kind signature:" <+> quotes (ppr ty))
-       2 (text "Perhaps you intended to use KindSignatures")
+    TcRnKindSignaturesDisabled (Left ty)
 
 dataKindsErr :: RnTyKiEnv -> HsType GhcPs -> TcRnMessage
 dataKindsErr env thing

@@ -2049,7 +2049,7 @@ C. Examine the class declaration at the top of this Note again.
 -}
 
 doNotQuantifyTyVars :: CandidatesQTvs
-                    -> (TidyEnv -> TcM (TidyEnv, UninferrableTyvarCtx))
+                    -> (TidyEnv -> TcM (TidyEnv, UninferrableTyVarCtx))
                             -- ^ like "the class context (D a b, E foogle)"
                     -> TcM ()
 -- See Note [Error on unconstrained meta-variables]
@@ -2068,7 +2068,7 @@ doNotQuantifyTyVars dvs where_found
        ; unless (null leftover_metas) $
          do { let (tidy_env1, tidied_tvs) = tidyOpenTyCoVars emptyTidyEnv leftover_metas
             ; (tidy_env2, where_doc) <- where_found tidy_env1
-            ; let msg = TcRnUninferrableTyvar tidied_tvs where_doc
+            ; let msg = TcRnUninferrableTyVar tidied_tvs where_doc
             ; failWithTcM (tidy_env2, msg) }
        ; traceTc "doNotQuantifyTyVars success" empty }
 

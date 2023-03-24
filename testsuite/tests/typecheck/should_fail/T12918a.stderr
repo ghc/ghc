@@ -1,5 +1,5 @@
 
-T12918a.hs:8:11: error:
+T12918a.hs:8:11: error: [GHC-72771]
     • The default type signature for fresh:
         forall (t :: (* -> *) -> * -> *). MonadTrans t => t m Integer
       does not match its corresponding non-default type signature

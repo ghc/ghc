@@ -1,5 +1,5 @@
 
-T12151.hs:9:13: error:
+T12151.hs:9:13: error: [GHC-72771]
     • The default type signature for put: forall t. t
       does not match its corresponding non-default type signature
     • When checking the class method: put :: forall a. Put a => a

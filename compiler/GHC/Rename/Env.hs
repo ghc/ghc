@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE MultiWayIf       #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs            #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2006

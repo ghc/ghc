@@ -305,19 +305,14 @@ Each step expands superclasses one layer, and clearly does not terminate.
 
 type ClassSet = UniqSet Class
 
-checkClassCycles :: Class -> Maybe SDoc
+checkClassCycles :: Class -> Maybe SuperclassCycle
 -- Nothing  <=> ok
 -- Just err <=> possible cycle error
 checkClassCycles cls
-  = do { (definite_cycle, err) <- go (unitUniqSet cls)
+  = do { (definite_cycle, details) <- go (unitUniqSet cls)
                                      cls (mkTyVarTys (classTyVars cls))
-       ; let herald | definite_cycle = text "Superclass cycle for"
-                    | otherwise      = text "Potential superclass cycle for"
-       ; return (vcat [ herald <+> quotes (ppr cls)
-                      , nest 2 err, hint]) }
+       ; return (MkSuperclassCycle cls definite_cycle details) }
   where
-    hint = text "Use UndecidableSuperClasses to accept this"
-
     -- Expand superclasses starting with (C a b), complaining
     -- if you find the same class a second time, or a type function
     -- or predicate headed by a type variable
@@ -325,12 +320,12 @@ checkClassCycles cls
     -- NB: this code duplicates TcType.transSuperClasses, but
     --     with more error message generation clobber
     -- Make sure the two stay in sync.
-    go :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go :: ClassSet -> Class -> [Type] -> Maybe (Bool, [SuperclassCycleDetail])
     go so_far cls tys = firstJusts $
                         map (go_pred so_far) $
                         immSuperClasses cls tys
 
-    go_pred :: ClassSet -> PredType -> Maybe (Bool, SDoc)
+    go_pred :: ClassSet -> PredType -> Maybe (Bool, [SuperclassCycleDetail])
        -- Nothing <=> ok
        -- Just (True, err)  <=> definite cycle
        -- Just (False, err) <=> possible cycle
@@ -338,31 +333,28 @@ checkClassCycles cls
        | Just (tc, tys) <- tcSplitTyConApp_maybe pred
        = go_tc so_far pred tc tys
        | hasTyVarHead pred
-       = Just (False, hang (text "one of whose superclass constraints is headed by a type variable:")
-                         2 (quotes (ppr pred)))
+       = Just (False, [SCD_HeadTyVar pred])
        | otherwise
        = Nothing
 
-    go_tc :: ClassSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
+    go_tc :: ClassSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, [SuperclassCycleDetail])
     go_tc so_far pred tc tys
       | isFamilyTyCon tc
-      = Just (False, hang (text "one of whose superclass constraints is headed by a type family:")
-                        2 (quotes (ppr pred)))
+      = Just (False, [SCD_HeadTyFam pred])
       | Just cls <- tyConClass_maybe tc
       = go_cls so_far cls tys
       | otherwise   -- Equality predicate, for example
       = Nothing
 
-    go_cls :: ClassSet -> Class -> [Type] -> Maybe (Bool, SDoc)
+    go_cls :: ClassSet -> Class -> [Type] -> Maybe (Bool, [SuperclassCycleDetail])
     go_cls so_far cls tys
        | cls `elementOfUniqSet` so_far
-       = Just (True, text "one of whose superclasses is" <+> quotes (ppr cls))
+       = Just (True, [SCD_Superclass cls])
        | isCTupleClass cls
        = go so_far cls tys
        | otherwise
-       = do { (b,err) <- go  (so_far `addOneToUniqSet` cls) cls tys
-          ; return (b, text "one of whose superclasses is" <+> quotes (ppr cls)
-                       $$ err) }
+       = do { (b, details) <- go (so_far `addOneToUniqSet` cls) cls tys
+            ; return (b, SCD_Superclass cls : details) }
 
 {-
 ************************************************************************

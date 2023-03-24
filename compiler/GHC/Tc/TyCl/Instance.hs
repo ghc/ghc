@@ -589,7 +589,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; tcFamInstDeclChecks mb_clsinfo fam_tc
 
          -- (0) Check it's an open type family
-       ; checkTc (isTypeFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
+       ; checkTc (isTypeFamilyTyCon fam_tc)     (TcRnFamilyCategoryMismatch fam_tc)
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (TcRnNotOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
@@ -617,7 +617,7 @@ tcFamInstDeclChecks mb_clsinfo fam_tc
        ; traceTc "tcFamInstDecl" (ppr fam_tc)
        ; type_families <- xoptM LangExt.TypeFamilies
        ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
-       ; checkTc type_families (TcRnBadFamInstDecl fam_tc)
+       ; checkTc type_families (TcRnTyFamsDisabled (TyFamsDisabledInstance fam_tc))
        ; checkTc (not is_boot) TcRnBadBootFamInstDecl
 
        -- Check that it is a family TyCon, and that
@@ -684,7 +684,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; tcFamInstDeclChecks mb_clsinfo fam_tc
 
        -- Check that the family declaration is for the right kind
-       ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; checkTc (isDataFamilyTyCon fam_tc) (TcRnFamilyCategoryMismatch fam_tc)
        ; gadt_syntax <- dataDeclChecks fam_name hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv

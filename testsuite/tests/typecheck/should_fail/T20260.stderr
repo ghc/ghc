@@ -1,5 +1,5 @@
 
-T20260.hs:8:3: error:
+T20260.hs:8:3: error: [GHC-88221]
     • Mismatched type name in type family instance.
         Expected: Foo
           Actual: Bar

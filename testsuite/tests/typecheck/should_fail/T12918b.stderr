@@ -1,12 +1,12 @@
 
-T12918b.hs:8:11: error:
+T12918b.hs:8:11: error: [GHC-72771]
     • The default type signature for bar1: forall b. b -> a
       does not match its corresponding non-default type signature
     • When checking the class method:
         bar1 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
-T12918b.hs:12:11: error:
+T12918b.hs:12:11: error: [GHC-72771]
     • The default type signature for bar2: forall x. x
       does not match its corresponding non-default type signature
     • When checking the class method:
@@ -26,14 +26,14 @@ T12918b.hs:12:11: error: [GHC-39999]
         bar2 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
-T12918b.hs:16:11: error:
+T12918b.hs:16:11: error: [GHC-72771]
     • The default type signature for bar3: a -> Int
       does not match its corresponding non-default type signature
     • When checking the class method:
         bar3 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
-T12918b.hs:20:11: error:
+T12918b.hs:20:11: error: [GHC-72771]
     • The default type signature for bar4: forall b. a -> b
       does not match its corresponding non-default type signature
     • When checking the class method:
