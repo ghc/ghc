@@ -62,7 +62,7 @@ import GHC.Core.Unfold.Make
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type     hiding( substTy )
 import GHC.Core.Coercion hiding( substCo )
-import GHC.Core.DataCon ( dataConWorkId, isNullaryRepDataCon )
+import GHC.Core.DataCon ( dataConWorkId, dataConRepArity )
 import GHC.Core.Multiplicity
 import GHC.Core.Opt.ConstantFold
 
@@ -2659,7 +2659,7 @@ mkCase2 mode scrut bndr alts_ty alts
                       DataAlt dc -> mkConApp2 dc (tyConAppArgs (idType bndr)) bs
 
     mk_new_bndrs new_bndr (DataAlt dc)
-      | not (isNullaryRepDataCon dc)
+      | dataConRepArity dc /= 0
       = -- For non-nullary data cons we must invent some fake binders
         -- See Note [caseRules for dataToTag] in GHC.Core.Opt.ConstantFold
         do { us <- getUniquesM
