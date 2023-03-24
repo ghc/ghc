@@ -2528,11 +2528,23 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
    MutVar# s a -> (a -> c) -> State# s -> (# State# s, a, c #)
    { Modify the contents of a 'MutVar#', returning the previous
-     contents and the result of applying the given function to the
-     previous contents. Note that this isn't strictly
-     speaking the correct type for this function; it should really be
-     @'MutVar#' s a -> (a -> (a,b)) -> 'State#' s -> (# 'State#' s, a, (a, b) #)@,
-     but we don't know about pairs here. }
+     contents @x :: a@ and the result of applying the given function to the
+     previous contents @f x :: c@.
+
+     The @data@ type @c@ (not a @newtype@!) must be a record whose first field
+     is of lifted type @a :: Type@ and is not unpacked. For example, product
+     types @c ~ Solo a@ or @c ~ (a, b)@ work well. If the record type is both
+     monomorphic and strict in its first field, it's recommended to mark the
+     latter @{-# NOUNPACK #-}@ explicitly.
+
+     Under the hood 'atomicModifyMutVar2#' atomically replaces a pointer to an
+     old @x :: a@ with a pointer to a selector thunk @fst r@, where
+     @fst@ is a selector for the first field of the record and @r@ is a
+     function application thunk @r = f x@.
+
+     @atomicModifyIORef2Native@ from @atomic-modify-general@ package makes an
+     effort to reflect restrictions on @c@ faithfully, providing a
+     well-typed high-level wrapper.}
    with
    out_of_line = True
    has_side_effects = True
