@@ -4,6 +4,7 @@
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
     ([CLC proposal #87](https://github.com/haskell/core-libraries-committee/issues/87) and [#114](https://github.com/haskell/core-libraries-committee/issues/114))
+  * `GHC.Conc.Sync` now exports `fromThreadId :: ThreadId -> Word64`, which maps a thread to a per-process-unique identifier ([CLC proposal #117](https://github.com/haskell/core-libraries-committee/issues/117))
   * Add `Data.List.!?` ([CLC proposal #110](https://github.com/haskell/core-libraries-committee/issues/110))
   * `maximumBy`/`minimumBy` are now marked as `INLINE` improving performance for unpackable
     types significantly.
