@@ -79,6 +79,7 @@ import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.Compare( eqType )
 import GHC.Core.Multiplicity
 import {-# SOURCE #-} GHC.Types.TyThing
+import {-# SOURCE #-} GHC.Types.RepType (isZeroBitTy)
 import GHC.Types.FieldLabel
 import GHC.Types.SourceText
 import GHC.Core.Class
@@ -111,8 +112,8 @@ import Data.List( find )
 import Language.Haskell.Syntax.Module.Name
 
 {-
-Data constructor representation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Data constructor representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following Haskell data type declaration
 
         data T = T !Int ![Int]
@@ -981,7 +982,7 @@ but the rep type is
         Trep :: Int# -> a -> Void# -> T a
 Actually, the unboxed part isn't implemented yet!
 
-Not that this representation is still *different* from runtime
+Note that this representation is still *different* from runtime
 representation. (Which is what STG uses after unarise).
 
 This is how T would end up being used in STG post-unarise:
@@ -1395,9 +1396,9 @@ dataConSrcBangs = dcSrcBangs
 dataConSourceArity :: DataCon -> Arity
 dataConSourceArity (MkData { dcSourceArity = arity }) = arity
 
--- | Gives the number of actual fields in the /representation/ of the
--- data constructor. This may be more than appear in the source code;
--- the extra ones are the existentially quantified dictionaries
+-- | Gives the number of actual fields in the core /representation/ of the data
+-- constructor. This may be more than appear in the source code; the extra ones
+-- are the existentially quantified dictionaries.
 dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData { dcRepArity = arity }) = arity
 
@@ -1408,8 +1409,12 @@ isNullarySrcDataCon dc = dataConSourceArity dc == 0
 
 -- | Return whether there are any argument types for this 'DataCon's runtime representation type
 -- See Note [DataCon arities]
+-- ROMES:TODO: I'll improve the comment so this is clearer
+--
+-- ROMES: The arity of the runtime representation DOES NOT match the arity of the Core representation, which is what `dataConRepArity` means
+-- TODO: Might need caching
 isNullaryRepDataCon :: DataCon -> Bool
-isNullaryRepDataCon dc = dataConRepArity dc == 0
+isNullaryRepDataCon dc = length (filter (not . isZeroBitTy . scaledThing) (dataConRepArgTys dc)) == 0
 
 dataConRepStrictness :: DataCon -> [StrictnessMark]
 -- ^ Give the demands on the arguments of a
@@ -1668,6 +1673,21 @@ dataConOtherTheta dc = dcOtherTheta dc
 -- | Returns the arg types of the worker, including *all* non-dependent
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
+--
+-- In Note [Data constructor workers and wrappers], 'dataConRepArgTys' is
+-- mentioned as the arguments of the worker, in contrast with 'dcOrigArgTys'
+-- which are the arguments of the wrapper. In this context, it makes sense to
+-- consider that coercions should be in the list returned by 'dataConRepArgTys'
+--
+-- In Note [Data con representation] it is said the following
+--
+--    So whenever this module talks about the representation of a data constructor
+--    what it means is the DataCon with all Unpacking having been applied.
+--    We can think of this as the Core representation.
+--
+-- This means we should be careful NOT to use 'dataConRepArgTys' to determine
+-- the number of runtime arguments a function has.
+-- filter (not . isZeroBitTy . scaledThing)
 dataConRepArgTys :: DataCon -> [Scaled Type]
 dataConRepArgTys (MkData { dcRep        = rep
                          , dcEqSpec     = eq_spec
