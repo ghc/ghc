@@ -64,6 +64,14 @@ module System.Mem.Weak (
         mkWeakPair,
         -- replaceFinaliser
 
+        -- * Handling exceptions
+        -- | When an exception is thrown by a finalizer called by the
+        -- garbage collector, GHC calls a global handler which can be set with
+        -- 'setFinalizerExceptionHandler'. Note that any exceptions thrown by
+        -- this handler will be ignored.
+        setFinalizerExceptionHandler,
+        getFinalizerExceptionHandler,
+
         -- * A precise semantics
 
         -- $precise
