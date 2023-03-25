@@ -1743,7 +1743,7 @@ stg_takeMVarzh ( P_ mvar /* :: MVar a */ )
         }
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
-        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+        %release StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
         StgMVar_tail(mvar)             = q;
 
         jump stg_block_takemvar(mvar);
@@ -1910,7 +1910,7 @@ stg_putMVarzh ( P_ mvar, /* :: MVar a */
         }
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
-        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+        %release StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
         StgMVar_tail(mvar)             = q;
 
         jump stg_block_putmvar(mvar,val);
@@ -2047,11 +2047,11 @@ loop:
         }
     }
 
-    ASSERT(StgTSO_block_info(tso) == mvar);
     // save why_blocked here, because waking up the thread destroys
     // this information
     W_ why_blocked;
-    why_blocked = TO_W_(StgTSO_why_blocked(tso));
+    why_blocked = TO_W_(StgTSO_why_blocked(tso)); // TODO: Missing barrier
+    ASSERT(StgTSO_block_info(tso) == mvar);
 
     // actually perform the takeMVar
     W_ stack;
@@ -2112,7 +2112,7 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = mvar;
-        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVarRead::I16;
+        %release StgTSO_why_blocked(CurrentTSO) = BlockedOnMVarRead::I16;
         StgMVar_head(mvar) = q;
 
         if (StgMVar_tail(mvar) == stg_END_TSO_QUEUE_closure) {
@@ -2240,17 +2240,16 @@ stg_readIOPortzh ( P_ ioport /* :: IOPort a */ )
         StgMVarTSOQueue_tso(q)  = CurrentTSO;
 
         SET_HDR(q, stg_MVAR_TSO_QUEUE_info, CCS_SYSTEM);
-        // See Note [Heap memory barriers]
-        RELEASE_FENCE;
 
         StgMVar_head(ioport) = q;
         StgTSO__link(CurrentTSO)       = q;
         StgTSO_block_info(CurrentTSO)  = ioport;
-        StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
+
+        // See Note [Heap memory barriers]
+        %release StgTSO_why_blocked(CurrentTSO) = BlockedOnMVar::I16;
 
         //Unlocks the closure as well
         jump stg_block_readmvar(ioport);
-
     }
 
     //This way we can check of there has been a read already.
@@ -2328,11 +2327,11 @@ loop:
     // next element in the waiting list here, as there can only ever
     // be one thread blocked on a port.
 
-    ASSERT(StgTSO_block_info(tso) == ioport);
     // save why_blocked here, because waking up the thread destroys
     // this information
     W_ why_blocked;
-    why_blocked = TO_W_(StgTSO_why_blocked(tso));
+    why_blocked = TO_W_(StgTSO_why_blocked(tso)); // TODO Missing acquire
+    ASSERT(StgTSO_block_info(tso) == ioport);
 
     // actually perform the takeMVar
     W_ stack;
@@ -2574,8 +2573,8 @@ stg_waitReadzh ( W_ fd )
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
     StgTSO_block_info(CurrentTSO) = fd;
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
@@ -2590,8 +2589,8 @@ stg_waitWritezh ( W_ fd )
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
     StgTSO_block_info(CurrentTSO) = fd;
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
     // No locking - we're not going to use this interface in the
     // threaded RTS anyway.
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
@@ -2613,7 +2612,6 @@ stg_delayzh ( W_ us_delay )
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
 
 #if defined(mingw32_HOST_OS)
 
@@ -2630,12 +2628,13 @@ stg_delayzh ( W_ us_delay )
      * simplifies matters, so change the status to OnDoProc put the
      * delayed thread on the blocked_queue.
      */
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async_void();
 
 #else
 
+    %relaxed StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
     (target) = ccall getDelayTarget(us_delay);
 
     StgTSO_block_info(CurrentTSO) = target;
@@ -2657,9 +2656,6 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     ccall barf("asyncRead# on threaded RTS") never returns;
 #else
 
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
-
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
                                         "stg_asyncReadzh");
@@ -2668,6 +2664,10 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
+
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
+
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif
@@ -2682,9 +2682,6 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     ccall barf("asyncWrite# on threaded RTS") never returns;
 #else
 
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
-
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
                                         "stg_asyncWritezh");
     (reqID) = ccall addIORequest(fd, 1/*TRUE*/,is_sock,len,buf "ptr");
@@ -2693,6 +2690,10 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO)  = ares;
+
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
+
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif
@@ -2707,9 +2708,6 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     ccall barf("asyncDoProc# on threaded RTS") never returns;
 #else
 
-    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
-    StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
-
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
                                         "stg_asyncDoProczh");
@@ -2718,6 +2716,10 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
     StgTSO_block_info(CurrentTSO) = ares;
+
+    ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
+    %release StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
+
     ccall appendToIOBlockedQueue(MyCapability() "ptr", CurrentTSO "ptr");
     jump stg_block_async();
 #endif

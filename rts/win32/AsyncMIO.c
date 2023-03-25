@@ -294,7 +294,7 @@ start:
             for(tso = iomgr->blocked_queue_hd; tso != END_TSO_QUEUE;
                   tso = tso->_link) {
 
-                switch(tso->why_blocked) {
+                switch(ACQUIRE_LOAD(&tso->why_blocked)) {
                 case BlockedOnRead:
                 case BlockedOnWrite:
                 case BlockedOnDoProc:

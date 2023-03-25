@@ -128,7 +128,7 @@ typedef struct StgTSO_ {
     StgWord16               what_next;      // Values defined in Constants.h
     StgWord16               why_blocked;    // Values defined in Constants.h
     StgWord32               flags;          // Values defined in Constants.h
-    StgTSOBlockInfo         block_info;
+    StgTSOBlockInfo         block_info;     // Barrier provided by why_blocked
     StgThreadID             id;
     StgWord32               saved_errno;
     StgWord32               dirty;          /* non-zero => dirty */

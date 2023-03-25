@@ -94,8 +94,8 @@ createThread(Capability *cap, W_ size)
 
     // Always start with the compiled code evaluator
     tso->what_next = ThreadRunGHC;
-    tso->why_blocked  = NotBlocked;
     tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
+    tso->why_blocked  = NotBlocked;
     tso->blocked_exceptions = END_BLOCKED_EXCEPTIONS_QUEUE;
     tso->bq = (StgBlockingQueue *)END_TSO_QUEUE;
     tso->flags = 0;
@@ -285,7 +285,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     }
 #endif
 
-    switch (tso->why_blocked)
+    switch (ACQUIRE_LOAD(&tso->why_blocked))
     {
     case BlockedOnMVar:
     case BlockedOnMVarRead:
@@ -825,10 +825,11 @@ loop:
         }
     }
 
-    ASSERT(tso->block_info.closure == (StgClosure*)mvar);
     // save why_blocked here, because waking up the thread destroys
     // this information
-    StgWord why_blocked = RELAXED_LOAD(&tso->why_blocked);
+    StgWord why_blocked = ACQUIRE_LOAD(&tso->why_blocked);
+    ASSERT(why_blocked == BlockedOnMVarRead);
+    ASSERT(tso->block_info.closure == (StgClosure*)mvar);
 
     // actually perform the takeMVar
     StgStack* stack = tso->stackobj;
@@ -902,7 +903,7 @@ StgMutArrPtrs *listThreads(Capability *cap)
 void
 printThreadBlockage(StgTSO *tso)
 {
-  switch (tso->why_blocked) {
+  switch (ACQUIRE_LOAD(&tso->why_blocked)) {
 #if defined(mingw32_HOST_OS)
     case BlockedOnDoProc:
     debugBelch("is blocked on proc (request: %u)", tso->block_info.async_result->reqID);

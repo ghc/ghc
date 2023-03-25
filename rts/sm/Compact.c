@@ -463,13 +463,16 @@ thread_TSO (StgTSO *tso)
     thread_(&tso->_link);
     thread_(&tso->global_link);
 
-    if (   tso->why_blocked == BlockedOnMVar
-        || tso->why_blocked == BlockedOnMVarRead
-        || tso->why_blocked == BlockedOnBlackHole
-        || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == NotBlocked
-        ) {
+    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+    case BlockedOnMVar:
+    case BlockedOnMVarRead:
+    case BlockedOnBlackHole:
+    case BlockedOnMsgThrowTo:
+    case NotBlocked:
         thread_(&tso->block_info.closure);
+        break;
+    default:
+        break;
     }
     thread_(&tso->blocked_exceptions);
     thread_(&tso->bq);

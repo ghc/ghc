@@ -177,6 +177,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *   - StgMutArrPtrs: payload
  *   - StgSmallMutArrPtrs: payload
  *   - StgThunk although this is a somewhat special case; see below
+ *   - StgTSO: block_info
  *
  * Writing to a mutable pointer field must be done via a release-store.
  * Reading from such a field is done via an acquire-load.
@@ -211,8 +212,8 @@ EXTERN_INLINE void load_load_barrier(void);
  * particular, they have the unique property of being updatable, transforming
  * from a thunk to an indirection. This transformation requires its own
  * synchronization protocol. In particular, we must ensure that a reader
- * examining a thunk being updated can see the indirectee. Consequently, a
- * thunk update (see rts/Updates.h) does the following:
+ * examining a thunk being updated by another core can see the indirectee.
+ * Consequently, a thunk update (see rts/Updates.h) does the following:
  *
  *  1. Use a relaxed-store to place the new indirectee into the thunk's
  *     indirectee field
@@ -267,6 +268,14 @@ EXTERN_INLINE void load_load_barrier(void);
  * N.B. recordClosureMutated places a reference to the mutated object on
  * the capability-local mut_list. Consequently this does not require any memory
  * barrier.
+ *
+ * Barriers in thread blocking
+ * ---------------------------
+ * When a thread blocks (e.g. on an MVar) it will typically allocate a heap object
+ * to record its blocked-ness (e.g. a StgMVarTSOQueue), expose this via
+ * StgTSO.block_info, and update StgTSO.why_blocked to record the reason for
+ * its blocking. The visibility of the block_info is guaranteed by the ordering
+ * of the why_blocked update.
  *
  * Barriers in thread migration
  * ----------------------------
