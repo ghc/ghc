@@ -592,6 +592,14 @@ load_load_barrier(void) {
 #define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
 #define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 
+#if defined(TSAN_ENABLED)
+#define ACQUIRE_FENCE_ON(x) ACQUIRE_LOAD(x)
+#define RELEASE_FENCE_ON(x) RELEASE_STORE()
+#else
+#define ACQUIRE_FENCE_ON(x) __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#define RELEASE_FENCE_ON(x) __atomic_thread_fence(__ATOMIC_RELEASE)
+#endif
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
@@ -626,6 +634,8 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 #define ACQUIRE_FENCE()
 #define RELEASE_FENCE()
 #define SEQ_CST_FENCE()
+#define ACQUIRE_FENCE_ON(x)
+#define RELEASE_FENCE_ON(x)
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord

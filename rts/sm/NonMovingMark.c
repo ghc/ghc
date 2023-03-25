@@ -1590,7 +1590,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         // Synchronizes with the release-store in updateWithIndirection.
         // See Note [Heap memory barriers] in SMP.h.
         StgInd *ind = (StgInd *) p;
-        ACQUIRE_FENCE();
+        ACQUIRE_FENCE_ON(&p->header.info);
         StgClosure *indirectee = RELAXED_LOAD(&ind->indirectee);
         markQueuePushClosure(queue, indirectee, &ind->indirectee);
         if (GET_CLOSURE_TAG(indirectee) == 0 || origin == NULL) {

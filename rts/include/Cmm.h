@@ -690,12 +690,20 @@
 #define RELEASE_FENCE prim %write_barrier()
 #define ACQUIRE_FENCE prim %read_barrier()
 
+// TODO
+#if 1
+#define ACQUIRE_FENCE_ON(x) if (1) { W_ tmp; (tmp) = prim %load_acquire64(x); }
+#else
+#define ACQUIRE_FENCE_ON(x) ACQUIRE_FENCE
+#endif
+
 #else
 
 #define prim_read_barrier /* nothing */
 #define prim_write_barrier /* nothing */
 #define RELEASE_FENCE /* nothing */
 #define ACQUIRE_FENCE /* nothing */
+#define ACQUIRE_FENCE_ON(x) /* nothing */
 #endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------
