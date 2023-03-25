@@ -1984,7 +1984,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
     case RET_BCO: {
         StgRetBCO* retBCO;
-        StgWord size;
+        StgHalfWord size;
 
         retBCO = (StgRetBCO *) p;
         evacuate((StgClosure **) &retBCO->bco);

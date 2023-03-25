@@ -125,7 +125,7 @@ checkStackFrame( StgPtr c )
     case CATCH_RETRY_FRAME:
     case CATCH_STM_FRAME:
     case CATCH_FRAME:
-      // small bitmap cases (<= 32 entries)
+      // small bitmap cases (<= 27 entries (32bit arch) or <= 58 entries (64bit arch))
     case UNDERFLOW_FRAME:
     case STOP_FRAME:
     case RET_SMALL:
@@ -135,16 +135,14 @@ checkStackFrame( StgPtr c )
         return 1 + size;
 
     case RET_BCO: {
-      // TODO: Adjust
-        StgBCO *bco;
-        uint32_t size;
-        bco = (StgBCO *)*(c+1);
-        size = BCO_BITMAP_SIZE(bco);
-        checkLargeBitmap((StgPtr)c + 2, BCO_BITMAP(bco), size);
+        StgRetBCO* retBCO = (StgRetBCO*) c;
+        StgWord size;
+        size = BCO_BITMAP_SIZE(retBCO->bco);
+        checkLargeBitmap((StgPtr) &retBCO->args, BCO_BITMAP(retBCO->bco), size);
         return 2 + size;
     }
 
-    case RET_BIG: // large bitmap (> 32 entries)
+    case RET_BIG: // large bitmap (> 27 entries (32bit arch) or > 58 entries (64bit arch))
         size = GET_LARGE_BITMAP(&info->i)->size;
         checkLargeBitmap((StgPtr)c + 1, GET_LARGE_BITMAP(&info->i), size);
         return 1 + size;
