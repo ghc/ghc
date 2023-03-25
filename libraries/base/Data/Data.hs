@@ -1136,7 +1136,10 @@ consConstr   = mkConstr listDataType "(:)" [] Infix
 listDataType :: DataType
 listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 
--- | @since 4.0.0.0
+-- | For historical reasons, the constructor name used for @(:)@ is
+-- @"(:)"@. In a derived instance, it would be @":"@.
+--
+-- @since 4.0.0.0
 instance Data a => Data [a] where
   gfoldl _ z []     = z []
   gfoldl f z (x:xs) = z (:) `f` x `f` xs
