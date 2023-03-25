@@ -841,7 +841,9 @@ stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
     StgMutVar_var(mv) = z;
 #endif
 
-    if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+    W_ info;
+    info = %relaxed GET_INFO(mv);
+    if (info == stg_MUT_VAR_CLEAN_info) {
         ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", x "ptr");
     }
 
