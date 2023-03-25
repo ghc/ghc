@@ -509,7 +509,7 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     (P_ node)
 {
     TICK_ENT_DYN_IND(); /* tick */
-    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
+    ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
     node = UNTAG(StgInd_indirectee(node));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(node) (node);
@@ -518,7 +518,7 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     /* explicit stack */
 {
     TICK_ENT_DYN_IND(); /* tick */
-    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
+    ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
     R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
@@ -529,7 +529,7 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     /* explicit stack */
 {
     TICK_ENT_STATIC_IND(); /* tick */
-    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
+    ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
     R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
