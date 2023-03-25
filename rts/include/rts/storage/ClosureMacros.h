@@ -184,7 +184,7 @@ EXTERN_INLINE StgHalfWord GET_TAG(const StgClosure *con)
 // Use when changing a closure from one kind to another
 #define OVERWRITE_INFO(c, new_info)                             \
     OVERWRITING_CLOSURE((StgClosure *)(c));                     \
-    SET_INFO((StgClosure *)(c), (new_info));                    \
+    SET_INFO_RELAXED((StgClosure *)(c), (new_info));                    \
     LDV_RECORD_CREATE(c);
 
 /* -----------------------------------------------------------------------------
