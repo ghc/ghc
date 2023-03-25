@@ -137,23 +137,24 @@ scavengeTSO (StgTSO *tso)
         evacuate((StgClosure **)&tso->label);
     }
 
-    if (   tso->why_blocked == BlockedOnMVar
-        || tso->why_blocked == BlockedOnMVarRead
-        || tso->why_blocked == BlockedOnBlackHole
-        || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == NotBlocked
-        ) {
+    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+    case BlockedOnMVar:
+    case BlockedOnMVarRead:
+    case BlockedOnBlackHole:
+    case BlockedOnMsgThrowTo:
+    case NotBlocked:
         evacuate(&tso->block_info.closure);
-    }
+        break;
+    default:
 #if defined(THREADED_RTS)
     // in the THREADED_RTS, block_info.closure must always point to a
     // valid closure, because we assume this in throwTo().  In the
     // non-threaded RTS it might be a FD (for
     // BlockedOnRead/BlockedOnWrite) or a time value (BlockedOnDelay)
-    else {
         tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
-    }
 #endif
+        break;
+    }
 
     tso->dirty = gct->failed_to_evac;
 

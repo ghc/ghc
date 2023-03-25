@@ -1239,12 +1239,14 @@ inner_loop:
         traversePushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->bq, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->trec, c, sep, child_data);
-        if (   tso->why_blocked == BlockedOnMVar
-               || tso->why_blocked == BlockedOnMVarRead
-               || tso->why_blocked == BlockedOnBlackHole
-               || tso->why_blocked == BlockedOnMsgThrowTo
-            ) {
+        switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+        case BlockedOnMVar:
+        case BlockedOnMVarRead:
+        case BlockedOnBlackHole:
+        case BlockedOnMsgThrowTo:
             traversePushClosure(ts, tso->block_info.closure, c, sep, child_data);
+            break;
+        default:
         }
         goto loop;
     }

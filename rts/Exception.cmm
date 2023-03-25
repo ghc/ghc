@@ -351,9 +351,9 @@ stg_killThreadzh (P_ target, P_ exception)
         if (msg == NULL) {
             return ();
         } else {
-            StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
             updateRemembSetPushPtr(StgTSO_block_info(CurrentTSO));
             StgTSO_block_info(CurrentTSO) = msg;
+            %release StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
             // we must block, and unlock the message before returning
             jump stg_block_throwto (target, exception);
         }

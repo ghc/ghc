@@ -1051,13 +1051,16 @@ trace_tso (MarkQueue *queue, StgTSO *tso)
     if (tso->label != NULL) {
         markQueuePushClosure_(queue, (StgClosure *) tso->label);
     }
-    if (   tso->why_blocked == BlockedOnMVar
-        || tso->why_blocked == BlockedOnMVarRead
-        || tso->why_blocked == BlockedOnBlackHole
-        || tso->why_blocked == BlockedOnMsgThrowTo
-        || tso->why_blocked == NotBlocked
-        ) {
+    switch (ACQUIRE_LOAD(&tso->why_blocked)) {
+    case BlockedOnMVar:
+    case BlockedOnMVarRead:
+    case BlockedOnBlackHole:
+    case BlockedOnMsgThrowTo:
+    case NotBlocked:
         markQueuePushClosure_(queue, tso->block_info.closure);
+        break;
+    default:
+        break;
     }
 }
 

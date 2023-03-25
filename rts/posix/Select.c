@@ -105,7 +105,7 @@ static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
             break;
         }
         iomgr->sleeping_queue = tso->_link;
-        tso->why_blocked = NotBlocked;
+        RELAXED_STORE(&tso->why_blocked, NotBlocked);
         tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
                                        FMT_StgThreadID "\n", tso->id));
@@ -268,7 +268,7 @@ awaitEvent(Capability *cap, bool wait)
        * So the (int) cast should be removed across the code base once
        * GHC requires a version of FreeBSD that has that change in it.
        */
-        switch (tso->why_blocked) {
+        switch (ACQUIRE_LOAD(&tso->why_blocked)) {
         case BlockedOnRead:
           {
             int fd = tso->block_info.fd;
