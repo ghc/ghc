@@ -367,6 +367,7 @@ newtype SNat (n :: Nat) = UnsafeSNat Natural
 pattern SNat :: forall n. () => KnownNat n => SNat n
 pattern SNat <- (knownNatInstance -> KnownNatInstance)
   where SNat = natSing
+{-# COMPLETE SNat #-}
 
 -- An internal data type that is only used for defining the SNat pattern
 -- synonym.

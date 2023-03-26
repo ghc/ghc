@@ -363,6 +363,7 @@ newtype SSymbol (s :: Symbol) = UnsafeSSymbol String
 pattern SSymbol :: forall s. () => KnownSymbol s => SSymbol s
 pattern SSymbol <- (knownSymbolInstance -> KnownSymbolInstance)
   where SSymbol = symbolSing
+{-# COMPLETE SSymbol #-}
 
 -- An internal data type that is only used for defining the SSymbol pattern
 -- synonym.
@@ -464,6 +465,7 @@ newtype SChar (s :: Char) = UnsafeSChar Char
 pattern SChar :: forall c. () => KnownChar c => SChar c
 pattern SChar <- (knownCharInstance -> KnownCharInstance)
   where SChar = charSing
+{-# COMPLETE SChar #-}
 
 -- An internal data type that is only used for defining the SChar pattern
 -- synonym.

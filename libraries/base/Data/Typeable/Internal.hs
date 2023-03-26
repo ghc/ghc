@@ -272,6 +272,7 @@ typeableInstance rep = withTypeable rep TypeableInstance
 pattern TypeRep :: forall {k :: Type} (a :: k). () => Typeable @k a => TypeRep @k a
 pattern TypeRep <- (typeableInstance -> TypeableInstance)
   where TypeRep = typeRep
+{-# COMPLETE TypeRep #-}
 
 {- Note [TypeRep fingerprints]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -16,6 +16,8 @@
       ([CLC proposal #57](https://github.com/haskell/core-libraries-committee/issues/57))
   * Add `Eq` and `Ord` instances for `SSymbol`, `SChar`, and `SNat`.
       ([CLC proposal #148](https://github.com/haskell/core-libraries-committee/issues/148))
+  * Add `COMPLETE` pragmas to the `TypeRep`, `SSymbol`, `SChar`, and `SNat` pattern synonyms.
+      ([CLC proposal #149](https://github.com/haskell/core-libraries-committee/issues/149))
 
 ## 4.18.0.0 *TBA*
   * Shipped with GHC 9.6.1
