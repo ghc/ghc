@@ -531,6 +531,7 @@ oneShot orig_hsc_env stop_phase srcs = do
   -- In oneshot mode, initialise plugins specified on command line
   -- we also initialise in ghc/Main but this might be used as an entry point by API clients who
   -- should initialise their own plugins but may not.
+  -- See Note [Timing of plugin initialization]
   hsc_env <- initializePlugins orig_hsc_env
   o_files <- mapMaybeM (compileFile hsc_env stop_phase) srcs
   case stop_phase of

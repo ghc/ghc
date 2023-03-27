@@ -76,6 +76,29 @@ import Data.List (unzip4)
 import GHC.Iface.Errors.Ppr
 import GHC.Driver.Monad
 
+{- Note [Timing of plugin initialization]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Plugins needs to be initialised as soon as possible in the pipeline. This is because
+driver plugins are executed immediately after being loaded, which can modify anything
+in the HscEnv, including the logger and DynFlags (for example #21279). For example,
+in ghc/Main.hs the logger is used almost immediately after the session has been initialised
+and so if a user overwrites the logger expecting all output to go there then unless
+the plugins are initialised before that point then unexpected things will happen.
+
+We initialise plugins in ghc/Main.hs for the main ghc executable.
+
+When people are using the GHC API, they also need to initialise plugins
+at the highest level possible for things to work as expected. We keep
+some defensive calls to plugin initialisation in functions like `load'` and `oneshot`
+to catch cases where API users have not initialised their own plugins.
+
+In addition to this, there needs to be an initialisation call for each module
+just in case the user has enabled a plugin just for that module using OPTIONS_GHC
+pragma.
+
+-}
+
 -- | Initialise plugins specified by the current DynFlags and update the session.
 initializeSessionPlugins :: GhcMonad m => m ()
 initializeSessionPlugins = getSession >>= liftIO . initializePlugins >>= setSession
