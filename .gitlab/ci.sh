@@ -606,6 +606,8 @@ function test_hadrian() {
     return
     # special case for JS backend
   elif [ -n "${CROSS_TARGET:-}" ] && [ "${CROSS_EMULATOR:-}" == "js-emulator" ]; then
+    # The JS backend doesn't support CROSS_EMULATOR logic yet
+    unset CROSS_EMULATOR
     # run "hadrian test" directly, not using the bindist, even though it did get installed.
     # This is a temporary solution, See !9515 for the status of hadrian support.
     run_hadrian \
