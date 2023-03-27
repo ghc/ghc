@@ -12,6 +12,7 @@ import GHC.Int
 import GHC.IO
 import GHC.IORef
 import GHC.MVar
+import GHC.Ptr
 import GHC.Stack
 import GHC.STRef
 import GHC.Weak
@@ -176,7 +177,7 @@ exWord64Closure = Word64Closure
 
 exAddrClosure :: Closure
 exAddrClosure = AddrClosure
-    { ptipe = PAddr, addrVal = 42 }
+    { ptipe = PAddr, addrVal = nullPtr `plusPtr` 42 }
 
 exFloatClosure :: Closure
 exFloatClosure = FloatClosure
@@ -316,19 +317,17 @@ main = do
         assertClosuresEq exWordClosure
 
     -- Primitive Int64
-    -- FAILING: On 64-bit platforms, v is a regular Int
-    -- let (I64# v) = 42
-    -- getClosureData v >>=
-    --     assertClosuresEq exInt64Closure
+    let (I64# v) = 42
+    getClosureData v >>=
+        assertClosuresEq exInt64Closure
 
     -- Primitive Word64
-    -- FAILING: On 64-bit platforms, v is a regular Word
-    -- let (W64# v) = 42
-    -- getClosureData v >>=
-    --     assertClosuresEq exWord64Closure
+    let (W64# v) = 42
+    getClosureData v >>=
+        assertClosuresEq exWord64Closure
 
     -- Primitive Addr
-    let v = unsafeCoerce# 42# :: Addr#
+    let (Ptr v) = nullPtr `plusPtr` 42
     getClosureData v >>=
         assertClosuresEq exAddrClosure
 
