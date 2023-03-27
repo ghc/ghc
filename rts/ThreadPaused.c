@@ -352,7 +352,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             OVERWRITING_CLOSURE_SIZE(bh, closure_sizeW_(bh, INFO_PTR_TO_STRUCT(bh_info)));
 
             // The payload of the BLACKHOLE points to the TSO
-            ((StgInd *)bh)->indirectee = (StgClosure *)tso;
+            RELEASE_STORE(&((StgInd *)bh)->indirectee, (StgClosure *)tso);
             SET_INFO_RELEASE(bh,&stg_BLACKHOLE_info);
 
             // .. and we need a write barrier, since we just mutated the closure:

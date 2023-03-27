@@ -261,6 +261,66 @@
  * `tso_1` and other blocked threads may be unblocked more quickly.
  *
  *
+ * Waking up blocking queues
+ * -------------------------
+ * As noted above, when a thread updates a `BLACKHOLE`'d thunk it may find that
+ * some threads have added themselves to the thunk's blocking queue. Naturally,
+ * we must ensure that these threads are woken up. However, this gets a bit
+ * subtle since multiple threads may have raced to enter the thunk.
+ *
+ * That is, we may end up in a situation like one of these (TODO audit):
+ *
+ * ### Race A
+ *
+ *     Thread 0                      Thread 1                     Thread 2
+ *     --------------------------    --------------------------   ----------------------
+ *     enter thnk
+ *                                   enter thnk
+ *     thnk.indirectee := tso_0
+ *                                   thnk.indirectee := tso_1
+ *     thnk.info := BLACKHOLE
+ *                                   thnk.info := BLACKHOLE
+ *                                                                enter, block on thnk
+ *                                                                send MSG_BLACKHOLE to tso_1->cap
+ *     finishes evaluation
+ *     thnk.indirectee := result
+ *                                   handle MSG_BLACKHOLE
+ *                                   add
+ *
+ * ### Race B
+ *
+ *     Thread 0                      Thread 1                     Thread 2
+ *     --------------------------    --------------------------   ----------------------
+ *     enter thnk
+ *                                   enter thnk
+ *     thnk.indirectee := tso_0
+ *                                   thnk.indirectee := tso_1
+ *     thnk.info := BLACKHOLE
+ *                                   thnk.info := BLACKHOLE
+ *                                                                enter, block on thnk
+ *                                                                send MSG_BLACKHOLE to tso_1->cap
+ *                                   handle MSG_BLACKHOLE
+ *                                   add
+ *     finishes evaluation
+ *     thnk.indirectee := result
+ *
+ * ### Race C
+ *
+ *     Thread 0                      Thread 1                     Thread 2
+ *     --------------------------    --------------------------   ----------------------
+ *     enter thnk
+ *                                   enter thnk
+ *     thnk.indirectee := tso_0
+ *     thnk.info := BLACKHOLE
+ *                                                                enter, block on thnk
+ *                                                                send MSG_BLACKHOLE to tso_0->cap
+ *     handle MSG_BLACKHOLE
+ *     thnk.indirectee := new BLOCKING_QUEUE
+ *
+ *                                   thnk.indirectee := tso_1
+ *                                   thnk.info := BLACKHOLE
+ *
+ *
  * Exception handling
  * ------------------
  * When an exception is thrown to a thread which is evaluating a thunk, it is
@@ -400,8 +460,8 @@
     }                                                           \
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
-    %relaxed StgInd_indirectee(p1) = p2;                        \
-    SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
+    %release StgInd_indirectee(p1) = p2;                        \
+    %release SET_INFO(p1, stg_BLACKHOLE_info);                  \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
 

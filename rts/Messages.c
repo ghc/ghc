@@ -191,9 +191,6 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     StgClosure *p;
     const StgInfoTable *info;
     do {
-        // If we are being called from stg_BLACKHOLE then TSAN won't know about the
-        // previous read barrier that makes the following access safe.
-        TSAN_ANNOTATE_BENIGN_RACE(&((StgInd*)bh)->indirectee, "messageBlackHole");
         p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
         info = RELAXED_LOAD(&p->header.info);
     } while (info == &stg_IND_info);
@@ -291,7 +288,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
             // makes it into the update remembered set
             updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);
         }
-        RELAXED_STORE(&msg->link, bq->queue);
+        msg->link = bq->queue;
         bq->queue = msg;
         // No barrier is necessary here: we are only exposing the
         // closure to the GC. See Note [Heap memory barriers] in SMP.h.
