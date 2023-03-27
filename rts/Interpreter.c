@@ -420,7 +420,7 @@ eval_obj:
     case IND:
     case IND_STATIC:
     {
-        tagged_obj = ((StgInd*)obj)->indirectee;
+        tagged_obj = ACQUIRE_LOAD(&((StgInd*)obj)->indirectee);
         goto eval_obj;
     }
 

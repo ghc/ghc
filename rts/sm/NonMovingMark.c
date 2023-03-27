@@ -688,8 +688,9 @@ void updateRemembSetPushThunkEager(Capability *cap,
     case IND:
     {
         StgInd *ind = (StgInd *) thunk;
-        if (check_in_nonmoving_heap(ind->indirectee)) {
-            push_closure(queue, ind->indirectee, NULL);
+        StgClosure *indirectee = ACQUIRE_LOAD(&ind->indirectee);
+        if (check_in_nonmoving_heap(indirectee)) {
+            push_closure(queue, indirectee, NULL);
         }
         break;
     }

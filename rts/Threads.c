@@ -437,7 +437,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
         p = UNTAG_CLOSURE(bq->bh);
         const StgInfoTable *pinfo = ACQUIRE_LOAD(&p->header.info);
         if (pinfo != &stg_BLACKHOLE_info ||
-            ((StgInd *)p)->indirectee != (StgClosure*)bq)
+            (RELAXED_LOAD(&((StgInd *)p)->indirectee) != (StgClosure*)bq))
         {
             wakeBlockingQueue(cap,bq);
         }
@@ -468,7 +468,7 @@ updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
         return;
     }
 
-    v = UNTAG_CLOSURE(((StgInd*)thunk)->indirectee);
+    v = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)thunk)->indirectee));
 
     updateWithIndirection(cap, thunk, val);
 
@@ -808,7 +808,7 @@ loop:
     qinfo = ACQUIRE_LOAD(&q->header.info);
     if (qinfo == &stg_IND_info ||
         qinfo == &stg_MSG_NULL_info) {
-        q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
+        q = (StgMVarTSOQueue*) ACQUIRE_LOAD(&((StgInd*)q)->indirectee);
         goto loop;
     }
 

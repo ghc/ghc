@@ -509,7 +509,9 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     (P_ node)
 {
     TICK_ENT_DYN_IND(); /* tick */
-    node = UNTAG(StgInd_indirectee(node));
+    ACQUIRE_FENCE;
+    node = %acquire StgInd_indirectee(node);
+    node = UNTAG(node);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(node) (node);
 }
@@ -517,7 +519,10 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     /* explicit stack */
 {
     TICK_ENT_DYN_IND(); /* tick */
-    R1 = UNTAG(StgInd_indirectee(R1));
+    ACQUIRE_FENCE;
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -527,7 +532,10 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
     /* explicit stack */
 {
     TICK_ENT_STATIC_IND(); /* tick */
-    R1 = UNTAG(StgInd_indirectee(R1));
+    ACQUIRE_FENCE;
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -661,6 +669,7 @@ loop:
         // defined in CMM.
         goto loop;
     }
+    ACQUIRE_FENCE;
     jump %ENTRY_CODE(info) (node);
 #else
     ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
