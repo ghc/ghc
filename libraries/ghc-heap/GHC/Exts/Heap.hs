@@ -120,7 +120,7 @@ instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
 
 instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
     getClosureData x = return $
-        AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
+        AddrClosure { ptipe = PAddr, addrVal = Ptr x }
 
 instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
     getClosureData x = return $
