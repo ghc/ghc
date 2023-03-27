@@ -1753,7 +1753,7 @@ loop:
     qinfo = GET_INFO_ACQUIRE(q);
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
-        q = StgInd_indirectee(q);
+        q = %acquire StgInd_indirectee(q);
         goto loop;
     }
 
@@ -1821,7 +1821,7 @@ loop:
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
-        q = StgInd_indirectee(q);
+        q = %acquire StgInd_indirectee(q);
         goto loop;
     }
 
@@ -1923,7 +1923,7 @@ loop:
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
-        q = StgInd_indirectee(q);
+        q = %acquire StgInd_indirectee(q);
         goto loop;
     }
 
@@ -2012,7 +2012,7 @@ loop:
 
     if (qinfo == stg_IND_info ||
         qinfo == stg_MSG_NULL_info) {
-        q = StgInd_indirectee(q);
+        q = %acquire StgInd_indirectee(q);
         goto loop;
     }
 
@@ -2293,7 +2293,7 @@ loop:
     //Possibly IND added by removeFromMVarBlockedQueue
     if (StgHeader_info(q) == stg_IND_info ||
         StgHeader_info(q) == stg_MSG_NULL_info) {
-        q = StgInd_indirectee(q);
+        q = %acquire StgInd_indirectee(q);
         goto loop;
     }
 

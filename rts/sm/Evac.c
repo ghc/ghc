@@ -1542,7 +1542,7 @@ selector_loop:
 bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
-    SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
+    SET_INFO_RELAXED((StgClosure *)p, (const StgInfoTable *)info_ptr);
     // THREADED_RTS: we just unlocked the thunk, so another thread
     // might get in and update it.  copy() will lock it again and
     // check whether it was updated in the meantime.

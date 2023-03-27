@@ -108,7 +108,7 @@ again:
             IND,
             IND_STATIC:
         {
-            fun = StgInd_indirectee(fun);
+            fun = %acquire StgInd_indirectee(fun);
             goto again;
         }
         case BCO:
@@ -693,7 +693,7 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
   }
   // Can't add StgInd_indirectee(ap) to UpdRemSet here because the old value is
   // not reachable.
-  StgInd_indirectee(ap) = CurrentTSO;
+  %release StgInd_indirectee(ap) = CurrentTSO;
   SET_INFO_RELEASE(ap, __stg_EAGER_BLACKHOLE_info);
 
   /* ensure there is at least AP_STACK_SPLIM words of headroom available
