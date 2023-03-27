@@ -114,6 +114,7 @@ data LinuxDistro
   | Ubuntu1804
   | Centos7
   | Alpine
+  | AlpineWasm
   | Rocky8
   deriving (Eq)
 
@@ -279,6 +280,7 @@ distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
 distroName Alpine     = "alpine3_12"
+distroName AlpineWasm = "alpine3_17-wasm"
 distroName Rocky8     = "rocky8"
 
 opsysName :: Opsys -> String
@@ -646,7 +648,6 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
         , "bash .gitlab/ci.sh test_hadrian" ]
       | otherwise
       = [ "find libraries -name config.sub -exec cp config.sub {} \\;" | Darwin == opsys ] ++
-        [ "sudo apk del --purge glibc*" | opsys == Linux Alpine, isNothing $ crossTarget buildConfig ] ++
         [ "sudo chown ghc:ghc -R ." | Linux {} <- [opsys]] ++
         [ ".gitlab/ci.sh setup"
         , ".gitlab/ci.sh configure"
@@ -929,7 +930,7 @@ job_groups =
             . setVariable "HADRIAN_ARGS" "--docs=none"
             . delVariable "INSTALL_CONFIGURE_ARGS"
         )
-        $ validateBuilds Amd64 (Linux Alpine) cfg
+        $ validateBuilds Amd64 (Linux AlpineWasm) cfg
 
     wasm_build_config =
       (crossConfig "wasm32-wasi" NoEmulatorNeeded Nothing)
@@ -992,4 +993,3 @@ write_result as obj =
     [] -> B.putStrLn
     (fp:_) -> B.writeFile fp)
     (A.encode obj)
-
