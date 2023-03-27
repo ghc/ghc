@@ -380,6 +380,12 @@ getFieldE e f = do
 projectionE :: Quote m => NonEmpty String -> m Exp
 projectionE xs = pure (ProjectionE xs)
 
+typedSpliceE :: Quote m => m Exp -> m Exp
+typedSpliceE = fmap TypedSpliceE
+
+typedBracketE :: Quote m => m Exp -> m Exp
+typedBracketE = fmap TypedBracketE
+
 -- ** 'arithSeqE' Shortcuts
 fromE :: Quote m => m Exp -> m Exp
 fromE x = do { a <- x; pure (ArithSeqE (FromR a)) }

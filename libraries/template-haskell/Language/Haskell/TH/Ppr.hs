@@ -232,6 +232,8 @@ pprExp _ (LabelE s) = text "#" <> text s
 pprExp _ (ImplicitParamVarE n) = text ('?' : n)
 pprExp _ (GetFieldE e f) = pprExp appPrec e <> text ('.': f)
 pprExp _ (ProjectionE xs) = parens $ hcat $ map ((char '.'<>) . text) $ toList xs
+pprExp _ (TypedBracketE e) = text "[||" <> ppr e <> text "||]"
+pprExp _ (TypedSpliceE e) = text "$$" <> pprExp appPrec e
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> pprName' Applied s <+> equals <+> ppr e)

@@ -2385,6 +2385,8 @@ data Exp
   | ImplicitParamVarE String           -- ^ @{ ?x }@ ( Implicit parameter )
   | GetFieldE Exp String               -- ^ @{ exp.field }@ ( Overloaded Record Dot )
   | ProjectionE (NonEmpty String)      -- ^ @(.x)@ or @(.x.y)@ (Record projections)
+  | TypedBracketE Exp                  -- ^ @[|| e ||]@
+  | TypedSpliceE Exp                   -- ^ @$$e@
   deriving( Show, Eq, Ord, Data, Generic )
 
 type FieldExp = (Name,Exp)

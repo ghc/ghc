@@ -8,6 +8,10 @@
 
     This change enables TemplateHaskell support for `DuplicateRecordFields`.
 
+  * Add support for generating typed splices and brackets in untyped Template Haskell
+    Introduces `typedSpliceE :: Quote m => m Exp -> m Exp` and
+    `typedBracketE :: Quote m => m Exp -> m Exp`
+
 ## 2.20.0.0
 
   * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 

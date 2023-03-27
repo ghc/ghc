@@ -1157,6 +1157,10 @@ cvtl e = wrapLA (cvt e)
                                          (L noSrcSpanA (DotFieldOcc noAnn (L noSrcSpanA (FieldLabelString (fsLit f))))) }
     cvt (ProjectionE xs) = return $ HsProjection noAnn $ fmap
                                          (L noSrcSpanA . DotFieldOcc noAnn . L noSrcSpanA . FieldLabelString  . fsLit) xs
+    cvt (TypedSpliceE e) = do { e' <- parenthesizeHsExpr appPrec <$> cvtl e
+                              ; return $ HsTypedSplice (noAnn, noAnn) e' }
+    cvt (TypedBracketE e) = do { e' <- cvtl e
+                               ; return $ HsTypedBracket noAnn e' }
 
 {- | #16895 Ensure an infix expression's operator is a variable/constructor.
 Consider this example:

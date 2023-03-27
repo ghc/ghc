@@ -44,7 +44,7 @@ module Language.Haskell.TH.Lib (
         appE, appTypeE, uInfixE, parensE, infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, lamCasesE, tupE, unboxedTupE, unboxedSumE, condE,
         multiIfE, letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE,
-        fieldExp, getFieldE, projectionE,
+        fieldExp, getFieldE, projectionE, typedSpliceE, typedBracketE,
     -- **** Ranges
     fromE, fromThenE, fromToE, fromThenToE,
 
