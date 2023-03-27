@@ -783,7 +783,11 @@ genApply regstatus args =
         text "case IND,",
         text "     IND_STATIC: {",
         nest 4 (vcat [
-          text "R1 = StgInd_indirectee(R1);",
+          -- N.B. annoyingly the %acquire syntax must place its result in a local register
+          -- as it is a Cmm prim call node.
+          text "P_ p;",
+          text "p = %acquire StgInd_indirectee(R1);",
+          text "R1 = p;",
             -- An indirection node might contain a tagged pointer
           text "goto again;"
          ]),

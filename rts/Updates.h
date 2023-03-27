@@ -59,8 +59,8 @@
     }                                                           \
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
-    %relaxed StgInd_indirectee(p1) = p2;                        \
-    SET_INFO_RELEASE(p1, stg_BLACKHOLE_info);                   \
+    %release StgInd_indirectee(p1) = p2;                        \
+    %relaxed SET_INFO(p1, stg_BLACKHOLE_info);                  \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
 

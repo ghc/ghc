@@ -59,7 +59,7 @@ INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
     ASSERT(HpAlloc == 0); // Note [HpAlloc]
 
     // we know the closure is a BLACKHOLE
-    v = StgInd_indirectee(updatee);
+    v = %acquire StgInd_indirectee(updatee);
 
     if (GETTAG(v) != 0) (likely: False) {
         // updated by someone else: discard our value and use the

@@ -311,7 +311,7 @@
 #define ENTER(x) ENTER_(return,x)
 #endif
 
-#define ENTER_R1() ENTER_(RET_R1,R1)
+#define ENTER_R1() P_ _r1; _r1 = R1; ENTER_(RET_R1, _r1)
 
 #define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]
 
@@ -326,7 +326,7 @@
     IND,                                                \
     IND_STATIC:                                         \
    {                                                    \
-      x = StgInd_indirectee(x);                         \
+      x = %acquire StgInd_indirectee(x);                \
       goto again;                                       \
    }                                                    \
   case                                                  \

@@ -178,6 +178,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *   - StgSmallMutArrPtrs: payload
  *   - StgThunk although this is a somewhat special case; see below
  *   - StgTSO: block_info
+ *   - StgInd: indirectee
  *
  * Writing to a mutable pointer field must be done via a release-store.
  * Reading from such a field is done via an acquire-load.
@@ -222,9 +223,9 @@ EXTERN_INLINE void load_load_barrier(void);
  * can see the indirectee. Consequently, a thunk update (see rts/Updates.h)
  * does the following:
  *
- *  1. Use a relaxed-store to place the new indirectee into the thunk's
+ *  1. Use a release-store to place the new indirectee into the thunk's
  *     indirectee field
- *  2. use a release-store to set the info table to stg_BLACKHOLE (which
+ *  2. use a relaxed-store to set the info table to stg_BLACKHOLE (which
  *     represents an indirection)
  *
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
@@ -237,13 +238,10 @@ EXTERN_INLINE void load_load_barrier(void);
  *  1. We jump into the entry code of the indirection (e.g. stg_BLACKHOLE);
  *     this of course implies that we have already read the thunk's info table
  *     pointer, which is done with a relaxed load.
- *  2. use an acquire-fence to ensure that our view on the thunk is
- *     up-to-date. This synchronizes with step (2) in the update
- *     procedure.
- *  3. relaxed-load the indirectee. Since thunks are updated at most
+ *  2. acquire-load the indirectee. Since thunks are updated at most
  *     once we know that the fence in the last step has given us
  *     an up-to-date view of the indirectee closure.
- *  4. enter the indirectee (or block if the indirectee is a TSO)
+ *  3. enter the indirectee (or block if the indirectee is a TSO)
  *
  * Other closures
  * --------------
@@ -270,7 +268,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *    in this primops.
  *
  *  - Sending a Message to another capability:
- *    This is protected by the acquition and release of the target capability's
+ *    This is protected by the acquision and release of the target capability's
  *    lock in Messages.c:sendMessage.
  *
  * N.B. recordClosureMutated places a reference to the mutated object on
