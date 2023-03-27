@@ -696,6 +696,7 @@ load' :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> Maybe Messager -> M
 load' mhmi_cache how_much mHscMessage mod_graph = do
     -- In normal usage plugins are initialised already by ghc/Main.hs this is protective
     -- for any client who might interact with GHC via load'.
+    -- See Note [Timing of plugin initialization]
     initializeSessionPlugins
     modifySession $ \hsc_env -> hsc_env { hsc_mod_graph = mod_graph }
     guessOutputFile
