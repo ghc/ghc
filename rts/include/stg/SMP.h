@@ -133,7 +133,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * cache and the relevant cachelines invalidated in other cores).
  *
  * To ensure this we must use memory barriers. Which barriers are required to
- * access a field depends upon the type of the field. In general, fields come
+ * access a field depends upon the identity of the field. In general, fields come
  * in three flavours:
  *
  *  * Mutable GC Pointers (C type StgClosure*, Cmm type StgPtr)
@@ -141,8 +141,8 @@ EXTERN_INLINE void load_load_barrier(void);
  *  * Non-pointers (C type StgWord, Cmm type StdWord)
  *
  * Note that Addr# fields are *not* GC pointers and therefore are classified
- * as non-pointers. Responsibility for barriers lies with the party
- * dereferencing the pointer.
+ * as non-pointers. In this case responsibility for barriers lies with the
+ * party dereferencing the Addr#.
  *
  * Also note that we are only concerned with mutation by the mutator. The GC
  * is free to change nearly any field as this is necessary for a moving GC.
@@ -154,9 +154,9 @@ EXTERN_INLINE void load_load_barrier(void);
  * flavour (e.g. all data constructor fields). As these fields are written
  * precisely once, no write barriers are needed on writes nor reads. This is
  * safe due to an argument hinging on causality: Consider an immutable field F
- * of an object O refers to object O'. Naturally, O' must have been visible to
- * the creator of O when O was constructed. Consequently, if O is visible to a
- * reader, O' must also be visible.
+ * of an object O which refers to object O'. Naturally, O' must have been
+ * visible to the creator of O when O was constructed. Consequently, if O is
+ * visible to a reader, O' must also be visible to the same reader..
  *
  * Mutable pointer fields are those which can be modified by the mutator. These
  * require a bit more care as they may break the causality argument given
@@ -183,37 +183,44 @@ EXTERN_INLINE void load_load_barrier(void);
  * Reading from such a field is done via an acquire-load.
  *
  * Finally, non-pointer fields can be safely mutated without barriers as
- * they do not refer to other memory. Technically, concurrent accesses to
- * non-pointer fields still do need to be atomic in many cases to avoid torn
- * accesses. However, this is something that we generally avoid by locking
- * closures prior to mutating non-pointer fields (see Locking closures below).
- *
- * Note that MUT_VARs offer both synchronized and unsynchronized primops.
- * Consequently, in these cases there is a burden on the user to ensure that
- * synchronization is provided where necessary.
+ * they do not refer to other memory locations. Technically, concurrent
+ * accesses to non-pointer fields still do need to be atomic in many cases to
+ * avoid torn accesses. However, this is something that we generally avoid by
+ * locking closures prior to mutating non-pointer fields (see Locking closures
+ * below).
  *
  * Locking closures
  * ----------------
  * Several primops temporarily turn closures into WHITEHOLEs to ensure that
  * they have exclusive access (see SMPClosureOps.h:reallyLockClosure).
+ * These include,
+ *
+ *   - takeMVar#, tryTakeMVar#
+ *   - putMVar#, tryPutMVar#
+ *   - readMVar#, tryReadMVar#
+ *   - readIOPort#
+ *   - writeIOPort#
+ *   - addCFinalizerToWeak#
+ *   - finalizeWeak#
+ *   - deRefWeak#
+ *
  * Locking is done via an atomic exchange operation on the closure's info table
  * pointer with sequential consistency (although only acquire ordering is
- * needed). This acquire ensures that we synchronize with any previous thread
- * that had locked the closure. Consequently, it is important that we take great
- * care in examining the mutable fields of a lockable closure prior to having
- * locked it.
- *
- * Naturally, unlocking is done via a release-store to restore the closure's
- * original info table pointer.
+ * needed). Similarly, unlocking is also done with an atomic exchange to
+ * restore the closure's original info table pointer (although
+ * this time only the release ordering is needed). This ensures
+ * that we synchronize with any previous thread that had locked the closure.
  *
  * Thunks
  * ------
  * As noted above, thunks are a rather special (yet quite common) case. In
- * particular, they have the unique property of being updatable, transforming
- * from a thunk to an indirection. This transformation requires its own
- * synchronization protocol. In particular, we must ensure that a reader
- * examining a thunk being updated by another core can see the indirectee.
- * Consequently, a thunk update (see rts/Updates.h) does the following:
+ * particular, they have the unique property of being updatable (that is, can
+ * be transformed from a thunk into an indirection after evaluation). This
+ * transformation requires its own synchronization protocol mediating the
+ * interaction between the updater and the reader. In particular, we
+ * must ensure that a reader examining a thunk being updated by another core
+ * can see the indirectee. Consequently, a thunk update (see rts/Updates.h)
+ * does the following:
  *
  *  1. Use a relaxed-store to place the new indirectee into the thunk's
  *     indirectee field
@@ -223,12 +230,13 @@ EXTERN_INLINE void load_load_barrier(void);
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
  * or lazily, by ThreadPaused.c:threadPaused) is done similarly.
  *
- * Conversely, indirection entry (see the entry code of stg_BLACKHOLE, stg_IND,
- * and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the following:
+ * Conversely, entering an indirection (see the entry code of stg_BLACKHOLE,
+ * stg_IND, and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the
+ * following:
  *
- *  1. We jump into the entry code for, e.g., stg_BLACKHOLE; this of course
- *     implies that we have already read the thunk's info table pointer, which
- *     is done with a relaxed load.
+ *  1. We jump into the entry code of the indirection (e.g. stg_BLACKHOLE);
+ *     this of course implies that we have already read the thunk's info table
+ *     pointer, which is done with a relaxed load.
  *  2. use an acquire-fence to ensure that our view on the thunk is
  *     up-to-date. This synchronizes with step (2) in the update
  *     procedure.
