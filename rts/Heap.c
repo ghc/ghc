@@ -173,7 +173,7 @@ StgWord collect_pointers(StgClosure *closure, StgClosure *ptrs[]) {
         case IND:
         case IND_STATIC:
         case BLACKHOLE:
-            ptrs[nptrs++] = (StgClosure *)(((StgInd *)closure)->indirectee);
+            ptrs[nptrs++] = (StgClosure *) ACQUIRE_LOAD(&((StgInd *)closure)->indirectee);
             break;
 
         case MUT_ARR_PTRS_CLEAN:
