@@ -110,6 +110,47 @@ EXTERN_INLINE void busy_wait_nop(void);
 #endif // !IN_STG_CODE
 
 /*
+ * Note [C11 memory model]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
+ * When it comes to memory, real multiprocessors provide a wide range of
+ * concurrency semantics due to out-of-order execution and caching.
+ * To provide consistent reasoning across architectures, GHC relies the C11
+ * memory model. Not only does this provide a well-studied, fairly
+ * easy-to-understand conceptual model, but the C11 memory model gives us
+ * access to a number of tools which help us verify the compiler (see Note
+ * [ThreadSanitizer] in rts/include/rts/TSANUtils.h).
+ *
+ * Under the C11 model, each processor can be imagined to have a potentially
+ * out-of-date view onto the system's memory, which can be manipulated with two
+ * classes of memory operations:
+ *
+ *  - non-atomic operations (e.g. loads and stores) operate strictly on the
+ *    processor's local view of memory and consequently may not be visible
+ *    from other processors.
+ *
+ *  - atomic operations (e.g. load, store, fetch-and-{add,subtract,and,or},
+ *    exchange, and compare-and-swap) parametrized by ordering semantics.
+ *
+ * The ordering semantics of an operation (acquire, release, or sequentially
+ * consistent) will determine the amount of synchronization the operation
+ * requires.
+ *
+ * A processor may synchronize its
+ * view of memory with that of another processor by performing an atomic
+ * memory operation.
+ *
+ * While non-atomic operations can be thought of as operating on a local
+ *
+ * See also:
+ *
+ *   - The C11 standard, ISO/IEC 14882 2011.
+ *
+ *   - Boehm, Adve. "Foundations of the C++ Concurrency Memory Model."
+ *     PLDI '08.
+ *
+ *   - Batty, Owens, Sarkar, Sewall, Weber. "Mathematizing C++ Concurrency."
+ *     POPL '11.
+ *
  * Note [Heap memory barriers]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Machines with weak memory ordering semantics have consequences for how
@@ -124,7 +165,7 @@ EXTERN_INLINE void busy_wait_nop(void);
  * in terms of an abstract memory model and let the compiler (GHC and the
  * system's C compiler) worry about what barriers are needed to realize the
  * requested semantics on the target system. GHC relies on the widely used C11
- * memory model for this.
+ * memory model for this; see Note [C11 memory model] for a brief introduction.
  *
  * Also note that the majority of this Note are only concerned with mutation
  * by the mutator. The GC is free to change nearly any field (which is
