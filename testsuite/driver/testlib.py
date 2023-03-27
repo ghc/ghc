@@ -681,6 +681,9 @@ def compiler_profiled( ) -> bool:
 def compiler_debugged( ) -> bool:
     return config.compiler_debugged
 
+def debug_rts( ) -> bool:
+    return config.debug_rts
+
 def have_gdb( ) -> bool:
     return config.have_gdb
 

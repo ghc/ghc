@@ -69,6 +69,9 @@ data TestCompilerArgs = TestCompilerArgs{
  ,   unregisterised    :: Bool
  ,   tables_next_to_code :: Bool
  ,   targetWithSMP       :: Bool  -- does the target support SMP
+ ,   debugged            :: Bool
+      -- ^ Whether the compiler has the debug RTS,
+      -- corresponding to the -debug option.
  ,   debugAssertions     :: Bool
       -- ^ Whether the compiler has debug assertions enabled,
       -- corresponding to the -DDEBUG option.
@@ -104,6 +107,7 @@ inTreeCompilerArgs stg = do
 
     let ghcStage = succStage stg
     debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
+    debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
     os          <- setting HostOs
@@ -149,12 +153,14 @@ outOfTreeCompilerArgs = do
     unregisterised      <- getBooleanSetting TestGhcUnregisterised
     tables_next_to_code <- getBooleanSetting TestGhcTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
-    debugAssertions     <- getBooleanSetting TestGhcDebugged
+    debugAssertions     <- getBooleanSetting TestGhcDebugAssertions
 
     os          <- getTestSetting TestHostOS
     arch        <- getTestSetting TestTargetARCH_CPP
     platform    <- getTestSetting TestTARGETPLATFORM
     wordsize    <- getTestSetting TestWORDSIZE
+    rtsWay      <- getTestSetting TestRTSWay
+    let debugged = "debug" `isInfixOf` rtsWay
 
     llc_cmd   <- getTestSetting TestLLC
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
@@ -243,6 +249,7 @@ runTestBuilderArgs = builder Testsuite ? do
             , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
             , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
             , arg "-e", arg $ "config.compiler_debugged=" ++ show debugAssertions
+            , arg "-e", arg $ "config.debug_rts=" ++ show debugged
 
             -- MP: TODO, we do not need both, they get aliased to the same thing.
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen

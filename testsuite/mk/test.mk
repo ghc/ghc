@@ -78,7 +78,7 @@ endif
 
 RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
 
-ifeq "$(GhcDebugged)" "YES"
+ifeq "$(GhcDebugAssertions)" "YES"
 RUNTEST_OPTS += -e "config.compiler_debugged=True"
 else
 RUNTEST_OPTS += -e "config.compiler_debugged=False"

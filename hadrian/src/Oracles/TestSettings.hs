@@ -25,8 +25,9 @@ data TestSetting = TestHostOS
                  | TestTARGETPLATFORM
                  | TestTargetOS_CPP
                  | TestTargetARCH_CPP
+                 | TestRTSWay
                  | TestGhcStage
-                 | TestGhcDebugged
+                 | TestGhcDebugAssertions
                  | TestGhcWithNativeCodeGen
                  | TestGhcWithInterpreter
                  | TestGhcWithRtsLinker
@@ -56,8 +57,9 @@ testSetting key = do
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
         TestTargetOS_CPP          -> "TargetOS_CPP"
         TestTargetARCH_CPP        -> "TargetARCH_CPP"
+        TestRTSWay                -> "RTSWay"
         TestGhcStage              -> "GhcStage"
-        TestGhcDebugged           -> "GhcDebugged"
+        TestGhcDebugAssertions    -> "GhcDebugAssertions"
         TestGhcWithNativeCodeGen  -> "GhcWithNativeCodeGen"
         TestGhcWithInterpreter    -> "GhcWithInterpreter"
         TestGhcWithRtsLinker      -> "GhcWithRtsLinker"

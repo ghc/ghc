@@ -13,12 +13,13 @@ main = do
   getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
   getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
   getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
+  getGhcFieldOrFail fields "RTSWay" "RTS way"
 
   info <- readProcess ghc ["--info"] ""
   let fields = read info :: [(String,String)]
 
   getGhcFieldOrFail fields "GhcStage" "Stage"
-  getGhcFieldOrFail fields "GhcDebugged" "Debug on"
+  getGhcFieldOrFail fields "GhcDebugAssertions" "Debug on"
   getGhcFieldOrFail fields "GhcWithNativeCodeGen" "Have native code generator"
   getGhcFieldOrFail fields "GhcWithInterpreter" "Have interpreter"
   getGhcFieldOrFail fields "GhcWithRtsLinker" "target has RTS linker"

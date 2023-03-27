@@ -64,6 +64,9 @@ class TestConfig:
         # Was the compiler compiled with DEBUG?
         self.compiler_debugged = False
 
+        # Was the compiler compiled with -debug?
+        self.debug_rts = False
+
         # Was the compiler compiled with LLVM?
         self.ghc_built_by_llvm = False
 
