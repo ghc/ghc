@@ -329,7 +329,7 @@ data GenClosure b
     -- | Primitive Addr
   | AddrClosure
         { ptipe      :: PrimType
-        , addrVal    :: !Int }
+        , addrVal    :: !(Ptr ()) }
 
     -- | Primitive Float
   | FloatClosure
