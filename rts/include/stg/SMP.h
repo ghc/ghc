@@ -118,31 +118,40 @@ EXTERN_INLINE void busy_wait_nop(void);
  * stores which formed the new object are visible (e.g. stores are flushed from
  * cache and the relevant cachelines invalidated in other cores).
  *
- * To ensure this we must use memory barriers. Which barriers are required to
- * access a field depends upon the type of the field. In general, fields come
- * in three flavours:
+ * To ensure this we must issue memory barriers when accessing closures and
+ * their fields. Since reasoning about concurrent memory access with barriers tends to be
+ * subtle and platform dependent, it is more common to instead write programs
+ * in terms of an abstract memory model and let the compiler (GHC and the
+ * system's C compiler) worry about what barriers are needed to realize the
+ * requested semantics on the target system. GHC relies on the widely used C11
+ * memory model for this.
  *
- *  * Mutable GC Pointers (C type StgClosure*, Cmm type StgPtr)
- *  * Immutable GC Pointers (C type MUT_FIELD StgClosure*, Cmm type StgPtr)
- *  * Non-pointers (C type StgWord, Cmm type StdWord)
+ * Also note that the majority of this Note are only concerned with mutation
+ * by the mutator. The GC is free to change nearly any field (which is
+ * necessary for a moving GC). Naturally, doing this safely requires care which
+ * we discuss in the "Barriers during GC" section below.
+ *
+ * Field access
+ * ------------
+ * Which barriers are required to access a field of a closure depends upon the
+ * identity of the field. In general, fields come in three flavours:
+ *
+ *  * Mutable GC Pointers (C type `StgClosure*`, Cmm type `StgPtr`)
+ *  * Immutable GC Pointers (C type `MUT_FIELD StgClosure*`, Cmm type `StgPtr`)
+ *  * Non-pointers (C type `StgWord`, Cmm type `StgWord`)
  *
  * Note that Addr# fields are *not* GC pointers and therefore are classified
- * as non-pointers. Responsibility for barriers lies with the party
- * dereferencing the pointer.
- *
- * Also note that we are only concerned with mutation by the mutator. The GC
- * is free to change nearly any field as this is necessary for a moving GC.
- * Naturally, doing this safely requires care which we discuss in section
- * below.
+ * as non-pointers. In this case responsibility for barriers lies with the
+ * party dereferencing the Addr#.
  *
  * Immutable pointer fields are those which the mutator cannot change after
  * an object is made visible on the heap. Most objects' fields are of this
  * flavour (e.g. all data constructor fields). As these fields are written
  * precisely once, no write barriers are needed on writes nor reads. This is
  * safe due to an argument hinging on causality: Consider an immutable field F
- * of an object O refers to object O'. Naturally, O' must have been visible to
- * the creator of O when O was constructed. Consequently, if O is visible to a
- * reader, O' must also be visible.
+ * of an object O which refers to object O'. Naturally, O' must have been
+ * visible to the creator of O when O was constructed. Consequently, if O is
+ * visible to a reader, O' must also be visible to the same reader.
  *
  * Mutable pointer fields are those which can be modified by the mutator. These
  * require a bit more care as they may break the causality argument given
@@ -150,6 +159,10 @@ EXTERN_INLINE void busy_wait_nop(void);
  * field F. A thread may allocate a new object O' and store a reference to O'
  * into F. Without explicit synchronization O' may not be visible to another
  * thread attempting to dereference F.
+ *
+ * To ensure the visibility of the referent, writing to a mutable pointer field
+ * must be done via a release-store. Conversely, reading from such a field is
+ * done via an acquire-load.
  *
  * Mutable fields include:
  *
@@ -163,64 +176,102 @@ EXTERN_INLINE void busy_wait_nop(void);
  *   - StgMutArrPtrs: payload
  *   - StgSmallMutArrPtrs: payload
  *   - StgThunk although this is a somewhat special case; see below
- *
- * Writing to a mutable pointer field must be done via a release-store.
- * Reading from such a field is done via an acquire-load.
+ *   - StgInd: indirectee
  *
  * Finally, non-pointer fields can be safely mutated without barriers as
- * they do not refer to other memory. Technically, concurrent accesses to
- * non-pointer fields still do need to be atomic in many cases to avoid torn
- * accesses. However, this is something that we generally avoid by locking
- * closures prior to mutating non-pointer fields (see Locking closures below).
- *
- * Note that MUT_VARs offer both synchronized and unsynchronized primops.
- * Consequently, in these cases there is a burden on the user to ensure that
- * synchronization is provided where necessary.
+ * they do not refer to other memory locations. Technically, concurrent
+ * accesses to non-pointer fields still do need to be atomic in many cases to
+ * avoid torn accesses. However, this is something that we generally avoid by
+ * locking closures prior to mutating non-pointer fields (see Locking closures
+ * below).
  *
  * Locking closures
  * ----------------
  * Several primops temporarily turn closures into WHITEHOLEs to ensure that
  * they have exclusive access (see SMPClosureOps.h:reallyLockClosure).
+ * These include,
+ *
+ *   - takeMVar#, tryTakeMVar#
+ *   - putMVar#, tryPutMVar#
+ *   - readMVar#, tryReadMVar#
+ *   - readIOPort#
+ *   - writeIOPort#
+ *   - addCFinalizerToWeak#
+ *   - finalizeWeak#
+ *   - deRefWeak#
+ *
  * Locking is done via an atomic exchange operation on the closure's info table
  * pointer with sequential consistency (although only acquire ordering is
- * needed). This acquire ensures that we synchronize with any previous thread
- * that had locked the closure. Consequently, it is important that we take great
- * care in examining the mutable fields of a lockable closure prior to having
- * locked it.
- *
- * Naturally, unlocking is done via a release-store to restore the closure's
- * original info table pointer.
+ * needed). Similarly, unlocking is also done with an atomic exchange to
+ * restore the closure's original info table pointer (although
+ * this time only the release ordering is needed). This ensures
+ * that we synchronize with any previous thread that had locked the closure.
  *
  * Thunks
  * ------
  * As noted above, thunks are a rather special (yet quite common) case. In
- * particular, they have the unique property of being updatable, transforming
- * from a thunk to an indirection. This transformation requires its own
- * synchronization protocol. In particular, we must ensure that a reader
- * examining a thunk being updated can see the indirectee. Consequently, a
- * thunk update (see rts/Updates.h) does the following:
+ * particular, they have the unique property of being updatable (that is, can
+ * be transformed from a thunk into an indirection after evaluation). This
+ * transformation requires its own synchronization protocol to mediate the
+ * interaction between the updater and the reader. In particular, we
+ * must ensure that a reader examining a thunk being updated by another core
+ * can see the indirectee. Consequently, a thunk update (see rts/Updates.h)
+ * does the following:
  *
- *  1. Use a relaxed-store to place the new indirectee into the thunk's
- *     indirectee field
- *  2. use a release-store to set the info table to stg_BLACKHOLE (which
- *     represents an indirection)
+ *  U1. use a release-store to place the new indirectee into the thunk's
+ *      indirectee field
+ *
+ *  U2. use a release-store to set the info table to stg_BLACKHOLE (which
+ *      represents an indirection)
  *
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
  * or lazily, by ThreadPaused.c:threadPaused) is done similarly.
  *
- * Conversely, indirection entry (see the entry code of stg_BLACKHOLE, stg_IND,
- * and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the following:
+ * Conversely, entering an indirection (see the entry code of stg_BLACKHOLE,
+ * stg_IND, and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the
+ * following:
  *
- *  1. We jump into the entry code for, e.g., stg_BLACKHOLE; this of course
- *     implies that we have already read the thunk's info table pointer, which
- *     is done with a relaxed load.
- *  2. use an acquire-fence to ensure that our view on the thunk is
- *     up-to-date. This synchronizes with step (2) in the update
- *     procedure.
- *  3. relaxed-load the indirectee. Since thunks are updated at most
- *     once we know that the fence in the last step has given us
- *     an up-to-date view of the indirectee closure.
- *  4. enter the indirectee (or block if the indirectee is a TSO)
+ *  E1. jump into the entry code of the indirection (e.g. stg_BLACKHOLE);
+ *      this of course implies that we have already read the thunk's info table
+ *      pointer, which is done with a relaxed load.
+ *
+ *  E2. acquire-fence
+ *
+ *  E3. acquire-load the indirectee. Since thunks are updated at most
+ *      once we know that the fence in the last step has given us
+ *      an up-to-date view of the indirectee closure.
+ *
+ *  E4. enter the indirectee (or block if the indirectee is a TSO)
+ *
+ * The release/acquire pair (U2)/(E2) is somewhat surprising but is necessary as
+ * the C11 memory model does not guarantee that the store (U1) is visible to
+ * (E3) despite (U1) preceding (U2) in program-order (due to the relaxed
+ * ordering of (E3)). This is demonstrated by the following CppMem model:
+ *
+ *     int main() {
+ *       atomic_int x = 0;    // info table pointer
+ *       atomic_int y = 0;    // indirectee
+ *       {{{
+ *         {    // blackhole update
+ *           y.store(1, memory_order_release);                // U1
+ *           x.store(2, memory_order_release);                // U2
+ *         }
+ *       |||
+ *         {    // blackhole entry
+ *           r1=x.load(memory_order_relaxed).readsvalue(2);   // E1
+ *           //fence(memory_order_acquire);                   // E2
+ *           r2=y.load(memory_order_acquire);                 // E3
+ *         }
+ *       }}};
+ *       return 0;
+ *     }
+ *
+ * Under the C11 memory model this program admits an execution where the
+ * indirectee `r2=0`.
+ *
+ * Of course, this could also be addressed by strengthing the ordering of (E1)
+ * to acquire, but this would incur a significant cost on every closure entry
+ * (including non-blackholes).
  *
  * Other closures
  * --------------
@@ -327,6 +378,12 @@ EXTERN_INLINE void busy_wait_nop(void);
  *
  * The work-stealing queue (WSDeque) also requires barriers; these are
  * documented in WSDeque.c.
+ *
+ * Verifying memory ordering
+ * -------------------------
+ * To verify that GHC's RTS and the code produced by the compiler are free of
+ * data races we employ ThreadSaniziter. See Note [ThreadSanitizer] in TSANUtils.h
+ * for details on this facility.
  *
  */
 
