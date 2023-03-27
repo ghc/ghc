@@ -35,6 +35,7 @@ import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
 import GHCi.UI.Monad hiding ( args, runStmt )
 import GHCi.UI.Tags
 import GHCi.UI.Info
+import GHCi.UI.Exception
 import GHC.Runtime.Debugger
 
 -- The GHC interface
@@ -1115,7 +1116,7 @@ runOneCommand eh gCmd = do
                -- is the handler necessary here?
   where
     printErrorAndFail err = do
-        GHC.printException err
+        printGhciException err
         return $ Just False     -- Exit ghc -e, but not GHCi
 
     noSpace q = q >>= maybe (return Nothing)
@@ -1588,7 +1589,7 @@ help _ = do
 
 info :: GHC.GhcMonad m => Bool -> String -> m ()
 info _ "" = throwGhcException (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
-info allInfo s  = handleSourceError GHC.printException $ do
+info allInfo s  = handleSourceError printGhciException $ do
     forM_ (words s) $ \thing -> do
       sdoc <- infoThing allInfo thing
       rendered <- showSDocForUser' sdoc
@@ -2002,7 +2003,7 @@ instancesCmd :: String -> InputT GHCi ()
 instancesCmd "" =
   throwGhcException (CmdLineError "syntax: ':instances <type-you-want-instances-for>'")
 instancesCmd s = do
-  handleSourceError GHC.printException $ do
+  handleSourceError printGhciException $ do
     ty <- GHC.parseInstanceHead s
     res <- GHC.getInstancesForType ty
 
@@ -2309,7 +2310,7 @@ modulesLoadedMsg ok mods = do
 -- and printing 'throwE' strings to 'stderr'. If in expression
 -- evaluation mode - throw GhcException and exit.
 runExceptGhciMonad :: GhciMonad m => ExceptT SDoc m () -> m ()
-runExceptGhciMonad act = handleSourceError GHC.printException $
+runExceptGhciMonad act = handleSourceError printGhciException $
                          either handleErr pure =<<
                          runExceptT act
   where
@@ -4547,7 +4548,7 @@ failIfExprEvalMode = do
 -- | When in expression evaluation mode (ghc -e), we want to exit immediately.
 -- Otherwis, just print out the message.
 printErrAndMaybeExit :: (GhciMonad m, MonadIO m, HasLogger m) => SourceError -> m ()
-printErrAndMaybeExit = (>> failIfExprEvalMode) . GHC.printException
+printErrAndMaybeExit = (>> failIfExprEvalMode) . printGhciException
 
 -----------------------------------------------------------------------------
 -- recursive exception handlers
@@ -4645,7 +4646,7 @@ wantNameFromInterpretedModule :: GHC.GhcMonad m
                               -> (Name -> m ())
                               -> m ()
 wantNameFromInterpretedModule noCanDo str and_then =
-  handleSourceError GHC.printException $ do
+  handleSourceError printGhciException $ do
     n NE.:| _ <- GHC.parseName str
     let modl = assert (isExternalName n) $ GHC.nameModule n
     if not (GHC.isExternalName n)
