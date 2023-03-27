@@ -100,7 +100,7 @@ eval:
 
     // Follow indirections:
     case IND, IND_STATIC: {
-        p = StgInd_indirectee(p);
+        p = %acquire StgInd_indirectee(p);
         goto eval;
     }
 

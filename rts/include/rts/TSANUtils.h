@@ -39,6 +39,7 @@
 #endif
 #endif
 
+#if !defined(CMINUSMINUS)
 #if defined(TSAN_ENABLED)
 #if !defined(HAVE_C11_ATOMICS)
 #error TSAN cannot be enabled without C11 atomics support.
@@ -72,3 +73,4 @@ uint32_t ghc_tsan_atomic32_compare_exchange(uint32_t *ptr, uint32_t expected, ui
 uint16_t ghc_tsan_atomic16_compare_exchange(uint16_t *ptr, uint16_t expected, uint16_t new_value, int success_memorder, int failure_memorder);
 uint8_t ghc_tsan_atomic8_compare_exchange(uint8_t *ptr, uint8_t expected, uint8_t new_value, int success_memorder, int failure_memorder);
 
+#endif

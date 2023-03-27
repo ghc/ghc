@@ -35,6 +35,7 @@
 #define CMINUSMINUS 1
 
 #include "ghcconfig.h"
+#include "rts/TSANUtils.h"
 
 /* -----------------------------------------------------------------------------
    Types
@@ -311,7 +312,7 @@
 #define ENTER(x) ENTER_(return,x)
 #endif
 
-#define ENTER_R1() ENTER_(RET_R1,R1)
+#define ENTER_R1() P_ _r1; _r1 = R1; ENTER_(RET_R1, _r1)
 
 #define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]
 
@@ -326,7 +327,7 @@
     IND,                                                \
     IND_STATIC:                                         \
    {                                                    \
-      x = StgInd_indirectee(x);                         \
+      x = %acquire StgInd_indirectee(x);                \
       goto again;                                       \
    }                                                    \
   case                                                  \
@@ -446,9 +447,17 @@
    HP_CHK_P(bytes);                             \
    TICK_ALLOC_RTS(bytes);
 
+// Load a field out of structure with relaxed ordering.
+#define RELAXED_LOAD_FIELD(fld, ptr) \
+    REP_##fld[(ptr) + OFFSET_##fld]
+
+// Load a field out of an StgClosure with relaxed ordering.
+#define RELAXED_LOAD_CLOSURE_FIELD(fld, ptr) \
+    REP_##fld[(ptr) + SIZEOF_StgHeader + OFFSET_##fld]
+
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
-   generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
+   RELAXED_LOAD_FIELD(generation_n_new_large_words, W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
 
 // allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses

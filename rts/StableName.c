@@ -156,11 +156,11 @@ removeIndirections (StgClosure* p)
         switch (get_itbl(q)->type) {
         case IND:
         case IND_STATIC:
-            p = ((StgInd *)q)->indirectee;
+            p = ACQUIRE_LOAD(&((StgInd *)q)->indirectee);
             continue;
 
         case BLACKHOLE:
-            p = ((StgInd *)q)->indirectee;
+            p = ACQUIRE_LOAD(&((StgInd *)q)->indirectee);
             if (GET_CLOSURE_TAG(p) != 0) {
                 continue;
             } else {

@@ -510,7 +510,8 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
     TICK_ENT_DYN_IND(); /* tick */
     ACQUIRE_FENCE;
-    node = UNTAG(StgInd_indirectee(node));
+    node = %acquire StgInd_indirectee(node);
+    node = UNTAG(node);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(node) (node);
 }
@@ -519,7 +520,9 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
     TICK_ENT_DYN_IND(); /* tick */
     ACQUIRE_FENCE;
-    R1 = UNTAG(StgInd_indirectee(R1));
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -530,7 +533,9 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {
     TICK_ENT_STATIC_IND(); /* tick */
     ACQUIRE_FENCE;
-    R1 = UNTAG(StgInd_indirectee(R1));
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -553,14 +558,11 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     TICK_ENT_DYN_IND(); /* tick */
 
 retry:
-#if defined(TSAN_ENABLED)
-    // See Note [ThreadSanitizer and fences]
-    W_ unused; unused = %acquire GET_INFO(node);
-#endif
-    // Synchronizes with the release-store in updateWithIndirection.
+    // Synchronizes with the release-store in
+    // updateWithIndirection.
     // See Note [Heap memory barriers] in SMP.h.
     ACQUIRE_FENCE;
-    p = %relaxed StgInd_indirectee(node);
+    p = %acquire StgInd_indirectee(node);
     if (GETTAG(p) != 0) {
         return (p);
     }
@@ -645,7 +647,7 @@ INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
     i = 0;
 loop:
     // spin until the WHITEHOLE is updated
-    info = StgHeader_info(node);
+    info = %relaxed StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
         W_[whitehole_lockClosure_spin] =
@@ -664,6 +666,7 @@ loop:
         // defined in CMM.
         goto loop;
     }
+    ACQUIRE_FENCE;
     jump %ENTRY_CODE(info) (node);
 #else
     ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
