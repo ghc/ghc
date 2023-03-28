@@ -742,6 +742,7 @@ AC_PROG_INSTALL
 dnl ** how to invoke `ar' and `ranlib'
 FP_PROG_AR_SUPPORTS_ATFILE
 FP_PROG_AR_SUPPORTS_DASH_L
+FP_PROG_LD_SUPPORTS_DOT_O_ARCHIVES
 FP_PROG_AR_NEEDS_RANLIB
 
 dnl ** Check to see whether ln -s works
