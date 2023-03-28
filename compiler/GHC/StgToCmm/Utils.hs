@@ -37,6 +37,7 @@ module GHC.StgToCmm.Utils (
         cmmUntag, cmmIsTagged,
 
         addToMem, addToMemE, addToMemLblE, addToMemLbl,
+        emitAtomicRead, emitAtomicWrite,
 
         -- * Update remembered set operations
         whenUpdRemSetEnabled,
@@ -59,6 +60,7 @@ import GHC.Platform.Regs
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
+import {-# SOURCE #-} GHC.StgToCmm.Foreign (emitPrimCall)
 import GHC.StgToCmm.CgUtils
 
 import GHC.Types.ForeignCall
@@ -118,6 +120,29 @@ addToMemE :: CmmType    -- rep of the counter
 addToMemE rep ptr n
   = mkStore ptr (CmmMachOp (MO_Add (typeWidth rep)) [CmmLoad ptr rep NaturallyAligned, n])
 
+-------------------------------------------------------------------------
+--      Atomic loads and stores
+-------------------------------------------------------------------------
+
+emitAtomicRead
+  :: MemoryOrdering
+  -> LocalReg -- ^ result register
+  -> CmmExpr  -- ^ address
+  -> FCode ()
+emitAtomicRead mord res addr
+  = void $ emitPrimCall [res] (MO_AtomicRead w mord) [addr]
+  where
+    w = typeWidth $ localRegType res
+
+emitAtomicWrite
+  :: MemoryOrdering
+  -> CmmExpr  -- ^ address
+  -> CmmExpr  -- ^ value
+  -> FCode ()
+emitAtomicWrite mord addr val
+  = do platform <- getPlatform
+       let w = typeWidth $ cmmExprType platform val
+       void $ emitPrimCall [] (MO_AtomicWrite w mord) [addr, val]
 
 -------------------------------------------------------------------------
 --
