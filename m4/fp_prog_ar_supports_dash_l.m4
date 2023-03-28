@@ -18,8 +18,10 @@ AC_DEFUN([FP_PROG_AR_SUPPORTS_DASH_L],
       "$fp_prog_ar" qcL conftest.a conftest-a.a conftest-b.a 2>/dev/null
       if "$fp_prog_ar" t conftest.a | grep -s "conftest.a1" > /dev/null
       then
+        AC_MSG_RESULT([yes])
         fp_cv_prog_ar_supports_dash_l=yes
       else
+        AC_MSG_RESULT([no])
         fp_cv_prog_ar_supports_dash_l=no
       fi
       rm -f conftest*
