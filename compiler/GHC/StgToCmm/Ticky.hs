@@ -829,25 +829,34 @@ bumpTickyLit :: CmmLit -> FCode ()
 bumpTickyLit lhs = bumpTickyLitBy lhs 1
 
 bumpTickyLitBy :: CmmLit -> Int -> FCode ()
-bumpTickyLitBy lhs n = do
-  platform <- getPlatform
-  emit (addToMem (bWord platform) (CmmLit lhs) n)
+bumpTickyLitBy lhs n = emitAddToMem (CmmLit lhs) n
 
 bumpTickyLitByE :: CmmLit -> CmmExpr -> FCode ()
-bumpTickyLitByE lhs e = do
-  platform <- getPlatform
-  emit (addToMemE (bWord platform) (CmmLit lhs) e)
+bumpTickyLitByE lhs e = emitAddToMemE (CmmLit lhs) e
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
     platform <- getPlatform
     let offset = n `min` (pc_TICKY_BIN_COUNT (platformConstants platform) - 1)
-    emit (addToMem (bWord platform)
-           (cmmIndexExpr platform
+    let addr = 
+           cmmIndexExpr platform
                 (wordWidth platform)
                 (CmmLit (CmmLabel (mkRtsCmmDataLabel lbl)))
-                (CmmLit (CmmInt (fromIntegral offset) (wordWidth platform))))
-           1)
+                (CmmLit (CmmInt (fromIntegral offset) (wordWidth platform)))
+    emitAddToMem addr 1
+
+emitAddToMem :: CmmExpr -> Int -> FCode ()
+emitAddToMem lhs n = do
+  platform <- getPlatform
+  emitAddToMemE lhs (mkIntExpr platform n)
+
+emitAddToMemE :: CmmExpr -> CmmExpr -> FCode ()
+emitAddToMemE lhs n = do
+  platform <- getPlatform
+  val <- newTemp (bWord platform)
+  emitAtomicRead MemOrderRelaxed val lhs
+  let val' = cmmOffsetExpr platform (CmmReg (CmmLocal val)) n
+  emitAtomicWrite MemOrderRelaxed lhs val'
 
 ------------------------------------------------------------------
 -- Showing the "type category" for ticky-ticky profiling
