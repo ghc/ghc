@@ -25,4 +25,5 @@ void test_c() {
     for (int i = 0; i < 16; i++) {
         printf("%2i: %02x %02x\n", i, blah[i], foo[i]);
     }
+    fflush(stdout);
 }
