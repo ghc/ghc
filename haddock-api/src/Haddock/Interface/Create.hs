@@ -32,7 +32,8 @@ module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
 import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
-import Haddock.GhcUtils (addClassContext, filterSigNames, lHsQTyVarsToTypes, mkEmptySigType, moduleString, parents,
+import Haddock.GhcUtils (addClassContext, filterSigNames, lHsQTyVarsToTypes,
+                         mkEmptySigType, moduleString, parents,
                          pretty, restrictTo, sigName, unL)
 import Haddock.Interface.LexParseRn
 import Haddock.Options (Flag (..), modulePackageInfo)
@@ -62,11 +63,12 @@ import GHC.IORef (readIORef)
 import GHC.Stack (HasCallStack)
 import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
-import GHC.Types.Avail hiding (avail)
-import qualified GHC.Types.Avail as Avail
-import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv)
+import GHC.Types.Avail
+import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName,
+                       nameIsLocalOrFrom, nameOccName, emptyOccEnv)
 import GHC.Types.Name.Env (lookupNameEnv)
-import GHC.Types.Name.Reader (GlobalRdrEnv, greMangledName, lookupGlobalRdrEnv)
+import GHC.Types.Name.Reader (GlobalRdrEnv, FieldsOrSelectors(..), WhichGREs(..),
+                              greName, lookupGRE_OccName)
 import GHC.Types.Name.Set (elemNameSet, mkNameSet)
 import GHC.Types.SourceFile (HscSource (..))
 import GHC.Types.SourceText (SourceText (..), sl_fs)
@@ -226,7 +228,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     -- All the exported Names of this module.
     exported_names :: [Name]
     exported_names =
-      concatMap availNamesWithSelectors tcg_exports
+      concatMap availNames tcg_exports
 
     -- Module imports of the form `import X`. Note that there is
     -- a) no qualification and
@@ -412,8 +414,9 @@ mkWarningMap dflags warnings gre exps = case warnings of
   WarnSome ws ->
     let ws' = [ (n, w)
               | (occ, w) <- ws
-              , elt <- lookupGlobalRdrEnv gre occ
-              , let n = greMangledName elt, n `elem` exps ]
+              , elt <- lookupGRE_OccName (IncludeFields WantNormal) gre occ
+              , let n = greName elt
+              , n `elem` exps ]
     in M.fromList <$> traverse (bitraverse pure (parseWarning dflags gre)) ws'
 
 moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings a -> ErrMsgM (Maybe (Doc Name))
@@ -875,7 +878,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
         mtyThing <- lookupName name
         case mtyThing of
           Just (AConLike PatSynCon{}) -> do
-            export_items <- declWith (Avail.avail name)
+            export_items <- declWith (Avail name)
             pure [ (unLoc patsyn_decl, patsyn_doc)
                  | ExportDecl {
                        expItemDecl  = patsyn_decl
@@ -889,7 +892,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           filter isDataConName (availSubordinates avail)
 
 availSubordinates :: AvailInfo -> [Name]
-availSubordinates = map greNameMangledName . availSubordinateGreNames
+availSubordinates = availSubordinateNames
 
 availNoDocs :: AvailInfo -> [(Name, DocForDecl Name)]
 availNoDocs avail =

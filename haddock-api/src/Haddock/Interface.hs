@@ -318,7 +318,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
     !mods = mkModuleSet
       [ nameModule name
       | gre <- globalRdrEnvElts tcg_rdr_env
-      , let name = greMangledName gre
+      , let name = greName gre
       , nameIsFromExternalPackage (hsc_home_unit hsc_env) name
       , isTcOcc (nameOccName name)   -- Types and classes only
       , unQualOK gre -- In scope unqualified

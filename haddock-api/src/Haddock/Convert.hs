@@ -48,6 +48,7 @@ import GHC.Types.Unique ( getUnique )
 import GHC.Utils.Misc ( chkAppend, dropList, equalLength
                       , filterByList, filterOut )
 import GHC.Utils.Panic.Plain ( assert )
+import GHC.Types.FieldLabel
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc

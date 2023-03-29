@@ -247,8 +247,8 @@ moduleInfo iface =
       info = ifaceInfo iface
 
       doOneEntry :: (String, HaddockModInfo GHC.Name -> Maybe String) -> Maybe HtmlTable
-      doOneEntry (fieldName, field) =
-        field info >>= \a -> return (th << fieldName <-> td << a)
+      doOneEntry (fldNm, fld) =
+        fld info >>= \a -> return (th << fldNm <-> td << a)
 
       entries :: [HtmlTable]
       entries = maybeToList copyrightsTable ++ mapMaybe doOneEntry [

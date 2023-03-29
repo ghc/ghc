@@ -109,7 +109,7 @@ rename dflags gre = rn
       DocIdentifier i -> do
         let NsRdrName ns x = unwrap i
             occ = rdrNameOcc x
-            isValueName = isDataOcc occ || isVarOcc occ
+            isValueName = isDataOcc occ || isVarOcc occ || isFieldOcc occ
 
         let valueNsChoices | isValueName = [x]
                            | otherwise   = [] -- is this ever possible?
@@ -125,7 +125,7 @@ rename dflags gre = rn
                         None  -> valueNsChoices ++ typeNsChoices
 
         -- Lookup any GlobalRdrElts that match the choices.
-        case concatMap (\c -> lookupGRE_RdrName c gre) choices of
+        case concatMap (\c -> lookupGRE_RdrName (IncludeFields WantNormal) gre c) choices of
           -- We found no names in the env so we start guessing.
           [] ->
             case choices of
@@ -145,7 +145,7 @@ rename dflags gre = rn
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure $ DocIdentifier (i $> greMangledName a)
+          [a] -> pure $ DocIdentifier (i $> greName a)
 
           -- There are multiple names available.
           gres -> ambiguous dflags i gres
@@ -213,7 +213,7 @@ ambiguous dflags x gres = do
   let noChildren = map availName (gresToAvailInfo gres)
       dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
       msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greMangledName gres) ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greName gres) ++
             "    You may be able to disambiguate the identifier by qualifying it or\n" ++
             "    by specifying the type/value namespace explicitly.\n" ++
             "    Defaulting to the one defined " ++ defnLoc dflt
