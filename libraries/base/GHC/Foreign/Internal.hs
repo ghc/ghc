@@ -21,19 +21,16 @@ module GHC.Foreign.Internal (
     -- * C strings with a configurable encoding
     CString, CStringLen,
 
-    -- conversion of C strings into Haskell strings
-    --
+    -- * Conversion of C strings into Haskell strings
     peekCString,
     peekCStringLen,
 
-    -- conversion of Haskell strings into C strings
-    --
+    -- * Conversion of Haskell strings into C strings
     newCString,
     newCStringLen,
     newCStringLen0,
 
-    -- conversion of Haskell strings into C strings using temporary storage
-    --
+    -- * Conversion of Haskell strings into C strings using temporary storage
     withCString,
     withCStringLen,
     withCStringLen0,
