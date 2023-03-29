@@ -215,11 +215,6 @@ Runtime system
 - Add `Foreign.C.Types.ConstPtr` was added to encode ``const``-qualified pointer return
   types in foreign declarations when using ``CApiFFI`` extension.
 
-- The ``RecordUpd`` constructor of ``HsExpr`` now takes an ``HsRecUpdFields``
-  instead of ``Either [LHsRecUpdField p] [LHsRecUpdProj p]``.
-  Instead of ``Left ..``, use the constructor ``RegularRecUpdFields``, and instead
-  of ``Right ..``, use the constructor ``OverloadedRecUpdFields``.
-
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 

@@ -93,6 +93,11 @@ Runtime system
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- The ``RecordUpd`` constructor of ``HsExpr`` now takes an ``HsRecUpdFields``
+  instead of ``Either [LHsRecUpdField p] [LHsRecUpdProj p]``.
+  Instead of ``Left ..``, use the constructor ``RegularRecUpdFields``, and instead
+  of ``Right ..``, use the constructor ``OverloadedRecUpdFields``.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
