@@ -3557,8 +3557,8 @@ mkDupableContWithDmds env dmds
         --              let a = ...arg...
         --              in [...hole...] a
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-    do  { let (dmd:_) = dmds   -- Never fails
-        ; (floats1, cont') <- mkDupableContWithDmds env dmds cont
+    do  { let (dmd:cont_dmds) = dmds   -- Never fails
+        ; (floats1, cont') <- mkDupableContWithDmds env cont_dmds cont
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplArg env' dup se arg
         ; (let_floats2, arg'') <- makeTrivial env NotTopLevel dmd (fsLit "karg") arg'
