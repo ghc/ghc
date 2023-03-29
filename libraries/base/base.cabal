@@ -351,6 +351,7 @@ Library
         GHC.Event.IntVar
         GHC.Event.PSQ
         GHC.Event.Unique
+        GHC.Foreign.Internal
         -- GHC.IOPort -- TODO: hide again after debug
         GHC.Unicode.Internal.Bits
         GHC.Unicode.Internal.Char.DerivedCoreProperties
