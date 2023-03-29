@@ -74,7 +74,6 @@ pprNatCmmDecl config (CmmData section dats) =
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config in
-  pprProcAlignment config $$
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:

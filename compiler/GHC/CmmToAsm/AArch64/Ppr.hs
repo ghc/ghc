@@ -18,7 +18,6 @@ import GHC.CmmToAsm.Utils
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
@@ -29,18 +28,12 @@ import GHC.Utils.Outputable
 
 import GHC.Utils.Panic
 
-pprProcAlignment :: IsDoc doc => NCGConfig -> doc
-pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
-   where
-      platform = ncgPlatform config
-
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
 pprNatCmmDecl config (CmmData section dats) =
   pprSectionAlign config section $$ pprDatas config dats
 
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config in
-  pprProcAlignment config $$
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
@@ -79,10 +72,6 @@ pprLabel platform lbl =
    pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
    $$ line (pprAsmLabel platform lbl <> char ':')
-
-pprAlign :: IsDoc doc => Platform -> Alignment -> doc
-pprAlign _platform alignment
-        = line $ text "\t.balign " <> int (alignmentBytes alignment)
 
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
