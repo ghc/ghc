@@ -471,14 +471,10 @@ instance Binary Heap.WhyBlocked
 instance Binary Heap.TsoFlags
 #endif
 
-#if MIN_VERSION_base(4,17,0)
-instance Binary Heap.RetFunType
-#endif
-
 instance Binary Heap.StgInfoTable
 instance Binary Heap.ClosureType
 instance Binary Heap.PrimType
-instance Binary a => Binary (Heap.GenClosure a)
+instance (Binary a) => Binary (Heap.GenClosure a)
 
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 

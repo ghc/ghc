@@ -26,6 +26,7 @@ module GHC.Exts.Heap (
     -- * Closure types
       Closure
     , GenClosure(..)
+    , StackFrame(..)
     , ClosureType(..)
     , PrimType(..)
     , WhatNext(..)
@@ -138,11 +139,6 @@ instance Double# ~ a => HasHeapRep (a :: TYPE 'DoubleRep) where
     getClosureData x = return $
         DoubleClosure { ptipe = PDouble, doubleVal = D# x }
 
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-instance {-# OVERLAPPING #-} HasHeapRep StackSnapshot# where
-    getClosureData s# = decodeStack (StackSnapshot s#)
-#endif
-
 -- | Get the heap representation of a closure _at this moment_, even if it is
 -- unevaluated or an indirection or other exotic stuff. Beware when passing
 -- something to this function, the same caveats as for
@@ -180,31 +176,9 @@ getClosureDataFromHeapObject x = do
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
 
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-getBoxedClosureData b@(StackFrameBox sfi) = trace ("unpack " ++ show b) $ unpackStackFrameIter sfi
-#endif
-
 -- | Get the size of the top-level closure in words.
 -- Includes header and payload. Does not follow pointers.
 --
 -- @since 8.10.1
 closureSize :: Box -> IO Int
 closureSize (Box x) = pure $ I# (closureSize# x)
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-closureSize (StackFrameBox sfi) = unpackStackFrameIter sfi <&>
-  \c ->
-    case c of
-      UpdateFrame {} -> sizeStgUpdateFrame
-      CatchFrame {} -> sizeStgCatchFrame
-      CatchStmFrame {} -> sizeStgCatchSTMFrame
-      CatchRetryFrame {} -> sizeStgCatchRetryFrame
-      AtomicallyFrame {} -> sizeStgAtomicallyFrame
-      RetSmall {..} -> sizeStgClosure + length payload
-      RetBig {..} -> sizeStgClosure + length payload
-      RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
-      -- The one additional word is a pointer to the StgBCO in the closure's payload
-      RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
-      -- The one additional word is a pointer to the next stack chunk
-      UnderflowFrame {} -> sizeStgClosure + 1
-      _ -> error "Unexpected closure type"
-#endif

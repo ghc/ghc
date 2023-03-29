@@ -11,6 +11,7 @@ module GHC.Exts.Heap.Closures (
     -- * Closures
       Closure
     , GenClosure(..)
+    , StackFrame(..)
     , PrimType(..)
     , WhatNext(..)
     , WhyBlocked(..)
@@ -22,6 +23,7 @@ module GHC.Exts.Heap.Closures (
     , Box(..)
     , areBoxesEqual
     , asBox
+    , StgStackClosure(..)
 #if MIN_TOOL_VERSION_ghc(9,7,0)
     , StackFrameIter(..)
 #endif
@@ -50,7 +52,6 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
-
 #if MIN_TOOL_VERSION_ghc(9,7,0)
 import GHC.Stack.CloneStack (StackSnapshot(..), stackSnapshotToString)
 import GHC.Exts.Stack.Constants
@@ -67,11 +68,8 @@ foreign import prim "reallyUnsafePtrEqualityUpToTag"
 #if MIN_TOOL_VERSION_ghc(9,7,0)
 -- | Iterator state for stack decoding
 data StackFrameIter =
-  -- | Represents a `StackClosure` / @StgStack@
-  SfiStackClosure
-    { stackSnapshot# :: !StackSnapshot# }
   -- | Represents a closure on the stack
-  | SfiClosure
+  SfiClosure
     { stackSnapshot# :: !StackSnapshot#,
       index :: !WordOffset
     }
@@ -82,8 +80,6 @@ data StackFrameIter =
     }
 
 instance Eq StackFrameIter where
-  (SfiStackClosure s1#) == (SfiStackClosure s2#) =
-    (StackSnapshot s1#) == (StackSnapshot s2#)
   (SfiClosure s1# i1) == (SfiClosure s2# i2) =
     (StackSnapshot s1#) == (StackSnapshot s2#)
     && i1 == i2
@@ -93,34 +89,31 @@ instance Eq StackFrameIter where
   _ == _ = False
 
 instance Show StackFrameIter where
-   showsPrec _ (SfiStackClosure s#) rs =
-    "SfiStackClosure { stackSnapshot# = " ++ stackSnapshotToString (StackSnapshot s#) ++ "}" ++ rs
    showsPrec _ (SfiClosure s# i ) rs =
     "SfiClosure { stackSnapshot# = " ++ stackSnapshotToString (StackSnapshot s#) ++ show i ++ ", " ++ "}" ++ rs
    showsPrec _ (SfiPrimitive s# i ) rs =
     "SfiPrimitive { stackSnapshot# = " ++ stackSnapshotToString (StackSnapshot s#) ++ show i ++ ", " ++ "}" ++ rs
 
--- | An arbitrary Haskell value in a safe Box.
---
--- The point is that even unevaluated thunks can safely be moved around inside
--- the Box, and when required, e.g. in 'getBoxedClosureData', the function knows
--- how far it has to evaluate the argument.
---
--- `Box`es can be used to increase (and enforce) laziness: In a graph of
--- closures they can act as a barrier of evaluation. `Closure` is an example for
--- this.
-data Box =
-  -- | A heap located closure.
-  Box Any
-  -- | A value or reference to a value on the stack.
-  | StackFrameBox StackFrameIter
-#else
+-- | A value or reference to a value on the stack.
+newtype StackFrameBox =  StackFrameBox StackFrameIter
+  deriving (Eq)
+
+instance Show StackFrameBox where
+   showsPrec _ (StackFrameBox sfi) rs =
+    "(StackFrameBox " ++ show sfi ++ ")" ++ rs
+
+areStackFrameBoxesEqual :: StackFrameBox -> StackFrameBox -> Bool
+areStackFrameBoxesEqual (StackFrameBox sfi1) (StackFrameBox sfi2) =
+  sfi1 == sfi2
+areStackFrameBoxesEqual _ _ = False
+
+#endif
+
 -- | An arbitrary Haskell value in a safe Box. The point is that even
 -- unevaluated thunks can safely be moved around inside the Box, and when
 -- required, e.g. in 'getBoxedClosureData', the function knows how far it has
 -- to evaluate the argument.
 data Box = Box Any
-#endif
 
 instance Show Box where
 -- From libraries/base/GHC/Ptr.lhs
@@ -132,10 +125,6 @@ instance Show Box where
        tag  = ptr .&. fromIntegral tAG_MASK -- ((1 `shiftL` TAG_BITS) -1)
        addr = ptr - tag
        pad_out ls = '0':'x':ls
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-   showsPrec _ (StackFrameBox sfi) rs =
-    "(StackFrameBox " ++ show sfi ++ ")" ++ rs
-#endif
 
 -- | Boxes can be compared, but this is not pure, as different heap objects can,
 -- after garbage collection, become the same object.
@@ -143,11 +132,6 @@ areBoxesEqual :: Box -> Box -> IO Bool
 areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
     0# -> pure False
     _  -> pure True
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-areBoxesEqual (StackFrameBox sfi1) (StackFrameBox sfi2) =
-  pure $ sfi1 == sfi2
-areBoxesEqual _ _ = pure False
-#endif
 
 -- |This takes an arbitrary value and puts it into a box.
 -- Note that calls like
@@ -163,7 +147,6 @@ asBox x = Box (unsafeCoerce# x)
 
 ------------------------------------------------------------------------
 -- Closures
-
 type Closure = GenClosure Box
 
 -- | This is the representation of a Haskell value on the heap. It reflects
@@ -369,74 +352,8 @@ data GenClosure b
 #if __GLASGOW_HASKELL__ >= 811
       , stack_marking   :: !Word8
 #endif
-      -- | The frames of the stack. Only available if a cloned stack was
-      -- decoded, otherwise empty.
-      , stack           :: ![b]
       }
 
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-  | UpdateFrame
-      { info            :: !StgInfoTable
-      , updatee :: !b
-      }
-
-  | CatchFrame
-      { info            :: !StgInfoTable
-      , exceptions_blocked :: Word
-      , handler :: !b
-      }
-
-  | CatchStmFrame
-      { info            :: !StgInfoTable
-      , catchFrameCode :: !b
-      , handler :: !b
-      }
-
-  | CatchRetryFrame
-      { info            :: !StgInfoTable
-      , running_alt_code :: !Word
-      , first_code :: !b
-      , alt_code :: !b
-      }
-
-  | AtomicallyFrame
-      { info            :: !StgInfoTable
-      , atomicallyFrameCode :: !b
-      , result :: !b
-      }
-
-  | UnderflowFrame
-      { info            :: !StgInfoTable
-      , nextChunk       :: !b
-      }
-
-  | StopFrame
-      { info            :: !StgInfoTable }
-
-  | RetSmall
-      { info            :: !StgInfoTable
-      , payload :: ![b]
-      }
-
-  | RetBig
-      { info            :: !StgInfoTable
-      , payload :: ![b]
-      }
-
-  | RetFun
-      { info            :: !StgInfoTable
-      , retFunType :: RetFunType
-      , retFunSize :: Word
-      , retFunFun :: !b
-      , retFunPayload :: ![b]
-      }
-
-  |  RetBCO
-      { info            :: !StgInfoTable
-      , bco :: !b -- must be a BCOClosure
-      , bcoArgs :: ![b]
-      }
-#endif
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
@@ -491,7 +408,92 @@ data GenClosure b
 
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
-  deriving (Eq, Show, Generic, Functor, Foldable, Traversable)
+  deriving (Show, Generic, Functor, Foldable, Traversable)
+
+-- | A decoded @StgStack@ with `StackFrame`s
+--
+-- This is separate from it's `Closure` incarnation, as unification would
+-- require two kinds of boxes for bitmap encoded stack content: One for
+-- primitives and one for closures. This turned out to be a nightmare with lots
+-- of pattern matches and leaking data structures to enable access to primitives
+-- on the stack...
+data  StgStackClosure = StgStackClosure
+      { ssc_info            :: !StgInfoTable
+      , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
+      , ssc_stack_dirty     :: !Word8 -- ^ non-zero => dirty
+      , ssc_stack_marking   :: !Word8
+      , ssc_stack           :: ![StackFrame]
+      }
+      deriving Show
+
+-- | A single stack frame
+--
+-- It doesn't use `Box`es because that would require a `Box` constructor for
+-- primitive values (bitmap encoded payloads), which introduces lots of pattern
+-- matches and complicates the whole implementation (and breaks existing code.)
+data StackFrame =
+   UpdateFrame
+      { info_tbl            :: !StgInfoTable
+      , updatee :: !Closure
+      }
+
+  | CatchFrame
+      { info_tbl            :: !StgInfoTable
+      , exceptions_blocked :: Word
+      , handler :: !Closure
+      }
+
+  | CatchStmFrame
+      { info_tbl            :: !StgInfoTable
+      , catchFrameCode :: !Closure
+      , handler :: !Closure
+      }
+
+  | CatchRetryFrame
+      { info_tbl            :: !StgInfoTable
+      , running_alt_code :: !Word
+      , first_code :: !Closure
+      , alt_code :: !Closure
+      }
+
+  | AtomicallyFrame
+      { info_tbl            :: !StgInfoTable
+      , atomicallyFrameCode :: !Closure
+      , result :: !Closure
+      }
+
+  | UnderflowFrame
+      { info_tbl            :: !StgInfoTable
+      , nextChunk       :: !StgStackClosure
+      }
+
+  | StopFrame
+      { info_tbl            :: !StgInfoTable }
+
+  | RetSmall
+      { info_tbl            :: !StgInfoTable
+      , stack_payload :: ![Closure]
+      }
+
+  | RetBig
+      { info_tbl            :: !StgInfoTable
+      , stack_payload :: ![Closure]
+      }
+
+  | RetFun
+      { info_tbl            :: !StgInfoTable
+      , retFunType :: RetFunType
+      , retFunSize :: Word
+      , retFunFun :: !Closure
+      , retFunPayload :: ![Closure]
+      }
+
+  |  RetBCO
+      { info_tbl            :: !StgInfoTable
+      , bco :: !Closure -- must be a BCOClosure
+      , bcoArgs :: ![Closure]
+      }
+  deriving (Show, Generic)
 
 data RetFunType =
       ARG_GEN     |
@@ -592,16 +594,5 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-allClosures (StackClosure {..}) = stack
-allClosures (UpdateFrame {..}) = [updatee]
-allClosures (CatchFrame {..}) = [handler]
-allClosures (CatchStmFrame {..}) = [catchFrameCode, handler]
-allClosures (CatchRetryFrame {..}) = [first_code, alt_code]
-allClosures (AtomicallyFrame {..}) = [atomicallyFrameCode, result]
-allClosures (RetSmall {..}) = payload
-allClosures (RetBig {..}) = payload
-allClosures (RetFun {..}) = retFunFun : retFunPayload
-allClosures (RetBCO {..}) = bco : bcoArgs
-#endif
+allClosures (StackClosure {}) = []
 allClosures _ = []
