@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables, PatternSynonyms, MultiWayIf #-}
 
 {-# LANGUAGE DeriveFunctor #-}
 
@@ -50,6 +50,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import {-# SOURCE #-} GHC.Tc.Utils.TcType ( tcEqType )
 import GHC.Exts( oneShot )
+import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 
@@ -1045,6 +1046,59 @@ These two TyConApps have the same TyCon at the front but they
 (legitimately) have different numbers of arguments.  They
 are surelyApart, so we can report that without looking any
 further (see #15704).
+
+Note [Unifying type applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unifying type applications is quite subtle, as we found
+in #23134 and #22647, when type families are involved.
+
+Suppose
+   type family F a :: Type -> Type
+   type family G k :: k = r | r -> k
+
+and consider these examples:
+
+* F Int ~ F Char, where F is injective
+  Since F is injective, we can reduce this to Int ~ Char,
+  therefore SurelyApart.
+
+* F Int ~ F Char, where F is not injective
+  Without injectivity, return MaybeApart.
+
+* G Type ~ G (Type -> Type) Int
+  Even though G is injective and the arguments to G are different,
+  we cannot deduce apartness because the RHS is oversaturated.
+  For example, G might be defined as
+    G Type = Maybe Int
+    G (Type -> Type) = Maybe
+  So we return MaybeApart.
+
+* F Int Bool ~ F Int Char       -- SurelyApart (since Bool is apart from Char)
+  F Int Bool ~ Maybe a          -- MaybeApart
+  F Int Bool ~ a b              -- MaybeApart
+  F Int Bool ~ Char -> Bool     -- MaybeApart
+  An oversaturated type family can match an application,
+  whether it's a TyConApp, AppTy or FunTy. Decompose.
+
+* F Int ~ a b
+  We cannot decompose a saturated, or under-saturated
+  type family application. We return MaybeApart.
+
+To handle all those conditions, unify_ty goes through
+the following checks in sequence, where Fn is a type family
+of arity n:
+
+* (C1) Fn x_1 ... x_n ~ Fn y_1 .. y_n
+  A saturated application.
+  Here we can unify arguments in which Fn is injective.
+* (C2) Fn x_1 ... x_n ~ anything, anything ~ Fn x_1 ... x_n
+  A saturated type family can match anything - we return MaybeApart.
+* (C3) Fn x_1 ... x_m ~ a b, a b ~ Fn x_1 ... x_m where m > n
+  An oversaturated type family can be decomposed.
+* (C4) Fn x_1 ... x_m ~ anything, anything ~ Fn x_1 ... x_m, where m > n
+  If we couldn't decompose in the previous step, we return SurelyApart.
+
+Afterwards, the rest of the code doesn't have to worry about type families.
 -}
 
 -------------- unify_ty: the main workhorse -----------
@@ -1093,33 +1147,62 @@ unify_ty env ty1 (TyVarTy tv2) kco
   = uVar (umSwapRn env) tv2 ty1 (mkSymCo kco)
 
 unify_ty env ty1 ty2 _kco
- -- NB: This keeps Constraint and Type distinct, as it should for use in the
- -- type-checker.
+  -- Handle non-oversaturated type families first
+  -- See Note [Unifying type applications]
+  --
+  -- (C1) If we have T x1 ... xn ~ T y1 ... yn, use injectivity information of T
+  -- Note that both sides must not be oversaturated
+  | Just (tc1, tys1) <- isSatTyFamApp mb_tc_app1
+  , Just (tc2, tys2) <- isSatTyFamApp mb_tc_app2
+  , tc1 == tc2
+  = do { let inj = case tyConInjectivityInfo tc1 of
+                          NotInjective -> repeat False
+                          Injective bs -> bs
+
+             (inj_tys1, noninj_tys1) = partitionByList inj tys1
+             (inj_tys2, noninj_tys2) = partitionByList inj tys2
+
+       ; unify_tys env inj_tys1 inj_tys2
+       ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
+         don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
+
+  | Just _ <- isSatTyFamApp mb_tc_app1  -- (C2) A (not-over-saturated) type-family application
+  = maybeApart MARTypeFamily            -- behaves like a type variable; might match
+
+  | Just _ <- isSatTyFamApp mb_tc_app2  -- (C2) A (not-over-saturated) type-family application
+                                        -- behaves like a type variable; might unify
+                                        -- but doesn't match (as in the TyVarTy case)
+  = if um_unif env then maybeApart MARTypeFamily else surelyApart
+
+  -- Handle oversaturated type families.
+  --
+  -- They can match an application (TyConApp/FunTy/AppTy), this is handled
+  -- the same way as in the AppTy case below.
+  --
+  -- If there is no application, an oversaturated type family can only
+  -- match a type variable or a saturated type family,
+  -- both of which we handled earlier. So we can say surelyApart.
+  | Just (tc1, _) <- mb_tc_app1
+  , isTypeFamilyTyCon tc1
+  = if | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
+       , Just (ty2a, ty2b) <- tcRepSplitAppTy_maybe ty2
+       -> unify_ty_app env ty1a [ty1b] ty2a [ty2b]            -- (C3)
+       | otherwise -> surelyApart                             -- (C4)
+
+  | Just (tc2, _) <- mb_tc_app2
+  , isTypeFamilyTyCon tc2
+  = if | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
+       , Just (ty2a, ty2b) <- tcRepSplitAppTy_maybe ty2
+       -> unify_ty_app env ty1a [ty1b] ty2a [ty2b]            -- (C3)
+       | otherwise -> surelyApart                             -- (C4)
+
+  -- At this point, neither tc1 nor tc2 can be a type family.
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
   , tc1 == tc2
-  = if isInjectiveTyCon tc1 Nominal
-    then unify_tys env tys1 tys2
-    else do { let inj | isTypeFamilyTyCon tc1
-                      = case tyConInjectivityInfo tc1 of
-                               NotInjective -> repeat False
-                               Injective bs -> bs
-                      | otherwise
-                      = repeat False
-
-                  (inj_tys1, noninj_tys1) = partitionByList inj tys1
-                  (inj_tys2, noninj_tys2) = partitionByList inj tys2
-
-            ; unify_tys env inj_tys1 inj_tys2
-            ; unless (um_inj_tf env) $ -- See (end of) Note [Specification of unification]
-              don'tBeSoSure MARTypeFamily $ unify_tys env noninj_tys1 noninj_tys2 }
-
-  | isTyFamApp mb_tc_app1     -- A (not-over-saturated) type-family application
-  = maybeApart MARTypeFamily  -- behaves like a type variable; might match
-
-  | isTyFamApp mb_tc_app2     -- A (not-over-saturated) type-family application
-  , um_unif env               -- behaves like a type variable; might unify
-  = maybeApart MARTypeFamily
+  = do { massertPpr (isInjectiveTyCon tc1 Nominal) (ppr tc1)
+       ; unify_tys env tys1 tys2
+       }
 
   where
     mb_tc_app1 = tcSplitTyConApp_maybe ty1
@@ -1207,16 +1290,16 @@ unify_tys env orig_xs orig_ys
       -- Possibly different saturations of a polykinded tycon
       -- See Note [Polykinded tycon applications]
 
-isTyFamApp :: Maybe (TyCon, [Type]) -> Bool
--- True if we have a saturated or under-saturated type family application
+isSatTyFamApp :: Maybe (TyCon, [Type]) -> Maybe (TyCon, [Type])
+-- Return the argument if we have a saturated type family application
 -- If it is /over/ saturated then we return False.  E.g.
 --     unify_ty (F a b) (c d)    where F has arity 1
 -- we definitely want to decompose that type application! (#22647)
-isTyFamApp (Just (tc, tys))
-  =  not (isGenerativeTyCon tc Nominal)       -- Type family-ish
+isSatTyFamApp tapp@(Just (tc, tys))
+  |  isTypeFamilyTyCon tc
   && not (tys `lengthExceeds` tyConArity tc)  -- Not over-saturated
-isTyFamApp Nothing
-  = False
+  = tapp
+isSatTyFamApp _ = Nothing
 
 ---------------------------------
 uVar :: UMEnv
