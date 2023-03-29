@@ -108,3 +108,4 @@ test('T21575', normal, compile_and_run, ['-O'])
 test('T21575b', [], multimod_compile_and_run, ['T21575b', '-O'])
 test('T20836', normal, compile_and_run, ['-O0']) # Should not time out; See #20836
 test('T22998', normal, compile_and_run, ['-O0 -fspecialise -dcore-lint'])
+test('T23134', normal, compile_and_run, ['-O0 -fcatch-nonexhaustive-cases'])
