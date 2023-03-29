@@ -30,11 +30,13 @@ module GHC.Foreign.Internal (
     --
     newCString,
     newCStringLen,
+    newCStringLen0,
 
     -- conversion of Haskell strings into C strings using temporary storage
     --
     withCString,
     withCStringLen,
+    withCStringLen0,
     withCStringsLen,
 
     charIsRepresentable,
@@ -111,6 +113,8 @@ newCString enc = liftM fst . newEncodedCString enc True
 -- | Marshal a Haskell string into a C string (ie, character array) with
 -- explicit length information.
 --
+-- Note that this does not NUL terminate the resulting string.
+--
 -- * new storage is allocated for the C string and must be
 --   explicitly freed using 'Foreign.Marshal.Alloc.free' or
 --   'Foreign.Marshal.Alloc.finalizerFree'.
@@ -133,12 +137,36 @@ withCString enc s act = withEncodedCString enc True s $ \(cp, _sz) -> act cp
 -- | Marshal a Haskell string into a C string (ie, character array)
 -- in temporary storage, with explicit length information.
 --
+-- Note that this does not NUL terminate the resulting string.
+--
 -- * the memory is freed when the subcomputation terminates (either
 --   normally or via an exception), so the pointer to the temporary
 --   storage must /not/ be used after this.
 --
 withCStringLen         :: TextEncoding -> String -> (CStringLen -> IO a) -> IO a
 withCStringLen enc = withEncodedCString enc False
+
+-- | Marshal a Haskell string into a NUL-terminated C string (ie, character array)
+-- with explicit length information.
+--
+-- * new storage is allocated for the C string and must be
+--   explicitly freed using 'Foreign.Marshal.Alloc.free' or
+--   'Foreign.Marshal.Alloc.finalizerFree'.
+--
+-- @since 4.19.0.0
+newCStringLen0     :: TextEncoding -> String -> IO CStringLen
+newCStringLen0 enc = newEncodedCString enc True
+
+-- | Marshal a Haskell string into a NUL-terminated C string (ie, character array)
+-- in temporary storage, with explicit length information.
+--
+-- * the memory is freed when the subcomputation terminates (either
+--   normally or via an exception), so the pointer to the temporary
+--   storage must /not/ be used after this.
+--
+-- @since 4.19.0.0
+withCStringLen0         :: TextEncoding -> String -> (CStringLen -> IO a) -> IO a
+withCStringLen0 enc = withEncodedCString enc True
 
 -- | Marshal a list of Haskell strings into an array of NUL terminated C strings
 -- using temporary storage.
