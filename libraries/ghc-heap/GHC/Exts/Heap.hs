@@ -112,15 +112,15 @@ instance Word# ~ a => HasHeapRep (a :: TYPE 'WordRep) where
 
 instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
     getClosureData x = return $
-        Int64Closure { ptipe = PInt64, int64Val = I64# x }
+        Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
 
 instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
     getClosureData x = return $
-        Word64Closure { ptipe = PWord64, word64Val = W64# x }
+        Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
 
 instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
     getClosureData x = return $
-        AddrClosure { ptipe = PAddr, addrVal = Ptr x }
+        AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
 
 instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
     getClosureData x = return $
