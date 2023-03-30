@@ -31,6 +31,7 @@ import GHC.Platform.Host (hostPlatformArchOS)
 
 import GHC.JS.Make
 import GHC.JS.Unsat.Syntax
+import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Transform
 
 import GHC.Driver.Session (DynFlags(..))
@@ -280,7 +281,7 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
 -- | Compiled module
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
-  , mc_js_code  :: !JStat
+  , mc_js_code  :: !Sat.JStat
   , mc_exports  :: !B.ByteString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
@@ -293,7 +294,7 @@ data ModuleCode = ModuleCode
 -- up into global "metadata" for the whole link.
 data CompactedModuleCode = CompactedModuleCode
   { cmc_module  :: !Module
-  , cmc_js_code :: !JStat
+  , cmc_js_code :: !Sat.JStat
   , cmc_exports :: !B.ByteString        -- ^ rendered exports
   }
 
@@ -326,7 +327,7 @@ renderLinker h mods jsFiles = do
 
   -- modules themselves
   mod_sizes <- forM compacted_mods $ \m -> do
-    !mod_size <- fromIntegral <$> putJS (satJStat $! cmc_js_code m)
+    !mod_size <- fromIntegral <$> putJS (cmc_js_code m)
     let !mod_mod  = cmc_module m
     pure (mod_mod, mod_size)
 
@@ -565,7 +566,7 @@ extractDeps ar_state units deps loc =
     mod           = depsModule deps
     newline       = BC.pack "\n"
     mk_exports    = mconcat . intersperse newline . filter (not . BS.null) . map oiRaw
-    mk_js_code    = mconcat . map (unsatJStat . oiStat)
+    mk_js_code    = mconcat . map oiStat
     collectCode l = ModuleCode
                       { mc_module   = mod
                       , mc_js_code  = mk_js_code l

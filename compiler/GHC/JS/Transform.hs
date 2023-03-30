@@ -23,7 +23,6 @@ module GHC.JS.Transform
   , composOpFold
   , satJExpr
   , satJStat
-  , unsatJStat
   )
 where
 
@@ -321,98 +320,3 @@ satJVal = go
     go (JHash m)   = Sat.JHash (satJExpr <$> m)
     go (JFunc args body) = Sat.JFunc args (satJStat body)
     go UnsatVal{} = error "jvalToSatVar: discovered an Sat...impossibly"
-
-unsatJStat :: Sat.JStat -> JStat
-unsatJStat = go_back
-  where
-        -- This is an Applicative but we can't use it because no type variables :(
-        go_back :: Sat.JStat -> JStat
-        go_back (Sat.DeclStat i rhs)      = DeclStat i (fmap unsatJExpr rhs)
-        go_back (Sat.ReturnStat e)        = ReturnStat (unsatJExpr e)
-        go_back (Sat.IfStat c t e)        = IfStat (unsatJExpr c) (go_back t) (go_back e)
-        go_back (Sat.WhileStat is_do c e) = WhileStat is_do (unsatJExpr c) (go_back e)
-        go_back (Sat.ForInStat is_each i iter body) = ForInStat is_each i
-                                                  (unsatJExpr iter)
-                                                  (go_back body)
-        go_back (Sat.SwitchStat struct ps def) = SwitchStat
-                                             (unsatJExpr struct)
-                                             (map (unsatJExpr *** go_back) ps)
-                                             (go_back def)
-        go_back (Sat.TryStat t i c f)     = TryStat (go_back t) i (go_back c) (go_back f)
-        go_back (Sat.BlockStat bs)        = BlockStat $! fmap go_back bs
-        go_back (Sat.ApplStat rator rand) = ApplStat (unsatJExpr rator) (unsatJExpr <$> rand)
-        go_back (Sat.UOpStat rator rand)  = UOpStat  (unsatJUOp rator) (unsatJExpr rand)
-        go_back (Sat.AssignStat lhs rhs)  = AssignStat (unsatJExpr lhs) (unsatJExpr rhs)
-        go_back (Sat.LabelStat lbl stmt)  = LabelStat lbl (go_back stmt)
-        go_back (Sat.BreakStat Nothing)   = BreakStat Nothing
-        go_back (Sat.BreakStat (Just l))  = BreakStat $! Just l
-        go_back (Sat.ContinueStat Nothing)  = ContinueStat Nothing
-        go_back (Sat.ContinueStat (Just l)) = ContinueStat $! Just l
-
-
-unsatJExpr :: Sat.JExpr -> JExpr
-unsatJExpr = go
-  where
-    go (Sat.ValExpr v)        = ValExpr (unsatJVal v)
-    go (Sat.SelExpr obj i)    = SelExpr (unsatJExpr obj) i
-    go (Sat.IdxExpr o i)      = IdxExpr (unsatJExpr o) (unsatJExpr i)
-    go (Sat.InfixExpr op l r) = InfixExpr (satOpToJOp op) (unsatJExpr l) (unsatJExpr r)
-    go (Sat.UOpExpr op r)     = UOpExpr (unsatJUOp op) (unsatJExpr r)
-    go (Sat.IfExpr c t e)     = IfExpr (unsatJExpr c) (unsatJExpr t) (unsatJExpr e)
-    go (Sat.ApplExpr rator rands) = ApplExpr (unsatJExpr rator) (unsatJExpr <$> rands)
-
-satOpToJOp :: Sat.Op -> JOp
-satOpToJOp = go
-  where
-    go Sat.EqOp         = EqOp
-    go Sat.StrictEqOp   = StrictEqOp
-    go Sat.NeqOp        = NeqOp
-    go Sat.StrictNeqOp  = StrictNeqOp
-    go Sat.GtOp         = GtOp
-    go Sat.GeOp         = GeOp
-    go Sat.LtOp         = LtOp
-    go Sat.LeOp         = LeOp
-    go Sat.AddOp        = AddOp
-    go Sat.SubOp        = SubOp
-    go Sat.MulOp        = MulOp
-    go Sat.DivOp        = DivOp
-    go Sat.ModOp        = ModOp
-    go Sat.LeftShiftOp  = LeftShiftOp
-    go Sat.RightShiftOp = RightShiftOp
-    go Sat.ZRightShiftOp = ZRightShiftOp
-    go Sat.BAndOp       = BAndOp
-    go Sat.BOrOp        = BOrOp
-    go Sat.BXorOp       = BXorOp
-    go Sat.LAndOp       = LAndOp
-    go Sat.LOrOp        = LOrOp
-    go Sat.InstanceofOp = InstanceofOp
-    go Sat.InOp         = InOp
-
-unsatJUOp :: Sat.UOp -> JUOp
-unsatJUOp = go
-  where
-    go Sat.NotOp     = NotOp
-    go Sat.BNotOp    = BNotOp
-    go Sat.NegOp     = NegOp
-    go Sat.PlusOp    = PlusOp
-    go Sat.NewOp     = NewOp
-    go Sat.TypeofOp  = TypeofOp
-    go Sat.DeleteOp  = DeleteOp
-    go Sat.YieldOp   = YieldOp
-    go Sat.VoidOp    = VoidOp
-    go Sat.PreIncOp  = PreIncOp
-    go Sat.PostIncOp = PostIncOp
-    go Sat.PreDecOp  = PreDecOp
-    go Sat.PostDecOp = PostDecOp
-
-unsatJVal :: Sat.JVal -> JVal
-unsatJVal = go
-  where
-    go (Sat.JVar i)    = JVar i
-    go (Sat.JList xs)  = JList (unsatJExpr <$> xs)
-    go (Sat.JDouble d) = JDouble (SaneDouble (Sat.unSaneDouble d))
-    go (Sat.JInt i)    = JInt   i
-    go (Sat.JStr f)    = JStr   f
-    go (Sat.JRegEx f)  = JRegEx f
-    go (Sat.JHash m)   = JHash (unsatJExpr <$> m)
-    go (Sat.JFunc args body) = JFunc args (unsatJStat body)
