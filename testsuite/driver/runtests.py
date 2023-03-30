@@ -29,7 +29,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 from testutil import getStdout, str_warn, str_info, print_table, shorten_metric_name
-from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
+from testglobals import getConfig, ghc_env, TestConfig, t, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
 from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat, get_abbrev_hash_length, is_commit_hash
@@ -337,8 +337,6 @@ t_files = list(findTFiles(config.rootdirs))
 
 print('Found', len(t_files), '.T files...')
 
-t = getTestRun() # type: TestRun
-
 # Avoid cmd.exe built-in 'date' command on Windows
 t.start_time = datetime.datetime.now()
 
@@ -523,13 +521,13 @@ else:
 
             groups[m.stat.metric].append(m)
 
-        for metric_name, stats in groups.items():
+        for metric_name, stats in groups.items(): # type: ignore
             heading = 'Metrics: %s' % metric_name
             print()
             print(heading)
             print('-' * len(heading))
             print()
-            tabulate_metrics(stats)
+            tabulate_metrics(stats) # type: ignore
     else:
         print("\nNone collected.")
     print("")

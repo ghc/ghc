@@ -304,9 +304,6 @@ class TestRun:
 global t
 t = TestRun()
 
-def getTestRun() -> TestRun:
-    return t
-
 # -----------------------------------------------------------------------------
 # Information about the current test
 
