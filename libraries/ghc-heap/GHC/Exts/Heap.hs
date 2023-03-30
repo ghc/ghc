@@ -56,7 +56,9 @@ module GHC.Exts.Heap (
     , getBoxedClosureData
     , allClosures
     , closureSize
-
+#if MIN_TOOL_VERSION_ghc(9,7,0)
+    , stackFrameSize
+#endif
     -- * Boxes
     , Box(..)
     , asBox
@@ -182,3 +184,24 @@ getBoxedClosureData (Box a) = getClosureData a
 -- @since 8.10.1
 closureSize :: Box -> IO Int
 closureSize (Box x) = pure $ I# (closureSize# x)
+
+#if MIN_TOOL_VERSION_ghc(9,7,0)
+-- TODO: Pattern match may move to function arguments
+stackFrameSize :: StackFrame -> Int
+stackFrameSize =
+  \c ->
+    case c of
+      UpdateFrame {} -> sizeStgUpdateFrame
+      CatchFrame {} -> sizeStgCatchFrame
+      CatchStmFrame {} -> sizeStgCatchSTMFrame
+      CatchRetryFrame {} -> sizeStgCatchRetryFrame
+      AtomicallyFrame {} -> sizeStgAtomicallyFrame
+      RetSmall {..} -> sizeStgClosure + length stack_payload
+      RetBig {..} -> sizeStgClosure + length stack_payload
+      RetFun {..} -> sizeStgRetFunFrame + length retFunPayload
+      -- The one additional word is a pointer to the StgBCO in the closure's payload
+      RetBCO {..} -> sizeStgClosure + 1 + length bcoArgs
+      -- The one additional word is a pointer to the next stack chunk
+      UnderflowFrame {} -> sizeStgClosure + 1
+      _ -> error "Unexpected closure type"
+#endif

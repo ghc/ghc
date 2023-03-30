@@ -25,6 +25,7 @@ import System.Info
 import System.Mem
 import TestUtils
 import Unsafe.Coerce (unsafeCoerce)
+import GHC.Exts.Heap.Closures (StackFrame(info_tbl))
 
 foreign import prim "any_update_framezh" any_update_frame# :: SetupFunction
 
@@ -100,8 +101,8 @@ main = do
   test any_update_frame# $
     \case
       UpdateFrame {..} -> do
-        assertEqual (tipe info) UPDATE_FRAME
-        assertEqual 1 =<< (getWordFromBlackhole =<< getBoxedClosureData updatee)
+        assertEqual (tipe info_tbl) UPDATE_FRAME
+        assertEqual 1 =<< getWordFromBlackhole updatee
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 2"
   testSize any_update_frame# 2
@@ -109,9 +110,9 @@ main = do
   test any_catch_frame# $
     \case
       CatchFrame {..} -> do
-        assertEqual (tipe info) CATCH_FRAME
+        assertEqual (tipe info_tbl) CATCH_FRAME
         assertEqual exceptions_blocked 1
-        assertConstrClosure 1 =<< getBoxedClosureData handler
+        assertConstrClosure 1 handler
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 4"
   testSize any_catch_frame# 3
@@ -119,9 +120,9 @@ main = do
   test any_catch_stm_frame# $
     \case
       CatchStmFrame {..} -> do
-        assertEqual (tipe info) CATCH_STM_FRAME
-        assertConstrClosure 1 =<< getBoxedClosureData catchFrameCode
-        assertConstrClosure 2 =<< getBoxedClosureData handler
+        assertEqual (tipe info_tbl) CATCH_STM_FRAME
+        assertConstrClosure 1 catchFrameCode
+        assertConstrClosure 2 handler
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 6"
   testSize any_catch_stm_frame# 3
@@ -129,10 +130,10 @@ main = do
   test any_catch_retry_frame# $
     \case
       CatchRetryFrame {..} -> do
-        assertEqual (tipe info) CATCH_RETRY_FRAME
+        assertEqual (tipe info_tbl) CATCH_RETRY_FRAME
         assertEqual running_alt_code 1
-        assertConstrClosure 2 =<< getBoxedClosureData first_code
-        assertConstrClosure 3 =<< getBoxedClosureData alt_code
+        assertConstrClosure 2 first_code
+        assertConstrClosure 3 alt_code
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 8"
   testSize any_catch_retry_frame# 4
@@ -140,9 +141,9 @@ main = do
   test any_atomically_frame# $
     \case
       AtomicallyFrame {..} -> do
-        assertEqual (tipe info) ATOMICALLY_FRAME
-        assertConstrClosure 1 =<< getBoxedClosureData atomicallyFrameCode
-        assertConstrClosure 2 =<< getBoxedClosureData result
+        assertEqual (tipe info_tbl) ATOMICALLY_FRAME
+        assertConstrClosure 1 atomicallyFrameCode
+        assertConstrClosure 2 result
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 10"
   testSize any_atomically_frame# 3
@@ -150,10 +151,9 @@ main = do
   test any_ret_small_prim_frame# $
     \case
       RetSmall {..} -> do
-        assertEqual (tipe info) RET_SMALL
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) 1
-        assertUnknownTypeWordSizedPrimitive 1 (head pCs)
+        assertEqual (tipe info_tbl) RET_SMALL
+        assertEqual (length stack_payload) 1
+        assertUnknownTypeWordSizedPrimitive 1 (head stack_payload)
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 12"
   testSize any_ret_small_prim_frame# 2
@@ -161,10 +161,9 @@ main = do
   test any_ret_small_closure_frame# $
     \case
       RetSmall {..} -> do
-        assertEqual (tipe info) RET_SMALL
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) 1
-        assertConstrClosure 1 (head pCs)
+        assertEqual (tipe info_tbl) RET_SMALL
+        assertEqual (length stack_payload) 1
+        assertConstrClosure 1 (head stack_payload)
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 14"
   testSize any_ret_small_closure_frame# 2
@@ -172,10 +171,9 @@ main = do
   test any_ret_small_closures_frame# $
     \case
       RetSmall {..} -> do
-        assertEqual (tipe info) RET_SMALL
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) maxSmallBitmapBits
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (tipe info_tbl) RET_SMALL
+        assertEqual (length stack_payload) maxSmallBitmapBits
+        let wds = map getWordFromConstr01 stack_payload
         assertEqual wds [1 .. maxSmallBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 16"
@@ -184,10 +182,9 @@ main = do
   test any_ret_small_prims_frame# $
     \case
       RetSmall {..} -> do
-        assertEqual (tipe info) RET_SMALL
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) maxSmallBitmapBits
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertEqual (tipe info_tbl) RET_SMALL
+        assertEqual (length stack_payload) maxSmallBitmapBits
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive stack_payload
         assertEqual wds [1 .. maxSmallBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 18"
@@ -196,10 +193,9 @@ main = do
   test any_ret_big_prims_min_frame# $
     \case
       RetBig {..} -> do
-        assertEqual (tipe info) RET_BIG
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) minBigBitmapBits
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertEqual (tipe info_tbl) RET_BIG
+        assertEqual (length stack_payload) minBigBitmapBits
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive stack_payload
         assertEqual wds [1 .. minBigBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 20"
@@ -208,10 +204,9 @@ main = do
   test any_ret_big_closures_min_frame# $
     \case
       RetBig {..} -> do
-        assertEqual (tipe info) RET_BIG
-        pCs <- mapM getBoxedClosureData payload
-        assertEqual (length pCs) minBigBitmapBits
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (tipe info_tbl) RET_BIG
+        assertEqual (length stack_payload) minBigBitmapBits
+        let wds = map getWordFromConstr01 stack_payload
         assertEqual wds [1 .. minBigBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 22"
@@ -220,11 +215,10 @@ main = do
   test any_ret_big_closures_two_words_frame# $
     \case
       RetBig {..} -> do
-        assertEqual (tipe info) RET_BIG
-        pCs <- mapM getBoxedClosureData payload
+        assertEqual (tipe info_tbl) RET_BIG
         let closureCount = fromIntegral $ bitsInWord + 1
-        assertEqual (length pCs) closureCount
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (length stack_payload) closureCount
+        let wds = map getWordFromConstr01 stack_payload
         assertEqual wds [1 .. (fromIntegral closureCount)]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 24"
@@ -233,24 +227,22 @@ main = do
   test any_ret_fun_arg_n_prim_frame# $
     \case
       RetFun {..} -> do
-        assertEqual (tipe info) RET_FUN
+        assertEqual (tipe info_tbl) RET_FUN
         assertEqual retFunType ARG_N
         assertEqual retFunSize 1
-        assertFun01Closure 1 =<< getBoxedClosureData retFunFun
-        pCs <- mapM getBoxedClosureData retFunPayload
-        assertEqual (length pCs) 1
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive pCs
+        assertFun01Closure 1 retFunFun
+        assertEqual (length retFunPayload) 1
+        let wds = map getWordFromUnknownTypeWordSizedPrimitive retFunPayload
         assertEqual wds [1]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 26"
   test any_ret_fun_arg_gen_frame# $
     \case
       RetFun {..} -> do
-        assertEqual (tipe info) RET_FUN
+        assertEqual (tipe info_tbl) RET_FUN
         assertEqual retFunType ARG_GEN
         assertEqual retFunSize 9
-        fc <- getBoxedClosureData retFunFun
-        case fc of
+        case retFunFun of
           FunClosure {..} -> do
             assertEqual (tipe info) FUN_STATIC
             assertEqual (null dataArgs) True
@@ -258,9 +250,8 @@ main = do
             -- function `argGenFun`
             assertEqual (null ptrArgs) (os /= "darwin")
           e -> error $ "Wrong closure type: " ++ show e
-        pCs <- mapM getBoxedClosureData retFunPayload
-        assertEqual (length pCs) 9
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (length retFunPayload) 9
+        let wds = map getWordFromConstr01 retFunPayload
         assertEqual wds [1 .. 9]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 27"
@@ -269,19 +260,17 @@ main = do
   test any_ret_fun_arg_gen_big_frame# $
     \case
       RetFun {..} -> do
-        assertEqual (tipe info) RET_FUN
+        assertEqual (tipe info_tbl) RET_FUN
         assertEqual retFunType ARG_GEN_BIG
         assertEqual retFunSize 59
-        fc <- getBoxedClosureData retFunFun
-        case fc of
+        case retFunFun of
           FunClosure {..} -> do
             assertEqual (tipe info) FUN_STATIC
             assertEqual (null dataArgs) True
             assertEqual (null ptrArgs) True
           e -> error $ "Wrong closure type: " ++ show e
-        pCs <- mapM getBoxedClosureData retFunPayload
-        assertEqual (length pCs) 59
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (length retFunPayload) 59
+        let wds = map getWordFromConstr01 retFunPayload
         assertEqual wds [1 .. 59]
   traceM "Test 29"
   testSize any_ret_fun_arg_gen_big_frame# (3 + 59)
@@ -289,12 +278,10 @@ main = do
   test any_bco_frame# $
     \case
       RetBCO {..} -> do
-        assertEqual (tipe info) RET_BCO
-        pCs <- mapM getBoxedClosureData bcoArgs
-        assertEqual (length pCs) 1
-        let wds = map getWordFromConstr01 pCs
+        assertEqual (tipe info_tbl) RET_BCO
+        assertEqual (length bcoArgs) 1
+        let wds = map getWordFromConstr01 bcoArgs
         assertEqual wds [3]
-        bco <- getBoxedClosureData bco
         case bco of
           BCOClosure {..} -> do
             assertEqual (tipe info) BCO
@@ -316,58 +303,43 @@ main = do
   test any_underflow_frame# $
     \case
       UnderflowFrame {..} -> do
-        assertEqual (tipe info) UNDERFLOW_FRAME
-        nextStack <- getBoxedClosureData nextChunk
-        case nextStack of
-          StackClosure {..} -> do
-            assertEqual (tipe info) STACK
-            assertEqual stack_size 27
-            assertEqual stack_dirty 0
-            assertEqual stack_marking 0
-            nextStackClosures <- mapM getBoxedClosureData stack
-            assertEqual (length nextStackClosures) 2
-            case head nextStackClosures of
-              RetSmall {..} ->
-                assertEqual (tipe info) RET_SMALL
-              e -> error $ "Wrong closure type: " ++ show e
-            case last nextStackClosures of
-              StopFrame {..} ->
-                assertEqual (tipe info) STOP_FRAME
-              e -> error $ "Wrong closure type: " ++ show e
+        assertEqual (tipe info_tbl) UNDERFLOW_FRAME
+        assertEqual (tipe (ssc_info nextChunk)) STACK
+        assertEqual (ssc_stack_size nextChunk) 27
+        assertEqual (ssc_stack_dirty nextChunk) 0
+        assertEqual (ssc_stack_marking nextChunk) 0
+        assertEqual (length (ssc_stack nextChunk)) 2
+        case head (ssc_stack nextChunk) of
+          RetSmall {..} ->
+            assertEqual (tipe info_tbl) RET_SMALL
+          e -> error $ "Wrong closure type: " ++ show e
+        case last (ssc_stack nextChunk) of
+          StopFrame {..} ->
+            assertEqual (tipe info_tbl) STOP_FRAME
           e -> error $ "Wrong closure type: " ++ show e
       e -> error $ "Wrong closure type: " ++ show e
   testSize any_underflow_frame# 2
 
 type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
-test :: HasCallStack => SetupFunction -> (Closure -> IO ()) -> IO ()
+test :: HasCallStack => SetupFunction -> (StackFrame -> IO ()) -> IO ()
 test setup assertion = do
-  sn@(StackSnapshot sn#) <- getStackSnapshot setup
+  stackSnapshot <- getStackSnapshot setup
   performGC
   traceM $ "entertainGC - " ++ entertainGC 100
   -- Run garbage collection now, to prevent later surprises: It's hard to debug
   -- when the GC suddenly does it's work and there were bad closures or pointers.
   -- Better fail early, here.
   performGC
-  stackClosure <- getClosureData sn#
+  stackClosure <- decodeStack stackSnapshot
   performGC
-  let boxedFrames = stack stackClosure
-  stack <- mapM getBoxedClosureData boxedFrames
+  let stack = ssc_stack stackClosure
   performGC
-  assert sn stack
-  -- The result of HasHeapRep should be similar (wrapped in the closure for
-  -- StgStack itself.)
-  let (StackSnapshot sn#) = sn
-  stack' <- getClosureData sn#
-  case stack' of
-    StackClosure {..} -> do
-      !cs <- mapM getBoxedClosureData stack
-      assert sn cs
-    _ -> error $ "Unexpected closure type : " ++ show stack'
+  assert stack
   where
-    assert :: StackSnapshot -> [Closure] -> IO ()
-    assert sn stack = do
-      assertStackInvariants sn stack
+    assert :: [StackFrame] -> IO ()
+    assert stack = do
+      assertStackInvariants stack
       assertEqual (length stack) 2
       assertion $ head stack
 
@@ -377,9 +349,9 @@ entertainGC x = show x ++ entertainGC (x - 1)
 
 testSize :: HasCallStack => SetupFunction -> Int -> IO ()
 testSize setup expectedSize = do
-  (StackSnapshot sn#) <- getStackSnapshot setup
-  stackClosure <- getClosureData sn#
-  assertEqual expectedSize =<< (closureSize . head . stack) stackClosure
+  stackSnapshot <- getStackSnapshot setup
+  stackClosure <- decodeStack stackSnapshot
+  assertEqual expectedSize $ (stackFrameSize . head . ssc_stack) stackClosure
 
 -- | Get a `StackSnapshot` from test setup
 --

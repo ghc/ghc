@@ -19,7 +19,7 @@ main = do
     atomically $
       catchSTM @SomeException (unsafeIOToSTM getDecodedStack) throwSTM
 
-  assertStackInvariants stackSnapshot decodedStack
+  assertStackInvariants decodedStack
   assertThat
     "Stack contains one catch stm frame"
     (== 1)
@@ -29,10 +29,10 @@ main = do
     (== 1)
     (length $ filter isAtomicallyFrame decodedStack)
 
-isCatchStmFrame :: Closure -> Bool
-isCatchStmFrame (CatchStmFrame {..}) = tipe info == CATCH_STM_FRAME
+isCatchStmFrame :: StackFrame -> Bool
+isCatchStmFrame (CatchStmFrame {..}) = tipe info_tbl == CATCH_STM_FRAME
 isCatchStmFrame _ = False
 
-isAtomicallyFrame :: Closure -> Bool
-isAtomicallyFrame (AtomicallyFrame {..}) = tipe info == ATOMICALLY_FRAME
+isAtomicallyFrame :: StackFrame -> Bool
+isAtomicallyFrame (AtomicallyFrame {..}) = tipe info_tbl == ATOMICALLY_FRAME
 isAtomicallyFrame _ = False

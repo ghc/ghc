@@ -22,7 +22,7 @@ loop n = print "x" >> loop (n - 1) >> print "x"
 getStack :: HasCallStack => IO ()
 getStack = do
   (s, decodedStack) <- getDecodedStack
-  assertStackInvariants s decodedStack
+  assertStackInvariants decodedStack
   assertThat
     "Stack contains underflow frames"
     (== True)
@@ -30,17 +30,20 @@ getStack = do
   assertStackChunksAreDecodable decodedStack
   return ()
 
-isUnderflowFrame (UnderflowFrame {..}) = tipe info == UNDERFLOW_FRAME
+isUnderflowFrame :: StackFrame -> Bool
+isUnderflowFrame (UnderflowFrame {..}) = tipe info_tbl == UNDERFLOW_FRAME
 isUnderflowFrame _ = False
 
-assertStackChunksAreDecodable :: HasCallStack => [Closure] -> IO ()
+assertStackChunksAreDecodable :: HasCallStack => [StackFrame] -> IO ()
 assertStackChunksAreDecodable s = do
   let underflowFrames = filter isUnderflowFrame s
-  stackClosures <- mapM (getBoxedClosureData . nextChunk) underflowFrames
-  let stackBoxes = map stack stackClosures
-  framesOfChunks <- mapM (mapM getBoxedClosureData) stackBoxes
+  assertThat
+    "Expect some underflow frames"
+    (>= 2)
+    (length underflowFrames)
+  let stackFrames = map (ssc_stack . nextChunk) underflowFrames
   assertThat
     "No empty stack chunks"
     (== True)
-    ( not (any null framesOfChunks)
+    ( not (any null stackFrames)
     )

@@ -25,12 +25,12 @@ import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
 import Unsafe.Coerce (unsafeCoerce)
 
-getDecodedStack :: IO (StackSnapshot, [Closure])
+getDecodedStack :: IO (StackSnapshot, [StackFrame])
 getDecodedStack = do
-  s@(StackSnapshot s#) <- cloneMyStack
-  stackClosure <- getClosureData s#
-  unboxedCs <- mapM getBoxedClosureData (stack stackClosure)
-  pure (s, unboxedCs)
+  stack <- cloneMyStack
+  stackClosure <- decodeStack stack
+
+  pure (stack, ssc_stack stackClosure)
 
 assertEqual :: (HasCallStack, Monad m, Show a, Eq a) => a -> a -> m ()
 assertEqual a b
@@ -40,8 +40,8 @@ assertEqual a b
 assertThat :: (HasCallStack, Monad m) => String -> (a -> Bool) -> a -> m ()
 assertThat s f a = if f a then pure () else error s
 
-assertStackInvariants :: (HasCallStack, MonadIO m) => StackSnapshot -> [Closure] -> m ()
-assertStackInvariants stack decodedStack =
+assertStackInvariants :: (HasCallStack, MonadIO m) => [StackFrame] -> m ()
+assertStackInvariants decodedStack =
   assertThat
     "Last frame is stop frame"
     ( \case
