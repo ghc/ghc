@@ -2685,7 +2685,7 @@ data DecidedStrictness = DecidedLazy -- ^ Field inferred to not have a bang.
                        | DecidedUnpack -- ^ Field inferred to be unpacked.
         deriving (Show, Eq, Ord, Data, Generic)
 
--- | A single data constructor.
+-- | A data constructor.
 --
 -- The constructors for 'Con' can roughly be divided up into two categories:
 -- those for constructors with \"vanilla\" syntax ('NormalC', 'RecC', and
@@ -2718,16 +2718,32 @@ data DecidedStrictness = DecidedLazy -- ^ Field inferred to not have a bang.
 -- Multiplicity annotations for data types are currently not supported
 -- in Template Haskell (i.e. all fields represented by Template Haskell
 -- will be linear).
-data Con = NormalC Name [BangType]       -- ^ @C Int a@
-         | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
-         | InfixC BangType Name BangType -- ^ @Int :+ a@
-         | ForallC [TyVarBndr Specificity] Cxt Con -- ^ @forall a. Eq a => C [a]@
-         | GadtC (NonEmpty Name) [BangType]
-                 Type                    -- See Note [GADT return type]
-                                         -- ^ @C :: a -> b -> T b Int@
-         | RecGadtC (NonEmpty Name) [VarBangType]
-                    Type                 -- See Note [GADT return type]
-                                         -- ^ @C :: { v :: Int } -> T b Int@
+data Con =
+  -- | @C Int a@
+    NormalC Name [BangType]
+
+  -- | @C { v :: Int, w :: a }@
+  | RecC Name [VarBangType]
+
+  -- | @Int :+ a@
+  | InfixC BangType Name BangType
+
+  -- | @forall a. Eq a => C [a]@
+  | ForallC [TyVarBndr Specificity] Cxt Con
+
+  -- @C :: a -> b -> T b Int@
+  | GadtC (NonEmpty Name)
+            -- ^ The list of constructors, corresponding to the GADT constructor
+            -- syntax @C1, C2 :: a -> T b@
+          [BangType] -- ^ The constructor arguments
+          Type -- ^ See Note [GADT return type]
+
+  -- | @C :: { v :: Int } -> T b Int@
+  | RecGadtC (NonEmpty Name)
+             -- ^ The list of constructors, corresponding to the GADT record
+             -- constructor syntax @C1, C2 :: { fld :: a } -> T b@
+             [VarBangType] -- ^ The constructor arguments
+             Type -- ^ See Note [GADT return type]
         deriving (Show, Eq, Ord, Data, Generic)
 
 -- Note [GADT return type]
