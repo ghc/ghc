@@ -110,12 +110,11 @@ shiftR = Bits.unsafeShiftR
 #endif
 
 {- Note [Proxies for head and tail]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Prelude.head and Prelude.tail has recently acquired {-# WARNING in "x-partial" #-},
-but GHC codebase uses them fairly extensively and insists on building warning-free.
-Thus instead of adding {-# OPTIONS_GHC -Wno-x-partial #-} to every module which
-employs them, we define a warning-less proxies and export them from GHC.Prelude.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prelude.head and Prelude.tail have recently acquired {-# WARNING in "x-partial" #-},
+but the GHC codebase uses them fairly extensively and insists on building warning-free.
+Thus, instead of adding {-# OPTIONS_GHC -Wno-x-partial #-} to every module which
+employs them, we define warning-less proxies and export them from GHC.Prelude.
 -}
 
 -- See Note [Proxies for head and tail]
