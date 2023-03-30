@@ -264,7 +264,7 @@ lint-author:
     - *drafts-can-fail-lint
 
 lint-ci-config:
-  image: nixos/nix:2.12.0
+  image: nixos/nix:2.14.1
   extends: .lint
   # We don't need history/submodules in this job
   variables:
@@ -979,7 +979,7 @@ project-version:
 
 .ghcup-metadata:
   stage: deploy
-  image: "nixos/nix:2.12.0"
+  image: nixos/nix:2.14.1
   dependencies: null
   tags:
     - x86_64-linux
