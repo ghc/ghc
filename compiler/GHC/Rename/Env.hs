@@ -1,5 +1,5 @@
-
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
 {-# LANGUAGE MultiWayIf       #-}
 {-# LANGUAGE TypeApplications #-}
 
