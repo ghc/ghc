@@ -1,5 +1,5 @@
 {-# LANGUAGE MagicHash #-}
-module T5570 where
+module Main where
 
 import GHC.Exts
 

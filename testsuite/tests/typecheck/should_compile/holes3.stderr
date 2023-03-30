@@ -187,7 +187,6 @@ holes3.hs:11:15: error: [GHC-88464]
         round :: forall a b. (RealFrac a, Integral b) => a -> b
         truncate :: forall a b. (RealFrac a, Integral b) => a -> b
         seq :: forall a b. a -> b -> b
-        ($) :: forall a b. (a -> b) -> a -> b
         either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
         curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
@@ -197,5 +196,6 @@ holes3.hs:11:15: error: [GHC-88464]
         unzip3 :: forall a b c. [(a, b, c)] -> ([a], [b], [c])
         zip3 :: forall a b c. [a] -> [b] -> [c] -> [(a, b, c)]
         zipWith :: forall a b c. (a -> b -> c) -> [a] -> [b] -> [c]
+        ($) :: forall a b. (a -> b) -> a -> b
         zipWith3 :: forall a b c d.
                     (a -> b -> c -> d) -> [a] -> [b] -> [c] -> [d]

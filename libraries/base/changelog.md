@@ -21,6 +21,7 @@
       ([CLC proposal #148](https://github.com/haskell/core-libraries-committee/issues/148))
   * Add `COMPLETE` pragmas to the `TypeRep`, `SSymbol`, `SChar`, and `SNat` pattern synonyms.
       ([CLC proposal #149](https://github.com/haskell/core-libraries-committee/issues/149))
+  * Make `($)` representation polymorphic ([CLC proposal #132](https://github.com/haskell/core-libraries-committee/issues/132))
 
 ## 4.18.0.0 *TBA*
   * Shipped with GHC 9.6.1

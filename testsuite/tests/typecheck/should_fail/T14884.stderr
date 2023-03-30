@@ -23,7 +23,7 @@ T14884.hs:4:5: error: [GHC-88464]
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @GHC.Types.LiftedRep @String @(IO ())
+          with ($) @GHC.Types.LiftedRep @GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b

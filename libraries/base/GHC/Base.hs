@@ -1598,6 +1598,14 @@ const x _               =  x
 flip                    :: (a -> b -> c) -> b -> a -> c
 flip f x y              =  f y x
 
+-- Note: Before base-4.19, ($) was not representation polymorphic
+-- in both type parameters but only in the return type.
+-- The generalization forced a change to the implementation,
+-- changing its laziness, affecting expressions like (($) undefined): before
+-- base-4.19 the expression (($) undefined) `seq` () was equivalent to
+-- (\x -> undefined x) `seq` () and thus would just evaluate to (), but now
+-- it is equivalent to undefined `seq` () which diverges.
+
 -- | Application operator.  This operator is redundant, since ordinary
 -- application @(f x)@ means the same as @(f '$' x)@. However, '$' has
 -- low, right-associative binding precedence, so it sometimes allows
@@ -1608,11 +1616,11 @@ flip f x y              =  f y x
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
 --
--- Note that @('$')@ is representation-polymorphic in its result type, so that
--- @foo '$' True@ where @foo :: Bool -> Int#@ is well-typed.
+-- Note that @('$')@ is representation-polymorphic, so that
+-- @foo '$' 4#@ where @foo :: Int# -> Int#@ is well-typed.
 {-# INLINE ($) #-}
-($) :: forall r a (b :: TYPE r). (a -> b) -> a -> b
-f $ x =  f x
+($) :: forall repa repb (a :: TYPE repa) (b :: TYPE repb). (a -> b) -> a -> b
+($) f = f
 
 -- | Strict (call-by-value) application operator. It takes a function and an
 -- argument, evaluates the argument to weak head normal form (WHNF), then calls

@@ -115,10 +115,10 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b
-        ($) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
-          where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        ($) (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
+          where ($) :: forall a b. (a -> b) -> a -> b
         return (_ :: [Integer] -> Integer) (_ :: t0)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer) (_ :: t0)
@@ -237,10 +237,10 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         seq (_ :: t2) (_ :: Integer -> [Integer] -> Integer)
           where seq :: forall a b. a -> b -> b
-        ($) (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
-          where ($) :: forall a b. (a -> b) -> a -> b
         ($!) (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where ($!) :: forall a b. (a -> b) -> a -> b
+        ($) (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
+          where ($) :: forall a b. (a -> b) -> a -> b
         return (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer -> [Integer] -> Integer) (_ :: t0)

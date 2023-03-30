@@ -8,8 +8,14 @@ error :: GHC.Stack.Types.HasCallStack => [Char] -> a
   	-- Defined in ‘GHC.Err’
 
 -fprint-explicit-runtime-reps
-($) :: forall (r :: RuntimeRep) a (b :: TYPE r). (a -> b) -> a -> b
-($) :: forall (r :: RuntimeRep) a (b :: TYPE r). (a -> b) -> a -> b
+($)
+  :: forall (repa :: RuntimeRep) (repb :: RuntimeRep)
+            (a :: TYPE repa) (b :: TYPE repb).
+     (a -> b) -> a -> b
+($) ::
+  forall (repa :: RuntimeRep) (repb :: RuntimeRep) (a :: TYPE repa)
+         (b :: TYPE repb).
+  (a -> b) -> a -> b
   	-- Defined in ‘GHC.Base’
 infixr 0 $
 TYPE :: RuntimeRep -> *
