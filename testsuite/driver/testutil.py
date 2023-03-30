@@ -29,9 +29,9 @@ def passed(hc_opts=None) -> PassFail:
                     hc_opts=hc_opts)
 
 def failBecause(reason: str,
-                tag: str=None,
-                stderr: str=None,
-                stdout: str=None
+                tag: Optional[str]=None,
+                stderr: Optional[str]=None,
+                stdout: Optional[str]=None
                 ) -> PassFail:
     return PassFail(passed=False, reason=reason, tag=tag,
                     stderr=stderr, stdout=stdout, hc_opts=None)
@@ -57,7 +57,7 @@ def getStdout(cmd_and_args: List[str]):
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
-        raise Exception("stderr from command: %s\nStdOut(%s):\n%s\n%s\nOutput(%s):\n%s\n%s\n" % (cmd_and_args,str(len(stdout)), stdout, stdout.decode('utf-8'), str(len(stderr)), stderr, stderr.decode('utf-8')))
+        raise Exception("stderr from command: %s\nStdOut(%s):\n%r\n%s\nOutput(%s):\n%r\n%s\n" % (cmd_and_args,str(len(stdout)), stdout, stdout.decode('utf-8'), str(len(stderr)), stderr, stderr.decode('utf-8')))
     return stdout.decode('utf-8')
 
 def lndir(srcdir: Path, dstdir: Path, force_copy=False):

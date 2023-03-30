@@ -8,13 +8,8 @@ The testsuite driver can be typechecked using mypy [1].
 [1] http://mypy-lang.org/
 """
 
-try:
-    from typing import *
-    import typing
-except:
-    # The backwards compatibility stubs must live in another module lest
-    # mypy complains.
-    from typing_stubs import * # type: ignore
+from typing import *
+import typing
 
 
 ####################################################
@@ -23,14 +18,7 @@ except:
 # N.B. mypy appears to typecheck as though the "then" clause of if structures
 # is taken. We exploit this below.
 
-# TextIO is missing on some older Pythons.
-if 'TextIO' not in globals():
-    try:
-        from typing import TextIO
-    except ImportError:
-        TextIO = None # type: ignore
-else:
-    TextIO = None # type: ignore
+from typing import TextIO
 
 
 ####################################################
