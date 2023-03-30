@@ -14,7 +14,7 @@
     },
     {
       "package": "base",
-      "version": "4.16.3.0"
+      "version": "4.16.4.0"
     },
     {
       "package": "array",
@@ -26,7 +26,7 @@
     },
     {
       "package": "ghc-boot-th",
-      "version": "9.2.4"
+      "version": "9.2.7"
     },
     {
       "package": "pretty",
@@ -38,7 +38,7 @@
     },
     {
       "package": "bytestring",
-      "version": "0.11.3.1"
+      "version": "0.11.4.0"
     },
     {
       "package": "containers",
@@ -82,7 +82,7 @@
     },
     {
       "package": "process",
-      "version": "1.6.13.2"
+      "version": "1.6.16.0"
     },
     {
       "package": "Cabal",
