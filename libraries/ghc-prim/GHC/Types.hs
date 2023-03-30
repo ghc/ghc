@@ -202,17 +202,96 @@ data Ordering = LT | EQ | GT
 *                                                                      *
 ********************************************************************* -}
 
-{- | The character type 'Char' is an enumeration whose values represent
-Unicode (or equivalently ISO\/IEC 10646) code points (i.e. characters, see
-<http://www.unicode.org/> for details).  This set extends the ISO 8859-1
-(Latin-1) character set (the first 256 characters), which is itself an extension
-of the ASCII character set (the first 128 characters).  A character literal in
-Haskell has type 'Char'.
+{- | The character type 'Char' represents Unicode codespace
+and its elements are code points as in definitions
+[D9 and D10 of the Unicode Standard](https://www.unicode.org/versions/Unicode15.0.0/ch03.pdf#G2212).
 
-To convert a 'Char' to or from the corresponding 'Int' value defined
-by Unicode, use 'Prelude.toEnum' and 'Prelude.fromEnum' from the
-'Prelude.Enum' class respectively (or equivalently 'Data.Char.ord' and
-'Data.Char.chr').
+Character literals in Haskell are single-quoted: @\'Q\'@, @\'Я\'@ or @\'Ω\'@.
+To represent a single quote itself use @\'\\''@, and to represent a backslash
+use @\'\\\\\'@. The full grammar can be found in the section 2.6 of the
+[Haskell 2010 Language Report](https://www.haskell.org/definition/haskell2010.pdf#section.2.6).
+
+To specify a character by its code point one can use decimal, hexadecimal
+or octal notation: @\'\\65\'@, @\'\\x41\'@ and @\'\\o101\'@ are all alternative forms
+of @\'A\'@. The largest code point is @\'\\x10ffff\'@.
+
+There is a special escape syntax for ASCII control characters:
+
++-------------+-------------------+---------------------------+
+| Escape      | Alternatives      | Meaning                   |
++=============+===================+===========================+
+| @'\\NUL'@   | @'\\0'@           | null character            |
++-------------+-------------------+---------------------------+
+| @'\\SOH'@   | @'\\1'@           | start of heading          |
++-------------+-------------------+---------------------------+
+| @'\\STX'@   | @'\\2'@           | start of text             |
++-------------+-------------------+---------------------------+
+| @'\\ETX'@   | @'\\3'@           | end of text               |
++-------------+-------------------+---------------------------+
+| @'\\EOT'@   | @'\\4'@           | end of transmission       |
++-------------+-------------------+---------------------------+
+| @'\\ENQ'@   | @'\\5'@           | enquiry                   |
++-------------+-------------------+---------------------------+
+| @'\\ACK'@   | @'\\6'@           | acknowledge               |
++-------------+-------------------+---------------------------+
+| @'\\BEL'@   | @'\\7'@, @'\\a'@  | bell (alert)              |
++-------------+-------------------+---------------------------+
+| @'\\BS'@    | @'\\8'@, @'\\b'@  | backspace                 |
++-------------+-------------------+---------------------------+
+| @'\\HT'@    | @'\\9'@, @'\\t'@  | horizontal tab            |
++-------------+-------------------+---------------------------+
+| @'\\LF'@    | @'\\10'@, @'\\n'@ | line feed (new line)      |
++-------------+-------------------+---------------------------+
+| @'\\VT'@    | @'\\11'@, @'\\v'@ | vertical tab              |
++-------------+-------------------+---------------------------+
+| @'\\FF'@    | @'\\12'@, @'\\f'@ | form feed                 |
++-------------+-------------------+---------------------------+
+| @'\\CR'@    | @'\\13'@, @'\\r'@ | carriage return           |
++-------------+-------------------+---------------------------+
+| @'\\SO'@    | @'\\14'@          | shift out                 |
++-------------+-------------------+---------------------------+
+| @'\\SI'@    | @'\\15'@          | shift in                  |
++-------------+-------------------+---------------------------+
+| @'\\DLE'@   | @'\\16'@          | data link escape          |
++-------------+-------------------+---------------------------+
+| @'\\DC1'@   | @'\\17'@          | device control 1          |
++-------------+-------------------+---------------------------+
+| @'\\DC2'@   | @'\\18'@          | device control 2          |
++-------------+-------------------+---------------------------+
+| @'\\DC3'@   | @'\\19'@          | device control 3          |
++-------------+-------------------+---------------------------+
+| @'\\DC4'@   | @'\\20'@          | device control 4          |
++-------------+-------------------+---------------------------+
+| @'\\NAK'@   | @'\\21'@          | negative acknowledge      |
++-------------+-------------------+---------------------------+
+| @'\\SYN'@   | @'\\22'@          | synchronous idle          |
++-------------+-------------------+---------------------------+
+| @'\\ETB'@   | @'\\23'@          | end of transmission block |
++-------------+-------------------+---------------------------+
+| @'\\CAN'@   | @'\\24'@          | cancel                    |
++-------------+-------------------+---------------------------+
+| @'\\EM'@    | @'\\25'@          | end of medium             |
++-------------+-------------------+---------------------------+
+| @'\\SUB'@   | @'\\26'@          | substitute                |
++-------------+-------------------+---------------------------+
+| @'\\ESC'@   | @'\\27'@          | escape                    |
++-------------+-------------------+---------------------------+
+| @'\\FS'@    | @'\\28'@          | file separator            |
++-------------+-------------------+---------------------------+
+| @'\\GS'@    | @'\\29'@          | group separator           |
++-------------+-------------------+---------------------------+
+| @'\\RS'@    | @'\\30'@          | record separator          |
++-------------+-------------------+---------------------------+
+| @'\\US'@    | @'\\31'@          | unit separator            |
++-------------+-------------------+---------------------------+
+| @'\\SP'@    | @'\\32'@, @' '@   | space                     |
++-------------+-------------------+---------------------------+
+| @'\\DEL'@   | @'\\127'@         | delete                    |
++-------------+-------------------+---------------------------+
+
+[Data.Char](https://hackage.haskell.org/package/base/docs/Data-Char.html)
+provides utilities to work with 'Char'.
+
 -}
 data {-# CTYPE "HsChar" #-} Char = C# Char#
 
