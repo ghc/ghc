@@ -462,8 +462,8 @@ mkErrorItem ct
        ; (suppress, m_evdest) <- case ctEvidence ct of
            CtGiven {} -> return (False, Nothing)
            CtWanted { ctev_rewriters = rewriters, ctev_dest = dest }
-             -> do { supp <- anyUnfilledCoercionHoles rewriters
-                   ; return (supp, Just dest) }
+             -> do { rewriters' <- zonkRewriterSet rewriters
+                   ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
 
        ; let m_reason = case ct of CIrredCan { cc_reason = reason } -> Just reason
                                    _                                -> Nothing
@@ -492,20 +492,24 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                                          , text "tidy_items1 =" <+> ppr tidy_items1
                                          , text "tidy_errs =" <+> ppr tidy_errs ])
 
-         -- Catch an awkward case in which /all/ errors are suppressed:
-         -- see Wrinkle at end of Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint
-         -- Unless we are sure that an error will be reported some other way (details
-         -- in the defn of tidy_items) un-suppress the lot. This makes sure we don't forget to
-         -- report an error at all, which is catastrophic: GHC proceeds to desguar and optimise
-         -- the program, even though it is full of type errors (#22702, #22793)
+         -- Catch an awkward (and probably rare) case in which /all/ errors are
+         -- suppressed: see Wrinkle (WRW2) in Note [Prioritise Wanteds with empty
+         -- RewriterSet] in GHC.Tc.Types.Constraint.
+         --
+         -- Unless we are sure that an error will be reported some other way
+         -- (details in the defn of tidy_items) un-suppress the lot. This makes
+         -- sure we don't forget to report an error at all, which is
+         -- catastrophic: GHC proceeds to desguar and optimise the program, even
+         -- though it is full of type errors (#22702, #22793)
        ; errs_already <- ifErrsM (return True) (return False)
        ; let tidy_items
                | not errs_already                     -- Have not already reported an error (perhaps
                                                       --   from an outer implication); see #21405
                , not (any ignoreConstraint simples)   -- No error is ignorable (is reported elsewhere)
                , all ei_suppress tidy_items1          -- All errors are suppressed
-                           = map unsuppressErrorItem tidy_items1
-               | otherwise = tidy_items1
+               = map unsuppressErrorItem tidy_items1
+               | otherwise
+               = tidy_items1
 
          -- First, deal with any out-of-scope errors:
        ; let (out_of_scope, other_holes, not_conc_errs) = partition_errors tidy_errs
@@ -1804,8 +1808,8 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     return (main_msg, [])
 
   -- Incompatible kinds
-  -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
-  -- GHC.Tc.Solver.Canonical
+  -- This is wrinkle (EIK2) in Note [Equalities with incompatible kinds]
+  -- in GHC.Tc.Solver.Equality
   | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
   = return (mkBlockedEqErr item, [])
 
@@ -1987,8 +1991,8 @@ misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
--- These are for the "blocked" equalities, as described in TcCanonical
--- Note [Equalities with incompatible kinds], wrinkle (2). There should
+-- These are for the "blocked" equalities, as described in GHC.Tc.Solver.Equality
+-- Note [Equalities with incompatible kinds], wrinkle (EIK2). There should
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.

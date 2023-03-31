@@ -17,7 +17,7 @@ RepPolyRecordUpdate.hs:13:9: error: [GHC-55287]
     • The record update at field ‘fld’
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE rep0
+        a :: TYPE rep0
       Cannot unify ‘rep’ with the type variable ‘rep0’
       because it is not a concrete ‘RuntimeRep’.
     • In a record update at field ‘fld’,

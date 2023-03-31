@@ -230,7 +230,7 @@ mkWpEta xs wrap = foldr eta_one wrap xs
 
 mk_wp_fun_co :: Mult -> TcCoercionR -> TcCoercionR -> TcCoercionR
 mk_wp_fun_co mult arg_co res_co
-  = mkNakedFunCo1 Representational FTF_T_T (multToCo mult) arg_co res_co
+  = mkNakedFunCo Representational FTF_T_T (multToCo mult) arg_co res_co
     -- FTF_T_T: WpFun is always (->)
 
 mkWpCastR :: TcCoercionR -> HsWrapper

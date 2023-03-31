@@ -41,6 +41,7 @@ import Control.Applicative (liftA3)
 import GHC.Builtin.Types (tYPETyCon)
 import Data.List ( find )
 import GHC.Data.List.Infinite (Infinite)
+import GHC.Data.Bag( listToBag )
 import qualified GHC.Data.List.Infinite as Inf
 
 {-
@@ -155,7 +156,7 @@ bumpDepth (RewriteM thing_inside)
 -- Precondition: the CtEvidence is a CtWanted of an equality
 recordRewriter :: CtEvidence -> RewriteM ()
 recordRewriter (CtWanted { ctev_dest = HoleDest hole })
-  = RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriterSet` hole)
+  = RewriteM $ \env -> updTcRef (re_rewriters env) (`addRewriter` hole)
 recordRewriter other = pprPanic "recordRewriter" (ppr other)
 
 {-
@@ -945,7 +946,7 @@ runTcPluginRewriters rewriteEnv rewriterFunctions tys
            TcPluginRewriteTo
              { tcPluginReduction    = redn
              , tcRewriterNewWanteds = wanteds
-             } -> do { emitWork wanteds; return $ Just redn }
+             } -> do { emitWork (listToBag wanteds); return $ Just redn }
            TcPluginNoRewrite {} -> runRewriters givens rewriters
 
 {-

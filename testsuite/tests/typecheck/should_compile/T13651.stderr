@@ -1,6 +1,6 @@
 
 T13651.hs:12:8: error: [GHC-25897]
-    • Could not deduce ‘cs ~ Bar (Foo h) (Foo s)’
+    • Could not deduce ‘cr ~ Bar h (Foo r)’
       from the context: (F cr cu ~ Bar h (Bar r u),
                          F cu cs ~ Bar (Foo h) (Bar u s))
         bound by the type signature for:
@@ -8,7 +8,7 @@ T13651.hs:12:8: error: [GHC-25897]
                           (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>
                           Bar h (Bar r u) -> Bar (Foo h) (Bar u s) -> Foo (cr -> cs)
         at T13651.hs:(12,8)-(14,65)
-      ‘cs’ is a rigid type variable bound by
+      ‘cr’ is a rigid type variable bound by
         the type signature for:
           foo :: forall cr cu h r u cs s.
                  (F cr cu ~ Bar h (Bar r u), F cu cs ~ Bar (Foo h) (Bar u s)) =>

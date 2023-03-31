@@ -764,7 +764,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
              unsafe_equality k a b
                = ( mkTyApps (Var unsafe_equality_proof_id) [k,b,a]
                  , mkTyConApp unsafe_equality_tc [k,b,a]
-                 , mkHeteroPrimEqPred k k a b
+                 , mkNomPrimEqPred k a b
                  )
              -- NB: UnsafeRefl :: (b ~# a) -> UnsafeEquality a b, so we have to
              -- carefully swap the arguments above

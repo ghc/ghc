@@ -5,7 +5,6 @@
 
 module GHC.Tc.Solver.Canonical(
      canonicalize,
-     unifyWanted,
      makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith, andWhenContinue,
      solveCallStack    -- For GHC.Tc.Solver
@@ -144,7 +143,7 @@ canClassNC ev cls tys
   = do { dflags <- getDynFlags
        ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev [] [] cls tys
                            -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
-       ; emitWork sc_cts
+       ; emitWork (listToBag sc_cts)
        ; canClass ev cls tys doNotExpand }
                            -- doNotExpand: We have already expanded superclasses for /this/ dict
                            -- so set the fuel to doNotExpand to avoid repeating expansion
@@ -211,15 +210,13 @@ canClass ev cls tys pend_sc
   = -- all classes do *nominal* matching
     assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
     do { (redns@(Reductions _ xis), rewriters) <- rewriteArgsNom ev cls_tc tys
-       ; let redn@(Reduction _ xi) = mkClassPredRedn cls redns
-             mk_ct new_ev = CDictCan { cc_ev = new_ev
-                                     , cc_tyargs = xis
-                                     , cc_class = cls
-                                     , cc_pend_sc = pend_sc }
-       ; mb <- rewriteEvidence rewriters ev redn
-       ; traceTcS "canClass" (vcat [ ppr ev
-                                   , ppr xi, ppr mb ])
-       ; return (fmap mk_ct mb) }
+       ; let redn = mkClassPredRedn cls redns
+       ; rewriteEvidence rewriters ev redn $ \new_ev ->
+    do { traceTcS "canClass" (vcat [ ppr new_ev, ppr (reductionReducedType redn) ])
+       ; continueWith (CDictCan { cc_ev = new_ev
+                                , cc_tyargs = xis
+                                , cc_class = cls
+                                , cc_pend_sc = pend_sc }) }}
   where
     cls_tc = classTyCon cls
 
@@ -738,7 +735,7 @@ canIrred ev
   = do { let pred = ctEvPred ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
        ; (redn, rewriters) <- rewrite ev pred
-       ; rewriteEvidence rewriters ev redn `andWhenContinue` \ new_ev ->
+       ; rewriteEvidence rewriters ev redn $ \ new_ev ->
 
     do { -- Re-classify, in case rewriting has improved its shape
          -- Code is like the canNC, except
@@ -843,7 +840,7 @@ canForAllNC ev tvs theta pred
   = do { dflags <- getDynFlags
        ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev tvs theta cls tys
        -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
-       ; emitWork sc_cts
+       ; emitWork (listToBag sc_cts)
        ; canForAll ev doNotExpand }
        -- doNotExpand: as we have already (eagerly) expanded superclasses for this class
 
@@ -863,9 +860,8 @@ canForAll :: CtEvidence -> ExpansionFuel -> TcS (StopOrContinue Ct)
 -- We have a constraint (forall as. blah => C tys)
 canForAll ev fuel
   = do { -- First rewrite it to apply the current substitution
-         let pred = ctEvPred ev
-       ; (redn, rewriters) <- rewrite ev pred
-       ; rewriteEvidence rewriters ev redn `andWhenContinue` \ new_ev ->
+       ; (redn, rewriters) <- rewrite ev (ctEvPred ev)
+       ; rewriteEvidence rewriters ev redn $ \ new_ev ->
 
     do { -- Now decompose into its pieces and solve it
          -- (It takes a lot less code to rewrite before decomposing.)
@@ -979,32 +975,29 @@ rewriteEvidence :: RewriterSet  -- ^ See Note [Wanteds rewrite Wanteds]
                                 -- in GHC.Tc.Types.Constraint
                 -> CtEvidence   -- ^ old evidence
                 -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
-                -> TcS (StopOrContinue CtEvidence)
--- Returns Just new_ev iff either (i)  'co' is reflexivity
---                             or (ii) 'co' is not reflexivity, and 'new_pred' not cached
--- In either case, there is nothing new to do with new_ev
-{-
-     rewriteEvidence old_ev new_pred co
-Main purpose: create new evidence for new_pred;
-              unless new_pred is cached already
-* Returns a new_ev : new_pred, with same wanted/given flag as old_ev
-* If old_ev was wanted, create a binding for old_ev, in terms of new_ev
-* If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
-* Returns Nothing if new_ev is already cached
+                -> (CtEvidence -> TcS (StopOrContinue Ct))
+                -> TcS (StopOrContinue Ct)
+-- (rewriteEvidence old_ev new_pred co do_next)
+-- Main purpose: create new evidence for new_pred;
+--                 unless new_pred is cached already
+-- * Calls do_next with (new_ev :: new_pred), with same wanted/given flag as old_ev
+-- * If old_ev was wanted, create a binding for old_ev, in terms of new_ev
+-- * If old_ev was given, AND not cached, create a binding for new_ev, in terms of old_ev
+-- * Stops if new_ev is already cached
+--
+--        Old evidence    New predicate is               Return new evidence
+--        flavour                                        of same flavor
+--        -------------------------------------------------------------------
+--        Wanted          Already solved or in inert     Stop
+--                        Not                            do_next new_evidence
+--
+--        Given           Already in inert               Stop
+--                        Not                            do_next new_evidence
 
-        Old evidence    New predicate is               Return new evidence
-        flavour                                        of same flavor
-        -------------------------------------------------------------------
-        Wanted          Already solved or in inert     Nothing
-                        Not                            Just new_evidence
-
-        Given           Already in inert               Nothing
-                        Not                            Just new_evidence
-
-Note [Rewriting with Refl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Rewriting with Refl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the coercion is just reflexivity then you may re-use the same
-variable.  But be careful!  Although the coercion is Refl, new_pred
+evidence variable.  But be careful!  Although the coercion is Refl, new_pred
 may reflect the result of unification alpha := ty, so new_pred might
 not _look_ the same as old_pred, and it's vital to proceed from now on
 using new_pred.
@@ -1017,16 +1010,16 @@ the rewriter set. We check this with an assertion.
  -}
 
 
-rewriteEvidence rewriters old_ev (Reduction co new_pred)
+rewriteEvidence rewriters old_ev (Reduction co new_pred) do_next
   | isReflCo co -- See Note [Rewriting with Refl]
   = assert (isEmptyRewriterSet rewriters) $
-    continueWith (setCtEvPredType old_ev new_pred)
+    do_next (setCtEvPredType old_ev new_pred)
 
 rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
-                (Reduction co new_pred)
+                (Reduction co new_pred) do_next
   = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
     do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
-       ; continueWith new_ev }
+       ; do_next new_ev }
   where
     -- mkEvCast optimises ReflCo
     new_tm = mkEvCast (evId old_evar)
@@ -1036,14 +1029,14 @@ rewriteEvidence new_rewriters
                 ev@(CtWanted { ctev_dest = dest
                              , ctev_loc = loc
                              , ctev_rewriters = rewriters })
-                (Reduction co new_pred)
+                (Reduction co new_pred) do_next
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ctEvRole ev)
        ; setWantedEvTerm dest IsCoherent $
             mkEvCast (getEvExpr mb_new_ev)
                      (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
        ; case mb_new_ev of
-            Fresh  new_ev -> continueWith new_ev
+            Fresh  new_ev -> do_next new_ev
             Cached _      -> stopWith ev "Cached wanted" }
   where
     rewriters' = rewriters S.<> new_rewriters

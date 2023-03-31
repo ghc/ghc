@@ -133,7 +133,7 @@ tcRule (HsRule { rd_ext  = ext
                                   , ppr lhs_wanted
                                   , ppr rhs_wanted ])
 
-       ; (lhs_evs, residual_lhs_wanted)
+       ; (lhs_evs, residual_lhs_wanted, dont_default)
             <- simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
        -- SimplifyRule Plan, step 4
@@ -153,15 +153,14 @@ tcRule (HsRule { rd_ext  = ext
 
        -- See Note [Re-quantify type variables in rules]
        ; forall_tkvs <- candidateQTyVarsOfTypes (rule_ty : map idType tpl_ids)
-       ; let don't_default = nonDefaultableTyVarsOfWC residual_lhs_wanted
-       ; let weed_out = (`dVarSetMinusVarSet` don't_default)
+       ; let weed_out = (`dVarSetMinusVarSet` dont_default)
              quant_cands = forall_tkvs { dv_kvs = weed_out (dv_kvs forall_tkvs)
                                        , dv_tvs = weed_out (dv_tvs forall_tkvs) }
        ; qtkvs <- quantifyTyVars skol_info DefaultNonStandardTyVars quant_cands
        ; traceTc "tcRule" (vcat [ pprFullRuleName (snd ext) rname
                                 , text "forall_tkvs:" <+> ppr forall_tkvs
                                 , text "quant_cands:" <+> ppr quant_cands
-                                , text "don't_default:" <+> ppr don't_default
+                                , text "dont_default:" <+> ppr dont_default
                                 , text "residual_lhs_wanted:" <+> ppr residual_lhs_wanted
                                 , text "qtkvs:" <+> ppr qtkvs
                                 , text "rule_ty:" <+> ppr rule_ty
@@ -401,7 +400,8 @@ simplifyRule :: RuleName
              -> WantedConstraints       -- Constraints from LHS
              -> WantedConstraints       -- Constraints from RHS
              -> TcM ( [EvVar]               -- Quantify over these LHS vars
-                    , WantedConstraints)    -- Residual un-quantified LHS constraints
+                    , WantedConstraints     -- Residual un-quantified LHS constraints
+                    , TcTyVarSet )          -- Don't default these
 -- See Note [The SimplifyRule Plan]
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
@@ -413,14 +413,23 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
        -- Why clone?  See Note [Simplify cloned constraints]
        ; lhs_clone <- cloneWC lhs_wanted
        ; rhs_clone <- cloneWC rhs_wanted
-       ; setTcLevel tc_lvl $
-         discardResult     $
-         runTcS            $
-         do { _ <- solveWanteds lhs_clone
-            ; _ <- solveWanteds rhs_clone
-                  -- Why do them separately?
-                  -- See Note [Solve order for RULES]
-            ; return () }
+       ; (dont_default, _)
+            <- setTcLevel tc_lvl $
+               runTcS            $
+               do { lhs_wc  <- solveWanteds lhs_clone
+                  ; _rhs_wc <- solveWanteds rhs_clone
+                        -- Why do them separately?
+                        -- See Note [Solve order for RULES]
+
+                  ; let dont_default = nonDefaultableTyVarsOfWC lhs_wc
+                        -- If lhs_wanteds has
+                        --   (a[sk] :: TYPE rr[sk]) ~ (b0[tau] :: TYPE r0[conc])
+                        -- we want r0 to be non-defaultable;
+                        -- see nonDefaultableTyVarsOfWC.  Simplest way to get
+                        -- this is to look at the post-simplified lhs_wc, which
+                        -- will contain (rr[sk] ~ r0[conc)].  An example is in
+                        -- test rep-poly/RepPolyRule1
+                  ; return dont_default }
 
        -- Note [The SimplifyRule Plan] step 2
        ; lhs_wanted <- zonkWC lhs_wanted
@@ -435,9 +444,10 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
               , text "rhs_wanted" <+> ppr rhs_wanted
               , text "quant_cts" <+> ppr quant_cts
               , text "residual_lhs_wanted" <+> ppr residual_lhs_wanted
+              , text "dont_default" <+> ppr dont_default
               ]
 
-       ; return (quant_evs, residual_lhs_wanted) }
+       ; return (quant_evs, residual_lhs_wanted, dont_default) }
 
   where
     mk_quant_ev :: Ct -> TcM EvVar

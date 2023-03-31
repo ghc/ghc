@@ -3088,6 +3088,18 @@ neededEvVars implic@(Implic { ic_given = givens
 
 -------------------------------------------------
 simplifyDelayedErrors :: Bag DelayedError -> TcS (Bag DelayedError)
+-- Simplify any delayed errors: e.g. type and term holes
+-- NB: At this point we have finished with all the simple
+--     constraints; they are in wc_simple, not in the inert set.
+--     So those Wanteds will not rewrite these delayed errors.
+--     That's probably no bad thing.
+--
+--     However if we have [W] alpha ~ Maybe a, [W] alpha ~ Int
+--     and _ : alpha, then we'll /unify/ alpha with the first of
+--     the Wanteds we get, and thereby report (_ : Maybe a) or
+--     (_ : Int) unpredictably, depending on which we happen to see
+--     first.  Doesn't matter much; there is a type error anyhow.
+--     T17139 is a case in point.
 simplifyDelayedErrors = mapBagM simpl_err
   where
     simpl_err :: DelayedError -> TcS DelayedError
@@ -3104,6 +3116,7 @@ simplifyDelayedErrors = mapBagM simpl_err
      -- code, because we have all the givens already set up
     simpl_hole h@(Hole { hole_ty = ty, hole_loc = loc })
       = do { ty' <- rewriteType loc ty
+           ; traceTcS "simpl_hole" (ppr ty $$ ppr ty')
            ; return (h { hole_ty = ty' }) }
 
 {- Note [Delete dead Given evidence bindings]

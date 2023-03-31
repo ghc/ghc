@@ -184,7 +184,7 @@ newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 -- | Create a fresh coercion hole.
 -- This should only be invoked within 'tcPluginSolve'.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
-newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
+newCoercionHole = unsafeTcPluginTcM . TcM.newVanillaCoercionHole
 
 -- | Bind an evidence variable.
 --
