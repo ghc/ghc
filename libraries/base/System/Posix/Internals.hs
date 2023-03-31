@@ -139,10 +139,10 @@ ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
                         Nothing
 
 fdGetMode :: FD -> IO IOMode
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(javascript_HOST_ARCH)
 fdGetMode _ = do
     -- We don't have a way of finding out which flags are set on FDs
-    -- on Windows, so make a handle that thinks that anything goes.
+    -- on Windows/JS, so make a handle that thinks that anything goes.
     let flags = o_RDWR
 #else
 fdGetMode fd = do

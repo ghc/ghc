@@ -450,6 +450,15 @@ function h$base_c_s_isdir(mode) {
 function h$base_c_s_isfifo(mode) {
     return 0;
 }
+function h$base_c_fcntl_read(fd,cmd) {
+    return -1;
+}
+function h$base_c_fcntl_write(fd,cmd,value) {
+    return -1;
+}
+function h$base_c_fcntl_lock(fd,cmd,ptr,ptr_o) {
+    return -1;
+}
 
 #ifndef GHCJS_BROWSER
 // The `fileStat` is filled according to the layout of Emscripten's `stat`
