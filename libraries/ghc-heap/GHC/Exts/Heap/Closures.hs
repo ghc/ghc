@@ -77,13 +77,6 @@ instance Show Box where
        addr = ptr - tag
        pad_out ls = '0':'x':ls
 
--- | Boxes can be compared, but this is not pure, as different heap objects can,
--- after garbage collection, become the same object.
-areBoxesEqual :: Box -> Box -> IO Bool
-areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
-    0# -> pure False
-    _  -> pure True
-
 -- |This takes an arbitrary value and puts it into a box.
 -- Note that calls like
 --
@@ -95,6 +88,14 @@ areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
 -- > case list of x:_ -> asBox x
 asBox :: a -> Box
 asBox x = Box (unsafeCoerce# x)
+
+-- | Boxes can be compared, but this is not pure, as different heap objects can,
+-- after garbage collection, become the same object.
+areBoxesEqual :: Box -> Box -> IO Bool
+areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
+    0# -> pure False
+    _  -> pure True
+
 
 ------------------------------------------------------------------------
 -- Closures
@@ -545,5 +546,4 @@ allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
-allClosures (StackClosure {}) = []
 allClosures _ = []
