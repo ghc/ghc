@@ -403,7 +403,6 @@ data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
-  | IfaceCorePrepProv Bool  -- See defn of CorePrepProv
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -625,7 +624,6 @@ substIfaceType env ty
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
     go_prov co@(IfacePluginProv _)   = co
-    go_prov co@(IfaceCorePrepProv _) = co
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
@@ -1925,8 +1923,6 @@ pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
-pprIfaceUnivCoProv (IfaceCorePrepProv _)
-  = text "CorePrep"
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -2298,9 +2294,6 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfacePluginProv a) = do
           putByte bh 3
           put_ bh a
-  put_ bh (IfaceCorePrepProv a) = do
-          putByte bh 4
-          put_ bh a
 
   get bh = do
       tag <- getByte bh
@@ -2311,8 +2304,6 @@ instance Binary IfaceUnivCoProv where
                    return $ IfaceProofIrrelProv a
            3 -> do a <- get bh
                    return $ IfacePluginProv a
-           4 -> do a <- get bh
-                   return (IfaceCorePrepProv a)
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 

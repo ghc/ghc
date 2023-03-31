@@ -1471,6 +1471,18 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     -- simplifications).  Until phase zero we take no special notice of
     -- top level things, but then we become more leery about inlining
     -- them.
+    --
+    -- What exactly to check in `early_phase` above is the subject of #17910.
+    --
+    -- !10088 introduced an additional Simplifier iteration in LargeRecord
+    -- because we first FloatOut `case unsafeEqualityProof of ... -> I# 2#`
+    -- (a non-trivial value) which we immediately inline back in.
+    -- Ideally, we'd never have inlined it because the binding turns out to
+    -- be expandable; unfortunately we need an iteration of the Simplifier to
+    -- attach the proper unfolding and can't check isExpandableUnfolding right
+    -- here.
+    -- (Nor can we check for `exprIsExpandable rhs`, because that needs to look
+    -- at the non-existent unfolding for the `I# 2#` which is also floated out.)
 
 {-
 ************************************************************************

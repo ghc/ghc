@@ -37,15 +37,16 @@ The programmer thinks that the unsafeCoerce from 't1' to 't2' is safe,
 because it is justified by a runtime test (sameTypeRep t1 t2).
 It used to compile to a cast, with a magical 'UnsafeCo' coercion.
 
-But alas, nothing then stops GHC floating that call to unsafeCoerce
-outwards so we get
+But alas, if `x` is known to be evaluated, nothing then stops GHC floating that
+call to unsafeCoerce outwards so we get
    case (x |> UnsafeCo @t1 @t2) of
      K -> case sameTypeRep t1 t2 of
              False -> blah2
              True  -> ...blah...
 
 and this is utterly wrong, because the unsafeCoerce is being performed
-before the dynamic test. This is exactly the setup in #16893.
+before the dynamic test. This is exactly the setup in #16893 (search for
+"Diagnosis").
 
 The solution is this:
 
@@ -81,13 +82,13 @@ several ways
 
 (U1) unsafeEqualityProof is /never/ inlined.
 
-(U2) In CoreToStg.Prep, we transform
+(U2) In CoreToStg.coreToStgExpr, we transform
        case unsafeEqualityProof of UnsafeRefl g -> blah
       ==>
-       blah[unsafe-co/g]
+       blah
 
-     This eliminates the overhead of evaluating the unsafe
-     equality proof.
+     This eliminates the overhead of evaluating the unsafe equality proof.
+     (It follows that the Case is trivial iff `blah` is.)
 
      Any /other/ occurrence of unsafeEqualityProof is left alone.
      For example you could write
@@ -121,12 +122,25 @@ several ways
         let a = e
             x = K a
         in ...  }
-     Floating the case is OK here, even though it broadens the
-     scope, because we are done with simplification.
+     NB: Floating the case is OK here, even though it broadens the scope,
+     because we are done with simplification and won't float out of
+     branching Case alternatives such as in the `sameTypeRep` example above.
 
-(U4) Ditto GHC.Core.Unfold.inlineBoringOk we want to treat
-     the RHS of unsafeCoerce as very small; see
-     Note [Inline unsafeCoerce] in that module.
+     Neglecting this transformation triggered test failures in GHCi debugger
+     test cases such as `print003`, because it could no longer identify things
+     such as `x` above as a value.
+
+(U4) `case unsafeEqualityProof of UnsafeRefl -> rhs` as trivial iff `rhs` is,
+     see `exprIsTrivial`. One reason is that we want to treat the RHS
+     of unsafeCoerce as very small; see Note [Inline unsafeCoerce] in
+     GHC.Core.Unfold.
+     Another reason is
+       f (case unsafeEqualitProof ... of UnsafeRefl co -> x |> co))
+     we do not want to ANF-ise to
+        let arg = case unsafeEqualitProof ... of UnsafeRefl co -> x |> co
+        in f arg
+     because that `let` will turn into a silly indirection `let arg = x in ..`
+     in CoreToStg. Triviality means we can "look through" the Case in CoreToStg.
 
 (U5) The definition of unsafeEqualityProof in Unsafe.Coerce
      looks very strange:

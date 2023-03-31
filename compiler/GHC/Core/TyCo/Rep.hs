@@ -1529,17 +1529,12 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
-  | CorePrepProv       -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
-      Bool   -- True  <=> the UnivCo must be homogeneously kinded
-             -- False <=> allow hetero-kinded, e.g. Int ~ Int#
-
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
-  ppr (CorePrepProv _)   = text "(CorePrep)"
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
@@ -1861,7 +1856,6 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _)      = mempty
-    go_prov _   (CorePrepProv _)    = mempty
 
 -- | A view function that looks through nothing.
 noView :: Type -> Maybe Type
@@ -1928,7 +1922,6 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
-provSize (CorePrepProv _)    = 1
 
 {-
 ************************************************************************

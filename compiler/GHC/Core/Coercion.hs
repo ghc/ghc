@@ -1395,8 +1395,6 @@ setNominalRole_maybe r co
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
-
-                     CorePrepProv _   -> True
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1522,7 +1520,6 @@ promoteCoercion co = case co of
     UnivCo (PhantomProv kco)    _ _ _ -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _)       _ _ _ -> mkKindCo co
-    UnivCo (CorePrepProv _)     _ _ _ -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -2346,7 +2343,6 @@ seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
-seqProv (CorePrepProv _)    = ()
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()

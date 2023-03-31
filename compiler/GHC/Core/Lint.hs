@@ -2398,9 +2398,6 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
-       | allow_ill_kinded_univ_co prov
-       = return ()  -- Skip kind checks
-       | otherwise
        = do { checkWarnL fixed_rep_1
                          (report "left-hand type does not have a fixed runtime representation")
             ; checkWarnL fixed_rep_2
@@ -2417,13 +2414,6 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
          -- Otherwise, we get #13458
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
-
-     -- CorePrep deliberately makes ill-kinded casts
-     --  e.g (case error @Int "blah" of {}) :: Int#
-     --     ==> (error @Int "blah") |> Unsafe Int Int#
-     -- See Note [Unsafe coercions] in GHC.Core.CoreToStg.Prep
-     allow_ill_kinded_univ_co (CorePrepProv homo_kind) = not homo_kind
-     allow_ill_kinded_univ_co _                        = False
 
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
@@ -2454,8 +2444,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
             ; check_kinds kco k1 k2
             ; return (ProofIrrelProv kco') }
 
-     lint_prov _ _ prov@(PluginProv _)   = return prov
-     lint_prov _ _ prov@(CorePrepProv _) = return prov
+     lint_prov _ _ prov@(PluginProv _) = return prov
 
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco

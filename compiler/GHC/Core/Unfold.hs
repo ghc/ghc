@@ -231,8 +231,11 @@ inlineBoringOk e
                         , exprIsTrivial a  = go (credit-1) f
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
-    go credit (Case scrut _ _ [Alt _ _ rhs]) -- See Note [Inline unsafeCoerce]
-      | isUnsafeEqualityProof scrut        = go credit rhs
+    go credit (Case e b _ alts)
+      | null alts
+      = go credit e   -- EmptyCase is like e
+      | Just rhs <- isUnsafeEqualityCase e b alts
+      = go credit rhs -- See Note [Inline unsafeCoerce]
     go _      (Var {})                     = boringCxtOk
     go _      (Lit l)                      = litIsTrivial l && boringCxtOk
     go _      _                            = boringCxtNotOk
@@ -286,7 +289,7 @@ calcUnfoldingGuidance opts is_top_bottoming expr
 We really want to inline unsafeCoerce, even when applied to boring
 arguments.  It doesn't look as if its RHS is smaller than the call
    unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
-but that case is discarded -- see Note [Implementing unsafeCoerce]
+but that case is discarded in CoreToStg -- see Note [Implementing unsafeCoerce]
 in base:Unsafe.Coerce.
 
 Moreover, if we /don't/ inline it, we may be left with
@@ -294,7 +297,9 @@ Moreover, if we /don't/ inline it, we may be left with
 which will build a thunk -- bad, bad, bad.
 
 Conclusion: we really want inlineBoringOk to be True of the RHS of
-unsafeCoerce.  This is (U4) in Note [Implementing unsafeCoerce].
+unsafeCoerce. And it really is, because we regard
+  case unsafeEqualityProof @a @b of UnsafeRefl -> rhs
+as trivial iff rhs is. This is (U4) in Note [Implementing unsafeCoerce].
 
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

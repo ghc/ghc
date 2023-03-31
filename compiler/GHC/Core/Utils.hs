@@ -60,7 +60,7 @@ module GHC.Core.Utils (
         mkStrictFieldSeqs, shouldStrictifyIdForCbv, shouldUseCbvForId,
 
         -- * unsafeEqualityProof
-        isUnsafeEqualityProof,
+        isUnsafeEqualityCase,
 
         -- * Dumping stuff
         dumpIdInfoOfProgram
@@ -80,7 +80,7 @@ import GHC.Core.Reduction
 import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 
-import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey )
+import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofIdKey, unsafeReflDataConKey )
 import GHC.Builtin.PrimOps
 
 import GHC.Types.Var
@@ -1068,6 +1068,9 @@ trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
 -- * `case e of {}` an empty case
 trivial_expr_fold k_id k_lit k_triv k_not_triv = go
   where
+    -- If you change this function, be sure to change SetLevels.notWorthFloating
+    -- as well!
+    -- (Or yet better: Come up with a way to share code with this function.)
     go (Var v)                            = k_id v  -- See Note [Variables are trivial]
     go (Lit l)    | litIsTrivial l        = k_lit l
     go (Type _)                           = k_triv
@@ -1076,7 +1079,11 @@ trivial_expr_fold k_id k_lit k_triv k_not_triv = go
     go (Lam b e)  | not (isRuntimeVar b)  = go e
     go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
     go (Cast e _)                         = go e
-    go (Case e _ _ [])                    = go e              -- See Note [Empty case is trivial]
+    go (Case e b _ as)
+      | null as
+      = go e     -- See Note [Empty case is trivial]
+      | Just rhs <- isUnsafeEqualityCase e b as
+      = go rhs   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     go _                                  = k_not_triv
 
 exprIsTrivial :: CoreExpr -> Bool
@@ -1707,7 +1714,7 @@ altsAreExhaustive :: [Alt b] -> Bool
 -- True  <=> the case alternatives are definitely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []
-  = False    -- Should not happen
+  = True    -- The scrutinee never returns; see Note [Empty case alternatives] in GHC.Core
 altsAreExhaustive (Alt con1 _ _ : alts)
   = case con1 of
       DEFAULT   -> True
@@ -2692,11 +2699,20 @@ wantCbvForId cbv_for_strict v
 *                                                                      *
 ********************************************************************* -}
 
-isUnsafeEqualityProof :: CoreExpr -> Bool
+isUnsafeEqualityCase :: CoreExpr -> Id -> [CoreAlt] -> Maybe CoreExpr
 -- See (U3) and (U4) in
 -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-isUnsafeEqualityProof e
-  | Var v `App` Type _ `App` Type _ `App` Type _ <- e
-  = v `hasKey` unsafeEqualityProofIdKey
+isUnsafeEqualityCase scrut bndr alts
+  | [Alt ac _ rhs] <- alts
+  , DataAlt dc <- ac
+  , dc `hasKey` unsafeReflDataConKey
+  , isDeadBinder bndr
+      -- We can only discard the case if the case-binder is dead
+      -- It usually is, but see #18227
+  , Var v `App` _ `App` _ `App` _ <- scrut
+  , v `hasKey` unsafeEqualityProofIdKey
+      -- Check that the scrutinee really is unsafeEqualityProof
+      -- and not, say, error
+  = Just rhs
   | otherwise
-  = False
+  = Nothing
