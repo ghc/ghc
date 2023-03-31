@@ -212,6 +212,14 @@ getClosure stackSnapshot# index relativeOffset =
       (# s1, ptr #) ->
         (# s1, Box ptr #)
 
+-- TODO: Inline later
+-- | Iterator state for stack decoding
+data StackFrameIter =
+  -- | Represents a closure on the stack
+  SfiClosure !StackSnapshot# !WordOffset
+  -- | Represents a primitive word on the stack
+  | SfiPrimitive !StackSnapshot# !WordOffset
+
 decodeLargeBitmap :: LargeBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
   (bitmapArray, size) <- IO $ \s ->
@@ -237,11 +245,10 @@ decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
    in mapM toBitmapPayload bes
   where
     toBitmapPayload :: StackFrameIter -> IO Closure
-    toBitmapPayload sfi@SfiPrimitive {..} = do
-      w <- getWord stackSnapshot# index 0
+    toBitmapPayload (SfiPrimitive stack# i)  = do
+      w <- getWord stack# i 0
       pure $ UnknownTypeWordSizedPrimitive w
-    toBitmapPayload sfi@SfiClosure {..} = getBoxedClosureData =<< getClosure stackSnapshot# index 0
-    toBitmapPayload sfi = error $ "Unexpected StackFrameIter type: " ++ show sfi
+    toBitmapPayload (SfiClosure stack# i) = getBoxedClosureData =<< getClosure stack# i 0
 
     wordsToBitmapEntries :: WordOffset -> [Word] -> Word -> [StackFrameIter]
     wordsToBitmapEntries _ [] 0 = []
@@ -279,7 +286,6 @@ decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
         getIndex :: StackFrameIter -> WordOffset
         getIndex (SfiClosure _ i) = i
         getIndex (SfiPrimitive _ i) = i
-        getIndex sfi' = error $ "Has no index : " ++ show sfi'
 
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =

@@ -11,7 +11,6 @@ module GHC.Exts.Heap.Closures (
     -- * Closures
       Closure
     , GenClosure(..)
-    , StackFrame(..)
     , PrimType(..)
     , WhatNext(..)
     , WhyBlocked(..)
@@ -19,14 +18,14 @@ module GHC.Exts.Heap.Closures (
     , RetFunType(..)
     , allClosures
 
+    -- * Stack
+    , StgStackClosure(..)
+    , StackFrame(..)
+
     -- * Boxes
     , Box(..)
     , areBoxesEqual
     , asBox
-    , StgStackClosure(..)
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-    , StackFrameIter(..)
-#endif
     ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
@@ -52,10 +51,6 @@ import Data.Word
 import GHC.Exts
 import GHC.Generics
 import Numeric
-#if MIN_TOOL_VERSION_ghc(9,7,0)
-import GHC.Stack.CloneStack (StackSnapshot(..), stackSnapshotToString)
-import GHC.Exts.Stack.Constants
-#endif
 
 ------------------------------------------------------------------------
 -- Boxes
@@ -64,50 +59,6 @@ foreign import prim "aToWordzh" aToWord# :: Any -> Word#
 
 foreign import prim "reallyUnsafePtrEqualityUpToTag"
     reallyUnsafePtrEqualityUpToTag# :: Any -> Any -> Int#
-
-#if MIN_TOOL_VERSION_ghc(9,7,0)
--- | Iterator state for stack decoding
-data StackFrameIter =
-  -- | Represents a closure on the stack
-  SfiClosure
-    { stackSnapshot# :: !StackSnapshot#,
-      index :: !WordOffset
-    }
-  -- | Represents a primitive word on the stack
-  | SfiPrimitive
-    { stackSnapshot# :: !StackSnapshot#,
-      index :: !WordOffset
-    }
-
-instance Eq StackFrameIter where
-  (SfiClosure s1# i1) == (SfiClosure s2# i2) =
-    (StackSnapshot s1#) == (StackSnapshot s2#)
-    && i1 == i2
-  (SfiPrimitive s1# i1) == (SfiPrimitive s2# i2) =
-    (StackSnapshot s1#) == (StackSnapshot s2#)
-    && i1 == i2
-  _ == _ = False
-
-instance Show StackFrameIter where
-   showsPrec _ (SfiClosure s# i ) rs =
-    "SfiClosure { stackSnapshot# = " ++ stackSnapshotToString (StackSnapshot s#) ++ show i ++ ", " ++ "}" ++ rs
-   showsPrec _ (SfiPrimitive s# i ) rs =
-    "SfiPrimitive { stackSnapshot# = " ++ stackSnapshotToString (StackSnapshot s#) ++ show i ++ ", " ++ "}" ++ rs
-
--- | A value or reference to a value on the stack.
-newtype StackFrameBox =  StackFrameBox StackFrameIter
-  deriving (Eq)
-
-instance Show StackFrameBox where
-   showsPrec _ (StackFrameBox sfi) rs =
-    "(StackFrameBox " ++ show sfi ++ ")" ++ rs
-
-areStackFrameBoxesEqual :: StackFrameBox -> StackFrameBox -> Bool
-areStackFrameBoxesEqual (StackFrameBox sfi1) (StackFrameBox sfi2) =
-  sfi1 == sfi2
-areStackFrameBoxesEqual _ _ = False
-
-#endif
 
 -- | An arbitrary Haskell value in a safe Box. The point is that even
 -- unevaluated thunks can safely be moved around inside the Box, and when

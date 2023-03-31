@@ -57,6 +57,8 @@ module GHC.Exts.Heap (
     , allClosures
     , closureSize
 #if MIN_TOOL_VERSION_ghc(9,7,0)
+     -- * Stack inspection
+    , decodeStack
     , stackFrameSize
 #endif
     -- * Boxes
@@ -80,11 +82,8 @@ import GHC.Exts
 import GHC.Int
 import GHC.Word
 #if MIN_TOOL_VERSION_ghc(9,7,0)
-import GHC.Stack.CloneStack
 import GHC.Exts.Stack.Decode
 import GHC.Exts.Stack.Constants
-import Data.Functor
-import Debug.Trace
 #endif
 
 
