@@ -8,9 +8,6 @@ module GHC.Tc.Utils.Concrete
   ( -- * Ensuring that a type has a fixed runtime representation
     hasFixedRuntimeRep
   , hasFixedRuntimeRep_syntactic
-
-    -- * Making a type concrete
-  , makeTypeConcrete
   )
  where
 

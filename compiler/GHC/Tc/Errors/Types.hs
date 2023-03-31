@@ -3473,7 +3473,7 @@ data TcRnMessage where
                        -> ![LIdP GhcRn] -- ^ The LHS args
                        -> !PatSynInvalidRhsReason -- ^ The number of equation arguments
                        -> TcRnMessage
-  {- TcRnCannotDefaultConcrete is an error occurring when a concrete
+  {-| TcRnCannotDefaultConcrete is an error occurring when a concrete
     type variable cannot be defaulted.
 
     Test cases:

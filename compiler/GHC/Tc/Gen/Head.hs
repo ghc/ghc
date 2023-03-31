@@ -883,7 +883,7 @@ tcExprWithSig expr hs_ty
     loc = getLocA (dropWildCards hs_ty)
     ctxt = ExprSigCtxt (lhsSigWcTypeContextSpan hs_ty)
 
-tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
+tcExprSig :: UserTypeCtxt -> LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcSigmaType)
 tcExprSig ctxt expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { let poly_ty = idType poly_id

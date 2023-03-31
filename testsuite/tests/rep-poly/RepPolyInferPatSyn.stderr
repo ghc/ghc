@@ -4,7 +4,7 @@ RepPolyInferPatSyn.hs:22:16: error: [GHC-55287]
       does not have a fixed runtime representation.
       Its type is:
         T :: TYPE R
-      Cannot unify ‘R’ with the type variable ‘p0’
+      Cannot unify ‘R’ with the type variable ‘c0’
       because it is not a concrete ‘RuntimeRep’.
     • When checking that the pattern signature: T
         fits the type of its context: T

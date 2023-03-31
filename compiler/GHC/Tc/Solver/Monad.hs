@@ -2119,14 +2119,17 @@ checkTouchableTyVarEq ev lhs_tv rhs
            ; if not (cterHasNoProblem reason)  -- Failed to promote free vars
              then failCheckWith reason
              else
-        do { let tv_info | isConcreteInfo lhs_tv_info = lhs_tv_info
-                         | otherwise                  = TauTv
-                -- Make a concrete tyvar if lhs_tv is concrete
-                -- e.g.  alpha[2,conc] ~ Maybe (F beta[4])
-                --       We want to flatten to
-                --       alpha[2,conc] ~ Maybe gamma[2,conc]
-                --       gamma[2,conc] ~ F beta[4]
-           ; new_tv_ty <- TcM.newMetaTyVarTyWithInfo lhs_tv_lvl tv_info fam_app_kind
+        do { new_tv_ty <-
+              case lhs_tv_info of
+                ConcreteTv conc_info ->
+                  -- Make a concrete tyvar if lhs_tv is concrete
+                  -- e.g.  alpha[2,conc] ~ Maybe (F beta[4])
+                  --       We want to flatten to
+                  --       alpha[2,conc] ~ Maybe gamma[2,conc]
+                  --       gamma[2,conc] ~ F beta[4]
+                  TcM.newConcreteTyVarTyAtLevel conc_info lhs_tv_lvl fam_app_kind
+                _ -> TcM.newMetaTyVarTyAtLevel lhs_tv_lvl fam_app_kind
+
            ; let pty = mkPrimEqPredRole Nominal fam_app new_tv_ty
            ; hole <- TcM.newCoercionHole pty
            ; let new_ev = CtWanted { ctev_pred      = pty
