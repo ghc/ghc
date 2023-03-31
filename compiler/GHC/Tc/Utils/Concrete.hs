@@ -521,7 +521,8 @@ ensureConcrete :: HasDebugCallStack
                -> TcType
                -> TcM TcType
 ensureConcrete frr_orig ty
-  = do { (ty', errs) <- makeTypeConcrete conc_orig ty
+  = do { traceTc "ensureConcrete {" (ppr frr_orig $$ ppr ty)
+       ; (ty', errs) <- makeTypeConcrete conc_orig ty
        ; case errs of
           { err:errs ->
               do { traceTc "ensureConcrete } failure" $

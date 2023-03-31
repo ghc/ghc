@@ -9,8 +9,9 @@ import GHC.Tc.Types.Origin   ( CtOrigin, TypedThing )
 
 
 -- This boot file exists only to tie the knot between
---   GHC.Tc.Utils.Unify and GHC.Tc.Utils.Instantiate
+--   GHC.Tc.Utils.Unify and GHC.Tc.Utils.Instantiate/GHC.Tc.Utils.TcMType
 
-unifyType :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
+unifyType          :: Maybe TypedThing -> TcTauType -> TcTauType -> TcM TcCoercion
+unifyInvisibleType :: TcTauType -> TcTauType -> TcM TcCoercion
 
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper

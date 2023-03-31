@@ -388,9 +388,9 @@ kcClassSigType :: [LocatedN Name] -> LHsSigType GhcRn -> TcM ()
 --     meth :: forall a (x :: f a). Proxy x -> ()
 -- When instantiating Proxy with kappa, we must unify kappa := f a. But we're
 -- still working out the kind of f, and thus f a will have a coercion in it.
--- Coercions block unification (Note [Equalities with incompatible kinds] in
--- TcCanonical) and so we fail to unify. If we try to kind-generalize, we'll
--- end up promoting kappa to the top level (because kind-generalization is
+-- Coercions may block unification (Note [Equalities with incompatible kinds] in
+-- GHC.Tc.Solver.Equality) and so we fail to unify. If we try to kind-generalize,
+-- we'll end up promoting kappa to the top level (because kind-generalization is
 -- normally done right before adding a binding to the context), and then we
 -- can't set kappa := f a, because a is local.
 kcClassSigType names
@@ -1932,7 +1932,7 @@ checkExpectedKind hs_ty ty act_kind exp_kind
 
        ; if act_kind' `tcEqType` exp_kind
          then return res_ty  -- This is very common
-         else do { co_k <- uType KindLevel origin act_kind' exp_kind
+         else do { co_k <- unifyTypeAndEmit KindLevel origin act_kind' exp_kind
                  ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                                      , ppr exp_kind
                                                      , ppr co_k ])

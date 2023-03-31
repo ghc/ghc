@@ -11,7 +11,6 @@ import GHC.Tc.Solver.Canonical
 import GHC.Tc.Solver.Dict
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Class ( safeOverlap )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types
@@ -22,7 +21,6 @@ import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 
 import GHC.Core.InstEnv     ( Coherence(..) )
-import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Coercion
 
@@ -155,8 +153,7 @@ solveSimples :: Cts -> TcS ()
 
 solveSimples cts
   = {-# SCC "solveSimples" #-}
-    do { updWorkListTcS (\wl -> foldr extendWorkListCt wl cts)
-       ; solve_loop }
+    do { emitWork cts; solve_loop }
   where
     solve_loop
       = {-# SCC "solve_loop" #-}
@@ -308,7 +305,7 @@ runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
                   -> WorkItem                   -- The work item
                   -> TcS ()
 -- Run this item down the pipeline, leaving behind new work and inerts
-runSolverPipeline pipeline workItem
+runSolverPipeline full_pipeline workItem
   = do { wl <- getWorkList
        ; inerts <- getTcSInerts
        ; tclevel <- getTcLevel
@@ -320,7 +317,7 @@ runSolverPipeline pipeline workItem
                        , text "rest of worklist =" <+> ppr wl ]
 
        ; bumpStepCountTcS    -- One step for each constraint processed
-       ; final_res  <- run_pipeline pipeline (ContinueWith workItem)
+       ; final_res  <- run_pipeline full_pipeline workItem
 
        ; case final_res of
            Stop ev s       -> do { traceFireTcS ev s
@@ -330,26 +327,29 @@ runSolverPipeline pipeline workItem
                                  ; traceFireTcS (ctEvidence ct) (text "Kept as inert")
                                  ; traceTcS "End solver pipeline (kept as inert) }" $
                                             (text "final_item =" <+> ppr ct) }
+           StartAgain ct -> pprPanic "runSolverPipeline: StartAgain" (ppr ct)
        }
-  where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
-                     -> TcS (StopOrContinue Ct)
-        run_pipeline [] res        = return res
-        run_pipeline _ (Stop ev s) = return (Stop ev s)
-        run_pipeline ((stg_name,stg):stgs) (ContinueWith ct)
-          = do { traceTcS ("runStage " ++ stg_name ++ " {")
-                          (text "workitem   = " <+> ppr ct)
-               ; res <- stg ct
-               ; traceTcS ("end stage " ++ stg_name ++ " }") empty
-               ; run_pipeline stgs res }
+  where
+    run_pipeline :: [(String,SimplifierStage)] -> Ct -> TcS (StopOrContinue Ct)
+    run_pipeline [] ct = return (ContinueWith ct)
+    run_pipeline ((stage_name,stage):stages) ct
+      = do { traceTcS ("runStage " ++ stage_name ++ " {")
+                      (text "workitem   = " <+> ppr ct)
+           ; res <- stage ct
+           ; traceTcS ("end stage " ++ stage_name ++ " }") (ppr res)
+           ; case res of
+               Stop {}         -> return res
+               StartAgain ct   -> run_pipeline full_pipeline ct
+               ContinueWith ct -> run_pipeline stages ct }
 
 {-
 Example 1:
   Inert:   {c ~ d, F a ~ t, b ~ Int, a ~ ty} (all given)
   Reagent: a ~ [b] (given)
 
-React with (c~d)     ==> IR (ContinueWith (a~[b]))  True    []
-React with (F a ~ t) ==> IR (ContinueWith (a~[b]))  False   [F [b] ~ t]
-React with (b ~ Int) ==> IR (ContinueWith (a~[Int]) True    []
+React with (c~d)     ==> IR (ContinueWith (a~[b]))   True    []
+React with (F a ~ t) ==> IR (ContinueWith (a~[b]))   False   [F [b] ~ t]
+React with (b ~ Int) ==> IR (ContinueWith (a~[Int])) True    []
 
 Example 2:
   Inert:  {c ~w d, F a ~g t, b ~w Int, a ~w ty}
@@ -1025,8 +1025,7 @@ interactDict inerts ct_w@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = t
   = interactGivenIP inerts ct_w
 
   | otherwise
-  = do { addFunDepWork inerts ev_w cls
-       ; continueWith ct_w  }
+  = continueWith ct_w
 
 interactDict _ wi = pprPanic "interactDict" (ppr wi)
 
@@ -1131,44 +1130,6 @@ shortCutSolver dflags ev_w ev_i
           Nothing   -> Fresh <$> newWantedNC loc (ctEvRewriters ev_w) pty
       | otherwise = mzero
 
-addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
--- Add wanted constraints from type-class functional dependencies.
-addFunDepWork inerts work_ev cls
-  = mapBagM_ add_fds (findDictsByClass (inert_dicts inerts) cls)
-               -- No need to check flavour; fundeps work between
-               -- any pair of constraints, regardless of flavour
-               -- Importantly we don't throw workitem back in the
-               -- worklist because this can cause loops (see #5236)
-  where
-    work_pred = ctEvPred work_ev
-    work_loc  = ctEvLoc work_ev
-
-    add_fds inert_ct
-      = do { traceTcS "addFunDepWork" (vcat
-                [ ppr work_ev
-                , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
-                , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
-                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
-
-           ; unless (isGiven work_ev && isGiven inert_ev) $
-             emitFunDepWanteds (ctEvRewriters work_ev) $
-             improveFromAnother (derived_loc, inert_rewriters) inert_pred work_pred
-               -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
-               -- Do not create FDs from Given/Given interactions: See Note [No Given/Given fundeps]
-        }
-      where
-        inert_ev   = ctEvidence inert_ct
-        inert_pred = ctEvPred inert_ev
-        inert_loc  = ctEvLoc inert_ev
-        inert_rewriters = ctRewriters inert_ct
-        derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
-                                              ctl_depth inert_loc
-                               , ctl_origin = FunDepOrigin1 work_pred
-                                                            (ctLocOrigin work_loc)
-                                                            (ctLocSpan work_loc)
-                                                            inert_pred
-                                                            (ctLocOrigin inert_loc)
-                                                            (ctLocSpan inert_loc) }
 
 {-
 **********************************************************************

@@ -68,11 +68,11 @@ module GHC.Tc.Types.Constraint (
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth, isGivenLoc,
         setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        pprCtLoc,
+        pprCtLoc, adjustCtLoc, adjustCtLocTyConBinder,
 
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
-        mkKindLoc, toKindLoc, mkGivenLoc,
+        mkKindEqLoc, toKindLoc, toInvisibleLoc, mkGivenLoc,
         isWanted, isGiven,
         ctEvRole, setCtEvPredType, setCtEvLoc, arisesFromGivens,
         tyCoVarsOfCtEvList, tyCoVarsOfCtEv, tyCoVarsOfCtEvsList,
@@ -80,8 +80,7 @@ module GHC.Tc.Types.Constraint (
 
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
            -- exported concretely only for anyUnfilledCoercionHoles
-        rewriterSetFromType, rewriterSetFromTypes, rewriterSetFromCo,
-        addRewriterSet,
+        addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
 
         wrapType,
 
@@ -132,7 +131,6 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Types.Name.Reader
 
 import Data.Coerce
-import Data.Monoid ( Endo(..) )
 import qualified Data.Semigroup as S
 import Control.Monad ( msum, when )
 import Data.Maybe ( mapMaybe, isJust )
@@ -234,8 +232,8 @@ data Ct
       --     look like this, with the payload in an
       --     auxiliary type
 
-{- Note [Invariants of EqCt]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Canonical equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An EqCt is a canonical equality constraint, one that can live in the inert set,
 and that can be used to rewrite other constrtaints. It satisfies these invariants:
   * (TyEq:OC) lhs does not occur in rhs (occurs check)
@@ -249,6 +247,9 @@ and that can be used to rewrite other constrtaints. It satisfies these invariant
     (Applies only when constructor of newtype is in scope.)
   * (TyEq:U) An EqCt is not immediately unifiable. If we can unify a:=ty, we
     will not form an EqCt (a ~ ty).
+  * (TyEq:CH) rhs does not mention any coercion holes that resulted from fixing up
+    a hetero-kinded equality.  See Note [Equalities with incompatible kinds] in
+    GHC.Tc.Solver.Equality
 
 These invariants ensure that the EqCts in inert_eqs constitute a terminating
 generalised substitution. See Note [inert_eqs: the inert equalities]
@@ -286,7 +287,7 @@ and forms condition T3 in Note [Extending the inert equalities]
 in GHC.Tc.Solver.InertSet.
 -}
 
-data EqCt -- An equality constraint; see Note [Invariants of EqCt]
+data EqCt -- An equality constraint; see Note [Canonical equalities]
   = EqCt {  -- CanEqLHS ~ rhs
       eq_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       eq_lhs    :: CanEqLHS,
@@ -2083,41 +2084,26 @@ newtype RewriterSet = RewriterSet (UniqSet CoercionHole)
 emptyRewriterSet :: RewriterSet
 emptyRewriterSet = RewriterSet emptyUniqSet
 
+unitRewriterSet :: CoercionHole -> RewriterSet
+unitRewriterSet = coerce (unitUniqSet @CoercionHole)
+
+unionRewriterSet :: RewriterSet -> RewriterSet -> RewriterSet
+unionRewriterSet = coerce (unionUniqSets @CoercionHole)
+
 isEmptyRewriterSet :: RewriterSet -> Bool
-isEmptyRewriterSet (RewriterSet set) = isEmptyUniqSet set
+isEmptyRewriterSet = coerce (isEmptyUniqSet @CoercionHole)
 
-addRewriterSet :: RewriterSet -> CoercionHole -> RewriterSet
-addRewriterSet = coerce (addOneToUniqSet @CoercionHole)
+addRewriter :: RewriterSet -> CoercionHole -> RewriterSet
+addRewriter = coerce (addOneToUniqSet @CoercionHole)
 
--- | Makes a 'RewriterSet' from all the coercion holes that occur in the
--- given coercion.
-rewriterSetFromCo :: Coercion -> RewriterSet
-rewriterSetFromCo co = appEndo (rewriter_set_from_co co) emptyRewriterSet
-
--- | Makes a 'RewriterSet' from all the coercion holes that occur in the
--- given type.
-rewriterSetFromType :: Type -> RewriterSet
-rewriterSetFromType ty = appEndo (rewriter_set_from_ty ty) emptyRewriterSet
-
--- | Makes a 'RewriterSet' from all the coercion holes that occur in the
--- given types.
-rewriterSetFromTypes :: [Type] -> RewriterSet
-rewriterSetFromTypes tys = appEndo (rewriter_set_from_tys tys) emptyRewriterSet
-
-rewriter_set_from_ty :: Type -> Endo RewriterSet
-rewriter_set_from_tys :: [Type] -> Endo RewriterSet
-rewriter_set_from_co :: Coercion -> Endo RewriterSet
-(rewriter_set_from_ty, rewriter_set_from_tys, rewriter_set_from_co, _)
-  = foldTyCo folder ()
+rewriterSetFromCts :: Bag Ct -> RewriterSet
+-- Take a bag of Wanted equalities, and collect them as a RewriterSet
+rewriterSetFromCts cts
+  = foldr add emptyRewriterSet cts
   where
-    folder :: TyCoFolder () (Endo RewriterSet)
-    folder = TyCoFolder
-               { tcf_view  = noView
-               , tcf_tyvar = \ _ tv -> rewriter_set_from_ty (tyVarKind tv)
-               , tcf_covar = \ _ cv -> rewriter_set_from_ty (varType cv)
-               , tcf_hole  = \ _ hole -> coerce (`addOneToUniqSet` hole) S.<>
-                                         rewriter_set_from_ty (varType (coHoleCoVar hole))
-               , tcf_tycobinder = \ _ _ _ -> () }
+    add ct rw_set = case ctEvidence ct of
+         CtWanted { ctev_dest = HoleDest hole } -> rw_set `addRewriter` hole
+         _                                      -> rw_set
 
 {-
 ************************************************************************
@@ -2234,10 +2220,54 @@ uses GHC.Tc.Utils.anyUnfilledCoercionHoles to look through any filled coercion
 holes. The idea is that we wish to report the "root cause" -- the error that
 rewrote all the others.
 
-Wrinkle: In #22707, we have a case where all of the Wanteds have rewritten
-each other. In order to report /some/ error in this case, we simply report
-all the Wanteds. The user will get a perhaps-confusing error message, but
-they've written a confusing program!
+Wrinkle (W1): prioritising non-rewritten constraints.   Consider this, which came up
+in T22793:
+  inert: {}
+  work list: [W] co_ayf : awq ~ awo
+  work item: [W] co_ayb : awq ~ awp
+
+  ==> {just put work item in inert set}
+  inert: co_ayb : awq ~ awp
+  work list: {}
+  work: [W] co_ayf : awq ~ awo
+
+  ==> {rewrite ayf with co_ayb}
+  work list: {}
+  inert: co_ayb : awq ~ awp
+         co_aym{co_ayb} : awp ~ awo
+                ^ rewritten by ayb
+
+  ----- start again in simplify_loop in Solver.hs -----
+  inert: {}
+  work list: [W] co_ayb : awq ~ awp
+  work: co_aym{co_ayb} : awp ~ awo
+
+  ==> {add to inert set}
+  inert: co_aym{co_ayb} : awp ~ awo
+  work list: {}
+  work: co_ayb : awq ~ awp
+
+  ==> {rewrite co_ayb}
+  inert: co_aym{co_ayb} : awp ~ awo
+         co_ayp{co_aym} : awq ~ awo
+  work list: {}
+
+Now both wanteds have been rewriten by the other! This happened because
+in our simplify_loop iteration, we happened to start with co_aym. All would have
+been well if we'd started with the (not-rewritten) co_ayb and gotten it into the
+inert set.
+
+With that in mind, we /prioritise/ the work-list to put constraints with no
+rewriters first, rather as we priorities erronenous containts to put ones with
+no rewriters first (see GHC.Tc.Utils.TcMType.zonkRewriterSet).  To be
+accurate, we must zonk those rewriters (zonkRewriterSet).
+
+It is hard to be /sure/ that we can't end up in a situation where all of the
+Wanteds have rewritten each other. In order to report /some/ error in this
+case, we simply report all the Wanteds. The user will get a perhaps-confusing
+error message, but they've written a confusing program!  (T22707 and T22793
+were close, but they do not exhibit this behaviour.)  So belt and braces:
+see the `suppress` stuff in GHC.Tc.Errors.mkErrorItem.
 
 Note [Avoiding rewriting cycles]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2416,10 +2446,11 @@ dictionaries don't appear in the original source code.
 
 -}
 
-data CtLoc = CtLoc { ctl_origin   :: CtOrigin
-                   , ctl_env      :: TcLclEnv
-                   , ctl_t_or_k   :: Maybe TypeOrKind  -- OK if we're not sure
-                   , ctl_depth    :: !SubGoalDepth }
+data CtLoc
+  = CtLoc { ctl_origin   :: CtOrigin
+          , ctl_env      :: TcLclEnv
+          , ctl_t_or_k   :: Maybe TypeOrKind  -- Used only to improve error messages
+          , ctl_depth    :: !SubGoalDepth }
 
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
@@ -2427,15 +2458,39 @@ data CtLoc = CtLoc { ctl_origin   :: CtOrigin
   --    binder stack:     tcl_bndrs :: TcBinderStack
   --    level:            tcl_tclvl :: TcLevel
 
-mkKindLoc :: TcType -> TcType   -- original *types* being compared
-          -> CtLoc -> CtLoc
-mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
-                        (KindEqOrigin s1 s2 (ctLocOrigin loc)
-                                      (ctLocTypeOrKind_maybe loc))
+mkKindEqLoc :: TcType -> TcType   -- original *types* being compared
+            -> CtLoc -> CtLoc
+mkKindEqLoc s1 s2 ctloc
+  | CtLoc { ctl_t_or_k = t_or_k, ctl_origin = origin } <- ctloc
+  = ctloc { ctl_origin = KindEqOrigin s1 s2 origin t_or_k
+          , ctl_t_or_k = Just KindLevel }
+
+adjustCtLocTyConBinder :: TyConBinder -> CtLoc -> CtLoc
+-- Adjust the CtLoc when decomposing a type constructor
+adjustCtLocTyConBinder tc_bndr loc
+  = adjustCtLoc is_vis is_kind loc
+  where
+    is_vis  = isVisibleTyConBinder tc_bndr
+    is_kind = isNamedTyConBinder tc_bndr
+
+adjustCtLoc :: Bool    -- True <=> A visible argument
+            -> Bool    -- True <=> A kind argument
+            -> CtLoc -> CtLoc
+-- Adjust the CtLoc when decomposing a type constructor, application, etc
+adjustCtLoc is_vis is_kind loc
+  = loc2
+  where
+    loc1 | is_kind   = toKindLoc loc
+         | otherwise = loc
+    loc2 | is_vis    = loc1
+         | otherwise = toInvisibleLoc loc1
 
 -- | Take a CtLoc and moves it to the kind level
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
+
+toInvisibleLoc :: CtLoc -> CtLoc
+toInvisibleLoc loc = updateCtLocOrigin loc toInvisibleOrigin
 
 mkGivenLoc :: TcLevel -> SkolemInfoAnon -> TcLclEnv -> CtLoc
 mkGivenLoc tclvl skol_info env

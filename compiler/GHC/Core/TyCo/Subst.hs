@@ -387,9 +387,9 @@ extendTvSubstWithClone :: Subst -> TyVar -> TyVar -> Subst
 --   those variables should be in scope already
 extendTvSubstWithClone (Subst in_scope idenv tenv cenv) tv tv'
   = Subst (extendInScopeSet in_scope tv')
-             idenv
-             (extendVarEnv tenv tv (mkTyVarTy tv'))
-             cenv
+          idenv
+          (extendVarEnv tenv tv (mkTyVarTy tv'))
+          cenv
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst':
 -- you must ensure that the in-scope set satisfies

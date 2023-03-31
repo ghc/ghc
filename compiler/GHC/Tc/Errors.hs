@@ -462,8 +462,8 @@ mkErrorItem ct
        ; (suppress, m_evdest) <- case ctEvidence ct of
            CtGiven {} -> return (False, Nothing)
            CtWanted { ctev_rewriters = rewriters, ctev_dest = dest }
-             -> do { supp <- anyUnfilledCoercionHoles rewriters
-                   ; return (supp, Just dest) }
+             -> do { rewriters' <- zonkRewriterSet rewriters
+                   ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
 
        ; let m_reason = case ct of CIrredCan { cc_reason = reason } -> Just reason
                                    _                                -> Nothing
@@ -1804,8 +1804,8 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     return (main_msg, [])
 
   -- Incompatible kinds
-  -- This is wrinkle (4) in Note [Equalities with incompatible kinds] in
-  -- GHC.Tc.Solver.Canonical
+  -- This is wrinkle (W2) in Note [Equalities with incompatible kinds]
+  -- in GHC.Tc.Solver.Equality
   | hasCoercionHoleCo co1 || hasCoercionHoleTy ty2
   = return (mkBlockedEqErr item, [])
 
@@ -1987,8 +1987,8 @@ misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
               -- Keep only UserGivens that have some equalities.
               -- See Note [Suppress redundant givens during error reporting]
 
--- These are for the "blocked" equalities, as described in TcCanonical
--- Note [Equalities with incompatible kinds], wrinkle (2). There should
+-- These are for the "blocked" equalities, as described in GHC.Tc.Solver.Equality
+-- Note [Equalities with incompatible kinds], wrinkle (W2). There should
 -- always be another unsolved wanted around, which will ordinarily suppress
 -- this message. But this can still be printed out with -fdefer-type-errors
 -- (sigh), so we must produce a message.

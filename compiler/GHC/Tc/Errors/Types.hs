@@ -4609,7 +4609,7 @@ data TcSolverReportMsg
   | BlockedEquality ErrorItem
     -- These are for the "blocked" equalities, as described in
     -- Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical,
-    -- wrinkle (2). There should always be another unsolved wanted around,
+    -- wrinkle (W2). There should always be another unsolved wanted around,
     -- which will ordinarily suppress this message. But this can still be printed out
     -- with -fdefer-type-errors (sigh), so we must produce a message.
 

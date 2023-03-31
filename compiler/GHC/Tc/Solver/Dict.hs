@@ -16,6 +16,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
+import GHC.Tc.Solver.Types
 
 import GHC.Builtin.Names ( coercibleTyConKey, heqTyConKey, eqTyConKey )
 
@@ -31,6 +32,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Env
 import GHC.Types.Unique( hasKey )
 
+import GHC.Utils.Monad ( foldlM )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
@@ -69,22 +71,33 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                         ; addSolvedDict what ev cls xis
                         ; chooseInstance work_item lkup_res }
                _  -> -- NoInstance or NotSure
-                     -- We didn't solve it; so try functional dependencies with
-                     -- the instance environment
-                     do { doTopFundepImprovement work_item
-                        ; tryLastResortProhibitedSuperclass inerts work_item } }
+                     -- We didn't solve it; so try functional dependencies
+                     tryFunDeps work_item }
    where
      dict_loc = ctEvLoc ev
 
-
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
--- | As a last resort, we TEMPORARILY allow a prohibited superclass solve,
+tryFunDeps :: Ct -> TcS (StopOrContinue Ct)
+-- Try functional dependencies
+-- We do local improvement, then try top level; and we do all this last
+-- See Note [Do fundeps last]
+tryFunDeps work_item
+  = do { improved <- doLocalFunDepImprovement work_item
+       ; if improved then startAgainWith work_item else
+
+    do { improved <- doTopFunDepImprovement work_item
+       ; if improved then startAgainWith work_item else
+
+    do { inerts <- getTcSInerts
+       ; tryLastResortProhibitedSuperclass inerts work_item } } }
+
+tryLastResortProhibitedSuperclass :: InertSet -> Ct -> TcS (StopOrContinue Ct)
+-- ^ As a last resort, we TEMPORARILY allow a prohibited superclass solve,
 -- emitting a loud warning when doing so: we might be creating non-terminating
 -- evidence (as we are in T22912 for example).
 --
 -- See Note [Migrating away from loopy superclass solving] in GHC.Tc.TyCl.Instance.
-tryLastResortProhibitedSuperclass :: InertSet -> Ct -> TcS (StopOrContinue Ct)
 tryLastResortProhibitedSuperclass inerts
     work_item@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs = xis })
   | let loc_w  = ctEvLoc ev_w
@@ -679,7 +692,7 @@ This Note describes a delicate interaction that constrains the orientation of
 equalities. This one is about fundeps, but the /exact/ same thing arises for
 type-family injectivity constraints: see Note [Improvement orientation].
 
-doTopFundepImprovement compares the constraint with all the instance
+doTopFunDepImprovement compares the constraint with all the instance
 declarations, to see if we can produce any equalities. E.g
    class C2 a b | a -> b
    instance C Int Bool
@@ -693,7 +706,7 @@ There is a nasty corner in #19415 which led to the typechecker looping:
    work_item: dwrk :: C (T @ka (a::ka)) (T @kb0 (b0::kb0)) Char
       where kb0, b0 are unification vars
 
-   ==> {doTopFundepImprovement: compare work_item with instance,
+   ==> {doTopFunDepImprovement: compare work_item with instance,
         generate /fresh/ unification variables kfresh0, yfresh0,
         emit a new Wanted, and add dwrk to inert set}
 
@@ -719,10 +732,10 @@ We solve the problem by (#21703):
     carefully orienting the new Wanted so that all the
     freshly-generated unification variables are on the LHS.
 
-    Thus we emit
-       [W] T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
+    Thus we call unifyWanteds on
+       T kfresh0 (yfresh0::kfresh0) ~ T kb0 (b0::kb0)
     and /NOT/
-       [W] T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
+       T kb0 (b0::kb0) ~ T kfresh0 (yfresh0::kfresh0)
 
 Now we'll unify kfresh0:=kb0, yfresh0:=b0, and all is well.  The general idea
 is that we want to preferentially eliminate those freshly-generated
@@ -809,6 +822,29 @@ wanteds.  This solution was not complete, and caused a failures while trying
 to solve for transitive functional dependencies (test case: T21703)
 -- End of Historical note: Failed Alternative Plan (3) --
 
+Note [Do fundeps last]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider T4254b:
+  class FD a b | a -> b where { op :: a -> b }
+
+  instance FD Int Bool
+
+  foo :: forall a b. (a~Int,FD a b) => a -> Bool
+  foo = op
+
+From the ambiguity check on the type signature we get
+  [G] FD Int b
+  [W] FD Int beta
+Interacting these gives beta:=b; then we start again and solve without
+trying fundeps between the new [W] FD Int b and the top-level instance.
+If we did, we'd generate [W] b ~ Bool, which fails.
+
+From the definition `foo = op` we get
+  [G] FD Int b
+  [W] FD Int Bool
+We solve this from the top level instance before even trying fundeps.
+If we did try fundeps, we'd generate [W] b ~ Bool, which fails.
+
 Note [Weird fundeps]
 ~~~~~~~~~~~~~~~~~~~~
 Consider   class Het a b | a -> b where
@@ -831,17 +867,58 @@ as the fundeps.
 #7875 is a case in point.
 -}
 
-doTopFundepImprovement :: Ct -> TcS ()
+doLocalFunDepImprovement :: Ct -> TcS Bool
+-- Add wanted constraints from type-class functional dependencies.
+doLocalFunDepImprovement (CDictCan { cc_ev = work_ev, cc_class = cls })
+  = do { inerts <- getInertCans
+       ; foldlM add_fds False (findDictsByClass (inert_dicts inerts) cls) }
+  where
+    work_pred = ctEvPred work_ev
+    work_loc  = ctEvLoc work_ev
+
+    add_fds :: Bool -> Ct -> TcS Bool
+    add_fds so_far inert_ct
+      | isGiven work_ev && isGiven inert_ev
+        -- Do not create FDs from Given/Given interactions: See Note [No Given/Given fundeps]
+      = return so_far
+      | otherwise
+      = do { traceTcS "doLocalFunDepImprovement" (vcat
+                [ ppr work_ev
+                , pprCtLoc work_loc, ppr (isGivenLoc work_loc)
+                , pprCtLoc inert_loc, ppr (isGivenLoc inert_loc)
+                , pprCtLoc derived_loc, ppr (isGivenLoc derived_loc) ])
+
+           ; unifs <- emitFunDepWanteds work_ev $
+                      improveFromAnother (derived_loc, inert_rewriters)
+                                         inert_pred work_pred
+           ; return (so_far || unifs)
+        }
+      where
+        inert_ev   = ctEvidence inert_ct
+        inert_pred = ctEvPred inert_ev
+        inert_loc  = ctEvLoc inert_ev
+        inert_rewriters = ctRewriters inert_ct
+        derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
+                                              ctl_depth inert_loc
+                               , ctl_origin = FunDepOrigin1 work_pred
+                                                            (ctLocOrigin work_loc)
+                                                            (ctLocSpan work_loc)
+                                                            inert_pred
+                                                            (ctLocOrigin inert_loc)
+                                                            (ctLocSpan inert_loc) }
+
+doLocalFunDepImprovement work_item = pprPanic "doLocalFunDepImprovement" (ppr work_item)
+
+doTopFunDepImprovement :: Ct -> TcS Bool
 -- Try to functional-dependency improvement between the constraint
 -- and the top-level instance declarations
 -- See Note [Fundeps with instances, and equality orientation]
 -- See also Note [Weird fundeps]
-doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
-                                           , cc_tyargs = xis })
+doTopFunDepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = xis })
   = do { traceTcS "try_fundeps" (ppr work_item)
        ; instEnvs <- getInstEnvs
        ; let fundep_eqns = improveFromInstEnv instEnvs mk_ct_loc cls xis
-       ; emitFunDepWanteds (ctEvRewriters ev) fundep_eqns }
+       ; emitFunDepWanteds ev fundep_eqns }
   where
      dict_pred   = mkClassPred cls xis
      dict_loc    = ctEvLoc ev
@@ -855,5 +932,4 @@ doTopFundepImprovement work_item@(CDictCan { cc_ev = ev, cc_class = cls
                                                  inst_pred inst_loc }
          , emptyRewriterSet )
 
-doTopFundepImprovement work_item = pprPanic "doTopFundepImprovement" (ppr work_item)
-
+doTopFunDepImprovement work_item = pprPanic "doTopFunDepImprovement" (ppr work_item)

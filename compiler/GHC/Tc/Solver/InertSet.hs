@@ -8,7 +8,8 @@ module GHC.Tc.Solver.InertSet (
     -- * The work list
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt,
-    extendWorkListCts, extendWorkListEq,
+    extendWorkListCts, extendWorkListCtList,
+    extendWorkListEq, extendWorkListEqs,
     appendWorkList, extendWorkListImplic,
     workListSize,
     selectWorkItem,
@@ -93,7 +94,7 @@ As a simple form of priority queue, our worklist separates out
 
 Note [Prioritise equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's very important to process equalities /first/:
+It's very important to process equalities over class constraints:
 
 * (Efficiency)  The general reason to do so is that if we process a
   class constraint first, we may end up putting it into the inert set
@@ -111,13 +112,16 @@ It's very important to process equalities /first/:
   Solution: prioritise equalities over class constraints
 
 * (Class equalities) We need to prioritise equalities even if they
-  are hidden inside a class constraint;
-  see Note [Prioritise class equalities]
+  are hidden inside a class constraint; see Note [Prioritise class equalities]
 
 * (Kick-out) We want to apply this priority scheme to kicked-out
-  constraints too (see the call to extendWorkListCt in kick_out_rewritable
+  constraints too (see the call to extendWorkListCt in kick_out_rewritable)
   E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
   homo-kinded when kicked out, and hence we want to prioritise it.
+
+Among the equalities we prioritise ones with an empty rewriter set;
+see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint, wrinkle (W1).
+
 
 Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -157,6 +161,12 @@ data WorkList
                        -- See Note [Prioritise equalities]
                        -- See Note [Prioritise class equalities]
 
+       , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that have a non-empty
+                             -- rewriter set; or, more precisely, did when
+                             -- added to the WorkList
+         -- We priorities wl_eqs over wl_rw_eqs; see Note [Wanteds rewrite Wanteds]
+         -- in GHC.Tc.Types.Constraint for more details.
+
        , wl_rest    :: [Ct]
 
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
@@ -164,20 +174,33 @@ data WorkList
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs = eqs1, wl_rest = rest1
-        , wl_implics = implics1 })
-    (WL { wl_eqs = eqs2, wl_rest = rest2
-        , wl_implics = implics2 })
+    (WL { wl_eqs = eqs1, wl_rw_eqs = rw_eqs1
+        , wl_rest = rest1, wl_implics = implics1 })
+    (WL { wl_eqs = eqs2, wl_rw_eqs = rw_eqs2
+        , wl_rest = rest2, wl_implics = implics2 })
    = WL { wl_eqs     = eqs1     ++ eqs2
+        , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
         , wl_rest    = rest1    ++ rest2
         , wl_implics = implics1 `unionBags`   implics2 }
 
 workListSize :: WorkList -> Int
-workListSize (WL { wl_eqs = eqs, wl_rest = rest })
-  = length eqs + length rest
+workListSize (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
+  = length eqs + length rw_eqs + length rest
 
-extendWorkListEq :: Ct -> WorkList -> WorkList
-extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
+extendWorkListEq :: RewriterSet -> Ct -> WorkList -> WorkList
+extendWorkListEq rw ct wl
+  | isEmptyRewriterSet rw      -- A wanted that has not been rewritten
+  = wl { wl_eqs = ct : wl_eqs wl }
+  | otherwise
+  = wl { wl_rw_eqs = ct : wl_rw_eqs wl }
+
+extendWorkListEqs :: RewriterSet -> Bag Ct -> WorkList -> WorkList
+-- Add [eq1,...,eqn] to the work-list
+-- They all have the same rewriter set
+-- The constraints will be solved in left-to-right order.
+-- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+extendWorkListEqs rewriters eqs wl
+  = foldr (extendWorkListEq rewriters) wl eqs
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -187,20 +210,25 @@ extendWorkListImplic :: Implication -> WorkList -> WorkList
 extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
--- Agnostic
+-- Agnostic about what kind of constraint
 extendWorkListCt ct wl
- = case classifyPredType (ctPred ct) of
+ = case classifyPredType (ctEvPred ev) of
      EqPred {}
-       -> extendWorkListEq ct wl
+       -> extendWorkListEq rewriters ct wl
 
      ClassPred cls _  -- See Note [Prioritise class equalities]
        |  isEqPredClass cls
-       -> extendWorkListEq ct wl
+       -> extendWorkListEq rewriters ct wl
 
      _ -> extendWorkListNonEq ct wl
+  where
+    ev = ctEvidence ct
+    rewriters = ctEvRewriters ev
 
-extendWorkListCts :: [Ct] -> WorkList -> WorkList
--- Agnostic
+extendWorkListCtList :: [Ct] -> WorkList -> WorkList
+extendWorkListCtList cts wl = foldr extendWorkListCt wl cts
+
+extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
@@ -208,21 +236,24 @@ isEmptyWorkList (WL { wl_eqs = eqs, wl_rest = rest, wl_implics = implics })
   = null eqs && null rest && isEmptyBag implics
 
 emptyWorkList :: WorkList
-emptyWorkList = WL { wl_eqs  = [], wl_rest = [], wl_implics = emptyBag }
+emptyWorkList = WL { wl_eqs  = [], wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
 -- See Note [Prioritise equalities]
-selectWorkItem wl@(WL { wl_eqs = eqs, wl_rest = rest })
-  | ct:cts <- eqs  = Just (ct, wl { wl_eqs    = cts })
-  | ct:cts <- rest = Just (ct, wl { wl_rest   = cts })
-  | otherwise      = Nothing
+selectWorkItem wl@(WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
+  | ct:cts <- eqs    = Just (ct, wl { wl_eqs    = cts })
+  | ct:cts <- rw_eqs = Just (ct, wl { wl_rw_eqs = cts })
+  | ct:cts <- rest   = Just (ct, wl { wl_rest   = cts })
+  | otherwise        = Nothing
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs = eqs, wl_rest = rest, wl_implics = implics })
+  ppr (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest, wl_implics = implics })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs) $
             text "Eqs =" <+> vcat (map ppr eqs)
+          , ppUnless (null rw_eqs) $
+            text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $
             text "Non-eqs =" <+> vcat (map ppr rest)
           , ppUnless (isEmptyBag implics) $
@@ -1302,7 +1333,7 @@ kickOutRewritableLHS :: CtFlavourRole  -- Flavour/role of the equality that
                                        -- is being added to the inert set
                      -> CanEqLHS       -- The new equality is lhs ~ ty
                      -> InertCans
-                     -> (WorkList, InertCans)
+                     -> (Cts, InertCans)
 -- See Note [kickOutRewritable]
 kickOutRewritableLHS new_fr new_lhs
                      ics@(IC { inert_eqs      = tv_eqs
@@ -1319,18 +1350,18 @@ kickOutRewritableLHS new_fr new_lhs
                         , inert_irreds   = irs_in
                         , inert_insts    = insts_in }
 
-    kicked_out :: WorkList
+    kicked_out :: Cts
+    --       ToDo: update this comment
     -- NB: use extendWorkList to ensure that kicked-out equalities get priority
     -- See Note [Prioritise equalities] (Kick-out).
     -- The irreds may include non-canonical (hetero-kinded) equality
     -- constraints, which perhaps may have become soluble after new_lhs
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
-    kicked_out = foldr extendWorkListCt
-                          (emptyWorkList { wl_eqs = map CEqCan tv_eqs_out ++
-                                                    map CEqCan feqs_out })
-                          ((dicts_out `andCts` irs_out)
-                            `extendCtsList` insts_out)
+    kicked_out = (dicts_out `andCts` irs_out)
+                  `extendCtsList` insts_out
+                  `extendCtsList` map CEqCan tv_eqs_out
+                  `extendCtsList` map CEqCan feqs_out
 
     (tv_eqs_out, tv_eqs_in) = partitionInertEqs kick_out_eq tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs   kick_out_eq funeqmap

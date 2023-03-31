@@ -1,8 +1,8 @@
 
 T17139.hs:15:16: error: [GHC-88464]
-    • Found hole: _ :: (a -> b0) -> f a -> TypeFam f b0
+    • Found hole: _ :: (a -> b0) -> (a -> a) -> TypeFam ((->) a) b0
       Where: ‘b0’ is an ambiguous type variable
-             ‘a’, ‘f’ are rigid type variables bound by
+             ‘a’ is a rigid type variable bound by
                the type signature for:
                  lift :: forall a b (f :: * -> *). (a -> b) -> TypeFam f (a -> b)
                at T17139.hs:14:1-38

@@ -8,3 +8,7 @@ newtype UhOh (k :: * -> *) (a :: k *) = UhOh (k *)
 -- UhOh :: forall (k : * -> *). k * -> *
 
 instance Functor a => Functor (UhOh a) where
+
+{- Functor expects (* -> *)
+   (UhOh a) :: k * -> *
+-}

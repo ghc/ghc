@@ -379,7 +379,7 @@ We perform this optimisation in a number of places:
  * GHC.Core.Types.eqType
  * GHC.Core.Types.nonDetCmpType
  * GHC.Core.Unify.unify_ty
- * TcCanonical.can_eq_nc'
+ * GHC.Tc.Solver.Equality.can_eq_nc'
  * TcUnify.uType
 
 This optimisation is especially helpful for the ubiquitous GHC.Types.Type,

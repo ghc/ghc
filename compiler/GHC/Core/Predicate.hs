@@ -16,7 +16,7 @@ module GHC.Core.Predicate (
   getEqPredTys, getEqPredTys_maybe, getEqPredRole,
   predTypeEqRel,
   mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
-  mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
+  mkNomPrimEqPred,
 
   -- Class predicates
   mkClassPred, isDictTy, typeDeterminesValue,

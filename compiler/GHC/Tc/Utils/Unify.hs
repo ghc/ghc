@@ -20,9 +20,11 @@ module GHC.Tc.Utils.Unify (
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind, unifyExpectedType,
-  uType, promoteTcType,
+  unifyType, unifyKind, unifyInvisibleType, unifyExpectedType,
+  unifyTypeAndEmit, promoteTcType,
   swapOverTyVars, touchabilityAndShapeTest,
+  UnifyEnv(..), updUEnvLoc, setUEnvRole,
+  uType,
 
   --------------------------------
   -- Holes
@@ -1145,7 +1147,7 @@ tcEqMult origin w_actual w_expected = do
   {
   -- Note that here we do not call to `submult`, so we check
   -- for strict equality.
-  ; coercion <- uType TypeLevel origin w_actual w_expected
+  ; coercion <- unifyTypeAndEmit TypeLevel origin w_actual w_expected
   ; return $ if isReflCo coercion then WpHole else WpMultCoercion coercion }
 
 
@@ -1711,18 +1713,30 @@ unifyType :: Maybe TypedThing  -- ^ If present, the thing that has type ty1
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
 unifyType thing ty1 ty2
-  = uType TypeLevel origin ty1 ty2
+  = unifyTypeAndEmit TypeLevel origin ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual   = ty1
                           , uo_expected = ty2
                           , uo_thing    = thing
                           , uo_visible  = True }
 
+unifyInvisibleType :: TcTauType -> TcTauType    -- ty1 (actual), ty2 (expected)
+                   -> TcM TcCoercionN           -- :: ty1 ~# ty2
+-- Actual and expected types
+-- Returns a coercion : ty1 ~ ty2
+unifyInvisibleType ty1 ty2
+  = unifyTypeAndEmit TypeLevel origin ty1 ty2
+  where
+    origin = TypeEqOrigin { uo_actual   = ty1
+                          , uo_expected = ty2
+                          , uo_thing    = Nothing
+                          , uo_visible  = False }  -- This is the "invisible" bit
+
 unifyTypeET :: TcTauType -> TcTauType -> TcM CoercionN
 -- Like unifyType, but swap expected and actual in error messages
 -- This is used when typechecking patterns
 unifyTypeET ty1 ty2
-  = uType TypeLevel origin ty1 ty2
+  = unifyTypeAndEmit TypeLevel origin ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual   = ty2   -- NB swapped
                           , uo_expected = ty1   -- NB swapped
@@ -1732,13 +1746,28 @@ unifyTypeET ty1 ty2
 
 unifyKind :: Maybe TypedThing -> TcKind -> TcKind -> TcM CoercionN
 unifyKind mb_thing ty1 ty2
-  = uType KindLevel origin ty1 ty2
+  = unifyTypeAndEmit KindLevel origin ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual   = ty1
                           , uo_expected = ty2
                           , uo_thing    = mb_thing
                           , uo_visible  = True }
 
+unifyTypeAndEmit :: TypeOrKind -> CtOrigin -> TcType -> TcType -> TcM CoercionN
+-- Make a ref-cell, unify, emit the collected constraints
+unifyTypeAndEmit t_or_k orig ty1 ty2
+  = do { ref <- newTcRef emptyBag
+       ; loc <- getCtLocM orig (Just t_or_k)
+       ; let env = UE { u_loc = loc, u_role = Nominal
+                      , u_rewriters = emptyRewriterSet  -- ToDo: check this
+                      , u_defer = ref, u_unified = Nothing }
+
+       -- The hard work happens here
+       ; co <- uType env ty1 ty2
+
+       ; cts <- readTcRef ref
+       ; unless (null cts) (emitSimples cts)
+       ; return co }
 
 {-
 %************************************************************************
@@ -1747,45 +1776,98 @@ unifyKind mb_thing ty1 ty2
 %*                                                                      *
 %************************************************************************
 
-uType is the heart of the unifier.
+Note [The eager unifier]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The eager unifier, `uType`, is called by
+
+  * The constraint generator (e.g. in GHC.Tc.Gen.Expr),
+    via the wrappers `unifyType`, `unifyKind` etc
+
+  * The constraint solver (e.g. in GHC.Tc.Solver.Equality),
+    via `GHC.Tc.Solver.Monad.wrapUnifierTcS`.
+
+`uType` runs in the TcM monad, but it carries a UnifyEnv that tells it
+what to do when unifying a variable or deferring a constraint. Specifically,
+  * it collects deferred constraints in `u_defer`, and
+  * it records which unification variables it has unified in `u_unified`
+Then it is up to the wrappers (one for the constraint generator, one for
+the constraint solver) to deal with these collected sets.
 -}
 
+data UnifyEnv
+  = UE { u_role      :: Role
+       , u_loc       :: CtLoc
+       , u_rewriters :: RewriterSet
+
+         -- Deferred constraints
+       , u_defer     :: TcRef (Bag Ct)
+
+         -- Which variables are unified;
+         -- if Nothing, we don't care
+       , u_unified :: Maybe (TcRef [TcTyVar])
+    }
+
+setUEnvRole :: UnifyEnv -> Role -> UnifyEnv
+setUEnvRole uenv role = uenv { u_role = role }
+
+updUEnvLoc :: UnifyEnv -> (CtLoc -> CtLoc) -> UnifyEnv
+updUEnvLoc uenv@(UE { u_loc = loc }) upd = uenv { u_loc = upd loc }
+
+mkKindEnv :: UnifyEnv -> TcType -> TcType -> UnifyEnv
+-- Modify the UnifyEnv to be right for unifing
+-- the kinds of these two types
+mkKindEnv env@(UE { u_loc = ctloc }) ty1 ty2
+  = env { u_role = Nominal, u_loc = mkKindEqLoc ty1 ty2 ctloc }
+
 uType, uType_defer
-  :: TypeOrKind
-  -> CtOrigin
+  :: UnifyEnv
   -> TcType    -- ty1 is the *actual* type
   -> TcType    -- ty2 is the *expected* type
   -> TcM CoercionN
 
---------------
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
---    ty1 is "actual"
---    ty2 is "expected"
-uType_defer t_or_k origin ty1 ty2
-  = do { co <- emitWantedEq origin t_or_k Nominal ty1 ty2
+uType_defer (UE { u_loc = loc, u_defer = ref
+                , u_role = role, u_rewriters = rewriters })
+            ty1 ty2  -- ty1 is "actual", ty2 is "expected"
+  = do { let pred_ty = mkPrimEqPredRole role ty1 ty2
+       ; hole <- newCoercionHole loc pred_ty
+       ; let ct = mkNonCanonical $
+                  CtWanted { ctev_pred      = pred_ty
+                           , ctev_dest      = HoleDest hole
+                           , ctev_loc       = loc
+                           , ctev_rewriters = rewriters }
+             co = HoleCo hole
+       ; updTcRef ref (`snocBag` ct)
+         -- snocBag: see Note [Work-list ordering] in GHC.Tc.Solver.Equality
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on,
        --     because it is hugely expensive (#5631)
-       ; whenDOptM Opt_D_dump_tc_trace $ do
-            { ctxt <- getErrCtxt
-            ; doc <- mkErrInfo emptyTidyEnv ctxt
-            ; traceTc "utype_defer" (vcat [ debugPprType ty1
+       ; whenDOptM Opt_D_dump_tc_trace $
+         do { ctxt <- getErrCtxt
+            ; doc  <- mkErrInfo emptyTidyEnv ctxt
+            ; traceTc "utype_defer" (vcat [ ppr role
+                                          , debugPprType ty1
                                           , debugPprType ty2
-                                          , pprCtOrigin origin
                                           , doc])
-            ; traceTc "utype_defer2" (ppr co)
-            }
+            ; traceTc "utype_defer2" (ppr co) }
+
        ; return co }
 
+
 --------------
-uType t_or_k origin orig_ty1 orig_ty2
+uType env@(UE { u_role = role }) orig_ty1 orig_ty2
+  | Phantom <- role
+  = do { kind_co <- uType (mkKindEnv env orig_ty1 orig_ty2)
+                          (typeKind orig_ty1) (typeKind orig_ty2)
+       ; return (mkPhantomCo kind_co orig_ty1 orig_ty2) }
+
+  | otherwise
   = do { tclvl <- getTcLevel
        ; traceTc "u_tys" $ vcat
               [ text "tclvl" <+> ppr tclvl
-              , sep [ ppr orig_ty1, text "~", ppr orig_ty2]
-              , pprCtOrigin origin]
+              , sep [ ppr orig_ty1, text "~" <> ppr role, ppr orig_ty2] ]
        ; co <- go orig_ty1 orig_ty2
        ; if isReflCo co
             then traceTc "u_tys yields no coercion" Outputable.empty
@@ -1800,12 +1882,12 @@ uType t_or_k origin orig_ty1 orig_ty2
      -- recognize (t |> co) ~ (t |> co), which is nice. Previously, we
      -- didn't do it this way, and then the unification above was deferred.
     go (CastTy t1 co1) t2
-      = do { co_tys <- uType t_or_k origin t1 t2
-           ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
+      = do { co_tys <- uType env t1 t2
+           ; return (mkCoherenceLeftCo role t1 co1 co_tys) }
 
     go t1 (CastTy t2 co2)
-      = do { co_tys <- uType t_or_k origin t1 t2
-           ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
+      = do { co_tys <- uType env t1 t2
+           ; return (mkCoherenceRightCo role t2 co2 co_tys) }
 
         -- Variables; go for uUnfilledVar
         -- Note that we pass in *original* (before synonym expansion),
@@ -1815,19 +1897,20 @@ uType t_or_k origin orig_ty1 orig_ty2
       = do { lookup_res <- isFilledMetaTyVar_maybe tv1
            ; case lookup_res of
                Just ty1 -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
-                                ; go ty1 ty2 }
-               Nothing  -> uUnfilledVar origin t_or_k NotSwapped tv1 ty2 }
+                              ; uType env ty1 orig_ty2 }
+               Nothing -> uUnfilledVar env NotSwapped tv1 ty2 }
+
     go ty1 (TyVarTy tv2)
       = do { lookup_res <- isFilledMetaTyVar_maybe tv2
            ; case lookup_res of
                Just ty2 -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
-                              ; go ty1 ty2 }
-               Nothing  -> uUnfilledVar origin t_or_k IsSwapped tv2 ty1 }
+                              ; uType env orig_ty1 ty2 }
+               Nothing -> uUnfilledVar env IsSwapped tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
-      = return $ mkNomReflCo ty1
+      = return $ mkReflCo role ty1
 
         -- See Note [Expanding synonyms during unification]
         --
@@ -1842,14 +1925,14 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty2' <- coreView ty2 = go ty1  ty2'
 
     -- Functions (t1 -> t2) just check the two parts
-    -- Do not attempt (c => t); just defer
     go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
-      | isVisibleFunArg af1, af1 == af2
-      = do { co_l <- uType t_or_k origin arg1 arg2
-           ; co_r <- uType t_or_k origin res1 res2
-           ; co_w <- uType t_or_k origin w1 w2
-           ; return $ mkNakedFunCo1 Nominal af1 co_w co_l co_r }
+      | isVisibleFunArg af1  -- Do not attempt (c => t); just defer
+      , af1 == af2           -- Important!  See #21530
+      = do { co_w <- uType (env { u_role = funRole role SelMult }) w1   w2
+           ; co_l <- uType (env { u_role = funRole role SelArg })  arg1 arg2
+           ; co_r <- uType (env { u_role = funRole role SelRes })  res1 res2
+           ; return $ mkNakedFunCo role af1 co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -1861,41 +1944,40 @@ uType t_or_k origin orig_ty1 orig_ty2
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, equalLength tys1 tys2
-      = assertPpr (isGenerativeTyCon tc1 Nominal) (ppr tc1) $
-        do { cos <- zipWith3M (uType t_or_k) origins' tys1 tys2
-           ; return $ mkTyConAppCo Nominal tc1 cos }
-      where
-        origins' = map (\is_vis -> if is_vis then origin else toInvisibleOrigin origin)
-                       (tcTyConVisibilities tc1)
+      , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
+      = assertPpr (isGenerativeTyCon tc1 role) (ppr tc1) $
+        do { traceTc "go-tycon" (ppr tc1 $$ ppr tys1 $$ ppr tys2 $$ ppr (take 10 (tyConRoleListX role tc1)))
+           ; cos <- zipWith4M u_tc_arg (tyConVisibilities tc1)   -- Infinite
+                                       (tyConRoleListX role tc1) -- Infinite
+                                       tys1 tys2
+           ; return $ mkTyConAppCo role tc1 cos }
 
     go (LitTy m) ty@(LitTy n)
       | m == n
-      = return $ mkNomReflCo ty
+      = return $ mkReflCo role ty
 
         -- See Note [Care with type applications]
         -- Do not decompose FunTy against App;
         -- it's often a type error, so leave it for the constraint solver
-    go (AppTy s1 t1) (AppTy s2 t2)
-      = go_app (isNextArgVisible s1) s1 t1 s2 t2
+    go ty1@(AppTy s1 t1) ty2@(AppTy s2 t2)
+      = go_app (isNextArgVisible s1) ty1 s1 t1 ty2 s2 t2
 
-    go (AppTy s1 t1) (TyConApp tc2 ts2)
+    go ty1@(AppTy s1 t1) ty2@(TyConApp tc2 ts2)
       | Just (ts2', t2') <- snocView ts2
       = assert (not (tyConMustBeSaturated tc2)) $
-        go_app (isNextTyConArgVisible tc2 ts2') s1 t1 (TyConApp tc2 ts2') t2'
+        go_app (isNextTyConArgVisible tc2 ts2')
+               ty1 s1 t1 ty2 (TyConApp tc2 ts2') t2'
 
-    go (TyConApp tc1 ts1) (AppTy s2 t2)
+    go ty1@(TyConApp tc1 ts1) ty2@(AppTy s2 t2)
       | Just (ts1', t1') <- snocView ts1
       = assert (not (tyConMustBeSaturated tc1)) $
-        go_app (isNextTyConArgVisible tc1 ts1') (TyConApp tc1 ts1') t1' s2 t2
+        go_app (isNextTyConArgVisible tc1 ts1')
+               ty1 (TyConApp tc1 ts1') t1' ty2 s2 t2
 
-    go (CoercionTy co1) (CoercionTy co2)
-      = do { let ty1 = coercionType co1
-                 ty2 = coercionType co2
-           ; kco <- uType KindLevel
-                          (KindEqOrigin orig_ty1 orig_ty2 origin
-                                        (Just t_or_k))
-                          ty1 ty2
-           ; return $ mkProofIrrelCo Nominal kco co1 co2 }
+    go ty1@(CoercionTy co1) ty2@(CoercionTy co2)
+      = do { kco <- uType (mkKindEnv env ty1 ty2)
+                          (coercionType co1) (coercionType co2)
+           ; return $ mkProofIrrelCo role kco co1 co2 }
 
         -- Anything else fails
         -- E.g. unifying for-all types, which is relative unusual
@@ -1903,17 +1985,33 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     ------------------
     defer ty1 ty2   -- See Note [Check for equality before deferring]
-      | ty1 `tcEqType` ty2 = return (mkNomReflCo ty1)
-      | otherwise          = uType_defer t_or_k origin ty1 ty2
+      | ty1 `tcEqType` ty2 = return (mkReflCo role ty1)
+      | otherwise          = uType_defer env orig_ty1 orig_ty2
+
 
     ------------------
-    go_app vis s1 t1 s2 t2
-      = do { co_s <- uType t_or_k origin s1 s2
-           ; let arg_origin
-                   | vis       = origin
-                   | otherwise = toInvisibleOrigin origin
-           ; co_t <- uType t_or_k arg_origin t1 t2
+    u_tc_arg is_vis role ty1 ty2
+      = do { traceTc "u_tc_arg" (ppr role $$ ppr ty1 $$ ppr ty2)
+           ; uType env_arg ty1 ty2 }
+      where
+        env_arg = env { u_loc = adjustCtLoc is_vis False (u_loc env)
+                      , u_role = role }
+
+    ------------------
+    -- For AppTy, decompose only nominal equalities
+    -- See Note [Decomposing AppTy equalities] in GHC.Tc.Solver.Equality
+    go_app vis ty1 s1 t1 ty2 s2 t2
+      | Nominal <- role
+      = -- Unify arguments t1/t2 before function s1/s2, because
+        -- the former have smaller kinds, and hence simpler error messages
+        -- c.f. GHC.Tc.Solver.Equality.can_eq_app
+        -- Example: test T8603
+        do { let env_arg = env { u_loc = adjustCtLoc vis False (u_loc env) }
+           ; co_t <- uType env_arg t1 t2
+           ; co_s <- uType env s1 s2
            ; return $ mkAppCo co_s co_t }
+      | otherwise
+      = defer ty1 ty2
 
 {- Note [Check for equality before deferring]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2009,38 +2107,37 @@ back into @uTys@ if it turns out that the variable is already bound.
 -}
 
 ----------
-uUnfilledVar :: CtOrigin
-             -> TypeOrKind
-             -> SwapFlag
-             -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
-                               --    definitely not a /filled/ meta-tyvar
-             -> TcTauType      -- Type 2
-             -> TcM Coercion
+uUnfilledVar, uUnfilledVar1
+    :: UnifyEnv
+    -> SwapFlag
+    -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
+                      --    definitely not a /filled/ meta-tyvar
+    -> TcTauType      -- Type 2
+    -> TcM CoercionN
 -- "Unfilled" means that the variable is definitely not a filled-in meta tyvar
 --            It might be a skolem, or untouchable, or meta
+--
+-- Precondition: u_role env = Nominal
+uUnfilledVar env swapped tv1 ty2
+  | Nominal <- u_role env
+  = do { ty2 <- zonkTcType ty2    -- Zonk to expose things to the occurs check, and so
+                                  -- that if ty2 looks like a type variable then it
+                                  -- /is/ a type variable
+       ; uUnfilledVar1 env swapped tv1 ty2 }
 
-uUnfilledVar origin t_or_k swapped tv1 ty2
-  = do { ty2 <- zonkTcType ty2
-             -- Zonk to expose things to the
-             -- occurs check, and so that if ty2
-             -- looks like a type variable then it
-             -- /is/ a type variable
-       ; uUnfilledVar1 origin t_or_k swapped tv1 ty2 }
+  | otherwise  -- See Note [Do not unify representational equalities]
+               -- in GHC.Tc.Solver.Equality
+  = unSwap swapped (uType_defer env) (mkTyVarTy tv1) ty2
 
-----------
-uUnfilledVar1 :: CtOrigin
-              -> TypeOrKind
-              -> SwapFlag
-              -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
-                                --    definitely not a /filled/ meta-tyvar
-              -> TcTauType      -- Type 2, zonked
-              -> TcM Coercion
-uUnfilledVar1 origin t_or_k swapped tv1 ty2
+uUnfilledVar1 env       -- u_role==Nominal
+              swapped
+              tv1
+              ty2       -- ty2 is zonked
   | Just tv2 <- getTyVar_maybe ty2
   = go tv2
 
   | otherwise
-  = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+  = uUnfilledVar2 env swapped tv1 ty2
 
   where
     -- 'go' handles the case where both are
@@ -2056,21 +2153,19 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
                      -- not have happened yet, and it's an invariant of
                      -- uUnfilledTyVar2 that ty2 is fully zonked
                      -- Omitting this caused #16902
-                ; uUnfilledVar2 origin t_or_k (flipSwap swapped)
-                           tv2 (mkTyVarTy tv1) }
+                ; uUnfilledVar2 env (flipSwap swapped) tv2 (mkTyVarTy tv1) }
 
            | otherwise
-           = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+           = uUnfilledVar2 env swapped tv1 ty2
 
 ----------
-uUnfilledVar2 :: CtOrigin
-              -> TypeOrKind
+uUnfilledVar2 :: UnifyEnv
               -> SwapFlag
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
-              -> TcM Coercion
-uUnfilledVar2 origin t_or_k swapped tv1 ty2
+              -> TcM CoercionN
+uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
   = do { cur_lvl <- getTcLevel
            -- See Note [Unification preconditions], (UNTOUCHABLE) wrinkles
            -- Here we don't know about given equalities here; so we treat
@@ -2079,7 +2174,8 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
                  && simpleUnifyCheck False tv1 ty2)
          then not_ok_so_defer
          else
-    do { co_k <- uType KindLevel kind_origin (typeKind ty2) (tyVarKind tv1)
+    do { def_eqs <- readTcRef def_eq_ref
+       ; co_k <- uType (mkKindEnv env ty1 ty2) (typeKind ty2) (tyVarKind tv1)
        ; traceTc "uUnfilledVar2 ok" $
          vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
               , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
@@ -2090,17 +2186,22 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
            -- NB: tv1 should still be unfilled, despite the kind unification
            --     because tv1 is not free in ty2' (or, hence, in its kind)
          then do { writeMetaTyVar tv1 ty2
-                 ; return (mkNomReflCo ty2) }
+                 ; case u_unified env of
+                     Nothing -> return ()
+                     Just uref -> updTcRef uref (tv1 :)
+                 ; return (mkNomReflCo ty2) }  -- Unification is always Nominal
 
-         else defer  -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
-                     -- Note [Equalities with incompatible kinds] for how
-                     -- this will be dealt with in the solver
+         else -- This cannot be solved now.  See GHC.Tc.Solver.Canonical
+              -- Note [Equalities with incompatible kinds] for how this
+              -- will be dealt with in the solver
+              -- Since we are discarding co_k, also discard any constraints
+              -- emitted by kind unification; they are just useless clutter.
+              do { writeTcRef def_eq_ref def_eqs
+                 ; defer }
          }}
   where
     ty1 = mkTyVarTy tv1
-    kind_origin = KindEqOrigin ty1 ty2 origin (Just t_or_k)
-
-    defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
+    defer = unSwap swapped (uType_defer env) ty1 ty2
 
     not_ok_so_defer =
       do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
@@ -2219,18 +2320,10 @@ There are five reasons not to unify:
 5. (COERCION-HOLE) Confusing coercion holes
    Suppose our equality is
      (alpha :: k) ~ (Int |> {co})
-   where co :: Type ~ k is an unsolved wanted. Note that this
-   equality is homogeneous; both sides have kind k. Unifying here
-   is sensible, but it can lead to very confusing error messages.
-   It's very much like a Wanted rewriting a Wanted. Even worse,
-   unifying a variable essentially turns an equality into a Given,
-   and so we could not use the tracking mechanism in
-   Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint.
-   We thus simply do not unify in this case.
-
-   This is expanded as Wrinkle (2) in Note [Equalities with incompatible kinds]
-   in GHC.Tc.Solver.Equality
-
+   where co :: Type ~ k is an unsolved wanted. Note that this equality
+   is homogeneous; both sides have kind k. We refrain from unifying here, because
+   of the coercion hold in the RHS -- see Wrinkle (W2) in
+   Note [Equalities with incompatible kinds] in GHC.Solver.Equality.
 
 Needless to say, all there are wrinkles:
 
@@ -2500,7 +2593,7 @@ matchExpectedFunKind hs_ty n k = go n k
     go n (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
       | isVisibleFunArg af
       = do { co <- go (n-1) res
-           ; return (mkNakedFunCo1 Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
+           ; return (mkNakedFunCo Nominal af (mkNomReflCo w) (mkNomReflCo arg) co) }
 
     go n other
      = defer n other
@@ -2514,7 +2607,7 @@ matchExpectedFunKind hs_ty n k = go n k
                                         , uo_thing    = Just hs_ty
                                         , uo_visible  = True
                                         }
-           ; uType KindLevel origin k new_fun }
+           ; unifyTypeAndEmit KindLevel origin k new_fun }
 
 {- *********************************************************************
 *                                                                      *
@@ -2542,7 +2635,7 @@ uTypeCheckTouchableTyVarEq lhs_tv rhs
        ; traceTc "uTypeCheckTouchableTyVarEq }" (ppr check_result)
        ; case check_result of
             PuFail reason -> return (PuFail reason)
-            PuOK redn _   -> assertPpr (isReflCo (reductionCoercion redn))
+            PuOK _ redn   -> assertPpr (isReflCo (reductionCoercion redn))
                                        (ppr lhs_tv $$ ppr rhs $$ ppr redn) $
                              return (pure (reductionReducedType redn)) }
   where
@@ -2690,22 +2783,22 @@ reductionCoercion is Refl.  See `canEqCanLHSFinish_no_unification`.
 -}
 
 data PuResult a b = PuFail CheckTyEqResult
-                  | PuOK b (Bag a)
+                  | PuOK (Bag a) b
 
 instance Functor (PuResult a) where
   fmap _ (PuFail prob) = PuFail prob
-  fmap f (PuOK x cts)  = PuOK (f x) cts
+  fmap f (PuOK cts x)  = PuOK cts (f x)
 
 instance Applicative (PuResult a) where
-  pure x = PuOK x emptyBag
+  pure x = PuOK emptyBag x
   PuFail p1 <*> PuFail p2 = PuFail (p1 S.<> p2)
   PuFail p1 <*> PuOK {}   = PuFail p1
   PuOK {}   <*> PuFail p2 = PuFail p2
-  PuOK f c1 <*> PuOK x c2 = PuOK (f x) (c1 `unionBags` c2)
+  PuOK c1 f <*> PuOK c2 x = PuOK (c1 `unionBags` c2) (f x)
 
 instance (Outputable a, Outputable b) => Outputable (PuResult a b) where
   ppr (PuFail prob) = text "PuFail" <+> (ppr prob)
-  ppr (PuOK x cts)  = text "PuOK" <> braces
+  ppr (PuOK cts x)  = text "PuOK" <> braces
                         (vcat [ text "redn:" <+> ppr x
                               , text "cts:" <+> ppr cts ])
 
@@ -2715,7 +2808,7 @@ pprPur (PuFail prob) = text "PuFail:" <> ppr prob
 pprPur (PuOK {})     = text "PuOK"
 
 okCheckRefl :: TcType -> TcM (PuResult a Reduction)
-okCheckRefl ty = return (PuOK (mkReflRedn Nominal ty) emptyBag)
+okCheckRefl ty = return (PuOK emptyBag (mkReflRedn Nominal ty))
 
 failCheckWith :: CheckTyEqResult -> TcM (PuResult a b)
 failCheckWith p = return (PuFail p)
@@ -2851,15 +2944,14 @@ checkTyEqRhs flags ty
 checkCo :: TyEqFlags a -> Coercion -> TcM (PuResult a Coercion)
 -- See Note [checkCo]
 checkCo (TEF { tef_lhs = TyFamLHS {} }) co
-  = return (PuOK co emptyBag)
+  = return (pure co)
 
 checkCo (TEF { tef_lhs = TyVarLHS lhs_tv
              , tef_unifying = unifying
              , tef_occurs = occ_prob }) co
   -- Check for coercion holes, if unifying
   -- See (COERCION-HOLE) in Note [Unification preconditions]
-  | Unifying {} <- unifying
-  , hasCoercionHoleCo co
+  | hasCoercionHoleCo co
   = failCheckWith (cteProblem cteCoercionHole)
 
   -- Occurs check (can promote)
@@ -2874,7 +2966,7 @@ checkCo (TEF { tef_lhs = TyVarLHS lhs_tv
   = failCheckWith (cteProblem occ_prob)
 
   | otherwise
-  = return (PuOK co emptyBag)
+  = return (pure co)
 
 {- Note [checkCo]
 ~~~~~~~~~~~~~~~~~
@@ -3058,7 +3150,7 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
       TEFA_Break breaker    -- Recurse; and break if there is a problem
         -> do { tys_res <- mapCheck (checkTyEqRhs arg_flags) tys
               ; case tys_res of
-                  PuOK redns cts -> return (PuOK (mkTyConAppRedn Nominal tc redns) cts)
+                  PuOK cts redns -> return (PuOK cts (mkTyConAppRedn Nominal tc redns))
                   PuFail {}      -> breaker fam_app }
   where
     arg_flags = famAppArgFlags flags
@@ -3228,4 +3320,3 @@ checkTopShape info xi
                         _                             -> False
       CycleBreakerTv -> False  -- We never unify these
       _ -> True
-
