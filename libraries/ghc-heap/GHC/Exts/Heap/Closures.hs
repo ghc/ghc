@@ -358,6 +358,10 @@ data GenClosure b
         { info       :: !StgInfoTable
         }
 
+    -- | A primitive word from a bitmap encoded stack frame payload
+    --
+    -- The type itself cannot be restored (i.e. it might also represent a byte
+    -- or an int).
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
   deriving (Show, Generic, Functor, Foldable, Traversable)
