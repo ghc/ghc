@@ -1041,18 +1041,25 @@ notWorthFloating :: CoreExpr -> [Var] -> Bool
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
   where
-    go (Var {}) n    = n >= 0
-    go (Lit lit) n   = assert (n==0) $
-                       litIsTrivial lit   -- Note [Floating literals]
-    go (Tick t e) n  = not (tickishIsCode t) && go e n
-    go (Cast e _)  n = go e n
+    go (Var {}) n               = n >= 0
+    go (Lit lit) n              = assert (n==0) $
+                                  litIsTrivial lit   -- Note [Floating literals]
+    go (Type {}) _              = True
+    go (Coercion {}) _          = True
     go (App e arg) n
        -- See Note [Floating applications to coercions]
-       | Type {} <- arg    = go e n
-       | n==0              = False
-       | exprIsTrivial arg = go e (n-1)
-       | otherwise         = False
-    go _ _                 = False
+       | not (isRuntimeArg arg) = go e n
+       | n==0                   = False
+       | exprIsTrivial arg      = go e (n-1) -- NB: exprIsTrivial arg = go arg 0
+       | otherwise              = False
+    go (Tick t e) n             = not (tickishIsCode t) && go e n
+    go (Cast e _)  n            = go e n
+    go (Case e b _ as) n
+      | null as
+      = go e n     -- See Note [Empty case is trivial]
+      | Just rhs <- isUnsafeEqualityCase e b as
+      = go rhs n   -- See (U2) of Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+    go _ _                      = False
 
 {-
 Note [Floating literals]

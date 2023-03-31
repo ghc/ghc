@@ -725,9 +725,13 @@ this exhaustive list can be empty!
   its scrutinee is (see GHC.Core.Utils.exprIsTrivial).  This is actually
   important; see Note [Empty case is trivial] in GHC.Core.Utils
 
-* An empty case is replaced by its scrutinee during the CoreToStg
-  conversion; remember STG is un-typed, so there is no need for
-  the empty case to do the type conversion.
+* We lower empty cases in GHC.CoreToStg.coreToStgExpr to an eval on the
+  scrutinee.
+
+Historical Note: We used to lower EmptyCase in CorePrep by way of an
+unsafeCoercion on the scrutinee, but that yielded panics in CodeGen when
+we were beginning to eta expand in arguments, plus required to mess with
+heterogenously-kinded coercions. It's simpler to stick to it just a bit longer.
 
 Note [Join points]
 ~~~~~~~~~~~~~~~~~~

@@ -40,12 +40,10 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
-import GHC.Core.TyCo.Rep( UnivCoProvenance(..) )
 
 import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Data.FastString
-import GHC.Data.Pair
 import GHC.Data.Graph.UnVar
 
 import GHC.Utils.Error
@@ -71,7 +69,6 @@ import GHC.Types.TyThing
 import GHC.Types.Unique.Supply
 
 import Data.List        ( unfoldr )
-import Data.Functor.Identity
 import Control.Monad
 
 {-
@@ -142,10 +139,7 @@ The goal of this pass is to prepare for code generation.
     profiling mode. We have to do this here because we won't have unfoldings
     after this pass (see `trimUnfolding` and Note [Drop unfoldings and rules].
 
-12. Eliminate case clutter in favour of unsafe coercions.
-    See Note [Unsafe coercions]
-
-13. Eliminate some magic Ids, specifically
+12. Eliminate some magic Ids, specifically
      runRW# (\s. e)  ==>  e[readWorldId/s]
              lazy e  ==>  e (see Note [lazyId magic] in GHC.Types.Id.Make)
          noinline e  ==>  e
@@ -156,48 +150,6 @@ The goal of this pass is to prepare for code generation.
 This is all done modulo type applications and abstractions, so that
 when type erasure is done for conversion to STG, we don't end up with
 any trivial or useless bindings.
-
-Note [Unsafe coercions]
-~~~~~~~~~~~~~~~~~~~~~~~
-CorePrep does these two transformations:
-
-1. Convert empty case to cast with an unsafe coercion
-          (case e of {}) ===>  e |> unsafe-co
-   See Note [Empty case alternatives] in GHC.Core: if the case
-   alternatives are empty, the scrutinee must diverge or raise an
-   exception, so we can just dive into it.
-
-   Of course, if the scrutinee *does* return, we may get a seg-fault.
-   A belt-and-braces approach would be to persist empty-alternative
-   cases to code generator, and put a return point anyway that calls a
-   runtime system error function.
-
-   Notice that eliminating empty case can lead to an ill-kinded coercion
-       case error @Int "foo" of {}  :: Int#
-       ===> error @Int "foo" |> unsafe-co
-       where unsafe-co :: Int ~ Int#
-   But that's fine because the expression diverges anyway. And it's
-   no different to what happened before.
-
-2. Eliminate unsafeEqualityProof in favour of an unsafe coercion
-           case unsafeEqualityProof of UnsafeRefl g -> e
-           ===>  e[unsafe-co/g]
-   See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
-
-   Note that this requires us to substitute 'unsafe-co' for 'g', and
-   that is the main (current) reason for cpe_tyco_env in CorePrepEnv.
-   Tiresome, but not difficult.
-
-These transformations get rid of "case clutter", leaving only casts.
-We are doing no further significant transformations, so the reasons
-for the case forms have disappeared. And it is extremely helpful for
-the ANF-ery, CoreToStg, and backends, if trivial expressions really do
-look trivial. #19700 was an example.
-
-In both cases, the "unsafe-co" is just (UnivCo ty1 ty2 (CorePrepProv b)),
-The boolean 'b' says whether the unsafe coercion is supposed to be
-kind-homogeneous (yes for (2), no for (1).  This information is used
-/only/ by Lint.
 
 Note [CorePrep invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -789,10 +741,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- For example
 --      f (g x)   ===>   ([v = g x], f v)
 
-cpeRhsE env (Type ty)
-  = return (emptyFloats, Type (cpSubstTy env ty))
-cpeRhsE env (Coercion co)
-  = return (emptyFloats, Coercion (cpSubstCo env co))
+cpeRhsE _ (Type ty)
+  = return (emptyFloats, Type ty)
+cpeRhsE _ (Coercion co)
+  = return (emptyFloats, Coercion co)
 cpeRhsE env expr@(Lit (LitNumber nt i))
    = case cp_convertNumLit (cpe_config env) nt i of
       Nothing -> return (emptyFloats, expr)
@@ -826,7 +778,7 @@ cpeRhsE env (Tick tickish expr)
 
 cpeRhsE env (Cast expr co)
    = do { (floats, expr') <- cpeRhsE env expr
-        ; return (floats, Cast expr' (cpSubstCo env co)) }
+        ; return (floats, Cast expr' co) }
 
 cpeRhsE env expr@(Lam {})
    = do { let (bndrs,body) = collectBinders expr
@@ -834,35 +786,36 @@ cpeRhsE env expr@(Lam {})
         ; body' <- cpeBodyNF env' body
         ; return (emptyFloats, mkLams bndrs' body') }
 
--- Eliminate empty case
--- See Note [Unsafe coercions]
-cpeRhsE env (Case scrut _ ty [])
-  = do { (floats, scrut') <- cpeRhsE env scrut
-       ; let ty'       = cpSubstTy env ty
-             scrut_ty' = exprType scrut'
-             co'       = mkUnivCo prov Representational scrut_ty' ty'
-             prov      = CorePrepProv False
-               -- False says that the kinds of two types may differ
-               -- E.g. we might cast Int to Int#.  This is fine
-               -- because the scrutinee is guaranteed to diverge
-
-       ; return (floats, Cast scrut' co') }
-   -- This can give rise to
-   --   Warning: Unsafe coercion: between unboxed and boxed value
-   -- but it's fine because 'scrut' diverges
-
--- Eliminate unsafeEqualityProof
--- See Note [Unsafe coercions]
-cpeRhsE env (Case scrut bndr _ alts)
-  | isUnsafeEqualityProof scrut
-  , isDeadBinder bndr -- We can only discard the case if the case-binder
-                      -- is dead.  It usually is, but see #18227
-  , [Alt _ [co_var] rhs] <- alts
-  , let Pair ty1 ty2 = coVarTypes co_var
-        the_co = mkUnivCo prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
-        prov   = CorePrepProv True  -- True <=> kind homogeneous
-        env'   = extendCoVarEnv env co_var the_co
-  = cpeRhsE env' rhs
+cpeRhsE env (Case scrut bndr _ alts@[Alt con bs _])
+  -- See (U3) in Note [Implementing unsafeCoerce]
+  -- We need make the Case float, otherwise we get
+  --   let x = case ... of UnsafeRefl co ->
+  --           let y = expr in
+  --           K y
+  --   in f x
+  -- instead of
+  --   case ... of UnsafeRefl co ->
+  --   let y = expr in
+  --   let x = K y
+  --   in f x
+  -- Note that `x` is a value here. This is visible in the GHCi debugger tests
+  -- (such as `print003`).
+  | Just rhs <- isUnsafeEqualityCase scrut bndr alts
+  = do { (floats_scrut, scrut) <- cpeBody env scrut
+       ; (env, bndr) <- cpCloneBndr env bndr
+       ; (env, bs) <- cpCloneBndrs env bs
+         -- Up until here this should do exactly the same as the regular code
+         -- path of `cpeRhsE Case{}`.
+       ; (floats_rhs, rhs) <- cpeBody env rhs
+         -- ... but we want to float `floats_rhs` as in (U3) so that rhs' might
+         -- become a value
+       ; let case_float = FloatCase scrut bndr con bs True
+         -- NB: True <=> ok-for-spec; it is OK to "evaluate" the proof eagerly.
+         --     Usually there's the danger that we float the unsafeCoerce out of
+         --     a branching Case alt. Not so here, because the regular code path
+         --     for `cpeRhsE Case{}` will not float out of alts.
+             floats = addFloat floats_scrut case_float `appendFloats` floats_rhs
+       ; return (floats, rhs) }
 
 cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
@@ -1209,14 +1162,10 @@ cpeApp top_env expr
             in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       CpeApp (Type arg_ty)
-        -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
-        where
-          arg_ty' = cpSubstTy env arg_ty
+        -> rebuild_app' env as (App fun' (Type arg_ty)) floats ss rt_ticks req_depth
 
       CpeApp (Coercion co)
-        -> rebuild_app' env as (App fun' (Coercion co')) floats (drop 1 ss) rt_ticks req_depth
-        where
-            co' = cpSubstCo env co
+        -> rebuild_app' env as (App fun' (Coercion co)) floats (drop 1 ss) rt_ticks req_depth
 
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
@@ -1228,9 +1177,7 @@ cpeApp top_env expr
         rebuild_app' env as (App fun' arg') (fs `appendFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       CpeCast co
-        -> rebuild_app' env as (Cast fun' co') floats ss rt_ticks req_depth
-        where
-           co' = cpSubstCo env co
+        -> rebuild_app' env as (Cast fun' co) floats ss rt_ticks req_depth
       -- See Note [Ticks and mandatory eta expansion]
       CpeTick tickish
         | tickishPlace tickish == PlaceRuntime
@@ -2064,8 +2011,6 @@ data CorePrepEnv
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
 
-        , cpe_tyco_env :: Maybe CpeTyCoEnv -- See Note [CpeTyCoEnv]
-
         , cpe_rec_ids         :: UnVarSet -- Faster OutIdSet; See Note [Speculative evaluation]
     }
 
@@ -2073,7 +2018,6 @@ mkInitialCorePrepEnv :: CorePrepConfig -> CorePrepEnv
 mkInitialCorePrepEnv cfg = CPE
       { cpe_config        = cfg
       , cpe_env           = emptyVarEnv
-      , cpe_tyco_env      = Nothing
       , cpe_rec_ids       = emptyUnVarSet
       }
 
@@ -2101,117 +2045,6 @@ enterRecGroupRHSs env grp
   = env { cpe_rec_ids = extendUnVarSetList grp (cpe_rec_ids env) }
 
 ------------------------------------------------------------------------------
---           CpeTyCoEnv
--- ---------------------------------------------------------------------------
-
-{- Note [CpeTyCoEnv]
-~~~~~~~~~~~~~~~~~~~~
-The cpe_tyco_env :: Maybe CpeTyCoEnv field carries a substitution
-for type and coercion variables
-
-* We need the coercion substitution to support the elimination of
-  unsafeEqualityProof (see Note [Unsafe coercions])
-
-* We need the type substitution in case one of those unsafe
-  coercions occurs in the kind of tyvar binder (sigh)
-
-We don't need an in-scope set because we don't clone any of these
-binders at all, so no new capture can take place.
-
-The cpe_tyco_env is almost always empty -- it only gets populated
-when we get under an usafeEqualityProof.  Hence the Maybe CpeTyCoEnv,
-which makes everything into a no-op in the common case.
--}
-
-data CpeTyCoEnv = TCE TvSubstEnv CvSubstEnv
-
-emptyTCE :: CpeTyCoEnv
-emptyTCE = TCE emptyTvSubstEnv emptyCvSubstEnv
-
-extend_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion -> CpeTyCoEnv
-extend_tce_cv (TCE tv_env cv_env) cv co
-  = TCE tv_env (extendVarEnv cv_env cv co)
-
-extend_tce_tv :: CpeTyCoEnv -> TyVar -> Type -> CpeTyCoEnv
-extend_tce_tv (TCE tv_env cv_env) tv ty
-  = TCE (extendVarEnv tv_env tv ty) cv_env
-
-lookup_tce_cv :: CpeTyCoEnv -> CoVar -> Coercion
-lookup_tce_cv (TCE _ cv_env) cv
-  = case lookupVarEnv cv_env cv of
-        Just co -> co
-        Nothing -> mkCoVarCo cv
-
-lookup_tce_tv :: CpeTyCoEnv -> TyVar -> Type
-lookup_tce_tv (TCE tv_env _) tv
-  = case lookupVarEnv tv_env tv of
-        Just ty -> ty
-        Nothing -> mkTyVarTy tv
-
-extendCoVarEnv :: CorePrepEnv -> CoVar -> Coercion -> CorePrepEnv
-extendCoVarEnv cpe@(CPE { cpe_tyco_env = mb_tce }) cv co
-  = cpe { cpe_tyco_env = Just (extend_tce_cv tce cv co) }
-  where
-    tce = mb_tce `orElse` emptyTCE
-
-
-cpSubstTy :: CorePrepEnv -> Type -> Type
-cpSubstTy (CPE { cpe_tyco_env = mb_env }) ty
-  = case mb_env of
-      Just env -> runIdentity (subst_ty env ty)
-      Nothing  -> ty
-
-cpSubstCo :: CorePrepEnv -> Coercion -> Coercion
-cpSubstCo (CPE { cpe_tyco_env = mb_env }) co
-  = case mb_env of
-      Just tce -> runIdentity (subst_co tce co)
-      Nothing  -> co
-
-subst_tyco_mapper :: TyCoMapper CpeTyCoEnv Identity
-subst_tyco_mapper = TyCoMapper
-  { tcm_tyvar      = \env tv -> return (lookup_tce_tv env tv)
-  , tcm_covar      = \env cv -> return (lookup_tce_cv env cv)
-  , tcm_hole       = \_ hole -> pprPanic "subst_co_mapper:hole" (ppr hole)
-  , tcm_tycobinder = \env tcv _vis k -> if isTyVar tcv
-                                        then uncurry k (subst_tv_bndr env tcv)
-                                        else uncurry k (subst_cv_bndr env tcv)
-  , tcm_tycon      = \tc -> return tc }
-
-subst_ty :: CpeTyCoEnv -> Type     -> Identity Type
-subst_co :: CpeTyCoEnv -> Coercion -> Identity Coercion
-(subst_ty, _, subst_co, _) = mapTyCoX subst_tyco_mapper
-
-cpSubstTyVarBndr :: CorePrepEnv -> TyVar -> (CorePrepEnv, TyVar)
-cpSubstTyVarBndr env@(CPE { cpe_tyco_env = mb_env }) tv
-  = case mb_env of
-      Nothing  -> (env, tv)
-      Just tce -> (env { cpe_tyco_env = Just tce' }, tv')
-               where
-                  (tce', tv') = subst_tv_bndr tce tv
-
-subst_tv_bndr :: CpeTyCoEnv -> TyVar -> (CpeTyCoEnv, TyVar)
-subst_tv_bndr tce tv
-  = (extend_tce_tv tce tv (mkTyVarTy tv'), tv')
-  where
-    tv'   = mkTyVar (tyVarName tv) kind'
-    kind' = runIdentity $ subst_ty tce $ tyVarKind tv
-
-cpSubstCoVarBndr :: CorePrepEnv -> CoVar -> (CorePrepEnv, CoVar)
-cpSubstCoVarBndr env@(CPE { cpe_tyco_env = mb_env }) cv
-  = case mb_env of
-      Nothing  -> (env, cv)
-      Just tce -> (env { cpe_tyco_env = Just tce' }, cv')
-               where
-                  (tce', cv') = subst_cv_bndr tce cv
-
-subst_cv_bndr :: CpeTyCoEnv -> CoVar -> (CpeTyCoEnv, CoVar)
-subst_cv_bndr tce cv
-  = (extend_tce_cv tce cv (mkCoVarCo cv'), cv')
-  where
-    cv' = mkCoVar (varName cv) ty'
-    ty' = runIdentity (subst_ty tce $ varType cv)
-
-------------------------------------------------------------------------------
 -- Cloning binders
 -- ---------------------------------------------------------------------------
 
@@ -2220,12 +2053,8 @@ cpCloneBndrs env bs = mapAccumLM cpCloneBndr env bs
 
 cpCloneBndr  :: CorePrepEnv -> InVar -> UniqSM (CorePrepEnv, OutVar)
 cpCloneBndr env bndr
-  | isTyVar bndr
-  = return (cpSubstTyVarBndr env bndr)
-
-  | isCoVar bndr
-  = return (cpSubstCoVarBndr env bndr)
-
+  | isTyCoVar bndr
+  = return (env, bndr)
   | otherwise
   = do { bndr' <- clone_it bndr
 
@@ -2245,8 +2074,7 @@ cpCloneBndr env bndr
     clone_it bndr
       | isLocalId bndr
       = do { uniq <- getUniqueM
-           ; let ty' = cpSubstTy env (idType bndr)
-           ; return (setVarUnique (setIdType bndr ty') uniq) }
+           ; return (setVarUnique bndr uniq) }
 
       | otherwise   -- Top level things, which we don't want
                     -- to clone, have become GlobalIds by now

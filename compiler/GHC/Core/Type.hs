@@ -583,7 +583,6 @@ expandTypeSynonyms ty
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
-    go_prov _     p@(CorePrepProv _)  = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -1003,7 +1002,6 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov !env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov !env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov !_   p@(PluginProv _)    = return p
-    go_prov !_   p@(CorePrepProv _)  = return p
 
 
 {- *********************************************************************

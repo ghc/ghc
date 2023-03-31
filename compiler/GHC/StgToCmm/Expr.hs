@@ -53,7 +53,6 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
@@ -1028,7 +1027,7 @@ cgIdApp fun_id args = do
                       (text "TagCheck failed on entry in" <+> ppr mod <+> text "- value:" <> ppr fun_id <+> pdoc platform fun))
                       fun
 
-        EnterIt -> assert (null args) $  -- Discarding arguments
+        EnterIt -> assertPpr (null args) (ppr fun_id $$ ppr args) $  -- Discarding arguments
                    emitEnter fun
 
         SlowCall -> do      -- A slow function call via the RTS apply routines

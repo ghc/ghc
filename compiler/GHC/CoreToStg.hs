@@ -19,8 +19,7 @@ module GHC.CoreToStg ( CoreToStgOpts (..), coreToStg ) where
 import GHC.Prelude
 
 import GHC.Core
-import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
-                        , exprIsTickedString_maybe )
+import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Core.Type
 import GHC.Core.TyCon
@@ -49,7 +48,7 @@ import GHC.Unit.Module
 import GHC.Data.FastString
 import GHC.Platform        ( Platform )
 import GHC.Platform.Ways
-import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
+import GHC.Builtin.PrimOps
 
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
@@ -430,30 +429,23 @@ coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
 
 -- Cases require a little more real work.
-
-{-
-coreToStgExpr (Case scrut _ _ [])
-  = coreToStgExpr scrut
-    -- See Note [Empty case alternatives] in GHC.Core If the case
-    -- alternatives are empty, the scrutinee must diverge or raise an
-    -- exception, so we can just dive into it.
-    --
-    -- Of course this may seg-fault if the scrutinee *does* return.  A
-    -- belt-and-braces approach would be to move this case into the
-    -- code generator, and put a return point anyway that calls a
-    -- runtime system error function.
-
-coreToStgExpr e0@(Case scrut bndr _ [alt]) = do
-  | isUnsafeEqualityProof scrut
-  , isDeadBinder bndr -- We can only discard the case if the case-binder is dead
-                      -- It usually is, but see #18227
-  , (_,_,rhs) <- alt
-  = coreToStgExpr rhs
-    -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
--}
-
--- The normal case for case-expressions
 coreToStgExpr (Case scrut bndr _ alts)
+  | null alts
+  -- See Note [Empty case alternatives] in GHC.Core If the case
+  -- alternatives are empty, the scrutinee must diverge or raise an
+  -- exception, so we can just dive into it.
+  --
+  -- Of course this may seg-fault if the scrutinee *does* return.  A
+  -- belt-and-braces approach would be to move this case into the
+  -- code generator, and put a return point anyway that calls a
+  -- runtime system error function.
+  = coreToStgExpr scrut
+
+  | Just rhs <- isUnsafeEqualityCase scrut bndr alts
+  -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+  = coreToStgExpr rhs
+
+  | otherwise
   = do { scrut2 <- coreToStgExpr scrut
        ; alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
        ; return (StgCase scrut2 bndr (mkStgAltType bndr alts) alts2) }
@@ -574,6 +566,15 @@ coreToStgApp f args ticks = do
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
+getStgArgFromTrivialArg :: HasDebugCallStack => CoreArg -> StgArg
+-- A (non-erased) trivial CoreArg corresponds to an atomic StgArg.
+-- CoreArgs may not immediately look trivial, e.g., `case e of {}` or
+-- `case unsafeequalityProof of UnsafeRefl -> e` might intervene.
+-- Good thing we can just call `trivial_expr_fold` here.
+getStgArgFromTrivialArg e = trivial_expr_fold StgVarArg StgLitArg panic panic e
+  where
+    panic = pprPanic "getStgArgFromTrivialArg" (ppr e)
+
 coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], [StgTickish])
 coreToStgArgs []
   = return ([], [])
@@ -586,42 +587,29 @@ coreToStgArgs (Coercion _ : args) -- Coercion argument; See Note [Coercion token
   = do { (args', ts) <- coreToStgArgs args
        ; return (StgVarArg coercionTokenId : args', ts) }
 
-coreToStgArgs (Tick t e : args)
-  = assert (not (tickishIsCode t)) $
-    do { (args', ts) <- coreToStgArgs (e : args)
-       ; let !t' = coreToStgTick (exprType e) t
-       ; return (args', t':ts) }
-
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, ticks) <- coreToStgArgs args
-    arg' <- coreToStgExpr arg
-    let
-        (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
-        stg_arg = case arg'' of
-           StgApp v []                  -> StgVarArg v
-           StgConApp con _ [] _         -> StgVarArg (dataConWorkId con)
-           StgOpApp (StgPrimOp op) [] _ -> StgVarArg (primOpWrapperId op)
-           StgLit lit                   -> StgLitArg lit
-           _ -> pprPanic "coreToStgArgs" (ppr arg $$ pprStgExpr panicStgPprOpts arg' $$ pprStgExpr panicStgPprOpts arg'')
-
-        -- WARNING: what if we have an argument like (v `cast` co)
-        --          where 'co' changes the representation type?
-        --          (This really only happens if co is unsafe.)
-        -- Then all the getArgAmode stuff in CgBindery will set the
-        -- cg_rep of the CgIdInfo based on the type of v, rather
-        -- than the type of 'co'.
-        -- This matters particularly when the function is a primop
-        -- or foreign call.
-        -- Wanted: a better solution than this hacky warning
-
+    -- We know that `arg` must be trivial, but it may contain Ticks.
+    -- Example from test case `decodeMyStack`:
+    --   $ @... ((src<decodeMyStack.hs:18:26-28> Data.Tuple.snd) @Int @[..])
+    -- Note that unfortunately the Tick is not at the top.
+    -- So we'll traverse the expression twice:
+    --   * Once with `stripTicksT` (which collects *all* ticks from the expression)
+    --   * and another time with `getStgArgFromTrivialArg`.
+    -- Since the argument is trivial, the only place the Tick can occur is
+    -- somehow wrapping a variable (give or take type args, as above).
     platform <- getPlatform
-    let
-        arg_rep = typePrimRep (exprType arg)
-        stg_arg_rep = typePrimRep (stgArgType stg_arg)
+    let arg_ty = exprType arg
+        ticks' = map (coreToStgTick arg_ty) (stripTicksT (not . tickishIsCode) arg)
+        arg' = getStgArgFromTrivialArg arg
+        arg_rep = typePrimRep arg_ty
+        stg_arg_rep = typePrimRep (stgArgType arg')
         bad_args = not (primRepsCompatible platform arg_rep stg_arg_rep)
 
-    warnPprTrace bad_args "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" (ppr arg) $
-     return (stg_arg : stg_args, ticks ++ aticks)
+    massertPpr (length ticks' <= 1) (text "More than one Tick in trivial arg:" <+> ppr arg)
+    warnPprTraceM bad_args "Dangerous-looking argument. Probable cause: bad unsafeCoerce#" (ppr arg)
+
+    return (arg' : stg_args, ticks' ++ ticks)
 
 coreToStgTick :: Type -- type of the ticked expression
               -> CoreTickish
@@ -959,6 +947,9 @@ myCollectBinders expr
 
 -- | If the argument expression is (potential chain of) 'App', return the head
 -- of the app chain, and collect ticks/args along the chain.
+-- INVARIANT: If the app head is trivial, return the atomic Var/Lit that was
+-- wrapped in casts, empty case, ticks, etc.
+-- So keep in sync with 'exprIsTrivial'.
 myCollectArgs :: HasDebugCallStack => CoreExpr -> (CoreExpr, [CoreArg], [CoreTickish])
 myCollectArgs expr
   = go expr [] []
@@ -970,8 +961,16 @@ myCollectArgs expr
                                 -- See Note [Ticks in applications]
                                 go e as (t:ts) -- ticks can appear in type apps
     go (Cast e _)       as ts = go e as ts
+    go (Case e b _ alts) as ts  -- Just like in exprIsTrivial!
+                                -- Otherwise we fall over in case we encounter
+                                -- `(case f a of {}) b` in the future.
+       | null alts
+       = assertPpr (null as) (ppr e $$ ppr as $$ ppr expr) $
+                   go e [] ts -- NB: Empty case discards arguments
+       | Just rhs <- isUnsafeEqualityCase e b alts
+       = go rhs as ts         -- Discards unsafeCoerce in App heads
     go (Lam b e)        as ts
-       | isTyVar b            = go e as ts -- Note [Collect args]
+       | isTyVar b            = go e (drop 1 as) ts -- Note [Collect args]
     go e                as ts = (e, as, ts)
 
 {- Note [Collect args]

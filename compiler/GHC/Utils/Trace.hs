@@ -8,6 +8,7 @@ module GHC.Utils.Trace
   , pprSTrace
   , pprTraceException
   , warnPprTrace
+  , warnPprTraceM
   , pprTraceUserWarning
   , trace
   )
@@ -83,6 +84,9 @@ warnPprTrace True   s  msg x
   = pprDebugAndThen traceSDocContext trace (text "WARNING:")
                     (text s $$ msg $$ withFrozenCallStack traceCallStackDoc )
                     x
+
+warnPprTraceM :: (Applicative f, HasCallStack) => Bool -> String -> SDoc -> f ()
+warnPprTraceM b s doc = withFrozenCallStack warnPprTrace b s doc (pure ())
 
 -- | For when we want to show the user a non-fatal WARNING so that they can
 -- report a GHC bug, but don't want to panic.
