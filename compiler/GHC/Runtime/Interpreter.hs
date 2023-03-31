@@ -690,17 +690,15 @@ principle it would probably be ok, but it seems less hairy this way.
 -- 'RemoteRef' when it is no longer referenced.
 mkFinalizedHValue :: Interp -> RemoteRef a -> IO (ForeignRef a)
 mkFinalizedHValue interp rref = do
-   let hvref = toHValueRef rref
-
    free <- case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-      InternalInterp             -> return (freeRemoteRef hvref)
+      InternalInterp             -> return (freeRemoteRef rref)
 #endif
       ExternalInterp _ (IServ i) -> return $ modifyMVar_ i $ \state ->
        case state of
          IServPending {}   -> pure state -- already shut down
          IServRunning inst -> do
-            let !inst' = inst {iservPendingFrees = hvref:iservPendingFrees inst}
+            let !inst' = inst {iservPendingFrees = castRemoteRef rref : iservPendingFrees inst}
             pure (IServRunning inst')
 
    mkForeignRef rref free
