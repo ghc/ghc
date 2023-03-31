@@ -3,7 +3,7 @@ T13929.hs:29:24: error: [GHC-55287]
     • The tuple argument in first position
       does not have a fixed runtime representation.
       Its type is:
-        a0 :: TYPE k00
+        GUnboxed f rf :: TYPE k00
       Cannot unify ‘rf’ with the type variable ‘k00’
       because it is not a concrete ‘RuntimeRep’.
     • In the expression: (# gunbox x, gunbox y #)

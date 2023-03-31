@@ -39,8 +39,8 @@ module GHC.Core.Coercion (
         mkSymCo, mkTransCo,
         mkSelCo, getNthFun, getNthFromType, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
-        mkFunCo1, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
-        mkNakedFunCo1, mkNakedFunCo2,
+        mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
+        mkNakedFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
         mkHoleCo, mkUnivCo, mkSubCo,
@@ -51,7 +51,7 @@ module GHC.Core.Coercion (
         castCoercionKind, castCoercionKind1, castCoercionKind2,
 
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
-        mkHeteroPrimEqPred, mkHeteroReprPrimEqPred,
+        mkNomPrimEqPred,
 
         -- ** Decomposition
         instNewTyCon_maybe,
@@ -811,29 +811,20 @@ mkFunCoNoFTF r w arg_co res_co
 -- or @(a => x) ~ (b => y)@, depending on the kind of @a@/@b@.
 -- This (most common) version takes a single FunTyFlag, which is used
 --   for both fco_afl and ftf_afr of the FunCo
-mkFunCo1 :: HasDebugCallStack => Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
-mkFunCo1 r af w arg_co res_co
+mkFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo r af w arg_co res_co
   = mkFunCo2 r af af w arg_co res_co
 
-mkNakedFunCo1 :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
--- This version of mkFunCo1 does not check FunCo invariants (checkFunCo)
--- It is called during typechecking on un-zonked types;
--- in particular there may be un-zonked coercion variables.
-mkNakedFunCo1 r af w arg_co res_co
-  = mkNakedFunCo2 r af af w arg_co res_co
+mkNakedFunCo :: Role -> FunTyFlag -> CoercionN -> Coercion -> Coercion -> Coercion
+-- This version of mkFunCo does not check FunCo invariants (checkFunCo)
+-- It's a historical vestige; See Note [No assertion check on mkFunCo]
+mkNakedFunCo = mkFunCo
 
-mkFunCo2 :: HasDebugCallStack => Role -> FunTyFlag -> FunTyFlag
-                              -> CoercionN -> Coercion -> Coercion -> Coercion
+mkFunCo2 :: Role -> FunTyFlag -> FunTyFlag
+         -> CoercionN -> Coercion -> Coercion -> Coercion
 -- This is the smart constructor for FunCo; it checks invariants
 mkFunCo2 r afl afr w arg_co res_co
-  = assertPprMaybe (checkFunCo r afl afr w arg_co res_co) $
-    mkNakedFunCo2 r afl afr w arg_co res_co
-
-mkNakedFunCo2 :: Role -> FunTyFlag -> FunTyFlag
-              -> CoercionN -> Coercion -> Coercion -> Coercion
--- This is the smart constructor for FunCo
--- "Naked"; it does not check invariants
-mkNakedFunCo2 r afl afr w arg_co res_co
+  -- See Note [No assertion check on mkFunCo]
   | Just (ty1, _) <- isReflCo_maybe arg_co
   , Just (ty2, _) <- isReflCo_maybe res_co
   , Just (w, _)   <- isReflCo_maybe w
@@ -844,6 +835,19 @@ mkNakedFunCo2 r afl afr w arg_co res_co
           , fco_mult = w, fco_arg = arg_co, fco_res = res_co }
 
 
+{- Note [No assertion check on mkFunCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to have a checkFunCo assertion on mkFunCo, but during typechecking
+we can (legitimately) have not-full-zonked types or coercion variables, so
+the assertion spuriously fails (test T11480b is a case in point).  Lint
+checks all these things anyway.
+
+We used to get around the problem by calling mkNakedFunCo from within the
+typechecker, which dodged the assertion check.  But then mkAppCo calls
+mkTyConAppCo, which calls tyConAppFunCo_maybe, which calls mkFunCo.
+Duplicating this stack of calls with "naked" versions of each seems too much.
+
+-- Commented out: see Note [No assertion check on mkFunCo]
 checkFunCo :: Role -> FunTyFlag -> FunTyFlag
            -> CoercionN -> Coercion -> Coercion
            -> Maybe SDoc
@@ -875,6 +879,7 @@ checkFunCo _r afl afr _w arg_co res_co
     ok ty = isTYPEorCONSTRAINT (typeKind ty)
     pp_ty str ty = text str <> colon <+> hang (ppr ty)
                                             2 (dcolon <+> ppr (typeKind ty))
+-}
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -2068,7 +2073,7 @@ ty_co_subst !lc role ty
                               liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
-    go r (FunTy af w t1 t2) = mkFunCo1 r af (go Nominal w) (go r t1) (go r t2)
+    go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
     go r t@(ForAllTy (Bndr v _) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty in
@@ -2597,11 +2602,22 @@ mkCoercionType Phantom          = \ty1 ty2 ->
   in
   TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
 
--- | Creates a primitive type equality predicate.
+-- | Creates a primitive nominal type equality predicate.
+--      t1 ~# t2
 -- Invariant: the types are not Coercions
 mkPrimEqPred :: Type -> Type -> Type
 mkPrimEqPred ty1 ty2
   = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
+  where
+    k1 = typeKind ty1
+    k2 = typeKind ty2
+
+-- | Creates a primitive representational type equality predicate.
+--      t1 ~R# t2
+-- Invariant: the types are not Coercions
+mkReprPrimEqPred :: Type -> Type -> Type
+mkReprPrimEqPred ty1  ty2
+  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
   where
     k1 = typeKind ty1
     k2 = typeKind ty2
@@ -2612,22 +2628,10 @@ mkPrimEqPredRole Nominal          = mkPrimEqPred
 mkPrimEqPredRole Representational = mkReprPrimEqPred
 mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
 
--- | Creates a primitive type equality predicate with explicit kinds
-mkHeteroPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
-mkHeteroPrimEqPred k1 k2 ty1 ty2 = mkTyConApp eqPrimTyCon [k1, k2, ty1, ty2]
-
--- | Creates a primitive representational type equality predicate
--- with explicit kinds
-mkHeteroReprPrimEqPred :: Kind -> Kind -> Type -> Type -> Type
-mkHeteroReprPrimEqPred k1 k2 ty1 ty2
-  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
-
-mkReprPrimEqPred :: Type -> Type -> Type
-mkReprPrimEqPred ty1  ty2
-  = mkTyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
-  where
-    k1 = typeKind ty1
-    k2 = typeKind ty2
+-- | Creates a primitive nominal type equality predicate with an explicit
+--   (but homogeneous) kind: (~#) k k ty1 ty2
+mkNomPrimEqPred :: Kind -> Type -> Type -> Type
+mkNomPrimEqPred k ty1 ty2 = mkTyConApp eqPrimTyCon [k, k, ty1, ty2]
 
 -- | Assuming that two types are the same, ignoring coercions, find
 -- a nominal coercion between the types. This is useful when optimizing
@@ -2659,7 +2663,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
     go (FunTy { ft_af = af1, ft_mult = w1, ft_arg = arg1, ft_res = res1 })
        (FunTy { ft_af = af2, ft_mult = w2, ft_arg = arg2, ft_res = res2 })
       = assert (af1 == af2) $
-        mkFunCo1 Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
+        mkFunCo Nominal af1 (go w1 w2) (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
       = assert (tc1 == tc2) $
@@ -2740,15 +2744,17 @@ has_co_hole_co :: Coercion -> Monoid.Any
     folder = TyCoFolder { tcf_view  = noView
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = const2 (Monoid.Any True)
+                        , tcf_hole  = \_ hole -> Monoid.Any (isHeteroKindCoHole hole)
                         , tcf_tycobinder = const2
                         }
 
--- | Is there a coercion hole in this type?
+-- | Is there a hetero-kind coercion hole in this type?
+--   (That is, a coercion hole with ch_hetero_kind=True.)
+-- See wrinkle (EIK2) of Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
 hasCoercionHoleTy :: Type -> Bool
 hasCoercionHoleTy = Monoid.getAny . has_co_hole_ty
 
--- | Is there a coercion hole in this coercion?
+-- | Is there a hetero-kind coercion hole in this coercion?
 hasCoercionHoleCo :: Coercion -> Bool
 hasCoercionHoleCo = Monoid.getAny . has_co_hole_co
 

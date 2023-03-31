@@ -1000,6 +1000,11 @@ data FixedRuntimeRepOrigin
       -- ^ What context requires a fixed runtime representation?
     }
 
+instance Outputable FixedRuntimeRepOrigin where
+  ppr (FixedRuntimeRepOrigin { frr_type = ty, frr_context = cxt })
+    = text "FrOrigin" <> braces (vcat [ text "frr_type:" <+> ppr ty
+                                      , text "frr_context:" <+> ppr cxt ])
+
 -- | The context in which a representation-polymorphism check was performed.
 --
 -- Does not include the type on which the check was performed; see

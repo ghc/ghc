@@ -44,7 +44,8 @@ module GHC.Tc.Utils.TcMType (
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
   emitNewExprHole,
 
-  newCoercionHole, fillCoercionHole, isFilledCoercionHole,
+  newCoercionHole, newCoercionHoleO, newVanillaCoercionHole,
+  fillCoercionHole, isFilledCoercionHole,
   unpackCoercionHole, unpackCoercionHole_maybe,
   checkCoercionHole,
 
@@ -103,7 +104,7 @@ module GHC.Tc.Utils.TcMType (
 
   ------------------------------
   -- Other
-  anyUnfilledCoercionHoles
+  zonkRewriterSet, zonkCtRewriterSet, zonkCtEvRewriterSet
   ) where
 
 import GHC.Prelude
@@ -111,6 +112,7 @@ import GHC.Prelude
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 
+import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyInvisibleType )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
@@ -198,7 +200,7 @@ newEvVar ty = do { name <- newSysName (predTypeOccName ty)
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
 newWantedWithLoc loc pty
   = do dst <- case classifyPredType pty of
-                EqPred {} -> HoleDest  <$> newCoercionHole pty
+                EqPred {} -> HoleDest  <$> newCoercionHole loc pty
                 _         -> EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest      = dst
                          , ctev_pred      = pty
@@ -223,9 +225,9 @@ newWanteds orig = mapM (newWanted orig Nothing)
 ----------------------------------------------
 
 cloneWantedCtEv :: CtEvidence -> TcM CtEvidence
-cloneWantedCtEv ctev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _ })
+cloneWantedCtEv ctev@(CtWanted { ctev_pred = pty, ctev_dest = HoleDest _, ctev_loc = loc })
   | isEqPrimPred pty
-  = do { co_hole <- newCoercionHole pty
+  = do { co_hole <- newCoercionHole loc pty
        ; return (ctev { ctev_dest = HoleDest co_hole }) }
   | otherwise
   = pprPanic "cloneWantedCtEv" (ppr pty)
@@ -273,13 +275,13 @@ emitWantedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole pty
-       ; loc <- getCtLocM origin (Just t_or_k)
+  = do { hole <- newCoercionHoleO origin pty
+       ; loc  <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
-         CtWanted { ctev_pred = pty
-                  , ctev_dest = HoleDest hole
-                  , ctev_loc = loc
-                  , ctev_rewriters = rewriterSetFromTypes [ty1, ty2] }
+         CtWanted { ctev_pred      = pty
+                  , ctev_dest      = HoleDest hole
+                  , ctev_loc       = loc
+                  , ctev_rewriters = emptyRewriterSet }
        ; return (HoleCo hole) }
   where
     pty = mkPrimEqPredRole role ty1 ty2
@@ -290,8 +292,8 @@ emitWantedEvVar :: CtOrigin -> TcPredType -> TcM EvVar
 emitWantedEvVar origin ty
   = do { new_cv <- newEvVar ty
        ; loc <- getCtLocM origin Nothing
-       ; let ctev = CtWanted { ctev_dest      = EvVarDest new_cv
-                             , ctev_pred      = ty
+       ; let ctev = CtWanted { ctev_pred      = ty
+                             , ctev_dest      = EvVarDest new_cv
                              , ctev_loc       = loc
                              , ctev_rewriters = emptyRewriterSet }
        ; emitSimple $ mkNonCanonical ctev
@@ -353,12 +355,23 @@ newImplication
 ************************************************************************
 -}
 
-newCoercionHole :: TcPredType -> TcM CoercionHole
-newCoercionHole pred_ty
+newVanillaCoercionHole :: TcPredType -> TcM CoercionHole
+newVanillaCoercionHole = new_coercion_hole False
+
+newCoercionHole :: CtLoc -> TcPredType -> TcM CoercionHole
+newCoercionHole loc = newCoercionHoleO (ctLocOrigin loc)
+
+newCoercionHoleO :: CtOrigin -> TcPredType -> TcM CoercionHole
+newCoercionHoleO (KindEqOrigin {}) = new_coercion_hole True
+newCoercionHoleO _                 = new_coercion_hole False
+
+new_coercion_hole :: Bool -> TcPredType -> TcM CoercionHole
+new_coercion_hole hetero_kind pred_ty
   = do { co_var <- newEvVar pred_ty
        ; traceTc "New coercion hole:" (ppr co_var <+> dcolon <+> ppr pred_ty)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
+       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref
+                               , ch_hetero_kind = hetero_kind } }
 
 -- | Put a value in a coercion hole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
@@ -621,12 +634,7 @@ ensureMonoType res_ty
   = return ()
   | otherwise
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; let eq_orig = TypeEqOrigin { uo_actual   = res_ty
-                                    , uo_expected = mono_ty
-                                    , uo_thing    = Nothing
-                                    , uo_visible  = False }
-
-       ; _co <- emitWantedEq eq_orig TypeLevel Nominal res_ty mono_ty
+       ; _co <- unifyInvisibleType res_ty mono_ty
        ; return () }
 
 promoteTcType :: TcLevel -> TcType -> TcM (TcCoercionN, TcType)
@@ -652,12 +660,7 @@ promoteTcType dest_lvl ty
                 -- where alpha and rr are fresh and from level dest_lvl
       = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
            ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (mkTYPEapp rr)
-           ; let eq_orig = TypeEqOrigin { uo_actual   = ty
-                                        , uo_expected = prom_ty
-                                        , uo_thing    = Nothing
-                                        , uo_visible  = False }
-
-           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
+           ; co <- unifyInvisibleType ty prom_ty
            ; return (co, prom_ty) }
 
 {- Note [Promoting a type]
@@ -2471,8 +2474,7 @@ zonkCt ct
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
 zonkCtEvidence ctev
   = do { pred' <- zonkTcType (ctev_pred ctev)
-       ; return (setCtEvPredType ctev pred')
-       }
+       ; return (setCtEvPredType ctev pred') }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
 zonkSkolemInfo (SkolemInfo u sk) = SkolemInfo u <$> zonkSkolemInfoAnon sk
@@ -2788,23 +2790,43 @@ naughtyQuantification orig_ty tv escapees
 ************************************************************************
 -}
 
+zonkCtRewriterSet :: Ct -> TcM Ct
+zonkCtRewriterSet ct
+  | isGiven ev = return ct
+  | otherwise
+  = case ct of
+      CQuantCan {}                    -> return ct
+      CEqCan eq@(EqCt { eq_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
+                                            ; return (CEqCan (eq { eq_ev = ev' })) }
+      _ ->  do { ev' <- zonkCtEvRewriterSet ev
+               ; return (ct { cc_ev = ev' }) }
+  where
+    ev = ctEvidence ct
+
+zonkCtEvRewriterSet :: CtEvidence -> TcM CtEvidence
+zonkCtEvRewriterSet ev@(CtGiven {})
+  = return ev
+zonkCtEvRewriterSet ev@(CtWanted { ctev_rewriters = rewriters })
+  = do { rewriters' <- zonkRewriterSet rewriters
+       ; return (ev { ctev_rewriters = rewriters' }) }
+
 -- | Check whether any coercion hole in a RewriterSet is still unsolved.
 -- Does this by recursively looking through filled coercion holes until
 -- one is found that is not yet filled in, at which point this aborts.
-anyUnfilledCoercionHoles :: RewriterSet -> TcM Bool
-anyUnfilledCoercionHoles (RewriterSet set)
-  = nonDetStrictFoldUniqSet go (return False) set
+zonkRewriterSet :: RewriterSet -> TcM RewriterSet
+zonkRewriterSet (RewriterSet set)
+  = nonDetStrictFoldUniqSet go (return emptyRewriterSet) set
      -- this does not introduce non-determinism, because the only
      -- monadic action is to read, and the combining function is
      -- commutative
   where
-    go :: CoercionHole -> TcM Bool -> TcM Bool
-    go hole m_acc = m_acc <||> check_hole hole
+    go :: CoercionHole -> TcM RewriterSet -> TcM RewriterSet
+    go hole m_acc = unionRewriterSet <$> (check_hole hole) <*> m_acc
 
-    check_hole :: CoercionHole -> TcM Bool
+    check_hole :: CoercionHole -> TcM RewriterSet
     check_hole hole = do { m_co <- unpackCoercionHole_maybe hole
                          ; case m_co of
-                             Nothing -> return True  -- unfilled hole
+                             Nothing -> return (unitRewriterSet hole)
                              Just co -> unUCHM (check_co co) }
 
     check_ty :: Type -> UnfilledCoercionHoleMonoid
@@ -2818,10 +2840,10 @@ anyUnfilledCoercionHoles (RewriterSet set)
                         , tcf_hole  = \ _ -> UCHM . check_hole
                         , tcf_tycobinder = \ _ _ _ -> () }
 
-newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: TcM Bool }
+newtype UnfilledCoercionHoleMonoid = UCHM { unUCHM :: TcM RewriterSet }
 
 instance Semigroup UnfilledCoercionHoleMonoid where
-  UCHM l <> UCHM r = UCHM (l <||> r)
+  UCHM l <> UCHM r = UCHM (unionRewriterSet <$> l <*> r)
 
 instance Monoid UnfilledCoercionHoleMonoid where
-  mempty = UCHM (return False)
+  mempty = UCHM (return emptyRewriterSet)

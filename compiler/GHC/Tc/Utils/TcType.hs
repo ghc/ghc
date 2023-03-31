@@ -205,7 +205,7 @@ module GHC.Tc.Utils.TcType (
 
   ---------------------------------
   -- argument visibility
-  tcTyConVisibilities, isNextTyConArgVisible, isNextArgVisible
+  tyConVisibilities, isNextTyConArgVisible, isNextArgVisible
 
   ) where
 
@@ -2307,8 +2307,8 @@ Reason: the back end falls over with panic "primRepHint:VoidRep";
 -- | For every arg a tycon can take, the returned list says True if the argument
 -- is taken visibly, and False otherwise. Ends with an infinite tail of Trues to
 -- allow for oversaturation.
-tcTyConVisibilities :: TyCon -> [Bool]
-tcTyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
+tyConVisibilities :: TyCon -> [Bool]
+tyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
   where
     tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
     tc_return_kind_viss = map isVisiblePiTyBinder (fst $ tcSplitPiTys (tyConResKind tc))
@@ -2316,13 +2316,14 @@ tcTyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
 -- | If the tycon is applied to the types, is the next argument visible?
 isNextTyConArgVisible :: TyCon -> [Type] -> Bool
 isNextTyConArgVisible tc tys
-  = tcTyConVisibilities tc `getNth` length tys
+  = tyConVisibilities tc `getNth` length tys
 
 -- | Should this type be applied to a visible argument?
+-- E.g. (s t): is `t` a visible argument of `s`?
 isNextArgVisible :: TcType -> Bool
 isNextArgVisible ty
-  | Just (bndr, _) <- tcSplitPiTy_maybe ty = isVisiblePiTyBinder bndr
-  | otherwise                              = True
+  | Just (bndr, _) <- tcSplitPiTy_maybe (typeKind ty) = isVisiblePiTyBinder bndr
+  | otherwise                                         = True
     -- this second case might happen if, say, we have an unzonked TauTv.
     -- But TauTvs can't range over types that take invisible arguments
 

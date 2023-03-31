@@ -8,7 +8,8 @@ module GHC.Tc.Solver.InertSet (
     -- * The work list
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt,
-    extendWorkListCts, extendWorkListEq,
+    extendWorkListCts, extendWorkListCtList,
+    extendWorkListEq, extendWorkListEqs,
     appendWorkList, extendWorkListImplic,
     workListSize,
     selectWorkItem,
@@ -31,7 +32,7 @@ module GHC.Tc.Solver.InertSet (
     foldFunEqs,
 
     -- * Kick-out
-    kickOutRewritableLHS,
+    KickOutSpec(..), kickOutRewritableLHS,
 
     -- * Cycle breaker vars
     CycleBreakerVarStack,
@@ -50,6 +51,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 
 import GHC.Core.Reduction
 import GHC.Core.Predicate
@@ -60,6 +62,7 @@ import GHC.Core.TyCon
 import GHC.Core.Unify
 
 import GHC.Data.Bag
+
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -93,7 +96,7 @@ As a simple form of priority queue, our worklist separates out
 
 Note [Prioritise equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's very important to process equalities /first/:
+It's very important to process equalities over class constraints:
 
 * (Efficiency)  The general reason to do so is that if we process a
   class constraint first, we may end up putting it into the inert set
@@ -111,13 +114,16 @@ It's very important to process equalities /first/:
   Solution: prioritise equalities over class constraints
 
 * (Class equalities) We need to prioritise equalities even if they
-  are hidden inside a class constraint;
-  see Note [Prioritise class equalities]
+  are hidden inside a class constraint; see Note [Prioritise class equalities]
 
 * (Kick-out) We want to apply this priority scheme to kicked-out
-  constraints too (see the call to extendWorkListCt in kick_out_rewritable
+  constraints too (see the call to extendWorkListCt in kick_out_rewritable)
   E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
   homo-kinded when kicked out, and hence we want to prioritise it.
+
+Among the equalities we prioritise ones with an empty rewriter set;
+see Note [Wanteds rewrite Wanteds] in GHC.Tc.Types.Constraint, wrinkle (W1).
+
 
 Note [Prioritise class equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -157,6 +163,13 @@ data WorkList
                        -- See Note [Prioritise equalities]
                        -- See Note [Prioritise class equalities]
 
+       , wl_rw_eqs  :: [Ct]  -- Like wl_eqs, but ones that have a non-empty
+                             -- rewriter set; or, more precisely, did when
+                             -- added to the WorkList
+         -- We prioritise wl_eqs over wl_rw_eqs;
+         -- see Note [Prioritise Wanteds with empty RewriterSet]
+         -- in GHC.Tc.Types.Constraint for more details.
+
        , wl_rest    :: [Ct]
 
        , wl_implics :: Bag Implication  -- See Note [Residual implications]
@@ -164,20 +177,41 @@ data WorkList
 
 appendWorkList :: WorkList -> WorkList -> WorkList
 appendWorkList
-    (WL { wl_eqs = eqs1, wl_rest = rest1
-        , wl_implics = implics1 })
-    (WL { wl_eqs = eqs2, wl_rest = rest2
-        , wl_implics = implics2 })
+    (WL { wl_eqs = eqs1, wl_rw_eqs = rw_eqs1
+        , wl_rest = rest1, wl_implics = implics1 })
+    (WL { wl_eqs = eqs2, wl_rw_eqs = rw_eqs2
+        , wl_rest = rest2, wl_implics = implics2 })
    = WL { wl_eqs     = eqs1     ++ eqs2
+        , wl_rw_eqs  = rw_eqs1  ++ rw_eqs2
         , wl_rest    = rest1    ++ rest2
         , wl_implics = implics1 `unionBags`   implics2 }
 
 workListSize :: WorkList -> Int
-workListSize (WL { wl_eqs = eqs, wl_rest = rest })
-  = length eqs + length rest
+workListSize (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
+  = length eqs + length rw_eqs + length rest
 
-extendWorkListEq :: Ct -> WorkList -> WorkList
-extendWorkListEq ct wl = wl { wl_eqs = ct : wl_eqs wl }
+extendWorkListEq :: RewriterSet -> Ct -> WorkList -> WorkList
+extendWorkListEq rewriters ct wl
+  | isEmptyRewriterSet rewriters      -- A wanted that has not been rewritten
+    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+    --                         in GHC.Tc.Types.Constraint
+  = wl { wl_eqs = ct : wl_eqs wl }
+  | otherwise
+  = wl { wl_rw_eqs = ct : wl_rw_eqs wl }
+
+extendWorkListEqs :: RewriterSet -> Bag Ct -> WorkList -> WorkList
+-- Add [eq1,...,eqn] to the work-list
+-- They all have the same rewriter set
+-- The constraints will be solved in left-to-right order:
+--   see Note [Work-list ordering] in GHC.Tc.Solved.Equality
+extendWorkListEqs rewriters eqs wl
+  | isEmptyRewriterSet rewriters
+    -- isEmptyRewriterSet: see Note [Prioritise Wanteds with empty RewriterSet]
+    --                         in GHC.Tc.Types.Constraint
+  = wl { wl_eqs = foldr (:) (wl_eqs wl) eqs }
+         -- The foldr just appends wl_eqs to the bag of eqs
+  | otherwise
+  = wl { wl_rw_eqs = foldr (:) (wl_rw_eqs wl) eqs }
 
 extendWorkListNonEq :: Ct -> WorkList -> WorkList
 -- Extension by non equality
@@ -187,20 +221,25 @@ extendWorkListImplic :: Implication -> WorkList -> WorkList
 extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
--- Agnostic
+-- Agnostic about what kind of constraint
 extendWorkListCt ct wl
- = case classifyPredType (ctPred ct) of
+ = case classifyPredType (ctEvPred ev) of
      EqPred {}
-       -> extendWorkListEq ct wl
+       -> extendWorkListEq rewriters ct wl
 
      ClassPred cls _  -- See Note [Prioritise class equalities]
        |  isEqPredClass cls
-       -> extendWorkListEq ct wl
+       -> extendWorkListEq rewriters ct wl
 
      _ -> extendWorkListNonEq ct wl
+  where
+    ev = ctEvidence ct
+    rewriters = ctEvRewriters ev
 
-extendWorkListCts :: [Ct] -> WorkList -> WorkList
--- Agnostic
+extendWorkListCtList :: [Ct] -> WorkList -> WorkList
+extendWorkListCtList cts wl = foldr extendWorkListCt wl cts
+
+extendWorkListCts :: Cts -> WorkList -> WorkList
 extendWorkListCts cts wl = foldr extendWorkListCt wl cts
 
 isEmptyWorkList :: WorkList -> Bool
@@ -208,21 +247,24 @@ isEmptyWorkList (WL { wl_eqs = eqs, wl_rest = rest, wl_implics = implics })
   = null eqs && null rest && isEmptyBag implics
 
 emptyWorkList :: WorkList
-emptyWorkList = WL { wl_eqs  = [], wl_rest = [], wl_implics = emptyBag }
+emptyWorkList = WL { wl_eqs  = [], wl_rw_eqs = [], wl_rest = [], wl_implics = emptyBag }
 
 selectWorkItem :: WorkList -> Maybe (Ct, WorkList)
 -- See Note [Prioritise equalities]
-selectWorkItem wl@(WL { wl_eqs = eqs, wl_rest = rest })
-  | ct:cts <- eqs  = Just (ct, wl { wl_eqs    = cts })
-  | ct:cts <- rest = Just (ct, wl { wl_rest   = cts })
-  | otherwise      = Nothing
+selectWorkItem wl@(WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest })
+  | ct:cts <- eqs    = Just (ct, wl { wl_eqs    = cts })
+  | ct:cts <- rw_eqs = Just (ct, wl { wl_rw_eqs = cts })
+  | ct:cts <- rest   = Just (ct, wl { wl_rest   = cts })
+  | otherwise        = Nothing
 
 -- Pretty printing
 instance Outputable WorkList where
-  ppr (WL { wl_eqs = eqs, wl_rest = rest, wl_implics = implics })
+  ppr (WL { wl_eqs = eqs, wl_rw_eqs = rw_eqs, wl_rest = rest, wl_implics = implics })
    = text "WL" <+> (braces $
      vcat [ ppUnless (null eqs) $
             text "Eqs =" <+> vcat (map ppr eqs)
+          , ppUnless (null rw_eqs) $
+            text "RwEqs =" <+> vcat (map ppr rw_eqs)
           , ppUnless (null rest) $
             text "Non-eqs =" <+> vcat (map ppr rest)
           , ppUnless (isEmptyBag implics) $
@@ -1298,13 +1340,27 @@ updateGivenEqs tclvl ct inerts@(IC { inert_given_eq_lvl = ge_lvl })
     not_equality (CDictCan {})                            = True
     not_equality _                                        = False
 
-kickOutRewritableLHS :: CtFlavourRole  -- Flavour/role of the equality that
-                                       -- is being added to the inert set
-                     -> CanEqLHS       -- The new equality is lhs ~ ty
-                     -> InertCans
-                     -> (WorkList, InertCans)
+data KickOutSpec -- See Note [KickOutSpec]
+  = KOAfterUnify  TcTyVarSet   -- We have unified these tyvars
+  | KOAfterAdding CanEqLHS     -- We are adding to the inert set a canonical equality
+                               -- constraint with this LHS
+
+{- Note [KickOutSpec]
+~~~~~~~~~~~~~~~~~~~~~~
+KickOutSpec explains why we are kicking out.
+
+Important property:
+  KOAfterAdding (TyVarLHS tv) should behave exactly like
+  KOAfterUnifying (unitVarSet tv)
+
+The main reasons for treating the two separately are
+* More efficient in the single-tyvar case
+* The code is far more perspicuous
+-}
+
+kickOutRewritableLHS :: KickOutSpec -> CtFlavourRole -> InertCans -> (Cts, InertCans)
 -- See Note [kickOutRewritable]
-kickOutRewritableLHS new_fr new_lhs
+kickOutRewritableLHS ko_spec new_fr@(_, new_role)
                      ics@(IC { inert_eqs      = tv_eqs
                              , inert_dicts    = dictmap
                              , inert_funeqs   = funeqmap
@@ -1319,18 +1375,11 @@ kickOutRewritableLHS new_fr new_lhs
                         , inert_irreds   = irs_in
                         , inert_insts    = insts_in }
 
-    kicked_out :: WorkList
-    -- NB: use extendWorkList to ensure that kicked-out equalities get priority
-    -- See Note [Prioritise equalities] (Kick-out).
-    -- The irreds may include non-canonical (hetero-kinded) equality
-    -- constraints, which perhaps may have become soluble after new_lhs
-    -- is substituted; ditto the dictionaries, which may include (a~b)
-    -- or (a~~b) constraints.
-    kicked_out = foldr extendWorkListCt
-                          (emptyWorkList { wl_eqs = map CEqCan tv_eqs_out ++
-                                                    map CEqCan feqs_out })
-                          ((dicts_out `andCts` irs_out)
-                            `extendCtsList` insts_out)
+    kicked_out :: Cts
+    kicked_out = (dicts_out `andCts` irs_out)
+                  `extendCtsList` insts_out
+                  `extendCtsList` map CEqCan tv_eqs_out
+                  `extendCtsList` map CEqCan feqs_out
 
     (tv_eqs_out, tv_eqs_in) = partitionInertEqs kick_out_eq tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs   kick_out_eq funeqmap
@@ -1356,14 +1405,12 @@ kickOutRewritableLHS new_fr new_lhs
       | otherwise
       = Right qci
 
-    (_, new_role) = new_fr
-
-    fr_tv_can_rewrite_ty :: TyVar -> EqRel -> Type -> Bool
-    fr_tv_can_rewrite_ty new_tv role ty
+    fr_tv_can_rewrite_ty :: (TyVar -> Bool) -> EqRel -> Type -> Bool
+    fr_tv_can_rewrite_ty ok_tv role ty
       = anyRewritableTyVar role can_rewrite ty
       where
         can_rewrite :: EqRel -> TyVar -> Bool
-        can_rewrite old_role tv = new_role `eqCanRewrite` old_role && tv == new_tv
+        can_rewrite old_role tv = new_role `eqCanRewrite` old_role && ok_tv tv
 
     fr_tf_can_rewrite_ty :: TyCon -> [TcType] -> EqRel -> Type -> Bool
     fr_tf_can_rewrite_ty new_tf new_tf_args role ty
@@ -1376,28 +1423,23 @@ kickOutRewritableLHS new_fr new_lhs
               -- it's possible for old_tf_args to have too many. This is fine;
               -- we'll only check what we need to.
 
-    {-# INLINE fr_can_rewrite_ty #-}   -- perform the check here only once
+    {-# INLINE fr_can_rewrite_ty #-}   -- Perform case analysis on ko_spec only once
     fr_can_rewrite_ty :: EqRel -> Type -> Bool
-    fr_can_rewrite_ty = case new_lhs of
-      TyVarLHS new_tv             -> fr_tv_can_rewrite_ty new_tv
-      TyFamLHS new_tf new_tf_args -> fr_tf_can_rewrite_ty new_tf new_tf_args
+    fr_can_rewrite_ty = case ko_spec of  -- See Note [KickOutSpec]
+      KOAfterUnify tvs                    -> fr_tv_can_rewrite_ty (`elemVarSet` tvs)
+      KOAfterAdding (TyVarLHS tv)         -> fr_tv_can_rewrite_ty (== tv)
+      KOAfterAdding (TyFamLHS tf tf_args) -> fr_tf_can_rewrite_ty tf tf_args
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqCanRewriteFR` fs
         -- Can the new item rewrite the inert item?
 
-    {-# INLINE kick_out_ct #-}   -- perform case on new_lhs here only once
     kick_out_ct :: Ct -> Bool
     -- Kick it out if the new CEqCan can rewrite the inert one
     -- See Note [kickOutRewritable]
-    kick_out_ct = case new_lhs of
-      TyVarLHS new_tv -> \ct -> let fs@(_,role) = ctFlavourRole ct in
-                                fr_may_rewrite fs
-                             && fr_tv_can_rewrite_ty new_tv role (ctPred ct)
-      TyFamLHS new_tf new_tf_args
-        -> \ct -> let fs@(_, role) = ctFlavourRole ct in
-                  fr_may_rewrite fs
-               && fr_tf_can_rewrite_ty new_tf new_tf_args role (ctPred ct)
+    kick_out_ct ct = fr_may_rewrite fs && fr_can_rewrite_ty role (ctPred ct)
+      where
+        fs@(_,role) = ctFlavourRole ct
 
     -- Implements criteria K1-K3 in Note [Extending the inert equalities]
     kick_out_eq :: EqCt -> Bool
@@ -1430,13 +1472,31 @@ kickOutRewritableLHS new_fr new_lhs
 
         kick_out_for_completeness  -- (K3) and Note [K3: completeness of solving]
           = case eq_rel of
-              NomEq  -> rhs_ty `eqType` canEqLHSType new_lhs -- (K3a)
-              ReprEq -> is_can_eq_lhs_head new_lhs rhs_ty    -- (K3b)
+              NomEq  -> is_new_lhs      rhs_ty   -- (K3a)
+              ReprEq -> head_is_new_lhs rhs_ty   -- (K3b)
 
+    is_new_lhs :: Type -> Bool
+    is_new_lhs = case ko_spec of   -- See Note [KickOutSpec]
+          KOAfterUnify tvs  -> is_tyvar_ty_for tvs
+          KOAfterAdding lhs -> (`eqType` canEqLHSType lhs)
 
-    is_can_eq_lhs_head (TyVarLHS tv) = go
+    is_tyvar_ty_for :: TcTyVarSet -> Type -> Bool
+    -- True if the type is equal to one of the tyvars
+    is_tyvar_ty_for tvs ty
+      = case getTyVar_maybe ty of
+          Nothing -> False
+          Just tv -> tv `elemVarSet` tvs
+
+    head_is_new_lhs :: Type -> Bool
+    head_is_new_lhs = case ko_spec of   -- See Note [KickOutSpec]
+          KOAfterUnify tvs                    -> tv_at_head (`elemVarSet` tvs)
+          KOAfterAdding (TyVarLHS tv)         -> tv_at_head (== tv)
+          KOAfterAdding (TyFamLHS tf tf_args) -> fam_at_head tf tf_args
+
+    tv_at_head :: (TyVar -> Bool) -> Type -> Bool
+    tv_at_head is_tv = go
       where
-        go (Rep.TyVarTy tv')   = tv == tv'
+        go (Rep.TyVarTy tv)    = is_tv tv
         go (Rep.AppTy fun _)   = go fun
         go (Rep.CastTy ty _)   = go ty
         go (Rep.TyConApp {})   = False
@@ -1444,7 +1504,9 @@ kickOutRewritableLHS new_fr new_lhs
         go (Rep.ForAllTy {})   = False
         go (Rep.FunTy {})      = False
         go (Rep.CoercionTy {}) = False
-    is_can_eq_lhs_head (TyFamLHS fun_tc fun_args) = go
+
+    fam_at_head :: TyCon -> [Type] -> Type -> Bool
+    fam_at_head fun_tc fun_args = go
       where
         go (Rep.TyVarTy {})       = False
         go (Rep.AppTy {})         = False  -- no TyConApp to the left of an AppTy

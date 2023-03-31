@@ -361,8 +361,8 @@ mkFunRedn r af
   (Reduction arg_co arg_ty)
   (Reduction res_co res_ty)
     = mkReduction
-        (mkFunCo1 r af w_co arg_co res_co)
-        (mkFunTy    af w_ty arg_ty res_ty)
+        (mkFunCo r af w_co arg_co res_co)
+        (mkFunTy   af w_ty arg_ty res_ty)
 {-# INLINE mkFunRedn #-}
 
 -- | Create a 'Reduction' associated to a Π type,

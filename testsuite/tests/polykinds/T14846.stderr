@@ -5,8 +5,8 @@ T14846.hs:38:8: error: [GHC-25897]
         Actual: Hom riki a a
       ‘ríki’ is a rigid type variable bound by
         the type signature for:
-          i :: forall {k4} {k5} {cls2 :: k5 -> Constraint} (xx :: k4)
-                      (a :: Struct cls2) (ríki :: Struct cls2 -> Struct cls2 -> *).
+          i :: forall {k4} {k5} {cls1 :: k5 -> Constraint} (xx :: k4)
+                      (a :: Struct cls1) (ríki :: Struct cls1 -> Struct cls1 -> *).
                StructI xx a =>
                ríki a a
         at T14846.hs:38:8-48
@@ -23,8 +23,8 @@ T14846.hs:38:8: error: [GHC-25897]
       In the instance declaration for ‘Category (Hom riki)’
 
 T14846.hs:39:44: error: [GHC-25897]
-    • Couldn't match kind ‘k3’ with ‘Struct cls2’
-      Expected kind ‘Struct cls2 -> Constraint’,
+    • Couldn't match kind ‘k3’ with ‘Struct cls1’
+      Expected kind ‘Struct cls1 -> Constraint’,
         but ‘cls’ has kind ‘k3 -> Constraint’
       ‘k3’ is a rigid type variable bound by
         the instance declaration

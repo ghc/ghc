@@ -2,13 +2,13 @@
 T18851c.hs:25:27: error: [GHC-25897]
     • Could not deduce ‘n2 ~ n1’
         arising from reasoning about an injective type family using constraints:
-          ‘Plus1 n2 ~ n’
-            arising from a type equality
-              VSucc (Plus1 n2) ~ VSucc n at T18851c.hs:25:27-33
           ‘Plus1 n1 ~ n’
+            arising from a type equality
+              VSucc (Plus1 n1) ~ VSucc n at T18851c.hs:25:27-33
+          ‘Plus1 n2 ~ n’
             arising from a pattern with constructor:
                            VSucc :: forall (n :: Nat). V n -> VSucc (Plus1 n),
-                         in an equation for ‘foo’ at T18851c.hs:25:6-12
+                         in an equation for ‘foo’ at T18851c.hs:25:16-22
       from the context: n ~ Plus1 n1
         bound by a pattern with constructor:
                    VSucc :: forall (n :: Nat). V n -> VSucc (Plus1 n),
