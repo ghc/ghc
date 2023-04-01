@@ -451,6 +451,8 @@ data StackFrame =
       }
   deriving (Show, Generic)
 
+-- | Fun types according to @FunTypes.h@
+-- This `Enum` must be aligned with the values in @FunTypes.h@.
 data RetFunType =
       ARG_GEN     |
       ARG_GEN_BIG |
