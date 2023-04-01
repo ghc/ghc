@@ -86,7 +86,7 @@ extern const StgWord16 closure_flags[];
 #define closure_IND(c)          (  closureFlags(c) & _IND)
 
 /* same as above but for info-ptr rather than closure */
-#define ipFlags(ip)             (closure_flags[ip->type])
+#define ipFlags(ip)             (closure_flags[(ip)->type])
 
 #define ip_HNF(ip)               (  ipFlags(ip) & _HNF)
 #define ip_BITMAP(ip)            (  ipFlags(ip) & _BTM)
