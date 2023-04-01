@@ -616,16 +616,17 @@ function test_hadrian() {
       --test-have-intree-files    \
       --docs=none                 \
       "runtest.opts+=${RUNTEST_ARGS:-}" || fail "cross-compiled hadrian main testsuite"
+  elif [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
+    run_hadrian \
+      test \
+      --summary-junit=./junit.xml \
+      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian main testsuite targetting $CROSS_TARGET"
   elif [ -n "${CROSS_TARGET:-}" ]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
     install_bindist _build/bindist/ghc-*/ "$instdir"
     echo 'main = putStrLn "hello world"' > expected
     run "$test_compiler" -package ghc "$TOP/.gitlab/hello.hs" -o hello
-    # Despite "-o hello", ghc may output something like hello.exe or
-    # hello.wasm depending on the backend. For the time being let's
-    # just move it to hello before proceeding to running it.
-    mv hello.wasm hello || true
     ${CROSS_EMULATOR:-} ./hello > actual
     run diff expected actual
   elif [[ -n "${REINSTALL_GHC:-}" ]]; then
