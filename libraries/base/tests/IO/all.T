@@ -86,11 +86,13 @@ test('hGetBuf001',
      [ when(fast(), skip)
      , expect_fail_if_windows
      , js_broken(22374)
+     , req_process
      ],
      compile_and_run, ['-package unix'])
 
 test('hDuplicateTo001', [fragile_for(16819, concurrent_ways),
-                         when(opsys('mingw32'), skip)], compile_and_run, [''])
+                         when(opsys('mingw32'), skip),
+                         req_process], compile_and_run, [''])
 
 test('countReaders001', js_broken(22261), compile_and_run, [''])
 

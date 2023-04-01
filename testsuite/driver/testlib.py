@@ -317,6 +317,10 @@ def req_ghc_with_threaded_rts( name, opts ):
     if not config.ghc_with_threaded_rts:
         opts.skip = True
 
+def req_process( name, opts ):
+    if not config.have_process:
+        opts.skip = True
+
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 

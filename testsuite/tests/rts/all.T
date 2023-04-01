@@ -222,7 +222,8 @@ test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
       cmd_prefix('./exec_signals_prepare'),
-      js_broken(22355)],
+      js_broken(22355),
+      req_process],
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
@@ -390,6 +391,7 @@ test('T9839_05',
 test('T10590', [ ignore_stderr
                , when(opsys('mingw32'), skip)
                , js_skip # JS backend doesn't support pipes
+               , req_process
                ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
@@ -422,7 +424,8 @@ test('T13617', [ unless(opsys('mingw32'), skip)],
 # Test is fragile on all systems. #21184 links to various other reports through
 # its history.
 test('T12903', [ fragile(21184)
-               , js_broken(22374)]
+               , js_broken(22374)
+               , req_process]
                , compile_and_run, [''])
 
 test('T13832', [exit_code(1), req_ghc_with_threaded_rts], compile_and_run, ['-threaded'])
