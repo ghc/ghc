@@ -8,6 +8,7 @@
 // developed.
 #if defined(StgStack_marking)
 
+// advanceStackFrameIterzh(StgStack* stack, StgWord offsetWords)
 advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
   (frameSize) = ccall stackFrameSize(stack, offsetWords);
@@ -47,6 +48,7 @@ advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
   return (newStack, newOffsetWords, hasNext);
 }
 
+// getSmallBitmapzh(StgStack* stack, StgWord offsetWords)
 getSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -59,6 +61,8 @@ getSmallBitmapzh(P_ stack, W_ offsetWords) {
   return (bitmap, size);
 }
 
+
+// getRetFunSmallBitmapzh(StgStack* stack, StgWord offsetWords)
 getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -71,7 +75,8 @@ getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   return (bitmap, size);
 }
 
-getLargeBitmapzh(P_ stack, W_ offsetWords){
+// getLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+getLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, stgArrBytes;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -83,7 +88,8 @@ getLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-getBCOLargeBitmapzh(P_ stack, W_ offsetWords){
+// getBCOLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+getBCOLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, stgArrBytes;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -95,7 +101,8 @@ getBCOLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
+// getRetFunLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, stgArrBytes;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -107,7 +114,8 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords){
   return (stgArrBytes, size);
 }
 
-getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes){
+// getWordzh(StgStack* stack, StgWord offsetWords, StgWord offsetBytes)
+getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes) {
   P_ wordAddr;
   wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(offsetBytes));
   return (W_[wordAddr]);
@@ -121,7 +129,8 @@ getAddrzh(P_ stack, W_ offsetWords){
   return (ptr);
 }
 
-getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords){
+// getUnderflowFrameNextChunkzh(StgStack* stack, StgWord offsetWords)
+getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
   ASSERT(LOOKS_LIKE_CLOURE_PTR(closurePtr));
@@ -132,7 +141,8 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords){
   return (next_chunk);
 }
 
-getRetFunTypezh(P_ stack, W_ offsetWords){
+// getRetFunTypezh(StgStack* stack, StgWord offsetWords)
+getRetFunTypezh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
@@ -142,7 +152,8 @@ getRetFunTypezh(P_ stack, W_ offsetWords){
   return (type);
 }
 
-getInfoTableAddrzh(P_ stack, W_ offsetWords){
+// getInfoTableAddrzh(StgStack* stack, StgWord offsetWords)
+getInfoTableAddrzh(P_ stack, W_ offsetWords) {
   P_ p, info;
   p = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -151,13 +162,15 @@ getInfoTableAddrzh(P_ stack, W_ offsetWords){
   return (info);
 }
 
-getStackInfoTableAddrzh(P_ stack){
+// getStackInfoTableAddrzh(StgStack* stack)
+getStackInfoTableAddrzh(P_ stack) {
   P_ info;
   info = %GET_STD_INFO(UNTAG(stack));
   return (info);
 }
 
-getBoxedClosurezh(P_ stack, W_ offsetWords){
+// getBoxedClosurezh(StgStack* stack, StgWord offsetWords)
+getBoxedClosurezh(P_ stack, W_ offsetWords) {
   P_ ptr;
   ptr = StgStack_sp(stack) + WDS(offsetWords);
 
@@ -166,6 +179,7 @@ getBoxedClosurezh(P_ stack, W_ offsetWords){
   return (box);
 }
 
+// getStackFieldszh(StgStack* stack)
 getStackFieldszh(P_ stack){
   bits32 size;
   bits8 dirty, marking;
