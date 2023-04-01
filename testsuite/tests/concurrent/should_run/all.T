@@ -35,6 +35,7 @@ test('T3279', normal, compile_and_run, [''])
 
 # This test takes a long time with the default context switch interval
 test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
+                req_ghc_with_threaded_rts,
                 unless(unregisterised(), extra_ways(['debug_numa'])) ],
      compile_and_run, [''])
 
@@ -289,4 +290,3 @@ test('hs_try_putmvar003',
 
 # Check forkIO exception determinism under optimization
 test('T13330', normal, compile_and_run, ['-O'])
-

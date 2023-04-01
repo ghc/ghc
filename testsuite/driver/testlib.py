@@ -313,6 +313,10 @@ def req_target_smp( name, opts ):
     if not config.target_has_smp:
         opts.expect = 'fail'
 
+def req_ghc_with_threaded_rts( name, opts ):
+    if not config.ghc_with_threaded_rts:
+        opts.skip = True
+
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 

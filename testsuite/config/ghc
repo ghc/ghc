@@ -45,7 +45,7 @@ if config.have_interp:
 
 # we read the 'Support SMP' setting from the ghcconfig file. This dictates
 # whether the target supports smp
-if ghc_with_threaded_rts:
+if config.ghc_with_threaded_rts:
     config.run_ways.append('threaded1')
     if target_with_smp:
         config.target_has_smp = True
@@ -265,7 +265,7 @@ def get_compiler_info():
         config.compile_ways.append('profasm')
         config.run_ways.append('profasm')
 
-    if config.have_profiling and ghc_with_threaded_rts:
+    if config.have_profiling and config.ghc_with_threaded_rts:
         config.run_ways.append('profthreaded')
         ghc_env['HAVE_PROFILING'] = 'YES'
 

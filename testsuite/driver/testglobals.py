@@ -142,6 +142,9 @@ class TestConfig:
         # Do we have RTS linker?
         self.have_RTS_linker = False
 
+        # Do we have threaded RTS?
+        self.ghc_with_threaded_rts = False
+
         # Does the platform support loading of dynamic shared libraries? e.g.
         # some musl-based environments do not.
         self.supports_dynamic_libs = True

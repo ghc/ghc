@@ -110,9 +110,9 @@ HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo
 BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
 
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
-RUNTEST_OPTS += -e ghc_with_threaded_rts=True
+RUNTEST_OPTS += -e config.ghc_with_threaded_rts=True
 else
-RUNTEST_OPTS += -e ghc_with_threaded_rts=False
+RUNTEST_OPTS += -e config.ghc_with_threaded_rts=False
 endif
 
 ifeq "$(filter dyn, $(GhcRTSWays))" "dyn"
