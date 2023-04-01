@@ -34,3 +34,12 @@ test('T22871',
      ],
      multi_compile_and_run,
      ['T22871', [('T22871_cmm.cmm', '')], ''])
+
+test('AtomicFetch',
+     [    extra_run_opts('"' + config.libdir + '"')
+     ,    omit_ways(['ghci'])
+     ,    req_cmm
+     ,    when(arch('i386'), skip) # https://gitlab.haskell.org/ghc/ghc/-/issues/23217
+     ],
+     multi_compile_and_run,
+     ['AtomicFetch', [('AtomicFetch_cmm.cmm', '')], ''])
