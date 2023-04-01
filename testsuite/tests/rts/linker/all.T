@@ -28,6 +28,7 @@ test('T23066',
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
      [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
+       req_dynamic_lib_support,
        # JavaScript linker doesn't support linker scripts
        js_skip,
        # Windows linker doesn't seem to support linker scripts
@@ -130,6 +131,7 @@ test('linker_error3', [extra_files(['linker_error.c']),
 
 ######################################
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
+                 , req_rts_linker
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
@@ -138,10 +140,10 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
      compile_and_run, ['-rdynamic -package ghc'])
 
 
-test('T7072', 
-	[extra_files(['T7072-main.c', 'T7072-obj.c']), 
-		unless(opsys('linux'), skip), 
-		req_rts_linker], 
+test('T7072',
+	[extra_files(['T7072-main.c', 'T7072-obj.c']),
+		unless(opsys('linux'), skip),
+		req_rts_linker],
 	makefile_test, ['T7072'])
 
 test('T20494', [req_rts_linker, when(opsys('linux') and not ghc_dynamic(), expect_broken(20706))],

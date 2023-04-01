@@ -8,6 +8,7 @@ test('TcPlugin_Nullary'
         , 'NullaryPlugin.hs'
         , 'TcPlugin_Nullary.hs'
         ])
+      , req_th
       ]
     , multimod_compile
     , [ 'TcPlugin_Nullary.hs'
@@ -22,6 +23,7 @@ test('TcPlugin_Args'
         , 'ArgsPlugin.hs'
         , 'TcPlugin_Args.hs'
         ])
+      , req_th
       ]
     , multimod_compile_and_run
     , [ 'TcPlugin_Args.hs'
@@ -36,6 +38,7 @@ test('TcPlugin_TyFam'
         , 'TyFamPlugin.hs'
         , 'TcPlugin_TyFam.hs'
         ])
+      , req_th
       ]
     , multimod_compile
     , [ 'TcPlugin_TyFam.hs'
@@ -50,6 +53,7 @@ test('TcPlugin_Rewrite'
         , 'RewritePlugin.hs'
         , 'TcPlugin_Rewrite.hs'
         ])
+      , req_th
       ]
     , multimod_compile
     , [ 'TcPlugin_Rewrite.hs'
@@ -66,6 +70,7 @@ test('TcPlugin_RewritePerf'
       , only_ways(['normal'])
       , collect_compiler_stats('bytes allocated', 1)
       , high_memory_usage
+      , req_th
       ]
     , multimod_compile_fail
     , [ 'TcPlugin_RewritePerf.hs'
@@ -80,6 +85,7 @@ test('TcPlugin_EmitWanted'
         , 'EmitWantedPlugin.hs'
         , 'TcPlugin_EmitWanted.hs'
         ])
+      , req_th
       ]
     , multimod_compile_fail
     , [ 'TcPlugin_EmitWanted.hs'
@@ -94,6 +100,7 @@ test('TcPlugin_CtId'
         , 'CtIdPlugin.hs'
         , 'TcPlugin_CtId.hs'
         ])
+      , req_th
       ]
     , multimod_compile
     , [ 'TcPlugin_CtId.hs'
