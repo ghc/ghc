@@ -6,7 +6,6 @@ module T10828 where
 import Language.Haskell.TH hiding (Type)
 import System.IO
 import Data.Kind (Type)
-import qualified Data.List.NonEmpty as NE ( singleton )
 
 $( do { decl <- [d| data family D a :: Type -> Type
                     data instance D Int Bool :: Type where
@@ -34,7 +33,7 @@ $( return
    [ DataD [] (mkName "T")
            [ PlainTV (mkName "a") () ]
            (Just StarT)
-           [ GadtC (NE.singleton (mkName "MkT"))
+           [ GadtC [mkName "MkT"]
                    [ ( Bang NoSourceUnpackedness NoSourceStrictness
                      , VarT (mkName "a")
                      )
@@ -47,7 +46,7 @@ $( return
            , ForallC [PlainTV (mkName "a") SpecifiedSpec, PlainTV (mkName "b") SpecifiedSpec]
                      [AppT (AppT EqualityT (VarT $ mkName "a"  ) )
                                            (ConT $ mkName "Int") ] $
-             RecGadtC (NE.singleton (mkName "MkC"))
+             RecGadtC [mkName "MkC"]
                   [ ( mkName "foo"
                     , Bang NoSourceUnpackedness NoSourceStrictness
                     , VarT (mkName "a")

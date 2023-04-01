@@ -3683,6 +3683,8 @@ data ConversionFailReason
   | CasesExprWithoutAlts
   | ImplicitParamsWithOtherBinds
   | InvalidCCallImpent !String -- ^ Source
+  | RecGadtNoCons
+  | GadtNoCons
   | InvalidTypeInstanceHeader !TH.Type
   | InvalidTyFamInstLHS !TH.Type
   | InvalidImplicitParamBinding

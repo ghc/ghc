@@ -23,7 +23,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 import Control.Applicative(liftA, Applicative(..))
 import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )
-import Data.List.NonEmpty ( NonEmpty(..), toList )
+import Data.List.NonEmpty ( NonEmpty(..) )
 import GHC.Exts (TYPE)
 import Prelude hiding (Applicative(..))
 
@@ -680,10 +680,10 @@ forallC ns ctxt con = do
   con'  <- con
   pure $ ForallC ns' ctxt' con'
 
-gadtC :: Quote m => NonEmpty Name -> [m StrictType] -> m Type -> m Con
+gadtC :: Quote m => [Name] -> [m StrictType] -> m Type -> m Con
 gadtC cons strtys ty = liftA2 (GadtC cons) (sequenceA strtys) ty
 
-recGadtC :: Quote m => NonEmpty Name -> [m VarStrictType] -> m Type -> m Con
+recGadtC :: Quote m => [Name] -> [m VarStrictType] -> m Type -> m Con
 recGadtC cons varstrtys ty = liftA2 (RecGadtC cons) (sequenceA varstrtys) ty
 
 -------------------------------------------------------------------------------
@@ -1177,7 +1177,7 @@ docCons :: (Q Con, Maybe String, [Maybe String]) -> Q ()
 docCons (c, md, arg_docs) = do
   c' <- c
   -- Attach docs to the constructors
-  sequence_ [ putDoc (DeclDoc nm) d | Just d <- [md], nm <- toList $ get_cons_names c' ]
+  sequence_ [ putDoc (DeclDoc nm) d | Just d <- [md], nm <- get_cons_names c' ]
   -- Attach docs to the arguments
   case c' of
     -- Record selector documentation isn't stored in the argument map,
@@ -1188,6 +1188,6 @@ docCons (c, md, arg_docs) = do
                 ]
     _ ->
       sequence_ [ putDoc (ArgDoc nm i) arg_doc
-                    | nm <- toList $ get_cons_names c'
+                    | nm <- get_cons_names c'
                     , (i, Just arg_doc) <- zip [0..] arg_docs
                 ]

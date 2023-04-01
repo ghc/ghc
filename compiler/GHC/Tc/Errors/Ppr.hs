@@ -4831,6 +4831,10 @@ pprConversionFailReason = \case
     text "Implicit parameters mixed with other bindings"
   InvalidCCallImpent from ->
     text (show from) <+> text "is not a valid ccall impent"
+  RecGadtNoCons ->
+    quotes (text "RecGadtC") <+> text "must have at least one constructor name"
+  GadtNoCons ->
+    quotes (text "GadtC") <+> text "must have at least one constructor name"
   InvalidTypeInstanceHeader tys ->
     text "Invalid type instance header:"
     <+> text (show tys)

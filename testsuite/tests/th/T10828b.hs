@@ -4,7 +4,6 @@ module T10828b where
 
 import Language.Haskell.TH
 import System.IO
-import qualified Data.List.NonEmpty as NE ( singleton )
 
 -- attempting to mix GADT and normal constructors
 $( return
@@ -24,7 +23,7 @@ $( return
                      [AppT (AppT EqualityT (VarT $ mkName "a"  ) )
                                            (ConT $ mkName "Int") ] $
              RecGadtC
-                 (NE.singleton (mkName "MkC"))
+                 [mkName "MkC"]
                  [ ( mkName "foo"
                    , Bang NoSourceUnpackedness NoSourceStrictness
                    , VarT (mkName "a")

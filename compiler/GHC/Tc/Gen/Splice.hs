@@ -143,7 +143,6 @@ import Unsafe.Coerce    ( unsafeCoerce )
 import Control.Monad
 import Data.Binary
 import Data.Binary.Get
-import qualified Data.List.NonEmpty as NE ( singleton )
 import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
@@ -2235,7 +2234,7 @@ reifyDataCon isGadtDataCon tys dc
                                          dcdBangs r_arg_tys)
               | not (null fields) -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.RecGadtC (NE.singleton name)
+                  ; return $ TH.RecGadtC [name]
                                      (zip3 (map reifyFieldLabel fields)
                                       dcdBangs r_arg_tys) res_ty }
                 -- We need to check not isGadtDataCon here because GADT
@@ -2248,7 +2247,7 @@ reifyDataCon isGadtDataCon tys dc
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
               | isGadtDataCon -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.GadtC (NE.singleton name)
+                  ; return $ TH.GadtC [name]
                                  (dcdBangs `zip` r_arg_tys) res_ty }
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)

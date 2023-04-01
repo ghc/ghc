@@ -11,7 +11,6 @@ module Language.Haskell.TH.Ppr where
 import Text.PrettyPrint (render)
 import Language.Haskell.TH.PprLib
 import Language.Haskell.TH.Syntax
-import qualified Data.List.NonEmpty as NE ( toList )
 import Data.Word ( Word8 )
 import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
@@ -684,21 +683,21 @@ instance Ppr Con where
                          <+> pprBangType st2
 
     ppr (ForallC ns ctxt (GadtC cs sts ty))
-        = commaSepApplied (NE.toList cs) <+> dcolon <+> pprForall ns ctxt
+        = commaSepApplied cs <+> dcolon <+> pprForall ns ctxt
       <+> pprGadtRHS sts ty
 
     ppr (ForallC ns ctxt (RecGadtC cs vsts ty))
-        = commaSepApplied (NE.toList cs) <+> dcolon <+> pprForall ns ctxt
+        = commaSepApplied cs <+> dcolon <+> pprForall ns ctxt
       <+> pprRecFields vsts ty
 
     ppr (ForallC ns ctxt con)
         = pprForall ns ctxt <+> ppr con
 
     ppr (GadtC cs sts ty)
-        = commaSepApplied (NE.toList cs) <+> dcolon <+> pprGadtRHS sts ty
+        = commaSepApplied cs <+> dcolon <+> pprGadtRHS sts ty
 
     ppr (RecGadtC cs vsts ty)
-        = commaSepApplied (NE.toList cs) <+> dcolon <+> pprRecFields vsts ty
+        = commaSepApplied cs <+> dcolon <+> pprRecFields vsts ty
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"

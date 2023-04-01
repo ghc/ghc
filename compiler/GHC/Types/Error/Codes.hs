@@ -622,6 +622,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "CasesExprWithoutAlts"                          = 91745
   GhcDiagnosticCode "ImplicitParamsWithOtherBinds"                  = 42974
   GhcDiagnosticCode "InvalidCCallImpent"                            = 60220
+  GhcDiagnosticCode "RecGadtNoCons"                                 = 18816
+  GhcDiagnosticCode "GadtNoCons"                                    = 38140
   GhcDiagnosticCode "InvalidTypeInstanceHeader"                     = 37056
   GhcDiagnosticCode "InvalidTyFamInstLHS"                           = 78486
   GhcDiagnosticCode "InvalidImplicitParamBinding"                   = 51603
@@ -705,8 +707,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
   GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
-  GhcDiagnosticCode "RecGadtNoCons"                                 = 18816
-  GhcDiagnosticCode "GadtNoCons"                                    = 38140
 
 {- *********************************************************************
 *                                                                      *

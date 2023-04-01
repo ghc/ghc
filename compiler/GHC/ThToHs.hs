@@ -276,7 +276,11 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
-        ; con' <- cvtConstr (NE.head $ get_cons_names constr) cNameN constr
+        ; let first_datacon =
+                case get_cons_names constr of
+                  []  -> panic "cvtDec: empty list of constructors"
+                  c:_ -> c
+        ; con' <- cvtConstr first_datacon cNameN constr
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_cType = Nothing
@@ -348,8 +352,10 @@ cvtDec (DataFamilyD tc tvs kind)
 cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-
-       ; let first_datacon = NE.head $ get_cons_names $ head constrs
+       ; let first_datacon =
+                case get_cons_names $ head constrs of
+                  []  -> panic "cvtDec: empty list of constructors"
+                  c:_ -> c
        ; cons' <- mapM (cvtConstr first_datacon cNameN) constrs
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
@@ -372,7 +378,11 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
 cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-       ; con' <- cvtConstr (NE.head $ get_cons_names $ constr) cNameN constr
+       ; let first_datacon =
+                case get_cons_names constr of
+                  []  -> panic "cvtDec: empty list of constructors"
+                  c:_ -> c
+       ; con' <- cvtConstr first_datacon cNameN constr
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_cType = Nothing
@@ -507,7 +517,10 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
         ; (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
 
-        ; let first_datacon = NE.head $ get_cons_names $ head constrs
+        ; let first_datacon =
+                case get_cons_names $ head constrs of
+                  []  -> panic "cvtGenDataDec: empty list of constructors"
+                  c:_ -> c
         ; cons' <- mapM (cvtConstr first_datacon con_name) constrs
 
         ; derivs' <- cvtDerivs derivs
@@ -709,18 +722,22 @@ cvtConstr parent_con do_con_name (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
-cvtConstr _ do_con_name (GadtC cs strtys ty)
-  = do { cs'     <- mapM do_con_name cs
-       ; args    <- mapM cvt_arg strtys
-       ; ty'     <- cvtType ty
-       ; mk_gadt_decl cs' (PrefixConGADT $ map hsLinear args) ty'}
+cvtConstr _ do_con_name (GadtC c strtys ty) = case nonEmpty c of
+    Nothing -> failWith GadtNoCons
+    Just c -> do
+        { c'      <- mapM do_con_name c
+        ; args    <- mapM cvt_arg strtys
+        ; ty'     <- cvtType ty
+        ; mk_gadt_decl c' (PrefixConGADT $ map hsLinear args) ty'}
 
-cvtConstr parent_con do_con_name (RecGadtC cs varstrtys ty)
-  = do { cs'      <- mapM do_con_name cs
-       ; ty'      <- cvtType ty
-       ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
-       ; lrec_flds <- returnLA rec_flds
-       ; mk_gadt_decl cs' (RecConGADT lrec_flds noHsUniTok) ty' }
+cvtConstr parent_con do_con_name (RecGadtC c varstrtys ty) = case nonEmpty c of
+    Nothing -> failWith RecGadtNoCons
+    Just c -> do
+        { c'       <- mapM do_con_name c
+        ; ty'      <- cvtType ty
+        ; rec_flds <- mapM (cvt_id_arg parent_con) varstrtys
+        ; lrec_flds <- returnLA rec_flds
+        ; mk_gadt_decl c' (RecConGADT lrec_flds noHsUniTok) ty' }
 
 mk_gadt_decl :: NonEmpty (LocatedN RdrName) -> HsConDeclGADTDetails GhcPs -> LHsType GhcPs
              -> CvtM (LConDecl GhcPs)

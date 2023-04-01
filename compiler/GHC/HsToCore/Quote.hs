@@ -95,7 +95,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List (sort, sortBy)
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), toList )
 import Data.Function
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
@@ -2742,19 +2742,16 @@ repGadtDataCons :: NonEmpty (LocatedN Name)
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
 repGadtDataCons cons details res_ty
-    = do ne_tycon   <- lift $ dsLookupTyCon nonEmptyTyConName
-         name_tycon <- lift $ dsLookupTyCon nameTyConName
-         let mk_nonEmpty = coreListNonEmpty ne_tycon (mkTyConTy name_tycon)
-         cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
+    = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
          case details of
            PrefixConGADT ps -> do
              arg_tys <- repPrefixConArgs ps
              res_ty' <- repLTy res_ty
-             rep2 gadtCName [unC (mk_nonEmpty cons'), unC arg_tys, unC res_ty']
+             rep2 gadtCName [ unC (nonEmptyCoreList' cons'), unC arg_tys, unC res_ty']
            RecConGADT ips _ -> do
              arg_vtys <- repRecConArgs ips
              res_ty'  <- repLTy res_ty
-             rep2 recGadtCName [unC (mk_nonEmpty cons'), unC arg_vtys,
+             rep2 recGadtCName [unC (nonEmptyCoreList' cons'), unC arg_vtys,
                                 unC res_ty']
 
 -- TH currently only supports linear constructors.
@@ -3059,6 +3056,9 @@ nonEmptyCoreList :: [Core a] -> Core [a]
   -- Otherwise use coreList
 nonEmptyCoreList []           = panic "coreList: empty argument"
 nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
+
+nonEmptyCoreList' :: NonEmpty (Core a) -> Core [a]
+nonEmptyCoreList' xs@(MkC x:|_) = MkC (mkListExpr (exprType x) (toList $ fmap unC xs))
 
 coreStringLit :: MonadThings m => FastString -> m (Core String)
 coreStringLit s = do { z <- mkStringExprFS s; return (MkC z) }

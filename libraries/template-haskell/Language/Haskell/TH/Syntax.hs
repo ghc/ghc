@@ -48,7 +48,6 @@ import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
 import Data.List.NonEmpty ( NonEmpty(..) )
-import qualified Data.List.NonEmpty as NE ( singleton )
 import Data.Void        ( Void, absurd )
 import Data.Word
 import Data.Ratio
@@ -2732,16 +2731,20 @@ data Con =
   | ForallC [TyVarBndr Specificity] Cxt Con
 
   -- @C :: a -> b -> T b Int@
-  | GadtC (NonEmpty Name)
+  | GadtC [Name]
             -- ^ The list of constructors, corresponding to the GADT constructor
-            -- syntax @C1, C2 :: a -> T b@
+            -- syntax @C1, C2 :: a -> T b@.
+            --
+            -- Invariant: the list must be non-empty.
           [BangType] -- ^ The constructor arguments
           Type -- ^ See Note [GADT return type]
 
   -- | @C :: { v :: Int } -> T b Int@
-  | RecGadtC (NonEmpty Name)
+  | RecGadtC [Name]
              -- ^ The list of constructors, corresponding to the GADT record
-             -- constructor syntax @C1, C2 :: { fld :: a } -> T b@
+             -- constructor syntax @C1, C2 :: { fld :: a } -> T b@.
+             --
+             -- Invariant: the list must be non-empty.
              [VarBangType] -- ^ The constructor arguments
              Type -- ^ See Note [GADT return type]
         deriving (Show, Eq, Ord, Data, Generic)
@@ -2941,10 +2944,10 @@ thenCmp :: Ordering -> Ordering -> Ordering
 thenCmp EQ o2 = o2
 thenCmp o1 _  = o1
 
-get_cons_names :: Con -> NonEmpty Name
-get_cons_names (NormalC n _)     = NE.singleton n
-get_cons_names (RecC n _)        = NE.singleton n
-get_cons_names (InfixC _ n _)    = NE.singleton n
+get_cons_names :: Con -> [Name]
+get_cons_names (NormalC n _)     = [n]
+get_cons_names (RecC n _)        = [n]
+get_cons_names (InfixC _ n _)    = [n]
 get_cons_names (ForallC _ _ con) = get_cons_names con
 -- GadtC can have multiple names, e.g
 -- > data Bar a where
