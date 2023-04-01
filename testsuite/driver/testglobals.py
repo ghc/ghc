@@ -134,6 +134,8 @@ class TestConfig:
         # Do we have interpreter support?
         self.have_interp = False
 
+        # Do we even have processes?
+        self.have_process = True
         # Does the platform support loading of dynamic shared libraries? e.g.
         # some musl-based environments do not.
         self.supports_dynamic_libs = True

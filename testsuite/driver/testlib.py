@@ -274,6 +274,9 @@ def req_smp( name, opts ):
     if not config.have_smp:
         opts.expect = 'fail'
 
+def req_process( name, opts ):
+    if not config.have_process:
+        opts.skip = True
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 
