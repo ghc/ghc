@@ -1744,23 +1744,29 @@ run_BCO:
         }
 
         case bci_PACK: {
-            W_ i;
             W_ o_itbl         = BCO_GET_LARGE_ARG;
             W_ n_words        = BCO_GET_LARGE_ARG;
-            StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
-            int request        = CONSTR_sizeW( itbl->layout.payload.ptrs,
-                                               itbl->layout.payload.nptrs );
+            StgConInfoTable* itbl = CON_INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
+            W_ n_ptrs         = itbl->i.layout.payload.ptrs;
+            W_ n_nptrs        = itbl->i.layout.payload.nptrs;
+            W_ request        = CONSTR_sizeW( n_ptrs, n_nptrs );
             StgClosure* con = (StgClosure*)allocate_NONUPD(cap,request);
-            ASSERT( itbl->layout.payload.ptrs + itbl->layout.payload.nptrs > 0);
-            for (i = 0; i < n_words; i++) {
+            ASSERT(ip_HNF(&itbl->i)); // We don't have a CON flag, HNF is a good approximation
+                                      // N.
+            // N.B. we may have a nullary datacon with padding, in which case
+            // n_nptrs=1, n_ptrs=0.
+            ASSERT(n_ptrs + n_nptrs == n_words || (n_nptrs == 1 && n_ptrs == 0));
+            ASSERT(n_ptrs + n_nptrs > 0);
+            //ASSERT(n_words > 0); // We shouldn't ever need to allocate nullary constructors
+            for (W_ i = 0; i < n_words; i++) {
                 con->payload[i] = (StgClosure*)SpW(i);
             }
             Sp_addW(n_words);
             Sp_subW(1);
             // No write barrier is needed here as this is a new allocation
             // visible only from our stack
-            StgInfoTable *con_itbl = (StgInfoTable*) BCO_LIT(o_itbl);
-            SET_HDR(con, con_itbl, cap->r.rCCCS);
+            StgInfoTable *con_ptr = (StgInfoTable*) BCO_LIT(o_itbl);
+            SET_HDR(con, con_ptr, cap->r.rCCCS);
 
             StgClosure* tagged_con = tagConstr(con);
             SpW(0) = (W_)tagged_con;
