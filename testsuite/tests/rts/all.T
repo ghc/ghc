@@ -226,7 +226,8 @@ test('exec_signals',
      [when(opsys('mingw32'), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
       cmd_prefix('./exec_signals_prepare'),
-      js_broken(22355)],
+      js_broken(22355),
+      req_process],
      compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
@@ -393,6 +394,7 @@ test('T9839_05',
 test('T10590', [ ignore_stderr
                , when(opsys('mingw32'), skip)
                , js_skip # JS backend doesn't support pipes
+               , req_process
                ], compile_and_run, [''])
 
 # 20000 was easily enough to trigger the bug with 7.10
@@ -422,14 +424,11 @@ test('T12497', [ unless(opsys('mingw32'), skip), expect_broken(22694)
 test('T13617', [ unless(opsys('mingw32'), skip)],
                makefile_test, ['T13617'])
 
-# This test sometimes produces out of sequence samples in the profasm way, but
-# not reliably, so we just skip it. See ticket #15065.
-# Test is being skipped on darwin due to it's flakiness.
-test('T12903', [ when(opsys('mingw32'), skip)
-               , when(opsys('darwin'), skip)
-               , when(arch('i386'), fragile(20377))
-               , omit_ways(['ghci', 'profasm'])
-               , js_broken(22374)]
+# Test is fragile on all systems. #21184 links to various other reports through
+# its history.
+test('T12903', [ fragile(21184)
+               , js_broken(22374)
+               , req_process]
                , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])

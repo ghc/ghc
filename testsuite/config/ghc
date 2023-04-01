@@ -77,6 +77,9 @@ if not config.arch == "javascript":
     config.compile_ways.append('hpc')
     config.run_ways.append('hpc')
 
+if config.arch == "wasm32":
+    config.have_process = False
+
 config.way_flags = {
     'normal'       : [],
     'normal_h'     : [],
