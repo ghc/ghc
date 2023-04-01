@@ -1,0 +1,28 @@
+T23203.hs:(9,2)-(30,27): Splicing declarations
+    do let genPat1 :: Q [Dec]
+           genPat1
+             = sequence
+                 [patSynD name (prefixPatSyn []) unidir wildP,
+                  pure $ PragmaD $ InlineP name Inline FunLike AllPhases]
+             where
+                 name = mkName "A"
+           genPat2 :: Q [Dec]
+           genPat2
+             = sequence
+                 [patSynD
+                    con_name (recordPatSyn [fld_name]) implBidir
+                    (conP 'MkD [varP fld_name]),
+                  pure $ PragmaD $ InlineP con_name Inline FunLike AllPhases,
+                  pure $ PragmaD $ InlineP fld_name Inline FunLike AllPhases]
+             where
+                 con_name = mkName "P"
+                 fld_name = mkName "fld"
+       decs1 <- genPat1
+       decs2 <- genPat2
+       pure (decs1 ++ decs2)
+  ======>
+    pattern A <- _
+    {-# INLINE A #-}
+    pattern P{fld} = MkD fld
+    {-# INLINE P #-}
+    {-# INLINE fld #-}

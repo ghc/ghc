@@ -851,7 +851,10 @@ cvt_conv TH.JavaScript = JavaScriptCallConv
 
 cvtPragmaD :: Pragma -> CvtM (Maybe (LHsDecl GhcPs))
 cvtPragmaD (InlineP nm inline rm phases)
-  = do { nm' <- vNameN nm
+  = do { -- NB: Use vcNameN here, which works for both the variable namespace
+         -- (e.g., `INLINE`d functions) and the constructor namespace
+         -- (e.g., `INLINE`d pattern synonyms, cf. #23203)
+         nm' <- vcNameN nm
        ; let dflt = dfltActivation inline
        ; let src TH.NoInline  = "{-# NOINLINE"
              src TH.Inline    = "{-# INLINE"
