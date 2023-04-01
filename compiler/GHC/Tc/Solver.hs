@@ -2731,8 +2731,8 @@ findUnnecessaryGivens info need_inner givens
   | not (null unused_givens)         -- Some givens are literally unused
   = unused_givens
 
-   | otherwise                       -- All givens are used, but some might
-   = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
+  | otherwise                       -- All givens are used, but some might
+  = redundant_givens                -- still be redundant e.g. (Eq a, Ord a)
 
   where
     in_instance_decl = case info of { InstSkol {} -> True; _ -> False }
@@ -3084,7 +3084,7 @@ others).
 
    - For example, in a class declaration, the default method *can*
      use the class constraint, but it certainly doesn't *have* to,
-     and we don't want to report an error there.
+     and we don't want to report an error there.  Ditto instance decls.
 
    - More subtly, in a function definition
        f :: (Ord a, Ord a, Ix a) => a -> a
@@ -3105,7 +3105,7 @@ others).
 
 ----- Shortcomings
 
-Consider
+Shortcoming 1.  Consider
 
   j :: (Eq a, a ~ b) => a -> Bool
   j x = x == x
@@ -3118,6 +3118,18 @@ is redundant. This is because j uses the a ~ b constraint to rewrite
 everything to be in terms of b, while k does none of that. This is
 ridiculous, but I (Richard E) don't see a good fix.
 
+Shortcoming 2.  Removing a redundant constraint can cause clients to fail to
+compile, by making the function more polymoprhic. Consider (#16154)
+
+  f :: (a ~ Bool) => a -> Int
+  f x = 3
+
+  g :: String -> Int
+  g s = f (read s)
+
+The constraint in f's signature is redundant; not used to typecheck
+`f`.  And yet if you remove it, `g` won't compile, because there'll
+be an ambiguous variable in `g`.
 -}
 
 -- | Like 'defaultTyVar', but in the TcS monad.

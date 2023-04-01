@@ -85,11 +85,22 @@ data UserTypeCtxt
                     -- Also used for types in SPECIALISE pragmas
        Name              -- Name of the function
        ReportRedundantConstraints
-         -- This is usually 'WantRCC', but 'NoRCC' for
+         -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
+         -- This field is usually 'WantRCC', but 'NoRCC' for
          --   * Record selectors (not important here)
          --   * Class and instance methods.  Here the code may legitimately
          --     be more polymorphic than the signature generated from the
          --     class declaration
+         --   * Functions whose type signature has hidden the constraints
+         --     behind a type synonym.  E.g.
+         --          type Foo = forall a. Eq a => a -> a
+         --          id :: Foo
+         --          id x = x
+         --     Here we can't give a good location for the redundant constraints
+         --     (see lhsSigWcTypeContextSpan), so we don't report redundant
+         --     constraints at all. It's not clear that this a good choice;
+         --     perhaps we should report, just with a less informative SrcSpan.
+         --     c.f. #16154
 
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
