@@ -3638,6 +3638,128 @@
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
     }
   },
+  "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_17-wasm-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_17-wasm:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "allow_failure": true,
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "manual"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "native",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static",
+      "BUILD_FLAVOUR": "release+fully_static",
+      "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
+      "CROSS_TARGET": "wasm32-wasi",
+      "HADRIAN_ARGS": "--docs=none",
+      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static"
+    }
+  },
+  "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_17-wasm-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_17-wasm:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "allow_failure": true,
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "manual"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static",
+      "BUILD_FLAVOUR": "release+fully_static",
+      "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi",
+      "CROSS_TARGET": "wasm32-wasi",
+      "HADRIAN_ARGS": "--docs=none",
+      "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static"
+    }
+  },
   "x86_64-linux-deb10-int_native-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
