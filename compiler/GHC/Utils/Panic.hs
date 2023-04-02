@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables, LambdaCase #-}
 
+#include <ghcautoconf.h>
+
 -- | Defines basic functions for printing error messages.
 --
 -- It's hard to put these functions anywhere else without causing
@@ -236,6 +238,11 @@ signalHandlersRefCount = unsafePerformIO $ newMVar (0,Nothing)
 -- | Temporarily install standard signal handlers for catching ^C, which just
 -- throw an exception in the current thread.
 withSignalHandlers :: ExceptionMonad m => m a -> m a
+#if !defined(HAVE_SIGNAL_H)
+-- No signal functionality exist on the host platform (e.g. on
+-- wasm32-wasi), so don't attempt to set up signal handlers
+withSignalHandlers = id
+#else
 withSignalHandlers act = do
   main_thread <- liftIO myThreadId
   wtid <- liftIO (mkWeakThreadId main_thread)
@@ -295,6 +302,7 @@ withSignalHandlers act = do
 
   mayInstallHandlers
   act `MC.finally` mayUninstallHandlers
+#endif
 
 callStackDoc :: HasCallStack => SDoc
 callStackDoc = prettyCallStackDoc callStack
