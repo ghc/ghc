@@ -256,6 +256,9 @@ def req_dynamic_hs( name, opts ):
 def req_interp( name, opts ):
     if not config.have_interp or isCross():
         opts.expect = 'fail'
+    # skip on wasm32, otherwise they show up as unexpected passes
+    if arch('wasm32'):
+        skip(name, opts)
     # JS backend doesn't provide an interpreter yet
     js_skip(name, opts)
 
@@ -491,6 +494,10 @@ def _exit_code( name, opts, v ):
 def signal_exit_code( val: int ):
     if opsys('solaris2'):
         return exit_code( val )
+    elif arch('wasm32'):
+        # wasmtime always exits with 1 when wasm program exits with a
+        # non-zero exit code
+        return exit_code(1)
     else:
         # When application running on Linux receives fatal error
         # signal, then its exit code is encoded as 128 + signal

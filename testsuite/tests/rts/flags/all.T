@@ -44,7 +44,10 @@ test('T12870f',
 # Check handling of env variables
 test('T12870g',
     [extra_files(['T12870g.hs']), cmd_prefix('GHCRTS=-G7 '), extra_files(['T12870g.hs']),
-        only_ways(['normal'])],
+        only_ways(['normal']),
+        # cross emulator for wasm32 always clears host environment
+        # variables
+        when(arch('wasm32'), skip)],
     multimod_compile_and_run,
     ['T12870g', '-rtsopts -with-rtsopts="-G3"'])
 

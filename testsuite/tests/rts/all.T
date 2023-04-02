@@ -3,7 +3,8 @@ test('testblockalloc',
      compile_and_run, [''])
 
 test('testmblockalloc',
-     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0')],
+     [c_src, only_ways(['normal','threaded1']), extra_run_opts('+RTS -I0'),
+      when(arch('wasm32'), skip)], # MBlocks can't be freed on wasm32, see Note [Megablock allocator on wasm] in rts
      compile_and_run, [''])
 # -I0 is important: the idle GC will run the memory leak detector,
 # which will crash because the mblocks we allocate are not in a state
@@ -349,8 +350,12 @@ test('ListStaticPointers', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 # 251 = RTS exit code for "out of memory"
 test('overflow1', [ js_skip, exit_code(251), when(wordsize(32), expect_broken(15255)) ],
      compile_and_run, [''])
-test('overflow2', [ js_skip, exit_code(251) ], compile_and_run, [''])
-test('overflow3', [ js_skip, exit_code(251) ], compile_and_run, [''])
+test('overflow2', [ js_skip,
+                    exit_code(1 if arch('wasm32') else 251),
+                    when(arch('wasm32'), ignore_stderr) ], compile_and_run, [''])
+test('overflow3', [ js_skip,
+                    exit_code(1 if arch('wasm32') else 251),
+                    when(arch('wasm32'), ignore_stderr) ], compile_and_run, [''])
 
 def grep_stderr(pattern):
     def wrapper(cmd, pattern=pattern):
@@ -497,7 +502,7 @@ test('keep-cafs',
 
 # Test proper functioning of C++ exceptions within a C++ program.
 # On darwin, this requires -fcompact-unwind.
-test('T11829', [ req_c, check_errmsg("This is a test") ], compile_and_run,
+test('T11829', [ req_c, check_errmsg("This is a test"), when(arch('wasm32'), fragile(23244)) ], compile_and_run,
      ['T11829_c.cpp -package system-cxx-std-lib'])
 
 test('T16514', req_c, compile_and_run, ['T16514_c.c'])
@@ -527,12 +532,18 @@ test('T15427', js_broken(22374), compile_and_run, [''])
 test('T19481',
      [extra_run_opts('+RTS -T -RTS'),
       js_broken(22374),
+      # MBlocks can't be freed on wasm32, see Note [Megablock
+      # allocator on wasm] in rts
+      when(arch('wasm32'), skip),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])
 test('T19381',
      [extra_run_opts('+RTS -T -RTS'),
       js_broken(22374),
+      # MBlocks can't be freed on wasm32, see Note [Megablock
+      # allocator on wasm] in rts
+      when(arch('wasm32'), skip),
       # memory behavior changes appreciably with the nonmoving collector
       omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
      compile_and_run, [''])

@@ -25,7 +25,11 @@ test('conc072', only_ways(concurrent_ways), compile_and_run, [''])
 test('conc073', normal, compile_and_run, [''])
 
 test('T367_letnoescape',
-     [run_timeout_multiplier(0.02), expect_broken_for(7297,['optllvm'])],
+     [run_timeout_multiplier(0.02), expect_broken_for(7297,['optllvm']),
+     # wasm32 rts has no timer and scheduler always behaves as -C0,
+     # see Note [No timer on wasm32] in rts. It'll be stuck in the
+     # thread that infinitely loops, which is the expected behavior.
+     when(arch('wasm32'), skip)],
      compile_and_run, ['-fno-omit-yields'])
 
 test('T1980', normal, compile_and_run, [''])
@@ -86,7 +90,10 @@ test('T7970', normal, compile_and_run, [''])
 test('AtomicPrimops', normal, compile_and_run, [''])
 
 # test uses 2 threads and yield, scheduling can vary with threaded2
-test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_ways(concurrent_ways)], compile_and_run, [''])
+test('threadstatus-9333', [fragile_for(16555, ['ghci', 'profthreaded']), omit_ways(concurrent_ways),
+# wasm32 rts has no timer and scheduler always behaves as -C0. See
+# Note [No timer on wasm32] in rts
+when(arch('wasm32'), skip)], compile_and_run, [''])
 
 test('T9379', normal, compile_and_run, [''])
 

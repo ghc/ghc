@@ -60,7 +60,9 @@ test('heapprof001',
      compile_and_run, [''])
 
 test('T2592',
-     [only_ways(['profasm']), extra_run_opts('+RTS -M1m -A1m -RTS'), exit_code(251)],
+     [only_ways(['profasm']), extra_run_opts('+RTS -M1m -A1m -RTS'),
+     exit_code(1 if arch('wasm32') else 251),
+     when(arch('wasm32'), ignore_stderr)],
      compile_and_run, [''])
 
 test('T3001', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],

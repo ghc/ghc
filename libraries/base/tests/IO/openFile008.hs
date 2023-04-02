@@ -1,5 +1,4 @@
 import System.IO
-import System.Cmd
 import System.FilePath
 import Text.Printf
 import System.Directory
@@ -10,7 +9,7 @@ testdir = "openFile008_testdir"
 -- Test repeated opening/closing of 1000 files.  This is useful for guaging
 -- the performance of open/close and file locking.
 main = do
-  system ("rm -rf " ++ testdir)
+  removePathForcibly testdir
   createDirectory testdir
   let filenames = [testdir </> printf "file%03d" (n::Int) | n <- [1..1000]]
 

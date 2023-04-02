@@ -29,7 +29,7 @@ test('cgrun021', extra_ways(['nursery_chunks']), compile_and_run, [''])
 test('cgrun022', normal, compile_and_run, [''])
 test('cgrun024', normal, compile_and_run, [''])
 test('cgrun025',
-     [ extra_run_opts('cgrun025.hs < /dev/null'), exit_code(1)],
+     [ extra_run_opts('cgrun025.hs < /dev/null'), exit_code(1), when(arch('wasm32'), fragile(23275))],
      compile_and_run, [''])
 test('cgrun026', normal, compile_and_run, [''])
 test('cgrun027', normal, compile_and_run, [''])
@@ -74,7 +74,7 @@ test('cgrun065', normal, compile_and_run, [''])
 test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun069',
-     [ omit_ways(['ghci']), req_cmm],
+     [ omit_ways(['ghci']), req_cmm, when(arch('wasm32'), fragile(22854))],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -212,7 +212,7 @@ test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
 
-test('T17920', cmm_src, compile_and_run, [''])
+test('T17920', [cmm_src, when(arch('wasm32'), fragile(22854))], compile_and_run, [''])
 test('T18527', req_c, compile_and_run, ['T18527FFI.c'])
 test('T19149', [req_c,only_ways('sanity')], compile_and_run, ['T19149_c.c'])
 test('T20275', normal, compile_and_run, [''])

@@ -35,7 +35,7 @@ test('hReady001', js_broken(22374), compile_and_run, ['-cpp'])
 # work for the 'ghci' way because in that case we already pipe input from
 # a script, so hence omit_ways(['ghci'])
 test('hReady002', [cmd_prefix('sleep 1 |'), omit_ways(['ghci']),
-                   multi_cpu_race, js_broken(22374)],
+                   multi_cpu_race, js_broken(22374), when(arch('wasm32'), fragile(23275))],
      compile_and_run, [''])
 
 test('hSeek001', normal, compile_and_run, [''])
@@ -57,7 +57,7 @@ test('hSetBuffering004', set_stdin('hSetBuffering004.hs'), compile_and_run, ['']
 test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
 test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
 test('ioeGetHandle001',      normal, compile_and_run, ['-cpp'])
-test('isEOF001', extra_run_opts('</dev/null'), compile_and_run, [''])
+test('isEOF001', [extra_run_opts('</dev/null'), when(arch('wasm32'), fragile(23275))], compile_and_run, [''])
 
 test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
      [''])
@@ -70,7 +70,7 @@ test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', js_broken(22261), compile_and_run, [''])
 test('openFile008', [js_broken(22349), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
-test('openFile009', [], compile_and_run, [''])
+test('openFile009', [when(arch('wasm32'), fragile(23284))], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001', js_broken(22261), compile_and_run, [''])
@@ -121,7 +121,13 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', [extra_files(['encoded-data/']), js_broken(22374)], compile_and_run, [''])
+test('encoding004', [extra_files(['encoded-data/']), js_broken(22374),
+# wasi-libc doesn't have cp936, see
+# https://gitlab.haskell.org/ghc/wasi-libc/-/blob/main/libc-top-half/musl/src/locale/iconv.c#L38
+# and
+# https://gitlab.haskell.org/ghc/wasi-libc/-/blob/main/libc-top-half/musl/src/locale/codepages.h
+# for locales supported by wasi-libc's iconv implementation
+when(arch('wasm32'), skip)], compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], makefile_test, ['environment001-test'])
@@ -136,6 +142,7 @@ test('encodingerror001', normal, compile_and_run, [''])
 
 # Requires use of the FD interface which is not supported under WINIO
 test('T4808', [when(opsys('mingw32'), skip)
+              , when(arch('wasm32'), fragile(23284))
               ,fragile_for(16909, concurrent_ways), exit_code(1)]
               , compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])

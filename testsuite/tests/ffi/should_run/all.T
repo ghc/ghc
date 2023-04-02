@@ -144,9 +144,9 @@ if config.os == 'mingw32':
 	flagsForT4038 = ['-optl-Wl,--stack,10485760']
 else:
 	flagsForT4038 = ['']
-test('T4038', js_broken(22261), compile_and_run, flagsForT4038)
+test('T4038', [js_broken(22261), when(arch('wasm32'), fragile(22606))], compile_and_run, flagsForT4038)
 
-test('T4221', [omit_ways(['ghci']),req_c], compile_and_run, ['T4221_c.c'])
+test('T4221', [omit_ways(['ghci']),req_c, when(arch('wasm32'), fragile(22606))], compile_and_run, ['T4221_c.c'])
 
 test('T5402', [ omit_ways(['ghci']),
                 exit_code(42),

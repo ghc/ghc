@@ -42,6 +42,7 @@ test('T4801',
      [collect_compiler_stats('bytes allocated',2),
       only_ways(['normal']),
       extra_hc_opts('-static'),
+      when(arch('wasm32') and unregisterised(), fragile(23290))
       ],
      compile,
      [''])
@@ -657,7 +658,7 @@ test('T21839c',
     ['-O'])
 
 test ('InfiniteListFusion',
-      [collect_stats('bytes allocated',2), when(arch('i386'), skip), js_broken(22576)],
+      [collect_stats('bytes allocated',2), when(wordsize(32), skip), js_broken(22576)],
       compile_and_run,
       ['-O2 -package ghc'])
 
