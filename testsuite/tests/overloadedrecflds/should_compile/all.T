@@ -47,3 +47,6 @@ test('BootFldReexport'
       # Should either pass or give an ambiguity error when compiling
       # the final module (BootFldReexport), but not fail earlier.
     , ['BootFldReexport', '-v0'])
+test('T23220'
+    , [req_th, extra_files(['T23220_aux.hs'])]
+    , multimod_compile, ['T23220_aux.hs T23220.hs', '-v0'])

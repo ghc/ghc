@@ -465,9 +465,12 @@ varToRecFieldOcc dc (OccName ns s) =
   assert makes_sense $ mkRecFieldOccFS dc s
     where
       makes_sense = case ns of
-        VarName     -> True
-        FldName con -> con == dc
-        _           -> False
+        VarName    -> True
+        FldName {} -> True
+          -- NB: it's OK to change the parent data constructor,
+          -- see e.g. test T23220 in which we construct with TH
+          -- a datatype using the fields of a different datatype.
+        _          -> False
 
 recFieldToVarOcc :: HasDebugCallStack => OccName -> OccName
 recFieldToVarOcc (OccName _ns s) = mkVarOccFS s

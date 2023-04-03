@@ -1011,7 +1011,7 @@ newRecordFieldLabel dup_fields_ok has_sel (dc:_) (L loc (FieldOcc _ (L _ fld)))
                              , flSelector = selName } }
   where
     fld_occ = rdrNameOcc fld
-    dc_fs = (occNameFS $ nameOccName dc)
+    dc_fs = occNameFS $ nameOccName dc
     field
       -- Use an Exact RdrName as-is, to preserve the bindings
       -- of an already renamer-resolved field and its use
