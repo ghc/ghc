@@ -12,7 +12,7 @@ T2431.$WRefl
 -- RHS size: {terms: 4, types: 7, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Str=<L>b, Cpr=b, Unf=OtherCon []]
-absurd = \ (@a) (x :: Int :~: Bool) -> case x of { }
+absurd = \ (@a) (x :: Int :~: Bool) -> case x of {}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: GHC.Prim.Addr#

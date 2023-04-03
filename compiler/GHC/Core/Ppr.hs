@@ -239,7 +239,13 @@ ppr_expr add_par expr@(App {})
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
 
-ppr_expr add_par (Case expr var ty [Alt con args rhs])
+ppr_expr add_par (Case expr _ ty []) -- Empty Case
+  = add_par $ sep [text "case"
+                      <+> pprCoreExpr expr
+                      <+> whenPprDebug (text "return" <+> ppr ty),
+                    text "of {}"]
+
+ppr_expr add_par (Case expr var ty [Alt con args rhs]) -- Single alt Case
   = sdocOption sdocPrintCaseAsLet $ \case
       True -> add_par $  -- See Note [Print case as let]
                sep [ sep [ text "let! {"
@@ -263,7 +269,7 @@ ppr_expr add_par (Case expr var ty [Alt con args rhs])
   where
     ppr_bndr = pprBndr CaseBind
 
-ppr_expr add_par (Case expr var ty alts)
+ppr_expr add_par (Case expr var ty alts) -- Multi alt Case
   = add_par $
     sep [sep [text "case"
                 <+> pprCoreExpr expr

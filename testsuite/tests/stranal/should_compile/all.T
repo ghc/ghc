@@ -43,7 +43,7 @@ test('T13077', normal, compile, [''])
 test('T13077a', normal, compile, [''])
 
 # T13143: WW for NOINLINE function f
-test('T13143', [ grep_errmsg(r'^T13143\.\$wf') ], compile, ['-ddump-simpl'])
+test('T13143', [ grep_errmsg(r'^T13143\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 
 # T15627
 #   Absent bindings of unlifted types should be WW'ed away.
