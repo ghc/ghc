@@ -1,0 +1,3 @@
+T23208: really important message
+CallStack (from HasCallStack):
+  error, called at T23208_Lib.hs:4:7 in main:T23208_Lib
