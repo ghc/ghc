@@ -1,5 +1,5 @@
 
-BadKindVar.hs:9:21: error:
+BadKindVar.hs:9:21: error: [GHC-12875]
     Unexpected kind variable ‘k’
-    Perhaps you intended to use PolyKinds
     In the type signature for ‘f’
+    Suggested fix: Perhaps you intended to use PolyKinds

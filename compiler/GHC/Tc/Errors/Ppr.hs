@@ -1662,6 +1662,61 @@ instance Diagnostic TcRnMessage where
          2 (vcat [ text "Expected:" <+> ppr fam_tc_name
                  , text "  Actual:" <+> ppr eqn_tc_name ])
 
+    TcRnBindVarAlreadyInScope tv_names_in_scope
+      -> mkSimpleDecorated $
+        vcat
+          [ text "Type variable" <> plural tv_names_in_scope
+            <+> hcat (punctuate (text ",") (map (quotes . ppr) tv_names_in_scope))
+            <+> isOrAre tv_names_in_scope
+            <+> text "already in scope."
+          , text "Type applications in patterns must bind fresh variables, without shadowing."
+          ]
+
+    TcRnBindMultipleVariables ctx tv_name_w_loc
+      -> mkSimpleDecorated $
+        text "Variable" <+> text "`" <> ppr tv_name_w_loc <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
+
+    TcRnUnexpectedKindVar tv_name
+      -> mkSimpleDecorated $ text "Unexpected kind variable" <+> quotes (ppr tv_name)
+
+    TcRnNegativeNumTypeLiteral tyLit
+      -> mkSimpleDecorated $ text "Illegal literal in type (type literals must not be negative):" <+> ppr tyLit
+
+    TcRnIllegalKind ty_thing _
+      -> mkSimpleDecorated $ text "Illegal kind:" <+> (ppr ty_thing)
+
+    TcRnPrecedenceParsingError op1 op2
+      -> mkSimpleDecorated $
+           hang (text "Precedence parsing error")
+           4 (hsep [text "cannot mix", ppr_opfix op1, text "and",
+           ppr_opfix op2,
+           text "in the same infix expression"])
+
+    TcRnSectionPrecedenceError op arg_op section
+      -> mkSimpleDecorated $
+           vcat [text "The operator" <+> ppr_opfix op <+> text "of a section",
+             nest 4 (sep [text "must have lower precedence than that of the operand,",
+                          nest 2 (text "namely" <+> ppr_opfix arg_op)]),
+             nest 4 (text "in the section:" <+> quotes (ppr section))]
+
+    TcRnUnexpectedPatSigType ty
+      -> mkSimpleDecorated $
+           hang (text "Illegal type signature:" <+> quotes (ppr ty))
+              2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
+
+    TcRnIllegalKindSignature ty
+      -> mkSimpleDecorated $ text "Illegal kind signature:" <+> quotes (ppr ty)
+
+    TcRnUnusedQuantifiedTypeVar doc tyVar
+      -> mkSimpleDecorated $
+           vcat [ text "Unused quantified type variable" <+> quotes (ppr tyVar)
+                , inHsDocContext doc ]
+
+    TcRnDataKindsError typeOrKind thing
+      -> mkSimpleDecorated $
+           text "Illegal" <+> (text $ levelString typeOrKind) <> colon <+> quotes (ppr thing)
+
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2208,6 +2263,28 @@ instance Diagnostic TcRnMessage where
     TcRnIncoherentRoles{}
       -> ErrorWithoutFlag
     TcRnTyFamNameMismatch{}
+      -> ErrorWithoutFlag
+    TcRnBindVarAlreadyInScope{}
+      -> ErrorWithoutFlag
+    TcRnBindMultipleVariables{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedKindVar{}
+      -> ErrorWithoutFlag
+    TcRnNegativeNumTypeLiteral{}
+      -> ErrorWithoutFlag
+    TcRnIllegalKind{}
+      -> ErrorWithoutFlag
+    TcRnPrecedenceParsingError{}
+      -> ErrorWithoutFlag
+    TcRnSectionPrecedenceError{}
+      -> ErrorWithoutFlag
+    TcRnUnexpectedPatSigType{}
+      -> ErrorWithoutFlag
+    TcRnIllegalKindSignature{}
+      -> ErrorWithoutFlag
+    TcRnUnusedQuantifiedTypeVar{}
+      -> WarningWithFlag Opt_WarnUnusedForalls
+    TcRnDataKindsError{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2782,6 +2859,30 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.IncoherentInstances]
     TcRnTyFamNameMismatch{}
       -> noHints
+    TcRnBindVarAlreadyInScope{}
+      -> noHints
+    TcRnBindMultipleVariables{}
+      -> noHints
+    TcRnUnexpectedKindVar{}
+      -> [suggestExtension LangExt.PolyKinds]
+    TcRnNegativeNumTypeLiteral{}
+      -> noHints
+    TcRnIllegalKind _ suggest_polyKinds
+      -> if suggest_polyKinds
+         then [suggestExtension LangExt.PolyKinds]
+         else noHints
+    TcRnPrecedenceParsingError{}
+      -> noHints
+    TcRnSectionPrecedenceError{}
+      -> noHints
+    TcRnUnexpectedPatSigType{}
+      -> [suggestExtension LangExt.ScopedTypeVariables]
+    TcRnIllegalKindSignature{}
+      -> [suggestExtension LangExt.KindSignatures]
+    TcRnUnusedQuantifiedTypeVar{}
+      -> noHints
+    TcRnDataKindsError{}
+      -> [suggestExtension LangExt.DataKinds]
 
   diagnosticCode = constructorCode
 
@@ -2932,6 +3033,12 @@ pprRecordFieldPart = \case
   RecordFieldConstructor{} -> text "construction"
   RecordFieldPattern{}     -> text "pattern"
   RecordFieldUpdate        -> text "update"
+
+ppr_opfix :: (OpName, Fixity) -> SDoc
+ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
+   where
+     pp_op | NegateOp <- op = text "prefix `-'"
+           | otherwise      = quotes (ppr op)
 
 pprBindings :: [Name] -> SDoc
 pprBindings = pprWithCommas (quotes . ppr)

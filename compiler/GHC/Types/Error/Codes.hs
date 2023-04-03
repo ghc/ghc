@@ -434,6 +434,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalImplicitParameterBindings"          = 50730
   GhcDiagnosticCode "TcRnIllegalTupleSection"                       = 59155
   GhcDiagnosticCode "TcRnTermNameInType"                            = 37479
+  GhcDiagnosticCode "TcRnUnexpectedKindVar"                         = 12875
+  GhcDiagnosticCode "TcRnNegativeNumTypeLiteral"                    = 93632
+  GhcDiagnosticCode "TcRnUnusedQuantifiedTypeVar"                   = 54180
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957
   GhcDiagnosticCode "TcRnIllegalBuiltinSyntax"                      = 39716
@@ -468,6 +471,12 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNonOverloadedSpecialisePragma"             = 35827
   GhcDiagnosticCode "TcRnSpecialiseNotVisible"                      = 85337
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
+  GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = 69710
+  GhcDiagnosticCode "TcRnBindMultipleVariables"                     = 92957
+  GhcDiagnosticCode "TcRnIllegalKind"                               = 64861
+  GhcDiagnosticCode "TcRnUnexpectedPatSigType"                      = 74097
+  GhcDiagnosticCode "TcRnIllegalKindSignature"                      = 91382
+  GhcDiagnosticCode "TcRnDataKindsError"                            = 68567
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnHsigFixityMismatch"                        = 93007
@@ -588,6 +597,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnTyFamsDisabled/TyFamsDisabledReason
   GhcDiagnosticCode "TyFamsDisabledFamily"                          = 39191
   GhcDiagnosticCode "TyFamsDisabledInstance"                        = 06206
+  GhcDiagnosticCode "TcRnPrecedenceParsingError"                    = 88747
+  GhcDiagnosticCode "TcRnSectionPrecedenceError"                    = 46878
 
   -- IllegalNewtypeReason
   GhcDiagnosticCode "DoesNotHaveSingleField"                        = 23517

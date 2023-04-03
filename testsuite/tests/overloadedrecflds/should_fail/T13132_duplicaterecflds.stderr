@@ -7,7 +7,7 @@ T13132_duplicaterecflds.hs:7:16: error:
            or the field ‘runContT’ of record ‘ContT2’,
               defined at T13132_duplicaterecflds.hs:5:33
 
-T13132_duplicaterecflds.hs:9:11: error:
+T13132_duplicaterecflds.hs:9:11: error: [GHC-46878]
     The operator ‘runContT’ [infixl 9] of a section
         must have lower precedence than that of the operand,
           namely ‘y’ [infixl 9]

@@ -60,6 +60,8 @@ module GHC.Hs.Type (
         selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
+        OpName(..),
+
         mkAnonWildCardTy, pprAnonWildCard,
 
         hsOuterTyVarNames, hsOuterExplicitBndrs, mapHsOuterImplicit,
@@ -109,6 +111,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Types.Var ( VarBndr, visArgTypeLike )
 import GHC.Core.TyCo.Rep ( Type(..) )
+import GHC.Builtin.Names ( negateName )
 import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
 import GHC.Core.Ppr ( pprOccWithTick)
 import GHC.Core.Type
@@ -946,6 +949,26 @@ unambiguousFieldOcc (Ambiguous   rdr sel) = FieldOcc rdr sel
 
 ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
 ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
+
+{-
+************************************************************************
+*                                                                      *
+                OpName
+*                                                                      *
+************************************************************************
+-}
+
+-- | Name of an operator in an operator application or section
+data OpName = NormalOp Name             -- ^ A normal identifier
+            | NegateOp                  -- ^ Prefix negation
+            | UnboundOp RdrName         -- ^ An unbound identifier
+            | RecFldOp (FieldOcc GhcRn) -- ^ A record field occurrence
+
+instance Outputable OpName where
+  ppr (NormalOp n)   = ppr n
+  ppr NegateOp       = ppr negateName
+  ppr (UnboundOp uv) = ppr uv
+  ppr (RecFldOp fld) = ppr fld
 
 {-
 ************************************************************************

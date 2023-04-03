@@ -1,3 +1,4 @@
 
-TH_Promoted1Tuple.hs:7:2: error:
-    Illegal type: ‘'MkSolo Int’ Perhaps you intended to use DataKinds
+TH_Promoted1Tuple.hs:7:2: error: [GHC-68567]
+    Illegal type: ‘'MkSolo Int’
+    Suggested fix: Perhaps you intended to use DataKinds

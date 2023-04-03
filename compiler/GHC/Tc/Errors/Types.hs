@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module GHC.Tc.Errors.Types (
   -- * Main types
@@ -103,6 +106,8 @@ module GHC.Tc.Errors.Types (
   , RoleValidationFailedReason(..)
   , DisabledClassExtension(..)
   , TyFamsDisabledReason(..)
+  , HsTypeOrSigType(..)
+  , HsTyVarBndrExistentialFlag(..)
   ) where
 
 import GHC.Prelude
@@ -322,6 +327,7 @@ data TcRnMessage where
      Test cases: th/T17804
   -}
   TcRnImplicitLift :: Name -> !ErrInfo -> TcRnMessage
+
   {-| TcRnUnusedPatternBinds is a warning (controlled with -Wunused-pattern-binds)
       that occurs if a pattern binding binds no variables at all, unless it is a
       lone wild-card pattern, or a banged pattern.
@@ -335,6 +341,21 @@ data TcRnMessage where
      Test cases: rename/{T13646,T17c,T17e,T7085}
   -}
   TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
+
+  {-| TcRnUnusedQuantifiedTypeVar is a warning that occurs if there are unused
+      quantified type variables.
+
+      Examples:
+        f :: forall a. Int -> Char
+
+      Test cases: rename/should_compile/ExplicitForAllRules1
+                  rename/should_compile/T5331
+  -}
+  TcRnUnusedQuantifiedTypeVar
+    :: HsDocContext
+    -> HsTyVarBndrExistentialFlag -- ^ tyVar binder.
+    -> TcRnMessage
+
   {-| TcRnDodgyImports is a warning (controlled with -Wdodgy-imports) that occurs when
       an import of the form 'T(..)' or 'f(..)' does not actually import anything beside
       'T'/'f' itself.
@@ -620,6 +641,16 @@ data TcRnMessage where
      Test cases: None
   -}
   TcRnCharLiteralOutOfRange :: !Char -> TcRnMessage
+
+  {-| TcRnNegativeNumTypeLiteral is an error that occurs whenever
+      a type-level number literal is negative.
+
+      type Neg = -1
+
+     Test cases: th/T8412
+                 typecheck/should_fail/T8306
+  -}
+  TcRnNegativeNumTypeLiteral :: HsType GhcPs -> TcRnMessage
 
   {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
       the record wildcards '..' are used inside a constructor without labeled fields.
@@ -1723,10 +1754,29 @@ data TcRnMessage where
  -}
   TcRnCapturedTermName :: RdrName -> Either [GlobalRdrElt] Name -> TcRnMessage
 
+  {-| TcRnTypeMultipleOccurenceOfBindVar is an error that occurs if a bound
+      type variable's name is already in use.
+    Example:
+      f :: forall a. ...
+      f (MkT @a ...) = ...
+
+    Test cases: TyAppPat_ScopedTyVarConflict TyAppPat_NonlinearMultiPat TyAppPat_NonlinearMultiAppPat
+  -}
+  TcRnBindVarAlreadyInScope :: [LocatedN RdrName] -> TcRnMessage
+
+  {-| TcRnBindMultipleVariables is an error that occurs in the case of
+    multiple occurrences of a bound variable.
+    Example:
+      foo (MkFoo @(a,a) ...) = ...
+
+    Test case: typecheck/should_fail/TyAppPat_NonlinearSinglePat
+  -}
+  TcRnBindMultipleVariables :: HsDocContext -> LocatedN RdrName -> TcRnMessage
+
   {-| TcRnTypeEqualityOutOfScope is a warning (controlled by -Wtype-equality-out-of-scope)
       that occurs when the type equality (a ~ b) is not in scope.
 
-      Test case: T18862b
+      Test case: warnings/should_compile/T18862b
   -}
   TcRnTypeEqualityOutOfScope :: TcRnMessage
 
@@ -2106,6 +2156,31 @@ data TcRnMessage where
     -> !(Maybe SuggestUnliftedTypes) -- ^ suggested extension
     -> TcRnMessage
 
+  {-| TcRnUnexpectedKindVar is an error that occurs when the user
+      tries to use kind variables without -XPolyKinds.
+
+      Example:
+        f :: forall k a. Proxy (a :: k)
+
+      Test cases: polykinds/BadKindVar
+                  polykinds/T14710
+                  saks/should_fail/T16722
+  -}
+  TcRnUnexpectedKindVar :: RdrName -> TcRnMessage
+
+  {-| TcRnIllegalKind is used for a various illegal kinds errors including
+
+      Example:
+        type T :: forall k. Type -- without emabled -XPolyKinds
+
+      Test cases: polykinds/T16762b
+  -}
+  TcRnIllegalKind
+    :: HsTypeOrSigType GhcPs
+            -- ^ The illegal kind
+    -> Bool -- ^ Whether enabling -XPolyKinds should be suggested
+    -> TcRnMessage
+
   {- TcRnClassKindNotConstraint is an error for a type class that has a kind that
      is not equivalent to Constraint.
 
@@ -2166,6 +2241,43 @@ data TcRnMessage where
     :: !(HsMatchContext GhcTc) -- ^ Pattern match specifics
     -> !MatchArgBadMatches
     -> TcRnMessage
+
+  {-| TcRnUnexpectedPatSigType is an error occurring when there is
+      a type signature in a pattern without -XScopedTypeVariables extension
+
+      Examples:
+        f (a :: Bool) = ...
+
+      Test case: rename/should_fail/T11663
+  -}
+  TcRnUnexpectedPatSigType :: HsPatSigType GhcPs -> TcRnMessage
+
+  {-| TcRnIllegalKindSignature is an error occuring when there is
+      a kind signature without -XKindSignatures extension
+
+      Examples:
+        data Foo (a :: Nat) = ....
+
+      Test case: parser/should_fail/readFail036
+  -}
+  TcRnIllegalKindSignature :: HsType GhcPs -> TcRnMessage
+
+  {-| TcRnDataKindsError is an error occurring when there is
+      an illegal type or kind, probably required -XDataKinds
+      and is used without the enabled extension.
+
+      Examples:
+
+        type Foo = [Nat, Char]
+
+        type Bar = [Int, String]
+
+      Test cases: linear/should_fail/T18888
+                  polykinds/T7151
+                  th/TH_Promoted1Tuple
+                  typecheck/should_fail/tcfail094
+  -}
+  TcRnDataKindsError :: TypeOrKind -> HsType GhcPs -> TcRnMessage
 
   {- TcRnCannotBindScopedTyVarInPatSig is an error stating that scoped type
      variables cannot be used in pattern bindings.
@@ -3638,6 +3750,43 @@ data TcRnMessage where
                         -> !Name -- ^ The name used in the equation
                         -> TcRnMessage
 
+  {-| TcRnPrecedenceParsingError is an error caused by attempting to
+      use operators with the same precedence in one infix expression.
+
+      Example:
+        eq :: (a ~ b ~ c) :~: ()
+
+      Test cases: module/mod61
+                  parser/should_fail/readFail016
+                  rename/should_fail/rnfail017
+                  rename/should_fail/T9077
+                  typecheck/should_fail/T18252a
+  -}
+  TcRnPrecedenceParsingError
+    :: (OpName, Fixity) -- ^ first operator's name and fixity
+    -> (OpName, Fixity) -- ^ second operator's name and fixity
+    -> TcRnMessage
+
+  {-| TcRnPrecedenceParsingError is an error caused by attempting to
+      use an operator with higher precedence than the operand.
+
+      Example:
+        k = (-3 **)
+          where
+                (**) = const
+                infixl 7 **
+
+      Test cases: overloadedrecflds/should_fail/T13132_duplicaterecflds
+                  parser/should_fail/readFail023
+                  rename/should_fail/rnfail019
+                  th/TH_unresolvedInfix2
+  -}
+  TcRnSectionPrecedenceError
+    :: (OpName, Fixity) -- ^ first operator's name and fixity
+    -> (OpName, Fixity) -- ^ argument operator
+    -> HsExpr GhcPs -- ^ Section
+    -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -4075,6 +4224,7 @@ data Exported
 instance Outputable Exported where
   ppr IsNotExported = text "IsNotExported"
   ppr IsExported    = text "IsExported"
+
 
 --------------------------------------------------------------------------------
 --
@@ -5023,3 +5173,22 @@ data TyFamsDisabledReason
   = TyFamsDisabledFamily !Name
   | TyFamsDisabledInstance !TyCon
   deriving (Generic)
+
+-- | Either `HsType p` or `HsSigType p`.
+--
+-- Used for reporting errors in `TcRnIllegalKind`.
+data HsTypeOrSigType p
+  = HsType    (HsType p)
+  | HsSigType (HsSigType p)
+
+instance OutputableBndrId p => Outputable (HsTypeOrSigType (GhcPass p)) where
+  ppr (HsType ty) = ppr ty
+  ppr (HsSigType sig_ty) = ppr sig_ty
+
+-- | A wrapper around HsTyVarBndr.
+-- Used for reporting errors in `TcRnUnusedQuantifiedTypeVar`.
+data HsTyVarBndrExistentialFlag = forall flag. OutputableBndrFlag flag 'Renamed =>
+  HsTyVarBndrExistentialFlag (HsTyVarBndr flag GhcRn)
+
+instance Outputable HsTyVarBndrExistentialFlag where
+  ppr (HsTyVarBndrExistentialFlag hsTyVarBndr) = ppr hsTyVarBndr
