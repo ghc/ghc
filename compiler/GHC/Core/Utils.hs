@@ -23,9 +23,9 @@ module GHC.Core.Utils (
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType, mkLamType, mkLamTypes,
         mkFunctionType,
-        exprIsDupable, exprIsTrivial, getIdFromTrivialExpr,
-        getIdFromTrivialExpr_maybe,
-        exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
+        exprIsTrivial, getIdFromTrivialExpr, getIdFromTrivialExpr_maybe,
+        trivial_expr_fold,
+        exprIsDupable, exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprOkForSpecEval,
         exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
@@ -1046,20 +1046,37 @@ and that confuses the code generator (#11155). So best to kill
 it off at source.
 -}
 
+{-# INLINE trivial_expr_fold #-}
+trivial_expr_fold :: (Id -> r) -> (Literal -> r) -> r -> r -> CoreExpr -> r
+-- ^ The worker function for Note [exprIsTrivial] and Note [getIdFromTrivialExpr]
+-- This is meant to have the code of both functions in one place and make it
+-- easy to derive custom predicates.
+--
+-- (trivial_expr_fold k_id k_triv k_not_triv e)
+-- * returns (k_id x) if `e` is a variable `x` (with trivial wrapping)
+-- * returns (k_lit x) if `e` is a trivial literal `l` (with trivial wrapping)
+-- * returns k_triv if `e` is a literal, type, or coercion (with trivial wrapping)
+-- * returns k_not_triv otherwise
+--
+-- where "trivial wrapping" is
+-- * Type application or abstraction
+-- * Ticks other than `tickishIsCode`
+-- * `case e of {}` an empty case
+trivial_expr_fold k_id k_lit k_triv k_not_triv = go
+  where
+    go (Var v)                            = k_id v  -- See Note [Variables are trivial]
+    go (Lit l)    | litIsTrivial l        = k_lit l
+    go (Type _)                           = k_triv
+    go (Coercion _)                       = k_triv
+    go (App f t)  | not (isRuntimeArg t)  = go f
+    go (Lam b e)  | not (isRuntimeVar b)  = go e
+    go (Tick t e) | not (tickishIsCode t) = go e              -- See Note [Tick trivial]
+    go (Cast e _)                         = go e
+    go (Case e _ _ [])                    = go e              -- See Note [Empty case is trivial]
+    go _                                  = k_not_triv
+
 exprIsTrivial :: CoreExpr -> Bool
--- If you modify this function, you may also
--- need to modify getIdFromTrivialExpr
-exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
-exprIsTrivial (Type _)         = True
-exprIsTrivial (Coercion _)     = True
-exprIsTrivial (Lit lit)        = litIsTrivial lit
-exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Lam b e)        = not (isRuntimeVar b) && exprIsTrivial e
-exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
-                                 -- See Note [Tick trivial]
-exprIsTrivial (Cast e _)       = exprIsTrivial e
-exprIsTrivial (Case e _ _ [])  = exprIsTrivial e  -- See Note [Empty case is trivial]
-exprIsTrivial _                = False
+exprIsTrivial e = trivial_expr_fold (const True) (const True) True False e
 
 {-
 Note [getIdFromTrivialExpr]
@@ -1079,24 +1096,13 @@ T12076lit for an example where this matters.
 -}
 
 getIdFromTrivialExpr :: HasDebugCallStack => CoreExpr -> Id
-getIdFromTrivialExpr e
-    = fromMaybe (pprPanic "getIdFromTrivialExpr" (ppr e))
-                (getIdFromTrivialExpr_maybe e)
+-- See Note [getIdFromTrivialExpr]
+getIdFromTrivialExpr e = trivial_expr_fold id (const panic) panic panic e
+  where
+    panic = pprPanic "getIdFromTrivialExpr" (ppr e)
 
 getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
--- See Note [getIdFromTrivialExpr]
--- Th equations for this should line up with those for exprIsTrivial
-getIdFromTrivialExpr_maybe e
-  = go e
-  where
-    go (App f t) | not (isRuntimeArg t)   = go f
-    go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e _)                         = go e
-    go (Lam b e) | not (isRuntimeVar b)   = go e
-    go (Case e _ _ [])                    = go e
-    go (Var v) = Just v
-    go _       = Nothing
-
+getIdFromTrivialExpr_maybe e = trivial_expr_fold Just (const Nothing) Nothing Nothing e
 
 {- *********************************************************************
 *                                                                      *
