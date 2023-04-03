@@ -760,7 +760,7 @@ nightly arch opsys bc =
 release :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 release arch opsys bc =
   let NamedJob n j = job arch opsys (bc { buildFlavour = Release })
-  in NamedJob { name = "release-" ++ n, jobInfo = addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . highCompression $ j}
+  in NamedJob { name = "release-" ++ n, jobInfo = addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . useHashUnitIds . highCompression $ j}
 
 -- Specific job modification functions
 
@@ -784,6 +784,9 @@ ignorePerfFailures = addVariable "IGNORE_PERF_FAILURES" "all"
 -- smaller results)
 highCompression :: Job -> Job
 highCompression = addVariable "XZ_OPT" "-9"
+
+useHashUnitIds :: Job -> Job
+useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 
 -- | Mark the validate job to run in fast-ci mode
 fastCI :: JobGroup Job -> JobGroup Job
