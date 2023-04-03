@@ -38,7 +38,7 @@ assertStackChunksAreDecodable :: HasCallStack => [StackFrame] -> IO ()
 assertStackChunksAreDecodable s = do
   let underflowFrames = filter isUnderflowFrame s
   assertThat
-    "Expect some underflow frames"
+    ("Expect some underflow frames. Got " ++ show (length underflowFrames))
     (>= 2)
     (length underflowFrames)
   let stackFrames = map (ssc_stack . nextChunk) underflowFrames
