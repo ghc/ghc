@@ -13,7 +13,7 @@ import GHC.Stack (HasCallStack)
 import GHC.Stack.CloneStack
 import TestUtils
 
-main = loop 128
+main = loop 256
 
 {-# NOINLINE loop #-}
 loop 0 = Control.Monad.void getStack
