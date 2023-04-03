@@ -1111,7 +1111,7 @@ cpeApp top_env expr
         where
           depth = val_args args
           stricts = case idDmdSig v of
-                            DmdSig (DmdType _ demands _)
+                            DmdSig (DmdType _ demands)
                               | listLengthCmp demands depth /= GT -> demands
                                     -- length demands <= depth
                               | otherwise                         -> []

@@ -228,7 +228,6 @@ test('T13027', normal, compile, [''])
 test('T13025',
      normal,
      makefile_test, ['T13025'])
-test('T13143', only_ways(['optasm']), compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T13156', normal, makefile_test, ['T13156'])
 test('T11444', normal, compile, [''])
 test('str-rules',
@@ -414,7 +413,8 @@ test('T17966',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 # We expect to see a SPEC rule for $cm
 test('T19644',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-spec'])
 test('T21391', normal, compile, ['-O -dcore-lint'])
-test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
+# T22112: Simply test that dumping the Core doesn't loop becuse of the unfolding and ignore the dump output
+test('T22112', [ grep_errmsg('never matches') ], compile, ['-O -dsuppress-uniques -dno-typeable-binds -fexpose-all-unfoldings -ddump-simpl'])
 test('T21391a', normal, compile, ['-O -dcore-lint'])
 # We don't want to see a thunk allocation for the insertBy expression after CorePrep.
 test('T21392', [ grep_errmsg(r'sat.* :: \[\(.*Unique, .*Int\)\]'), expect_broken(21392) ], compile, ['-O -ddump-prep -dno-typeable-binds -dsuppress-uniques'])

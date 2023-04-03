@@ -2095,15 +2095,16 @@ calcSpecInfo :: Id           -- The original function
 calcSpecInfo fn arg_bndrs (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
   = ( spec_lam_bndrs_w_dmds
     , spec_call_args
-    , mkClosedDmdSig [idDemandInfo b | b <- spec_lam_bndrs_w_dmds, isId b] div )
+    , zapDmdEnvSig (DmdSig (dt{dt_args = spec_fn_dmds})) )
   where
-    DmdSig (DmdType _ fn_dmds div) = idDmdSig fn
+    DmdSig dt@DmdType{dt_args=fn_dmds} = idDmdSig fn
+    spec_fn_dmds = [idDemandInfo b | b <- spec_lam_bndrs_w_dmds, isId b]
 
     val_pats   = filterOut isTypeArg pats
                  -- Value args at call sites, used to determine how many demands to drop
-                 -- from the original functions demand and for setting up dmd_env.
-    dmd_env    = go emptyVarEnv fn_dmds val_pats
-    qvar_dmds  = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
+                 -- from the original functions demand and for setting up arg_dmd_env.
+    arg_dmd_env = go emptyVarEnv fn_dmds val_pats
+    qvar_dmds  = [ lookupVarEnv arg_dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     extra_dmds = dropList val_pats fn_dmds
 
     -- Annotate the variables with the strictness information from
@@ -2127,12 +2128,12 @@ calcSpecInfo fn arg_bndrs (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
     set_dmds (v:vs) ds@(d:ds') | isTyVar v = v                   : set_dmds vs ds
                                | otherwise = setIdDemandInfo v d : set_dmds vs ds'
 
-    go :: DmdEnv -> [Demand] -> [CoreExpr] -> DmdEnv
+    go :: VarEnv Demand -> [Demand] -> [CoreExpr] -> VarEnv Demand
     -- We've filtered out all the type patterns already
     go env (d:ds) (pat : pats)     = go (go_one env d pat) ds pats
     go env _      _                = env
 
-    go_one :: DmdEnv -> Demand -> CoreExpr -> DmdEnv
+    go_one :: VarEnv Demand -> Demand -> CoreExpr -> VarEnv Demand
     go_one env d          (Var v) = extendVarEnv_C plusDmd env v d
     go_one env (_n :* cd) e -- NB: _n does not have to be strict
       | (Var _, args) <- collectArgs e
