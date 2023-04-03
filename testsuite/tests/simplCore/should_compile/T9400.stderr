@@ -71,8 +71,7 @@ main
                   @()
                   (case Control.Exception.Base.patError
                           @LiftedRep @() "T9400.hs:(17,5)-(18,29)|case"#
-                   of wild {
-                   })
+                   of {})
                   (>>
                      @IO
                      GHC.Base.$fMonadIO

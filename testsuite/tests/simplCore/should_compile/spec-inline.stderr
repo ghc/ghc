@@ -6,36 +6,41 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 20 0}]
 Roman.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 30 0}]
 Roman.$trModule2 = "Roman"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule
   = GHC.Types.Module Roman.$trModule3 Roman.$trModule1
 
@@ -77,12 +82,13 @@ Roman.$wgo [InlPrag=[2]] :: Maybe Int -> Maybe Int -> GHC.Prim.Int#
 [GblId[StrictWorker([!, !])],
  Arity=2,
  Str=<1L><1L>,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [61 30] 249 0}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [61 30] 249 0}]
 Roman.$wgo
   = \ (u :: Maybe Int) (ds :: Maybe Int) ->
       case ds of {
-        Nothing -> case Roman.foo3 of wild1 { };
+        Nothing -> case Roman.foo3 of {};
         Just x ->
           case x of { GHC.Types.I# ipv ->
           case u of {
@@ -113,8 +119,8 @@ Roman.foo_go [InlPrag=[2]] :: Maybe Int -> Maybe Int -> Int
  Arity=2,
  Str=<1L><1L>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
          Tmpl= \ (u [Occ=Once1] :: Maybe Int)
                  (ds [Occ=Once1] :: Maybe Int) ->
@@ -128,15 +134,17 @@ Roman.foo_go
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.foo2 :: Int
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 Roman.foo2 = GHC.Types.I# 6#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
 [GblId,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
+ Unf=Unf{Src=<vanilla>, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=IF_ARGS [] 10 10}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
 
 -- RHS size: {terms: 11, types: 4, coercions: 0, joins: 0/0}
@@ -145,8 +153,8 @@ foo :: Int -> Int
  Arity=1,
  Str=<1L>,
  Cpr=1,
- Unf=Unf{Src=StableSystem, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True,
+ Unf=Unf{Src=StableSystem, TopLvl=True,
+         Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once1!] :: Int) ->
                  case n of n1 [Occ=Once1] { GHC.Types.I# _ [Occ=Dead] ->
