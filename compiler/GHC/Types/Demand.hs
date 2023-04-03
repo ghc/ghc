@@ -43,23 +43,20 @@ module GHC.Types.Demand (
     -- ** Manipulating Boxity of a Demand
     unboxDeeplyDmd,
 
-    -- * Demand environments
-    DmdEnv, emptyDmdEnv,
-    keepAliveDmdEnv, reuseEnv,
-
     -- * Divergence
     Divergence(..), topDiv, botDiv, exnDiv, lubDivergence, isDeadEndDiv,
+
+    -- * Demand environments
+    DmdEnv(..), addVarDmdEnv, mkTermDmdEnv, nopDmdEnv, plusDmdEnv, plusDmdEnvs,
+    reuseEnv,
 
     -- * Demand types
     DmdType(..), dmdTypeDepth,
     -- ** Algebra
     nopDmdType, botDmdType,
-    lubDmdType, plusDmdType, multDmdType,
-    -- *** PlusDmdArg
-    PlusDmdArg, mkPlusDmdArg, toPlusDmdArg,
+    lubDmdType, plusDmdType, multDmdType, discardArgDmds,
     -- ** Other operations
     peelFV, findIdDemand, addDemand, splitDmdTy, deferAfterPreciseException,
-    keepAliveDmdType,
 
     -- * Demand signatures
     DmdSig(..), mkDmdSigForArity, mkClosedDmdSig, mkVanillaDmdSig,
@@ -85,9 +82,8 @@ module GHC.Types.Demand (
 
 import GHC.Prelude
 
-import GHC.Types.Var ( Var, Id )
+import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
@@ -1054,7 +1050,7 @@ mkWorkerDemand n = C_01 :* go n
 
 argsOneShots :: DmdSig -> Arity -> [[OneShotInfo]]
 -- ^ See Note [Computing one-shot info]
-argsOneShots (DmdSig (DmdType _ arg_ds _)) n_val_args
+argsOneShots (DmdSig (DmdType _ arg_ds)) n_val_args
   | unsaturated_call = []
   | otherwise = go arg_ds
   where
@@ -1466,7 +1462,7 @@ lubDivergence _        _        = Dunno
 -- defaultFvDmd (r1 `lubDivergence` r2) = defaultFvDmd r1 `lubDmd` defaultFvDmd r2
 -- (See Note [Default demand on free variables and arguments] for why)
 
--- | See Note [Asymmetry of 'plus*'], which concludes that 'plusDivergence'
+-- | See Note [Asymmetry of plusDmdType], which concludes that 'plusDivergence'
 -- needs to be symmetric.
 -- Strictly speaking, we should have @plusDivergence Dunno Diverges = ExnOrDiv@.
 -- But that regresses in too many places (every infinite loop, basically) to be
@@ -1737,112 +1733,131 @@ a consequence of fixed-point iteration, it's not important that they agree.
 -}
 
 -- Subject to Note [Default demand on free variables and arguments]
-type DmdEnv = VarEnv Demand
+-- | Captures the result of an evaluation of an expression, by
+--
+--   * Listing how the free variables of that expression have been evaluted
+--     ('de_fvs')
+--   * Saying whether or not evaluation would surely diverge ('de_div')
+--
+-- See Note [Demand env Equality].
+data DmdEnv = DE { de_fvs :: !(VarEnv Demand), de_div :: !Divergence }
 
-emptyDmdEnv :: DmdEnv
-emptyDmdEnv = emptyVarEnv
+instance Eq DmdEnv where
+  DE fv1 div1 == DE fv2 div2
+    = div1 == div2 && canonicalise div1 fv1 == canonicalise div2 fv2
+    where
+      canonicalise div fv = filterUFM (/= defaultFvDmd div) fv
+
+mkEmptyDmdEnv :: Divergence -> DmdEnv
+mkEmptyDmdEnv div = DE emptyVarEnv div
+
+-- | Build a potentially terminating 'DmdEnv' from a finite map that says what
+-- has been evaluated so far
+mkTermDmdEnv :: VarEnv Demand -> DmdEnv
+mkTermDmdEnv fvs = DE fvs topDiv
+
+nopDmdEnv :: DmdEnv
+nopDmdEnv = mkEmptyDmdEnv topDiv
+
+botDmdEnv :: DmdEnv
+botDmdEnv = mkEmptyDmdEnv botDiv
+
+exnDmdEnv :: DmdEnv
+exnDmdEnv = mkEmptyDmdEnv exnDiv
+
+lubDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
+lubDmdEnv (DE fv1 d1) (DE fv2 d2) = DE lub_fv lub_div
+  where
+    -- See Note [Demand env Equality]
+    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2)
+    lub_div = lubDivergence d1 d2
+
+addVarDmdEnv :: DmdEnv -> Id -> Demand -> DmdEnv
+addVarDmdEnv env@(DE fvs div) id dmd
+  = DE (extendVarEnv fvs id (dmd `plusDmd` lookupDmdEnv env id)) div
+
+plusDmdEnv :: DmdEnv -> DmdEnv -> DmdEnv
+plusDmdEnv (DE fv1 d1) (DE fv2 d2)
+  -- In contrast to Note [Asymmetry of plusDmdType], this function is symmetric.
+  | isEmptyVarEnv fv2, defaultFvDmd d2 == absDmd
+  = DE fv1 (d1 `plusDivergence` d2) -- a very common case that is much more efficient
+  | isEmptyVarEnv fv1, defaultFvDmd d1 == absDmd
+  = DE fv2 (d1 `plusDivergence` d2) -- another very common case that is much more efficient
+  | otherwise
+  = DE (plusVarEnv_CD plusDmd fv1 (defaultFvDmd d1) fv2 (defaultFvDmd d2))
+       (d1 `plusDivergence` d2)
+
+-- | 'DmdEnv' is a monoid via 'plusDmdEnv' and 'nopDmdEnv'; this is its 'msum'
+plusDmdEnvs :: [DmdEnv] -> DmdEnv
+plusDmdEnvs []   = nopDmdEnv
+plusDmdEnvs pdas = foldl1' plusDmdEnv pdas
 
 multDmdEnv :: Card -> DmdEnv -> DmdEnv
-multDmdEnv C_11 env = env
-multDmdEnv C_00 _   = emptyDmdEnv
-multDmdEnv n    env = mapVarEnv (multDmd n) env
+multDmdEnv C_11 env          = env
+multDmdEnv C_00 _            = nopDmdEnv
+multDmdEnv n    (DE fvs div) = DE (mapVarEnv (multDmd n) fvs) (multDivergence n div)
 
 reuseEnv :: DmdEnv -> DmdEnv
 reuseEnv = multDmdEnv C_1N
 
--- | @keepAliveDmdType dt vs@ makes sure that the Ids in @vs@ have
--- /some/ usage in the returned demand types -- they are not Absent.
--- See Note [Absence analysis for stable unfoldings and RULES]
---     in "GHC.Core.Opt.DmdAnal".
-keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
-keepAliveDmdEnv env vs
-  = nonDetStrictFoldVarSet add env vs
-  where
-    add :: Id -> DmdEnv -> DmdEnv
-    add v env = extendVarEnv_C add_dmd env v topDmd
+lookupDmdEnv :: DmdEnv -> Id -> Demand
+-- See Note [Default demand on free variables and arguments]
+lookupDmdEnv (DE fv div) id = lookupVarEnv fv id `orElse` defaultFvDmd div
 
-    add_dmd :: Demand -> Demand -> Demand
-    -- If the existing usage is Absent, make it used
-    -- Otherwise leave it alone
-    add_dmd dmd _ | isAbsDmd dmd = topDmd
-                  | otherwise    = dmd
+delDmdEnv :: DmdEnv -> Id -> DmdEnv
+delDmdEnv (DE fv div) id = DE (fv `delVarEnv` id) div
 
 -- | Characterises how an expression
 --
---    * Evaluates its free variables ('dt_env')
+--    * Evaluates its free variables ('dt_env') including divergence info
 --    * Evaluates its arguments ('dt_args')
---    * Diverges on every code path or not ('dt_div')
 --
--- Equality is defined modulo 'defaultFvDmd's in 'dt_env'.
--- See Note [Demand type Equality].
 data DmdType
   = DmdType
-  { dt_env  :: !DmdEnv     -- ^ Demand on explicitly-mentioned free variables
+  { dt_env  :: !DmdEnv     -- ^ Demands on free variables.
+                           -- See Note [Demand type Divergence]
   , dt_args :: ![Demand]   -- ^ Demand on arguments
-  , dt_div  :: !Divergence -- ^ Whether evaluation diverges.
-                          -- See Note [Demand type Divergence]
   }
 
--- | See Note [Demand type Equality].
+-- | See Note [Demand env Equality].
 instance Eq DmdType where
-  (==) (DmdType fv1 ds1 div1)
-       (DmdType fv2 ds2 div2) =  div1 == div2 && ds1 == ds2 -- cheap checks first
-                              && canonicalise div1 fv1 == canonicalise div2 fv2
-       where
-         canonicalise div fv = filterUFM (/= defaultFvDmd div) fv
+  DmdType env1 ds1 == DmdType env2 ds2
+    = ds1 == ds2 -- cheap checks first
+      && env1 == env2
 
 -- | Compute the least upper bound of two 'DmdType's elicited /by the same
 -- incoming demand/!
 lubDmdType :: DmdType -> DmdType -> DmdType
-lubDmdType d1 d2
-  = DmdType lub_fv lub_ds lub_div
+lubDmdType d1 d2 = DmdType lub_fv lub_ds
   where
     n = max (dmdTypeDepth d1) (dmdTypeDepth d2)
-    (DmdType fv1 ds1 r1) = etaExpandDmdType n d1
-    (DmdType fv2 ds2 r2) = etaExpandDmdType n d2
-
-    -- See Note [Demand type Equality]
-    lub_fv  = plusVarEnv_CD lubDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd r2)
+    (DmdType fv1 ds1) = etaExpandDmdType n d1
+    (DmdType fv2 ds2) = etaExpandDmdType n d2
     lub_ds  = zipWithEqual "lubDmdType" lubDmd ds1 ds2
-    lub_div = lubDivergence r1 r2
+    lub_fv = lubDmdEnv fv1 fv2
 
-type PlusDmdArg = (DmdEnv, Divergence)
+discardArgDmds :: DmdType -> DmdEnv
+discardArgDmds (DmdType fv _) = fv
 
-mkPlusDmdArg :: DmdEnv -> PlusDmdArg
-mkPlusDmdArg env = (env, topDiv)
-
-toPlusDmdArg :: DmdType -> PlusDmdArg
-toPlusDmdArg (DmdType fv _ r) = (fv, r)
-
-plusDmdType :: DmdType -> PlusDmdArg -> DmdType
-plusDmdType (DmdType fv1 ds1 r1) (fv2, t2)
-    -- See Note [Asymmetry of 'plus*']
-    -- 'plus' takes the argument/result info from its *first* arg,
-    -- using its second arg just for its free-var info.
-  | isEmptyVarEnv fv2, defaultFvDmd t2 == absDmd
-  = DmdType fv1 ds1 (r1 `plusDivergence` t2) -- a very common case that is much more efficient
-  | otherwise
-  = DmdType (plusVarEnv_CD plusDmd fv1 (defaultFvDmd r1) fv2 (defaultFvDmd t2))
-            ds1
-            (r1 `plusDivergence` t2)
+plusDmdType :: DmdType -> DmdEnv -> DmdType
+plusDmdType (DmdType fv ds) fv'
+  -- See Note [Asymmetry of plusDmdType]
+  -- 'DmdEnv' forms a (monoidal) action on 'DmdType' via this operation.
+  = DmdType (plusDmdEnv fv fv') ds
 
 botDmdType :: DmdType
-botDmdType = DmdType emptyDmdEnv [] botDiv
+botDmdType = DmdType botDmdEnv []
 
 -- | The demand type of doing nothing (lazy, absent, no Divergence
 -- information). Note that it is ''not'' the top of the lattice (which would be
 -- "may use everything"), so it is (no longer) called topDmdType.
 nopDmdType :: DmdType
-nopDmdType = DmdType emptyDmdEnv [] topDiv
-
-isNopDmdType :: DmdType -> Bool
-isNopDmdType (DmdType env args div)
-  = div == topDiv && null args && isEmptyVarEnv env
+nopDmdType = DmdType nopDmdEnv []
 
 -- | The demand type of an unspecified expression that is guaranteed to
 -- throw a (precise or imprecise) exception or diverge.
 exnDmdType :: DmdType
-exnDmdType = DmdType emptyDmdEnv [] exnDiv
+exnDmdType = DmdType exnDmdEnv []
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth = length . dt_args
@@ -1851,7 +1866,7 @@ dmdTypeDepth = length . dt_args
 -- expansion, where n must not be lower than the demand types depth.
 -- It appends the argument list with the correct 'defaultArgDmd'.
 etaExpandDmdType :: Arity -> DmdType -> DmdType
-etaExpandDmdType n d@DmdType{dt_args = ds, dt_div = div}
+etaExpandDmdType n d@DmdType{dt_args = ds, dt_env = env}
   | n == depth = d
   | n >  depth = d{dt_args = inc_ds}
   | otherwise  = pprPanic "etaExpandDmdType: arity decrease" (ppr n $$ ppr d)
@@ -1863,7 +1878,7 @@ etaExpandDmdType n d@DmdType{dt_args = ds, dt_div = div}
         --  * Divergence is still valid:
         --    - A dead end after 2 arguments stays a dead end after 3 arguments
         --    - The remaining case is Dunno, which is already topDiv
-        inc_ds = take n (ds ++ repeat (defaultArgDmd div))
+        inc_ds = take n (ds ++ repeat (defaultArgDmd (de_div env)))
 
 -- | A conservative approximation for a given 'DmdType' in case of an arity
 -- decrease. Currently, it's just nopDmdType.
@@ -1875,30 +1890,27 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 -- We already have a suitable demand on all
 -- free vars, so no need to add more!
 splitDmdTy ty@DmdType{dt_args=dmd:args} = (dmd, ty{dt_args=args})
-splitDmdTy ty@DmdType{dt_div=div}       = (defaultArgDmd div, ty)
+splitDmdTy ty@DmdType{dt_env=env}       = (defaultArgDmd (de_div env), ty)
 
 multDmdType :: Card -> DmdType -> DmdType
-multDmdType n (DmdType fv args res_ty)
+multDmdType n (DmdType fv args)
   = -- pprTrace "multDmdType" (ppr n $$ ppr fv $$ ppr (multDmdEnv n fv)) $
     DmdType (multDmdEnv n fv)
             (map (multDmd n) args)
-            (multDivergence n res_ty)
 
 peelFV :: DmdType -> Var -> (DmdType, Demand)
-peelFV (DmdType fv ds res) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
-                               (DmdType fv' ds res, dmd)
+peelFV (DmdType fv ds) id = -- pprTrace "rfv" (ppr id <+> ppr dmd $$ ppr fv)
+                            (DmdType fv' ds, dmd)
   where
   -- Force these arguments so that old `Env` is not retained.
-  !fv' = fv `delVarEnv` id
-  -- See Note [Default demand on free variables and arguments]
-  !dmd  = lookupVarEnv fv id `orElse` defaultFvDmd res
+  !fv' = fv `delDmdEnv` id
+  !dmd = lookupDmdEnv fv id
 
 addDemand :: Demand -> DmdType -> DmdType
-addDemand dmd (DmdType fv ds res) = DmdType fv (dmd:ds) res
+addDemand dmd (DmdType fv ds) = DmdType fv (dmd:ds)
 
 findIdDemand :: DmdType -> Var -> Demand
-findIdDemand (DmdType fv _ res) id
-  = lookupVarEnv fv id `orElse` defaultFvDmd res
+findIdDemand (DmdType fv _) id = lookupDmdEnv fv id
 
 -- | When e is evaluated after executing an IO action that may throw a precise
 -- exception, we act as if there is an additional control flow path that is
@@ -1913,11 +1925,6 @@ findIdDemand (DmdType fv _ res) id
 -- That means failure to drop dead-ends, see #18086.
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
-
--- | See 'keepAliveDmdEnv'.
-keepAliveDmdType :: DmdType -> VarSet -> DmdType
-keepAliveDmdType (DmdType fvs ds res) vars =
-  DmdType (fvs `keepAliveDmdEnv` vars) ds res
 
 {- Note [deferAfterPreciseException]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1974,32 +1981,25 @@ on err via the App rule. In contrast to weaker head strictness, this demand is
 strong enough to unleash err's signature and hence we see that the whole
 expression diverges!
 
-Note [Demand type Equality]
+Note [Demand env Equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What is the difference between the DmdType <L>{x->A} and <L>?
+What is the difference between the Demand env {x->A} and {}?
 Answer: There is none! They have the exact same semantics, because any var that
-is not mentioned in 'dt_env' implicitly has demand 'defaultFvDmd', based on
-the divergence of the demand type 'dt_div'.
-Similarly, <B>b{x->B, y->A} is the same as <B>b{y->A}, because the default FV
-demand of BotDiv is B. But neither is equal to <B>b, because y has demand B in
+is not mentioned in 'de_fvs' implicitly has demand 'defaultFvDmd', based on
+the divergence of the demand env 'de_div'.
+Similarly, b{x->B, y->A} is the same as b{y->A}, because the default FV
+demand of BotDiv is B. But neither is equal to b{}, because y has demand B in
 the latter, not A as before.
 
-NB: 'dt_env' technically can't stand for its own, because it doesn't tell us the
-demand on FVs that don't appear in the DmdEnv. Hence 'PlusDmdArg' carries along
-a 'Divergence', for example.
+The Eq instance of DmdEnv must reflect that, otherwise we can get into monotonicity
+issues during fixed-point iteration ({x->A} /= {} /= {x->A} /= ...).
+It does so by filtering out any default FV demands prior to comparing 'de_fvs'.
 
-The Eq instance of DmdType must reflect that, otherwise we can get into monotonicity
-issues during fixed-point iteration (<L>{x->A} /= <L> /= <L>{x->A} /= ...).
-It does so by filtering out any default FV demands prior to comparing 'dt_env'.
-An alternative would be to maintain an invariant that there are no default FV demands
-in 'dt_env' to begin with, but that seems more involved to maintain in the current
-implementation.
-
-Note that 'lubDmdType' maintains this kind of equality by using 'plusVarEnv_CD',
-involving 'defaultFvDmd' for any entries present in one 'dt_env' but not the
+Note that 'lubDmdEnv' maintains this kind of equality by using 'plusVarEnv_CD',
+involving 'defaultFvDmd' for any entries present in one 'de_fvs' but not the
 other.
 
-Note [Asymmetry of 'plus*']
+Note [Asymmetry of plusDmdType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'plus' for DmdTypes is *asymmetrical*, because there can only one
 be one type contributing argument demands!  For example, given (e1 e2), we get
@@ -2155,24 +2155,24 @@ newtype DmdSig
 -- | Turns a 'DmdType' computed for the particular 'Arity' into a 'DmdSig'
 -- unleashable at that arity. See Note [Understanding DmdType and DmdSig].
 mkDmdSigForArity :: Arity -> DmdType -> DmdSig
-mkDmdSigForArity arity dmd_ty@(DmdType fvs args div)
-  | arity < dmdTypeDepth dmd_ty = DmdSig $ DmdType fvs (take arity args) div
+mkDmdSigForArity arity dmd_ty@(DmdType fvs args)
+  | arity < dmdTypeDepth dmd_ty = DmdSig $ DmdType fvs (take arity args)
   | otherwise                   = DmdSig (etaExpandDmdType arity dmd_ty)
 
 mkClosedDmdSig :: [Demand] -> Divergence -> DmdSig
-mkClosedDmdSig ds res = mkDmdSigForArity (length ds) (DmdType emptyDmdEnv ds res)
+mkClosedDmdSig ds div = mkDmdSigForArity (length ds) (DmdType (mkEmptyDmdEnv div) ds)
 
 mkVanillaDmdSig :: Arity -> Divergence -> DmdSig
 mkVanillaDmdSig ar div = mkClosedDmdSig (replicate ar topDmd) div
 
 splitDmdSig :: DmdSig -> ([Demand], Divergence)
-splitDmdSig (DmdSig (DmdType _ dmds res)) = (dmds, res)
+splitDmdSig (DmdSig (DmdType env dmds)) = (dmds, de_div env)
 
 dmdSigDmdEnv :: DmdSig -> DmdEnv
-dmdSigDmdEnv (DmdSig (DmdType env _ _)) = env
+dmdSigDmdEnv (DmdSig (DmdType env _)) = env
 
 hasDemandEnvSig :: DmdSig -> Bool
-hasDemandEnvSig = not . isEmptyVarEnv . dmdSigDmdEnv
+hasDemandEnvSig = not . isEmptyVarEnv . de_fvs . dmdSigDmdEnv
 
 botSig :: DmdSig
 botSig = DmdSig botDmdType
@@ -2181,23 +2181,23 @@ nopSig :: DmdSig
 nopSig = DmdSig nopDmdType
 
 isNopSig :: DmdSig -> Bool
-isNopSig (DmdSig ty) = isNopDmdType ty
+isNopSig (DmdSig ty) = ty == nopDmdType
 
 -- | True if the signature diverges or throws an exception in a saturated call.
 -- See Note [Dead ends].
 isDeadEndSig :: DmdSig -> Bool
-isDeadEndSig (DmdSig (DmdType _ _ res)) = isDeadEndDiv res
+isDeadEndSig (DmdSig (DmdType env _)) = isDeadEndDiv (de_div env)
 
 -- | True if the signature diverges or throws an imprecise exception in a saturated call.
 -- NB: In constrast to 'isDeadEndSig' this returns False for 'exnDiv'.
 -- See Note [Dead ends]
 -- and Note [Precise vs imprecise exceptions].
 isBottomingSig :: DmdSig -> Bool
-isBottomingSig (DmdSig (DmdType _ _ res)) = res == botDiv
+isBottomingSig (DmdSig (DmdType env _)) = de_div env == botDiv
 
 -- | True when the signature indicates all arguments are boxed
 onlyBoxedArguments :: DmdSig -> Bool
-onlyBoxedArguments (DmdSig (DmdType _ dmds _)) = all demandIsBoxed dmds
+onlyBoxedArguments (DmdSig (DmdType _ dmds)) = all demandIsBoxed dmds
  where
    demandIsBoxed BotDmd    = True
    demandIsBoxed AbsDmd    = True
@@ -2217,12 +2217,15 @@ onlyBoxedArguments (DmdSig (DmdType _ dmds _)) = all demandIsBoxed dmds
 -- Hence this function conservatively returns False in that case.
 -- See Note [Dead ends].
 isDeadEndAppSig :: DmdSig -> Int -> Bool
-isDeadEndAppSig (DmdSig (DmdType _ ds res)) n
-  = isDeadEndDiv res && not (lengthExceeds ds n)
+isDeadEndAppSig (DmdSig (DmdType env ds)) n
+  = isDeadEndDiv (de_div env) && not (lengthExceeds ds n)
+
+trimBoxityDmdEnv :: DmdEnv -> DmdEnv
+trimBoxityDmdEnv (DE fvs div) = DE (mapVarEnv trimBoxity fvs) div
 
 trimBoxityDmdType :: DmdType -> DmdType
-trimBoxityDmdType (DmdType fvs ds res) =
-  DmdType (mapVarEnv trimBoxity fvs) (map trimBoxity ds) res
+trimBoxityDmdType (DmdType env ds) =
+  DmdType (trimBoxityDmdEnv env) (map trimBoxity ds)
 
 trimBoxityDmdSig :: DmdSig -> DmdSig
 trimBoxityDmdSig = coerce trimBoxityDmdType
@@ -2247,12 +2250,11 @@ transferBoxity from to = go_dmd from to
           _ -> trimBoxity to_dmd
 
 transferArgBoxityDmdType :: DmdType -> DmdType -> DmdType
-transferArgBoxityDmdType _from@(DmdType _ from_ds _) to@(DmdType to_fvs to_ds to_res)
+transferArgBoxityDmdType _from@(DmdType _ from_ds) to@(DmdType to_env to_ds)
   | equalLength from_ds to_ds
   = -- pprTraceWith "transfer" (\r -> ppr _from $$ ppr to $$ ppr r) $
-    DmdType to_fvs -- Only arg boxity! See Note [Don't change boxity without worker/wrapper]
+    DmdType to_env -- Only arg boxity! See Note [Don't change boxity without worker/wrapper]
             (zipWith transferBoxity from_ds to_ds)
-            to_res
   | otherwise
   = trimBoxityDmdType to
 
@@ -2263,10 +2265,10 @@ prependArgsDmdSig :: Int -> DmdSig -> DmdSig
 -- ^ Add extra ('topDmd') arguments to a strictness signature.
 -- In contrast to 'etaConvertDmdSig', this /prepends/ additional argument
 -- demands. This is used by FloatOut.
-prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds res))
-  | new_args == 0       = sig
-  | isNopDmdType dmd_ty = sig
-  | otherwise           = DmdSig (DmdType env dmds' res)
+prependArgsDmdSig new_args sig@(DmdSig dmd_ty@(DmdType env dmds))
+  | new_args == 0        = sig
+  | dmd_ty == nopDmdType = sig
+  | otherwise            = DmdSig (DmdType env dmds')
   where
     dmds' = assertPpr (new_args > 0) (ppr new_args) $
             replicate new_args topDmd ++ dmds
@@ -2308,7 +2310,7 @@ type DmdTransformer = SubDemand -> DmdType
 -- Given a function's 'DmdSig' and a 'SubDemand' for the evaluation context,
 -- return how the function evaluates its free variables and arguments.
 dmdTransformSig :: DmdSig -> DmdTransformer
-dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds _)) sd
+dmdTransformSig (DmdSig dmd_ty@(DmdType _ arg_ds)) sd
   = multDmdType (fst $ peelManyCalls (length arg_ds) sd) dmd_ty
     -- see Note [Demands from unsaturated function calls]
     -- and Note [What are demand signatures?]
@@ -2323,7 +2325,7 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
   where
     arity = length str_marks
     (n, body_sd) = peelManyCalls arity sd
-    mk_body_ty n dmds = DmdType emptyDmdEnv (zipWith (bump n) str_marks dmds) topDiv
+    mk_body_ty n dmds = DmdType nopDmdEnv (zipWith (bump n) str_marks dmds)
     bump n str dmd | isMarkedStrict str = multDmd n (plusDmd str_field_dmd dmd)
                    | otherwise          = multDmd n dmd
     str_field_dmd = C_01 :* seqSubDmd -- Why not C_11? See Note [Data-con worker strictness]
@@ -2334,11 +2336,11 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
 dmdTransformDictSelSig :: DmdSig -> DmdTransformer
 -- NB: This currently doesn't handle newtype dictionaries.
 -- It should simply apply call_sd directly to the dictionary, I suppose.
-dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod] _)) call_sd
+dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod])) call_sd
    | (n, sd') <- peelCallDmd call_sd
    , Prod _ sig_ds <- prod
    = multDmdType n $
-     DmdType emptyDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)] topDiv
+     DmdType nopDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)]
    | otherwise
    = nopDmdType -- See Note [Demand transformer for a dictionary selector]
   where
@@ -2460,9 +2462,12 @@ This is weird, so I'm not worried about whether this optimises brilliantly; but
 it should not fall over.
 -}
 
+zapDmdEnv :: DmdEnv -> DmdEnv
+zapDmdEnv (DE _ div) = mkEmptyDmdEnv div
+
 -- | Remove the demand environment from the signature.
 zapDmdEnvSig :: DmdSig -> DmdSig
-zapDmdEnvSig (DmdSig (DmdType _ ds r)) = mkClosedDmdSig ds r
+zapDmdEnvSig (DmdSig (DmdType env ds)) = DmdSig (DmdType (zapDmdEnv env) ds)
 
 zapUsageDemand :: Demand -> Demand
 -- Remove the usage info, but not the strictness info, from the demand
@@ -2483,8 +2488,8 @@ zapUsedOnceDemand = kill_usage $ KillFlags
 -- | Remove all `C_01 :*` info (but not `CM` sub-demands) from the strictness
 --   signature
 zapUsedOnceSig :: DmdSig -> DmdSig
-zapUsedOnceSig (DmdSig (DmdType env ds r))
-    = DmdSig (DmdType env (map zapUsedOnceDemand ds) r)
+zapUsedOnceSig (DmdSig (DmdType env ds))
+    = DmdSig (DmdType env (map zapUsedOnceDemand ds))
 
 data KillFlags = KillFlags
     { kf_abs         :: Bool
@@ -2569,11 +2574,11 @@ seqDemandList :: [Demand] -> ()
 seqDemandList = foldr (seq . seqDemand) ()
 
 seqDmdType :: DmdType -> ()
-seqDmdType (DmdType env ds res) =
-  seqDmdEnv env `seq` seqDemandList ds `seq` res `seq` ()
+seqDmdType (DmdType env ds) =
+  seqDmdEnv env `seq` seqDemandList ds `seq` ()
 
 seqDmdEnv :: DmdEnv -> ()
-seqDmdEnv env = seqEltsUFM seqDemand env
+seqDmdEnv (DE fvs _) = seqEltsUFM seqDemand fvs
 
 seqDmdSig :: DmdSig -> ()
 seqDmdSig (DmdSig ty) = seqDmdType ty
@@ -2682,16 +2687,19 @@ instance Outputable Divergence where
   ppr ExnOrDiv = char 'x' -- for e(x)ception
   ppr Dunno    = empty
 
-instance Outputable DmdType where
-  ppr (DmdType fv ds res)
-    = hsep [hcat (map (angleBrackets . ppr) ds) <> ppr res,
-            if null fv_elts then empty
-            else braces (fsep (map pp_elt fv_elts))]
+instance Outputable DmdEnv where
+  ppr (DE fvs div)
+    = ppr div <> if null fv_elts then empty
+                 else braces (fsep (map pp_elt fv_elts))
     where
       pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
-      fv_elts = nonDetUFMToList fv
+      fv_elts = nonDetUFMToList fvs
         -- It's OK to use nonDetUFMToList here because we only do it for
         -- pretty printing
+
+instance Outputable DmdType where
+  ppr (DmdType fv ds)
+    = hcat (map (angleBrackets . ppr) ds) <> ppr fv
 
 instance Outputable DmdSig where
    ppr (DmdSig ty) = ppr ty
@@ -2741,15 +2749,6 @@ instance Binary SubDemand where
       2 -> Prod <$> get bh <*> get bh
       _ -> pprPanic "Binary:SubDemand" (ppr (fromIntegral h :: Int))
 
-instance Binary DmdSig where
-  put_ bh (DmdSig aa) = put_ bh aa
-  get bh = DmdSig <$> get bh
-
-instance Binary DmdType where
-  -- Ignore DmdEnv when spitting out the DmdType
-  put_ bh (DmdType _ ds dr) = put_ bh ds *> put_ bh dr
-  get bh = DmdType emptyDmdEnv <$> get bh <*> get bh
-
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
   put_ bh ExnOrDiv = putByte bh 1
@@ -2761,3 +2760,16 @@ instance Binary Divergence where
       1 -> return ExnOrDiv
       2 -> return Diverges
       _ -> pprPanic "Binary:Divergence" (ppr (fromIntegral h :: Int))
+
+instance Binary DmdEnv where
+  -- Ignore VarEnv when spitting out the DmdType
+  put_ bh (DE _ d) = put_ bh d
+  get bh = DE emptyVarEnv <$> get bh
+
+instance Binary DmdType where
+  put_ bh (DmdType fv ds) = put_ bh fv *> put_ bh ds
+  get bh = DmdType <$> get bh <*> get bh
+
+instance Binary DmdSig where
+  put_ bh (DmdSig aa) = put_ bh aa
+  get bh = DmdSig <$> get bh
