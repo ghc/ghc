@@ -1455,3 +1455,15 @@ function h$pext64(src_b, src_a, mask_b, mask_a) {
  }
  RETURN_UBX_TUP2(dst_b, dst_a);
 }
+
+function h$checkOverlapByteArray(a1, o1, a2, o2, n) {
+  if (n == 0) return true;
+  if (a1 == a2) {
+    if (o1 < o2) {
+      return o1 + n - 1 < o2;
+    } else {
+      return o2 + n - 1 < o1;
+    }
+  }
+  return true;
+}
