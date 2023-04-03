@@ -89,27 +89,34 @@ dmdAnalProgram opts fam_envs rules binds
       where
         anal_body env'
           | WithDmdType body_ty bs' <- go env' bs
-          = WithDmdType (add_exported_uses env' body_ty (bindersOf b)) bs'
+          = WithDmdType (body_ty `plusDmdType` keep_alive_roots env' (bindersOf b)) bs'
 
     cons_up :: WithDmdType (DmdResult b [b]) -> WithDmdType [b]
     cons_up (WithDmdType dmd_ty (R b' bs')) = WithDmdType dmd_ty (b' : bs')
 
-    add_exported_uses :: AnalEnv -> DmdType -> [Id] -> DmdType
-    add_exported_uses env = foldl' (add_exported_use env)
+    keep_alive_roots :: AnalEnv -> [Id] -> DmdEnv
+    -- See Note [Absence analysis for stable unfoldings and RULES]
+    -- Here we keep alive "roots", e.g., exported ids and stuff mentioned in
+    -- orphan RULES
+    keep_alive_roots env ids = plusDmdEnvs (map (demandRoot env) (filter is_root ids))
 
-    -- If @e@ is denoted by @dmd_ty@, then @add_exported_use _ dmd_ty id@
-    -- corresponds to the demand type of @(id, e)@, but is a lot more direct.
-    -- See Note [Analysing top-level bindings].
-    add_exported_use :: AnalEnv -> DmdType -> Id -> DmdType
-    add_exported_use env dmd_ty id
-      | isExportedId id || elemVarSet id rule_fvs
-      -- See Note [Absence analysis for stable unfoldings and RULES]
-      = dmd_ty `plusDmdType` fst (dmdAnalStar env topDmd (Var id))
-      | otherwise
-      = dmd_ty
+    is_root :: Id -> Bool
+    is_root id = isExportedId id || elemVarSet id rule_fvs
 
     rule_fvs :: IdSet
     rule_fvs = rulesRhsFreeIds rules
+
+demandRoot :: AnalEnv -> Id -> DmdEnv
+-- See Note [Absence analysis for stable unfoldings and RULES]
+demandRoot env id = fst (dmdAnalStar env topDmd (Var id))
+
+demandRoots :: AnalEnv -> [Id] -> DmdEnv
+-- See Note [Absence analysis for stable unfoldings and RULES]
+demandRoots env roots = plusDmdEnvs (map (demandRoot env) roots)
+
+demandRootSet :: AnalEnv -> IdSet -> DmdEnv
+demandRootSet env ids = demandRoots env (nonDetEltsUniqSet ids)
+  -- It's OK to use nonDetEltsUniqSet here because plusDmdType is commutative
 
 -- | We attach useful (e.g. not 'topDmd') 'idDemandInfo' to top-level bindings
 -- that satisfy this function.
@@ -292,7 +299,7 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
     rule_fvs           = bndrRuleAndUnfoldingIds id
-    final_ty           = body_ty' `plusDmdType` rhs_ty `keepAliveDmdType` rule_fvs
+    final_ty           = body_ty' `plusDmdType` rhs_ty `plusDmdType` demandRootSet env rule_fvs
 
 -- | Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -309,18 +316,18 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
 dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> WithDmdType a) -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
-    | (env', lazy_fv, id1, rhs1) <-
+    | (env', weak_fv, id1, rhs1) <-
         dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
-    -> do_rest env' lazy_fv [(id1, rhs1)] (uncurry NonRec . only)
+    -> do_rest env' weak_fv [(id1, rhs1)] (uncurry NonRec . only)
   Rec pairs
-    | (env', lazy_fv, pairs') <- dmdFix top_lvl env dmd pairs
-    -> do_rest env' lazy_fv pairs' Rec
+    | (env', weak_fv, pairs') <- dmdFix top_lvl env dmd pairs
+    -> do_rest env' weak_fv pairs' Rec
   where
-    do_rest env' lazy_fv pairs1 build_bind = WithDmdType final_ty (R (build_bind pairs2) body')
+    do_rest env' weak_fv pairs1 build_bind = WithDmdType final_ty (R (build_bind pairs2) body')
       where
         WithDmdType body_ty body'        = anal_body env'
         -- see Note [Lazy and unleashable free variables]
-        dmd_ty                          = addLazyFVs body_ty lazy_fv
+        dmd_ty                          = addWeakFVs body_ty weak_fv
         WithDmdType final_ty id_dmds    = findBndrsDmds env' dmd_ty (strictMap fst pairs1)
         -- Important to force this as build_bind might not force it.
         !pairs2                         = strictZipWith do_one pairs1 id_dmds
@@ -350,15 +357,15 @@ dmdTransformThunkDmd e
 -- See ↦* relation in the Cardinality Analysis paper
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
-            -> CoreExpr -- Should obey the let/app invariant
-            -> (PlusDmdArg, CoreExpr)
+            -> CoreExpr
+            -> (DmdEnv, CoreExpr)
 dmdAnalStar env (n :* sd) e
   -- NB: (:*) expands AbsDmd and BotDmd as needed
   -- See Note [Analysing with absent demand]
   | WithDmdType dmd_ty e' <- dmdAnal env sd e
   = assertPpr (mightBeLiftedType (exprType e) || exprOkForSpeculation e) (ppr e)
     -- The argument 'e' should satisfy the let/app invariant
-    (toPlusDmdArg $ multDmdType n dmd_ty, e')
+    (discardArgDmds $ multDmdType n dmd_ty, e')
 
 -- Main Demand Analsysis machinery
 dmdAnal, dmdAnal' :: AnalEnv
@@ -371,13 +378,13 @@ dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
 dmdAnal' _ _ (Lit lit)     = WithDmdType nopDmdType (Lit lit)
 dmdAnal' _ _ (Type ty)     = WithDmdType nopDmdType (Type ty) -- Doesn't happen, in fact
 dmdAnal' _ _ (Coercion co)
-  = WithDmdType (unitDmdType (coercionDmdEnv co)) (Coercion co)
+  = WithDmdType (noArgsDmdType (coercionDmdEnv co)) (Coercion co)
 
 dmdAnal' env dmd (Var var)
   = WithDmdType (dmdTransform env var dmd) (Var var)
 
 dmdAnal' env dmd (Cast e co)
-  = WithDmdType (dmd_ty `plusDmdType` mkPlusDmdArg (coercionDmdEnv co)) (Cast e' co)
+  = WithDmdType (dmd_ty `plusDmdType` coercionDmdEnv co) (Cast e' co)
   where
     WithDmdType dmd_ty e' = dmdAnal env dmd e
 
@@ -472,7 +479,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt bndrs rhs])
           = alt_ty2
 
         WithDmdType scrut_ty scrut' = dmdAnal env scrut_sd scrut
-        res_ty             = alt_ty3 `plusDmdType` toPlusDmdArg scrut_ty
+        res_ty             = alt_ty3 `plusDmdType` discardArgDmds scrut_ty
     in
 --    pprTrace "dmdAnal:Case1" (vcat [ text "scrut" <+> ppr scrut
 --                                   , text "dmd" <+> ppr dmd
@@ -517,7 +524,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
           = deferAfterPreciseException alt_ty1
           | otherwise
           = alt_ty1
-        res_ty               = alt_ty2 `plusDmdType` toPlusDmdArg scrut_ty
+        res_ty               = scrut_ty `plusDmdType` discardArgDmds alt_ty2
 
     in
 --    pprTrace "dmdAnal:Case2" (vcat [ text "scrut" <+> ppr scrut
@@ -915,13 +922,17 @@ dmdTransform env var sd
   --   * Case and constructor field binders
   | otherwise
   = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr boxity, ppr sd]) $
-    unitDmdType (unitVarEnv var (C_11 :* sd))
+    noArgsDmdType (addVarDmdEnv nopDmdEnv var (C_11 :* sd))
 
 {- *********************************************************************
 *                                                                      *
                       Binding right-hand sides
 *                                                                      *
 ********************************************************************* -}
+
+-- | An environment in which all demands are weak according to 'isWeakDmd'.
+-- See Note [Lazy and unleashable free variables].
+type WeakDmds = VarEnv Demand
 
 -- | @dmdAnalRhsSig@ analyses the given RHS to compute a demand signature
 -- for the LetDown rule. It works as follows:
@@ -937,13 +948,13 @@ dmdAnalRhsSig
   -> RecFlag
   -> AnalEnv -> SubDemand
   -> Id -> CoreExpr
-  -> (AnalEnv, DmdEnv, Id, CoreExpr)
+  -> (AnalEnv, WeakDmds, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
-  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr rhs_dmds $$ ppr sig $$ ppr lazy_fv) $
-    (final_env, lazy_fv, final_id, final_rhs)
+  = -- pprTrace "dmdAnalRhsSig" (ppr id $$ ppr let_dmd $$ ppr rhs_dmds $$ ppr sig $$ ppr weak_fvs) $
+    (final_env, weak_fvs, final_id, final_rhs)
   where
     rhs_arity = idArity id
     -- See Note [Demand signatures are computed for a threshold demand based on idArity]
@@ -962,13 +973,11 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
       = unboxedWhenSmall env rec_flag (resultType_maybe id) topSubDmd
 
     WithDmdType rhs_dmd_ty rhs' = dmdAnal env rhs_dmd rhs
-    DmdType rhs_fv rhs_dmds rhs_div = rhs_dmd_ty
-    -- See Note [Do not unbox class dictionaries]
-    -- See Note [Boxity for bottoming functions]
-    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs' rhs_div
-                                  `orElse` (rhs_dmds, rhs')
+    DmdType rhs_env rhs_dmds = rhs_dmd_ty
+    (final_rhs_dmds, final_rhs) = finaliseArgBoxities env id rhs_arity rhs' (de_div rhs_env)
+                                    `orElse` (rhs_dmds, rhs')
 
-    sig = mkDmdSigForArity rhs_arity (DmdType sig_fv final_rhs_dmds rhs_div)
+    sig = mkDmdSigForArity rhs_arity (DmdType sig_env final_rhs_dmds)
 
     final_id   = id `setIdDmdSig` sig
     !final_env = extendAnalEnv top_lvl env final_id sig
@@ -985,15 +994,19 @@ dmdAnalRhsSig top_lvl rec_flag env let_dmd id rhs
     --        we'd have to do an additional iteration. reuseEnv makes sure that
     --        we never get used-once info for FVs of recursive functions.
     --        See #14816 where we try to get rid of reuseEnv.
-    rhs_fv1 = case rec_flag of
-                Recursive    -> reuseEnv rhs_fv
-                NonRecursive -> rhs_fv
+    rhs_env1 = case rec_flag of
+                Recursive    -> reuseEnv rhs_env
+                NonRecursive -> rhs_env
 
     -- See Note [Absence analysis for stable unfoldings and RULES]
-    rhs_fv2 = rhs_fv1 `keepAliveDmdEnv` bndrRuleAndUnfoldingIds id
+    rhs_env2 = rhs_env1 `plusDmdEnv` demandRootSet env (bndrRuleAndUnfoldingIds id)
 
     -- See Note [Lazy and unleashable free variables]
-    !(!lazy_fv, !sig_fv) = partitionVarEnv isWeakDmd rhs_fv2
+    !(!sig_env, !weak_fvs) = splitWeakDmds rhs_env2
+
+splitWeakDmds :: DmdEnv -> (DmdEnv, WeakDmds)
+splitWeakDmds (DE fvs div) = (DE sig_fvs div, weak_fvs)
+  where (!weak_fvs, !sig_fvs) = partitionVarEnv isWeakDmd fvs
 
 -- | The result type after applying 'idArity' many arguments. Returns 'Nothing'
 -- when the type doesn't have exactly 'idArity' many arrows.
@@ -1216,8 +1229,8 @@ GHC.Core.Opt.Arity)! A small example is the test case NewtypeArity.
 
 Note [Absence analysis for stable unfoldings and RULES]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ticket #18638 shows that it's really important to do absence analysis
-for stable unfoldings. Consider
+Among others, tickets #18638 and #23208 show that it's really important to treat
+stable unfoldings as demanded. Consider
 
    g = blah
 
@@ -1234,23 +1247,47 @@ and transform to
 
 Now if f is subsequently inlined, we'll use 'g' and ... disaster.
 
-SOLUTION: if f has a stable unfolding, adjust its DmdEnv (the demands
-on its free variables) so that no variable mentioned in its unfolding
-is Absent.  This is done by the function Demand.keepAliveDmdEnv.
+SOLUTION: if f has a stable unfolding, treat every free variable as a
+/demand root/, that is: Analyse it as if it was a variable occuring in a
+'topDmd' context. This is done in `demandRoot` (which we also use for exported
+top-level ids). Do the same for Ids free in the RHS of any RULES for f.
 
-ALSO: do the same for Ids free in the RHS of any RULES for f.
+Wrinkles:
 
-PS: You may wonder how it can be that f's optimised RHS has somehow
-discarded 'g', but when f is inlined we /don't/ discard g in the same
-way. I think a simple example is
-   g = (a,b)
-   f = \x.  fst g
-   {-# INLINE f #-}
+  (W1) You may wonder how it can be that f's optimised RHS has somehow
+    discarded 'g', but when f is inlined we /don't/ discard g in the same
+    way. I think a simple example is
+       g = (a,b)
+       f = \x.  fst g
+       {-# INLINE f #-}
 
-Now f's optimised RHS will be \x.a, but if we change g to (error "..")
-(since it is apparently Absent) and then inline (\x. fst g) we get
-disaster.  But regardless, #18638 was a more complicated version of
-this, that actually happened in practice.
+    Now f's optimised RHS will be \x.a, but if we change g to (error "..")
+    (since it is apparently Absent) and then inline (\x. fst g) we get
+    disaster.  But regardless, #18638 was a more complicated version of
+    this, that actually happened in practice.
+
+  (W2) You might wonder why we don't simply take the free vars of the
+    unfolding/RULE and map them to topDmd. The reason is that any of the free vars
+    might have demand signatures themselves that in turn demand transitive free
+    variables and that we hence need to unleash! This came up in #23208.
+    Consider
+
+       err :: Int -> b
+       err = error "really important message"
+
+       sg :: Int -> Int
+       sg _ = case err of {}  -- Str=<1B>b {err:->S}
+
+       g :: a -> a  -- g is exported
+       g x = x
+       {-# RULES "g" g @Int = sg #-}
+
+    Here, `err` is only demanded by `sg`'s demand signature: It doesn't occur
+    in the weak_fvs of `sg`'s RHS at all. Hence when we `demandRoots` `sg`
+    because it occurs in the RULEs of `g` (which is exported), we better unleash
+    the demand signature of `sg`, too! Before #23208 we simply added a 'topDmd'
+    for `sg`, failing to unleash the signature and hence observed an absent
+    error instead of the `really important message`.
 
 Note [Boxity for bottoming functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1728,8 +1765,7 @@ dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> SubDemand
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
-
+       -> (AnalEnv, WeakDmds, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
   where
@@ -1739,33 +1775,33 @@ dmdFix top_lvl env let_dmd orig_pairs
 
     -- If fixed-point iteration does not yield a result we use this instead
     -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdDmdSig orig_pairs)
+    abort :: (AnalEnv, WeakDmds, [(Id,CoreExpr)])
+    abort = (env, weak_fv', zapped_pairs)
+      where (weak_fv, pairs') = step True (zapIdDmdSig orig_pairs)
             -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (dmdSigDmdEnv . idDmdSig . fst) pairs'
-            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+            weak_fvs = plusVarEnvList $ map (de_fvs . dmdSigDmdEnv . idDmdSig . fst) pairs'
+            weak_fv'     = plusVarEnv_C plusDmd weak_fv $ mapVarEnv (const topDmd) weak_fvs
             zapped_pairs = zapIdDmdSig pairs'
 
     -- The fixed-point varies the idDmdSig field of the binders, and terminates if that
     -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, WeakDmds, [(Id,CoreExpr)])
     loop n pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idDmdSig id)
                    --                                     | (id,_)<- pairs]) $
                    loop' n pairs
 
     loop' n pairs
-      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+      | found_fixpoint = (final_anal_env, weak_fv, pairs')
       | n == 10        = abort
       | otherwise      = loop (n+1) pairs'
       where
         found_fixpoint    = map (idDmdSig . fst) pairs' == map (idDmdSig . fst) pairs
         first_round       = n == 1
-        (lazy_fv, pairs') = step first_round pairs
+        (weak_fv, pairs') = step first_round pairs
         final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
 
-    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
+    step :: Bool -> [(Id, CoreExpr)] -> (WeakDmds, [(Id, CoreExpr)])
+    step first_round pairs = (weak_fv, pairs')
       where
         -- In all but the first iteration, delete the virgin flag
         start_env | first_round = env
@@ -1773,17 +1809,17 @@ dmdFix top_lvl env let_dmd orig_pairs
 
         start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyVarEnv)
 
-        !((_,!lazy_fv), !pairs') = mapAccumL my_downRhs start pairs
+        !((_,!weak_fv), !pairs') = mapAccumL my_downRhs start pairs
                 -- mapAccumL: Use the new signature to do the next pair
                 -- The occurrence analyser has arranged them in a good order
                 -- so this can significantly reduce the number of iterations needed
 
-        my_downRhs (env, lazy_fv) (id,rhs)
+        my_downRhs (env, weak_fv) (id,rhs)
           = -- pprTrace "my_downRhs" (ppr id $$ ppr (idDmdSig id) $$ ppr sig) $
-            ((env', lazy_fv'), (id', rhs'))
+            ((env', weak_fv'), (id', rhs'))
           where
-            !(!env', !lazy_fv1, !id', !rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
-            !lazy_fv'                    = plusVarEnv_C plusDmd lazy_fv lazy_fv1
+            !(!env', !weak_fv1, !id', !rhs') = dmdAnalRhsSig top_lvl Recursive env let_dmd id rhs
+            !weak_fv'                    = plusVarEnv_C plusDmd weak_fv weak_fv1
 
     zapIdDmdSig :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdDmdSig pairs = [(setIdDmdSig id nopSig, rhs) | (id, rhs) <- pairs ]
@@ -1857,23 +1893,24 @@ convenient to do it there.
 *                                                                      *
 ********************************************************************* -}
 
-unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topDiv
+noArgsDmdType :: DmdEnv -> DmdType
+noArgsDmdType dmd_env = DmdType dmd_env []
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = coercionsDmdEnv [co]
 
 coercionsDmdEnv :: [Coercion] -> DmdEnv
-coercionsDmdEnv cos = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCos cos)
-                      -- The VarSet from coVarsOfCos is really a VarEnv Var
+coercionsDmdEnv cos
+  = mkTermDmdEnv $ mapVarEnv (const topDmd) $ getUniqSet $ coVarsOfCos cos
+  -- The VarSet from coVarsOfCos is really a VarEnv Var
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType
-addVarDmd (DmdType fv ds res) var dmd
-  = DmdType (extendVarEnv_C plusDmd fv var dmd) ds res
+addVarDmd (DmdType fv ds) var dmd
+  = DmdType (addVarDmdEnv fv var dmd) ds
 
-addLazyFVs :: DmdType -> DmdEnv -> DmdType
-addLazyFVs dmd_ty lazy_fvs
-  = dmd_ty `plusDmdType` mkPlusDmdArg lazy_fvs
+addWeakFVs :: DmdType -> WeakDmds -> DmdType
+addWeakFVs dmd_ty weak_fvs
+  = dmd_ty `plusDmdType` mkTermDmdEnv weak_fvs
         -- Using plusDmdType (rather than just plus'ing the envs)
         -- is vital.  Consider
         --      let f = \x -> (x,y)
@@ -1882,7 +1919,7 @@ addLazyFVs dmd_ty lazy_fvs
         -- demand with the bottom coming up from 'error'
         --
         -- I got a loop in the fixpointer without this, due to an interaction
-        -- with the lazy_fv filtering in dmdAnalRhsSig.  Roughly, it was
+        -- with the weak_fv filtering in dmdAnalRhsSig.  Roughly, it was
         --      letrec f n x
         --          = letrec g y = x `fatbar`
         --                         letrec h z = z + ...g...
@@ -1983,14 +2020,14 @@ DmdType.
 
 But now the signature lies! (Missing variables are assumed to be absent.) To
 make up for this, the code that analyses the binding keeps the demand on those
-variable separate (usually called "lazy_fv") and adds it to the demand of the
+variable separate (usually called "weak_fv") and adds it to the demand of the
 whole binding later.
 
 What if we decide _not_ to store a strictness signature for a binding at all, as
 we do when aborting a fixed-point iteration? The we risk losing the information
 that the strict variables are being used. In that case, we take all free variables
 mentioned in the (unsound) strictness signature, conservatively approximate the
-demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
+demand put on them (topDmd), and add that to the "weak_fv" returned by "dmdFix".
 
 
 ************************************************************************

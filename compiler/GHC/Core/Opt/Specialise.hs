@@ -1528,41 +1528,32 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
 
                  simpl_opts = initSimpleOpts dflags
 
-                --------------------------------------
-                -- Add a suitable unfolding if the spec_inl_prag says so
-                -- See Note [Inline specialisations]
-                (spec_inl_prag, spec_unf)
-                  | not is_local && isStrongLoopBreaker (idOccInfo fn)
-                  = (neverInlinePragma, noUnfolding)
-                        -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
+                 --------------------------------------
+                 -- Add a suitable unfolding if the spec_inl_prag says so
+                 -- See Note [Inline specialisations]
+                 (spec_inl_prag, spec_unf)
+                   | not is_local && isStrongLoopBreaker (idOccInfo fn)
+                   = (neverInlinePragma, noUnfolding)
+                         -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
 
-                  | isInlinablePragma inl_prag
-                  = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
+                   | isInlinablePragma inl_prag
+                   = (inl_prag { inl_inline = NoUserInlinePrag }, noUnfolding)
 
-                  | otherwise
-                  = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
-                                             rule_lhs_args fn_unf)
+                   | otherwise
+                   = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
+                                              rule_lhs_args fn_unf)
 
-                --------------------------------------
-                -- Adding arity information just propagates it a bit faster
-                --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
-                -- Copy InlinePragma information from the parent Id.
-                -- So if f has INLINE[1] so does spec_fn
+                 --------------------------------------
+                 -- Adding arity information just propagates it a bit faster
+                 --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
+                 -- Copy InlinePragma information from the parent Id.
+                 -- So if f has INLINE[1] so does spec_fn
                  arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
-                 spec_f_w_arity = spec_fn `setIdArity`      max 0 (fn_arity - arity_decr)
-                                          `setInlinePragma` spec_inl_prag
-                                          `setIdUnfolding`  spec_unf
-                                          `asJoinId_maybe`  spec_join_arity
 
                  --------------------------------------
                  -- Add a suitable unfolding; see Note [Inline specialisations]
                  -- The wrap_unf_body applies the original unfolding to the specialised
                  -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
-                 simpl_opts = initSimpleOpts dflags
-                 wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
-                 spec_unf = specUnfolding simpl_opts spec_bndrs wrap_unf_body
-                                          rule_lhs_args fn_unf
-
                  spec_fn_info
                    = vanillaIdInfo `setArityInfo`      max 0 (fn_arity - arity_decr)
                                    `setInlinePragInfo` spec_inl_prag

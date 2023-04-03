@@ -51,7 +51,7 @@ import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Make ( mkDictSelRhs )
 import GHC.Types.Id.Info
-import GHC.Types.Demand  ( isDeadEndAppSig, isTopSig, isDeadEndSig )
+import GHC.Types.Demand  ( isDeadEndAppSig, isNopSig, isDeadEndSig )
 import GHC.Types.Cpr     ( mkCprSig, botCpr )
 import GHC.Types.Basic
 import GHC.Types.Name hiding (varName)
@@ -1253,7 +1253,7 @@ tidyTopIdInfo rhs_tidy_env name rhs_ty orig_rhs tidy_rhs idinfo show_unfold
     mb_bot_str = exprBotStrictness_maybe orig_rhs
 
     sig = dmdSigInfo idinfo
-    final_sig | not $ isTopSig sig
+    final_sig | not $ isNopSig sig
               = warnPprTrace (_bottom_hidden sig) "tidyTopIdInfo" (ppr name) sig
               -- try a cheap-and-cheerful bottom analyser
               | Just (_, nsig) <- mb_bot_str = nsig

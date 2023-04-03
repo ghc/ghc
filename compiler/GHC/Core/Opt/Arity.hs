@@ -1333,7 +1333,7 @@ let-bindings, and that takes less code.
 idArityType :: Id -> ArityType
 idArityType v
   | strict_sig <- idDmdSig v
-  , not $ isTopSig strict_sig
+  , not $ isNopSig strict_sig
   , (ds, div) <- splitDmdSig strict_sig
   , let arity = length ds
   -- Every strictness signature admits an arity signature!

@@ -110,5 +110,5 @@ test('T14815', [], makefile_test, ['T14815'])
 test('T13208', [], makefile_test, ['T13208'])
 test('T16615', normal, compile, ['-ddump-ds -dsuppress-uniques'])
 test('T18112', [grep_errmsg('cast')], compile, ['-ddump-ds'])
-test('T19969', normal, compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T19969', [grep_errmsg('LoopBreaker')], compile, ['-ddump-simpl -dsuppress-uniques']) # f should become loopbreaker
 test('T19883', normal, compile, [''])

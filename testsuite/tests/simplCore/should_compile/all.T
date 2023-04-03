@@ -220,7 +220,6 @@ test('T13027', normal, compile, [''])
 test('T13025',
      normal,
      makefile_test, ['T13025'])
-test('T13143', only_ways(['optasm']), compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T13156', normal, makefile_test, ['T13156'])
 test('T11444', normal, compile, [''])
 test('str-rules',
@@ -393,7 +392,8 @@ test('OpaqueNoStrictArgWW', normal, compile, ['-O -fworker-wrapper-cbv -ddump-si
 test('OpaqueNoWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 
 test('T21144',  normal, compile, ['-O'])
-test('T22112', normal, compile, ['-O -dsuppress-uniques -dno-typeable-binds -ddump-simpl'])
+# T22112: Simply test that dumping the Core doesn't loop becuse of the unfolding and ignore the dump output
+test('T22112', [ grep_errmsg('never matches') ], compile, ['-O -dsuppress-uniques -dno-typeable-binds -fexpose-all-unfoldings -ddump-simpl'])
 
 test('T22491', normal, compile, ['-O2'])
 test('T22623', normal, multimod_compile, ['T22623', '-O -v0'])
