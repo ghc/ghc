@@ -210,7 +210,7 @@ function set_toolchain_paths() {
           *) fail "unknown NIX_SYSTEM" ;;
         esac
         info "Building toolchain for $NIX_SYSTEM"
-        nix-build .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh
+        nix-build .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh --show-trace
         cat toolchain.sh
       fi
       source toolchain.sh
