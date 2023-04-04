@@ -870,3 +870,4 @@ test('T21443', normal, compile, [''])
 test('QualifiedRecordUpdate',
     [ extra_files(['QualifiedRecordUpdate_aux.hs']) ]
     , multimod_compile, ['QualifiedRecordUpdate', '-v0'])
+test('T23192', normal, compile, [''])
