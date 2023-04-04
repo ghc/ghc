@@ -10,7 +10,7 @@ import {-# SOURCE #-} Settings.Default
 benchmarkFlavour :: Flavour
 benchmarkFlavour = defaultFlavour
     { name = "bench"
-    , args = defaultBuilderArgs <> benchmarkArgs <> defaultPackageArgs
+    , extraArgs = benchmarkArgs
     , libraryWays = pure $ Set.fromList [vanilla]
     , rtsWays = Set.fromList <$> mconcat [pure [vanilla], targetSupportsThreadedRts ? pure [threaded]] }
 

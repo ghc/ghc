@@ -1,7 +1,7 @@
 {-# LANGUAGE TupleSections #-}
 
 module Settings (
-    getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
+    getExtraArgs, getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
     isLibrary, stagePackages, getBignumBackend, getBignumCheck, completeSetting
     ) where
@@ -25,8 +25,11 @@ import Settings.Flavours.Validate
 import Settings.Flavours.Release
 
 
+getExtraArgs :: Args
+getExtraArgs = expr flavour >>= extraArgs
+
 getArgs :: Args
-getArgs = expr flavour >>= args
+getArgs = mconcat [ defaultBuilderArgs, getExtraArgs, defaultPackageArgs ]
 
 getLibraryWays :: Ways
 getLibraryWays = expr flavour >>= libraryWays

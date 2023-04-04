@@ -12,7 +12,7 @@ import {-# SOURCE #-} Settings.Default
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ stageString ghcStage
-    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
+    , extraArgs = developmentArgs ghcStage
     , libraryWays = pure $ Set.fromList [vanilla]
     , rtsWays = Set.fromList <$> mconcat [pure [vanilla, debug], targetSupportsThreadedRts ? pure [threaded, threadedDebug]]
     , dynamicGhcPrograms = return False

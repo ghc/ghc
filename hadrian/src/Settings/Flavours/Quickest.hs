@@ -11,7 +11,7 @@ import {-# SOURCE #-} Settings.Default
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
-    , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
+    , extraArgs        = quickestArgs
     , libraryWays = pure (Set.fromList [vanilla])
     , rtsWays     = pure (Set.fromList [vanilla]) <> (targetSupportsThreadedRts ? pure (Set.fromList [threaded]))
     , dynamicGhcPrograms = return False }

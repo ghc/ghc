@@ -158,9 +158,8 @@ configurePackage context@Context {..} = do
             pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
 
     -- Compute the list of flags, and the Cabal configuration arguments
-    flavourArgs <- args <$> flavour
-    flagList    <- interpret (target context (Cabal Flags stage) [] []) flavourArgs
-    argList     <- interpret (target context (Cabal Setup stage) [] []) flavourArgs
+    flagList    <- interpret (target context (Cabal Flags stage) [] []) getArgs
+    argList     <- interpret (target context (Cabal Setup stage) [] []) getArgs
     trackArgsHash (target context (Cabal Flags stage) [] [])
     trackArgsHash (target context (Cabal Setup stage) [] [])
     verbosity   <- getVerbosity

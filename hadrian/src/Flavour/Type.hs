@@ -14,8 +14,9 @@ import Data.Set (Set)
 data Flavour = Flavour {
     -- | Flavour name, to select this flavour from command line.
     name :: String,
-    -- | Use these command line arguments.
-    args :: Args,
+    -- | Use these extra command line arguments.
+    -- This can't depend on the result of configuring a package (ie, using readContextData)
+    extraArgs :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
     -- | Bignum backend: 'native', 'gmp', 'ffi', etc.

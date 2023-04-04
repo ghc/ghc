@@ -39,6 +39,7 @@ toolArgs = do
               , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
               , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
               , map ("-optP" ++) <$> getContextData cppOpts
+              , getContextData hcOpts
               ]
 
 compileAndLinkHs :: Args
@@ -228,6 +229,8 @@ commonGhcArgs = do
               -- input hash to avoid superfluous recompilation, avoiding
               -- #18672.
               arg "-fdiagnostics-color=always"
+            -- Important this is last.. as these options can override the default options
+            , getContextData hcOpts
             ]
 
 -- TODO: Do '-ticky' in all debug ways?
