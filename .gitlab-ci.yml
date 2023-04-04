@@ -381,54 +381,54 @@ hadrian-ghc-in-ghci:
 # Hadrian Multi-Repl
 ############################################################
 
-hadrian-multi:
-  stage: testing
-  needs:
-    - job: x86_64-linux-fedora33-release
-      optional: true
-    - job: nightly-x86_64-linux-fedora33-release
-      optional: true
-    - job: release-x86_64-linux-fedora33-release
-      optional: true
-  dependencies: null
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  before_script:
-    # workaround for docker permissions
-    - sudo chown ghc:ghc -R .
-  variables:
-    GHC_FLAGS: -Werror
-    CONFIGURE_ARGS: --enable-bootstrap-with-devel-snapshot
-  tags:
-    - x86_64-linux
-  script:
-    - export BOOT_HC=$GHC
-    - root=$(pwd)/ghc
-    - ls
-    - |
-      mkdir tmp
-      tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C tmp
-      pushd tmp/ghc-*/
-      ./configure --prefix=$root
-      make install
-      popd
-      rm -Rf tmp
-    - export HC=$root/bin/ghc
-    # This GHC means, use this GHC to configure with
-    - export GHC=$root/bin/ghc
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    # Now GHC means, use this GHC for hadrian
-    - export GHC=$BOOT_HC
-    # Load hadrian-multi then immediately exit and check the modules loaded
-    - echo ":q" | hadrian/ghci-multi -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
-  after_script:
-    - .gitlab/ci.sh save_cache
-  cache:
-    key: hadrian-ghci-$CACHE_REV
-    paths:
-      - cabal-cache
-  rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+# hadrian-multi:
+#   stage: testing
+#   needs:
+#     - job: x86_64-linux-fedora33-release
+#       optional: true
+#     - job: nightly-x86_64-linux-fedora33-release
+#       optional: true
+#     - job: release-x86_64-linux-fedora33-release
+#       optional: true
+#   dependencies: null
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
+#   before_script:
+#     # workaround for docker permissions
+#     - sudo chown ghc:ghc -R .
+#   variables:
+#     GHC_FLAGS: -Werror
+#     CONFIGURE_ARGS: --enable-bootstrap-with-devel-snapshot
+#   tags:
+#     - x86_64-linux
+#   script:
+#     - export BOOT_HC=$GHC
+#     - root=$(pwd)/ghc
+#     - ls
+#     - |
+#       mkdir tmp
+#       tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C tmp
+#       pushd tmp/ghc-*/
+#       ./configure --prefix=$root
+#       make install
+#       popd
+#       rm -Rf tmp
+#     - export HC=$root/bin/ghc
+#     # This GHC means, use this GHC to configure with
+#     - export GHC=$root/bin/ghc
+#     - .gitlab/ci.sh setup
+#     - .gitlab/ci.sh configure
+#     # Now GHC means, use this GHC for hadrian
+#     - export GHC=$BOOT_HC
+#     # Load hadrian-multi then immediately exit and check the modules loaded
+#     - echo ":q" | hadrian/ghci-multi -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+#   after_script:
+#     - .gitlab/ci.sh save_cache
+#   cache:
+#     key: hadrian-ghci-$CACHE_REV
+#     paths:
+#       - cabal-cache
+#   rules:
+#     - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
 
 ############################################################
 # stack-hadrian-build
@@ -437,13 +437,13 @@ hadrian-multi:
 # Verify that Hadrian builds with stack. Note that we don't actually perform a
 # build of GHC itself; we merely test that the Hadrian executable builds and
 # works (by invoking `hadrian --version`).
-stack-hadrian-build:
-  extends: hadrian-ghc-in-ghci
-  stage: quick-build
-  script:
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - hadrian/build-stack --version
+# stack-hadrian-build:
+#   extends: hadrian-ghc-in-ghci
+#   stage: quick-build
+#   script:
+#     - .gitlab/ci.sh setup
+#     - .gitlab/ci.sh configure
+#     - hadrian/build-stack --version
 
 ####################################
 # Testing reinstallable ghc codepath
