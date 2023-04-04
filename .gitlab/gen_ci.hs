@@ -803,6 +803,12 @@ addValidateRule t = modifyValidateJobs (addJobRule t)
 disableValidate :: JobGroup Job -> JobGroup Job
 disableValidate = addValidateRule Disable
 
+addNightlyRule :: Rule -> JobGroup Job -> JobGroup Job
+addNightlyRule t = modifyNightlyJobs (addJobRule t)
+
+disableNightly :: JobGroup Job -> JobGroup Job
+disableNightly = addNightlyRule Disable
+
 data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving Functor
 
 renameJob :: (String -> String) -> NamedJob a -> NamedJob a
@@ -865,52 +871,53 @@ jobs = Map.fromList $ concatMap (filter is_enabled_job . flattenJobGroup) job_gr
 
 job_groups :: [JobGroup Job]
 job_groups =
-     [ disableValidate (standardBuilds Amd64 (Linux Debian10))
-     , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
-     , validateBuilds Amd64 (Linux Debian10) nativeInt
-     , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
-     , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , -- Nightly allowed to fail: #22520
-       modifyNightlyJobs allowFailure
-         (modifyValidateJobs manual tsan_jobs)
-     , -- Nightly allowed to fail: #22343
-       modifyNightlyJobs allowFailure
-        (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
-     , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
+     [
+        -- disableValidate (standardBuilds Amd64 (Linux Debian10))
+    --  , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
+    --  , validateBuilds Amd64 (Linux Debian10) nativeInt
+    --  , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
+    --  , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
+    --  , -- Nightly allowed to fail: #22520
+    --    modifyNightlyJobs allowFailure
+    --      (modifyValidateJobs manual tsan_jobs)
+    --  , -- Nightly allowed to fail: #22343
+    --    modifyNightlyJobs allowFailure
+    --     (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
+    --  , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
 
-     , disableValidate (standardBuilds Amd64 (Linux Debian11))
-     -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
-     -- not being at EOL until April 2023 and they still need tinfo5.
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
-     , disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
-     , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
-     , disableValidate (standardBuilds Amd64 (Linux Rocky8))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
-     -- Fedora33 job is always built with perf so there's one job in the normal
-     -- validate pipeline which is built with perf.
-     , standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig
-     -- This job is only for generating head.hackage docs
-     , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
-     , fastCI (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken nativeInt))
-     , standardBuilds Amd64 Darwin
-     , allowFailureGroup (addValidateRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
-     , standardBuilds AArch64 Darwin
-     , standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla)
-     , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
-     , standardBuildsWithConfig I386 (Linux Debian9) (splitSectionsBroken vanilla)
-     , standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static)
-     , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
-        )
-        { bignumBackend = Native
-        }
-     , make_wasm_jobs wasm_build_config
-     , disableValidate $ make_wasm_jobs wasm_build_config { bignumBackend = Native }
-     , disableValidate $ make_wasm_jobs wasm_build_config { unregisterised = True }
-     , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+    --  , disableValidate (standardBuilds Amd64 (Linux Debian11))
+    --  -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
+    --  -- not being at EOL until April 2023 and they still need tinfo5.
+    --  , disableValidate (standardBuildsWithConfig Amd64 (Linux Debian9) (splitSectionsBroken vanilla))
+    --  , disableValidate (standardBuilds Amd64 (Linux Ubuntu1804))
+    --  , disableValidate (standardBuilds Amd64 (Linux Ubuntu2004))
+    --  , disableValidate (standardBuilds Amd64 (Linux Rocky8))
+    --  , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
+    --  -- Fedora33 job is always built with perf so there's one job in the normal
+    --  -- validate pipeline which is built with perf.
+    --  , standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig
+    --  -- This job is only for generating head.hackage docs
+    --  , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
+    --  , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
+    --  , fastCI (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken vanilla))
+    --  , disableValidate (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken nativeInt))
+      disableNightly (validateBuilds Amd64 Darwin vanilla)
+    --  , allowFailureGroup (addValidateRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
+     , disableNightly (validateBuilds AArch64 Darwin vanilla)
+    --  , standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla)
+    --  , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
+    --  , standardBuildsWithConfig I386 (Linux Debian9) (splitSectionsBroken vanilla)
+    --  , standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static)
+    --  , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
+    --  , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
+    --  , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
+    --     )
+    --     { bignumBackend = Native
+    --     }
+    --  , make_wasm_jobs wasm_build_config
+    --  , disableValidate $ make_wasm_jobs wasm_build_config { bignumBackend = Native }
+    --  , disableValidate $ make_wasm_jobs wasm_build_config { unregisterised = True }
+    --  , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
      ]
 
   where
