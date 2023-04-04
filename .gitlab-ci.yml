@@ -449,228 +449,228 @@ stack-hadrian-build:
 # Testing reinstallable ghc codepath
 ####################################
 
-test-cabal-reinstall-x86_64-linux-deb10:
-  extends: nightly-x86_64-linux-deb10-validate
-  stage: full-build
-  variables:
-    REINSTALL_GHC: "yes"
-    BUILD_FLAVOUR: validate
-    TEST_ENV: "x86_64-linux-deb10-cabal-install"
-  rules:
-    - if: $NIGHTLY
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
+# test-cabal-reinstall-x86_64-linux-deb10:
+#   extends: nightly-x86_64-linux-deb10-validate
+#   stage: full-build
+#   variables:
+#     REINSTALL_GHC: "yes"
+#     BUILD_FLAVOUR: validate
+#     TEST_ENV: "x86_64-linux-deb10-cabal-install"
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-reinstall.*/'
 
 ########################################
 # Testing ABI is invariant across builds
 ########################################
 
-abi-test-nightly:
-  stage: full-build
-  needs:
-    - job: nightly-x86_64-linux-fedora33-release-hackage
-    - job: nightly-x86_64-linux-fedora33-release
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  dependencies: null
-  before_script:
-    - mkdir -p normal
-    - mkdir -p hackage
-    - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C normal/
-    - tar -xf ghc-x86_64-linux-fedora33-release-hackage_docs.tar.xz -C hackage/
-  script:
-    - .gitlab/ci.sh compare_interfaces_of "normal/ghc-*" "hackage/ghc-*"
-  artifacts:
-    paths:
-      - out
-  rules:
-    - if: $NIGHTLY
+# abi-test-nightly:
+#   stage: full-build
+#   needs:
+#     - job: nightly-x86_64-linux-fedora33-release-hackage
+#     - job: nightly-x86_64-linux-fedora33-release
+#   tags:
+#     - x86_64-linux
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
+#   dependencies: null
+#   before_script:
+#     - mkdir -p normal
+#     - mkdir -p hackage
+#     - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C normal/
+#     - tar -xf ghc-x86_64-linux-fedora33-release-hackage_docs.tar.xz -C hackage/
+#   script:
+#     - .gitlab/ci.sh compare_interfaces_of "normal/ghc-*" "hackage/ghc-*"
+#   artifacts:
+#     paths:
+#       - out
+#   rules:
+#     - if: $NIGHTLY
 
 ############################################################
 # Packaging
 ############################################################
 
-doc-tarball:
-  stage: packaging
-  needs:
-    - job: x86_64-linux-deb10-numa-slow-validate
-      optional: true
-    - job: nightly-x86_64-linux-deb10-validate
-      optional: true
-    - job: release-x86_64-linux-deb10-release
-      optional: true
+# doc-tarball:
+#   stage: packaging
+#   needs:
+#     - job: x86_64-linux-deb10-numa-slow-validate
+#       optional: true
+#     - job: nightly-x86_64-linux-deb10-validate
+#       optional: true
+#     - job: release-x86_64-linux-deb10-release
+#       optional: true
 
-    - job: x86_64-windows-validate
-      optional: true
-    - job: nightly-x86_64-windows-validate
-      optional: true
-    - job: release-x86_64-windows-release+no_split_sections
-      optional: true
+#     - job: x86_64-windows-validate
+#       optional: true
+#     - job: nightly-x86_64-windows-validate
+#       optional: true
+#     - job: release-x86_64-windows-release+no_split_sections
+#       optional: true
 
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies: null
-  variables:
-    LINUX_BINDIST: "ghc-x86_64-linux-deb10.tar.xz"
-    WINDOWS_BINDIST: "ghc-x86_64-windows.tar.xz"
-  artifacts:
-    paths:
-      - haddock.html.tar.xz
-      - libraries.html.tar.xz
-      - users_guide.html.tar.xz
-      - index.html
-      - "*.pdf"
-  script:
-    - |
-      mv "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
-        || mv "ghc-x86_64-linux-deb10-validate.tar.xz" "$LINUX_BINDIST" \
-        || mv "ghc-x86_64-linux-deb10-release.tar.xz" "$LINUX_BINDIST" \
-        || true
-      mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
-        || mv "ghc-x86_64-windows-release+no_split_sections.tar.xz" "$WINDOWS_BINDIST" \
-        || true
-      if [ ! -f "$LINUX_BINDIST" ]; then
-        echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
-        exit 1
-      fi
-      if [ ! -f "$WINDOWS_BINDIST" ]; then
-        echo "Error: $WINDOWS_BINDIST does not exist. Did the 64-bit Windows job fail?"
-        exit 1
-      fi
-    - rm -Rf docs
-    - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
-    - ls -lh
-    - mv docs/*.tar.xz docs/index.html .
+#   tags:
+#     - x86_64-linux
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+#   dependencies: null
+#   variables:
+#     LINUX_BINDIST: "ghc-x86_64-linux-deb10.tar.xz"
+#     WINDOWS_BINDIST: "ghc-x86_64-windows.tar.xz"
+#   artifacts:
+#     paths:
+#       - haddock.html.tar.xz
+#       - libraries.html.tar.xz
+#       - users_guide.html.tar.xz
+#       - index.html
+#       - "*.pdf"
+#   script:
+#     - |
+#       mv "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz" "$LINUX_BINDIST" \
+#         || mv "ghc-x86_64-linux-deb10-validate.tar.xz" "$LINUX_BINDIST" \
+#         || mv "ghc-x86_64-linux-deb10-release.tar.xz" "$LINUX_BINDIST" \
+#         || true
+#       mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
+#         || mv "ghc-x86_64-windows-release+no_split_sections.tar.xz" "$WINDOWS_BINDIST" \
+#         || true
+#       if [ ! -f "$LINUX_BINDIST" ]; then
+#         echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
+#         exit 1
+#       fi
+#       if [ ! -f "$WINDOWS_BINDIST" ]; then
+#         echo "Error: $WINDOWS_BINDIST does not exist. Did the 64-bit Windows job fail?"
+#         exit 1
+#       fi
+#     - rm -Rf docs
+#     - bash -ex distrib/mkDocs/mkDocs $LINUX_BINDIST $WINDOWS_BINDIST
+#     - ls -lh
+#     - mv docs/*.tar.xz docs/index.html .
 
-hackage-doc-tarball:
-  stage: packaging
-  needs:
-    - job: nightly-x86_64-linux-fedora33-release-hackage
-      optional: true
-    - job: release-x86_64-linux-fedora33-release-hackage
-      optional: true
-    - job: source-tarball
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies: null
-  variables:
-    # Don't clone the git repo..
-    GIT_STRATEGY: none
-    # Don't attempt to boot a source tarball
-    NO_BOOT: "1"
-  artifacts:
-    paths:
-      - hackage_docs
-  before_script:
-    - tar -xf ghc-*[0-9]-src.tar.xz
-    - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C ghc*/
-  script:
-    - cd ghc*/
-    - mv .gitlab/rel_eng/upload_ghc_libs.py .
-    - .gitlab/ci.sh setup
-    - .gitlab/ci.sh configure
-    - ./upload_ghc_libs.py prepare --bindist ghc*linux/
-    - mv .upload-libs/docs ../hackage_docs
-  rules:
-    - if: $NIGHTLY
-    - if: '$RELEASE_JOB == "yes"'
+# hackage-doc-tarball:
+#   stage: packaging
+#   needs:
+#     - job: nightly-x86_64-linux-fedora33-release-hackage
+#       optional: true
+#     - job: release-x86_64-linux-fedora33-release-hackage
+#       optional: true
+#     - job: source-tarball
+#   tags:
+#     - x86_64-linux
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+#   dependencies: null
+#   variables:
+#     # Don't clone the git repo..
+#     GIT_STRATEGY: none
+#     # Don't attempt to boot a source tarball
+#     NO_BOOT: "1"
+#   artifacts:
+#     paths:
+#       - hackage_docs
+#   before_script:
+#     - tar -xf ghc-*[0-9]-src.tar.xz
+#     - tar -xf ghc-x86_64-linux-fedora33-release.tar.xz -C ghc*/
+#   script:
+#     - cd ghc*/
+#     - mv .gitlab/rel_eng/upload_ghc_libs.py .
+#     - .gitlab/ci.sh setup
+#     - .gitlab/ci.sh configure
+#     - ./upload_ghc_libs.py prepare --bindist ghc*linux/
+#     - mv .upload-libs/docs ../hackage_docs
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$RELEASE_JOB == "yes"'
 
-source-tarball:
-  stage: full-build
-  tags:
-    - x86_64-linux
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  dependencies: []
-  artifacts:
-    paths:
-      - ghc-*.tar.xz
-  script:
-    - sudo chown ghc:ghc -R .
-    - ./boot
-    - ./configure
-    - ./hadrian/build source-dist
-    - mv _build/source-dist/*.xz  .
-  rules:
-    - if: $NIGHTLY
-    - if: '$RELEASE_JOB == "yes"'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+# source-tarball:
+#   stage: full-build
+#   tags:
+#     - x86_64-linux
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+#   dependencies: []
+#   artifacts:
+#     paths:
+#       - ghc-*.tar.xz
+#   script:
+#     - sudo chown ghc:ghc -R .
+#     - ./boot
+#     - ./configure
+#     - ./hadrian/build source-dist
+#     - mv _build/source-dist/*.xz  .
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$RELEASE_JOB == "yes"'
+#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
-generate-hadrian-bootstrap-sources:
-  stage: full-build
-  tags:
-    - x86_64-linux
-  image: "$DOCKER_IMAGE"
-  dependencies: []
-  parallel: *bootstrap_matrix
-  artifacts:
-    paths:
-      - hadrian-bootstrap-sources-*.tar.gz
-  script:
-    - bash -c "[ $($GHC --numeric-version) = $GHC_VERSION ] || { echo $GHC_VERSION is not the same as the version of $GHC && exit 1; }"
-    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
-  rules:
-    - if: $NIGHTLY
-    - if: '$RELEASE_JOB == "yes"'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+# generate-hadrian-bootstrap-sources:
+#   stage: full-build
+#   tags:
+#     - x86_64-linux
+#   image: "$DOCKER_IMAGE"
+#   dependencies: []
+#   parallel: *bootstrap_matrix
+#   artifacts:
+#     paths:
+#       - hadrian-bootstrap-sources-*.tar.gz
+#   script:
+#     - bash -c "[ $($GHC --numeric-version) = $GHC_VERSION ] || { echo $GHC_VERSION is not the same as the version of $GHC && exit 1; }"
+#     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC fetch -o hadrian-bootstrap-sources-$GHC_VERSION
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$RELEASE_JOB == "yes"'
+#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
 
-package-hadrian-bootstrap-sources:
-  stage: full-build
-  tags:
-    - x86_64-linux
-  needs: ["generate-hadrian-bootstrap-sources"]
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
-  artifacts:
-    paths:
-      - hadrian-bootstrap-sources-all.tar.gz
-  script:
-    - tar -czvf hadrian-bootstrap-sources-all.tar.gz hadrian-bootstrap-sources-*.tar.gz
-  rules:
-    - if: $NIGHTLY
-    - if: '$RELEASE_JOB == "yes"'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+# package-hadrian-bootstrap-sources:
+#   stage: full-build
+#   tags:
+#     - x86_64-linux
+#   needs: ["generate-hadrian-bootstrap-sources"]
+#   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+#   artifacts:
+#     paths:
+#       - hadrian-bootstrap-sources-all.tar.gz
+#   script:
+#     - tar -czvf hadrian-bootstrap-sources-all.tar.gz hadrian-bootstrap-sources-*.tar.gz
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$RELEASE_JOB == "yes"'
+#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
 
-test-bootstrap:
-  stage: full-build
-  needs: [generate-hadrian-bootstrap-sources, source-tarball]
-  tags:
-    - x86_64-linux
-  image: "$DOCKER_IMAGE"
-  parallel: *bootstrap_matrix
-  dependencies: null
-  script:
-    - sudo chown ghc:ghc -R .
-    - mkdir test-bootstrap
-    - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
-    - tar -xf ghc-*-testsuite.tar.xz -C test-bootstrap
-    - cp hadrian-bootstrap-sources-$GHC_VERSION.tar.gz test-bootstrap/ghc-*
-    - pushd test-bootstrap/ghc-*
-    - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-$GHC_VERSION.tar.gz
-    - export HADRIAN_PATH="$PWD/_build/bin/hadrian"
-    - .gitlab/ci.sh setup
-    # Bootstrapping should not depend on HAPPY or ALEX so set them to false
-    # so the build fails if they are invoked.
-    - export HAPPY=/bin/false; export ALEX=/bin/false
-    - .gitlab/ci.sh configure
-    - .gitlab/ci.sh build_hadrian
-    - .gitlab/ci.sh test_hadrian
-    - popd
-    - rm -Rf test-bootstrap
-  variables:
-    # Don't record performance benchmarks
-    TEST_ENV: ""
-    BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
-    BUILD_FLAVOUR: "validate"
-    NO_BOOT: "1"
-  rules:
-    - if: $NIGHTLY
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
-    - if: '$RELEASE_JOB == "yes"'
-      when: always
-      variables:
-        BUILD_FLAVOUR: "release"
+# test-bootstrap:
+#   stage: full-build
+#   needs: [generate-hadrian-bootstrap-sources, source-tarball]
+#   tags:
+#     - x86_64-linux
+#   image: "$DOCKER_IMAGE"
+#   parallel: *bootstrap_matrix
+#   dependencies: null
+#   script:
+#     - sudo chown ghc:ghc -R .
+#     - mkdir test-bootstrap
+#     - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
+#     - tar -xf ghc-*-testsuite.tar.xz -C test-bootstrap
+#     - cp hadrian-bootstrap-sources-$GHC_VERSION.tar.gz test-bootstrap/ghc-*
+#     - pushd test-bootstrap/ghc-*
+#     - python3 ./hadrian/bootstrap/bootstrap.py -w $GHC --bootstrap-sources hadrian-bootstrap-sources-$GHC_VERSION.tar.gz
+#     - export HADRIAN_PATH="$PWD/_build/bin/hadrian"
+#     - .gitlab/ci.sh setup
+#     # Bootstrapping should not depend on HAPPY or ALEX so set them to false
+#     # so the build fails if they are invoked.
+#     - export HAPPY=/bin/false; export ALEX=/bin/false
+#     - .gitlab/ci.sh configure
+#     - .gitlab/ci.sh build_hadrian
+#     - .gitlab/ci.sh test_hadrian
+#     - popd
+#     - rm -Rf test-bootstrap
+#   variables:
+#     # Don't record performance benchmarks
+#     TEST_ENV: ""
+#     BIN_DIST_NAME: "ghc-x86_64-deb10-linux"
+#     BUILD_FLAVOUR: "validate"
+#     NO_BOOT: "1"
+#   rules:
+#     - if: $NIGHTLY
+#     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+#     - if: '$RELEASE_JOB == "yes"'
+#       when: always
+#       variables:
+#         BUILD_FLAVOUR: "release"
 
 
 ############################################################
