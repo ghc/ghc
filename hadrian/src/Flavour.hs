@@ -112,7 +112,7 @@ parseFlavour baseFlavours transformers str =
 
 -- | Add arguments to the 'args' of a 'Flavour'.
 addArgs :: Args -> Flavour -> Flavour
-addArgs args' fl = fl { args = args fl <> args' }
+addArgs args' fl = fl { extraArgs = extraArgs fl <> args' }
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
@@ -468,7 +468,7 @@ applySetting (KeyVal ks op v) = case runSettingsM ks builderPredicate of
   Left err -> throwError $
       "error while setting `" ++ intercalate "`." ks ++ ": " ++ err
   Right pred -> Right $ \flav -> flav
-    { args = update (args flav) pred }
+    { extraArgs = update (extraArgs flav) pred }
 
   where override arguments predicate = do
           holds <- predicate

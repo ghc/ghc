@@ -11,7 +11,7 @@ import {-# SOURCE #-} Settings.Default
 quickCrossFlavour :: Flavour
 quickCrossFlavour = defaultFlavour
     { name        = "quick-cross"
-    , args        = defaultBuilderArgs <> quickCrossArgs <> defaultPackageArgs
+    , extraArgs        = quickCrossArgs
     , dynamicGhcPrograms = pure False
     , libraryWays = Set.fromList <$>
                     mconcat

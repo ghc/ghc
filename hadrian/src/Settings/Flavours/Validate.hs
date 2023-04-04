@@ -12,7 +12,7 @@ import {-# SOURCE #-} Settings.Default
 validateFlavour :: Flavour
 validateFlavour = enableLinting $ werror $ defaultFlavour
     { name = "validate"
-    , args = defaultBuilderArgs <> validateArgs <> defaultPackageArgs
+    , extraArgs = validateArgs
     , libraryWays = Set.fromList <$>
                     mconcat [ pure [vanilla]
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
@@ -60,4 +60,4 @@ quickValidateArgs = sourceArgs SourceArgs
 quickValidateFlavour :: Flavour
 quickValidateFlavour = werror $ validateFlavour
     { name               = "quick-validate"
-    , args               = defaultBuilderArgs <> quickValidateArgs <> defaultPackageArgs }
+    , extraArgs               = quickValidateArgs }

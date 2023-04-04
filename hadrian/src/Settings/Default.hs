@@ -7,7 +7,7 @@ module Settings.Default (
 
     -- * Default command line arguments for various builders
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
-    defaultArgs,
+    defaultExtraArgs,
 
     -- * Default build flavour and BigNum backend
     defaultFlavour, defaultBignumBackend
@@ -210,7 +210,6 @@ data SourceArgs = SourceArgs
 sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
-    , getContextData hcOpts
     -- `compiler` is also a library but the specific arguments that we want
     -- to apply to that are given by the hsCompiler option. `ghc` is an
     -- executable so we don't have to exclude that.
@@ -219,11 +218,8 @@ sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     , package ghc      ? hsGhc ]
 
 -- | All default command line arguments.
-defaultArgs :: Args
-defaultArgs = mconcat
-    [ defaultBuilderArgs
-    , sourceArgs defaultSourceArgs
-    , defaultPackageArgs ]
+defaultExtraArgs :: Args
+defaultExtraArgs = sourceArgs defaultSourceArgs
 
 -- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs
@@ -241,7 +237,7 @@ defaultSourceArgs = SourceArgs
 defaultFlavour :: Flavour
 defaultFlavour = Flavour
     { name               = "default"
-    , args               = defaultArgs
+    , extraArgs          = defaultExtraArgs
     , packages           = defaultPackages
     , bignumBackend      = defaultBignumBackend
     , bignumCheck        = False
