@@ -28,10 +28,6 @@
     "dependencies": [],
     "image": null,
     "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
     ],
     "rules": [
       {
@@ -90,10 +86,6 @@
     "dependencies": [],
     "image": null,
     "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
     ],
     "rules": [
       {
