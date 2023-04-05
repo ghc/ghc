@@ -41,7 +41,7 @@ where
 -- base
 import Control.Monad    ( unless, liftM, when, (<=<) )
 import GHC.Exts
-import Data.Maybe       ( maybeToList )
+import Data.Maybe       ( maybeToList, fromMaybe, fromJust, maybe )
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
 import qualified Data.List.NonEmpty as NE
 import qualified Prelude -- for happy-generated code
@@ -61,7 +61,7 @@ import GHC.Data.Maybe          ( orElse )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error
-import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
+import GHC.Utils.Misc          ( looksLikePackageName, fstOf3, sndOf3, thdOf3, lastMaybe )
 import GHC.Utils.Panic
 import GHC.Prelude
 import qualified GHC.Data.Strict as Strict
@@ -3080,12 +3080,22 @@ texp :: { ECP }
 
         | 'one' 'of' vocurly orpats close
                              {% do {
-                                    let srcSpan = comb2 $1 (reLoc (NE.last $4))
+                                    let srcSpan = comb2 $1 $ reLoc (fromJust $ lastMaybe $4)
                                     ; cs <- getCommentsFor srcSpan
                                     ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) $4
                                     ; let pat = sL (noAnnSrcSpan srcSpan) pat'
                                     ; orPatsOn <- hintOrPats pat
-                                    ; when (orPatsOn && length $4 < 2) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrOrPatNeedsTwoAlternatives pat)
+                                    ; when (orPatsOn && null $4) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrEmptyOrPatWithoutCurlys pat)
+                                    ; return $ ecpFromPat pat
+                             }  }
+
+        | 'one' 'of' '{' orpats '}'
+                             {% do {
+                                    let srcSpan = comb2 $1 $5 -- todo: loc ?
+                                    ; cs <- getCommentsFor srcSpan
+                                    ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) $4
+                                    ; let pat = sL (noAnnSrcSpan srcSpan) pat'
+                                    ; _ <- hintOrPats pat
                                     ; return $ ecpFromPat pat
                              }  }
 
@@ -3095,12 +3105,12 @@ texp :: { ECP }
                              unECP $3 >>= \ $3 ->
                              mkHsViewPatPV (comb2 (reLoc $1) (reLoc $>)) $1 $3 [mu AnnRarrow $2] }
 
-orpats :: { NonEmpty (LPat GhcPs) }
-        : tpat %shift      { NE.singleton $1 }
+orpats :: { [LPat GhcPs] }
+        : %shift           { [] }
 
-        | tpat ',' orpats  {% do {
+        | tpat ';' orpats  {% do {
                                   a <- addTrailingCommaA $1 (getLoc $2)
-                                  ; return (a<|$3)
+                                  ; return (a:$3)
                            } }
 
 -- Always at least one comma or bar.

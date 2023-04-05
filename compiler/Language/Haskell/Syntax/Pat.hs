@@ -52,7 +52,6 @@ import Data.Ord
 import Data.Int
 import Data.Function
 import qualified Data.List
-import qualified Data.List.NonEmpty as NEL
 
 type LPat p = XRec p (Pat p)
 
@@ -139,7 +138,7 @@ data Pat p
     --            'GHC.Parser.Annotation.AnnClose' @')'@ or  @'#)'@
 
   | OrPat       (XOrPat p)
-                (NEL.NonEmpty (LPat p))
+                [LPat p]
     -- ^ Or Pattern
 
   | SumPat      (XSumPat p)        -- after typechecker, types of the alternative

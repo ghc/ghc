@@ -610,8 +610,8 @@ rnPatAndThen mk (TuplePat _ pats boxed)
        ; return (TuplePat noExtField pats' boxed) }
 
 rnPatAndThen mk (OrPat _ pats)
-  = do { pats' <- rnLPatsAndThen mk (NE.toList pats)
-       ; return (OrPat noExtField (NE.fromList pats')) }
+  = do { pats' <- rnLPatsAndThen mk pats
+       ; return (OrPat noExtField pats') }
 
 rnPatAndThen mk (SumPat _ pat alt arity)
   = do { pat <- rnLPatAndThen mk pat

@@ -84,7 +84,6 @@ import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
 import GHC.Driver.DynFlags (DynFlags, xopt)
 import qualified GHC.LanguageExtensions as LangExt
-import qualified Data.List.NonEmpty as NE
 import Data.Data
 
 
@@ -353,7 +352,7 @@ pprPat (SplicePat ext splice)   =
       GhcTc -> dataConCantHappen ext
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
-pprPat (OrPat _ pats)           = text "one of" <+> pprWithCommas ppr (NE.toList pats)
+pprPat (OrPat _ pats)           = text "one of { " <+> pprWithSemis ppr pats <+> text " }"
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `MkSolo x`, not `(x)`

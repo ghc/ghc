@@ -272,7 +272,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrMultipleConForNewtype"                    = 05380
   GhcDiagnosticCode "PsErrUnicodeCharLooksLike"                     = 31623
   GhcDiagnosticCode "PsErrIllegalOrPat"                             = 29847
-  GhcDiagnosticCode "PsErrOrPatNeedsTwoAlternatives"                = 96152
+  GhcDiagnosticCode "PsErrEmptyOrPatWithoutCurlys"                = 96152
 
   -- Driver diagnostic codes
   GhcDiagnosticCode "DriverMissingHomeModules"                      = 32850

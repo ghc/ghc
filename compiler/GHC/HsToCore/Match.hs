@@ -315,8 +315,8 @@ matchOr (var :| vars) ty eqn = do {
     ; match_result <- match vars ty (shiftEqns [eqn])
      -- share match_result across the different cases of the OrPat match
     ; shareSuccessHandler match_result ty (\expr -> do {
-      let or_eqns = map (singleEqn expr) (NEL.toList pats)
-    ; match [var] ty or_eqns
+      let or_eqns = map (singleEqn expr) pats
+    ; match [var] ty or_eqns -- todo: not if pats is empty
     })
   } where
     singleEqn expr (L _ pat) = EqnInfo { eqn_pats = [pat], eqn_orig = FromSource, eqn_rhs = pure expr }
@@ -443,9 +443,9 @@ tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
 
 tidy1 v o (OrPat x pats) = do
-  (wraps, pats) <- mapAndUnzipM (tidy1 v o . unLoc) (NEL.toList pats)
+  (wraps, pats) <- mapAndUnzipM (tidy1 v o . unLoc) pats
   let wrap = foldr (.) id wraps in
-    return (wrap, OrPat x (NEL.fromList $ map (L noSrcSpanA) pats))
+    return (wrap, OrPat x (map (L noSrcSpanA) pats))
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }

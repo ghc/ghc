@@ -92,7 +92,6 @@ import GHC.Data.Bag
 
 import Control.Monad
 import Data.List  ( partition )
-import qualified Data.List.NonEmpty as NE
 import Control.Arrow ( second )
 import Data.List.NonEmpty (NonEmpty(..))
 
@@ -1347,8 +1346,8 @@ zonk_pat env (TuplePat tys pats boxed)
 
 zonk_pat env p@(OrPat ty pats)
   = do  { ty' <- zonkTcTypeToTypeX env ty
-        ; (env', pats') <- zonkPatsNE env pats
-        ; checkNoVarsBound (NE.toList pats') p
+        ; (env', pats') <- zonkPats env pats
+        ; checkNoVarsBound pats' p
         ; return (env', OrPat ty' pats') }
     where
       checkNoVarsBound :: [LPat GhcTc] -> Pat GhcTc -> TcRn ()
@@ -1460,11 +1459,6 @@ zonkPats env []         = return (env, [])
 zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
                              ; (env', pats') <- zonkPats env1 pats
                              ; return (env', pat':pats') }
-
-zonkPatsNE :: ZonkEnv -> NonEmpty (LPat GhcTc) -> TcM (ZonkEnv, NonEmpty (LPat GhcTc))
-zonkPatsNE env (pat:|pats) = do { (env1, pat') <- zonkPat env pat
-                             ; (env', pats') <- zonkPats env1 pats
-                             ; return (env', pat':|pats') }
 
 {-
 ************************************************************************

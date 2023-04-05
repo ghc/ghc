@@ -474,8 +474,8 @@ data PsMessage
     -- | Or pattern used without -XOrPatterns
     | PsErrIllegalOrPat (LPat GhcPs)
 
-    -- | Or pattern with just a single alternative like (one of x)
-    | PsErrOrPatNeedsTwoAlternatives (LPat GhcPs)
+    -- | Writing (one of) instead of (one of {}) is illegal
+    | PsErrEmptyOrPatWithoutCurlys (LPat GhcPs)
 
    deriving Generic
 

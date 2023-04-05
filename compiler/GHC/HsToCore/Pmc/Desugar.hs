@@ -231,7 +231,8 @@ desugarPat x pat = case pat of
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars `consGrdDag` sequenceGrdDags grdss
 
-  OrPat _tys pats -> alternativesGrdDags <$> traverse (desugarLPat x) pats
+  OrPat _tys [] -> error "lol" -- pure failGrd
+  OrPat _tys (pat:pats) -> alternativesGrdDags <$> traverse (desugarLPat x) (pat:|pats)
 
   SumPat _ty p alt arity -> do
     (y, grds) <- desugarLPatV p
@@ -240,6 +241,9 @@ desugarPat x pat = case pat of
     pure $ vanillaConGrd x sum_con [y] `consGrdDag` grds
 
   SplicePat {} -> panic "Check.desugarPat: SplicePat"
+
+
+-- failGrd = mkPmLetVar trueId trueDataConId `consGrdDag` vanillaConGrd trueId falseDataCon []
 
 -- | 'desugarPat', but also select and return a new match var.
 desugarPatV :: Pat GhcTc -> DsM (Id, GrdDag)
