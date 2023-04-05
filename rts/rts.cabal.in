@@ -45,8 +45,6 @@ flag libdw
   default: @CabalHaveLibdw@
 flag libnuma
   default: @CabalHaveLibNuma@
-flag 64bit
-  default: @Cabal64bit@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
 flag smp
@@ -289,27 +287,6 @@ library
                         stg/Types.h
 
       -- See Note [Undefined symbols in the RTS]
-      if flag(64bit)
-        if flag(leading-underscore)
-          ld-options:
-            "-Wl,-u,_hs_atomic_add64"
-            "-Wl,-u,_hs_atomic_sub64"
-            "-Wl,-u,_hs_atomic_and64"
-            "-Wl,-u,_hs_atomic_nand64"
-            "-Wl,-u,_hs_atomic_or64"
-            "-Wl,-u,_hs_atomic_xor64"
-            "-Wl,-u,_hs_atomicread64"
-            "-Wl,-u,_hs_atomicwrite64"
-        else
-          ld-options:
-            "-Wl,-u,hs_atomic_add64"
-            "-Wl,-u,hs_atomic_sub64"
-            "-Wl,-u,hs_atomic_and64"
-            "-Wl,-u,hs_atomic_nand64"
-            "-Wl,-u,hs_atomic_or64"
-            "-Wl,-u,hs_atomic_xor64"
-            "-Wl,-u,hs_atomicread64"
-            "-Wl,-u,hs_atomicwrite64"
       if flag(leading-underscore)
         ld-options:
            "-Wl,-u,_base_GHCziTopHandler_runIO_closure"
@@ -357,21 +334,27 @@ library
            "-Wl,-u,_hs_atomic_add8"
            "-Wl,-u,_hs_atomic_add16"
            "-Wl,-u,_hs_atomic_add32"
+           "-Wl,-u,_hs_atomic_add64"
            "-Wl,-u,_hs_atomic_sub8"
            "-Wl,-u,_hs_atomic_sub16"
            "-Wl,-u,_hs_atomic_sub32"
+           "-Wl,-u,_hs_atomic_sub64"
            "-Wl,-u,_hs_atomic_and8"
            "-Wl,-u,_hs_atomic_and16"
            "-Wl,-u,_hs_atomic_and32"
+           "-Wl,-u,_hs_atomic_and64"
            "-Wl,-u,_hs_atomic_nand8"
            "-Wl,-u,_hs_atomic_nand16"
            "-Wl,-u,_hs_atomic_nand32"
+           "-Wl,-u,_hs_atomic_nand64"
            "-Wl,-u,_hs_atomic_or8"
            "-Wl,-u,_hs_atomic_or16"
            "-Wl,-u,_hs_atomic_or32"
+           "-Wl,-u,_hs_atomic_or64"
            "-Wl,-u,_hs_atomic_xor8"
            "-Wl,-u,_hs_atomic_xor16"
            "-Wl,-u,_hs_atomic_xor32"
+           "-Wl,-u,_hs_atomic_xor64"
            "-Wl,-u,_hs_cmpxchg8"
            "-Wl,-u,_hs_cmpxchg16"
            "-Wl,-u,_hs_cmpxchg32"
@@ -383,9 +366,11 @@ library
            "-Wl,-u,_hs_atomicread8"
            "-Wl,-u,_hs_atomicread16"
            "-Wl,-u,_hs_atomicread32"
+           "-Wl,-u,_hs_atomicread64"
            "-Wl,-u,_hs_atomicwrite8"
            "-Wl,-u,_hs_atomicwrite16"
            "-Wl,-u,_hs_atomicwrite32"
+           "-Wl,-u,_hs_atomicwrite64"
            "-Wl,-u,_base_GHCziStackziCloneStack_StackSnapshot_closure"
 
         if flag(find-ptr)
@@ -440,21 +425,27 @@ library
            "-Wl,-u,hs_atomic_add8"
            "-Wl,-u,hs_atomic_add16"
            "-Wl,-u,hs_atomic_add32"
+           "-Wl,-u,hs_atomic_add64"
            "-Wl,-u,hs_atomic_sub8"
            "-Wl,-u,hs_atomic_sub16"
            "-Wl,-u,hs_atomic_sub32"
+           "-Wl,-u,hs_atomic_sub64"
            "-Wl,-u,hs_atomic_and8"
            "-Wl,-u,hs_atomic_and16"
            "-Wl,-u,hs_atomic_and32"
+           "-Wl,-u,hs_atomic_and64"
            "-Wl,-u,hs_atomic_nand8"
            "-Wl,-u,hs_atomic_nand16"
            "-Wl,-u,hs_atomic_nand32"
+           "-Wl,-u,hs_atomic_nand64"
            "-Wl,-u,hs_atomic_or8"
            "-Wl,-u,hs_atomic_or16"
            "-Wl,-u,hs_atomic_or32"
+           "-Wl,-u,hs_atomic_or64"
            "-Wl,-u,hs_atomic_xor8"
            "-Wl,-u,hs_atomic_xor16"
            "-Wl,-u,hs_atomic_xor32"
+           "-Wl,-u,hs_atomic_xor64"
            "-Wl,-u,hs_cmpxchg8"
            "-Wl,-u,hs_cmpxchg16"
            "-Wl,-u,hs_cmpxchg32"
@@ -466,9 +457,11 @@ library
            "-Wl,-u,hs_atomicread8"
            "-Wl,-u,hs_atomicread16"
            "-Wl,-u,hs_atomicread32"
+           "-Wl,-u,hs_atomicread64"
            "-Wl,-u,hs_atomicwrite8"
            "-Wl,-u,hs_atomicwrite16"
            "-Wl,-u,hs_atomicwrite32"
+           "-Wl,-u,hs_atomicwrite64"
            "-Wl,-u,base_GHCziStackziCloneStack_StackSnapshot_closure"
 
         if flag(find-ptr)

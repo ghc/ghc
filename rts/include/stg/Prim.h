@@ -53,7 +53,7 @@ void hs_atomicwrite64(StgWord x, StgWord64 val);
 StgWord hs_xchg8(StgWord x, StgWord val);
 StgWord hs_xchg16(StgWord x, StgWord val);
 StgWord hs_xchg32(StgWord x, StgWord val);
-StgWord hs_xchg64(StgWord x, StgWord val);
+StgWord64 hs_xchg64(StgWord x, StgWord64 val);
 
 /* libraries/ghc-prim/cbits/bswap.c */
 StgWord16 hs_bswap16(StgWord16 x);

@@ -33,14 +33,12 @@ hs_atomic_add32(StgWord x, StgWord val)
   return __sync_fetch_and_add((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_add64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_add64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_add((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchSubByteArrayOp_Int
 
@@ -65,14 +63,12 @@ hs_atomic_sub32(StgWord x, StgWord val)
   return __sync_fetch_and_sub((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_sub64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_sub64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_sub((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchAndByteArrayOp_Int
 
@@ -97,14 +93,12 @@ hs_atomic_and32(StgWord x, StgWord val)
   return __sync_fetch_and_and((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_and64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_and64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_and((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchNandByteArrayOp_Int
 
@@ -206,7 +200,6 @@ hs_atomic_nand32(StgWord x, StgWord val)
 #endif
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(StgWord x, StgWord64 val)
@@ -217,7 +210,6 @@ hs_atomic_nand64(StgWord x, StgWord64 val)
   CAS_NAND((volatile StgWord64 *) x, val);
 #endif
 }
-#endif
 
 #pragma GCC diagnostic pop
 
@@ -244,14 +236,12 @@ hs_atomic_or32(StgWord x, StgWord val)
   return __sync_fetch_and_or((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_or64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_or64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_or((volatile StgWord64 *) x, val);
 }
-#endif
 
 // FetchXorByteArrayOp_Int
 
@@ -276,14 +266,12 @@ hs_atomic_xor32(StgWord x, StgWord val)
   return __sync_fetch_and_xor((volatile StgWord32 *) x, (StgWord32) val);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomic_xor64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_xor64(StgWord x, StgWord64 val)
 {
   return __sync_fetch_and_xor((volatile StgWord64 *) x, val);
 }
-#endif
 
 // CasByteArrayOp_Int
 
@@ -338,15 +326,13 @@ hs_xchg32(StgWord x, StgWord val)
   return (StgWord) __atomic_exchange_n((StgWord32 *) x, (StgWord32) val, __ATOMIC_SEQ_CST);
 }
 
-#if WORD_SIZE_IN_BITS == 64
 //GCC provides this even on 32bit, but StgWord is still 32 bits.
-extern StgWord hs_xchg64(StgWord x, StgWord val);
-StgWord
-hs_xchg64(StgWord x, StgWord val)
+extern StgWord64 hs_xchg64(StgWord x, StgWord64 val);
+StgWord64
+hs_xchg64(StgWord x, StgWord64 val)
 {
-  return (StgWord) __atomic_exchange_n((StgWord64 *) x, (StgWord64) val, __ATOMIC_SEQ_CST);
+  return (StgWord64) __atomic_exchange_n((StgWord64 *) x, (StgWord64) val, __ATOMIC_SEQ_CST);
 }
-#endif
 
 // AtomicReadByteArrayOp_Int
 // Implies a full memory barrier (see compiler/GHC/Builtin/primops.txt.pp)
@@ -391,7 +377,6 @@ hs_atomicread32(StgWord x)
 #endif
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern StgWord64 hs_atomicread64(StgWord x);
 StgWord64
 hs_atomicread64(StgWord x)
@@ -402,7 +387,6 @@ hs_atomicread64(StgWord x)
   return __sync_add_and_fetch((StgWord64 *) x, 0);
 #endif
 }
-#endif
 
 // AtomicWriteByteArrayOp_Int
 // Implies a full memory barrier (see compiler/GHC/Builtin/primops.txt.pp)
@@ -441,7 +425,6 @@ hs_atomicwrite32(StgWord x, StgWord val)
 #endif
 }
 
-#if WORD_SIZE_IN_BITS == 64
 extern void hs_atomicwrite64(StgWord x, StgWord64 val);
 void
 hs_atomicwrite64(StgWord x, StgWord64 val)
@@ -452,6 +435,5 @@ hs_atomicwrite64(StgWord x, StgWord64 val)
   while (!__sync_bool_compare_and_swap((StgWord64 *) x, *(StgWord64 *) x, (StgWord64) val));
 #endif
 }
-#endif
 
 #endif

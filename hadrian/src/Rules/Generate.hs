@@ -295,11 +295,6 @@ rtsCabalFlags = mconcat
     , flag "CabalUseSystemLibFFI" UseSystemFfi
     , flag "CabalLibffiAdjustors" UseLibffiForAdjustors
     , flag "CabalLeadingUnderscore" LeadingUnderscore
-    , interpolateVar "Cabal64bit" $ do
-        let settingWord :: Setting -> Action Word
-            settingWord s = read <$> setting s
-        ws <- settingWord TargetWordSize
-        return $ toCabalBool (ws == 8)
     ]
   where
     flag = interpolateCabalFlag
