@@ -1606,8 +1606,8 @@ flip f x y              =  f y x
 -- (\x -> undefined x) `seq` () and thus would just evaluate to (), but now
 -- it is equivalent to undefined `seq` () which diverges.
 
-{- | @($)@ is the __function application__ operator. 
- 
+{- | @($)@ is the __function application__ operator.
+
 Applying @($)@ to a function @f@ and an argument @x@ gives the same result as applying @f@ to @x@ directly. The definition is akin to this:
 
 @
@@ -1649,7 +1649,7 @@ we can deploy the function application operator:
 @
 -- | Sum numbers in a string: strSum "100  5 -7" == 98
 strSum :: 'String' -> 'Int'
-strSum s = 'sum' '$' 'Data.Maybe.mapMaybe' 'Text.Read.readMaybe' '$' 'words' s 
+strSum s = 'sum' '$' 'Data.Maybe.mapMaybe' 'Text.Read.readMaybe' '$' 'words' s
 @
 
 @($)@ is also used as a section (a partially applied operator), in order to indicate that we wish to apply some yet-unspecified function to a given value. For example, to apply the argument @5@ to a list of functions:
