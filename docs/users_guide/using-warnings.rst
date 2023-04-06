@@ -1615,7 +1615,7 @@ of ``-W(no-)*``.
     :shortdesc: Warn when using :ghc-flag:`-fllvm` with an unsupported
         version of LLVM.
     :type: dynamic
-    :reverse: -Wno-monomorphism-restriction
+    :reverse: -Wno-unsupported-llvm-version
     :category:
 
     :since: 7.8
