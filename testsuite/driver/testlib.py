@@ -439,10 +439,17 @@ def only_ways( ways: List[WayName] ):
 
 # -----
 
+def valid_way( way: WayName ) -> bool:
+    if way in {'ghci', 'ghci-ext'}:
+        return config.have_RTS_linker
+    if way == 'ghci-ext-prof':
+        return config.have_RTS_linker and config.have_profiling
+    return True
+
 def extra_ways( ways: List[WayName] ):
     def helper( name: TestName, opts ):
         _lint_ways(name, ways)
-        opts.extra_ways = ways
+        opts.extra_ways = [way for way in ways if valid_way(way)]
 
     return helper
 
