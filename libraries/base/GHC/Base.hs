@@ -1662,7 +1662,7 @@ applyFive = map ($ 5) [(+1), (2^)]
 
 === Technical Remark (Representation Polymorphism)
 
-@($)@ is fully representation-polymorphic. This allows it to also be used with low-level primitive values, which have a different type to regular Haskell values.
+@($)@ is fully representation-polymorphic. This allows it to also be used with arguments of unlifted and even unboxed kinds, such as unboxed integers:
 
 @
 fastMod :: Int -> Int -> Int
