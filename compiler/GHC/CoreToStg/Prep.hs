@@ -6,7 +6,7 @@
 (c) The University of Glasgow, 1994-2006
 
 
-Core pass to saturate constructors and PrimOps
+Core pass to ANF-ise and saturate PrimOps and cbv-functions
 -}
 
 module GHC.CoreToStg.Prep
@@ -77,7 +77,7 @@ Note [CorePrep Overview]
 
 The goal of this pass is to prepare for code generation.
 
-1.  Saturate constructor and primop applications.
+1.  Saturate applications of primops and cbv functions.
 
 2.  Convert to A-normal form; that is, function arguments
     are always variables.
@@ -1058,12 +1058,14 @@ cpeApp top_env expr
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
                  hd = getIdFromTrivialExpr_maybe e2
-                 -- Determine number of required arguments. See Note [Ticks and mandatory eta expansion]
-                 min_arity = case hd of
+                 -- Determine the number of required arguments.
+                 -- See Note [Calling primitives with the right arity]
+                 -- and Note [Ticks and mandatory eta expansion]
+                 exact_arity = case hd of
                    Just v_hd -> if hasNoBinding v_hd then Just $! (idArity v_hd) else Nothing
                    Nothing -> Nothing
           --  ; pprTraceM "cpe_app:stricts:" (ppr v <+> ppr args $$ ppr stricts $$ ppr (idCbvMarks_maybe v))
-           ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts min_arity
+           ; (app, floats, unsat_ticks) <- rebuild_app env args e2 emptyFloats stricts exact_arity
            ; mb_saturate hd app floats unsat_ticks depth }
         where
           depth = val_args args
@@ -1091,9 +1093,12 @@ cpeApp top_env expr
                           -- If evalDmd says that it's sure to be evaluated,
                           -- we'll end up case-binding it
            ; (app, floats,unsat_ticks) <- rebuild_app env args fun' fun_floats [] Nothing
-           ; mb_saturate Nothing app floats unsat_ticks (val_args args) }
+           ; massert (null unsat_ticks)
+           ; return (floats, app) }
 
-    -- Count the number of value arguments *and* coercions (since we don't eliminate the later in STG)
+
+    -- Count the number of value arguments *including* coercions
+    -- (since we don't eliminate the latter in STG)
     val_args :: [ArgInfo] -> Int
     val_args args = go args 0
       where
@@ -1131,13 +1136,13 @@ cpeApp top_env expr
         -> CpeApp                     -- The function
         -> Floats
         -> [Demand]
-        -> Maybe Arity
+        -> Maybe Arity                -- (Just arity) when headed by a hasNoBinding Id
         -> UniqSM (CpeApp
                   ,Floats
                   ,[CoreTickish] -- Underscoped ticks. See Note [Ticks and mandatory eta expansion]
                   )
-    rebuild_app env args app floats ss req_depth =
-      rebuild_app' env args app floats ss [] (fromMaybe 0 req_depth)
+    rebuild_app env args app floats ss req_depth  =
+      rebuild_app' env args app floats ss [] (fromMaybe (0-1) req_depth)
 
     rebuild_app'
         :: CorePrepEnv
@@ -1146,29 +1151,34 @@ cpeApp top_env expr
         -> Floats
         -> [Demand]
         -> [CoreTickish]
-        -> Int -- Number of arguments required to satisfy minimal tick scopes.
+        -> Int -- Negative for normal functions;
+               -- number of remaining value arguments for hasNoBinding Ids;
+               -- see Note [Calling primitives with the right arity]
+               -- and Note [Ticks and mandatory eta expansion]
         -> UniqSM (CpeApp, Floats, [CoreTickish])
     rebuild_app' _ [] app floats ss rt_ticks !_req_depth
       = assertPpr (null ss) (ppr ss)-- make sure we used all the strictness info
         return (app, floats, rt_ticks)
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
-      -- See Note [Ticks and mandatory eta expansion]
-      _
-        | not (null rt_ticks)
-        , req_depth <= 0
-        ->
-            let tick_fun = foldr mkTick fun' rt_ticks
-            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
-
       CpeApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty)) floats ss rt_ticks req_depth
 
-      CpeApp (Coercion co)
-        -> rebuild_app' env as (App fun' (Coercion co)) floats (drop 1 ss) rt_ticks req_depth
-
-      CpeApp arg -> do
-        let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make
+      CpeApp arg
+        | req_depth == 0 -> do
+            -- See Note [Calling primitives with the right arity], wrinkle W2:
+            -- The primitive already has the right number of value arguments
+            -- we must case-bind before we can apply it to another argument.
+            -- We also apply any collected profiling ticks now; see
+            -- Note [Ticks and mandatory eta expansion]
+            v <- newVar (exprType fun')
+            let tick_fun = foldr mkTick fun' rt_ticks
+                float = mkFloat env evalDmd False v tick_fun
+            rebuild_app' env (a : as) (Var v) (addFloat floats float) ss [] (0-1)
+        | Coercion co <- arg
+        -> rebuild_app' env as (App fun' (Coercion co)) floats (drop 1 ss) rt_ticks (req_depth-1)
+        | otherwise -> do
+        let (ss1, ss_rest)  -- See Note [lazyId magic] in GHC.Types.Id.Make, wrinkle W3
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
@@ -1178,10 +1188,11 @@ cpeApp top_env expr
 
       CpeCast co
         -> rebuild_app' env as (Cast fun' co) floats ss rt_ticks req_depth
+
       -- See Note [Ticks and mandatory eta expansion]
       CpeTick tickish
         | tickishPlace tickish == PlaceRuntime
-        , req_depth > 0
+        , req_depth >= 0
         -> assert (isProfTick tickish) $
            rebuild_app' env as fun' floats ss (tickish:rt_ticks) req_depth
         | otherwise
@@ -1189,7 +1200,7 @@ cpeApp top_env expr
         -> rebuild_app' env as fun' (addFloat floats (FloatTick tickish)) ss rt_ticks req_depth
 
 isLazyExpr :: CoreExpr -> Bool
--- See Note [lazyId magic] in GHC.Types.Id.Make
+-- See Note [lazyId magic] in GHC.Types.Id.Make, wrinkle W3
 isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
@@ -1395,6 +1406,12 @@ the continuation may not be a manifest lambda.
 
 Note [ANF-ising literal string arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*** Is this Note still necessary? Yes, the example transformation to
+       foo = u\ [] case "turtle"# of s { __DEFAULT__ -> Foo s }
+    seems pretty bad.  But these days, we'd expect the simplifier to
+    have floated "turtle"# to top-level anyway.  Right?
+
 Consider a Core program like,
 
     data Foo = Foo Addr#
@@ -1530,21 +1547,56 @@ because that has different strictness.  Hence the use of 'allLazy'.
 -- Building the saturated syntax
 -- ---------------------------------------------------------------------------
 
-Note [Eta expansion of hasNoBinding things in CorePrep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-maybeSaturate deals with eta expanding to saturate things that can't deal with
-unsaturated applications (identified by 'hasNoBinding', currently
-foreign calls, unboxed tuple/sum constructors, and representation-polymorphic
-primitives such as 'coerce' and 'unsafeCoerce#').
+Note [Calling primitives with the right arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For several low-level things, the code generator can only handle
+saturated applications, i.e. applications with exactly the right
+number of arguments.  (These things are identified by 'hasNoBinding'.
+Currently, they are: foreign calls, unboxed tuple/sum constructors,
+and representation-polymorphic primitives such as 'coerce' and
+'unsafeCoerce#'.)
+
+W1: If an application has too few arguments, we must eta-expand. For
+    example, we transform `(+#) x` into `\y -> (+#) x y`.  This happens
+    in maybeSaturate.
+
+W2: Perhaps surprisingly, an application of a primitive can have too
+    many arguments!  This can make sense if the primitive returns a
+    function.  Here's an example, from #22937:
+
+      let  arg3 = \s' f -> unIO f s'
+           arg4 = putStrLn "test"
+       in  keepAlive# () s arg3 arg4
+
+    keepAlive# is a primop with arity 3, so we must apply it to its
+    first 3 arguments, and then apply the resulting function to the
+    remaining argument, as follows:
+
+      let  arg3 = \s' f -> unIO f s'
+           arg4 = putStrLn "test"
+       in  case  keepAlive# () s arg3  of  fun {
+             __DEFAULT -> fun arg4
+           };
+
+    We perform this transformation in rebuild_app.
+
+TODO: Per #23865, we must not over-saturate DataCon workers, either.
+  This can happen in dead code, but we don't want to panic.  But it's
+  OK to under-saturate DataCon workers. (Unless they have a strict
+  field, for reasons inexplicably not discussed in either Note [CBV
+  Function Ids] or Note [Strict Field Invariant].)
+
+TODO: There is work ongoing in !6245 to allow representation-monomorphic
+  primops to be used un-saturated, by lowering un-saturated calls into
+  calls of their respective primop wrappers.  So the mechanism here
+  should be adusted to easily accommodate that.
 
 Historical Note: Note that eta expansion in CorePrep used to be very fragile
 due to the "prediction" of CAFfyness that we used to make during tidying.
-We previously saturated primop
-applications here as well but due to this fragility (see #16846) we now deal
-with this another way, as described in Note [Primop wrappers] in GHC.Builtin.PrimOps.
 -}
 
 maybeSaturate :: Id -> CpeApp -> Int -> [CoreTickish] -> UniqSM CpeRhs
+-- TODO: We must also saturate DataCon workers that have strict fields.
 maybeSaturate fn expr n_args unsat_ticks
   | hasNoBinding fn        -- There's no binding
   = return $ wrapLamBody (\body -> foldr mkTick body unsat_ticks) sat_expr
@@ -1866,19 +1918,6 @@ mkFloat env dmd is_unlifted bndr rhs
       -- Otherwise we get  case (\x -> e) of ...!
 
   | is_unlifted            = FloatCase rhs bndr DEFAULT [] True
-      -- we used to assertPpr ok_for_spec (ppr rhs) here, but it is now disabled
-      -- because exprOkForSpeculation isn't stable under ANF-ing. See for
-      -- example #19489 where the following unlifted expression:
-      --
-      --    GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0]
-      --                    (GHC.Types.: @a_ax0 a2_agq a3_agl)
-      --
-      -- is ok-for-spec but is ANF-ised into:
-      --
-      --    let sat = GHC.Types.: @a_ax0 a2_agq a3_agl
-      --    in GHC.Prim.(#|_#) @LiftedRep @LiftedRep @[a_ax0] @[a_ax0] sat
-      --
-      -- which isn't ok-for-spec because of the let-expression.
 
   | is_hnf                 = FloatLet (NonRec bndr                       rhs)
   | otherwise              = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)

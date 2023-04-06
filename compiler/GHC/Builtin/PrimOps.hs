@@ -804,7 +804,7 @@ convention for curried applications that can accommodate representation
 polymorphism.
 
 To ensure saturation, CorePrep eta expands all primop applications as
-described in Note [Eta expansion of hasNoBinding things in CorePrep] in
+described in Note [Calling primitives with the right arity] in
 GHC.Core.Prep.
 
 Historical Note:

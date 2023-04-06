@@ -2112,43 +2112,43 @@ Note [lazyId magic]
 lazy :: forall a. a -> a
 
 'lazy' is used to make sure that a sub-expression, and its free variables,
-are truly used call-by-need, with no code motion.  Key examples:
+are truly used call-by-need, with no code motion.  Key example:
 
 * pseq:    pseq a b = a `seq` lazy b
   We want to make sure that the free vars of 'b' are not evaluated
   before 'a', even though the expression is plainly strict in 'b'.
-
-* catch:   catch a b = catch# (lazy a) b
-  Again, it's clear that 'a' will be evaluated strictly (and indeed
-  applied to a state token) but we want to make sure that any exceptions
-  arising from the evaluation of 'a' are caught by the catch (see
-  #11555).
+    *** This isn't especially robust. See #23233.
 
 Implementing 'lazy' is a bit tricky:
 
-* It must not have a strictness signature: by being a built-in Id,
-  all the info about lazyId comes from here, not from GHC.Magic.hi.
-  This is important, because the strictness analyser will spot it as
-  strict!
+W1: It must not have a strictness signature: by being a built-in Id,
+    all the info about lazyId comes from here, not from GHC.Magic.hi.
+    This is important, because the strictness analyser will spot it as
+    strict!
 
-* It must not have an unfolding: it gets "inlined" by a HACK in
-  CorePrep. It's very important to do this inlining *after* unfoldings
-  are exposed in the interface file.  Otherwise, the unfolding for
-  (say) pseq in the interface file will not mention 'lazy', so if we
-  inline 'pseq' we'll totally miss the very thing that 'lazy' was
-  there for in the first place. See #3259 for a real world
-  example.
+W2: It must not have an unfolding: it gets "inlined" by a HACK in
+    CorePrep. It's very important to do this inlining *after* unfoldings
+    are exposed in the interface file.  Otherwise, the unfolding for
+    (say) pseq in the interface file will not mention 'lazy', so if we
+    inline 'pseq' we'll totally miss the very thing that 'lazy' was
+    there for in the first place. See #3259 for a real world
+    example.
 
-* Suppose CorePrep sees (catch# (lazy e) b).  At all costs we must
-  avoid using call by value here:
-     case e of r -> catch# r b
-  Avoiding that is the whole point of 'lazy'.  So in CorePrep (which
-  generate the 'case' expression for a call-by-value call) we must
-  spot the 'lazy' on the arg (in CorePrep.cpeApp), and build a 'let'
-  instead.
+W3: Suppose CorePrep sees (catch# (lazy e) b).  At all costs we must
+    avoid using call by value here:
+       case e of r -> catch# r b
+    Avoiding that is the whole point of 'lazy'.  So in CorePrep (which
+    generate the 'case' expression for a call-by-value call) we must
+    spot the 'lazy' on the arg (in CorePrep.cpeApp), and build a 'let'
+    instead.
+      *** We wouldn't use call-by-value in this example anyway, since
+          catch# is no longer considered strict.  (See primops.txt.pp
+          Note [Strictness for mask/unmask/catch]) This property of
+          lazy is news to me (clyring, Apr 2023). Is it documented
+          anywhere else? Is there any reason to keep it?
 
-* lazyId is defined in GHC.Base, so we don't *have* to inline it.  If it
-  appears un-applied, we'll end up just calling it.
+W4: lazyId is defined in GHC.Magic, so we don't *have* to inline it.  If it
+    appears un-applied, we'll end up just calling it.
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -2190,8 +2190,8 @@ Wrinkles
 (W1) Sometimes case (2) above needs to apply `noinline` to a type of kind
      Constraint; e.g.
                     noinline @(Eq Int) $dfEqInt
-     We don't have type-or-kind polymorphism, so we simply have two `inline`
-     Ids, namely `noinlineId` and `noinlineConstraintId`.
+     We don't have type-or-constraint polymorphism, so we simply have two
+     `noinline` Ids, namely `noinlineId` and `noinlineConstraintId`.
 
 (W2) Note that noinline as currently implemented can hide some simplifications
      since it hides strictness from the demand analyser. Specifically, the
