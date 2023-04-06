@@ -108,6 +108,7 @@ module GHC.Tc.Errors.Types (
   , TyFamsDisabledReason(..)
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
+  , TySynCycleTyCons
   ) where
 
 import GHC.Prelude
@@ -3787,6 +3788,15 @@ data TcRnMessage where
     -> HsExpr GhcPs -- ^ Section
     -> TcRnMessage
 
+  {-| TcRnTypeSynonymCycle is an error indicating that a cycle between type
+    synonyms has occurred.
+
+    Test cases:
+      mod27, ghc-e-fail2, bkpfail29
+  -}
+  TcRnTypeSynonymCycle :: !TySynCycleTyCons -- ^ The tycons involved in the cycle
+                       -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -5192,3 +5202,6 @@ data HsTyVarBndrExistentialFlag = forall flag. OutputableBndrFlag flag 'Renamed 
 
 instance Outputable HsTyVarBndrExistentialFlag where
   ppr (HsTyVarBndrExistentialFlag hsTyVarBndr) = ppr hsTyVarBndr
+
+type TySynCycleTyCons =
+  [Either TyCon (LTyClDecl GhcRn)]

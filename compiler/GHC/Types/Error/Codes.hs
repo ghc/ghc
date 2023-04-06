@@ -578,6 +578,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnRoleAnnotationsDisabled"                   = 17779
   GhcDiagnosticCode "TcRnIncoherentRoles"                           = 18273
   GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
+  GhcDiagnosticCode "TcRnTypeSynonymCycle"                          = 97522
 
   -- TcRnBadFieldAnnotation/BadFieldAnnotationReason
   GhcDiagnosticCode "LazyFieldsDisabled"                            = 81601

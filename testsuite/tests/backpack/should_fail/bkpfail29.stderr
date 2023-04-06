@@ -5,7 +5,7 @@
 [3 of 3] Processing r
   [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
 
-bkpfail29.bkp:8:9: error:
+bkpfail29.bkp:8:9: error: [GHC-97522]
     • Cycle in type synonym declarations:
         bkpfail29.bkp:8:9-18: S from external module
         bkpfail29.bkp:7:9-14: T from external module

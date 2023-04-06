@@ -1716,6 +1716,18 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "Illegal" <+> (text $ levelString typeOrKind) <> colon <+> quotes (ppr thing)
 
+    TcRnTypeSynonymCycle decl_or_tcs
+      -> mkSimpleDecorated $
+           sep [ text "Cycle in type synonym declarations:"
+               , nest 2 (vcat (map ppr_decl decl_or_tcs)) ]
+      where
+        ppr_decl = \case
+          Right (L loc decl) -> ppr (locA loc) <> colon <+> ppr decl
+          Left tc ->
+            let n = tyConName tc
+            in ppr (getSrcSpan n) <> colon <+> ppr (tyConName tc)
+                   <+> text "from external module"
+
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2285,6 +2297,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnusedQuantifiedTypeVar{}
       -> WarningWithFlag Opt_WarnUnusedForalls
     TcRnDataKindsError{}
+      -> ErrorWithoutFlag
+    TcRnTypeSynonymCycle{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -2883,6 +2897,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnDataKindsError{}
       -> [suggestExtension LangExt.DataKinds]
+    TcRnTypeSynonymCycle{}
+      -> noHints
 
   diagnosticCode = constructorCode
 

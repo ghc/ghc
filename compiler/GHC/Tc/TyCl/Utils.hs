@@ -65,7 +65,6 @@ import GHC.Data.FastString
 import GHC.Unit.Module
 
 import GHC.Types.Basic
-import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -168,7 +167,7 @@ synonymTyConsOfType ty
 -- track of the TyCons which are known to be acyclic, or
 -- a failure message reporting that a cycle was found.
 newtype SynCycleM a = SynCycleM {
-    runSynCycleM :: SynCycleState -> Either (SrcSpan, SDoc) (a, SynCycleState) }
+    runSynCycleM :: SynCycleState -> Either (SrcSpan, TySynCycleTyCons) (a, SynCycleState) }
     deriving (Functor)
 
 -- TODO: TyConSet is implemented as IntMap over uniques.
@@ -188,8 +187,8 @@ instance Monad SynCycleM where
                 runSynCycleM (f x) state'
             Left err -> Left err
 
-failSynCycleM :: SrcSpan -> SDoc -> SynCycleM ()
-failSynCycleM loc err = SynCycleM $ \_ -> Left (loc, err)
+failSynCycleM :: SrcSpan -> TySynCycleTyCons -> SynCycleM ()
+failSynCycleM loc seen_tcs = SynCycleM $ \_ -> Left (loc, seen_tcs)
 
 -- | Test if a 'Name' is acyclic, short-circuiting if we've
 -- seen it already.
@@ -209,7 +208,7 @@ checkTyConIsAcyclic tc m = SynCycleM $ \s ->
 checkSynCycles :: Unit -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds =
     case runSynCycleM (mapM_ (go emptyTyConSet []) tcs) emptyTyConSet of
-        Left (loc, err) -> setSrcSpan loc $ failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints err)
+        Left (loc, err) -> setSrcSpan loc $ failWithTc (TcRnTypeSynonymCycle err)
         Right _  -> return ()
   where
     -- Try our best to print the LTyClDecl for locally defined things
@@ -226,9 +225,7 @@ checkSynCycles this_uid tcs tyclds =
     go' :: TyConSet -> [TyCon] -> TyCon -> SynCycleM ()
     go' so_far seen_tcs tc
         | tc `elemTyConSet` so_far
-            = failSynCycleM (getSrcSpan (head seen_tcs)) $
-                  sep [ text "Cycle in type synonym declarations:"
-                      , nest 2 (vcat (map ppr_decl seen_tcs)) ]
+            = failSynCycleM (getSrcSpan (head seen_tcs)) (lookup_decl <$> seen_tcs)
         -- Optimization: we don't allow cycles through external packages,
         -- so once we find a non-local name we are guaranteed to not
         -- have a cycle.
@@ -245,13 +242,10 @@ checkSynCycles this_uid tcs tyclds =
       where
         n = tyConName tc
         mod = nameModule n
-        ppr_decl tc =
-          case lookupNameEnv lcl_decls n of
-            Just (L loc decl) -> ppr (locA loc) <> colon <+> ppr decl
-            Nothing -> ppr (getSrcSpan n) <> colon <+> ppr n
-                       <+> text "from external module"
-         where
-          n = tyConName tc
+        lookup_decl tc =
+          case lookupNameEnv lcl_decls (tyConName tc) of
+            Just decl -> Right decl
+            Nothing -> Left tc
 
     go_ty :: TyConSet -> [TyCon] -> Type -> SynCycleM ()
     go_ty so_far seen_tcs ty =
