@@ -1606,18 +1606,69 @@ flip f x y              =  f y x
 -- (\x -> undefined x) `seq` () and thus would just evaluate to (), but now
 -- it is equivalent to undefined `seq` () which diverges.
 
--- | Application operator.  This operator is redundant, since ordinary
--- application @(f x)@ means the same as @(f '$' x)@. However, '$' has
--- low, right-associative binding precedence, so it sometimes allows
--- parentheses to be omitted; for example:
---
--- > f $ g $ h x  =  f (g (h x))
---
--- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
--- or @'Data.List.zipWith' ('$') fs xs@.
---
--- Note that @('$')@ is representation-polymorphic, so that
--- @foo '$' 4#@ where @foo :: Int# -> Int#@ is well-typed.
+{- | @($)@ is the __function application__ operator. 
+ 
+Applying @($)@ to a function @f@ and an argument @x@ gives the same result as applying @f@ to @x@ directly. The definition is akin to this:
+
+@
+($) :: (a -> b) -> a -> b
+($) f x = f x
+@
+
+On the face of it, this may appear pointless! But it's actually one of the most useful and important operators in Haskell.
+
+The order of operations is very different between @($)@ and normal function application. Normal function application has precedence 10 - higher than any operator - and associates to the left. So these two definitions are equivalent:
+
+@
+expr = min 5 1 + 5
+expr = ((min 5) 1) + 5
+@
+
+@($)@ has precedence 0 (the lowest) and associates to the right, so these are equivalent:
+
+@
+expr = min 5 $ 1 + 5
+expr = (min 5) (1 + 5)
+@
+
+=== Uses
+
+A common use cases of @($)@ is to avoid parentheses in complex expressions.
+
+For example, instead of using nested parentheses in the following
+ Haskell function:
+
+@
+-- | Sum numbers in a string: strSum "100  5 -7" == 98
+strSum :: 'String' -> 'Int'
+strSum s = 'sum' ('Data.Maybe.mapMaybe' 'Text.Read.readMaybe' ('words' s))
+@
+
+we can deploy the function application operator:
+
+@
+-- | Sum numbers in a string: strSum "100  5 -7" == 98
+strSum :: 'String' -> 'Int'
+strSum s = 'sum' '$' 'Data.Maybe.mapMaybe' 'Text.Read.readMaybe' '$' 'words' s 
+@
+
+@($)@ is also used as a section (a partially applied operator), in order to indicate that we wish to apply some yet-unspecified function to a given value. For example, to apply the argument @5@ to a list of functions:
+
+@
+applyFive :: [Int]
+applyFive = map ($ 5) [(+1), (2^)]
+>>> [6, 32]
+@
+
+=== Technical Remark (Representation Polymorphism)
+
+@($)@ is fully representation-polymorphic. This allows it to also be used with low-level primitive values, which have a different type to regular Haskell values.
+
+@
+fastMod :: Int -> Int -> Int
+fastMod (I# x) (I# m) = I# $ remInt# x m
+@
+-}
 {-# INLINE ($) #-}
 ($) :: forall repa repb (a :: TYPE repa) (b :: TYPE repb). (a -> b) -> a -> b
 ($) f = f
