@@ -408,17 +408,11 @@ mkApplyArr = mconcat
   [ TxtI "h$apply" ||= toJExpr (JList [])
   , TxtI "h$paps"  ||= toJExpr (JList [])
   , ApplStat (var "h$initStatic" .^ "push")
-    [ ValExpr $ JFunc [] $ jVar \i -> mconcat
-        [ i |= zero_
-        , WhileStat False (i .<. Int 65536) $ mconcat
-            [ var "h$apply" .! i |= var "h$ap_gen"
-            , preIncrS i
-            ]
-        , i |= zero_
-        , WhileStat False (i .<. Int 128) $ mconcat
-            [ var "h$paps" .! i |= var "h$pap_gen"
-            , preIncrS i
-            ]
+    [ ValExpr $ JFunc [] $ mconcat
+        [ jFor (|= zero_) (.<. Int 65536) preIncrS
+          (\j -> var "h$apply" .! j |= var "h$ap_gen")
+        , jFor (|= zero_) (.<. Int 128) preIncrS
+          (\j -> var "h$paps" .! j |= var "h$pap_gen")
         , mconcat (map assignSpec applySpec)
         , mconcat (map assignPap specPap)
         ]

@@ -240,7 +240,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
   body <- genBody ctx R1 args body typ
   ei@(TxtI eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
-  let f = JFunc [] (bh <> lvs <> body)
+  let f = (bh <> lvs <> body)
   emitClosureInfo $
     ClosureInfo ei
                 (CIRegs 0 $ concatMap idVt args)
@@ -249,7 +249,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
                     map (stackSlotType . fst) (ctxLneFrameVars ctx))
                 CIStackFrame
                 sr
-  emitToplevel (ei ||= toJExpr f)
+  emitToplevel (jFunction ei [] f)
 genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
   ei@(TxtI _eii) <- identForEntryId i
@@ -258,8 +258,7 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
   p  <- popLneFrame True payloadSize ctx
   args' <- concatMapM genArg args
   ac    <- allocCon ii con cc args'
-  emitToplevel (ei ||= toJExpr (JFunc []
-    (mconcat [decl ii, p, ac, r1 |= toJExpr ii, returnStack])))
+  emitToplevel (jFunction ei [] (mconcat [decl ii, p, ac, r1 |= toJExpr ii, returnStack]))
 
 -- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
@@ -283,7 +282,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) =
                                 (fixedLayout $ map (uTypeVt . idType) live)
                                 et
                                 sr
-  emitToplevel (ei ||= toJExpr (JFunc [] (mconcat [ll, llv, upd, setcc, body])))
+  emitToplevel (jFunction ei [] (mconcat [ll, llv, upd, setcc, body]))
   where
     entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
@@ -630,7 +629,7 @@ genRet ctx e at as l = freshIdent >>= f
                        ++ if prof then [ObjV] else map stackSlotType lneVars)
                     CIStackFrame
                     sr
-      emitToplevel $ r ||= toJExpr (JFunc [] fun')
+      emitToplevel $ jFunction r [] fun'
       return (pushLne <> saveCCS <> pushRet)
     fst3 ~(x,_,_)  = x
 

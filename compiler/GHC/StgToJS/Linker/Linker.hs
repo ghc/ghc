@@ -30,6 +30,7 @@ import Prelude
 import GHC.Platform.Host (hostPlatformArchOS)
 
 import GHC.JS.Make
+import GHC.JS.Optimizer
 import GHC.JS.Unsat.Syntax
 import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Transform
@@ -43,11 +44,11 @@ import GHC.Linker.Static.Utils (exeFileName)
 
 import GHC.StgToJS.Linker.Types
 import GHC.StgToJS.Linker.Utils
+import GHC.StgToJS.Linker.Opt
 import GHC.StgToJS.Rts.Rts
 import GHC.StgToJS.Object
 import GHC.StgToJS.Types hiding (LinkableUnit)
 import GHC.StgToJS.Symbols
-import GHC.StgToJS.Printer
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Closure
 
@@ -332,7 +333,7 @@ renderLinker h mods jsFiles = do
     pure (mod_mod, mod_size)
 
   -- commoned up metadata
-  !meta_length <- fromIntegral <$> putJS (satJStat meta)
+  !meta_length <- fromIntegral <$> putJS (jsOptimize $ satJStat meta)
 
   -- module exports
   mapM_ (putBS . cmc_exports) compacted_mods

@@ -16,6 +16,7 @@ import GHC.JS.Ppr
 import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
+import GHC.JS.Optimizer
 
 import GHC.StgToJS.Arg
 import GHC.StgToJS.Sinker
@@ -133,10 +134,10 @@ genUnits m ss spt_entries foreign_stubs = do
         glbl <- State.gets gsGlobal
         staticInit <-
           initStaticPtrs spt_entries
-        let stat = ( -- O.optimize .
-                     satJStat .
-                     jsSaturate (Just $ modulePrefix m 1)
-                   $ mconcat (reverse glbl) <> staticInit)
+        let stat = ( jsOptimize
+                     . satJStat
+                     . jsSaturate (Just $ modulePrefix m 1)
+                     $ mconcat (reverse glbl) <> staticInit)
         let syms = [moduleGlobalSymbol m]
         let oi = ObjUnit
                   { oiSymbols  = syms
@@ -208,7 +209,9 @@ genUnits m ss spt_entries foreign_stubs = do
               _extraTl   <- State.gets (ggsToplevelStats . gsGroup)
               si        <- State.gets (ggsStatic . gsGroup)
               let body = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
-              let stat =  satJStat $ jsSaturate (Just $ modulePrefix m n) body
+              let stat =  jsOptimize
+                          . satJStat
+                          $ jsSaturate (Just $ modulePrefix m n) body
               let ids = [bnd]
               syms <- (\(TxtI i) -> [i]) <$> identForId bnd
               let oi = ObjUnit
@@ -245,10 +248,10 @@ genUnits m ss spt_entries foreign_stubs = do
           let allDeps  = collectIds unf decl
               topDeps  = collectTopIds decl
               required = hasExport decl
-              stat     = -- Opt.optimize .
-                         satJStat .
-                         jsSaturate (Just $ modulePrefix m n)
-                       $ mconcat (reverse extraTl) <> tl
+              stat     = jsOptimize
+                         . satJStat
+                         . jsSaturate (Just $ modulePrefix m n)
+                         $ mconcat (reverse extraTl) <> tl
           syms <- mapM (fmap (\(TxtI i) -> i) . identForId) topDeps
           let oi = ObjUnit
                     { oiSymbols  = syms
@@ -308,15 +311,15 @@ genSetConInfo i d l {- srt -} = do
                                 (fixedLayout $ map uTypeVt fields)
                                 (CICon $ dataConTag d)
                                 sr
-  return (ei ||= mkDataEntry)
+  return (mkDataEntry ei)
     where
       -- dataConRepArgTys sometimes returns unboxed tuples. is that a bug?
       fields = concatMap (map primRepToType . typePrimRep . unwrapType . scaledThing)
                          (dataConRepArgTys d)
         -- concatMap (map slotTyToType . repTypeSlots . repType) (dataConRepArgTys d)
 
-mkDataEntry :: JExpr
-mkDataEntry = ValExpr $ JFunc [] returnStack
+mkDataEntry :: Ident -> JStat
+mkDataEntry i = FuncStat i [] returnStack
 
 genToplevelRhs :: Id -> CgStgRhs -> G JStat
 -- general cases:

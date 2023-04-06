@@ -532,6 +532,7 @@ Library
         GHC.IfaceToCore
         GHC.Iface.Type
         GHC.JS.Make
+        GHC.JS.Optimizer
         GHC.JS.Ppr
         GHC.JS.Syntax
         GHC.JS.Transform
@@ -672,7 +673,6 @@ Library
         GHC.StgToJS.Object
         GHC.StgToJS.Prim
         GHC.StgToJS.Profiling
-        GHC.StgToJS.Printer
         GHC.StgToJS.Regs
         GHC.StgToJS.Rts.Types
         GHC.StgToJS.Rts.Rts
@@ -686,6 +686,7 @@ Library
         GHC.StgToJS.Linker.Linker
         GHC.StgToJS.Linker.Types
         GHC.StgToJS.Linker.Utils
+        GHC.StgToJS.Linker.Opt
         GHC.Stg.Unarise
         GHC.SysTools
         GHC.SysTools.Ar

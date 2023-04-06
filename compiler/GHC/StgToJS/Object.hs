@@ -408,31 +408,35 @@ instance Binary Sat.JStat where
   put_ bh (Sat.ReturnStat e)       = putByte bh 2  >> put_ bh e
   put_ bh (Sat.IfStat e s1 s2)     = putByte bh 3  >> put_ bh e  >> put_ bh s1 >> put_ bh s2
   put_ bh (Sat.WhileStat b e s)    = putByte bh 4  >> put_ bh b  >> put_ bh e  >> put_ bh s
-  put_ bh (Sat.ForInStat b i e s)  = putByte bh 5  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
-  put_ bh (Sat.SwitchStat e ss s)  = putByte bh 6  >> put_ bh e  >> put_ bh ss >> put_ bh s
-  put_ bh (Sat.TryStat s1 i s2 s3) = putByte bh 7  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
-  put_ bh (Sat.BlockStat xs)       = putByte bh 8  >> put_ bh xs
-  put_ bh (Sat.ApplStat e es)      = putByte bh 9  >> put_ bh e  >> put_ bh es
-  put_ bh (Sat.UOpStat o e)        = putByte bh 10 >> put_ bh o  >> put_ bh e
-  put_ bh (Sat.AssignStat e1 e2)   = putByte bh 11 >> put_ bh e1 >> put_ bh e2
-  put_ bh (Sat.LabelStat l s)      = putByte bh 12 >> put_ bh l  >> put_ bh s
-  put_ bh (Sat.BreakStat ml)       = putByte bh 13 >> put_ bh ml
-  put_ bh (Sat.ContinueStat ml)    = putByte bh 14 >> put_ bh ml
+  put_ bh (Sat.ForStat is c s bd)  = putByte bh 5 >> put_ bh is  >> put_ bh c >> put_ bh s >> put_ bh bd
+  put_ bh (Sat.ForInStat b i e s)  = putByte bh 6  >> put_ bh b  >> put_ bh i  >> put_ bh e  >> put_ bh s
+  put_ bh (Sat.SwitchStat e ss s)  = putByte bh 7  >> put_ bh e  >> put_ bh ss >> put_ bh s
+  put_ bh (Sat.TryStat s1 i s2 s3) = putByte bh 8  >> put_ bh s1 >> put_ bh i  >> put_ bh s2 >> put_ bh s3
+  put_ bh (Sat.BlockStat xs)       = putByte bh 9  >> put_ bh xs
+  put_ bh (Sat.ApplStat e es)      = putByte bh 10 >> put_ bh e  >> put_ bh es
+  put_ bh (Sat.UOpStat o e)        = putByte bh 11 >> put_ bh o  >> put_ bh e
+  put_ bh (Sat.AssignStat e1 op e2) = putByte bh 12 >> put_ bh e1 >> put_ bh op >> put_ bh e2
+  put_ bh (Sat.LabelStat l s)      = putByte bh 13 >> put_ bh l  >> put_ bh s
+  put_ bh (Sat.BreakStat ml)       = putByte bh 14 >> put_ bh ml
+  put_ bh (Sat.ContinueStat ml)    = putByte bh 15 >> put_ bh ml
+  put_ bh (Sat.FuncStat i is b)    = putByte bh 16 >> put_ bh i >> put_ bh is >> put_ bh b
   get bh = getByte bh >>= \case
     1  -> Sat.DeclStat     <$> get bh <*> get bh
     2  -> Sat.ReturnStat   <$> get bh
     3  -> Sat.IfStat       <$> get bh <*> get bh <*> get bh
     4  -> Sat.WhileStat    <$> get bh <*> get bh <*> get bh
-    5  -> Sat.ForInStat    <$> get bh <*> get bh <*> get bh <*> get bh
-    6  -> Sat.SwitchStat   <$> get bh <*> get bh <*> get bh
-    7  -> Sat.TryStat      <$> get bh <*> get bh <*> get bh <*> get bh
-    8  -> Sat.BlockStat    <$> get bh
-    9  -> Sat.ApplStat     <$> get bh <*> get bh
-    10 -> Sat.UOpStat      <$> get bh <*> get bh
-    11 -> Sat.AssignStat   <$> get bh <*> get bh
-    12 -> Sat.LabelStat    <$> get bh <*> get bh
-    13 -> Sat.BreakStat    <$> get bh
-    14 -> Sat.ContinueStat <$> get bh
+    5  -> Sat.ForStat      <$> get bh <*> get bh <*> get bh <*> get bh
+    6  -> Sat.ForInStat    <$> get bh <*> get bh <*> get bh <*> get bh
+    7  -> Sat.SwitchStat   <$> get bh <*> get bh <*> get bh
+    8  -> Sat.TryStat      <$> get bh <*> get bh <*> get bh <*> get bh
+    9  -> Sat.BlockStat    <$> get bh
+    10 -> Sat.ApplStat     <$> get bh <*> get bh
+    11 -> Sat.UOpStat      <$> get bh <*> get bh
+    12 -> Sat.AssignStat   <$> get bh <*> get bh <*> get bh
+    13 -> Sat.LabelStat    <$> get bh <*> get bh
+    14 -> Sat.BreakStat    <$> get bh
+    15 -> Sat.ContinueStat <$> get bh
+    16 -> Sat.FuncStat     <$> get bh <*> get bh <*> get bh
     n -> error ("Binary get bh JStat: invalid tag: " ++ show n)
 
 
@@ -538,6 +542,10 @@ instance Binary Sat.Op where
   get bh = getEnum bh
 
 instance Binary Sat.UOp where
+  put_ bh = putEnum bh
+  get bh = getEnum bh
+
+instance Binary Sat.AOp where
   put_ bh = putEnum bh
   get bh = getEnum bh
 

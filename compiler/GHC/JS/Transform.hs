@@ -47,6 +47,7 @@ identsS = \case
   Sat.ReturnStat e       -> identsE e
   Sat.IfStat e s1 s2     -> identsE e ++ identsS s1 ++ identsS s2
   Sat.WhileStat _ e s    -> identsE e ++ identsS s
+  Sat.ForStat init p step body -> identsS init ++ identsE p ++ identsS step ++ identsS body
   Sat.ForInStat _ i e s  -> [i] ++ identsE e ++ identsS s
   Sat.SwitchStat e xs s  -> identsE e ++ concatMap traverseCase xs ++ identsS s
                                where traverseCase (e,s) = identsE e ++ identsS s
@@ -54,10 +55,11 @@ identsS = \case
   Sat.BlockStat xs       -> concatMap identsS xs
   Sat.ApplStat e es      -> identsE e ++ concatMap identsE es
   Sat.UOpStat _op e      -> identsE e
-  Sat.AssignStat e1 e2   -> identsE e1 ++ identsE e2
+  Sat.AssignStat e1 _op e2 -> identsE e1 ++ identsE e2
   Sat.LabelStat _l s     -> identsS s
   Sat.BreakStat{}        -> []
   Sat.ContinueStat{}     -> []
+  Sat.FuncStat i args body -> [i] ++ args ++ identsS body
 
 {-# INLINE identsE #-}
 identsE :: Sat.JExpr -> [Ident]
@@ -148,6 +150,8 @@ jmcompos ret app f' v =
            ReturnStat i -> ret ReturnStat `app` f i
            IfStat e s s' -> ret IfStat `app` f e `app` f s `app` f s'
            WhileStat b e s -> ret (WhileStat b) `app` f e `app` f s
+           ForStat init p step body -> ret ForStat  `app` f init `app` f p
+                                           `app` f step `app` f body
            ForInStat b i e s -> ret (ForInStat b) `app` f i `app` f e `app` f s
            SwitchStat e l d -> ret SwitchStat `app` f e `app` l' `app` f d
                where l' = mapM' (\(c,s) -> ret (,) `app` f c `app` f s) l
@@ -158,6 +162,7 @@ jmcompos ret app f' v =
            AssignStat e e' -> ret AssignStat `app` f e `app` f e'
            UnsatBlock _ -> ret v'
            ContinueStat l -> ret (ContinueStat l)
+           FuncStat i args body -> ret FuncStat `app` f i `app` mapM' f args `app` f body
            BreakStat l -> ret (BreakStat l)
            LabelStat l s -> ret (LabelStat l) `app` f s
      JMGExpr v' -> ret JMGExpr `app` case v' of
@@ -217,7 +222,6 @@ jsSaturate_ e = IS $ jfromGADT <$> go (jtoGADT e)
 --------------------------------------------------------------------------------
 --                            Translation
 --
--- This will be moved after GHC.JS.Syntax is removed
 --------------------------------------------------------------------------------
 satJStat :: JStat -> Sat.JStat
 satJStat = witness . proof
@@ -229,6 +233,9 @@ satJStat = witness . proof
         witness (ReturnStat e)        = Sat.ReturnStat (satJExpr e)
         witness (IfStat c t e)        = Sat.IfStat (satJExpr c) (witness t) (witness e)
         witness (WhileStat is_do c e) = Sat.WhileStat is_do (satJExpr c) (witness e)
+        witness (ForStat init p step body) = Sat.ForStat
+                                             (witness init) (satJExpr p)
+                                             (witness step) (witness body)
         witness (ForInStat is_each i iter body) = Sat.ForInStat is_each i
                                                   (satJExpr iter)
                                                   (witness body)
@@ -240,12 +247,13 @@ satJStat = witness . proof
         witness (BlockStat bs)        = Sat.BlockStat $! fmap witness bs
         witness (ApplStat rator rand) = Sat.ApplStat (satJExpr rator) (satJExpr <$> rand)
         witness (UOpStat rator rand)  = Sat.UOpStat  (satJUOp rator) (satJExpr rand)
-        witness (AssignStat lhs rhs)  = Sat.AssignStat (satJExpr lhs) (satJExpr rhs)
+        witness (AssignStat lhs rhs)  = Sat.AssignStat (satJExpr lhs) Sat.AssignOp (satJExpr rhs)
         witness (LabelStat lbl stmt)  = Sat.LabelStat lbl (witness stmt)
         witness (BreakStat Nothing)   = Sat.BreakStat Nothing
         witness (BreakStat (Just l))  = Sat.BreakStat $! Just l
         witness (ContinueStat Nothing)  = Sat.ContinueStat Nothing
         witness (ContinueStat (Just l)) = Sat.ContinueStat $! Just l
+        witness (FuncStat i args body)  = Sat.FuncStat i args (witness body)
         witness UnsatBlock{}            = error "satJStat: discovered an Unsat...impossibly"
 
 

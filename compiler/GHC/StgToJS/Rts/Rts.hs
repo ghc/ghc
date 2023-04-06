@@ -30,15 +30,17 @@ import GHC.Prelude
 import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
+import GHC.JS.Optimizer
 
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Closure
 import GHC.StgToJS.Heap
-import GHC.StgToJS.Printer
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 import GHC.StgToJS.Stack
+
+import GHC.StgToJS.Linker.Opt
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
@@ -134,7 +136,7 @@ closureConstructors s = BlockStat
            | otherwise = mempty
 
     mkClosureCon :: Maybe Int -> JStat
-    mkClosureCon n0 = funName ||= toJExpr fun
+    mkClosureCon n0 = jFunction funName args funBod
       where
         n | Just n' <- n0 = n'
           | Nothing <- n0 = 0
@@ -142,7 +144,6 @@ closureConstructors s = BlockStat
                 | Nothing <- n0 = TxtI $ mkFastString "h$c"
         -- args are: f x1 x2 .. xn [cc]
         args   = TxtI "f" : addCCArg' (map varName [1..n])
-        fun    = JFunc args funBod
         -- x1 goes into closureField1. All the other args are bundled into an
         -- object in closureField2: { d1 = x2, d2 = x3, ... }
         --
@@ -157,12 +158,12 @@ closureConstructors s = BlockStat
             ]
 
     mkDataFill :: Int -> JStat
-    mkDataFill n = funName ||= toJExpr fun
+    mkDataFill n = jFunction funName (map TxtI ds) body
       where
         funName    = TxtI $ dataName n
         ds         = map dataFieldName [1..n]
         extra_args = ValExpr . JHash . listToUniqMap . zip ds $ map (toJExpr . TxtI) ds
-        fun        = JFunc (map TxtI ds) (checkD <> returnS extra_args)
+        body       = (checkD <> returnS extra_args)
 
 -- | JS Payload to perform stack manipulation in the RTS
 stackManip :: JStat
@@ -172,10 +173,10 @@ stackManip = mconcat (map mkPush [1..32]) <>
     mkPush :: Int -> JStat
     mkPush n = let funName = TxtI $ mkFastString ("h$p" ++ show n)
                    as      = map varName [1..n]
-                   fun     = JFunc as ((sp |= sp + toJExpr n)
-                                       <> mconcat (zipWith (\i a -> stack .! (sp - toJExpr (n-i)) |= toJExpr a)
-                                                   [1..] as))
-               in funName ||= toJExpr fun
+                   body    = ((sp |= sp + toJExpr n)
+                               <> mconcat (zipWith (\i a -> stack .! (sp - toJExpr (n-i)) |= toJExpr a)
+                                            [1..] as))
+               in jFunction funName as body
 
     -- partial pushes, based on bitmap, increases Sp by highest bit
     mkPpush :: Integer -> JStat
@@ -185,11 +186,10 @@ stackManip = mconcat (map mkPush [1..32]) <>
                       n       = length bits
                       h       = last bits
                       args    = map varName [1..n]
-                      fun     = JFunc args $
-                        mconcat [ sp |= sp + toJExpr (h+1)
-                                , mconcat (zipWith (\b a -> stack .! (sp - toJExpr (h-b)) |= toJExpr a) bits args)
-                                ]
-                   in funName ||= toJExpr fun
+                      body    = mconcat [ sp |= sp + toJExpr (h+1)
+                                        , mconcat (zipWith (\b a -> stack .! (sp - toJExpr (h-b)) |= toJExpr a) bits args)
+                                        ]
+                   in jFunction funName args body
 
 bitsIdx :: Integer -> [Int]
 bitsIdx n | n < 0 = error "bitsIdx: negative"
@@ -244,12 +244,12 @@ loadRegs :: JStat
 loadRegs = mconcat $ map mkLoad [1..32]
   where
     mkLoad :: Int -> JStat
-    mkLoad n = let args   = map varName [1..n]
-                   assign = zipWith (\a r -> toJExpr r |= toJExpr a)
-                              args (reverse $ take n regsFromR1)
-                   fname  = TxtI $ mkFastString ("h$l" ++ show n)
-                   fun    = JFunc args (mconcat assign)
-               in fname ||= toJExpr fun
+    mkLoad n = let args  = map varName [1..n]
+                   body  = mconcat $
+                           zipWith (\a r -> toJExpr r |= toJExpr a)
+                           args (reverse $ take n regsFromR1)
+                   fname = TxtI $ mkFastString ("h$l" ++ show n)
+               in jFunction fname args body
 
 -- | Assign registers R1 ... Rn in descending order, that is assign Rn first.
 -- This function uses the 'assignRegs'' array to construct functions which set
@@ -314,11 +314,11 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
 
 -- | print the embedded RTS to a String
 rtsText :: StgToJSConfig -> String
-rtsText = show . pretty . satJStat . rts
+rtsText = show . pretty . jsOptimize . satJStat . rts
 
 -- | print the RTS declarations to a String.
 rtsDeclsText :: String
-rtsDeclsText = show . pretty . satJStat $ rtsDecls
+rtsDeclsText = show . pretty . jsOptimize . satJStat $ rtsDecls
 
 -- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
 rts :: StgToJSConfig -> JStat

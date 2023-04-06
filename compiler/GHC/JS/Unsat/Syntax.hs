@@ -146,6 +146,7 @@ data JStat
   | ReturnStat JExpr                         -- ^ Return
   | IfStat     JExpr JStat JStat             -- ^ If
   | WhileStat  Bool JExpr JStat              -- ^ While, bool is "do" when True
+  | ForStat    JStat JExpr JStat JStat       -- ^ For
   | ForInStat  Bool Ident JExpr JStat        -- ^ For-in, bool is "each' when True
   | SwitchStat JExpr [(JExpr, JStat)] JStat  -- ^ Switch
   | TryStat    JStat Ident JStat JStat       -- ^ Try
@@ -157,6 +158,7 @@ data JStat
   | LabelStat JsLabel JStat                  -- ^ Statement Labels, makes me nostalgic for qbasic
   | BreakStat (Maybe JsLabel)                -- ^ Break
   | ContinueStat (Maybe JsLabel)             -- ^ Continue
+  | FuncStat   !Ident [Ident] JStat          -- ^ an explicit function definition
   deriving (Eq, Typeable, Generic)
 
 -- | A Label used for 'JStat', specifically 'BreakStat', 'ContinueStat' and of

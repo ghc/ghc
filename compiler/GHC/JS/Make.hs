@@ -83,7 +83,7 @@ module GHC.JS.Make
   -- $intro_funcs
   , var
   , jString
-  , jLam, jVar, jFor, jForIn, jForEachIn, jTryCatchFinally
+  , jLam, jFunction, jVar, jFor, jForNoDecl, jForIn, jForEachIn, jTryCatchFinally
   -- * Combinators
   -- $combinators
   , (||=), (|=), (.==.), (.===.), (.!=.), (.!==.), (.!)
@@ -253,7 +253,7 @@ jLam f = ValExpr . UnsatVal . IS $ do
 -- of the enclosed expression. The result is a block statement.
 -- Usage:
 --
--- @jVar $ \x y -> mconcat [jVar x ||= one_, jVar y ||= two_, jVar x + jVar y]@
+-- @jVar $ \x y -> mconcat [x ||= one_, y ||= two_, x + y]@
 jVar :: ToSat a => a -> JStat
 jVar f = UnsatBlock . IS $ do
            (block, is) <- runIdentSupply $ toSat_ f []
@@ -261,6 +261,9 @@ jVar f = UnsatBlock . IS $ do
                   BlockStat $ map decl is ++ ss
                addDecls x = x
            return $ addDecls block
+
+jFunction :: Ident -> [Ident] -> JStat -> JStat
+jFunction name args body = FuncStat name args body
 
 -- | Create a 'for in' statement.
 -- Usage:
@@ -279,6 +282,23 @@ jForEachIn e f = UnsatBlock . IS $ do
                let i = head is
                return $ decl i `mappend` ForInStat True i e block
 
+-- | Create a 'for' statement given a function for initialization, a predicate
+-- to step to, a step and a body
+-- Usage:
+--
+-- @ jFor (|= zero_) (.<. Int 65536) preIncrS
+--        (\j -> ...something with the counter j...)@
+--
+jFor :: (JExpr -> JStat)
+     -> (JExpr -> JExpr)
+     -> (JExpr -> JStat)
+     -> (JExpr -> JStat)
+     -> JStat
+jFor init pred step body = jVar $ \i -> ForStat (init i) (pred i) (step i) (body i)
+
+jForNoDecl :: Ident -> JExpr -> JExpr -> JStat -> JStat -> JStat
+jForNoDecl i initial p step body = ForStat (toJExpr i |= initial) p step body
+
 -- | As with "jForIn" but creating a \"for each in\" statement.
 jTryCatchFinally :: (ToSat a) => JStat -> a -> JStat -> JStat
 jTryCatchFinally s f s2 = UnsatBlock . IS $ do
@@ -293,13 +313,6 @@ var = ValExpr . JVar . TxtI
 -- | Convert a ShortText to a Javascript String
 jString :: FastString -> JExpr
 jString = toJExpr
-
--- | Create a 'for' statement
-jFor :: (ToJExpr a, ToStat b) => JStat -> a -> JStat -> b -> JStat
-jFor before p after b = BlockStat [before, WhileStat False (toJExpr p) b']
-    where b' = case toStat b of
-                 BlockStat xs -> BlockStat $ xs ++ [after]
-                 x -> BlockStat [x,after]
 
 -- | construct a js declaration with the given identifier
 decl :: Ident -> JStat

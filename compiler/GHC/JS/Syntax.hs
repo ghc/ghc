@@ -58,6 +58,7 @@ module GHC.JS.Syntax
   , JVal(..)
   , Op(..)
   , UOp(..)
+  , AOp(..)
   , Ident(..)
   , JLabel
   -- * pattern synonyms over JS operators
@@ -110,20 +111,22 @@ import GHC.Generics
 -- Reference](https://tc39.es/ecma262/#sec-ecmascript-language-statements-and-declarations)
 -- for details
 data JStat
-  = DeclStat   !Ident !(Maybe JExpr)     -- ^ Variable declarations: var foo [= e]
-  | ReturnStat JExpr                     -- ^ Return
-  | IfStat     JExpr JStat JStat   -- ^ If
+  = DeclStat   !Ident !(Maybe JExpr)  -- ^ Variable declarations: var foo [= e]
+  | ReturnStat JExpr                  -- ^ Return
+  | IfStat     JExpr JStat JStat      -- ^ If
   | WhileStat  Bool JExpr JStat       -- ^ While, bool is "do" when True
+  | ForStat    JStat JExpr JStat JStat  -- ^ For
   | ForInStat  Bool Ident JExpr JStat -- ^ For-in, bool is "each' when True
   | SwitchStat JExpr [(JExpr, JStat)] JStat  -- ^ Switch
   | TryStat    JStat Ident JStat JStat -- ^ Try
-  | BlockStat  [JStat]                   -- ^ Blocks
-  | ApplStat   JExpr [JExpr]          -- ^ Application
-  | UOpStat UOp JExpr                -- ^ Unary operators
-  | AssignStat JExpr JExpr            -- ^ Binding form: @foo = bar@
-  | LabelStat JLabel JStat               -- ^ Statement Labels, makes me nostalgic for qbasic
-  | BreakStat (Maybe JLabel)                -- ^ Break
-  | ContinueStat (Maybe JLabel)             -- ^ Continue
+  | BlockStat  [JStat]                 -- ^ Blocks
+  | ApplStat   JExpr [JExpr]           -- ^ Application
+  | UOpStat UOp JExpr                  -- ^ Unary operators
+  | AssignStat JExpr AOp JExpr         -- ^ Binding form: @<foo> <op> <bar>@
+  | LabelStat JLabel JStat             -- ^ Statement Labels, makes me nostalgic for qbasic
+  | BreakStat (Maybe JLabel)           -- ^ Break
+  | ContinueStat (Maybe JLabel)        -- ^ Continue
+  | FuncStat   !Ident [Ident] JStat    -- ^ an explicit function definition
   deriving (Eq, Typeable, Generic)
 
 -- | A Label used for 'JStat', specifically 'BreakStat', 'ContinueStat' and of
@@ -146,9 +149,9 @@ appendJStat mx my = case (mx,my) of
   (BlockStat [] , y           ) -> y
   (x            , BlockStat []) -> x
   (BlockStat xs , BlockStat ys) -> BlockStat $! xs ++ ys
-  (BlockStat xs , ys          )  -> BlockStat $! xs ++ [ys]
-  (xs           , BlockStat ys)  -> BlockStat $! xs : ys
-  (xs           , ys          )   -> BlockStat [xs,ys]
+  (BlockStat xs , ys          ) -> BlockStat $! xs ++ [ys]
+  (xs           , BlockStat ys) -> BlockStat $! xs : ys
+  (xs           , ys          ) -> BlockStat [xs,ys]
 
 
 --------------------------------------------------------------------------------
@@ -156,13 +159,13 @@ appendJStat mx my = case (mx,my) of
 --------------------------------------------------------------------------------
 -- | JavaScript Expressions
 data JExpr
-  = ValExpr    JVal                    -- ^ All values are trivially expressions
-  | SelExpr    JExpr Ident             -- ^ Selection: Obj.foo, see 'GHC.JS.Make..^'
-  | IdxExpr    JExpr JExpr          -- ^ Indexing:  Obj[foo], see 'GHC.JS.Make..!'
-  | InfixExpr  Op JExpr JExpr   -- ^ Infix Expressions, see 'JExpr' pattern synonyms
-  | UOpExpr    UOp JExpr           -- ^ Unary Expressions
+  = ValExpr    JVal              -- ^ All values are trivially expressions
+  | SelExpr    JExpr Ident       -- ^ Selection: Obj.foo, see 'GHC.JS.Make..^'
+  | IdxExpr    JExpr JExpr       -- ^ Indexing:  Obj[foo], see 'GHC.JS.Make..!'
+  | InfixExpr  Op JExpr JExpr    -- ^ Infix Expressions, see 'JExpr' pattern synonyms
+  | UOpExpr    UOp JExpr         -- ^ Unary Expressions
   | IfExpr     JExpr JExpr JExpr -- ^ If-expression
-  | ApplExpr   JExpr [JExpr]        -- ^ Application
+  | ApplExpr   JExpr [JExpr]     -- ^ Application
   deriving (Eq, Typeable, Generic)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
@@ -321,6 +324,15 @@ data UOp
 
 instance NFData UOp
 
+-- | JS Unary Operators
+data AOp
+  = AssignOp    -- ^ Vanilla  Assignment: =
+  | AddAssignOp -- ^ Addition Assignment: +=
+  | SubAssignOp -- ^ Subtraction Assignment: -=
+  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
+
+instance NFData AOp
+
 -- | A newtype wrapper around 'Double' to ensure we never generate a 'Double'
 -- that becomes a 'NaN', see 'Eq SaneDouble', 'Ord SaneDouble' for details on
 -- Sane-ness
@@ -345,10 +357,12 @@ instance Show SaneDouble where
 --------------------------------------------------------------------------------
 
 jassignAllEqual :: [JExpr] -> [JExpr] -> JStat
-jassignAllEqual xs ys = mconcat (zipWithEqual "assignAllEqual" AssignStat xs ys)
+jassignAllEqual xs ys = mconcat (zipWithEqual "assignAllEqual" go xs ys)
+  where go l r = AssignStat l AssignOp r
 
 jassignAll :: [JExpr] -> [JExpr] -> JStat
-jassignAll xs ys = mconcat (zipWith AssignStat xs ys)
+jassignAll xs ys = mconcat $ zipWith go xs ys
+  where go l r = AssignStat l AssignOp r
 
 jvar :: FastString -> JExpr
 jvar = ValExpr . JVar . TxtI
