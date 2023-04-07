@@ -1142,7 +1142,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
    = do { -- When quantifying, we want to preserve any order of variables as they
           -- appear in partial signatures. cf. decideQuantifiedTyVars
           let psig_tv_tys = [ mkTyVarTy tv | sig <- partial_sigs
-                                          , (_,Bndr tv _) <- sig_inst_skols sig ]
+                                           , (_,Bndr tv _) <- sig_inst_skols sig ]
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
@@ -1535,8 +1535,7 @@ decideQuantification
 decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
   = do { -- Step 1: find the mono_tvs
        ; (candidates, co_vars, mono_tvs0)
-             <- decidePromotedTyVars infer_mode
-                                     name_taus psigs candidates
+             <- decidePromotedTyVars infer_mode name_taus psigs candidates
 
        -- Step 2: default any non-mono tyvars, and re-simplify
        -- This step may do some unification, but result candidates is zonked
@@ -1736,7 +1735,7 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
              --   by some variable that is free in the env't
 
              mono_tvs = (mono_tvs2 `unionVarSet` constrained_tvs)
-                          `delVarSetList` psig_qtvs
+                        `delVarSetList` psig_qtvs
              -- (`delVarSetList` psig_qtvs): if the user has explicitly
              --   asked for quantification, then that request "wins"
              --   over the MR.
@@ -1755,6 +1754,8 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
 
        ; traceTc "decidePromotedTyVars" $ vcat
            [ text "infer_mode =" <+> ppr infer_mode
+           , text "psigs =" <+> ppr psigs
+           , text "psig_qtvs =" <+> ppr psig_qtvs
            , text "mono_tvs0 =" <+> ppr mono_tvs0
            , text "no_quant =" <+> ppr no_quant
            , text "maybe_quant =" <+> ppr maybe_quant
@@ -1876,7 +1877,8 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
 -- See Note [pickQuantifiablePreds]
 pickQuantifiablePreds
   :: TyVarSet           -- Quantifying over these
-  -> TcTyVarSet         -- These ones are free in the enviroment
+  -> TcTyVarSet         -- mono_tvs0: variables mentioned a candidate
+                        --   constraint that come from some outer level
   -> TcThetaType        -- Proposed constraints to quantify
   -> TcM TcThetaType    -- A subset that we can actually quantify
 -- This function decides whether a particular constraint should be
@@ -1888,9 +1890,9 @@ pickQuantifiablePreds qtvs mono_tvs0 theta
                  mapMaybe (pick_me is_nested) theta) }
   where
     pick_me is_nested pred
-      | let pred_tvs = tyCoVarsOfType pred
+      = let pred_tvs = tyCoVarsOfType pred
             mentions_qtvs = pred_tvs `intersectsVarSet` qtvs
-      = case classifyPredType pred of
+        in case classifyPredType pred of
 
           ClassPred cls tys
             | Just {} <- isCallStackPred cls tys
@@ -2141,15 +2143,16 @@ Definitely not.  Since we're not quantifying over beta, it has been
 promoted; and then will be zapped to Any in the final zonk.  So we end
 up with a (perhaps exported) type involving
   forall a. Zork a (Z [Char]) Any => blah
-No no no.  We never want to show the programmer a type with `Any` in it.
+No no no:
+
+  Key principle: we never want to show the programmer
+                 a type with `Any` in it.
 
 What we really want (to catch the Zork example) is this:
-Hence, for a top-level binding, we eliminate the candidate from the
-pool, by asking
 
-   Do not quantify over the constraint if it mentions a variable that is
-   (a) not quantified (i.e. is determined by the type environment), but
-   (b) do not appear literally in the environment (mono_tvs0)?
+   Quantify over the constraint only if all its free variables are
+   (a) quantified, or
+   (b) appears in the type of something in the environment (mono_tvs0).
 
 To understand (b) consider
 
@@ -2163,14 +2166,24 @@ In `f1` should we quantify over that `(C b alpha)`?  Answer: since `alpha`
 is free in the type envt, yes we should.  After all, if we'd typechecked
 `intify` first, we'd have set `alpha := Int`, and /then/ we'd certainly
 quantify.  The delicate Zork situation applies when beta is completely
-unconstrained -- except by the fudep.
+unconstrained (not free in the environment) -- except by the fundep.
 
-However this subtle reasoning is needed only for /top-level/ declarations.
-For /nested/ decls we can see all the calls, so we'll instantiate that
-quantifed `Zork a (Z [Char]) beta` constraint at call sites, and either solve
-it or not (probably not).  We won't be left with a still-callable function
-with Any in its type.  So for nested definitions we don't make this tricky
-test.
+Another way to put it: let's say `alpha` is in `mono_tvs0`. It must be that
+some variable `x` has `alpha` free in its type. If we are at top-level (and we
+are, because nested decls don't go through this path all), then `x` must also
+be at top-level. And, by induction, `x` will not have Any in its type when all
+is said and done. The induction is well-founded because, if `x` is mutually
+recursive with the definition at hand, then their constraints get processed
+together (or `x` has a type signature, in which case the type doesn't have
+`Any`). So the key thing is that we must not introduce a new top-level
+unconstrained variable here.
+
+However this regrettably-subtle reasoning is needed only for /top-level/
+declarations.  For /nested/ decls we can see all the calls, so we'll
+instantiate that quantifed `Zork a (Z [Char]) beta` constraint at call sites,
+and either solve it or not (probably not).  We won't be left with a
+still-callable function with Any in its type.  So for nested definitions we
+don't make this tricky test.
 
 Historical note: we had a different, and more complicated test
 before, but it was utterly wrong: #23199.
@@ -3187,32 +3200,41 @@ defaultTyVarTcS the_tv
   | otherwise
   = return False  -- the common case
 
-approximateWC :: Bool -> WantedConstraints -> Cts
+approximateWC :: Bool   -- See Wrinkle (W3) in Note [ApproximateWC]
+              -> WantedConstraints
+              -> Cts
 -- Second return value is the depleted wc
--- Third return value is YesFDsCombined <=> multiple constraints for the same fundep floated
 -- Postcondition: Wanted Cts
 -- See Note [ApproximateWC]
 -- See Note [floatKindEqualities vs approximateWC]
 approximateWC float_past_equalities wc
-  = float_wc emptyVarSet wc
+  = float_wc False emptyVarSet wc
   where
-    float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
-    float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
-      = filterBag (is_floatable trapping_tvs) simples `unionBags`
-        concatMapBag (float_implic trapping_tvs) implics
-    float_implic :: TcTyCoVarSet -> Implication -> Cts
-    float_implic trapping_tvs imp
-      | float_past_equalities || ic_given_eqs imp /= MaybeGivenEqs
-      = float_wc new_trapping_tvs (ic_wanted imp)
-      | otherwise   -- Take care with equalities
-      = emptyCts    -- See (1) under Note [ApproximateWC]
+    float_wc :: Bool           -- True <=> there are enclosing equalities
+             -> TcTyCoVarSet   -- Enclosing skolem binders
+             -> WantedConstraints -> Cts
+    float_wc encl_eqs trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
+      = filterBag (is_floatable encl_eqs trapping_tvs) simples `unionBags`
+        concatMapBag (float_implic encl_eqs trapping_tvs) implics
+
+    float_implic :: Bool -> TcTyCoVarSet -> Implication -> Cts
+    float_implic encl_eqs trapping_tvs imp
+      = float_wc new_encl_eqs new_trapping_tvs (ic_wanted imp)
       where
         new_trapping_tvs = trapping_tvs `extendVarSetList` ic_skols imp
+        new_encl_eqs = encl_eqs || ic_given_eqs imp == MaybeGivenEqs
 
-    is_floatable skol_tvs ct
-       | isGivenCt ct     = False
-       | insolubleEqCt ct = False
-       | otherwise        = tyCoVarsOfCt ct `disjointVarSet` skol_tvs
+    is_floatable encl_eqs skol_tvs ct
+       | isGivenCt ct                                = False
+       | insolubleEqCt ct                            = False
+       | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
+       | otherwise
+       = case classifyPredType (ctPred ct) of
+           EqPred {}     -> float_past_equalities || not encl_eqs
+                                  -- See Wrinkle (W1)
+           ClassPred {}  -> True  -- See Wrinkle (W2)
+           IrredPred {}  -> True  -- ..both in Note [ApproximateWC]
+           ForAllPred {} -> False
 
 {- Note [ApproximateWC]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -3225,28 +3247,39 @@ out from inside, if they are not captured by skolems.
 The same function is used when doing type-class defaulting (see the call
 to applyDefaultingRules) to extract constraints that might be defaulted.
 
-There is one caveat:
+Wrinkle (W1)
+  When inferring most-general types (in simplifyInfer), we
+  do *not* float an equality constraint if the implication binds
+  equality constraints, because that defeats the OutsideIn story.
+  Consider data T a where TInt :: T Int MkT :: T a
 
-1.  When inferring most-general types (in simplifyInfer), we do *not*
-    float anything out if the implication binds equality constraints,
-    because that defeats the OutsideIn story.  Consider
-       data T a where
-         TInt :: T Int
-         MkT :: T a
+         f TInt = 3::Int
 
-       f TInt = 3::Int
+  We get the implication (a ~ Int => res ~ Int), where so far we've decided
+     f :: T a -> res
+  We don't want to float (res~Int) out because then we'll infer
+     f :: T a -> Int
+  which is only on of the possible types. (GHC 7.6 accidentally *did*
+  float out of such implications, which meant it would happily infer
+  non-principal types.)
 
-    We get the implication (a ~ Int => res ~ Int), where so far we've decided
-      f :: T a -> res
-    We don't want to float (res~Int) out because then we'll infer
-      f :: T a -> Int
-    which is only on of the possible types. (GHC 7.6 accidentally *did*
-    float out of such implications, which meant it would happily infer
-    non-principal types.)
+Wrinkle (W2)
+  We do allow /class/ constraints to float, even if
+  the implication binds equalities.  This is a subtle point: see #23224.
+  In principle, a class constraint might ultimately be satisfiable from
+  a constraint bound by an implication (see #19106 for an example of this
+  kind), but it's extremely obscure and I was unable to construct a
+  concrete example.  In any case, in super-subtle cases where this might
+  make a difference, you would be much better advised to simply write a
+  type signature.
 
-   HOWEVER (#12797) in findDefaultableGroups we are not worried about
-   the most-general type; and we /do/ want to float out of equalities.
-   Hence the boolean flag to approximateWC.
+  I included IrredPred here too, for good measure.  In general,
+  abstracting over more constraints does no harm.
+
+Wrinkle (W3)
+  In findDefaultableGroups we are not worried about the
+  most-general type; and we /do/ want to float out of equalities
+  (#12797).  Hence the boolean flag to approximateWC.
 
 ------ Historical note -----------
 There used to be a second caveat, driven by #8155
