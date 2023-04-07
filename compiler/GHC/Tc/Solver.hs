@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE MultiWayIf, RecursiveDo #-}
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
@@ -1553,19 +1553,16 @@ decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
        ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
        ; min_theta  <- pickQuantifiablePreds (mkVarSet qtvs) mono_tvs0 candidates
 
-       -- Add psig_theta back in here, even though it's already
-       -- part of candidates, because we always want to quantify over
-       -- psig_theta, and pickQuantifiableCandidates might have
-       -- dropped some e.g. CallStack constraints.  c.f #14658
-       --                   equalities (a ~ Bool)
-       -- It's helpful to use the same "find difference" algorithm here as
-       -- we use in GHC.Tc.Gen.Bind.chooseInferredQuantifiers (#20921)
+       -- Take account of partial type signatures
        -- See Note [Constraints in partial type signatures]
        ; let min_psig_theta = mkMinimalBySCs id psig_theta
-       ; theta <- if null psig_theta
-                  then return min_theta  -- Fast path for the non-partial-sig case
-                  else do { diff <- findInferredDiff min_psig_theta min_theta
-                          ; return (min_psig_theta ++ diff) }
+       ; theta <- if
+           | null psigs -> return min_theta                 -- Case (P3)
+           | not (all has_extra_constraints_wildcard psigs) -- Case (P2)
+             -> return min_psig_theta
+           | otherwise                                      -- Case (P1)
+             -> do { diff <- findInferredDiff min_psig_theta min_theta
+                   ; return (min_psig_theta ++ diff) }
 
        ; traceTc "decideQuantification"
            (vcat [ text "infer_mode:" <+> ppr infer_mode
@@ -1576,37 +1573,72 @@ decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
                  , text "theta:"      <+> ppr theta ])
        ; return (qtvs, theta, co_vars) }
 
+  where
+    has_extra_constraints_wildcard (TISI { sig_inst_wcx = Just {} }) = True
+    has_extra_constraints_wildcard _                                 = False
+
 {- Note [Constraints in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have a partial type signature
-    f :: (Eq a, C a, _) => blah
+Suppose we have decided to quantify over min_theta, say (Eq a, C a, Ix a).
+Then we distinguish three cases:
 
-We will ultimately quantify f over (Eq a, C a, <diff>), where
+(P1) No partial type signatures: just quantify over min_theta
 
-   * <diff> is the result of
-         findInferredDiff (Eq a, C a) <quant-theta>
-     in GHC.Tc.Gen.Bind.chooseInferredQuantifiers
+(P2) Partial type signatures with no extra_constraints wildcard:
+      e.g.   f :: (Eq a, C a) => a -> _
+     Quantify over psig_theta: the user has explicitly specified the
+     entire context.
 
-   * <quant-theta> is the theta returned right here,
-     by decideQuantification
+     That may mean we have an unsolved residual constraint (Ix a) arising
+     from the RHS of the function. But so be it: the user said (Eq a, C a).
 
-At least for single functions we would like to quantify f over
-precisely the same theta as <quant-theta>, so that we get to take
-the short-cut path in GHC.Tc.Gen.Bind.mkExport, and avoid calling
-tcSubTypeSigma for impedance matching. Why avoid?  Because it falls
-over for ambiguous types (#20921).
+(P3) Partial type signature with an extra_constraints wildcard.
+      e.g.   f :: (Eq a, C a, _) => a -> a
+    Quantify over (psig_theta ++ diff)
+      where diff = min_theta - psig_theta, using findInferredDiff.
+    In our example, diff = Ix a
 
-We can get precisely the same theta by using the same algorithm,
-findInferredDiff.
+Some rationale and observations
 
-All of this goes wrong if we have (a) mutual recursion, (b) multiple
-partial type signatures, (c) with different constraints, and (d)
-ambiguous types.  Something like
+* See Note [When the MR applies] in GHC.Tc.Gen.Bind.
+
+* We always want to quantify over psig_theta (if present).  The user specified
+  it!  And pickQuantifiableCandidates might have dropped some
+  e.g. CallStack constraints.  c.f #14658
+       equalities (a ~ Bool)
+
+* In case (P3) we ask that /all/ the signatures have an extra-constraints
+  wildcard.  It's a bit arbitrary; not clear what the "right" thing is.
+
+* In (P2) we encounter #20076:
+     f :: Eq [a] => a -> _
+     f x = [x] == [x]
+  From the RHS we get [W] Eq [a].  We simplify those Wanteds in simplifyInfer,
+  to get (Eq a).  But then we quantify over the user-specified (Eq [a]), leaving
+  a residual implication constraint (forall a. Eq [a] => [W] Eq a), which is
+  insoluble.  Idea: in simplifyInfer we could put the /un-simplified/ constraints
+  in the residual -- at least in the case like #20076 where the partial signature
+  fully specifies the final constraint. Maybe: a battle for another day.
+
+* It's helpful to use the same "find difference" algorithm, `findInferredDiff`,
+  here as we use in GHC.Tc.Gen.Bind.chooseInferredQuantifiers (#20921)
+
+  At least for single functions we would like to quantify f over precisely the
+  same theta as <quant-theta>, so that we get to take the short-cut path in
+  `GHC.Tc.Gen.Bind.mkExport`, and avoid calling `tcSubTypeSigma` for impedance
+  matching. Why avoid?  Because it falls over for ambiguous types (#20921).
+
+  We can get precisely the same theta by using the same algorithm,
+  `findInferredDiff`.
+
+* All of this goes wrong if we have (a) mutual recursion, (b) multiple
+  partial type signatures, (c) with different constraints, and (d)
+  ambiguous types.  Something like
     f :: forall a. Eq a => F a -> _
     f x = (undefined :: a) == g x undefined
     g :: forall b. Show b => F b -> _ -> b
     g x y = let _ = (f y, show x) in x
-But that's a battle for another day.
+  But that's a battle for another day.
 -}
 
 decidePromotedTyVars :: InferMode

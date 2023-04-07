@@ -751,56 +751,101 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
 
 checkMonomorphismRestriction :: [MonoBindInfo] -> [LHsBind GhcRn] -> TcM Bool
 -- True <=> apply the MR
+-- See Note [When the MR applies]
 checkMonomorphismRestriction mbis lbinds
-  | null partial_sigs  -- The normal case
   = do { mr_on <- xoptM LangExt.MonomorphismRestriction
        ; let mr_applies = mr_on && any (restricted . unLoc) lbinds
-       ; when mr_applies $ mapM_ checkOverloadedSig sigs
+       ; when mr_applies $ mapM_ checkOverloadedSig mbis
        ; return mr_applies }
-
-  | otherwise    -- See Note [Partial type signatures and the monomorphism restriction]
-  = return (all is_mono_psig partial_sigs)
-
   where
-    sigs, partial_sigs :: [TcIdSigInst]
-    sigs          = [sig | MBI { mbi_sig = Just sig } <- mbis]
-    partial_sigs  = [sig | sig@(TISI { sig_inst_sig = PartialSig {} }) <- sigs]
+    no_mr_bndrs :: NameSet
+    no_mr_bndrs = mkNameSet (mapMaybe no_mr_name mbis)
 
-    complete_sig_bndrs :: NameSet
-    complete_sig_bndrs
-      = mkNameSet [ idName bndr
-                  | TISI { sig_inst_sig = CompleteSig { sig_bndr = bndr }} <- sigs ]
-
-    is_mono_psig (TISI { sig_inst_theta = theta, sig_inst_wcx = mb_extra_constraints })
-       = null theta && isNothing mb_extra_constraints
+    no_mr_name :: MonoBindInfo -> Maybe Name
+    -- Just n for binders that have a signature that says "no MR needed for me"
+    no_mr_name (MBI { mbi_sig = Just sig })
+       | TISI { sig_inst_sig = info, sig_inst_theta = theta, sig_inst_wcx = wcx } <- sig
+       = case info of
+           CompleteSig { sig_bndr = bndr } -> Just (idName bndr)
+           PartialSig { psig_name = nm }
+             | null theta, isNothing wcx   -> Nothing  -- f :: _ -> _
+             | otherwise                   -> Just nm  -- f :: Num a => a -> _
+             -- For the latter case, we don't want the MR:
+             -- the user has explicitly specified a type-class context
+    no_mr_name _ = Nothing
 
     -- The Haskell 98 monomorphism restriction
     restricted (PatBind {})                              = True
-    restricted (VarBind { var_id = v })                  = no_sig v
+    restricted (VarBind { var_id = v })                  = mr_needed_for v
     restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
-                                                           && no_sig (unLoc v)
+                                                           && mr_needed_for (unLoc v)
     restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
 
     restricted_match mg = matchGroupArity mg == 0
         -- No args => like a pattern binding
         -- Some args => a function binding
 
-    no_sig nm = not (nm `elemNameSet` complete_sig_bndrs)
+    mr_needed_for nm = not (nm `elemNameSet` no_mr_bndrs)
 
-checkOverloadedSig :: TcIdSigInst -> TcM ()
+checkOverloadedSig :: MonoBindInfo -> TcM ()
 -- Example:
 --   f :: Eq a => a -> a
 --   K f = e
 -- The MR applies, but the signature is overloaded, and it's
 -- best to complain about this directly
 -- c.f #11339
-checkOverloadedSig sig
-  | not (null (sig_inst_theta sig))
-  , let orig_sig = sig_inst_sig sig
+checkOverloadedSig (MBI { mbi_sig = mb_sig })
+  | Just (TISI { sig_inst_sig = orig_sig, sig_inst_theta = theta, sig_inst_wcx = wcx }) <- mb_sig
+  , not (null theta && isNothing wcx)
   = setSrcSpan (sig_loc orig_sig) $
     failWith $ TcRnOverloadedSig orig_sig
   | otherwise
   = return ()
+
+{- Note [When the MR applies]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Monomorphism Restriction (MR) applies as specifies in the Haskell Report:
+
+* If -XMonomorphismRestriction is on, and
+* Any binding is restricted
+
+A binding is restricted if:
+* It is a pattern binding e.g. (x,y) = e
+* Or it is a FunBind with no arguments e.g. f = rhs
+     and the binder `f` lacks a No-MR signature
+
+A binder f has a No-MR signature if
+
+* It has a complete type signature
+    e.g. f :: Num a => a -> a
+
+* Or it has a /partial/ type signature with a /context/
+    e.g.  f :: (_) => a -> _
+          g :: Num a => a -> _
+          h :: (Num a, _) => a -> _
+   All of f,g,h have a No-MR signature.  They say that the function is overloaded
+   so it's silly to try to apply the MR. This means that #19106 works out
+   fine.  Ditto #11016, which looked like
+      f4 :: (?loc :: Int) => _
+      f4 = ?loc
+
+   This partial-signature stuff is a bit ad-hoc but seems to match our
+   use-cases.  See also Note [Constraints in partial type signatures]
+   in GHC.Tc.Solver.
+
+Example: the MR does apply to
+   k :: _ -> _
+   k = rhs
+because k's binding has no arguments, and `k` does not have
+a No-MR signature.
+
+All of this checking takes place after synonym expansion.  For example:
+   type Wombat a = forall b. Eq [b] => ...b...a...
+   f5 :: Wombat _
+This (and does) behave just like
+   f5 :: forall b. Eq [b] => ...b..._...
+
+-}
 
 --------------
 mkExport :: TcPragEnv
@@ -850,15 +895,9 @@ mkExport prag_fn residual insoluble qtvs theta
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
-                  else tcSubTypeSigma GhcBug20076
+                  else tcSubTypeSigma (Shouldn'tHappenOrigin "mkExport")
                                       sig_ctxt sel_poly_ty poly_ty
-                       -- as Note [Impedance matching] explains, this should never fail,
-                       -- and thus we'll never see an error message. It *may* do
-                       -- instantiation, but no message will ever be printed to the
-                       -- user, and so we use Shouldn'tHappenOrigin.
-                       -- Actually, there is a bug here: #20076. So we tell the user
-                       -- that they hit the bug. Once #20076 is fixed, change this
-                       -- back to Shouldn'tHappenOrigin.
+                       -- See Note [Impedance matching]
 
         ; localSigWarn poly_id mb_sig
 
@@ -1102,33 +1141,6 @@ It might be possible to fix these difficulties somehow, but there
 doesn't seem much point.  Indeed, adding a partial type signature is a
 way to get per-binding inferred generalisation.
 
-Note [Partial type signatures and the monomorphism restriction]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We apply the MR if /none/ of the partial signatures has a context. e.g.
-   f :: _ -> Int
-   f x = rhs
-The partial type signature says, in effect, "there is no context", which
-amounts to appplying the MR. Indeed, saying
-   f :: _
-   f = rhs
-is a way for forcing the MR to apply.
-
-But we /don't/ want to apply the MR if the partial signatures do have
-a context  e.g. (#11016):
-   f2 :: (?loc :: Int) => _
-   f2 = ?loc
-It's stupid to apply the MR here.  This test includes an extra-constraints
-wildcard; that is, we don't apply the MR if you write
-   f3 :: _ => blah
-
-But watch out.  We don't want to apply the MR to
-   type Wombat a = forall b. Eq b => ...b...a...
-   f4 :: Wombat _
-Here f4 doesn't /look/ as if it has top-level overloading, but in fact it
-does, hidden under Wombat.  We can't "see" that because we only have access
-to the HsType at the moment.  That's why we do the check in
-checkMonomorphismRestriction.
-
 Note [Quantified variables in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1205,7 +1217,6 @@ considered:
   Concrete; and we never generalise over Concrete variables.  A bit
   more indirect, but we need the "don't generalise over Concrete variables"
   stuff anyway.
-
 
 Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

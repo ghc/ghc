@@ -513,12 +513,12 @@ ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 
 tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
-tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
+tcInstSig hs_sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { (tv_prs, theta, tau) <- tcInstTypeBndrs (idType poly_id)
               -- See Note [Pattern bindings and complete signatures]
 
-       ; return (TISI { sig_inst_sig   = sig
+       ; return (TISI { sig_inst_sig   = hs_sig
                       , sig_inst_skols = tv_prs
                       , sig_inst_wcs   = []
                       , sig_inst_wcx   = Nothing

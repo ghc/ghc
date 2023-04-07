@@ -591,9 +591,7 @@ data CtOrigin
   | IfThenElseOrigin    -- An if-then-else expression
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
-  | Shouldn'tHappenOrigin String
-                            -- the user should never see this one
-  | GhcBug20076             -- see #20076
+  | Shouldn'tHappenOrigin String  -- The user should never see this one
 
   -- | Testing whether the constraint associated with an instance declaration
   -- in a signature file is satisfied upon instantiation.
@@ -819,13 +817,6 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
          , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>"
          ]
 
-pprCtOrigin GhcBug20076
-  = vcat [ text "GHC Bug #20076 <https://gitlab.haskell.org/ghc/ghc/-/issues/20076>"
-         , text "Assuming you have a partial type signature, you can avoid this error"
-         , text "by either adding an extra-constraints wildcard (like `(..., _) => ...`,"
-         , text "with the underscore at the end of the constraint), or by avoiding the"
-         , text "use of a simplifiable constraint in your partial type signature." ]
-
 pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")
        2 (text "the signature of" <+> quotes (ppr name))
@@ -927,7 +918,6 @@ pprCtO (ProvCtxtOrigin {})          = text "a provided constraint"
 pprCtO (InstProvidedOrigin {})      = text "a provided constraint"
 pprCtO (CycleBreakerOrigin orig)    = pprCtO orig
 pprCtO (FRROrigin {})               = text "a representation-polymorphism check"
-pprCtO GhcBug20076                  = text "GHC Bug #20076"
 pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
 pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
