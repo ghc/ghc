@@ -1529,9 +1529,11 @@ lower_CmmGraph :: CLabel -> CmmGraph -> WasmCodeGenM w (FuncBody w)
 lower_CmmGraph lbl g = do
   ty_word <- wasmWordTypeM
   platform <- wasmPlatformM
+  us <- getUniqueSupplyM
   body <-
     structuredControl
       platform
+      us
       (\_ -> lower_CmmExpr_Typed lbl ty_word)
       (lower_CmmActions lbl)
       g
