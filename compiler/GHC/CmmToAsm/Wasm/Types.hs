@@ -45,7 +45,6 @@ module GHC.CmmToAsm.Wasm.Types
     wasmStateM,
     wasmModifyM,
     wasmExecM,
-    wasmUniq,
   )
 where
 
@@ -466,10 +465,18 @@ wasmStateM = coerce . State
 wasmModifyM :: (WasmCodeGenState w -> WasmCodeGenState w) -> WasmCodeGenM w ()
 wasmModifyM = coerce . modify
 
+wasmEvalM :: WasmCodeGenM w a -> WasmCodeGenState w -> a
+wasmEvalM (WasmCodeGenM s) = evalState s
+
 wasmExecM :: WasmCodeGenM w a -> WasmCodeGenState w -> WasmCodeGenState w
 wasmExecM (WasmCodeGenM s) = execState s
 
-wasmUniq :: WasmCodeGenM w Unique
-wasmUniq = wasmStateM $
-  \s@WasmCodeGenState {..} -> case takeUniqFromSupply wasmUniqSupply of
-    (u, us) -> (# u, s {wasmUniqSupply = us} #)
+instance MonadUnique (WasmCodeGenM w) where
+  getUniqueSupplyM = wasmGetsM wasmUniqSupply
+  getUniqueM = wasmStateM $
+    \s@WasmCodeGenState {..} -> case takeUniqFromSupply wasmUniqSupply of
+      (u, us) -> (# u, s {wasmUniqSupply = us} #)
+  getUniquesM = do
+    u <- getUniqueM
+    s <- WasmCodeGenM get
+    pure $ u:(wasmEvalM getUniquesM s)

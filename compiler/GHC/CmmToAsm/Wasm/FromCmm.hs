@@ -48,6 +48,7 @@ import GHC.Types.ForeignCall
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Map
+import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Utils.Panic
 import GHC.Wasm.ControlFlow.FromCmm
@@ -1328,7 +1329,7 @@ lower_CmmUnsafeForeignCall_Drop ::
   [CmmActual] ->
   WasmCodeGenM w (WasmStatements w)
 lower_CmmUnsafeForeignCall_Drop lbl sym_callee ret_cmm_ty arg_exprs = do
-  ret_uniq <- wasmUniq
+  ret_uniq <- getUniqueM
   let ret_local = LocalReg ret_uniq ret_cmm_ty
   lower_CmmUnsafeForeignCall
     lbl
