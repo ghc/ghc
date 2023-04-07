@@ -8,6 +8,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module GHC.Types.Error
    ( -- * Messages
@@ -32,7 +33,8 @@ module GHC.Types.Error
    , mkUnknownDiagnostic
    , embedUnknownDiagnostic
    , DiagnosticMessage (..)
-   , DiagnosticReason (..)
+   , DiagnosticReason (WarningWithFlag, ..)
+   , ResolvedDiagnosticReason(..)
    , DiagnosticHint (..)
    , mkPlainDiagnostic
    , mkPlainError
@@ -103,6 +105,7 @@ import GHC.Unit.Module.Warnings (WarningCategory)
 
 import Data.Bifunctor
 import Data.Foldable    ( fold )
+import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
 import Data.Typeable ( Typeable )
@@ -159,7 +162,10 @@ instance Diagnostic e => Outputable (Messages e) where
   ppr msgs = braces (vcat (map ppr_one (bagToList (getMessages msgs))))
      where
        ppr_one :: MsgEnvelope e -> SDoc
-       ppr_one envelope = pprDiagnostic (errMsgDiagnostic envelope)
+       ppr_one envelope =
+        vcat [ text "Resolved:" <+> ppr (errMsgReason envelope),
+               pprDiagnostic (errMsgDiagnostic envelope)
+             ]
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -363,7 +369,7 @@ mkDecoratedError hints docs = DiagnosticMessage (mkDecorated docs) ErrorWithoutF
 data DiagnosticReason
   = WarningWithoutFlag
   -- ^ Born as a warning.
-  | WarningWithFlag !WarningFlag
+  | WarningWithFlags !(NE.NonEmpty WarningFlag)
   -- ^ Warning was enabled with the flag.
   | WarningWithCategory !WarningCategory
   -- ^ Warning was enabled with a custom category.
@@ -371,12 +377,66 @@ data DiagnosticReason
   -- ^ Born as an error.
   deriving (Eq, Show)
 
+-- | Like a 'DiagnosticReason', but resolved against a specific set of `DynFlags` to
+-- work out which warning flag actually enabled this warning.
+newtype ResolvedDiagnosticReason
+          = ResolvedDiagnosticReason { resolvedDiagnosticReason :: DiagnosticReason }
+
+-- | The single warning case 'DiagnosticReason' is very common.
+pattern WarningWithFlag :: WarningFlag -> DiagnosticReason
+pattern WarningWithFlag w = WarningWithFlags (w :| [])
+
+{-
+Note [Warnings controlled by multiple flags]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Diagnostics that started life as flag-controlled warnings have a
+'diagnosticReason' of 'WarningWithFlags', giving the flags that control the
+warning. Usually there is only one flag, but in a few cases multiple flags
+apply. Where there are more than one, they are listed highest-priority first.
+
+For example, the same exported binding may give rise to a warning if either
+`-Wmissing-signatures` or `-Wmissing-exported-signatures` is enabled. Here
+`-Wmissing-signatures` has higher priority, because we want to mention it if
+before are enabled.  See `missingSignatureWarningFlags` for the specific logic
+in this case.
+
+When reporting such a warning to the user, it is important to mention the
+correct flag (e.g. `-Wmissing-signatures` if it is enabled, or
+`-Wmissing-exported-signatures` if only the latter is enabled).  Thus
+`diag_reason_severity` filters the `DiagnosticReason` based on the currently
+active `DiagOpts`. For a `WarningWithFlags` it returns only the flags that are
+enabled; it leaves other `DiagnosticReason`s unchanged. This is then wrapped
+in a `ResolvedDiagnosticReason` newtype which records that this filtering has
+taken place.
+
+If we have `-Wmissing-signatures -Werror=missing-exported-signatures` we want
+the error to mention `-Werror=missing-exported-signatures` (even though
+`-Wmissing-signatures` would normally take precedence). Thus if there are any
+fatal warnings, `diag_reason_severity` returns those alone.
+
+The `MsgEnvelope` stores the filtered `ResolvedDiagnosticReason` listing only the
+relevant flags for subsequent display.
+
+
+Side note: we do not treat `-Wmissing-signatures` as a warning group that
+includes `-Wmissing-exported-signatures`, because
+
+  (a) this would require us to provide a flag for the complement, and
+
+  (b) currently, in `-Wmissing-exported-signatures -Wno-missing-signatures`, the
+      latter option does not switch off the former.
+-}
+
 instance Outputable DiagnosticReason where
   ppr = \case
     WarningWithoutFlag  -> text "WarningWithoutFlag"
-    WarningWithFlag wf  -> text ("WarningWithFlag " ++ show wf)
+    WarningWithFlags wf -> text ("WarningWithFlags " ++ show wf)
     WarningWithCategory cat -> text "WarningWithCategory" <+> ppr cat
     ErrorWithoutFlag    -> text "ErrorWithoutFlag"
+
+instance Outputable ResolvedDiagnosticReason where
+  ppr = ppr . resolvedDiagnosticReason
 
 -- | An envelope for GHC's facts about a running program, parameterised over the
 -- /domain-specific/ (i.e. parsing, typecheck-renaming, etc) diagnostics.
@@ -392,6 +452,10 @@ data MsgEnvelope e = MsgEnvelope
    , errMsgContext     :: NamePprCtx
    , errMsgDiagnostic  :: e
    , errMsgSeverity    :: Severity
+   , errMsgReason      :: ResolvedDiagnosticReason
+      -- ^ The actual reason caused this message
+      --
+      -- See Note [Warnings controlled by multiple flags]
    } deriving (Functor, Foldable, Traversable)
 
 -- | The class for a diagnostic message. The main purpose is to classify a
@@ -410,7 +474,7 @@ data MessageClass
     -- ^ Log messages intended for end users.
     -- No file\/line\/column stuff.
 
-  | MCDiagnostic Severity DiagnosticReason (Maybe DiagnosticCode)
+  | MCDiagnostic Severity ResolvedDiagnosticReason (Maybe DiagnosticCode)
     -- ^ Diagnostics from the compiler. This constructor is very powerful as
     -- it allows the construction of a 'MessageClass' with a completely
     -- arbitrary permutation of 'Severity' and 'DiagnosticReason'. As such,
@@ -464,7 +528,7 @@ data Severity
   -- don't want to see. See Note [Suppressing Messages]
   | SevWarning
   | SevError
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 instance Outputable Severity where
   ppr = \case
@@ -532,8 +596,9 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
           warning_flag_doc =
             case msg_class of
               MCDiagnostic sev reason _code
-                | Just msg <- flag_msg sev reason -> brackets msg
-              _                                   -> empty
+                | Just msg <- flag_msg sev (resolvedDiagnosticReason reason)
+                  -> brackets msg
+              _   -> empty
 
           code_doc =
             case msg_class of
@@ -546,7 +611,7 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
             -- in a log file, e.g. with -ddump-tc-trace. It should not
             -- happen otherwise, though.
           flag_msg SevError WarningWithoutFlag = Just (col "-Werror")
-          flag_msg SevError (WarningWithFlag wflag) =
+          flag_msg SevError (WarningWithFlags (wflag :| _)) =
             let name = NE.head (warnFlagNames wflag) in
             Just $ col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag)
                                       <> comma
@@ -558,7 +623,7 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
                        <+> coloured msg_colour (text "-Werror=" <> ppr cat)
           flag_msg SevError   ErrorWithoutFlag   = Nothing
           flag_msg SevWarning WarningWithoutFlag = Nothing
-          flag_msg SevWarning (WarningWithFlag wflag) =
+          flag_msg SevWarning (WarningWithFlags (wflag :| _)) =
             let name = NE.head (warnFlagNames wflag) in
             Just (col ("-W" ++ name) <+> warn_flag_grp (smallestWarningGroups wflag))
           flag_msg SevWarning (WarningWithCategory cat) =
@@ -689,7 +754,7 @@ later classify and report them appropriately (in the driver).
 -- | Returns 'True' if this is, intrinsically, a failure. See
 -- Note [Intrinsic And Extrinsic Failures].
 isIntrinsicErrorMessage :: Diagnostic e => MsgEnvelope e -> Bool
-isIntrinsicErrorMessage = (==) ErrorWithoutFlag . diagnosticReason . errMsgDiagnostic
+isIntrinsicErrorMessage = (==) ErrorWithoutFlag . resolvedDiagnosticReason . errMsgReason
 
 isWarningMessage :: Diagnostic e => MsgEnvelope e -> Bool
 isWarningMessage = not . isIntrinsicErrorMessage

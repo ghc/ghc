@@ -90,6 +90,8 @@ import Control.Monad.IO.Class
 import Control.Monad.Catch as MC (handle)
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 
 data DiagOpts = DiagOpts
   { diag_warning_flags       :: !(EnumSet WarningFlag) -- ^ Enabled warnings
@@ -132,32 +134,49 @@ diag_fatal_wopt_custom wflag opts = wflag `elemWarningCategorySet` diag_fatal_cu
 -- i.e. with a 'DiagOpts \"snapshot\" taken as close as possible to where a
 -- particular diagnostic message is built, otherwise the computed 'Severity' might
 -- not be correct, due to the mutable nature of the 'DynFlags' in GHC.
+--
+--
 diagReasonSeverity :: DiagOpts -> DiagnosticReason -> Severity
-diagReasonSeverity opts reason = case reason of
-  WarningWithFlag wflag
-    | not (diag_wopt wflag opts) -> SevIgnore
-    | diag_fatal_wopt wflag opts -> SevError
-    | otherwise                  -> SevWarning
-  WarningWithCategory wcat
-    | not (diag_wopt_custom wcat opts) -> SevIgnore
-    | diag_fatal_wopt_custom wcat opts -> SevError
-    | otherwise                        -> SevWarning
-  WarningWithoutFlag
-    | diag_warn_is_error opts -> SevError
-    | otherwise             -> SevWarning
-  ErrorWithoutFlag
-    -> SevError
+diagReasonSeverity opts reason = fst (diag_reason_severity opts reason)
 
+-- Like the diagReasonSeverity but the second half of the pair is a small
+-- ReasolvedDiagnosticReason which would cause the diagnostic to be triggered with the
+-- same severity.
+--
+-- See Note [Warnings controlled by multiple flags]
+--
+diag_reason_severity :: DiagOpts -> DiagnosticReason -> (Severity, ResolvedDiagnosticReason)
+diag_reason_severity opts reason = fmap ResolvedDiagnosticReason $ case reason of
+  WarningWithFlags wflags -> case wflags' of
+    []     -> (SevIgnore, reason)
+    w : ws -> case wflagsE of
+      []     -> (SevWarning, WarningWithFlags (w :| ws))
+      e : es -> (SevError, WarningWithFlags (e :| es))
+    where
+      wflags' = NE.filter (\wflag -> diag_wopt wflag opts) wflags
+      wflagsE = filter (\wflag -> diag_fatal_wopt wflag opts) wflags'
+
+  WarningWithCategory wcat
+    | not (diag_wopt_custom wcat opts) -> (SevIgnore, reason)
+    | diag_fatal_wopt_custom wcat opts -> (SevError, reason)
+    | otherwise                        -> (SevWarning, reason)
+  WarningWithoutFlag
+    | diag_warn_is_error opts -> (SevError, reason)
+    | otherwise             -> (SevWarning, reason)
+  ErrorWithoutFlag
+    -> (SevError, reason)
 
 -- | Make a 'MessageClass' for a given 'DiagnosticReason', consulting the
--- 'DiagOpts.
+-- 'DiagOpts'.
 mkMCDiagnostic :: DiagOpts -> DiagnosticReason -> Maybe DiagnosticCode -> MessageClass
-mkMCDiagnostic opts reason code = MCDiagnostic (diagReasonSeverity opts reason) reason code
+mkMCDiagnostic opts reason code = MCDiagnostic sev reason' code
+  where
+    (sev, reason') = diag_reason_severity opts reason
 
 -- | Varation of 'mkMCDiagnostic' which can be used when we are /sure/ the
 -- input 'DiagnosticReason' /is/ 'ErrorWithoutFlag' and there is no diagnostic code.
 errorDiagnostic :: MessageClass
-errorDiagnostic = MCDiagnostic SevError ErrorWithoutFlag Nothing
+errorDiagnostic = MCDiagnostic SevError (ResolvedDiagnosticReason ErrorWithoutFlag) Nothing
 
 --
 -- Creating MsgEnvelope(s)
@@ -168,13 +187,15 @@ mk_msg_envelope
   => Severity
   -> SrcSpan
   -> NamePprCtx
+  -> ResolvedDiagnosticReason
   -> e
   -> MsgEnvelope e
-mk_msg_envelope severity locn name_ppr_ctx err
+mk_msg_envelope severity locn name_ppr_ctx reason err
  = MsgEnvelope { errMsgSpan = locn
                , errMsgContext = name_ppr_ctx
                , errMsgDiagnostic = err
                , errMsgSeverity = severity
+               , errMsgReason = reason
                }
 
 -- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
@@ -188,7 +209,9 @@ mkMsgEnvelope
   -> e
   -> MsgEnvelope e
 mkMsgEnvelope opts locn name_ppr_ctx err
- = mk_msg_envelope (diagReasonSeverity opts (diagnosticReason err)) locn name_ppr_ctx err
+ = mk_msg_envelope sev locn name_ppr_ctx reason err
+  where
+    (sev, reason) = diag_reason_severity opts (diagnosticReason err)
 
 -- | Wrap a 'Diagnostic' in a 'MsgEnvelope', recording its location.
 -- Precondition: the diagnostic is, in fact, an error. That is,
@@ -199,7 +222,7 @@ mkErrorMsgEnvelope :: Diagnostic e
                    -> e
                    -> MsgEnvelope e
 mkErrorMsgEnvelope locn name_ppr_ctx msg =
- assert (diagnosticReason msg == ErrorWithoutFlag) $ mk_msg_envelope SevError locn name_ppr_ctx msg
+ assert (diagnosticReason msg == ErrorWithoutFlag) $ mk_msg_envelope SevError locn name_ppr_ctx (ResolvedDiagnosticReason ErrorWithoutFlag) msg
 
 -- | Variant that doesn't care about qualified/unqualified names.
 mkPlainMsgEnvelope :: Diagnostic e
@@ -217,7 +240,7 @@ mkPlainErrorMsgEnvelope :: Diagnostic e
                         -> e
                         -> MsgEnvelope e
 mkPlainErrorMsgEnvelope locn msg =
-  mk_msg_envelope SevError locn alwaysQualify msg
+  mk_msg_envelope SevError locn alwaysQualify (ResolvedDiagnosticReason ErrorWithoutFlag) msg
 
 -------------------------
 data Validity' a
@@ -273,10 +296,11 @@ pprLocMsgEnvelope :: Diagnostic e => DiagnosticOpts e -> MsgEnvelope e -> SDoc
 pprLocMsgEnvelope opts (MsgEnvelope { errMsgSpan      = s
                                , errMsgDiagnostic = e
                                , errMsgSeverity  = sev
-                               , errMsgContext   = name_ppr_ctx })
+                               , errMsgContext   = name_ppr_ctx
+                               , errMsgReason    = reason })
   = withErrStyle name_ppr_ctx $
       mkLocMessage
-        (MCDiagnostic sev (diagnosticReason e) (diagnosticCode e))
+        (MCDiagnostic sev reason (diagnosticCode e))
         s
         (formatBulleted $ diagnosticMessage opts e)
 

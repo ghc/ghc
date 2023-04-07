@@ -17,11 +17,12 @@ printMessages :: forall a . Diagnostic a => Logger -> DiagnosticOpts a -> DiagOp
 printMessages logger msg_opts opts msgs
   = sequence_ [ let style = mkErrStyle name_ppr_ctx
                     ctx   = (diag_ppr_ctx opts) { sdocStyle = style }
-                in logMsg logger (MCDiagnostic sev (diagnosticReason dia) (diagnosticCode dia)) s $
+                in logMsg logger (MCDiagnostic sev reason (diagnosticCode dia)) s $
                    updSDocContext (\_ -> ctx) (messageWithHints dia)
               | MsgEnvelope { errMsgSpan       = s,
                               errMsgDiagnostic = dia,
                               errMsgSeverity   = sev,
+                              errMsgReason     = reason,
                               errMsgContext    = name_ppr_ctx }
                   <- sortMsgBag (Just opts) (getMessages msgs) ]
   where

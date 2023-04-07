@@ -352,7 +352,7 @@ instance Diagnostic TcRnMessage where
               = sep [ quotes (ppr n), text "should really be", quotes (ppr rhs_ty) ]
               | otherwise
               = empty
-    TcRnMissingSignature what _ _ ->
+    TcRnMissingSignature what _ ->
       mkSimpleDecorated $
       case what of
         MissingPatSynSig p ->
@@ -1939,8 +1939,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPartialTypeSigBadQuantifier{}
       -> ErrorWithoutFlag
-    TcRnMissingSignature what exported overridden
-      -> WarningWithFlag $ missingSignatureWarningFlag what exported overridden
+    TcRnMissingSignature what exported
+      -> WarningWithFlags $ missingSignatureWarningFlags what exported
     TcRnPolymorphicBinderMissingSig{}
       -> WarningWithFlag Opt_WarnMissingLocalSignatures
     TcRnOverloadedSig{}
@@ -3310,22 +3310,19 @@ formatExportItemError exportedThing reason =
        , quotes exportedThing
        , text reason ]
 
--- | What warning flag is associated with the given missing signature?
-missingSignatureWarningFlag :: MissingSignature -> Exported -> Bool -> WarningFlag
-missingSignatureWarningFlag (MissingTopLevelBindingSig {}) exported overridden
-  | IsExported <- exported
-  , not overridden
-  = Opt_WarnMissingExportedSignatures
-  | otherwise
-  = Opt_WarnMissingSignatures
-missingSignatureWarningFlag (MissingPatSynSig {}) exported overridden
-  | IsExported <- exported
-  , not overridden
-  = Opt_WarnMissingExportedPatternSynonymSignatures
-  | otherwise
-  = Opt_WarnMissingPatternSynonymSignatures
-missingSignatureWarningFlag (MissingTyConKindSig {}) _ _
-  = Opt_WarnMissingKindSignatures
+-- | What warning flags are associated with the given missing signature?
+missingSignatureWarningFlags :: MissingSignature -> Exported -> NonEmpty WarningFlag
+missingSignatureWarningFlags (MissingTopLevelBindingSig {}) exported
+  -- We prefer "bigger" warnings first: #14794
+  --
+  -- See Note [Warnings controlled by multiple flags]
+  = Opt_WarnMissingSignatures :|
+    [ Opt_WarnMissingExportedSignatures | IsExported == exported ]
+missingSignatureWarningFlags (MissingPatSynSig {}) exported
+  = Opt_WarnMissingPatternSynonymSignatures :|
+    [ Opt_WarnMissingExportedPatternSynonymSignatures | IsExported  == exported ]
+missingSignatureWarningFlags (MissingTyConKindSig {}) _
+  = Opt_WarnMissingKindSignatures :| []
 
 useDerivingStrategies :: GhcHint
 useDerivingStrategies =

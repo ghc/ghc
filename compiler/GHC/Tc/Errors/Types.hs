@@ -941,8 +941,6 @@ data TcRnMessage where
   -}
   TcRnMissingSignature :: MissingSignature
                        -> Exported
-                       -> Bool -- ^ True: -Wmissing-signatures overrides -Wmissing-exported-signatures,
-                               --     or -Wmissing-pattern-synonym-signatures overrides -Wmissing-exported-pattern-synonym-signatures
                        -> TcRnMessage
 
   {-| TcRnPolymorphicBinderMissingSig is a warning controlled by -Wmissing-local-signatures
@@ -4494,6 +4492,7 @@ data MissingSignature
 data Exported
   = IsNotExported
   | IsExported
+  deriving Eq
 
 instance Outputable Exported where
   ppr IsNotExported = text "IsNotExported"

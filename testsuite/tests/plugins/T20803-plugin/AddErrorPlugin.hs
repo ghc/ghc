@@ -7,6 +7,7 @@ module AddErrorPlugin where
 
 import GHC.Plugins
 import GHC.Types.Error
+import GHC.Utils.Error
 import GHC.Hs
 import GHC.Data.Bag
 import GHC.Parser.Errors.Types
@@ -25,9 +26,7 @@ parsedAction _ _ (ParsedResult pm msgs) = do
   liftIO $ hFlush stdout
   pure (ParsedResult pm msgs{psErrors = mkMessages $ unitBag err})
   where
-    err = MsgEnvelope
-      { errMsgSpan = UnhelpfulSpan UnhelpfulNoLocationInfo
-      , errMsgContext = alwaysQualify
-      , errMsgDiagnostic = PsErrEmptyLambda
-      , errMsgSeverity = SevError
-      }
+    err = mkErrorMsgEnvelope
+      (UnhelpfulSpan UnhelpfulNoLocationInfo)
+      alwaysQualify
+      PsErrEmptyLambda
