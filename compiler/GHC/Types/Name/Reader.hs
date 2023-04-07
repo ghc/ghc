@@ -126,7 +126,6 @@ import GHC.Utils.Panic
 import Control.DeepSeq
 import Control.Monad ( guard )
 import Data.Data
-import Data.List ( sortBy )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Semigroup as S
@@ -1654,12 +1653,9 @@ data ImpItemSpec
         -- only @T@ is named explicitly.
   deriving (Eq, Data)
 
-bestImport :: [ImportSpec] -> ImportSpec
+bestImport :: NE.NonEmpty ImportSpec -> ImportSpec
 -- See Note [Choosing the best import declaration]
-bestImport iss
-  = case sortBy best iss of
-      (is:_) -> is
-      []     -> pprPanic "bestImport" (ppr iss)
+bestImport iss = NE.head $ NE.sortBy best iss
   where
     best :: ImportSpec -> ImportSpec -> Ordering
     -- Less means better

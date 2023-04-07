@@ -534,30 +534,29 @@ lookupRecFieldOcc mb_con rdr_name
   = return $ mk_unbound_rec_fld con
   | Just con <- mb_con
   = do { let lbl = FieldLabelString $ occNameFS (rdrNameOcc rdr_name)
-       ; res <- lookupExactOrOrig rdr_name ensure_recfld $  -- See Note [Record field names and Template Haskell]
+       ; mb_nm <- lookupExactOrOrig rdr_name ensure_recfld $  -- See Note [Record field names and Template Haskell]
             do { flds <- lookupConstructorFields con
                ; env <- getGlobalRdrEnv
-               ; let lbl    = FieldLabelString $ occNameFS (rdrNameOcc rdr_name)
-                     mb_gre = do fl <- find ((== lbl) . flLabel) flds
+               ; let mb_gre = do fl <- find ((== lbl) . flLabel) flds
                                  -- We have the label, now check it is in scope.  If
                                  -- there is a qualifier, use pickGREs to check that
                                  -- the qualifier is correct, and return the filtered
                                  -- GRE so we get import usage right (see #17853).
                                  gre <- lookupGRE_FieldLabel env fl
                                  if isQual rdr_name
-                                 then listToMaybe (pickGREs rdr_name [gre])
+                                 then listToMaybe $ pickGREs rdr_name [gre]
                                  else return gre
                ; traceRn "lookupRecFieldOcc" $
                    vcat [ text "mb_con:" <+> ppr mb_con
                         , text "rdr_name:" <+> ppr rdr_name
                         , text "flds:" <+> ppr flds
                         , text "mb_gre:" <+> ppr mb_gre ]
-               ; return mb_gre }
-        ; case res of
+               ; mapM_ (addUsedGRE True) mb_gre
+               ; return $ flSelector . fieldGRELabel <$> mb_gre }
+       ; case mb_nm of
           { Nothing  -> do { addErr (badFieldConErr con lbl)
                            ; return $ mk_unbound_rec_fld con }
-          ; Just gre -> do { addUsedGRE True gre
-                           ; return (flSelector $ fieldGRELabel gre) } } }
+          ; Just nm -> return nm } }
 
   | otherwise  -- Can't use the data constructor to disambiguate
   = greName <$> lookupGlobalOccRn' (IncludeFields WantField) rdr_name
@@ -572,7 +571,9 @@ lookupRecFieldOcc mb_con rdr_name
       mkRecFieldOccFS (getOccFS con) (occNameFS occ)
     occ = rdrNameOcc rdr_name
 
-    ensure_recfld gre = do { guard (isRecFldGRE gre) ; return gre }
+    ensure_recfld :: GlobalRdrElt -> Maybe Name
+    ensure_recfld gre = do { guard (isRecFldGRE gre)
+                           ; return $ greName gre }
 
 {- Note [DisambiguateRecordFields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

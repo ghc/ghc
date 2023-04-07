@@ -1855,7 +1855,10 @@ mkImportMap gres
        RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
        UnhelpfulLoc _ -> imp_map
        where
-          best_imp_spec = bestImport (bagToList imp_specs)
+          best_imp_spec =
+            case bagToList imp_specs of
+              []     -> pprPanic "mkImportMap: GRE with no ImportSpecs" (ppr gre)
+              is:iss -> bestImport (is NE.:| iss)
           add _ gres = gre : gres
 
 warnUnusedImport :: WarningFlag -> GlobalRdrEnv
