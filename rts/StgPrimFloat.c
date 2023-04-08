@@ -248,4 +248,3 @@ __decodeFloat_Int (I_ *man, I_ *exp, StgFloat flt)
             *man = - *man;
     }
 }
-

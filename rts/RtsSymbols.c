@@ -930,7 +930,6 @@ extern char **environ;
       RTS_USER_SIGNALS_SYMBOLS                                          \
       RTS_INTCHAR_SYMBOLS
 
-
 // 64-bit support functions in libgcc.a
 #if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
 #define RTS_LIBGCC_SYMBOLS                             \

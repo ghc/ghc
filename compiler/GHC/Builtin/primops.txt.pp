@@ -1370,6 +1370,75 @@ primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
    with out_of_line = True
 
 ------------------------------------------------------------------------
+section "Fused multiply-add operations"
+  { #fma#
+
+    The fused multiply-add primops 'fmaddFloat#' and 'fmaddDouble#'
+    implement the operation
+
+    \[
+    \lambda\ x\ y\ z \rightarrow x * y + z
+    \]
+
+    with a single floating-point rounding operation at the end, as opposed to
+    rounding twice (which can accumulate rounding errors).
+
+    These primops can be compiled directly to a single machine instruction on
+    architectures that support them. Currently, these are:
+
+      1. x86 with CPUs that support the FMA3 extended instruction set (which
+         includes most processors since 2013).
+      2. PowerPC.
+      3. AArch64.
+
+    This requires users pass the '-mfma' flag to GHC. Otherwise, the primop
+    is implemented by falling back to the C standard library, which might
+    perform software emulation (this may yield results that are not IEEE
+    compliant on some platforms).
+
+    The additional operations 'fmsubFloat#'/'fmsubDouble#',
+    'fnmaddFloat#'/'fnmaddDouble#' and 'fnmsubFloat#'/'fnmsubDouble#' provide
+    variants on 'fmaddFloat#'/'fmaddDouble#' in which some signs are changed:
+
+    \[
+    \begin{aligned}
+    \mathrm{fmadd}\ x\ y\ z &= \phantom{+} x * y + z \\[8pt]
+    \mathrm{fmsub}\ x\ y\ z &= \phantom{+} x * y - z \\[8pt]
+    \mathrm{fnmadd}\ x\ y\ z &= - x * y + z \\[8pt]
+    \mathrm{fnmsub}\ x\ y\ z &= - x * y - z
+    \end{aligned}
+    \]
+
+    }
+------------------------------------------------------------------------
+
+primop   FloatFMAdd   "fmaddFloat#" GenPrimOp
+   Float# -> Float# -> Float# -> Float#
+   {Fused multiply-add operation @x*y+z@. See "GHC.Prim#fma".}
+primop   FloatFMSub   "fmsubFloat#" GenPrimOp
+   Float# -> Float# -> Float# -> Float#
+   {Fused multiply-subtract operation @x*y-z@. See "GHC.Prim#fma".}
+primop   FloatFNMAdd   "fnmaddFloat#" GenPrimOp
+   Float# -> Float# -> Float# -> Float#
+   {Fused negate-multiply-add operation @-x*y+z@. See "GHC.Prim#fma".}
+primop   FloatFNMSub   "fnmsubFloat#" GenPrimOp
+   Float# -> Float# -> Float# -> Float#
+   {Fused negate-multiply-subtract operation @-x*y-z@. See "GHC.Prim#fma".}
+
+primop   DoubleFMAdd   "fmaddDouble#" GenPrimOp
+   Double# -> Double# -> Double# -> Double#
+   {Fused multiply-add operation @x*y+z@. See "GHC.Prim#fma".}
+primop   DoubleFMSub   "fmsubDouble#" GenPrimOp
+   Double# -> Double# -> Double# -> Double#
+   {Fused multiply-subtract operation @x*y-z@. See "GHC.Prim#fma".}
+primop   DoubleFNMAdd   "fnmaddDouble#" GenPrimOp
+   Double# -> Double# -> Double# -> Double#
+   {Fused negate-multiply-add operation @-x*y+z@. See "GHC.Prim#fma".}
+primop   DoubleFNMSub   "fnmsubDouble#" GenPrimOp
+   Double# -> Double# -> Double# -> Double#
+   {Fused negate-multiply-subtract operation @-x*y-z@. See "GHC.Prim#fma".}
+
+------------------------------------------------------------------------
 section "Arrays"
         {Operations on 'Array#'.}
 ------------------------------------------------------------------------

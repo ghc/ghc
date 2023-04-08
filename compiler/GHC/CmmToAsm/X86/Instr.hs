@@ -12,6 +12,7 @@ module GHC.CmmToAsm.X86.Instr
    ( Instr(..)
    , Operand(..)
    , PrefetchVariant(..)
+   , FMAPermutation(..)
    , JumpDest(..)
    , getJumpDestBlockId
    , canShortcut
@@ -272,6 +273,10 @@ data Instr
         | CVTSI2SS      Format Operand Reg -- I32/I64 to F32
         | CVTSI2SD      Format Operand Reg -- I32/I64 to F64
 
+        -- | FMA3 fused multiply-add operations.
+        | FMA3         Format FMASign FMAPermutation Operand Reg Reg
+          -- src1 (r/m), src2 (r), dst (r)
+
         -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
 
@@ -351,7 +356,7 @@ data Operand
         | OpImm  Imm            -- immediate value
         | OpAddr AddrMode       -- memory reference
 
-
+data FMAPermutation = FMA132 | FMA213 | FMA231
 
 -- | Returns which registers are read and written as a (read, written)
 -- pair.
@@ -438,6 +443,8 @@ regUsageOfInstr platform instr
     PDEP   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
     PEXT   _ src mask dst -> mkRU (use_R src $ use_R mask []) [dst]
 
+    FMA3 _ _ _ src1 src2 dst -> usageFMA src1 src2 dst
+
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
     LOCK i              -> regUsageOfInstr platform i
@@ -481,6 +488,15 @@ regUsageOfInstr platform instr
     usageRMM (OpReg src) (OpReg dst) (OpReg reg) = mkRU [src, dst, reg] [dst, reg]
     usageRMM (OpReg src) (OpAddr ea) (OpReg reg) = mkRU (use_EA ea [src, reg]) [reg]
     usageRMM _ _ _                               = panic "X86.RegInfo.usageRMM: no match"
+
+    -- 3 operand form of FMA instructions.
+    usageFMA :: Operand -> Reg -> Reg -> RegUsage
+    usageFMA (OpReg src1) src2 dst
+      = mkRU [src1, src2, dst] [dst]
+    usageFMA (OpAddr ea1) src2 dst
+      = mkRU (use_EA ea1 [src2, dst]) [dst]
+    usageFMA _ _ _
+      = panic "X86.RegInfo.usageFMA: no match"
 
     -- 1 operand form; operand Modified
     usageM :: Operand -> RegUsage
@@ -561,6 +577,8 @@ patchRegsOfInstr instr env
     JMP op regs          -> JMP (patchOp op) regs
     JMP_TBL op ids s lbl -> JMP_TBL (patchOp op) ids s lbl
 
+    FMA3 fmt perm var x1 x2 x3 -> patch3 (FMA3 fmt perm var) x1 x2 x3
+
     -- literally only support storing the top x87 stack value st(0)
     X87Store  fmt  dst     -> X87Store fmt  (lookupAddr dst)
 
@@ -612,6 +630,8 @@ patchRegsOfInstr instr env
     patch1 insn op      = insn $! patchOp op
     patch2 :: (Operand -> Operand -> a) -> Operand -> Operand -> a
     patch2 insn src dst = (insn $! patchOp src) $! patchOp dst
+    patch3 :: (Operand -> Reg -> Reg -> a) -> Operand -> Reg -> Reg -> a
+    patch3 insn src1 src2 dst = ((insn $! patchOp src1) $! env src2) $! env dst
 
     patchOp (OpReg  reg) = OpReg $! env reg
     patchOp (OpImm  imm) = OpImm imm

@@ -65,6 +65,9 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
+import GHC.Cmm.MachOp ( FMASign(..) )
+import GHC.Cmm.Type ( Width(..) )
+
 import GHC.Data.FastString
 import GHC.Data.Maybe      ( orElse )
 
@@ -677,6 +680,11 @@ primOpRules nm = \case
    FloatMulOp        -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (*))
                                           , identity onef
                                           , strengthReduction twof FloatAddOp  ]
+   FloatFMAdd        -> mkPrimOpRule nm 3 (fmaRules FMAdd  W32)
+   FloatFMSub        -> mkPrimOpRule nm 3 (fmaRules FMSub  W32)
+   FloatFNMAdd       -> mkPrimOpRule nm 3 (fmaRules FNMAdd W32)
+   FloatFNMSub       -> mkPrimOpRule nm 3 (fmaRules FNMSub W32)
+
              -- zeroElem zerof doesn't hold because of NaN
    FloatDivOp        -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
                                           , rightIdentity onef ]
@@ -692,6 +700,10 @@ primOpRules nm = \case
    DoubleMulOp          -> mkPrimOpRule nm 2 [ binaryLit (doubleOp2 (*))
                                              , identity oned
                                              , strengthReduction twod DoubleAddOp  ]
+   DoubleFMAdd          -> mkPrimOpRule nm 3 (fmaRules FMAdd  W64)
+   DoubleFMSub          -> mkPrimOpRule nm 3 (fmaRules FMSub  W64)
+   DoubleFNMAdd         -> mkPrimOpRule nm 3 (fmaRules FNMAdd W64)
+   DoubleFNMSub         -> mkPrimOpRule nm 3 (fmaRules FNMSub W64)
               -- zeroElem zerod doesn't hold because of NaN
    DoubleDivOp          -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
                                              , rightIdentity oned ]
@@ -1137,6 +1149,150 @@ doubleDecodeOp env (LitDouble ((decodeFloat . fromRational @Double) -> (m, e)))
     platform = roPlatform env
 doubleDecodeOp _   _
   = Nothing
+
+--------------------------
+
+-- | Constant folding rules for fused multiply-add operations.
+fmaRules :: FMASign -> Width -> [RuleM CoreExpr]
+fmaRules signs width =
+     [ fmaLit signs width
+     , fmaZero_z signs width
+     , fmaOne signs width ]
+
+-- | Compute @a * b + c@ when @a@, @b@, @c@ are all literals.
+fmaLit :: FMASign -> Width -> RuleM CoreExpr
+fmaLit signs width = do
+  env <- getRuleOpts
+  [Lit l1, Lit l2, Lit l3] <- getArgs
+  liftMaybe $
+    op env
+      (convFloating env l1)
+      (convFloating env l2)
+      (convFloating env l3)
+
+  where
+    op env l1 l2 l3 =
+      case width of
+        W32
+          | LitFloat x <- l1
+          , LitFloat y <- l2
+          , LitFloat z <- l3
+          -> Just $ mkFloatVal env $
+            case signs of
+              FMAdd  -> x * y + z
+              FMSub  -> x * y - z
+              FNMAdd -> negate ( x * y ) + z
+              FNMSub -> negate ( x * y ) - z
+        W64
+          | LitDouble x <- l1
+          , LitDouble y <- l2
+          , LitDouble z <- l3
+          -> Just $ mkDoubleVal env $
+            case signs of
+              FMAdd  -> x * y + z
+              FMSub  -> x * y - z
+              FNMAdd -> negate ( x * y ) + z
+              FNMSub -> negate ( x * y ) - z
+        _ -> Nothing
+
+-- | @x * y + 0 = x * y@.
+fmaZero_z :: FMASign -> Width -> RuleM CoreExpr
+fmaZero_z signs width = do
+  [x, y, Lit z] <- getArgs
+  let
+    -- TODO: we should additionally check the sign of z.
+    -- FMAdd, FNMAdd: should be -0.0.
+    -- FMSub, FNMSub: should be +0.0.
+    ok =
+      case width of
+        W32
+          | LitFloat 0 <- z
+          -> True
+        W64
+          | LitDouble 0 <- z
+          -> True
+        _ -> False
+    neg = case width of
+      W32 ->  FloatNegOp
+      W64 -> DoubleNegOp
+      _   -> panic "fmaZero_xy: not Float# or Double#"
+    mul = case width of
+      W32 ->  FloatMulOp
+      W64 -> DoubleMulOp
+      _   -> panic "fmaZero_z: not Float# or Double#"
+  if ok
+  then return $ case signs of
+    FMAdd  -> Var (primOpId mul) `App` x `App` y
+    FMSub  -> Var (primOpId mul) `App` x `App` y
+    FNMAdd -> Var (primOpId neg) `App` (Var (primOpId mul) `App` x `App` y)
+    FNMSub -> Var (primOpId neg) `App` (Var (primOpId mul) `App` x `App` y)
+  else mzero
+
+-- | @±1 * y + z ==> z ± y@ and @x * ±1 + z ==> z ± x@.
+fmaOne :: FMASign -> Width -> RuleM CoreExpr
+fmaOne signs width = do
+  [x, y, z] <- getArgs
+  let
+    posNegOne_maybe :: Rational -> Maybe Bool
+    posNegOne_maybe i
+      | i == 1
+      = Just False
+      | i == -1
+      = Just True
+      | otherwise
+      = Nothing
+    ok =
+      case width of
+        W32
+          | Lit (LitFloat i) <- x
+          , Just sgn <- posNegOne_maybe i
+          -> Just (sgn, y)
+          | Lit (LitFloat i) <- y
+          , Just sgn <- posNegOne_maybe i
+          -> Just (sgn, x)
+        W64
+          | Lit (LitDouble i) <- x
+          , Just sgn <- posNegOne_maybe i
+          -> Just (sgn, y)
+          | Lit (LitDouble i) <- y
+          , Just sgn <- posNegOne_maybe i
+          -> Just (sgn, x)
+        _ -> Nothing
+    neg = case width of
+      W32 ->  FloatNegOp
+      W64 -> DoubleNegOp
+      _   -> panic "fmaOne: not Float# or Double#"
+    add = case width of
+      W32 ->  FloatAddOp
+      W64 -> DoubleAddOp
+      _   -> panic "fmaOne: not Float# or Double#"
+    sub = case width of
+      W32 ->  FloatSubOp
+      W64 -> DoubleSubOp
+      _   -> panic "fmaOne: not Float# or Double#"
+  case ok of
+    Nothing  -> mzero
+    Just (sgn, t) -> return $
+      if -- t + z
+         |  ( signs ==  FMAdd && sgn == False )
+         || ( signs == FNMAdd && sgn == True  )
+         -> Var (primOpId add) `App` t `App` z
+         -- - t + z
+         |  signs ==  FMAdd
+         || signs == FNMAdd
+         -> Var (primOpId sub) `App` z `App` t
+         -- t - z
+         |  ( signs ==  FMSub && sgn == False )
+         || ( signs == FNMSub && sgn == True  )
+         -> Var (primOpId sub) `App` t `App` z
+         -- - t - z
+         |  signs ==  FMSub
+         || signs == FNMSub
+         -> Var (primOpId neg) `App` (Var (primOpId add) `App` t `App` z)
+         | otherwise
+         -> pprPanic "fmaOne: non-exhaustive pattern match" $
+              vcat [ text "signs:" <+> text (show signs)
+                   , text "sign:" <+> ppr sgn ]
 
 --------------------------
 {- Note [The litEq rule: converting equality to case]

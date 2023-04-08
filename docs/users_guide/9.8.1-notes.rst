@@ -142,6 +142,24 @@ Runtime system
     - ``sameMutVar#``, ``sameTVar#``, ``sameMVar#``
     - ``sameIOPort#``, ``eqStableName#``.
 
+- New primops for fused multiply-add operations. These primops combine a
+  multiplication and an addition, compiling to a single instruction when
+  the ``-mfma`` flag is enabled and the architecture supports it.
+
+  The new primops are ``fmaddFloat#, fmsubFloat#, fnmaddFloat#, fnmsubFloat# :: Float# -> Float# -> Float# -> Float#``
+  and ``fmaddDouble#, fmsubDouble#, fnmaddDouble#, fnmsubDouble# :: Double# -> Double# -> Double# -> Double#``.
+
+  These implement the following operations, while performing one single
+  rounding at the end, leading to a more accurate result:
+
+    - ``fmaddFloat# x y z``, ``fmaddDouble# x y z`` compute ``x * y + z``.
+    - ``fmsubFloat# x y z``, ``fmsubDouble# x y z`` compute ``x * y - z``.
+    - ``fnmaddFloat# x y z``, ``fnmaddDouble# x y z`` compute ``- x * y + z``.
+    - ``fnmsubFloat# x y z``, ``fnmsubDouble# x y z`` compute ``- x * y - z``.
+
+  Warning: on unsupported architectures, the software emulation provided by
+  the fallback to the C standard library is not guaranteed to be IEEE-compliant.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

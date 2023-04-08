@@ -775,7 +775,6 @@ ppLlvmCastOp LM_Bitcast  = text "bitcast"
 {-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> SDoc #-}
 {-# SPECIALIZE ppLlvmCastOp :: LlvmCastOp -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-
 -- -----------------------------------------------------------------------------
 -- * Floating point conversion
 --

@@ -901,14 +901,10 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
       MO_U_Lt _ -> condIntReg LU  x y
       MO_U_Le _ -> condIntReg LEU x y
 
-      MO_F_Add w   -> trivialFCode_sse2 w ADD  x y
-
-      MO_F_Sub w   -> trivialFCode_sse2 w SUB  x y
-
-      MO_F_Quot w  -> trivialFCode_sse2 w FDIV x y
-
-      MO_F_Mul w   -> trivialFCode_sse2 w MUL x y
-
+      MO_F_Add  w -> trivialFCode_sse2 w ADD  x y
+      MO_F_Sub  w -> trivialFCode_sse2 w SUB  x y
+      MO_F_Quot w -> trivialFCode_sse2 w FDIV x y
+      MO_F_Mul  w -> trivialFCode_sse2 w MUL  x y
 
       MO_Add rep -> add_code rep x y
       MO_Sub rep -> sub_code rep x y
@@ -1113,6 +1109,13 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
 
            return (Fixed format result code)
 
+getRegister' _plat _is32Bit (CmmMachOp mop [x, y, z]) = -- ternary MachOps
+  case mop of
+      -- Floating point fused multiply-add operations @ ± x*y ± z@
+      MO_FMA var w -> genFMA3Code w var x y z
+
+      _other -> pprPanic "getRegister(x86) - ternary CmmMachOp (1)"
+                  (pprMachOp mop)
 
 getRegister' _ _ (CmmLoad mem pk _)
   | isFloatType pk
@@ -3151,12 +3154,12 @@ genTrivialCode rep instr a b = do
   a_code <- getAnyReg a
   tmp <- getNewRegNat rep
   let
-     -- We want the value of b to stay alive across the computation of a.
-     -- But, we want to calculate a straight into the destination register,
+     -- We want the value of 'b' to stay alive across the computation of 'a'.
+     -- But, we want to calculate 'a' straight into the destination register,
      -- because the instruction only has two operands (dst := dst `op` src).
-     -- The troublesome case is when the result of b is in the same register
-     -- as the destination reg.  In this case, we have to save b in a
-     -- new temporary across the computation of a.
+     -- The troublesome case is when the result of 'b' is in the same register
+     -- as the destination 'reg'.  In this case, we have to save 'b' in a
+     -- new temporary across the computation of 'a'.
      code dst
         | dst `regClashesWithOp` b_op =
                 b_code `appOL`
@@ -3173,6 +3176,69 @@ regClashesWithOp :: Reg -> Operand -> Bool
 reg `regClashesWithOp` OpReg reg2   = reg == reg2
 reg `regClashesWithOp` OpAddr amode = any (==reg) (addrModeRegs amode)
 _   `regClashesWithOp` _            = False
+
+-- | Generate code for a fused multiply-add operation, of the form @± x * y ± z@,
+-- with 3 operands (FMA3 instruction set).
+genFMA3Code :: Width
+            -> FMASign
+            -> CmmExpr -> CmmExpr -> CmmExpr -> NatM Register
+genFMA3Code w signs x y z = do
+
+  -- For the FMA instruction, we want to compute x * y + z
+  --
+  -- There are three possible instructions we could emit:
+  --
+  --   - fmadd213 z y x, result in x, z can be a memory address
+  --   - fmadd132 x z y, result in y, x can be a memory address
+  --   - fmadd231 y x z, result in z, y can be a memory address
+  --
+  -- This suggests two possible optimisations:
+  --
+  --   - OPTIMISATION 1
+  --     If one argument is an address, use the instruction that allows
+  --     a memory address in that position.
+  --
+  --   - OPTIMISATION 2
+  --     If one argument is in a fixed register, use the instruction that puts
+  --     the result in that same register.
+  --
+  -- Currently we follow neither of these optimisations,
+  -- opting to always use fmadd213 for simplicity.
+  let rep = floatFormat w
+  (y_reg, y_code) <- getNonClobberedReg y
+  (z_reg, z_code) <- getNonClobberedReg z
+  x_code <- getAnyReg x
+  y_tmp <- getNewRegNat rep
+  z_tmp <- getNewRegNat rep
+  let
+     fma213 = FMA3 rep signs FMA213
+     code dst
+         | dst == y_reg
+         , dst == z_reg
+         = y_code `appOL`
+           unitOL (MOV rep (OpReg y_reg) (OpReg y_tmp)) `appOL`
+           z_code `appOL`
+           unitOL (MOV rep (OpReg z_reg) (OpReg z_tmp)) `appOL`
+           x_code dst `snocOL`
+           fma213 (OpReg z_tmp) y_tmp dst
+        | dst == y_reg
+        = y_code `appOL`
+          unitOL (MOV rep (OpReg y_reg) (OpReg z_tmp)) `appOL`
+          z_code `appOL`
+          x_code dst `snocOL`
+          fma213 (OpReg z_reg) y_tmp dst
+        | dst == z_reg
+        = y_code `appOL`
+          z_code `appOL`
+          unitOL (MOV rep (OpReg z_reg) (OpReg z_tmp)) `appOL`
+          x_code dst `snocOL`
+          fma213 (OpReg z_tmp) y_reg dst
+        | otherwise
+        = y_code `appOL`
+          z_code `appOL`
+          x_code dst `snocOL`
+          fma213 (OpReg z_reg) y_reg dst
+  return (Any rep code)
 
 -----------
 

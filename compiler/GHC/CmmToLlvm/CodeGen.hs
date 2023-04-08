@@ -1469,6 +1469,9 @@ genMachOp _ op [x] = case op of
     MO_F_Sub        _ -> panicOp
     MO_F_Mul        _ -> panicOp
     MO_F_Quot       _ -> panicOp
+
+    MO_FMA _ _        -> panicOp
+
     MO_F_Eq         _ -> panicOp
     MO_F_Ne         _ -> panicOp
     MO_F_Ge         _ -> panicOp
@@ -1652,6 +1655,8 @@ genMachOp_slow opt op [x, y] = case op of
     MO_F_Mul  _ -> genBinMach LM_MO_FMul
     MO_F_Quot _ -> genBinMach LM_MO_FDiv
 
+    MO_FMA _ _ -> panicOp
+
     MO_And _   -> genBinMach LM_MO_And
     MO_Or  _   -> genBinMach LM_MO_Or
     MO_Xor _   -> genBinMach LM_MO_Xor
@@ -1785,8 +1790,27 @@ genMachOp_slow opt op [x, y] = case op of
         panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encountered"
                        ++ "with two arguments! (" ++ show op ++ ")"
 
--- More than two expression, invalid!
-genMachOp_slow _ _ _ = panic "genMachOp: More than 2 expressions in MachOp!"
+genMachOp_slow _opt op [x, y, z] = case op of
+    MO_FMA var _ -> triLlvmOp getVarType (FMAOp var)
+    _            -> panicOp
+    where
+        triLlvmOp ty op = do
+          platform <- getPlatform
+          runExprData $ do
+            vx <- exprToVarW x
+            vy <- exprToVarW y
+            vz <- exprToVarW z
+
+            if | getVarType vx == getVarType vy
+               , getVarType vx == getVarType vz
+               -> doExprW (ty vx) $ op vx vy vz
+               | otherwise
+               -> pprPanic "triLlvmOp types" (pdoc platform x $$ pdoc platform y $$ pdoc platform z)
+        panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: non-ternary op encountered"
+                       ++ "with three arguments! (" ++ show op ++ ")"
+
+-- More than three expressions, invalid!
+genMachOp_slow _ _ _ = panic "genMachOp_slow: More than 3 expressions in MachOp!"
 
 
 -- | Handle CmmLoad expression.

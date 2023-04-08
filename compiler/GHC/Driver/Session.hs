@@ -208,6 +208,7 @@ module GHC.Driver.Session (
         isAvx512erEnabled,
         isAvx512fEnabled,
         isAvx512pfEnabled,
+        isFmaEnabled,
 
         -- * Linker/compiler information
         LinkerInfo(..),
@@ -718,6 +719,7 @@ data DynFlags = DynFlags {
   avx512er              :: Bool, -- Enable AVX-512 Exponential and Reciprocal Instructions.
   avx512f               :: Bool, -- Enable AVX-512 instructions.
   avx512pf              :: Bool, -- Enable AVX-512 PreFetch Instructions.
+  fma                   :: Bool, -- ^ Enable FMA instructions.
 
   -- | Run-time linker information (what options we need, etc.)
   rtldInfo              :: IORef (Maybe LinkerInfo),
@@ -1303,6 +1305,7 @@ defaultDynFlags mySettings =
         avx512er = False,
         avx512f = False,
         avx512pf = False,
+        fma = False,
         rtldInfo = panic "defaultDynFlags: no rtldInfo",
         rtccInfo = panic "defaultDynFlags: no rtccInfo",
         rtasmInfo = panic "defaultDynFlags: no rtasmInfo",
@@ -2730,6 +2733,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "mavx512f"     (noArg (\d -> d { avx512f = True }))
   , make_ord_flag defGhcFlag "mavx512pf"    (noArg (\d ->
                                                          d { avx512pf = True }))
+  , make_ord_flag defGhcFlag "mfma"         (noArg (\d -> d { fma = True }))
 
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
@@ -5008,7 +5012,7 @@ setUnsafeGlobalDynFlags dflags = do
 
 
 -- -----------------------------------------------------------------------------
--- SSE and AVX
+-- SSE, AVX, FMA
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42
@@ -5031,6 +5035,9 @@ isAvx512fEnabled dflags = avx512f dflags
 isAvx512pfEnabled :: DynFlags -> Bool
 isAvx512pfEnabled dflags = avx512pf dflags
 
+isFmaEnabled :: DynFlags -> Bool
+isFmaEnabled dflags = fma dflags
+
 -- -----------------------------------------------------------------------------
 -- BMI2
 
@@ -5045,6 +5052,8 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> bmiVersion dflags >= Just BMI2
     ArchX86    -> bmiVersion dflags >= Just BMI2
     _          -> False
+
+-- -----------------------------------------------------------------------------
 
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool

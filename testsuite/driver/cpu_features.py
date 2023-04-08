@@ -10,6 +10,7 @@ SUPPORTED_CPU_FEATURES = {
     # x86:
     'sse', 'sse2', 'sse3', 'ssse3', 'sse4_1', 'sse4_2',
     'avx1', 'avx2',
+    'fma',
     'popcnt', 'bmi1', 'bmi2'
 }
 
@@ -45,6 +46,10 @@ def get_cpu_features():
         check_feature('avx1_0', 'avx1')
         check_feature('avx2_0', 'avx2')
         return features
+
+    elif config.arch in [ 'powerpc', 'powerpc64' ]:
+        # Hardcode support for 'fma' on PowerPC
+        return [ 'fma' ]
 
     else:
         # TODO: Add {Open,Free}BSD support

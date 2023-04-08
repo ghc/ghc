@@ -1,3 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+
 module GHC.Driver.Config.StgToCmm
   ( initStgToCmmConfig
   ) where
@@ -6,6 +9,7 @@ import GHC.Prelude.Basic
 
 import GHC.StgToCmm.Config
 
+import GHC.Cmm.MachOp ( FMASign(..))
 import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Platform
@@ -50,6 +54,24 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmAllowQuotRemInstr         = ncg  && (x86ish || ppc)
   , stgToCmmAllowQuotRem2             = (ncg && (x86ish || ppc)) || llvm
   , stgToCmmAllowExtendedAddSubInstrs = (ncg && (x86ish || ppc)) || llvm
+  , stgToCmmAllowFMAInstr =
+      if
+        | not (isFmaEnabled dflags)
+        || not (ncg || llvm)
+        -- If we're not using the native code generator or LLVM,
+        -- fall back to the generic implementation.
+        || platformArch platform == ArchWasm32
+        -- WASM doesn't support native FMA instructions (at the time of writing).
+        -> const False
+
+        -- FNMSub and FNMAdd have different semantics on PowerPC,
+        -- so we avoid using them.
+        | ppc
+        -> \ case { FMAdd -> True; FMSub -> True; _ -> False }
+
+        | otherwise
+        -> const True
+
   , stgToCmmAllowIntMul2Instr         = (ncg && x86ish) || llvm
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err

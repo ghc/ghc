@@ -280,6 +280,14 @@ data Instr
     | FABS    Reg Reg               -- abs is the same for single and double
     | FNEG    Reg Reg               -- negate is the same for single and double prec.
 
+    -- | Fused multiply-add instructions.
+    --
+    --   - FMADD:  @rd =  (ra * rb) + rd@
+    --   - FMSUB:  @rd =   ra * rb  - rd@
+    --   - FNMADD: @rd = -(ra * rb + rd)@
+    --   - FNMSUB: @rd = -(ra * rb - rd)@
+    | FMADD FMASign Format Reg Reg Reg Reg
+
     | FCMP    Reg Reg
 
     | FCTIWZ  Reg Reg           -- convert to integer word
@@ -380,6 +388,7 @@ regUsageOfInstr platform instr
     MFCR    reg             -> usage ([], [reg])
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
+    FMADD _ _ rt ra rc rb   -> usage ([ra, rc, rb], [rt])
     _                       -> noUsage
   where
     usage (src, dst) = RU (filter (interesting platform) src)
@@ -467,6 +476,8 @@ patchRegsOfInstr instr env
     FDIV    fmt r1 r2 r3    -> FDIV fmt (env r1) (env r2) (env r3)
     FABS    r1 r2           -> FABS (env r1) (env r2)
     FNEG    r1 r2           -> FNEG (env r1) (env r2)
+    FMADD   sgn fmt r1 r2 r3 r4
+                            -> FMADD sgn fmt (env r1) (env r2) (env r3) (env r4)
     FCMP    r1 r2           -> FCMP (env r1) (env r2)
     FCTIWZ  r1 r2           -> FCTIWZ (env r1) (env r2)
     FCTIDZ  r1 r2           -> FCTIDZ (env r1) (env r2)

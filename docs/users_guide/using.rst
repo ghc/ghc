@@ -1732,6 +1732,24 @@ Some flags only make sense for particular target platforms.
     :ref:`native code generator <native-code-gen>`. The resulting compiled
     code will only run on processors that support BMI2 (Intel Haswell and newer, AMD Excavator, Zen and newer).
 
+.. ghc-flag:: -mfma
+    :shortdesc: Use native FMA instructions for fused multiply-add floating-point operations
+    :type: dynamic
+    :category: platform-options
+
+    :since: 9.8.1
+
+    Use native FMA instructions to implement the fused multiply-add floating-point
+    operations of the form ``x * y + z``.
+    This allows computing a multiplication and addition in a single instruction,
+    without an intermediate rounding step.
+    Supported architectures: X86 with the FMA3 instruction set (this includes
+    most consumer processors since 2013), PowerPC and AArch64.
+
+    When this flag is disabled, GHC falls back to the C implementation of fused
+    multiply-add, which might perform non-IEEE-compliant software emulation on
+    some platforms (depending on the implementation of the C standard library).
+
 Haddock
 -------
 

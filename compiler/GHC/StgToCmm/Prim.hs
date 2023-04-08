@@ -1395,6 +1395,11 @@ emitPrimOp cfg primop =
   DoubleDivOp    -> \args -> opTranslate args (MO_F_Quot W64)
   DoubleNegOp    -> \args -> opTranslate args (MO_F_Neg W64)
 
+  DoubleFMAdd    -> fmaOp FMAdd  W64
+  DoubleFMSub    -> fmaOp FMSub  W64
+  DoubleFNMAdd   -> fmaOp FNMAdd W64
+  DoubleFNMSub   -> fmaOp FNMSub W64
+
 -- Float ops
 
   FloatEqOp     -> \args -> opTranslate args (MO_F_Eq W32)
@@ -1409,6 +1414,11 @@ emitPrimOp cfg primop =
   FloatMulOp    -> \args -> opTranslate args (MO_F_Mul  W32)
   FloatDivOp    -> \args -> opTranslate args (MO_F_Quot W32)
   FloatNegOp    -> \args -> opTranslate args (MO_F_Neg  W32)
+
+  FloatFMAdd    -> fmaOp FMAdd  W32
+  FloatFMSub    -> fmaOp FMSub  W32
+  FloatFNMAdd   -> fmaOp FNMAdd W32
+  FloatFNMSub   -> fmaOp FNMSub W32
 
 -- Vector ops
 
@@ -1735,6 +1745,27 @@ emitPrimOp cfg primop =
   allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
   allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
 
+  allowFMA = stgToCmmAllowFMAInstr cfg
+
+  fmaOp :: FMASign -> Width -> [CmmActual] -> PrimopCmmEmit
+  fmaOp signs w args@[arg_x, arg_y, arg_z]
+    | allowFMA signs
+    = opTranslate args (MO_FMA signs w)
+    | otherwise
+    = case signs of
+
+        -- For fused multiply-add x * y + z, we fall back to the C implementation.
+        FMAdd -> opIntoRegs $ \ [res] -> fmaCCall w res arg_x arg_y arg_z
+
+        -- Other fused multiply-add operations are implemented in terms of fmadd
+        -- This is sound: it does not lose any precision.
+        FMSub  -> fmaOp FMAdd w [arg_x, arg_y, neg arg_z]
+        FNMAdd -> fmaOp FMAdd w [neg arg_x, arg_y, arg_z]
+        FNMSub -> fmaOp FMAdd w [neg arg_x, arg_y, neg arg_z]
+    where
+      neg x = CmmMachOp (MO_F_Neg w) [x]
+  fmaOp _ _ _ = panic "fmaOp: wrong number of arguments (expected 3)"
+
 data PrimopCmmEmit
   -- | Out of line fake primop that's actually just a foreign call to other
   -- (presumably) C--.
@@ -2022,6 +2053,19 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
              , mkAssign (CmmLocal res_c) (rl res_h `neq` carryFill (rl res_l))
              ]
 genericIntMul2Op _ _ = panic "genericIntMul2Op"
+
+fmaCCall :: Width -> CmmFormal -> CmmActual -> CmmActual -> CmmActual -> FCode ()
+fmaCCall width res arg_x arg_y arg_z =
+  emitCCall
+    [(res,NoHint)]
+    (CmmLit (CmmLabel fma_lbl))
+    [(arg_x,NoHint), (arg_y,NoHint), (arg_z,NoHint)]
+  where
+    fma_lbl = mkForeignLabel fma_op Nothing ForeignLabelInExternalPackage IsFunction
+    fma_op = case width of
+      W32 -> fsLit "fmaf"
+      W64 -> fsLit "fma"
+      _   -> panic ("fmaCall: " ++ show width)
 
 ------------------------------------------------------------------------------
 -- Helpers for translating various minor variants of array indexing.

@@ -934,6 +934,9 @@ pprInstr platform instr = case instr of
    FNEG reg1 reg2
       -> pprUnary (text "fneg") reg1 reg2
 
+   FMADD signs fmt dst ra rc rb
+     -> pprTernaryF (pprFMASign signs) fmt dst ra rc rb
+
    FCMP reg1 reg2
       -> line $ hcat [
            char '\t',
@@ -1081,6 +1084,21 @@ pprBinaryF op fmt reg1 reg2 reg3 = line $ hcat [
         pprReg reg2,
         text ", ",
         pprReg reg3
+    ]
+
+pprTernaryF :: IsDoc doc => Line doc -> Format -> Reg -> Reg -> Reg -> Reg -> doc
+pprTernaryF op fmt rt ra rc rb = line $ hcat [
+        char '\t',
+        op,
+        pprFFormat fmt,
+        char '\t',
+        pprReg rt,
+        text ", ",
+        pprReg ra,
+        text ", ",
+        pprReg rc,
+        text ", ",
+        pprReg rb
     ]
 
 pprRI :: IsLine doc => Platform -> RI -> doc

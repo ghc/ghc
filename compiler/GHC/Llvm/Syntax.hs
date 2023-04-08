@@ -10,6 +10,7 @@ import GHC.Llvm.MetaData
 import GHC.Llvm.Types
 
 import GHC.Types.Unique
+import GHC.Cmm.MachOp ( FMASign(..) )
 
 -- | Block labels
 type LlvmBlockId = Unique
@@ -337,6 +338,8 @@ data LlvmExpression
                      expression is executed.
   -}
   | Asm LMString LMString LlvmType [LlvmVar] Bool Bool
+
+  | FMAOp FMASign LlvmVar LlvmVar LlvmVar
 
   {- |
     A LLVM expression with metadata attached to it.

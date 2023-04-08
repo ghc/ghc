@@ -59,5 +59,16 @@ test('UnliftedTVar1', normal, compile_and_run, [''])
 test('UnliftedTVar2', normal, compile_and_run, [''])
 test('UnliftedWeakPtr', normal, compile_and_run, [''])
 
+test('FMA_Primops'
+    , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
+      , js_skip # JS backend doesn't have an FMA implementation
+      ]
+     , compile_and_run, [''])
+test('FMA_ConstantFold'
+    , [ js_skip # JS backend doesn't have an FMA implementation ]
+      , expect_broken(21227)
+      ]
+    , compile_and_run, ['-O'])
+
 test('T21624', normal, compile_and_run, [''])
 test('T23071', ignore_stdout, compile_and_run, [''])

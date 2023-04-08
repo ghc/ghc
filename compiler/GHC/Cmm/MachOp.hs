@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Cmm.MachOp
@@ -26,6 +28,9 @@ module GHC.Cmm.MachOp
     -- Atomic read-modify-write
     , MemoryOrdering(..)
     , AtomicMachOp(..)
+
+    -- Fused multiply-add
+    , FMASign(..), pprFMASign
    )
 where
 
@@ -87,6 +92,10 @@ data MachOp
   | MO_F_Neg  Width             -- unary -
   | MO_F_Mul  Width
   | MO_F_Quot Width
+
+  -- Floating-point fused multiply-add operations
+  -- | Fused multiply-add, see 'FMASign'.
+  | MO_FMA FMASign Width
 
   -- Floating point comparison
   | MO_F_Eq Width
@@ -160,7 +169,30 @@ data MachOp
 pprMachOp :: MachOp -> SDoc
 pprMachOp mo = text (show mo)
 
+-- | Where are the signs in a fused multiply-add instruction?
+--
+-- @x*y + z@ vs @x*y - z@ vs @-x*y+z@ vs @-x*y-z@.
+--
+-- Warning: the signs aren't consistent across architectures (X86, PowerPC, AArch64).
+-- The user-facing implementation uses the X86 convention, while the relevant
+-- backends use their corresponding conventions.
+data FMASign
+  -- | Fused multiply-add @x*y + z@.
+  = FMAdd
+  -- | Fused multiply-subtract. On X86: @x*y - z@.
+  | FMSub
+  -- | Fused multiply-add. On X86: @-x*y + z@.
+  | FNMAdd
+  -- | Fused multiply-subtract. On X86: @-x*y - z@.
+  | FNMSub
+  deriving (Eq, Show)
 
+pprFMASign :: IsLine doc => FMASign -> doc
+pprFMASign = \case
+  FMAdd  -> text "fmadd"
+  FMSub  -> text "fmsub"
+  FNMAdd -> text "fnmadd"
+  FNMSub -> text "fnmsub"
 
 -- -----------------------------------------------------------------------------
 -- Some common MachReps
@@ -398,6 +430,9 @@ machOpResultType platform mop tys =
     MO_F_Mul r          -> cmmFloat r
     MO_F_Quot r         -> cmmFloat r
     MO_F_Neg r          -> cmmFloat r
+
+    MO_FMA _ r          -> cmmFloat r
+
     MO_F_Eq  {}         -> comparisonResultRep platform
     MO_F_Ne  {}         -> comparisonResultRep platform
     MO_F_Ge  {}         -> comparisonResultRep platform
@@ -489,6 +524,9 @@ machOpArgReps platform op =
     MO_F_Mul r          -> [r,r]
     MO_F_Quot r         -> [r,r]
     MO_F_Neg r          -> [r]
+
+    MO_FMA _ r          -> [r,r,r]
+
     MO_F_Eq  r          -> [r,r]
     MO_F_Ne  r          -> [r,r]
     MO_F_Ge  r          -> [r,r]

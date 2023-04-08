@@ -816,7 +816,9 @@ lower_CmmMachOp lbl (MO_SS_Conv w0 w1) xs = lower_MO_SS_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_UU_Conv w0 w1) xs = lower_MO_UU_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_XX_Conv w0 w1) xs = lower_MO_UU_Conv lbl w0 w1 xs
 lower_CmmMachOp lbl (MO_FF_Conv w0 w1) xs = lower_MO_FF_Conv lbl w0 w1 xs
-lower_CmmMachOp _ _ _ = panic "lower_CmmMachOp: unreachable"
+lower_CmmMachOp _ mop _ =
+  pprPanic "lower_CmmMachOp: unreachable" $
+    vcat [ text "offending MachOp:" <+> pprMachOp mop ]
 
 -- | Lower a 'CmmLit'. Note that we don't emit 'f32.const' or
 -- 'f64.const' for the time being, and instead emit their relative bit

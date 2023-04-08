@@ -488,6 +488,11 @@ genPrim prof bound ty op = case op of
   DoubleDecode_2IntOp  -> \[s,h,l,e] [x] -> PrimInline $ appT [s,h,l,e] "h$decodeDouble2Int" [x]
   DoubleDecode_Int64Op -> \[s1,s2,e] [d] -> PrimInline $ appT [e,s1,s2] "h$decodeDoubleInt64" [d]
 
+  DoubleFMAdd  -> unhandledPrimop op
+  DoubleFMSub  -> unhandledPrimop op
+  DoubleFNMAdd -> unhandledPrimop op
+  DoubleFNMSub -> unhandledPrimop op
+
 ------------------------------ Float --------------------------------------------
 
   FloatGtOp         -> \[r] [x,y] -> PrimInline $ r |= if10 (x .>.   y)
@@ -523,6 +528,11 @@ genPrim prof bound ty op = case op of
   FloatPowerOp      -> \[r] [x,y] -> PrimInline $ r |= math_fround [math_pow [x,y]]
   FloatToDoubleOp   -> \[r] [x]   -> PrimInline $ r |= x
   FloatDecode_IntOp -> \[s,e] [x] -> PrimInline $ appT [s,e] "h$decodeFloatInt" [x]
+
+  FloatFMAdd  -> unhandledPrimop op
+  FloatFMSub  -> unhandledPrimop op
+  FloatFNMAdd -> unhandledPrimop op
+  FloatFNMSub -> unhandledPrimop op
 
 ------------------------------ Arrays -------------------------------------------
 

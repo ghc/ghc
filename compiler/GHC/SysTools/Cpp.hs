@@ -98,6 +98,9 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
           [ "-D__SSE2__"     | isSse2Enabled     platform ] ++
           [ "-D__SSE4_2__"   | isSse4_2Enabled   dflags ]
 
+    let fma_def =
+         [ "-D__FMA__"       | isFmaEnabled dflags ]
+
     let avx_defs =
           [ "-D__AVX__"      | isAvxEnabled      dflags ] ++
           [ "-D__AVX2__"     | isAvx2Enabled     dflags ] ++
@@ -140,6 +143,7 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
                     ++ map GHC.SysTools.Option th_defs
                     ++ map GHC.SysTools.Option hscpp_opts
                     ++ map GHC.SysTools.Option sse_defs
+                    ++ map GHC.SysTools.Option fma_def
                     ++ map GHC.SysTools.Option avx_defs
                     ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include

@@ -1028,6 +1028,7 @@ llvmOptions llvm_config dflags =
               ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
               ++ ["+avx512er"| isAvx512erEnabled dflags ]
               ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
+              ++ ["+fma"     | isFmaEnabled dflags      ]
               ++ ["+bmi"     | isBmiEnabled dflags      ]
               ++ ["+bmi2"    | isBmi2Enabled dflags     ]
 

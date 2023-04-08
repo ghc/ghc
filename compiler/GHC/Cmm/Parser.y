@@ -1009,7 +1009,7 @@ machOps = listToUFM $
         ( "eq",         MO_Eq ),
         ( "ne",         MO_Ne ),
         ( "mul",        MO_Mul ),
-        ( "mulmayoflo",  MO_S_MulMayOflo ),
+        ( "mulmayoflo", MO_S_MulMayOflo ),
         ( "neg",        MO_S_Neg ),
         ( "quot",       MO_S_Quot ),
         ( "rem",        MO_S_Rem ),
@@ -1039,6 +1039,11 @@ machOps = listToUFM $
         ( "fneg",       MO_F_Neg ),
         ( "fmul",       MO_F_Mul ),
         ( "fquot",      MO_F_Quot ),
+
+        ( "fmadd" ,     MO_FMA FMAdd  ),
+        ( "fmsub" ,     MO_FMA FMSub  ),
+        ( "fnmadd",     MO_FMA FNMAdd ),
+        ( "fnmsub",     MO_FMA FNMSub ),
 
         ( "feq",        MO_F_Eq ),
         ( "fne",        MO_F_Ne ),

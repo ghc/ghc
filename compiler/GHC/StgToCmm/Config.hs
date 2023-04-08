@@ -11,6 +11,7 @@ import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.TmpFs
 
+import GHC.Cmm.MachOp ( FMASign(..) )
 import GHC.Prelude
 
 
@@ -66,6 +67,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAllowQuotRem2             :: !Bool   -- ^ Allowed to generate QuotRem
   , stgToCmmAllowExtendedAddSubInstrs :: !Bool   -- ^ Allowed to generate AddWordC, SubWordC, Add2, etc.
   , stgToCmmAllowIntMul2Instr         :: !Bool   -- ^ Allowed to generate IntMul2 instruction
+  , stgToCmmAllowFMAInstr             :: FMASign -> Bool -- ^ Allowed to generate FMA instruction
   , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   ------------------------------ SIMD flags ------------------------------------
   -- Each of these flags checks vector compatibility with the backend requested

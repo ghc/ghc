@@ -529,6 +529,11 @@ machOpNeedsCast platform mop args
 pprMachOpApp' :: Platform -> MachOp -> [CmmExpr] -> SDoc
 pprMachOpApp' platform mop args
  = case args of
+
+    -- ternary
+    args@[_,_,_] ->
+      pprMachOp_for_C platform mop <> parens (pprWithCommas pprArg args)
+
     -- dyadic
     [x,y] -> pprArg x <+> pprMachOp_for_C platform mop <+> pprArg y
 
@@ -711,12 +716,27 @@ pprMachOp_for_C platform mop = case mop of
         MO_U_Quot       _ -> char '/'
         MO_U_Rem        _ -> char '%'
 
-        -- & Floating-point operations
+        -- Floating-point operations
         MO_F_Add        _ -> char '+'
         MO_F_Sub        _ -> char '-'
         MO_F_Neg        _ -> char '-'
         MO_F_Mul        _ -> char '*'
         MO_F_Quot       _ -> char '/'
+
+        -- Floating-point fused multiply-add operations
+        MO_FMA FMAdd w ->
+          case w of
+            W32 -> text "fmaf"
+            W64 -> text "fma"
+            _   ->
+              pprTrace "offending mop:"
+                (text "FMAdd")
+                (panic $ "PprC.pprMachOp_for_C: FMAdd unsupported"
+                       ++ "at width " ++ show w)
+        MO_FMA var _width  ->
+          pprTrace "offending mop:"
+            (text $ "FMA " ++ show var)
+            (panic $ "PprC.pprMachOp_for_C: should have been handled earlier!")
 
         -- Signed comparisons
         MO_S_Ge         _ -> text ">="

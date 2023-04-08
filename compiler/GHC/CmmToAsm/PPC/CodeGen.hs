@@ -649,6 +649,21 @@ getRegister' _ _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
       code <- remainderCode rep sgn tmp x y
       return (Any fmt code)
 
+getRegister' _ _ (CmmMachOp mop [x, y, z]) -- ternary PrimOps
+  = case mop of
+
+      -- x86 fmadd    x * y + z <> PPC fmadd  rt =   ra * rc + rb
+      -- x86 fmsub    x * y - z <> PPC fmsub  rt =   ra * rc - rb
+      -- x86 fnmadd - x * y + z ~~ PPC fnmsub rt = -(ra * rc - rb)
+      -- x86 fnmsub - x * y - z ~~ PPC fnmadd rt = -(ra * rc + rb)
+
+      MO_FMA variant w ->
+        case variant of
+          FMAdd  -> fma_code w (FMADD FMAdd) x y z
+          FMSub  -> fma_code w (FMADD FMSub) x y z
+          FNMAdd -> fma_code w (FMADD FNMAdd) x y z
+          FNMSub -> fma_code w (FMADD FNMSub) x y z
+      _ -> panic "PPC.CodeGen.getRegister: no match"
 
 getRegister' _ _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
@@ -2358,10 +2373,28 @@ trivialUCode rep instr x = do
     let code' dst = code `snocOL` instr dst src
     return (Any rep code')
 
+-- | Generate code for a 4-register FMA instruction,
+-- e.g. @fmadd rt ra rc rb := rt <- ra * rc + rb@.
+fma_code :: Width
+         -> (Format -> Reg -> Reg -> Reg -> Reg -> Instr)
+         -> CmmExpr
+         -> CmmExpr
+         -> CmmExpr
+         -> NatM Register
+fma_code w instr ra rc rb = do
+    let rep = floatFormat w
+    (src1, code1) <- getSomeReg ra
+    (src2, code2) <- getSomeReg rc
+    (src3, code3) <- getSomeReg rb
+    let instrCode rt =
+          code1 `appOL`
+          code2 `appOL`
+          code3 `snocOL` instr rep rt src1 src2 src3
+    return $ Any rep instrCode
+
 -- There is no "remainder" instruction on the PPC, so we have to do
 -- it the hard way.
 -- The "sgn" parameter is the signedness for the division instruction
-
 remainderCode :: Width -> Bool -> Reg -> CmmExpr -> CmmExpr
                -> NatM (Reg -> InstrBlock)
 remainderCode rep sgn reg_q arg_x arg_y = do
