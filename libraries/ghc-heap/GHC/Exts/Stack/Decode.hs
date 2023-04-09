@@ -225,7 +225,7 @@ decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
     case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
       (# s1, ba#, s# #) -> (# s1, (ByteArray ba#, W# s#) #)
   let bitmapWords :: [Word] = byteArrayToList bitmapArray
-  decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size
+  decodeBitmaps stackSnapshot# (index + relativePayloadOffset) bitmapWords size
   where
     byteArrayToList :: ByteArray -> [Word]
     byteArrayToList (ByteArray bArray) = go 0
@@ -238,9 +238,9 @@ decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
     sizeofByteArray :: ByteArray# -> Int
     sizeofByteArray arr# = I# (sizeofByteArray# arr#)
 
-decodeBitmaps :: StackSnapshot# -> WordOffset -> WordOffset -> [Word] -> Word -> IO [Closure]
-decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
-  let bes = wordsToBitmapEntries (index + relativePayloadOffset) bitmapWords size
+decodeBitmaps :: StackSnapshot# -> WordOffset ->  [Word] -> Word -> IO [Closure]
+decodeBitmaps stackSnapshot# index bitmapWords size =
+  let bes = wordsToBitmapEntries index bitmapWords size
    in mapM toBitmapPayload bes
   where
     toBitmapPayload :: StackFrameIter -> IO Closure
@@ -295,7 +295,7 @@ decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
       case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
         (# s1, b#, s# #) -> (# s1, (W# b#, W# s#) #)
     let bitmapWords = [bitmap | size > 0]
-    decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size
+    decodeBitmaps stackSnapshot# (index + relativePayloadOffset) bitmapWords size
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
 unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
