@@ -23,9 +23,9 @@ import Data.Maybe
 import Foreign
 import GHC.Exts
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Closures
+import GHC.Exts.Heap.Closures (Box(..), RetFunType(..), Closure, GenClosure(UnknownTypeWordSizedPrimitive), StackFrame(..), StgStackClosure(..))
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
-import GHC.Exts.Heap.Decode
+import GHC.Exts.Heap
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Stack.Constants
 import GHC.IO (IO (..))
@@ -296,8 +296,6 @@ decodeBitmaps stackSnapshot# index bitmapWords size =
         getIndex (SfiClosure _ i) = i
         getIndex (SfiPrimitive _ i) = i
 
--- TODO: (auto-) format the code
--- TODO: Check all functions with two WordOffsets? Can't it be one?
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
   do
@@ -411,32 +409,6 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
               }
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
--- TODO: Duplicate
-getClosureDataFromHeapObject ::
-  -- | Heap object to decode.
-  a ->
-  -- | Heap representation of the closure.
-  IO Closure
-getClosureDataFromHeapObject x = do
-  case unpackClosure# x of
-    (# infoTableAddr, heapRep, pointersArray #) -> do
-      let infoTablePtr = Ptr infoTableAddr
-          ptrList =
-            [ case indexArray# pointersArray i of
-                (# ptr #) -> Box ptr
-              | I# i <- [0 .. I# (sizeofArray# pointersArray) - 1]
-            ]
-
-      infoTable <- peekItbl infoTablePtr
-      case tipe infoTable of
-        TSO -> pure $ UnsupportedClosure infoTable
-        STACK -> pure $ UnsupportedClosure infoTable
-        _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
-
--- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
-getBoxedClosureData :: Box -> IO Closure
-getBoxedClosureData (Box a) = getClosureDataFromHeapObject a
-
 -- | Unbox 'Int#' from 'Int'
 toInt# :: Int -> Int#
 toInt# (I# i) = i
@@ -482,5 +454,4 @@ decodeStack (StackSnapshot stack#) = do
 
 #else
 module GHC.Exts.Stack.Decode where
-import GHC.Base (IO)
 #endif

@@ -17,6 +17,7 @@ module GHC.Exts.Heap.Closures (
     , TsoFlags(..)
     , RetFunType(..)
     , allClosures
+    , closureSize
 
     -- * Stack
     , StgStackClosure(..)
@@ -553,3 +554,10 @@ allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
 allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer] ++ Data.Foldable.toList weakLink
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
+
+-- | Get the size of the top-level closure in words.
+-- Includes header and payload. Does not follow pointers.
+--
+-- @since 8.10.1
+closureSize :: Box -> Int
+closureSize (Box x) = I# (closureSize# x)

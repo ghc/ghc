@@ -17,6 +17,7 @@ import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
 import GHC.Exts.Heap.Closures
+import GHC.Exts.Stack
 import GHC.Exts.Stack.Decode
 import GHC.IO (IO (..))
 import GHC.Stack (HasCallStack)

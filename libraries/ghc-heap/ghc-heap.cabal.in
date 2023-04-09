@@ -39,7 +39,6 @@ library
                     GHC.Exts.Heap.Closures
                     GHC.Exts.Heap.ClosureTypes
                     GHC.Exts.Heap.Constants
-                    GHC.Exts.Heap.Decode
                     GHC.Exts.Heap.InfoTable
                     GHC.Exts.Heap.InfoTable.Types
                     GHC.Exts.Heap.InfoTableProf
@@ -52,4 +51,5 @@ library
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
                     GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
                     GHC.Exts.Stack.Constants
+                    GHC.Exts.Stack
                     GHC.Exts.Stack.Decode

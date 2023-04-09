@@ -11,7 +11,6 @@ module ClosureSizeUtils (assertSize, assertSizeUnlifted) where
 
 import Control.Monad
 import GHC.Exts
-import GHC.Exts.Heap
 import GHC.Exts.Heap.Closures
 import GHC.Stack
 import Type.Reflection
@@ -46,7 +45,7 @@ assertSizeBox
   -> Int   -- ^ expected size in words
   -> IO ()
 assertSizeBox x ty expected = do
-  !size <- closureSize x
+  let !size = closureSize x
   when (size /= expected') $ do
     putStrLn $ "closureSize ("++show ty++") == "++show size++", expected "++show expected'
     putStrLn $ prettyCallStack callStack
