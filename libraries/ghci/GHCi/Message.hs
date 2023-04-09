@@ -474,7 +474,7 @@ instance Binary Heap.TsoFlags
 instance Binary Heap.StgInfoTable
 instance Binary Heap.ClosureType
 instance Binary Heap.PrimType
-instance (Binary a) => Binary (Heap.GenClosure a)
+instance Binary a => Binary (Heap.GenClosure a)
 
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 

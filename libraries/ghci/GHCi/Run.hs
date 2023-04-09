@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP, UnboxedTuples #-}
+{-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
+    UnboxedTuples #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -372,21 +373,21 @@ mkString0 bs = B.unsafeUseAsCStringLen bs $ \(cstr,len) -> do
   return (castRemotePtr (toRemotePtr ptr))
 
 mkCostCentres :: String -> [(String,String)] -> IO [RemotePtr CostCentre]
+#if defined(PROFILING)
+mkCostCentres mod ccs = do
+  c_module <- newCString mod
+  mapM (mk_one c_module) ccs
+ where
+  mk_one c_module (decl_path,srcspan) = do
+    c_name <- newCString decl_path
+    c_srcspan <- newCString srcspan
+    toRemotePtr <$> c_mkCostCentre c_name c_module c_srcspan
 
-
-
-
-
-
-
-
-
-
-
-
-
+foreign import ccall unsafe "mkCostCentre"
+  c_mkCostCentre :: Ptr CChar -> Ptr CChar -> Ptr CChar -> IO (Ptr CostCentre)
+#else
 mkCostCentres _ _ = return []
-
+#endif
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
 getIdValFromApStack apStack (I# stackDepth) = do
