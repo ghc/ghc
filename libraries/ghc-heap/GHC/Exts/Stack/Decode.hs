@@ -116,14 +116,13 @@ getUnderflowFrameNextChunk stackSnapshot# index = IO $ \s ->
   case getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index) s of
     (# s1, stack# #) -> (# s1, StackSnapshot stack# #)
 
-foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
+foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
 
-getWord :: StackSnapshot# -> WordOffset -> WordOffset -> IO Word
-getWord stackSnapshot# index relativeOffset = IO $ \s ->
+getWord :: StackSnapshot# -> WordOffset -> IO Word
+getWord stackSnapshot# index = IO $ \s ->
   case getWord#
     stackSnapshot#
     (wordOffsetToWord# index)
-    (wordOffsetToWord# relativeOffset)
     s of
     (# s1, w# #) -> (# s1, W# w# #)
 
@@ -246,7 +245,7 @@ decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
   where
     toBitmapPayload :: StackFrameIter -> IO Closure
     toBitmapPayload (SfiPrimitive stack# i)  = do
-      w <- getWord stack# i 0
+      w <- getWord stack# i
       pure $ UnknownTypeWordSizedPrimitive w
     toBitmapPayload (SfiClosure stack# i) = getClosure stack# i
 
@@ -332,7 +331,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
               }
         RET_FUN -> do
           retFunType' <- getRetFunType stackSnapshot# index
-          retFunSize' <- getWord stackSnapshot# index offsetStgRetFunFrameSize
+          retFunSize' <- getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
           retFunFun' <- getClosure stackSnapshot# (index + offsetStgRetFunFrameFun)
           retFunPayload' <-
             if retFunType' == ARG_GEN_BIG
@@ -354,7 +353,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
                 updatee = updatee'
               }
         CATCH_FRAME -> do
-          exceptions_blocked' <- getWord stackSnapshot# index offsetStgCatchFrameExceptionsBlocked
+          exceptions_blocked' <- getWord stackSnapshot# (index + offsetStgCatchFrameExceptionsBlocked)
           handler' <- getClosure stackSnapshot# (index + offsetStgCatchFrameHandler)
           pure $
             CatchFrame
@@ -381,7 +380,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
                 result = result'
               }
         CATCH_RETRY_FRAME -> do
-          running_alt_code' <- getWord stackSnapshot# index offsetStgCatchRetryFrameRunningAltCode
+          running_alt_code' <- getWord stackSnapshot# (index + offsetStgCatchRetryFrameRunningAltCode)
           first_code' <- getClosure stackSnapshot# (index + offsetStgCatchRetryFrameRunningFirstCode)
           alt_code' <- getClosure stackSnapshot# (index + offsetStgCatchRetryFrameAltCode)
           pure $

@@ -114,10 +114,10 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
   return (stgArrBytes, size);
 }
 
-// getWordzh(StgStack* stack, StgWord offsetWords, StgWord offsetBytes)
-getWordzh(P_ stack, W_ offsetWords, W_ offsetBytes) {
+// getWordzh(StgStack* stack, StgWord offsetWords)
+getWordzh(P_ stack, W_ offsetWords) {
   P_ wordAddr;
-  wordAddr = (StgStack_sp(stack) + WDS(offsetWords) + WDS(offsetBytes));
+  wordAddr = (StgStack_sp(stack) + WDS(offsetWords));
   return (W_[wordAddr]);
 }
 
