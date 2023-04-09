@@ -23,9 +23,9 @@ import Data.Maybe
 import Foreign
 import GHC.Exts
 import GHC.Exts.Heap.ClosureTypes
-import GHC.Exts.Heap.Closures (Box(..), RetFunType(..), Closure, GenClosure(UnknownTypeWordSizedPrimitive), StackFrame(..), StgStackClosure(..))
+import GHC.Exts.Heap.Closures (RetFunType(..), Closure, GenClosure(UnknownTypeWordSizedPrimitive), StackFrame(..), StgStackClosure(..))
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
-import GHC.Exts.Heap
+import GHC.Exts.Heap (Box(..), getBoxedClosureData)
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Stack.Constants
 import GHC.IO (IO (..))
