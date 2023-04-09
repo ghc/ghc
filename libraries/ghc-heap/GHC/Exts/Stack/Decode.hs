@@ -202,15 +202,16 @@ advanceStackFrameIter (StackSnapshot stackSnapshot#) index =
     primWordToWordOffset :: Word# -> WordOffset
     primWordToWordOffset w# = fromIntegral (W# w#)
 
-getClosure :: StackSnapshot# -> WordOffset -> WordOffset -> IO Box
+getClosure :: StackSnapshot# -> WordOffset -> WordOffset -> IO Closure
 getClosure stackSnapshot# index relativeOffset =
-  IO $ \s ->
+  (IO $ \s ->
     case getBoxedClosure#
       stackSnapshot#
       (wordOffsetToWord# (index + relativeOffset))
       s of
       (# s1, ptr #) ->
         (# s1, Box ptr #)
+  ) >>= getBoxedClosureData
 
 -- | Iterator state for stack decoding
 data StackFrameIter =
@@ -247,7 +248,7 @@ decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
     toBitmapPayload (SfiPrimitive stack# i)  = do
       w <- getWord stack# i 0
       pure $ UnknownTypeWordSizedPrimitive w
-    toBitmapPayload (SfiClosure stack# i) = getBoxedClosureData =<< getClosure stack# i 0
+    toBitmapPayload (SfiClosure stack# i) = getClosure stack# i 0
 
     wordsToBitmapEntries :: WordOffset -> [Word] -> Word -> [StackFrameIter]
     wordsToBitmapEntries _ [] 0 = []
@@ -306,7 +307,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
     unpackStackFrame' info =
       case tipe info of
         RET_BCO -> do
-          bco' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgClosurePayload
+          bco' <- getClosure stackSnapshot# index offsetStgClosurePayload
           -- The arguments begin directly after the payload's one element
           bcoArgs' <- decodeLargeBitmap getBCOLargeBitmap# stackSnapshot# index (offsetStgClosurePayload + 1)
           pure
@@ -332,7 +333,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
         RET_FUN -> do
           retFunType' <- getRetFunType stackSnapshot# index
           retFunSize' <- getWord stackSnapshot# index offsetStgRetFunFrameSize
-          retFunFun' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgRetFunFrameFun
+          retFunFun' <- getClosure stackSnapshot# index offsetStgRetFunFrameFun
           retFunPayload' <-
             if retFunType' == ARG_GEN_BIG
               then decodeLargeBitmap getRetFunLargeBitmap# stackSnapshot# index offsetStgRetFunFramePayload
@@ -346,7 +347,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
                 retFunPayload = retFunPayload'
               }
         UPDATE_FRAME -> do
-          updatee' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgUpdateFrameUpdatee
+          updatee' <- getClosure stackSnapshot# index offsetStgUpdateFrameUpdatee
           pure $
             UpdateFrame
               { info_tbl = info,
@@ -354,7 +355,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
               }
         CATCH_FRAME -> do
           exceptions_blocked' <- getWord stackSnapshot# index offsetStgCatchFrameExceptionsBlocked
-          handler' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchFrameHandler
+          handler' <- getClosure stackSnapshot# index offsetStgCatchFrameHandler
           pure $
             CatchFrame
               { info_tbl = info,
@@ -371,8 +372,8 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
               }
         STOP_FRAME -> pure $ StopFrame {info_tbl = info}
         ATOMICALLY_FRAME -> do
-          atomicallyFrameCode' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgAtomicallyFrameCode
-          result' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgAtomicallyFrameResult
+          atomicallyFrameCode' <- getClosure stackSnapshot# index offsetStgAtomicallyFrameCode
+          result' <- getClosure stackSnapshot# index offsetStgAtomicallyFrameResult
           pure $
             AtomicallyFrame
               { info_tbl = info,
@@ -381,8 +382,8 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
               }
         CATCH_RETRY_FRAME -> do
           running_alt_code' <- getWord stackSnapshot# index offsetStgCatchRetryFrameRunningAltCode
-          first_code' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchRetryFrameRunningFirstCode
-          alt_code' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchRetryFrameAltCode
+          first_code' <- getClosure stackSnapshot# index offsetStgCatchRetryFrameRunningFirstCode
+          alt_code' <- getClosure stackSnapshot# index offsetStgCatchRetryFrameAltCode
           pure $
             CatchRetryFrame
               { info_tbl = info,
@@ -391,9 +392,8 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
                 alt_code = alt_code'
               }
         CATCH_STM_FRAME -> do
-          -- TODO: Move `getBoxedClosureData =<<` to `getClosure`
-          catchFrameCode' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchSTMFrameCode
-          handler' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchSTMFrameHandler
+          catchFrameCode' <- getClosure stackSnapshot# index offsetStgCatchSTMFrameCode
+          handler' <- getClosure stackSnapshot# index offsetStgCatchSTMFrameHandler
           pure $
             CatchStmFrame
               { info_tbl = info,
