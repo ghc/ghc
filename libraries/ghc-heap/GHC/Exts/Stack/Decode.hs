@@ -212,7 +212,6 @@ getClosure stackSnapshot# index relativeOffset =
       (# s1, ptr #) ->
         (# s1, Box ptr #)
 
--- TODO: Inline later
 -- | Iterator state for stack decoding
 data StackFrameIter =
   -- | Represents a closure on the stack
@@ -287,6 +286,8 @@ decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size =
         getIndex (SfiClosure _ i) = i
         getIndex (SfiPrimitive _ i) = i
 
+-- TODO: (auto-) format the code
+-- TODO: Check all functions with two WordOffsets? Can't it be one?
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
   do
@@ -296,7 +297,7 @@ decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
     let bitmapWords = [bitmap | size > 0]
     decodeBitmaps stackSnapshot# index relativePayloadOffset bitmapWords size
 
-unpackStackFrame :: (StackSnapshot, WordOffset) -> IO StackFrame
+unpackStackFrame :: StackFrameLocation -> IO StackFrame
 unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
   info <- getInfoTableOnStack stackSnapshot# index
   unpackStackFrame' info
@@ -390,6 +391,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
                 alt_code = alt_code'
               }
         CATCH_STM_FRAME -> do
+          -- TODO: Move `getBoxedClosureData =<<` to `getClosure`
           catchFrameCode' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchSTMFrameCode
           handler' <- getBoxedClosureData =<< getClosure stackSnapshot# index offsetStgCatchSTMFrameHandler
           pure $
@@ -400,6 +402,7 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
               }
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
+-- TODO: Duplicate
 getClosureDataFromHeapObject
     :: a
     -- ^ Heap object to decode.
@@ -435,21 +438,18 @@ intToWord# i = int2Word# (toInt# i)
 wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 
--- | Decode `StackSnapshot` to a Closure
---
--- Due to the use of `Box` this decoding is lazy. The first decoded closure is
--- the representation of the @StgStack@ itself.
-decodeStack :: StackSnapshot -> IO StgStackClosure
-decodeStack (StackSnapshot stack#) =
-  unpackStack stack#
+type StackFrameLocation = (StackSnapshot, WordOffset)
 
-unpackStack :: StackSnapshot# -> IO StgStackClosure
-unpackStack stack#  = do
+-- | Decode `StackSnapshot` to a `StgStackClosure`
+--
+-- The return value is the representation of the @StgStack@ itself.
+decodeStack :: StackSnapshot -> IO StgStackClosure
+decodeStack (StackSnapshot stack#) = do
   info <- getInfoTableForStack stack#
   (stack_size', stack_dirty', stack_marking') <- getStackFields stack#
   case tipe info of
     STACK -> do
-      let sfis = decodeStackToBoxes (StackSnapshot stack#)
+      let sfis = stackFrameLocations (StackSnapshot stack#)
       stack' <- mapM unpackStackFrame sfis
       pure $
         StgStackClosure
@@ -461,12 +461,12 @@ unpackStack stack#  = do
           }
     _ -> error $ "Expected STACK closure, got " ++ show info
   where
-    decodeStackToBoxes :: StackSnapshot -> [(StackSnapshot, WordOffset)]
-    decodeStackToBoxes s =
+     stackFrameLocations :: StackSnapshot -> [StackFrameLocation]
+     stackFrameLocations s =
       (stackHead s)
         : go (advanceStackFrameIter (fst (stackHead s)) (snd (stackHead s)))
       where
-        go :: Maybe (StackSnapshot, WordOffset) -> [(StackSnapshot, WordOffset)]
+        go :: Maybe StackFrameLocation -> [StackFrameLocation]
         go Nothing = []
         go (Just r) = r : go (advanceStackFrameIter (fst r) (snd r))
 
