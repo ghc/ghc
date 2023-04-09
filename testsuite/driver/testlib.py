@@ -2378,21 +2378,22 @@ def normalise_errmsg(s: str) -> str:
     # normalise slashes, minimise Windows/Unix filename differences
     s = re.sub('\\\\', '/', s)
 
+    # hpc executable is given ghc suffix
+    s = re.sub('hpc-ghc', 'hpc', s)
+
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
     # Remove platform prefix (e.g. javascript-unknown-ghcjs) for cross-compiled tools
     # (ghc, ghc-pkg, unlit, etc.)
-    s = re.sub('\\w+-\\w+-\\w+-ghc', 'ghc', s)
-    s = re.sub('\\w+-\\w+-\\w+-unlit', 'unlit', s)
+    s = re.sub('\\w+(-\\w+)*-ghc', 'ghc', s)
+    s = re.sub('\\w+(-\\w+)*-unlit', 'unlit', s)
 
     # On windows error messages can mention versioned executables
     s = re.sub('ghc-[0-9.]+', 'ghc', s)
     s = re.sub('runghc-[0-9.]+', 'runghc', s)
     s = re.sub('hpc-[0-9.]+', 'hpc', s)
     s = re.sub('ghc-pkg-[0-9.]+', 'ghc-pkg', s)
-    # hpc executable is given ghc suffix
-    s = re.sub('hpc-ghc', 'hpc', s)
 
     # Error messages sometimes contain ghc-bignum implementation package
     s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
@@ -2434,9 +2435,6 @@ def normalise_errmsg(s: str) -> str:
     s = re.sub('.*strip: changes being made to the file will invalidate the code signature in.*\n','',s)
     # clang may warn about unused argument when used as assembler
     s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
-
-    # strip the cross prefix if any
-    s = re.sub('^([^:]+-)?ghc:', 'ghc:', s)
 
     return s
 
@@ -2531,7 +2529,7 @@ def normalise_output( s: str ) -> str:
     s = re.sub('.*warning: argument unused during compilation:.*\n', '', s)
 
     # strip the cross prefix if any
-    s = re.sub('^([^:]+-)?ghc:', 'ghc:', s)
+    s = re.sub('\\w+(-\\w+)*-ghc', 'ghc', s)
 
     return s
 
