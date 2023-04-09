@@ -6,7 +6,6 @@
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
@@ -26,9 +25,9 @@ import GHC.Exts
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
+import GHC.Exts.Heap.Decode
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Stack.Constants
-import GHC.Exts.Heap.Decode
 import GHC.IO (IO (..))
 import GHC.Stack.CloneStack
 import GHC.Word
@@ -43,38 +42,30 @@ simplified perspective) at any time.
 
 The array of closures inside an StgStack (that makeup the execution stack; the
 stack frames) is moved as bare memory by the garbage collector. References
-(pointers) to stack frames are not updated.
+(pointers) to stack frames are not updated by the garbage collector.
 
 As the StgStack closure is moved as whole, the relative offsets inside it stay
 the same. (Though, the absolute addresses change!)
 
-Stack frame iterator
+Decoding
 ====================
 
-A stack frame iterator (StackFrameIter) deals with the mentioned challenges
-regarding garbage collected memory. It consists of the StgStack itself and the
-mentioned offset (or index) where needed.
+Stack frames are defined by their `StackSnapshot#` (`StgStack*` in RTS) and
+their relative offset. This tuple is described by `StackFrameLocation`.
 
-It has three constructors:
+`StackFrame` is an ADT for decoded stack frames. Where it points to heap located
+closures or primitive Words (in bitmap encoded payloads), `Closure` is used to
+describe the referenced payload.
 
-- SfiStackClosure: Represents the StgStack closure itself. As stacks are chained
-  by underflow frames, there can be multiple StgStack closures per logical
-  stack.
+The decoding happens in two phases:
 
-- SfiClosure: Represents a closure on the stack. The location on the stack is
-  defined by the StgStack itself and an index into it.
+1. The whole stack is decoded into `StackFrameLocation`s.
 
-- SfiPrimitive: Is structurally equivalent to SfiClosure, but represents a data
-  Word on the stack. These appear as payloads to closures with bitmap layout.
-  From the RTS-perspective, there's no information about the concrete type of
-  the Word. So, it's just handled as Word in further processing.
+2. All `StackFrameLocation`s are decoded into `StackFrame`s which have
+`Closure`s as fields/references.
 
-The `stackSnapshot# :: !StackSnapshot#` field represents a StgStack closure. It
-is updated by the garbage collector when the stack closure is moved.
-
-The relative offset (index) describes the location of a stack frame on the
-stack. As stack frames come in various sizes, one cannot simply step over the
-stack array with a constant offset.
+`StackSnapshot#` parameters are updated by the garbage collector and thus safe
+to hand around.
 
 The head of the stack frame array has offset (index) 0. To traverse the stack
 frames the latest stack frame's offset is incremented by the closure size. The
@@ -83,16 +74,24 @@ unit of the offset is machine words (32bit or 64bit.)
 Boxes
 =====
 
-As references into the stack frame array aren't updated by the garbage collector,
-creating a Box with a pointer (address) to a stack frame would break as soon as
-the StgStack closure is moved.
+`Closure` makes extensive usage of `Box`es. Unfortunately, we cannot simply apply the
+same here:
 
-To deal with this another kind of Box is introduced: A StackFrameBox contains a
-stack frame iterator (StackFrameIter).
+- Bitmap encoded payloads can be either words or closure pointers.
 
-Heap-represented closures referenced by stack frames are boxed the usual way,
-with a Box that contains a pointer to the closure as it's payload. In
-Haskell-land this means: A Box which contains the closure.
+- Underflow frames point to `StgStack` closures.
+
+These three cases are hard to encode in boxes. Additionally, introducing new box
+types would break existing box usages. Thus, the stack is decoded unboxed, while
+the referenced `Closure`s use boxes. This seems to be a good compromise between
+optimization (with boxes) and simplicity (by leaving out the mentioned special
+cases.)
+
+IO
+==
+
+Unfortunately, ghc-heap decodes `Closure`s in `IO`. This leads to `StackFrames`
+also being decoded in `IO`, due to references to `Closure`s.
 
 Technical details
 =================
@@ -109,14 +108,18 @@ Technical details
   This keeps the code very portable.
 -}
 
-foreign import prim "getUnderflowFrameNextChunkzh" getUnderflowFrameNextChunk# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
+foreign import prim "getUnderflowFrameNextChunkzh"
+  getUnderflowFrameNextChunk# ::
+    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 
 getUnderflowFrameNextChunk :: StackSnapshot# -> WordOffset -> IO StackSnapshot
 getUnderflowFrameNextChunk stackSnapshot# index = IO $ \s ->
   case getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index) s of
     (# s1, stack# #) -> (# s1, StackSnapshot stack# #)
 
-foreign import prim "getWordzh" getWord# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
+foreign import prim "getWordzh"
+  getWord# ::
+    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
 
 getWord :: StackSnapshot# -> WordOffset -> IO Word
 getWord stackSnapshot# index = IO $ \s ->
@@ -170,9 +173,13 @@ getInfoTableForStack stackSnapshot# =
   peekItbl $
     Ptr (getStackInfoTableAddr# stackSnapshot#)
 
-foreign import prim "getBoxedClosurezh" getBoxedClosure# :: StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
+foreign import prim "getBoxedClosurezh"
+  getBoxedClosure# ::
+    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
 
-foreign import prim "getStackFieldszh" getStackFields# :: StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Word32#, Word8#, Word8# #)
+foreign import prim "getStackFieldszh"
+  getStackFields# ::
+    StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Word32#, Word8#, Word8# #)
 
 getStackFields :: StackSnapshot# -> IO (Word32, Word8, Word8)
 getStackFields stackSnapshot# = IO $ \s ->
@@ -182,13 +189,15 @@ getStackFields stackSnapshot# = IO $ \s ->
 
 -- | Get an interator starting with the top-most stack frame
 stackHead :: StackSnapshot -> (StackSnapshot, WordOffset)
-stackHead (StackSnapshot s#) = (StackSnapshot s#, 0 ) -- GHC stacks are never empty
+stackHead (StackSnapshot s#) = (StackSnapshot s#, 0) -- GHC stacks are never empty
 
 -- | Advance to the next stack frame (if any)
 --
 -- The last `Int#` in the result tuple is meant to be treated as bool
 -- (has_next).
-foreign import prim "advanceStackFrameIterzh" advanceStackFrameIter# :: StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
+foreign import prim "advanceStackFrameIterzh"
+  advanceStackFrameIter# ::
+    StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
 
 -- | Advance iterator to the next stack frame (if any)
 advanceStackFrameIter :: StackSnapshot -> WordOffset -> Maybe (StackSnapshot, WordOffset)
@@ -203,21 +212,22 @@ advanceStackFrameIter (StackSnapshot stackSnapshot#) index =
 
 getClosure :: StackSnapshot# -> WordOffset -> IO Closure
 getClosure stackSnapshot# index =
-  (IO $ \s ->
-    case getBoxedClosure#
-      stackSnapshot#
-      (wordOffsetToWord# index)
-      s of
-      (# s1, ptr #) ->
-        (# s1, Box ptr #)
-  ) >>= getBoxedClosureData
+  ( IO $ \s ->
+      case getBoxedClosure#
+        stackSnapshot#
+        (wordOffsetToWord# index)
+        s of
+        (# s1, ptr #) ->
+          (# s1, Box ptr #)
+  )
+    >>= getBoxedClosureData
 
 -- | Iterator state for stack decoding
-data StackFrameIter =
-  -- | Represents a closure on the stack
-  SfiClosure !StackSnapshot# !WordOffset
-  -- | Represents a primitive word on the stack
-  | SfiPrimitive !StackSnapshot# !WordOffset
+data StackFrameIter
+  = -- | Represents a closure on the stack
+    SfiClosure !StackSnapshot# !WordOffset
+  | -- | Represents a primitive word on the stack
+    SfiPrimitive !StackSnapshot# !WordOffset
 
 decodeLargeBitmap :: LargeBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
@@ -238,13 +248,13 @@ decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
     sizeofByteArray :: ByteArray# -> Int
     sizeofByteArray arr# = I# (sizeofByteArray# arr#)
 
-decodeBitmaps :: StackSnapshot# -> WordOffset ->  [Word] -> Word -> IO [Closure]
+decodeBitmaps :: StackSnapshot# -> WordOffset -> [Word] -> Word -> IO [Closure]
 decodeBitmaps stackSnapshot# index bitmapWords size =
   let bes = wordsToBitmapEntries index bitmapWords size
    in mapM toBitmapPayload bes
   where
     toBitmapPayload :: StackFrameIter -> IO Closure
-    toBitmapPayload (SfiPrimitive stack# i)  = do
+    toBitmapPayload (SfiPrimitive stack# i) = do
       w <- getWord stack# i
       pure $ UnknownTypeWordSizedPrimitive w
     toBitmapPayload (SfiClosure stack# i) = getClosure stack# i
@@ -260,7 +270,7 @@ decodeBitmaps stackSnapshot# index bitmapWords size =
             Just sfi' ->
               entries
                 ++ wordsToBitmapEntries
-                  ((getIndex sfi') + 1)
+                  (getIndex sfi' + 1)
                   bs
                   subtractDecodedBitmapWord
             _ -> error "This should never happen! Recursion ended not in base case."
@@ -298,7 +308,7 @@ decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
     decodeBitmaps stackSnapshot# (index + relativePayloadOffset) bitmapWords size
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
-unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
+unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
   info <- getInfoTableOnStack stackSnapshot# index
   unpackStackFrame' info
   where
@@ -402,25 +412,26 @@ unpackStackFrame ((StackSnapshot stackSnapshot#), index) = do
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- TODO: Duplicate
-getClosureDataFromHeapObject
-    :: a
-    -- ^ Heap object to decode.
-    -> IO Closure
-    -- ^ Heap representation of the closure.
+getClosureDataFromHeapObject ::
+  -- | Heap object to decode.
+  a ->
+  -- | Heap representation of the closure.
+  IO Closure
 getClosureDataFromHeapObject x = do
-    case unpackClosure# x of
-        (# infoTableAddr, heapRep, pointersArray #) -> do
-            let infoTablePtr = Ptr infoTableAddr
-                ptrList = [case indexArray# pointersArray i of
-                                (# ptr #) -> Box ptr
-                            | I# i <- [0..I# (sizeofArray# pointersArray) - 1]
-                            ]
+  case unpackClosure# x of
+    (# infoTableAddr, heapRep, pointersArray #) -> do
+      let infoTablePtr = Ptr infoTableAddr
+          ptrList =
+            [ case indexArray# pointersArray i of
+                (# ptr #) -> Box ptr
+              | I# i <- [0 .. I# (sizeofArray# pointersArray) - 1]
+            ]
 
-            infoTable <- peekItbl infoTablePtr
-            case tipe infoTable of
-                TSO   -> pure $ UnsupportedClosure infoTable
-                STACK -> pure $ UnsupportedClosure infoTable
-                _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
+      infoTable <- peekItbl infoTablePtr
+      case tipe infoTable of
+        TSO -> pure $ UnsupportedClosure infoTable
+        STACK -> pure $ UnsupportedClosure infoTable
+        _ -> getClosureDataFromHeapRep heapRep infoTablePtr ptrList
 
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
@@ -460,15 +471,16 @@ decodeStack (StackSnapshot stack#) = do
           }
     _ -> error $ "Expected STACK closure, got " ++ show info
   where
-     stackFrameLocations :: StackSnapshot -> [StackFrameLocation]
-     stackFrameLocations s =
-      (stackHead s)
-        : go (advanceStackFrameIter (fst (stackHead s)) (snd (stackHead s)))
+    stackFrameLocations :: StackSnapshot -> [StackFrameLocation]
+    stackFrameLocations s =
+      stackHead s
+        : go (uncurry advanceStackFrameIter (stackHead s))
       where
         go :: Maybe StackFrameLocation -> [StackFrameLocation]
         go Nothing = []
-        go (Just r) = r : go (advanceStackFrameIter (fst r) (snd r))
+        go (Just r) = r : go (uncurry advanceStackFrameIter r)
 
 #else
 module GHC.Exts.Stack.Decode where
+import GHC.Base (IO)
 #endif
