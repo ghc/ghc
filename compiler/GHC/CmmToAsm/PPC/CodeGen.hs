@@ -1223,6 +1223,7 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
             AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
       Amode addr_reg addr_code <- getAmodeIndex addr
       lbl_retry <- getBlockIdNat
+      lbl_done <- getBlockIdNat
       return $ n_code `appOL` addr_code
         `appOL` toOL [ HWSYNC
                      , BCC ALWAYS lbl_retry Nothing
@@ -1232,6 +1233,9 @@ genCCall _ (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                      , instr
                      , STC fmt reg_dst addr_reg
                      , BCC NE lbl_retry (Just False)
+                     , BCC ALWAYS lbl_done Nothing
+
+                     , NEWBLOCK lbl_done
                      , ISYNC
                      ]
          where
