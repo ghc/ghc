@@ -8,7 +8,8 @@ import Prelude
 cmmTopCodeGen
         :: RawCmmDecl
         -> NatM [NatCmmDecl RawCmmStatics Instr]
-cmmTopCodeGen _ = error "TODO: cmmTopCodeGen"
+-- "TODO: cmmTopCodeGen"
+cmmTopCodeGen _ = pure []
 
 generateJumpTableForInstr :: Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)

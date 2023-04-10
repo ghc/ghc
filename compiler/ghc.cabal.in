@@ -261,6 +261,12 @@ Library
         GHC.CmmToAsm.Reg.Liveness
         GHC.CmmToAsm.Reg.Target
         GHC.CmmToAsm.Reg.Utils
+        GHC.CmmToAsm.RISCV64
+        GHC.CmmToAsm.RISCV64.CodeGen
+        GHC.CmmToAsm.RISCV64.Instr
+        GHC.CmmToAsm.RISCV64.Ppr
+        GHC.CmmToAsm.RISCV64.RegInfo
+        GHC.CmmToAsm.RISCV64.Regs
         GHC.CmmToAsm.Types
         GHC.CmmToAsm.Utils
         GHC.CmmToAsm.X86

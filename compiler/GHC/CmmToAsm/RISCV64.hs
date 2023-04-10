@@ -38,7 +38,7 @@ ncgRISCV64 config = NcgImpl
    , invertCondBranches        = \_ _ -> id
    }
 
--- | Instruction instance for powerpc
+-- | Instruction instance for RISC-V 64bit
 instance Instruction RISCV64.Instr where
    regUsageOfInstr     = RISCV64.regUsageOfInstr
    patchRegsOfInstr    = RISCV64.patchRegsOfInstr
