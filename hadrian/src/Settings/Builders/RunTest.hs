@@ -315,6 +315,7 @@ getTestArgs = do
     bindir          <- expr $ getBinaryDirectory (testCompiler args)
     compiler        <- expr $ getCompilerPath (testCompiler args)
     globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
+    cross_prefix    <- expr crossPrefix
     -- the testsuite driver will itself tell us if we need to generate the docs target
     -- So we always pass the haddock path if the hadrian configuration allows us to build
     -- docs
@@ -354,12 +355,12 @@ getTestArgs = do
                            Just verbosity -> Just $ "--verbose=" ++ verbosity
         wayArgs      = map ("--way=" ++) (testWays args)
         compilerArg  = ["--config", "compiler=" ++ show (compiler)]
-        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg" <.> exe)]
+        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- (cross_prefix <> "ghc-pkg") <.> exe)]
         haddockArg   = if haveDocs
-          then [ "--config", "haddock=" ++ show (bindir -/- "haddock" <.> exe) ]
+          then [ "--config", "haddock=" ++ show (bindir -/- (cross_prefix <> "haddock") <.> exe) ]
           else [ "--config", "haddock=" ]
-        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps" <.> exe)]
-        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc" <.> exe)]
+        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- (cross_prefix <> "hp2ps") <.> exe)]
+        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- (cross_prefix <> "hpc") <.> exe)]
         inTreeArg    = [ "-e", "config.in_tree_compiler=" ++
           show (isInTreeCompiler (testCompiler args) || testHasInTreeFiles args) ]
 
