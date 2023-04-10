@@ -11,9 +11,8 @@ import Control.Monad
 import GHC.Cmm.Dataflow.Block
 import GHC.Data.OrdList
 import GHC.Cmm.Dataflow
-import GHC.Driver.Ppr (showPprUnsafe)
+import GHC.Driver.Ppr ( showPprUnsafe, showSDocUnsafe )
 import GHC.Plugins (Outputable)
-import GHC.Driver.Ppr (showSDocUnsafe)
 import GHC.Utils.Outputable
 
 -- | Don't try to compile all GHC Cmm files in the beginning.
