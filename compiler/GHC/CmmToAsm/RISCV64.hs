@@ -19,10 +19,10 @@ import qualified GHC.CmmToAsm.RISCV64.CodeGen as RISCV64
 import qualified GHC.CmmToAsm.RISCV64.Regs    as RISCV64
 import qualified GHC.CmmToAsm.RISCV64.RegInfo as RISCV64
 
-ncgRISCV64 :: NCGConfig -> NcgImpl RawCmmStatics RISCV64.Instr RISCV64.JumpDest
-ncgRISCV64 config = NcgImpl
+ncgRISCV64 :: Bool -> NCGConfig -> NcgImpl RawCmmStatics RISCV64.Instr RISCV64.JumpDest
+ncgRISCV64 no_empty_asm config = NcgImpl
    { ncgConfig                 = config
-   , cmmTopCodeGen             = RISCV64.cmmTopCodeGen
+   , cmmTopCodeGen             = if no_empty_asm then RISCV64.cmmTopCodeGen else RISCV64.emptyCmmTopCodeGen
    , generateJumpTableForInstr = RISCV64.generateJumpTableForInstr
    , getJumpDestBlockId        = RISCV64.getJumpDestBlockId
    , canShortcut               = RISCV64.canShortcut

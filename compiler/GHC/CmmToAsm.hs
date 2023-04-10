@@ -148,10 +148,10 @@ import System.IO
 import System.Directory ( getCurrentDirectory )
 
 --------------------
-nativeCodeGen :: forall a . Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle -> UniqSupply
+nativeCodeGen :: forall a . Bool -> Logger -> ToolSettings -> NCGConfig -> ModLocation -> Handle -> UniqSupply
               -> Stream IO RawCmmGroup a
               -> IO a
-nativeCodeGen logger ts config modLoc h us cmms
+nativeCodeGen no_empty_asm logger ts config modLoc h us cmms
  = let platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
@@ -167,7 +167,7 @@ nativeCodeGen logger ts config modLoc h us cmms
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
-      ArchRISCV64   -> nCG' (RISCV64.ncgRISCV64 config)
+      ArchRISCV64   -> nCG' (RISCV64.ncgRISCV64 no_empty_asm config)
       ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"

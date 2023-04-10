@@ -10,10 +10,22 @@ import GHC.Utils.Outputable
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Instr
+import GHC.Cmm
 
 data Instr
     -- comment pseudo-op
     = COMMENT FastString
+    -- some static data spat out during code
+    -- generation.  Will be extracted before
+    -- pretty-printing.
+    | LDATA   Section RawCmmStatics
+
+    -- start a new basic block.  Useful during
+    -- codegen, removed later.  Preceding
+    -- instruction should be a jump, as per the
+    -- invariants for a BasicBlock (see Cmm).
+    | NEWBLOCK BlockId
+
 
 allocMoreStack ::
    Int

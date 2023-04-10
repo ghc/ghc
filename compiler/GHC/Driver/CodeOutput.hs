@@ -63,6 +63,8 @@ import System.IO
 import Data.Set (Set)
 import qualified Data.Set as Set
 
+import GHC.Data.EnumSet as EnumSet
+
 {-
 ************************************************************************
 *                                                                      *
@@ -199,9 +201,10 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
   ncg_uniqs <- mkSplitUniqSupply 'n'
   debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
   let ncg_config = initNCGConfig dflags this_mod
+      no_empty_asm = EnumSet.member Opt_NoEmptyAsm (generalFlags dflags)
   {-# SCC "OutputAsm" #-} doOutput filenm $
     \h -> {-# SCC "NativeCodeGen" #-}
-      nativeCodeGen logger (toolSettings dflags) ncg_config location h ncg_uniqs cmm_stream
+      nativeCodeGen no_empty_asm logger (toolSettings dflags) ncg_config location h ncg_uniqs cmm_stream
 
 {-
 ************************************************************************

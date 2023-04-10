@@ -297,6 +297,7 @@ import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Driver.Flags (GeneralFlag(Opt_NoEmptyAsm))
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2913,6 +2914,8 @@ dynamic_flags_deps = [
       (NoArg (setGeneralFlag Opt_DistinctConstructorTables))
   , make_ord_flag defGhcFlag "finfo-table-map"
       (NoArg (setGeneralFlag Opt_InfoTableMap))
+  , make_ord_flag defGhcFlag "fno-empty-fasm"
+      (NoArg (setGeneralFlag Opt_NoEmptyAsm))
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))

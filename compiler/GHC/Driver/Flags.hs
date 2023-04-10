@@ -217,6 +217,7 @@ data GeneralFlag
 
    | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
+   | Opt_NoEmptyAsm
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
