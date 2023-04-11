@@ -16,19 +16,19 @@ runInteractiveProcess (char *const * args,
 {
         // N.B. We don't use %p here since the rendering of this varies across
         // libc implementations
-        printf("%" PRIx64 "\n", (uint64_t) args);
-        printf("%" PRIx64 "\n", (uint64_t) workingDirectory);
-        printf("%" PRIx64 "\n", (uint64_t) environment);
+        printf("%" PRIxPTR "\n", (uintptr_t) args);
+        printf("%" PRIxPTR "\n", (uintptr_t) workingDirectory);
+        printf("%" PRIxPTR "\n", (uintptr_t) environment);
         printf("%x\n", fdStdIn);
         printf("%x\n", fdStdOut);
         printf("%x\n", fdStdErr);
-        printf("%" PRIx64 "\n", (uint64_t) pfdStdInput);
-        printf("%" PRIx64 "\n", (uint64_t) pfdStdOutput);
-        printf("%" PRIx64 "\n", (uint64_t) pfdStdError);
-        printf("%" PRIx64 "\n", (uint64_t) childGroup);
-        printf("%" PRIx64 "\n", (uint64_t) childUser);
+        printf("%" PRIxPTR "\n", (uintptr_t) pfdStdInput);
+        printf("%" PRIxPTR "\n", (uintptr_t) pfdStdOutput);
+        printf("%" PRIxPTR "\n", (uintptr_t) pfdStdError);
+        printf("%" PRIxPTR "\n", (uintptr_t) childGroup);
+        printf("%" PRIxPTR "\n", (uintptr_t) childUser);
         printf("%x\n", flags);
-        printf("%" PRIx64 "\n", (uint64_t) failed_doing);
+        printf("%" PRIxPTR "\n", (uintptr_t) failed_doing);
         return 0;
 }
 
