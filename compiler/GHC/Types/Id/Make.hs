@@ -2002,10 +2002,15 @@ Note that this happens *after* unfoldings are exposed in the interface file.
 This is crucial: otherwise, we could import an unfolding in which
 'nospec' has been inlined (= erased), and we would lose the benefit.
 
-'nospec' is used in the implementation of 'withDict': we insert 'nospec'
-so that the typeclass specialiser doesn't assume any two evidence terms
-of the same type are equal. See Note [withDict] in GHC.Tc.Instance.Class,
-and see test case T21575b for an example.
+'nospec' is used:
+
+* In the implementation of 'withDict': we insert 'nospec' so that the
+  typeclass specialiser doesn't assume any two evidence terms of the
+  same type are equal. See Note [withDict] in GHC.Tc.Instance.Class,
+  and see test case T21575b for an example.
+
+* To defeat the specialiser when we have incoherent instances.
+  See Note [Coherence and specialisation: overview] in GHC.Core.InstEnv.
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
