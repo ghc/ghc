@@ -205,8 +205,8 @@ class Read a where
   -- | The method 'readList' is provided to allow the programmer to
   -- give a specialised way of parsing lists of values.
   -- For example, this is used by the predefined 'Read' instance of
-  -- the 'Char' type, where values of type 'String' should be are
-  -- expected to use double quotes, rather than square brackets.
+  -- the 'Char' type, where values of type 'String' are expected to
+  -- use double quotes, rather than square brackets.
   readList     :: ReadS [a]
 
   -- | Proposed replacement for 'readsPrec' using new-style parsers (GHC only).
