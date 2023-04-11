@@ -222,25 +222,25 @@ checkNoCurrentCCS rhs = do
    opts <- getStgPprOpts
    let rhs' = pprStgRhs opts rhs
    case rhs of
-      StgRhsClosure _ ccs _ _ _
+      StgRhsClosure _ ccs _ _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ rhs')
-      StgRhsCon ccs _ _ _ _
+      StgRhsCon ccs _ _ _ _ _
          | isCurrentCCS ccs
          -> addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ rhs')
       _ -> return ()
 
 lintStgRhs :: (OutputablePass a, BinderP a ~ Id) => GenStgRhs a -> LintM ()
 
-lintStgRhs (StgRhsClosure _ _ _ [] expr)
+lintStgRhs (StgRhsClosure _ _ _ [] expr _)
   = lintStgExpr expr
 
-lintStgRhs (StgRhsClosure _ _ _ binders expr)
+lintStgRhs (StgRhsClosure _ _ _ binders expr _)
   = addLoc (LambdaBodyOf binders) $
       addInScopeVars binders $
         lintStgExpr expr
 
-lintStgRhs rhs@(StgRhsCon _ con _ _ args) = do
+lintStgRhs rhs@(StgRhsCon _ con _ _ args _) = do
     opts <- getStgPprOpts
     when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$

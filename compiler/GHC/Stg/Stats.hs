@@ -122,10 +122,10 @@ statBinding top (StgRec pairs)
 
 statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 
-statRhs top (_, StgRhsCon _ _ _ _ _)
+statRhs top (_, StgRhsCon _ _ _ _ _ _)
   = countOne (ConstructorBinds top)
 
-statRhs top (_, StgRhsClosure _ _ u _ body)
+statRhs top (_, StgRhsClosure _ _ u _ body _)
   = statExpr body `combineSE`
     countOne (
       case u of

@@ -290,10 +290,10 @@ genToplevelDecl i rhs = do
 
 genToplevelConEntry :: Id -> CgStgRhs -> G JStat
 genToplevelConEntry i rhs = case rhs of
-   StgRhsCon _cc con _mu _ts _args
+   StgRhsCon _cc con _mu _ts _args _typ
      | isDataConWorkId i
        -> genSetConInfo i con (stgRhsLive rhs) -- NoSRT
-   StgRhsClosure _ _cc _upd_flag _args _body
+   StgRhsClosure _ _cc _upd_flag _args _body _typ
      | Just dc <- isDataConWorkId_maybe i
        -> genSetConInfo i dc (stgRhsLive rhs) -- srt
    _ -> pure mempty
@@ -321,11 +321,11 @@ mkDataEntry = ValExpr $ JFunc [] returnStack
 genToplevelRhs :: Id -> CgStgRhs -> G JStat
 -- general cases:
 genToplevelRhs i rhs = case rhs of
-  StgRhsCon cc con _mu _tys args -> do
+  StgRhsCon cc con _mu _tys args _typ -> do
     ii <- identForId i
     allocConStatic ii cc con args
     return mempty
-  StgRhsClosure _ext cc _upd_flag {- srt -} args body -> do
+  StgRhsClosure _ext cc _upd_flag {- srt -} args body typ -> do
     {-
       algorithm:
        - collect all Id refs that are in the global id cache
@@ -335,7 +335,7 @@ genToplevelRhs i rhs = case rhs of
     -}
     eid@(TxtI eidt) <- identForEntryId i
     (TxtI idt)   <- identForId i
-    body <- genBody (initExprCtx i) i R2 args body
+    body <- genBody (initExprCtx i) R2 args body typ
     global_occs <- globalOccs (jsSaturate (Just "ghcjs_tmp_sat_") body)
     let lidents = map global_ident global_occs
     let lids    = map global_id    global_occs

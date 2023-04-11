@@ -691,7 +691,7 @@ coreToStgRhs (bndr, rhs) = do
     return (mkStgRhs bndr new_rhs)
 
 -- Represents the RHS of a binding for use with mk(Top)StgRhs.
-data PreStgRhs = PreStgRhs [Id] StgExpr -- The [Id] is empty for thunks
+data PreStgRhs = PreStgRhs [Id] StgExpr Type -- The [Id] is empty for thunks
 
 -- Convert the RHS of a binding from Core to STG. This is a wrapper around
 -- coreToStgExpr that can handle value lambdas.
@@ -699,7 +699,7 @@ coreToPreStgRhs :: HasDebugCallStack => CoreExpr -> CtsM PreStgRhs
 coreToPreStgRhs expr
   = extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $
     do { body' <- coreToStgExpr body
-       ; return (PreStgRhs args' body') }
+       ; return (PreStgRhs args' body' (exprType body)) }
   where
    (args, body) = myCollectBinders expr
    args'        = filterStgBinders args
@@ -713,13 +713,13 @@ mkTopStgRhs CoreToStgOpts
   { coreToStg_platform = platform
   , coreToStg_ExternalDynamicRefs = opt_ExternalDynamicRefs
   , coreToStg_AutoSccsOnIndividualCafs = opt_AutoSccsOnIndividualCafs
-  } this_mod ccs bndr (PreStgRhs bndrs rhs)
+  } this_mod ccs bndr (PreStgRhs bndrs rhs typ)
   | not (null bndrs)
   = -- The list of arguments is non-empty, so not CAF
     ( StgRhsClosure noExtFieldSilent
                     dontCareCCS
                     ReEntrant
-                    bndrs rhs
+                    bndrs rhs typ
     , ccs )
 
   -- After this point we know that `bndrs` is empty,
@@ -730,19 +730,19 @@ mkTopStgRhs CoreToStgOpts
   = -- CorePrep does this right, but just to make sure
     assertPpr (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
               (ppr bndr $$ ppr con $$ ppr args)
-    ( StgRhsCon dontCareCCS con mn ticks args, ccs )
+    ( StgRhsCon dontCareCCS con mn ticks args typ, ccs )
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | opt_AutoSccsOnIndividualCafs
   = ( StgRhsClosure noExtFieldSilent
                     caf_ccs
-                    upd_flag [] rhs
+                    upd_flag [] rhs typ
     , collectCC caf_cc caf_ccs ccs )
 
   | otherwise
   = ( StgRhsClosure noExtFieldSilent
                     all_cafs_ccs
-                    upd_flag [] rhs
+                    upd_flag [] rhs typ
     , ccs )
 
   where
@@ -766,12 +766,12 @@ mkTopStgRhs CoreToStgOpts
 -- Generate a non-top-level RHS. Cost-centre is always currentCCS,
 -- see Note [Cost-centre initialization plan].
 mkStgRhs :: Id -> PreStgRhs -> StgRhs
-mkStgRhs bndr (PreStgRhs bndrs rhs)
+mkStgRhs bndr (PreStgRhs bndrs rhs typ)
   | not (null bndrs)
   = StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant
-                  bndrs rhs
+                  bndrs rhs typ
 
   -- After this point we know that `bndrs` is empty,
   -- so this is not a function binding
@@ -782,15 +782,15 @@ mkStgRhs bndr (PreStgRhs bndrs rhs)
     StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant -- ignored for LNE
-                  [] rhs
+                  [] rhs typ
 
   | StgConApp con mn args _ <- unticked_rhs
-  = StgRhsCon currentCCS con mn ticks args
+  = StgRhsCon currentCCS con mn ticks args typ
 
   | otherwise
   = StgRhsClosure noExtFieldSilent
                   currentCCS
-                  upd_flag [] rhs
+                  upd_flag [] rhs typ
   where
     (ticks, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
 

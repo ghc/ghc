@@ -241,10 +241,10 @@ tagSkeletonBinding is_lne body_skel body_arg_occs (StgRec pairs)
         bndr' = BindsClosure bndr (bndr `elemVarSet` scope_occs)
 
 tagSkeletonRhs :: Id -> CgStgRhs -> (Skeleton, IdSet, LlStgRhs)
-tagSkeletonRhs _ (StgRhsCon ccs dc mn ts args)
-  = (NilSk, mkArgOccs args, StgRhsCon ccs dc mn ts args)
-tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body)
-  = (rhs_skel, body_arg_occs, StgRhsClosure fvs ccs upd bndrs' body')
+tagSkeletonRhs _ (StgRhsCon ccs dc mn ts args typ)
+  = (NilSk, mkArgOccs args, StgRhsCon ccs dc mn ts args typ)
+tagSkeletonRhs bndr (StgRhsClosure fvs ccs upd bndrs body typ)
+  = (rhs_skel, body_arg_occs, StgRhsClosure fvs ccs upd bndrs' body' typ)
   where
     bndrs' = map BoringBinder bndrs
     (body_skel, body_arg_occs, body') = tagSkeletonExpr body
@@ -330,7 +330,7 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
       -- We don't lift updatable thunks or constructors
       any_memoized = any is_memoized_rhs rhss
       is_memoized_rhs StgRhsCon{} = True
-      is_memoized_rhs (StgRhsClosure _ _ upd _ _) = isUpdatable upd
+      is_memoized_rhs (StgRhsClosure _ _ upd _ _ _) = isUpdatable upd
 
       -- Don't lift binders occurring as arguments. This would result in complex
       -- argument expressions which would have to be given a name, reintroducing
@@ -399,7 +399,7 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
 
 rhsLambdaBndrs :: LlStgRhs -> [Id]
 rhsLambdaBndrs StgRhsCon{} = []
-rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _) = map binderInfoBndr bndrs
+rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _ _) = map binderInfoBndr bndrs
 
 -- | The size in words of a function closure closing over the given 'Id's,
 -- including the header.

@@ -350,8 +350,8 @@ schemeR fvs (nm, rhs)
 -- underlying expression
 
 collect :: CgStgRhs -> ([Var], CgStgExpr)
-collect (StgRhsClosure _ _ _ args body) = (args, body)
-collect (StgRhsCon _cc dc cnum _ticks args) = ([], StgConApp dc cnum args [])
+collect (StgRhsClosure _ _ _ args body _) = (args, body)
+collect (StgRhsCon _cc dc cnum _ticks args _typ) = ([], StgConApp dc cnum args [])
 
 schemeR_wrk
     :: [Id]
@@ -534,7 +534,7 @@ schemeE d s p e@(StgOpApp {}) = schemeT d s p e
 schemeE d s p (StgLetNoEscape xlet bnd body)
    = schemeE d s p (StgLet xlet bnd body)
 schemeE d s p (StgLet _xlet
-                      (StgNonRec x (StgRhsCon _cc data_con _cnum _ticks args))
+                      (StgNonRec x (StgRhsCon _cc data_con _cnum _ticks args _typ))
                       body)
    = do -- Special case for a non-recursive let whose RHS is a
         -- saturated constructor application.

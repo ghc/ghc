@@ -37,14 +37,14 @@ type BcPrepM a = State BcPrepM_State a
 
 bcPrepRHS :: StgRhs -> BcPrepM StgRhs
 -- explicitly match all constructors so we get a warning if we miss any
-bcPrepRHS (StgRhsClosure fvs cc upd args (StgTick bp@Breakpoint{} expr)) = do
+bcPrepRHS (StgRhsClosure fvs cc upd args (StgTick bp@Breakpoint{} expr) typ) = do
   {- If we have a breakpoint directly under an StgRhsClosure we don't
      need to introduce a new binding for it.
    -}
   expr' <- bcPrepExpr expr
-  pure (StgRhsClosure fvs cc upd args (StgTick bp expr'))
-bcPrepRHS (StgRhsClosure fvs cc upd args expr) =
-  StgRhsClosure fvs cc upd args <$> bcPrepExpr expr
+  pure (StgRhsClosure fvs cc upd args (StgTick bp expr') typ)
+bcPrepRHS (StgRhsClosure fvs cc upd args expr typ) =
+  StgRhsClosure fvs cc upd args <$> bcPrepExpr expr <*> pure typ
 bcPrepRHS con@StgRhsCon{} = pure con
 
 bcPrepExpr :: StgExpr -> BcPrepM StgExpr
@@ -59,6 +59,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             ReEntrant
                                             []
                                             expr'
+                                            tick_ty
                              )
           letExp = StgLet noExtFieldSilent bnd (StgApp id [])
       pure letExp
@@ -71,6 +72,7 @@ bcPrepExpr (StgTick bp@(Breakpoint tick_ty _ _) rhs)
                                             ReEntrant
                                             [voidArgId]
                                             expr'
+                                            tick_ty
                              )
       pure $ StgLet noExtFieldSilent bnd (StgApp id [StgVarArg realWorldPrimId])
 bcPrepExpr (StgTick tick rhs) =
@@ -110,10 +112,10 @@ bcPrepBind (StgRec bnds) =
 bcPrepSingleBind :: (Id, StgRhs) -> (Id, StgRhs)
 -- If necessary, modify this Id and body to protect not-necessarily-lifted join points.
 -- See Note [Not-necessarily-lifted join points], step 2.
-bcPrepSingleBind (x, StgRhsClosure ext cc upd_flag args body)
+bcPrepSingleBind (x, StgRhsClosure ext cc upd_flag args body typ)
   | isNNLJoinPoint x
   = ( protectNNLJoinPointId x
-    , StgRhsClosure ext cc upd_flag (args ++ [voidArgId]) body)
+    , StgRhsClosure ext cc upd_flag (args ++ [voidArgId]) body typ)
 bcPrepSingleBind bnd = bnd
 
 bcPrepTopLvl :: StgTopBinding -> BcPrepM StgTopBinding

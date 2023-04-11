@@ -483,14 +483,14 @@ unariseBinding rho (StgRec xrhss)
   = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
 
 unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
+unariseRhs rho (StgRhsClosure ext ccs update_flag args expr typ)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
-       return (StgRhsClosure ext ccs update_flag args1 expr')
+       return (StgRhsClosure ext ccs update_flag args1 expr' typ)
 
-unariseRhs rho (StgRhsCon ccs con mu ts args)
+unariseRhs rho (StgRhsCon ccs con mu ts args typ)
   = assert (not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
-    return (StgRhsCon ccs con mu ts (unariseConArgs rho args))
+    return (StgRhsCon ccs con mu ts (unariseConArgs rho args) typ)
 
 --------------------------------------------------------------------------------
 

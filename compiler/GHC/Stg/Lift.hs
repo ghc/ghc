@@ -198,20 +198,20 @@ liftRhs
   -- as lambda binders, discarding all free vars.
   -> LlStgRhs
   -> LiftM OutStgRhs
-liftRhs mb_former_fvs rhs@(StgRhsCon ccs con mn ts args)
+liftRhs mb_former_fvs rhs@(StgRhsCon ccs con mn ts args typ)
   = assertPpr (isNothing mb_former_fvs)
               (text "Should never lift a constructor"
                $$ pprStgRhs panicStgPprOpts rhs) $
-    StgRhsCon ccs con mn ts <$> traverse liftArgs args
-liftRhs Nothing (StgRhsClosure _ ccs upd infos body) =
+    StgRhsCon ccs con mn ts <$> traverse liftArgs args <*> pure typ
+liftRhs Nothing (StgRhsClosure _ ccs upd infos body typ) =
   -- This RHS wasn't lifted.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' ->
-    StgRhsClosure noExtFieldSilent ccs upd bndrs' <$> liftExpr body
-liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body) =
+    StgRhsClosure noExtFieldSilent ccs upd bndrs' <$> liftExpr body <*> pure typ
+liftRhs (Just former_fvs) (StgRhsClosure _ ccs upd infos body typ) =
   -- This RHS was lifted. Insert extra binders for @former_fvs@.
   withSubstBndrs (map binderInfoBndr infos) $ \bndrs' -> do
     let bndrs'' = dVarSetElems former_fvs ++ bndrs'
-    StgRhsClosure noExtFieldSilent ccs upd bndrs'' <$> liftExpr body
+    StgRhsClosure noExtFieldSilent ccs upd bndrs'' <$> liftExpr body <*> pure typ
 
 liftArgs :: InStgArg -> LiftM OutStgArg
 liftArgs a@(StgLitArg _) = pure a

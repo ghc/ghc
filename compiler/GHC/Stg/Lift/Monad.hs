@@ -197,12 +197,12 @@ collectFloats = go (0 :: Int) []
 -- | Omitting this makes for strange closure allocation schemes that crash the
 -- GC.
 removeRhsCCCS :: GenStgRhs pass -> GenStgRhs pass
-removeRhsCCCS (StgRhsClosure ext ccs upd bndrs body)
+removeRhsCCCS (StgRhsClosure ext ccs upd bndrs body typ)
   | isCurrentCCS ccs
-  = StgRhsClosure ext dontCareCCS upd bndrs body
-removeRhsCCCS (StgRhsCon ccs con mu ts args)
+  = StgRhsClosure ext dontCareCCS upd bndrs body typ
+removeRhsCCCS (StgRhsCon ccs con mu ts args typ)
   | isCurrentCCS ccs
-  = StgRhsCon dontCareCCS con mu ts args
+  = StgRhsCon dontCareCCS con mu ts args typ
 removeRhsCCCS rhs = rhs
 
 -- | The analysis monad consists of the following 'RWST' components:

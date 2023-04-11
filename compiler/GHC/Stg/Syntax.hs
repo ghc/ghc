@@ -393,6 +393,7 @@ data GenStgRhs pass
         [BinderP pass]     -- ^ arguments; if empty, then not a function;
                            --   as above, order is important.
         (GenStgExpr pass)  -- ^ body
+        Type               -- ^ result type
 
 {-
 An example may be in order.  Consider:
@@ -422,6 +423,7 @@ important):
         ConstructorNumber
         [StgTickish]
         [StgArg]        -- Args
+        Type            -- Type, for rewriting to an StgRhsClosure
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
 -- returns 'empty'.
@@ -439,14 +441,14 @@ noExtFieldSilent = NoExtFieldSilent
 -- implications on build time...
 
 stgRhsArity :: StgRhs -> Int
-stgRhsArity (StgRhsClosure _ _ _ bndrs _)
+stgRhsArity (StgRhsClosure _ _ _ bndrs _ _)
   = assert (all isId bndrs) $ length bndrs
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon {}) = 0
 
 freeVarsOfRhs :: (XRhsClosure pass ~ DIdSet) => GenStgRhs pass -> DIdSet
-freeVarsOfRhs (StgRhsCon _ _ _ _ args) = mkDVarSet [ id | StgVarArg id <- args ]
-freeVarsOfRhs (StgRhsClosure fvs _ _ _ _) = fvs
+freeVarsOfRhs (StgRhsCon _ _ _ _ args _) = mkDVarSet [ id | StgVarArg id <- args ]
+freeVarsOfRhs (StgRhsClosure fvs _ _ _ _ _) = fvs
 
 {-
 ************************************************************************
@@ -892,14 +894,14 @@ instance Outputable AltType where
 
 pprStgRhs :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc
 pprStgRhs opts rhs = case rhs of
-   StgRhsClosure ext cc upd_flag args body
+   StgRhsClosure ext cc upd_flag args body _
       -> hang (hsep [ if stgSccEnabled opts then ppr cc else empty
                     , ppUnlessOption sdocSuppressStgExts (ppr ext)
                     , char '\\' <> ppr upd_flag, brackets (interppSP args)
                     ])
               4 (pprStgExpr opts body)
 
-   StgRhsCon cc con mid _ticks args
+   StgRhsCon cc con mid _ticks args _
       -> hcat [ if stgSccEnabled opts then ppr cc <> space else empty
               , case mid of
                   NoNumber -> empty
