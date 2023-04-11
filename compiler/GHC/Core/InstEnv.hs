@@ -849,8 +849,10 @@ Here are the moving parts:
 
 * `GHC.HsToCore.Binds.dsHsWrapper` desugars the evidence application (f d) into
   (nospec f d) if `d` is incoherent. It has to do a dependency analysis to
-  determine transitive dependencies, but we need to do that anway.
+  determine transitive dependencies, but we need to do that anyway.
   See Note [Desugaring incoherent evidence] in GHC.HsToCore.Binds.
+
+  See also Note [nospecId magic] in GHC.Types.Id.Make.
 -}
 
 type DFunInstType = Maybe Type
