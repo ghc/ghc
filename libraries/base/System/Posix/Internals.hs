@@ -36,7 +36,9 @@ import Foreign.C
 -- import Data.Bits
 import Data.Maybe
 
+#if !defined(HTYPE_TCFLAG_T)
 import System.IO.Error
+#endif
 
 import GHC.Base
 import GHC.Num
@@ -457,13 +459,8 @@ foreign import capi unsafe "HsBase.h _lseeki64"
 foreign import capi unsafe "HsBase.h _access"
    c_access :: CString -> CInt -> IO CInt
 
-#if !defined(HAVE_CHMOD)
-c_chmod :: CString -> CMode -> IO CInt
-c_chmod _ _ = ioError (ioeSetLocation unsupportedOperation "_chmod")
-#else
 foreign import ccall unsafe "HsBase.h _chmod"
    c_chmod :: CString -> CMode -> IO CInt
-#endif
 
 foreign import capi unsafe "HsBase.h _close"
    c_close :: CInt -> IO CInt
@@ -471,19 +468,11 @@ foreign import capi unsafe "HsBase.h _close"
 foreign import capi unsafe "HsBase.h _creat"
    c_creat :: CString -> CMode -> IO CInt
 
-#if !defined(HAVE_DUP)
-c_dup :: CInt -> IO CInt
-c_dup _ = ioError (ioeSetLocation unsupportedOperation "_dup")
-
-c_dup2 :: CInt -> CInt -> IO CInt
-c_dup2 _ _ = ioError (ioeSetLocation unsupportedOperation "_dup2")
-#else
 foreign import ccall unsafe "HsBase.h _dup"
    c_dup :: CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h _dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
-#endif
 
 foreign import capi unsafe "HsBase.h _isatty"
    c_isatty :: CInt -> IO CInt
@@ -521,13 +510,8 @@ foreign import capi unsafe "HsBase.h write"
 foreign import capi safe "HsBase.h write"
    c_safe_write :: CInt -> Ptr Word8 -> CSize -> IO CSsize
 
-#if !defined(HAVE_PIPE)
-c_pipe :: Ptr CInt -> IO CInt
-c_pipe _ = ioError (ioeSetLocation unsupportedOperation "pipe")
-#else
 foreign import ccall unsafe "HsBase.h pipe"
    c_pipe :: Ptr CInt -> IO CInt
-#endif
 
 foreign import capi unsafe "unistd.h lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
@@ -535,13 +519,8 @@ foreign import capi unsafe "unistd.h lseek"
 foreign import ccall unsafe "HsBase.h access"
    c_access :: CString -> CInt -> IO CInt
 
-#if !defined(HAVE_CHMOD)
-c_chmod :: CString -> CMode -> IO CInt
-c_chmod _ _ = ioError (ioeSetLocation unsupportedOperation "chmod")
-#else
 foreign import ccall unsafe "HsBase.h chmod"
    c_chmod :: CString -> CMode -> IO CInt
-#endif
 
 foreign import ccall unsafe "HsBase.h close"
    c_close :: CInt -> IO CInt
@@ -549,19 +528,11 @@ foreign import ccall unsafe "HsBase.h close"
 foreign import ccall unsafe "HsBase.h creat"
    c_creat :: CString -> CMode -> IO CInt
 
-#if !defined(HAVE_DUP)
-c_dup :: CInt -> IO CInt
-c_dup _ = ioError (ioeSetLocation unsupportedOperation "dup")
-
-c_dup2 :: CInt -> CInt -> IO CInt
-c_dup2 _ _ = ioError (ioeSetLocation unsupportedOperation "dup2")
-#else
 foreign import ccall unsafe "HsBase.h dup"
    c_dup :: CInt -> IO CInt
 
 foreign import ccall unsafe "HsBase.h dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
-#endif
 
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
@@ -572,13 +543,8 @@ foreign import ccall unsafe "HsBase.h unlink"
 foreign import capi unsafe "HsBase.h utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 
-#if !defined(HAVE_GETPID)
-c_getpid :: IO CPid
-c_getpid = pure 1
-#else
 foreign import ccall unsafe "HsBase.h getpid"
    c_getpid :: IO CPid
-#endif
 #endif
 
 foreign import ccall unsafe "HsBase.h __hscore_stat"
