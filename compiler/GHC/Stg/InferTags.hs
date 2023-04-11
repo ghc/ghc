@@ -481,7 +481,7 @@ inferTagBind in_env (StgRec pairs)
 initSig :: forall p. (Id, GenStgRhs p) -> TagSig
 -- Initial signature for the fixpoint loop
 initSig (_bndr, StgRhsCon {})               = TagSig TagTagged
-initSig (bndr, StgRhsClosure _ _ _ _ _) =
+initSig (bndr, StgRhsClosure _ _ _ _ _ _) =
   fromMaybe defaultSig (idTagSig_maybe bndr)
   where defaultSig = (TagSig TagTagged)
 
@@ -516,13 +516,13 @@ inferTagRhs :: forall p.
   -> TagEnv p -- ^
   -> GenStgRhs p -- ^
   -> (TagSig, GenStgRhs 'InferTaggedBinders)
-inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body)
+inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body typ)
   | isDeadEndId bnd_id && (notNull) bndrs
   -- See Note [Bottom functions are TagTagged]
-  = (TagSig TagTagged, StgRhsClosure ext cc upd out_bndrs body')
+  = (TagSig TagTagged, StgRhsClosure ext cc upd out_bndrs body' typ)
   | otherwise
   = --pprTrace "inferTagRhsClosure" (ppr (_top, _grp_ids, env,info')) $
-    (TagSig info', StgRhsClosure ext cc upd out_bndrs body')
+    (TagSig info', StgRhsClosure ext cc upd out_bndrs body' typ)
   where
     out_bndrs
       | Just marks <- idCbvMarks_maybe bnd_id
@@ -553,11 +553,11 @@ inferTagRhs bnd_id in_env (StgRhsClosure ext cc upd bndrs body)
               | otherwise -> TagDunno
       in (id, TagSig tag)
 
-inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args)
+inferTagRhs _ env _rhs@(StgRhsCon cc con cn ticks args typ)
 -- Constructors, which have untagged arguments to strict fields
 -- become thunks. We encode this by giving changing RhsCon nodes the info TagDunno
   = --pprTrace "inferTagRhsCon" (ppr grp_ids) $
-    (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args)
+    (TagSig (inferConTag env con args), StgRhsCon cc con cn ticks args typ)
 
 -- Adjust let semantics to the targeted backend.
 -- See Note [Tag inference for interpreted code]

@@ -1,4 +1,4 @@
---
+
 -- Copyright (c) 2019 Andreas Klebinger
 --
 
@@ -343,7 +343,7 @@ rewriteBinds top_flag b@(StgRec binds) =
 -- Rewrite a RHS
 rewriteRhs :: (Id,TagSig) -> InferStgRhs
            -> RM (TgStgRhs)
-rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
+rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args typ) = {-# SCC rewriteRhs_ #-} do
     -- pprTraceM "rewriteRhs" (ppr _id)
 
     -- Look up the nodes representing the constructor arguments.
@@ -359,7 +359,7 @@ rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs
     let evalArgs = [v | StgVarArg v <- needsEval] :: [Id]
 
     if (null evalArgs)
-        then return $! (StgRhsCon ccs con cn ticks args)
+        then return $! (StgRhsCon ccs con cn ticks args typ)
         else do
             --assert not (isTaggedSig tagSig)
             -- pprTraceM "CreatingSeqs for " $ ppr _id <+> ppr node_id
@@ -373,11 +373,11 @@ rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs
             fvs <- fvArgs args
             -- lcls <- getFVs
             -- pprTraceM "RhsClosureConversion" (ppr (StgRhsClosure fvs ccs ReEntrant [] $! conExpr) $$ text "lcls:" <> ppr lcls)
-            return $! (StgRhsClosure fvs ccs ReEntrant [] $! conExpr)
-rewriteRhs _binding (StgRhsClosure fvs ccs flag args body) = do
+            return $! (StgRhsClosure fvs ccs ReEntrant [] $! conExpr) typ
+rewriteRhs _binding (StgRhsClosure fvs ccs flag args body typ) = do
     withBinders NotTopLevel args $
         withClosureLcls fvs $
-            StgRhsClosure fvs ccs flag (map fst args) <$> rewriteExpr body
+            StgRhsClosure fvs ccs flag (map fst args) <$> rewriteExpr body <*> pure typ
         -- return (closure)
 
 fvArgs :: [StgArg] -> RM DVarSet

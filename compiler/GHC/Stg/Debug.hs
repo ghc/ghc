@@ -68,7 +68,7 @@ collectStgBind (StgRec pairs) = do
     return (StgRec es)
 
 collectStgRhs :: Id -> StgRhs -> M StgRhs
-collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
+collectStgRhs bndr (StgRhsClosure ext cc us bs e t) = do
   let
     name = idName bndr
     -- If the name has a span, use that initially as the source position in-case
@@ -78,10 +78,10 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e)= do
                   _ -> id
   e' <- with_span $ collectExpr e
   recordInfo bndr e'
-  return $ StgRhsClosure ext cc us bs e'
-collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args) = do
+  return $ StgRhsClosure ext cc us bs e' t
+collectStgRhs _bndr (StgRhsCon cc dc _mn ticks args typ) = do
   n' <- numberDataCon dc ticks
-  return (StgRhsCon cc dc n' ticks args)
+  return (StgRhsCon cc dc n' ticks args typ)
 
 
 recordInfo :: Id -> StgExpr -> M ()

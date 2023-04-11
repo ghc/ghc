@@ -250,14 +250,14 @@ cgRhs :: Id
                                   -- (see above)
                )
 
-cgRhs id (StgRhsCon cc con mn _ts args)
+cgRhs id (StgRhsCon cc con mn _ts args _typ)
   = withNewTickyCounterCon id con mn $
     buildDynCon id mn True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 {- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
-cgRhs id (StgRhsClosure fvs cc upd_flag args body)
+cgRhs id (StgRhsClosure fvs cc upd_flag args body _typ)
   = do
     profile <- getProfile
     check_tags <- stgToCmmDoTagCheck <$> getStgToCmmConfig

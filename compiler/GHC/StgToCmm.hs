@@ -199,12 +199,12 @@ cgTopBinding logger tmpfs cfg = \case
 cgTopRhs :: StgToCmmConfig -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
 
-cgTopRhs cfg _rec bndr (StgRhsCon _cc con mn _ts args)
+cgTopRhs cfg _rec bndr (StgRhsCon _cc con mn _ts args _typ)
   = cgTopRhsCon cfg bndr con mn (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
-cgTopRhs cfg rec bndr (StgRhsClosure fvs cc upd_flag args body)
+cgTopRhs cfg rec bndr (StgRhsClosure fvs cc upd_flag args body _typ)
   = assertPpr (isEmptyDVarSet fvs) (text "fvs:" <> ppr fvs) $   -- There should be no free variables
     cgTopRhsClosure (stgToCmmPlatform cfg) rec bndr cc upd_flag args body
 

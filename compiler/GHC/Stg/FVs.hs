@@ -255,13 +255,13 @@ exprFVs env = go
 
 
 rhsFVs :: Env -> StgRhs -> (CgStgRhs, TopFVs, LocalFVs)
-rhsFVs env (StgRhsClosure _ ccs uf bs body)
+rhsFVs env (StgRhsClosure _ ccs uf bs body typ)
   | (body', top_fvs, lcl_fvs) <- exprFVs (addLocals bs env) body
   , let lcl_fvs' = delDVarSetList lcl_fvs bs
-  = (StgRhsClosure lcl_fvs' ccs uf bs body', top_fvs, lcl_fvs')
-rhsFVs env (StgRhsCon ccs dc mu ts bs)
+  = (StgRhsClosure lcl_fvs' ccs uf bs body' typ, top_fvs, lcl_fvs')
+rhsFVs env (StgRhsCon ccs dc mu ts bs typ)
   | (top_fvs, lcl_fvs) <- argsFVs env bs
-  = (StgRhsCon ccs dc mu ts bs, top_fvs, lcl_fvs)
+  = (StgRhsCon ccs dc mu ts bs typ, top_fvs, lcl_fvs)
 
 argsFVs :: Env -> [StgArg] -> (TopFVs, LocalFVs)
 argsFVs env = foldl' f (emptyVarSet, emptyDVarSet)

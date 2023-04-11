@@ -64,11 +64,11 @@ sinkPgm' m pgm =
 alwaysSinkable :: CgStgBinding -> [(Id, CgStgExpr)]
 alwaysSinkable (StgRec {})       = []
 alwaysSinkable (StgNonRec b rhs) = case rhs of
-  StgRhsClosure _ _ _ _ e@(StgLit l)
+  StgRhsClosure _ _ _ _ e@(StgLit l) _
     | isSmallSinkableLit l
     , isLocal b
     -> [(b,e)]
-  StgRhsCon _ccs dc cnum _ticks as@[StgLitArg l]
+  StgRhsCon _ccs dc cnum _ticks as@[StgLitArg l] _typ
     | isSmallSinkableLit l
     , isLocal b
     , isUnboxableCon dc
@@ -88,9 +88,9 @@ onceSinkable _m (StgNonRec b rhs)
   , isLocal b = [(b,e)]
   where
     getSinkable = \case
-      StgRhsCon _ccs dc cnum _ticks args -> Just (StgConApp dc cnum args [])
-      StgRhsClosure _ _ _ _ e@(StgLit{}) -> Just e
-      _                                  -> Nothing
+      StgRhsCon _ccs dc cnum _ticks args _typ -> Just (StgConApp dc cnum args [])
+      StgRhsClosure _ _ _ _ e@(StgLit{}) _typ -> Just e
+      _                                       -> Nothing
 onceSinkable _ _ = []
 
 -- | collect all idents used only once in an argument at the top level
@@ -115,8 +115,8 @@ collectArgsTop = \case
 
 collectArgsTopRhs :: CgStgRhs -> [Id]
 collectArgsTopRhs = \case
-  StgRhsCon _ccs _dc _mu _ticks args -> concatMap collectArgsA args
-  StgRhsClosure {}                   -> []
+  StgRhsCon _ccs _dc _mu _ticks args _typ -> concatMap collectArgsA args
+  StgRhsClosure {}                        -> []
 
 -- | fold over all Id in StgArg in the AST
 collectArgs :: CgStgBinding -> [Id]
@@ -126,8 +126,8 @@ collectArgs = \case
 
 collectArgsR :: CgStgRhs -> [Id]
 collectArgsR = \case
-  StgRhsClosure _x0 _x1 _x2 _x3 e     -> collectArgsE e
-  StgRhsCon _ccs _con _mu _ticks args -> concatMap collectArgsA args
+  StgRhsClosure _x0 _x1 _x2 _x3 e _typ     -> collectArgsE e
+  StgRhsCon _ccs _con _mu _ticks args _typ -> concatMap collectArgsA args
 
 collectArgsAlt :: CgStgAlt -> [Id]
 collectArgsAlt alt = collectArgsE (alt_rhs alt)
@@ -171,7 +171,7 @@ topSortDecls _m binds = rest ++ nr'
     keys = mkUniqSet (map node_key vs)
     getV e@(StgNonRec b _) = DigraphNode e b []
     getV _                 = error "topSortDecls: getV, unexpected binding"
-    collectDeps (StgNonRec b (StgRhsCon _cc _dc _cnum _ticks args)) =
+    collectDeps (StgNonRec b (StgRhsCon _cc _dc _cnum _ticks args _typ)) =
       [ (i, b) | StgVarArg i <- args, i `elementOfUniqSet` keys ]
     collectDeps _ = []
     g = graphFromVerticesAndAdjacency vs (concatMap collectDeps nr)

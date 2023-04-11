@@ -252,7 +252,7 @@ pprStgAltShort opts GenStgAlt{alt_con=con, alt_bndrs=args, alt_rhs=expr} =
   ppr con <+> sep (map ppr args) <+> text "->" <+> pprStgExprShort opts expr
 
 pprStgRhsShort :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc
-pprStgRhsShort opts (StgRhsClosure _ext _cc upd_flag args body) =
+pprStgRhsShort opts (StgRhsClosure _ext _cc upd_flag args body _typ) =
   hang (hsep [ char '\\' <> ppr upd_flag, brackets (interppSP args) ])
        4 (pprStgExprShort opts body)
 pprStgRhsShort opts rhs = pprStgRhs opts rhs

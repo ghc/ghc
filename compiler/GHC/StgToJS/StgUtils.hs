@@ -67,8 +67,8 @@ bindingRefs u = \case
 
 rhsRefs :: UniqFM Id CgStgExpr -> CgStgRhs -> Set Id
 rhsRefs u = \case
-  StgRhsClosure _ _ _ _ body       -> exprRefs u body
-  StgRhsCon _ccs d _mu _ticks args -> l s [ i | AnId i <- dataConImplicitTyThings d] <> l (argRefs u) args
+  StgRhsClosure _ _ _ _ body _       -> exprRefs u body
+  StgRhsCon _ccs d _mu _ticks args _ -> l s [ i | AnId i <- dataConImplicitTyThings d] <> l (argRefs u) args
 
 exprRefs :: UniqFM Id CgStgExpr -> CgStgExpr -> Set Id
 exprRefs u = \case
@@ -97,7 +97,7 @@ hasExport bnd =
     StgNonRec b e -> isExportedBind b e
     StgRec bs     -> any (uncurry isExportedBind) bs
   where
-    isExportedBind _i (StgRhsCon _cc con _ _ _) =
+    isExportedBind _i (StgRhsCon _cc con _ _ _ _) =
       getUnique con == staticPtrDataConKey
     isExportedBind _ _ = False
 
@@ -152,8 +152,8 @@ stgBindRhsLive b =
 
 stgRhsLive :: CgStgRhs -> LiveVars
 stgRhsLive = \case
-  StgRhsClosure _ _ _ args e -> delDVarSetList (stgExprLive True e) args
-  StgRhsCon _ _ _ _ args     -> unionDVarSets (map stgArgLive args)
+  StgRhsClosure _ _ _ args e _ -> delDVarSetList (stgExprLive True e) args
+  StgRhsCon _ _ _ _ args _     -> unionDVarSets (map stgArgLive args)
 
 stgArgLive :: StgArg -> LiveVars
 stgArgLive = \case
@@ -189,8 +189,8 @@ bindees = \case
   StgRec bs      -> map fst bs
 
 isUpdatableRhs :: CgStgRhs -> Bool
-isUpdatableRhs (StgRhsClosure _ _ u _ _) = isUpdatable u
-isUpdatableRhs _                         = False
+isUpdatableRhs (StgRhsClosure _ _ u _ _ _) = isUpdatable u
+isUpdatableRhs _                           = False
 
 stgLneLive' :: CgStgBinding -> [Id]
 stgLneLive' b = filter (`notElem` bindees b) (stgLneLive b)
@@ -241,9 +241,9 @@ inspectInlineBinding v = \case
 
 inspectInlineRhs :: UniqSet Id -> Id -> CgStgRhs -> UniqSet Id
 inspectInlineRhs v i = \case
-  StgRhsCon{}                     -> addOneToUniqSet v i
-  StgRhsClosure _ _ ReEntrant _ _ -> addOneToUniqSet v i
-  _                               -> v
+  StgRhsCon{}                       -> addOneToUniqSet v i
+  StgRhsClosure _ _ ReEntrant _ _ _ -> addOneToUniqSet v i
+  _                                 -> v
 
 isInlineForeignCall :: ForeignCall -> Bool
 isInlineForeignCall (CCall (CCallSpec _ cconv safety)) =

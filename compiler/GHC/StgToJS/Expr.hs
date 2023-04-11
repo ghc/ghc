@@ -74,7 +74,6 @@ import GHC.Core.Type hiding (typeSize)
 import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable (ppr, renderWithContext, defaultSDocContext)
 import qualified Control.Monad.Trans.State.Strict as State
 import GHC.Data.FastString
@@ -148,7 +147,7 @@ genBind ctx bndr =
      ctx' = ctxClearLneFrame ctx
 
      assign :: Id -> CgStgRhs -> G (Maybe JStat)
-     assign b (StgRhsClosure _ _ccs {-[the_fv]-} _upd [] expr)
+     assign b (StgRhsClosure _ _ccs {-[the_fv]-} _upd [] expr _typ)
        | let strip = snd . stripStgTicksTop (not . tickishIsCode)
        , StgCase (StgApp scrutinee []) _ (AlgAlt _) [GenStgAlt (DataAlt _) params sel_expr] <- strip expr
        , StgApp selectee [] <- strip sel_expr
@@ -168,7 +167,7 @@ genBind ctx bndr =
              ([tgt], [the_fvj]) -> return $ Just
                (tgt ||= ApplExpr (var ("h$c_sel_" <> mkFastString sel_tag)) [the_fvj])
              _ -> panic "genBind.assign: invalid size"
-     assign b (StgRhsClosure _ext _ccs _upd [] expr)
+     assign b (StgRhsClosure _ext _ccs _upd [] expr _typ)
        | snd (isInlineExpr (ctxEvaluatedIds ctx) expr) = do
            d   <- declVarsForId b
            tgt <- varsForId b
@@ -180,9 +179,9 @@ genBind ctx bndr =
 
      addEvalRhs c [] = c
      addEvalRhs c ((b,r):xs)
-       | StgRhsCon{} <- r                       = addEvalRhs (ctxAssertEvaluated b c) xs
-       | (StgRhsClosure _ _ ReEntrant _ _) <- r = addEvalRhs (ctxAssertEvaluated b c) xs
-       | otherwise                              = addEvalRhs c xs
+       | StgRhsCon{} <- r                         = addEvalRhs (ctxAssertEvaluated b c) xs
+       | (StgRhsClosure _ _ ReEntrant _ _ _) <- r = addEvalRhs (ctxAssertEvaluated b c) xs
+       | otherwise                                = addEvalRhs c xs
 
 genBindLne :: HasDebugCallStack
            => ExprCtx
@@ -223,7 +222,7 @@ genBindLne ctx bndr = do
 -- is initially set to null, changed to h$blackhole when the thunk is being evaluated.
 --
 genEntryLne :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
-genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
+genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
   resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
       vars        = ctxLneFrameVars ctx
@@ -238,7 +237,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
               ])
          | otherwise = mempty
   lvs  <- popLneFrame True payloadSize ctx
-  body <- genBody ctx i R1 args body
+  body <- genBody ctx R1 args body typ
   ei@(TxtI eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
   let f = JFunc [] (bh <> lvs <> body)
@@ -251,7 +250,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body) =
                 CIStackFrame
                 sr
   emitToplevel (ei ||= toJExpr f)
-genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
+genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
   ei@(TxtI _eii) <- identForEntryId i
   -- di <- varForDataConWorker con
@@ -265,12 +264,12 @@ genEntryLne ctx i (StgRhsCon cc con _mu _ticks args) = resetSlots $ do
 -- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
 genEntry _ _i StgRhsCon {} = return ()
-genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body) = resetSlots $ do
+genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) = resetSlots $ do
   let live = stgLneLiveExpr rhs -- error "fixme" -- probably find live vars in body
   ll    <- loadLiveFun live
   llv   <- verifyRuntimeReps live
   upd   <- genUpdFrame upd_flag i
-  body  <- genBody entryCtx i R2 args body
+  body  <- genBody entryCtx R2 args body typ
   ei@(TxtI eii) <- identForEntryId i
   et    <- genEntryType args
   setcc <- ifProfiling $
@@ -302,12 +301,12 @@ genEntryType args0 = do
 -- | Generate the body of an object
 genBody :: HasDebugCallStack
          => ExprCtx
-         -> Id
          -> StgReg
          -> [Id]
          -> CgStgExpr
+         -> Type
          -> G JStat
-genBody ctx i startReg args e = do
+genBody ctx startReg args e typ = do
   -- load arguments into local variables
   la <- do
     args' <- concatMapM genIdArgI args
@@ -318,7 +317,7 @@ genBody ctx i startReg args e = do
 
   -- compute PrimReps and their number of slots required to return the result of
   -- i applied to args.
-  let res_vars = resultSize args i
+  let res_vars = resultSize typ
 
   -- compute typed expressions for each slot and assign registers
   let go_var regs = \case
@@ -359,22 +358,12 @@ genBody ctx i startReg args e = do
 -- In case of failure to determine the type, we default to LiftedRep as it's
 -- probably what it is.
 --
-resultSize :: HasDebugCallStack => [Id] -> Id -> [(PrimRep, Int)]
-resultSize args i = result
+resultSize :: HasDebugCallStack => Type -> [(PrimRep, Int)]
+resultSize ty = result
   where
     result       = result_reps `zip` result_slots
     result_slots = fmap (slotCount . primRepSize) result_reps
-    result_reps  = trim_args (unwrapType (idType i)) (length args)
-
-    trim_args t 0 = typePrimRep t
-    trim_args t n
-      | Just (_af, _mult, arg, res) <- splitFunTy_maybe t
-      , nargs <- length (typePrimRepArgs arg)
-      , assert (n >= nargs) True
-      = trim_args (unwrapType res) (n - nargs)
-      | otherwise
-      = pprTrace "result_type: not a function type, assume LiftedRep" (ppr t)
-          [LiftedRep]
+    result_reps  = typePrimRep ty
 
 -- | Ensure that the set of identifiers has valid 'RuntimeRep's. This function
 -- returns a no-op when 'csRuntimeAssert' in 'StgToJSConfig' is False.
@@ -540,19 +529,19 @@ allocCls dynMiddle xs = do
       toCl (i, StgRhsCon cc con []) = do
       ii <- identForId i
       Left <$> (return (decl ii) <> allocCon ii con cc []) -}
-    toCl (i, StgRhsCon cc con _mui _ticjs [a]) | isUnboxableCon con = do
+    toCl (i, StgRhsCon cc con _mui _ticjs [a] _typ) | isUnboxableCon con = do
       ii <- identForId i
       ac <- allocCon ii con cc =<< genArg a
       pure (Left (decl ii <> ac))
 
     -- dynamics
-    toCl (i, StgRhsCon cc con _mu _ticks ar) =
+    toCl (i, StgRhsCon cc con _mu _ticks ar _typ) =
       -- fixme do we need to handle unboxed?
       Right <$> ((,,,) <$> identForId i
                        <*> varForDataConWorker con
                        <*> concatMapM genArg ar
                        <*> pure cc)
-    toCl (i, cl@(StgRhsClosure _ext cc _upd_flag _args _body)) =
+    toCl (i, cl@(StgRhsClosure _ext cc _upd_flag _args _body _typ)) =
       let live = stgLneLiveExpr cl
       in  Right <$> ((,,,) <$> identForId i
                        <*> varForEntryId i
