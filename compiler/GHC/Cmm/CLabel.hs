@@ -1384,6 +1384,7 @@ For a data constructor (such as Just or Nothing), we have:
                    ordinary Haskell function of arity 1 that
                    allocates a (Just x) box:
                       Just = \x -> Just x
+    Just_entry:    The entry code for the worker function
     Just_closure:  The closure for this worker
 
     Nothing_closure: a statically allocated closure for Nothing

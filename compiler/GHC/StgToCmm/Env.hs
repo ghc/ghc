@@ -151,7 +151,7 @@ getCgIdInfo id
               in return $
                   litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
           else
-              cgLookupPanic id -- Bug
+              cgLookupPanic id -- Bug, id is neither in local binds nor is external
         }}}
 
 -- | Retrieve cg info for a name if it already exists.
