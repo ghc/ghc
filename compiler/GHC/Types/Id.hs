@@ -697,6 +697,8 @@ idCallArity id = callArityInfo (idInfo id)
 setIdCallArity :: Id -> Arity -> Id
 setIdCallArity id arity = modifyIdInfo (`setCallArityInfo` arity) id
 
+-- | This function counts all arguments post-unarisation, which includes
+-- arguments with no runtime representation -- see Note [Unarisation and arity]
 idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 

@@ -111,8 +111,8 @@ import Data.List( find )
 import Language.Haskell.Syntax.Module.Name
 
 {-
-Data constructor representation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Data constructor representation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following Haskell data type declaration
 
         data T = T !Int ![Int]
@@ -213,7 +213,7 @@ Note [Data constructor workers and wrappers]
 
 * The wrapper (if it exists) takes dcOrigArgTys as its arguments.
   The worker takes dataConRepArgTys as its arguments
-  If the worker is absent, dataConRepArgTys is the same as dcOrigArgTys
+  If the wrapper is absent, dataConRepArgTys is the same as dcOrigArgTys
 
 * The 'NoDataConRep' case of DataConRep is important. Not only is it
   efficient, but it also ensures that the wrapper is replaced by the
@@ -586,11 +586,21 @@ Function call 'dataConKindEqSpec' returns [k'~k]
 
 Note [DataCon arities]
 ~~~~~~~~~~~~~~~~~~~~~~
-dcSourceArity does not take constraints into account,
-but dcRepArity does.  For example:
+A `DataCon`'s source arity and core representation arity may differ:
+`dcSourceArity` does not take constraints into account, but `dcRepArity` does.
+
+The additional arguments taken into account by `dcRepArity` include quantified
+dictionaries and coercion arguments, lifted and unlifted (despite the unlifted
+coercion arguments having a zero-width runtime representation).
+For example:
    MkT :: Ord a => a -> T a
     dcSourceArity = 1
     dcRepArity    = 2
+
+   MkU :: (b ~ '[]) => U b
+    dcSourceArity = 0
+    dcRepArity    = 1
+
 
 Note [DataCon user type variable binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -981,7 +991,7 @@ but the rep type is
         Trep :: Int# -> a -> Void# -> T a
 Actually, the unboxed part isn't implemented yet!
 
-Not that this representation is still *different* from runtime
+Note that this representation is still *different* from runtime
 representation. (Which is what STG uses after unarise).
 
 This is how T would end up being used in STG post-unarise:
@@ -1395,9 +1405,10 @@ dataConSrcBangs = dcSrcBangs
 dataConSourceArity :: DataCon -> Arity
 dataConSourceArity (MkData { dcSourceArity = arity }) = arity
 
--- | Gives the number of actual fields in the /representation/ of the
--- data constructor. This may be more than appear in the source code;
--- the extra ones are the existentially quantified dictionaries
+-- | Gives the number of value arguments (including zero-width coercions)
+-- stored by the given `DataCon`'s worker in its Core representation. This may
+-- differ from the number of arguments that appear in the source code; see also
+-- Note [DataCon arities]
 dataConRepArity :: DataCon -> Arity
 dataConRepArity (MkData { dcRepArity = arity }) = arity
 
@@ -1406,8 +1417,14 @@ dataConRepArity (MkData { dcRepArity = arity }) = arity
 isNullarySrcDataCon :: DataCon -> Bool
 isNullarySrcDataCon dc = dataConSourceArity dc == 0
 
--- | Return whether there are any argument types for this 'DataCon's runtime representation type
--- See Note [DataCon arities]
+-- | Return whether this `DataCon`'s worker, in its Core representation, takes
+-- any value arguments.
+--
+-- In particular, remember that we include coercion arguments in the arity of
+-- the Core representation of the `DataCon` -- both lifted and unlifted
+-- coercions, despite the latter having zero-width runtime representation.
+--
+-- See also Note [DataCon arities].
 isNullaryRepDataCon :: DataCon -> Bool
 isNullaryRepDataCon dc = dataConRepArity dc == 0
 

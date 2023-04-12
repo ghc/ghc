@@ -71,12 +71,13 @@ moving parts are:
   -fomit-interface-pragmas or -fno-code; and we won't read it in if you have
   -fignore-interface-pragmas.  (We could revisit this decision.)
 
-Note [Imported nullary datacon wrappers must have correct LFInfo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Imported unlifted nullary datacon wrappers must have correct LFInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in `Note [Conveying CAF-info and LFInfo between modules]`,
-imported nullary datacons must have their LambdaFormInfo set to reflect the
-fact that they are evaluated . This is necessary are otherwise references
-to them may be passed untagged to code that expects tagged references.
+imported unlifted nullary datacons must have their LambdaFormInfo set to
+reflect the fact that they are evaluated . This is necessary as otherwise
+references to them may be passed untagged to code that expects tagged
+references.
 
 What may be less obvious is that this must be done for not only datacon
 workers but also *wrappers*. The reason is found in this program
@@ -113,6 +114,8 @@ The fix is straightforward: extend the logic in `mkLFImported` to cover
 know that the wrapper of a nullary datacon will be in WHNF, even if it
 includes equalities evidence (since such equalities are not runtime
 relevant). This fixed #23146.
+
+See also Note [The LFInfo of Imported Ids]
 -}
 
 -- | Codegen-generated Id infos, to be passed to downstream via interfaces.
@@ -161,7 +164,7 @@ data LambdaFormInfo
         !StandardFormInfo
         !Bool           -- True <=> *might* be a function type
 
-  | LFCon               -- A saturated constructor application
+  | LFCon               -- A saturated data constructor application
         !DataCon        -- The constructor
 
   | LFUnknown           -- Used for function arguments and imported things.
