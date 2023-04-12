@@ -468,7 +468,7 @@ void contextSwitchAllCapabilities(void)
 {
     uint32_t i;
     for (i=0; i < getNumCapabilities(); i++) {
-        contextSwitchCapability(capabilities[i]);
+        contextSwitchCapability(getCapability(i));
     }
 }
 
