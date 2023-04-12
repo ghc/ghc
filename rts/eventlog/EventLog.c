@@ -759,8 +759,8 @@ void postCapsetVecEvent (EventTypeNum tag,
         if (size + increment > EVENT_PAYLOAD_SIZE_MAX) {
             errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, record only %"
                        FMT_Int " out of %" FMT_Int " args",
-                       (long long) i,
-                       (long long) argc);
+                       (StgInt) i,
+                       (StgInt) argc);
             argc = i;
             break;
         } else {
