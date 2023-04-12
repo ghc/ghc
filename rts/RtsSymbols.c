@@ -870,7 +870,8 @@ extern char **environ;
       SymI_HasDataProto(stg_unpack_cstring_utf8_info)                       \
       SymI_HasDataProto(stg_upd_frame_info)                                 \
       SymI_HasDataProto(stg_bh_upd_frame_info)                              \
-      SymI_HasProto(suspendThread)                                      \
+      SymI_HasDataProto(stg_orig_thunk_info_frame_info)                     \
+      SymI_HasProto(suspendThread)                                          \
       SymI_HasDataProto(stg_takeMVarzh)                                     \
       SymI_HasDataProto(stg_readMVarzh)                                     \
       SymI_HasDataProto(stg_threadStatuszh)                                 \
@@ -878,7 +879,7 @@ extern char **environ;
       SymI_HasDataProto(stg_tryTakeMVarzh)                                  \
       SymI_HasDataProto(stg_tryReadMVarzh)                                  \
       SymI_HasDataProto(stg_unmaskAsyncExceptionszh)                        \
-      SymI_HasProto(unloadObj)                                          \
+      SymI_HasProto(unloadObj)                                              \
       SymI_HasDataProto(stg_unsafeThawArrayzh)                              \
       SymI_HasDataProto(stg_waitReadzh)                                     \
       SymI_HasDataProto(stg_waitWritezh)                                    \
@@ -892,7 +893,7 @@ extern char **environ;
       SymI_NeedsProto(stg_interp_constr5_entry)                         \
       SymI_NeedsProto(stg_interp_constr6_entry)                         \
       SymI_NeedsProto(stg_interp_constr7_entry)                         \
-      SymI_HasDataProto(stg_arg_bitmaps)                                    \
+      SymI_HasDataProto(stg_arg_bitmaps)                                \
       SymI_HasProto(large_alloc_lim)                                    \
       SymI_HasProto(g0)                                                 \
       SymI_HasProto(allocate)                                           \
