@@ -1,5 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.17.1.0 *April 2023*
+
+   * Remove `mingwex` dependency on Windows (#22166).
+
+   * Fix inconcistency with decoding terminal input on Windows (#21488).
+
 ## 4.17.0.0 *August 2022*
 
   * Add explicitly bidirectional `pattern TypeRep` to `Type.Reflection`.

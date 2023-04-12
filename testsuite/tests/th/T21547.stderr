@@ -1,7 +1,7 @@
 
 T21547.hs:9:14: error:
     • GHC stage restriction:
-        instance for ‘base-4.17.0.0:Data.Typeable.Internal.Typeable
+        instance for ‘base-4.17.1.0:Data.Typeable.Internal.Typeable
                         T’ is used in a top-level splice, quasi-quote, or annotation,
         and must be imported, not defined locally
     • In the expression: foo [|| T () ||]
