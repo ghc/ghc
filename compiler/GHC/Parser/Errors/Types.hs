@@ -474,9 +474,6 @@ data PsMessage
     -- | Or pattern used without -XOrPatterns
     | PsErrIllegalOrPat (LPat GhcPs)
 
-    -- | Writing (one of) instead of (one of {}) is illegal
-    | PsErrEmptyOrPatWithoutCurlys (LPat GhcPs)
-
    deriving Generic
 
 -- | Extra details about a parse error, which helps

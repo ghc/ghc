@@ -522,9 +522,6 @@ instance Diagnostic PsMessage where
                 , text "'" <> text [looks_like_char] <> text "' (" <> text looks_like_char_name <> text ")" <> comma
                 , text "but it is not" ]
 
-    PsErrEmptyOrPatWithoutCurlys _
-      -> mkSimpleDecorated $ vcat [text "An empty or-pattern needs curly braces: one of"]
-
     PsErrIllegalOrPat pat
       -> mkSimpleDecorated $ vcat [text "Illegal or-pattern:" <+> ppr (unLoc pat)]
 
@@ -647,7 +644,6 @@ instance Diagnostic PsMessage where
     PsErrInvalidCApiImport {}                     -> ErrorWithoutFlag
     PsErrMultipleConForNewtype {}                 -> ErrorWithoutFlag
     PsErrUnicodeCharLooksLike{}                   -> ErrorWithoutFlag
-    PsErrEmptyOrPatWithoutCurlys{}                -> ErrorWithoutFlag
     PsErrIllegalOrPat{}                           -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -821,7 +817,6 @@ instance Diagnostic PsMessage where
     PsErrMultipleConForNewtype {}                 -> noHints
     PsErrUnicodeCharLooksLike{}                   -> noHints
     PsErrIllegalOrPat{}                           -> [suggestExtension LangExt.OrPatterns]
-    PsErrEmptyOrPatWithoutCurlys{}              -> noHints
 
   diagnosticCode = constructorCode
 

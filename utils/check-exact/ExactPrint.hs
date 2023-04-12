@@ -63,7 +63,6 @@ import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
-import qualified Data.List.NonEmpty as NE
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
@@ -4661,8 +4660,10 @@ instance ExactPrint (Pat GhcPs) where
   exact (OrPat an pats) = do
     an0 <- markEpAnnL an lidl AnnOne
     an1 <- markEpAnnL an0 lidl AnnOf
-    pats' <- markAnnotated (NE.toList pats)
-    return (OrPat an1 (NE.fromList pats'))
+    an2 <- markEpAnnL an1 lidl AnnOpenC
+    pats' <- markAnnotated pats
+    an3 <- markEpAnnL an2 lidl AnnCloseC
+    return (OrPat an3 pats')
 
 -- ---------------------------------------------------------------------
 

@@ -507,22 +507,6 @@ Ambiguity:
     empty activation and inlining '[0] Something'.
 -}
 
-{- Note [%shift: orpats -> pat]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Context:
-    orpats -> pat .
-    orpats -> pat . ',' orpats
-
-Example:
-
-    (one of a, b)
-
-Ambiguity:
-    We use ',' as a delimiter between options inside an or-pattern.
-    However, the ',' could also mean a tuple pattern.
-    If the user wants a tuple pattern, they have to put the or-pattern in parentheses.
--}
-
 {- Note [Parser API Annotations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A lot of the productions are now cluttered with calls to
@@ -3080,20 +3064,21 @@ texp :: { ECP }
 
         | 'one' 'of' vocurly orpats close
                              {% do {
-                                    let srcSpan = comb2 $1 $ reLoc (fromJust $ lastMaybe $4)
+                                    --let srcSpan = comb2 $1 $ maybe $2 reLoc (lastMaybe $4)
+                                    let srcSpan = maybe (comb2 $1 $2) (\a -> comb2 $1 (reLoc a)) (lastMaybe $4)
+                                    --let srcSpan = comb2 $1 $ reLoc (fromJust (lastMaybe $4))
                                     ; cs <- getCommentsFor srcSpan
                                     ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) $4
                                     ; let pat = sL (noAnnSrcSpan srcSpan) pat'
                                     ; orPatsOn <- hintOrPats pat
-                                    ; when (orPatsOn && null $4) $ addError $ mkPlainErrorMsgEnvelope (locA (getLoc pat)) (PsErrEmptyOrPatWithoutCurlys pat)
                                     ; return $ ecpFromPat pat
                              }  }
 
         | 'one' 'of' '{' orpats '}'
                              {% do {
-                                    let srcSpan = comb2 $1 $5 -- todo: loc ?
+                                    let srcSpan = comb2 $1 $5
                                     ; cs <- getCommentsFor srcSpan
-                                    ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2] cs) $4
+                                    ; let pat' = OrPat (EpAnn (spanAsAnchor srcSpan) [mj AnnOne $1, mj AnnOf $2, mj AnnOpenC $3, mj AnnCloseC $5] cs) $4
                                     ; let pat = sL (noAnnSrcSpan srcSpan) pat'
                                     ; _ <- hintOrPats pat
                                     ; return $ ecpFromPat pat
@@ -3106,10 +3091,18 @@ texp :: { ECP }
                              mkHsViewPatPV (comb2 (reLoc $1) (reLoc $>)) $1 $3 [mu AnnRarrow $2] }
 
 orpats :: { [LPat GhcPs] }
-        : %shift           { [] }
+        :                      { [] }
+        | tpat                 { [$1] }
 
-        | tpat ';' orpats  {% do {
-                                  a <- addTrailingCommaA $1 (getLoc $2)
+        | tpat ';' orpatss  {% do {
+                                  a <- addTrailingSemiA $1 (getLoc $2)
+                                  ; return (a:$3)
+                           } }
+
+orpatss :: { [LPat GhcPs] }
+        : tpat                  { [$1] }
+        | tpat ';' orpatss  {% do {
+                                  a <- addTrailingSemiA $1 (getLoc $2)
                                   ; return (a:$3)
                            } }
 

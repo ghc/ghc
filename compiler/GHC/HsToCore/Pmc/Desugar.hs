@@ -26,6 +26,8 @@ import GHC.Hs
 import GHC.Tc.Utils.TcMType (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
+import GHC.Core.Make (mkWildValBinder)
+import GHC.Core.Utils (exprType)
 import GHC.Types.Name
 import GHC.Builtin.Types
 import GHC.Builtin.Names (rationalTyConName)
@@ -231,7 +233,9 @@ desugarPat x pat = case pat of
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars `consGrdDag` sequenceGrdDags grdss
 
-  OrPat _tys [] -> error "lol" -- pure failGrd
+  OrPat _tys [] -> do
+    let true = mkWildValBinder OneTy (exprType (Var trueDataConId))
+    return $ vanillaConGrd true falseDataCon [] `consGrdDag` mkPmLetVar true trueDataConId
   OrPat _tys (pat:pats) -> alternativesGrdDags <$> traverse (desugarLPat x) (pat:|pats)
 
   SumPat _ty p alt arity -> do
@@ -242,8 +246,6 @@ desugarPat x pat = case pat of
 
   SplicePat {} -> panic "Check.desugarPat: SplicePat"
 
-
--- failGrd = mkPmLetVar trueId trueDataConId `consGrdDag` vanillaConGrd trueId falseDataCon []
 
 -- | 'desugarPat', but also select and return a new match var.
 desugarPatV :: Pat GhcTc -> DsM (Id, GrdDag)
