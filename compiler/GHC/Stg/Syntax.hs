@@ -245,7 +245,7 @@ literals.
         -- which can't be let-bound
   | StgConApp   DataCon
                 ConstructorNumber
-                [StgArg] -- Saturated
+                [StgArg] -- Saturated. (After Unarisation, [NonVoid StgArg])
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
   | StgOpApp    StgOp    -- Primitive op or foreign call

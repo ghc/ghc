@@ -36,6 +36,7 @@ import GHC.Core            ( AltCon(..) )
 import GHC.Core.Type
 
 import GHC.StgToCmm.Types
+import GHC.StgToCmm.Closure (mkLFImported)
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn
@@ -271,13 +272,10 @@ isTagged v = do
                             TagTagged -> True
                             TagTuple _ -> True -- Consider unboxed tuples tagged.
         False -- Imported
-            | Just con <- (isDataConWorkId_maybe v)
-            , isNullaryRepDataCon con
-            -> return True
-            | Just lf_info <- idLFInfo_maybe v
             -> return $!
-                -- Can we treat the thing as tagged based on it's LFInfo?
-                case lf_info of
+                -- Determine whether it is tagged from the LFInfo of the imported id.
+                -- See Note [The LFInfo of Imported Ids]
+                case mkLFImported v of
                     -- Function, applied not entered.
                     LFReEntrant {}
                         -> True
@@ -294,9 +292,6 @@ isTagged v = do
                     LFLetNoEscape {}
                     -- Shouldn't be possible. I don't think we can export letNoEscapes
                         -> True
-
-            | otherwise
-            -> return False
 
 
 isArgTagged :: StgArg -> RM Bool
