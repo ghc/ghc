@@ -958,6 +958,8 @@ ubxSumRubbishArg (VecSlot n e) = StgLitArg (LitRubbish vec_rep)
 --------------------------------------------------------------------------------
 
 {-
+Note [Unarisation of Void binders and arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For arguments (StgArg) and binders (Id) we have two kind of unarisation:
 
   - When unarising function arg binders and arguments, we don't want to remove

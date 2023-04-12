@@ -84,7 +84,7 @@ tidyBind env (Rec prs)
 -- This means the code generator can get the full calling convention by only looking at the function
 -- itself without having to inspect the RHS.
 --
--- The actual logic is in tidyCbvInfo and takes:
+-- The actual logic is in computeCbvInfo and takes:
 -- * The function id
 -- * The functions rhs
 -- And gives us back the function annotated with the marks.

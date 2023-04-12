@@ -372,6 +372,7 @@ data IdInfo
         --
         -- See documentation of the getters for what these packed fields mean.
         lfInfo          :: !(Maybe LambdaFormInfo),
+        -- ^ See Note [The LFInfo of Imported Ids] in GHC.StgToCmm.Closure
 
         -- See documentation of the getters for what these packed fields mean.
         tagSig          :: !(Maybe TagSig)
@@ -451,7 +452,7 @@ oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
 
 -- | 'Id' arity, as computed by "GHC.Core.Opt.Arity". Specifies how many arguments
--- this 'Id' has to be applied to before it doesn any meaningful work.
+-- this 'Id' has to be applied to before it does any meaningful work.
 arityInfo :: IdInfo -> ArityInfo
 arityInfo = bitfieldGetArityInfo . bitfield
 
