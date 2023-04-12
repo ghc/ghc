@@ -1070,6 +1070,17 @@ Checking for consistency
     cases. This is helpful when debugging demand analysis or type checker bugs
     which can sometimes manifest as segmentation faults.
 
+.. ghc-flag:: -forig-thunk-info
+    :shortdesc: Generate ``stg_orig_thunk_info`` stack frames on thunk entry
+    :type: dynamic
+
+    When debugging cyclic thunks it can be helpful to know the original
+    info table of a thunk being evaluated. This flag enables code generation logic
+    to facilitate this, producing a ``stg_orig_thunk_info`` stack frame alongside
+    the usual update frame; such ``orig_thunk`` frames have no operational
+    effect but capture the original info table of the updated thunk for inspection
+    by debugging tools.
+
 .. ghc-flag:: -fcheck-prim-bounds
     :shortdesc: Instrument array primops with bounds checks.
     :type: dynamic

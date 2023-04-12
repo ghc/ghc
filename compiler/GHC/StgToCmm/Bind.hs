@@ -728,7 +728,8 @@ setupUpdate closure_info node body
               lbl | bh        = mkBHUpdInfoLabel
                   | otherwise = mkUpdInfoLabel
 
-          pushUpdateFrame lbl (CmmReg (CmmLocal node)) body
+          pushOrigThunkInfoFrame closure_info
+            $ pushUpdateFrame lbl (CmmReg (CmmLocal node)) body
 
   | otherwise   -- A static closure
   = do  { tickyUpdateBhCaf closure_info
@@ -736,7 +737,8 @@ setupUpdate closure_info node body
         ; if closureUpdReqd closure_info
           then do       -- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf node
-                ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
+                ; pushOrigThunkInfoFrame closure_info
+                    $ pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
           else do {tickyUpdateFrameOmitted; body}
     }
 
@@ -752,32 +754,11 @@ pushUpdateFrame lbl updatee body
   = do
        updfr  <- getUpdFrameOff
        profile <- getProfile
-       cfg <- getStgToCmmConfig
-       let push_orig_thunk_info = stgToCmmOrigThunkInfo cfg
-           hdr         = fixedHdrSize profile
-           orig_info_frame_sz
-             | push_orig_thunk_info
-                              = hdr + pc_SIZEOF_StgOrigThunkInfoFrame_NoHdr (profileConstants profile)
-             | otherwise      = 0
-           frame1      = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
-           frame2      = frame1 + orig_info_frame_sz
+       let hdr         = fixedHdrSize profile
+           frame       = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
        --
-       emitUpdateFrame (CmmStackSlot Old frame1) lbl updatee
-       when push_orig_thunk_info $
-           emitOrigThunkInfoFrame (CmmStackSlot Old frame2) updatee
-       withUpdFrameOff frame2 body
-
-emitOrigThunkInfoFrame :: CmmExpr -> CmmExpr -> FCode ()
-emitOrigThunkInfoFrame frame updatee = do
-  profile <- getProfile
-  cfg <- getStgToCmmConfig
-  let platform      = profilePlatform profile
-      hdr           = fixedHdrSize profile
-      off_orig_info = hdr + pc_OFFSET_StgOrigThunkInfoFrame_info_ptr (profileConstants profile)
-      align_check   = stgToCmmAlignCheck cfg
-      info_ptr      = closureInfoPtr platform align_check updatee
-  emitStore frame (mkLblExpr mkOrigThunkInfoLabel)
-  emitStore (cmmOffset platform frame off_orig_info) info_ptr
+       emitUpdateFrame (CmmStackSlot Old frame) lbl updatee
+       withUpdFrameOff frame body
 
 emitUpdateFrame :: CmmExpr -> CLabel -> CmmExpr -> FCode ()
 emitUpdateFrame frame lbl updatee = do
@@ -790,6 +771,34 @@ emitUpdateFrame frame lbl updatee = do
   emitStore frame (mkLblExpr lbl)
   emitStore (cmmOffset platform frame off_updatee) updatee
   initUpdFrameProf frame
+
+-----------------------------------------------------------------------------
+-- Original thunk info table frames
+--
+-- Support for -forig-thunk-info
+
+pushOrigThunkInfoFrame :: ClosureInfo -> FCode () -> FCode ()
+pushOrigThunkInfoFrame closure_info body = do
+  cfg <- getStgToCmmConfig
+  if stgToCmmOrigThunkInfo cfg
+     then do_it
+     else body
+  where
+    orig_itbl = mkLblExpr (closureInfoLabel closure_info)
+    do_it = do
+      updfr <- getUpdFrameOff
+      profile <- getProfile
+      let platform = profilePlatform profile
+          hdr = fixedHdrSize profile
+          orig_info_frame_sz =
+              hdr + pc_SIZEOF_StgOrigThunkInfoFrame_NoHdr (profileConstants profile)
+          off_orig_info = hdr + pc_OFFSET_StgOrigThunkInfoFrame_info_ptr (profileConstants profile)
+          frame_off = updfr + orig_info_frame_sz
+          frame = CmmStackSlot Old frame_off
+      --
+      emitStore frame (mkLblExpr mkOrigThunkInfoLabel)
+      emitStore (cmmOffset platform frame off_orig_info) orig_itbl
+      withUpdFrameOff frame_off body
 
 -----------------------------------------------------------------------------
 -- Entering a CAF
