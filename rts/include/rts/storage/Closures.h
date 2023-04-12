@@ -261,6 +261,13 @@ typedef struct _StgUpdateFrame {
     StgClosure *updatee;
 } StgUpdateFrame;
 
+// Thunk update frame
+//
+// Closure types: RET_SMALL
+typedef struct _StgOrigThunkInfoFrame {
+    StgHeader  header;
+    StgInfoTable *info_ptr;
+} StgOrigThunkInfoFrame;
 
 // Closure types: RET_SMALL
 typedef struct {

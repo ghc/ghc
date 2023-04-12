@@ -53,6 +53,7 @@ module GHC.Cmm.CLabel (
         mkDirty_MUT_VAR_Label,
         mkMUT_VAR_CLEAN_infoLabel,
         mkNonmovingWriteBarrierEnabledLabel,
+        mkOrigThunkInfoLabel,
         mkUpdInfoLabel,
         mkBHUpdInfoLabel,
         mkIndStaticInfoLabel,
@@ -641,7 +642,7 @@ mkBlockInfoTableLabel name c = IdLabel name c BlockInfoTable
 -- Constructing Cmm Labels
 mkDirty_MUT_VAR_Label,
     mkNonmovingWriteBarrierEnabledLabel,
-    mkUpdInfoLabel,
+    mkOrigThunkInfoLabel, mkUpdInfoLabel,
     mkBHUpdInfoLabel, mkIndStaticInfoLabel, mkMainCapabilityLabel,
     mkMAP_FROZEN_CLEAN_infoLabel, mkMAP_FROZEN_DIRTY_infoLabel,
     mkMAP_DIRTY_infoLabel,
@@ -655,6 +656,7 @@ mkDirty_MUT_VAR_Label,
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
                                 = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "nonmoving_write_barrier_enabled") CmmData
+mkOrigThunkInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_orig_thunk_info_frame") CmmInfo
 mkUpdInfoLabel                  = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_upd_frame")         CmmInfo
 mkBHUpdInfoLabel                = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_bh_upd_frame" )     CmmInfo
 mkIndStaticInfoLabel            = CmmLabel rtsUnitId (NeedExternDecl False) (fsLit "stg_IND_STATIC")        CmmInfo

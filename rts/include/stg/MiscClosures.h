@@ -52,6 +52,7 @@ RTS_RET(stg_upd_frame);
 RTS_RET(stg_bh_upd_frame);
 RTS_RET(stg_marked_upd_frame);
 RTS_RET(stg_noupd_frame);
+RTS_RET(stg_orig_thunk_info_frame);
 RTS_RET(stg_catch_frame);
 RTS_RET(stg_catch_retry_frame);
 RTS_RET(stg_atomically_frame);
