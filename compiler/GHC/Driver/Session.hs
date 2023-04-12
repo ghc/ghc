@@ -3423,6 +3423,7 @@ fFlagsDeps = [
   flagSpec "do-eta-reduction"                 Opt_DoEtaReduction,
   flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
+  flagSpec "orig-thunk-info"                  Opt_OrigThunkInfo,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
   flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,

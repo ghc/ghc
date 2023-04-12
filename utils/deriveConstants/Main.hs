@@ -421,6 +421,7 @@ wanteds os = concat
           ,closureSize Both "StgUpdateFrame"
           ,closureSize C    "StgCatchFrame"
           ,closureSize C    "StgStopFrame"
+          ,closureSize  Both "StgOrigThunkInfoFrame"
 
           ,closureSize  Both "StgMutArrPtrs"
           ,closureField Both "StgMutArrPtrs" "ptrs"
@@ -458,6 +459,7 @@ wanteds os = concat
           ,structSize C "StgTSOProfInfo"
 
           ,closureField Both "StgUpdateFrame" "updatee"
+          ,closureField Both "StgOrigThunkInfoFrame" "info_ptr"
 
           ,closureField C "StgCatchFrame" "handler"
           ,closureField C "StgCatchFrame" "exceptions_blocked"

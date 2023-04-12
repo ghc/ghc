@@ -267,6 +267,7 @@ data GeneralFlag
    | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
+   | Opt_OrigThunkInfo
    | Opt_NoHsMain
    | Opt_SplitSections
    | Opt_StgStats
@@ -465,6 +466,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_SolveConstantDicts
    , Opt_CatchNonexhaustiveCases
    , Opt_IgnoreAsserts
+   , Opt_OrigThunkInfo
    ]
 
 data WarningFlag =

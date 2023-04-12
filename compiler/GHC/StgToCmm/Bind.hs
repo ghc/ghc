@@ -689,7 +689,8 @@ setupUpdate closure_info node body
               lbl | bh        = mkBHUpdInfoLabel
                   | otherwise = mkUpdInfoLabel
 
-          pushUpdateFrame lbl (CmmReg (CmmLocal node)) body
+          pushOrigThunkInfoFrame closure_info
+            $ pushUpdateFrame lbl (CmmReg (CmmLocal node)) body
 
   | otherwise   -- A static closure
   = do  { tickyUpdateBhCaf closure_info
@@ -697,7 +698,8 @@ setupUpdate closure_info node body
         ; if closureUpdReqd closure_info
           then do       -- Blackhole the (updatable) CAF:
                 { upd_closure <- link_caf node
-                ; pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
+                ; pushOrigThunkInfoFrame closure_info
+                    $ pushUpdateFrame mkBHUpdInfoLabel upd_closure body }
           else do {tickyUpdateFrameOmitted; body}
     }
 
@@ -713,8 +715,7 @@ pushUpdateFrame lbl updatee body
   = do
        updfr  <- getUpdFrameOff
        profile <- getProfile
-       let
-           hdr         = fixedHdrSize profile
+       let hdr         = fixedHdrSize profile
            frame       = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
        --
        emitUpdateFrame (CmmStackSlot Old frame) lbl updatee
@@ -731,6 +732,47 @@ emitUpdateFrame frame lbl updatee = do
   emitStore frame (mkLblExpr lbl)
   emitStore (cmmOffset platform frame off_updatee) updatee
   initUpdFrameProf frame
+
+-----------------------------------------------------------------------------
+-- Original thunk info table frames
+--
+-- Note [Original thunk info table frames]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In some debugging scenarios (e.g. when debugging cyclic thunks) it can be very
+-- useful to know which thunks the program is in the process of evaluating.
+-- However, in the case of updateable thunks this can be very difficult
+-- to determine since the process of blackholing overwrites the thunk's
+-- info table pointer.
+--
+-- To help in such situations we provide the -forig-thunk-info flag. This enables
+-- code generation logic which pushes a stg_orig_thunk_info_frame stack frame to
+-- accompany each update frame. As the name suggests, this frame captures the
+-- the original info table of the thunk being updated. The entry code for these
+-- frames has no operational effects; the frames merely exist as breadcrumbs
+-- for debugging.
+
+pushOrigThunkInfoFrame :: ClosureInfo -> FCode () -> FCode ()
+pushOrigThunkInfoFrame closure_info body = do
+  cfg <- getStgToCmmConfig
+  if stgToCmmOrigThunkInfo cfg
+     then do_it
+     else body
+  where
+    orig_itbl = mkLblExpr (closureInfoLabel closure_info)
+    do_it = do
+      updfr <- getUpdFrameOff
+      profile <- getProfile
+      let platform = profilePlatform profile
+          hdr = fixedHdrSize profile
+          orig_info_frame_sz =
+              hdr + pc_SIZEOF_StgOrigThunkInfoFrame_NoHdr (profileConstants profile)
+          off_orig_info = hdr + pc_OFFSET_StgOrigThunkInfoFrame_info_ptr (profileConstants profile)
+          frame_off = updfr + orig_info_frame_sz
+          frame = CmmStackSlot Old frame_off
+      --
+      emitStore frame (mkLblExpr mkOrigThunkInfoLabel)
+      emitStore (cmmOffset platform frame off_orig_info) orig_itbl
+      withUpdFrameOff frame_off body
 
 -----------------------------------------------------------------------------
 -- Entering a CAF

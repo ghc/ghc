@@ -49,6 +49,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmFastPAPCalls   :: !Bool              -- ^
   , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
   , stgToCmmEagerBlackHole :: !Bool              -- ^
+  , stgToCmmOrigThunkInfo  :: !Bool              -- ^ Push @stg_orig_thunk_info@ frames during thunk update.
   , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See note [Mapping
                                                  -- Info Tables to Source Positions]
   , stgToCmmOmitYields     :: !Bool              -- ^ true means omit heap checks when no allocation is performed
