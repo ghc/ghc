@@ -4,7 +4,7 @@
 
    * Remove `mingwex` dependency on Windows (#22166).
 
-   * Fix inconcistency with decoding terminal input on Windows (#21488).
+   * Fix inconsistency with decoding terminal input on Windows (#21488).
 
 ## 4.17.0.0 *August 2022*
 
