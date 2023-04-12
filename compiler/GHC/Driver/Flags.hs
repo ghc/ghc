@@ -322,6 +322,7 @@ data GeneralFlag
    | Opt_IgnoreHpcChanges
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
+   | Opt_OrigThunkInfo
    | Opt_NoHsMain
    | Opt_SplitSections
    | Opt_StgStats

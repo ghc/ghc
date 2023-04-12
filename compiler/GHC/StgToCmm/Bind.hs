@@ -752,12 +752,32 @@ pushUpdateFrame lbl updatee body
   = do
        updfr  <- getUpdFrameOff
        profile <- getProfile
-       let
+       cfg <- getStgToCmmConfig
+       let push_orig_thunk_info = stgToCmmOrigThunkInfo cfg
            hdr         = fixedHdrSize profile
-           frame       = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
+           orig_info_frame_sz
+             | push_orig_thunk_info
+                              = hdr + pc_SIZEOF_StgOrigThunkInfoFrame_NoHdr (profileConstants profile)
+             | otherwise      = 0
+           frame1      = updfr + hdr + pc_SIZEOF_StgUpdateFrame_NoHdr (profileConstants profile)
+           frame2      = frame1 + orig_info_frame_sz
        --
-       emitUpdateFrame (CmmStackSlot Old frame) lbl updatee
-       withUpdFrameOff frame body
+       emitUpdateFrame (CmmStackSlot Old frame1) lbl updatee
+       when push_orig_thunk_info $
+           emitOrigThunkInfoFrame (CmmStackSlot Old frame2) updatee
+       withUpdFrameOff frame2 body
+
+emitOrigThunkInfoFrame :: CmmExpr -> CmmExpr -> FCode ()
+emitOrigThunkInfoFrame frame updatee = do
+  profile <- getProfile
+  cfg <- getStgToCmmConfig
+  let platform      = profilePlatform profile
+      hdr           = fixedHdrSize profile
+      off_orig_info = hdr + pc_OFFSET_StgOrigThunkInfoFrame_info_ptr (profileConstants profile)
+      align_check   = stgToCmmAlignCheck cfg
+      info_ptr      = closureInfoPtr platform align_check updatee
+  emitStore frame (mkLblExpr mkOrigThunkInfoLabel)
+  emitStore (cmmOffset platform frame off_orig_info) info_ptr
 
 emitUpdateFrame :: CmmExpr -> CLabel -> CmmExpr -> FCode ()
 emitUpdateFrame frame lbl updatee = do

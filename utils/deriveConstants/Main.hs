@@ -438,6 +438,7 @@ wanteds os = concat
           ,structField  Both "StgEntCounter" "entry_count"
 
           ,closureSize  Both "StgUpdateFrame"
+          ,closureSize  Both "StgOrigThunkInfoFrame"
           ,closureSize  C    "StgCatchFrame"
           ,closureSize  C    "StgStopFrame"
           ,closureSize  C    "StgDeadThreadFrame"
@@ -480,6 +481,7 @@ wanteds os = concat
           ,structSize C "StgTSOProfInfo"
 
           ,closureField Both "StgUpdateFrame" "updatee"
+          ,closureField Both "StgOrigThunkInfoFrame" "info_ptr"
 
           ,closureField C "StgCatchFrame" "handler"
           ,closureField C "StgCatchFrame" "exceptions_blocked"

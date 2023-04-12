@@ -37,6 +37,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmFastPAPCalls  = gopt Opt_FastPAPCalls          dflags
   , stgToCmmSCCProfiling  = sccProfilingEnabled            dflags
   , stgToCmmEagerBlackHole = gopt Opt_EagerBlackHoling     dflags
+  , stgToCmmOrigThunkInfo = gopt Opt_OrigThunkInfo         dflags
   , stgToCmmInfoTableMap  = gopt Opt_InfoTableMap          dflags
   , stgToCmmOmitYields    = gopt Opt_OmitYields            dflags
   , stgToCmmOmitIfPragmas = gopt Opt_OmitInterfacePragmas  dflags
