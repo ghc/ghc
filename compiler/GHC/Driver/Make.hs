@@ -514,13 +514,17 @@ warnUnusedPackages :: UnitState -> DynFlags -> ModuleGraph -> DriverMessages
 warnUnusedPackages us dflags mod_graph =
     let diag_opts = initDiagOpts dflags
 
+        home_mod_sum = filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph)
+
     -- Only need non-source imports here because SOURCE imports are always HPT
         loadedPackages = concat $
           mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
-            $ concatMap ms_imps (
-              filter (\ms -> homeUnitId_ dflags == ms_unitid ms) (mgModSummaries mod_graph))
+            $ concatMap ms_imps home_mod_sum
 
-        used_args = Set.fromList $ map unitId loadedPackages
+        any_import_ghc_prim = any ms_ghc_prim_import home_mod_sum
+
+        used_args = Set.fromList (map unitId loadedPackages)
+                      `Set.union` Set.fromList [ primUnitId |  any_import_ghc_prim ]
 
         resolve (u,mflag) = do
                   -- The units which we depend on via the command line explicitly

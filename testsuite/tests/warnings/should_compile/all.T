@@ -39,6 +39,10 @@ test('UnusedPackages', [normalise_version('bytestring')
                        ], multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
 
+test('T23212', [normalise_version('ghc-prim')
+                       ], multimod_compile,
+    ['T23212', '-v0 -package=ghc-prim -Werror -Wunused-packages'])
+
 test('T18402', normal, compile, [''])
 
 test('T19564a', normal, compile, [''])
