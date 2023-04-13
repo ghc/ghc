@@ -889,3 +889,21 @@ function h$__hscore_free_dirent(a,o) {
 function h$__hscore_d_name(a,o) {
   RETURN_UBX_TUP2(h$encodeModifiedUtf8(a.name),0);
 }
+
+function h$mkdir(path, path_offset, mode) {
+  if (!h$isNode()) {
+    throw "h$mkdir unsupported";
+  }
+  const d = h$decodeUtf8z(path, path_offset);
+  try {
+    h$fs.mkdirSync(d, {mode: mode});
+  } catch(e) {
+    // we can't directly set errno code, because numbers may not match
+    // e.g. e.errno is -17 for EEXIST while we would expect -20
+    // this is probably an inconsistency between nodejs using the native
+    // environment and everything else using Emscripten-provided headers.
+    h$setErrno(e);
+    return -1;
+  }
+  return 0;
+}

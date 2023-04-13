@@ -64,7 +64,7 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
-test('openFile003', [normalise_win32_io_errors, js_broken(22374)], compile_and_run, [''])
+test('openFile003', [normalise_win32_io_errors, js_broken(22362)], compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
 test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
@@ -152,3 +152,5 @@ test('T17510', expect_broken(17510), compile_and_run, [''])
 test('bytestringread001', extra_run_opts('test.data'), compile_and_run, [''])
 test('T17912', [only_ways(['threaded1']), when(opsys('mingw32'),expect_broken(1))], compile_and_run, [''])
 test('T18832', only_ways(['threaded1']), compile_and_run, [''])
+
+test('mkdirExists', [exit_code(1), when(opsys('mingw32'), ignore_stderr)], compile_and_run, [''])
