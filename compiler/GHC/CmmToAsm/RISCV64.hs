@@ -18,6 +18,7 @@ import qualified GHC.CmmToAsm.RISCV64.Ppr     as RISCV64
 import qualified GHC.CmmToAsm.RISCV64.CodeGen as RISCV64
 import qualified GHC.CmmToAsm.RISCV64.Regs    as RISCV64
 import qualified GHC.CmmToAsm.RISCV64.RegInfo as RISCV64
+import GHC.Utils.Outputable
 
 ncgRISCV64 :: Bool -> NCGConfig -> NcgImpl RawCmmStatics RISCV64.Instr RISCV64.JumpDest
 ncgRISCV64 no_empty_asm config = NcgImpl
@@ -28,15 +29,18 @@ ncgRISCV64 no_empty_asm config = NcgImpl
    , canShortcut               = RISCV64.canShortcut
    , shortcutStatics           = RISCV64.shortcutStatics
    , shortcutJump              = RISCV64.shortcutJump
-   , pprNatCmmDeclH            = RISCV64.pprNatCmmDeclH
+   , pprNatCmmDeclH            = RISCV64.pprNatCmmDecl
    , pprNatCmmDeclS            = RISCV64.pprNatCmmDeclS
-   , maxSpillSlots             = RISCV64.maxSpillSlots
-   , allocatableRegs           = RISCV64.allocatableRegs
+   , maxSpillSlots             = RISCV64.maxSpillSlots config
+   , allocatableRegs           = RISCV64.allocatableRegs platform
    , ncgAllocMoreStack         = RISCV64.allocMoreStack
-   , ncgMakeFarBranches        = RISCV64.makeFarBranches
+   , ncgMakeFarBranches        = const id
    , extractUnwindPoints       = const []
    , invertCondBranches        = \_ _ -> id
    }
+    where
+      platform = ncgPlatform config
+
 
 -- | Instruction instance for RISC-V 64bit
 instance Instruction RISCV64.Instr where
@@ -55,4 +59,4 @@ instance Instruction RISCV64.Instr where
    mkStackAllocInstr   = RISCV64.mkStackAllocInstr
    mkStackDeallocInstr = RISCV64.mkStackDeallocInstr
    pprInstr            = RISCV64.pprInstr
-   mkComment           = pure . RISCV64.COMMENT
+   mkComment           = pure . RISCV64.COMMENT . ftext

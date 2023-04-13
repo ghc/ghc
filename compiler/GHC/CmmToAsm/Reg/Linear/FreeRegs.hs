@@ -29,10 +29,12 @@ import qualified GHC.CmmToAsm.Reg.Linear.PPC     as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.X86     as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64  as X86_64
 import qualified GHC.CmmToAsm.Reg.Linear.AArch64 as AArch64
+import qualified GHC.CmmToAsm.Reg.Linear.RISCV64 as RISCV64
 
 import qualified GHC.CmmToAsm.PPC.Instr     as PPC.Instr
 import qualified GHC.CmmToAsm.X86.Instr     as X86.Instr
 import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
+import qualified GHC.CmmToAsm.RISCV64.Instr as RISCV64.Instr
 
 class Show freeRegs => FR freeRegs where
     frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
@@ -64,6 +66,13 @@ instance FR AArch64.FreeRegs where
     frInitFreeRegs = AArch64.initFreeRegs
     frReleaseReg = \_ -> AArch64.releaseReg
 
+instance FR RISCV64.FreeRegs where
+    frAllocateReg = \_ -> RISCV64.allocateReg
+    frGetFreeRegs = \_ -> RISCV64.getFreeRegs
+    frInitFreeRegs = RISCV64.initFreeRegs
+    frReleaseReg = \_ -> RISCV64.releaseReg
+
+
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchX86       -> X86.Instr.maxSpillSlots config
@@ -76,7 +85,7 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
    ArchMipseb    -> panic "maxSpillSlots ArchMipseb"
    ArchMipsel    -> panic "maxSpillSlots ArchMipsel"
-   ArchRISCV64   -> panic "maxSpillSlots ArchRISCV64"
+   ArchRISCV64   -> RISCV64.Instr.maxSpillSlots config
    ArchLoongArch64->panic "maxSpillSlots ArchLoongArch64"
    ArchJavaScript-> panic "maxSpillSlots ArchJavaScript"
    ArchWasm32    -> panic "maxSpillSlots ArchWasm32"

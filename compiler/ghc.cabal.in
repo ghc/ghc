@@ -253,6 +253,7 @@ Library
         GHC.CmmToAsm.Reg.Linear.FreeRegs
         GHC.CmmToAsm.Reg.Linear.JoinToTargets
         GHC.CmmToAsm.Reg.Linear.PPC
+        GHC.CmmToAsm.Reg.Linear.RISCV64
         GHC.CmmToAsm.Reg.Linear.StackMap
         GHC.CmmToAsm.Reg.Linear.State
         GHC.CmmToAsm.Reg.Linear.Stats
