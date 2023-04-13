@@ -124,6 +124,47 @@ EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
 
 /*
+ * Note [C11 memory model]
+ * ~~~~~~~~~~~~~~~~~~~~~~~
+ * When it comes to memory, real multiprocessors provide a wide range of
+ * concurrency semantics due to out-of-order execution and caching.
+ * To provide consistent reasoning across architectures, GHC relies the C11
+ * memory model. Not only does this provide a well-studied, fairly
+ * easy-to-understand conceptual model, but the C11 memory model gives us
+ * access to a number of tools which help us verify the compiler (see Note
+ * [ThreadSanitizer] in rts/include/rts/TSANUtils.h).
+ *
+ * Under the C11 model, each processor can be imagined to have a potentially
+ * out-of-date view onto the system's memory, which can be manipulated with two
+ * classes of memory operations:
+ *
+ *  - non-atomic operations (e.g. loads and stores) operate strictly on the
+ *    processor's local view of memory and consequently may not be visible
+ *    from other processors.
+ *
+ *  - atomic operations (e.g. load, store, fetch-and-{add,subtract,and,or},
+ *    exchange, and compare-and-swap) parametrized by ordering semantics.
+ *
+ * The ordering semantics of an operation (acquire, release, or sequentially
+ * consistent) will determine the amount of synchronization the operation
+ * requires.
+ *
+ * A processor may synchronize its
+ * view of memory with that of another processor by performing an atomic
+ * memory operation.
+ *
+ * While non-atomic operations can be thought of as operating on a local
+ *
+ * See also:
+ *
+ *   - The C11 standard, ISO/IEC 14882 2011.
+ *
+ *   - Boehm, Adve. "Foundations of the C++ Concurrency Memory Model."
+ *     PLDI '08.
+ *
+ *   - Batty, Owens, Sarkar, Sewall, Weber. "Mathematizing C++ Concurrency."
+ *     POPL '11.
+ *
  * Note [Heap memory barriers]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * Machines with weak memory ordering semantics have consequences for how
@@ -132,22 +173,31 @@ EXTERN_INLINE void load_load_barrier(void);
  * stores which formed the new object are visible (e.g. stores are flushed from
  * cache and the relevant cachelines invalidated in other cores).
  *
- * To ensure this we must use memory barriers. Which barriers are required to
- * access a field depends upon the identity of the field. In general, fields come
- * in three flavours:
+ * To ensure this we must issue memory barriers when accessing closures and
+ * their fields. Since reasoning about concurrent memory access with barriers tends to be
+ * subtle and platform dependent, it is more common to instead write programs
+ * in terms of an abstract memory model and let the compiler (GHC and the
+ * system's C compiler) worry about what barriers are needed to realize the
+ * requested semantics on the target system. GHC relies on the widely used C11
+ * memory model for this; see Note [C11 memory model] for a brief introduction.
  *
- *  * Mutable GC Pointers (C type StgClosure*, Cmm type StgPtr)
- *  * Immutable GC Pointers (C type MUT_FIELD StgClosure*, Cmm type StgPtr)
- *  * Non-pointers (C type StgWord, Cmm type StdWord)
+ * Also note that the majority of this Note are only concerned with mutation
+ * by the mutator. The GC is free to change nearly any field (which is
+ * necessary for a moving GC). Naturally, doing this safely requires care which
+ * we discuss in the "Barriers during GC" section below.
+ *
+ * Field access
+ * ------------
+ * Which barriers are required to access a field of a closure depends upon the
+ * identity of the field. In general, fields come in three flavours:
+ *
+ *  * Mutable GC Pointers (C type `StgClosure*`, Cmm type `StgPtr`)
+ *  * Immutable GC Pointers (C type `MUT_FIELD StgClosure*`, Cmm type `StgPtr`)
+ *  * Non-pointers (C type `StgWord`, Cmm type `StgWord`)
  *
  * Note that Addr# fields are *not* GC pointers and therefore are classified
  * as non-pointers. In this case responsibility for barriers lies with the
  * party dereferencing the Addr#.
- *
- * Also note that we are only concerned with mutation by the mutator. The GC
- * is free to change nearly any field as this is necessary for a moving GC.
- * Naturally, doing this safely requires care which we discuss in section
- * below.
  *
  * Immutable pointer fields are those which the mutator cannot change after
  * an object is made visible on the heap. Most objects' fields are of this
@@ -156,7 +206,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * safe due to an argument hinging on causality: Consider an immutable field F
  * of an object O which refers to object O'. Naturally, O' must have been
  * visible to the creator of O when O was constructed. Consequently, if O is
- * visible to a reader, O' must also be visible to the same reader..
+ * visible to a reader, O' must also be visible to the same reader.
  *
  * Mutable pointer fields are those which can be modified by the mutator. These
  * require a bit more care as they may break the causality argument given
@@ -164,6 +214,10 @@ EXTERN_INLINE void load_load_barrier(void);
  * field F. A thread may allocate a new object O' and store a reference to O'
  * into F. Without explicit synchronization O' may not be visible to another
  * thread attempting to dereference F.
+ *
+ * To ensure the visibility of the referent, writing to a mutable pointer field
+ * must be done via a release-store. Conversely, reading from such a field is
+ * done via an acquire-load.
  *
  * Mutable fields include:
  *
@@ -179,9 +233,6 @@ EXTERN_INLINE void load_load_barrier(void);
  *   - StgThunk although this is a somewhat special case; see below
  *   - StgTSO: block_info
  *   - StgInd: indirectee
- *
- * Writing to a mutable pointer field must be done via a release-store.
- * Reading from such a field is done via an acquire-load.
  *
  * Finally, non-pointer fields can be safely mutated without barriers as
  * they do not refer to other memory locations. Technically, concurrent
@@ -217,7 +268,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * As noted above, thunks are a rather special (yet quite common) case. In
  * particular, they have the unique property of being updatable (that is, can
  * be transformed from a thunk into an indirection after evaluation). This
- * transformation requires its own synchronization protocol mediating the
+ * transformation requires its own synchronization protocol to mediate the
  * interaction between the updater and the reader. In particular, we
  * must ensure that a reader examining a thunk being updated by another core
  * can see the indirectee. Consequently, a thunk update (see rts/Updates.h)
@@ -356,6 +407,11 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  * The work-stealing queue (WSDeque) also requires barriers; these are
  * documented in WSDeque.c.
+ *
+ * Verifying memory ordering
+ * -------------------------
+ * To verify that GHC's RTS and the code produced by the compiler are free of
+ * data races.
  *
  */
 
