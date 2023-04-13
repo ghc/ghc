@@ -248,7 +248,13 @@ tcTyClDecls tyclds kisig_env role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
-         (tc_tycons, kindless) <- kcTyClGroup kisig_env tyclds
+         (tc_tycons, kindless) <- checkNoErrs $
+                                  kcTyClGroup kisig_env tyclds
+            -- checkNoErrs: If the TyCons are ill-kinded, stop now.  Else we
+            -- can get follow-on errors. Example: #23252, where the TyCon
+            -- had an ill-scoped kind forall (d::k) k (a::k). blah
+            -- and that ill-scoped kind made role inference fall over.
+
        ; traceTc "tcTyAndCl generalized kinds" (vcat (map ppr_tc_tycon tc_tycons))
 
             -- Step 2: type-check all groups together, returning
