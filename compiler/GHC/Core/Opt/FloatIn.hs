@@ -177,7 +177,6 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
            -- length ann_args = length arg_fvs = length arg_drops
   where
     (ann_fun, ann_args, ticks) = collectAnnArgsTicks tickishFloatable ann_expr
-    fun_ty  = exprType (deAnnotate ann_fun)
     fun_fvs = freeVarsOf ann_fun
 
     (drop_here, fun_drop : arg_drops)
@@ -189,7 +188,7 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
          -- lists without evaluating extra_fvs, and hence without
          -- peering into each argument
 
-    ((_,here_fvs), arg_fvs) = mapAccumL add_arg (fun_ty, here_fvs0) ann_args
+    (here_fvs, arg_fvs) = mapAccumL add_arg here_fvs0 ann_args
     here_fvs0 = case ann_fun of
                    (_, AnnVar _) -> fun_fvs
                    _             -> emptyDVarSet
@@ -198,15 +197,14 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
           -- join point, floating it in isn't especially harmful but it's
           -- useless since the simplifier will immediately float it back out.)
 
-    add_arg :: (Type,FreeVarSet) -> CoreExprWithFVs -> ((Type,FreeVarSet),FreeVarSet)
-    add_arg (fun_ty, here_fvs) (arg_fvs, AnnType ty)
-      = ((piResultTy fun_ty ty, here_fvs), arg_fvs)
-    -- We can't float into some arguments, so put them into the here_fvs
-    add_arg (fun_ty, here_fvs) (arg_fvs, arg)
-      | noFloatIntoArg arg arg_ty = ((res_ty,here_fvs `unionDVarSet` arg_fvs), emptyDVarSet)
-      | otherwise          = ((res_ty,here_fvs), arg_fvs)
+    add_arg :: FreeVarSet -> CoreExprWithFVs -> (FreeVarSet,FreeVarSet)
+    add_arg here_fvs (arg_fvs, AnnType _)
+      = (here_fvs, arg_fvs)
+    add_arg here_fvs (arg_fvs, arg)
+      | noFloatIntoArg arg arg_ty = (here_fvs `unionDVarSet` arg_fvs, emptyDVarSet)
+      | otherwise          = (here_fvs, arg_fvs)
       where
-       (_, arg_ty, res_ty) = splitFunTy fun_ty
+       arg_ty = exprType $ deAnnotate' arg
 
 {- Note [Dead bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
