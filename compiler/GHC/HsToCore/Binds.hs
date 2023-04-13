@@ -252,16 +252,15 @@ dsHsBind
                         , abs_exports = exports
                         , abs_ev_binds = ev_binds
                         , abs_binds = binds, abs_sig = has_sig }))
-  = do { ds_binds <- addTyCs FromSource (listToBag dicts) $
+  = dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
+    { ds_binds <- addTyCs FromSource (listToBag dicts) $
                      dsLHsBinds binds
              -- addTyCs: push type constraints deeper
              --            for inner pattern match check
              -- See Check, Note [Long-distance information]
 
-       ; dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
-
-       -- dsAbsBinds does the hard work
-       { dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingletonBag binds) has_sig } }
+    -- dsAbsBinds does the hard work
+    ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingletonBag binds) has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
