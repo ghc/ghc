@@ -86,7 +86,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     }
     OVERWRITING_CLOSURE(p1);
     RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
-    SET_INFO_RELEASE(p1, &stg_BLACKHOLE_info);
+    SET_INFO_RELAXED(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
 }
 
