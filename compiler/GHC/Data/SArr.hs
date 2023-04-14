@@ -230,8 +230,8 @@ zipWithEqual msg f a b
 {-# INLINE zipWithEqual #-}
 
 zipWith :: (a -> b -> c) -> SArr a -> SArr b -> SArr c
-zipWith f a b = fromListN (min (len a) (len b)) $ Prelude.zipWith f (toList a) (toList b)
-{-# INLINE [2] zipWith #-}
+zipWith f a b = zipWithS f (slice a) (slice b)
+{-# INLINE zipWith #-}
 
 zipWith3 :: HasDebugCallStack => (a -> b -> c -> d) -> SArr a -> SArr b -> SArr c -> SArr d
 zipWith3 f a b c = fromListN (len a `min` len b `min` len c) $
@@ -331,6 +331,14 @@ toSArr = \sl -> fromList . drp (s_begin sl) . tk (s_end sl) . toList $ s_arr sl
 "slice/toSArr" forall sl.  slice (toSArr sl)  = sl
 "toSArr/slice" forall arr. toSArr (slice arr) = arr
 #-}
+
+-- TODO: More efficient implementation
+zipWithS :: (a -> b -> c) -> Slice a -> Slice b -> SArr c
+zipWithS f a b =
+    fromListN n $ Prelude.zipWith f (Exts.toList a) (Exts.toList b)
+  where
+    n = length a `min` length b
+{-# INLINE[2] zipWithS #-}
 
 instance Exts.IsList (Slice a) where
   type Item (Slice a) = a
