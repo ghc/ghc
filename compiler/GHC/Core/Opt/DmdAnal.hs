@@ -81,6 +81,9 @@ data WithDmdType a = WithDmdType !DmdType !a
 getAnnotated :: WithDmdType a -> a
 getAnnotated (WithDmdType _ a) = a
 
+instance Functor WithDmdType where
+    fmap f (WithDmdType t x) = WithDmdType t (f x)
+
 data DmdResult a b = R !a !b
 
 -- | Outputs a new copy of the Core program in which binders have been annotated
@@ -359,16 +362,22 @@ dmdAnalBindLetUp top_lvl env id rhs anal_body = WithDmdType final_ty (R (NonRec 
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalBindLetDown :: TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> WithDmdType a) -> WithDmdType (DmdResult CoreBind a)
+dmdAnalBindLetDown :: forall a. TopLevelFlag -> AnalEnv -> SubDemand -> CoreBind -> (AnalEnv -> WithDmdType a) -> WithDmdType (DmdResult CoreBind a)
 dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
   NonRec id rhs
     | (env', lazy_fv, id1, rhs1) <-
         dmdAnalRhsSig top_lvl NonRecursive env dmd id rhs
-    -> do_rest env' lazy_fv [(id1, rhs1)] (uncurry NonRec . only)
+    -> do_rest env' lazy_fv
+         [(id1, rhs1)]
+         (uncurry NonRec . only . SArr.toList)
   Rec pairs
     | (env', lazy_fv, pairs') <- dmdFix top_lvl env dmd pairs
-    -> do_rest env' lazy_fv pairs' Rec
+    -> do_rest env' lazy_fv pairs' (Rec . SArr.toList)
   where
+    do_rest :: AnalEnv -> DmdEnv
+            -> [(Id, b)]
+            -> (SArr (Id, b) -> CoreBind)
+            -> WithDmdType (DmdResult CoreBind a)
     do_rest env' lazy_fv pairs1 build_bind = WithDmdType final_ty (R (build_bind pairs2) body')
       where
         WithDmdType body_ty body'        = anal_body env'
@@ -376,7 +385,7 @@ dmdAnalBindLetDown top_lvl env dmd bind anal_body = case bind of
         dmd_ty                          = addLazyFVs body_ty lazy_fv
         WithDmdType final_ty id_dmds    = findBndrsDmds env' dmd_ty (strictMap fst pairs1)
         -- Important to force this as build_bind might not force it.
-        !pairs2                         = strictZipWith do_one pairs1 id_dmds
+        !pairs2                         = SArr.zipWith do_one (SArr.fromList pairs1) id_dmds
         do_one (id', rhs') dmd          = ((,) $! setBindIdDemandInfo top_lvl id' dmd) $! rhs'
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -519,7 +528,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
           , let !scrut_sd = scrutSubDmd case_bndr_sd fld_dmds
           -- See Note [Demand on case-alternative binders]
           , let !fld_dmds' = fieldBndrDmds scrut_sd (length fld_dmds)
-          , let !bndrs' = setBndrsDemandInfo bndrs fld_dmds'
+          , let !bndrs' = setBndrsDemandInfo bndrs (SArr.slice fld_dmds')
           = (bndrs', scrut_sd)
           | otherwise
           -- DEFAULT alts. Simply add demands and discard the evaluation
@@ -646,7 +655,7 @@ dmdAnalSumAlt env dmd case_bndr (Alt con bndrs rhs)
         scrut_sd = scrutSubDmd case_bndr_sd dmds
         dmds' = fieldBndrDmds scrut_sd (length dmds)
         -- Do not put a thunk into the Alt
-        !new_ids            = setBndrsDemandInfo bndrs dmds'
+        !new_ids            = setBndrsDemandInfo bndrs (SArr.slice dmds')
   = -- pprTrace "dmdAnalSumAlt" (ppr con $$ ppr case_bndr $$ ppr dmd $$ ppr alt_ty) $
     WithDmdType alt_ty (Alt con new_ids rhs')
 
@@ -1145,8 +1154,8 @@ unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
       , dataConRepArity dc <= dmd_unbox_width (ae_opts env)
       , Just (_, ds) <- viewProd (dataConRepArity dc) sd
       , arg_tys <- map scaledThing $ dataConInstArgTys dc tc_args
-      , equalLength ds arg_tys
-      = mkProd Unboxed $! strictZipWith (go_dmd (depth+1)) arg_tys ds
+      , length ds == length arg_tys
+      = mkProd Unboxed $! SArr.zipWith (go_dmd (depth+1)) (SArr.fromList arg_tys) ds
       | otherwise
       = sd
 
@@ -1942,7 +1951,7 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
     --   vcat [text "function:" <+> ppr fn
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
     --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
-    (arg_dmds', set_lam_dmds arg_dmds' rhs)
+    (SArr.toList arg_dmds', set_lam_dmds (SArr.toList arg_dmds') rhs)
     -- set_lam_dmds: we must attach the final boxities to the lambda-binders
     -- of the function, both because that's kosher, and because CPR analysis
     -- uses the info on the binders directly.
@@ -1959,8 +1968,9 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
     -- budget for the next layer down.  See Note [Worker argument budget]
     (remaining_budget, arg_dmds') = go_args (MkB max_wkr_args remaining_budget) arg_triples
 
-    arg_triples :: [(Type, StrictnessMark, Demand)]
-    arg_triples = take threshold_arity $
+    arg_triples :: SArr (Type, StrictnessMark, Demand)
+    arg_triples = SArr.take threshold_arity $
+                  SArr.fromList $
                   [ (bndr_ty, NotMarkedStrict, get_dmd bndr bndr_ty)
                   | bndr <- bndrs
                   , isRuntimeVar bndr, let bndr_ty = idType bndr ]
@@ -1983,7 +1993,7 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
     -- is_bot_fn:  see Note [Boxity for bottoming functions]
     is_bot_fn = div == botDiv
 
-    go_args :: Budgets -> [(Type,StrictnessMark,Demand)] -> (Budgets, [Demand])
+    go_args :: Budgets -> SArr (Type,StrictnessMark,Demand) -> (Budgets, SArr Demand)
     go_args bg triples = mapAccumL go_arg bg triples
 
     go_arg :: Budgets -> (Type,StrictnessMark,Demand) -> (Budgets, Demand)
@@ -2065,10 +2075,10 @@ finaliseLetBoxity env ty dmd
       case wantToUnboxArg env ty str dmd of
         DropAbsent      -> dmd
         DontUnbox       -> trimBoxity dmd
-        DoUnbox triples -> n :* (mkProd Unboxed $! map go triples)
+        DoUnbox triples -> n :* (mkProd Unboxed $! SArr.map go triples)
 
 wantToUnboxArg :: AnalEnv -> Type -> StrictnessMark -> Demand
-               -> UnboxingDecision [(Type, StrictnessMark, Demand)]
+               -> UnboxingDecision (SArr (Type, StrictnessMark, Demand))
 wantToUnboxArg env ty str_mark dmd@(n :* _)
   = case canUnboxArg (ae_fam_envs env) ty dmd of
       DropAbsent -> DropAbsent
@@ -2088,9 +2098,10 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
        -> DontUnbox
 
        | otherwise  -- Bad cases dealt with: we want to unbox!
-       -> DoUnbox (zip3 (dubiousDataConInstArgTys dc tc_args)
-                        (dataConRepStrictness dc)
-                        dmds)
+       -> DoUnbox (SArr.zipWith3 (,,)
+                            (dubiousDataConInstArgTys dc tc_args)
+                            (SArr.fromList $ dataConRepStrictness dc)
+                            dmds)
 
 {- *********************************************************************
 *                                                                      *
@@ -2453,10 +2464,10 @@ addInScopeAnalEnvs env ids = env { ae_sigs = delVarEnvList (ae_sigs env) ids }
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
-findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> WithDmdType [Demand]
+findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> WithDmdType (SArr Demand)
 -- Return the demands on the Ids in the [Var]
 findBndrsDmds env dmd_ty bndrs
-  = go dmd_ty bndrs
+  = fmap SArr.fromList (go dmd_ty bndrs)
   where
     go dmd_ty []  = WithDmdType dmd_ty []
     go dmd_ty (b:bs)

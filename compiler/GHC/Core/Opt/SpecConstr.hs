@@ -2104,7 +2104,7 @@ calcSpecInfo fn arg_bndrs (CP { cp_qvars = qvars, cp_args = pats }) extra_bndrs
     val_pats   = filterOut isTypeArg pats
                  -- Value args at call sites, used to determine how many demands to drop
                  -- from the original functions demand and for setting up dmd_env.
-    dmd_env    = go emptyVarEnv fn_dmds val_pats
+    dmd_env    = go emptyVarEnv (SArr.slice $ SArr.fromList fn_dmds) val_pats
     qvar_dmds  = [ lookupVarEnv dmd_env qv `orElse` topDmd | qv <- qvars, isId qv ]
     extra_dmds = dropList val_pats fn_dmds
 

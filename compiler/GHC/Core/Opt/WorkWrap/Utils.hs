@@ -59,8 +59,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
-import GHC.Exts
-
 import Control.Applicative ( (<|>) )
 import Control.Monad ( zipWithM )
 import Data.List ( unzip4 )
@@ -982,7 +980,7 @@ unbox_one_arg opts arg_var
              -- don't end up in lambda binders of the worker.
              -- See Note [Never put `OtherCon` unfoldings on lambda binders]
              arg_ids' = map zapIdUnfolding $
-                        zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids ds
+                        zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids (SArr.toList ds)
 
              unbox_fn = mkUnpackCase (Var arg_var) co (idMult arg_var)
                                      dc (ex_tvs' ++ arg_ids')
@@ -1280,8 +1278,8 @@ also unbox its components. That is governed by the `usefulSplit` mechanism.
 -- existentials this function \"dubious\"; only use it where type variables
 -- aren't substituted for!  Why may the data con bind existentials?
 --    See Note [Which types are unboxed?]
-dubiousDataConInstArgTys :: DataCon -> [Type] -> [Type]
-dubiousDataConInstArgTys dc tc_args = arg_tys
+dubiousDataConInstArgTys :: DataCon -> [Type] -> SArr Type
+dubiousDataConInstArgTys dc tc_args = SArr.fromList arg_tys
   where
     univ_tvs        = dataConUnivTyVars dc
     ex_tvs          = dataConExTyCoVars dc
@@ -1335,7 +1333,7 @@ findTypeShape fam_envs ty
          -- don't matter.
          -- We really do encounter existentials here, see
          -- Note [Which types are unboxed?] for an example.
-       = TsProd (map (go rec_tc) (dubiousDataConInstArgTys con tc_args))
+       = TsProd (SArr.map (go rec_tc) (dubiousDataConInstArgTys con tc_args))
 
        | Just (ty', _) <- instNewTyCon_maybe tc tc_args
        , Just rec_tc <- checkRecTc rec_tc tc
@@ -1542,7 +1540,7 @@ unbox_one_result opts res_bndr
   massert (null _exs) -- Should have been caught by canUnboxResult
 
   (nested_useful, transit_vars, con_args, work_unbox_res) <-
-    mkWWcpr opts arg_ids arg_cprs
+    mkWWcpr opts arg_ids (SArr.toList arg_cprs)
 
   let -- rebuilt_result = (C a b |> sym co)
       rebuilt_result = mkConApp dc (map Type tc_args ++ con_args) `mkCast` mkSymCo co

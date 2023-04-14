@@ -756,7 +756,7 @@ polyFieldDmd b     n    = n :* Poly b n & assertPpr (isCardNonOnce n) (ppr n)
 --   * Rewrites @!P(L!L,L!L)@ (e.g., arguments @Unboxed@, @[L!L,L!L]@) to @!L@
 --   * Does not rewrite @P(1L)@, @P(L!L)@, @!P(L)@ or @P(L,A)@
 --
-mkProd :: Boxity -> [Demand] -> SubDemand
+mkProd :: Boxity -> SArr Demand -> SubDemand
 mkProd b ds
   | SArr.all (== AbsDmd) ds = Poly b C_00
   | SArr.all (== BotDmd) ds = Poly b C_10
@@ -811,7 +811,7 @@ seqDmd = C_11 :* seqSubDmd
 -- | Sets 'Boxity' to 'Unboxed' for non-'Call' sub-demands and recurses into 'Prod'.
 unboxDeeplySubDmd :: SubDemand -> SubDemand
 unboxDeeplySubDmd (Poly _ n)  = Poly Unboxed n
-unboxDeeplySubDmd (Prod _ ds) = mkProd Unboxed (strictMap unboxDeeplyDmd ds)
+unboxDeeplySubDmd (Prod _ ds) = mkProd Unboxed (SArr.map unboxDeeplyDmd ds)
 unboxDeeplySubDmd call@Call{} = call
 
 -- | Sets 'Boxity' to 'Unboxed' for the 'Demand', recursing into 'Prod's.
@@ -850,7 +850,7 @@ multSubDmd C_10 (Poly _ n)   = if isStrict n then botSubDmd else seqSubDmd -- Ot
 multSubDmd C_10 (Call n _)   = if isStrict n then botSubDmd else seqSubDmd -- Otherwise we'd call `mkCall` with absent cardinality
 multSubDmd n    (Poly b m)   = Poly b (multCard n m)
 multSubDmd n    (Call n' sd) = mkCall (multCard n n') sd
-multSubDmd n    (Prod b ds)  = mkProd b (strictMap (multDmd n) ds)
+multSubDmd n    (Prod b ds)  = mkProd b (SArr.map (multDmd n) ds)
 
 lazifyIfStrict :: Card -> SubDemand -> SubDemand
 lazifyIfStrict n sd = multSubDmd (glbCard C_01 n) sd
@@ -1002,7 +1002,7 @@ strictifyDictDmd :: Type -> Demand -> Demand
 strictifyDictDmd ty (n :* Prod b ds)
   | not (isAbs n)
   , Just field_tys <- as_non_newtype_dict ty
-  = C_1N :* mkProd b (SArr.zipWith strictifyDictDmd (fromList field_tys) ds)
+  = C_1N :* mkProd b (SArr.zipWith strictifyDictDmd (SArr.fromList field_tys) ds)
       -- main idea: ensure it's strict
   where
     -- Return a TyCon and a list of field types if the given
@@ -2244,10 +2244,10 @@ transferBoxity from to = go_dmd from to
             to_n :* Poly from_b to_c
           (_, Prod _ to_ds)
             | Just (from_b, from_ds) <- viewProd (length to_ds) from_sd
-            -> to_n :* mkProd from_b (strictZipWith go_dmd from_ds to_ds)
+            -> to_n :* mkProd from_b (SArr.zipWith go_dmd from_ds to_ds)
           (Prod from_b from_ds, _)
             | Just (_, to_ds) <- viewProd (length from_ds) to_sd
-            -> to_n :* mkProd from_b (strictZipWith go_dmd from_ds to_ds)
+            -> to_n :* mkProd from_b (SArr.zipWith go_dmd from_ds to_ds)
           _ -> trimBoxity to_dmd
 
 transferArgBoxityDmdType :: DmdType -> DmdType -> DmdType
@@ -2327,7 +2327,7 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
   where
     arity = length str_marks
     (n, body_sd) = peelManyCalls arity sd
-    mk_body_ty n dmds = DmdType emptyDmdEnv (zipWith (bump n) str_marks dmds) topDiv
+    mk_body_ty n dmds = DmdType emptyDmdEnv (SArr.toList $ SArr.zipWith (bump n) (SArr.fromList str_marks) dmds) topDiv
     bump n str dmd | isMarkedStrict str = multDmd n (plusDmd str_field_dmd dmd)
                    | otherwise          = multDmd n dmd
     str_field_dmd = C_01 :* seqSubDmd -- Why not C_11? See Note [Data-con worker strictness]
