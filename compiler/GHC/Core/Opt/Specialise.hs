@@ -48,10 +48,11 @@ import GHC.Types.Unique.DFM
 import GHC.Types.Name
 import GHC.Types.Tickish
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Types.Var      ( PiTyBinder(..), isLocalVar, isInvisibleFunArg )
+import GHC.Types.Var      ( PiTyBinder(..), isLocalVar, isInvisibleFunArg, mkLocalVar )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Error
 
 import GHC.Utils.Error ( mkMCDiagnostic )
@@ -59,6 +60,7 @@ import GHC.Utils.Monad    ( foldlM )
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain( assert )
 
 import GHC.Unit.Module( Module )
 import GHC.Unit.Module.ModGuts
@@ -1748,12 +1750,44 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                    | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
 
                  join_arity_decr = length rule_lhs_args - length spec_bndrs
-                 spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
-                                 = Just (orig_join_arity - join_arity_decr)
-                                 | otherwise
-                                 = Nothing
 
-           ; spec_fn <- newSpecIdSM fn spec_fn_ty spec_join_arity
+                 --------------------------------------
+                 -- Add a suitable unfolding; see Note [Inline specialisations]
+                 -- The wrap_unf_body applies the original unfolding to the specialised
+                 -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
+                 simpl_opts = initSimpleOpts dflags
+                 wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
+                 spec_unf = specUnfolding simpl_opts spec_bndrs wrap_unf_body
+                                          rule_lhs_args fn_unf
+
+                 --------------------------------------
+                 -- Adding arity information just propagates it a bit faster
+                 --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
+                 -- Copy InlinePragma information from the parent Id.
+                 -- So if f has INLINE[1] so does spec_fn
+                 arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
+
+                 spec_inl_prag
+                   | not is_local     -- See Note [Specialising imported functions]
+                   , isStrongLoopBreaker (idOccInfo fn) -- in GHC.Core.Opt.OccurAnal
+                   = neverInlinePragma
+                   | otherwise
+                   = inl_prag
+
+                 spec_fn_info
+                   = vanillaIdInfo `setArityInfo`      max 0 (fn_arity - arity_decr)
+                                   `setInlinePragInfo` spec_inl_prag
+                                   `setUnfoldingInfo`  spec_unf
+
+                 -- Compute the IdDetails of the specialise Id
+                 -- See Note [Transfer IdDetails during specialisation]
+                 spec_fn_details
+                   = case idDetails fn of
+                       JoinId join_arity _ -> JoinId (join_arity - join_arity_decr) Nothing
+                       DFunId is_nt        -> DFunId is_nt
+                       _                   -> VanillaId
+
+           ; spec_fn <- newSpecIdSM fn spec_fn_ty spec_fn_details spec_fn_info
            ; let
                 -- The rule to put in the function's specialisation is:
                 --      forall x @b d1' d2'.
@@ -1768,33 +1802,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                                     herald fn rule_bndrs rule_lhs_args
                                     (mkVarApps (Var spec_fn) spec_bndrs)
 
-                simpl_opts = initSimpleOpts dflags
-
-                --------------------------------------
-                -- Add a suitable unfolding; see Note [Inline specialisations]
-                -- The wrap_unf_body applies the original unfolding to the specialised
-                -- arguments, not forgetting to wrap the dx_binds around the outside (#22358)
-                wrap_unf_body body = foldr (Let . db_bind) (body `mkApps` spec_args) dx_binds
-                spec_unf = specUnfolding simpl_opts spec_bndrs wrap_unf_body
-                                         rule_lhs_args fn_unf
-
-                spec_inl_prag
-                  | not is_local     -- See Note [Specialising imported functions]
-                  , isStrongLoopBreaker (idOccInfo fn) -- in GHC.Core.Opt.OccurAnal
-                  = neverInlinePragma
-                  | otherwise
-                  = inl_prag
-
-                --------------------------------------
-                -- Adding arity information just propagates it a bit faster
-                --      See Note [Arity decrease] in GHC.Core.Opt.Simplify
-                -- Copy InlinePragma information from the parent Id.
-                -- So if f has INLINE[1] so does spec_fn
-                arity_decr     = count isValArg rule_lhs_args - count isId spec_bndrs
-                spec_f_w_arity = spec_fn `setIdArity`      max 0 (fn_arity - arity_decr)
-                                         `setInlinePragma` spec_inl_prag
-                                         `setIdUnfolding`  spec_unf
-                                         `asJoinId_maybe`  spec_join_arity
+                spec_f_w_arity = spec_fn
 
                 _rule_trace_doc = vcat [ ppr fn <+> dcolon <+> ppr fn_type
                                        , ppr spec_fn  <+> dcolon <+> ppr spec_fn_ty
@@ -1824,7 +1832,7 @@ specLookupRule env fn args phase rules
 
 {- Note [Specialising DFuns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DFuns have a special sort of unfolding (DFunUnfolding), and these are
+DFuns have a special sort of unfolding (DFunUnfolding), and it is
 hard to specialise a DFunUnfolding to give another DFunUnfolding
 unless the DFun is fully applied (#18120).  So, in the case of DFunIds
 we simply extend the CallKey with trailing UnspecTypes/UnspecArgs,
@@ -1832,6 +1840,36 @@ so that we'll generate a rule that completely saturates the DFun.
 
 There is an ASSERT that checks this, in the DFunUnfolding case of
 GHC.Core.Unfold.Make.specUnfolding.
+
+Note [Transfer IdDetails during specialisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When specialising a function, `newSpecIdSM` comes up with a fresh Id the
+specialised RHS will be bound to. It is critical that we get the `IdDetails` of
+the specialised Id correct:
+
+* JoinId: We want the specialised Id to be a join point, too.  But
+  we have to carefully adjust the arity
+
+* DFunId: It is crucial that we also make the new Id a DFunId.
+  - First, because it obviously /is/ a DFun, having a DFunUnfolding and
+    all that; see Note [Specialising DFuns]
+
+  - Second, DFuns get very delicate special treatment in the demand analyser;
+    see GHC.Core.Opt.DmdAnal.enterDFun.  If the specialised function isn't
+    also a DFunId, this special treatment doesn't happen, so the demand
+    analyser makes a too-strict DFun, and we get an infinite loop.  See Note
+    [Do not strictify a DFun's parameter dictionaries] in GHC.Core.Opt.DmdAnal.
+    #22549 describes the loop, and (lower down) a case where a /specialised/
+    DFun caused a loop.
+
+* WorkerLikeId: Introduced by WW, so after Specialise. Nevertheless, they come
+  up when specialising imports. We must keep them as VanillaIds because WW
+  will detect them as WorkerLikeIds again. That is, unless specialisation
+  allows unboxing of all previous CBV args, in which case sticking to
+  VanillaIds was the only correct choice to begin with.
+
+* RecSelId, DataCon*Id, ClassOpId, PrimOpId, FCallId, CoVarId, TickBoxId:
+  Never specialised.
 
 Note [Specialisation Must Preserve Sharing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3439,15 +3477,15 @@ newDictBndr env@(SE { se_subst = subst }) b
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }
 
-newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
+newSpecIdSM :: Id -> Type -> IdDetails -> IdInfo -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
-newSpecIdSM old_id new_ty join_arity_maybe
+newSpecIdSM old_id new_ty details info
   = do  { uniq <- getUniqueM
-        ; let name    = idName old_id
-              new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocal new_occ uniq ManyTy new_ty (getSrcSpan name)
-                          `asJoinId_maybe` join_arity_maybe
-        ; return new_id }
+        ; let old_name = idName old_id
+              new_occ  = mkSpecOcc (nameOccName old_name)
+              new_name = mkInternalName uniq new_occ  (getSrcSpan old_name)
+        ; return (assert (not (isCoVarType new_ty)) $
+                  mkLocalVar details new_name ManyTy new_ty info) }
 
 {-
                 Old (but interesting) stuff about unboxed bindings
