@@ -57,6 +57,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
+import GHC.Exts
+
 import Control.Applicative ( (<|>) )
 import Control.Monad ( zipWithM )
 import Data.List ( unzip4 )

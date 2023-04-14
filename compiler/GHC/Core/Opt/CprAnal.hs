@@ -32,6 +32,8 @@ import GHC.Core.Opt.WorkWrap.Utils
 
 import GHC.Data.Graph.UnVar -- for UnVarSet
 
+import GHC.Exts ( IsList(..) )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -689,7 +691,7 @@ argCprType dmd = CprType 0 (go dmd)
   where
     go (n :* sd)
       | isAbs n               = topCpr
-      | Prod Unboxed ds <- sd = ConCpr fIRST_TAG (strictMap go ds)
+      | Prod Unboxed ds <- sd = ConCpr fIRST_TAG (strictMap go (toList ds))
       | Poly Unboxed _  <- sd = ConCpr fIRST_TAG []
       | otherwise             = topCpr
 

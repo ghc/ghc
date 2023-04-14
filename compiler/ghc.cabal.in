@@ -384,6 +384,7 @@ Library
         GHC.Data.Maybe
         GHC.Data.OrdList
         GHC.Data.Pair
+        GHC.Data.SArr
         GHC.Data.SmallArray
         GHC.Data.Stream
         GHC.Data.Strict
