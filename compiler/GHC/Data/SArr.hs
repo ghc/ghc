@@ -346,7 +346,11 @@ instance Exts.IsList (Slice a) where
   {-# INLINE fromList #-}
   fromListN n = slice . fromListN n
   {-# INLINE fromListN #-}
-  toList = \sl -> List.drop (s_begin sl) . List.take (s_end sl) . toList $ s_arr sl
+  toList sl = Exts.build $ go (s_begin sl) (s_end sl) (s_arr sl)
+    where
+      go !i0 !i1 arr c z
+        | i0 < i1   = (arr ! i0) `c` go (i0+1) i1 arr c z
+        | otherwise = z
   {-# INLINE toList #-}
 
 instance Functor Slice where
