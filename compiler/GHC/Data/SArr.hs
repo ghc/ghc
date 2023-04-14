@@ -342,7 +342,7 @@ instance Exts.IsList (Slice a) where
   {-# INLINE toList #-}
 
 instance Functor Slice where
-  fmap f sl = sl { s_arr = fmap f (s_arr sl) }
+  fmap f sl = slice $ map f (toSArr sl)
   {-# INLINE fmap #-}
 
 instance Foldable Slice where
