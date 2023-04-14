@@ -478,6 +478,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnSpecialiseNotVisible"                      = 85337
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
   GhcDiagnosticCode "TcRnOrPatBindsVariables"                       = 81303
+  GhcDiagnosticCode "TcRnOrPatHasVisibleTyApps"                     = 28418
   GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = 69710
   GhcDiagnosticCode "TcRnBindMultipleVariables"                     = 92957
   GhcDiagnosticCode "TcRnIllegalKind"                               = 64861

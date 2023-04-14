@@ -2708,8 +2708,17 @@ data TcRnMessage where
      testsuite/tests/typecheck/should_fail/Or3
   -}
   TcRnOrPatBindsVariables
-    :: Pat GhcTc -- the or-pattern
-    -> Bool -- True => pattern contains just (type) variables; False => pattern contains other dictionary/evidence binders
+    :: Pat GhcRn -- the or-pattern
+    -> TcRnMessage
+
+    {-| TcRnOrPatHasVisibleTyApps is an error that happens when
+     a pattern nested in an or-pattern uses a visible type application e.g. (one of Just @Int _).
+
+     Test case:
+     todo
+  -}
+  TcRnOrPatHasVisibleTyApps
+    :: Pat GhcRn -- the or-pattern
     -> TcRnMessage
 
   {- | TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance

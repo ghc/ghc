@@ -401,7 +401,8 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (BangPat x pat', res) }
 
   OrPat _ pats -> do -- or-patterns with variables are rejected later, after zonking
-    { (pats', res) <- tc_lpats (map (const pat_ty) pats) penv pats thing_inside
+    { (pats', (res, pat_ct)) <- tc_lpats (map (const pat_ty) pats) penv pats (captureConstraints thing_inside)
+    ; emitConstraints pat_ct
     ; pat_ty <- expTypeToType (scaledThing pat_ty)
     ; return (OrPat pat_ty pats', res) }
 

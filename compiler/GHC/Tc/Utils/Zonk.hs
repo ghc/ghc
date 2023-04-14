@@ -1347,14 +1347,7 @@ zonk_pat env (TuplePat tys pats boxed)
 zonk_pat env p@(OrPat ty pats)
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; (env', pats') <- zonkPats env pats
-        ; checkNoVarsBound pats' p
         ; return (env', OrPat ty' pats') }
-    where
-      checkNoVarsBound :: [LPat GhcTc] -> Pat GhcTc -> TcRn ()
-      checkNoVarsBound pats orpat = do
-        let bnds = collectPatsBinders CollWithDictBinders pats
-        let varBnds = collectPatsBinders CollNoDictBinders pats
-        unless (null bnds) $ addErr (TcRnOrPatBindsVariables orpat (varBnds `equalLength` bnds))
 
 zonk_pat env (SumPat tys pat alt arity )
   = do  { tys' <- mapM (zonkTcTypeToTypeX env) tys

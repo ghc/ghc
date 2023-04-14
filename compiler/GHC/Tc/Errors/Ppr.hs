@@ -1192,9 +1192,11 @@ instance Diagnostic TcRnMessage where
           -- Is the data con a "covert" GADT?  See Note [isCovertGadtDataCon]
           -- in GHC.Core.DataCon
           sneaky_eq_spec = isCovertGadtDataCon con
-    TcRnOrPatBindsVariables pat vars -> case vars of
-      True -> mkSimpleDecorated $ text "An or-pattern may not bind (type) variables:" <+> ppr pat
-      False -> mkSimpleDecorated $ text "An or-pattern may not bind (type) variables nor type class or equality constraints:" <+> ppr pat
+    TcRnOrPatBindsVariables pat ->
+      mkSimpleDecorated $ text "An or-pattern may not bind (type) variables nor type class or equality constraints:" <+> ppr pat
+    TcRnOrPatHasVisibleTyApps pat
+      -> mkSimpleDecorated $
+        text "An or-pattern may not contain visible type applications:" <+> ppr pat
     TcRnUnsatisfiedMinimalDef mindef
       -> mkSimpleDecorated $
         vcat [text "No explicit implementation for"
@@ -2186,6 +2188,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnOrPatBindsVariables{}
       -> ErrorWithoutFlag
+    TcRnOrPatHasVisibleTyApps{}
+      -> ErrorWithoutFlag
     TcRnUnsatisfiedMinimalDef{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnMisplacedInstSig{}
@@ -2817,6 +2821,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalNewtype{}
       -> noHints
     TcRnOrPatBindsVariables{}
+      -> noHints
+    TcRnOrPatHasVisibleTyApps{}
       -> noHints
     TcRnUnsatisfiedMinimalDef{}
       -> noHints

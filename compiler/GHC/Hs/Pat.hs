@@ -47,6 +47,8 @@ module GHC.Hs.Pat (
 
         collectEvVarsPat, collectEvVarsPats,
 
+        patHasTyAppsL,
+
         pprParendLPat, pprConArgs,
         pprLPat
     ) where
@@ -732,6 +734,7 @@ collectEvVarsPat pat =
     BangPat _ p      -> collectEvVarsLPat p
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
+    OrPat _ ps       -> unionManyBags $ map collectEvVarsLPat ps
     SumPat _ p _ _   -> collectEvVarsLPat p
     ConPat
       { pat_args  = args
@@ -749,6 +752,29 @@ collectEvVarsPat pat =
       ExpansionPat _ p -> collectEvVarsPat p
     _other_pat       -> emptyBag
 
+{-
+% True if the pattern contains a type application, ignoring nested or-patterns.
+-}
+patHasTyApps :: Pat GhcPs -> Bool
+patHasTyApps pat =
+  case pat of
+    LazyPat _ p      -> patHasTyAppsL p
+    AsPat _ _ _ p    -> patHasTyAppsL p
+    ParPat  _ _ p _  -> patHasTyAppsL p
+    BangPat _ p      -> patHasTyAppsL p
+    ListPat _ ps     -> any patHasTyAppsL ps
+    TuplePat _ ps _  -> any patHasTyAppsL ps
+    OrPat _ _        -> False -- this prohibits redundant error messages
+    SumPat _ p _ _   -> patHasTyAppsL p
+    ConPat { pat_args  = args } -> case args of
+      PrefixCon ts ps -> not (null ts) || any patHasTyAppsL ps
+      RecCon fs       -> any (patHasTyAppsL . hfbRHS . unXRec @GhcPs) (rec_flds fs)
+      InfixCon p1 p2  -> any patHasTyAppsL [p1,p2]
+    SigPat  _ p _    -> patHasTyAppsL p
+    _other_pat       -> False
+
+patHasTyAppsL :: GenLocated l (Pat GhcPs) -> Bool
+patHasTyAppsL = patHasTyApps . unLoc
 {-
 ************************************************************************
 *                                                                      *

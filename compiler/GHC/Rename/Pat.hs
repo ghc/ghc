@@ -44,6 +44,7 @@ import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
 import GHC.Hs
+import GHC.Hs.Pat ( patHasTyAppsL )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType ( hsOverLitName )
@@ -611,7 +612,12 @@ rnPatAndThen mk (TuplePat _ pats boxed)
 
 rnPatAndThen mk (OrPat _ pats)
   = do { pats' <- rnLPatsAndThen mk pats
-       ; return (OrPat noExtField pats') }
+       ; let orpat :: Pat GhcRn = OrPat noExtField pats'
+       ; let varBnds = collectPatsBinders CollNoDictBinders pats
+        -- mapM_ (\(b,i) -> pprTraceM ("bnds " ++ show i) b) (zip (map ppr bnds) [0..])
+       ; liftCps $ checkErr (null varBnds) (TcRnOrPatBindsVariables orpat)
+       ; liftCps $ checkErr (not $ any patHasTyAppsL pats) (TcRnOrPatHasVisibleTyApps orpat)
+       ; return orpat }
 
 rnPatAndThen mk (SumPat _ pat alt arity)
   = do { pat <- rnLPatAndThen mk pat

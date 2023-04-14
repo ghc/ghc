@@ -1220,7 +1220,7 @@ collect_pat flag pat bndrs = case pat of
   ListPat _ pats        -> foldr (collect_lpat flag) bndrs pats
   TuplePat _ pats _     -> foldr (collect_lpat flag) bndrs pats
   -- Evidence binders in an OrPat currently aren't visible outside their
-  -- binding pattern. This makes error messages more specific.
+  -- binding pattern. This prohibits redundant error messages.
   OrPat _ _             -> []
   SumPat _ pat _ _      -> collect_lpat flag pat bndrs
   LitPat _ _            -> bndrs
