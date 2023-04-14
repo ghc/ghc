@@ -21,7 +21,7 @@ module GHC.Data.SArr (
       -- * Slicing
       Slice(Empty,(:<|),(:|>)), slice, toSArr, takeS, dropS,
       -- * Other operations
-      all, map, zipWith, zipWith3
+      all, map, zipWithEqual, zipWith, zipWith3
   ) where
 
 import Prelude hiding (replicate, drop, take, head, init, map, all, zipWith, zipWith3)
@@ -31,7 +31,7 @@ import qualified Data.List as List
 import qualified GHC.Exts as Exts
 import qualified GHC.Utils.Binary as Binary
 import GHC.ST
-import GHC.Utils.Misc
+import GHC.Utils.Misc hiding (zipWithEqual)
 import GHC.Utils.Outputable
 
 import Data.Maybe
@@ -222,6 +222,12 @@ all cond = List.all cond . toList
 map :: HasDebugCallStack => (a -> b) -> SArr a -> SArr b
 map f = fromList . Prelude.map f . toList
 {-# INLINE [2] map #-}
+
+zipWithEqual :: String -> (a -> b -> c) -> SArr a -> SArr b -> SArr c
+zipWithEqual msg f a b
+  | length a /= length b = error $ "SArr.zipWithEqual: " ++ msg
+  | otherwise = zipWith f a b
+{-# INLINE zipWithEqual #-}
 
 zipWith :: (a -> b -> c) -> SArr a -> SArr b -> SArr c
 zipWith f a b = fromListN (min (len a) (len b)) $ Prelude.zipWith f (toList a) (toList b)
