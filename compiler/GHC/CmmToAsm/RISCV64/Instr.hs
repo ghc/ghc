@@ -7,7 +7,6 @@ import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Instr hiding (patchRegsOfInstr, takeDeltaInstr, regUsageOfInstr, isMetaInstr, jumpDestsOfInstr)
 import GHC.CmmToAsm.Types
-import GHC.Data.FastString
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Types.Unique.Supply
@@ -38,9 +37,6 @@ data Instr
     LI Reg Integer
   | -- jump pseudo-instruction
     J BlockId
-
-instance Outputable Instr where
-  ppr instr = text "TODO: Outputable Instr ppr"
 
 allocMoreStack ::
   Int ->
@@ -250,11 +246,3 @@ mkStackDeallocInstr ::
   Int ->
   [instr]
 mkStackDeallocInstr _ _ = error "TODO: mkStackDeallocInstr"
-
--- | Pretty-print an instruction
-pprInstr :: Platform -> instr -> SDoc
-pprInstr _ _ = error "TODO: pprInstr"
-
--- Create a comment instruction
-mkComment :: FastString -> [instr]
-mkComment _ = error "mkComment"

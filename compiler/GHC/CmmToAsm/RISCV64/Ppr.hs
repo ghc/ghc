@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-
+{-# LANGUAGE MultiParamTypeClasses #-}
 module GHC.CmmToAsm.RISCV64.Ppr where
 
 import GHC.Cmm hiding (topInfoTable)
@@ -16,9 +16,13 @@ import GHC.Types.Basic
 import GHC.Utils.Outputable
 import Prelude hiding ((<>))
 import GHC.CmmToAsm.Utils
+import GHC.Platform.Reg
+import GHC.Utils.Panic
+import GHC.Types.Unique
 
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
-pprNatCmmDecl _ cmmData@(CmmData _ _) = error $ "TODO: pprNatCmmDecl : " ++ showPprUnsafe cmmData
+pprNatCmmDecl config (CmmData _ _) = error "TODO: pprNatCmmDecl "
+
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config
    in pprProcAlignment config
@@ -34,7 +38,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
               $$
               -- TODO: Is this call to pprSizeDecl needed? (Doc states this .size is only for source compatibility.)
               pprSizeDecl platform lbl
-          Just cmmStaticsRaw@(CmmStaticsRaw info_lbl _) -> error $ "TODO: pprNatCmmDecl : " ++ show cmmStaticsRaw
+          Just (CmmStaticsRaw info_lbl _) -> error "TODO: pprNatCmmDecl : "
 
 pprProcAlignment :: IsDoc doc => NCGConfig -> doc
 pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
@@ -110,7 +114,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
     platform = ncgPlatform config
     maybe_infotable c = case mapLookup blockid info_env of
       Nothing -> c
-      Just cmm@(CmmStaticsRaw info_lbl info) -> error $ "pprBasicBlock " ++ showPprUnsafe cmm
+      Just (CmmStaticsRaw info_lbl info) -> error "pprBasicBlock"
 
 pprInstr :: IsDoc doc => Platform -> Instr -> doc
 pprInstr platform instr = case instr of
@@ -123,8 +127,22 @@ pprInstr platform instr = case instr of
   -- see Note [dualLine and dualDoc] in GHC.Utils.Outputable
   NEWBLOCK _ -> error "pprInstr: NEWBLOCK"
   LDATA _ _ -> error "pprInstr: LDATA"
-  J t -> error "pprInstr: LDATA"
-  LI reg i -> error "pprInstr: LDATA"
+  J label -> line $ pprJ label
+  LI reg immediate -> line $ pprLI reg immediate
+  where
+    pprLI :: IsLine doc => Reg -> Integer -> doc
+    pprLI reg immediate = text "\tli" <+> pprReg reg <> char ',' <+> (text.show) immediate
+
+    pprReg :: IsLine doc => Reg -> doc
+    pprReg (RegReal (RealRegSingle r)) = text "x" <> (text.show) r
+    pprReg (RegVirtual r) = panic $ "RISCV64.Ppr.ppr: Unexpected virtual register " ++ show r
+
+    pprJ :: IsLine doc => BlockId -> doc
+    pprJ label = text "\tj" <+> pprBlockId label
+
+    pprBlockId:: IsLine doc => BlockId -> doc
+    pprBlockId blockId = pprAsmLabel platform (mkLocalBlockLabel (getUnique blockId))
+
 
 -- aarch64 GNU as uses // for comments.
 asmComment :: SDoc -> SDoc
