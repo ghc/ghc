@@ -18,6 +18,7 @@ module GHC.Exts.Stack.Decode
   )
 where
 
+import Control.Monad
 import Data.Bits
 import Data.Maybe
 import Foreign
@@ -32,7 +33,6 @@ import GHC.IO (IO (..))
 import GHC.Stack.CloneStack
 import GHC.Word
 import Prelude
-import Debug.Trace
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -223,13 +223,6 @@ getClosure stackSnapshot# index =
   )
     >>= getBoxedClosureData
 
--- | Iterator state for stack decoding
-data StackFrameIter
-  = -- | Represents a closure on the stack
-    SfiClosure !StackSnapshot# !WordOffset
-  | -- | Represents a primitive word on the stack
-    SfiPrimitive !StackSnapshot# !WordOffset
-
 data LargeBitmap = LargeBitmap
     { largeBitmapSize :: Word
     , largebitmapWords :: Ptr Word
@@ -279,26 +272,15 @@ bitmapWordPointerness bSize bitmapWord =
       (bitmapWord `shiftR` 1)
 
 decodeBitmaps :: StackSnapshot# -> WordOffset -> [Pointerness] -> IO [Closure]
-decodeBitmaps stackSnapshot# index bitmapWords =
-  let bes = toEntries index bitmapWords
-   in do
-    traceM $ "decodeBitmaps - index: " ++ show index ++ " words: " ++ show bitmapWords
-    mapM toBitmapPayload bes
+decodeBitmaps stack# index ps =
+  zipWithM toPayload ps [index..]
   where
-    toBitmapPayload :: StackFrameIter -> IO Closure
-    toBitmapPayload (SfiPrimitive stack# i) = do
-      w <- getWord stack# i
-      pure $ UnknownTypeWordSizedPrimitive w
-    toBitmapPayload (SfiClosure stack# i) = getClosure stack# i
-
-    toEntries :: WordOffset -> [Pointerness] -> [StackFrameIter]
-    toEntries _ [] = []
-    toEntries i (p:ps) =
-      let sn = case p of
-                NonPointer -> SfiPrimitive stackSnapshot# i
-                Pointer -> SfiClosure stackSnapshot# i
-      in
-        sn : toEntries (i + 1) ps
+    toPayload :: Pointerness -> WordOffset -> IO Closure
+    toPayload p i = case p of
+                      NonPointer -> do
+                        w <- getWord stack# i
+                        pure $ UnknownTypeWordSizedPrimitive w
+                      Pointer -> getClosure stack# i
 
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
