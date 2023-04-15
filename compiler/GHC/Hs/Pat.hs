@@ -82,7 +82,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
-import GHC.Driver.Session
+import GHC.Driver.Session (DynFlags, xopt)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
 

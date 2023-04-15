@@ -9,7 +9,8 @@ import GHC.Prelude
 import GHC.Core (CoreRule, CoreExpr, RuleName)
 import GHC.Core.DataCon
 import GHC.Core.Type
-import GHC.Driver.Session
+import GHC.Driver.Session (DynFlags, xopt)
+import GHC.Driver.Flags (WarningFlag)
 import GHC.Hs
 import GHC.HsToCore.Pmc.Solver.Types
 import GHC.Types.Basic (Activation)

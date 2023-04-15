@@ -117,7 +117,7 @@ import GHC.Core
 import GHC.Core.TyCo.Ppr
 import GHC.Utils.FV
 import GHC.Types.Var.Set
-import GHC.Driver.Session
+import GHC.Driver.Session (DynFlags(reductionDepth))
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
