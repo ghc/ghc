@@ -110,52 +110,30 @@ StgWord getBCOLargeBitmapSize(StgClosure *c) {
   return BCO_BITMAP_SIZE(bco);
 }
 
-#define ROUNDUP_BITS_TO_WDS(n)                                                 \
-  (((n) + WORD_SIZE_IN_BITS - 1) / WORD_SIZE_IN_BITS)
-
-// Copied from Cmm.h
-#define SIZEOF_W SIZEOF_VOID_P
-#define WDS(n) ((n)*SIZEOF_W)
-
-static StgArrBytes *largeBitmapToStgArrBytes(Capability *cap,
-                                             StgLargeBitmap *bitmap) {
-  StgWord neededWords = ROUNDUP_BITS_TO_WDS(bitmap->size);
-  StgArrBytes *array =
-      (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + neededWords);
-  SET_HDR(array, &stg_ARR_WORDS_info, CCS_SYSTEM);
-  array->bytes = WDS(ROUNDUP_BITS_TO_WDS(bitmap->size));
-
-  for (int i = 0; i < neededWords; i++) {
-    array->payload[i] = bitmap->bitmap[i];
-  }
-
-  return array;
-}
-
-StgArrBytes *getLargeBitmap(Capability *cap, StgClosure *c) {
+StgWord *getLargeBitmap(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
   const StgInfoTable *info = get_itbl(c);
   StgLargeBitmap *bitmap = GET_LARGE_BITMAP(info);
 
-  return largeBitmapToStgArrBytes(cap, bitmap);
+  return bitmap->bitmap;
 }
 
-StgArrBytes *getRetFunLargeBitmap(Capability *cap, StgRetFun *ret_fun) {
+StgWord *getRetFunLargeBitmap(Capability *cap, StgRetFun *ret_fun) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(ret_fun));
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
   StgLargeBitmap *bitmap = GET_FUN_LARGE_BITMAP(fun_info);
 
-  return largeBitmapToStgArrBytes(cap, bitmap);
+  return bitmap->bitmap;
 }
 
-StgArrBytes *getBCOLargeBitmap(Capability *cap, StgClosure *c) {
+StgWord *getBCOLargeBitmap(Capability *cap, StgClosure *c) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   StgBCO *bco = (StgBCO *)*c->payload;
   StgLargeBitmap *bitmap = BCO_BITMAP(bco);
 
-  return largeBitmapToStgArrBytes(cap, bitmap);
+  return bitmap->bitmap;
 }
 
 StgStack *getUnderflowFrameNextChunk(StgUnderflowFrame *frame) {

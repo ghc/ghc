@@ -77,41 +77,41 @@ getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
 
 // getLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getLargeBitmapzh(P_ stack, W_ offsetWords) {
-  P_ c, stgArrBytes;
+  P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getLargeBitmap(MyCapability(), c);
+  (words) = ccall getLargeBitmap(MyCapability(), c);
   (size) = ccall getLargeBitmapSize(c);
 
-  return (stgArrBytes, size);
+  return (words, size);
 }
 
 // getBCOLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getBCOLargeBitmapzh(P_ stack, W_ offsetWords) {
-  P_ c, stgArrBytes;
+  P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getBCOLargeBitmap(MyCapability(), c);
+  (words) = ccall getBCOLargeBitmap(MyCapability(), c);
   (size) = ccall getBCOLargeBitmapSize(c);
 
-  return (stgArrBytes, size);
+  return (words, size);
 }
 
 // getRetFunLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
-  P_ c, stgArrBytes;
+  P_ c, words;
   W_ size;
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
-  (stgArrBytes) = ccall getRetFunLargeBitmap(MyCapability(), c);
+  (words) = ccall getRetFunLargeBitmap(MyCapability(), c);
   (size) = ccall getRetFunSize(c);
 
-  return (stgArrBytes, size);
+  return (words, size);
 }
 
 // getWordzh(StgStack* stack, StgWord offsetWords)

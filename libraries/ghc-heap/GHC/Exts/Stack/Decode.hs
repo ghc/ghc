@@ -6,6 +6,7 @@
 {-# LANGUAGE GHCForeignImportPrim #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeInType #-}
@@ -17,7 +18,6 @@ module GHC.Exts.Stack.Decode
   )
 where
 
-import Data.Array.Byte
 import Data.Bits
 import Data.Maybe
 import Foreign
@@ -32,6 +32,7 @@ import GHC.IO (IO (..))
 import GHC.Stack.CloneStack
 import GHC.Word
 import Prelude
+import Debug.Trace
 
 {- Note [Decoding the stack]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,7 +146,7 @@ getRetFunType stackSnapshot# index =
             (# s1, rft# #) -> (# s1, W# rft# #)
       )
 
-type LargeBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, ByteArray#, Word# #)
+type LargeBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: LargeBitmapGetter
 
@@ -229,29 +230,60 @@ data StackFrameIter
   | -- | Represents a primitive word on the stack
     SfiPrimitive !StackSnapshot# !WordOffset
 
+data LargeBitmap = LargeBitmap
+    { largeBitmapSize :: Word
+    , largebitmapWords :: Ptr Word
+    }
+
+-- | Is a bitmap entry a closure pointer or a primitive non-pointer?
+data Pointerness = Pointer | NonPointer
+  deriving Show
+
 decodeLargeBitmap :: LargeBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
-  (bitmapArray, size) <- IO $ \s ->
+  largeBitmap <- IO $ \s ->
     case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
-      (# s1, ba#, s# #) -> (# s1, (ByteArray ba#, W# s#) #)
-  let bitmapWords :: [Word] = byteArrayToList bitmapArray
-  decodeBitmaps stackSnapshot# (index + relativePayloadOffset) bitmapWords size
+      (# s1, wordsAddr#, size# #) -> (# s1, LargeBitmap (W# size#) (Ptr wordsAddr#) #)
+  bitmapWords <-largeBitmapToList largeBitmap
+  decodeBitmaps stackSnapshot#
+    (index + relativePayloadOffset)
+    (bitmapWordsPointerness (largeBitmapSize largeBitmap) bitmapWords)
   where
-    byteArrayToList :: ByteArray -> [Word]
-    byteArrayToList (ByteArray bArray) = go 0
-      where
-        go i
-          | i < maxIndex = W# (indexWordArray# bArray (toInt# i)) : go (i + 1)
-          | otherwise = []
-        maxIndex = sizeofByteArray bArray `quot` sizeOf (undefined :: Word)
+    largeBitmapToList :: LargeBitmap -> IO [Word]
+    largeBitmapToList LargeBitmap {..} = cWordArrayToList largebitmapWords $
+      (usedBitmapWords.fromIntegral) largeBitmapSize
 
-    sizeofByteArray :: ByteArray# -> Int
-    sizeofByteArray arr# = I# (sizeofByteArray# arr#)
+    cWordArrayToList :: Ptr Word -> Int -> IO [Word]
+    cWordArrayToList ptr size = mapM (peekElemOff ptr) [0..(size-1)]
 
-decodeBitmaps :: StackSnapshot# -> WordOffset -> [Word] -> Word -> IO [Closure]
-decodeBitmaps stackSnapshot# index bitmapWords size =
-  let bes = wordsToBitmapEntries index bitmapWords size
-   in mapM toBitmapPayload bes
+    usedBitmapWords :: Int -> Int
+    usedBitmapWords 0 = error "Invalid large bitmap size 0."
+    usedBitmapWords size = (size `div` (fromIntegral wORD_SIZE_IN_BITS)) + 1
+
+    bitmapWordsPointerness :: Word -> [Word] -> [Pointerness]
+    bitmapWordsPointerness size _ | size <= 0 = []
+    bitmapWordsPointerness _ [] = []
+    bitmapWordsPointerness size (w:wds) =
+      bitmapWordPointerness (min size (fromIntegral wORD_SIZE_IN_BITS)) w ++
+        bitmapWordsPointerness (size - (fromIntegral wORD_SIZE_IN_BITS)) wds
+
+bitmapWordPointerness :: Word -> Word -> [Pointerness]
+bitmapWordPointerness 0 _ = []
+bitmapWordPointerness bSize bitmapWord =
+  ( if (bitmapWord .&. 1) /= 0
+      then NonPointer
+      else Pointer
+  )
+    : bitmapWordPointerness
+      (bSize - 1)
+      (bitmapWord `shiftR` 1)
+
+decodeBitmaps :: StackSnapshot# -> WordOffset -> [Pointerness] -> IO [Closure]
+decodeBitmaps stackSnapshot# index bitmapWords =
+  let bes = toEntries index bitmapWords
+   in do
+    traceM $ "decodeBitmaps - index: " ++ show index ++ " words: " ++ show bitmapWords
+    mapM toBitmapPayload bes
   where
     toBitmapPayload :: StackFrameIter -> IO Closure
     toBitmapPayload (SfiPrimitive stack# i) = do
@@ -259,42 +291,14 @@ decodeBitmaps stackSnapshot# index bitmapWords size =
       pure $ UnknownTypeWordSizedPrimitive w
     toBitmapPayload (SfiClosure stack# i) = getClosure stack# i
 
-    wordsToBitmapEntries :: WordOffset -> [Word] -> Word -> [StackFrameIter]
-    wordsToBitmapEntries _ [] 0 = []
-    wordsToBitmapEntries _ [] i = error $ "Invalid state: Empty list, size " ++ show i
-    wordsToBitmapEntries _ l 0 = error $ "Invalid state: Size 0, list " ++ show l
-    wordsToBitmapEntries index' (b : bs) bitmapSize =
-      let entries = toBitmapEntries index' b (min bitmapSize (fromIntegral wORD_SIZE_IN_BITS))
-          mbLastFrame = (listToMaybe . reverse) entries
-       in case mbLastFrame of
-            Just sfi' ->
-              entries
-                ++ wordsToBitmapEntries
-                  (getIndex sfi' + 1)
-                  bs
-                  subtractDecodedBitmapWord
-            _ -> error "This should never happen! Recursion ended not in base case."
-      where
-        subtractDecodedBitmapWord :: Word
-        subtractDecodedBitmapWord =
-          fromIntegral $
-            max 0 (fromIntegral bitmapSize - wORD_SIZE_IN_BITS)
-
-        toBitmapEntries :: WordOffset -> Word -> Word -> [StackFrameIter]
-        toBitmapEntries _ _ 0 = []
-        toBitmapEntries i bitmapWord bSize =
-          ( if (bitmapWord .&. 1) /= 0
-              then SfiPrimitive stackSnapshot# i
-              else SfiClosure stackSnapshot# i
-          )
-            : toBitmapEntries
-              (i + 1)
-              (bitmapWord `shiftR` 1)
-              (bSize - 1)
-
-        getIndex :: StackFrameIter -> WordOffset
-        getIndex (SfiClosure _ i) = i
-        getIndex (SfiPrimitive _ i) = i
+    toEntries :: WordOffset -> [Pointerness] -> [StackFrameIter]
+    toEntries _ [] = []
+    toEntries i (p:ps) =
+      let sn = case p of
+                NonPointer -> SfiPrimitive stackSnapshot# i
+                Pointer -> SfiClosure stackSnapshot# i
+      in
+        sn : toEntries (i + 1) ps
 
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
@@ -302,8 +306,7 @@ decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
     (bitmap, size) <- IO $ \s ->
       case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
         (# s1, b#, s# #) -> (# s1, (W# b#, W# s#) #)
-    let bitmapWords = [bitmap | size > 0]
-    decodeBitmaps stackSnapshot# (index + relativePayloadOffset) bitmapWords size
+    decodeBitmaps stackSnapshot# (index + relativePayloadOffset) (bitmapWordPointerness size bitmap)
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
 unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
