@@ -32,9 +32,9 @@ import Data.Maybe (fromMaybe)
 
 import GHC.Stack
 
--- | TODO: verify this!
-stackFrameHeaderSize :: Platform -> Int
-stackFrameHeaderSize _ = 64
+-- | LR and FP (8 byte each) are the prologue of each stack frame
+stackFrameHeaderSize :: Int
+stackFrameHeaderSize = 2 * 8
 
 -- | All registers are 8 byte wide.
 spillSlotSize :: Int
@@ -49,14 +49,13 @@ stackAlign = 16
 maxSpillSlots :: NCGConfig -> Int
 maxSpillSlots config
 --  = 0 -- set to zero, to see when allocMoreStack has to fire.
-    = let platform = ncgPlatform config
-      in ((ncgSpillPreallocSize config - stackFrameHeaderSize platform)
+    = ((ncgSpillPreallocSize config - stackFrameHeaderSize)
          `div` spillSlotSize) - 1
 
 -- | Convert a spill slot number to a *byte* offset, with no sign.
 spillSlotToOffset :: NCGConfig -> Int -> Int
-spillSlotToOffset config slot
-   = stackFrameHeaderSize (ncgPlatform config) + spillSlotSize * slot
+spillSlotToOffset _ slot
+   = stackFrameHeaderSize + spillSlotSize * slot
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
