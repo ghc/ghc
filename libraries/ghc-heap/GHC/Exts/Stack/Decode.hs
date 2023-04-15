@@ -152,6 +152,11 @@ getRetFunType stackSnapshot# index =
             (# s1, rft# #) -> (# s1, W# rft# #)
       )
 
+-- | Gets contents of a `LargeBitmap` (@StgLargeBitmap@)
+--
+-- The first two arguments identify the location of the frame on the stack.
+-- Returned is the `Addr#` of the @StgWord[]@ (bitmap) and it's size. The
+-- `RealWorld` token is used to run this in an `IO` context.
 type LargeBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: LargeBitmapGetter
@@ -160,6 +165,11 @@ foreign import prim "getBCOLargeBitmapzh" getBCOLargeBitmap# :: LargeBitmapGette
 
 foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: LargeBitmapGetter
 
+-- | Gets contents of a small bitmap (fitting in one @StgWord@)
+--
+-- The first two arguments identify the location of the frame on the stack.
+-- Returned is the bitmap and it's size. The `RealWorld` token is used to run
+-- this in an `IO` context.
 type SmallBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word#, Word# #)
 
 foreign import prim "getSmallBitmapzh" getSmallBitmap# :: SmallBitmapGetter
@@ -194,22 +204,22 @@ getStackFields stackSnapshot# = IO $ \s ->
     (# s1, sSize#, sDirty#, sMarking# #) ->
       (# s1, (W32# sSize#, W8# sDirty#, W8# sMarking#) #)
 
--- | Get an interator starting with the top-most stack frame
-stackHead :: StackSnapshot -> (StackSnapshot, WordOffset)
+-- | `StackFrameLocation` of the top-most stack frame
+stackHead :: StackSnapshot -> StackFrameLocation
 stackHead (StackSnapshot s#) = (StackSnapshot s#, 0) -- GHC stacks are never empty
 
 -- | Advance to the next stack frame (if any)
 --
 -- The last `Int#` in the result tuple is meant to be treated as bool
 -- (has_next).
-foreign import prim "advanceStackFrameIterzh"
-  advanceStackFrameIter# ::
+foreign import prim "advanceStackFrameLocationzh"
+  advanceStackFrameLocation# ::
     StackSnapshot# -> Word# -> (# StackSnapshot#, Word#, Int# #)
 
--- | Advance iterator to the next stack frame (if any)
-advanceStackFrameIter :: StackSnapshot -> WordOffset -> Maybe (StackSnapshot, WordOffset)
-advanceStackFrameIter (StackSnapshot stackSnapshot#) index =
-  let !(# s', i', hasNext #) = advanceStackFrameIter# stackSnapshot# (wordOffsetToWord# index)
+-- | Advance to the next stack frame (if any)
+advanceStackFrameLocation :: StackFrameLocation -> Maybe StackFrameLocation
+advanceStackFrameLocation ((StackSnapshot stackSnapshot#), index) =
+  let !(# s', i', hasNext #) = advanceStackFrameLocation# stackSnapshot# (wordOffsetToWord# index)
    in if I# hasNext > 0
         then Just (StackSnapshot s', primWordToWordOffset i')
         else Nothing
@@ -443,12 +453,13 @@ decodeStack (StackSnapshot stack#) = do
     stackFrameLocations :: StackSnapshot -> [StackFrameLocation]
     stackFrameLocations s =
       stackHead s
-        : go (uncurry advanceStackFrameIter (stackHead s))
+        : go (advanceStackFrameLocation (stackHead s))
       where
         go :: Maybe StackFrameLocation -> [StackFrameLocation]
         go Nothing = []
-        go (Just r) = r : go (uncurry advanceStackFrameIter r)
+        go (Just r) = r : go (advanceStackFrameLocation r)
 
 #else
 module GHC.Exts.Stack.Decode where
+import qualified GHC.Base as stack
 #endif

@@ -8,8 +8,8 @@
 // developed.
 #if defined(StgStack_marking)
 
-// advanceStackFrameIterzh(StgStack* stack, StgWord offsetWords)
-advanceStackFrameIterzh (P_ stack, W_ offsetWords) {
+// advanceStackFrameLocationzh(StgStack* stack, StgWord offsetWords)
+advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
   (frameSize) = ccall stackFrameSize(stack, offsetWords);
 
