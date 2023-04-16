@@ -3,6 +3,7 @@
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 tmp=$(mktemp)
+rm -f /root/.cabal/config
 ./gen_ci.hs $tmp
 rm -f jobs.yaml
 echo "### THIS IS A GENERATED FILE, DO NOT MODIFY DIRECTLY" > jobs.yaml
