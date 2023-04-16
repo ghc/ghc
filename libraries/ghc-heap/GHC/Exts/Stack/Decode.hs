@@ -461,5 +461,4 @@ decodeStack (StackSnapshot stack#) = do
 
 #else
 module GHC.Exts.Stack.Decode where
-import qualified GHC.Base as stack
 #endif
