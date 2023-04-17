@@ -233,9 +233,9 @@ cgEnumerationTyCon tycon
              | con <- tyConDataCons tycon]
 
 
+-- | Generate the entry code and associated info table for a constructor.
+-- Where are generating the static closure at all?
 cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
--- Generate the entry code, info tables, and (for niladic constructor)
--- the static closure, for a constructor.
 cgDataCon mn data_con
   = do  { massert (not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con))
         ; profile <- getProfile
