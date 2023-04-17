@@ -1,0 +1,26 @@
+
+T21050.hs:8:18: error: [GHC-25897]
+    • Couldn't match expected type ‘Code m a1’ with actual type ‘p’
+      ‘p’ is a rigid type variable bound by
+        the inferred type of f :: Quote m => p -> Code m T
+        at T21050.hs:8:1-23
+    • In the expression: x
+      In the Template Haskell splice $$(x)
+      In the first argument of ‘MkT’, namely ‘$$(x)’
+    • Relevant bindings include
+        x :: p (bound at T21050.hs:8:3)
+        f :: p -> Code m T (bound at T21050.hs:8:1)
+
+T21050.hs:11:18: error: [GHC-91028]
+    • Couldn't match type ‘a’ with ‘forall a2. a2’
+      Expected: Code Q a
+        Actual: Code Q (forall a. a)
+      Cannot equate type variable ‘a’
+      with a type involving polytypes: forall a2. a2
+      ‘a’ is a rigid type variable bound by
+        a type expected by the context:
+          forall a. a
+        at T21050.hs:11:15-19
+    • In the expression: x
+      In the Template Haskell splice $$(x)
+      In the first argument of ‘MkT’, namely ‘$$(x)’
