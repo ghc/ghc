@@ -974,7 +974,8 @@ loop:
       return;
 
   case THUNK_SELECTOR:
-      eval_thunk_selector(p, (StgSelector *)q, true);
+      copy(p,info,q,THUNK_SELECTOR_sizeW(),gen_no);
+      //eval_thunk_selector(p, (StgSelector *)q, true);
       return;
 
   case IND:
