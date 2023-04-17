@@ -279,28 +279,36 @@ extern StgWord hs_cmpxchg8(StgWord x, StgWord old, StgWord new);
 StgWord
 hs_cmpxchg8(StgWord x, StgWord old, StgWord new)
 {
-  return __sync_val_compare_and_swap((volatile StgWord8 *) x, (StgWord8) old, (StgWord8) new);
+  StgWord8 expected = (StgWord8) old;
+  __atomic_compare_exchange_n((StgWord8 *) x, &expected, (StgWord8) new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return expected;
 }
 
 extern StgWord hs_cmpxchg16(StgWord x, StgWord old, StgWord new);
 StgWord
 hs_cmpxchg16(StgWord x, StgWord old, StgWord new)
 {
-  return __sync_val_compare_and_swap((volatile StgWord16 *) x, (StgWord16) old, (StgWord16) new);
+  StgWord16 expected = (StgWord16) old;
+  __atomic_compare_exchange_n((StgWord16 *) x, &expected, (StgWord16) new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return expected;
 }
 
 extern StgWord hs_cmpxchg32(StgWord x, StgWord old, StgWord new);
 StgWord
 hs_cmpxchg32(StgWord x, StgWord old, StgWord new)
 {
-  return __sync_val_compare_and_swap((volatile StgWord32 *) x, (StgWord32) old, (StgWord32) new);
+  StgWord32 expected = (StgWord32) old;
+  __atomic_compare_exchange_n((StgWord32 *) x, &expected, (StgWord32) new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return expected;
 }
 
 extern StgWord64 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new);
 StgWord64
 hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 {
-  return __sync_val_compare_and_swap((volatile StgWord64 *) x, old, new);
+  StgWord64 expected = (StgWord64) old;
+  __atomic_compare_exchange_n((StgWord64 *) x, &expected, (StgWord64) new, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+  return expected;
 }
 
 // Atomic exchange operations
