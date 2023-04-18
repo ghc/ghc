@@ -106,8 +106,8 @@ function h$Thread() {
 #endif
 }
 
-function h$rts_getThreadId(t) {
-  return t.tid;
+function h$rts_getThreadId(t) { // returns a CULLong
+  RETURN_UBX_TUP2((t.tid / Math.pow(2,32))>>>0, (t.tid & 0xFFFFFFFF)>>>0);
 }
 
 function h$cmp_thread(t1,t2) {
@@ -121,11 +121,33 @@ function h$threadString(t) {
   if(t === null) {
     return "<no thread>";
   } else if(t.label) {
-    var str = h$decodeUtf8z(t.label[0], t.label[1]);
+    var str = h$decodeUtf8z(t.label, 0);
     return str + " (" + t.tid + ")";
   } else {
     return (""+t.tid);
   }
+}
+
+function h$getThreadLabel(t) {
+  if (t.label) {
+    RETURN_UBX_TUP2(1, t.label);
+  } else {
+    RETURN_UBX_TUP2(0, 0);
+  }
+}
+
+function h$listThreads() {
+  var r = h$newArray(0,null);
+
+  if (h$currentThread) r.push(h$currentThread);
+
+  var threads_iter = h$threads.iter();
+  while ((t = threads_iter()) !== null) r.push(t);
+
+  var blocked_iter = h$blocked.iter();
+  while ((t = blocked_iter.next()) !== null) r.push(t);
+
+  return r;
 }
 
 function h$fork(a, inherit) {
@@ -1134,7 +1156,7 @@ function h$main(a) {
   t.stack[8] = a;
   t.stack[9] = h$return;
   t.sp = 9;
-  t.label = [h$encodeUtf8("main"), 0];
+  t.label = h$encodeUtf8("main");
   h$wakeupThread(t);
   h$startMainLoop();
   return t;
