@@ -534,7 +534,7 @@ unariseExpr rho (StgConApp dc n args ty_args)
       return $ (StgConApp dc n args' (map stgArgType args'))
 
 unariseExpr rho (StgOpApp op args ty)
-  = return (StgOpApp op (unariseFunArgs rho args) ty)
+  = return (StgOpApp op (unariseConArgs rho args) ty)
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated

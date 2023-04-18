@@ -20,6 +20,7 @@ import GHC.Prelude hiding ((<*>))
 import GHC.Platform
 import GHC.Platform.Profile
 
+import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Config
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
@@ -78,11 +79,11 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     cfg <- getStgToCmmConfig
-    cmm_args <- getNonVoidArgAmodes args
+    cmm_args <- getArgAmodes (assertNonVoidStgArgs args)
     cmmPrimOpApp cfg primop cmm_args (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
-  = do  { cmm_args <- getNonVoidArgAmodes args
+  = do  { cmm_args <- getArgAmodes (assertNonVoidStgArgs args)
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
 

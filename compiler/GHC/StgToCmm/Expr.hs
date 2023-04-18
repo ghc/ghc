@@ -642,7 +642,7 @@ isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSa
 -- dataToTag# evaluates its argument, see Note [dataToTag# magic] in GHC.Core.Opt.ConstantFold
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do
-    arg_exprs <- getNonVoidArgAmodes stg_args
+    arg_exprs <- getArgAmodes (assertNonVoidStgArgs stg_args)
     cfg       <- getStgToCmmConfig
     -- See Note [Inlining out-of-line primops and heap checks]
     return $! shouldInlinePrimOp cfg op arg_exprs
@@ -971,7 +971,7 @@ maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
 cgConApp :: DataCon -> ConstructorNumber -> [StgArg] -> FCode ReturnKind
 cgConApp con mn stg_args
   | isUnboxedTupleDataCon con       -- Unboxed tuple: assign and return
-  = do { arg_exprs <- getNonVoidArgAmodes stg_args
+  = do { arg_exprs <- getArgAmodes (assertNonVoidStgArgs stg_args)
        ; tickyUnboxedTupleReturn (length arg_exprs)
        ; emitReturn arg_exprs }
 

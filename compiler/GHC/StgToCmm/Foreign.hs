@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE ViewPatterns #-}
+
 module GHC.StgToCmm.Foreign (
   cgForeignCall,
   emitPrimCall,
@@ -672,20 +674,16 @@ getFCallArgs ::
 -- It's (b) that makes this differ from getNonVoidArgAmodes
 -- Precondition: args and typs have the same length
 -- See Note [Unlifted boxed arguments to foreign calls]
-getFCallArgs args typ
+getFCallArgs (assertNonVoidStgArgs -> args) typ
   = do  { mb_cmms <- mapM get (zipEqual "getFCallArgs" args (collectStgFArgTypes typ))
         ; return (catMaybes mb_cmms) }
   where
     get (arg,typ)
-      | null arg_reps
-      = return Nothing
-      | otherwise
-      = do { cmm <- getArgAmode (NonVoid arg)
+      = do { cmm <- getArgAmode arg
            ; profile <- getProfile
            ; return (Just (add_shim profile typ cmm, hint)) }
       where
-        arg_ty   = stgArgType arg
-        arg_reps = typePrimRep arg_ty
+        arg_ty   = stgArgType (fromNonVoid arg)
         hint     = typeForeignHint arg_ty
 
 -- The minimum amount of information needed to determine

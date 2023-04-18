@@ -27,7 +27,7 @@ module GHC.StgToCmm.Layout (
         getHpRelOffset,
 
         ArgRep(..), toArgRep, argRepSizeW, -- re-exported from GHC.StgToCmm.ArgRep
-        getArgAmode, getNonVoidArgAmodes
+        getArgAmode, getArgAmodes, getNonVoidArgAmodes
   ) where
 
 
@@ -600,6 +600,9 @@ stdPattern reps
 getArgAmode :: NonVoid StgArg -> FCode CmmExpr
 getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
 getArgAmode (NonVoid (StgLitArg lit)) = cgLit lit
+
+getArgAmodes :: [NonVoid StgArg] -> FCode [CmmExpr]
+getArgAmodes = mapM getArgAmode
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args,
