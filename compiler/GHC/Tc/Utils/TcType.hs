@@ -2387,22 +2387,32 @@ has a separate call to isStuckTypeFamily, so the `F` above will still be accepte
 -}
 
 
+-- | Why was the LHS 'PatersonSize' not strictly smaller than the RHS 'PatersonSize'?
+--
+-- See Note [Paterson conditions] in GHC.Tc.Validity.
 data PatersonSizeFailure
-  = PSF_TyFam TyCon     -- Type family
-  | PSF_Size            -- Too many type constructors/variables
-  | PSF_TyVar [TyVar]   -- These type variables appear more often than in instance head;
-                        --   no duplicates in this list
+  -- | Either side contains a type family.
+  = PSF_TyFam TyCon
+  -- | The size of the LHS is not strictly less than the size of the RHS.
+  | PSF_Size
+  -- | These type variables appear more often in the LHS than in the RHS.
+  | PSF_TyVar [TyVar] -- ^  no duplicates in this list
 
 --------------------------------------
 
-data PatersonSize    -- See Note [Paterson conditions] in GHC.Tc.Validity
-  = PS_TyFam TyCon   -- Mentions a type family; infinite size
+-- | The Paterson size of a given type, in the sense of
+-- Note [Paterson conditions] in GHC.Tc.Validity
+--
+--   - after expanding synonyms,
+--   - ignoring coercions (as they are not user written).
+data PatersonSize
+  -- | The type mentions a type family, so the size could be anything.
+  = PS_TyFam TyCon
 
-  | PS_Vanilla { ps_tvs :: [TyVar]  -- Free tyvars, including repetitions;
-               , ps_size :: Int     -- Number of type constructors and variables
+  -- | The type does not mention a type family.
+  | PS_Vanilla { ps_tvs :: [TyVar]  -- ^ free tyvars, including repetitions;
+               , ps_size :: Int     -- ^ number of type constructors and variables
     }
-  -- Always after expanding synonyms
-  -- Always ignore coercions (not user written)
   -- ToDo: ignore invisible arguments?  See Note [Invisible arguments and termination]
 
 instance Outputable PatersonSize where
@@ -2415,21 +2425,26 @@ pSizeZero, pSizeOne :: PatersonSize
 pSizeZero = PS_Vanilla { ps_tvs = [], ps_size = 0 }
 pSizeOne  = PS_Vanilla { ps_tvs = [], ps_size = 1 }
 
-ltPatersonSize :: PatersonSize    -- Size of constraint
-               -> PatersonSize    -- Size of instance head; never PS_TyFam
+-- | @ltPatersonSize ps1 ps2@ returns:
+--
+--  - @Nothing@ iff @ps1@ is definitely strictly smaller than @ps2@,
+--  - @Just ps_fail@ otherwise; @ps_fail@ says what went wrong.
+ltPatersonSize :: PatersonSize
+               -> PatersonSize
                -> Maybe PatersonSizeFailure
--- (ps1 `ltPatersonSize` ps2) returns
---     Nothing iff ps1 is strictly smaller than p2
---     Just ps_fail says what went wrong
-ltPatersonSize (PS_TyFam tc) _ = Just (PSF_TyFam tc)
 ltPatersonSize (PS_Vanilla { ps_tvs = tvs1, ps_size = s1 })
                (PS_Vanilla { ps_tvs = tvs2, ps_size = s2 })
   | s1 >= s2                                = Just PSF_Size
   | bad_tvs@(_:_) <- noMoreTyVars tvs1 tvs2 = Just (PSF_TyVar bad_tvs)
   | otherwise                               = Nothing -- OK!
-ltPatersonSize (PS_Vanilla {}) (PS_TyFam tc)
-  = pprPanic "ltPSize" (ppr tc)
-    -- Impossible because we never have a type family in an instance head
+ltPatersonSize (PS_TyFam tc) _ = Just (PSF_TyFam tc)
+ltPatersonSize _ (PS_TyFam tc) = Just (PSF_TyFam tc)
+  -- NB: this last equation is never taken when checking instances, because
+  -- type families are disallowed in instance heads.
+  --
+  -- However, this function is also used in the logic for solving superclass
+  -- constraints (see Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance),
+  -- in which case we might well hit this case (see e.g. T23171).
 
 noMoreTyVars :: [TyVar]  -- Free vars (with repetitions) of the constraint C
              -> [TyVar]  -- Free vars (with repetitions) of the head H
