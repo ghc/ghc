@@ -921,7 +921,7 @@ genPrim prof bound ty op = case op of
   IsCurrentThreadBoundOp -> \[r] [] -> PrimInline $ r |= one_
   NoDuplicateOp -> \[] [] -> PrimInline mempty -- don't need to do anything as long as we have eager blackholing
   ThreadStatusOp -> \[stat,cap,locked] [tid] -> PrimInline $ appT [stat, cap, locked] "h$threadStatus" [tid]
-  ListThreadsOp  -> \[r] [] -> PrimInline $ r |= var "h$threads"
+  ListThreadsOp  -> \[r] [] -> PrimInline $ appT [r] "h$listThreads" []
   GetThreadLabelOp -> \[r1, r2] [t] -> PrimInline $ appT [r1, r2] "h$getThreadLabel" [t]
   LabelThreadOp    -> \[] [t,l] -> PrimInline $ t .^ "label" |= l
 
