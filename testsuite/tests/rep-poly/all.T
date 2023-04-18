@@ -85,7 +85,7 @@ test('RepPolyUnliftedNewtype', normal, compile,
      ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
-test('RepPolyWrappedVar2', js_broken(22576), compile, [''])
+test('RepPolyWrappedVar2', js_broken(23280), compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 

@@ -14,11 +14,11 @@ function h$base_access(file, file_off, mode, c) {
     TRACE_IO("base_access")
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
-        h$fs.stat(fd, function(err, fs) {
-            if(err) {
+        h$fs.access(h$decodeUtf8z(file, file_off), mode, function(err) {
+            if (err) {
                 h$handleErrnoC(err, -1, 0, c);
             } else {
-                c(mode & fs.mode); // fixme is this ok?
+                c(0);
             }
         });
     } else
