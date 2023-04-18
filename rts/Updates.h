@@ -60,7 +60,7 @@
                                                                 \
     OVERWRITING_CLOSURE(p1);                                    \
     %release StgInd_indirectee(p1) = p2;                        \
-    %relaxed SET_INFO(p1, stg_BLACKHOLE_info);                  \
+    %release SET_INFO(p1, stg_BLACKHOLE_info);                  \
     LDV_RECORD_CREATE(p1);                                      \
     and_then;
 
@@ -86,7 +86,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     }
     OVERWRITING_CLOSURE(p1);
     RELEASE_STORE(&((StgInd *)p1)->indirectee, p2);
-    SET_INFO_RELAXED(p1, &stg_BLACKHOLE_info);
+    SET_INFO_RELEASE(p1, &stg_BLACKHOLE_info);
     LDV_RECORD_CREATE(p1);
 }
 

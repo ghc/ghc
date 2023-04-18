@@ -274,10 +274,11 @@ EXTERN_INLINE void load_load_barrier(void);
  * can see the indirectee. Consequently, a thunk update (see rts/Updates.h)
  * does the following:
  *
- *  1. Use a release-store to place the new indirectee into the thunk's
- *     indirectee field
- *  2. use a relaxed-store to set the info table to stg_BLACKHOLE (which
- *     represents an indirection)
+ *  U1. use a release-store to place the new indirectee into the thunk's
+ *      indirectee field
+ *
+ *  U2. use a relaxed-store to set the info table to stg_BLACKHOLE (which
+ *      represents an indirection)
  *
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
  * or lazily, by ThreadPaused.c:threadPaused) is done similarly.
@@ -286,13 +287,47 @@ EXTERN_INLINE void load_load_barrier(void);
  * stg_IND, and stg_IND_STATIC in rts/StgMiscClosure.cmm) does the
  * following:
  *
- *  1. We jump into the entry code of the indirection (e.g. stg_BLACKHOLE);
- *     this of course implies that we have already read the thunk's info table
- *     pointer, which is done with a relaxed load.
- *  2. acquire-load the indirectee. Since thunks are updated at most
- *     once we know that the fence in the last step has given us
- *     an up-to-date view of the indirectee closure.
- *  3. enter the indirectee (or block if the indirectee is a TSO)
+ *  E1. jump into the entry code of the indirection (e.g. stg_BLACKHOLE);
+ *      this of course implies that we have already read the thunk's info table
+ *      pointer, which is done with a relaxed load.
+ *
+ *  E2. acquire-fence
+ *
+ *  E3. acquire-load the indirectee. Since thunks are updated at most
+ *      once we know that the fence in the last step has given us
+ *      an up-to-date view of the indirectee closure.
+ *
+ *  E4. enter the indirectee (or block if the indirectee is a TSO)
+ *
+ * The acquire-fence in step (E2) is somewhat surprising but is necessary as
+ * the C11 memory model does not guarantee that the store (U1) is visible to
+ * (E3) despite (U1) preceding (U2) in program-order (due to the relaxed
+ * ordering of (E3)). This is demonstrated by the following CppMem model:
+ *
+ *     int main() {
+ *       atomic_int x = 0;    // info table pointer
+ *       atomic_int y = 0;    // indirectee
+ *       {{{
+ *         {    // blackhole update
+ *           y.store(1, memory_order_release);                // U1
+ *           x.store(2, memory_order_release);                // U2
+ *         }
+ *       |||
+ *         {    // blackhole entry
+ *           r1=x.load(memory_order_relaxed).readsvalue(2);   // E1
+ *           //fence(memory_order_acquire);                   // E2
+ *           r2=y.load(memory_order_acquire);                 // E3
+ *         }
+ *       }}};
+ *       return 0;
+ *     }
+ *
+ * Under the C11 memory model this program admits an execution where the
+ * indirectee `r2=0`.
+ *
+ * Of course, this could also be addressed by strengthing the ordering of E1
+ * to acquire, but this would incur a significant cost on every closure entry
+ * (including non-blackholes).
  *
  * Other closures
  * --------------
