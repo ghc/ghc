@@ -685,6 +685,12 @@ load_load_barrier(void) {
 // These are typically necessary only in very specific cases (e.g. WSDeque)
 // where the ordered operations aren't expressive enough to capture the desired
 // ordering.
+//
+// Additionally, it is preferable to use the *_FENCE_ON() forms, which turn into
+// memory accesses when compiling for ThreadSanitizer (as ThreadSanitizer is
+// otherwise unable to reason about fences). See Note [ThreadSanitizer] in
+// TSANUtils.h.
+
 #define ACQUIRE_FENCE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 #define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
 #define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
