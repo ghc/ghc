@@ -103,6 +103,7 @@ stmtToInstrs stmt = do
           where ty = cmmRegType reg
                 format = cmmTypeFormat ty
     CmmBranch id          -> genBranch id
+    CmmCall { cml_target = arg } -> genJump arg
     a -> error $ "TODO: stmtToInstrs " ++ (showSDocUnsafe . pdoc platform) a
 
 assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
@@ -146,6 +147,13 @@ getRegister' config plat expr
         CmmInt i w -> error ("TODO: getRegister' CmmInt " ++ show i ++ show w ++ " " ++show expr)
         e -> error ("TODO: getRegister' other " ++ show e)
     e -> error ("TODO: getRegister'" ++ show e)
+
+-- -----------------------------------------------------------------------------
+-- Jumps
+genJump :: CmmExpr{-the branch target-} -> NatM InstrBlock
+genJump expr@(CmmLit (CmmLabel lbl))
+  = return $ unitOL (annExpr expr (J (TLabel lbl)))
+genJump expr = error $ "TODO: genJump " ++ show expr
 
 -- -----------------------------------------------------------------------------
 --  Unconditional branches

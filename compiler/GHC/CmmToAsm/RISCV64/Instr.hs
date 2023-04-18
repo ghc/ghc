@@ -13,6 +13,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import Prelude
 import GHC.Platform.Regs (freeReg)
+import GHC.Cmm.CLabel
 
 data Instr
   = -- comment pseudo-op
@@ -36,7 +37,11 @@ data Instr
   | -- load immediate pseudo-instruction
     LI Reg Integer
   | -- jump pseudo-instruction
-    J BlockId
+    J Target
+
+data Target
+    = TBlock BlockId
+    | TLabel CLabel
 
 allocMoreStack ::
   Int ->
@@ -136,7 +141,7 @@ isJumpishInstr J {} = True
 -- register allocator needs to worry about.
 jumpDestsOfInstr :: Instr -> [BlockId]
 jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
-jumpDestsOfInstr (J t) = [t]
+jumpDestsOfInstr (J (TBlock t)) = [t]
 jumpDestsOfInstr _ = []
 
 -- | Change the destination of this jump instruction.
@@ -231,7 +236,7 @@ takeRegRegMoveInstr J {} = Nothing
 mkJumpInstr ::
   BlockId ->
   [Instr]
-mkJumpInstr id = [J id]
+mkJumpInstr id = [J (TBlock id)]
 
 -- Subtract an amount from the C stack pointer
 mkStackAllocInstr ::

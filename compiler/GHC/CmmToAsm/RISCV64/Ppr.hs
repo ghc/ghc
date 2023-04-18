@@ -137,8 +137,9 @@ pprInstr platform instr = case instr of
     pprReg (RegReal (RealRegSingle r)) = text "x" <> (text.show) r
     pprReg (RegVirtual r) = panic $ "RISCV64.Ppr.ppr: Unexpected virtual register " ++ show r
 
-    pprJ :: IsLine doc => BlockId -> doc
-    pprJ label = text "\tj" <+> pprBlockId label
+    pprJ :: IsLine doc => Target -> doc
+    pprJ (TBlock label) = text "\tj" <+> pprBlockId label
+    pprJ (TLabel label) = text "\tj" <+> pprAsmLabel platform label
 
     pprBlockId:: IsLine doc => BlockId -> doc
     pprBlockId blockId = pprAsmLabel platform (mkLocalBlockLabel (getUnique blockId))
