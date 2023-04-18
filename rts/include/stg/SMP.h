@@ -325,7 +325,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * Under the C11 memory model this program admits an execution where the
  * indirectee `r2=0`.
  *
- * Of course, this could also be addressed by strengthing the ordering of E1
+ * Of course, this could also be addressed by strengthing the ordering of (E1)
  * to acquire, but this would incur a significant cost on every closure entry
  * (including non-blackholes).
  *
