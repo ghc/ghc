@@ -71,7 +71,7 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 
 -- seq# a s ==> a
 -- See Note [seq# magic] in GHC.Core.Opt.ConstantFold
-cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
+cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a] _res_ty) =
   cgIdApp a []
 
 -- dataToTag# :: a -> Int#
@@ -541,7 +541,7 @@ The special case for seq# in cgCase does this:
 is the same as the return convention for just 'a')
 -}
 
-cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _) bndr alt_type alts
+cgCase (StgOpApp (StgPrimOp SeqOp) [StgVarArg a] _) bndr alt_type alts
   = -- Note [Handle seq#]
     -- And see Note [seq# magic] in GHC.Core.Opt.ConstantFold
     -- Use the same return convention as vanilla 'a'.
