@@ -720,20 +720,23 @@ collectStgFArgTypes = go []
     go  _ (CastTy{}) = panic "myCollectTypeArgs: CastTy"
     go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
     go bs (FunTy {ft_arg = arg, ft_res=res}) =
-      go (typeToStgFArgType arg:bs) res
+      case typeToStgFArgType arg of
+        Just b  -> go (b : bs) res
+        Nothing -> go bs res
 
 -- Choose the offset based on the type. For anything other
 -- than an unlifted boxed type, there is no offset.
 -- See Note [Unlifted boxed arguments to foreign calls]
-typeToStgFArgType :: Type -> StgFArgType
+typeToStgFArgType :: Type -> Maybe StgFArgType
 typeToStgFArgType typ
-  | tycon == arrayPrimTyCon = StgArrayType
-  | tycon == mutableArrayPrimTyCon = StgArrayType
-  | tycon == smallArrayPrimTyCon = StgSmallArrayType
-  | tycon == smallMutableArrayPrimTyCon = StgSmallArrayType
-  | tycon == byteArrayPrimTyCon = StgByteArrayType
-  | tycon == mutableByteArrayPrimTyCon = StgByteArrayType
-  | otherwise = StgPlainType
+  | tycon == arrayPrimTyCon = Just StgArrayType
+  | tycon == mutableArrayPrimTyCon = Just StgArrayType
+  | tycon == smallArrayPrimTyCon = Just StgSmallArrayType
+  | tycon == smallMutableArrayPrimTyCon = Just StgSmallArrayType
+  | tycon == byteArrayPrimTyCon = Just StgByteArrayType
+  | tycon == mutableByteArrayPrimTyCon = Just StgByteArrayType
+  | isZeroBitTy typ = Nothing
+  | otherwise = Just StgPlainType
   where
   -- Should be a tycon app, since this is a foreign call. We look
   -- through newtypes so the offset does not change if a user replaces
