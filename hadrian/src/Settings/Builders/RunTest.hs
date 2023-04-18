@@ -105,7 +105,11 @@ inTreeCompilerArgs stg = do
     tables_next_to_code <- flag TablesNextToCode
     targetWithSMP       <- targetSupportsSMP
 
-    let ghcStage = succStage stg
+    cross <- flag CrossCompiling
+
+    let ghcStage
+          | cross, Stage1 <- stg = Stage1
+          | otherwise = succStage stg
     debugAssertions     <- ghcDebugAssertions <$> flavour <*> pure ghcStage
     debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
