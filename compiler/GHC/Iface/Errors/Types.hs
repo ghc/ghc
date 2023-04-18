@@ -70,7 +70,7 @@ data CantFindInstalledReason
   | ModuleSuggestion [ModuleSuggestion] [FilePath]
   | NotAModule
   | CouldntFindInFiles [FilePath]
-  | GenericMissing BuildingCabalPackage
+  | GenericMissing
       [(Unit, Maybe UnitInfo)] [Unit]
       [(Unit, UnusableUnitReason)] [FilePath]
   | MultiplePackages [(Module, ModuleOrigin)]

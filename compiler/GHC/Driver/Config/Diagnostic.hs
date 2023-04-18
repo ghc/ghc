@@ -18,7 +18,7 @@ import GHC.Prelude
 
 import GHC.Utils.Outputable
 import GHC.Utils.Error (DiagOpts (..))
-import GHC.Driver.Errors.Types (GhcMessage, GhcMessageOpts (..), PsMessage, DriverMessage, DriverMessageOpts (..))
+import GHC.Driver.Errors.Types (GhcMessage, GhcMessageOpts (..), PsMessage, DriverMessage, DriverMessageOpts (..), checkBuildingCabalPackage)
 import GHC.Driver.Errors.Ppr ()
 import GHC.Tc.Errors.Types
 import GHC.HsToCore.Errors.Types
@@ -63,7 +63,8 @@ initDsMessageOpts _ = NoDiagnosticOpts
 
 initIfaceMessageOpts :: DynFlags -> DiagnosticOpts IfaceMessage
 initIfaceMessageOpts dflags =
-                  IfaceMessageOpts { ifaceShowTriedFiles = verbosity dflags >= 3 }
+                  IfaceMessageOpts { ifaceShowTriedFiles = verbosity dflags >= 3
+                                   , ifaceBuildingCabalPackage = checkBuildingCabalPackage dflags }
 
 initDriverMessageOpts :: DynFlags -> DiagnosticOpts DriverMessage
 initDriverMessageOpts dflags = DriverMessageOpts (initPsMessageOpts dflags) (initIfaceMessageOpts dflags)
