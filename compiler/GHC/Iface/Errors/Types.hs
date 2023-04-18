@@ -35,6 +35,7 @@ import GHC.Generics ( Generic )
 import GHC.Unit.Module.Location
 
 data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
+                                         , ifaceBuildingCabalPackage :: !BuildingCabalPackage
                                          }
 
 data InterfaceLookingFor
@@ -76,7 +77,7 @@ data CantFindInstalledReason
   | ModuleSuggestion [ModuleSuggestion] [FilePath]
   | NotAModule
   | CouldntFindInFiles [FilePath]
-  | GenericMissing BuildingCabalPackage
+  | GenericMissing
       [(Unit, Maybe UnitInfo)] [Unit]
       [(Unit, UnusableUnitReason)] [FilePath]
   | MultiplePackages [(Module, ModuleOrigin)]

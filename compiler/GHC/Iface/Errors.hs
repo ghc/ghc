@@ -13,7 +13,6 @@ import GHC.Platform.Ways
 import GHC.Utils.Panic.Plain
 import GHC.Driver.Session
 import GHC.Driver.Env
-import GHC.Driver.Errors.Types
 import GHC.Data.Maybe
 import GHC.Prelude
 import GHC.Unit
@@ -80,32 +79,29 @@ cantFindInstalledErr unit_state mhome_unit profile mod_name find_result
 
 cannotFindModule :: HscEnv -> ModuleName -> FindResult -> MissingInterfaceError
 cannotFindModule hsc_env = cannotFindModule'
-    (hsc_dflags   hsc_env)
     (hsc_unit_env hsc_env)
     (targetProfile (hsc_dflags hsc_env))
 
 
-cannotFindModule' :: DynFlags -> UnitEnv -> Profile -> ModuleName -> FindResult
+cannotFindModule' :: UnitEnv -> Profile -> ModuleName -> FindResult
                   -> MissingInterfaceError
-cannotFindModule' dflags unit_env profile mod res =
+cannotFindModule' unit_env profile mod res =
   CantFindErr (ue_units unit_env) FindingModule $
-  cantFindErr (checkBuildingCabalPackage dflags)
-              unit_env
+  cantFindErr unit_env
               profile
               mod
               res
 
 cantFindErr
-    :: BuildingCabalPackage -- ^ Using Cabal?
-    -> UnitEnv
+    :: UnitEnv
     -> Profile
     -> ModuleName
     -> FindResult
     -> CantFindInstalled
-cantFindErr _ _ _ mod_name (FoundMultiple mods)
+cantFindErr _ _ mod_name (FoundMultiple mods)
   = CantFindInstalled mod_name (MultiplePackages mods)
 
-cantFindErr using_cabal unit_env profile mod_name find_result
+cantFindErr unit_env profile mod_name find_result
   = CantFindInstalled mod_name more_info
   where
     mhome_unit = ue_homeUnit unit_env
@@ -133,7 +129,7 @@ cantFindErr using_cabal unit_env profile mod_name find_result
                 -> NotAModule
 
                 | otherwise
-                -> GenericMissing using_cabal
+                -> GenericMissing
                     (map ((\uid -> (uid, lookupUnit (ue_units unit_env) uid))) pkg_hiddens)
                     mod_hiddens unusables files
             _ -> panic "cantFindErr"
