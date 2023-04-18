@@ -115,10 +115,12 @@ def symlinks_work() -> bool:
 if not symlinks_work():
     def link_or_copy_file(src: Path, dst: Path, force_copy=False):
         shutil.copyfile(str(src), str(dst))
+        shutil.copymode(str(src), str(dst))
 else:
     def link_or_copy_file(src: Path, dst: Path, force_copy=False):
         if force_copy:
             shutil.copyfile(str(src), str(dst))
+            shutil.copymode(str(src), str(dst))
         else:
             os.symlink(str(src), str(dst))
 

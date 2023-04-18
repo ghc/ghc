@@ -1264,7 +1264,7 @@ async def do_test(name: TestName,
     for extra_file in files:
         src = in_srcdir(extra_file)
         dst = in_testdir(os.path.basename(extra_file.rstrip('/\\')))
-        force_copy = opts.copy_files
+        force_copy = opts.copy_files or arch("wasm32")
         if src.is_file():
             link_or_copy_file(src, dst, force_copy)
         elif src.is_dir():
