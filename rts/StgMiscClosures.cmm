@@ -555,7 +555,7 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 retry:
     // Synchronizes with the SET_INFO_RELEASE in
     // updateWithIndirection
-    ACQUIRE_FENCE;
+    ACQUIRE_FENCE_ON(StgHeader_info(node));
 
     // Synchronizes with the release-store in
     // updateWithIndirection.
@@ -665,7 +665,7 @@ loop:
         // defined in CMM.
         goto loop;
     }
-    ACQUIRE_FENCE;
+    ACQUIRE_FENCE_ON(StgHeader_info(node));
     jump %ENTRY_CODE(info) (node);
 #else
     ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
