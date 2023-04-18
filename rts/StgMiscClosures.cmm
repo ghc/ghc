@@ -646,7 +646,7 @@ INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
     i = 0;
 loop:
     // spin until the WHITEHOLE is updated
-    info = StgHeader_info(node);
+    info = %relaxed StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
         W_[whitehole_lockClosure_spin] =
@@ -665,6 +665,7 @@ loop:
         // defined in CMM.
         goto loop;
     }
+    ACQUIRE_FENCE;
     jump %ENTRY_CODE(info) (node);
 #else
     ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
