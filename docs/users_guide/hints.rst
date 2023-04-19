@@ -153,7 +153,7 @@ Use ``SPECIALIZE`` pragmas:
 
     .. code-block:: sh
 
-        $ ghc --show-iface Foo.hi | egrep '^[a-z].*::.*=>'
+        $ ghc --show-iface Foo.hi | grep -E '^[a-z].*::.*=>'
 
 Strict functions are your dear friends:
     And, among other things, lazy pattern-matching is your enemy.

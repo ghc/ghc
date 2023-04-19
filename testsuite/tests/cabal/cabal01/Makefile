@@ -5,7 +5,7 @@ include $(TOP)/mk/test.mk
 # Find all the env variables starting with CI_ to unset them.
 # Otherwise, we might run into environment length limitations on Windows.
 # (See `xargs --show-limits`.)
-VARS_TO_UNSET := $(shell env | grep ^CI_ | egrep -o '^[^=]+')
+VARS_TO_UNSET := $(shell env | grep ^CI_ | grep -E -o '^[^=]+')
 unexport $(VARS_TO_UNSET)
 
 clean:
