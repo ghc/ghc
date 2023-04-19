@@ -54,6 +54,7 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Core.Rules
 import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.UsageEnv ( zeroUE )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
@@ -299,7 +300,7 @@ dsAbsBinds dflags tyvars dicts exports
                             mkLet aux_binds $
                             tup_expr
 
-       ; poly_tup_id <- newSysLocalDs ManyTy (exprType poly_tup_rhs)
+       ; poly_tup_id <- newSysLocalDs (LetBound zeroUE) (exprType poly_tup_rhs) -- ROMES:TODO zeroUE
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -310,7 +311,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs ManyTy tup_ty
+                = do { tup_id  <- newSysLocalDs (LambdaBound ManyTy) tup_ty -- ROMES:TODO?
                      ; dsHsWrapper wrap $ \core_wrap -> do
                      { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $
@@ -370,7 +371,7 @@ dsAbsBinds dflags tyvars dicts exports
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs ManyTy
+      do global <- newSysLocalDs GlobalBinding
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE { abe_poly  = global
                      , abe_mono  = local
@@ -716,7 +717,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let fn_unf    = realIdUnfolding poly_id
              simpl_opts = initSimpleOpts dflags
              spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id    = mkLocalId spec_name ManyTy spec_ty -- Specialised binding is toplevel, hence Many.
+             spec_id    = mkLocalId spec_name GlobalBinding spec_ty -- Specialised binding is toplevel, hence GlobalBinding (can be used Many times).
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -885,7 +886,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
                 extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) ManyTy (idType d)
+                  [ mkLocalId (localiseName (idName d)) (LambdaBound ManyTy) (idType d) -- ROMES:TODO: Dicts lambda bound here?
                   | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v
@@ -1193,7 +1194,7 @@ dsHsWrapper (WpCompose c1 c2) k = do { dsHsWrapper c1 $ \w1 -> do
                                      { dsHsWrapper c2 $ \w2 -> do
                                      { k (w1 . w2) } } }
 dsHsWrapper (WpFun c1 c2 (Scaled w t1)) k -- See Note [Desugaring WpFun]
-                                = do { x <- newSysLocalDs w t1
+                                = do { x <- newSysLocalDs (LambdaBound w) t1 -- ROMES: Scaled - LambdaBound
                                      ; dsHsWrapper c1 $ \w1 -> do
                                      { dsHsWrapper c2 $ \w2 -> do
                                      { let app f a = mkCoreAppDs (text "dsHsWrapper") f a

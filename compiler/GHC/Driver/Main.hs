@@ -172,7 +172,6 @@ import GHC.Core
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
-import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
@@ -183,6 +182,7 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
 import GHC.Core.LateCC (addLateCostCentresPgm)
+import GHC.Core.UsageEnv ( zeroUE )
 
 
 import GHC.CoreToStg.Prep
@@ -2163,7 +2163,7 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
        binding for the stg2stg step) -}
     let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
                                 (mkPseudoUniqueE 0)
-                                ManyTy
+                                (LetBound zeroUE) -- ROMES:TODO: zeroUE
                                 (exprType prepd_expr)
     (stg_binds, prov_map, collected_ccs, stg_cg_infos) <-
        myCoreToStg logger

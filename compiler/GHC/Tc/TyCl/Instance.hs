@@ -1484,7 +1484,7 @@ tcSuperClasses skol_info dfun_id cls tyvars dfun_evs dfun_ev_binds sc_theta
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id IsCoherent sc_ev_tm
            ; let sc_top_ty = tcMkDFunSigmaTy tyvars (map idType dfun_evs) sc_pred
-                 sc_top_id = mkLocalId sc_top_name ManyTy sc_top_ty
+                 sc_top_id = mkLocalId sc_top_name (LambdaBound ManyTy) sc_top_ty -- ROMES:TODO:
                  export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
@@ -2050,7 +2050,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; let ctxt = FunSigCtxt sel_name (lhsSigTypeContextSpan hs_sig_ty)
                     -- WantRCC <=> check for redundant constraints in the
                     --          user-specified instance signature
-             inner_meth_id  = mkLocalId inner_meth_name ManyTy sig_ty
+             inner_meth_id  = mkLocalId inner_meth_name (LambdaBound ManyTy) sig_ty -- ROMES:TODO:
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
                                           , sig_loc  = getLocA hs_sig_ty }
@@ -2099,8 +2099,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  ManyTy poly_meth_ty
-              local_meth_id = mkLocalId local_meth_name ManyTy local_meth_ty
+        ; let poly_meth_id  = mkLocalId poly_meth_name  (LambdaBound ManyTy) poly_meth_ty -- ROMES:TODO:
+              local_meth_id = mkLocalId local_meth_name (LambdaBound ManyTy) local_meth_ty -- ROMES:TODO:
 
         ; return (poly_meth_id, local_meth_id) }
   where

@@ -163,7 +163,7 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  eqDeBruijnType (D env1 (varType b1)) (D env2 (varType b2))
-      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
+      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2) -- ROMES:NOTE: Usage of varMultMaybe here will return the multiplicity of the lambda bound binder, good.
       && eqDeBruijnExpr (D (extendCME env1 b1) e1) (D (extendCME env2 b2) e2)
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)

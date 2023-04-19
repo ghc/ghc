@@ -45,7 +45,7 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
-        varMult, varMultMaybe,
+        varMultMaybe, varMults,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
@@ -55,9 +55,10 @@ module GHC.Types.Var (
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
         idInfo, idDetails,
         lazySetIdInfo, setIdDetails, globaliseId,
-        setIdExported, setIdNotExported, setIdMult,
-        updateIdTypeButNotMult,
-        updateIdTypeAndMult, updateIdTypeAndMultM,
+        setIdExported, setIdNotExported, setIdBinding,
+        updateIdTypeButNotMults,
+        updateIdTypeAndMults, updateIdTypeAndMultsM,
+        IdBinding(..), idBinding,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -109,6 +110,7 @@ module GHC.Types.Var (
 
 import GHC.Prelude
 
+import {-# SOURCE #-}   GHC.Core.UsageEnv ( UsageEnv, nonDetMults, mapUE, mapUEM )
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk )
@@ -267,10 +269,20 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
-        varMult    :: Mult,             -- See Note [Multiplicity of let binders]
+        idBinding  :: IdBinding,        -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
+
+data IdBinding
+  = LambdaBound !Mult -- ^ includes lambda-bound and constructor fields---pattern bound
+  | LetBound UsageEnv -- ^ a local let binding has a usage env bc it might have free linear variables in its body
+  | GlobalBinding -- ^ Romes:Always Many multiplicity? (global let binding cannot have free linear variables in its body)
+
+instance Outputable IdBinding where
+  ppr (LambdaBound m) = text "LambdaBound" <+> ppr m
+  ppr (LetBound ue)   = text "LetBound UsageEnv" -- <+> ppr ue
+  ppr (GlobalBinding)   = text "GlobalBinding" -- <+> ppr ue
 
 -- | Identifier Scope
 data IdScope    -- See Note [GlobalId/LocalId]
@@ -330,6 +342,8 @@ right-hand side.
 Therefore, the `varMult` field of identifier is only used by binders in lambda
 and case expressions. In a let expression the `varMult` field holds an
 arbitrary value which will (and must!) be ignored.
+
+ROMES:TODO: Update this Note
 -}
 
 instance Outputable Var where
@@ -353,7 +367,7 @@ instance Outputable Var where
                   _  -> empty
             in if
                |  debug && (not supp_var_kinds)
-                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
+                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var) -- ROMES:NOTE: This will print Nothing for let bound vars
                                               <+> ppr_var <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
@@ -399,9 +413,25 @@ instance HasOccName Var where
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 
-varMultMaybe :: Id -> Maybe Mult
-varMultMaybe (Id { varMult = mult }) = Just mult
+-- | Returns a multiplicity of an Id if it is a lambda bound Id
+--
+-- This is what already was expected of the varMult, except previously let
+-- bound variables had a rubbish varMult, as described
+-- in Note [Multiplicity of let binders]
+varMultMaybe :: Var -> Maybe Mult
+varMultMaybe (Id { idBinding = LambdaBound mult }) = Just mult
 varMultMaybe _ = Nothing
+
+-- | Returns all the multiplicities from a variable
+-- In the case of a lambda bound var, this will be the only multiplicity, in
+-- the case of a usage env, it'll be the usage env mults...
+varMults :: Var -> [Mult]
+varMults (Id { idBinding = idB }) =
+  case idB of
+    LambdaBound x -> [x]
+    LetBound ue -> nonDetMults ue -- the order of the multiplicities does not matter
+    GlobalBinding -> []
+varMults _ = panic "varMults"
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
@@ -1117,29 +1147,32 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name manyDataConTy ty GlobalId details info
+  -- ROMES: This doesn't really classify as LambdaBound, but has the semantics we want...
+  = mk_id name (LambdaBound manyDataConTy) ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Mult -> Type -> IdInfo -> Id
-mkLocalVar details name w ty info
-  = mk_id name w ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> IdBinding -> Type -> IdInfo -> Id
+mkLocalVar details name binding ty info
+  = mk_id name binding ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name manyDataConTy ty (LocalId NotExported) coVarDetails vanillaIdInfo
+-- ROMES:TODO: Do we ever have let bound coercion variables? Doubt it but check.
+mkCoVar name ty = mk_id name (LambdaBound manyDataConTy) ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name manyDataConTy ty (LocalId Exported) details info
+  -- ROMES:TODO: As in mkGlobalVar, this isn't really LambdaBound I figure
+  = mk_id name (LambdaBound manyDataConTy) ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name !w ty scope details info
+mk_id :: Name -> IdBinding -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name !binding ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
-         varMult    = w,
+         idBinding  = binding,
          varType    = ty,
          idScope    = scope,
          id_details = details,
@@ -1169,31 +1202,41 @@ setIdNotExported id = assert (isLocalId id) $
                       id { idScope = LocalId NotExported }
 
 -----------------------
-updateIdTypeButNotMult :: (Type -> Type) -> Id -> Id
-updateIdTypeButNotMult f id = id { varType = f (varType id) }
+updateIdTypeButNotMults :: (Type -> Type) -> Id -> Id
+updateIdTypeButNotMults f id = id { varType = f (varType id) }
 
 
-updateIdTypeAndMult :: (Type -> Type) -> Id -> Id
-updateIdTypeAndMult f id@(Id { varType = ty
-                             , varMult = mult })
+-- | Updates the Type and Multiplicities of an Id.
+-- If the Id is LambdaBound, we update its singleton Multiplicity,
+-- If the Id is LetBound, we update all Multiplicities in the UsageEnv
+updateIdTypeAndMults :: (Type -> Type) -> Id -> Id
+updateIdTypeAndMults f id@(Id { varType = ty
+                              , idBinding = binding })
   = id { varType = ty'
-       , varMult = mult' }
+       , idBinding = binding' }
   where
     !ty'   = f ty
-    !mult' = f mult
-updateIdTypeAndMult _ other = pprPanic "updateIdTypeAndMult" (ppr other)
+    !binding' = case binding of
+                  LambdaBound mult -> LambdaBound (f mult)
+                  LetBound ue      -> LetBound (mapUE f ue)
+                  GlobalBinding    -> GlobalBinding
+updateIdTypeAndMults _ other = pprPanic "updateIdTypeAndMult" (ppr other)
 
-updateIdTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateIdTypeAndMultM f id@(Id { varType = ty
-                              , varMult = mult })
+-- | As 'updateIdTypeAndMults' -- the monadic version.
+updateIdTypeAndMultsM :: Monad m => (Type -> m Type) -> Id -> m Id
+updateIdTypeAndMultsM f id@(Id { varType = ty
+                               , idBinding = binding })
   = do { !ty' <- f ty
-       ; !mult' <- f mult
-       ; return (id { varType = ty', varMult = mult' }) }
-updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
+       ; !binding' <- case binding of
+                        LambdaBound mult -> LambdaBound <$> f mult
+                        LetBound ue      -> LetBound    <$> mapUEM f ue
+                        GlobalBinding    -> pure GlobalBinding
+       ; return (id { varType = ty', idBinding = binding' }) }
+updateIdTypeAndMultsM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 
-setIdMult :: Id -> Mult -> Id
-setIdMult id !r | isId id = id { varMult = r }
-                | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
+setIdBinding :: Id -> IdBinding -> Id
+setIdBinding id !r | isId id = id { idBinding = r }
+                   | otherwise = pprPanic "setIdBinding" (ppr id <+> ppr r)
 
 {-
 ************************************************************************

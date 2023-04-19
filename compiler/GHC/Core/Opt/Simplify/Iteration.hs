@@ -40,6 +40,7 @@ import GHC.Core.Opt.Stats ( Tick(..) )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
+import GHC.Core.UsageEnv
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
@@ -604,7 +605,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
-              work_id   = mkLocalIdWithInfo work_name ManyTy work_ty work_info
+              work_id   = mkLocalIdWithInfo work_name GlobalBinding work_ty work_info -- ROMES: Or is it LetBound?
               is_strict = isStrictId bndr
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
@@ -836,7 +837,7 @@ makeTrivial env top_lvl dmd occ_fs expr
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name ManyTy expr_ty id_info
+              var  = mkLocalIdWithInfo name (LetBound zeroUE) expr_ty id_info -- ROMES:TODO: zeroUE?
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
@@ -2243,7 +2244,7 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
-           _ -> do { s' <- newId (fsLit "s") ManyTy realWorldStatePrimTy
+           _ -> do { s' <- newId (fsLit "s") (LambdaBound ManyTy) realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
@@ -3255,7 +3256,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [Alt DEFAULT _ _]
   | Just (Reduction co ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ManyTy ty2
+  = do { case_bndr2 <- newId (fsLit "nt") (LambdaBound ManyTy) ty2 -- ROMES:Case Binder with LambdaBound again...
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -3701,7 +3702,7 @@ mkDupableContWithDmds env _
     --                         j <>
     do { let rhs_ty       = contResultType cont
              (m,arg_ty,_) = splitFunTy fun_ty
-       ; arg_bndr <- newId (fsLit "arg") m arg_ty
+       ; arg_bndr <- newId (fsLit "arg") (LambdaBound m) arg_ty
        ; let env' = env `addNewInScopeIds` [arg_bndr]
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (Var arg_bndr) fun_ty) cont
        ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }

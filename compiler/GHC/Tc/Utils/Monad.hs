@@ -743,7 +743,7 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> Mult -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId :: FastString -> IdBinding -> TcType -> TcRnIf gbl lcl TcId
 newSysLocalId fs w ty
   = do  { u <- newUnique
         ; return (mkSysLocal fs u w ty) }
@@ -751,7 +751,7 @@ newSysLocalId fs w ty
 newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- getUniquesM
-        ; let mkId' n (Scaled w t) = mkSysLocal fs n w t
+        ; let mkId' n (Scaled w t) = mkSysLocal fs n (LambdaBound w) t -- Scaled -> LambdaBound
         ; return (zipWith mkId' us tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where

@@ -232,7 +232,7 @@ tcRuleTmBndrs _ [] = return ([],[])
 tcRuleTmBndrs rule_name (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; (tyvars, tmvars) <- tcRuleTmBndrs rule_name rule_bndrs
-        ; return (tyvars, mkLocalId name ManyTy ty : tmvars) }
+        ; return (tyvars, mkLocalId name (LambdaBound ManyTy) ty : tmvars) } -- ROMES:TODO:
 tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
@@ -241,7 +241,7 @@ tcRuleTmBndrs rule_name (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt rule_name name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt HM_Sig rn_ty OpenKind
-        ; let id  = mkLocalId name ManyTy id_ty
+        ; let id  = mkLocalId name (LambdaBound ManyTy) id_ty -- ROMES:TODO:
                     -- See Note [Typechecking pattern signature binders] in GHC.Tc.Gen.HsType
 
               -- The type variables scope over subsequent bindings; yuk

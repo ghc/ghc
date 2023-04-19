@@ -267,7 +267,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
              -- for overloaded functions, but doesn't seem worth it
              (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
 
-             id = mkLocalId nm ManyTy sig_ty
+             id = mkLocalId nm (LambdaBound ManyTy) sig_ty -- ROMES:TODO: how bound?
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Zonk.Type.zonkForeignExports ignores it).

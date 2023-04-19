@@ -59,6 +59,7 @@ import GHC.Core.Utils
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.UsageEnv ( zeroUE )
 
 import GHC.Types.Var
 import GHC.Types.Id
@@ -423,13 +424,13 @@ saTransform binder arg_staticness rhs_binders rhs_body
           shadow_rhs = mkLams shadow_lam_bndrs local_body
             -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
 
-          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq ManyTy (exprType rec_body)
+          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq (LetBound zeroUE) (exprType rec_body) -- ROMES:TODO: NOT zeroUE! Must find free linear vars body
             -- rec_body_bndr = sat_worker
 
             -- See Note [Shadow binding]; make a SysLocal
           shadow_bndr = mkSysLocal (occNameFS (getOccName binder))
                                    (idUnique binder)
-                                   ManyTy
+                                   (LetBound zeroUE) -- ROMES:TODO: NOT zeroUE! Must find free linear vars body
                                    (exprType shadow_rhs)
 
 isStaticValue :: Staticness App -> Bool

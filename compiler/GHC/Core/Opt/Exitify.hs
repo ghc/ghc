@@ -265,7 +265,7 @@ mkExitJoinId in_scope ty join_arity = do
                          `extendInScopeSet` exit_id_tmpl -- just cosmetics
     return (uniqAway avoid exit_id_tmpl)
   where
-    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ManyTy ty
+    exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique (LambdaBound ManyTy) ty -- ROMES:TODO: LambdaBound here for ExitJoinId??
                     `asJoinId` join_arity
 
 addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId

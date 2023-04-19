@@ -78,6 +78,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Ppr
+import GHC.Core.UsageEnv
 
 import GHC.Unit.Env
 import GHC.Unit.External
@@ -1567,7 +1568,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let
         scrut_ty   = exprType scrut'
         case_mult  = ManyTy
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_mult scrut_ty
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name (LambdaBound case_mult) scrut_ty
      -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
      -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
         tc_app     = splitTyConApp scrut_ty
@@ -1586,7 +1587,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name ManyTy ty' id_info
+        ; let id = mkLocalIdWithInfo name (LetBound zeroUE) ty' id_info -- ROMES:TODO: zeroUE!
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1602,7 +1603,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name ManyTy ty' `asJoinId_maybe` tcJoinInfo ji) }
+          ; return (mkLocalId name (LetBound zeroUE) ty' `asJoinId_maybe` tcJoinInfo ji) } -- ROMES:TODO: zeroUE!
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -2072,7 +2073,7 @@ bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
         ; w' <- tcIfaceType w
-        ; let id = mkLocalIdOrCoVar name w' ty'
+        ; let id = mkLocalIdOrCoVar name (LambdaBound w') ty' -- ROMES:TODO: I don't know what here
           -- We should not have "OrCoVar" here, this is a bug (#17545)
         ; extendIfaceIdEnv [id] (thing_inside id) }
 

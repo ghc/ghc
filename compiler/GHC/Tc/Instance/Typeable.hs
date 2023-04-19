@@ -556,7 +556,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") ManyTy (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") (LambdaBound ManyTy) (mkTyConTy kindRepTyCon) -- ROMES:TODO: Are these type variables? What provenance should we give them
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do

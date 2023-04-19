@@ -16,6 +16,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Type
+import GHC.Core.UsageEnv
 
 import GHC.Core.Seq ( seqUnfolding )
 import GHC.Types.Id
@@ -296,7 +297,7 @@ tidyIdBndr env@(tidy_env, var_env) id
         -- though we could extract it from the Id
         --
         ty'      = tidyType env (idType id)
-        mult'    = tidyType env (idMult id)
+        mult'    = LambdaBound $ tidyType env (idMult id) -- LambdaBound vars in tidyIdBndr since this is used for lambda and case binders (TODO See to case binders differently...), LetBound in tidyLetBndr
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         id'      = mkLocalIdWithInfo name' mult' ty' new_info
         var_env' = extendVarEnv var_env id id'
@@ -322,7 +323,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
   = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
         ty'      = tidyType env (idType id)
-        mult'    = tidyType env (idMult id)
+        mult'    = LetBound $ mapUE (tidyType env) (idUsageEnv id) -- Let bound binding with tidied usage env
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
         id'      = mkLocalVar details name' mult' ty' new_info

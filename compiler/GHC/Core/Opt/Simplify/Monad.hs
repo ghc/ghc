@@ -24,9 +24,9 @@ import GHC.Prelude
 
 import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
-import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM )
+import GHC.Types.Id        ( Id, mkSysLocalOrCoVarM, IdBinding(..) )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import GHC.Core.Type       ( Type, Mult )
+import GHC.Core.Type       ( Type )
 import GHC.Core.Opt.Stats
 import GHC.Core.Rules
 import GHC.Core.Utils      ( mkLamTypes )
@@ -205,7 +205,7 @@ liftIOWithEnv m = SM (\st_env sc -> do
 gets :: (SimplTopEnv -> a) -> SimplM a
 gets f = liftIOWithEnv (return . f)
 
-newId :: FastString -> Mult -> Type -> SimplM Id
+newId :: FastString -> IdBinding -> Type -> SimplM Id
 newId fs w ty = mkSysLocalOrCoVarM fs w ty
 
 -- | Make a join id with given type and arity but without call-by-value annotations.
@@ -221,7 +221,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name ManyTy join_id_ty id_info) }
+       ; return (mkLocalVar details name (LambdaBound ManyTy) join_id_ty id_info) } -- ROMES: What are the IdBindings of JoinPoints? We are not taking them into account, yet?
 
 {-
 ************************************************************************

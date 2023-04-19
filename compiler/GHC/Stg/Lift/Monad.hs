@@ -281,7 +281,7 @@ withLiftedBndr abs_ids bndr inner = do
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
             transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        <$> mkSysLocalM str ManyTy ty
+        <$> mkSysLocalM str (LambdaBound ManyTy) ty -- ROMES:TODO: LambdaBound?
   LiftM $ RWS.local
     (\e -> e
       { e_subst = extendSubst bndr bndr' $ extendInScope bndr' $ e_subst e

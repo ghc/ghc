@@ -13,12 +13,15 @@ module GHC.Core.UsageEnv
   , supUEs
   , singleUsageUE
   , zeroUE
+  , nonDetMults
+  , mapUE, mapUEM
   ) where
 
 import Data.Foldable
 import GHC.Prelude
 import GHC.Core.Multiplicity
 import GHC.Types.Var
+import GHC.Types.Unique.FM (nonDetEltsUFM, ufmToIntMap, unsafeIntMapToUFM)
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
@@ -54,7 +57,8 @@ scaleUsage x     Bottom     = MUsage x
 scaleUsage x     (MUsage y) = MUsage $ mkMultMul x y
 
 -- For now, we use extra multiplicity Bottom for empty case.
-data UsageEnv = UsageEnv !(NameEnv Mult) Bool
+data UsageEnv = UsageEnv !(NameEnv Mult)
+                         Bool -- ^ has_bottom ?
 
 -- | Record a single usage of an Id, i.e. {n: 1}
 -- Exception: We do not record external names (both GlobalIds and top-level LocalIds)
@@ -110,3 +114,15 @@ popUE ue x = (lookupUE ue x, deleteUE ue x)
 
 instance Outputable UsageEnv where
   ppr (UsageEnv ne b) = text "UsageEnv:" <+> ppr ne <+> ppr b
+
+-- | Map a function on multiplicities over a UsageEnv
+mapUE :: (Mult -> Mult) -> UsageEnv -> UsageEnv
+mapUE f (UsageEnv nset b) = UsageEnv (mapNameEnv f nset) b
+
+-- | Map a monadic function on multiplicities over a UsageEnv
+mapUEM :: Applicative m => (Mult -> m Mult) -> UsageEnv -> m UsageEnv
+mapUEM f (UsageEnv nset b) = flip UsageEnv b . unsafeIntMapToUFM <$> (traverse f (ufmToIntMap nset))
+
+-- | Get the multiplicities in a usage environment in a non deterministic order
+nonDetMults :: UsageEnv -> [Mult]
+nonDetMults (UsageEnv mset _) = nonDetEltsUFM mset

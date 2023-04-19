@@ -174,7 +174,13 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v Required) body_ty
 
    | otherwise
-   = mkFunctionType (varMult v) (varType v) body_ty
+   = mkFunctionType mult (varType v) body_ty
+     where
+       mult = case varMultMaybe v of
+                -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
+                -- ... it could prove pretty invasive...
+                Nothing -> panic "mkLamType: lambda bound var should be annotated with LambdaBound"
+                Just m  -> m
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
@@ -2089,6 +2095,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
+-- ROMES:TODO: Consider how scaling happens here too
 dataConInstPat fss uniqs mult con inst_tys
   = assert (univ_tvs `equalLength` inst_tys) $
     (ex_bndrs, arg_ids)
@@ -2126,7 +2133,8 @@ dataConInstPat fss uniqs mult con inst_tys
     mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkUserLocalOrCoVar (mkVarOccFS fs) uniq
-                           (mult `mkMultMul` m) (Type.substTy full_subst ty) noSrcSpan
+                           (LambdaBound $ mult `mkMultMul` m) (Type.substTy full_subst ty) noSrcSpan
+                           --- ^ These are variables bound in the pattern
 
 {-
 Note [Mark evaluated arguments]

@@ -180,7 +180,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (LambdaBound w) ty -- ROMES: for now we consider wildcards to be lambdabound
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
@@ -529,7 +529,7 @@ unwrapBox us var body
       BI_Box { bi_data_con = box_con, bi_boxed_type = box_ty }
          -> (us', var', body')
          where
-           var'  = mkSysLocal (fsLit "uc") uniq ManyTy box_ty
+           var'  = mkSysLocal (fsLit "uc") uniq (LambdaBound ManyTy) box_ty -- ROMES:TODO: LambdaBound here?
            body' = Case (Var var') var' (exprType body)
                         [Alt (DataAlt box_con) [var] body]
   where
@@ -705,7 +705,7 @@ mkBigTupleCase vars body scrut
     new_var us ty = (us', id)
        where
          (uniq, us') = takeUniqFromSupply us
-         id = mkSysLocal (fsLit "ds") uniq ManyTy ty
+         id = mkSysLocal (fsLit "ds") uniq (LambdaBound ManyTy) ty -- ROMES:LambdaBound here as elsewhere in mkTuple functions here...
 
 -- | As 'mkBigTupleCase', but for a tuple that is small enough to be guaranteed
 -- not to need nesting.
@@ -808,7 +808,7 @@ mkBuildExpr elt_ty mk_build_inside = do
     n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") ManyTy c_ty, mkSysLocalM (fsLit "n") ManyTy n_ty]
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") (LambdaBound ManyTy) c_ty, mkSysLocalM (fsLit "n") (LambdaBound ManyTy) n_ty] -- ROMES: LambdaBound explanation for case expressions...
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 

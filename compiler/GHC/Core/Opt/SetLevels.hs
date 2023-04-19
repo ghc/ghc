@@ -1711,7 +1711,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
-                             mkSysLocal str uniq (idMult bndr) poly_ty
+                             mkSysLocal str uniq (idBinding bndr) poly_ty
                            where
                              str     = fsLit "poly_" `appendFS` occNameFS (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (substTyUnchecked subst (idType bndr))
@@ -1746,7 +1746,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq ManyTy rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq (LambdaBound ManyTy) rhs_ty -- ROMES:TODO: What's the IdBinding
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

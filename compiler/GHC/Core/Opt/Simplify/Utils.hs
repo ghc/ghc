@@ -2163,7 +2163,7 @@ abstractFloats uf_opts top_lvl main_tvs floats body
            ; let  poly_name = setNameUnique (idName var) uniq      -- Keep same name
                   poly_ty   = mkInfForAllTys tvs_here (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in GHC.Types.Id
-                              mkLocalId poly_name (idMult var) poly_ty
+                              mkLocalId poly_name (idBinding var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!
@@ -2619,7 +2619,7 @@ mkCase2 mode scrut bndr alts_ty alts
       _                 -> True
   , sm_case_folding mode
   , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
-  = do { bndr' <- newId (fsLit "lwild") ManyTy (exprType scrut')
+  = do { bndr' <- newId (fsLit "lwild") (LambdaBound ManyTy) (exprType scrut') -- ROMES:Again, case binder with LambdaBound temporarily
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives

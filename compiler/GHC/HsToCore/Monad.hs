@@ -377,7 +377,7 @@ it easier to read debugging output.
 -}
 
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Id -> Mult -> Type -> DsM Id
+newUniqueId :: Id -> IdBinding -> Type -> DsM Id
 newUniqueId id = mkSysLocalOrCoVarM (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
@@ -387,14 +387,15 @@ duplicateLocalDs old_local
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds") ManyTy  -- like newSysLocalDs, but we allow covars
+ = mkSysLocalOrCoVarM (fsLit "ds") (LambdaBound ManyTy)  -- like newSysLocalDs, but we allow covars
+  -- ROMES:TODO: PredVars - LambdaBound?
 
-newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
+newSysLocalDs, newFailLocalDs :: IdBinding -> Type -> DsM Id
 newSysLocalDs = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
 
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
-newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs (LambdaBound w) t) -- Scaled -> LambdaBound
 
 {-
 We can also reach out and either set/grab location information from

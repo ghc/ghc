@@ -2907,7 +2907,7 @@ pushCoercionIntoLambda in_scope x e co
     = let
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
-          x' = x `setIdType` t1 `setIdMult` w1
+          x' = x `setIdType` t1 `setIdBinding` (LambdaBound w1)
           in_scope' = in_scope `extendInScopeSet` x'
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x
@@ -3139,7 +3139,7 @@ freshEtaId n subst ty
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
         eta_id' = uniqAway (getSubstInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (LambdaBound mult') ty' -- ROMES:TODO: LambdaBound here? Comes from a ScaledType, which should mean its lambda bound (only fields and lambdas Ids have Scaled Types)
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
         subst'  = extendSubstInScope subst eta_id'

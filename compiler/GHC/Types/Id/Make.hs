@@ -1119,7 +1119,7 @@ newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
          -> Scaled Type  -- ^ the type of the 'Var'
          -> UniqSM Var
 newLocal name_stem (Scaled w ty) =
-    mkSysLocalOrCoVarM name_stem w ty
+    mkSysLocalOrCoVarM name_stem (LambdaBound w) ty -- ROMES: LambdaBound bc comes from Scaled?
          -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
@@ -1966,7 +1966,7 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
     [f,x] = mkTemplateLocals [mkVisFunTy mult openAlphaTy openBetaTy, openAlphaTy]
 
     mult = mkTyVarTy multiplicityTyVar1 :: Mult
-    xmult = setIdMult x mult
+    xmult = setIdBinding x (LambdaBound mult) -- ROMES: LambdaBound why? where is it bound?
 
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, multiplicityTyVar1
                   , openAlphaTyVar,   openBetaTyVar   ] body
@@ -1995,8 +1995,8 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
     [f,x,y] = mkTemplateLocals [ mkScaledFunTys [ Scaled mult1 openAlphaTy
                                                 , Scaled mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
-    xmult = setIdMult x mult1
-    ymult = setIdMult y mult2
+    xmult = setIdBinding x (LambdaBound mult1)
+    ymult = setIdBinding y (LambdaBound mult2) -- ROMES:TODO: Where is it bound
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body
@@ -2268,7 +2268,7 @@ unboxedUnitExpr :: CoreExpr
 unboxedUnitExpr = Var (dataConWorkId unboxedUnitDataCon)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey ManyTy unboxedUnitTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey (LambdaBound ManyTy) unboxedUnitTy
 
 coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"

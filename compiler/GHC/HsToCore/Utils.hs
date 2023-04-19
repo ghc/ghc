@@ -142,7 +142,7 @@ selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
-selectMatchVar w other_pat        = newSysLocalDs w (hsPatType other_pat)
+selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: provenance isn't so trivial in match var?
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -737,7 +737,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs ManyTy pat_ty
+       ; val_var <- newSysLocalDs (LambdaBound ManyTy) pat_ty -- ROMES:TODO: selector binders are lambda bound?
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -755,7 +755,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs ManyTy tuple_ty
+  = do { tuple_var  <- newSysLocalDs (LambdaBound ManyTy) tuple_ty -- ROMES:TODO: selector binders are lambda bound?
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
@@ -912,8 +912,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs ManyTy (unboxedUnitTy `mkVisFunTyMany` ty)
-       ; fail_fun_arg <- newSysLocalDs ManyTy unboxedUnitTy
+  = do { fail_fun_var <- newFailLocalDs (LambdaBound ManyTy) (unboxedUnitTy `mkVisFunTyMany` ty) -- ROMES:TODO: Failure pair LambdaBound?
+       ; fail_fun_arg <- newSysLocalDs  (LambdaBound ManyTy) unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) unboxedUnitExpr) }

@@ -375,7 +375,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
     id2 | no_type_change = id1
-        | otherwise      = updateIdTypeAndMult (substTyUnchecked subst) id1
+        | otherwise      = updateIdTypeAndMults (substTyUnchecked subst) id1
 
     old_ty = idType old_id
     old_w = idMult old_id
@@ -471,15 +471,15 @@ clone_id rec_subst subst@(Subst in_scope idvs tvs cvs) (old_id, uniq)
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
-    || (noFreeVarsOfType old_ty && noFreeVarsOfType old_w) = id
+    || (noFreeVarsOfType old_ty && noFreeVarsOfTypes old_ws) = id
   | otherwise   =
-      updateIdTypeAndMult (substTyUnchecked subst) id
+      updateIdTypeAndMults (substTyUnchecked subst) id
         -- The tyCoVarsOfType is cheaper than it looks
         -- because we cache the free tyvars of the type
         -- in a Note in the id's type itself
   where
     old_ty = idType id
-    old_w  = varMult id
+    old_ws = varMults id
 
 ------------------
 -- | Substitute into some 'IdInfo' with regard to the supplied new 'Id'.

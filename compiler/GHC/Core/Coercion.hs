@@ -796,8 +796,8 @@ mkTyConAppCo r tc cos
 
   | otherwise = TyConAppCo r tc cos
 
+-- | A version of mkFunCo1 that takes no FunTyFlags; it works them out
 mkFunCoNoFTF :: HasDebugCallStack => Role -> CoercionN -> Coercion -> Coercion -> Coercion
--- This version of mkFunCo takes no FunTyFlags; it works them out
 mkFunCoNoFTF r w arg_co res_co
   = mkFunCo2 r afl afr w arg_co res_co
   where
@@ -1671,13 +1671,24 @@ mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
 
 mkFunResCo :: Role -> Id -> Coercion -> Coercion
 -- Given res_co :: res1 ~ res2,
---   mkFunResCo r m arg res_co :: (arg -> res1) ~r (arg -> res2)
+--   mkFunResCo r arg res_co :: (arg -> res1) ~r (arg -> res2)
 -- Reflexive in the multiplicity argument
 mkFunResCo role id res_co
   = mkFunCoNoFTF role mult arg_co res_co
   where
-    arg_co = mkReflCo role (varType id)
-    mult   = multToCo (varMult id)
+    arg_co = mkReflCo role (varType id) -- (arg ~ arg)
+    mult   = multToCo $ case idBinding id of 
+                          LambdaBound m -> m
+                          LetBound _ -> panic "mkFunResCo"
+                          GlobalBinding -> panic "global"
+    -- ROMES:
+    -- to make (arg %π -> res1) ~r (arg %π -> res2), we need π.
+    --
+    -- Bet from quick look: arg is always lambda bound, thus it has a multiplicity.
+    -- We'll find out soon enough
+    --
+    -- What can @arg@ be? Can it be a let bound variable? In that case it won't
+    -- have a multiplicity...
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above

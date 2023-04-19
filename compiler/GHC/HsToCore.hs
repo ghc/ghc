@@ -58,6 +58,7 @@ import GHC.Core.Make
 import GHC.Core.Rules
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo(..) )
 import GHC.Core.Ppr
+import GHC.Core.UsageEnv ( zeroUE )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
@@ -526,7 +527,8 @@ unfold_coerce bndrs lhs rhs = do
 
             let ty' = mkTyConApp eqReprPrimTyCon [k, k, t1, t2]
                 v'  = mkLocalCoVar
-                        (mkDerivedInternalName mkRepEqOcc u (getName v)) ty'
+                        (mkDerivedInternalName mkRepEqOcc u (getName v))
+                        (LetBound zeroUE) ty'
                 box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
                       [k, t1, t2] `App`
                       Coercion (mkCoVarCo v')

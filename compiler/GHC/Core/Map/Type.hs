@@ -542,6 +542,12 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- We also need to do the same for multiplicity! Which, since multiplicities are
 -- encoded simply as a 'Type', amounts to have a Trie for a pair of types. Tries
 -- of pairs are composition.
+--
+-- ROMES:TODO: Temporarily, say let bound vars alwyas have Nothing
+-- multiplicity, further ahead we might want to match on the actual binders,
+-- and will require a new kind of TrieMap which matches IdBindings which also
+-- only exist for Ids, not TyVars and such
+-- The impl for varMultMaybe will surely chnge
 data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
 
 -- TODO(22292): derive
@@ -564,12 +570,15 @@ fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
 -- We need to use 'BndrMap' for 'Coercion', 'CoreExpr' AND 'Type', since all
 -- of these data types have binding forms.
 
+-- ROMES:NOTE: The lookup for let binders ignores the multiplicity, whereas it
+-- previously used the rubbish argument... document this all
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   multmap <- lkG (D env (varType v)) tymap
   lookupTM (D env <$> varMultMaybe v) multmap
 
-
+-- ROMES:NOTE: The lookup for let binders ignores the multiplicity, whereas it
+-- previously used the rubbish argument... document this all
 xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
   BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))

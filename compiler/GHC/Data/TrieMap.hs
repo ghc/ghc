@@ -243,11 +243,10 @@ instance forall key. Uniquable key => TrieMap (UniqDFM key) where
                    Maybes
 *                                                                      *
 ************************************************************************
-
-If              m is a map from k -> val
-then (MaybeMap m) is a map from (Maybe k) -> val
 -}
 
+-- | If @m@ is a map from @k -> val@,
+-- then @MaybeMap m@ is a map from @Maybe k -> val@
 data MaybeMap m a = MM { mm_nothing  :: Maybe a, mm_just :: m a }
 
 -- TODO(22292): derive

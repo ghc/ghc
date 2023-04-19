@@ -51,7 +51,7 @@ traceWhenFailPm herald doc act = MaybeT $ do
 mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "pm"
-  in  return (mkUserLocalOrCoVar occname unique ManyTy ty noSrcSpan)
+  in  return (mkUserLocalOrCoVar occname unique (LambdaBound ManyTy) ty noSrcSpan) -- ROMES:TODO: Pmc LambdaBound?
 {-# NOINLINE mkPmId #-} -- We'll CPR deeply, that should be enough
 
 -- | All warning flags that need to run the pattern match checker.

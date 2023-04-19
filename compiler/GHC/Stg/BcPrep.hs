@@ -136,7 +136,7 @@ isNNLJoinPoint x = isJoinId x && mightBeUnliftedType (idType x)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = assert (isNNLJoinPoint x )
-    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
+    updateIdTypeButNotMults (unboxedUnitTy `mkVisFunTyMany`) x
 
 newUnique :: BcPrepM Unique
 newUnique = state $
@@ -146,7 +146,7 @@ newUnique = state $
 newId :: Type -> BcPrepM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal prepFS uniq ManyTy ty
+    return $ mkSysLocal prepFS uniq (LambdaBound ManyTy) ty -- ROMES:TODO: LAmbdaBound?
 
 prepFS :: FastString
 prepFS = fsLit "bcprep"

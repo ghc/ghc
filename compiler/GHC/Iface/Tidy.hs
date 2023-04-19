@@ -215,7 +215,7 @@ globaliseAndTidyBootId :: Id -> Id
 --     * VanillaIdInfo (makes a conservative assumption about arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in GHC.CoreToIface)
 globaliseAndTidyBootId id
-  = updateIdTypeAndMult tidyTopType (globaliseId id)
+  = updateIdTypeAndMults tidyTopType (globaliseId id)
                    `setIdUnfolding` BootUnfolding
 
 {-

@@ -1932,7 +1932,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_join_arity | isJoinId fn = Just (length spec_call_args)
                               | otherwise   = Nothing
               spec_id    = asWorkerLikeId $
-                           mkLocalId spec_name ManyTy
+                           mkLocalId spec_name (LambdaBound ManyTy)
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`    spec_sig
@@ -1986,7 +1986,7 @@ generaliseDictPats qvars pats
        , let pat_ty = exprType pat
        , typeDeterminesValue pat_ty
        , exprFreeVars pat `disjointVarSet` qvar_set
-       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") ManyTy pat_ty
+       = do { id <- mkSysLocalOrCoVarM (fsLit "dict") (LambdaBound ManyTy) pat_ty
             ; return (id:extra_qvs, Var id) }
        | otherwise
        = return (extra_qvs, pat)
@@ -2508,7 +2508,7 @@ callToPats env bndr_occs call@(Call fn args con_env)
                 -- The kind of a type variable may mention a kind variable
                 -- and the type of a term variable may mention a type variable
 
-              sanitise id   = updateIdTypeAndMult expandTypeSynonyms id
+              sanitise id   = updateIdTypeAndMults expandTypeSynonyms id
                 -- See Note [Free type variables of the qvar types]
 
 
@@ -2723,7 +2723,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") ManyTy ty
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") (LambdaBound ManyTy) ty -- ROMES:TODO: Wildcard binders... 
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

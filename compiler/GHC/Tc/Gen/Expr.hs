@@ -1186,7 +1186,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
                       -- (As we will typecheck the let-bindings later, we can drop this coercion here.)
                       -- See RepPolyRecordUpdate test.
                     ; nm <- newNameAt nm_occ generatedSrcSpan
-                    ; let id = mkLocalId nm ManyTy actual_arg_ty
+                    ; let id = mkLocalId nm LetBound actual_arg_ty
                       -- NB: create fresh names to avoid any accidental shadowing
                       -- occurring in the RHS expressions when creating the let bindings:
                       --
@@ -1508,7 +1508,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        ManyTy field_ty (locA loc)
+                                        (LambdaBound ManyTy) field_ty (locA loc) -- ROMES:TODO
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

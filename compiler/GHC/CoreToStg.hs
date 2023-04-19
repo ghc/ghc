@@ -32,7 +32,7 @@ import GHC.Stg.Utils
 
 import GHC.Types.RepType
 import GHC.Types.Id.Make ( coercionTokenId )
-import GHC.Types.Id
+import GHC.Types.Id hiding ( IdBinding(..) )
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
 import GHC.Types.Tickish

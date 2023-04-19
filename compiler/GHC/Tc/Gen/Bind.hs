@@ -57,6 +57,7 @@ import GHC.Tc.Zonk.TcType
 import GHC.Core.Predicate ( getEqPredTys_maybe )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )
@@ -553,7 +554,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name ManyTy forall_a_a
+      = mkLocalId name (LambdaBound ManyTy) forall_a_a -- ROMES:TODO: Does it matter?
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -623,7 +624,7 @@ tcPolyCheck prag_fn
                 -- NB: tcSkolemiseScoped makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
 
-                let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
+                let mono_id = mkLocalId mono_name (idBinding poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 --    See Note [Relevant bindings and the binder stack]
@@ -639,7 +640,7 @@ tcPolyCheck prag_fn
        -- We re-use mono-name, but we could equally well use a fresh one
 
        ; let prag_sigs = lookupPragEnv prag_fn name
-             poly_id2  = mkLocalId mono_name (idMult poly_id) (idType poly_id)
+             poly_id2  = mkLocalId mono_name (idBinding poly_id) (idType poly_id)
        ; spec_prags <- tcSpecPrags    poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
@@ -962,7 +963,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- (#14000) we may report an ambiguity error for a rather
          -- bogus type.
 
-       ; return (mkLocalId poly_name ManyTy inferred_poly_ty) }
+       ; return (mkLocalId poly_name (LambdaBound ManyTy) inferred_poly_ty) } -- ROMES:TODO: Inferred poly id is prob forall bound, consider lambda bound (its lambda alright, a big one) ?
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints
@@ -1310,7 +1311,7 @@ tcMonoBinds is_rec sig_fn no_gen
                           -- function so that in type error messages we show the
                           -- type of the thing whose rhs we are type checking
                        tcMatchesFun (L nm_loc name) matches exp_ty
-       ; mono_id <- newLetBndr no_gen name ManyTy rhs_ty'
+       ; mono_id <- newLetBndr no_gen name zeroUE rhs_ty' -- ROMES:TODO: zeroUE!
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
@@ -1470,7 +1471,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name ManyTy mono_ty
+       ; mono_id <- newLetBndr no_gen name zeroUE mono_ty -- ROMES:TODO: zeroUE !
           -- This ^ generates a binder with Many multiplicity because all
           -- let/where-binders are unrestricted. When we introduce linear let
           -- binders, we will need to retrieve the multiplicity information.
@@ -1543,7 +1544,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name ManyTy tau
+  = newLetBndr no_gen name zeroUE tau -- ROMES:TODO: zeroUE! edit comment below and similar others in this module
     -- Binders with a signature are currently always of multiplicity
     -- Many. Because they come either from toplevel, let, or where
     -- declarations. Which are all unrestricted currently.

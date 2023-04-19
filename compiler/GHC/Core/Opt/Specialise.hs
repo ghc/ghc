@@ -1329,7 +1329,7 @@ specCase env scrut' case_bndr [Alt con args rhs]
                        ; return (mkUserLocalOrCoVar occ uniq wght ty loc) }
        where
          name = idName bndr
-         wght = idMult bndr
+         wght = idBinding bndr
          ty   = idType bndr
          occ  = nameOccName name
          loc  = getSrcSpan name
@@ -3472,7 +3472,7 @@ newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
        ; let n    = idName b
              ty'  = substTyUnchecked subst (idType b)
-             b'   = mkUserLocal (nameOccName n) uniq ManyTy ty' (getSrcSpan n)
+             b'   = mkUserLocal (nameOccName n) uniq (LambdaBound ManyTy) ty' (getSrcSpan n)
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }
 
@@ -3483,7 +3483,7 @@ newSpecIdSM old_name new_ty details info
         ; let new_occ  = mkSpecOcc (nameOccName old_name)
               new_name = mkInternalName uniq new_occ  (getSrcSpan old_name)
         ; return (assert (not (isCoVarType new_ty)) $
-                  mkLocalVar details new_name ManyTy new_ty info) }
+                  mkLocalVar details new_name (LambdaBound ManyTy) new_ty info) } -- ROMES:TODO: LambdaBound?
 
 {-
                 Old (but interesting) stuff about unboxed bindings

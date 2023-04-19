@@ -2223,7 +2223,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") ManyTy ty
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") (LambdaBound ManyTy) ty -- ROMES:TODO: What kind of binders?! I guess up until now it didn't really matter, but now it does
 
 
 ------------------------------------------------------------------------------

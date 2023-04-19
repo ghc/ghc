@@ -57,7 +57,7 @@ import GHC.Core.TyCo.Rep( mkNakedFunTy )
 import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
-                     , mkLocalId, realIdUnfolding )
+                     , mkLocalId, realIdUnfolding, IdBinding(..) )
 import GHC.Types.Basic
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -231,7 +231,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name ManyTy sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name (LambdaBound ManyTy) sigma_ty -- ROMES:TODO: LambdaBound?
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level

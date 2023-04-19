@@ -44,13 +44,15 @@ module GHC.Types.Id (
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idMult, idScaledType, idUnique, idInfo, idDetails,
+        idName, idType, idMult, Var.idBinding, idUsageEnv,
+        idScaledType, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
         recordSelectorTyCon_maybe,
 
         -- ** Modifying an Id
-        setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
-        updateIdTypeButNotMult, updateIdTypeAndMult, updateIdTypeAndMultM,
+        setIdName, setIdUnique, GHC.Types.Id.setIdType,
+        IdBinding(..), setIdBinding,
+        updateIdTypeButNotMults, updateIdTypeAndMults, updateIdTypeAndMultsM,
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
@@ -141,7 +143,10 @@ import GHC.Types.Var( Id, CoVar, JoinId,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId,
             isId, isLocalId, isGlobalId, isExportedId,
-            setIdMult, updateIdTypeAndMult, updateIdTypeButNotMult, updateIdTypeAndMultM)
+            setIdBinding, -- used to be setIdMult
+            updateIdTypeAndMults, updateIdTypeButNotMults, updateIdTypeAndMultsM,
+            IdBinding(..)
+            )
 import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
@@ -161,6 +166,7 @@ import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv (UsageEnv)
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -206,13 +212,28 @@ idType   :: Id -> Kind
 idType    = Var.varType
 
 idMult :: Id -> Mult
-idMult = Var.varMult
+idMult x = case Var.varMultMaybe x of
+             Nothing   -> pprPanic "idMult" (ppr x)
+             Just mult -> mult
 
+idUsageEnv :: Id -> UsageEnv
+idUsageEnv x = case Var.idBinding x of
+             LambdaBound _ -> pprPanic "idUsageEnv" (ppr x)
+             LetBound ue -> ue
+             GlobalBinding -> pprPanic "idUsageEnv" (ppr x)
+
+-- ROMES: Scaled Types seem to be used mainly in data cons; I think Scaled
+-- things remain as they are, bc they seem to only occur in places where the Id is definitely a lambda bound (or datacon, which would be the same) variable
 idScaledType :: Id -> Scaled Type
 idScaledType id = Scaled (idMult id) (idType id)
 
+-- | ROMES:TODO: For now, we keep scaling as is where it is used, but I think
+-- some occurrences might no longer need scaling like this
+-- (see Note [Scaling in case-of-case] and other usage sites)
 scaleIdBy :: Mult -> Id -> Id
-scaleIdBy m id = setIdMult id (m `mkMultMul` idMult id)
+scaleIdBy m id = case Var.varMultMaybe id of
+                   Nothing -> panic "ROMES:TODO: Trying to scale let-bound Id. This should be possible, its just not implemented yet"
+                   Just idMult -> setIdBinding id (LambdaBound (m `mkMultMul` idMult))
 
 -- | Like 'scaleIdBy', but skips non-Ids. Useful for scaling
 -- a mixed list of ids and tyvars.
@@ -245,7 +266,7 @@ localiseId id
   | assert (isId id) $ isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.idBinding id) (idType id) (idInfo id)
   where
     name = idName id
 
@@ -305,28 +326,28 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
-mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
+mkLocalId :: HasDebugCallStack => Name -> IdBinding -> Type -> Id
 mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
-mkLocalCoVar :: Name -> Type -> CoVar
-mkLocalCoVar name ty
+mkLocalCoVar :: Name -> IdBinding -> Type -> CoVar
+mkLocalCoVar name w ty
   = assert (isCoVarType ty) $
-    Var.mkLocalVar CoVarId name ManyTy ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name w ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Mult -> Type -> Id
+mkLocalIdOrCoVar :: Name -> IdBinding -> Type -> Id
 mkLocalIdOrCoVar name w ty
   -- We should assert (eqType w Many) in the isCoVarType case.
   -- However, currently this assertion does not hold.
   -- In tests with -fdefer-type-errors, such as T14584a,
   -- we create a linear 'case' where the scrutinee is a coercion
   -- (see castBottomExpr). This problem is covered by #17291.
-  | isCoVarType ty = mkLocalCoVar name   ty
+  | isCoVarType ty = mkLocalCoVar name w ty
   | otherwise      = mkLocalId    name w ty
 
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: HasDebugCallStack => Name -> Mult -> Type -> IdInfo -> Id
+mkLocalIdWithInfo :: HasDebugCallStack => Name -> IdBinding -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name w ty info =
   Var.mkLocalVar VanillaId name w (assert (not (isCoVarType ty)) ty) info
         -- Note [Free type variables]
@@ -345,29 +366,29 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
-mkSysLocal :: FastString -> Unique -> Mult -> Type -> Id
+mkSysLocal :: FastString -> Unique -> IdBinding -> Type -> Id
 mkSysLocal fs uniq w ty = assert (not (isCoVarType ty)) $
                         mkLocalId (mkSystemVarName uniq fs) w ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Mult -> Type -> Id
+mkSysLocalOrCoVar :: FastString -> Unique -> IdBinding -> Type -> Id
 mkSysLocalOrCoVar fs uniq w ty
   = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
-mkSysLocalM :: MonadUnique m => FastString -> Mult -> Type -> m Id
+mkSysLocalM :: MonadUnique m => FastString -> IdBinding -> Type -> m Id
 mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
+mkSysLocalOrCoVarM :: MonadUnique m => FastString -> IdBinding -> Type -> m Id
 mkSysLocalOrCoVarM fs w ty
   = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
+mkUserLocal :: OccName -> Unique -> IdBinding -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq w ty loc = assert (not (isCoVarType ty)) $
                                 mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
+mkUserLocalOrCoVar :: OccName -> Unique -> IdBinding -> Type -> SrcSpan -> Id
 mkUserLocalOrCoVar occ uniq w ty loc
   = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
 
@@ -380,14 +401,14 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ManyTy ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) GlobalBinding ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkScaledTemplateLocal i (unrestricted ty)
 
 mkScaledTemplateLocal :: Int -> Scaled Type -> Id
-mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) w ty
+mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (LambdaBound w) ty -- ROMES:...Scaled things are always lambda bound
    -- "OrCoVar" since this is used in a superclass selector,
    -- and "~" and "~~" have coercion "superclasses".
 

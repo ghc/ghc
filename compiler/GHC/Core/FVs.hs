@@ -736,7 +736,7 @@ freeVars = go
       | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` mult_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
-        mult_vars = tyCoVarsOfTypeDSet (varMult v)
+        mult_vars = tyCoVarsOfTypesDSet (varMults v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 

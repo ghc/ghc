@@ -104,7 +104,7 @@ pprintClosureCommand bindThings force str = do
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => Subst -> Id -> m (Subst, Term)
    go subst id = do
-       let id' = updateIdTypeAndMult (substTy subst) id
+       let id' = updateIdTypeAndMults (substTy subst) id
            id_ty' = idType id'
        term_    <- GHC.obtainTermFromId maxBound force id'
        term     <- tidyTermTyVars term_

@@ -645,7 +645,7 @@ nameTyCt :: PredType -> DsM EvVar
 nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
-  return (mkUserLocalOrCoVar occname unique ManyTy pred_ty noSrcSpan)
+  return (mkUserLocalOrCoVar occname unique (LambdaBound ManyTy) pred_ty noSrcSpan) -- ROMES:TODO: LambdaBound for PredTys?
 
 -----------------------------
 -- ** Adding term constraints

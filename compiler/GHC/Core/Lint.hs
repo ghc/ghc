@@ -1375,7 +1375,7 @@ lintAltBinders rhs_ue case_bndr scrut_ty con_ty ((var_w, bndr):bndrs)
 checkCaseLinearity :: UsageEnv -> Var -> Mult -> Var -> LintM UsageEnv
 checkCaseLinearity ue case_bndr var_w bndr = do
   ensureSubUsage lhs rhs err_msg
-  lintLinearBinder (ppr bndr) (case_bndr_w `mkMultMul` var_w) (varMult bndr)
+  lintLinearBinder (ppr bndr) (case_bndr_w `mkMultMul` var_w) (idMult bndr) -- idMult since bndr is case so must really have LambdaBound
   return $ deleteUE ue bndr
   where
     lhs = bndr_usage `addUsage` (var_w `scaleUsage` case_bndr_usage)
@@ -1388,7 +1388,7 @@ checkCaseLinearity ue case_bndr var_w bndr = do
     lhs_formula = ppr bndr_usage <+> text "+"
                                  <+> parens (ppr case_bndr_usage <+> text "*" <+> ppr var_w)
     rhs_formula = ppr case_bndr_w <+> text "*" <+> ppr var_w
-    case_bndr_w = varMult case_bndr
+    case_bndr_w = idMult case_bndr -- idMult since is case binder so must be lambdabound...
     case_bndr_usage = lookupUE ue case_bndr
     bndr_usage = lookupUE ue bndr
 
@@ -1452,7 +1452,7 @@ lintCaseExpr scrut var alt_ty alts =
      ; (scrut_ty, scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
           -- See Note [Join points are less general than the paper]
           -- in GHC.Core
-     ; let scrut_mult = varMult var
+     ; let scrut_mult = idMult var -- ROMES:TODO: not really much less for the scrut.., don't use idMult
 
      ; alt_ty <- addLoc (CaseTy scrut) $
                  lintValueType alt_ty

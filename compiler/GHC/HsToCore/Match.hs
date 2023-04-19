@@ -282,7 +282,7 @@ matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (Match
 matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { let XPat (CoPat co pat _) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
+        ; var' <- newUniqueId var (idBinding var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
@@ -298,7 +298,7 @@ matchView (var :| vars) ty (eqns@(eqn1 :| _))
          let TcViewPat viewExpr pat = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idMult var) pat_ty'
+        ; var' <- newUniqueId var (idBinding var) pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions

@@ -36,6 +36,7 @@ import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils
 import GHC.Core.Make
+import GHC.Core.UsageEnv
 import GHC.HsToCore.Binds (dsHsWrapper)
 
 
@@ -85,7 +86,7 @@ mkCmdEnv tc_meths
   where
     mk_bind (std_name, expr)
       = do { rhs <- dsExpr expr
-           ; id <- newSysLocalDs ManyTy (exprType rhs)
+           ; id <- newSysLocalDs (LetBound zeroUE) (exprType rhs) -- ROMES:TODO: zeroUE
            -- no check needed; these are functions
            ; return (NonRec id rhs, (std_name, id)) }
 
@@ -134,18 +135,18 @@ do_premap ids b_ty c_ty d_ty f g
 -- construct CoreExpr for \ (a :: a_ty, b :: b_ty) -> a
 mkFstExpr :: Type -> Type -> DsM CoreExpr
 mkFstExpr a_ty b_ty = do
-    a_var <- newSysLocalDs ManyTy a_ty
-    b_var <- newSysLocalDs ManyTy b_ty
-    pair_var <- newSysLocalDs ManyTy (mkCorePairTy a_ty b_ty)
+    a_var <- newSysLocalDs (LambdaBound ManyTy) a_ty -- ROMES:TODO: LambdaBound for coreCasePair patterns?
+    b_var <- newSysLocalDs (LambdaBound ManyTy) b_ty
+    pair_var <- newSysLocalDs (LambdaBound ManyTy) (mkCorePairTy a_ty b_ty)
     return (Lam pair_var
                (coreCasePair pair_var a_var b_var (Var a_var)))
 
 -- construct CoreExpr for \ (a :: a_ty, b :: b_ty) -> b
 mkSndExpr :: Type -> Type -> DsM CoreExpr
 mkSndExpr a_ty b_ty = do
-    a_var <- newSysLocalDs ManyTy a_ty
-    b_var <- newSysLocalDs ManyTy b_ty
-    pair_var <- newSysLocalDs ManyTy (mkCorePairTy a_ty b_ty)
+    a_var <- newSysLocalDs (LambdaBound ManyTy) a_ty -- ROMES:TODO: As above
+    b_var <- newSysLocalDs (LambdaBound ManyTy) b_ty
+    pair_var <- newSysLocalDs (LambdaBound ManyTy) (mkCorePairTy a_ty b_ty)
     return (Lam pair_var
                (coreCasePair pair_var a_var b_var (Var b_var)))
 
@@ -231,9 +232,9 @@ matchEnvStack   :: [Id]         -- x1..xn
                 -> CoreExpr     -- e
                 -> DsM CoreExpr
 matchEnvStack env_ids stack_id body = do
-    tup_var <- newSysLocalDs ManyTy (mkBigCoreVarTupTy env_ids)
+    tup_var <- newSysLocalDs (LambdaBound ManyTy) (mkBigCoreVarTupTy env_ids) -- ROMES:TODO: LambdaBound for coreCaseTuple
     match_env <- coreCaseTuple tup_var env_ids body
-    pair_id <- newSysLocalDs ManyTy (mkCorePairTy (idType tup_var) (idType stack_id))
+    pair_id <- newSysLocalDs (LambdaBound ManyTy) (mkCorePairTy (idType tup_var) (idType stack_id))
     return (Lam pair_id (coreCasePair pair_id tup_var stack_id match_env))
 
 ----------------------------------------------
@@ -249,7 +250,7 @@ matchEnv :: [Id]        -- x1..xn
          -> CoreExpr    -- e
          -> DsM CoreExpr
 matchEnv env_ids body = do
-    tup_id <- newSysLocalDs ManyTy (mkBigCoreVarTupTy env_ids)
+    tup_id <- newSysLocalDs (LambdaBound ManyTy) (mkBigCoreVarTupTy env_ids)
     tup_case <- coreCaseTuple tup_id env_ids body
     return (Lam tup_id tup_case)
 
@@ -265,7 +266,7 @@ matchVarStack :: [Id] -> Id -> CoreExpr -> DsM (Id, CoreExpr)
 matchVarStack [] stack_id body = return (stack_id, body)
 matchVarStack (param_id:param_ids) stack_id body = do
     (tail_id, tail_code) <- matchVarStack param_ids stack_id body
-    pair_id <- newSysLocalDs ManyTy (mkCorePairTy (idType param_id) (idType tail_id))
+    pair_id <- newSysLocalDs (LambdaBound ManyTy) (mkCorePairTy (idType param_id) (idType tail_id)) -- ROMES:TODO:?
     return (pair_id, coreCasePair pair_id param_id tail_id tail_code)
 
 mkHsEnvStackExpr :: [Id] -> Id -> LHsExpr GhcTc
@@ -343,7 +344,7 @@ dsCmd ids local_vars stack_ty res_ty
         (_a_ty, arg_ty) = tcSplitAppTy a_arg_ty
     core_arrow <- dsLExpr arrow
     core_arg   <- dsLExpr arg
-    stack_id   <- newSysLocalDs ManyTy stack_ty
+    stack_id   <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO: Don't know
     core_make_arg <- matchEnvStack env_ids stack_id core_arg
     return (do_premap ids
               (envStackType env_ids stack_ty)
@@ -369,7 +370,7 @@ dsCmd ids local_vars stack_ty res_ty
 
     core_arrow <- dsLExpr arrow
     core_arg   <- dsLExpr arg
-    stack_id   <- newSysLocalDs ManyTy stack_ty
+    stack_id   <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO: Do't knw
     core_make_pair <- matchEnvStack env_ids stack_id
           (mkCorePairExpr core_arrow core_arg)
 
@@ -396,8 +397,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
         stack_ty' = mkCorePairTy arg_ty stack_ty
     (core_cmd, free_vars, env_ids')
              <- dsfixCmd ids local_vars stack_ty' res_ty cmd
-    stack_id <- newSysLocalDs ManyTy stack_ty
-    arg_id <- newSysLocalDs ManyTy arg_ty
+    stack_id <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO: DOn't know
+    arg_id <- newSysLocalDs (LambdaBound ManyTy) arg_ty -- ROMES:TODO: Don't Know
     -- push the argument expression onto the stack
     let
         stack' = mkCorePairExpr (Var arg_id) (Var stack_id)
@@ -442,7 +443,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
        <- dsfixCmd ids local_vars stack_ty res_ty then_cmd
     (core_else, fvs_else, else_ids)
        <- dsfixCmd ids local_vars stack_ty res_ty else_cmd
-    stack_id   <- newSysLocalDs ManyTy stack_ty
+    stack_id   <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO: stack_id don't know
     either_con <- dsLookupTyCon eitherTyConName
     left_con   <- dsLookupDataCon leftDataConName
     right_con  <- dsLookupDataCon rightDataConName
@@ -504,7 +505,7 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
-    stack_id <- newSysLocalDs ManyTy stack_ty
+    stack_id <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO: Don't know
     (match', core_choices)
       <- dsCases ids local_vars stack_id stack_ty res_ty match
     let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
@@ -546,7 +547,7 @@ dsCmd ids local_vars stack_ty res_ty
 
     -- construct and desugar a case expression with multiple scrutinees
     (core_body, free_vars, env_ids') <- trimInput \env_ids -> do
-      stack_id <- newSysLocalDs ManyTy stack_ty'
+      stack_id <- newSysLocalDs (LambdaBound ManyTy) stack_ty' -- ROMES:TODO:
       (match', core_choices)
         <- dsCases ids local_vars' stack_id stack_ty' res_ty match
 
@@ -562,8 +563,8 @@ dsCmd ids local_vars stack_ty res_ty
       return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
               exprFreeIdsDSet core_body `uniqDSetIntersectUniqSet` local_vars')
 
-    param_ids <- mapM (newSysLocalDs ManyTy) pat_tys
-    stack_id' <- newSysLocalDs ManyTy stack_ty'
+    param_ids <- mapM (newSysLocalDs (LambdaBound ManyTy)) pat_tys -- ROMES:TODO:
+    stack_id' <- newSysLocalDs (LambdaBound ManyTy) stack_ty' -- ROMES:TODO:
 
     -- the expression is built from the inside out, so the actions
     -- are presented in reverse order
@@ -598,7 +599,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ _ lbinds@binds _ body) env_ids 
 
     (core_body, _free_vars, env_ids')
        <- dsfixCmd ids local_vars' stack_ty res_ty body
-    stack_id <- newSysLocalDs ManyTy stack_ty
+    stack_id <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO:
     -- build a new environment, plus the stack, using the let bindings
     core_binds <- dsLocalBinds lbinds (buildEnvStack env_ids' stack_id)
     -- match the old environment and stack against the input
@@ -664,7 +665,7 @@ dsTrimCmdArg local_vars env_ids
     (meth_binds, meth_ids) <- mkCmdEnv ids
     (core_cmd, free_vars, env_ids')
        <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd
-    stack_id <- newSysLocalDs ManyTy stack_ty
+    stack_id <- newSysLocalDs (LambdaBound ManyTy) stack_ty -- ROMES:TODO:
     trim_code
       <- matchEnvStack env_ids stack_id (buildEnvStack env_ids' stack_id)
     let
@@ -728,8 +729,8 @@ dsCmdLam ids local_vars stack_ty res_ty pats body env_ids = do
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
     (core_body, free_vars, env_ids')
        <- dsfixCmd ids local_vars' stack_ty' res_ty body
-    param_ids <- mapM (newSysLocalDs ManyTy) pat_tys
-    stack_id' <- newSysLocalDs ManyTy stack_ty'
+    param_ids <- mapM (newSysLocalDs (LambdaBound ManyTy)) pat_tys -- ROMES:TODO:
+    stack_id' <- newSysLocalDs (LambdaBound ManyTy) stack_ty' -- ROMES:TODO:
 
     -- the expression is built from the inside out, so the actions
     -- are presented in reverse order
@@ -853,7 +854,7 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 dsCmdDo ids local_vars res_ty [L _ (LastStmt _ body _ _)] env_ids = do
     (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
-    env_var <- newSysLocalDs ManyTy env_ty
+    env_var <- newSysLocalDs (LambdaBound ManyTy) env_ty
     let core_map = Lam env_var (mkCorePairExpr (Var env_var) mkCoreUnitExpr)
     return (do_premap ids
                         env_ty
@@ -955,7 +956,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     -- projection function
     --          \ (p, (xs2)) -> (zs)
 
-    env_id <- newSysLocalDs ManyTy env_ty2
+    env_id <- newSysLocalDs (LambdaBound ManyTy) env_ty2 -- ROMES:TODO:
     let
        after_c_ty = mkCorePairTy pat_ty env_ty2
        out_ty = mkBigCoreVarTupTy out_ids
@@ -965,7 +966,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     pat_id    <- selectSimpleMatchVarL ManyTy pat
     match_code
       <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) pat body_expr fail_expr
-    pair_id   <- newSysLocalDs ManyTy after_c_ty
+    pair_id   <- newSysLocalDs (LambdaBound ManyTy) after_c_ty
     let
         proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
 
@@ -1027,7 +1028,7 @@ dsCmdStmt ids local_vars out_ids
 
     -- post_loop_fn = \((later_ids),(env2_ids)) -> (out_ids)
 
-    env2_id <- newSysLocalDs ManyTy env2_ty
+    env2_id <- newSysLocalDs (LambdaBound ManyTy) env2_ty -- ROMES:TODO:
     let
         later_ty = mkBigCoreVarTupTy later_ids
         post_pair_ty = mkCorePairTy later_ty env2_ty
@@ -1114,7 +1115,7 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     -- squash_pair_fn = \ ((env1_ids), ~(rec_ids)) -> (env_ids)
 
-    rec_id <- newSysLocalDs ManyTy rec_ty
+    rec_id <- newSysLocalDs (LambdaBound ManyTy) rec_ty -- ROMES:TODO: seems like ti would be let here... didn't inspect
     let
         env1_id_set = fv_stmts `uniqDSetMinusUniqSet` rec_id_set
         env1_ids = dVarSetElems env1_id_set

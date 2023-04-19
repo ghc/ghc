@@ -1476,7 +1476,7 @@ mkWWcpr_entry opts body_ty body_cpr
 mk_res_bndr :: Type -> UniqSM Id
 mk_res_bndr body_ty = do
   -- See Note [Linear types and CPR]
-  bndr <- mkSysLocalOrCoVarM ww_prefix cprCaseBndrMult body_ty
+  bndr <- mkSysLocalOrCoVarM ww_prefix (LambdaBound cprCaseBndrMult) body_ty -- ROMES: Case Binders for now are LambdaBound, but I don't think for too long...
   -- See Note [Record evaluated-ness in worker/wrapper]
   pure (setCaseBndrEvald MarkedStrict bndr)
 

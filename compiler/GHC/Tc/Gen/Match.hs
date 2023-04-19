@@ -542,7 +542,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (LambdaBound ManyTy) (n_app (idType bndr_id)) -- ROMES:TODO:
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -735,7 +735,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Building the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name ManyTy (n_app (idType bndr_id))
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (LambdaBound ManyTy) (n_app (idType bndr_id)) -- ROMES:TODO:
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -916,7 +916,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n t -> mkLocalId n ManyTy t) tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n t -> mkLocalId n (LambdaBound ManyTy) t) tup_names tup_elt_tys -- ROMES:TODO:
                 -- Many because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 

@@ -57,6 +57,7 @@ import GHC.Core.Coercion
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
+import GHC.Core.UsageEnv
 import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
 import GHC.Driver.DynFlags
@@ -237,7 +238,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkNomReflCo bndr_ty, bndr_ty) }
        ; let bndr_mult = scaledMult exp_pat_ty
-       ; bndr_id <- newLetBndr no_gen bndr_name bndr_mult bndr_ty
+       ; bndr_id <- newLetBndr no_gen bndr_name (unitUE bndr_name bndr_mult) bndr_ty -- ROMES:TODO: Likely incorrect
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
                                           , ppr exp_pat_ty, ppr bndr_ty, ppr co
                                           , ppr bndr_id ])
@@ -247,12 +248,12 @@ tcPatBndr _ bndr_name pat_ty
   = do { let pat_mult = scaledMult pat_ty
        ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name pat_mult pat_ty) }
+       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name (LambdaBound pat_mult) pat_ty) } -- ROMES:TODO: Pat Mult Lambda bound?
                -- We should not have "OrCoVar" here, this is a bug (#17545)
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
-newLetBndr :: LetBndrSpec -> Name -> Mult -> TcType -> TcM TcId
+newLetBndr :: LetBndrSpec -> Name -> UsageEnv -> TcType -> TcM TcId
 -- Make up a suitable Id for the pattern-binder.
 -- See Note [Typechecking pattern bindings], item (4) in GHC.Tc.Gen.Bind
 --
@@ -263,11 +264,11 @@ newLetBndr :: LetBndrSpec -> Name -> Mult -> TcType -> TcM TcId
 -- In the monomorphic case when we are not going to generalise
 --    (plan NoGen, no_gen = LetGblBndr) there is no AbsBinds,
 --    and we use the original name directly
-newLetBndr LetLclBndr name w ty
+newLetBndr LetLclBndr name ue ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name w ty) }
-newLetBndr (LetGblBndr prags) name w ty
-  = addInlinePrags (mkLocalId name w ty) (lookupPragEnv prags name)
+       ; return (mkLocalId mono_name (LetBound ue) ty) }
+newLetBndr (LetGblBndr prags) name ue ty
+  = addInlinePrags (mkLocalId name (LetBound ue) ty) (lookupPragEnv prags name)
 
 tc_sub_type :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt
