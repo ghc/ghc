@@ -41,6 +41,7 @@ import Packages
 import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified Data.ByteString as BS
 import qualified GHC.Foreign as GHC
+import GHC.ResponseFile
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -353,6 +354,8 @@ instance H.Builder Builder where
                     Exit _ <- cmd' [path] (buildArgs ++ [input])
                     return ()
 
+                Haddock BuildPackage -> runHaddock path buildArgs buildInputs
+
                 HsCpp    -> captureStdout
 
                 Make dir -> cmd' path ["-C", dir] buildArgs
@@ -384,6 +387,16 @@ instance H.Builder Builder where
                     fail "tests failed"
 
                 _  -> cmd' [path] buildArgs
+
+-- | Invoke @haddock@ given a path to it and a list of arguments. The arguments
+-- are passed in a response file.
+runHaddock :: FilePath    -- ^ path to @haddock@
+      -> [String]
+      -> [FilePath]  -- ^ input file paths
+      -> Action ()
+runHaddock haddockPath flagArgs fileInputs = withTempFile $ \tmp -> do
+    writeFile' tmp $ escapeArgs fileInputs
+    cmd [haddockPath] flagArgs ('@' : tmp)
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform

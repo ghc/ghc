@@ -68,7 +68,6 @@ haddockBuilderArgs = mconcat
                      ++ "," ++ baseUrl p ++ "/src/%{MODULE}.html#%{NAME},"
                      ++ haddock | (p, haddock) <- haddocks_with_versions ]
             , pure [ "--optghc=" ++ opt | opt <- ghcOpts, not ("--package-db" `isInfixOf` opt) ]
-            , getInputs
             , arg "+RTS"
             , arg $ "-t" ++ (statsDir -/- pkgName pkg ++ ".t")
             , arg "--machine-readable"
