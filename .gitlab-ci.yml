@@ -484,6 +484,9 @@ abi-test-nightly:
     paths:
       - out
   rules:
+    # This job is broken. Disabling it until some kind soul can finish its
+    # implementation. #23269
+    - when: never
     - if: $NIGHTLY
 
 ############################################################
