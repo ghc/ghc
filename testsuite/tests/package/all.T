@@ -20,3 +20,5 @@ test('package10',  normal, compile,      ['-hide-all-packages -package "ghc (GHC
 
 test('T4806', normalise_version('containers'), compile_fail, ['-ignore-package containers'])
 test('T4806a', normalise_version('deepseq', 'containers'), compile_fail, ['-ignore-package deepseq'])
+test('T22884', normalise_version('text'), compile_fail, ['-hide-package text'])
+test('T22884_interactive', normalise_version('text'), ghci_script, ['T22884_interactive.script'])

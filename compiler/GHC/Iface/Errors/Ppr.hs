@@ -19,6 +19,11 @@ module GHC.Iface.Errors.Ppr
   , missingInterfaceErrorReason
   , missingInterfaceErrorDiagnostic
   , readInterfaceErrorDiagnostic
+
+  , lookingForHerald
+  , cantFindErrorX
+  , mayShowLocations
+  , pkgHiddenHint
   )
   where
 
@@ -130,34 +135,34 @@ cantFindError :: IfaceMessageOpts
   -> FindingModuleOrInterface
   -> CantFindInstalled
   -> SDoc
-cantFindError opts = cantFindErrorX (pkg_hidden_hint (ifaceBuildingCabalPackage opts)) (mayShowLocations (ifaceShowTriedFiles opts))
-  where
-    pkg_hidden_hint using_cabal (Just pkg)
-     | using_cabal == YesBuildingCabalPackage
-        = text "Perhaps you need to add" <+>
-              quotes (ppr (unitPackageName pkg)) <+>
-              text "to the build-depends in your .cabal file."
-    -- MP: This is ghci specific, remove
-     | otherwise
-         = text "You can run" <+>
-           quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
-           text "to expose it." $$
-           text "(Note: this unloads all the modules in the current scope.)"
-    pkg_hidden_hint _ Nothing = empty
+cantFindError opts =
+  cantFindErrorX
+    (pkgHiddenHint (const empty) (ifaceBuildingCabalPackage opts))
+    (mayShowLocations "-v" (ifaceShowTriedFiles opts))
 
-mayShowLocations :: Bool -> [FilePath] -> SDoc
-mayShowLocations verbose files
+
+pkgHiddenHint :: (UnitInfo -> SDoc) -> BuildingCabalPackage
+              -> UnitInfo -> SDoc
+pkgHiddenHint _hint YesBuildingCabalPackage pkg
+ = text "Perhaps you need to add" <+>
+   quotes (ppr (unitPackageName pkg)) <+>
+   text "to the build-depends in your .cabal file."
+pkgHiddenHint hint _not_cabal pkg
+ = hint pkg
+
+mayShowLocations :: String -> Bool -> [FilePath] -> SDoc
+mayShowLocations option verbose files
     | null files = empty
     | not verbose =
-          text "Use -v (or `:set -v` in ghci) " <>
+          text "Use" <+> text option <+>
               text "to see a list of the files searched for."
     | otherwise =
           hang (text "Locations searched:") 2 $ vcat (map text files)
 
 -- | General version of cantFindError which has some holes which allow GHC/GHCi to display slightly different
 -- error messages.
-cantFindErrorX :: (Maybe UnitInfo -> SDoc) -> ([FilePath] -> SDoc) -> FindingModuleOrInterface -> CantFindInstalled -> SDoc
-cantFindErrorX pkg_hidden_hint mayShowLocations mod_or_interface (CantFindInstalled mod_name cfir) =
+cantFindErrorX :: (UnitInfo -> SDoc) -> ([FilePath] -> SDoc) -> FindingModuleOrInterface -> CantFindInstalled -> SDoc
+cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInstalled mod_name cfir) =
   let ambig = isAmbiguousInstalledReason cfir
       find_or_load = isLoadOrFindReason cfir
       ppr_what = prettyCantFindWhat find_or_load mod_or_interface ambig
@@ -185,11 +190,11 @@ cantFindErrorX pkg_hidden_hint mayShowLocations mod_or_interface (CantFindInstal
       text "There are files missing in the " <> quotes (ppr pkg) <+>
       text "package," $$
       text "try running 'ghc-pkg check'." $$
-      mayShowLocations files
+      may_show_locations files
     MissingPackageWayFiles build pkg files ->
       text "Perhaps you haven't installed the " <> text build <+>
       text "libraries for package " <> quotes (ppr pkg) <> char '?' $$
-      mayShowLocations files
+      may_show_locations files
     ModuleSuggestion ms fps ->
 
       let pp_suggestions :: [ModuleSuggestion] -> SDoc
@@ -231,7 +236,7 @@ cantFindErrorX pkg_hidden_hint mayShowLocations mod_or_interface (CantFindInstal
                           <+> ppr (mkUnit pkg))
                     | otherwise = empty
 
-        in pp_suggestions ms $$ mayShowLocations fps
+        in pp_suggestions ms $$ may_show_locations fps
     NotAModule -> text "It is not a module in the current program, or in any known package."
     CouldntFindInFiles fps -> vcat (map text fps)
     MultiplePackages mods
@@ -249,7 +254,7 @@ cantFindErrorX pkg_hidden_hint mayShowLocations mod_or_interface (CantFindInstal
       vcat (map pkg_hidden pkg_hiddens) $$
       vcat (map mod_hidden mod_hiddens) $$
       vcat (map unusable unusables) $$
-      mayShowLocations files
+      may_show_locations files
   where
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
                                 text "by" <+> pprOrigin m o
@@ -269,7 +274,7 @@ cantFindErrorX pkg_hidden_hint mayShowLocations mod_or_interface (CantFindInstal
         <+> quotes (ppr uid)
         --FIXME: we don't really want to show the unit id here we should
         -- show the source package id or installed package id if it's ambiguous
-        <> dot $$ pkg_hidden_hint uif
+        <> dot $$ maybe empty pkg_hidden_hint uif
 
 
     mod_hidden pkg =
@@ -286,17 +291,17 @@ interfaceErrorDiagnostic opts = \ case
   Can'tFindNameInInterface name relevant_tyThings ->
     missingDeclInInterface name relevant_tyThings
   Can'tFindInterface err looking_for ->
+    hangNotEmpty (lookingForHerald looking_for) 2 (missingInterfaceErrorDiagnostic opts err)
+
+lookingForHerald :: InterfaceLookingFor -> SDoc
+lookingForHerald looking_for =
     case looking_for of
-      LookingForName {} ->
-        missingInterfaceErrorDiagnostic opts err
-      LookingForModule {} ->
-        missingInterfaceErrorDiagnostic opts err
+      LookingForName {} -> empty
+      LookingForModule {} -> empty
       LookingForHiBoot mod ->
-        hang (text "Could not find hi-boot interface for" <+> quotes (ppr mod) <> colon)
-          2 (missingInterfaceErrorDiagnostic opts err)
+        text "Could not find hi-boot interface for" <+> quotes (ppr mod) <> colon
       LookingForSig sig ->
-        hang (text "Could not find interface file for signature" <+> quotes (ppr sig) <> colon)
-          2 (missingInterfaceErrorDiagnostic opts err)
+        text "Could not find interface file for signature" <+> quotes (ppr sig) <> colon
 
 readInterfaceErrorDiagnostic :: ReadInterfaceError -> SDoc
 readInterfaceErrorDiagnostic = \ case
