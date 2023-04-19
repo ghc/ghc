@@ -92,7 +92,7 @@ config.way_flags = {
     'prof_no_auto' : ['-prof', '-static', '-fasm'],
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
-    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
+    'ghci'         : ['--interactive', '-fallow-optimised-byte-code', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
     'ghci_opt'     : ['--interactive', '-fallow-optimised-byte-code', '-fno-break-points', '-O', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'] + (['-fghci-leak-check'] if not config.compiler_debugged else []),
     'sanity'       : ['-debug'],
     'threaded1'    : ['-threaded', '-debug'],

@@ -758,6 +758,8 @@ def cmm_src( name, opts ):
     opts.cmm_src = True
     # JS backend doesn't support Cmm
     js_skip(name, opts)
+    # GHCi way doesn't support cmm
+    omit_ways(["ghci"])(name, opts)
 
 def outputdir( odir ):
     return lambda name, opts, d=odir: _outputdir(name, opts, d)
@@ -1890,6 +1892,9 @@ def interpreter_run(name: TestName,
 
     delimiter = '===== program output begins here\n'
 
+    pat = re.compile('-main-is (\w+)')
+    res = pat.search(extra_hc_opts)
+    main_is = res.group(1) if res else "main"
     with script.open('w', encoding='UTF-8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
@@ -1903,7 +1908,7 @@ def interpreter_run(name: TestName,
         f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
+        f.write('GHC.TopHandler.runIOFastExit {main_is} Prelude.>> Prelude.return ()\n'.format(main_is=main_is))
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
     if stdin.exists():
@@ -1928,6 +1933,12 @@ def interpreter_run(name: TestName,
     split_file(stderr, delimiter,
                in_testdir(name, 'comp.stderr'),
                in_testdir(name, 'run.stderr'))
+
+    expected_stderr_file = find_expected_file(name, 'compile-stderr')
+    actual_stderr_file = add_suffix(name, 'comp.stderr')
+    result = check_compile_stderr(way, name, expected_stderr_file, actual_stderr_file)
+    if badResult(result):
+        return result
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:

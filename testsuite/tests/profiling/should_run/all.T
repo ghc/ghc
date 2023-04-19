@@ -21,13 +21,13 @@ def normalise_InfoProv_ipName(str):
      return re.sub('ipName = "\\w*"', '', str)
 
 test('staticcallstack001',
-     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     [ omit_ways(['ghci', 'ghci-ext-prof']), # produces a different stack
        normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
 test('staticcallstack002',
-     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     [ omit_ways(['ghci', 'ghci-ext-prof']), # produces a different stack
        normalise_fun(normalise_InfoProv_ipName)
      ], compile_and_run,
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])

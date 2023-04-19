@@ -2905,6 +2905,7 @@ dynamic_flags_deps = [
       setBackend $ platformDefaultBackend (targetPlatform dflags)
       dflags' <- liftEwM getCmdLineState
       pure $ gopt_unset dflags' Opt_ByteCodeAndObjectCode
+      pure $ gopt_unset dflags' Opt_InsertBreakpoints
 
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
