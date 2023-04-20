@@ -1,6 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
+{-# LANGUAGE UnboxedTuples, MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,11 +20,13 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.Encoding.Types (
-    BufferCodec(..),
+    BufferCodec(.., BufferCodec, encode, recover, close, getState, setState),
     TextEncoding(..),
     TextEncoder, TextDecoder,
     CodeBuffer, EncodeBuffer, DecodeBuffer,
-    CodingProgress(..)
+    CodingProgress(..),
+    DecodeBuffer#, EncodeBuffer#,
+    DecodingBuffer#, EncodingBuffer#
   ) where
 
 import GHC.Base
@@ -33,8 +38,8 @@ import GHC.IO.Buffer
 -- -----------------------------------------------------------------------------
 -- Text encoders/decoders
 
-data BufferCodec from to state = BufferCodec {
-  encode :: CodeBuffer from to,
+data BufferCodec from to state = BufferCodec# {
+  encode# :: CodeBuffer# from to,
    -- ^ The @encode@ function translates elements of the buffer @from@
    -- to the buffer @to@.  It should translate as many elements as possible
    -- given the sizes of the buffers, including translating zero elements
@@ -50,7 +55,7 @@ data BufferCodec from to state = BufferCodec {
    -- library in order to report translation errors at the point they
    -- actually occur, rather than when the buffer is translated.
   
-  recover :: Buffer from -> Buffer to -> IO (Buffer from, Buffer to),
+  recover# :: Buffer from -> Buffer to -> State# RealWorld -> (# State# RealWorld, Buffer from, Buffer to #),
    -- ^ The @recover@ function is used to continue decoding
    -- in the presence of invalid or unrepresentable sequences. This includes
    -- both those detected by @encode@ returning @InvalidSequence@ and those
@@ -69,12 +74,12 @@ data BufferCodec from to state = BufferCodec {
    --
    -- @since 4.4.0.0
   
-  close  :: IO (),
+  close# :: IO (),
    -- ^ Resources associated with the encoding may now be released.
    -- The @encode@ function may not be called again after calling
    -- @close@.
 
-  getState :: IO state,
+  getState# :: IO state,
    -- ^ Return the current state of the codec.
    --
    -- Many codecs are not stateful, and in these case the state can be
@@ -87,14 +92,22 @@ data BufferCodec from to state = BufferCodec {
    -- beginning), and if not, whether to use the big or little-endian
    -- encoding.
 
-  setState :: state -> IO ()
+  setState# :: state -> IO ()
    -- restore the state of the codec using the state from a previous
    -- call to 'getState'.
  }
 
-type CodeBuffer from to = Buffer from -> Buffer to -> IO (CodingProgress, Buffer from, Buffer to)
-type DecodeBuffer = CodeBuffer Word8 Char
-type EncodeBuffer = CodeBuffer Char Word8
+type CodeBuffer      from to = Buffer from -> Buffer to -> IO (CodingProgress, Buffer from, Buffer to)
+type DecodeBuffer            = CodeBuffer Word8 Char
+type EncodeBuffer            = CodeBuffer Char Word8
+
+type CodeBuffer#     from to = Buffer from -> Buffer to -> State# RealWorld -> (# State# RealWorld, CodingProgress, Buffer from, Buffer to #)
+type DecodeBuffer#           = CodeBuffer# Word8 Char
+type EncodeBuffer#           = CodeBuffer# Char  Word8
+
+type CodingBuffer#   from to = State# RealWorld -> (# State# RealWorld, CodingProgress, Buffer from, Buffer to #)
+type DecodingBuffer#         = CodingBuffer# Word8 Char
+type EncodingBuffer#         = CodingBuffer# Char  Word8
 
 type TextDecoder state = BufferCodec Word8 CharBufElem state
 type TextEncoder state = BufferCodec CharBufElem Word8 state
@@ -132,3 +145,29 @@ data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains in
                              , Show -- ^ @since 4.4.0.0
                              )
 
+pattern BufferCodec :: CodeBuffer from to
+                    -> (Buffer from -> Buffer to -> IO (Buffer from, Buffer to))
+                    -> IO ()
+                    -> IO state
+                    -> (state -> IO ())
+                    -> BufferCodec from to state
+pattern BufferCodec{encode, recover, close, getState, setState} <-
+    BufferCodec# (getEncode -> encode) (getRecover -> recover) close getState setState
+  where
+    BufferCodec e r c g s = BufferCodec# (mkEncode e) (mkRecover r) c g s
+
+getEncode :: CodeBuffer# from to -> CodeBuffer from to
+getEncode e i o = IO $ \st ->
+  let !(# st', prog, i', o' #) = e i o st in (# st', (prog, i', o') #)
+
+getRecover :: (Buffer from -> Buffer to -> State# RealWorld -> (# State# RealWorld, Buffer from, Buffer to #))
+           -> (Buffer from -> Buffer to -> IO (Buffer from, Buffer to))
+getRecover r i o = IO $ \st ->
+  let !(# st', i', o' #) = r i o st in (# st', (i', o') #)
+
+mkEncode :: CodeBuffer from to -> CodeBuffer# from to
+mkEncode e i o st = let !(# st', (prog, i', o') #) = unIO (e i o) st in (# st', prog, i', o' #)
+
+mkRecover :: (Buffer from -> Buffer to -> IO (Buffer from, Buffer to))
+          -> (Buffer from -> Buffer to -> State# RealWorld -> (# State# RealWorld, Buffer from, Buffer to #))
+mkRecover r i o st = let !(# st', (i', o') #) = unIO (r i o) st in (# st', i', o' #)
