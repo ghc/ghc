@@ -20,6 +20,7 @@ module Control.Monad.Zip where
 
 import Control.Monad (liftM, liftM2)
 import Data.Functor.Identity
+import qualified Data.Functor
 import Data.Monoid
 import Data.Ord ( Down(..) )
 import Data.Proxy
@@ -65,7 +66,7 @@ instance MonadZip [] where
 instance MonadZip NE.NonEmpty where
   mzip     = NE.zip
   mzipWith = NE.zipWith
-  munzip   = NE.unzip
+  munzip   = Data.Functor.unzip
 
 -- | @since 4.8.0.0
 instance MonadZip Identity where

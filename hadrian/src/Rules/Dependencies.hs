@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 module Rules.Dependencies (buildPackageDependencies) where
 
 import Data.Bifunctor
