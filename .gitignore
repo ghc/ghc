@@ -115,6 +115,7 @@ _darcs/
 /compiler/ghc.cabal.old
 /distrib/configure.ac
 /distrib/ghc.iss
+/docs/index.html
 /docs/man
 /docs/users_guide/.log
 /docs/users_guide/users_guide

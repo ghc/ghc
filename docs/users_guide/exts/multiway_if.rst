@@ -51,3 +51,11 @@ except that the semi-colons between guards in a multi-way if are
 optional. So it is not necessary to line up all the guards at the same
 column; this is consistent with the way guards work in function
 definitions and case expressions.
+
+Note that multi-way if supports guards other than boolean conditions: ::
+
+      if | parseNumbers settings
+         , Just (exponent, mantissa) <- decomposeNumber str
+         , let (integralPart, fractionPart) = parse mantissa
+         , integralPart >= 0 = ...
+         | otherwise = ...
