@@ -110,7 +110,7 @@ genApp ctx i args
         prof <- csProf <$> getSettings
         let profArg = if prof then [jCafCCS] else []
         a <- genArg x
-        return ( top |= app "h$appendToHsStringA" ([toJExpr d, toJExpr a] ++ profArg)
+        return ( top |= app "h$appendToHsStringA" (toJExpr d : a ++ profArg)
                , ExprInline Nothing
                )
 
