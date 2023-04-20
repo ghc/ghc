@@ -2358,7 +2358,7 @@ of ``-W(no-)*``.
 
     :since: 9.6.1
 
-    As explained in :ref:`undecidable_instances`, when using
+    As explained in :ref:`undecidable-instances`, when using
     :extension:`UndecidableInstances` it is possible for GHC to construct
     non-terminating evidence for certain superclass constraints.
 

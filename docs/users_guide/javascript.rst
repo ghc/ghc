@@ -1,4 +1,4 @@
-.. _ffi-javascript
+.. _ffi-javascript:
 
 FFI and the JavaScript Backend
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -23,7 +23,7 @@ look like:
     js_add :: Int -> Int -> Int
 
 JSVal
-^^^^^
+~~~~~
 
 The JavaScript backend has a concept of an untyped 'plain' JavaScript
 value, under the guise of the type ``JSVal``. Values having this type
@@ -47,7 +47,7 @@ It also contains functions for working with objects:
 * ``getProp :: JSVal -> String -> JSVal`` - object field access
 
 JavaScript FFI Types
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~
 
 Some types are able to be used directly in the type signatures of foreign
 exports, without conversion to a ``JSVal``. We saw in the first example
@@ -75,7 +75,7 @@ for the Haskell `Bool` type:
     type_error :: Bool -> Bool
 
 JavaScript Callbacks
-^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~
 
 The JavaScript execution model is based around callback functions, and
 GHC's JavaScript backend implements these as a type in order to support
@@ -146,7 +146,7 @@ passed as an ``Int`` to a ``Callback`` that accepts a ``JSVal``:
     releaseCallback add3
 
 Callbacks as Foreign Exports
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 JavaScript callbacks allow for a sort of FFI exports via FFI imports. To do
 this, a global JavaScript variable is set, and that global variable can then

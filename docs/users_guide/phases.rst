@@ -247,13 +247,6 @@ the following flags:
     Pass ⟨option⟩ to the linker when merging object files. In the case of a
     standard ``ld``-style linker this should generally include the ``-r`` flag.
 
-.. ghc-flag:: -optdll ⟨option⟩
-    :shortdesc: pass ⟨option⟩ to the DLL generator
-    :type: dynamic
-    :category: phase-options
-
-    Pass ⟨option⟩ to the DLL generator.
-
 .. ghc-flag:: -optwindres ⟨option⟩
     :shortdesc: pass ⟨option⟩ to ``windres``.
     :type: dynamic
