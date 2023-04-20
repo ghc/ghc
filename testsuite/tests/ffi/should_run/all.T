@@ -192,7 +192,7 @@ test('T9274', [omit_ways(['ghci'])], compile_and_run, [''])
 
 test('ffi023', [ omit_ways(['ghci']),
                 extra_run_opts('1000 4'),
-                js_broken(22363),
+                req_c,
                 pre_cmd('$MAKE -s --no-print-directory ffi023_setup') ],
                 # The ffi023_setup hack is to ensure that we generate
                 # ffi023_stub.h before compiling ffi023_c.c, which
@@ -206,7 +206,7 @@ test('rts_clearMemory', [
      extra_ways(['g1', 'nursery_chunks', 'nonmoving', 'compacting_gc']),
      # On windows, nonmoving way fails with bad exit code (2816)
      when(opsys('mingw32'), fragile(23091)),
-     js_broken(22363),
+     req_c,
      pre_cmd('$MAKE -s --no-print-directory rts_clearMemory_setup') ],
      # Same hack as ffi023
      compile_and_run, ['rts_clearMemory_c.c -no-hs-main'])

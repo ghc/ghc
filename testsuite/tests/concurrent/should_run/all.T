@@ -260,7 +260,7 @@ test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
      only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
-     js_skip
+     req_c
      ],
      compile_and_run,
      ['hs_try_putmvar001_c.c'])
@@ -270,7 +270,7 @@ test('hs_try_putmvar001',
 test('hs_try_putmvar002',
      [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
       omit_ways(['ghci']),
-      js_skip,
+      req_c,
       extra_run_opts('1 8 10000')],
      compile_and_run, ['hs_try_putmvar002_c.c'])
 
@@ -280,7 +280,7 @@ test('hs_try_putmvar003',
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
      only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
-     js_skip,
+     req_c,
      extra_run_opts('1 16 32 100'),
      fragile_for(16361, ['threaded1'])
      ],

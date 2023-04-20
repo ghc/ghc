@@ -251,7 +251,7 @@ test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
 test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  pre_cmd('$MAKE -s --no-print-directory T6006_setup'),
-                 js_skip
+                 req_c
                  ],
                  # The T6006_setup hack is to ensure that we generate
                  # T6006_stub.h before compiling T6006_c.c, which

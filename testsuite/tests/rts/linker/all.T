@@ -93,13 +93,13 @@ test('T5435_v_gcc',
 test('T5435_dyn_asm',
      [extra_files(['T5435.hs', 'T5435_asm.c']),
       fragile(22970),
-      js_skip, # dynamic linking not supported by the JS backend
+      req_c,
       check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
 test('T5435_dyn_gcc',
      [extra_files(['T5435.hs', 'T5435_gcc.c']),
       fragile(22970),
-      js_skip], # dynamic linking not supported by the JS backend
+      req_c],
      makefile_test, ['T5435_dyn_gcc'])
 
 ######################################
