@@ -3,6 +3,7 @@
            , BangPatterns
            , NondecreasingIndentation
            , MagicHash
+           , UnboxedTuples
   #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -56,22 +57,22 @@ mkUTF8 cfm = TextEncoding { textEncodingName = "UTF-8",
 
 utf8_DF :: CodingFailureMode -> IO (TextDecoder ())
 utf8_DF cfm =
-  return (BufferCodec {
-             encode   = utf8_decode,
-             recover  = recoverDecode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = utf8_decode,
+             recover#  = recoverDecode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 utf8_EF :: CodingFailureMode -> IO (TextEncoder ())
 utf8_EF cfm =
-  return (BufferCodec {
-             encode   = utf8_encode,
-             recover  = recoverEncode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = utf8_encode,
+             recover#  = recoverEncode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 utf8_bom :: TextEncoding
@@ -85,177 +86,188 @@ mkUTF8_bom cfm = TextEncoding { textEncodingName = "UTF-8BOM",
 utf8_bom_DF :: CodingFailureMode -> IO (TextDecoder Bool)
 utf8_bom_DF cfm = do
    ref <- newIORef True
-   return (BufferCodec {
-             encode   = utf8_bom_decode ref,
-             recover  = recoverDecode cfm,
-             close    = return (),
-             getState = readIORef ref,
-             setState = writeIORef ref
+   return (BufferCodec# {
+             encode#   = utf8_bom_decode ref,
+             recover#  = recoverDecode# cfm,
+             close#    = return (),
+             getState# = readIORef ref,
+             setState# = writeIORef ref
           })
 
 utf8_bom_EF :: CodingFailureMode -> IO (TextEncoder Bool)
 utf8_bom_EF cfm = do
    ref <- newIORef True
-   return (BufferCodec {
-             encode   = utf8_bom_encode ref,
-             recover  = recoverEncode cfm,
-             close    = return (),
-             getState = readIORef ref,
-             setState = writeIORef ref
+   return (BufferCodec# {
+             encode#   = utf8_bom_encode ref,
+             recover#  = recoverEncode# cfm,
+             close#    = return (),
+             getState# = readIORef ref,
+             setState# = writeIORef ref
           })
 
-utf8_bom_decode :: IORef Bool -> DecodeBuffer
+utf8_bom_decode :: IORef Bool -> DecodeBuffer#
 utf8_bom_decode ref
   input@Buffer{  bufRaw=iraw, bufL=ir, bufR=iw,  bufSize=_  }
   output
+  st0
  = do
-   first <- readIORef ref
+   let !(# st1, first #) = unIO (readIORef ref) st0
    if not first
-      then utf8_decode input output
+      then utf8_decode input output st1
       else do
-       let no_bom = do writeIORef ref False; utf8_decode input output
-       if iw - ir < 1 then return (InputUnderflow,input,output) else do
-       c0 <- readWord8Buf iraw ir
+       let no_bom = let !(# st', () #) = unIO (writeIORef ref False) st1 in utf8_decode input output st'
+       if iw - ir < 1 then (# st1,InputUnderflow,input,output #) else do
+       let !(# st2, c0 #) = unIO (readWord8Buf iraw ir) st1
        if (c0 /= bom0) then no_bom else do
-       if iw - ir < 2 then return (InputUnderflow,input,output) else do
-       c1 <- readWord8Buf iraw (ir+1)
+       if iw - ir < 2 then (# st2,InputUnderflow,input,output #) else do
+       let !(# st3, c1 #) = unIO (readWord8Buf iraw (ir+1)) st2
        if (c1 /= bom1) then no_bom else do
-       if iw - ir < 3 then return (InputUnderflow,input,output) else do
-       c2 <- readWord8Buf iraw (ir+2)
+       if iw - ir < 3 then (# st3,InputUnderflow,input,output #) else do
+       let !(# st4, c2 #) = unIO (readWord8Buf iraw (ir+2)) st3
        if (c2 /= bom2) then no_bom else do
        -- found a BOM, ignore it and carry on
-       writeIORef ref False
-       utf8_decode input{ bufL = ir + 3 } output
+       let !(# st5, () #) = unIO (writeIORef ref False) st4
+       utf8_decode input{ bufL = ir + 3 } output st5
 
-utf8_bom_encode :: IORef Bool -> EncodeBuffer
+utf8_bom_encode :: IORef Bool -> EncodeBuffer#
 utf8_bom_encode ref input
   output@Buffer{ bufRaw=oraw, bufL=_, bufR=ow, bufSize=os }
+  st0
  = do
-  b <- readIORef ref
-  if not b then utf8_encode input output
+  let !(# st1, b #) = unIO (readIORef ref) st0
+  if not b then utf8_encode input output st1
            else if os - ow < 3
-                  then return (OutputUnderflow,input,output)
+                  then (# st1,OutputUnderflow,input,output #)
                   else do
-                    writeIORef ref False
-                    writeWord8Buf oraw ow     bom0
-                    writeWord8Buf oraw (ow+1) bom1
-                    writeWord8Buf oraw (ow+2) bom2
-                    utf8_encode input output{ bufR = ow+3 }
+                    let !(# st2, () #) = unIO (writeIORef ref False)           st1
+                        !(# st3, () #) = unIO (writeWord8Buf oraw ow     bom0) st2
+                        !(# st4, () #) = unIO (writeWord8Buf oraw (ow+1) bom1) st3
+                        !(# st5, () #) = unIO (writeWord8Buf oraw (ow+2) bom2) st4
+                    utf8_encode input output{ bufR = ow+3 } st5
 
 bom0, bom1, bom2 :: Word8
 bom0 = 0xef
 bom1 = 0xbb
 bom2 = 0xbf
 
-utf8_decode :: DecodeBuffer
+utf8_decode :: DecodeBuffer#
 utf8_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let
-       loop !ir !ow
-         | ow >= os = done OutputUnderflow ir ow
-         | ir >= iw = done InputUnderflow ir ow
+       loop :: Int -> Int -> DecodingBuffer#
+       loop !ir !ow st0
+         | ow >= os = done OutputUnderflow ir ow st0
+         | ir >= iw = done InputUnderflow ir ow st0
          | otherwise = do
-              c0 <- readWord8Buf iraw ir
+              let !(# st1, c0 #) = unIO (readWord8Buf iraw ir) st0
               case c0 of
                 _ | c0 <= 0x7f -> do
-                           ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
-                           loop (ir+1) ow'
-                  | c0 >= 0xc0 && c0 <= 0xc1 -> invalid -- Overlong forms
+                           let !(# st2, ow' #) = unIO (writeCharBuf oraw ow (unsafeChr (fromIntegral c0))) st1
+                           loop (ir+1) ow' st2
+                  | c0 >= 0xc0 && c0 <= 0xc1 -> invalid st1 -- Overlong forms
                   | c0 >= 0xc2 && c0 <= 0xdf ->
-                           if iw - ir < 2 then done InputUnderflow ir ow else do
-                           c1 <- readWord8Buf iraw (ir+1)
-                           if (c1 < 0x80 || c1 >= 0xc0) then invalid else do
-                           ow' <- writeCharBuf oraw ow (chr2 c0 c1)
-                           loop (ir+2) ow'
+                           if iw - ir < 2 then done InputUnderflow ir ow st1 else do
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
+                           if (c1 < 0x80 || c1 >= 0xc0) then invalid st2 else do
+                           let !(# st3, ow' #) = unIO (writeCharBuf oraw ow (chr2 c0 c1)) st2
+                           loop (ir+2) ow' st3
                   | c0 >= 0xe0 && c0 <= 0xef ->
                       case iw - ir of
-                        1 -> done InputUnderflow ir ow
+                        1 -> done InputUnderflow ir ow st1
                         2 -> do -- check for an error even when we don't have
                                 -- the full sequence yet (#3341)
-                           c1 <- readWord8Buf iraw (ir+1)
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
                            if not (validate3 c0 c1 0x80)
-                              then invalid else done InputUnderflow ir ow
+                              then invalid st2 else done InputUnderflow ir ow st2
                         _ -> do
-                           c1 <- readWord8Buf iraw (ir+1)
-                           c2 <- readWord8Buf iraw (ir+2)
-                           if not (validate3 c0 c1 c2) then invalid else do
-                           ow' <- writeCharBuf oraw ow (chr3 c0 c1 c2)
-                           loop (ir+3) ow'
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
+                           let !(# st3, c2 #) = unIO (readWord8Buf iraw (ir+2)) st2
+                           if not (validate3 c0 c1 c2) then invalid st3 else do
+                           let !(# st4, ow' #) = unIO (writeCharBuf oraw ow (chr3 c0 c1 c2)) st3
+                           loop (ir+3) ow' st4
                   | c0 >= 0xf0 ->
                       case iw - ir of
-                        1 -> done InputUnderflow ir ow
+                        1 -> done InputUnderflow ir ow st1
                         2 -> do -- check for an error even when we don't have
                                 -- the full sequence yet (#3341)
-                           c1 <- readWord8Buf iraw (ir+1)
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
                            if not (validate4 c0 c1 0x80 0x80)
-                              then invalid else done InputUnderflow ir ow
+                              then invalid st2 else done InputUnderflow ir ow st2
                         3 -> do
-                           c1 <- readWord8Buf iraw (ir+1)
-                           c2 <- readWord8Buf iraw (ir+2)
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
+                               !(# st3, c2 #) = unIO (readWord8Buf iraw (ir+2)) st2
                            if not (validate4 c0 c1 c2 0x80)
-                              then invalid else done InputUnderflow ir ow
+                              then invalid st3 else done InputUnderflow ir ow st3
                         _ -> do
-                           c1 <- readWord8Buf iraw (ir+1)
-                           c2 <- readWord8Buf iraw (ir+2)
-                           c3 <- readWord8Buf iraw (ir+3)
-                           if not (validate4 c0 c1 c2 c3) then invalid else do
-                           ow' <- writeCharBuf oraw ow (chr4 c0 c1 c2 c3)
-                           loop (ir+4) ow'
+                           let !(# st2, c1 #) = unIO (readWord8Buf iraw (ir+1)) st1
+                               !(# st3, c2 #) = unIO (readWord8Buf iraw (ir+2)) st2
+                               !(# st4, c3 #) = unIO (readWord8Buf iraw (ir+3)) st3
+                           if not (validate4 c0 c1 c2 c3) then invalid st4 else do
+                           let !(# st5, ow' #) = unIO (writeCharBuf oraw ow (chr4 c0 c1 c2 c3)) st4
+                           loop (ir+4) ow' st5
                   | otherwise ->
-                           invalid
+                           invalid st1
          where
-           invalid = done InvalidSequence ir ow
+           invalid :: DecodingBuffer#
+           invalid st' = done InvalidSequence ir ow st'
 
        -- lambda-lifted, to avoid thunks being built in the inner-loop:
-       done why !ir !ow = return (why,
-                                  if ir == iw then input{ bufL=0, bufR=0 }
-                                              else input{ bufL=ir },
-                                  output{ bufR=ow })
+       {-# NOINLINE done #-}
+       done :: CodingProgress -> Int -> Int -> DecodingBuffer#
+       done why !ir !ow st' =
+         let !ri = if ir == iw then input{ bufL = 0, bufR = 0} else input{ bufL = ir }
+             !ro = output { bufR = ow }
+         in (# st', why, ri, ro #)
    in
-   loop ir0 ow0
+   loop ir0 ow0 st
 
-utf8_encode :: EncodeBuffer
+utf8_encode :: EncodeBuffer#
 utf8_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let
-      done why !ir !ow = return (why,
-                                 if ir == iw then input{ bufL=0, bufR=0 }
-                                             else input{ bufL=ir },
-                                 output{ bufR=ow })
-      loop !ir !ow
-        | ow >= os = done OutputUnderflow ir ow
-        | ir >= iw = done InputUnderflow ir ow
+      {-# NOINLINE done #-}
+      done :: CodingProgress -> Int -> Int -> EncodingBuffer#
+      done why !ir !ow st' =
+        let !ri = if ir == iw then input{ bufL = 0, bufR = 0 } else input{ bufL = ir }
+            !ro = output{ bufR = ow }
+        in  (# st', why, ri, ro #)
+      loop :: Int -> Int -> EncodingBuffer#
+      loop !ir !ow st0
+        | ow >= os = done OutputUnderflow ir ow st0
+        | ir >= iw = done InputUnderflow ir ow st0
         | otherwise = do
-           (c,ir') <- readCharBuf iraw ir
+           let !(# st1, (c,ir') #) = unIO (readCharBuf iraw ir) st0
            case ord c of
              x | x <= 0x7F   -> do
-                    writeWord8Buf oraw ow (fromIntegral x)
-                    loop ir' (ow+1)
+                     let !(# st2, () #) = unIO (writeWord8Buf oraw ow (fromIntegral x)) st1
+                     loop ir' (ow+1) st2
                | x <= 0x07FF ->
-                    if os - ow < 2 then done OutputUnderflow ir ow else do
+                    if os - ow < 2 then done OutputUnderflow ir ow st1 else do
                     let (c1,c2) = ord2 c
-                    writeWord8Buf oraw ow     c1
-                    writeWord8Buf oraw (ow+1) c2
-                    loop ir' (ow+2)
-               | x <= 0xFFFF -> if isSurrogate c then done InvalidSequence ir ow else do
-                    if os - ow < 3 then done OutputUnderflow ir ow else do
+                        !(# st2, () #) = unIO (writeWord8Buf oraw ow     c1) st1
+                        !(# st3, () #) = unIO (writeWord8Buf oraw (ow+1) c2) st2
+                    loop ir' (ow+2) st3
+               | x <= 0xFFFF -> if isSurrogate c then done InvalidSequence ir ow st1 else do
+                    if os - ow < 3 then done OutputUnderflow ir ow st1 else do
                     let (c1,c2,c3) = ord3 c
-                    writeWord8Buf oraw ow     c1
-                    writeWord8Buf oraw (ow+1) c2
-                    writeWord8Buf oraw (ow+2) c3
-                    loop ir' (ow+3)
+                        !(# st2, () #) = unIO (writeWord8Buf oraw ow     c1) st1
+                        !(# st3, () #) = unIO (writeWord8Buf oraw (ow+1) c2) st2
+                        !(# st4, () #) = unIO (writeWord8Buf oraw (ow+2) c3) st3
+                    loop ir' (ow+3) st4
                | otherwise -> do
-                    if os - ow < 4 then done OutputUnderflow ir ow else do
+                    if os - ow < 4 then done OutputUnderflow ir ow st1 else do
                     let (c1,c2,c3,c4) = ord4 c
-                    writeWord8Buf oraw ow     c1
-                    writeWord8Buf oraw (ow+1) c2
-                    writeWord8Buf oraw (ow+2) c3
-                    writeWord8Buf oraw (ow+3) c4
-                    loop ir' (ow+4)
+                        !(# st2, () #) = unIO (writeWord8Buf oraw ow     c1) st1
+                        !(# st3, () #) = unIO (writeWord8Buf oraw (ow+1) c2) st2
+                        !(# st4, () #) = unIO (writeWord8Buf oraw (ow+2) c3) st3
+                        !(# st5, () #) = unIO (writeWord8Buf oraw (ow+3) c4) st4
+                    loop ir' (ow+4) st5
    in
-   loop ir0 ow0
+   loop ir0 ow0 st
 
 -- -----------------------------------------------------------------------------
 -- UTF-8 primitives, lifted from Data.Text.Fusion.Utf8

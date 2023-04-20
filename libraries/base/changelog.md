@@ -28,6 +28,7 @@
   * Add more instances for `Compose`: `Enum`, `Bounded`, `Num`, `Real`, `Integral` ([CLC proposal #160](https://github.com/haskell/core-libraries-committee/issues/160))
   * Make `(&)` representation polymorphic in the return type ([CLC proposal #158](https://github.com/haskell/core-libraries-committee/issues/158))
   * Implement `GHC.IORef.atomicSwapIORef` via a new dedicated primop `atomicSwapMutVar#` ([CLC proposal #139](https://github.com/haskell/core-libraries-committee/issues/139))
+  * Change codebuffers to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
