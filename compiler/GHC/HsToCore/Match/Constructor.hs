@@ -2,6 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-deprecations #-}
 
 {-
 (c) The University of Glasgow 2006

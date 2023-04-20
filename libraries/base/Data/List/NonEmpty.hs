@@ -472,6 +472,7 @@ zipWith f ~(x :| xs) ~(y :| ys) = f x y :| List.zipWith f xs ys
 -- | The 'unzip' function is the inverse of the 'zip' function.
 unzip :: Functor f => f (a,b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
+{-# DEPRECATED unzip "This function will be made monomorphic in base-4.22, consider switching to Data.Functor.unzip" #-}
 
 -- | The 'nub' function removes duplicate elements from a list. In
 -- particular, it keeps only the first occurrence of each element.
