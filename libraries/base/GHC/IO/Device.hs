@@ -35,7 +35,7 @@ import {-# SOURCE #-} GHC.IO.Exception ( unsupportedOperation )
 
 -- | A low-level I/O provider where the data is bytes in memory.
 --   The Word64 offsets currently have no effect on POSIX system or consoles
---   where the implicit behaviour of the C runtime is assume to move the file
+--   where the implicit behaviour of the C runtime is assumed to move the file
 --   pointer on every read/write without needing an explicit seek.
 class RawIO a where
   -- | Read up to the specified number of bytes starting from a specified
@@ -107,7 +107,7 @@ class IODevice a where
 
   -- | some devices (e.g. terminals) support a "raw" mode where
   -- characters entered are immediately made available to the program.
-  -- If available, this operations enables raw mode.
+  -- If available, this operation enables raw mode.
   setRaw :: a -> Bool -> IO ()
   setRaw _ _ = ioe_unsupportedOperation
 

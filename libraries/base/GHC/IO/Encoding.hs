@@ -268,7 +268,7 @@ char8 = Latin1.latin1
 --
 --      2. If the underlying encoding is not itself roundtrippable, this mechanism
 --         can fail. Roundtrippable encodings are those which have an injective mapping
---         into Unicode. Almost all encodings meet this criteria, but some do not. Notably,
+--         into Unicode. Almost all encodings meet this criterion, but some do not. Notably,
 --         Shift-JIS (CP932) and Big5 contain several different encodings of the same
 --         Unicode codepoint.
 --

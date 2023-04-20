@@ -39,7 +39,7 @@ infixl 7 <!>
 
 -- | Conditionally execute an action depending on the configured I/O subsystem.
 -- On POSIX systems always execute the first action.
--- On windows execute the second action if WINIO as active, otherwise fall back to
+-- On Windows execute the second action if WINIO as active, otherwise fall back to
 -- the first action.
 conditional :: a -> a -> a
 #if defined(mingw32_HOST_OS)

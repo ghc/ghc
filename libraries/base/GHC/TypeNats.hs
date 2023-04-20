@@ -68,7 +68,7 @@ import GHC.TypeNats.Internal(CmpNat)
 
 -- | A type synonym for 'Natural'.
 --
--- Prevously, this was an opaque data type, but it was changed to a type
+-- Previously, this was an opaque data type, but it was changed to a type
 -- synonym.
 --
 -- @since 4.16.0.0

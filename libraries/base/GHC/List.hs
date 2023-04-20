@@ -1084,7 +1084,7 @@ splitAt n ls
 #endif /* USE_REPORT_PRELUDE */
 
 -- | 'span', applied to a predicate @p@ and a list @xs@, returns a tuple where
--- first element is longest prefix (possibly empty) of @xs@ of elements that
+-- first element is the longest prefix (possibly empty) of @xs@ of elements that
 -- satisfy @p@ and second element is the remainder of the list:
 --
 -- >>> span (< 3) [1,2,3,4,1,2,3,4]
