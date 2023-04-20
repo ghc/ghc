@@ -999,7 +999,7 @@ project-version:
     - . ./version.sh
 
     # Download existing ghcup metadata
-    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#wget -c wget "https://raw.githubusercontent.com/haskell/ghcup-metadata/develop/ghcup-0.0.7.yaml"
+    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#wget -c wget "https://gitlab.haskell.org/ghc/ghcup-metadata/-/raw/updates/ghcup-0.0.7.yaml"
 
     - .gitlab/generate_job_metadata
 
@@ -1047,6 +1047,37 @@ ghcup-metadata-nightly:
     - nix shell --extra-experimental-features nix-command -f .gitlab/rel_eng -c ghcup-metadata --metadata ghcup-0.0.7.yaml --pipeline-id="$CI_PIPELINE_ID" --version="$ProjectVersion" > "metadata_test.yaml"
   rules:
     - if: $NIGHTLY
+
+# Update the
+ghcup-metadata-nightly-push:
+  stage: deploy
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
+  dependencies: null
+  tags:
+    - x86_64-linux
+  variables:
+    BUILD_FLAVOUR: default
+    GIT_SUBMODULE_STRATEGY: "none"
+  needs:
+    - job: ghcup-metadata-nightly
+      artifacts: true
+  script:
+    - git clone https://gitlab.haskell.org/ghc/ghcup-metadata.git
+    - cp metadata_test.yaml ghcup-metadata/ghcup-0.0.7.yaml
+    - cd ghcup-metadata
+    - git config user.email "ghc-ci@gitlab-haskell.org"
+    - git config user.name "GHC GitLab CI"
+    - git remote add gitlab_origin https://oauth2:$PROJECT_PUSH_TOKEN@gitlab.haskell.org/ghc/ghcup-metadata.git
+    - git add .
+    - git commit -m "Update metadata"
+    - git push gitlab_origin HEAD:updates -o ci.skip
+  rules:
+    - if: $NIGHTLY
+    # Only run the update on scheduled nightly pipelines, ie once a day
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    # And only update the metadata for master branch
+    - if: '$CI_COMMIT_BRANCH == "master"'
+
 
 ghcup-metadata-release:
   # No explicit needs for release pipeline as we assume we need everything and everything will pass.
