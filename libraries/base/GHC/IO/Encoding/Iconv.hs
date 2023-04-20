@@ -2,6 +2,8 @@
 {-# LANGUAGE CPP
            , NoImplicitPrelude
            , NondecreasingIndentation
+           , UnboxedTuples
+           , MagicHash
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -133,19 +135,24 @@ newIConv from to rec fn =
   withCAString to   $ \ to_str -> do
     iconvt <- throwErrnoIfMinus1 "mkTextEncoding" $ hs_iconv_open to_str from_str
     let iclose = throwErrnoIfMinus1_ "Iconv.close" $ hs_iconv_close iconvt
-    return BufferCodec{
-                encode = fn iconvt,
-                recover = rec,
-                close  = iclose,
+        fn_iconvt ibuf obuf st = case unIO (fn iconvt ibuf obuf) st of
+          (# st', (prog, ibuf', obuf') #) -> (# st', prog, ibuf', obuf' #)
+    return BufferCodec# {
+                encode#   = fn_iconvt,
+                recover#  = rec#,
+                close#    = iclose,
                 -- iconv doesn't supply a way to save/restore the state
-                getState = return (),
-                setState = const $ return ()
+                getState# = return (),
+                setState# = const $ return ()
                 }
+  where
+    rec# ibuf obuf st = case unIO (rec ibuf obuf) st of
+      (# st', (ibuf', obuf') #) -> (# st', ibuf', obuf' #)
 
-iconvDecode :: IConv -> DecodeBuffer
+iconvDecode :: IConv -> Buffer Word8 -> Buffer Char -> IO (CodingProgress, Buffer Word8, Buffer Char)
 iconvDecode iconv_t ibuf obuf = iconvRecode iconv_t ibuf 0 obuf char_shift
 
-iconvEncode :: IConv -> EncodeBuffer
+iconvEncode :: IConv -> Buffer Char -> Buffer Word8 -> IO (CodingProgress, Buffer Char, Buffer Word8)
 iconvEncode iconv_t ibuf obuf = iconvRecode iconv_t ibuf char_shift obuf 0
 
 iconvRecode :: IConv -> Buffer a -> Int -> Buffer b -> Int

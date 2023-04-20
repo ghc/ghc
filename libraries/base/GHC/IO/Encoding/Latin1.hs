@@ -2,6 +2,8 @@
 {-# LANGUAGE NoImplicitPrelude
            , BangPatterns
            , NondecreasingIndentation
+           , UnboxedTuples
+           , MagicHash
   #-}
 {-# OPTIONS_GHC  -funbox-strict-fields #-}
 
@@ -56,22 +58,22 @@ mkLatin1 cfm = TextEncoding { textEncodingName = "ISO-8859-1",
 
 latin1_DF :: CodingFailureMode -> IO (TextDecoder ())
 latin1_DF cfm =
-  return (BufferCodec {
-             encode   = latin1_decode,
-             recover  = recoverDecode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = latin1_decode,
+             recover#  = recoverDecode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 latin1_EF :: CodingFailureMode -> IO (TextEncoder ())
 latin1_EF cfm =
-  return (BufferCodec {
-             encode   = latin1_encode,
-             recover  = recoverEncode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = latin1_encode,
+             recover#  = recoverEncode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 latin1_checked :: TextEncoding
@@ -85,12 +87,12 @@ mkLatin1_checked cfm = TextEncoding { textEncodingName = "ISO-8859-1",
 
 latin1_checked_EF :: CodingFailureMode -> IO (TextEncoder ())
 latin1_checked_EF cfm =
-  return (BufferCodec {
-             encode   = latin1_checked_encode,
-             recover  = recoverEncode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = latin1_checked_encode,
+             recover#  = recoverEncode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 -- -----------------------------------------------------------------------------
@@ -108,22 +110,22 @@ mkAscii cfm = TextEncoding { textEncodingName = "ASCII",
 
 ascii_DF :: CodingFailureMode -> IO (TextDecoder ())
 ascii_DF cfm =
-  return (BufferCodec {
-             encode   = ascii_decode,
-             recover  = recoverDecode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = ascii_decode,
+             recover#  = recoverDecode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 ascii_EF :: CodingFailureMode -> IO (TextEncoder ())
 ascii_EF cfm =
-  return (BufferCodec {
-             encode   = ascii_encode,
-             recover  = recoverEncode cfm,
-             close    = return (),
-             getState = return (),
-             setState = const $ return ()
+  return (BufferCodec# {
+             encode#   = ascii_encode,
+             recover#  = recoverEncode# cfm,
+             close#    = return (),
+             getState# = return (),
+             setState# = const $ return ()
           })
 
 
@@ -134,97 +136,115 @@ ascii_EF cfm =
 -- TODO: Eliminate code duplication between the checked and unchecked
 -- versions of the decoder or encoder (but don't change the Core!)
 
-latin1_decode :: DecodeBuffer
+latin1_decode :: DecodeBuffer#
 latin1_decode 
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let 
-       loop !ir !ow
-         | ow >= os = done OutputUnderflow ir ow
-         | ir >= iw = done InputUnderflow ir ow
+       loop :: Int -> Int -> DecodingBuffer#
+       loop !ir !ow st0
+         | ow >= os = done OutputUnderflow ir ow st0
+         | ir >= iw = done InputUnderflow ir ow st0
          | otherwise = do
-              c0 <- readWord8Buf iraw ir
-              ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
-              loop (ir+1) ow'
+              let !(# st1, c0 #) = unIO (readWord8Buf iraw ir) st0
+                  !(# st2, ow' #) = unIO (writeCharBuf oraw ow (unsafeChr (fromIntegral c0))) st1
+              loop (ir+1) ow' st2
 
        -- lambda-lifted, to avoid thunks being built in the inner-loop:
-       done why !ir !ow = return (why,
-                                  if ir == iw then input{ bufL=0, bufR=0 }
-                                              else input{ bufL=ir },
-                                  output{ bufR=ow })
+       {-# NOINLINE done #-}
+       done :: CodingProgress -> Int -> Int -> DecodingBuffer#
+       done why !ir !ow st' =
+         let !ri = if ir == iw then input{ bufL=0, bufR=0 } else input{ bufL=ir }
+             !ro = output{ bufR=ow }
+         in  (# st', why, ri, ro #)
     in
-    loop ir0 ow0
+    loop ir0 ow0 st
 
-ascii_decode :: DecodeBuffer
+ascii_decode :: DecodeBuffer#
 ascii_decode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let
-       loop !ir !ow
-         | ow >= os = done OutputUnderflow ir ow
-         | ir >= iw = done InputUnderflow ir ow
+       loop :: Int -> Int -> DecodingBuffer#
+       loop !ir !ow st0
+         | ow >= os = done OutputUnderflow ir ow st0
+         | ir >= iw = done InputUnderflow ir ow st0
          | otherwise = do
-              c0 <- readWord8Buf iraw ir
-              if c0 > 0x7f then invalid else do
-              ow' <- writeCharBuf oraw ow (unsafeChr (fromIntegral c0))
-              loop (ir+1) ow'
+              let !(# st1, c0 #) = unIO (readWord8Buf iraw ir) st0
+              if c0 > 0x7f then invalid st1 else do
+                let !(# st2, ow' #) = unIO (writeCharBuf oraw ow (unsafeChr (fromIntegral c0))) st1
+                loop (ir+1) ow' st2
          where
-           invalid = done InvalidSequence ir ow
+           invalid :: DecodingBuffer#
+           invalid st' = done InvalidSequence ir ow st'
 
        -- lambda-lifted, to avoid thunks being built in the inner-loop:
-       done why !ir !ow = return (why,
-                                  if ir == iw then input{ bufL=0, bufR=0 }
-                                              else input{ bufL=ir },
-                                  output{ bufR=ow })
+       {-# NOINLINE done #-}
+       done :: CodingProgress -> Int -> Int -> DecodingBuffer#
+       done why !ir !ow st' = 
+         let !ri = if ir == iw then input{ bufL=0, bufR=0 } else input{ bufL=ir }
+             !ro = output{ bufR=ow }
+         in  (# st', why, ri, ro #)
     in
-    loop ir0 ow0
+    loop ir0 ow0 st
 
-latin1_encode :: EncodeBuffer
+latin1_encode :: EncodeBuffer#
 latin1_encode
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let
-      done why !ir !ow = return (why,
-                                 if ir == iw then input{ bufL=0, bufR=0 }
-                                             else input{ bufL=ir },
-                                 output{ bufR=ow })
-      loop !ir !ow
-        | ow >= os = done OutputUnderflow ir ow
-        | ir >= iw = done InputUnderflow ir ow
+      {-# NOINLINE done #-}
+      done :: CodingProgress -> Int -> Int -> EncodingBuffer#
+      done why !ir !ow st' = 
+        let !ri = if ir == iw then input{ bufL=0, bufR=0 } else input{ bufL=ir }
+            !ro = output{ bufR=ow }
+        in  (# st', why, ri, ro #)
+      loop :: Int -> Int -> EncodingBuffer#
+      loop !ir !ow st0
+        | ow >= os = done OutputUnderflow ir ow st0
+        | ir >= iw = done InputUnderflow ir ow st0
         | otherwise = do
-           (c,ir') <- readCharBuf iraw ir
-           writeWord8Buf oraw ow (fromIntegral (ord c))
-           loop ir' (ow+1)
+           let !(# st1, (c,ir') #) = unIO (readCharBuf iraw ir) st0
+               !(# st2, () #) = unIO (writeWord8Buf oraw ow (fromIntegral (ord c))) st1
+           loop ir' (ow+1) st2
     in
-    loop ir0 ow0
+    loop ir0 ow0 st
 
-latin1_checked_encode :: EncodeBuffer
+latin1_checked_encode :: EncodeBuffer#
 latin1_checked_encode input output
  = single_byte_checked_encode 0xff input output
 
-ascii_encode :: EncodeBuffer
+ascii_encode :: EncodeBuffer#
 ascii_encode input output
  = single_byte_checked_encode 0x7f input output
 
-single_byte_checked_encode :: Int -> EncodeBuffer
+single_byte_checked_encode :: Int -> EncodeBuffer#
 single_byte_checked_encode max_legal_char
   input@Buffer{  bufRaw=iraw, bufL=ir0, bufR=iw,  bufSize=_  }
   output@Buffer{ bufRaw=oraw, bufL=_,   bufR=ow0, bufSize=os }
+  st
  = let
-      done why !ir !ow = return (why,
-                                 if ir == iw then input{ bufL=0, bufR=0 }
-                                             else input{ bufL=ir },
-                                 output{ bufR=ow })
-      loop !ir !ow
-        | ow >= os = done OutputUnderflow ir ow
-        | ir >= iw = done InputUnderflow ir ow
+      {-# NOINLINE done #-}
+      done :: CodingProgress -> Int -> Int -> EncodingBuffer#
+      done why !ir !ow st' = 
+        let !ri = if ir == iw then input{ bufL=0, bufR=0 } else input{ bufL=ir }
+            !ro = output{ bufR=ow }
+        in  (# st', why, ri, ro #)
+      loop :: Int -> Int -> EncodingBuffer#
+      loop !ir !ow st0
+        | ow >= os = done OutputUnderflow ir ow st0
+        | ir >= iw = done InputUnderflow ir ow st0
         | otherwise = do
-           (c,ir') <- readCharBuf iraw ir
-           if ord c > max_legal_char then invalid else do
-           writeWord8Buf oraw ow (fromIntegral (ord c))
-           loop ir' (ow+1)
+           let !(# st1, (c,ir') #) = unIO (readCharBuf iraw ir) st0
+           if ord c > max_legal_char then invalid st1 else do
+             let !(# st2, () #) = unIO (writeWord8Buf oraw ow (fromIntegral (ord c))) st1
+             loop ir' (ow+1) st2
         where
-           invalid = done InvalidSequence ir ow
+          invalid :: EncodingBuffer#
+          invalid st' = done InvalidSequence ir ow st'
     in
-    loop ir0 ow0
+    loop ir0 ow0 st
 {-# INLINE single_byte_checked_encode #-}

@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, NondecreasingIndentation,
-             RecordWildCards, ScopedTypeVariables #-}
+             RecordWildCards, ScopedTypeVariables,
+             UnboxedTuples #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 module GHC.IO.Encoding.CodePage.API (
@@ -157,11 +158,15 @@ newCP rec fn cp = do
 utf16_native_encode' :: EncodeBuffer
 utf16_native_decode' :: DecodeBuffer
 #if defined(WORDS_BIGENDIAN)
-utf16_native_encode' = utf16be_encode
-utf16_native_decode' = utf16be_decode
+utf16_native_encode' i o = IO $ \st -> case utf16be_encode i o st of
+  (# st', c, i', o' #) -> (# st', (c, i', o') #)
+utf16_native_decode' i o = IO $ \st -> case utf16be_decode i o st of
+  (# st', c, i', o' #) -> (# st', (c, i', o') #)
 #else
-utf16_native_encode' = utf16le_encode
-utf16_native_decode' = utf16le_decode
+utf16_native_encode' i o = IO $ \st -> case utf16le_encode i o st of
+  (# st', c, i', o' #) -> (# st', (c, i', o') #)
+utf16_native_decode' i o = IO $ \st -> case utf16le_decode i o st of
+  (# st', c, i', o' #) -> (# st', (c, i', o') #)
 #endif
 
 saner :: CodeBuffer from to

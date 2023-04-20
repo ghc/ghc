@@ -1,5 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,7 +21,8 @@
 module GHC.IO.Encoding.Failure (
     CodingFailureMode(..), codingFailureModeSuffix,
     isSurrogate,
-    recoverDecode, recoverEncode
+    recoverDecode, recoverEncode,
+    recoverDecode#, recoverEncode#,
   ) where
 
 import GHC.IO
@@ -142,6 +146,12 @@ unescapeRoundtripCharacterSurrogate c
     | otherwise                 = Nothing
   where x = ord c
 
+recoverDecode# :: CodingFailureMode -> Buffer Word8 -> Buffer Char
+               -> State# RealWorld -> (# State# RealWorld, Buffer Word8, Buffer Char #)
+recoverDecode# cfm input output st =
+  let !(# st', (bIn, bOut) #) = unIO (recoverDecode cfm input output) st
+  in (# st', bIn, bOut #)
+
 recoverDecode :: CodingFailureMode -> Buffer Word8 -> Buffer Char
               -> IO (Buffer Word8, Buffer Char)
 recoverDecode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
@@ -159,6 +169,12 @@ recoverDecode cfm input@Buffer{  bufRaw=iraw, bufL=ir, bufR=_  }
       b <- readWord8Buf iraw ir
       ow' <- writeCharBuf oraw ow (escapeToRoundtripCharacterSurrogate b)
       return (input { bufL=ir+1 }, output { bufR=ow' })
+
+recoverEncode# :: CodingFailureMode -> Buffer Char -> Buffer Word8
+               -> State# RealWorld -> (# State# RealWorld, Buffer Char, Buffer Word8 #)
+recoverEncode# cfm input output st =
+  let !(# st', (bIn, bOut) #) = unIO (recoverEncode cfm input output) st
+  in (# st', bIn, bOut #)
 
 recoverEncode :: CodingFailureMode -> Buffer Char -> Buffer Word8
               -> IO (Buffer Char, Buffer Word8)
