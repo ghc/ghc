@@ -1146,3 +1146,17 @@ Other
     be terminated. This helps narrowing down if an issue is due to tag inference
     if things go wrong. Which would otherwise be quite difficult.
 
+.. ghc-flag:: -funoptimized-core-for-interpreter
+    :shortdesc: Disable optimizations with the interpreter 
+    :reverse: -fno-unoptimized-core-for-interpreter
+    :type: dynamic
+
+    :since: 9.8.1
+
+    default: enabled
+
+    At the moment, ghci disables optimizations, because not all passes
+    are compatible with the interpreter.
+    This option can be used to override this check, e.g.
+    ``ghci -O2 -fno-unoptimized-core-for-interpreter``.
+    It is not recommended for normal use and can cause a compiler panic.

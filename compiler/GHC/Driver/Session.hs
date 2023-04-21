@@ -3573,6 +3573,7 @@ fFlagsDeps = [
   flagSpec "write-ide-info"                   Opt_WriteHie,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
+  flagSpec "unoptimized-core-for-interpreter" Opt_UnoptimizedCoreForInterpreter,
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "worker-wrapper-cbv"               Opt_WorkerWrapperUnlift, -- See Note [Worker/wrapper for strict arguments]
@@ -3896,7 +3897,8 @@ defaultFlags settings
       Opt_DumpWithWays,
       Opt_CompactUnwind,
       Opt_ShowErrorContext,
-      Opt_SuppressStgReps
+      Opt_SuppressStgReps,
+      Opt_UnoptimizedCoreForInterpreter
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -4976,6 +4978,7 @@ makeDynFlagsConsistent dflags
            "Enabling -fPIC as it is always on for this platform"
 
  | backendForcesOptimization0 (backend dflags)
+ , gopt Opt_UnoptimizedCoreForInterpreter dflags
  , let (dflags', changed) = updOptLevelChanged 0 dflags
  , changed
     = loop dflags' ("Optimization flags are incompatible with the " ++

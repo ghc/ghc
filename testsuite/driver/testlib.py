@@ -387,7 +387,7 @@ def expect_fail_for( ways: List[WayName] ):
 
 def expect_broken( bug: IssueNumber ):
     """
-    This test is a expected not to work due to the indicated issue number.
+    This test is expected not to work due to the indicated issue number.
     """
     def helper( name: TestName, opts ):
         record_broken(name, opts, bug)

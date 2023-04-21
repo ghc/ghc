@@ -387,6 +387,7 @@ data GeneralFlag
    | Opt_KeepGoing
    | Opt_ByteCode
    | Opt_ByteCodeAndObjectCode
+   | Opt_UnoptimizedCoreForInterpreter
    | Opt_LinkRts
 
    -- output style opts
