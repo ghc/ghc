@@ -97,7 +97,7 @@ module GHC.Tc.Solver.Monad (
     instDFunType,
 
     -- Unification
-    wrapUnifierTcS, unifyFunDeps, uPairsTcM,
+    wrapUnifierTcS, unifyFunDeps, uPairsTcM, unifyForAllBody,
 
     -- MetaTyVars
     newFlexiTcSTy, instFlexiX,
@@ -1998,6 +1998,22 @@ unifyFunDeps ev role do_unifications
   where
     fvs = tyCoVarsOfType (ctEvPred ev)
 
+unifyForAllBody :: CtEvidence -> Role -> (UnifyEnv -> TcM a)
+                -> TcS (a, Cts)
+-- We /return/ the equality constraints we generate,
+-- rather than emitting them into the monad.
+-- See See (SF5) in Note [Solving forall equalities] in GHC.Tc.Solver.Equality
+unifyForAllBody ev role unify_body
+  = do { (res, cts, unified, _rewriters) <- wrapUnifierX ev role unify_body
+         -- Ignore the rewriters. They are used in wrapUnifierTcS only
+         -- as an optimistion to prioritise the work list; but they are
+         -- /also/ stored in each individual constraint we return.
+
+       -- Kick out any inert constraint that we have unified
+       ; _ <- kickOutAfterUnification unified
+
+       ; return (res, cts) }
+
 wrapUnifierTcS :: CtEvidence -> Role
                -> (UnifyEnv -> TcM a)  -- Some calls to uType
                -> TcS (a, Bag Ct, [TcTyVar])
@@ -2011,31 +2027,41 @@ wrapUnifierTcS :: CtEvidence -> Role
 -- unified the process; the (Bag Ct) are the deferred constraints.
 
 wrapUnifierTcS ev role do_unifications
-  = do { (cos, unified, rewriters, cts) <- wrapTcS $
-             do { defer_ref   <- TcM.newTcRef emptyBag
-                ; unified_ref <- TcM.newTcRef []
-                ; rewriters <- TcM.zonkRewriterSet (ctEvRewriters ev)
-                ; let env = UE { u_role      = role
-                               , u_rewriters = rewriters
-                               , u_loc       = ctEvLoc ev
-                               , u_defer     = defer_ref
-                               , u_unified   = Just unified_ref}
-
-                ; cos <- do_unifications env
-
-                ; cts     <- TcM.readTcRef defer_ref
-                ; unified <- TcM.readTcRef unified_ref
-                ; return (cos, unified, rewriters, cts) }
+  = do { (res, cts, unified, rewriters) <- wrapUnifierX ev role do_unifications
 
        -- Emit the deferred constraints
        -- See Note [Work-list ordering] in GHC.Tc.Solved.Equality
+       --
+       -- All the constraints in `cts` share the same rewriter set so,
+       -- rather than looking at it one by one, we pass it to
+       -- extendWorkListEqs; just a small optimisation.
        ; unless (isEmptyBag cts) $
          updWorkListTcS (extendWorkListEqs rewriters cts)
 
        -- And kick out any inert constraint that we have unified
        ; _ <- kickOutAfterUnification unified
 
-       ; return (cos, cts, unified) }
+       ; return (res, cts, unified) }
+
+wrapUnifierX :: CtEvidence -> Role
+             -> (UnifyEnv -> TcM a)  -- Some calls to uType
+             -> TcS (a, Bag Ct, [TcTyVar], RewriterSet)
+wrapUnifierX ev role do_unifications
+  = wrapTcS $
+    do { defer_ref   <- TcM.newTcRef emptyBag
+       ; unified_ref <- TcM.newTcRef []
+       ; rewriters   <- TcM.zonkRewriterSet (ctEvRewriters ev)
+       ; let env = UE { u_role      = role
+                      , u_rewriters = rewriters
+                      , u_loc       = ctEvLoc ev
+                      , u_defer     = defer_ref
+                      , u_unified   = Just unified_ref}
+
+       ; res <- do_unifications env
+
+       ; cts     <- TcM.readTcRef defer_ref
+       ; unified <- TcM.readTcRef unified_ref
+       ; return (res, cts, unified, rewriters) }
 
 
 {-

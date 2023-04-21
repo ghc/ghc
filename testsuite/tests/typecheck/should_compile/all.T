@@ -871,6 +871,8 @@ test('T22194', normal, compile, [''])
 test('QualifiedRecordUpdate',
     [ extra_files(['QualifiedRecordUpdate_aux.hs']) ]
     , multimod_compile, ['QualifiedRecordUpdate', '-v0'])
+test('CoerceToVDQ', normal, compile, ['-dlint'])
+test('T22762', normal, compile, ['-dlint'])
 test('T23171', normal, compile, [''])
 test('T23192', normal, compile, [''])
 test('T23199', normal, compile, [''])
@@ -883,3 +885,5 @@ test('T22560d', extra_files(['T22560d.hs']), ghci_script, ['T22560d.script'])
 test('T22560e', normal, compile, [''])
 test('T23514b', normal, compile, [''])
 test('T23514c', normal, compile, [''])
+test('T22537', normal, compile, [''])
+

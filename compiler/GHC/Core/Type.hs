@@ -48,11 +48,11 @@ module GHC.Core.Type (
 
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
-        mkVisForAllTys, mkTyCoInvForAllTy,
+        mkVisForAllTys, mkTyCoForAllTy, mkTyCoForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
         splitForAllTyCoVars, splitForAllTyVars,
         splitForAllReqTyBinders, splitForAllInvisTyBinders,
-        splitForAllForAllTyBinders,
+        splitForAllForAllTyBinders, splitForAllForAllTyBinder_maybe,
         splitForAllTyCoVar_maybe, splitForAllTyCoVar,
         splitForAllTyVar_maybe, splitForAllCoVar_maybe,
         splitPiTy_maybe, splitPiTy, splitPiTys,
@@ -549,9 +549,10 @@ expandTypeSynonyms ty
       = mkTyConAppCo r tc (map (go_co subst) args)
     go_co subst (AppCo co arg)
       = mkAppCo (go_co subst co) (go_co subst arg)
-    go_co subst (ForAllCo tv kind_co co)
+    go_co subst (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+                          , fco_kind = kind_co, fco_body = co })
       = let (subst', tv', kind_co') = go_cobndr subst tv kind_co in
-        mkForAllCo tv' kind_co' (go_co subst' co)
+        mkForAllCo tv' visL visR kind_co' (go_co subst' co)
     go_co subst (FunCo r afl afr w co1 co2)
       = mkFunCo2 r afl afr (go_co subst w) (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
@@ -850,7 +851,7 @@ on all variables and binding sites. Primarily used for zonking.
 
 Note [Efficiency for ForAllCo case of mapTyCoX]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As noted in Note [Forall coercions] in GHC.Core.TyCo.Rep, a ForAllCo is a bit redundant.
+As noted in Note [ForAllCo] in GHC.Core.TyCo.Rep, a ForAllCo is a bit redundant.
 It stores a TyCoVar and a Coercion, where the kind of the TyCoVar always matches
 the left-hand kind of the coercion. This is convenient lots of the time, but
 not when mapping a function over a coercion.
@@ -991,11 +992,12 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
       | otherwise
       = mkTyConAppCo r tc <$> go_cos env cos
-    go_co !env (ForAllCo tv kind_co co)
+    go_co !env (ForAllCo { fco_tcv = tv, fco_visL = visL, fco_visR = visR
+                         , fco_kind = kind_co, fco_body = co })
       = do { kind_co' <- go_co env kind_co
-           ; tycobinder env tv Inferred $ \env' tv' ->  do
+           ; tycobinder env tv visL $ \env' tv' ->  do
            ; co' <- go_co env' co
-           ; return $ mkForAllCo tv' kind_co' co' }
+           ; return $ mkForAllCo tv' visL visR kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
 
     go_prov !env (PhantomProv co)    = PhantomProv <$> go_co env co
@@ -1063,14 +1065,13 @@ The type (Proxy (Eq Int => Int)) is only accepted with -XImpredicativeTypes,
 but suppose we want that.  But then in the call to 'i', we end
 up decomposing (Eq Int => Int), and we definitely don't want that.
 
-This really only applies to the type checker; in Core, '=>' and '->'
-are the same, as are 'Constraint' and '*'.  But for now I've put
-the test in splitAppTyNoView_maybe, which applies throughout, because
-the other calls to splitAppTy are in GHC.Core.Unify, which is also used by
-the type checker (e.g. when matching type-function equations).
-
 We are willing to split (t1 -=> t2) because the argument is still of
 kind Type, not Constraint.  So the criterion is isVisibleFunArg.
+
+In Core there is no real reason to avoid such decomposition.  But for now I've
+put the test in splitAppTyNoView_maybe, which applies throughout, because the
+other calls to splitAppTy are in GHC.Core.Unify, which is also used by the
+type checker (e.g. when matching type-function equations).
 -}
 
 -- | Applies a type to another, as in e.g. @k a@
@@ -1763,14 +1764,25 @@ tyConBindersPiTyBinders = map to_tyb
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv)) FTF_T_T
 
--- | Make a dependent forall over an 'Inferred' variable
-mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
-mkTyCoInvForAllTy tv ty
+-- | Make a dependent forall over a TyCoVar
+mkTyCoForAllTy :: TyCoVar -> ForAllTyFlag -> Type -> Type
+mkTyCoForAllTy tv vis ty
   | isCoVar tv
   , not (tv `elemVarSet` tyCoVarsOfType ty)
+   -- Maintain ForAllTy's invariants
+    -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
   = mkVisFunTyMany (varType tv) ty
   | otherwise
-  = ForAllTy (Bndr tv Inferred) ty
+  = ForAllTy (mkForAllTyBinder vis tv) ty
+
+-- | Make a dependent forall over a TyCoVar
+mkTyCoForAllTys :: [ForAllTyBinder] -> Type -> Type
+mkTyCoForAllTys bndrs ty
+  = foldr (\(Bndr var vis) -> mkTyCoForAllTy var vis) ty bndrs
+
+-- | Make a dependent forall over an 'Inferred' variable
+mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
+mkTyCoInvForAllTy tv ty = mkTyCoForAllTy tv Inferred ty
 
 -- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
 mkInfForAllTy :: TyVar -> Type -> Type
@@ -1937,14 +1949,20 @@ dropForAlls ty = go ty
     go ty | Just ty' <- coreView ty = go ty'
     go res                         = res
 
--- | Attempts to take a forall type apart, but only if it's a proper forall,
--- with a named binder
+-- | Attempts to take a ForAllTy apart, returning the full ForAllTyBinder
+splitForAllForAllTyBinder_maybe :: Type -> Maybe (ForAllTyBinder, Type)
+splitForAllForAllTyBinder_maybe ty
+  | ForAllTy bndr inner_ty <- coreFullView ty = Just (bndr, inner_ty)
+  | otherwise                                 = Nothing
+
+
+-- | Attempts to take a ForAllTy apart, returning the Var
 splitForAllTyCoVar_maybe :: Type -> Maybe (TyCoVar, Type)
 splitForAllTyCoVar_maybe ty
   | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty = Just (tv, inner_ty)
   | otherwise                                        = Nothing
 
--- | Like 'splitForAllTyCoVar_maybe', but only returns Just if it is a tyvar binder.
+-- | Attempts to take a ForAllTy apart, but only if the binder is a TyVar
 splitForAllTyVar_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTyVar_maybe ty
   | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty

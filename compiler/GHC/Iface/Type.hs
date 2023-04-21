@@ -381,7 +381,7 @@ data IfaceCoercion
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceBndr IfaceCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr !ForAllTyFlag !ForAllTyFlag IfaceCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
@@ -1282,7 +1282,8 @@ pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
-pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
+pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)]
+                     -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
@@ -1321,11 +1322,11 @@ ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | otherwise              = (all_bndrs, [])
 ppr_itv_bndrs [] _ = ([], [])
 
-pprIfaceForAllCo :: [(IfLclName, IfaceCoercion)] -> SDoc
+pprIfaceForAllCo :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCo []  = empty
 pprIfaceForAllCo tvs = text "forall" <+> pprIfaceForAllCoBndrs tvs <> dot
 
-pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
+pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
@@ -1340,9 +1341,15 @@ pprIfaceForAllBndr bndr =
     -- See Note [Suppressing binder signatures]
     suppress_sig = SuppressBndrSig False
 
-pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
-pprIfaceForAllCoBndr (tv, kind_co)
-  = parens (ppr tv <+> dcolon <+> pprIfaceCoercion kind_co)
+pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag) -> SDoc
+pprIfaceForAllCoBndr (tv, kind_co, visL, visR)
+  = parens (ppr tv <> pp_vis <+> dcolon <+> pprIfaceCoercion kind_co)
+  where
+    pp_vis | visL == coreTyLamForAllTyFlag
+           , visR == coreTyLamForAllTyFlag
+           = empty
+           | otherwise
+           = ppr visL <> char '~' <> ppr visR    -- "[spec]~[reqd]"
 
 -- | Show forall flag
 --
@@ -1850,14 +1857,15 @@ ppr_co ctxt_prec (IfaceAppCo co1 co2)
     ppr_co funPrec co1 <+> pprParendIfaceCoercion co2
 ppr_co ctxt_prec co@(IfaceForAllCo {})
   = maybeParen ctxt_prec funPrec $
+    -- FIXME: collect and pretty-print visibility info?
     pprIfaceForAllCoPart tvs (pprIfaceCoercion inner_co)
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
-    split_co (IfaceForAllCo (IfaceIdBndr (_, name, _)) kind_co co')
-      = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
+    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) visL visR kind_co co')
+      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
+    split_co (IfaceForAllCo (IfaceIdBndr (_, name, _)) visL visR kind_co co')
+      = let (tvs, co'') = split_co co' in ((name,kind_co,visL,visR):tvs,co'')
     split_co co' = ([], co')
 
 -- Why these three? See Note [Free tyvars in IfaceType]
@@ -2163,9 +2171,11 @@ instance Binary IfaceCoercion where
           putByte bh 5
           put_ bh a
           put_ bh b
-  put_ bh (IfaceForAllCo a b c) = do
+  put_ bh (IfaceForAllCo a visL visR b c) = do
           putByte bh 6
           put_ bh a
+          put_ bh visL
+          put_ bh visR
           put_ bh b
           put_ bh c
   put_ bh (IfaceCoVarCo a) = do
@@ -2239,9 +2249,11 @@ instance Binary IfaceCoercion where
                    b <- get bh
                    return $ IfaceAppCo a b
            6 -> do a <- get bh
+                   visL <- get bh
+                   visR <- get bh
                    b <- get bh
                    c <- get bh
-                   return $ IfaceForAllCo a b c
+                   return $ IfaceForAllCo a visL visR b c
            7 -> do a <- get bh
                    return $ IfaceCoVarCo a
            8 -> do a <- get bh
@@ -2339,7 +2351,7 @@ instance NFData IfaceCoercion where
     IfaceFunCo f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
     IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceAppCo f1 f2 -> rnf f1 `seq` rnf f2
-    IfaceForAllCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+    IfaceForAllCo f1 f2 f3 f4 f5 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5
     IfaceCoVarCo f1 -> rnf f1
     IfaceAxiomInstCo f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
     IfaceAxiomRuleCo f1 f2 -> rnf f1 `seq` rnf f2

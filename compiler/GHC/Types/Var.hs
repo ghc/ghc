@@ -69,6 +69,7 @@ module GHC.Types.Var (
         ForAllTyFlag(Invisible,Required,Specified,Inferred),
         Specificity(..),
         isVisibleForAllTyFlag, isInvisibleForAllTyFlag, isInferredForAllTyFlag,
+        coreTyLamForAllTyFlag,
 
         -- * FunTyFlag
         FunTyFlag(..), isVisibleFunArg, isInvisibleFunArg, isFUNArg,
@@ -126,6 +127,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import Data.Data
+import Control.DeepSeq
 
 {-
 ************************************************************************
@@ -453,7 +455,7 @@ updateVarTypeM upd var
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
 -- See Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
-data ForAllTyFlag = Invisible Specificity
+data ForAllTyFlag = Invisible !Specificity
                   | Required
   deriving (Eq, Ord, Data)
   -- (<) on ForAllTyFlag means "is less visible than"
@@ -487,6 +489,12 @@ isInferredForAllTyFlag :: ForAllTyFlag -> Bool
 isInferredForAllTyFlag (Invisible InferredSpec) = True
 isInferredForAllTyFlag _                        = False
 
+coreTyLamForAllTyFlag :: ForAllTyFlag
+-- ^ The ForAllTyFlag on a (Lam a e) term, where `a` is a type variable.
+-- If you want other ForAllTyFlag, use a cast.
+-- See Note [ForAllCo] in GHC.Core.TyCo.Rep
+coreTyLamForAllTyFlag = Specified
+
 instance Outputable ForAllTyFlag where
   ppr Required  = text "[req]"
   ppr Specified = text "[spec]"
@@ -513,6 +521,13 @@ instance Binary ForAllTyFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
+
+instance NFData Specificity where
+  rnf SpecifiedSpec = ()
+  rnf InferredSpec = ()
+instance NFData ForAllTyFlag where
+  rnf (Invisible spec) = rnf spec
+  rnf Required = ()
 
 {- *********************************************************************
 *                                                                      *
@@ -882,7 +897,7 @@ Wrinkles
 
 
 Note [VarBndrs, ForAllTyBinders, TyConBinders, and visibility]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * A ForAllTy (used for both types and kinds) contains a ForAllTyBinder.
   Each ForAllTyBinder
       Bndr a tvis

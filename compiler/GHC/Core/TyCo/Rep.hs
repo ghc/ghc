@@ -71,12 +71,14 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprCo, pprTyLit )
 import {-# SOURCE #-} GHC.Builtin.Types
+import {-# SOURCE #-} GHC.Core.TyCo.FVs( tyCoVarsOfType ) -- Use in assertions
 import {-# SOURCE #-} GHC.Core.Type( chooseFunTyFlag, typeKind, typeTypeOrConstraint )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 -- friends:
 import GHC.Types.Var
+import GHC.Types.Var.Set( elemVarSet )
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -152,13 +154,13 @@ data Type
                         --    for example unsaturated type synonyms
                         --    can appear as the right hand side of a type synonym.
 
-  | ForAllTy
+  | ForAllTy  -- See Note [ForAllTy]
         {-# UNPACK #-} !ForAllTyBinder
         Type            -- ^ A Π type.
-             -- Note [When we quantify over a coercion variable]
+             -- See Note [Why ForAllTy can quantify over a coercion variable]
              -- INVARIANT: If the binder is a coercion variable, it must
-             -- be mentioned in the Type. See
-             -- Note [Unused coercion variable in ForAllTy]
+             --            be mentioned in the Type.
+             --            See Note [Unused coercion variable in ForAllTy]
 
   | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
@@ -452,7 +454,7 @@ to differ, leading to a contradiction. Thus, co is reflexive.
 
 Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
 about outermost casts to uphold (EQ). Eliminating reflexive casts is done
-in mkCastTy. This is (EQ1) below.
+in mkCastTy. This is (EQ2) below.
 
 Unfortunately, that's not the end of the story. Consider comparing
   (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> co)
@@ -475,7 +477,7 @@ our (EQ) property.
 
 In order to detect reflexive casts reliably, we must make sure not
 to have nested casts: we update (t |> co1 |> co2) to (t |> (co1 `TransCo` co2)).
-This is (EQ2) below.
+This is (EQ3) below.
 
 One other troublesome case is ForAllTy. See Note [Weird typing rule for ForAllTy].
 The kind of the body is the same as the kind of the ForAllTy. Accordingly,
@@ -488,9 +490,9 @@ This is done in mkCastTy.
 
 In sum, in order to uphold (EQ), we need the following invariants:
 
-  (EQ1) No decomposable CastTy to the left of an AppTy, where a decomposable
-        cast is one that relates either a FunTy to a FunTy or a
-        ForAllTy to a ForAllTy.
+  (EQ1) No decomposable CastTy to the left of an AppTy,
+        where a "decomposable cast" is one that relates
+        either a FunTy to a FunTy, or a ForAllTy to a ForAllTy.
   (EQ2) No reflexive casts in CastTy.
   (EQ3) No nested CastTys.
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
@@ -517,8 +519,22 @@ In order to compare FunTys while respecting how they could
 expand into TyConApps, we must check
 the kinds of the arg and the res.
 
-Note [When we quantify over a coercion variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [ForAllTy]
+~~~~~~~~~~~~~~~
+A (ForAllTy (Bndr tcv vis) ty) can quantify over a TyVar or, less commonly, a CoVar.
+See Note [Why ForAllTy can quantify over a coercion variable] for why we need the latter.
+
+(FT1) Invariant: See Note [Weird typing rule for ForAllTy]
+
+(FT2) Invariant: in (ForAllTy (Bndr tcv vis) ty),
+      if tcv is a CoVar, then vis = coreTyLamForAllTyFlag.
+   Visibility is not important for coercion abstractions,
+   because they are not user-visible.
+
+(FT3) Invariant: see Note [Unused coercion variable in ForAllTy]
+
+Note [Why ForAllTy can quantify over a coercion variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ForAllTyBinder in a ForAllTy can be (most often) a TyVar or (rarely)
 a CoVar. We support quantifying over a CoVar here in order to support
 a homogeneous (~#) relation (someday -- not yet implemented). Here is
@@ -541,10 +557,8 @@ Note that we must cast `a` by a cv bound in the same type in order to
 make this work out.
 
 See also https://gitlab.haskell.org/ghc/ghc/-/wikis/dependent-haskell/phase2
-which gives a general road map that covers this space.
-
-Having this feature in Core does *not* mean we have it in source Haskell.
-See #15710 about that.
+which gives a general road map that covers this space.  Having this feature in
+Core does *not* mean we have it in source Haskell.  See #15710 about that.
 
 Note [Unused coercion variable in ForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -775,7 +789,17 @@ tcMkScaledFunTys tys ty = foldr mk ty tys
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
 mkForAllTy :: ForAllTyBinder -> Type -> Type
-mkForAllTy = ForAllTy
+mkForAllTy bndr body
+  = assertPpr (good_bndr bndr) (ppr bndr <+> ppr body) $
+    ForAllTy bndr body
+  where
+    -- Check ForAllTy invariants
+    good_bndr (Bndr cv vis)
+      | isCoVar cv = vis == coreTyLamForAllTyFlag
+                     -- See (FT2) in Note [ForAllTy]
+                  && (cv `elemVarSet` tyCoVarsOfType body)
+                     -- See (FT3) in Note [ForAllTy]
+      | otherwise = True
 
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [ForAllTyBinder] -> Type -> Type
@@ -849,8 +873,14 @@ data Coercion
   | AppCo Coercion CoercionN             -- lift AppTy
           -- AppCo :: e -> N -> e
 
-  -- See Note [Forall coercions]
-  | ForAllCo TyCoVar KindCoercion Coercion
+  -- See Note [ForAllCo]
+  | ForAllCo
+      { fco_tcv  :: TyCoVar
+      , fco_visL :: !ForAllTyFlag -- Visibility of coercionLKind
+      , fco_visR :: !ForAllTyFlag -- Visibility of coercionRKind
+                                  -- See (FC7) of Note [ForAllCo]
+      , fco_kind :: KindCoercion
+      , fco_body :: Coercion }
          -- ForAllCo :: _ -> N -> e -> e
 
   | FunCo  -- FunCo :: "e" -> N/P -> e -> e -> e
@@ -1159,43 +1189,105 @@ among branches, but that doesn't quite concern us here.)
 The Int in the AxiomInstCo constructor is the 0-indexed number
 of the chosen branch.
 
-Note [Forall coercions]
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [ForAllCo]
+~~~~~~~~~~~~~~~
+See also Note [ForAllTy and type equality] in GHC.Core.TyCo.Compare.
+
 Constructing coercions between forall-types can be a bit tricky,
 because the kinds of the bound tyvars can be different.
 
 The typing rule is:
 
+  kind_co : k1 ~N k2
+  tv1:k1 |- co : t1 ~r t2
+  if r=N, then vis1=vis2
+  ------------------------------------
+  ForAllCo (tv1:k1) vis1 vis2 kind_co co
+     : forall (tv1:k1) <vis1>. t1
+              ~r
+       forall (tv1:k2) <vis2>. (t2[tv1 |-> (tv1:k2) |> sym kind_co])
 
-  kind_co : k1 ~ k2
-  tv1:k1 |- co : t1 ~ t2
-  -------------------------------------------------------------------
-  ForAllCo tv1 kind_co co : all tv1:k1. t1  ~
-                            all tv1:k2. (t2[tv1 |-> tv1 |> sym kind_co])
+Several things to note here
 
-First, the TyCoVar stored in a ForAllCo is really an optimisation: this field
-should be a Name, as its kind is redundant. Thinking of the field as a Name
-is helpful in understanding what a ForAllCo means.
-The kind of TyCoVar always matches the left-hand kind of the coercion.
+(FC1) First, the TyCoVar stored in a ForAllCo is really just a convenience: this
+  field should be a Name, as its kind is redundant. Thinking of the field as a
+  Name is helpful in understanding what a ForAllCo means.  The kind of TyCoVar
+  always matches the left-hand kind of the coercion.
 
-The idea is that kind_co gives the two kinds of the tyvar. See how, in the
-conclusion, tv1 is assigned kind k1 on the left but kind k2 on the right.
+  * The idea is that kind_co gives the two kinds of the tyvar. See how, in the
+    conclusion, tv1 is assigned kind k1 on the left but kind k2 on the right.
 
-Of course, a type variable can't have different kinds at the same time. So,
-we arbitrarily prefer the first kind when using tv1 in the inner coercion
-co, which shows that t1 equals t2.
+  * Of course, a type variable can't have different kinds at the same time.
+    So, in `co` itself we use (tv1 : k1); hence the premise
+          tv1:k1 |- co : t1 ~r t2
 
-The last wrinkle is that we need to fix the kinds in the conclusion. In
-t2, tv1 is assumed to have kind k1, but it has kind k2 in the conclusion of
-the rule. So we do a kind-fixing substitution, replacing (tv1:k1) with
-(tv1:k2) |> sym kind_co. This substitution is slightly bizarre, because it
-mentions the same name with different kinds, but it *is* well-kinded, noting
-that `(tv1:k2) |> sym kind_co` has kind k1.
+  * The last wrinkle is that we need to fix the kinds in the conclusion. In
+    t2, tv1 is assumed to have kind k1, but it has kind k2 in the conclusion of
+     the rule. So we do a kind-fixing substitution, replacing (tv1:k1) with
+     (tv1:k2) |> sym kind_co. This substitution is slightly bizarre, because it
+    mentions the same name with different kinds, but it *is* well-kinded, noting
+     that `(tv1:k2) |> sym kind_co` has kind k1.
 
-This all really would work storing just a Name in the ForAllCo. But we can't
-add Names to, e.g., VarSets, and there generally is just an impedance mismatch
-in a bunch of places. So we use tv1. When we need tv2, we can use
-setTyVarKind.
+  We could instead store just a Name in the ForAllCo, and it might even be
+  more efficient to do so. But we can't add Names to, e.g., VarSets, and
+  there generally is just an impedance mismatch in a bunch of places. So we
+  use tv1. When we need tv2, we can use setTyVarKind.
+
+(FC2) Note that the kind coercion must be Nominal; and that the role `r` of
+  the final coercion is the same as that of the body coercion.
+
+(FC3) A ForAllCo allows casting between visibilities.  For example:
+         ForAllCo a Required Specified (SubCo (Refl ty))
+           : (forall a -> ty) ~R (forall a. ty)
+  But you can only cast between visiblities at Representational role;
+  Hence the premise
+      if r=N, then vis1=vis2
+  in the typing rule.  See also Note [ForAllTy and type equality] in
+  GHC.Core.TyCo.Compare.
+
+(FC4) A lambda term (Lam a e) has type (forall a. ty), with visibility
+  flag `GHC.Type.Var.coreTyLamForAllTyFlag`, not (forall a -> ty).
+  See `GHC.Type.Var.coreTyLamForAllTyFlag` and `GHC.Core.Utils.mkLamType`.
+  The only way to get a term of type (forall a -> ty) is to cast a lambda.
+
+(FC5) In a /type/, in (ForAllTy cv ty) where cv is a CoVar, we insist that
+  `cv` must appear free in `ty`; see Note [Unused coercion variable in ForAllTy]
+  in GHC.Core.TyCo.Rep for the motivation.  If it does not appear free,
+  use FunTy.
+
+  However we do /not/ impose the same restriction on ForAllCo in /coercions/.
+  Instead, in coercionLKind and coercionRKind, we use mkTyCoForAllTy to perform
+  the check and construct a FunTy when necessary.  Why?
+    * For a coercion, all that matters is its kind, So ForAllCo vs FunCo does not
+       make a difference.
+    * Even if cv occurs in body_co, it is possible that cv does not occur in the kind
+      of body_co. Therefore the check in coercionKind is inevitable.
+
+(FC6) Invariant: in a ForAllCo where fco_tcv is a coercion variable, `cv`,
+  we insist that `cv` appears only in positions that are erased. In fact we use
+  a conservative approximation of this: we require that
+       (almostDevoidCoVarOfCo cv fco_body)
+  holds.  This function checks that `cv` appers only within the type in a Refl
+  node and under a GRefl node (including in the Coercion stored in a GRefl).
+  It's possible other places are OK, too, but this is a safe approximation.
+
+  Why all this fuss?  See Section 5.8.5.2 of Richard's thesis. The idea is that
+  we cannot prove that the type system is consistent with unrestricted use of this
+  cv; the consistency proof uses an untyped rewrite relation that works over types
+  with all coercions and casts removed. So, we can allow the cv to appear only in
+  positions that are erased.
+
+  Sadly, with heterogeneous equality, this restriction might be able to be
+  violated; Richard's thesis is unable to prove that it isn't. Specifically, the
+  liftCoSubst function might create an invalid coercion. Because a violation of
+  the restriction might lead to a program that "goes wrong", it is checked all
+  the time, even in a production compiler and without -dcore-lint. We *have*
+  proved that the problem does not occur with homogeneous equality, so this
+  check can be dropped once ~# is made to be homogeneous.
+
+(FC7) Invariant: in a ForAllCo, if fco_tcv is a CoVar, then
+         fco_visL = fco_visR = coreTyLamForAllTyFlag
+  c.f. (FT2) in Note [ForAllTy]
 
 Note [Predicate coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1760,7 +1852,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (FunCo { fco_mult = cw, fco_arg = c1, fco_res = c2 })
        = go_co env cw `mappend` go_co env c1 `mappend` go_co env c2
 
-    go_co env (ForAllCo tv kind_co co)
+    go_co env (ForAllCo tv _vis1 _vis2 kind_co co)
       = go_co env kind_co `mappend` go_ty env (varType tv)
                           `mappend` go_co env' co
       where
@@ -1815,7 +1907,8 @@ coercionSize (GRefl _ ty MRefl)    = typeSize ty
 coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)        = coercionSize co + coercionSize arg
-coercionSize (ForAllCo _ h co)     = 1 + coercionSize co + coercionSize h
+coercionSize (ForAllCo { fco_kind = h, fco_body = co })
+                                   = 1 + coercionSize co + coercionSize h
 coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
                                                          + coercionSize w
 coercionSize (CoVarCo _)         = 1

@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 82, types: 52, coercions: 29, joins: 0/0}
 
 -- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
-unsafeToInteger1 :: forall {n :: Nat}. Signed n -> Signed n
+unsafeToInteger1 :: forall (n :: Nat). Signed n -> Signed n
 [GblId, Arity=1, Unf=OtherCon []]
 unsafeToInteger1 = \ (@(n :: Nat)) (ds :: Signed n) -> ds
 
@@ -15,8 +15,8 @@ unsafeToInteger
   = unsafeToInteger1
     `cast` (forall (n :: <Nat>_N).
             <Signed n>_R %<Many>_N ->_R OpaqueNoCastWW.N:Signed[0] <n>_P
-            :: (forall {n :: Nat}. Signed n -> Signed n)
-               ~R# (forall {n :: Nat}. Signed n -> Integer))
+            :: (forall (n :: Nat). Signed n -> Signed n)
+               ~R# (forall (n :: Nat). Signed n -> Integer))
 
 -- RHS size: {terms: 8, types: 7, coercions: 21, joins: 0/0}
 times [InlPrag=OPAQUE]
@@ -38,8 +38,8 @@ times
             <Signed m>_R
             %<Many>_N ->_R <Signed n>_R
             %<Many>_N ->_R Sym (OpaqueNoCastWW.N:Signed[0] <m + n>_P)
-            :: (forall {m :: Nat} {n :: Nat}. Signed m -> Signed n -> Integer)
-               ~R# (forall {m :: Nat} {n :: Nat}.
+            :: (forall (m :: Nat) (n :: Nat). Signed m -> Signed n -> Integer)
+               ~R# (forall (m :: Nat) (n :: Nat).
                     Signed m -> Signed n -> Signed (m + n)))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

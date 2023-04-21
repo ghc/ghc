@@ -668,8 +668,9 @@ rnIfaceCo (IfaceTyConAppCo role tc cos)
     = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)
     = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
-rnIfaceCo (IfaceForAllCo bndr co1 co2)
-    = IfaceForAllCo <$> rnIfaceBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceForAllCo bndr visL visR co1 co2)
+    = (\bndr' co1' co2' -> IfaceForAllCo bndr' visL visR co1' co2')
+      <$> rnIfaceBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c) = pure (IfaceFreeCoVar c)
 rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl

@@ -21,6 +21,7 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family ( tcTopNormaliseNewTypeTF_maybe )
 import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )
+import qualified GHC.Tc.Utils.Monad    as TcM
 
 import GHC.Core.Type
 import GHC.Core.Predicate
@@ -467,29 +468,24 @@ Missing this point is what caused #15431
 can_eq_nc_forall :: CtEvidence -> EqRel
                  -> Type -> Type    -- LHS and RHS
                  -> TcS (StopOrContinue (Either IrredCt EqCt))
--- (forall as. phi1) ~ (forall bs. phi2)
--- Check for length match of as, bs
--- Then build an implication constraint: forall as. phi1 ~ phi2[as/bs]
--- But remember also to unify the kinds of as and bs
---  (this is the 'go' loop), and actually substitute phi2[as |> cos / bs]
--- Remember also that we might have forall z (a:z). blah
---  so we must proceed one binder at a time (#13879)
+-- See Note [Solving forall equalities]
 
 can_eq_nc_forall ev eq_rel s1 s2
- | CtWanted { ctev_loc = loc, ctev_dest = orig_dest, ctev_rewriters = rewriters } <- ev
- = do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
-            (bndrs1, phi1) = tcSplitForAllTyVarBinders s1
-            (bndrs2, phi2) = tcSplitForAllTyVarBinders s2
+ | CtWanted { ctev_dest = orig_dest } <- ev
+ = do { let (bndrs1, phi1, bndrs2, phi2) = split_foralls s1 s2
             flags1 = binderFlags bndrs1
             flags2 = binderFlags bndrs2
-      ; if not (all2 eqForAllVis flags1 flags2) -- Note [ForAllTy and type equality]
-        then do { traceTcS "Forall failure" $
+
+      ; if eq_rel == NomEq && not (all2 eqForAllVis flags1 flags2) -- Note [ForAllTy and type equality]
+        then do { traceTcS "Forall failure: visibility-mismatch" $
                      vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
                           , ppr flags1, ppr flags2 ]
                 ; canEqHardFailure ev s1 s2 }
-        else
-   do { traceTcS "Creating implication for polytype equality" $ ppr ev
-      ; let empty_subst1 = mkEmptySubst $ mkInScopeSet free_tvs
+
+        else do {
+        traceTcS "Creating implication for polytype equality" (ppr ev)
+      ; let free_tvs     = tyCoVarsOfTypes [s1,s2]
+            empty_subst1 = mkEmptySubst $ mkInScopeSet free_tvs
       ; skol_info <- mkSkolemInfo (UnifyForAllSkol phi1)
       ; (subst1, skol_tvs) <- tcInstSkolTyVarsX skol_info empty_subst1 $
                               binderVars bndrs1
@@ -497,31 +493,44 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; let phi1' = substTy subst1 phi1
 
             -- Unify the kinds, extend the substitution
-            go :: [TcTyVar] -> Subst -> [TyVarBinder]
-               -> TcS (TcCoercion, Cts)
-            go (skol_tv:skol_tvs) subst (bndr2:bndrs2)
-              = do { let tv2 = binderVar bndr2
-                   ; (kind_co, wanteds1) <- unify loc rewriters Nominal (tyVarKind skol_tv)
-                                                  (substTy subst (tyVarKind tv2))
-                   ; let subst' = extendTvSubstAndInScope subst tv2
+            go :: UnifyEnv -> [TcTyVar] -> Subst
+               -> [TyVarBinder] -> [TyVarBinder] -> TcM.TcM TcCoercion
+            go uenv (skol_tv:skol_tvs) subst2 (bndr1:bndrs1) (bndr2:bndrs2)
+              = do { let tv2  = binderVar bndr2
+                         vis1 = binderFlag bndr1
+                         vis2 = binderFlag bndr2
+
+                   -- Unify the kinds, at Nominal role
+                   -- See (SF1) in Note [Solving forall equalities]
+                   ; kind_co <- uType (uenv `setUEnvRole` Nominal)
+                                      (tyVarKind skol_tv)
+                                      (substTy subst2 (tyVarKind tv2))
+
+                   ; let subst2' = extendTvSubstAndInScope subst2 tv2
                                        (mkCastTy (mkTyVarTy skol_tv) kind_co)
                          -- skol_tv is already in the in-scope set, but the
                          -- free vars of kind_co are not; hence "...AndInScope"
-                   ; (co, wanteds2) <- go skol_tvs subst' bndrs2
-                   ; return ( mkForAllCo skol_tv kind_co co
-                            , wanteds1 `unionBags` wanteds2 ) }
+                   ; co <- go uenv skol_tvs subst2' bndrs1 bndrs2
+
+                   ; return (mkNakedForAllCo skol_tv vis1 vis2 kind_co co)}
+                     -- mkNaked.. because these types are not zonked, and the
+                     -- assertions in mkForAllCo may fail without that zonking
 
             -- Done: unify phi1 ~ phi2
-            go [] subst bndrs2
-              = assert (null bndrs2) $
-                unify loc rewriters (eqRelRole eq_rel) phi1' (substTyUnchecked subst phi2)
+            go uenv [] subst2 bndrs1 bndrs2
+              = assert (null bndrs1 && null bndrs2) $
+                uType uenv phi1' (substTyUnchecked subst2 phi2)
 
-            go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
+            go _ _ _ _ _ = panic "can_eq_nc_forall"  -- case (s:ss) []
 
-            empty_subst2 = mkEmptySubst (getSubstInScope subst1)
+            init_subst2 = mkEmptySubst (getSubstInScope subst1)
 
-      ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info) $
-                                    go skol_tvs empty_subst2 bndrs2
+      -- Generate the constraints that live in the body of the implication
+      -- See (SF5) in Note [Solving forall equalities]
+      ; (lvl, (all_co, wanteds)) <- pushLevelNoWorkList (ppr skol_info)   $
+                                    unifyForAllBody ev (eqRelRole eq_rel) $ \uenv ->
+                                    go uenv skol_tvs init_subst2 bndrs1 bndrs2
+
       ; emitTvImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs wanteds
 
       ; setWantedEq orig_dest all_co
@@ -533,16 +542,69 @@ can_eq_nc_forall ev eq_rel s1 s2
       ; stopWith ev "Discard given polytype equality" }
 
  where
-    unify :: CtLoc -> RewriterSet -> Role -> TcType -> TcType -> TcS (TcCoercion, Cts)
-    -- This version returns the wanted constraint rather
-    -- than putting it in the work list
-    unify loc rewriters role ty1 ty2
-      | ty1 `tcEqType` ty2
-      = return (mkReflCo role ty1, emptyBag)
-      | otherwise
-      = do { (wanted, co) <- newWantedEq loc rewriters role ty1 ty2
-           ; return (co, unitBag (mkNonCanonical wanted)) }
+    split_foralls :: TcType -> TcType
+                  -> ( [ForAllTyBinder], TcType
+                     , [ForAllTyBinder], TcType)
+    -- Split matching foralls; stop when the foralls don't match
+    -- See #22537.  See (SF3) in Note [Solving forall equalities]
+    -- Postcondition: the two lists of binders returned have the same length
+    split_foralls s1 s2
+      | Just (bndr1, s1') <- splitForAllForAllTyBinder_maybe s1
+      , Just (bndr2, s2') <- splitForAllForAllTyBinder_maybe s2
+      = let !(bndrs1, phi1, bndrs2, phi2) = split_foralls s1' s2'
+        in (bndr1:bndrs1, phi1, bndr2:bndrs2, phi2)
+    split_foralls s1 s2 = ([], s1, [], s2)
 
+{- Note [Solving forall equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To solve an equality between foralls
+   [W] (forall a. t1) ~ (forall b. t2)
+the basic plan is simple: just create the implication constraint
+   [W] forall a. { t1 ~ (t2[a/b]) }
+
+The evidence we produce is a ForAllCo; see the typing rule for
+ForAllCo in Note [ForAllCo] in GHC.Tc.TyCo.Rep.
+
+There are lots of wrinkles of course:
+
+(SF1) We must check the kinds match (at Nominal role).  So from
+      [W] (forall (a:ka). t1) ~ (forall (b:kb). t2)
+   we actually generate the implication
+      [W] forall (a:ka). { ka ~N kb,  t1 ~ t2[a/b] }
+   These kind equalities are generated by the `go` loop in `can_eq_nc_forall`.
+   Why Nominal role? See the typing rule for ForAllCo.
+
+(SF2) At Nominal role we must check that the visiblities match.
+  For example
+     [W] (forall a. a -> a) ~N  (forall b -> b -> b)
+  should fail.  At /Representational/ role we allow this; see the
+  typing rule for ForAllCo, mentioned above.
+
+(SF3) Consider this (#22537)
+     newtype P a = MkP (forall c. (a,c))
+     [W] (forall a. P a) ~R (forall a b. (a,b))
+  The number of foralls does not line up.  But if we just unwrap the outer
+  forall a, we'll get
+     [W] P a ~R forall b. (a,b)
+  Now unwrap the newtype
+     [W] (forall c. (a,c)) ~R (forall b. (a,b))
+  and all is good.
+
+  Conclusion: Don't fail if the number of foralls does not line up.  Instead,
+  handle as many binders as are visibly apparent on both sides, and then keep
+  going with unification. See `split_foralls` in `can_eq_nc_forall`.  In the
+  above example, at Representational role, the unifier will proceed to unwrap
+  the newtype on the RHS and we'll end up back in can_eq_nc_forall.
+
+(SF4) Remember also that we might have forall z (a:z). blah
+  so in that `go` loop, we must proceed one binder at a time (#13879)
+
+(SF5) Rather than manually gather the constraints needed in the body of the
+   implication, we use `uType`.  That way we can solve some of them on the fly,
+   especially Refl ones.  We use the `unifyForAllBody` wrapper for `uType`,
+   because we want to /gather/ the equality constraint (to put in the implication)
+   rather than /emit/ them into the monad, as `wrapUnifierTcS` does.
+-}
 
 {- Note [Unwrap newtypes first]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

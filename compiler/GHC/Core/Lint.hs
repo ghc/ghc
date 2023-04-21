@@ -48,7 +48,7 @@ import GHC.Core.Type as Type
 import GHC.Core.Multiplicity
 import GHC.Core.UsageEnv
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
-import GHC.Core.TyCo.Compare( eqType )
+import GHC.Core.TyCo.Compare ( eqType, eqForAllVis )
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
@@ -1842,7 +1842,6 @@ lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
          lintL (tcv `elemVarSet` tyCoVarsOfType body_ty) $
          text "Covar does not occur in the body:" <+> (ppr tcv $$ ppr body_ty)
          -- See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
-         -- and cf GHC.Core.Coercion Note [Unused coercion variable in ForAllCo]
 
        ; return (ForAllTy (Bndr tcv' vis) body_ty') }
 
@@ -2230,9 +2229,14 @@ lintCoercion co@(AppCo co1 co2)
        ; return (AppCo co1' co2') }
 
 ----------
-lintCoercion co@(ForAllCo tcv kind_co body_co)
+lintCoercion co@(ForAllCo { fco_tcv = tcv, fco_visL = visL, fco_visR = visR
+                          , fco_kind = kind_co, fco_body = body_co })
+-- See Note [ForAllCo] in GHC.Core.TyCo.Rep,
+-- including the typing rule for ForAllCo
+
   | not (isTyCoVar tcv)
   = failWithL (text "Non tyco binder in ForAllCo:" <+> ppr co)
+
   | otherwise
   = do { kind_co' <- lintStarCoercion kind_co
        ; lintTyCoBndr tcv $ \tcv' ->
@@ -2246,18 +2250,24 @@ lintCoercion co@(ForAllCo tcv kind_co body_co)
        --    (forall (tcv:k2). rty[(tcv:k2) |> sym kind_co/tcv])
        -- are both well formed.  Easiest way is to call lintForAllBody
        -- for each; there is actually no need to do the funky substitution
-       ; let Pair lty rty = coercionKind body_co'
+       ; let (Pair lty rty, body_role) = coercionKindRole body_co'
        ; lintForAllBody tcv' lty
        ; lintForAllBody tcv' rty
 
        ; when (isCoVar tcv) $
-         lintL (almostDevoidCoVarOfCo tcv body_co) $
-         text "Covar can only appear in Refl and GRefl: " <+> ppr co
-         -- See "last wrinkle" in GHC.Core.Coercion
-         -- Note [Unused coercion variable in ForAllCo]
-         -- and c.f. GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
+         do { lintL (visL == coreTyLamForAllTyFlag && visR == coreTyLamForAllTyFlag) $
+              text "Invalid visibility flags in CoVar ForAllCo" <+> ppr co
+              -- See (FC7) in Note [ForAllCo] in GHC.Core.TyCo.Rep
+            ; lintL (almostDevoidCoVarOfCo tcv body_co) $
+              text "Covar can only appear in Refl and GRefl: " <+> ppr co
+              -- See (FC6) in Note [ForAllCo] in GHC.Core.TyCo.Rep
+         }
 
-       ; return (ForAllCo tcv' kind_co' body_co') } }
+       ; when (body_role == Nominal) $
+         lintL (visL `eqForAllVis` visR) $
+         text "Nominal ForAllCo has mismatched visibilities: " <+> ppr co
+
+       ; return (co { fco_tcv = tcv', fco_kind = kind_co', fco_body = body_co' }) } }
 
 lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
                        , fco_mult = cow, fco_arg = co1, fco_res = co2 })

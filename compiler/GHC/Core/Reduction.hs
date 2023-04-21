@@ -376,7 +376,7 @@ mkForAllRedn :: ForAllTyFlag
              -> Reduction
 mkForAllRedn vis tv1 (Reduction h ki') (Reduction co ty)
   = mkReduction
-      (mkForAllCo tv1 h co)
+      (mkForAllCo tv1 vis vis h co)
       (mkForAllTy (Bndr tv2 vis) ty)
   where
     tv2 = setTyVarKind tv1 ki'
@@ -389,7 +389,7 @@ mkForAllRedn vis tv1 (Reduction h ki') (Reduction co ty)
 mkHomoForAllRedn :: [TyVarBinder] -> Reduction -> Reduction
 mkHomoForAllRedn bndrs (Reduction co ty)
   = mkReduction
-      (mkHomoForAllCos (binderVars bndrs) co)
+      (mkHomoForAllCos bndrs co)
       (mkForAllTys bndrs ty)
 {-# INLINE mkHomoForAllRedn #-}
 

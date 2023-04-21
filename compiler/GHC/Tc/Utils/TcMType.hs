@@ -1447,7 +1447,7 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
 
     go_co dv (CoVarCo cv) = go_cv dv cv
 
-    go_co dv (ForAllCo tcv kind_co co)
+    go_co dv (ForAllCo { fco_tcv = tcv, fco_kind = kind_co, fco_body = co })
       = do { dv1 <- go_co dv kind_co
            ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
 

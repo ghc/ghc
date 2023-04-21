@@ -223,8 +223,8 @@ be a type function.
 the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
 \item If $[[forall z: h .g]]$ is a polymorphic coercion over a coercion variable
   (i.e. $[[z]]$ is a coercion variable), then $[[z]]$ can only appear in
-  \texttt{Refl} and \texttt{GRefl} in $[[g]]$. See \texttt{Note [Unused coercion
-    variable in ForAllCo] in \ghcfile{GHC.Core.Coercion}}.
+  \texttt{Refl} and \texttt{GRefl} in $[[g]]$. See \texttt{(FC6) in Note [ForAllCo]
+  in \ghcfile{GHC.Core.TyCon.Rep}}.
 \item Prefer $[[g1 ->_R g2]]$ over $[[(->)_R g1 g2]]$; that is, we use \ctor{FunCo},
 never \ctor{TyConAppCo}, for coercions over saturated uses of $[[->]]$.
 \end{itemize}

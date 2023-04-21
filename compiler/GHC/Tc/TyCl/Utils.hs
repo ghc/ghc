@@ -139,7 +139,8 @@ synonymTyConsOfType ty
      go_co (GRefl _ ty mco)       = go ty `plusNameEnv` go_mco mco
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
      go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
-     go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
+     go_co (ForAllCo { fco_kind = kind_co, fco_body = body_co })
+                                  = go_co kind_co `plusNameEnv` go_co body_co
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
                                   = go_co m `plusNameEnv` go_co a `plusNameEnv` go_co r
      go_co (CoVarCo _)            = emptyNameEnv

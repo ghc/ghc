@@ -21,7 +21,8 @@ module GHC.Core.Utils (
         scaleAltsBy,
 
         -- * Properties of expressions
-        exprType, coreAltType, coreAltsType, mkLamType, mkLamTypes,
+        exprType, coreAltType, coreAltsType,
+        mkLamType, mkLamTypes,
         mkFunctionType,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr,
         getIdFromTrivialExpr_maybe,
@@ -161,17 +162,20 @@ mkLamType  :: HasDebugCallStack => Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
--- Always uses Inferred binders.
+--
 mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v body_ty
    | isTyVar v
-   = mkForAllTy (Bndr v Inferred) body_ty
+   = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
+     -- coreTyLamForAllTyFlag: see (FC4) in Note [ForAllCo]
+     --                        in GHC.Core.TyCo.Rep
 
    | isCoVar v
    , v `elemVarSet` tyCoVarsOfType body_ty
-   = mkForAllTy (Bndr v Required) body_ty
+     -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
+   = mkForAllTy (Bndr v coreTyLamForAllTyFlag) body_ty
 
    | otherwise
    = mkFunctionType (varMult v) (varType v) body_ty

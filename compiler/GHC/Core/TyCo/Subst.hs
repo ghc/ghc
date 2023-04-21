@@ -535,7 +535,8 @@ Note [Sym and ForAllCo]
 In OptCoercion, we try to push "sym" out to the leaves of a coercion. But,
 how do we push sym into a ForAllCo? It's a little ugly.
 
-Here is the typing rule:
+Ignoring visibility, here is the typing rule
+(see Note [ForAllCo] in GHC.Core.TyCo.Rep).
 
 h : k1 ~# k2
 (tv : k1) |- g : ty1 ~# ty2
@@ -889,10 +890,10 @@ subst_co subst co
     go (TyConAppCo r tc args)= let args' = map go args
                                in  args' `seqList` mkTyConAppCo r tc args'
     go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
-    go (ForAllCo tv kind_co co)
+    go (ForAllCo tv visL visR kind_co co)
       = case substForAllCoBndrUnchecked subst tv kind_co of
          (subst', tv', kind_co') ->
-          ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co
+          ((mkForAllCo $! tv') visL visR $! kind_co') $! subst_co subst' co
     go (FunCo r afl afr w co1 co2)   = ((mkFunCo2 r afl afr $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos

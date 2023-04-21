@@ -173,7 +173,7 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 
     go env (ForAllTy (Bndr tv1 vis1) ty1)
            (ForAllTy (Bndr tv2 vis2) ty2)
-      =  vis1 `eqForAllVis` vis2
+      =  vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
@@ -230,7 +230,6 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
 -- equates 'Specified' and 'Inferred'. Used for printing.
 eqForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Bool
 -- See Note [ForAllTy and type equality]
--- If you change this, see IMPORTANT NOTE in the above Note
 eqForAllVis Required      Required      = True
 eqForAllVis (Invisible _) (Invisible _) = True
 eqForAllVis _             _             = False
@@ -240,7 +239,6 @@ eqForAllVis _             _             = False
 -- equates 'Specified' and 'Inferred'. Used for printing.
 cmpForAllVis :: ForAllTyFlag -> ForAllTyFlag -> Ordering
 -- See Note [ForAllTy and type equality]
--- If you change this, see IMPORTANT NOTE in the above Note
 cmpForAllVis Required      Required       = EQ
 cmpForAllVis Required      (Invisible {}) = LT
 cmpForAllVis (Invisible _) Required       = GT
@@ -251,12 +249,58 @@ cmpForAllVis (Invisible _) (Invisible _)  = EQ
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we compare (ForAllTy (Bndr tv1 vis1) ty1)
          and    (ForAllTy (Bndr tv2 vis2) ty2)
-what should we do about `vis1` vs `vis2`.
+what should we do about `vis1` vs `vis2`?
 
-First, we always compare with `eqForAllVis` and `cmpForAllVis`.
-But what decision do we make?
+We had a long debate about this: see #22762 and GHC Proposal 558.
+Here is the conclusion.
 
-Should GHC type-check the following program (adapted from #15740)?
+* In Haskell, we really do want (forall a. ty) and (forall a -> ty) to be
+  distinct types, not interchangeable.  The latter requires a type argument,
+  but the former does not.  See GHC Proposal 558.
+
+* We /really/ do not want the typechecker and Core to have different notions of
+  equality.  That is, we don't want `tcEqType` and `eqType` to differ.  Why not?
+  Not so much because of code duplication but because it is virtually impossible
+  to cleave the two apart. Here is one particularly awkward code path:
+     The type checker calls `substTy`, which calls `mkAppTy`,
+     which calls `mkCastTy`, which calls `isReflexiveCo`, which calls `eqType`.
+
+* Moreover the resolution of the TYPE vs CONSTRAINT story was to make the
+  typechecker and Core have a single notion of equality.
+
+* So in GHC:
+  - `tcEqType` and `eqType` implement the same equality
+  - (forall a. ty) and (forall a -> ty) are distinct types in both Core and typechecker
+  - That is, both `eqType` and `tcEqType` distinguish them.
+
+* But /at representational role/ we can relate the types. That is,
+    (forall a. ty) ~R (forall a -> ty)
+  After all, since types are erased, they are represented the same way.
+  See Note [ForAllCo] and the typing rule for ForAllCo given there
+
+* What about (forall a. ty) and (forall {a}. ty)?  See Note [Comparing visibility].
+
+Note [Comparing visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are sure that we want to distinguish (forall a. ty) and (forall a -> ty); see
+Note [ForAllTy and type equality].  But we have /three/ settings for the ForAllTyFlag:
+  * Specified: forall a. ty
+  * Inferred:  forall {a}. ty
+  * Required:  forall a -> ty
+
+We could (and perhaps should) distinguish all three. But for now we distinguish
+Required from Specified/Inferred, and ignore the distinction between Specified
+and Inferred.
+
+The answer doesn't matter too much, provided we are consistent. And we are consistent
+because we always compare ForAllTyFlags with
+  * `eqForAllVis`
+  * `cmpForAllVis`.
+(You can only really check this by inspecting all pattern matches on ForAllTyFlags.)
+So if we change the decision, we just need to change those functions.
+
+Why don't we distinguish all three? Should GHC type-check the following program
+(adapted from #15740)?
 
   {-# LANGUAGE PolyKinds, ... #-}
   data D a
@@ -303,15 +347,11 @@ That is, we have the following:
   |                   | forall k -> <...> | Yes    |
   --------------------------------------------------
 
-IMPORTANT NOTE: if we want to change this decision, ForAllCo will need to carry
-visiblity (by taking a ForAllTyBinder rathre than a TyCoVar), so that
-coercionLKind/RKind build forall types that match (are equal to) the desired
-ones.  Otherwise we get an infinite loop in the solver via canEqCanLHSHetero.
 Examples: T16946, T15079.
 
 Historical Note [Typechecker equality vs definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note describes some history, in case there are vesitges of this
+This Note describes some history, in case there are vestiges of this
 history lying around in the code.
 
 Summary: prior to summer 2022, GHC had have two notions of equality
@@ -514,7 +554,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
     go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
-      = liftOrdering (vis1 `cmpForAllVis` vis2)
+      = liftOrdering (vis1 `cmpForAllVis` vis2)   -- See Note [ForAllTy and type equality]
         `thenCmpTy` go env (varType tv1) (varType tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 

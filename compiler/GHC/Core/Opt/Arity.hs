@@ -68,6 +68,7 @@ import GHC.Core.TyCo.Compare( eqType )
 import GHC.Types.Demand
 import GHC.Types.Cpr( CprSig, mkCprSig, botCpr )
 import GHC.Types.Id
+import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
@@ -2037,8 +2038,8 @@ This what eta_expand does.  We do it in two steps:
 
    Note that the /same/ EtaInfo drives both etaInfoAbs and etaInfoApp
 
-To a first approximation EtaInfo is just [Var].  But
-casts complicate the question.  If we have
+To a first approximation EtaInfo is just [Var].  But casts complicate
+the question.  If we have
    newtype N a = MkN (S -> a)
      axN :: N a  ~  S -> a
 and
@@ -2053,6 +2054,20 @@ We want to get one cast, at the top, to account for all those
 nested newtypes. This is expressed by the EtaInfo type:
 
    data EtaInfo = EI [Var] MCoercionR
+
+Precisely, here is the (EtaInfo Invariant):
+
+  EI bs co :: EtaInfo
+
+describes a particular eta-expansion, thus:
+
+  Abstraction:  (\b1 b2 .. bn. []) |> sym co
+  Application:  ([] |> co) b1 b2 .. bn
+
+  e  :: T
+  co :: T ~R (t1 -> t2 -> .. -> tn -> tr)
+  e = (\b1 b2 ... bn. (e |> co) b1 b2 .. bn) |> sym co
+
 
 Note [Check for reflexive casts in eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2109,13 +2124,7 @@ Now, when we push that eta_co inward in etaInfoApp:
 
 --------------
 data EtaInfo = EI [Var] MCoercionR
-
--- (EI bs co) describes a particular eta-expansion, as follows:
---  Abstraction:  (\b1 b2 .. bn. []) |> sym co
---  Application:  ([] |> co) b1 b2 .. bn
---
---    e :: T    co :: T ~ (t1 -> t2 -> .. -> tn -> tr)
---    e = (\b1 b2 ... bn. (e |> co) b1 b2 .. bn) |> sym co
+     -- See Note [The EtaInfo mechanism]
 
 instance Outputable EtaInfo where
   ppr (EI vs mco) = text "EI" <+> ppr vs <+> parens (ppr mco)
@@ -2229,14 +2238,14 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
-       | Just (tcv,ty') <- splitForAllTyCoVar_maybe ty
+       | Just (Bndr tcv vis, ty') <- splitForAllForAllTyBinder_maybe ty
        , (subst', tcv') <- Type.substVarBndr subst tcv
        , let oss' | isTyVar tcv = oss
                   | otherwise   = oss1
          -- A forall can bind a CoVar, in which case
          -- we consume one of the [OneShotInfo]
        , (in_scope, EI bs mco) <- go n oss' subst' ty'
-       = (in_scope, EI (tcv' : bs) (mkHomoForAllMCo tcv' mco))
+       = (in_scope, EI (tcv' : bs) (mkEtaForAllMCo (Bndr tcv' vis) ty' mco))
 
        ----------- Function types  (t1 -> t2)
        | Just (_af, mult, arg_ty, res_ty) <- splitFunTy_maybe ty
@@ -2279,6 +2288,19 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
 
+mkEtaForAllMCo :: ForAllTyBinder -> Type -> MCoercion -> MCoercion
+mkEtaForAllMCo (Bndr tcv vis) ty mco
+  = case mco of
+      MRefl | vis == coreTyLamForAllTyFlag -> MRefl
+            | otherwise                    -> mk_fco (mkRepReflCo ty)
+      MCo co                               -> mk_fco co
+  where
+    mk_fco co = MCo (mkForAllCo tcv vis coreTyLamForAllTyFlag
+                                (mkNomReflCo (varType tcv)) co)
+    -- coreTyLamForAllTyFlag: See Note [The EtaInfo mechanism], particularly
+    -- the (EtaInfo Invariant).  (sym co) wraps a lambda that always has
+    -- a ForAllTyFlag of coreTyLamForAllTyFlag; see wrinkle (FC4) in
+    -- Note [ForAllCo] in GHC.Core.TyCo.Rep
 
 {-
 ************************************************************************
@@ -2706,9 +2728,14 @@ tryEtaReduce rec_ids bndrs body eval_sd
                                --   (and similarly for tyvars, coercion args)
                     , [CoreTickish])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type ty) co _
-       | Just tv <- getTyVar_maybe ty
-       , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
+    ok_arg bndr (Type arg_ty) co fun_ty
+       | Just tv <- getTyVar_maybe arg_ty
+       , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
+           Just (Bndr _ vis, _) -> Just (mkHomoForAllCos [Bndr tv vis] co, [])
+           Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
+                               (text "fun:" <+> ppr bndr
+                                $$ text "arg:" <+> ppr arg_ty
+                                $$ text "fun_ty:" <+> ppr fun_ty)
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr

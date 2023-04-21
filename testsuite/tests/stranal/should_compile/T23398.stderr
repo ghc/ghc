@@ -5,7 +5,7 @@ Result size of Tidy Core
 
 -- RHS size: {terms: 18, types: 11, coercions: 0, joins: 0/0}
 T23398.$wfoo [InlPrag=[2]]
-  :: forall {a}. (Eq a, Show a) => a -> a -> String
+  :: forall a. (Eq a, Show a) => a -> a -> String
 [GblId[StrictWorker([!, !])],
  Arity=4,
  Str=<SP(1C(1,C(1,L)),A)><SP(A,1C(1,L),A)><L><L>,
@@ -41,7 +41,7 @@ foo
 Rec {
 -- RHS size: {terms: 21, types: 19, coercions: 3, joins: 0/0}
 T23398.$wbar [InlPrag=[2], Occ=LoopBreaker]
-  :: forall {a} {b}.
+  :: forall a b.
      (a GHC.Prim.~# b, Show a) =>
      GHC.Prim.Int# -> a -> (# b, String #)
 [GblId[StrictWorker([~, !])],

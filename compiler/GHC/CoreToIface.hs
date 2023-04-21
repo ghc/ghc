@@ -309,9 +309,12 @@ toIfaceCoercionX fr co
     go (FunCo { fco_role = r, fco_mult = w, fco_arg = co1, fco_res = co2 })
       = IfaceFunCo r (go w) (go co1) (go co2)
 
-    go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
-                                          (toIfaceCoercionX fr' k)
-                                          (toIfaceCoercionX fr' co)
+    go (ForAllCo tv visL visR k co)
+      = IfaceForAllCo (toIfaceBndr tv)
+                      visL
+                      visR
+                      (toIfaceCoercionX fr' k)
+                      (toIfaceCoercionX fr' co)
                           where
                             fr' = fr `delVarSet` tv
 

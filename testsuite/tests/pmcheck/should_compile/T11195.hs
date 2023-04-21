@@ -111,11 +111,11 @@ opt_trans_rule is co1 co2@(AppCo co2a co2b)
 
 -- Push transitivity inside forall
 opt_trans_rule is co1 co2
-  | ForAllCo tv1 eta1 r1 <- co1
-  , Just (tv2,eta2,r2) <- etaForAllCo_maybe co2 = undefined
+  | ForAllCo tv1 vl1 vr1 eta1 r1 <- co1
+  , Just (tv2,vl2,vr2,eta2,r2) <- etaForAllCo_maybe co2 = undefined
 
-  | ForAllCo tv2 eta2 r2 <- co2
-  , Just (tv1,eta1,r1) <- etaForAllCo_maybe co1 = undefined
+  | ForAllCo tv2 vl2 vr1 eta2 r2 <- co2
+  , Just (tv1,vl1,vr2,eta1,r1) <- etaForAllCo_maybe co1 = undefined
 
   where
   push_trans tv1 eta1 r1 tv2 eta2 r2 = undefined
