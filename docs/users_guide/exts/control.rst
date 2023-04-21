@@ -98,6 +98,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
      * :extension:`CUSKs`
      * :extension:`DatatypeContexts`
+     * :extension:`DeepSubsumption`
      * :extension:`DoAndIfThenElse`
      * :extension:`EmptyDataDecls`
      * :extension:`FieldSelectors`
@@ -120,6 +121,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
 
      * :extension:`CUSKs`
      * :extension:`DatatypeContexts`
+     * :extension:`DeepSubsumption`
      * :extension:`FieldSelectors`
      * :extension:`ImplicitPrelude`
      * :extension:`MonomorphismRestriction`
