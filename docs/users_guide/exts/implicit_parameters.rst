@@ -180,6 +180,27 @@ parameter. So we get the following results in GHCi:
 Adding a type signature dramatically changes the result! This is a
 rather counter-intuitive phenomenon, worth watching out for.
 
+Implicit parameters scoping guarantees
+-------------------------------------
+
+GHC always takes the most nested implicit parameter binding from the
+context to find the value. Consider the following code::
+
+      let ?f = 1 in let ?f = 2 in ?f
+
+This expression will always return 2.
+
+Another example of this rule is matching over constructors with constraints.
+For example::
+
+      data T where
+        MkT :: (?f :: Int) => T
+
+      f :: T -> T -> Int
+      f MkT MkT = ?f
+
+Here GHC will always take ``?f`` from the last match.
+
 Implicit parameters and monomorphism
 ------------------------------------
 
@@ -199,5 +220,3 @@ a type signature for ``y``, then ``y`` will get type
 ``(?x::Int) => Int``, so the occurrence of ``y`` in the body of the
 ``let`` will see the inner binding of ``?x``, so ``(f 9)`` will return
 ``14``.
-
-
