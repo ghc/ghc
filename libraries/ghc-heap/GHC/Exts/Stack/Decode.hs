@@ -126,15 +126,11 @@ getUnderflowFrameNextChunk stackSnapshot# index = IO $ \s ->
 
 foreign import prim "getWordzh"
   getWord# ::
-    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
+    StackSnapshot# -> Word# -> Word#
 
-getWord :: StackSnapshot# -> WordOffset -> IO Word
-getWord stackSnapshot# index = IO $ \s ->
-  case getWord#
-    stackSnapshot#
-    (wordOffsetToWord# index)
-    s of
-    (# s1, w# #) -> (# s1, W# w# #)
+getWord :: StackSnapshot# -> WordOffset -> Word
+getWord stackSnapshot# index =
+  W# (getWord# stackSnapshot# (wordOffsetToWord# index))
 
 type WordGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
 
@@ -196,13 +192,13 @@ foreign import prim "getStackClosurezh"
 
 foreign import prim "getStackFieldszh"
   getStackFields# ::
-    StackSnapshot# -> State# RealWorld -> (# State# RealWorld, Word32#, Word8#, Word8# #)
+    StackSnapshot# -> (# Word32#, Word8#, Word8# #)
 
-getStackFields :: StackSnapshot# -> IO (Word32, Word8, Word8)
-getStackFields stackSnapshot# = IO $ \s ->
-  case getStackFields# stackSnapshot# s of
-    (# s1, sSize#, sDirty#, sMarking# #) ->
-      (# s1, (W32# sSize#, W8# sDirty#, W8# sMarking#) #)
+getStackFields :: StackSnapshot# -> (Word32, Word8, Word8)
+getStackFields stackSnapshot# =
+  case getStackFields# stackSnapshot# of
+    (# sSize#, sDirty#, sMarking# #) ->
+      (W32# sSize#, W8# sDirty#, W8# sMarking#)
 
 -- | `StackFrameLocation` of the top-most stack frame
 stackHead :: StackSnapshot# -> StackFrameLocation
@@ -296,9 +292,8 @@ decodeBitmaps stack# index ps =
   where
     toPayload :: Pointerness -> WordOffset -> IO Closure
     toPayload p i = case p of
-      NonPointer -> do
-        w <- getWord stack# i
-        pure $ UnknownTypeWordSizedPrimitive w
+      NonPointer ->
+        pure $ UnknownTypeWordSizedPrimitive (getWord stack# i)
       Pointer -> getClosure stack# i
 
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
@@ -346,7 +341,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
               }
         RET_FUN -> do
           retFunType' <- getRetFunType stackSnapshot# index
-          retFunSize' <- getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
+          let retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
           retFunFun' <- getClosure stackSnapshot# (index + offsetStgRetFunFrameFun)
           retFunPayload' <-
             if retFunType' == ARG_GEN_BIG
@@ -368,7 +363,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 updatee = updatee'
               }
         CATCH_FRAME -> do
-          exceptions_blocked' <- getWord stackSnapshot# (index + offsetStgCatchFrameExceptionsBlocked)
+          let exceptions_blocked' = getWord stackSnapshot# (index + offsetStgCatchFrameExceptionsBlocked)
           handler' <- getClosure stackSnapshot# (index + offsetStgCatchFrameHandler)
           pure $
             CatchFrame
@@ -395,7 +390,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 result = result'
               }
         CATCH_RETRY_FRAME -> do
-          running_alt_code' <- getWord stackSnapshot# (index + offsetStgCatchRetryFrameRunningAltCode)
+          let running_alt_code' = getWord stackSnapshot# (index + offsetStgCatchRetryFrameRunningAltCode)
           first_code' <- getClosure stackSnapshot# (index + offsetStgCatchRetryFrameRunningFirstCode)
           alt_code' <- getClosure stackSnapshot# (index + offsetStgCatchRetryFrameAltCode)
           pure $
@@ -441,10 +436,10 @@ type StackFrameLocation = (StackSnapshot, WordOffset)
 decodeStack :: StackSnapshot -> IO StgStackClosure
 decodeStack (StackSnapshot stack#) = do
   info <- getInfoTableForStack stack#
-  (stack_size', stack_dirty', stack_marking') <- getStackFields stack#
   case tipe info of
     STACK -> do
-      let sfls = stackFrameLocations stack#
+      let (stack_size', stack_dirty', stack_marking') = getStackFields stack#
+          sfls = stackFrameLocations stack#
       stack' <- mapM unpackStackFrame sfls
       pure $
         StgStackClosure
