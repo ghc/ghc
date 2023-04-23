@@ -131,21 +131,12 @@ getWord :: StackSnapshot# -> WordOffset -> Word
 getWord stackSnapshot# index =
   W# (getWord# stackSnapshot# (wordOffsetToWord# index))
 
-type WordGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word# #)
+foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
 
-foreign import prim "getRetFunTypezh" getRetFunType# :: WordGetter
-
-getRetFunType :: StackSnapshot# -> WordOffset -> IO RetFunType
+getRetFunType :: StackSnapshot# -> WordOffset -> RetFunType
 getRetFunType stackSnapshot# index =
-  toEnum . fromInteger . toInteger
-    <$> IO
-      ( \s ->
-          case getRetFunType#
-            stackSnapshot#
-            (wordOffsetToWord# index)
-            s of
-            (# s1, rft# #) -> (# s1, W# rft# #)
-      )
+  toEnum . fromInteger . toInteger $
+    W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index))
 
 -- | Gets contents of a `LargeBitmap` (@StgLargeBitmap@)
 --
@@ -339,8 +330,8 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 stack_payload = payload'
               }
         RET_FUN -> do
-          retFunType' <- getRetFunType stackSnapshot# index
-          let retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
+          let retFunType' = getRetFunType stackSnapshot# index
+              retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
           retFunFun' <- getClosure stackSnapshot# (index + offsetStgRetFunFrameFun)
           retFunPayload' <-
             if retFunType' == ARG_GEN_BIG
