@@ -117,12 +117,11 @@ Technical details
 
 foreign import prim "getUnderflowFrameNextChunkzh"
   getUnderflowFrameNextChunk# ::
-    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
+    StackSnapshot# -> Word# -> StackSnapshot#
 
-getUnderflowFrameNextChunk :: StackSnapshot# -> WordOffset -> IO StackSnapshot
-getUnderflowFrameNextChunk stackSnapshot# index = IO $ \s ->
-  case getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index) s of
-    (# s1, stack# #) -> (# s1, StackSnapshot stack# #)
+getUnderflowFrameNextChunk :: StackSnapshot# -> WordOffset -> StackSnapshot
+getUnderflowFrameNextChunk stackSnapshot# index =
+  StackSnapshot (getUnderflowFrameNextChunk# stackSnapshot# (wordOffsetToWord# index))
 
 foreign import prim "getWordzh"
   getWord# ::
@@ -372,7 +371,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 handler = handler'
               }
         UNDERFLOW_FRAME -> do
-          nextChunk' <- getUnderflowFrameNextChunk stackSnapshot# index
+          let nextChunk' = getUnderflowFrameNextChunk stackSnapshot# index
           stackClosure <- decodeStack nextChunk'
           pure $
             UnderflowFrame
