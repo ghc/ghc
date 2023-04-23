@@ -205,8 +205,8 @@ getStackFields stackSnapshot# = IO $ \s ->
       (# s1, (W32# sSize#, W8# sDirty#, W8# sMarking#) #)
 
 -- | `StackFrameLocation` of the top-most stack frame
-stackHead :: StackSnapshot -> StackFrameLocation
-stackHead (StackSnapshot s#) = (StackSnapshot s#, 0) -- GHC stacks are never empty
+stackHead :: StackSnapshot# -> StackFrameLocation
+stackHead s# = (StackSnapshot s#, 0) -- GHC stacks are never empty
 
 -- | Advance to the next stack frame (if any)
 --
@@ -444,7 +444,7 @@ decodeStack (StackSnapshot stack#) = do
   (stack_size', stack_dirty', stack_marking') <- getStackFields stack#
   case tipe info of
     STACK -> do
-      let sfls = stackFrameLocations (StackSnapshot stack#)
+      let sfls = stackFrameLocations stack#
       stack' <- mapM unpackStackFrame sfls
       pure $
         StgStackClosure
@@ -456,10 +456,10 @@ decodeStack (StackSnapshot stack#) = do
           }
     _ -> error $ "Expected STACK closure, got " ++ show info
   where
-    stackFrameLocations :: StackSnapshot -> [StackFrameLocation]
-    stackFrameLocations s =
-      stackHead s
-        : go (advanceStackFrameLocation (stackHead s))
+    stackFrameLocations :: StackSnapshot# -> [StackFrameLocation]
+    stackFrameLocations s# =
+      stackHead s#
+        : go (advanceStackFrameLocation (stackHead s#))
       where
         go :: Maybe StackFrameLocation -> [StackFrameLocation]
         go Nothing = []
