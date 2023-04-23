@@ -8,7 +8,9 @@
 // developed.
 #if defined(StgStack_marking)
 
-// advanceStackFrameLocationzh(StgStack* stack, StgWord offsetWords)
+// Returns the next stackframe's StgStack* and offset in it. And, an indicator
+// if this frame is the last one (`hasNext` bit.)
+// (StgStack*, StgWord, StgWord) advanceStackFrameLocationzh(StgStack* stack, StgWord offsetWords)
 advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
   W_ frameSize;
   (frameSize) = ccall stackFrameSize(stack, offsetWords);
@@ -48,7 +50,7 @@ advanceStackFrameLocationzh (P_ stack, W_ offsetWords) {
   return (newStack, newOffsetWords, hasNext);
 }
 
-// getSmallBitmapzh(StgStack* stack, StgWord offsetWords)
+// (StgWord, StgWord) getSmallBitmapzh(StgStack* stack, StgWord offsetWords)
 getSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -62,7 +64,7 @@ getSmallBitmapzh(P_ stack, W_ offsetWords) {
 }
 
 
-// getRetFunSmallBitmapzh(StgStack* stack, StgWord offsetWords)
+// (StgWord, StgWord) getRetFunSmallBitmapzh(StgStack* stack, StgWord offsetWords)
 getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -75,7 +77,7 @@ getRetFunSmallBitmapzh(P_ stack, W_ offsetWords) {
   return (bitmap, size);
 }
 
-// getLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+// (StgWord*, StgWord) getLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
@@ -88,7 +90,7 @@ getLargeBitmapzh(P_ stack, W_ offsetWords) {
   return (words, size);
 }
 
-// getBCOLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+// (StgWord*, StgWord) getBCOLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getBCOLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
@@ -101,7 +103,7 @@ getBCOLargeBitmapzh(P_ stack, W_ offsetWords) {
   return (words, size);
 }
 
-// getRetFunLargeBitmapzh(StgStack* stack, StgWord offsetWords)
+// (StgWord*, StgWord) getRetFunLargeBitmapzh(StgStack* stack, StgWord offsetWords)
 getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
   P_ c, words;
   W_ size;
@@ -114,22 +116,14 @@ getRetFunLargeBitmapzh(P_ stack, W_ offsetWords) {
   return (words, size);
 }
 
-// getWordzh(StgStack* stack, StgWord offsetWords)
+// (StgWord) getWordzh(StgStack* stack, StgWord offsetWords)
 getWordzh(P_ stack, W_ offsetWords) {
   P_ wordAddr;
   wordAddr = (StgStack_sp(stack) + WDS(offsetWords));
   return (W_[wordAddr]);
 }
 
-getAddrzh(P_ stack, W_ offsetWords){
-  P_ addr;
-  addr = (StgStack_sp(stack) + WDS(offsetWords));
-  P_ ptr;
-  ptr = P_[addr];
-  return (ptr);
-}
-
-// getUnderflowFrameNextChunkzh(StgStack* stack, StgWord offsetWords)
+// (StgStack*) getUnderflowFrameNextChunkzh(StgStack* stack, StgWord offsetWords)
 getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
   P_ closurePtr;
   closurePtr = (StgStack_sp(stack) + WDS(offsetWords));
@@ -141,7 +135,7 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
   return (next_chunk);
 }
 
-// getRetFunTypezh(StgStack* stack, StgWord offsetWords)
+// (StgWord) getRetFunTypezh(StgStack* stack, StgWord offsetWords)
 getRetFunTypezh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
@@ -152,7 +146,7 @@ getRetFunTypezh(P_ stack, W_ offsetWords) {
   return (type);
 }
 
-// getInfoTableAddrzh(StgStack* stack, StgWord offsetWords)
+// (StgInfoTable*) getInfoTableAddrzh(StgStack* stack, StgWord offsetWords)
 getInfoTableAddrzh(P_ stack, W_ offsetWords) {
   P_ p, info;
   p = StgStack_sp(stack) + WDS(offsetWords);
@@ -162,7 +156,7 @@ getInfoTableAddrzh(P_ stack, W_ offsetWords) {
   return (info);
 }
 
-// getStackInfoTableAddrzh(StgStack* stack)
+// (StgInfoTable*) getStackInfoTableAddrzh(StgStack* stack)
 getStackInfoTableAddrzh(P_ stack) {
   P_ info;
   info = %GET_STD_INFO(UNTAG(stack));
@@ -179,7 +173,7 @@ getStackClosurezh(P_ stack, W_ offsetWords) {
   return (closure);
 }
 
-// getStackFieldszh(StgStack* stack)
+// (bits32, bits8, bits8) getStackFieldszh(StgStack* stack)
 getStackFieldszh(P_ stack){
   bits32 size;
   bits8 dirty, marking;
