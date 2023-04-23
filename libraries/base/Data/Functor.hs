@@ -161,7 +161,10 @@ infixl 4 $>
 ($>) :: Functor f => f a -> b -> f b
 ($>) = flip (<$)
 
-unzip :: Functor f => f (a,b) -> (f a, f b)
+-- | Generalization of @Data.List.@'Data.List.unzip'.
+--
+-- @since 4.19.0.0
+unzip :: Functor f => f (a, b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
 
 -- | @'void' value@ discards or ignores the result of evaluation, such
