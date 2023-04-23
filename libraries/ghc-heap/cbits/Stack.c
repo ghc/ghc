@@ -147,4 +147,4 @@ StgWord getRetFunType(StgRetFun *ret_fun) {
   return fun_info->f.fun_type;
 }
 
-StgClosure *getBoxedClosure(StgClosure **c) { return *c; }
+StgClosure *getStackClosure(StgClosure **c) { return *c; }

@@ -190,8 +190,8 @@ getInfoTableForStack stackSnapshot# =
   peekItbl $
     Ptr (getStackInfoTableAddr# stackSnapshot#)
 
-foreign import prim "getBoxedClosurezh"
-  getBoxedClosure# ::
+foreign import prim "getStackClosurezh"
+  getStackClosure# ::
     StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
 
 foreign import prim "getStackFieldszh"
@@ -230,7 +230,7 @@ advanceStackFrameLocation ((StackSnapshot stackSnapshot#), index) =
 getClosure :: StackSnapshot# -> WordOffset -> IO Closure
 getClosure stackSnapshot# index =
   ( IO $ \s ->
-      case getBoxedClosure#
+      case getStackClosure#
         stackSnapshot#
         (wordOffsetToWord# index)
         s of
