@@ -213,6 +213,9 @@ advanceStackFrameLocation ((StackSnapshot stackSnapshot#), index) =
 
 getClosure :: StackSnapshot# -> WordOffset -> IO Closure
 getClosure stackSnapshot# index =
+  -- Beware! We have to put ptr into a Box immediately. Otherwise, the garbage
+  -- collector might move the referenced closure, without updating our reference
+  -- (pointer) to it.
   ( IO $ \s ->
       case getStackClosure#
         stackSnapshot#
@@ -236,7 +239,7 @@ data Pointerness = Pointer | NonPointer
 decodeLargeBitmap :: LargeBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
   let largeBitmap = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
-                      (# wordsAddr#, size# #) -> LargeBitmap (W# size#) (Ptr wordsAddr#)
+        (# wordsAddr#, size# #) -> LargeBitmap (W# size#) (Ptr wordsAddr#)
   bitmapWords <- largeBitmapToList largeBitmap
   decodeBitmaps
     stackSnapshot#
@@ -286,12 +289,11 @@ decodeBitmaps stack# index ps =
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
   let (bitmap, size) = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
-                          (# b#, s# #) -> (W# b#, W# s#)
-  in
-    decodeBitmaps
-      stackSnapshot#
-      (index + relativePayloadOffset)
-      (bitmapWordPointerness size bitmap)
+        (# b#, s# #) -> (W# b#, W# s#)
+   in decodeBitmaps
+        stackSnapshot#
+        (index + relativePayloadOffset)
+        (bitmapWordPointerness size bitmap)
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
 unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
