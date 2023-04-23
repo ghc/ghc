@@ -141,9 +141,8 @@ getRetFunType stackSnapshot# index =
 -- | Gets contents of a `LargeBitmap` (@StgLargeBitmap@)
 --
 -- The first two arguments identify the location of the frame on the stack.
--- Returned is the `Addr#` of the @StgWord[]@ (bitmap) and it's size. The
--- `RealWorld` token is used to run this in an `IO` context.
-type LargeBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
+-- Returned is the `Addr#` of the @StgWord[]@ (bitmap) and it's size.
+type LargeBitmapGetter = StackSnapshot# -> Word# -> (# Addr#, Word# #)
 
 foreign import prim "getLargeBitmapzh" getLargeBitmap# :: LargeBitmapGetter
 
@@ -237,9 +236,8 @@ data Pointerness = Pointer | NonPointer
 
 decodeLargeBitmap :: LargeBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
-  largeBitmap <- IO $ \s ->
-    case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
-      (# s1, wordsAddr#, size# #) -> (# s1, LargeBitmap (W# size#) (Ptr wordsAddr#) #)
+  let largeBitmap = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
+                      (# wordsAddr#, size# #) -> LargeBitmap (W# size#) (Ptr wordsAddr#)
   bitmapWords <- largeBitmapToList largeBitmap
   decodeBitmaps
     stackSnapshot#
