@@ -14,6 +14,9 @@ import GHC.Exts.Stack.Constants
 import GHC.Exts.Stack.Decode
 import Prelude
 
+-- | Get the size of the `StackFrame` in words.
+--
+-- Includes header and payload. Does not follow pointers.
 stackFrameSize :: StackFrame -> Int
 stackFrameSize (UpdateFrame {}) = sizeStgUpdateFrame
 stackFrameSize (CatchFrame {}) = sizeStgCatchFrame

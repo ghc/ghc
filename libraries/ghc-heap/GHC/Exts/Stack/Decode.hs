@@ -427,19 +427,25 @@ intToWord# i = int2Word# (toInt# i)
 wordOffsetToWord# :: WordOffset -> Word#
 wordOffsetToWord# wo = intToWord# (fromIntegral wo)
 
+-- | Location of a stackframe on the stack
+--
+-- It's defined by the `StackSnapshot` (@StgStack@) and the offset to the bottom
+-- of the stack.
 type StackFrameLocation = (StackSnapshot, WordOffset)
 
 -- | Decode `StackSnapshot` to a `StgStackClosure`
 --
 -- The return value is the representation of the @StgStack@ itself.
+--
+-- See /Note [Decoding the stack]/.
 decodeStack :: StackSnapshot -> IO StgStackClosure
 decodeStack (StackSnapshot stack#) = do
   info <- getInfoTableForStack stack#
   (stack_size', stack_dirty', stack_marking') <- getStackFields stack#
   case tipe info of
     STACK -> do
-      let sfis = stackFrameLocations (StackSnapshot stack#)
-      stack' <- mapM unpackStackFrame sfis
+      let sfls = stackFrameLocations (StackSnapshot stack#)
+      stack' <- mapM unpackStackFrame sfls
       pure $
         StgStackClosure
           { ssc_info = info,
