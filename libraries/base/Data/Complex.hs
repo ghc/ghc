@@ -104,13 +104,13 @@ cis theta        =  cos theta :+ sin theta
 
 -- | The function 'polar' takes a complex number and
 -- returns a (magnitude, phase) pair in canonical form:
--- the magnitude is nonnegative, and the phase in the range @(-'pi', 'pi']@;
+-- the magnitude is non-negative, and the phase in the range @(-'pi', 'pi']@;
 -- if the magnitude is zero, then so is the phase.
 {-# SPECIALISE polar :: Complex Double -> (Double,Double) #-}
 polar            :: (RealFloat a) => Complex a -> (a,a)
 polar z          =  (magnitude z, phase z)
 
--- | The nonnegative magnitude of a complex number.
+-- | The non-negative magnitude of a complex number.
 {-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k

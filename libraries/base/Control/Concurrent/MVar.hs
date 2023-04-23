@@ -37,7 +37,7 @@
 -- than 'GHC.Conc.STM'.  They are appropriate for building synchronization
 -- primitives and performing simple interthread communication; however
 -- they are very simple and susceptible to race conditions, deadlocks or
--- uncaught exceptions.  Do not use them if you need perform larger
+-- uncaught exceptions.  Do not use them if you need to perform larger
 -- atomic operations such as reading from multiple variables: use 'GHC.Conc.STM'
 -- instead.
 --

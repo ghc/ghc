@@ -112,7 +112,7 @@ numberToFixed _ _ = Nothing
 -- space problems in #5688
 -- Ways this is conservative:
 -- * the floatRange is in base 2, but we pretend it is in base 10
--- * we pad the floateRange a bit, just in case it is very small
+-- * we pad the floatRange a bit, just in case it is very small
 --   and we would otherwise hit an edge case
 -- * We only worry about numbers that have an exponent. If they don't
 --   have an exponent then the Rational won't be much larger than the
