@@ -223,7 +223,7 @@ onException io what = io `catch` \e -> do _ <- what
 -- handle.  Similarly, closing a socket (from \"network\" package) is also
 -- uninterruptible under similar conditions.  An example of an interruptible
 -- action is 'killThread'.  Completion of interruptible release actions can be
--- ensured by wrapping them in in 'uninterruptibleMask_', but this risks making
+-- ensured by wrapping them in 'uninterruptibleMask_', but this risks making
 -- the program non-responsive to @Control-C@, or timeouts.  Another option is to
 -- run the release action asynchronously in its own thread:
 --

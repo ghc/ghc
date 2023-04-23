@@ -124,7 +124,7 @@ module Data.List
    , partition
 
    -- * Indexing lists
-   -- | These functions treat a list @xs@ as a indexed collection,
+   -- | These functions treat a list @xs@ as an indexed collection,
    -- with indices ranging from 0 to @'length' xs - 1@.
 
    , (!?)

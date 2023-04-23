@@ -101,11 +101,11 @@ import GHC.Num  ( (-) )
 --
 -- ==== __Examples__
 --
--- Common uses of 'guard' include conditionally signaling an error in
+-- Common uses of 'guard' include conditionally signalling an error in
 -- an error monad and conditionally rejecting the current choice in an
 -- 'Alternative'-based parser.
 --
--- As an example of signaling an error in the error monad 'Maybe',
+-- As an example of signalling an error in the error monad 'Maybe',
 -- consider a safe division function @safeDiv x y@ that returns
 -- 'Nothing' when the denominator @y@ is zero and @'Just' (x \`div\`
 -- y)@ otherwise. For example:
