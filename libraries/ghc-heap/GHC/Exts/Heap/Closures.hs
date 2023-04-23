@@ -390,38 +390,38 @@ data  StgStackClosure = StgStackClosure
 -- matches and complicates the whole implementation (and breaks existing code.)
 data StackFrame =
    UpdateFrame
-      { info_tbl            :: !StgInfoTable
-      , updatee :: !Closure
+      { info_tbl           :: !StgInfoTable
+      , updatee            :: !Closure
       }
 
   | CatchFrame
       { info_tbl            :: !StgInfoTable
-      , exceptions_blocked :: Word
-      , handler :: !Closure
+      , exceptions_blocked  :: Word
+      , handler             :: !Closure
       }
 
   | CatchStmFrame
       { info_tbl            :: !StgInfoTable
-      , catchFrameCode :: !Closure
-      , handler :: !Closure
+      , catchFrameCode      :: !Closure
+      , handler             :: !Closure
       }
 
   | CatchRetryFrame
       { info_tbl            :: !StgInfoTable
-      , running_alt_code :: !Word
-      , first_code :: !Closure
-      , alt_code :: !Closure
+      , running_alt_code    :: !Word
+      , first_code          :: !Closure
+      , alt_code            :: !Closure
       }
 
   | AtomicallyFrame
       { info_tbl            :: !StgInfoTable
       , atomicallyFrameCode :: !Closure
-      , result :: !Closure
+      , result              :: !Closure
       }
 
   | UnderflowFrame
       { info_tbl            :: !StgInfoTable
-      , nextChunk       :: !StgStackClosure
+      , nextChunk           :: !StgStackClosure
       }
 
   | StopFrame
@@ -429,26 +429,26 @@ data StackFrame =
 
   | RetSmall
       { info_tbl            :: !StgInfoTable
-      , stack_payload :: ![Closure]
+      , stack_payload       :: ![Closure]
       }
 
   | RetBig
       { info_tbl            :: !StgInfoTable
-      , stack_payload :: ![Closure]
+      , stack_payload       :: ![Closure]
       }
 
   | RetFun
       { info_tbl            :: !StgInfoTable
-      , retFunType :: RetFunType
-      , retFunSize :: Word
-      , retFunFun :: !Closure
-      , retFunPayload :: ![Closure]
+      , retFunType          :: RetFunType
+      , retFunSize          :: Word
+      , retFunFun           :: !Closure
+      , retFunPayload       :: ![Closure]
       }
 
   |  RetBCO
       { info_tbl            :: !StgInfoTable
-      , bco :: !Closure -- must be a BCOClosure
-      , bcoArgs :: ![Closure]
+      , bco                 :: !Closure -- must be a BCOClosure
+      , bcoArgs             :: ![Closure]
       }
   deriving (Show, Generic)
 
