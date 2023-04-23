@@ -153,9 +153,8 @@ foreign import prim "getRetFunLargeBitmapzh" getRetFunLargeBitmap# :: LargeBitma
 -- | Gets contents of a small bitmap (fitting in one @StgWord@)
 --
 -- The first two arguments identify the location of the frame on the stack.
--- Returned is the bitmap and it's size. The `RealWorld` token is used to run
--- this in an `IO` context.
-type SmallBitmapGetter = StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Word#, Word# #)
+-- Returned is the bitmap and it's size.
+type SmallBitmapGetter = StackSnapshot# -> Word# -> (# Word#, Word# #)
 
 foreign import prim "getSmallBitmapzh" getSmallBitmap# :: SmallBitmapGetter
 
@@ -286,10 +285,9 @@ decodeBitmaps stack# index ps =
 
 decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [Closure]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
-  do
-    (bitmap, size) <- IO $ \s ->
-      case getterFun# stackSnapshot# (wordOffsetToWord# index) s of
-        (# s1, b#, s# #) -> (# s1, (W# b#, W# s#) #)
+  let (bitmap, size) = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
+                          (# b#, s# #) -> (W# b#, W# s#)
+  in
     decodeBitmaps
       stackSnapshot#
       (index + relativePayloadOffset)
