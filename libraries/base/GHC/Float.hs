@@ -276,17 +276,18 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 ------------------------------------------------------------------------
 
 -- | @since 2.01
--- Note that due to the presence of @NaN@, not all elements of 'Float' have an
--- additive inverse.
 --
--- >>> 0/0 + (negate 0/0 :: Float)
--- NaN
+-- This instance implements IEEE 754 standard with all its usual pitfalls
+-- about NaN, infinities and negative zero.
+-- Neither addition not multiplication are associative or distributive:
 --
--- Also note that due to the presence of -0, `Float`'s 'Num' instance doesn't
--- have an additive identity
+-- >>> (0.1 + 0.1 :: Float) + 0.5 == 0.1 + (0.1 + 0.5)
+-- False
+-- >>> (0.1 + 0.2 :: Float) * 0.9 == 0.1 * 0.9 + 0.2 * 0.9
+-- False
+-- >>> (0.1 * 0.1 :: Float) * 0.9 == 0.1 * (0.1 * 0.9)
+-- False
 --
--- >>> 0 + (-0 :: Float)
--- 0.0
 instance Num Float where
     (+)         x y     =  plusFloat x y
     (-)         x y     =  minusFloat x y
@@ -317,6 +318,14 @@ naturalToFloat# (NB b) = case integerToBinaryFloat' (IP b) of
                            F# x -> x
 
 -- | @since 2.01
+--
+-- Beware that 'toRational' generates garbage for non-finite arguments:
+--
+-- >>> toRational (1/0 :: Float)
+-- 340282366920938463463374607431768211456 % 1
+-- >>> toRational (0/0 :: Float)
+-- 510423550381407695195061911147652317184 % 1
+--
 instance  Real Float  where
     toRational (F# x#)  =
         case decodeFloat_Int# x# of
@@ -330,14 +339,19 @@ instance  Real Float  where
                     IS m# :% integerShiftL# 1 (int2Word# (negateInt# e#))
 
 -- | @since 2.01
--- Note that due to the presence of @NaN@, not all elements of 'Float' have an
--- multiplicative inverse.
 --
--- >>> 0/0 * (recip 0/0 :: Float)
--- NaN
+-- This instance implements IEEE 754 standard with all its usual pitfalls
+-- about NaN, infinities and negative zero.
 --
--- Additionally, because of @NaN@ this instance does not obey the left-inverse
--- law for 'toRational'/'fromRational'.
+-- >>> 0 == (-0 :: Float)
+-- True
+-- >>> recip 0 == recip (-0 :: Float)
+-- False
+-- >>> map (/ 0) [-1, 0, 1 :: Float]
+-- [-Infinity,NaN,Infinity]
+-- >>> map (* 0) $ map (/ 0) [-1, 0, 1 :: Float]
+-- [NaN,NaN,NaN]
+--
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
     {-# INLINE fromRational #-}
@@ -360,6 +374,15 @@ rationalToFloat n d
         mantDigs    = FLT_MANT_DIG
 
 -- | @since 2.01
+--
+-- Beware that results for non-finite arguments are garbage:
+--
+-- >>> [ f x | f <- [round, floor, ceiling], x <- [-1/0, 0/0, 1/0 :: Float] ] :: [Int]
+-- [0,0,0,0,0,0,0,0,0]
+-- >>> map properFraction [-1/0, 0/0, 1/0] :: [(Int, Float)]
+-- [(0,0.0),(0,0.0),(0,0.0)]
+--
+-- and get even more non-sensical if you ask for 'Integer' instead of 'Int'.
 instance  RealFrac Float  where
 
    properFraction = properFractionFloat
@@ -507,17 +530,18 @@ instance  Show Float  where
 ------------------------------------------------------------------------
 
 -- | @since 2.01
--- Note that due to the presence of @NaN@, not all elements of 'Double' have an
--- additive inverse.
 --
--- >>> 0/0 + (negate 0/0 :: Double)
--- NaN
+-- This instance implements IEEE 754 standard with all its usual pitfalls
+-- about NaN, infinities and negative zero.
+-- Neither addition not multiplication are associative or distributive:
 --
--- Also note that due to the presence of -0, `Double`'s 'Num' instance doesn't
--- have an additive identity
+-- >>> (0.1 + 0.1) + 0.4 == 0.1 + (0.1 + 0.4)
+-- False
+-- >>> (0.1 + 0.2) * 0.3 == 0.1 * 0.3 + 0.2 * 0.3
+-- False
+-- >>> (0.1 * 0.1) * 0.3 == 0.1 * (0.1 * 0.3)
+-- False
 --
--- >>> 0 + (-0 :: Double)
--- 0.0
 instance  Num Double  where
     (+)         x y     =  plusDouble x y
     (-)         x y     =  minusDouble x y
@@ -550,6 +574,14 @@ naturalToDouble# (NB b) = case integerToBinaryFloat' (IP b) of
 
 
 -- | @since 2.01
+--
+-- Beware that 'toRational' generates garbage for non-finite arguments:
+--
+-- >>> toRational (1/0)
+-- 179769313 (and 300 more digits...) % 1
+-- >>> toRational (0/0)
+-- 269653970 (and 300 more digits...) % 1
+--
 instance  Real Double  where
     toRational (D# x#)  =
         case integerDecodeDouble# x# of
@@ -563,14 +595,19 @@ instance  Real Double  where
                 m :% integerShiftL# 1 (int2Word# (negateInt# e#))
 
 -- | @since 2.01
--- Note that due to the presence of @NaN@, not all elements of 'Double' have an
--- multiplicative inverse.
 --
--- >>> 0/0 * (recip 0/0 :: Double)
--- NaN
+-- This instance implements IEEE 754 standard with all its usual pitfalls
+-- about NaN, infinities and negative zero.
 --
--- Additionally, because of @NaN@ this instance does not obey the left-inverse
--- law for 'toRational'/'fromRational'.
+-- >>> 0 == (-0 :: Double)
+-- True
+-- >>> recip 0 == recip (-0 :: Double)
+-- False
+-- >>> map (/ 0) [-1, 0, 1]
+-- [-Infinity,NaN,Infinity]
+-- >>> map (* 0) $ map (/ 0) [-1, 0, 1]
+-- [NaN,NaN,NaN]
+--
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
     {-# INLINE fromRational #-}
@@ -626,6 +663,15 @@ instance  Floating Double  where
     {-# INLINE log1pexp #-}
 
 -- | @since 2.01
+--
+-- Beware that results for non-finite arguments are garbage:
+--
+-- >>> [ f x | f <- [round, floor, ceiling], x <- [-1/0, 0/0, 1/0] ] :: [Int]
+-- [0,0,0,0,0,0,0,0,0]
+-- >>> map properFraction [-1/0, 0/0, 1/0] :: [(Int, Double)]
+-- [(0,0.0),(0,0.0),(0,0.0)]
+--
+-- and get even more non-sensical if you ask for 'Integer' instead of 'Int'.
 instance  RealFrac Double  where
     properFraction = properFractionDouble
     truncate       = truncateDouble
@@ -796,6 +842,14 @@ for these (@numericEnumFromTo@ and @numericEnumFromThenTo@ below.)
 -}
 
 -- | @since 2.01
+--
+-- 'fromEnum' just truncates its argument, beware of all sorts of overflows.
+--
+-- List generators have extremely peculiar behavior, mandated by
+-- [Haskell Report 2010](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#x13-1310006.3.4):
+--
+-- >>> [0..1.5 :: Float]
+-- [0.0,1.0,2.0]
 instance  Enum Float  where
     succ x         = x + 1
     pred x         = x - 1
@@ -807,6 +861,14 @@ instance  Enum Float  where
     enumFromThenTo = numericEnumFromThenTo
 
 -- | @since 2.01
+--
+-- 'fromEnum' just truncates its argument, beware of all sorts of overflows.
+--
+-- List generators have extremely peculiar behavior, mandated by
+-- [Haskell Report 2010](https://www.haskell.org/onlinereport/haskell2010/haskellch6.html#x13-1310006.3.4):
+--
+-- >>> [0..1.5]
+-- [0.0,1.0,2.0]
 instance  Enum Double  where
     succ x         = x + 1
     pred x         = x - 1

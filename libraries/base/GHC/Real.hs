@@ -142,6 +142,10 @@ denominator (_ :% y)    =  y
 --
 -- [__Coherence with 'fromRational'__]: if the type also implements 'Fractional',
 -- then 'fromRational' is a left inverse for 'toRational', i.e. @fromRational (toRational i) = i@
+--
+-- The law does not hold for 'Float', 'Double', 'Foreign.C.Types.CFloat',
+-- 'Foreign.C.Types.CDouble', etc., because these types contain non-finite values,
+-- which cannot be roundtripped through 'Rational'.
 class  (Num a, Ord a) => Real a  where
     -- | the rational equivalent of its real argument with full precision
     toRational          ::  a -> Rational
