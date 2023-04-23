@@ -21,8 +21,8 @@ import GHC.Utils.Panic
 import GHC.Types.Unique
 
 pprNatCmmDecl :: IsDoc doc => NCGConfig -> NatCmmDecl RawCmmStatics Instr -> doc
-pprNatCmmDecl config (CmmData _ _) = error "TODO: pprNatCmmDecl "
-
+pprNatCmmDecl config (CmmData section dats) =
+  pprSectionAlign config section $$ pprDatas config dats
 pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config
    in pprProcAlignment config
@@ -115,6 +115,18 @@ pprBasicBlock config info_env (BasicBlock blockid instrs) =
     maybe_infotable c = case mapLookup blockid info_env of
       Nothing -> c
       Just (CmmStaticsRaw info_lbl info) -> error "pprBasicBlock"
+
+pprDatas :: IsDoc doc => NCGConfig -> RawCmmStatics -> doc
+-- TODO: Adhere to Note [emit-time elimination of static indirections]
+-- See AArch64/Ppr.hs
+pprDatas config (CmmStaticsRaw lbl dats)
+  = vcat (pprLabel platform lbl : map (pprData config) dats)
+   where
+      platform = ncgPlatform config
+
+pprData :: IsDoc doc => NCGConfig -> CmmStatic -> doc
+pprData _config (CmmString str) = line (pprString str)
+pprData _ _ = error $ "TODO: pprData"
 
 pprInstr :: IsDoc doc => Platform -> Instr -> doc
 pprInstr platform instr = case instr of

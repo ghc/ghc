@@ -4,7 +4,7 @@ module GHC.CmmToAsm.RISCV64.CodeGen where
 import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.RISCV64.Instr
-import Prelude
+import Prelude hiding ((<>))
 import GHC.Cmm
 import GHC.Cmm.Utils
 import Control.Monad
@@ -22,6 +22,7 @@ import GHC.CmmToAsm.RISCV64.Regs
 import GHC.Platform.Regs
 import GHC.Utils.Panic
 import GHC.Cmm.BlockId
+import GHC.Utils.Trace
 
 -- | Don't try to compile all GHC Cmm files in the beginning.
 -- Ignore them. There's a flag to decide we really want to emit something.
@@ -94,6 +95,8 @@ stmtToInstrs :: CmmNode e x -> NatM InstrBlock
 stmtToInstrs stmt = do
   platform <- getPlatform
   case stmt of
+    CmmUnsafeForeignCall target result_regs args
+       -> genCCall target result_regs args
     CmmComment s   -> return (unitOL (COMMENT (ftext s)))
     -- TODO: Maybe, it would be nice to see the tick comment in assembly?
     CmmTick {}     -> return nilOL
@@ -129,6 +132,21 @@ getRegisterReg platform (CmmGlobal reg@(GlobalRegUse mid _))
         Just reg -> RegReal reg
         Nothing  -> pprPanic "getRegisterReg-memory" (ppr $ CmmGlobal reg)
 
+-- -----------------------------------------------------------------------------
+-- General things for putting together code sequences
+
+-- | The dual to getAnyReg: compute an expression into a register, but
+--      we don't mind which one it is.
+getSomeReg :: CmmExpr -> NatM (Reg, Format, InstrBlock)
+getSomeReg expr = do
+  r <- getRegister expr
+  case r of
+    Any rep code -> do
+        tmp <- getNewRegNat rep
+        return (tmp, rep, code tmp)
+    Fixed rep reg code ->
+        return (reg, rep, code)
+
 getRegister :: CmmExpr -> NatM Register
 getRegister e = do
   config <- getConfig
@@ -140,13 +158,20 @@ getRegister' config plat expr
   = case expr of
     CmmReg (CmmGlobal (GlobalRegUse PicBaseReg _))
       -> pprPanic "getRegisterReg-memory" (ppr $ PicBaseReg)
+    CmmReg reg
+      -> return (Fixed (cmmTypeFormat (cmmRegType reg))
+                       (getRegisterReg plat reg)
+                       nilOL)
     CmmLit lit
       -> case lit of
-        CmmInt i W64 -> do
-          return (Any (intFormat W64) (\dst -> unitOL $ annExpr expr (LI dst i)))
+        CmmInt i W64 ->
+          return (Any II64 (\dst -> unitOL $ annExpr expr (LI dst i)))
         CmmInt i w -> error ("TODO: getRegister' CmmInt " ++ show i ++ show w ++ " " ++show expr)
+        CmmLabel lbl ->
+          return (Any II64 (\dst -> unitOL $ annExpr expr (LA dst lbl)))
         e -> error ("TODO: getRegister' other " ++ show e)
-    e -> error ("TODO: getRegister'" ++ show e)
+    CmmRegOff reg off -> error $ "TODO: getRegister' : " ++ show reg ++ " , " ++ show off
+    e -> error ("TODO: getRegister' " ++ show e ++ " -- " ++ showPprUnsafe (pdoc plat e))
 
 -- -----------------------------------------------------------------------------
 -- Jumps
@@ -201,3 +226,88 @@ annExpr e instr {- debugIsOn -} = ANN (text . show $ e) instr
 generateJumpTableForInstr :: Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr _ = Nothing
+genCCall
+    :: ForeignTarget      -- function to call
+    -> [CmmFormal]        -- where to put the result
+    -> [CmmActual]        -- arguments (of mixed type)
+    -> NatM InstrBlock
+-- TODO: Specialize where we can.
+-- Generic impl
+genCCall target dest_regs arg_regs = do
+  -- we want to pass arg_regs into allArgRegs
+  -- pprTraceM "genCCall target" (ppr target)
+  -- pprTraceM "genCCall formal" (ppr dest_regs)
+  -- pprTraceM "genCCall actual" (ppr arg_regs)
+
+  platform <- getPlatform
+  case target of
+    -- The target :: ForeignTarget call can either
+    -- be a foreign procedure with an address expr
+    -- and a calling convention.
+    ForeignTarget expr _cconv -> do
+      (call_target, call_target_code) <- case expr of
+        -- if this is a label, let's just directly to it.  This will produce the
+        -- correct CALL relocation for BL...
+        (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
+        -- ... if it's not a label--well--let's compute the expression into a
+        -- register and jump to that. See Note [PLT vs GOT relocations]
+        e ->  do
+          (reg, _format, reg_code) <- getSomeReg expr
+          pure (TReg reg, reg_code)
+      -- compute the code and register logic for all arg_regs.
+      -- this will give us the format information to match on.
+      arg_regs' <- mapM getSomeReg arg_regs
+
+      -- Now this is stupid.  Our Cmm expressions doesn't carry the proper sizes
+      -- so while in Cmm we might get W64 incorrectly for an int, that is W32 in
+      -- STG; this thenn breaks packing of stack arguments, if we need to pack
+      -- for the pcs, e.g. darwinpcs.  Option one would be to fix the Int type
+      -- in Cmm proper. Option two, which we choose here is to use extended Hint
+      -- information to contain the size information and use that when packing
+      -- arguments, spilled onto the stack.
+      let (_res_hints, arg_hints) = foreignTargetHints target
+          arg_regs'' = zipWith (\(r, f, c) h -> (r,f,h,c)) arg_regs' arg_hints
+
+      (stackSpace, passRegs, passArgumentsCode) <- passArguments allGpArgRegs allFpArgRegs arg_regs'' 0 [] nilOL
+
+      (returnRegs, readResultsCode) <- readResults allGpArgRegs allFpArgRegs dest_regs [] nilOL
+
+      let moveStackDown 0 = toOL [ PUSH_STACK_FRAME
+                                 , DELTA (-16) ]
+          moveStackDown i = error $ "TODO: moveStackDown " ++ show i
+--          moveStackDown i | odd i = moveStackDown (i + 1)
+--          moveStackDown i = toOL [ PUSH_STACK_FRAME
+--                                 , SUB (OpReg W64 (regSingle 31)) (OpReg W64 (regSingle 31)) (OpImm (ImmInt (8 * i)))
+--                                 , DELTA (-8 * i - 16) ]
+          moveStackUp 0 = toOL [ POP_STACK_FRAME
+                               , DELTA 0 ]
+          moveStackUp i = error $ "TODO: moveStackUp " ++ show i
+--          moveStackUp i | odd i = moveStackUp (i + 1)
+--          moveStackUp i = toOL [ ADD (OpReg W64 (regSingle 31)) (OpReg W64 (regSingle 31)) (OpImm (ImmInt (8 * i)))
+--                               , POP_STACK_FRAME
+--                               , DELTA 0 ]
+
+      let code =    call_target_code          -- compute the label (possibly into a register)
+            `appOL` moveStackDown (stackSpace `div` 8)
+            `appOL` passArgumentsCode         -- put the arguments into x0, ...
+            `appOL` (unitOL $ J call_target) -- jump
+            `appOL` readResultsCode           -- parse the results into registers
+            `appOL` moveStackUp (stackSpace `div` 8)
+      return code
+    e -> error $ "TODO genCCall" ++ showSDocUnsafe (pdoc platform e)
+  where
+    passArguments :: [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
+    passArguments _ _ [] stackSpace accumRegs accumCode = return (stackSpace, accumRegs, accumCode)
+    passArguments (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
+      let w = formatToWidth format
+          mov = MV gpReg r
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass gp argument: " <> ppr r) mov
+      passArguments gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
+    passArguments _ _ _ _ _ _ = error $ "TODO: passArguments"
+
+
+    readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
+    readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)
+    readResults _ _ _ _ _ = error $ "TODO: readResults"

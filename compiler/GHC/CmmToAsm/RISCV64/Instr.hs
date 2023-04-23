@@ -1,19 +1,20 @@
 {-# LANGUAGE EmptyCase #-}
+
 module GHC.CmmToAsm.RISCV64.Instr where
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Config
-import GHC.CmmToAsm.Instr hiding (patchRegsOfInstr, takeDeltaInstr, regUsageOfInstr, isMetaInstr, jumpDestsOfInstr)
+import GHC.CmmToAsm.Instr hiding (isMetaInstr, jumpDestsOfInstr, patchRegsOfInstr, regUsageOfInstr, takeDeltaInstr)
 import GHC.CmmToAsm.Types
 import GHC.Platform
 import GHC.Platform.Reg
+import GHC.Platform.Regs (freeReg)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import Prelude
-import GHC.Platform.Regs (freeReg)
-import GHC.Cmm.CLabel
 
 data Instr
   = -- comment pseudo-op
@@ -21,10 +22,11 @@ data Instr
   | MULTILINE_COMMENT SDoc
   | -- Annotated instruction. Should print <instr> # <doc>
     ANN SDoc Instr
-    -- specify current stack offset for
+  | -- specify current stack offset for
     -- benefit of subsequent passes
-  | DELTA   Int
-
+    DELTA Int
+  | PUSH_STACK_FRAME
+  | POP_STACK_FRAME
   | -- some static data spat out during code
     -- generation.  Will be extracted before
     -- pretty-printing.
@@ -36,12 +38,17 @@ data Instr
     NEWBLOCK BlockId
   | -- load immediate pseudo-instruction
     LI Reg Integer
+  | -- load address (label)
+    LA Reg CLabel
   | -- jump pseudo-instruction
     J Target
+  | -- copy register
+    MV Reg Reg
 
 data Target
-    = TBlock BlockId
-    | TLabel CLabel
+  = TBlock BlockId
+  | TReg Reg
+  | TLabel CLabel
 
 allocMoreStack ::
   Int ->
@@ -60,10 +67,12 @@ spillSlotSize = 8
 
 -- | The number of spill slots available without allocating more.
 maxSpillSlots :: NCGConfig -> Int
-maxSpillSlots config
---  = 0 -- set to zero, to see when allocMoreStack has to fire.
-    = ((ncgSpillPreallocSize config - stackFrameHeaderSize)
-         `div` spillSlotSize) - 1
+maxSpillSlots config =
+  --  = 0 -- set to zero, to see when allocMoreStack has to fire.
+  ( (ncgSpillPreallocSize config - stackFrameHeaderSize)
+      `div` spillSlotSize
+  )
+    - 1
 
 makeFarBranches ::
   LabelMap RawCmmStatics ->
@@ -81,27 +90,33 @@ regUsageOfInstr ::
   Instr ->
   RegUsage
 regUsageOfInstr platform instr = case instr of
-    ANN _ i                  -> regUsageOfInstr platform i
-    COMMENT{}                -> usage ([], [])
-    MULTILINE_COMMENT{}      -> usage ([], [])
-    LDATA{}                  -> usage ([], [])
-    DELTA{}                  -> usage ([], [])
-    NEWBLOCK{}               -> usage ([], [])
-    LI reg _                 -> usage ([], [reg])
-    -- Looks like J doesn't change registers (beside PC)
-    -- This might be wrong.
-    J{}                      -> usage ([], [])
+  ANN _ i -> regUsageOfInstr platform i
+  COMMENT {} -> none
+  MULTILINE_COMMENT {} -> none
+  LDATA {} -> none
+  DELTA {} -> none
+  NEWBLOCK {} -> none
+  PUSH_STACK_FRAME -> none
+  POP_STACK_FRAME -> none
+  LI dst _ -> usage ([], [dst])
+  LA dst _ -> usage ([], [dst])
+  MV dst src -> usage ([src], [dst])
+  -- Looks like J doesn't change registers (beside PC)
+  -- This might be wrong.
+  J {} -> none
   where
-        -- filtering the usage is necessary, otherwise the register
-        -- allocator will try to allocate pre-defined fixed stg
-        -- registers as well, as they show up.
-        usage (src, dst) = RU (filter (interesting platform) src)
-                              (filter (interesting platform) dst)
+    none = usage ([], [])
+    -- filtering the usage is necessary, otherwise the register
+    -- allocator will try to allocate pre-defined fixed stg
+    -- registers as well, as they show up.
+    usage (src, dst) =
+      RU
+        (filter (interesting platform) src)
+        (filter (interesting platform) dst)
 
-        interesting :: Platform -> Reg -> Bool
-        interesting _        (RegVirtual _)              = True
-        interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
-
+    interesting :: Platform -> Reg -> Bool
+    interesting _ (RegVirtual _) = True
+    interesting platform (RegReal (RealRegSingle i)) = freeReg platform i
 
 -- | Apply a given mapping to all the register references in this
 --      instruction.
@@ -110,22 +125,25 @@ patchRegsOfInstr ::
   (Reg -> Reg) ->
   Instr
 patchRegsOfInstr instr env = case instr of
-    ANN _ i                  -> patchRegsOfInstr i env
-    COMMENT{}                -> instr
-    MULTILINE_COMMENT{}      -> instr
-    LDATA{}                  -> instr
-    DELTA{}                  -> instr
-    NEWBLOCK{}               -> instr
-    LI reg i                 -> LI (env reg) i
-    -- Looks like J doesn't change registers (beside PC)
-    -- This might be wrong.
-    J{}                      -> instr
-
+  ANN _ i -> patchRegsOfInstr i env
+  COMMENT {} -> instr
+  MULTILINE_COMMENT {} -> instr
+  LDATA {} -> instr
+  DELTA {} -> instr
+  NEWBLOCK {} -> instr
+  PUSH_STACK_FRAME {} -> instr
+  POP_STACK_FRAME {} -> instr
+  LI reg i -> LI (env reg) i
+  LA reg i -> LA (env reg) i
+  -- Looks like J doesn't change registers (beside PC)
+  -- This might be wrong.
+  J {} -> instr
+  MV dst src -> MV (env dst) (env src)
 
 -- | Checks whether this instruction is a jump/branch instruction.
 --      One that can change the flow of control in a way that the
 --      register allocator needs to worry about.
-isJumpishInstr ::  Instr -> Bool
+isJumpishInstr :: Instr -> Bool
 isJumpishInstr COMMENT {} = False
 isJumpishInstr MULTILINE_COMMENT {} = False
 isJumpishInstr ANN {} = False
@@ -134,7 +152,6 @@ isJumpishInstr LDATA {} = False
 isJumpishInstr NEWBLOCK {} = False
 isJumpishInstr LI {} = False
 isJumpishInstr J {} = True
-
 
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
@@ -183,8 +200,7 @@ mkLoadInstr _ _ _ _ = error "TODO: mkLoadInstr"
 takeDeltaInstr :: Instr -> Maybe Int
 takeDeltaInstr (ANN _ i) = takeDeltaInstr i
 takeDeltaInstr (DELTA i) = Just i
-takeDeltaInstr _         = Nothing
-
+takeDeltaInstr _ = Nothing
 
 -- | Check whether this instruction is some meta thing inserted into
 --      the instruction stream for other purposes.
@@ -194,16 +210,20 @@ takeDeltaInstr _         = Nothing
 --
 --      eg, comments, delta, ldata, etc.
 isMetaInstr :: Instr -> Bool
-isMetaInstr instr
- = case instr of
-    ANN _ i     -> isMetaInstr i
-    COMMENT{}   -> True
-    MULTILINE_COMMENT{} -> True
-    LDATA{}     -> True
-    NEWBLOCK{}  -> True
-    LI{}        -> False
-    J{}        -> False
-
+isMetaInstr instr =
+  case instr of
+    ANN _ i -> isMetaInstr i
+    COMMENT {} -> True
+    MULTILINE_COMMENT {} -> True
+    LDATA {} -> True
+    NEWBLOCK {} -> True
+    DELTA {} -> True
+    PUSH_STACK_FRAME -> True
+    POP_STACK_FRAME -> True
+    LI {} -> False
+    LA {} -> False
+    J {} -> False
+    MV {} -> False
 
 -- | Copy the value in a register to another one.
 --      Must work for all register classes.
@@ -225,8 +245,12 @@ takeRegRegMoveInstr ANN {} = Nothing
 takeRegRegMoveInstr DELTA {} = Nothing
 takeRegRegMoveInstr LDATA {} = Nothing
 takeRegRegMoveInstr NEWBLOCK {} = Nothing
+takeRegRegMoveInstr PUSH_STACK_FRAME {} = Nothing
+takeRegRegMoveInstr POP_STACK_FRAME {} = Nothing
 takeRegRegMoveInstr LI {} = Nothing
+takeRegRegMoveInstr LA {} = Nothing
 takeRegRegMoveInstr J {} = Nothing
+takeRegRegMoveInstr (MV dst src) = Just (src, dst)
 
 -- | Make an unconditional jump instruction.
 --      For architectures with branch delay slots, its ok to put

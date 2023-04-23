@@ -10,6 +10,12 @@ import GHC.Platform.Regs
 allMachRegNos   :: [RegNo]
 allMachRegNos   = [1..31] ++ [32..63]
 
+-- argRegs is the set of regs which are read for an n-argument call to C.
+allGpArgRegs :: [Reg]
+allGpArgRegs = map regSingle [10..17] -- a0..a7
+allFpArgRegs :: [Reg]
+allFpArgRegs = map regSingle [42..49] -- fa0..fa7
+
 -- allocatableRegs is allMachRegNos with the fixed-use regs removed.
 -- i.e., these are the regs for which we are prepared to allow the
 -- register allocator to attempt to map VRegs to.

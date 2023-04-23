@@ -64,6 +64,6 @@ initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs pla
 releaseReg :: HasCallStack => RealReg -> FreeRegs -> FreeRegs
 releaseReg (RealRegSingle r) (FreeRegs g f)
   | r > 31 && testBit f (r - 32) = pprPanic "Linear.RISCV64.releaseReg" (text  "can't release non-allocated reg v" <> int (r - 32))
-  | r < 32 && testBit g r = pprPanic "Linear.RISCV64.releaseReg" (text "can't release non-allocated reg x" <> int r)
+  | r < 32 && testBit g r = pprPanic "Linear.RISCV64.releaseReg" (text "can't release non-allocated reg x" <> int r <+> text (showBits g))
   | r > 31 = FreeRegs g (setBit f (r - 32))
   | otherwise = FreeRegs (setBit g r) f
