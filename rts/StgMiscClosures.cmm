@@ -558,15 +558,11 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     TICK_ENT_DYN_IND(); /* tick */
 
 retry:
-    // Synchronizes with the SET_INFO_RELEASE in
-    // updateWithIndirection
-    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
-
     // Synchronizes with the release-store in
     // updateWithIndirection.
     // See Note [Heap memory barriers] in SMP.h.
     ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
-    p = %relaxed StgInd_indirectee(node);
+    p = %acquire StgInd_indirectee(node);
     if (GETTAG(p) != 0) {
         return (p);
     }
