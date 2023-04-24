@@ -272,15 +272,16 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
     traceEventThreadWakeup (cap, tso, tso->cap->no);
 
 #if defined(THREADED_RTS)
-    if (tso->cap != cap)
+    Capability *tso_owner = RELAXED_LOAD(&tso->cap);
+    if (tso_owner != cap)
     {
         MessageWakeup *msg;
         msg = (MessageWakeup *)allocate(cap,sizeofW(MessageWakeup));
         msg->tso = tso;
         SET_HDR(msg, &stg_MSG_TRY_WAKEUP_info, CCS_SYSTEM);
-        sendMessage(cap, tso->cap, (Message*)msg);
+        sendMessage(cap, tso_owner, (Message*)msg);
         debugTraceCap(DEBUG_sched, cap, "message: try wakeup thread %"
-                      FMT_StgThreadID " on cap %d", tso->id, tso->cap->no);
+                      FMT_StgThreadID " on cap %d", tso->id, tso_owner->no);
         return;
     }
 #endif
