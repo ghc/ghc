@@ -139,8 +139,12 @@ pprInstr platform instr = case instr of
   -- see Note [dualLine and dualDoc] in GHC.Utils.Outputable
   NEWBLOCK _ -> error "pprInstr: NEWBLOCK"
   LDATA _ _ -> error "pprInstr: LDATA"
+  PUSH_STACK_FRAME -> error "pprInstr: PUSH_STACK_FRAME"
+  POP_STACK_FRAME -> error "pprInstr: POP_STACK_FRAME"
   J label -> line $ pprJ label
   LI reg immediate -> line $ pprLI reg immediate
+  LA reg label -> error $ "pprInstr: LA " ++ show reg ++ " " ++ show label
+  MV dst src -> error $ "pprInstr: MV " ++ show dst ++ " " ++ show src
   where
     pprLI :: IsLine doc => Reg -> Integer -> doc
     pprLI reg immediate = text "\tli" <+> pprReg reg <> char ',' <+> (text.show) immediate

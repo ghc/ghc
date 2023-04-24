@@ -52,7 +52,7 @@ getFreeRegs cls (FreeRegs g f)
   -- TODO: how to handle small floats?
   | RcFloat   <- cls = [] -- For now we only support double and integer registers, floats will need to be promoted.
   | RcDouble  <- cls = go 32 f 31
-  | RcInteger <- cls = go 1 g 30
+  | RcInteger <- cls = go 0 g 30
     where
         go _   _ i | i < 0 = []
         go off x i | testBit x i = RealRegSingle (off + i) : (go off x $! i - 1)

@@ -8,7 +8,7 @@ import GHC.Platform
 import GHC.Platform.Regs
 
 allMachRegNos   :: [RegNo]
-allMachRegNos   = [1..31] ++ [32..63]
+allMachRegNos   = [0..31] ++ [32..63]
 
 -- argRegs is the set of regs which are read for an n-argument call to C.
 allGpArgRegs :: [Reg]
