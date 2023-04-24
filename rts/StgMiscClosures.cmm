@@ -509,8 +509,9 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
     (P_ node)
 {
     TICK_ENT_DYN_IND(); /* tick */
-    ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
-    node = UNTAG(StgInd_indirectee(node));
+    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
+    node = %acquire StgInd_indirectee(node);
+    node = UNTAG(node);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(node) (node);
 }
@@ -519,7 +520,9 @@ INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
     TICK_ENT_DYN_IND(); /* tick */
     ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
-    R1 = UNTAG(StgInd_indirectee(R1));
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -530,7 +533,9 @@ INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {
     TICK_ENT_STATIC_IND(); /* tick */
     ACQUIRE_FENCE_ON(R1 + OFFSET_StgHeader_info);
-    R1 = UNTAG(StgInd_indirectee(R1));
+    P_ p;
+    p = %acquire StgInd_indirectee(R1);
+    R1 = UNTAG(p);
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1) [R1];
 }
@@ -555,7 +560,7 @@ INFO_TABLE(stg_BLACKHOLE,1,0,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
 retry:
     // Synchronizes with the SET_INFO_RELEASE in
     // updateWithIndirection
-    ACQUIRE_FENCE_ON(StgHeader_info(node));
+    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
 
     // Synchronizes with the release-store in
     // updateWithIndirection.
@@ -665,7 +670,7 @@ loop:
         // defined in CMM.
         goto loop;
     }
-    ACQUIRE_FENCE_ON(StgHeader_info(node));
+    ACQUIRE_FENCE_ON(node + OFFSET_StgHeader_info);
     jump %ENTRY_CODE(info) (node);
 #else
     ccall barf("WHITEHOLE object (%p) entered!", R1) never returns;
