@@ -2141,7 +2141,7 @@ doWriteOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doWriteOffAddrOp castOp idx_ty [] [addr,idx, val]
-   = mkBasicIndexedWrite 0 addr idx_ty idx (maybeCast castOp val)
+   = mkBasicIndexedWrite False 0 addr idx_ty idx (maybeCast castOp val)
 doWriteOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteOffAddrOp"
 
@@ -2155,7 +2155,7 @@ doWriteByteArrayOp castOp idx_ty [] [addr,idx, rawVal]
         platform <- getPlatform
         let val = maybeCast castOp rawVal
         doByteArrayBoundsCheck idx addr idx_ty (cmmExprType platform val)
-        mkBasicIndexedWrite (arrWordsHdrSize profile) addr idx_ty idx val
+        mkBasicIndexedWrite False (arrWordsHdrSize profile) addr idx_ty idx val
 doWriteByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
@@ -2177,8 +2177,7 @@ doWritePtrArrayOp addr idx val
        -- This write barrier is to ensure that the heap writes to the object
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
-       emitPrimCall [] MO_WriteBarrier []
-       mkBasicIndexedWrite hdr_size addr ty idx val
+       mkBasicIndexedWrite True hdr_size addr ty idx val
 
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
        -- the write barrier.  We must write a byte into the mark table:
@@ -2207,16 +2206,22 @@ mkBasicIndexedRead alignment off (Just cast) ty res base idx_ty idx
         emitAssign (CmmLocal res) (CmmMachOp cast [
                                    cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx])
 
-mkBasicIndexedWrite :: ByteOff      -- Initial offset in bytes
+mkBasicIndexedWrite :: Bool         -- Should this imply a release barrier
+                    -> ByteOff      -- Initial offset in bytes
                     -> CmmExpr      -- Base address
                     -> CmmType      -- Type of element by which we are indexing
                     -> CmmExpr      -- Index
                     -> CmmExpr      -- Value to write
                     -> FCode ()
-mkBasicIndexedWrite off base idx_ty idx val
+mkBasicIndexedWrite barrier off base idx_ty idx val
    = do platform <- getPlatform
         let alignment = alignmentFromTypes (cmmExprType platform val) idx_ty
-        emitStore' alignment (cmmIndexOffExpr platform off (typeWidth idx_ty) base idx) val
+            addr = cmmIndexOffExpr platform off (typeWidth idx_ty) base idx
+        if barrier
+          then let w = typeWidth idx_ty
+                   op = MO_AtomicWrite w MemOrderRelease
+               in emitPrimCall [] op [addr, val]
+          else emitStore' alignment addr val
 
 -- ----------------------------------------------------------------------------
 -- Misc utils
@@ -3048,8 +3053,8 @@ doWriteSmallPtrArrayOp addr idx val = do
     mkBasicIndexedRead NaturallyAligned (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
-    emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize profile) addr ty idx val
+    -- Barrier necessary due to #12469
+    mkBasicIndexedWrite True (smallArrPtrsHdrSize profile) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
