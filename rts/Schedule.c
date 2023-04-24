@@ -836,7 +836,7 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 if (t->bound) {
                     t->bound->task->cap = free_caps[i];
                 }
-                t->cap = free_caps[i];
+                RELAXED_STORE(&t->cap, free_caps[i]);
                 n--; // we have one fewer threads now
                 i++; // move on to the next free_cap
                 if (i == n_free_caps) i = 0;
