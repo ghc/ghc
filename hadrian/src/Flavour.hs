@@ -216,13 +216,16 @@ noSplitSections f = f { ghcSplitSections = False }
 -- configure with @--disable-large-address-space@ when using this.
 enableThreadSanitizer :: Bool -> Flavour -> Flavour
 enableThreadSanitizer instrumentCmm = addArgs $ notStage0 ? mconcat
-    [ builder (Ghc CompileHs) ? (arg "-optc-fsanitize=thread" <> arg "-fcmm-thread-sanitizer")
-    , instrumentCmm ? builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
+    [ instrumentCmm ? builder (Ghc CompileCWithGhc) ? arg "-optc-fsanitize=thread"
 
     , builder (Ghc LinkHs) ? (arg "-optc-fsanitize=thread" <> arg "-optl-fsanitize=thread")
     , builder Cc ? arg "-fsanitize=thread"
     , builder (Cabal Flags) ? arg "thread-sanitizer"
     , builder Testsuite ? arg "--config=have_thread_sanitizer=True"
+    , builder (Ghc CompileHs) ? mconcat
+        [ package pkg ? (arg "-optc-fsanitize=thread" <> arg "-fcmm-thread-sanitizer")
+        | pkg <- [base, ghcPrim, array, rts]
+        ]
     ]
 
 -- | Use the LLVM backend in stages 1 and later.
