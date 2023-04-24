@@ -3053,7 +3053,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     mkBasicIndexedRead NaturallyAligned (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
-    -- Barrier necessary due to #12469
+    -- Write barrier needed due to #12469
     mkBasicIndexedWrite True (smallArrPtrsHdrSize profile) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
