@@ -277,7 +277,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *  U1. use a release-store to place the new indirectee into the thunk's
  *      indirectee field
  *
- *  U2. use a relaxed-store to set the info table to stg_BLACKHOLE (which
+ *  U2. use a release-store to set the info table to stg_BLACKHOLE (which
  *      represents an indirection)
  *
  * Blackholing a thunk (either eagerly, by GHC.StgToCmm.Bind.emitBlackHoleCode,
@@ -299,7 +299,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  *  E4. enter the indirectee (or block if the indirectee is a TSO)
  *
- * The acquire-fence in step (E2) is somewhat surprising but is necessary as
+ * The release/acquire pair (U2)/(E2) is somewhat surprising but is necessary as
  * the C11 memory model does not guarantee that the store (U1) is visible to
  * (E3) despite (U1) preceding (U2) in program-order (due to the relaxed
  * ordering of (E3)). This is demonstrated by the following CppMem model:
