@@ -1,5 +1,5 @@
 
-WarningCategory1.hs:4:1: error: [-Wx-module-warning-42 (in -Wextended-warnings), -Werror=x-module-warning-42]
+WarningCategory1.hs:4:1: error: [GHC-15328] [-Wx-module-warning-42 (in -Wextended-warnings), -Werror=x-module-warning-42]
     Module ‘WarningCategoryModule’: "Module-level warning"
 
 WarningCategory1.hs:7:8: error: [GHC-63394] [-Wx-dangerous (in -Wextended-warnings), -Werror=x-dangerous]

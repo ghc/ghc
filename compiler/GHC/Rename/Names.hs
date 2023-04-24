@@ -72,7 +72,6 @@ import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Types.SourceText
 import GHC.Types.Id
 import GHC.Types.HpcInfo
-import GHC.Types.Error
 import GHC.Types.PkgQual
 import GHC.Types.GREInfo (ConInfo(..))
 
@@ -90,7 +89,7 @@ import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( removeDups )
 
 import Control.Monad
-import Data.Foldable    ( for_, toList )
+import Data.Foldable    ( for_ )
 import Data.IntMap      ( IntMap )
 import qualified Data.IntMap as IntMap
 import Data.Map         ( Map )
@@ -323,7 +322,7 @@ rnImportDecl this_mod
       NoRawPkgQual -> pure ()
       RawPkgQual _ -> do
         pkg_imports <- xoptM LangExt.PackageImports
-        when (not pkg_imports) $ addErr packageImportErr
+        when (not pkg_imports) $ addErr TcRnPackageImportsDisabled
 
     let qual_only = isImportDeclQualified qual_style
 
@@ -356,8 +355,7 @@ rnImportDecl this_mod
              NoPkgQual         -> True
              ThisPkg uid       -> uid == homeUnitId_ (hsc_dflags hsc_env)
              OtherPkg _        -> False))
-         (addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-           (text "A module cannot import itself:" <+> ppr imp_mod_name))
+         (addErr (TcRnSelfImport imp_mod_name))
 
     -- Check for a missing import list (Opt_WarnMissingImportList also
     -- checks for T(..) items but that is done in checkDodgyImport below)
@@ -365,12 +363,7 @@ rnImportDecl this_mod
         Just (Exactly, _) -> return () -- Explicit import list
         _  | implicit   -> return () -- Do not bleat for implicit imports
            | qual_only  -> return ()
-           | otherwise  -> whenWOptM Opt_WarnMissingImportList $ do
-                             let msg = mkTcRnUnknownMessage $
-                                   mkPlainDiagnostic (WarningWithFlag Opt_WarnMissingImportList)
-                                                     noHints
-                                                     (missingImportListWarn imp_mod_name)
-                             addDiagnostic msg
+           | otherwise  -> addDiagnostic (TcRnNoExplicitImportList imp_mod_name)
 
 
     iface <- loadSrcInterface doc imp_mod_name want_boot pkg_qual
@@ -389,11 +382,9 @@ rnImportDecl this_mod
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
     warnIf ((want_boot == IsBoot) && (mi_boot iface == NotBoot) && isOneShot (ghcMode dflags))
-           (warnRedundantSourceImport imp_mod_name)
+           (TcRnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
-        addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          (text "safe import can't be used as Safe Haskell isn't on!"
-                $+$ text ("please enable Safe Haskell through either Safe, Trustworthy or Unsafe"))
+        addErr (TcRnSafeImportsDisabled imp_mod_name)
 
     let
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
@@ -432,12 +423,7 @@ rnImportDecl this_mod
 
     -- Complain if we import a deprecated module
     case mi_warns iface of
-       WarnAll txt -> do
-         let msg = mkTcRnUnknownMessage $
-               mkPlainDiagnostic (WarningWithCategory (warningTxtCategory txt))
-                                 noHints
-                                 (moduleWarn imp_mod_name txt)
-         addDiagnostic msg
+       WarnAll txt -> addDiagnostic (TcRnDeprecatedModule imp_mod_name txt)
        _           -> return ()
 
     -- Complain about -Wcompat-unqualified-imports violations.
@@ -614,11 +600,7 @@ calculateAvails home_unit other_home_units iface mod_safe' want_boot imported_by
 warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
 warnUnqualifiedImport decl iface =
     when bad_import $ do
-      let msg = mkTcRnUnknownMessage $
-            mkPlainDiagnostic (WarningWithFlag Opt_WarnCompatUnqualifiedImports)
-                              noHints
-                              warning
-      addDiagnosticAt loc msg
+      addDiagnosticAt loc (TcRnCompatUnqualifiedImport decl)
   where
     mod = mi_module iface
     loc = getLocA $ ideclName decl
@@ -635,20 +617,9 @@ warnUnqualifiedImport decl iface =
       && not has_import_list
       && mod `elemModuleSet` qualifiedMods
 
-    warning = vcat
-      [ text "To ensure compatibility with future core libraries changes"
-      , text "imports to" <+> ppr (ideclName decl) <+> text "should be"
-      , text "either qualified or have an explicit import list."
-      ]
-
     -- Modules for which we warn if we see unqualified imports
     qualifiedMods = mkModuleSet [ dATA_LIST ]
 
-
-warnRedundantSourceImport :: ModuleName -> TcRnMessage
-warnRedundantSourceImport mod_name
-  = mkTcRnUnknownMessage $ mkPlainDiagnostic WarningWithoutFlag noHints $
-      text "Unnecessary {-# SOURCE #-} in the import of module" <+> quotes (ppr mod_name)
 
 {-
 ************************************************************************
@@ -1252,32 +1223,35 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
         = setSrcSpanA loc $
           do (stuff, warns) <- liftM (fromMaybe ([],[])) $
                                run_lookup (lookup_ie ieRdr)
-             mapM_ emit_warning warns
+             mapM_ (addTcRnDiagnostic <=< warning_msg) warns
              return [ (L loc ie, gres) | (ie,gres) <- stuff ]
         where
+
             -- Warn when importing T(..) and no children are brought in scope
-            emit_warning (DodgyImport n) = whenWOptM Opt_WarnDodgyImports $
-              addTcRnDiagnostic (TcRnDodgyImports n)
-            emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
-              addTcRnDiagnostic (TcRnMissingImportList ieRdr)
-            emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $ do
+            warning_msg (DodgyImport n) =
+              pure (TcRnDodgyImports (DodgyImportsEmptyParent n))
+            warning_msg MissingImportList =
+              pure (TcRnMissingImportList ieRdr)
+            warning_msg (BadImportW ie) = do
               -- 'BadImportW' is only constructed below in 'handle_bad_import', in
               -- the 'EverythingBut' case, so that's what we pass to
               -- 'badImportItemErr'.
-              badImportItemErr iface decl_spec ie BadImportIsParent all_avails EverythingBut
+              reason <- badImportItemErr iface decl_spec ie BadImportIsParent all_avails
+              pure (TcRnDodgyImports (DodgyImportsHiding reason))
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
               Failed err -> do
-                lookup_err_msg err
+                msg <- lookup_err_msg err
+                addErr (TcRnImportLookup msg)
                 return Nothing
               Succeeded a -> return (Just a)
 
             lookup_err_msg err = case err of
-              BadImport ie sub -> badImportItemErr iface decl_spec ie sub all_avails Exactly
-              IllegalImport -> illegalImportItemErr
-              QualImportError rdr -> qualImportItemErr rdr
-              AmbiguousImport rdr xs -> ambiguousImportItemErr rdr xs
+              BadImport ie sub -> badImportItemErr iface decl_spec ie sub all_avails
+              IllegalImport -> pure ImportLookupIllegal
+              QualImportError rdr -> pure (ImportLookupQualified rdr)
+              AmbiguousImport rdr xs -> pure (ImportLookupAmbiguous rdr xs)
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time compute all the GlobalRdrElt corresponding
@@ -1756,8 +1730,7 @@ warnUnusedImportDecls gbl_env hsc_src
                        (vcat [ text "Uses:" <+> ppr uses
                              , text "Import usage" <+> ppr usage])
 
-       ; whenWOptM Opt_WarnUnusedImports $
-         mapM_ (warnUnusedImport Opt_WarnUnusedImports rdr_env) usage
+       ; mapM_ (warnUnusedImport rdr_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
          printMinimalImports hsc_src usage }
@@ -1862,9 +1835,8 @@ mkImportMap gres
               is:iss -> bestImport (is NE.:| iss)
           add _ gres = gre : gres
 
-warnUnusedImport :: WarningFlag -> GlobalRdrEnv
-                 -> ImportDeclUsage -> RnM ()
-warnUnusedImport flag rdr_env (L loc decl, used, unused)
+warnUnusedImport :: GlobalRdrEnv -> ImportDeclUsage -> RnM ()
+warnUnusedImport rdr_env (L loc decl, used, unused)
 
   -- Do not warn for 'import M()'
   | Just (Exactly, L _ []) <- ideclImportList decl
@@ -1878,9 +1850,7 @@ warnUnusedImport flag rdr_env (L loc decl, used, unused)
 
   -- Nothing used; drop entire declaration
   | null used
-  = let dia = mkTcRnUnknownMessage $
-          mkPlainDiagnostic (WarningWithFlag flag) noHints msg1
-    in addDiagnosticAt (locA loc) dia
+  = addDiagnosticAt (locA loc) (TcRnUnusedImport decl UnusedImportNone)
 
   -- Everything imported is used; nop
   | null unused
@@ -1891,45 +1861,27 @@ warnUnusedImport flag rdr_env (L loc decl, used, unused)
   | Just (_, L _ imports) <- ideclImportList decl
   , length unused == 1
   , Just (L loc _) <- find (\(L _ ie) -> ((ieName ie) :: Name) `elem` unused) imports
-  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
-    in addDiagnosticAt (locA loc) dia
+  = addDiagnosticAt (locA loc) (TcRnUnusedImport decl (UnusedImportSome sort_unused))
 
   -- Some imports are unused
   | otherwise
-  = let dia = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints msg2
-    in addDiagnosticAt (locA loc) dia
+  = addDiagnosticAt (locA loc) (TcRnUnusedImport decl (UnusedImportSome sort_unused))
 
   where
-    msg1 = vcat [ pp_herald <+> quotes pp_mod <+> is_redundant
-                , nest 2 (text "except perhaps to import instances from"
-                                   <+> quotes pp_mod)
-                , text "To import instances alone, use:"
-                                   <+> text "import" <+> pp_mod <> parens Outputable.empty ]
-    msg2 = sep [ pp_herald <+> quotes sort_unused
-               , text "from module" <+> quotes pp_mod <+> is_redundant]
-    pp_herald  = text "The" <+> pp_qual <+> text "import of"
-    pp_qual
-      | isImportDeclQualified (ideclQualified decl)= text "qualified"
-      | otherwise                                  = Outputable.empty
-    pp_mod       = ppr (unLoc (ideclName decl))
-    is_redundant = text "is redundant"
-
     -- In warning message, pretty-print identifiers unqualified unconditionally
     -- to improve the consistent for ambiguous/unambiguous identifiers.
     -- See trac#14881.
-    ppr_possible_field n =
+    possible_field n =
       case lookupGRE_Name rdr_env n of
         Just (GRE { gre_par = par, gre_info = IAmRecField info }) ->
           let fld_occ :: OccName
               fld_occ = nameOccName $ flSelector $ recFieldLabel info
-          in case par of
-              ParentIs p -> pprNameUnqualified p <> parens (ppr fld_occ)
-              NoParent   -> ppr fld_occ
-        _  -> pprNameUnqualified n
+          in UnusedImportNameRecField par fld_occ
+        _  -> UnusedImportNameRegular n
 
     -- Print unused names in a deterministic (lexicographic) order
-    sort_unused :: SDoc
-    sort_unused = pprWithCommas ppr_possible_field $
+    sort_unused :: [UnusedImportName]
+    sort_unused = fmap possible_field $
                   sortBy (comparing nameOccName) unused
 
 {-
@@ -2137,30 +2089,13 @@ DRFPatSynExport for a test of this.
 ************************************************************************
 -}
 
-qualImportItemErr :: RdrName -> TcRn ()
-qualImportItemErr rdr
-  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Illegal qualified name in import item:")
-       2 (ppr rdr)
-
-ambiguousImportItemErr :: RdrName -> [GlobalRdrElt] -> TcRn ()
-ambiguousImportItemErr rdr gres
-  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints err
-  where
-    err = hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
-             2 (vcat (map (ppr . greOccName) gres))
-
 badImportItemErr
   :: ModIface -> ImpDeclSpec -> IE GhcPs -> BadImportIsSubordinate
   -> [AvailInfo]
-  -> ImportListInterpretation
-  -> TcRn ()
-badImportItemErr iface decl_spec ie sub avails ili
-  = do { patsyns_enabled <- xoptM LangExt.PatternSynonyms
-       ; let err = TcRnBadImport importErrorKind iface decl_spec ie patsyns_enabled ili
-       ; case ili of
-           EverythingBut -> addTcRnDiagnostic err
-           Exactly -> addErr err }
+  -> TcRn ImportLookupReason
+badImportItemErr iface decl_spec ie sub avails = do
+  patsyns_enabled <- xoptM LangExt.PatternSynonyms
+  pure (ImportLookupBad importErrorKind iface decl_spec ie patsyns_enabled)
   where
     importErrorKind
       | any checkIfTyCon avails = case sub of
@@ -2189,42 +2124,14 @@ badImportItemErr iface decl_spec ie sub avails ili
       IEThingWith _ _ _ ns -> map (ieWrappedName  . unLoc) ns
       _ -> panic "importedChildren failed pattern match: no children"
 
-illegalImportItemErr :: TcRn ()
-illegalImportItemErr = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $ text "Illegal import item"
-
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
 addDupDeclErr gres@(gre :| _)
-  = addErrAt (getSrcSpan (NE.last sorted_names)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    -- Report the error at the later location
-    vcat [text "Multiple declarations of" <+>
-             quotes (ppr (greOccName gre)),
-             -- NB. print the OccName, not the Name, because the
-             -- latter might not be in scope in the RdrEnv and so will
-             -- be printed qualified.
-          text "Declared at:" <+>
-                   vcat (toList $ ppr . nameSrcLoc <$> sorted_names)]
+  -- Report the error at the later location
+  = addErrAt (getSrcSpan (NE.last sorted_names)) $ (TcRnDuplicateDecls (greOccName gre) sorted_names)
   where
     sorted_names =
       NE.sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
         (fmap greName gres)
-
-missingImportListWarn :: ModuleName -> SDoc
-missingImportListWarn mod
-  = text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
-
-moduleWarn :: ModuleName -> WarningTxt GhcRn -> SDoc
-moduleWarn mod (WarningTxt _ _ txt)
-  = sep [ text "Module" <+> quotes (ppr mod) <> colon,
-          nest 2 (vcat (map (ppr . hsDocString . unLoc) txt)) ]
-moduleWarn mod (DeprecatedTxt _ txt)
-  = sep [ text "Module" <+> quotes (ppr mod)
-                                <+> text "is deprecated:",
-          nest 2 (vcat (map (ppr . hsDocString . unLoc) txt)) ]
-
-packageImportErr :: TcRnMessage
-packageImportErr
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-  text "Package-qualified imports are not enabled; use PackageImports"
 
 -- This data decl will parse OK
 --      data T = a Int
@@ -2241,9 +2148,4 @@ packageImportErr
 
 checkConName :: RdrName -> TcRn ()
 checkConName name
-  = checkErr (isRdrDataCon name || isRdrTc name) (badDataCon name)
-
-badDataCon :: RdrName -> TcRnMessage
-badDataCon name
-   = mkTcRnUnknownMessage $ mkPlainError noHints $
-   hsep [text "Illegal data constructor name", quotes (ppr name)]
+  = checkErr (isRdrDataCon name || isRdrTc name) (TcRnIllegalDataCon name)

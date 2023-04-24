@@ -429,6 +429,11 @@ data GhcHint
 
   | SuggestExplicitBidiPatSyn Name (LPat GhcRn) [LIdP GhcRn]
 
+    {-| Suggest enabling one of the SafeHaskell modes Safe, Unsafe or
+        Trustworthy.
+    -}
+  | SuggestSafeHaskell
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

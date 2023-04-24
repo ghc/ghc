@@ -110,6 +110,10 @@ module GHC.Tc.Errors.Types (
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
   , BadImportKind(..)
+  , DodgyImportsReason (..)
+  , ImportLookupReason (..)
+  , UnusedImportReason (..)
+  , UnusedImportName (..)
   ) where
 
 import GHC.Prelude
@@ -365,13 +369,11 @@ data TcRnMessage where
     -> HsTyVarBndrExistentialFlag -- ^ tyVar binder.
     -> TcRnMessage
 
-  {-| TcRnDodgyImports is a warning (controlled with -Wdodgy-imports) that occurs when
-      an import of the form 'T(..)' or 'f(..)' does not actually import anything beside
-      'T'/'f' itself.
+  {-| TcRnDodgyImports is a group of warnings (controlled with -Wdodgy-imports).
 
-     Test cases: rename/should_compile/T7167
+      See 'DodgyImportsReason' for the different warnings.
   -}
-  TcRnDodgyImports :: GlobalRdrElt -> TcRnMessage
+  TcRnDodgyImports :: !DodgyImportsReason -> TcRnMessage
   {-| TcRnDodgyExports is a warning (controlled by -Wdodgy-exports) that occurs when
       an export of the form 'T(..)' for a type constructor 'T' does not actually export anything
       beside 'T' itself.
@@ -2937,21 +2939,6 @@ data TcRnMessage where
                  rename/should_fail/T5657
   -}
   TcRnSectionWithoutParentheses :: HsExpr GhcPs -> TcRnMessage
-  {-| TcRnBadImport is an error that occurs in cases where an item in an import
-      statement is not exported by the corresponding module.
-      When a nonexistent item is included in the 'hiding' section of an import
-      statement, this becomes a warning instead, controlled by -Wdodgy-imports.
-
-      Test cases:
-        testsuite/tests/module/should_fail/T21826.hs
-  -}
-  TcRnBadImport :: BadImportKind
-                -> ModIface
-                -> ImpDeclSpec
-                -> IE GhcPs
-                -> Bool -- ^ whether @-XPatternSynonyms@ was enabled
-                -> ImportListInterpretation
-                -> TcRnMessage
 
   {- TcRnBindingOfExistingName is an error triggered by an attempt to rebind
      built-in syntax, punned list or tuple syntax, or a name quoted via Template Haskell.
@@ -3820,6 +3807,105 @@ data TcRnMessage where
   -}
   TcRnTypeSynonymCycle :: !TySynCycleTyCons -- ^ The tycons involved in the cycle
                        -> TcRnMessage
+
+  {-| TcRnSelfImport is an error indicating that a module contains an
+    import of itself.
+
+    Test cases:
+      T9032
+  -}
+  TcRnSelfImport :: !ModuleName -- ^ The module
+                 -> TcRnMessage
+
+  {-| TcRnNoExplicitImportList is a warning indicating that an import
+      statement did not include an explicit import list.
+
+    Test cases:
+      T1789, T4489
+  -}
+  TcRnNoExplicitImportList :: !ModuleName -- ^ The imported module
+                           -> TcRnMessage
+
+  {-| TcRnSafeImportsDisabled is an error indicating that an import was
+    declared using the @safe@ keyword while SafeHaskell wasn't active.
+
+    Test cases:
+      Mixed01
+  -}
+  TcRnSafeImportsDisabled :: !ModuleName -- ^ The imported module
+                           -> TcRnMessage
+
+  {-| TcRnDeprecatedModule is a warning indicating that an imported module
+    is annotated with a warning or deprecation pragma.
+
+    Test cases:
+      DeprU
+  -}
+  TcRnDeprecatedModule :: !ModuleName -- ^ The imported module
+                       -> !(WarningTxt GhcRn) -- ^ The pragma data
+                       -> TcRnMessage
+
+  {-| TcRnCompatUnqualifiedImport is a warning indicating that a special
+    module (right now only Data.List) was imported unqualified without
+    import list, for compatibility reasons.
+
+    Test cases:
+      T17244A
+  -}
+  TcRnCompatUnqualifiedImport :: !(ImportDecl GhcPs) -- ^ The import
+                              -> TcRnMessage
+
+  {-| TcRnRedundantSourceImport is a warning indicating that a {-# SOURCE #-}
+    import was used when there is no import cycle.
+
+    Test cases:
+      none
+  -}
+  TcRnRedundantSourceImport :: !ModuleName -- ^ The imported module
+                            -> TcRnMessage
+
+  {-| TcRnImportLookup is a group of errors about bad imported names.
+  -}
+  TcRnImportLookup :: !ImportLookupReason -- ^ Details about the error
+                   -> TcRnMessage
+
+  {-| TcRnUnusedImport is a group of errors about unused imports.
+  -}
+  TcRnUnusedImport :: !(ImportDecl GhcRn) -- ^ The import
+                   -> !UnusedImportReason -- ^ Details about the error
+                   -> TcRnMessage
+
+  {-| TcRnDuplicateDecls is an error indicating that the same name was used for
+    multiple declarations.
+
+    Test cases:
+      FieldSelectors, overloadedrecfldsfail03, T17965, NFSDuplicate, T9975a,
+      TDMultiple01, mod19, mod38, mod21, mod66, mod20, TDPunning, mod18, mod22,
+      TDMultiple02, T4127a, ghci048, T8932, rnfail015, rnfail010, rnfail011,
+      rnfail013, rnfail002, rnfail003, rn_dup, rnfail009, T7164, rnfail043,
+      TH_dupdecl, rnfail012
+  -}
+  TcRnDuplicateDecls :: !OccName -- ^ The name of the declarations
+                     -> !(NE.NonEmpty Name) -- ^ The individual declarations
+                     -> TcRnMessage
+
+  {-| TcRnPackageImportsDisabled is an error indicating that an import uses
+    a package qualifier while the extension PackageImports was disabled.
+
+    Test cases:
+      PackageImportsDisabled
+  -}
+  TcRnPackageImportsDisabled :: TcRnMessage
+
+  {-| TcRnIllegalDataCon is an error indicating that a data constructor was
+    defined using a lowercase name, or a symbolic name in prefix position.
+    Mostly caught by PsErrNotADataCon.
+
+    Test cases:
+      None
+  -}
+  TcRnIllegalDataCon :: !RdrName -- ^ The constructor name
+                     -> TcRnMessage
 
   deriving Generic
 
@@ -5246,3 +5332,85 @@ instance Outputable HsTyVarBndrExistentialFlag where
 
 type TySynCycleTyCons =
   [Either TyCon (LTyClDecl GhcRn)]
+
+-- | Different types of warnings for dodgy imports.
+data DodgyImportsReason =
+  {-| An import of the form 'T(..)' or 'f(..)' does not actually import anything beside
+      'T'/'f' itself.
+
+    Test cases:
+      DodgyImports
+  -}
+  DodgyImportsEmptyParent !GlobalRdrElt
+  |
+  {-| A 'hiding' clause contains something that would be reported as an error in a
+    regular import, but is relaxed to a warning.
+
+    Test cases:
+      DodgyImports_hiding
+  -}
+  DodgyImportsHiding !ImportLookupReason
+  deriving (Generic)
+
+-- | Different types of errors for import lookup.
+data ImportLookupReason where
+  {-| An item in an import statement is not exported by the corresponding
+    module.
+
+    Test cases:
+      T21826, recomp001, retc001, mod79, mod80, mod81, mod91, T6007, T7167,
+      T9006, T11071, T9905fail2, T5385, T10668
+  -}
+  ImportLookupBad :: BadImportKind
+                  -> ModIface
+                  -> ImpDeclSpec
+                  -> IE GhcPs
+                  -> Bool -- ^ whether @-XPatternSynonyms@ was enabled
+                  -> ImportLookupReason
+  {-| A name is specified with a qualifying module.
+
+    Test cases:
+      T3792
+  -}
+  ImportLookupQualified :: !RdrName -- ^ The name extracted from the import item
+                        -> ImportLookupReason
+
+  {-| Something completely unexpected is in an import list, like @module Foo@.
+
+    Test cases:
+      ImportLookupIllegal
+  -}
+  ImportLookupIllegal :: ImportLookupReason
+  {-| An item in an import list matches multiple names exported from that module.
+
+    Test cases:
+      None
+  -}
+  ImportLookupAmbiguous :: !RdrName -- ^ The name extracted from the import item
+                        -> ![GlobalRdrElt] -- ^ The potential matches
+                        -> ImportLookupReason
+  deriving (Generic)
+
+-- | Distinguish record fields from other names for pretty-printing.
+data UnusedImportName where
+  UnusedImportNameRecField :: !Parent -> !OccName -> UnusedImportName
+  UnusedImportNameRegular :: !Name -> UnusedImportName
+
+-- | Different types of errors for unused imports.
+data UnusedImportReason where
+  {-| No names in the import list are used in the module.
+
+    Test cases:
+      overloadedrecfldsfail06, T10890_2, t22391, t22391j, T1074, prog018,
+      mod177, rn046, rn037, T5211
+  -}
+  UnusedImportNone :: UnusedImportReason
+  {-| A set of names in the import list are not used in the module.
+
+    Test cases:
+      overloadedrecfldsfail06, T17324, mod176, T11970A, rn046, T14881,
+      T7454, T8149, T13064
+  -}
+  UnusedImportSome :: ![UnusedImportName] -- ^ The unsed names
+                   -> UnusedImportReason
+  deriving (Generic)

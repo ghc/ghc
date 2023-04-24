@@ -154,8 +154,11 @@ instance Diagnostic TcRnMessage where
            ) : [errInfoContext, errInfoSupplementary]
     TcRnUnusedPatternBinds bind
       -> mkDecorated [hang (text "This pattern-binding binds no variables:") 2 (ppr bind)]
-    TcRnDodgyImports gre
+    TcRnDodgyImports (DodgyImportsEmptyParent gre)
       -> mkDecorated [dodgy_msg (text "import") gre (dodgy_msg_insert gre)]
+    TcRnDodgyImports (DodgyImportsHiding reason)
+      -> mkSimpleDecorated $
+         pprImportLookup reason
     TcRnDodgyExports gre
       -> mkDecorated [dodgy_msg (text "export") gre (dodgy_msg_insert gre)]
     TcRnMissingImportList ie
@@ -1115,58 +1118,6 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids feature
       -> mkSimpleDecorated $
         ppr feature <+> text "are not allowed in type data declarations."
-    TcRnBadImport k iface decl_spec ie _ps _interp ->
-      mkSimpleDecorated $
-        let
-          pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
-          pprImpDeclSpec iface decl_spec =
-            quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
-                IsBoot  -> text "(hi-boot interface)"
-                NotBoot -> empty
-          withContext msgs =
-            hang (text "In the import of" <+> pprImpDeclSpec iface decl_spec <> colon)
-              2 (vcat msgs)
-        in case k of
-          BadImportNotExported ->
-            vcat
-              [ text "Module" <+> pprImpDeclSpec iface decl_spec <+>
-                text "does not export" <+> quotes (ppr ie) <> dot
-              ]
-          BadImportAvailVar ->
-            withContext
-              [ text "an item called"
-                  <+> quotes val <+> text "is exported, but it is not a type."
-              ]
-            where
-              val_occ = rdrNameOcc $ ieName ie
-              val = parenSymOcc val_occ (ppr val_occ)
-          BadImportAvailTyCon {} ->
-            withContext
-              [ text "an item called"
-                <+> quotes tycon <+> text "is exported, but it is a type."
-              ]
-            where
-              tycon_occ = rdrNameOcc $ ieName ie
-              tycon = parenSymOcc tycon_occ (ppr tycon_occ)
-          BadImportNotExportedSubordinates ns ->
-            withContext
-              [ text "an item called" <+> quotes sub <+> text "is exported, but it does not export any children"
-              , text "(constructors, class methods or field names) called"
-              <+> pprWithCommas (quotes . ppr) ns <> dot
-              ]
-              where
-                sub_occ = rdrNameOcc $ ieName ie
-                sub = parenSymOcc sub_occ (ppr sub_occ)
-          BadImportAvailDataCon dataType_occ ->
-            withContext
-              [ text "an item called" <+> quotes datacon
-              , text "is exported, but it is a data constructor of"
-              , quotes dataType <> dot
-              ]
-              where
-                datacon_occ = rdrNameOcc $ ieName ie
-                datacon = parenSymOcc datacon_occ (ppr datacon_occ)
-                dataType = parenSymOcc dataType_occ (ppr dataType_occ)
 
     TcRnIllegalNewtype con show_linear_types reason
       -> mkSimpleDecorated $
@@ -1791,6 +1742,54 @@ instance Diagnostic TcRnMessage where
          text "not even by defaulting."
     TcRnInterfaceError reason
       -> diagnosticMessage (tcOptsIfaceOpts opts) reason
+    TcRnSelfImport imp_mod_name
+      -> mkSimpleDecorated $
+         text "A module cannot import itself:" <+> ppr imp_mod_name
+    TcRnNoExplicitImportList mod
+      -> mkSimpleDecorated $
+         text "The module" <+> quotes (ppr mod) <+> text "does not have an explicit import list"
+    TcRnSafeImportsDisabled _
+      -> mkSimpleDecorated $
+         text "safe import can't be used as Safe Haskell isn't on!"
+    TcRnDeprecatedModule mod txt
+      -> mkSimpleDecorated $
+         sep [ text "Module" <+> quotes (ppr mod) <> text extra <> colon,
+               nest 2 (vcat (map (ppr . hsDocString . unLoc) msg)) ]
+         where
+          (extra, msg) = case txt of
+            WarningTxt _ _ msg -> ("", msg)
+            DeprecatedTxt _ msg -> (" is deprecated", msg)
+    TcRnCompatUnqualifiedImport decl
+      -> mkSimpleDecorated $
+         vcat
+         [ text "To ensure compatibility with future core libraries changes"
+         , text "imports to" <+> ppr (ideclName decl) <+> text "should be"
+         , text "either qualified or have an explicit import list."
+         ]
+    TcRnRedundantSourceImport mod_name
+      -> mkSimpleDecorated $
+         text "Unnecessary {-# SOURCE #-} in the import of module" <+> quotes (ppr mod_name)
+    TcRnImportLookup reason
+      -> mkSimpleDecorated $
+         pprImportLookup reason
+    TcRnUnusedImport decl reason
+      -> mkSimpleDecorated $
+         pprUnusedImport decl reason
+    TcRnDuplicateDecls name sorted_names
+      -> mkSimpleDecorated $
+         vcat [text "Multiple declarations of" <+>
+               quotes (ppr name),
+                -- NB. print the OccName, not the Name, because the
+                -- latter might not be in scope in the RdrEnv and so will
+                -- be printed qualified.
+               text "Declared at:" <+>
+               vcat (NE.toList $ ppr . nameSrcLoc <$> sorted_names)]
+    TcRnPackageImportsDisabled
+      -> mkSimpleDecorated $
+         text "Package-qualified imports are not enabled"
+    TcRnIllegalDataCon name
+      -> mkSimpleDecorated $
+         hsep [text "Illegal data constructor name", quotes (ppr name)]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2365,10 +2364,29 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInterfaceError err
       -> interfaceErrorReason err
-    TcRnBadImport _ _ _ _ _ importKind
-      -> case importKind of
-           Exactly -> ErrorWithoutFlag
-           EverythingBut -> WarningWithFlag Opt_WarnDodgyImports
+    TcRnSelfImport{}
+      -> ErrorWithoutFlag
+    TcRnNoExplicitImportList{}
+      -> WarningWithFlag Opt_WarnMissingImportList
+    TcRnSafeImportsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnDeprecatedModule _ txt
+      -> WarningWithCategory (warningTxtCategory txt)
+    TcRnCompatUnqualifiedImport{}
+      -> WarningWithFlag Opt_WarnCompatUnqualifiedImports
+    TcRnRedundantSourceImport{}
+      -> WarningWithoutFlag
+    TcRnImportLookup{}
+      -> ErrorWithoutFlag
+    TcRnUnusedImport{}
+      -> WarningWithFlag Opt_WarnUnusedImports
+    TcRnDuplicateDecls{}
+      -> ErrorWithoutFlag
+    TcRnPackageImportsDisabled
+      -> ErrorWithoutFlag
+    TcRnIllegalDataCon{}
+      -> ErrorWithoutFlag
+
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2975,7 +2993,19 @@ instance Diagnostic TcRnMessage where
       -> [SuggestAddTypeSignatures UnnamedBinding]
     TcRnInterfaceError reason
       -> interfaceErrorHints reason
-    TcRnBadImport k _ is ie patsyns_enabled _ ->
+    TcRnSelfImport{}
+      -> noHints
+    TcRnNoExplicitImportList{}
+      -> noHints
+    TcRnSafeImportsDisabled{}
+      -> [SuggestSafeHaskell]
+    TcRnDeprecatedModule{}
+      -> noHints
+    TcRnCompatUnqualifiedImport{}
+      -> noHints
+    TcRnRedundantSourceImport{}
+      -> noHints
+    TcRnImportLookup (ImportLookupBad k _ is ie patsyns_enabled) ->
       let mod = is_mod is
           occ = rdrNameOcc $ ieName ie
       in case k of
@@ -2984,6 +3014,16 @@ instance Diagnostic TcRnMessage where
         BadImportAvailTyCon       -> [ImportSuggestion occ $ CouldAddTypeKeyword (is_mod is)]
         BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (is_mod is, patsyns_enabled)) par]
         BadImportNotExportedSubordinates{} -> noHints
+    TcRnImportLookup{}
+      -> noHints
+    TcRnUnusedImport{}
+      -> noHints
+    TcRnDuplicateDecls{}
+      -> noHints
+    TcRnPackageImportsDisabled
+      -> [suggestExtension LangExt.PackageImports]
+    TcRnIllegalDataCon{}
+      -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
@@ -5153,3 +5193,90 @@ pprDisabledClassExtension cls = \case
     vcat [ hang (text "Constraint" <+> quotes (ppr pred)
                  <+> text "in the type of" <+> quotes (ppr sel_id))
               2 (text "constrains only the class type variables")]
+
+pprImportLookup :: ImportLookupReason -> SDoc
+pprImportLookup = \case
+  ImportLookupBad k iface decl_spec ie _ps ->
+    let
+      pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+      pprImpDeclSpec iface decl_spec =
+        quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
+            IsBoot  -> text "(hi-boot interface)"
+            NotBoot -> empty
+      withContext msgs =
+        hang (text "In the import of" <+> pprImpDeclSpec iface decl_spec <> colon)
+          2 (vcat msgs)
+    in case k of
+      BadImportNotExported ->
+        vcat
+          [ text "Module" <+> pprImpDeclSpec iface decl_spec <+>
+            text "does not export" <+> quotes (ppr ie) <> dot
+          ]
+      BadImportAvailVar ->
+        withContext
+          [ text "an item called"
+              <+> quotes val <+> text "is exported, but it is not a type."
+          ]
+        where
+          val_occ = rdrNameOcc $ ieName ie
+          val = parenSymOcc val_occ (ppr val_occ)
+      BadImportAvailTyCon {} ->
+        withContext
+          [ text "an item called"
+            <+> quotes tycon <+> text "is exported, but it is a type."
+          ]
+        where
+          tycon_occ = rdrNameOcc $ ieName ie
+          tycon = parenSymOcc tycon_occ (ppr tycon_occ)
+      BadImportNotExportedSubordinates ns ->
+        withContext
+          [ text "an item called" <+> quotes sub <+> text "is exported, but it does not export any children"
+          , text "(constructors, class methods or field names) called"
+          <+> pprWithCommas (quotes . ppr) ns <> dot
+          ]
+          where
+            sub_occ = rdrNameOcc $ ieName ie
+            sub = parenSymOcc sub_occ (ppr sub_occ)
+      BadImportAvailDataCon dataType_occ ->
+        withContext
+          [ text "an item called" <+> quotes datacon
+          , text "is exported, but it is a data constructor of"
+          , quotes dataType <> dot
+          ]
+          where
+            datacon_occ = rdrNameOcc $ ieName ie
+            datacon = parenSymOcc datacon_occ (ppr datacon_occ)
+            dataType = parenSymOcc dataType_occ (ppr dataType_occ)
+  ImportLookupQualified rdr ->
+    hang (text "Illegal qualified name in import item:")
+       2 (ppr rdr)
+  ImportLookupIllegal ->
+    text "Illegal import item"
+  ImportLookupAmbiguous rdr gres ->
+    hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
+       2 (vcat (map (ppr . greOccName) gres))
+
+pprUnusedImport :: ImportDecl GhcRn -> UnusedImportReason -> SDoc
+pprUnusedImport decl = \case
+  UnusedImportNone ->
+    vcat [ pp_herald <+> quotes pp_mod <+> text "is redundant"
+         , nest 2 (text "except perhaps to import instances from"
+                   <+> quotes pp_mod)
+         , text "To import instances alone, use:"
+           <+> text "import" <+> pp_mod <> parens empty ]
+  UnusedImportSome sort_unused ->
+    sep [ pp_herald <+> quotes (pprWithCommas pp_unused sort_unused)
+        , text "from module" <+> quotes pp_mod <+> text "is redundant"]
+  where
+    pp_mod = ppr (unLoc (ideclName decl))
+    pp_herald = text "The" <+> pp_qual <+> text "import of"
+    pp_qual
+      | isImportDeclQualified (ideclQualified decl) = text "qualified"
+      | otherwise                                   = empty
+    pp_unused = \case
+      UnusedImportNameRegular n ->
+        pprNameUnqualified n
+      UnusedImportNameRecField par fld_occ ->
+        case par of
+          ParentIs p -> pprNameUnqualified p <> parens (ppr fld_occ)
+          NoParent   -> ppr fld_occ

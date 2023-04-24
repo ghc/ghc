@@ -331,7 +331,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTypeDoesNotHaveFixedRuntimeRep"            = 18478
   GhcDiagnosticCode "TcRnImplicitLift"                              = 00846
   GhcDiagnosticCode "TcRnUnusedPatternBinds"                        = 61367
-  GhcDiagnosticCode "TcRnDodgyImports"                              = 99623
   GhcDiagnosticCode "TcRnDodgyExports"                              = 75356
   GhcDiagnosticCode "TcRnMissingImportList"                         = 77037
   GhcDiagnosticCode "TcRnUnsafeDueToPlugin"                         = 01687
@@ -578,6 +577,15 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIncoherentRoles"                           = 18273
   GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
   GhcDiagnosticCode "TcRnTypeSynonymCycle"                          = 97522
+  GhcDiagnosticCode "TcRnSelfImport"                                = 43281
+  GhcDiagnosticCode "TcRnNoExplicitImportList"                      = 16029
+  GhcDiagnosticCode "TcRnSafeImportsDisabled"                       = 26971
+  GhcDiagnosticCode "TcRnDeprecatedModule"                          = 15328
+  GhcDiagnosticCode "TcRnCompatUnqualifiedImport"                   = 82347
+  GhcDiagnosticCode "TcRnRedundantSourceImport"                     = 54478
+  GhcDiagnosticCode "TcRnDuplicateDecls"                            = 29916
+  GhcDiagnosticCode "TcRnPackageImportsDisabled"                    = 10032
+  GhcDiagnosticCode "TcRnIllegalDataCon"                            = 78448
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -655,6 +663,18 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "InvalidImplicitParamBinding"                   = 51603
   GhcDiagnosticCode "DefaultDataInstDecl"                           = 39639
   GhcDiagnosticCode "FunBindLacksEquations"                         = 52078
+
+  -- TcRnDodgyImports/DodgyImportsReason
+  GhcDiagnosticCode "DodgyImportsEmptyParent"                       = 99623
+
+  -- TcRnImportLookup/ImportLookupReason
+  GhcDiagnosticCode "ImportLookupQualified"                         = 48795
+  GhcDiagnosticCode "ImportLookupIllegal"                           = 14752
+  GhcDiagnosticCode "ImportLookupAmbiguous"                         = 92057
+
+  -- TcRnUnusedImport/UnusedImportReason
+  GhcDiagnosticCode "UnusedImportNone"                              = 66111
+  GhcDiagnosticCode "UnusedImportSome"                              = 38856
 
   -- Diagnostic codes for the foreign function interface
   GhcDiagnosticCode "NotADataType"                                  = 31136
@@ -820,6 +840,10 @@ type family ConRecursInto con where
   ConRecursInto "TcRnRoleValidationFailed" = 'Just RoleValidationFailedReason
   ConRecursInto "TcRnClassExtensionDisabled" = 'Just DisabledClassExtension
   ConRecursInto "TcRnTyFamsDisabled"       = 'Just TyFamsDisabledReason
+  ConRecursInto "TcRnDodgyImports"         = 'Just DodgyImportsReason
+  ConRecursInto "DodgyImportsHiding"       = 'Just ImportLookupReason
+  ConRecursInto "TcRnImportLookup"         = 'Just ImportLookupReason
+  ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
 
     --
     -- TH errors
@@ -861,8 +885,8 @@ type family ConRecursInto con where
   ConRecursInto "DsUnknownMessage"         = 'Just UnknownDiagnostic
 
   ----------------------------------
-  -- Constructors of TcRnBadImport
-  ConRecursInto "TcRnBadImport"            = 'Just BadImportKind
+  -- Constructors of ImportLookupBad
+  ConRecursInto "ImportLookupBad"          = 'Just BadImportKind
 
   ----------------------------------
   -- Any other constructors: don't recur, instead directly

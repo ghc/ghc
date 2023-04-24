@@ -1,0 +1,4 @@
+DodgyImports.hs:3:24: warning: [GHC-99623] [-Wdodgy-imports (in -Wextra)]
+    The import item ‘Data.Semigroup.ArgMin(..)’ suggests that
+    ‘Data.Semigroup.ArgMin’ has (in-scope) constructors or record fields,
+                                but it has none
