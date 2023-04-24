@@ -860,7 +860,7 @@ checkOriginativeSideConditions dit@(DerivInstTys{dit_cls_tys = cls_tys}) =
      dflags <- getDynFlags
 
      if    -- First, check if stock deriving is possible...
-        |  Just cond <- stockSideConditions deriv_ctxt cls
+       |  Just cond <- stockSideConditions deriv_ctxt cls
         -> case cond dflags dit of
              NotValid err -> pure $ StockClassError err  -- Class-specific error
              IsValid  |  null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
@@ -876,10 +876,10 @@ checkOriginativeSideConditions dit@(DerivInstTys{dit_cls_tys = cls_tys}) =
                         -- e.g. deriving( Eq s )
 
            -- ...if not, try falling back on DeriveAnyClass.
-        |  xopt LangExt.DeriveAnyClass dflags
+       |  xopt LangExt.DeriveAnyClass dflags
         -> pure CanDeriveAnyClass   -- DeriveAnyClass should work
 
-        |  otherwise
+       |  otherwise
         -> pure NonDerivableClass -- Neither anyclass nor stock work
 
 

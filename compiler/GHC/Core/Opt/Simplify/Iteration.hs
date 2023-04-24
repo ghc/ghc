@@ -1731,17 +1731,17 @@ simpl_lam env bndr body (ApplyToVal { sc_arg = arg, sc_env = arg_se
        ; if | isSimplified dup  -- Don't re-simplify if we've simplified it once
                                 -- Including don't preInlineUnconditionally
                                 -- See Note [Avoiding exponential behaviour]
-            -> completeBindX env (FromBeta arg_ty) bndr arg body cont
+             -> completeBindX env (FromBeta arg_ty) bndr arg body cont
 
             | Just env' <- preInlineUnconditionally env NotTopLevel bndr arg arg_se
-            , not (needsCaseBinding arg_ty arg)
+             , not (needsCaseBinding arg_ty arg)
               -- Ok to test arg::InExpr in needsCaseBinding because
               -- exprOkForSpeculation is stable under simplification
-            -> do { tick (PreInlineUnconditionally bndr)
+             -> do { tick (PreInlineUnconditionally bndr)
                   ; simplLam env' body cont }
 
             | otherwise
-            -> simplNonRecE env (FromBeta arg_ty) bndr (arg, arg_se) body cont }
+             -> simplNonRecE env (FromBeta arg_ty) bndr (arg, arg_se) body cont }
 
 -- Discard a non-counting tick on a lambda.  This may change the
 -- cost attribution slightly (moving the allocation of the

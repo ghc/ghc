@@ -154,9 +154,9 @@ withLiftedBind
   -> (Maybe OutStgBinding -> LiftM a)
   -> LiftM a
 withLiftedBind top_lvl bind scope k
-  = withLiftedBindPairs top_lvl rec pairs scope (k . fmap (mkStgBinding rec))
+  = withLiftedBindPairs top_lvl r pairs scope (k . fmap (mkStgBinding r))
   where
-    (rec, pairs) = decomposeStgBinding bind
+    (r, pairs) = decomposeStgBinding bind
 
 withLiftedBindPairs
   :: TopLevelFlag
@@ -165,12 +165,12 @@ withLiftedBindPairs
   -> Skeleton
   -> (Maybe [(Id, OutStgRhs)] -> LiftM a)
   -> LiftM a
-withLiftedBindPairs top rec pairs scope k = do
+withLiftedBindPairs top is_rec pairs scope k = do
   let (infos, rhss) = unzip pairs
   let bndrs = map binderInfoBndr infos
   expander <- liftedIdsExpander
   cfg <- getConfig
-  case goodToLift cfg top rec expander pairs scope of
+  case goodToLift cfg top is_rec expander pairs scope of
     -- @abs_ids@ is the set of all variables that need to become parameters.
     Just abs_ids -> withLiftedBndrs abs_ids bndrs $ \bndrs' -> do
       -- Within this block, all binders in @bndrs@ will be noted as lifted, so
@@ -179,11 +179,11 @@ withLiftedBindPairs top rec pairs scope k = do
       -- Now we can recurse into the RHSs and see if we can lift any further
       -- bindings. We pass the set of expanded free variables (thus OutIds) on
       -- to @liftRhs@ so that it can add them as parameter binders.
-      when (isRec rec) startBindingGroup
+      when (isRec is_rec) startBindingGroup
       rhss' <- traverse (liftRhs (Just abs_ids)) rhss
       let pairs' = zip bndrs' rhss'
-      addLiftedBinding (mkStgBinding rec pairs')
-      when (isRec rec) endBindingGroup
+      addLiftedBinding (mkStgBinding is_rec pairs')
+      when (isRec is_rec) endBindingGroup
       k Nothing
     Nothing -> withSubstBndrs bndrs $ \bndrs' -> do
       -- Don't lift the current binding, but possibly some bindings in their

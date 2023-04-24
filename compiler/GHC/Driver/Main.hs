@@ -860,7 +860,7 @@ hscRecompStatus
                msg UpToDate
                return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
            | not (backendGeneratesCodeForHsBoot (backend lcl_dflags))
-           , IsBoot <- isBootSummary mod_summary -> do
+            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
                return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
            | otherwise -> do
@@ -1822,7 +1822,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
         (late_cc_binds, late_local_ccs) <-
               if gopt Opt_ProfLateCcs dflags && not (gopt Opt_ProfLateInlineCcs dflags)
-                  then  {-# SCC lateCC #-} do
+                  then   do
                     (binds,late_ccs) <- addLateCostCentresPgm dflags logger this_mod core_binds
                     return ( binds, (S.toList late_ccs `mappend` local_ccs ))
                   else

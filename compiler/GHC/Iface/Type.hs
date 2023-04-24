@@ -1508,58 +1508,58 @@ pprTyTcApp ctxt_prec tc tys =
     getPprDebug $ \debug ->
 
     if | ifaceTyConName tc `hasKey` ipClassKey
-       , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
-                Required (IA_Arg ty Required IA_Nil) <- tys
-       -> maybeParen ctxt_prec funPrec
-         $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
+        , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
+                 Required (IA_Arg ty Required IA_Nil) <- tys
+        -> maybeParen ctxt_prec funPrec
+          $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
 
        | IfaceTupleTyCon arity sort <- ifaceTyConSort info
-       , not debug
-       , arity == ifaceVisAppArgsLength tys
-       -> pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
-           -- NB: pprTuple requires a saturated tuple.
+        , not debug
+        , arity == ifaceVisAppArgsLength tys
+        -> pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
+            -- NB: pprTuple requires a saturated tuple.
 
        | IfaceSumTyCon arity <- ifaceTyConSort info
-       , not debug
-       , arity == ifaceVisAppArgsLength tys
-       -> pprSum (ifaceTyConIsPromoted info) tys
-           -- NB: pprSum requires a saturated unboxed sum.
+        , not debug
+        , arity == ifaceVisAppArgsLength tys
+        -> pprSum (ifaceTyConIsPromoted info) tys
+            -- NB: pprSum requires a saturated unboxed sum.
 
        | tc `ifaceTyConHasKey` consDataConKey
-       , False <- print_kinds
-       , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
-       , isInvisibleForAllTyFlag argf
-       -> pprIfaceTyList ctxt_prec ty1 ty2
+        , False <- print_kinds
+        , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
+        , isInvisibleForAllTyFlag argf
+        -> pprIfaceTyList ctxt_prec ty1 ty2
 
        | isIfaceLiftedTypeKind (IfaceTyConApp tc tys)
-       , print_type_abbreviations  -- See Note [Printing type abbreviations]
-       -> ppr_kind_type ctxt_prec
+        , print_type_abbreviations  -- See Note [Printing type abbreviations]
+        -> ppr_kind_type ctxt_prec
 
        | isIfaceConstraintKind (IfaceTyConApp tc tys)
-       , print_type_abbreviations  -- See Note [Printing type abbreviations]
-       -> pprPrefixOcc constraintKindTyConName
+        , print_type_abbreviations  -- See Note [Printing type abbreviations]
+        -> pprPrefixOcc constraintKindTyConName
 
        | tc `ifaceTyConHasKey` fUNTyConKey
-       , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
-       , rep `ifaceTyConHasKey` manyDataConKey
-       , print_type_abbreviations  -- See Note [Printing type abbreviations]
-       -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_app_arg appPrec) $
-          appArgsIfaceTypesForAllTyFlags $
-          stripInvisArgs (PrintExplicitKinds print_kinds) args)
-          -- Use appArgsIfaceTypesForAllTyFlags to print invisible arguments
-          -- correctly (#19310)
+        , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
+        , rep `ifaceTyConHasKey` manyDataConKey
+        , print_type_abbreviations  -- See Note [Printing type abbreviations]
+        -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_app_arg appPrec) $
+           appArgsIfaceTypesForAllTyFlags $
+           stripInvisArgs (PrintExplicitKinds print_kinds) args)
+           -- Use appArgsIfaceTypesForAllTyFlags to print invisible arguments
+           -- correctly (#19310)
 
        | tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
-       , not debug
-         -- Suppress detail unless you _really_ want to see
-       -> text "(TypeError ...)"
+        , not debug
+          -- Suppress detail unless you _really_ want to see
+        -> text "(TypeError ...)"
 
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)
-       -> doc
+        -> doc
 
        | otherwise
-       -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc $
-          appArgsIfaceTypesForAllTyFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) tys
+        -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc $
+           appArgsIfaceTypesForAllTyFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) tys
   where
     info = ifaceTyConInfo tc
 
@@ -1675,22 +1675,22 @@ ppr_iface_tc_app :: (PprPrec -> (a, ForAllTyFlag) -> SDoc)
 ppr_iface_tc_app pp ctxt_prec tc tys =
   sdocOption sdocListTuplePuns $ \listTuplePuns ->
   if | listTuplePuns, tc `ifaceTyConHasKey` listTyConKey, [ty] <- tys
-     -> brackets (pp topPrec ty)
+      -> brackets (pp topPrec ty)
 
      | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
-     -> ppr_kind_type ctxt_prec
+      -> ppr_kind_type ctxt_prec
 
      | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-     -> pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
+      -> pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
 
      | [ ty1@(_, Required), ty2@(_, Required) ] <- tys
          -- Infix, two visible arguments (we know nothing of precedence though).
          -- Don't apply this special case if one of the arguments is invisible,
          -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
-     -> pprIfaceInfixApp ctxt_prec (ppr tc) (pp opPrec ty1) (pp opPrec ty2)
+      -> pprIfaceInfixApp ctxt_prec (ppr tc) (pp opPrec ty1) (pp opPrec ty2)
 
      | otherwise
-     -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
+      -> pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
 -- | Pretty-print an unboxed sum type. The sum should be saturated:
 -- as many visible arguments as the arity of the sum.

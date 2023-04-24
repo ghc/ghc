@@ -2608,7 +2608,7 @@ data TcRnMessage where
        Test case:
        testsuite/tests/indexed-types/should_fail/HsBootFam
   -}
-  TcRnBadBootFamInstDecl :: {} -> TcRnMessage
+  TcRnBadBootFamInstDecl :: TcRnMessage
   {- | 'TcRnIllegalFamilyInstance' is an error that occurs when an associated
        type or data family is given a top-level instance.
 

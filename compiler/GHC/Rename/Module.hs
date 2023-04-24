@@ -2019,8 +2019,8 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
            }
 
     has_labelled_fields (ConDeclGADT { con_g_args = RecConGADT _ _ }) = True
-    has_labelled_fields (ConDeclH98 { con_args = RecCon rec })
-      = not (null (unLoc rec))
+    has_labelled_fields (ConDeclH98 { con_args = RecCon r })
+      = not (null (unLoc r))
     has_labelled_fields _ = False
 
     has_strictness_flags condecl

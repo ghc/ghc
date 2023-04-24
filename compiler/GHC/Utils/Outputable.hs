@@ -1184,7 +1184,7 @@ instance (OutputableP env a) => OutputableP env (Set a) where
     pdoc env s = braces (fsep (punctuate comma (map (pdoc env) (Set.toList s))))
 
 instance OutputableP env Void where
-    pdoc _ = \ case
+    pdoc _ = \ case {}
 
 {-
 ************************************************************************

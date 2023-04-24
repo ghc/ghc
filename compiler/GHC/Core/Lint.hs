@@ -2386,34 +2386,16 @@ lintCoercion the_co@(SelCo cs co)
        ; let (Pair s t, co_role) = coercionKindRole co'
 
        ; if -- forall (both TyVar and CoVar)
-            | Just _ <- splitForAllTyCoVar_maybe s
-            , Just _ <- splitForAllTyCoVar_maybe t
-            , SelForAll <- cs
-            ,   (isForAllTy_ty s && isForAllTy_ty t)
-             || (isForAllTy_co s && isForAllTy_co t)
-            -> return (SelCo cs co')
+            | Just _ <- splitForAllTyCoVar_maybe s , Just _ <- splitForAllTyCoVar_maybe t , SelForAll <- cs ,   (isForAllTy_ty s && isForAllTy_ty t) || (isForAllTy_co s && isForAllTy_co t) -> return (SelCo cs co')
 
             -- function
-            | isFunTy s
-            , isFunTy t
-            , SelFun {} <- cs
-            -> return (SelCo cs co')
+            | isFunTy s , isFunTy t , SelFun {} <- cs -> return (SelCo cs co')
 
             -- TyCon
-            | Just (tc_s, tys_s) <- splitTyConApp_maybe s
-            , Just (tc_t, tys_t) <- splitTyConApp_maybe t
-            , tc_s == tc_t
-            , SelTyCon n r0 <- cs
-            , isInjectiveTyCon tc_s co_role
-                -- see Note [SelCo and newtypes] in GHC.Core.TyCo.Rep
-            , tys_s `equalLength` tys_t
-            , tys_s `lengthExceeds` n
-            -> do { lintRole the_co (tyConRole co_role tc_s n) r0
+            | Just (tc_s, tys_s) <- splitTyConApp_maybe s , Just (tc_t, tys_t) <- splitTyConApp_maybe t , tc_s == tc_t , SelTyCon n r0 <- cs , isInjectiveTyCon tc_s co_role , tys_s `equalLength` tys_t , tys_s `lengthExceeds` n -> do { lintRole the_co (tyConRole co_role tc_s n) r0
                   ; return (SelCo cs co') }
 
-            | otherwise
-            -> failWithL (hang (text "Bad SelCo:")
-                             2 (ppr the_co $$ ppr s $$ ppr t)) }
+            | otherwise -> failWithL (hang (text "Bad SelCo:") 2 (ppr the_co $$ ppr s $$ ppr t)) }
 
 lintCoercion the_co@(LRCo lr co)
   = do { co' <- lintCoercion co

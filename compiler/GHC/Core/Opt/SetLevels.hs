@@ -1277,7 +1277,7 @@ lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
             -> CoreExprWithFVs
             -> LvlM (Expr LevelledBndr)
 -- Ignores the le_ctxt_lvl in env; treats dest_lvl as the baseline
-lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
+lvlFloatRhs abs_vars dest_lvl env is_rec is_bot mb_join_arity rhs
   = do { body' <- if not is_bot  -- See Note [Floating from a RHS]
                      && any isId bndrs
                   then lvlMFE  body_env True body
@@ -1291,7 +1291,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
     (env1, bndrs1)    = substBndrsSL NonRecursive env bndrs
     all_bndrs         = abs_vars ++ bndrs1
     (body_env, bndrs') | Just _ <- mb_join_arity
-                      = lvlJoinBndrs env1 dest_lvl rec all_bndrs
+                      = lvlJoinBndrs env1 dest_lvl is_rec all_bndrs
                       | otherwise
                       = case lvlLamBndrs env1 dest_lvl all_bndrs of
                           (env2, bndrs') -> (placeJoinCeiling env2, bndrs')
@@ -1386,10 +1386,10 @@ lvlLamBndrs env lvl bndrs
 
 lvlJoinBndrs :: LevelEnv -> Level -> RecFlag -> [OutVar]
              -> (LevelEnv, [LevelledBndr])
-lvlJoinBndrs env lvl rec bndrs
+lvlJoinBndrs env lvl is_rec bndrs
   = lvlBndrs env new_lvl bndrs
   where
-    new_lvl | isRec rec = incMajorLvl lvl
+    new_lvl | isRec is_rec = incMajorLvl lvl
             | otherwise = incMinorLvl lvl
       -- Non-recursive join points are one-shot; recursive ones are not
 

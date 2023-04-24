@@ -81,12 +81,9 @@ data DebugBlock =
 
 instance OutputableP Platform DebugBlock where
   pdoc env blk =
-            (if | dblProcedure blk == dblLabel blk
-                -> text "proc"
-                | dblHasInfoTbl blk
-                -> text "pp-blk"
-                | otherwise
-                -> text "blk") <+>
+            (if | dblProcedure blk == dblLabel blk -> text "proc"
+                | dblHasInfoTbl blk -> text "pp-blk"
+                | otherwise -> text "blk") <+>
             ppr (dblLabel blk) <+> parens (pprAsmLabel env (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)

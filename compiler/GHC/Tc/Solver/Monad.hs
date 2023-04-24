@@ -1281,14 +1281,14 @@ touchabilityTest flav tv1 rhs
     do { ambient_lvl  <- getTcLevel
        ; given_eq_lvl <- getInnermostGivenEqLevel
 
-       ; if | tv_lvl `sameDepthAs` ambient_lvl
+       ; if| tv_lvl `sameDepthAs` ambient_lvl
             -> return TouchableSameLevel
 
-            | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
+           | tv_lvl `deeperThanOrSame` given_eq_lvl   -- No intervening given equalities
             , all (does_not_escape tv_lvl) free_skols  -- No skolem escapes
             -> return (TouchableOuterLevel free_metas tv_lvl)
 
-            | otherwise
+           | otherwise
             -> return Untouchable } }
   | otherwise
   = return Untouchable

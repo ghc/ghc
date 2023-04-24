@@ -296,7 +296,7 @@ findSectionFromName :: Logger
                     -> ByteString
                     -> IO (Maybe ByteString)
 findSectionFromName logger hdr secTable name bs =
-    rec [0..sectionEntryCount secTable - 1]
+    go [0..sectionEntryCount secTable - 1]
   where
     -- convert the required section name into a ByteString to perform
     -- ByteString comparison instead of String comparison
@@ -304,12 +304,12 @@ findSectionFromName logger hdr secTable name bs =
 
     -- compare recursively each section name and return the contents of
     -- the matching one, if any
-    rec []     = return Nothing
-    rec (x:xs) = do
+    go []     = return Nothing
+    go (x:xs) = do
       me <- readElfSectionByIndex logger hdr secTable x bs
       case me of
         Just e | entryName e == name' -> return (Just (entryBS e))
-        _                             -> rec xs
+        _                             -> go xs
 
 
 -- | Given a section name, read its contents as a ByteString.

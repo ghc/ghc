@@ -768,10 +768,7 @@ addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
                   -> TM (HsValBindsLR GhcTc (GhcPass b))
 addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
         b <- liftM2 NValBinds
-                (mapM (\ (rec,binds') ->
-                                liftM2 (,)
-                                        (return rec)
-                                        (addTickLHsBinds binds'))
+                (mapM (\ (r,binds') -> liftM2 (,) (return r) (addTickLHsBinds binds'))
                         binds)
                 (return sigs)
         return $ XValBindsLR b

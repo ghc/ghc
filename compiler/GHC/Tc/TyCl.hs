@@ -1385,9 +1385,9 @@ getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
        ; return [tc] }
 
 getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
-  FamilyDecl { fdLName     = unLoc -> name
+  FamilyDecl { fdLName     = (unLoc -> name)
              , fdTyVars    = ktvs
-             , fdResultSig = unLoc -> resultSig
+             , fdResultSig = (unLoc -> resultSig)
              , fdInfo      = info } } )
   = do { let flav = getFamFlav Nothing info
              ctxt = TyFamResKindCtxt name
@@ -1440,9 +1440,9 @@ check_initial_kind_assoc_fam
   -> TcM TcTyCon
 check_initial_kind_assoc_fam cls
   FamilyDecl
-    { fdLName     = unLoc -> name
+    { fdLName     = (unLoc -> name)
     , fdTyVars    = ktvs
-    , fdResultSig = unLoc -> resultSig
+    , fdResultSig = (unLoc -> resultSig)
     , fdInfo      = info }
   = kcDeclHeader (InitialKindCheck CUSK) name flav ktvs $
     case famResultKindSignature resultSig of

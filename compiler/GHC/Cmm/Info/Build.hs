@@ -900,7 +900,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
         flip map data_ $
         \(set, decl) ->
           case decl of
-            CmmProc void _ _ _ -> case void of
+            CmmProc void _ _ _ -> case void of {}
             CmmData _ static ->
               case static of
                 CmmStatics lbl _ _ _ _ -> (lbl, set)
@@ -921,7 +921,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
   -- them.
   let
     sccs :: [SCC (SomeLabel, CAFfyLabel, Set CAFfyLabel)]
-    sccs = {-# SCC depAnalSRTs #-} depAnalSRTs platform cafEnv static_data_env decls
+    sccs = depAnalSRTs platform cafEnv static_data_env decls
 
     cafsWithSRTs :: [(Maybe Label, CAFfyLabel, Set CAFfyLabel)]
     cafsWithSRTs = getCAFs platform cafEnv decls
@@ -979,7 +979,7 @@ doSRTs cfg moduleSRTInfo procs data_ = do
                       | otherwise ->
                           -- Not an IdLabel, ignore
                           srtMap
-                    CmmProc void _ _ _ -> case void of)
+                    CmmProc void _ _ _ -> case void of {})
                (moduleSRTMap moduleSRTInfo') data_
 
   return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')

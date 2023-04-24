@@ -1063,9 +1063,9 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
 -- a separate data type entirely (see 'HsConDeclGADTDetails' in
 -- "GHC.Hs.Decls"). This is because GADT constructors cannot be declared with
 -- infix syntax, unlike the concepts above (#18844).
-data HsConDetails tyarg arg rec
+data HsConDetails tyarg arg r
   = PrefixCon [tyarg] [arg]     -- C @t1 @t2 p1 p2 p3
-  | RecCon    rec               -- C { x = p1, y = p2 }
+  | RecCon    r                 -- C { x = p1, y = p2 }
   | InfixCon  arg arg           -- p1 `C` p2
   deriving Data
 
@@ -1077,7 +1077,7 @@ noTypeArgs = []
 conDetailsArity :: (rec -> Arity) -> HsConDetails tyarg arg rec -> Arity
 conDetailsArity recToArity = \case
   PrefixCon _ args -> length args
-  RecCon rec -> recToArity rec
+  RecCon r -> recToArity r
   InfixCon _ _ -> 2
 
 {-

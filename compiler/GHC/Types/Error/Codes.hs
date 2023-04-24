@@ -116,8 +116,7 @@ constructorCode diag = gdiagnosticCode (from diag)
 -- be tracked here to ensure uniqueness of diagnostic codes across GHC versions.
 --
 -- See Note [Diagnostic codes] in GHC.Types.Error.
-type GhcDiagnosticCode :: Symbol -> Nat
-type family GhcDiagnosticCode c = n | n -> c where
+type family GhcDiagnosticCode (c :: Symbol) = (n :: Nat) | n -> c where
 
   -- Desugarer diagnostic codes
   GhcDiagnosticCode "DsEmptyEnumeration"                            = 10190
@@ -637,8 +636,8 @@ type family GhcDiagnosticCode c = n | n -> c where
 -- an error code.
 --
 -- This type family keeps track of such constructors.
-type ConRecursInto :: Symbol -> Maybe Type
-type family ConRecursInto con where
+-- type ConRecursInto :: Symbol -> Maybe Type
+type family ConRecursInto (con :: Symbol) :: Maybe Type where
 
   ----------------------------------
   -- Constructors of GhcMessage
@@ -780,12 +779,12 @@ To achieve this, we use a variant of the 'typed' lens from 'generic-lens'
 -- diagnostic code, using the 'GhcDiagnosticCode' type family.
 --
 -- See Note [Diagnostic codes using generics] in GHC.Types.Error.Codes.
-type GDiagnosticCode :: (Type -> Type) -> Constraint
-class GDiagnosticCode f where
+-- type GDiagnosticCode :: (Type -> Type) -> Constraint
+class GDiagnosticCode (f :: Type -> Type) where
   gdiagnosticCode :: f a -> Maybe DiagnosticCode
 
-type ConstructorCode :: Symbol -> (Type -> Type) -> Maybe Type -> Constraint
-class ConstructorCode con f recur where
+-- type ConstructorCode :: Symbol -> (Type -> Type) -> Maybe Type -> Constraint
+class ConstructorCode (con :: Symbol) (f :: Type -> Type) (recur :: Maybe Type) where
   gconstructorCode :: f a -> Maybe DiagnosticCode
 instance KnownConstructor con => ConstructorCode con f 'Nothing where
   gconstructorCode _ = Just $ DiagnosticCode "GHC" $ natVal' @(GhcDiagnosticCode con) proxy#
@@ -848,8 +847,8 @@ type family Alt (m1 :: Maybe a) (m2 :: Maybe a) :: Maybe a where
   Alt ('Just a) _ = 'Just a
   Alt _ b = b
 
-type HasType :: Type -> Symbol -> (Type -> Type) -> Constraint
-class HasType ty orig f where
+-- type HasType :: Type -> Symbol -> (Type -> Type) -> Constraint
+class HasType (ty :: Type) (orig :: Symbol) (f :: Type -> Type) where
   getType :: f a -> ty
 
 instance HasType ty orig (M1 i s (K1 x ty)) where
@@ -891,8 +890,8 @@ instance {-# OVERLAPPABLE #-}
   getType = panic "getType: unreachable"
 
 -- (ERR2) Improve error messages for missing 'GhcDiagnosticCode' equations.
-type KnownConstructor :: Symbol -> Constraint
-type family KnownConstructor con where
+-- type KnownConstructor :: Symbol -> Constraint
+type family KnownConstructor (con :: Symbol) where
   KnownConstructor con =
     KnownNatOrErr
       ( TypeError
@@ -905,13 +904,13 @@ type family KnownConstructor con where
       )
       (GhcDiagnosticCode con)
 
-type KnownNatOrErr :: Constraint -> Nat -> Constraint
+-- type KnownNatOrErr :: Constraint -> Nat -> Constraint
 type KnownNatOrErr err n = (Assert err n, KnownNat n)
 
 -- Detecting a stuck type family using a data family.
 -- See https://blog.csongor.co.uk/report-stuck-families/.
-type Assert :: Constraint -> k -> Constraint
-type family Assert err n where
+-- type Assert :: Constraint -> k -> Constraint
+type family Assert (err ::Constraint) (n :: k) where
   Assert _ Dummy = Dummy
   Assert _ n     = ()
 data family Dummy :: k

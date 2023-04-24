@@ -1429,23 +1429,23 @@ mk_eqn_no_strategy = do
   -- First, check if the last argument is an application of a type constructor.
   -- If not, fall back to DeriveAnyClass.
   if |  Just (cls_tys, inst_ty) <- snocView cls_args
-     ,  Just dit <- mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty
-     -> if |  isNewTyCon (dit_rep_tc dit)
-              -- We have a dedicated code path for newtypes (see the
-              -- documentation for mkNewTypeEqn as to why this is the case)
-           -> mkNewTypeEqn False dit
-
-           |  otherwise
-           -> do -- Otherwise, our only other options are stock or anyclass.
-                 -- If it is stock, we must confirm that the last argument's
-                 -- type constructor is algebraic.
-                 -- See Note [DerivEnv and DerivSpecMechanism] in GHC.Tc.Deriv.Utils
-                 whenIsJust (hasStockDeriving cls) $ \_ ->
-                   expectNonDataFamTyCon dit
-                 mk_eqn_originative dit
-
+      ,  Just dit <- mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty
+      -> if |  isNewTyCon (dit_rep_tc dit)
+               -- We have a dedicated code path for newtypes (see the
+               -- documentation for mkNewTypeEqn as to why this is the case)
+             -> mkNewTypeEqn False dit
+ 
+            |  otherwise
+             -> do -- Otherwise, our only other options are stock or anyclass.
+                   -- If it is stock, we must confirm that the last argument's
+                   -- type constructor is algebraic.
+                   -- See Note [DerivEnv and DerivSpecMechanism] in GHC.Tc.Deriv.Utils
+                   whenIsJust (hasStockDeriving cls) $ \_ ->
+                     expectNonDataFamTyCon dit
+                   mk_eqn_originative dit
+ 
      |  otherwise
-     -> mk_eqn_anyclass
+      -> mk_eqn_anyclass
   where
     -- Use heuristics (checkOriginativeSideConditions) to determine whether
     -- stock or anyclass deriving should be used.

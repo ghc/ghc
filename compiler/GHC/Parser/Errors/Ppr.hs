@@ -41,8 +41,8 @@ instance Diagnostic PsMessage where
   type DiagnosticOpts PsMessage = NoDiagnosticOpts
   defaultDiagnosticOpts = NoDiagnosticOpts
   diagnosticMessage _ = \case
-    PsUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    PsUnknownMessage (UnknownDiagnostic m)
+      -> diagnosticMessage defaultDiagnosticOpts m
 
     PsHeaderMessage m
       -> psHeaderMessageDiagnostic m
@@ -786,13 +786,13 @@ instance Diagnostic PsMessage where
     PsErrIllegalRoleName _ nearby                 -> [SuggestRoles nearby]
     PsErrInvalidTypeSignature lhs                 ->
         if | foreign_RDR `looks_like` lhs
-           -> [suggestExtension LangExt.ForeignFunctionInterface]
+            -> [suggestExtension LangExt.ForeignFunctionInterface]
            | default_RDR `looks_like` lhs
-           -> [suggestExtension LangExt.DefaultSignatures]
+            -> [suggestExtension LangExt.DefaultSignatures]
            | pattern_RDR `looks_like` lhs
-           -> [suggestExtension LangExt.PatternSynonyms]
+            -> [suggestExtension LangExt.PatternSynonyms]
            | otherwise
-           -> [SuggestTypeSignatureForm]
+            -> [SuggestTypeSignatureForm]
       where
         -- A common error is to forget the ForeignFunctionInterface flag
         -- so check for that, and suggest.  cf #3805

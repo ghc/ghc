@@ -779,16 +779,16 @@ cvtForD (ImportF callconv safety from nm ty) =
   do { l <- getL
      ; if -- the prim and javascript calling conventions do not support headers
           -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
-          |  callconv == TH.Prim || callconv == TH.JavaScript
+         |  callconv == TH.Prim || callconv == TH.JavaScript
           -> mk_imp (CImport (L l $ quotedSourceText from) (L l (cvt_conv callconv)) (L l safety') Nothing
                              (CFunction (StaticTarget (SourceText from)
                                                       (mkFastString from) Nothing
                                                       True)))
-          |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
+         |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
                                           (mkFastString (TH.nameBase nm))
                                           from (L l $ quotedSourceText from)
           -> mk_imp impspec
-          |  otherwise
+         |  otherwise
           -> failWith $ InvalidCCallImpent from }
   where
     mk_imp impspec

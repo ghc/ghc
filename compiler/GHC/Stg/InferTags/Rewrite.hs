@@ -343,7 +343,7 @@ rewriteBinds top_flag b@(StgRec binds) =
 -- Rewrite a RHS
 rewriteRhs :: (Id,TagSig) -> InferStgRhs
            -> RM (TgStgRhs)
-rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs_ #-} do
+rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = do
     -- pprTraceM "rewriteRhs" (ppr _id)
 
     -- Look up the nodes representing the constructor arguments.

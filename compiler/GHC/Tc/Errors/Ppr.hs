@@ -111,8 +111,8 @@ instance Diagnostic TcRnMessage where
   type DiagnosticOpts TcRnMessage = TcRnMessageOpts
   defaultDiagnosticOpts = defaultTcRnMessageOpts
   diagnosticMessage opts = \case
-    TcRnUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    TcRnUnknownMessage (UnknownDiagnostic m)
+      -> diagnosticMessage (defaultDiagnosticOpts) m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg

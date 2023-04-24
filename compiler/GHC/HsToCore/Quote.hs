@@ -2093,7 +2093,7 @@ repP (ConPat NoExtField dc details)
                                    ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hsps_body t)
                                    ; ts <- repListM typeTyConName (repTy . unwrapTyArg) tyargs
                                    ; repPcon con_str ts qs }
-         RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
+         RecCon r -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds r)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
                                 p2' <- repLP p2;

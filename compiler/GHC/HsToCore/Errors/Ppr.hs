@@ -28,8 +28,8 @@ instance Diagnostic DsMessage where
   type DiagnosticOpts DsMessage = NoDiagnosticOpts
   defaultDiagnosticOpts = NoDiagnosticOpts
   diagnosticMessage _ = \case
-    DsUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    DsUnknownMessage (UnknownDiagnostic m)
+      -> diagnosticMessage defaultDiagnosticOpts m
     DsEmptyEnumeration
       -> mkSimpleDecorated $ text "Enumeration is empty"
     DsIdentitiesFound conv_fn type_of_conv

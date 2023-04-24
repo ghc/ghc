@@ -1401,12 +1401,12 @@ instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
 
 instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg rec) where
   toHie (PrefixCon tyargs args) = concatM [ toHie tyargs, toHie args ]
-  toHie (RecCon rec) = toHie rec
+  toHie (RecCon r) = toHie r
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
 instance ToHie (HsConDeclGADTDetails GhcRn) where
   toHie (PrefixConGADT args) = toHie args
-  toHie (RecConGADT rec _) = toHie rec
+  toHie (RecConGADT r _) = toHie r
 
 instance HiePass p => ToHie (LocatedAn NoEpAnns (HsCmdTop (GhcPass p))) where
   toHie (L span top) = concatM $ makeNodeA top span : case top of

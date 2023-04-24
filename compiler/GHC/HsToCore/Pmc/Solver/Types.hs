@@ -316,7 +316,7 @@ lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
 -- See also Note [Coverage checking Newtype matches] in GHC.HsToCore.Pmc.Solver.
 lookupVarInfoNT :: TmState -> Id -> (Id, VarInfo)
 lookupVarInfoNT ts x = case lookupVarInfo ts x of
-  VI{ vi_pos = as_newtype -> Just y } -> lookupVarInfoNT ts y
+  VI{ vi_pos = (as_newtype -> Just y) } -> lookupVarInfoNT ts y
   res                                 -> (x, res)
   where
     as_newtype = listToMaybe . mapMaybe go

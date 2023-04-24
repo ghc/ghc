@@ -1853,15 +1853,15 @@ checkMain explicit_mod_hdr export_ies
                                      , name  <- availNames avail
                                      , nameOccName name == main_occ ]
 
-      ; if | tcg_mod tcg_env /= main_mod
+      ; if| tcg_mod tcg_env /= main_mod
            -> -- Not the main module
               return tcg_env
 
-           | [main_name] <- exported_mains
+          | [main_name] <- exported_mains
            -> -- The module indeed exports a function called 'main'
               generateMainBinding tcg_env main_name
 
-           | otherwise
+          | otherwise
            -> assert (null exported_mains) $
               -- A fully-checked export list can't contain more
               -- than one function with the same OccName

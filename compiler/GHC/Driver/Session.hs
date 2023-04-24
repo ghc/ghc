@@ -1071,7 +1071,6 @@ setDynamicNow dflags0 =
 -- | Used by 'GHC.runGhc' to partially initialize a new 'DynFlags' value
 initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
- let
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
  refRtasmInfo <- newIORef Nothing

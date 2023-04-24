@@ -1462,16 +1462,16 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
 
            ; let tv_kind_vars = tyCoVarsOfType tv_kind
            ; cur_lvl <- getTcLevel
-           ; if |  tcTyVarLevel tv <= cur_lvl
+           ; if|  tcTyVarLevel tv <= cur_lvl
                 -> return dv   -- this variable is from an outer context; skip
                                -- See Note [Use level numbers for quantification]
 
-                | case tcTyVarDetails tv of
+               | case tcTyVarDetails tv of
                      SkolemTv _ lvl _ -> lvl > pushTcLevel cur_lvl
                      _                -> False
                 -> return dv  -- Skip inner skolems; ToDo: explain
 
-                |  intersectsVarSet bound tv_kind_vars
+               |  intersectsVarSet bound tv_kind_vars
                    -- the tyvar must not be from an outer context, but we have
                    -- already checked for this.
                    -- See Note [Naughty quantification candidates]
@@ -1483,7 +1483,7 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
                       ; let escapees = intersectVarSet bound tv_kind_vars
                       ; naughtyQuantification orig_ty tv escapees }
 
-                |  otherwise
+               |  otherwise
                 -> do { let tv' = tv `setTyVarKind` tv_kind
                             dv' | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv' }
                                 | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv' }

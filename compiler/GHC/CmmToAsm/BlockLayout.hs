@@ -711,8 +711,7 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
 
 
         allEdges :: [CfgEdge]
-        allEdges = {-# SCC allEdges #-}
-                   sortOn (relevantWeight) $ filter (not . deadEdge) $ (infoEdgeList weights)
+        allEdges = sortOn (relevantWeight) $ filter (not . deadEdge) $ (infoEdgeList weights)
           where
             deadEdge :: CfgEdge -> Bool
             deadEdge (CfgEdge from to _) = let e = (from,to) in Set.member e combined || Set.member e builtEdges
@@ -768,7 +767,6 @@ sequenceChain  info weights     blocks@((BasicBlock entry _):_) =
         assert (all (\bid -> mapMember bid blockMap) placedBlocks) $
         dropJumps info $ map getBlock placedBlocks
 
-{-# SCC dropJumps #-}
 -- | Remove redundant jumps between blocks when we can rely on
 -- fall through.
 dropJumps :: forall a i. Instruction i => LabelMap a -> [GenBasicBlock i]
@@ -809,19 +807,13 @@ sequenceTop ncgImpl edgeWeights (CmmProc info lbl live (ListGraph blocks))
 
     in CmmProc info lbl live $ ListGraph $ ncgMakeFarBranches ncgImpl info $
          if -- Chain based algorithm
-            | ncgCfgBlockLayout config
-            , backendMaintainsCfg platform
-            , Just cfg <- edgeWeights
-            -> {-# SCC layoutBlocks #-} sequenceChain info cfg blocks
+            | ncgCfgBlockLayout config , backendMaintainsCfg platform , Just cfg <- edgeWeights ->  sequenceChain info cfg blocks
 
             -- Old algorithm without edge weights
-            | ncgCfgWeightlessLayout config
-               || not (backendMaintainsCfg platform)
-            -> {-# SCC layoutBlocks #-} sequenceBlocks Nothing info blocks
+            | ncgCfgWeightlessLayout config || not (backendMaintainsCfg platform) ->  sequenceBlocks Nothing info blocks
 
             -- Old algorithm with edge weights (if any)
-            | otherwise
-            -> {-# SCC layoutBlocks #-} sequenceBlocks edgeWeights info blocks
+            | otherwise ->  sequenceBlocks edgeWeights info blocks
 
 -- The old algorithm:
 -- It is very simple (and stupid): We make a graph out of

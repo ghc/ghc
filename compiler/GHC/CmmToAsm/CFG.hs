@@ -697,7 +697,6 @@ optimizeCFG doStaticPred weights proc@(CmmProc _info _lab _live graph) cfg =
 optHsPatterns :: Weights -> RawCmmDecl -> CFG -> CFG
 optHsPatterns _ (CmmData {}) cfg = cfg
 optHsPatterns weights (CmmProc info _lab _live graph) cfg =
-    {-# SCC optHsPatterns #-}
     -- pprTrace "Initial:" (pprEdgeWeights cfg) $
     -- pprTrace "Initial:" (ppr $ mkGlobalWeights (g_entry graph) cfg) $
 
@@ -776,10 +775,8 @@ optHsPatterns weights (CmmProc info _lab _live graph) cfg =
 staticPredCfg :: BlockId -> CFG -> CFG
 staticPredCfg entry cfg = cfg'
   where
-    (_, globalEdgeWeights) = {-# SCC mkGlobalWeights #-}
-                             mkGlobalWeights entry cfg
-    cfg' = {-# SCC rewriteEdges #-}
-            mapFoldlWithKey
+    (_, globalEdgeWeights) = mkGlobalWeights entry cfg
+    cfg' = mapFoldlWithKey
                 (\cfg from m ->
                     mapFoldlWithKey
                         (\cfg to w -> setEdgeWeight cfg (EdgeWeight w) from to )
@@ -965,7 +962,6 @@ revPostorderFrom cfg root =
 --   for edges is the number of traversals.
 
 {-# NOINLINE mkGlobalWeights #-}
-{-# SCC mkGlobalWeights #-}
 mkGlobalWeights :: HasDebugCallStack => BlockId -> CFG -> (LabelMap Double, LabelMap (LabelMap Double))
 mkGlobalWeights root localCfg
   | null localCfg = panic "Error - Empty CFG"
@@ -1047,7 +1043,6 @@ type TargetNodeInfo = (BlockId, EdgeInfo)
 -- | Update branch weights based on certain heuristics.
 -- See Note [Static Branch Prediction]
 -- TODO: This should be combined with optimizeCFG
-{-# SCC staticBranchPrediction #-}
 staticBranchPrediction :: BlockId -> LoopInfo -> CFG -> CFG
 staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
     -- pprTrace "staticEstimatesOn" (ppr (cfg)) $

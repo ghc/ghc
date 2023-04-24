@@ -199,8 +199,8 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
   ncg_uniqs <- mkSplitUniqSupply 'n'
   debugTraceMsg logger 4 (text "Outputing asm to" <+> text filenm)
   let ncg_config = initNCGConfig dflags this_mod
-  {-# SCC "OutputAsm" #-} doOutput filenm $
-    \h -> {-# SCC "NativeCodeGen" #-}
+  doOutput filenm $
+    \h ->
       nativeCodeGen logger (toolSettings dflags) ncg_config location h ncg_uniqs cmm_stream
 
 {-
@@ -214,9 +214,8 @@ outputAsm logger dflags this_mod location filenm cmm_stream = do
 outputLlvm :: Logger -> LlvmConfigCache -> DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
 outputLlvm logger llvm_config dflags filenm cmm_stream = do
   lcg_config <- initLlvmCgConfig logger llvm_config dflags
-  {-# SCC "llvm_output" #-} doOutput filenm $
-    \f -> {-# SCC "llvm_CodeGen" #-}
-      llvmCodeGen logger lcg_config f cmm_stream
+  doOutput filenm $
+    \f -> llvmCodeGen logger lcg_config f cmm_stream
 
 {-
 ************************************************************************
@@ -342,8 +341,7 @@ outputForeignStubs_help fname doc_str header footer
 -- | Generate code to initialise cost centres
 profilingInitCode :: Platform -> Module -> CollectedCCs -> CStub
 profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
- = {-# SCC profilingInitCode #-}
-   initializerCStub platform fn_name decls body
+ = initializerCStub platform fn_name decls body
  where
    pdocC = pprCLabel platform
    fn_name = mkInitializerStubLabel this_mod (fsLit "prof_init")

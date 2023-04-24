@@ -444,16 +444,16 @@ checkFRR_with check_kind frr_ctxt ty
   = do { th_stage <- getStage
        ; if
           -- Shortcut: check for 'Type' and 'UnliftedType' type synonyms.
-          | TyConApp tc [] <- ki
+         | TyConApp tc [] <- ki
           , tc == liftedTypeKindTyCon || tc == unliftedTypeKindTyCon
           -> return refl
 
           -- See [Wrinkle: Typed Template Haskell] in Note [hasFixedRuntimeRep].
-          | Brack _ (TcPending {}) <- th_stage
+         | Brack _ (TcPending {}) <- th_stage
           -> return refl
 
           -- Otherwise: ensure that the kind 'ki' of 'ty' is concrete.
-          | otherwise
+         | otherwise
           -> do { kco <- check_kind frr_orig ki
                 ; return ( mkGReflRightMCo Nominal ty kco
                          , mkCastTyMCo ty kco ) } }

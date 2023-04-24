@@ -1304,8 +1304,7 @@ compileCore simplify fn = do
           else
              return $ Right mod_guts
 
-     Nothing -> panic "compileToCoreModule: target FilePath not found in\
-                           module dependency graph"
+     Nothing -> panic "compileToCoreModule: target FilePath not found in  module dependency graph"
   where -- two versions, based on whether we simplify (thus run tidyProgram,
         -- which returns a (CgGuts, ModDetails) pair, or not (in which case
         -- we just have a ModGuts.

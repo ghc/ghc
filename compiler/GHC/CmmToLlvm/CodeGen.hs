@@ -1707,17 +1707,14 @@ genMachOp_slow opt op [x, y] = case op of
             vx <- exprToVarW x
             vy <- exprToVarW y
 
-            if | getVarType vx == getVarType vy
-               -> doExprW (ty vx) $ binOp vx vy
+            if | getVarType vx == getVarType vy -> doExprW (ty vx) $ binOp vx vy
 
-               | allow_y_cast
-               -> do
+               | allow_y_cast -> do
                     vy' <- singletonPanic "binLlvmOp cast"<$>
                             castVarsW Signed [(vy, (ty vx))]
                     doExprW (ty vx) $ binOp vx vy'
 
-               | otherwise
-               -> pprPanic "binLlvmOp types" (pdoc platform x $$ pdoc platform y)
+               | otherwise -> pprPanic "binLlvmOp types" (pdoc platform x $$ pdoc platform y)
 
         binCastLlvmOp ty binOp = runExprData $ do
             vx <- exprToVarW x

@@ -467,7 +467,7 @@ tidyProgram opts (ModGuts { mg_module           = mod
 -- unfoldings.
 collectCostCentres :: Module -> CoreProgram -> [CoreRule] -> S.Set CostCentre
 collectCostCentres mod_name binds rules
-  = {-# SCC collectCostCentres #-} foldl' go_bind (go_rules S.empty) binds
+  = foldl' go_bind (go_rules S.empty) binds
   where
     go cs e = case e of
       Var{} -> cs

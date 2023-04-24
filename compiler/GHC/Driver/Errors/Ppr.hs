@@ -55,8 +55,8 @@ instance Diagnostic GhcMessage where
       -> diagnosticMessage (dsMessageOpts opts) m
     GhcDriverMessage m
       -> diagnosticMessage (driverMessageOpts opts) m
-    GhcUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    GhcUnknownMessage (UnknownDiagnostic m)
+      -> diagnosticMessage (defaultDiagnosticOpts) m
 
   diagnosticReason = \case
     GhcPsMessage m
@@ -88,8 +88,8 @@ instance Diagnostic DriverMessage where
   type DiagnosticOpts DriverMessage = DriverMessageOpts
   defaultDiagnosticOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage)
   diagnosticMessage opts = \case
-    DriverUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    DriverUnknownMessage (UnknownDiagnostic m)
+      -> diagnosticMessage defaultDiagnosticOpts m
     DriverPsHeaderMessage m
       -> diagnosticMessage (psDiagnosticOpts opts) m
     DriverMissingHomeModules uid missing buildingCabalPackage

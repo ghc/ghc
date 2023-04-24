@@ -118,7 +118,6 @@ analyzeCmm
     -> FactBase f
     -> FactBase f
 analyzeCmm dir lattice transfer cmmGraph initFact =
-    {-# SCC analyzeCmm #-}
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
         blockMap =
@@ -183,7 +182,7 @@ rewriteCmm
     -> GenCmmGraph node
     -> FactBase f
     -> UniqSM (GenCmmGraph node, FactBase f)
-rewriteCmm dir lattice rwFun cmmGraph initFact = {-# SCC rewriteCmm #-} do
+rewriteCmm dir lattice rwFun cmmGraph initFact = do
     let entry = g_entry cmmGraph
         hooplGraph = g_graph cmmGraph
         blockMap1 =

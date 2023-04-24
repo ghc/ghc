@@ -2979,13 +2979,9 @@ is_lit' f num_ops e = case f num_ops e of
 -- match "lit * x": return lit value (handles commutativity)
 is_expr_mul :: NumOps -> Expr CoreBndr -> Expr CoreBndr -> Maybe Integer
 is_expr_mul num_ops x e = if
-   | x `cheapEqExpr` e
-   -> Just 1
-   | Just (k,x') <- is_lit_mul num_ops e
-   , x `cheapEqExpr` x'
-   -> return k
-   | otherwise
-   -> Nothing
+   | x `cheapEqExpr` e -> Just 1
+   | Just (k,x') <- is_lit_mul num_ops e , x `cheapEqExpr` x' -> return k
+   | otherwise -> Nothing
 
 
 -- | Match the application of a binary primop

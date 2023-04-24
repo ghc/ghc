@@ -2530,12 +2530,12 @@ canEqTyVarFunEq :: CtEvidence               -- :: lhs ~ (rhs |> mco)
                 -> TcS (StopOrContinue Ct)
 canEqTyVarFunEq ev eq_rel swapped tv1 ps_xi1 fun_tc2 fun_args2 ps_xi2 mco
   = do { is_touchable <- touchabilityTest (ctEvFlavour ev) tv1 rhs
-       ; if | case is_touchable of { Untouchable -> False; _ -> True }
+       ; if| case is_touchable of { Untouchable -> False; _ -> True }
             , cterHasNoProblem $
                 checkTyVarEq tv1 rhs `cterRemoveProblem` cteTypeFamily
             -> canEqCanLHSFinish ev eq_rel swapped (TyVarLHS tv1) rhs
 
-            | otherwise
+           | otherwise
               -> do { new_ev <- rewriteCastedEquality ev eq_rel swapped
                                   (mkTyVarTy tv1) (mkTyConApp fun_tc2 fun_args2)
                                   mco

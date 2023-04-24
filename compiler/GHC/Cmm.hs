@@ -125,7 +125,7 @@ type GenCmmDataDecl d = GenCmmDecl d Void Void -- When `CmmProc` case can be sta
 
 cmmDataDeclCmmDecl :: GenCmmDataDecl d -> GenCmmDecl d h g
 cmmDataDeclCmmDecl = \ case
-    CmmProc void _ _ _ -> case void of
+    CmmProc void _ _ _ -> case void of {}
     CmmData section d -> CmmData section d
 {-# INLINE cmmDataDeclCmmDecl #-}
 
