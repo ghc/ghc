@@ -139,6 +139,7 @@ werror =
 enableDebugInfo :: Flavour -> Flavour
 enableDebugInfo = addArgs $ notStage0 ? mconcat
     [ builder (Ghc CompileHs) ? arg "-g3"
+    [ builder (Ghc CompileC) ? arg "-g3"
     , builder (Cc CompileC) ? arg "-g3"
     , builder (Cabal Setup) ? arg "--disable-library-stripping"
     , builder (Cabal Setup) ? arg "--disable-executable-stripping"
