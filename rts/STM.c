@@ -294,7 +294,7 @@ static StgClosure *lock_tvar(Capability *cap,
     StgInfoTable *info;
     do {
       result = ACQUIRE_LOAD(&s->current_value);
-      info = GET_INFO_RELAXED(UNTAG_CLOSURE(result));
+      info = GET_INFO(UNTAG_CLOSURE(result));
     } while (info == &stg_TREC_HEADER_info);
   } while (cas((void *) &s->current_value,
                (StgWord)result, (StgWord)trec) != (StgWord)result);
