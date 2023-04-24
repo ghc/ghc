@@ -308,7 +308,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     , ifaceRnArgMap          = M.empty
     , ifaceExportItems       = if OptPrune `elem` doc_opts then
                                  pruned_export_items else export_items
-    , ifaceRnExportItems     = []
+    , ifaceRnExportItems     = [] -- Filled in renameInterface
     , ifaceExports           = exported_names
     , ifaceVisibleExports    = visible_names
     , ifaceDeclMap           = decl_map

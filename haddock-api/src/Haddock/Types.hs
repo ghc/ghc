@@ -275,12 +275,10 @@ data Documentation name = Documentation
   , documentationWarning :: !(Maybe (Doc name))
   } deriving Functor
 
-
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (MDoc name)
 type DocForDecl name = (Documentation name, FnArgsDoc name)
-
 
 noDocForDecl :: DocForDecl name
 noDocForDecl = (Documentation Nothing Nothing, mempty)

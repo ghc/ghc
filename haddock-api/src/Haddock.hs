@@ -159,19 +159,21 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   qual <- rightOrThrowE (qualification flags)
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
-  -- inject dynamic-too into flags before we proceed
+  -- Inject dynamic-too into ghc options if the ghc we are using was built with
+  -- dynamic linking
   flags'' <- ghc flags $ do
         df <- getDynFlags
         case lookup "GHC Dynamic" (compilerInfo df) of
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
+  -- Inject `-j` into ghc options, if given
   flags' <- pure $ case optParCount flags'' of
     Nothing       -> flags''
     Just Nothing  -> Flag_OptGhc "-j" : flags''
     Just (Just n) -> Flag_OptGhc ("-j" ++ show n) : flags''
 
-  -- bypass the interface version check
+  -- Whether or not to bypass the interface version check
   let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
 
   -- Create a temporary directory and redirect GHC output there (unless user
@@ -183,10 +185,10 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   let withDir | Flag_NoTmpCompDir `elem` flags = id
               | otherwise = withTempOutputDir
 
+  -- Output warnings about potential misuse of some flags
   unless (Flag_NoWarnings `elem` flags) $ do
     hypSrcWarnings flags
-    forM_ (warnings args) $ \warning -> do
-      hPutStrLn stderr warning
+    mapM_ (hPutStrLn stderr) (optGhcWarnings args)
     when noChecks $
       hPutStrLn stderr noCheckWarning
 
@@ -195,12 +197,14 @@ haddockWithGhc ghc args = handleTopExceptions $ do
     logger <- getLogger
     unit_state <- hsc_units <$> getSession
 
+    -- If any --show-interface was used, show the given interfaces
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
       name_cache <- freshNameCache
       mIfaceFile <- readInterfaceFiles name_cache [(("", Nothing), Visible, path)] noChecks
       forM_ mIfaceFile $ \(_,_,_, ifaceFile) -> do
         putMsg logger $ renderJson (jsonInterfaceFile ifaceFile)
 
+    -- If we were given source files to generate documentation from, do it
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
       let packageInfo = PackageInfo { piPackageName =
@@ -220,6 +224,8 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       -- Render the interfaces.
       liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages ifaces
 
+    -- If we were not given any input files, error if documentation was
+    -- requested?
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
         throwE "No input file(s)."
@@ -241,8 +247,8 @@ withTempOutputDir action = do
   withTempDir dir action
 
 -- | Create warnings about potential misuse of -optghc
-warnings :: [String] -> [String]
-warnings = map format . filter (isPrefixOf "-optghc")
+optGhcWarnings :: [String] -> [String]
+optGhcWarnings = map format . filter (isPrefixOf "-optghc")
   where
     format arg = concat ["Warning: `", arg, "' means `-o ", drop 2 arg, "', did you mean `-", arg, "'?"]
 
@@ -267,12 +273,14 @@ withGhc flags action = do
 readPackagesAndProcessModules :: [Flag] -> [String]
                               -> Ghc ([(DocPaths, Visibility, FilePath, InterfaceFile)], [Interface], LinkEnv)
 readPackagesAndProcessModules flags files = do
-    -- Get packages supplied with --read-interface.
+    -- Whether or not we bypass the interface file version check
     let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
+
+    -- Read package dependency interface files supplied with --read-interface and
     name_cache <- hsc_NC <$> getSession
     packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
-    -- Create the interfaces -- this is the core part of Haddock.
+    -- Create the interfaces for the given modules -- this is the core part of Haddock
     let ifaceFiles = map (\(_, _, _, ifaceFile) -> ifaceFile) packages
     (ifaces, homeLinks) <- processModules (verbosity flags) files flags ifaceFiles
 
