@@ -6,7 +6,6 @@ module GHC.Cmm.ThreadSanitizer (annotateTSAN) where
 
 import GHC.Prelude
 
-import GHC.StgToCmm.Utils (get_GlobalReg_addr)
 import GHC.Platform
 import GHC.Platform.Regs (activeStgRegs, callerSaves)
 import GHC.Cmm
@@ -24,12 +23,12 @@ import GHC.Types.Unique.Supply
 import Data.Maybe (fromMaybe)
 
 data Env = Env { platform :: Platform
-               , uniques :: [Unique]
+               , uniques :: UniqSupply
                }
 
 annotateTSAN :: Platform -> CmmGraph -> UniqSM CmmGraph
 annotateTSAN platform graph = do
-    env <- Env platform <$> getUniquesM
+    env <- Env platform <$> getUniqueSupplyM
     return $ modifyGraph (mapGraphBlocks (annotateBlock env)) graph
 
 mapBlockList :: (forall e' x'. n e' x' -> Block n e' x')
@@ -137,14 +136,15 @@ mkUnsafeCall env ftgt formals args =
     call `blockAppend`     -- perform call
     restore                -- restore global registers
   where
-    -- We are rather conservative here and just save/restore all GlobalRegs.
-    (save, restore) = saveRestoreCallerRegs (platform env)
+    (save, restore) = saveRestoreCallerRegs gregs_us (platform env)
+
+    (arg_us, gregs_us) = splitUniqSupply (uniques env)
 
     -- We also must be careful not to mention caller-saved registers in
     -- arguments as Cmm-Lint checks this. To accomplish this we instead bind
     -- the arguments to local registers.
     arg_regs :: [CmmReg]
-    arg_regs = zipWith arg_reg (uniques env) args
+    arg_regs = zipWith arg_reg (uniqsFromSupply arg_us) args
       where
         arg_reg :: Unique -> CmmExpr -> CmmReg
         arg_reg u expr = CmmLocal $ LocalReg u (cmmExprType (platform env) expr)
@@ -154,31 +154,34 @@ mkUnsafeCall env ftgt formals args =
 
     call = CmmUnsafeForeignCall ftgt formals (map CmmReg arg_regs)
 
-saveRestoreCallerRegs :: Platform
+-- | We save the contents of global registers in locals and allow the
+-- register allocator to spill them to the stack around the call.
+-- We cannot use the register table for this since we would interface
+-- with {SAVE,RESTORE}_THREAD_STATE.
+saveRestoreCallerRegs :: UniqSupply -> Platform
                       -> (Block CmmNode O O, Block CmmNode O O)
-saveRestoreCallerRegs platform =
+saveRestoreCallerRegs us platform =
     (save, restore)
   where
-    regs = filter (callerSaves platform) (activeStgRegs platform)
+    regs_to_save :: [GlobalReg]
+    regs_to_save = filter (callerSaves platform) (activeStgRegs platform)
 
-    save = blockFromList (map saveReg regs)
+    nodes :: [(CmmNode O O, CmmNode O O)]
+    nodes =
+        zipWith mk_reg regs_to_save (uniqsFromSupply us)
+      where
+        mk_reg :: GlobalReg -> Unique -> (CmmNode O O, CmmNode O O)
+        mk_reg reg u =
+            let ty = globalRegSpillType platform reg
+                greg = CmmGlobal (GlobalRegUse reg ty)
+                lreg = CmmLocal (LocalReg u ty)
+                save = CmmAssign lreg (CmmReg greg)
+                restore = CmmAssign greg (CmmReg lreg)
+            in (save, restore)
 
-    saveReg :: GlobalReg -> CmmNode O O
-    saveReg reg =
-      CmmStore (get_GlobalReg_addr platform reg)
-               (CmmReg (CmmGlobal (GlobalRegUse reg ty)))
-               NaturallyAligned
-      where ty = globalRegSpillType platform reg
-
-    restore = blockFromList (map restoreReg regs)
-
-    restoreReg :: GlobalReg -> CmmNode O O
-    restoreReg reg =
-      CmmAssign (CmmGlobal (GlobalRegUse reg ty))
-                (CmmLoad (get_GlobalReg_addr platform reg)
-                         ty
-                         NaturallyAligned)
-      where ty = globalRegSpillType platform reg
+    (save_nodes, restore_nodes) = unzip nodes
+    save = blockFromList save_nodes
+    restore = blockFromList restore_nodes
 
 -- | Mirrors __tsan_memory_order
 -- <https://github.com/llvm-mirror/compiler-rt/blob/master/include/sanitizer/tsan_interface_atomic.h#L32>
