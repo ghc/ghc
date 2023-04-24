@@ -565,8 +565,8 @@ mkNameClashErr :: Outputable a
 mkNameClashErr rdr_name gres =
   mkTcRnUnknownMessage $ mkPlainError noHints $
     (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
-                 , text "It could refer to"
-                 , nest 3 (vcat (msg1 : msgs)) ])
+          , text "It could refer to"
+          , nest 3 (vcat (msg1 : msgs)) ])
   where
     np1 NE.:| nps = gres
     msg1 =  text "either" <+> ppr_gre np1

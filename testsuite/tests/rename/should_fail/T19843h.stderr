@@ -28,7 +28,7 @@ T19843h.hs:24:8: error: [GHC-39999]
     • No instance for ‘GHC.Records.HasField "getAll" r0 a0’
         arising from selecting the field ‘getAll’
       Perhaps use record field of Alt ‘getAlt’ (imported from Data.Monoid)
-      Perhaps you want to add ‘getAll’ to the import list
-      in the import of ‘Data.Monoid’ (T19843h.hs:9:1-28).
+      Add ‘getAll’ to the import list in the import of ‘Data.Monoid’
+      (at T19843h.hs:9:1-28).
     • In the expression: undefined.getAll
       In an equation for ‘quur’: quur = undefined.getAll

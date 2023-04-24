@@ -402,16 +402,9 @@ data GhcHint
 
       Test cases: mod28, mod36, mod87, mod114, ...
   -}
-  | ImportSuggestion ImportSuggestion
+  | ImportSuggestion OccName ImportSuggestion
 
-    {-| Suggest importing a data constructor to bring it into scope
-        Triggered by: 'GHC.Tc.Errors.Types.TcRnTypeCannotBeMarshaled'
-
-        Test cases: ccfail004
-    -}
-  | SuggestImportingDataCon
-  {-| Found a pragma in the body of a module, suggest
-     placing it in the header
+  {-| Found a pragma in the body of a module, suggest placing it in the header.
   -}
   | SuggestPlacePragmaInHeader
     {-| Suggest using pattern matching syntax for a non-bidirectional pattern synonym
@@ -452,9 +445,23 @@ data InstantiationSuggestion = InstantiationSuggestion !ModuleName !Module
 -- | Suggest how to fix an import.
 data ImportSuggestion
   -- | Some module exports what we want, but we aren't explicitly importing it.
-  = CouldImportFrom (NE.NonEmpty (Module, ImportedModsVal)) OccName
+  = CouldImportFrom (NE.NonEmpty (Module, ImportedModsVal))
   -- | Some module exports what we want, but we are explicitly hiding it.
-  | CouldUnhideFrom (NE.NonEmpty (Module, ImportedModsVal)) OccName
+  | CouldUnhideFrom (NE.NonEmpty (Module, ImportedModsVal))
+  -- | The module exports what we want, but it isn't a type.
+  | CouldRemoveTypeKeyword ModuleName
+  -- | The module exports what we want, but it's a type and we have @ExplicitNamespaces@ on.
+  | CouldAddTypeKeyword ModuleName
+  -- | Suggest importing a data constructor to bring it into scope
+  | ImportDataCon
+      -- | Where to suggest importing the 'DataCon' from.
+      --
+      -- The 'Bool' tracks whether to suggest using an import of the form
+      -- @import (pattern Foo)@, depending on whether @-XPatternSynonyms@
+      -- was enabled.
+      { ies_suggest_import_from :: Maybe (ModuleName, Bool)
+        -- | The 'OccName' of the parent of the data constructor.
+      , ies_parent :: OccName }
 
 -- | Explain how something is in scope.
 data HowInScope

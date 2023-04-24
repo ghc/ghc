@@ -29,6 +29,10 @@ import GHC.Prelude
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple )
 
+import GHC.Types.Name.Reader
+import GHC.Unit.Module.ModIface
+import GHC.Unit.Module.Warnings
+
 import GHC.Core.Coercion
 import GHC.Core.Unify     ( tcMatchTys )
 import GHC.Core.TyCon
@@ -58,14 +62,13 @@ import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Error
-import GHC.Types.Hint (UntickedPromotedThing(..), pprUntickedConstructor, isBareSymbol)
+import GHC.Types.Hint
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
 import GHC.Types.Error.Codes ( constructorCode )
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
-import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
@@ -78,7 +81,6 @@ import GHC.Types.Fixity (defaultFixity)
 
 import GHC.Unit.State
 import GHC.Unit.Module
-import GHC.Unit.Module.Warnings  ( warningTxtCategory, pprWarningTxtForMsg )
 
 import GHC.Data.Bag
 import GHC.Data.FastString
@@ -876,9 +878,9 @@ instance Diagnostic TcRnMessage where
                in case why of
                 NotADataType ->
                   quotes (ppr ty) <+> text "is not a data type"
-                NewtypeDataConNotInScope Nothing ->
+                NewtypeDataConNotInScope _ [] ->
                   hang innerMsg 2 $ text "because its data constructor is not in scope"
-                NewtypeDataConNotInScope (Just tc) ->
+                NewtypeDataConNotInScope tc _ ->
                   hang innerMsg 2 $
                     text "because the data constructor for"
                     <+> quotes (ppr tc) <+> text "is not in scope"
@@ -1113,6 +1115,58 @@ instance Diagnostic TcRnMessage where
     TcRnTypeDataForbids feature
       -> mkSimpleDecorated $
         ppr feature <+> text "are not allowed in type data declarations."
+    TcRnBadImport k iface decl_spec ie _ps _interp ->
+      mkSimpleDecorated $
+        let
+          pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
+          pprImpDeclSpec iface decl_spec =
+            quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
+                IsBoot  -> text "(hi-boot interface)"
+                NotBoot -> empty
+          withContext msgs =
+            hang (text "In the import of" <+> pprImpDeclSpec iface decl_spec <> colon)
+              2 (vcat msgs)
+        in case k of
+          BadImportNotExported ->
+            vcat
+              [ text "Module" <+> pprImpDeclSpec iface decl_spec <+>
+                text "does not export" <+> quotes (ppr ie) <> dot
+              ]
+          BadImportAvailVar ->
+            withContext
+              [ text "an item called"
+                  <+> quotes val <+> text "is exported, but it is not a type."
+              ]
+            where
+              val_occ = rdrNameOcc $ ieName ie
+              val = parenSymOcc val_occ (ppr val_occ)
+          BadImportAvailTyCon {} ->
+            withContext
+              [ text "an item called"
+                <+> quotes tycon <+> text "is exported, but it is a type."
+              ]
+            where
+              tycon_occ = rdrNameOcc $ ieName ie
+              tycon = parenSymOcc tycon_occ (ppr tycon_occ)
+          BadImportNotExportedSubordinates ns ->
+            withContext
+              [ text "an item called" <+> quotes sub <+> text "is exported, but it does not export any children"
+              , text "(constructors, class methods or field names) called"
+              <+> pprWithCommas (quotes . ppr) ns <> dot
+              ]
+              where
+                sub_occ = rdrNameOcc $ ieName ie
+                sub = parenSymOcc sub_occ (ppr sub_occ)
+          BadImportAvailDataCon dataType_occ ->
+            withContext
+              [ text "an item called" <+> quotes datacon
+              , text "is exported, but it is a data constructor of"
+              , quotes dataType <> dot
+              ]
+              where
+                datacon_occ = rdrNameOcc $ ieName ie
+                datacon = parenSymOcc datacon_occ (ppr datacon_occ)
+                dataType = parenSymOcc dataType_occ (ppr dataType_occ)
 
     TcRnIllegalNewtype con show_linear_types reason
       -> mkSimpleDecorated $
@@ -2311,7 +2365,10 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInterfaceError err
       -> interfaceErrorReason err
-
+    TcRnBadImport _ _ _ _ _ importKind
+      -> case importKind of
+           Exactly -> ErrorWithoutFlag
+           EverythingBut -> WarningWithFlag Opt_WarnDodgyImports
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2582,8 +2639,13 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalForeignType _ reason
       -> case reason of
            TypeCannotBeMarshaled _ why
-             | NewtypeDataConNotInScope{} <- why -> [SuggestImportingDataCon]
-             | UnliftedFFITypesNeeded <- why -> [suggestExtension LangExt.UnliftedFFITypes]
+             | NewtypeDataConNotInScope tc _ <- why
+             -> let tc_nm = tyConName tc
+                    dc = dataConName $ head $ tyConDataCons tc
+                in [ ImportSuggestion (occName dc)
+                   $ ImportDataCon Nothing (nameOccName tc_nm) ]
+             | UnliftedFFITypesNeeded <- why
+             -> [suggestExtension LangExt.UnliftedFFITypes]
            _ -> noHints
     TcRnInvalidCIdentifier{}
       -> noHints
@@ -2913,7 +2975,17 @@ instance Diagnostic TcRnMessage where
       -> [SuggestAddTypeSignatures UnnamedBinding]
     TcRnInterfaceError reason
       -> interfaceErrorHints reason
+    TcRnBadImport k _ is ie patsyns_enabled _ ->
+      let mod = is_mod is
+          occ = rdrNameOcc $ ieName ie
+      in case k of
+        BadImportAvailVar         -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod]
+        BadImportNotExported      -> noHints
+        BadImportAvailTyCon       -> [ImportSuggestion occ $ CouldAddTypeKeyword (is_mod is)]
+        BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (is_mod is, patsyns_enabled)) par]
+        BadImportNotExportedSubordinates{} -> noHints
 
+  diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",
@@ -4841,7 +4913,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     --   ...
     --   type T0  = Int
     --
-    -- `tyExpansions T10` returns [T9, T8, T7, ... Int]
+    -- `tyExpansions T10` returns [T9, T8, T7, ..., Int]
     --
     -- This only expands the top layer, so if you have:
     --

@@ -2071,7 +2071,7 @@ data IllegalForeignTypeReason
 -- | Reason why a type cannot be marshalled through the FFI.
 data TypeCannotBeMarshaledReason
   = NotADataType
-  | NewtypeDataConNotInScope !(Maybe TyCon)
+  | NewtypeDataConNotInScope !TyCon ![Type]
   | UnliftedFFITypesNeeded
   | NotABoxedMarshalableTyCon
   | ForeignLabelNotAPtr
@@ -2180,9 +2180,7 @@ checkRepTyCon check_tc ty
         | otherwise     -> check_tc tc
       Nothing -> NotValid NotADataType
   where
-    mk_nt_reason tc tys
-      | null tys  = NewtypeDataConNotInScope Nothing
-      | otherwise = NewtypeDataConNotInScope (Just tc)
+    mk_nt_reason tc tys = NewtypeDataConNotInScope tc tys
 
 {-
 Note [Foreign import dynamic]

@@ -620,6 +620,13 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "MultiplePossibleParents"                       = 99339
   GhcDiagnosticCode "InvalidTyConParent"                            = 33238
 
+  -- BadImport
+  GhcDiagnosticCode "BadImportNotExported"                          = 61689
+  GhcDiagnosticCode "BadImportAvailDataCon"                         = 35373
+  GhcDiagnosticCode "BadImportNotExportedSubordinates"              = 10237
+  GhcDiagnosticCode "BadImportAvailTyCon"                           = 56449
+  GhcDiagnosticCode "BadImportAvailVar"                             = 12112
+
   -- TcRnPragmaWarning
   GhcDiagnosticCode "WarningTxt"                                    = 63394
   GhcDiagnosticCode "DeprecatedTxt"                                 = 68441
@@ -851,6 +858,10 @@ type family ConRecursInto con where
   -- Constructors of DsMessage
 
   ConRecursInto "DsUnknownMessage"         = 'Just UnknownDiagnostic
+
+  ----------------------------------
+  -- Constructors of TcRnBadImport
+  ConRecursInto "TcRnBadImport"            = 'Just BadImportKind
 
   ----------------------------------
   -- Any other constructors: don't recur, instead directly

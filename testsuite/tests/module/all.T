@@ -297,3 +297,4 @@ test('T20562', normal, compile, [''])
 test('T21752', [extra_files(['T21752A.hs', 'T21752.hs'])], multimod_compile, ['T21752', '-v0'])
 
 test('TupleTyConUserSyntax', [extra_files(['TupleTyConUserSyntaxA.hs', 'TupleTyConUserSyntax.hs'])], multimod_compile, ['TupleTyConUserSyntax', '-v0'])
+test('T21826', normal, compile_fail, [''])

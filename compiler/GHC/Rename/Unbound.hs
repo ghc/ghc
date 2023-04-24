@@ -195,7 +195,7 @@ unknownNameSuggestions_ looking_for dflags hpt curr_mod global_env local_env
     suggs = mconcat
       [ if_ne (SuggestSimilarNames tried_rdr_name) $
           similarNameSuggestions looking_for dflags global_env local_env tried_rdr_name
-      , map ImportSuggestion imp_suggs
+      , map (ImportSuggestion $ rdrNameOcc tried_rdr_name) imp_suggs
       , extensionSuggestions tried_rdr_name
       , fieldSelectorSuggestions global_env tried_rdr_name ]
     (imp_errs, imp_suggs) = importSuggestions looking_for global_env hpt curr_mod imports tried_rdr_name
@@ -321,9 +321,9 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   , (mod : mods) <- map fst interesting_imports
   = ([ModulesDoNotExport (mod :| mods) occ_name], [])
   | mod : mods <- helpful_imports_non_hiding
-  = ([], [CouldImportFrom (mod :| mods) occ_name])
+  = ([], [CouldImportFrom (mod :| mods)])
   | mod : mods <- helpful_imports_hiding
-  = ([], [CouldUnhideFrom (mod :| mods) occ_name])
+  = ([], [CouldUnhideFrom (mod :| mods)])
   | otherwise
   = ([], [])
  where

@@ -16,7 +16,7 @@ import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Hs.Expr ()   -- instance Outputable
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
-import GHC.Types.Name (NameSpace, pprDefinedAt, occNameSpace, pprNameSpace, isValNameSpace, nameModule)
+import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)
 import GHC.Types.SrcLoc (SrcSpan(..), srcSpanStartLine)
 import GHC.Unit.Module.Imported (ImportedModsVal(..))
@@ -199,10 +199,8 @@ instance Outputable GhcHint where
         whose | null parents = empty
               | otherwise    = text "belonging to the type" <> plural parents
                                  <+> pprQuotedList parents
-    ImportSuggestion import_suggestion
-      -> pprImportSuggestion import_suggestion
-    SuggestImportingDataCon
-      -> text "Import the data constructor to bring it into scope"
+    ImportSuggestion occ_name import_suggestion
+      -> pprImportSuggestion occ_name import_suggestion
     SuggestPlacePragmaInHeader
       -> text "Perhaps you meant to place it in the module header?"
       $$ text "The module header is the section at the top of the file, before the" <+> quotes (text "module") <+> text "keyword"
@@ -237,50 +235,88 @@ perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
 
 -- | Pretty-print an 'ImportSuggestion'.
-pprImportSuggestion :: ImportSuggestion -> SDoc
-pprImportSuggestion (CouldImportFrom mods occ_name)
+pprImportSuggestion :: OccName -> ImportSuggestion -> SDoc
+pprImportSuggestion occ_name (CouldImportFrom mods)
   | (mod, imv) NE.:| [] <- mods
   = fsep
-      [ text "Perhaps you want to add"
+      [ text "Add"
       , quotes (ppr occ_name)
       , text "to the import list"
       , text "in the import of"
       , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
+      , parens (text "at" <+> ppr (imv_span imv)) <> dot
       ]
   | otherwise
   = fsep
-      [ text "Perhaps you want to add"
+      [ text "Add"
       , quotes (ppr occ_name)
       , text "to one of these import lists:"
       ]
     $$
     nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        [ quotes (ppr mod) <+> parens (text "at" <+> ppr (imv_span imv))
         | (mod,imv) <- NE.toList mods
         ])
-pprImportSuggestion (CouldUnhideFrom mods occ_name)
+pprImportSuggestion occ_name (CouldUnhideFrom mods)
   | (mod, imv) NE.:| [] <- mods
   = fsep
-      [ text "Perhaps you want to remove"
+      [ text "Remove"
       , quotes (ppr occ_name)
       , text "from the explicit hiding list"
       , text "in the import of"
       , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
+      , parens (text "at" <+> ppr (imv_span imv)) <> dot
       ]
   | otherwise
   = fsep
-      [ text "Perhaps you want to remove"
+      [ text "Remove"
       , quotes (ppr occ_name)
       , text "from the hiding clauses"
       , text "in one of these imports:"
       ]
     $$
     nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
+        [ quotes (ppr mod) <+> parens (text "at" <+> ppr (imv_span imv))
         | (mod,imv) <- NE.toList mods
         ])
+pprImportSuggestion occ_name (CouldAddTypeKeyword mod)
+ = vcat [ text "Add the" <+> quotes (text "type")
+          <+> text "keyword to the import statement:"
+        , nest 2 $ text "import"
+            <+> ppr mod
+            <+> parens_sp (text "type" <+> pprPrefixOcc occ_name)
+        ]
+  where
+    parens_sp d = parens (space <> d <> space)
+pprImportSuggestion occ_name (CouldRemoveTypeKeyword mod)
+  = vcat [ text "Remove the" <+> quotes (text "type")
+             <+> text "keyword from the import statement:"
+         , nest 2 $ text "import"
+             <+> ppr mod
+             <+> parens_sp (pprPrefixOcc occ_name) ]
+  where
+    parens_sp d = parens (space <> d <> space)
+pprImportSuggestion dc_occ (ImportDataCon Nothing parent_occ)
+  = text "Import the data constructor" <+> quotes (ppr dc_occ) <+>
+    text "of" <+> quotes (ppr parent_occ)
+pprImportSuggestion dc_occ (ImportDataCon (Just (mod, patsyns_enabled)) parent_occ)
+  = vcat $ [ text "Use"
+           , nest 2 $ text "import"
+               <+> ppr mod
+               <+> parens_sp (pprPrefixOcc parent_occ <> parens_sp (pprPrefixOcc dc_occ))
+           , text "or"
+           , nest 2 $ text "import"
+               <+> ppr mod
+               <+> parens_sp (pprPrefixOcc parent_occ <> text "(..)")
+           ] ++ if patsyns_enabled
+                then [ text "or"
+                     , nest 2 $ text "import"
+                         <+> ppr mod
+                         <+> parens_sp (text "pattern" <+> pprPrefixOcc dc_occ)
+                     ]
+                else []
+  where
+    parens_sp d = parens (space <> d <> space)
 
 -- | Pretty-print a 'SimilarName'.
 pprSimilarName :: NameSpace -> SimilarName -> SDoc

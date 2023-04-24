@@ -109,6 +109,7 @@ module GHC.Tc.Errors.Types (
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
+  , BadImportKind(..)
   ) where
 
 import GHC.Prelude
@@ -123,9 +124,9 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
 import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType, TcPredType)
-import GHC.Types.Avail (AvailInfo)
 import GHC.Types.Basic
 import GHC.Types.Error
+import GHC.Types.Avail
 import GHC.Types.Hint (UntickedPromotedThing(..))
 import GHC.Types.ForeignCall (CLabelString)
 import GHC.Types.Id.Info ( RecSelParent(..) )
@@ -163,6 +164,7 @@ import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import qualified Language.Haskell.TH.Syntax as TH
+import GHC.Unit.Module.ModIface
 
 import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)
@@ -2935,6 +2937,21 @@ data TcRnMessage where
                  rename/should_fail/T5657
   -}
   TcRnSectionWithoutParentheses :: HsExpr GhcPs -> TcRnMessage
+  {-| TcRnBadImport is an error that occurs in cases where an item in an import
+      statement is not exported by the corresponding module.
+      When a nonexistent item is included in the 'hiding' section of an import
+      statement, this becomes a warning instead, controlled by -Wdodgy-imports.
+
+      Test cases:
+        testsuite/tests/module/should_fail/T21826.hs
+  -}
+  TcRnBadImport :: BadImportKind
+                -> ModIface
+                -> ImpDeclSpec
+                -> IE GhcPs
+                -> Bool -- ^ whether @-XPatternSynonyms@ was enabled
+                -> ImportListInterpretation
+                -> TcRnMessage
 
   {- TcRnBindingOfExistingName is an error triggered by an attempt to rebind
      built-in syntax, punned list or tuple syntax, or a name quoted via Template Haskell.
@@ -4749,6 +4766,20 @@ data ExpectedActualInfo
 data WhenMatching
 
   = WhenMatching TcType TcType CtOrigin (Maybe TypeOrKind)
+  deriving Generic
+
+data BadImportKind
+  -- | Module does not export...
+  = BadImportNotExported
+  -- | Missing @type@ keyword when importing a type.
+  | BadImportAvailTyCon
+  -- | Trying to import a data constructor directly, e.g.
+  -- @import Data.Maybe (Just)@ instead of @import Data.Maybe (Maybe(Just))@
+  | BadImportAvailDataCon OccName
+  -- | The parent does not export the given children.
+  | BadImportNotExportedSubordinates [OccName]
+  -- | Incorrect @type@ keyword when importing something which isn't a type.
+  | BadImportAvailVar
   deriving Generic
 
 -- | Some form of @"not in scope"@ error. See also the 'OutOfScopeHole'

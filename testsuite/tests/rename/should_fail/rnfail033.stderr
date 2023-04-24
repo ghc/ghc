@@ -6,5 +6,5 @@ rnfail033.hs:2:21: error: [GHC-76037]
           ‘Data.List.zip’ (imported from Data.List),
           ‘Data.List.or’ (imported from Data.List),
           ‘Data.List.all’ (imported from Data.List)
-      • Perhaps you want to remove ‘map’ from the explicit hiding list
-        in the import of ‘Data.List’ (rnfail033.hs:3:1-31).
+      • Remove ‘map’ from the explicit hiding list in the import of
+        ‘Data.List’ (at rnfail033.hs:3:1-31).

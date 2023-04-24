@@ -7,9 +7,8 @@ valid_hole_fits.hs:9:6: warning: [GHC-88464] [-Wdeferred-out-of-scope-variables 
       • Perhaps use one of these:
           ‘System.IO.putStrLn’ (imported from System.IO),
           ‘System.IO.putStr’ (imported from System.IO)
-      • Perhaps you want to remove ‘putStrLn’
-        from the explicit hiding list in the import of ‘Prelude’
-        (valid_hole_fits.hs:3:1-40).
+      • Remove ‘putStrLn’ from the explicit hiding list in the import of
+        ‘Prelude’ (at valid_hole_fits.hs:3:1-40).
 
 valid_hole_fits.hs:17:17: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> IO Int

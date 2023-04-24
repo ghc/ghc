@@ -1241,7 +1241,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
        | isQual rdr
        = failLookupWith (QualImportError rdr)
        | null lookups
-       = failLookupWith (BadImport ie)
+       = failLookupWith (BadImport ie BadImportIsParent)
        | otherwise
        = return $ concatMap nonDetNameEnvElts lookups
       where
@@ -1249,8 +1249,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, [GlobalRdrElt])]
     lookup_lie (L loc ieRdr)
-        = do (stuff, warns) <- setSrcSpanA loc $
-                               liftM (fromMaybe ([],[])) $
+        = setSrcSpanA loc $
+          do (stuff, warns) <- liftM (fromMaybe ([],[])) $
                                run_lookup (lookup_ie ieRdr)
              mapM_ emit_warning warns
              return [ (L loc ie, gres) | (ie,gres) <- stuff ]
@@ -1261,21 +1261,20 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
             emit_warning MissingImportList = whenWOptM Opt_WarnMissingImportList $
               addTcRnDiagnostic (TcRnMissingImportList ieRdr)
             emit_warning (BadImportW ie) = whenWOptM Opt_WarnDodgyImports $ do
-              let msg = mkTcRnUnknownMessage $
-                    mkPlainDiagnostic (WarningWithFlag Opt_WarnDodgyImports)
-                                      noHints
-                                      (lookup_err_msg (BadImport ie))
-              addDiagnostic msg
+              -- 'BadImportW' is only constructed below in 'handle_bad_import', in
+              -- the 'EverythingBut' case, so that's what we pass to
+              -- 'badImportItemErr'.
+              badImportItemErr iface decl_spec ie BadImportIsParent all_avails EverythingBut
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
               Failed err -> do
-                addErr $ mkTcRnUnknownMessage $ mkPlainError noHints (lookup_err_msg err)
+                lookup_err_msg err
                 return Nothing
               Succeeded a -> return (Just a)
 
             lookup_err_msg err = case err of
-              BadImport ie  -> badImportItemErr iface decl_spec ie all_avails
+              BadImport ie sub -> badImportItemErr iface decl_spec ie sub all_avails Exactly
               IllegalImport -> illegalImportItemErr
               QualImportError rdr -> qualImportItemErr rdr
               AmbiguousImport rdr xs -> ambiguousImportItemErr rdr xs
@@ -1330,7 +1329,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                    dc_name = lookup_name ie (setRdrNameSpace tc srcDataName)
                in
                case catIELookupM [ tc_name, dc_name ] of
-                 []    -> failLookupWith (BadImport ie)
+                 []    -> failLookupWith (BadImport ie BadImportIsParent)
                  names -> return ([mkIEThingAbs tc' l (imp_item name) | name <- names], [])
             | otherwise
             -> do ImpOccItem { imp_item = gre } <- lookup_name ie (ieWrappedName tc')
@@ -1345,7 +1344,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            -- See Note [Importing DuplicateRecordFields]
            case lookupChildren subnames rdr_ns of
 
-             Failed rdrs -> failLookupWith (BadImport (IEThingWith xt ltc wc rdrs))
+             Failed rdrs -> failLookupWith (BadImport (IEThingWith xt ltc wc rdrs) BadImportIsSubordinate)
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
@@ -1369,7 +1368,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
           where n = greName gre
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
-          BadImport ie | want_hiding == EverythingBut -> return ([], [BadImportW ie])
+          BadImport ie _ | want_hiding == EverythingBut -> return ([], [BadImportW ie])
           _ -> failLookupWith err
 
 type IELookupM = MaybeErr IELookupError
@@ -1379,9 +1378,11 @@ data IELookupWarning
   | MissingImportList
   | DodgyImport GlobalRdrElt
 
+data BadImportIsSubordinate = BadImportIsParent | BadImportIsSubordinate
+
 data IELookupError
   = QualImportError RdrName
-  | BadImport (IE GhcPs)
+  | BadImport (IE GhcPs) BadImportIsSubordinate
   | IllegalImport
   | AmbiguousImport RdrName [GlobalRdrElt] -- e.g. a duplicated field name as a top-level import
 
@@ -2136,67 +2137,60 @@ DRFPatSynExport for a test of this.
 ************************************************************************
 -}
 
-qualImportItemErr :: RdrName -> SDoc
+qualImportItemErr :: RdrName -> TcRn ()
 qualImportItemErr rdr
-  = hang (text "Illegal qualified name in import item:")
+  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
+    hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
 
-ambiguousImportItemErr :: RdrName -> [GlobalRdrElt] -> SDoc
+ambiguousImportItemErr :: RdrName -> [GlobalRdrElt] -> TcRn ()
 ambiguousImportItemErr rdr gres
-  = hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
-       2 (vcat (map (ppr . greOccName) gres))
-
-pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
-pprImpDeclSpec iface decl_spec =
-  quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
-    IsBoot -> text "(hi-boot interface)"
-    NotBoot -> Outputable.empty
-
-badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE GhcPs -> SDoc
-badImportItemErrStd iface decl_spec ie
-  = sep [text "Module", pprImpDeclSpec iface decl_spec,
-         text "does not export", quotes (ppr ie)]
-
-badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE GhcPs
-                        -> SDoc
-badImportItemErrDataCon dataType_occ iface decl_spec ie
-  = vcat [ text "In module"
-             <+> pprImpDeclSpec iface decl_spec
-             <> colon
-         , nest 2 $ quotes datacon
-             <+> text "is a data constructor of"
-             <+> quotes dataType
-         , text "To import it use"
-         , nest 2 $ text "import"
-             <+> ppr (is_mod decl_spec)
-             <> parens_sp (dataType <> parens_sp datacon)
-         , text "or"
-         , nest 2 $ text "import"
-             <+> ppr (is_mod decl_spec)
-             <> parens_sp (dataType <> text "(..)")
-         ]
+  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints err
   where
-    datacon_occ = rdrNameOcc $ ieName ie
-    datacon = parenSymOcc datacon_occ (ppr datacon_occ)
-    dataType = parenSymOcc dataType_occ (ppr dataType_occ)
-    parens_sp d = parens (space <> d <> space)  -- T( f,g )
+    err = hang (text "Ambiguous name" <+> quotes (ppr rdr) <+> text "in import item. It could refer to:")
+             2 (vcat (map (ppr . greOccName) gres))
 
-badImportItemErr :: ModIface -> ImpDeclSpec -> IE GhcPs -> [AvailInfo] -> SDoc
-badImportItemErr iface decl_spec ie avails
-  = case find checkIfDataCon avails of
-      Just con -> badImportItemErrDataCon (availOccName con) iface decl_spec ie
-      Nothing  -> badImportItemErrStd iface decl_spec ie
+badImportItemErr
+  :: ModIface -> ImpDeclSpec -> IE GhcPs -> BadImportIsSubordinate
+  -> [AvailInfo]
+  -> ImportListInterpretation
+  -> TcRn ()
+badImportItemErr iface decl_spec ie sub avails ili
+  = do { patsyns_enabled <- xoptM LangExt.PatternSynonyms
+       ; let err = TcRnBadImport importErrorKind iface decl_spec ie patsyns_enabled ili
+       ; case ili of
+           EverythingBut -> addTcRnDiagnostic err
+           Exactly -> addErr err }
   where
-    checkIfDataCon (AvailTC _ ns) =
-      case find (\n -> importedFS == occNameFS (occName n)) ns of
-        Just n  -> isDataConName n
-        Nothing -> False
-    checkIfDataCon _ = False
+    importErrorKind
+      | any checkIfTyCon avails = case sub of
+          BadImportIsParent -> BadImportAvailTyCon
+          BadImportIsSubordinate -> BadImportNotExportedSubordinates unavailableChildren
+      | any checkIfVarName avails = BadImportAvailVar
+      | Just con <- find checkIfDataCon avails = BadImportAvailDataCon (availOccName con)
+      | otherwise = BadImportNotExported
+    checkIfDataCon = checkIfAvailMatches isDataConName
+    checkIfTyCon = checkIfAvailMatches isTyConName
+    checkIfVarName =
+      \case
+        AvailTC{} -> False
+        Avail n -> importedFS == occNameFS (occName n)
+                && (isVarOcc <||> isFieldOcc) (occName n)
+    checkIfAvailMatches namePred =
+      \case
+        AvailTC _ ns ->
+          case find (\n -> importedFS == occNameFS (occName n)) ns of
+            Just n  -> namePred n
+            Nothing -> False
+        Avail{} -> False
     availOccName = occName . availName
     importedFS = occNameFS . rdrNameOcc $ ieName ie
+    unavailableChildren = map (rdrNameOcc) $ case ie of
+      IEThingWith _ _ _ ns -> map (ieWrappedName  . unLoc) ns
+      _ -> panic "importedChildren failed pattern match: no children"
 
-illegalImportItemErr :: SDoc
-illegalImportItemErr = text "Illegal import item"
+illegalImportItemErr :: TcRn ()
+illegalImportItemErr = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $ text "Illegal import item"
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()
 addDupDeclErr gres@(gre :| _)
@@ -2212,7 +2206,7 @@ addDupDeclErr gres@(gre :| _)
   where
     sorted_names =
       NE.sortBy (SrcLoc.leftmost_smallest `on` nameSrcSpan)
-             (fmap greName gres)
+        (fmap greName gres)
 
 missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
