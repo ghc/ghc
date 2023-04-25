@@ -1,3 +1,5 @@
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK print-explicit-runtime-reps #-}
@@ -28,7 +30,7 @@ module Data.Function
   , applyWhen
   ) where
 
-import GHC.Base ( ($), (.), id, const, flip )
+import GHC.Base ( TYPE, ($), (.), id, const, flip )
 import Data.Bool ( Bool(..) )
 
 infixl 0 `on`
@@ -120,7 +122,7 @@ on :: (b -> b -> c) -> (a -> b) -> a -> a -> c
 -- "6"
 --
 -- @since 4.8.0.0
-(&) :: a -> (a -> b) -> b
+(&) :: forall r a (b :: TYPE r). a -> (a -> b) -> b
 x & f = f x
 
 -- | 'applyWhen' applies a function to a value if a condition is true,
