@@ -12,12 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { KindSigs.hs:6:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { KindSigs.hs:6:17-21 }))]
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [])
+     []
      (Just
       ((,)
        { KindSigs.hs:36:1 }

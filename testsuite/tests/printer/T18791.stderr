@@ -12,12 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T18791.hs:2:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:2:15-19 }))]
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [])
+     []
      (Just
       ((,)
        { T18791.hs:6:1 }

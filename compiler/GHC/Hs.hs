@@ -101,7 +101,7 @@ deriving instance Data (HsModule GhcPs)
 data AnnsModule
   = AnnsModule {
     am_main :: [AddEpAnn],
-    am_decls :: AnnList,
+    am_decls :: [TrailingAnn],
     am_eof :: Maybe (RealSrcSpan, RealSrcSpan) -- End of file and end of prior token
     } deriving (Data, Eq)
 

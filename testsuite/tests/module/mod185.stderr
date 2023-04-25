@@ -11,12 +11,7 @@
      (UnchangedAnchor))
     (AnnsModule
      []
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [])
+     []
      (Just
       ((,)
        { mod185.hs:6:1 }
