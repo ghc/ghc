@@ -2114,7 +2114,7 @@ GHC.Tc.Solver.defaultTyVarTcS
   It only defaults type (and kind) variables of kind 'RuntimeRep',
   'Levity', 'Multiplicity'.
 
-  It is not configurable, neither by options nor by the user.
+  It is not configurable, neither by options nor by the user. TODO
 
 GHC.Tc.Solver.applyDefaultingRules
 

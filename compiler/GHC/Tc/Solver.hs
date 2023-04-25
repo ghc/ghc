@@ -493,9 +493,6 @@ simplifyTopWanteds wanteds
     try_tyvar_defaulting dflags wc
       | isEmptyWC wc
       = return wc
-      | insolubleWC wc
-      , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
-      = try_class_defaulting wc
       | otherwise
       = do { -- Need to zonk first, as the WantedConstraints are not yet zonked.
            ; free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
@@ -512,7 +509,7 @@ simplifyTopWanteds wanteds
                        -- Weed out variables for which defaulting would be unhelpful,
                        -- e.g. alpha appearing in [W] alpha[conc] ~# rr[sk].
 
-           ; defaulted <- mapM defaultTyVarTcS defaultable_tvs -- Has unification side effects
+           ; defaulted <- mapM (defaultTyVarTcS dflags) defaultable_tvs -- Has unification side effects
            ; if or defaulted
              then do { wc_residual <- nestTcS (solveWanteds wc)
                             -- See Note [Must simplify after defaulting]
@@ -3178,18 +3175,20 @@ be an ambiguous variable in `g`.
 -}
 
 -- | Like 'defaultTyVar', but in the TcS monad.
-defaultTyVarTcS :: TcTyVar -> TcS Bool
-defaultTyVarTcS the_tv
+defaultTyVarTcS :: DynFlags -> TcTyVar -> TcS Bool
+defaultTyVarTcS dflags the_tv
   | isTyVarTyVar the_tv
     -- TyVarTvs should only be unified with a tyvar
     -- never with a type; c.f. GHC.Tc.Utils.TcMType.defaultTyVar
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = return False
   | isRuntimeRepVar the_tv
+  , not (gopt Opt_PrintExplicitRuntimeReps dflags)   -- See Note [Defaulting insolubles]
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
   | isLevityVar the_tv
+  , not (gopt Opt_PrintExplicitRuntimeReps dflags)   -- See Note [Defaulting insolubles]
   = do { traceTcS "defaultTyVarTcS Levity" (ppr the_tv)
        ; unifyTyVar the_tv liftedDataConTy
        ; return True }

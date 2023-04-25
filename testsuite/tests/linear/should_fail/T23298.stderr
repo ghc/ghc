@@ -1,0 +1,15 @@
+
+T23298.hs:12:41: error: [GHC-25897]
+    • Couldn't match type ‘x1’ with ‘Maybe x1’
+      Expected: HList x1 -> p
+        Actual: HList a1 -> p
+      ‘x1’ is a rigid type variable bound by
+        a pattern with constructor:
+          HCons :: forall x. HList x %1 -> HList (Maybe x),
+        in an equation for ‘go’
+        at T23298.hs:12:30-36
+    • In the expression: go x
+      In an equation for ‘go’: go (HCons x) = go x
+      In the expression: let go (HCons x) = go x in go ms
+    • Relevant bindings include
+        x :: HList x1 (bound at T23298.hs:12:36)
