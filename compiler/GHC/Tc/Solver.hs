@@ -490,12 +490,9 @@ simplifyTopWanteds wanteds
        ; try_tyvar_defaulting dflags wc_first_go }
   where
     try_tyvar_defaulting :: DynFlags -> WantedConstraints -> TcS WantedConstraints
-    try_tyvar_defaulting dflags wc
+    try_tyvar_defaulting _dflags wc
       | isEmptyWC wc
       = return wc
-      | insolubleWC wc
-      , gopt Opt_PrintExplicitRuntimeReps dflags -- See Note [Defaulting insolubles]
-      = try_class_defaulting wc
       | otherwise
       = do { -- Need to zonk first, as the WantedConstraints are not yet zonked.
            ; free_tvs <- TcS.zonkTyCoVarsAndFVList (tyCoVarsOfWCList wc)
