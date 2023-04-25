@@ -1,0 +1,42 @@
+cabal-version:      2.4
+name:               ghc-toolchain
+version:            0.1.0.0
+synopsis:           Utility for managing GHC target toolchains
+description:
+bug-reports:        https://gitlab.haskell.org/ghc/ghc/-/issues
+author:             Ben Gamari
+maintainer:         ben@well-typed.com
+copyright:          (c) The GHC Developers
+
+executable ghc-toolchain
+    main-is:          Main.hs
+    other-modules:    
+                      GHC.Toolchain.Lens,
+                      GHC.Toolchain.Monad,
+                      GHC.Toolchain.PlatformDetails,
+                      GHC.Toolchain.Prelude,
+                      GHC.Toolchain.Program,
+                      GHC.Toolchain.ParseTriple,
+                      GHC.Toolchain.CheckArm,
+                      GHC.Toolchain.Target,
+                      GHC.Toolchain.Tools.Ar,
+                      GHC.Toolchain.Tools.Cc,
+                      GHC.Toolchain.Tools.Cxx,
+                      GHC.Toolchain.Tools.Cpp,
+                      GHC.Toolchain.Tools.Link,
+                      GHC.Toolchain.Tools.Nm,
+                      GHC.Toolchain.Tools.Ranlib,
+                      GHC.Toolchain.Tools.Readelf,
+                      GHC.Toolchain.Tools.MergeObjs,
+                      GHC.Toolchain.Utils
+    ghc-options:      -Wall
+    default-extensions: NoImplicitPrelude
+    build-depends:    base,
+                      directory,
+                      exceptions,
+                      filepath,
+                      process,
+                      transformers,
+                      ghc-boot
+    hs-source-dirs:   src
+    default-language: Haskell2010
