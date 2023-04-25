@@ -1444,7 +1444,6 @@ pprCLabel platform lbl = pprCLabelStyle platform CStyle lbl
 {-# SPECIALIZE pprCLabel :: Platform -> CLabel -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 instance OutputableP Platform CLabel where
-  {-# INLINE pdoc #-} -- see Note [Bangs in CLabel]
   pdoc !platform lbl = getPprStyle $ \pp_sty ->
                         case pp_sty of
                           PprDump{} -> pprCLabel platform lbl
