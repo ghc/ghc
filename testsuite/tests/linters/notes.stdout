@@ -37,7 +37,6 @@ ref    compiler/GHC/Tc/TyCl.hs:1130:6:     Note [Unification variables need fres
 ref    compiler/GHC/Tc/TyCl.hs:4982:17:     Note [Missing role annotations warning]
 ref    compiler/GHC/Tc/TyCl.hs:5008:3:     Note [Missing role annotations warning]
 ref    compiler/GHC/Tc/Types.hs:692:33:     Note [Extra dependencies from .hs-boot files]
-ref    compiler/GHC/Tc/Types.hs:1423:47:     Note [Care with plugin imports]
 ref    compiler/GHC/Tc/Types/Constraint.hs:226:34:     Note [NonCanonical Semantics]
 ref    compiler/GHC/Types/Demand.hs:302:25:     Note [Preserving Boxity of results is rarely a win]
 ref    compiler/GHC/Unit/Module/Deps.hs:81:13:     Note [Structure of dep_boot_mods]

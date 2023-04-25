@@ -42,7 +42,7 @@ module GHC.Tc.Types(
         -- Renamer types
         ErrCtxt, pushErrCtxt, pushErrCtxtSameOrigin,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
-        WhereFrom(..), mkModDeps,
+        mkModDeps,
 
         -- Typechecker types
         TcTypeEnv, TcBinderStack, TcBinder(..),
@@ -1406,29 +1406,6 @@ plusImportAvails
                    imp_sig_mods      = unionListsOrd sig_mods1 sig_mods2,
                    imp_orphs         = unionListsOrd orphs1 orphs2,
                    imp_finsts        = unionListsOrd finsts1 finsts2 }
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Where from}
-*                                                                      *
-************************************************************************
-
-The @WhereFrom@ type controls where the renamer looks for an interface file
--}
-
-data WhereFrom
-  = ImportByUser IsBootInterface        -- Ordinary user import (perhaps {-# SOURCE #-})
-  | ImportBySystem                      -- Non user import.
-  | ImportByPlugin                      -- Importing a plugin;
-                                        -- See Note [Care with plugin imports] in GHC.Iface.Load
-
-instance Outputable WhereFrom where
-  ppr (ImportByUser IsBoot)                = text "{- SOURCE -}"
-  ppr (ImportByUser NotBoot)               = empty
-  ppr ImportBySystem                       = text "{- SYSTEM -}"
-  ppr ImportByPlugin                       = text "{- PLUGIN -}"
-
 
 {- *********************************************************************
 *                                                                      *

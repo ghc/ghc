@@ -541,6 +541,7 @@ Library
         GHC.JS.Unsat.Syntax
         GHC.Linker
         GHC.Linker.Config
+        GHC.Linker.Deps
         GHC.Linker.Dynamic
         GHC.Linker.ExtraObj
         GHC.Linker.Loader

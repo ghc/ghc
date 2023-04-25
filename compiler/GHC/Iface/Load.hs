@@ -30,6 +30,8 @@ module GHC.Iface.Load (
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
 
+        WhereFrom(..),
+
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface,
 
@@ -1222,3 +1224,20 @@ pprExtensibleFields :: ExtensibleFields -> SDoc
 pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ toList fs
   where
     pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
+
+
+-- | Reason for loading an interface file
+--
+-- Used to figure out whether we want to consider loading hi-boot files or not.
+data WhereFrom
+  = ImportByUser IsBootInterface        -- Ordinary user import (perhaps {-# SOURCE #-})
+  | ImportBySystem                      -- Non user import.
+  | ImportByPlugin                      -- Importing a plugin.
+
+instance Outputable WhereFrom where
+  ppr (ImportByUser IsBoot)                = text "{- SOURCE -}"
+  ppr (ImportByUser NotBoot)               = empty
+  ppr ImportBySystem                       = text "{- SYSTEM -}"
+  ppr ImportByPlugin                       = text "{- PLUGIN -}"
+
+

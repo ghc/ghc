@@ -50,7 +50,7 @@ import GHC.Tc.Utils.Monad
 
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
-
+import GHC.Iface.Load
 
 import GHC.ByteCode.Linker
 import GHC.ByteCode.Asm
@@ -67,24 +67,18 @@ import GHC.Types.Unique.DFM
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
 import GHC.Unit.Env
-import GHC.Unit.Finder
 import GHC.Unit.Module
-import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.WholeCoreBindings
-import GHC.Unit.Module.Deps
-import GHC.Unit.Home.ModInfo
 import GHC.Unit.State as Packages
 
 import qualified GHC.Data.ShortText as ST
-import qualified GHC.Data.Maybe as Maybes
 import GHC.Data.FastString
 
+import GHC.Linker.Deps
 import GHC.Linker.MacOS
 import GHC.Linker.Dynamic
 import GHC.Linker.Types
@@ -93,10 +87,9 @@ import GHC.Linker.Types
 import Control.Monad
 
 import qualified Data.Set as Set
-import qualified Data.Map as M
 import Data.Char (isSpace)
 import Data.IORef
-import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
+import Data.List (intercalate, isPrefixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
 import qualified Control.Monad.Catch as MC
@@ -111,15 +104,6 @@ import System.Win32.Info (getSystemDirectory)
 #endif
 
 import GHC.Utils.Exception
-
-import GHC.Unit.Module.Graph
-import GHC.Types.SourceFile
-import GHC.Utils.Misc
-import GHC.Iface.Load
-import GHC.Unit.Home
-import Data.Either
-import Control.Applicative
-import GHC.Iface.Errors.Ppr
 
 uninitialised :: a
 uninitialised = panic "Loader not initialised"
@@ -207,28 +191,23 @@ loadDependencies
   -> IO (LoaderState, SuccessFlag, [Linkable], PkgsLoaded) -- ^ returns the set of linkables required
 loadDependencies interp hsc_env pls span needed_mods = do
 --   initLoaderState (hsc_dflags hsc_env) dl
-   let dflags = hsc_dflags hsc_env
-   -- The interpreter and dynamic linker can only handle object code built
-   -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
-   -- So here we check the build tag: if we're building a non-standard way
-   -- then we need to find & link object files built the "normal" way.
-   maybe_normal_osuf <- checkNonStdWay dflags interp span
+   let opts = initLinkDepsOpts hsc_env
 
    -- Find what packages and linkables are required
-   (lnks, all_lnks, pkgs, this_pkgs_needed)
-      <- getLinkDeps hsc_env pls
-           maybe_normal_osuf span needed_mods
+   deps <- getLinkDeps opts interp pls span needed_mods
+
+   let this_pkgs_needed = ldNeededUnits deps
 
    -- Link the packages and modules required
-   pls1 <- loadPackages' interp hsc_env pkgs pls
-   (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 lnks
+   pls1 <- loadPackages' interp hsc_env (ldUnits deps) pls
+   (pls2, succ) <- loadModuleLinkables interp hsc_env pls1 (ldNeededLinkables deps)
    let this_pkgs_loaded = udfmRestrictKeys all_pkgs_loaded $ getUniqDSet trans_pkgs_needed
        all_pkgs_loaded = pkgs_loaded pls2
        trans_pkgs_needed = unionManyUniqDSets (this_pkgs_needed : [ loaded_pkg_trans_deps pkg
                                                                   | pkg_id <- uniqDSetToList this_pkgs_needed
                                                                   , Just pkg <- [lookupUDFM all_pkgs_loaded pkg_id]
                                                                   ])
-   return (pls2, succ, all_lnks, this_pkgs_loaded)
+   return (pls2, succ, ldAllLinkables deps, this_pkgs_loaded)
 
 
 -- | Temporarily extend the loaded env.
@@ -614,315 +593,27 @@ loadExpr interp hsc_env span root_ul_bco = do
         -- All wired-in names are in the base package, which we link
         -- by default, so we can safely ignore them here.
 
-dieWith :: DynFlags -> SrcSpan -> SDoc -> IO a
-dieWith dflags span msg = throwGhcExceptionIO (ProgramError (showSDoc dflags (mkLocMessage MCFatal span msg)))
-
-
-checkNonStdWay :: DynFlags -> Interp -> SrcSpan -> IO (Maybe FilePath)
-checkNonStdWay _dflags interp _srcspan
-  | ExternalInterp {} <- interpInstance interp = return Nothing
-    -- with -fexternal-interpreter we load the .o files, whatever way
-    -- they were built.  If they were built for a non-std way, then
-    -- we will use the appropriate variant of the iserv binary to load them.
-
--- #if-guard the following equations otherwise the pattern match checker will
--- complain that they are redundant.
-#if defined(HAVE_INTERNAL_INTERPRETER)
-checkNonStdWay dflags _interp srcspan
-  | hostFullWays == targetFullWays = return Nothing
-    -- Only if we are compiling with the same ways as GHC is built
-    -- with, can we dynamically load those object files. (see #3604)
-
-  | objectSuf_ dflags == normalObjectSuffix && not (null targetFullWays)
-  = failNonStd dflags srcspan
-
-  | otherwise = return (Just (hostWayTag ++ "o"))
+initLinkDepsOpts :: HscEnv -> LinkDepsOpts
+initLinkDepsOpts hsc_env = opts
   where
-    targetFullWays = fullWays (ways dflags)
-    hostWayTag = case waysTag hostFullWays of
-                  "" -> ""
-                  tag -> tag ++ "_"
-
-    normalObjectSuffix :: String
-    normalObjectSuffix = phaseInputExt StopLn
-
-data Way' = Normal | Prof | Dyn
-
-failNonStd :: DynFlags -> SrcSpan -> IO (Maybe FilePath)
-failNonStd dflags srcspan = dieWith dflags srcspan $
-  text "Cannot load" <+> pprWay' compWay <+>
-     text "objects when GHC is built" <+> pprWay' ghciWay $$
-  text "To fix this, either:" $$
-  text "  (1) Use -fexternal-interpreter, or" $$
-  buildTwiceMsg
-    where compWay
-            | ways dflags `hasWay` WayDyn  = Dyn
-            | ways dflags `hasWay` WayProf = Prof
-            | otherwise = Normal
-          ghciWay
-            | hostIsDynamic = Dyn
-            | hostIsProfiled = Prof
-            | otherwise = Normal
-          buildTwiceMsg = case (ghciWay, compWay) of
-            (Normal, Dyn) -> dynamicTooMsg
-            (Dyn, Normal) -> dynamicTooMsg
-            _ ->
-              text "  (2) Build the program twice: once" <+>
-                pprWay' ghciWay <> text ", and then" $$
-              text "      " <> pprWay' compWay <+>
-                text "using -osuf to set a different object file suffix."
-          dynamicTooMsg = text "  (2) Use -dynamic-too," <+>
-            text "and use -osuf and -dynosuf to set object file suffixes as needed."
-          pprWay' :: Way' -> SDoc
-          pprWay' way = text $ case way of
-            Normal -> "the normal way"
-            Prof -> "with -prof"
-            Dyn -> "with -dynamic"
-#endif
-
-getLinkDeps :: HscEnv
-            -> LoaderState
-            -> Maybe FilePath                   -- replace object suffixes?
-            -> SrcSpan                          -- for error messages
-            -> [Module]                         -- If you need these
-            -> IO ([Linkable], [Linkable], [UnitId], UniqDSet UnitId)     -- ... then link these first
-            -- The module and package dependencies for the needed modules are returned.
-            -- See Note [Object File Dependencies]
--- Fails with an IO exception if it can't find enough files
-
-getLinkDeps hsc_env pls replace_osuf span mods
--- Find all the packages and linkables that a set of modules depends on
- = do {
-        -- 1.  Find the dependent home-pkg-modules/packages from each iface
-        -- (omitting modules from the interactive package, which is already linked)
-      ; (mods_s, pkgs_s) <-
-          -- Why two code paths here? There is a significant amount of repeated work
-          -- performed calculating transitive dependencies
-          -- if --make uses the oneShot code path (see MultiLayerModulesTH_* tests)
-          if isOneShot (ghcMode dflags)
-            then follow_deps (filterOut isInteractiveModule mods)
-                              emptyUniqDSet emptyUniqDSet;
-            else do
-              (pkgs, mmods) <- unzip <$> mapM get_mod_info all_home_mods
-              return (catMaybes mmods, unionManyUniqDSets (init_pkg_set : pkgs))
-
-      ; let
-        -- 2.  Exclude ones already linked
-        --      Main reason: avoid findModule calls in get_linkable
-            (mods_needed, links_got) = partitionEithers (map split_mods mods_s)
-            pkgs_needed = eltsUDFM $ getUniqDSet pkgs_s `minusUDFM` pkgs_loaded pls
-
-            split_mods mod =
-                let is_linked = findModuleLinkable_maybe (objs_loaded pls) mod <|> findModuleLinkable_maybe (bcos_loaded pls) mod
-                in case is_linked of
-                     Just linkable -> Right linkable
-                     Nothing -> Left mod
-
-        -- 3.  For each dependent module, find its linkable
-        --     This will either be in the HPT or (in the case of one-shot
-        --     compilation) we may need to use maybe_getFileLinkable
-      ; let { osuf = objectSuf dflags }
-      ; lnks_needed <- mapM (get_linkable osuf) mods_needed
-
-      ; return (lnks_needed, links_got ++ lnks_needed, pkgs_needed, pkgs_s) }
-  where
+    opts = LinkDepsOpts
+            { ldObjSuffix   = objectSuf dflags
+            , ldOneShotMode = isOneShot (ghcMode dflags)
+            , ldModuleGraph = hsc_mod_graph hsc_env
+            , ldUnitEnv     = hsc_unit_env hsc_env
+            , ldLoadIface   = load_iface
+            , ldPprOpts     = initSDocContext dflags defaultUserStyle
+            , ldFinderCache = hsc_FC hsc_env
+            , ldFinderOpts  = initFinderOpts dflags
+            , ldUseByteCode = gopt Opt_UseBytecodeRatherThanObjects dflags
+            , ldMsgOpts     = initIfaceMessageOpts dflags
+            , ldWays        = ways dflags
+            }
     dflags = hsc_dflags hsc_env
-    mod_graph = hsc_mod_graph hsc_env
-
-    -- This code is used in `--make` mode to calculate the home package and unit dependencies
-    -- for a set of modules.
-    --
-    -- It is significantly more efficient to use the shared transitive dependency
-    -- calculation than to compute the transitive dependency set in the same manner as oneShot mode.
-
-    -- It is also a matter of correctness to use the module graph so that dependencies between home units
-    -- is resolved correctly.
-    make_deps_loop :: (UniqDSet UnitId, Set.Set NodeKey) -> [ModNodeKeyWithUid] -> (UniqDSet UnitId, Set.Set NodeKey)
-    make_deps_loop found [] = found
-    make_deps_loop found@(found_units, found_mods) (nk:nexts)
-      | NodeKey_Module nk `Set.member` found_mods = make_deps_loop found nexts
-      | otherwise =
-        case M.lookup (NodeKey_Module nk) (mgTransDeps mod_graph) of
-            Just trans_deps ->
-              let deps = Set.insert (NodeKey_Module nk) trans_deps
-                  -- See #936 and the ghci.prog007 test for why we have to continue traversing through
-                  -- boot modules.
-                  todo_boot_mods = [ModNodeKeyWithUid (GWIB mn NotBoot) uid | NodeKey_Module (ModNodeKeyWithUid (GWIB mn IsBoot) uid) <- Set.toList trans_deps]
-              in make_deps_loop (found_units, deps `Set.union` found_mods) (todo_boot_mods ++ nexts)
-            Nothing ->
-              let (ModNodeKeyWithUid _ uid) = nk
-              in make_deps_loop (addOneToUniqDSet found_units uid, found_mods) nexts
-
-    mkNk m = ModNodeKeyWithUid (GWIB (moduleName m) NotBoot) (moduleUnitId m)
-    (init_pkg_set, all_deps) = make_deps_loop (emptyUniqDSet, Set.empty) $ map mkNk (filterOut isInteractiveModule mods)
-
-    all_home_mods = [with_uid | NodeKey_Module with_uid <- Set.toList all_deps]
-
-    get_mod_info (ModNodeKeyWithUid gwib uid) =
-      case lookupHug (hsc_HUG hsc_env) uid (gwib_mod gwib) of
-        Just hmi ->
-          let iface = (hm_iface hmi)
-              mmod = case mi_hsc_src iface of
-                      HsBootFile -> link_boot_mod_error (mi_module iface)
-                      _          -> return $ Just (mi_module iface)
-
-          in (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface),) <$>  mmod
-        Nothing ->
-          let err = text "getLinkDeps: Home module not loaded" <+> ppr (gwib_mod gwib) <+> ppr uid
-          in throwGhcExceptionIO (ProgramError (showSDoc dflags err))
+    load_iface msg mod = initIfaceCheck (text "loader") hsc_env
+                          $ loadInterface msg mod (ImportByUser NotBoot)
 
 
-       -- This code is used in one-shot mode to traverse downwards through the HPT
-       -- to find all link dependencies.
-       -- The ModIface contains the transitive closure of the module dependencies
-       -- within the current package, *except* for boot modules: if we encounter
-       -- a boot module, we have to find its real interface and discover the
-       -- dependencies of that.  Hence we need to traverse the dependency
-       -- tree recursively.  See bug #936, testcase ghci/prog007.
-    follow_deps :: [Module]             -- modules to follow
-                -> UniqDSet Module         -- accum. module dependencies
-                -> UniqDSet UnitId          -- accum. package dependencies
-                -> IO ([Module], UniqDSet UnitId) -- result
-    follow_deps []     acc_mods acc_pkgs
-        = return (uniqDSetToList acc_mods, acc_pkgs)
-    follow_deps (mod:mods) acc_mods acc_pkgs
-        = do
-          mb_iface <- initIfaceCheck (text "getLinkDeps") hsc_env $
-                        loadInterface msg mod (ImportByUser NotBoot)
-          iface <- case mb_iface of
-                    Maybes.Failed err ->
-                      let opts   = initIfaceMessageOpts dflags
-                          err_txt = missingInterfaceErrorDiagnostic opts err
-                      in throwGhcExceptionIO (ProgramError (showSDoc dflags err_txt))
-                    Maybes.Succeeded iface -> return iface
-
-          when (mi_boot iface == IsBoot) $ link_boot_mod_error mod
-
-          let
-            pkg = moduleUnit mod
-            deps  = mi_deps iface
-
-            pkg_deps = dep_direct_pkgs deps
-            (boot_deps, mod_deps) = flip partitionWith (Set.toList (dep_direct_mods deps)) $
-              \case
-                (_, GWIB m IsBoot)  -> Left m
-                (_, GWIB m NotBoot) -> Right m
-
-            mod_deps' = case hsc_home_unit_maybe hsc_env of
-                          Nothing -> []
-                          Just home_unit -> filter (not . (`elementOfUniqDSet` acc_mods)) (map (mkHomeModule home_unit) $ (boot_deps ++ mod_deps))
-            acc_mods'  = case hsc_home_unit_maybe hsc_env of
-                          Nothing -> acc_mods
-                          Just home_unit -> addListToUniqDSet acc_mods (mod : map (mkHomeModule home_unit) mod_deps)
-            acc_pkgs'  = addListToUniqDSet acc_pkgs (Set.toList pkg_deps)
-
-          case hsc_home_unit_maybe hsc_env of
-            Just home_unit | isHomeUnit home_unit pkg ->  follow_deps (mod_deps' ++ mods)
-                                                                      acc_mods' acc_pkgs'
-            _ ->  follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-        where
-           msg = text "need to link module" <+> ppr mod <+>
-                  text "due to use of Template Haskell"
-
-
-
-    link_boot_mod_error :: Module -> IO a
-    link_boot_mod_error mod =
-        throwGhcExceptionIO (ProgramError (showSDoc dflags (
-            text "module" <+> ppr mod <+>
-            text "cannot be linked; it is only available as a boot module")))
-
-    no_obj :: Outputable a => a -> IO b
-    no_obj mod = dieWith dflags span $
-                     text "cannot find object file for module " <>
-                        quotes (ppr mod) $$
-                     while_linking_expr
-
-    while_linking_expr = text "while linking an interpreted expression"
-
-
-    -- See Note [Using Byte Code rather than Object Code for Template Haskell]
-    homeModLinkable :: DynFlags -> HomeModInfo -> Maybe Linkable
-    homeModLinkable dflags hmi =
-      if gopt Opt_UseBytecodeRatherThanObjects dflags
-        then homeModInfoByteCode hmi <|> homeModInfoObject hmi
-        else homeModInfoObject hmi   <|> homeModInfoByteCode hmi
-
-    get_linkable osuf mod      -- A home-package module
-        | Just mod_info <- lookupHugByModule mod (hsc_HUG hsc_env)
-        = adjust_linkable (Maybes.expectJust "getLinkDeps" (homeModLinkable dflags mod_info))
-        | otherwise
-        = do    -- It's not in the HPT because we are in one shot mode,
-                -- so use the Finder to get a ModLocation...
-             case hsc_home_unit_maybe hsc_env of
-              Nothing -> no_obj mod
-              Just home_unit -> do
-
-                let fc = hsc_FC hsc_env
-                let dflags = hsc_dflags hsc_env
-                let fopts = initFinderOpts dflags
-                mb_stuff <- findHomeModule fc fopts home_unit (moduleName mod)
-                case mb_stuff of
-                  Found loc mod -> found loc mod
-                  _ -> no_obj (moduleName mod)
-        where
-            found loc mod = do {
-                -- ...and then find the linkable for it
-               mb_lnk <- findObjectLinkableMaybe mod loc ;
-               case mb_lnk of {
-                  Nothing  -> no_obj mod ;
-                  Just lnk -> adjust_linkable lnk
-              }}
-
-            adjust_linkable lnk
-                | Just new_osuf <- replace_osuf = do
-                        new_uls <- mapM (adjust_ul new_osuf)
-                                        (linkableUnlinked lnk)
-                        return lnk{ linkableUnlinked=new_uls }
-                | otherwise =
-                        return lnk
-
-            adjust_ul new_osuf (DotO file) = do
-                massert (osuf `isSuffixOf` file)
-                let file_base = fromJust (stripExtension osuf file)
-                    new_file = file_base <.> new_osuf
-                ok <- doesFileExist new_file
-                if (not ok)
-                   then dieWith dflags span $
-                          text "cannot find object file "
-                                <> quotes (text new_file) $$ while_linking_expr
-                   else return (DotO new_file)
-            adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
-            adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
-            adjust_ul _ l@(BCOs {}) = return l
-            adjust_ul _ l@LoadedBCOs{} = return l
-            adjust_ul _ (CoreBindings (WholeCoreBindings _ mod _))     = pprPanic "Unhydrated core bindings" (ppr mod)
-
-{-
-Note [Using Byte Code rather than Object Code for Template Haskell]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The `-fprefer-byte-code` flag allows a user to specify that they want to use
-byte code (if availble) rather than object code for home module dependenices
-when executing Template Haskell splices.
-
-Why might you want to use byte code rather than object code?
-
-* Producing object code is much slower than producing byte code (for example if you're using -fno-code)
-* Linking many large object files, which happens once per splice, is quite expensive. (#21700)
-
-So we allow the user to choose to use byte code rather than object files if they want to avoid these
-two pitfalls.
-
-When using `-fprefer-byte-code` you have to arrange to have the byte code availble.
-In normal --make mode it will not be produced unless you enable `-fbyte-code-and-object-code`.
-See Note [Home module build products] for some more information about that.
-
-The only other place where the flag is consulted is when enabling code generation
-with `-fno-code`, which does so to anticipate what decision we will make at the
-splice point about what we would prefer.
-
--}
 
 {- **********************************************************************
 
@@ -1019,12 +710,9 @@ partitionLinkable li
                            li {linkableUnlinked=li_uls_bco}]
             _ -> [li]
 
-findModuleLinkable_maybe :: LinkableSet -> Module -> Maybe Linkable
-findModuleLinkable_maybe = lookupModuleEnv
-
 linkableInSet :: Linkable -> LinkableSet -> Bool
 linkableInSet l objs_loaded =
-  case findModuleLinkable_maybe objs_loaded (linkableModule l) of
+  case lookupModuleEnv objs_loaded (linkableModule l) of
         Nothing -> False
         Just m  -> linkableTime l == linkableTime m
 
