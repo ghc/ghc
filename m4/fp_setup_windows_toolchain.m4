@@ -80,6 +80,7 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     mingwbin="$hardtop/inplace/mingw/bin/"
     mingwlib="$hardtop/inplace/mingw/lib/"
 
+    # TODO
     CC="${mingwbin}clang.exe"
     CXX="${mingwbin}clang++.exe"
 

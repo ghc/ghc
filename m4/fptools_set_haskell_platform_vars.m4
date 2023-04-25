@@ -170,58 +170,9 @@ AC_DEFUN([GHC_SUBSECTIONS_VIA_SYMBOLS],
          AC_MSG_RESULT(no)])
 ])
 
-# GHC_IDENT_DIRECTIVE
-# ----------------------------------
-# check for .ident assembler directive
-AC_DEFUN([GHC_IDENT_DIRECTIVE],
-[
-    AC_MSG_CHECKING(whether your assembler supports .ident directive)
-    dnl See Note [autoconf assembler checks and -flto]
-    AC_LINK_IFELSE(
-        [AC_LANG_PROGRAM([__asm__ (".ident \"GHC x.y.z\"");], [])],
-        [AC_MSG_RESULT(yes)
-         TargetHasIdentDirective=YES],
-        [AC_MSG_RESULT(no)
-         TargetHasIdentDirective=NO])
-])
+# ROMES:TODO: We can't still remove this because of the #DEFINE HAVE_SUBSECTIONS_VIA_SYMBOLS 1, which is used in the rts
+# We might have to generate a bunch of -D CPP flags to satisfy these dependencies (future work).
 
-# GHC_GNU_NONEXEC_STACK
-# ----------------------------------
-# *** check for GNU non-executable stack note support (ELF only)
-#     (.section .note.GNU-stack,"",@progbits)
-#
-# This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
-#     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
-# so we empty CFLAGS while running this test
-AC_DEFUN([GHC_GNU_NONEXEC_STACK],
-[
-    CFLAGS2="$CFLAGS"
-    CFLAGS=
-    case $TargetArch in
-      arm)
-        dnl See #13937.
-        progbits="%progbits"
-        ;;
-      *)
-        progbits="@progbits"
-        ;;
-    esac
-    AC_MSG_CHECKING(for GNU non-executable stack support)
-    dnl See Note [autoconf assembler checks and -flto]
-    AC_LINK_IFELSE(
-       dnl the `main` function is placed after the .note.GNU-stack directive
-       dnl so we need to ensure that the active segment is correctly set,
-       dnl otherwise `main` will be placed in the wrong segment.
-        [AC_LANG_PROGRAM([
-           __asm__ (".section .note.GNU-stack,\"\",$progbits");
-           __asm__ (".section .text");
-         ], [0])],
-        [AC_MSG_RESULT(yes)
-         TargetHasGnuNonexecStack=YES],
-        [AC_MSG_RESULT(no)
-         TargetHasGnuNonexecStack=NO])
-    CFLAGS="$CFLAGS2"
-])
 
 # FPTOOLS_SET_HASKELL_PLATFORM_VARS
 # ----------------------------------

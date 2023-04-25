@@ -1,3 +1,5 @@
+# ROMES:TODO: We no longer use these e.g. BuildArch_CPP variables.
+# Delete this file but do so carefully...
 # FPTOOLS_SET_PLATFORMS_VARS
 # ----------------------------------
 # Set all the platform variables. First massage the default autoconf

@@ -1,6 +1,7 @@
 # FP_SETTINGS
 # ----------------------------------
 # Set the variables used in the settings file
+# ROMES:TODO: Make this file obsolete
 AC_DEFUN([FP_SETTINGS],
 [
     SettingsUseDistroMINGW="$EnableDistroToolchain"

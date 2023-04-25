@@ -106,33 +106,13 @@ dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
 AC_PROG_CXX([g++ clang++ c++])
 
-dnl ** figure out how to invoke the C preprocessor (i.e. `gcc -E`)
-AC_PROG_CPP
-
 # --with-hs-cpp/--with-hs-cpp-flags
-FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
-AC_SUBST([HaskellCPPCmd])
-AC_SUBST([HaskellCPPArgs])
+FP_HSCPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 
 FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
 dnl FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
-
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FIND_LD([$target],[GccUseLdOpt])
-FIND_MERGE_OBJECTS()
-CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
-CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
-LdCmd="$LD"
-CFLAGS="$CFLAGS $GccUseLdOpt"
-AC_SUBST([LdCmd])
-
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-FP_PROG_LD_FILELIST
 
 dnl ** which strip to use?
 dnl --------------------------------------------------------------
@@ -160,11 +140,6 @@ AC_ARG_VAR(OPT,[Use as the path to LLVM's opt [default=autodetect]])
 FIND_LLVM_PROG([OPT], [opt], [$LlvmMinVersion], [$LlvmMaxVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
-
-dnl ** Check gcc version and flags we need to pass it **
-FP_GCC_VERSION
-FP_GCC_SUPPORTS_NO_PIE
-FP_GCC_SUPPORTS_VIA_C_FLAGS
 
 FPTOOLS_SET_C_LD_FLAGS([target],[CFLAGS],[LDFLAGS],[IGNORE_LINKER_LD_FLAGS],[CPPFLAGS])
 FPTOOLS_SET_C_LD_FLAGS([build],[CONF_CC_OPTS_STAGE0],[CONF_GCC_LINKER_OPTS_STAGE0],[CONF_LD_LINKER_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
@@ -201,23 +176,6 @@ dnl May need to use gcc to find platform details.
 dnl --------------------------------------------------------------
 FPTOOLS_SET_HASKELL_PLATFORM_VARS([Build])
 
-FPTOOLS_SET_HASKELL_PLATFORM_VARS([Host])
-AC_SUBST(HaskellHostArch)
-AC_SUBST(HaskellHostOs)
-
-FPTOOLS_SET_HASKELL_PLATFORM_VARS([Target])
-AC_SUBST(HaskellTargetArch)
-AC_SUBST(HaskellTargetOs)
-
-GHC_SUBSECTIONS_VIA_SYMBOLS
-AC_SUBST(TargetHasSubsectionsViaSymbols)
-
-GHC_IDENT_DIRECTIVE
-AC_SUBST(TargetHasIdentDirective)
-
-GHC_GNU_NONEXEC_STACK
-AC_SUBST(TargetHasGnuNonexecStack)
-
 dnl ** See whether cc supports --target=<triple> and set
 dnl CONF_CC_OPTS_STAGE[12] accordingly.
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1], [CONF_GCC_LINK_OPTS_STAGE1])
@@ -226,6 +184,14 @@ FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2], [CON
 dnl Pass -Qunused-arguments or otherwise GHC will have very noisy invocations of Clang
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE1])
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE2])
+
+# CPP, CPPFLAGS
+# --with-cpp/-with-cpp-flags
+dnl Note that we must do this after setting and using the C99 CPPFLAGS, or
+dnl otherwise risk trying to configure the C99 and LD flags using -E as a CPPFLAG
+FP_CPP_CMD_WITH_ARGS([CPPCmd_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FP_CPP_CMD_WITH_ARGS([CPPCmd],[CONF_CPP_OPTS_STAGE1])
+FP_CPP_CMD_WITH_ARGS([CPPCmd],[CONF_CPP_OPTS_STAGE2])
 
 dnl TargetWordSize for settings file
 AC_CHECK_SIZEOF(void *, 4)
@@ -252,15 +218,6 @@ if test "x$TargetWordBigEndian" != "x@TargetWordBigEndian@"; then
                   of this compiler?])
 fi
 AC_SUBST(TargetWordBigEndian)
-
-#
-dnl ** how to invoke `ar' and `ranlib'
-#
-FP_PROG_AR_SUPPORTS_ATFILE
-FP_PROG_AR_SUPPORTS_DASH_L
-FP_PROG_AR_NEEDS_RANLIB
-RanlibCmd="$RANLIB"
-AC_SUBST([RanlibCmd])
 
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
