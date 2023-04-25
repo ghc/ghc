@@ -12,12 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { Test20297.hs:2:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:2:18-22 }))]
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [])
+     []
      (Just
       ((,)
        { Test20297.hs:12:1 }
@@ -357,12 +352,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { Test20297.ppr.hs:2:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:2:18-22 }))]
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [])
+     []
      (Just
       ((,)
        { Test20297.ppr.hs:9:25 }

@@ -1203,24 +1203,6 @@ markAnnListA reallyTrail an action = do
   debugM $ "markAnnListA: an5=" ++ showAst an
   return (an5, r)
 
-
-markAnnList' :: (Monad m, Monoid w)
-  => Bool -> EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
-markAnnList' reallyTrail an action = do
-  p <- getPosP
-  debugM $ "markAnnList : " ++ showPprUnsafe (p, an)
-  an0 <- markLensMAA an lal_open
-  an1 <- if (not reallyTrail)
-           then markTrailingL an0 lal_trailing
-           else return an0
-  an2 <- markEpAnnAllL an1 lal_rest AnnSemi
-  r <- action
-  an3 <- markLensMAA an2 lal_close
-  an4 <- if reallyTrail
-           then markTrailingL an3 lal_trailing
-           else return an3
-  return (an4, r)
-
 -- ---------------------------------------------------------------------
 
 printComments :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
@@ -1387,14 +1369,21 @@ instance ExactPrint (HsModule GhcPs) where
 
           return (an1, Just m', mdeprec', mexports')
 
-    let ann_decls = EpAnn (entry an) (am_decls $ anns an0) emptyComments
-    (ann_decls', (decls', imports')) <- markAnnList' False ann_decls $ do
-      imports' <- markTopLevelList imports
-      decls' <- markTopLevelList decls
-      return (decls', imports')
-    let am_decls' = case ann_decls' of
-          EpAnnNotUsed -> (am_decls $ anns an0)
-          EpAnn _ r _ -> r
+    lo0 <- case lo of
+        ExplicitBraces open close -> do
+          open' <- markToken open
+          return (ExplicitBraces open' close)
+        _ -> return lo
+
+    am_decls' <- markTrailing (am_decls $ anns an0)
+    imports' <- markTopLevelList imports
+    decls' <- markTopLevelList decls
+
+    lo1 <- case lo0 of
+        ExplicitBraces open close -> do
+          close' <- markToken close
+          return (ExplicitBraces open close')
+        _ -> return lo
 
     -- Print EOF
     case am_eof $ anns an of
@@ -1406,7 +1395,7 @@ instance ExactPrint (HsModule GhcPs) where
     let anf = an0 { anns = (anns an0) { am_decls = am_decls' }}
     debugM $ "HsModule, anf=" ++ showAst anf
 
-    return (HsModule (XModulePs anf lo mdeprec' mbDoc') mmn' mexports' imports' decls')
+    return (HsModule (XModulePs anf lo1 mdeprec' mbDoc') mmn' mexports' imports' decls')
 
 -- ---------------------------------------------------------------------
 

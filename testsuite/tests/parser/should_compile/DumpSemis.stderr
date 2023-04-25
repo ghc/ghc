@@ -12,23 +12,18 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { DumpSemis.hs:1:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { DumpSemis.hs:1:18-22 }))]
-     (AnnList
-      (Nothing)
-      (Nothing)
-      (Nothing)
-      []
-      [(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:1 }))
-      ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:2 }))
-      ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:3 }))
-      ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:4 }))
-      ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:7 }))
-      ,(AddSemiAnn
-        (EpaSpan { DumpSemis.hs:4:8 }))])
+     [(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:1 }))
+     ,(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:2 }))
+     ,(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:3 }))
+     ,(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:4 }))
+     ,(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:7 }))
+     ,(AddSemiAnn
+       (EpaSpan { DumpSemis.hs:4:8 }))]
      (Just
       ((,)
        { DumpSemis.hs:46:1 }

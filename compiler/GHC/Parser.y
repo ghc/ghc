@@ -925,20 +925,17 @@ maybemodwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
                                  (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
     |  {- empty -}                  { Nothing }
 
-body    :: { (AnnList
+body    :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,LayoutInfo GhcPs) }
-        :  '{'            top '}'      { (AnnList Nothing (Just $ moc $1) (Just $ mcc $3) [] (fst $2)
-                                         , snd $2, explicitBraces $1 $3) }
-        |      vocurly    top close    { (AnnList Nothing Nothing Nothing [] (fst $2)
-                                         , snd $2, VirtualBraces (getVOCURLY $1)) }
+        :  '{'            top '}'      { (fst $2, snd $2, explicitBraces $1 $3) }
+        |      vocurly    top close    { (fst $2, snd $2, VirtualBraces (getVOCURLY $1)) }
 
-body2   :: { (AnnList
+body2   :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
              ,LayoutInfo GhcPs) }
-        :  '{' top '}'                          { (AnnList Nothing (Just $ moc $1) (Just $ mcc $3) [] (fst $2)
-                                                  , snd $2, explicitBraces $1 $3) }
-        |  missing_module_keyword top close     { (AnnList Nothing Nothing Nothing [] [], snd $2, VirtualBraces leftmostColumn) }
+        :  '{' top '}'                          { (fst $2, snd $2, explicitBraces $1 $3) }
+        |  missing_module_keyword top close     { ([], snd $2, VirtualBraces leftmostColumn) }
 
 
 top     :: { ([TrailingAnn]
@@ -957,14 +954,14 @@ header  :: { Located (HsModule GhcPs) }
         : 'module' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] []) Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
-                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] (AnnList Nothing Nothing Nothing [] []) Nothing) cs)
+                                                   (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
