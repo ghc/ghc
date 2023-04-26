@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { DumpParsedAstComments.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { DumpParsedAstComments.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { DumpParsedAstComments.hs:5:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { DumpParsedAstComments.hs:5:30-34
@@ -20,17 +18,13 @@
        { DumpParsedAstComments.hs:19:17-23 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { DumpParsedAstComments.hs:1:1-28 }
-        (UnchangedAnchor))
+       (EpaSpan { DumpParsedAstComments.hs:1:1-28 })
        (EpaComment
         (EpaBlockComment
          "{-# LANGUAGE Haskell2010 #-}")
         { DumpParsedAstComments.hs:1:1 }))
      ,(L
-       (Anchor
-        { DumpParsedAstComments.hs:(2,1)-(4,4) }
-        (UnchangedAnchor))
+       (EpaSpan { DumpParsedAstComments.hs:(2,1)-(4,4) })
        (EpaComment
         (EpaBlockComment
          "{-/n  Block comment at the beginning/n  -}")
@@ -42,41 +36,44 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:5:8-28 })
+    ((EpAnnS
+      (EpaSpan { DumpParsedAstComments.hs:5:8-28 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: DumpParsedAstComments}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { DumpParsedAstComments.hs:9:1-7 }
-                  (UnchangedAnchor))
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:7:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment 1 for bar")
-                     { DumpParsedAstComments.hs:5:30-34 }))
-                  ,(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:8:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment 2 for bar")
-                     { DumpParsedAstComments.hs:7:1-20
-                        }))])) { DumpParsedAstComments.hs:9:1-7 })
+    ((EpAnnS
+      (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [(L
+         (EpaSpan { DumpParsedAstComments.hs:7:1-20 })
+         (EpaComment
+          (EpaLineComment
+           "-- comment 1 for bar")
+          { DumpParsedAstComments.hs:5:30-34 }))
+       ,(L
+         (EpaSpan { DumpParsedAstComments.hs:8:1-20 })
+         (EpaComment
+          (EpaLineComment
+           "-- comment 2 for bar")
+          { DumpParsedAstComments.hs:7:1-20 }))])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:9:1-3 })
+       ((EpAnnS
+         (EpaSpan { DumpParsedAstComments.hs:9:1-3 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: bar}))
       (MG
@@ -84,18 +81,26 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:9:1-7 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:9:1-7 })
+          ((EpAnnS
+            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
-            (Anchor
-             { DumpParsedAstComments.hs:9:1-7 }
-             (UnchangedAnchor))
+            (EpaSpan { DumpParsedAstComments.hs:9:1-7 })
             []
             (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:9:1-3 })
+             ((EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:9:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: bar}))
             (Prefix)
@@ -105,14 +110,14 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { DumpParsedAstComments.hs:9:5-7 })
+              (EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:9:5-7 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
-                (Anchor
-                 { DumpParsedAstComments.hs:9:5-7 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpParsedAstComments.hs:9:5-7 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:9:5 })))
@@ -120,12 +125,15 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:9:7 })
+                ((EpAnnS
+                  (EpaSpan { DumpParsedAstComments.hs:9:7 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsOverLit
                  (EpAnn
-                  (Anchor
-                   { DumpParsedAstComments.hs:9:7 }
-                   (UnchangedAnchor))
+                  (EpaSpan { DumpParsedAstComments.hs:9:7 })
                   (NoEpAnns)
                   (EpaComments
                    []))
@@ -139,44 +147,40 @@
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
-    (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { DumpParsedAstComments.hs:(14,1)-(16,3) }
-                  (UnchangedAnchor))
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:10:1-16 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- Other comment")
-                     { DumpParsedAstComments.hs:9:7 }))
-                  ,(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:12:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment 1 for foo")
-                     { DumpParsedAstComments.hs:10:1-16 }))
-                  ,(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:13:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- comment 2 for foo")
-                     { DumpParsedAstComments.hs:12:1-20
-                        }))])) { DumpParsedAstComments.hs:(14,1)-(16,3) })
+    ((EpAnnS
+      (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
+      (AnnListItem
+       [])
+      (EpaComments
+       [(L
+         (EpaSpan { DumpParsedAstComments.hs:10:1-16 })
+         (EpaComment
+          (EpaLineComment
+           "-- Other comment")
+          { DumpParsedAstComments.hs:9:7 }))
+       ,(L
+         (EpaSpan { DumpParsedAstComments.hs:12:1-20 })
+         (EpaComment
+          (EpaLineComment
+           "-- comment 1 for foo")
+          { DumpParsedAstComments.hs:10:1-16 }))
+       ,(L
+         (EpaSpan { DumpParsedAstComments.hs:13:1-20 })
+         (EpaComment
+          (EpaLineComment
+           "-- comment 2 for foo")
+          { DumpParsedAstComments.hs:12:1-20 }))])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:14:1-3 })
+       ((EpAnnS
+         (EpaSpan { DumpParsedAstComments.hs:14:1-3 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: foo}))
       (MG
@@ -185,19 +189,26 @@
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:(14,1)-(16,3)
                                       })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:(14,1)-(16,3)
-                                        })
+          ((EpAnnS
+            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
-            (Anchor
-             { DumpParsedAstComments.hs:(14,1)-(16,3) }
-             (UnchangedAnchor))
+            (EpaSpan { DumpParsedAstComments.hs:(14,1)-(16,3) })
             []
             (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:14:1-3 })
+             ((EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:14:1-3 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: foo}))
             (Prefix)
@@ -207,14 +218,14 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { DumpParsedAstComments.hs:(14,5)-(16,3) })
+              (EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:(14,5)-(16,3) })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
-                (Anchor
-                 { DumpParsedAstComments.hs:(14,5)-(16,3) }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpParsedAstComments.hs:(14,5)-(16,3) })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:14:5 })))
@@ -222,27 +233,25 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:(14,7)-(16,3)
-                                              })
+                ((EpAnnS
+                  (EpaSpan { DumpParsedAstComments.hs:(14,7)-(16,3) })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsDo
                  (EpAnn
-                  (Anchor
-                   { DumpParsedAstComments.hs:(14,7)-(16,3) }
-                   (UnchangedAnchor))
+                  (EpaSpan { DumpParsedAstComments.hs:(14,7)-(16,3) })
                   (AnnList
                    (Just
-                    (Anchor
-                     { DumpParsedAstComments.hs:16:3 }
-                     (UnchangedAnchor)))
+                    (EpaSpan { DumpParsedAstComments.hs:16:3 }))
                    (Nothing)
                    (Nothing)
                    [(AddEpAnn AnnDo (EpaSpan { DumpParsedAstComments.hs:14:7-8 }))]
                    [])
                   (EpaComments
                    [(L
-                     (Anchor
-                      { DumpParsedAstComments.hs:15:3-19 }
-                      (UnchangedAnchor))
+                     (EpaSpan { DumpParsedAstComments.hs:15:3-19 })
                      (EpaComment
                       (EpaLineComment
                        "-- normal comment")
@@ -251,14 +260,10 @@
                   (Nothing))
                  (L
                   (SrcSpanAnn (EpAnn
-                               (Anchor
-                                { DumpParsedAstComments.hs:16:3 }
-                                (UnchangedAnchor))
+                               (EpaSpan { DumpParsedAstComments.hs:16:3 })
                                (AnnList
                                 (Just
-                                 (Anchor
-                                  { DumpParsedAstComments.hs:16:3 }
-                                  (UnchangedAnchor)))
+                                 (EpaSpan { DumpParsedAstComments.hs:16:3 }))
                                 (Nothing)
                                 (Nothing)
                                 []
@@ -266,16 +271,24 @@
                                (EpaComments
                                 [])) { DumpParsedAstComments.hs:16:3 })
                   [(L
-                    (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:16:3 })
+                    ((EpAnnS
+                      (EpaSpan { DumpParsedAstComments.hs:16:3 })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])))
                     (BodyStmt
                      (NoExtField)
                      (L
-                      (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:16:3 })
+                      ((EpAnnS
+                        (EpaSpan { DumpParsedAstComments.hs:16:3 })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])))
                       (HsOverLit
                        (EpAnn
-                        (Anchor
-                         { DumpParsedAstComments.hs:16:3 }
-                         (UnchangedAnchor))
+                        (EpaSpan { DumpParsedAstComments.hs:16:3 })
                         (NoEpAnns)
                         (EpaComments
                          []))
@@ -291,28 +304,28 @@
             (EmptyLocalBinds
              (NoExtField)))))])))))
   ,(L
-    (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { DumpParsedAstComments.hs:19:1-23 }
-                  (UnchangedAnchor))
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [(L
-                    (Anchor
-                     { DumpParsedAstComments.hs:18:1-20 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- | Haddock comment")
-                     { DumpParsedAstComments.hs:16:3
-                        }))])) { DumpParsedAstComments.hs:19:1-23 })
+    ((EpAnnS
+      (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [(L
+         (EpaSpan { DumpParsedAstComments.hs:18:1-20 })
+         (EpaComment
+          (EpaLineComment
+           "-- | Haddock comment")
+          { DumpParsedAstComments.hs:16:3 }))])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:1-4 })
+       ((EpAnnS
+         (EpaSpan { DumpParsedAstComments.hs:19:1-4 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: main}))
       (MG
@@ -320,18 +333,26 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:1-23 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:1-23 })
+          ((EpAnnS
+            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
-            (Anchor
-             { DumpParsedAstComments.hs:19:1-23 }
-             (UnchangedAnchor))
+            (EpaSpan { DumpParsedAstComments.hs:19:1-23 })
             []
             (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:1-4 })
+             ((EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:19:1-4 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: main}))
             (Prefix)
@@ -341,14 +362,14 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { DumpParsedAstComments.hs:19:6-23 })
+              (EpAnnS
+               (EpaSpan { DumpParsedAstComments.hs:19:6-23 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
-                (Anchor
-                 { DumpParsedAstComments.hs:19:6-23 }
-                 (UnchangedAnchor))
+                (EpaSpan { DumpParsedAstComments.hs:19:6-23 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { DumpParsedAstComments.hs:19:6 })))
@@ -356,30 +377,46 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:8-23 })
+                ((EpAnnS
+                  (EpaSpan { DumpParsedAstComments.hs:19:8-23 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsApp
                  (EpAnn
-                  (Anchor
-                   { DumpParsedAstComments.hs:19:8-23 }
-                   (UnchangedAnchor))
+                  (EpaSpan { DumpParsedAstComments.hs:19:8-23 })
                   (NoEpAnns)
                   (EpaComments
                    []))
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:8-15 })
+                  ((EpAnnS
+                    (EpaSpan { DumpParsedAstComments.hs:19:8-15 })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])))
                   (HsVar
                    (NoExtField)
                    (L
-                    (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:8-15 })
+                    ((EpAnnS
+                      (EpaSpan { DumpParsedAstComments.hs:19:8-15 })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])))
                     (Unqual
                      {OccName: putStrLn}))))
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAstComments.hs:19:17-23 })
+                  ((EpAnnS
+                    (EpaSpan { DumpParsedAstComments.hs:19:17-23 })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])))
                   (HsLit
                    (EpAnn
-                    (Anchor
-                     { DumpParsedAstComments.hs:19:17-23 }
-                     (UnchangedAnchor))
+                    (EpaSpan { DumpParsedAstComments.hs:19:17-23 })
                     (NoEpAnns)
                     (EpaComments
                      []))

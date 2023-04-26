@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { ZeroWidthSemi.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { ZeroWidthSemi.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { ZeroWidthSemi.hs:1:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { ZeroWidthSemi.hs:1:22-26 }))]
@@ -19,17 +17,13 @@
        { ZeroWidthSemi.hs:8:1-58 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { ZeroWidthSemi.hs:3:1-19 }
-        (UnchangedAnchor))
+       (EpaSpan { ZeroWidthSemi.hs:3:1-19 })
        (EpaComment
         (EpaLineComment
          "-- leading comments")
         { ZeroWidthSemi.hs:1:22-26 }))]
      [(L
-       (Anchor
-        { ZeroWidthSemi.hs:8:1-58 }
-        (UnchangedAnchor))
+       (EpaSpan { ZeroWidthSemi.hs:8:1-58 })
        (EpaComment
         (EpaLineComment
          "-- Trailing comment, should be in HsModule extension point")
@@ -40,32 +34,38 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:1:8-20 })
+    ((EpAnnS
+      (EpaSpan { ZeroWidthSemi.hs:1:8-20 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: ZeroWidthSemi}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { ZeroWidthSemi.hs:6:1-5 }
-                  (UnchangedAnchor))
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [(L
-                    (Anchor
-                     { ZeroWidthSemi.hs:5:1-19 }
-                     (UnchangedAnchor))
-                    (EpaComment
-                     (EpaLineComment
-                      "-- Function comment")
-                     { ZeroWidthSemi.hs:3:1-19 }))])) { ZeroWidthSemi.hs:6:1-5 })
+    ((EpAnnS
+      (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [(L
+         (EpaSpan { ZeroWidthSemi.hs:5:1-19 })
+         (EpaComment
+          (EpaLineComment
+           "-- Function comment")
+          { ZeroWidthSemi.hs:3:1-19 }))])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1 })
+       ((EpAnnS
+         (EpaSpan { ZeroWidthSemi.hs:6:1 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: a}))
       (MG
@@ -73,18 +73,26 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1-5 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1-5 })
+          ((EpAnnS
+            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
-            (Anchor
-             { ZeroWidthSemi.hs:6:1-5 }
-             (UnchangedAnchor))
+            (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
             []
             (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1 })
+             ((EpAnnS
+               (EpaSpan { ZeroWidthSemi.hs:6:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: a}))
             (Prefix)
@@ -94,14 +102,14 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { ZeroWidthSemi.hs:6:3-5 })
+              (EpAnnS
+               (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
-                (Anchor
-                 { ZeroWidthSemi.hs:6:3-5 }
-                 (UnchangedAnchor))
+                (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { ZeroWidthSemi.hs:6:3 })))
@@ -109,12 +117,15 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:5 })
+                ((EpAnnS
+                  (EpaSpan { ZeroWidthSemi.hs:6:5 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsOverLit
                  (EpAnn
-                  (Anchor
-                   { ZeroWidthSemi.hs:6:5 }
-                   (UnchangedAnchor))
+                  (EpaSpan { ZeroWidthSemi.hs:6:5 })
                   (NoEpAnns)
                   (EpaComments
                    []))

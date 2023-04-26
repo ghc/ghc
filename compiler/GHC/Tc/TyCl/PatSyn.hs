@@ -83,7 +83,7 @@ tcPatSynDecl :: LocatedA (PatSynBind GhcRn GhcRn)
              -> TcPragEnv -- See Note [Pragmas for pattern synonyms]
              -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcPatSynDecl (L loc psb@(PSB { psb_id = L _ name })) sig_fn prag_fn
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
     recoverM (recoverPSB psb) $
@@ -816,7 +816,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
                     HsCase PatSyn (nlHsVar scrutinee) $
-                    MG{ mg_alts = L (l2l $ getLoc lpat) cases
+                    MG{ mg_alts = L (nn2la $ getLoc lpat) cases
                       , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }
              body' = noLocA $
@@ -830,7 +830,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                                        req_dicts body')
                              (EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-             mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
+             mg = MG{ mg_alts = L (nn2la $ getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty gen
                     }
              matcher_arity = length req_theta + 3
@@ -966,7 +966,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup (Generated SkipPmc) (noLocA [builder_match])
           where
-            builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
+            builder_args  = [L (l2l loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body

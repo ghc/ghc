@@ -491,7 +491,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
-  = setSrcSpanA loc                   $
+  = setSrcSpan (locA loc)             $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
@@ -590,7 +590,7 @@ tcTyFamInstDecl :: AssocInstInfo
   -- "type instance"
   -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
-  = setSrcSpanA loc           $
+  = setSrcSpan (locA loc)    $
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
@@ -604,7 +604,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- For some reason we don't have a location for the equation
          -- itself, so we make do with the location of family name
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (na2la $ getLoc fam_lname) eqn)
+                                        (L (l2l $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
@@ -689,7 +689,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}))
-  = setSrcSpanA loc            $
+  = setSrcSpan (locA loc)      $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
 

@@ -987,20 +987,20 @@ we'll miss the fact that the qualified import is redundant.
 -}
 
 
-lookupLocatedOccRn :: GenLocated (SrcSpanAnn' ann) RdrName
-                   -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRn :: LocatedN RdrName
+                   -> TcRn (LocatedN Name)
 lookupLocatedOccRn = wrapLocMA lookupOccRn
 
-lookupLocatedOccRnConstr :: GenLocated (SrcSpanAnn' ann) RdrName
-                         -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnConstr :: LocatedN RdrName
+                         -> TcRn (LocatedN Name)
 lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
 
-lookupLocatedOccRnRecField :: GenLocated (SrcSpanAnn' ann) RdrName
-                           -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnRecField :: LocatedAnS ann RdrName
+                           -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
 
-lookupLocatedOccRnNone :: GenLocated (SrcSpanAnn' ann) RdrName
-                       -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnNone :: LocatedAnS ann RdrName
+                       -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
@@ -1362,7 +1362,7 @@ lookupInfoOccRn rdr_name =
 -- See Note [DisambiguateRecordFields for updates].
 lookupFieldGREs :: GlobalRdrEnv -> LocatedN RdrName -> RnM (NE.NonEmpty FieldGlobalRdrElt)
 lookupFieldGREs env (L loc rdr)
-  = setSrcSpanA loc
+  = setSrcSpan (locA loc)
   $ do { res <- lookupExactOrOrig rdr (\ gre -> maybeToList $ fieldGRE_maybe gre) $
            do { let (env_fld_gres, env_var_gres) =
                       partition isRecFldGRE $
@@ -2075,7 +2075,7 @@ instance Outputable HsSigCtxt where
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig GhcPs
-               -> LocatedA RdrName -> RnM (LocatedA Name)
+               -> LocatedN RdrName -> RnM (LocatedN Name)
 lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 
 lookupSigOccRnN :: HsSigCtxt
@@ -2087,8 +2087,8 @@ lookupSigOccRnN ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 lookupSigCtxtOccRn :: HsSigCtxt
                    -> SDoc         -- ^ description of thing we're looking up,
                                    -- like "type family"
-                   -> GenLocated (SrcSpanAnn' ann) RdrName
-                   -> RnM (GenLocated (SrcSpanAnn' ann) Name)
+                   -> GenLocated (EpAnnS ann) RdrName
+                   -> RnM (GenLocated (EpAnnS ann) Name)
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { let also_try_tycons = False

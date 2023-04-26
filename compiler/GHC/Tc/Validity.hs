@@ -1949,7 +1949,7 @@ checkValidInstance ctxt hs_type ty = case tau of
   TyConApp tc inst_tys -> case tyConClass_maybe tc of
     Nothing -> failWithTc (TcRnIllegalClassInst (tyConFlavour tc))
     Just clas -> do
-        { setSrcSpanA head_loc $
+        { setSrcSpan (locA head_loc) $
           checkValidInstHead ctxt clas inst_tys
 
         ; traceTc "checkValidInstance {" (ppr ty)
@@ -2931,4 +2931,3 @@ checkTyConTelescope tc
       = hang (text "NB: Inferred variables")
            2 (vcat [ sep [ pp_inf, text "always come first"]
                    , sep [text "then Specified variables", pp_spec]])
-

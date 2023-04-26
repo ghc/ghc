@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T20718.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T20718.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T20718.hs:3:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T20718.hs:3:15-19 }))]
@@ -19,49 +17,37 @@
        { T20718.hs:11:1-8 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { T20718.hs:1:1-16 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:1:1-16 })
        (EpaComment
         (EpaLineComment
          "-- top of file 1")
         { T20718.hs:1:1 }))
      ,(L
-       (Anchor
-        { T20718.hs:2:1-16 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:2:1-16 })
        (EpaComment
         (EpaLineComment
          "-- top of file 2")
         { T20718.hs:1:1-16 }))
      ,(L
-       (Anchor
-        { T20718.hs:5:1-11 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:5:1-11 })
        (EpaComment
         (EpaLineComment
          "-- before 1")
         { T20718.hs:3:15-19 }))
      ,(L
-       (Anchor
-        { T20718.hs:6:1-11 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:6:1-11 })
        (EpaComment
         (EpaLineComment
          "-- before 2")
         { T20718.hs:5:1-11 }))]
      [(L
-       (Anchor
-        { T20718.hs:10:1-8 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:10:1-8 })
        (EpaComment
         (EpaLineComment
          "-- end 1")
         { T20718.hs:8:5 }))
      ,(L
-       (Anchor
-        { T20718.hs:11:1-8 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718.hs:11:1-8 })
        (EpaComment
         (EpaLineComment
          "-- end 2")
@@ -72,25 +58,33 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:3:8-13 })
+    ((EpAnnS
+      (EpaSpan { T20718.hs:3:8-13 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: T20718}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T20718.hs:8:1-5 }
-                  (UnchangedAnchor))
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20718.hs:8:1-5 })
+    ((EpAnnS
+      (EpaSpan { T20718.hs:8:1-5 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+       ((EpAnnS
+         (EpaSpan { T20718.hs:8:1 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: x}))
       (MG
@@ -98,18 +92,26 @@
        (L
         (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
+          ((EpAnnS
+            (EpaSpan { T20718.hs:8:1-5 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
-            (Anchor
-             { T20718.hs:8:1-5 }
-             (UnchangedAnchor))
+            (EpaSpan { T20718.hs:8:1-5 })
             []
             (EpaComments
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+             ((EpAnnS
+               (EpaSpan { T20718.hs:8:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: x}))
             (Prefix)
@@ -119,14 +121,14 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnnNotUsed)
-               { T20718.hs:8:3-5 })
+              (EpAnnS
+               (EpaSpan { T20718.hs:8:3-5 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
-                (Anchor
-                 { T20718.hs:8:3-5 }
-                 (UnchangedAnchor))
+                (EpaSpan { T20718.hs:8:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { T20718.hs:8:3 })))
@@ -134,12 +136,15 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:5 })
+                ((EpAnnS
+                  (EpaSpan { T20718.hs:8:5 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsOverLit
                  (EpAnn
-                  (Anchor
-                   { T20718.hs:8:5 }
-                   (UnchangedAnchor))
+                  (EpaSpan { T20718.hs:8:5 })
                   (NoEpAnns)
                   (EpaComments
                    []))

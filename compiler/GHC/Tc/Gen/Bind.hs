@@ -222,7 +222,7 @@ tcCompleteSigs sigs =
       -- There it is also where we consider if the type of the pattern match is
       -- compatible with the result type constructor 'mb_tc'.
       doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) (L _ ns) mb_tc_nm))
-        = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
+        = fmap Just $ setSrcSpan (locA loc) $ addErrCtxt (text "In" <+> ppr c) $ do
             cls   <- mkUniqDSet <$> mapM (addLocMA tcLookupConLike) ns
             mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
             pure CompleteMatch { cmConLikes = cls, cmResultTyCon = mb_tc }
@@ -628,7 +628,7 @@ tcPolyCheck prag_fn
                 -- Why mono_id in the BinderStack?
                 --    See Note [Relevant bindings and the binder stack]
 
-                setSrcSpanA bind_loc $
+                setSrcSpan (locA bind_loc) $
                 tcMatchesFun (L nm_loc (idName mono_id)) matches
                              (mkCheckExpType rho_ty)
 
@@ -1300,7 +1300,7 @@ tcMonoBinds is_rec sig_fn no_gen
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
-  = setSrcSpanA b_loc    $
+  = setSrcSpan (locA b_loc)  $
     do  { ((co_fn, matches'), rhs_ty')
             <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
                           -- tcInferFRR: the type of a let-binder must have

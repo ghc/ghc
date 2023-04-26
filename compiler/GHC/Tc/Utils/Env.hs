@@ -310,7 +310,7 @@ tcLookupAxiom name = do
 tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
 tcLookupLocatedGlobalId = addLocMA tcLookupId
 
-tcLookupLocatedClass :: LocatedA Name -> TcM Class
+tcLookupLocatedClass :: LocatedN Name -> TcM Class
 tcLookupLocatedClass = addLocMA tcLookupClass
 
 tcLookupLocatedTyCon :: LocatedN Name -> TcM TyCon

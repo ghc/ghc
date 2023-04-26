@@ -99,7 +99,7 @@ tcProc pat cmd@(L loc (HsCmdTop names _)) exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         -- start with the names as they are used to desugar the proc itself
         -- See #17423
-        ; names' <- setSrcSpanA loc $
+        ; names' <- setSrcSpan (locA loc) $
             mapM (tcSyntaxName ProcOrigin arr_ty) names
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- newArrowScope
@@ -136,7 +136,7 @@ tcCmdTop :: CmdEnv
          -> TcM (LHsCmdTop GhcTc)
 
 tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do  { cmd' <- tcCmd env cmd cmd_ty
         ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names) cmd') }
 
@@ -311,7 +311,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
             ; res_ty <- newFlexiTyVarTy liftedTypeKind
-            ; names' <- setSrcSpanA loc $
+            ; names' <- setSrcSpan (locA loc) $
                 mapM (tcSyntaxName ArrowCmdOrigin arr_ty) names
             ; let env' = env { cmd_arr = arr_ty }
             ; cmd' <- tcCmdTop env' names' cmd (stk_ty, res_ty)
@@ -358,7 +358,7 @@ tcCmdMatchLambda env
 
     -- Check the patterns, and the GRHSs inside
     tc_match arg_tys cmd_stk' (L mtch_loc (Match { m_pats = pats, m_grhss = grhss }))
-      = do { (pats', grhss') <- setSrcSpanA mtch_loc           $
+      = do { (pats', grhss') <- setSrcSpan (locA mtch_loc)     $
                                 tcPats match_ctxt pats arg_tys $
                                 tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 

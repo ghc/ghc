@@ -196,7 +196,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
     setSrcSpan (getLocA class_name) $
-    do  { clas <- tcLookupLocatedClass (n2l class_name)
+    do  { clas <- tcLookupLocatedClass class_name
 
         -- We make a separate binding for each default method.
         -- At one time I used a single AbsBinds for all of them, thus
@@ -282,7 +282,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              local_dm_ty = instantiateMethod clas global_dm_id (mkTyVarTys tyvars)
 
-             lm_bind     = dm_bind { fun_id = L (la2na bind_loc) local_dm_name }
+             lm_bind     = dm_bind { fun_id = L (l2l bind_loc) local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 

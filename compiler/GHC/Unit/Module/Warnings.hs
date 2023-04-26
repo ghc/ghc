@@ -232,6 +232,29 @@ instance Outputable (WarningTxt pass) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
+-- instance Binary (WarningTxt GhcRn) where
+--     put_ bh (WarningTxt c s w) = do
+--             putByte bh 0
+--             put_ bh $ unLoc <$> c
+--             put_ bh s
+--             put_ bh $ unLoc <$> w
+--     put_ bh (DeprecatedTxt s d) = do
+--             putByte bh 1
+--             put_ bh s
+--             put_ bh $ unLoc <$> d
+
+--     get bh = do
+--             h <- getByte bh
+--             case h of
+--               0 -> do c <- fmap noLoc <$> get bh
+--                       s <- get bh
+--                       w <- fmap noLoc  <$> get bh
+--                       return (WarningTxt c s w)
+--               _ -> do s <- get bh
+--                       d <- fmap noLoc <$> get bh
+--                       return (DeprecatedTxt s d)
+
+
 pp_ws :: [Located (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws

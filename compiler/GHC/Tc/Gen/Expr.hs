@@ -119,13 +119,13 @@ tcPolyLExpr, tcPolyLExprNC :: LHsExpr GhcRn -> ExpSigmaType
                            -> TcM (LHsExpr GhcTc)
 
 tcPolyLExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = setSrcSpan (locA loc) $  -- Set location /first/; see GHC.Tc.Utils.Monad
+    addExprCtxt expr      $  -- Note [Error contexts in generated code]
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
 tcPolyLExprNC (L loc expr) res_ty
-  = setSrcSpanA loc    $
+  = setSrcSpan (locA loc)    $
     do { expr' <- tcPolyExpr expr res_ty
        ; return (L loc expr') }
 
@@ -145,13 +145,13 @@ tcMonoExpr, tcMonoExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcMonoExpr (L loc expr) res_ty
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = setSrcSpan (locA loc) $  -- Set location /first/; see GHC.Tc.Utils.Monad
+    addExprCtxt expr      $  -- Note [Error contexts in generated code]
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
 tcMonoExprNC (L loc expr) res_ty
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -159,13 +159,13 @@ tcMonoExprNC (L loc expr) res_ty
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
 tcInferRho (L loc expr)
-  = setSrcSpanA loc   $  -- Set location /first/; see GHC.Tc.Utils.Monad
-    addExprCtxt expr $  -- Note [Error contexts in generated code]
+  = setSrcSpan (locA loc) $  -- Set location /first/; see GHC.Tc.Utils.Monad
+    addExprCtxt expr      $  -- Note [Error contexts in generated code]
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
 tcInferRhoNC (L loc expr)
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -1283,7 +1283,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
 
              case_expr :: HsExpr GhcRn
              case_expr = HsCase RecUpd record_expr
-                       $ mkMatchGroup (Generated DoPmc) (wrapGenSpan matches)
+                       $ mkMatchGroup (Generated DoPmc) (wrapGenSpanI matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat relevant_cons
 
@@ -1447,7 +1447,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
              -- Mark the record fields as used, now that we have disambiguated.
              -- There is no risk of duplicate deprecation warnings, as we have
              -- not marked the GREs as used previously.
-           ; setSrcSpanA loc $ mapM_ (addUsedGRE AllDeprecationWarnings) mb_gre
+           ; setSrcSpan (locA loc) $ mapM_ (addUsedGRE AllDeprecationWarnings) mb_gre
            ; sel <- tcLookupId (greName fld_gre)
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd

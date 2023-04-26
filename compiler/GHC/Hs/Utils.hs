@@ -181,7 +181,7 @@ mkHsPar e = L (getLoc e) (gHsPar e)
 mkSimpleMatch :: (Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA,
                   Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                        ~ SrcAnn NoEpAnns)
+                        ~ EpAnnS NoEpAnns)
               => HsMatchContext (GhcPass p)
               -> [LPat (GhcPass p)] -> LocatedA (body (GhcPass p))
               -> LMatch (GhcPass p) (LocatedA (body (GhcPass p)))
@@ -195,14 +195,14 @@ mkSimpleMatch ctxt pats rhs
                 (pat:_) -> combineSrcSpansA (getLoc pat) (getLoc rhs)
 
 unguardedGRHSs :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns
+                     ~ EpAnnS NoEpAnns
                => SrcSpan -> LocatedA (body (GhcPass p)) -> EpAnn GrhsAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs loc rhs an
   = GRHSs emptyComments (unguardedRHS an loc rhs) emptyLocalBinds
 
 unguardedRHS :: Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns
+                     ~ EpAnnS NoEpAnns
              => EpAnn GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
 unguardedRHS an loc rhs = [L (noAnnSrcSpan loc) (GRHS an [] rhs)]
@@ -229,8 +229,8 @@ mkLamCaseMatchGroup origin lc_variant (L l matches)
   = mkMatchGroup origin (L l $ map fixCtxt matches)
   where fixCtxt (L a match) = L a match{m_ctxt = LamCaseAlt lc_variant}
 
-mkLocatedList :: (Semigroup a, Monoid an)
-  => [GenLocated (SrcAnn a) e2] -> LocatedAn an [GenLocated (SrcAnn a) e2]
+mkLocatedList :: Semigroup a
+  => [LocatedAnS a e2] -> LocatedL [LocatedAnS a e2]
 mkLocatedList ms = case nonEmpty ms of
     Nothing -> noLocA []
     Just ms1 -> L (noAnnSrcSpan $ locA $ combineLocsA (NE.head ms1) (NE.last ms1)) ms
@@ -282,7 +282,7 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
 mkHsCaseAlt :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
-                     ~ SrcAnn NoEpAnns,
+                     ~ EpAnnS NoEpAnns,
                  Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
                         ~ SrcSpanAnnA)
             => LPat (GhcPass p) -> (LocatedA (body (GhcPass p)))
@@ -342,23 +342,38 @@ mkRnBindStmt :: LPat GhcRn -> LocatedA (bodyR GhcRn)
 mkTcBindStmt :: LPat GhcTc -> LocatedA (bodyR GhcTc)
              -> StmtLR GhcTc GhcTc (LocatedA (bodyR GhcTc))
 
-emptyRecStmt     :: (Anno [GenLocated
+emptyRecStmt     :: forall idL bodyR .
+                          (Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
-                             (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnL)
+                                   (StmtLR (GhcPass idL) GhcPs bodyR)] ~ SrcSpanAnnL,
+                           Anno [LocatedA (StmtLR (GhcPass idL) (GhcPass 'Parsed) bodyR)] ~ SrcSpanAnnL,
+                           WrapXRec GhcPs [GenLocated
+                                             (Anno (StmtLR (GhcPass idL) (GhcPass 'Parsed) bodyR))
+                                                   (StmtLR (GhcPass idL) (GhcPass 'Parsed) bodyR)],
+                          IsPass idL)
                  => StmtLR (GhcPass idL) GhcPs bodyR
-emptyRecStmtName :: (Anno [GenLocated
+emptyRecStmtName :: forall bodyR .
+                    (Anno [GenLocated
                              (Anno (StmtLR GhcRn GhcRn bodyR))
-                             (StmtLR GhcRn GhcRn bodyR)]
-                        ~ SrcSpanAnnL)
+                                   (StmtLR GhcRn GhcRn bodyR)] ~ SrcSpanAnnL,
+                     Anno [LocatedA (StmtLR GhcRn GhcRn bodyR)] ~ SrcSpanAnnL,
+                      WrapXRec GhcRn [LStmtLR GhcRn GhcRn bodyR]
+                    )
                  => StmtLR GhcRn GhcRn bodyR
 emptyRecStmtId   :: Stmt GhcTc (LocatedA (HsCmd GhcTc))
 
 mkRecStmt :: forall (idL :: Pass) bodyR.
-                    (Anno [GenLocated
+                    (WrapXRec GhcPs [LocatedA (StmtLR (GhcPass idL) GhcPs bodyR)],
+                    Anno [LocatedA (StmtLR (GhcPass idL) GhcPs bodyR)] ~ SrcSpanAnnL,
+                    WrapXRec GhcPs [GenLocated (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
+                                    (StmtLR (GhcPass idL) GhcPs bodyR)],
+                    IsPass idL,
+
+                    Anno [GenLocated
                              (Anno (StmtLR (GhcPass idL) GhcPs bodyR))
                              (StmtLR (GhcPass idL) GhcPs bodyR)]
-                        ~ SrcSpanAnnL)
+                        ~ SrcSpanAnnL
+                    )
                  => EpAnn AnnList
                  -> LocatedL [LStmtLR (GhcPass idL) GhcPs bodyR]
                  -> StmtLR (GhcPass idL) GhcPs bodyR
@@ -427,7 +442,11 @@ mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
                                                 xbstc_failOp = Nothing }) pat body
 
 emptyRecStmt' :: forall idL idR body .
-  (WrapXRec (GhcPass idR) [LStmtLR (GhcPass idL) (GhcPass idR) body], IsPass idR)
+  (Anno [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)] ~ SrcSpanAnnL,
+    WrapXRec (GhcPass idR) [GenLocated (Anno (StmtLR (GhcPass idL) (GhcPass idR) body))
+                            (StmtLR (GhcPass idL) (GhcPass idR) body)],
+
+    IsPass idL, IsPass idR)
               => XRecStmt (GhcPass idL) (GhcPass idR) body
               -> StmtLR (GhcPass idL) (GhcPass idR) body
 emptyRecStmt' tyVal =

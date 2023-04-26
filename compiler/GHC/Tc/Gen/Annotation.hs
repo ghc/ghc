@@ -44,7 +44,7 @@ warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
 --- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
-  = do { setSrcSpanA loc $ addDiagnosticTc (TcRnIgnoringAnnotations anns)
+  = do { setSrcSpan (locA loc) $ addDiagnosticTc (TcRnIgnoringAnnotations anns)
        ; return [] }
 
 tcAnnotation :: LAnnDecl GhcRn -> TcM Annotation
@@ -54,7 +54,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     let target = annProvenanceToTarget mod provenance
 
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpanA loc $ addErrCtxt (annCtxt ann) $ do
+    setSrcSpan (locA loc) $ addErrCtxt (annCtxt ann) $ do
       -- See #10826 -- Annotations allow one to bypass Safe Haskell.
       dflags <- getDynFlags
       when (safeLanguageOn dflags) $ failWithTc TcRnAnnotationInSafeHaskell

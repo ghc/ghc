@@ -216,7 +216,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
        ; return (nwcs, hs_ty', fvs) }
   where
     rn_lty env (L loc hs_ty)
-      = setSrcSpanA loc $
+      = setSrcSpan (locA loc) $
         do { (hs_ty', fvs) <- rn_ty env hs_ty
            ; return (L loc hs_ty', fvs) }
 
@@ -234,7 +234,7 @@ rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , L lx (HsWildCardTy _)  <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
-           ; setSrcSpanA lx $ checkExtraConstraintWildCard env hs_ctxt1
+           ; setSrcSpan (locA lx) $ checkExtraConstraintWildCard env hs_ctxt1
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy noExtField)]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
            ; return (HsQualTy { hst_xqual = noExtField
@@ -335,7 +335,7 @@ rnHsSigType :: HsDocContext
 -- that cannot have wildcards
 rnHsSigType ctx level
     (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body }))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { traceRn "rnHsSigType" (ppr sig_ty)
        ; case outer_bndrs of
            HsOuterExplicit{} -> checkPolyKinds env (HsSigType sig_ty)
@@ -503,7 +503,7 @@ rnMaybeContext doc (Just theta)
 --------------
 rnLHsTyKi  :: RnTyKiEnv -> LHsType GhcPs -> RnM (LHsType GhcRn, FreeVars)
 rnLHsTyKi env (L loc ty)
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { (ty', fvs) <- rnHsTyKi env ty
        ; return (L loc ty', fvs) }
 
@@ -541,7 +541,7 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
        ; return (HsTyVar noAnn ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
-  = setSrcSpan (getLocA l_op) $
+  = setSrcSpan (locA l_op) $
     do  { (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
         ; let op_name = unLoc l_op'
         ; fix   <- lookupTyFixityRn l_op'
@@ -1623,7 +1623,7 @@ unexpectedPatSigTypeErr ty
 
 badKindSigErr :: HsDocContext -> LHsType GhcPs -> TcM ()
 badKindSigErr doc (L loc ty)
-  = setSrcSpanA loc $ addErr $
+  = setSrcSpan (locA loc) $ addErr $
     TcRnWithHsDocContext doc $
     TcRnKindSignaturesDisabled (Left ty)
 

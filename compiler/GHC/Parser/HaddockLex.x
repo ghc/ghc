@@ -187,7 +187,7 @@ validateIdentWith identParser mloc str0 =
       pstate = initParserState pflags buffer realSrcLc
   in case unP identParser pstate of
     POk _ name -> Just $ case mloc of
-       RealSrcSpan _ _ -> reLoc name
+       RealSrcSpan _ _ -> reLocN name
        UnhelpfulSpan _ -> L mloc (unLoc name) -- Preserve the original reason
     _ -> Nothing
 }

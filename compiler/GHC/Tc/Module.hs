@@ -627,7 +627,7 @@ tc_rn_src_decls ds
                     ; case th_group_tail of
                         { Nothing -> return ()
                         ; Just (SpliceDecl _ (L loc _) _, _) ->
-                            setSrcSpanA loc $ addErr $
+                            setSrcSpan (locA loc) $ addErr $
                             TcRnTHError $ AddTopDeclsError
                               AddTopDeclsUnexpectedDeclarationSplice
                         }
@@ -2772,7 +2772,7 @@ tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
-    setSrcSpanA loc          $
+    setSrcSpan (locA loc)    $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.

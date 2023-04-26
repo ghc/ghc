@@ -345,7 +345,7 @@ tcMultiple tc_pat penv args thing_inside
 tc_lpat :: Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
-  = setSrcSpanA span $
+  = setSrcSpan (locA span) $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
                                           thing_inside
         ; return (L span pat', res) }
@@ -414,7 +414,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
   AsPat x (L nm_loc name) at pat -> do
         { mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
-        ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
+        ; (wrap, bndr_id) <- setSrcSpan (locA nm_loc) (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat (pat_ty `scaledSet`(mkCheckExpType $ idType bndr_id))
                                  penv pat thing_inside
@@ -661,7 +661,7 @@ AST is used for the subtraction operation.
             <- tcSyntaxOpGen orig minus [SynType pat_exp_ty, SynRho] SynAny $
                \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
-                  ; (wrap, bndr_id) <- setSrcSpanA nm_loc $
+                  ; (wrap, bndr_id) <- setSrcSpan (locA nm_loc) $
                                      tcPatBndr penv name (unrestricted $ mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
@@ -905,7 +905,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
         ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
 
           -- Add the stupid theta
-        ; setSrcSpanA con_span $ addDataConStupidTheta data_con ctxt_res_tys
+        ; setSrcSpan (locA con_span) $ addDataConStupidTheta data_con ctxt_res_tys
 
         -- Check that this isn't a GADT pattern match
         -- in situations in which that isn't allowed.
@@ -1358,8 +1358,8 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
                (L l (HsFieldBind ann (L loc (FieldOcc sel (L lr rdr))) pat pun))
                thing_inside
         = do { sel'   <- tcLookupId sel
-             ; pat_ty <- setSrcSpanA loc $ find_field_ty sel
-                                            (occNameFS $ rdrNameOcc rdr)
+             ; pat_ty <- setSrcSpan (locA loc) $ find_field_ty sel
+                                                 (occNameFS $ rdrNameOcc rdr)
              ; (pat', res) <- tcConArg penv (pat, pat_ty) thing_inside
              ; return (L l (HsFieldBind ann (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                         pun), res) }

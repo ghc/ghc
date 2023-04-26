@@ -479,7 +479,7 @@ rnLBind :: (Name -> [Name])      -- Signature tyvar function
         -> LHsBindLR GhcRn GhcPs
         -> RnM (LHsBind GhcRn, [Name], Uses)
 rnLBind sig_fn (L loc bind)
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { (bind', bndrs, dus) <- rnBind sig_fn bind
        ; return (L loc bind', bndrs, dus) }
 
@@ -973,7 +973,7 @@ rnMethodBindLHS :: Bool -> Name
                 -> LHsBindsLR GhcRn GhcPs
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
-  = setSrcSpanA loc $ do
+  = setSrcSpan (locA loc) $ do
     do { sel_name <- wrapLocMA (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
@@ -1238,8 +1238,8 @@ type AnnoBody body
     , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
-    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcAnn NoEpAnns
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnS NoEpAnns
+    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ EpAnnS NoEpAnns
     , Outputable (body GhcPs)
     )
 
@@ -1375,7 +1375,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
     lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one (L name_loc rdr_name)
-      = setSrcSpanA name_loc $
+      = setSrcSpan (locA name_loc) $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
         do names <- lookupLocalTcNames sig_ctxt what rdr_name
