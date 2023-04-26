@@ -41,49 +41,46 @@ import GHC.Types.Unique.Map
 
 
 {-# INLINE identsS #-}
-identsS :: JStat -> [Ident]
+identsS :: Sat.JStat -> [Ident]
 identsS = \case
-  DeclStat i e       -> [i] ++ maybe [] identsE e
-  ReturnStat e       -> identsE e
-  IfStat e s1 s2     -> identsE e ++ identsS s1 ++ identsS s2
-  WhileStat _ e s    -> identsE e ++ identsS s
-  ForInStat _ i e s  -> [i] ++ identsE e ++ identsS s
-  SwitchStat e xs s  -> identsE e ++ concatMap traverseCase xs ++ identsS s
-                          where traverseCase (e,s) = identsE e ++ identsS s
-  TryStat s1 i s2 s3 -> identsS s1 ++ [i] ++ identsS s2 ++ identsS s3
-  BlockStat xs       -> concatMap identsS xs
-  ApplStat e es      -> identsE e ++ concatMap identsE es
-  UOpStat _op e      -> identsE e
-  AssignStat e1 e2   -> identsE e1 ++ identsE e2
-  UnsatBlock{}       -> error "identsS: UnsatBlock"
-  LabelStat _l s     -> identsS s
-  BreakStat{}        -> []
-  ContinueStat{}     -> []
+  Sat.DeclStat i e       -> [i] ++ maybe [] identsE e
+  Sat.ReturnStat e       -> identsE e
+  Sat.IfStat e s1 s2     -> identsE e ++ identsS s1 ++ identsS s2
+  Sat.WhileStat _ e s    -> identsE e ++ identsS s
+  Sat.ForInStat _ i e s  -> [i] ++ identsE e ++ identsS s
+  Sat.SwitchStat e xs s  -> identsE e ++ concatMap traverseCase xs ++ identsS s
+                               where traverseCase (e,s) = identsE e ++ identsS s
+  Sat.TryStat s1 i s2 s3 -> identsS s1 ++ [i] ++ identsS s2 ++ identsS s3
+  Sat.BlockStat xs       -> concatMap identsS xs
+  Sat.ApplStat e es      -> identsE e ++ concatMap identsE es
+  Sat.UOpStat _op e      -> identsE e
+  Sat.AssignStat e1 e2   -> identsE e1 ++ identsE e2
+  Sat.LabelStat _l s     -> identsS s
+  Sat.BreakStat{}        -> []
+  Sat.ContinueStat{}     -> []
 
 {-# INLINE identsE #-}
-identsE :: JExpr -> [Ident]
+identsE :: Sat.JExpr -> [Ident]
 identsE = \case
-  ValExpr v         -> identsV v
-  SelExpr e _i      -> identsE e -- do not rename properties
-  IdxExpr e1 e2     -> identsE e1 ++ identsE e2
-  InfixExpr _ e1 e2 -> identsE e1 ++ identsE e2
-  UOpExpr _ e       -> identsE e
-  IfExpr e1 e2 e3   -> identsE e1 ++ identsE e2 ++ identsE e3
-  ApplExpr e es     -> identsE e  ++ concatMap identsE es
-  UnsatExpr{}       -> error "identsE: UnsatExpr"
+  Sat.ValExpr v         -> identsV v
+  Sat.SelExpr e _i      -> identsE e -- do not rename properties
+  Sat.IdxExpr e1 e2     -> identsE e1 ++ identsE e2
+  Sat.InfixExpr _ e1 e2 -> identsE e1 ++ identsE e2
+  Sat.UOpExpr _ e       -> identsE e
+  Sat.IfExpr e1 e2 e3   -> identsE e1 ++ identsE e2 ++ identsE e3
+  Sat.ApplExpr e es     -> identsE e  ++ concatMap identsE es
 
 {-# INLINE identsV #-}
-identsV :: JVal -> [Ident]
+identsV :: Sat.JVal -> [Ident]
 identsV = \case
-  JVar i       -> [i]
-  JList xs     -> concatMap identsE xs
-  JDouble{}    -> []
-  JInt{}       -> []
-  JStr{}       -> []
-  JRegEx{}     -> []
-  JHash m      -> concatMap identsE (nonDetEltsUniqMap m)
-  JFunc args s -> args ++ identsS s
-  UnsatVal{}   -> error "identsV: UnsatVal"
+  Sat.JVar i       -> [i]
+  Sat.JList xs     -> concatMap identsE xs
+  Sat.JDouble{}    -> []
+  Sat.JInt{}       -> []
+  Sat.JStr{}       -> []
+  Sat.JRegEx{}     -> []
+  Sat.JHash m      -> concatMap identsE (nonDetEltsUniqMap m)
+  Sat.JFunc args s -> args ++ identsS s
 
 
 {--------------------------------------------------------------------
