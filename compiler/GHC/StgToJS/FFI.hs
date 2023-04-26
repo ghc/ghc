@@ -14,6 +14,7 @@ import GHC.Prelude
 import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
+import qualified GHC.JS.Syntax as Sat
 
 import GHC.StgToJS.Arg
 import GHC.StgToJS.ExprCtx
@@ -176,8 +177,8 @@ genFFIArg isJavaScriptCc a@(StgVarArg i)
      arg_ty = stgArgType a
      r      = uTypeVt arg_ty
 
-saturateFFI :: JMacro a => Int -> a -> a
-saturateFFI u = jsSaturate (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)
+saturateFFI :: Int -> JStat -> Sat.JStat
+saturateFFI u = satJStat (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)
 
 genForeignCall :: HasDebugCallStack
                => ExprCtx

@@ -25,6 +25,7 @@ where
 import GHC.Prelude
 
 import GHC.JS.Unsat.Syntax
+import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Transform
 
 import GHC.StgToJS.Types
@@ -160,7 +161,7 @@ data GlobalOcc = GlobalOcc
 
 -- | Return number of occurrences of every global id used in the given JStat.
 -- Sort by increasing occurrence count.
-globalOccs :: JStat -> G [GlobalOcc]
+globalOccs :: Sat.JStat -> G [GlobalOcc]
 globalOccs jst = do
   GlobalIdCache gidc <- getGlobalIdCache
   -- build a map form Ident Unique to (Ident, Id, Count)
@@ -180,4 +181,4 @@ globalOccs jst = do
               let g = GlobalOcc i gid 1
               in go (addToUFM_C inc gids i g) is
 
-  pure $ go emptyUFM (identsS $ satJStat jst)
+  pure $ go emptyUFM (identsS jst)

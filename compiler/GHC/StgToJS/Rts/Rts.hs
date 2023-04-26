@@ -31,6 +31,7 @@ import GHC.JS.Unsat.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
 import GHC.JS.Optimizer
+import qualified GHC.JS.Syntax as Sat
 
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Closure
@@ -298,8 +299,8 @@ closureTypes = mconcat (map mkClosureType (enumFromTo minBound maxBound)) <> clo
     ifCT arg ct = jwhenS (arg .===. toJExpr ct) (returnS (toJExpr (show ct)))
 
 -- | JS payload declaring the RTS functions.
-rtsDecls :: JStat
-rtsDecls = jsSaturate (Just "h$RTSD") $
+rtsDecls :: Sat.JStat
+rtsDecls = satJStat (Just "h$RTSD") $
   mconcat [ TxtI "h$currentThread"   ||= null_                   -- thread state object for current thread
           , TxtI "h$stack"           ||= null_                   -- stack for the current thread
           , TxtI "h$sp"              ||= 0                       -- stack pointer for the current thread
@@ -314,15 +315,15 @@ rtsDecls = jsSaturate (Just "h$RTSD") $
 
 -- | print the embedded RTS to a String
 rtsText :: StgToJSConfig -> String
-rtsText = show . pretty . jsOptimize . satJStat . rts
+rtsText = show . pretty . jsOptimize . rts
 
 -- | print the RTS declarations to a String.
 rtsDeclsText :: String
-rtsDeclsText = show . pretty . jsOptimize . satJStat $ rtsDecls
+rtsDeclsText = show . pretty . jsOptimize $ rtsDecls
 
 -- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
-rts :: StgToJSConfig -> JStat
-rts = jsSaturate (Just "h$RTS") . rts'
+rts :: StgToJSConfig -> Sat.JStat
+rts = satJStat (Just "h$RTS") . rts'
 
 -- | JS Payload which defines the embedded RTS.
 rts' :: StgToJSConfig -> JStat

@@ -333,7 +333,7 @@ renderLinker h mods jsFiles = do
     pure (mod_mod, mod_size)
 
   -- commoned up metadata
-  !meta_length <- fromIntegral <$> putJS (jsOptimize $ satJStat meta)
+  !meta_length <- fromIntegral <$> putJS (jsOptimize $ satJStat Nothing meta)
 
   -- module exports
   mapM_ (putBS . cmc_exports) compacted_mods

@@ -899,7 +899,7 @@ caseCond = \case
   DataAlt da -> return $ Just (toJExpr $ dataConTag da)
   LitAlt l   -> genLit l >>= \case
     [e] -> pure (Just e)
-    es  -> pprPanic "caseCond: expected single-variable literal" (ppr $ fmap satJExpr es)
+    es  -> pprPanic "caseCond: expected single-variable literal" (ppr $ satJExpr Nothing <$> es)
 
 -- fixme use single tmp var for all branches
 -- | Load parameters from constructor
