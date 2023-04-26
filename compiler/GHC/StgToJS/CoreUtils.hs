@@ -253,7 +253,7 @@ assocPrimReps (r:rs) vs = case (primRepSize r,vs) of
   (NoSlot,   xs)     -> (r,[])    : assocPrimReps rs xs
   (OneSlot,  x:xs)   -> (r,[x])   : assocPrimReps rs xs
   (TwoSlots, x:y:xs) -> (r,[x,y]) : assocPrimReps rs xs
-  err                -> pprPanic "assocPrimReps" (ppr $ fmap (map satJExpr) $ err)
+  err                -> pprPanic "assocPrimReps" (ppr $ map (satJExpr Nothing) <$> err)
 
 -- | Associate the given values to the Id's PrimReps, taking into account the
 -- number of slots per PrimRep

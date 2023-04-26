@@ -60,8 +60,8 @@ genCon ctx con args
 
   | xs <- concatMap typex_expr (ctxTarget ctx)
   = pprPanic "genCon: unhandled DataCon" (ppr (con
-                                              , fmap satJExpr args
-                                              , fmap satJExpr xs
+                                              , satJExpr Nothing <$> args
+                                              , satJExpr Nothing <$> xs
                                               ))
 
 -- | Allocate a data constructor. Allocate in this context means bind the data
@@ -90,7 +90,7 @@ allocUnboxedCon con = \case
     | isBoolDataCon con && dataConTag con == 2 -> true_
   [x]
     | isUnboxableCon con -> x
-  xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con, fmap satJExpr xs))
+  xs -> pprPanic "allocUnboxedCon: not an unboxed constructor" (ppr (con, satJExpr Nothing <$> xs))
 
 -- | Allocate an entry function. See 'GHC.StgToJS.hs' for the object layout.
 allocDynamicE :: Bool          -- ^ csInlineAlloc from StgToJSConfig

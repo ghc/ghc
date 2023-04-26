@@ -134,10 +134,9 @@ genUnits m ss spt_entries foreign_stubs = do
         glbl <- State.gets gsGlobal
         staticInit <-
           initStaticPtrs spt_entries
-        let stat = ( jsOptimize
-                     . satJStat
-                     . jsSaturate (Just $ modulePrefix m 1)
-                     $ mconcat (reverse glbl) <> staticInit)
+        let stat = ( jsOptimize .
+                     satJStat (Just $ modulePrefix m 1)
+                   $ mconcat (reverse glbl) <> staticInit)
         let syms = [moduleGlobalSymbol m]
         let oi = ObjUnit
                   { oiSymbols  = syms
@@ -210,8 +209,7 @@ genUnits m ss spt_entries foreign_stubs = do
               si        <- State.gets (ggsStatic . gsGroup)
               let body = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
               let stat =  jsOptimize
-                          . satJStat
-                          $ jsSaturate (Just $ modulePrefix m n) body
+                          $ satJStat (Just $ modulePrefix m n) body
               let ids = [bnd]
               syms <- (\(TxtI i) -> [i]) <$> identForId bnd
               let oi = ObjUnit
@@ -249,8 +247,7 @@ genUnits m ss spt_entries foreign_stubs = do
               topDeps  = collectTopIds decl
               required = hasExport decl
               stat     = jsOptimize
-                         . satJStat
-                         . jsSaturate (Just $ modulePrefix m n)
+                         . satJStat (Just $ modulePrefix m n)
                          $ mconcat (reverse extraTl) <> tl
           syms <- mapM (fmap (\(TxtI i) -> i) . identForId) topDeps
           let oi = ObjUnit
@@ -339,7 +336,7 @@ genToplevelRhs i rhs = case rhs of
     eid@(TxtI eidt) <- identForEntryId i
     (TxtI idt)   <- identForId i
     body <- genBody (initExprCtx i) R2 args body typ
-    global_occs <- globalOccs (jsSaturate (Just "ghcjs_tmp_sat_") body)
+    global_occs <- globalOccs (satJStat (Just "ghcjs_tmp_sat_") body)
     let lidents = map global_ident global_occs
     let lids    = map global_id    global_occs
     let lidents' = map identFS lidents
