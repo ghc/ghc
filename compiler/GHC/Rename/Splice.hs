@@ -172,7 +172,7 @@ rn_utbracket outer_stage br@(VarBr x flg rdr_name)
                                       TcRnTHError $ THNameError $ QuotedNameWrongStage br }
                         }
                     }
-       ; return (VarBr x flg (noLocA name), unitFV name) }
+       ; return (VarBr x flg (noLocN name), unitFV name) }
 
 rn_utbracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
                                 ; return (ExpBr x e', fvs) }
@@ -285,7 +285,7 @@ rnUntypedSpliceGen run_splice pend_splice splice
           -> do { (splice', fvs) <- setStage pop_stage $
                                     rnUntypedSplice splice
                 ; loc  <- getSrcSpanM
-                ; splice_name <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+                ; splice_name <- newLocalBndrRn (L (noAnnSrcSpanN loc) unqualSplice)
                 ; let (pending_splice, result) = pend_splice splice_name splice'
                 ; ps <- readMutVar ps_var
                 ; writeMutVar ps_var (pending_splice : ps)
@@ -389,12 +389,12 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name
 mkQuasiQuoteExpr flavour quoter (L q_span' quote)
   = L q_span $ HsApp noComments (L q_span
              $ HsApp noComments (L q_span
-                    (HsVar noExtField (L (la2na q_span) quote_selector)))
+                    (HsVar noExtField (L (l2l q_span) quote_selector)))
                                 quoterExpr)
                     quoteExpr
   where
-    q_span = noAnnSrcSpan (locA q_span')
-    quoterExpr = L q_span $! HsVar noExtField $! (L (la2na q_span) quoter)
+    q_span = noAnnSrcSpan (locI q_span')
+    quoterExpr = L q_span $! HsVar noExtField $! (L (l2l q_span) quoter)
     quoteExpr  = L q_span $! HsLit noComments $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
@@ -463,7 +463,7 @@ rnTypedSplice expr
       do { loc <- getSrcSpanM
          -- The renamer allocates a splice-point name to every typed splice
          -- (incl the top level ones for which it will not ultimately be used)
-         ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) unqualSplice)
+         ; n' <- newLocalBndrRn (L (noAnnSrcSpanN loc) unqualSplice)
          ; (expr', fvs) <- rnLExpr expr
          ; return (HsTypedSplice n' expr', fvs) }
 

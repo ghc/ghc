@@ -866,10 +866,10 @@ getLocalNonValBinders fixity_env
     new_tc dup_fields_ok has_sel tc_decl -- NOT for type/data instances
         = do { let TyDeclBinders (main_bndr, tc_flav) at_bndrs sig_bndrs
                      (LConsWithFields cons_with_flds flds) = hsLTyClDeclBinders tc_decl
-             ; tycon_name          <- newTopSrcBinder $ l2n main_bndr
-             ; at_names            <- mapM (newTopSrcBinder . l2n . fst) at_bndrs
-             ; sig_names           <- mapM (newTopSrcBinder . l2n) sig_bndrs
-             ; con_names_with_flds <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (l2n con)) cons_with_flds
+             ; tycon_name          <- newTopSrcBinder $ la2la main_bndr
+             ; at_names            <- mapM (newTopSrcBinder . la2la . fst) at_bndrs
+             ; sig_names           <- mapM (newTopSrcBinder . la2la) sig_bndrs
+             ; con_names_with_flds <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (la2la con)) cons_with_flds
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst con_names_with_flds) flds
              ; mapM_ (add_dup_fld_errs flds') con_names_with_flds
              ; let tc_gre = mkLocalTyConGRE (fmap (const tycon_name) tc_flav) tycon_name
@@ -927,7 +927,7 @@ getLocalNonValBinders fixity_env
              -- See (1) above
              L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
              -- See (2) above
-             MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe SameNameSpace cls_rdr
+             MaybeT $ setSrcSpan (locN loc) $ lookupGlobalOccRn_maybe SameNameSpace cls_rdr
            -- Assuming the previous step succeeded, process any associated data
            -- family instances. If the previous step failed, bail out.
            case mb_cls_gre of
@@ -944,7 +944,7 @@ getLocalNonValBinders fixity_env
     new_di dup_fields_ok has_sel mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- unLoc <$> lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let LConsWithFields cons_with_flds flds = hsDataFamInstBinders dfid
-             ; sub_names <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (l2n con)) cons_with_flds
+             ; sub_names <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (la2la con)) cons_with_flds
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst sub_names) flds
              ; mapM_ (add_dup_fld_errs flds') sub_names
              ; let fld_env  = mk_fld_env sub_names flds'
@@ -1967,7 +1967,7 @@ getMinimalImports ie_decls
            ; iface <- loadSrcInterface doc mod_name is_boot pkg_qual
            ; let used_avails = gresToAvailInfo used_gres
            ; lies <- map (L l) <$> concatMapM (to_ie rdr_env iface) used_avails
-           ; return (L l (decl { ideclImportList = Just (Exactly, L (l2l l) lies) })) }
+           ; return (L l (decl { ideclImportList = Just (Exactly, L (nn2la l) lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
@@ -2026,7 +2026,7 @@ getMinimalImports ie_decls
         idecl = unLoc decl
 
     merge :: NonEmpty (LImportDecl GhcRn) -> LImportDecl GhcRn
-    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpan (locA l)) lies) })
+    merge decls@((L l decl) :| _) = L l (decl { ideclImportList = Just (Exactly, L (noAnnSrcSpanI (locA l)) lies) })
       where lies = concatMap (unLoc . snd) $ mapMaybe (ideclImportList . unLoc) $ NE.toList decls
 
 classifyGREs :: [GlobalRdrElt] -> ([GlobalRdrElt], [FieldGlobalRdrElt])
@@ -2060,14 +2060,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (la2e l)   (L (la2na l) n))
-  | otherwise             = L l (IEName    noExtField (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (epaLocationFromEpAnnS l) (L (l2l l) n))
+  | otherwise             = L l (IEName    noExtField                (L (l2l l) n))
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (la2e l)   (L (la2na l) n))
-  | otherwise                   = L l (IEName noExtField (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (epaLocationFromEpAnnS l) (L (l2l l) n))
+  | otherwise                   = L l (IEName noExtField         (L (l2l l) n))
   where occ = occName n
 
 {-

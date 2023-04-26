@@ -18,9 +18,9 @@ module GHC.Rename.Utils (
         warnForallIdentifier,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genLHsApp,
+        wrapGenSpan, wrapGenSpanI, genHsVar, genLHsVar, genHsApp, genHsApps, genLHsApp,
         genAppType,
-        genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
+        genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
 
@@ -86,9 +86,9 @@ newLocalBndrRn (L loc rdr_name)
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
   | otherwise
   = do { unless (isUnqual rdr_name)
-                (addErrAt (locA loc) (badQualBndrErr rdr_name))
+                (addErrAt (locN loc) (badQualBndrErr rdr_name))
        ; uniq <- newUnique
-       ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
+       ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locN loc)) }
 
 newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
@@ -112,7 +112,7 @@ bindLocalNamesFV names enclosed_scope
 checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNames rdr_names_w_loc
-  = mapM_ (\ ns -> dupNamesErr (getLocA <$> ns) (unLoc <$> ns)) dups
+  = mapM_ (\ ns -> dupNamesErr (getLocN <$> ns) (unLoc <$> ns)) dups
   where
     (_, dups) = removeDupsOn unLoc rdr_names_w_loc
 
@@ -135,7 +135,7 @@ checkShadowedRdrNames loc_rdr_names
   where
     filtered_rdrs = filterOut (isExact . unLoc) loc_rdr_names
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
-    get_loc_occ (L loc rdr) = (locA loc,rdrNameOcc rdr)
+    get_loc_occ (L loc rdr) = (locN loc,rdrNameOcc rdr)
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names
@@ -422,7 +422,7 @@ check_unused prov bound_names used_names
 warnForallIdentifier :: LocatedN RdrName -> RnM ()
 warnForallIdentifier (L l rdr_name@(Unqual occ))
   | isKw (fsLit "forall") || isKw (fsLit "∀")
-  = addDiagnosticAt (locA l) (TcRnForallIdentifier rdr_name)
+  = addDiagnosticAt (locN l) (TcRnForallIdentifier rdr_name)
   where isKw = (occNameFS occ ==)
 warnForallIdentifier _ = return ()
 
@@ -562,10 +562,15 @@ checkCTupSize tup_size
 *                                                                      *
 ********************************************************************* -}
 
-wrapGenSpan :: a -> LocatedAn an a
+wrapGenSpan :: (Monoid an) => a -> LocatedAnS an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
+
+wrapGenSpanI :: a -> LocatedAn an a
+-- Wrap something in a "generatedSrcSpan"
+-- See Note [Rebindable syntax and HsExpansion]
+wrapGenSpanI x = L (noAnnSrcSpanI generatedSrcSpan) x
 
 genHsApps :: Name -> [LHsExpr GhcRn] -> HsExpr GhcRn
 genHsApps fun args = foldl genHsApp (genHsVar fun) args
@@ -585,11 +590,19 @@ genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
-genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
-genLHsLit = wrapGenSpan . HsLit noAnn
+-- genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+-- genLHsLit = wrapGenSpan . HsLit noAnn
 
-genHsIntegralLit :: IntegralLit -> LocatedAn an (HsExpr GhcRn)
-genHsIntegralLit = genLHsLit . HsInt noExtField
+
+-- -- genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+-- genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+
+-- nlHsLit :: HsLit (GhcPass p) -> LHsExpr (GhcPass p)
+-- nlHsLit n = noLocA (HsLit noComments n)
+-- genLHsLit = wrapGenSpan . HsLit noAnn
+
+genHsIntegralLit :: IntegralLit -> LocatedA (HsExpr GhcRn)
+genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
 
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
@@ -610,17 +623,18 @@ genWildPat = wrapGenSpan $ WildPat noExtField
 genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
-  = L gen $ genFunBind (L gen fun)
-        [mkMatch (mkPrefixFunRhs (L gen fun)) pats expr
+  = L gen $ genFunBind (L genN fun)
+        [mkMatch (mkPrefixFunRhs (L genN fun)) pats expr
                  emptyLocalBinds]
   where
     gen = noAnnSrcSpan generatedSrcSpan
+    genN = noAnnSrcSpanN generatedSrcSpan
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup Generated (wrapGenSpan ms)
+            , fun_matches = mkMatchGroup Generated (wrapGenSpanI ms)
             , fun_ext = emptyNameSet
             }
 

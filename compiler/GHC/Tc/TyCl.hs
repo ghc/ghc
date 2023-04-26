@@ -3005,7 +3005,7 @@ tcInjectivity _ Nothing
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
 tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
-  = setSrcSpanA loc $
+  = setSrcSpanI loc $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
        -- Fail eagerly to avoid reporting injectivity errors when
@@ -4529,7 +4529,7 @@ checkFieldCompat fld con1 con2 res1 res2 fty1 fty2
 checkValidDataCon :: DynFlags -> Bool -> TyCon -> DataCon -> TcM ()
 checkValidDataCon dflags existential_ok tc con
   = setSrcSpan con_loc $
-    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpan con_loc) con_name))) $
+    addErrCtxt (dataConCtxt (NE.singleton (L (noAnnSrcSpanN con_loc) con_name))) $
     do  { let tc_tvs      = tyConTyVars tc
               res_ty_tmpl = mkFamilyTyConApp tc (mkTyVarTys tc_tvs)
               arg_tys     = dataConOrigArgTys con
@@ -5221,7 +5221,7 @@ checkValidRoleAnnots role_annots tc
 -- Expected 0, got 1:
 --
 
-checkRoleAnnot :: TyVar -> LocatedAn NoEpAnns (Maybe Role) -> Role -> TcM ()
+checkRoleAnnot :: TyVar -> LocatedAnS NoEpAnns (Maybe Role) -> Role -> TcM ()
 checkRoleAnnot _  (L _ Nothing)   _  = return ()
 checkRoleAnnot tv (L _ (Just r1)) r2
   = when (r1 /= r2) $

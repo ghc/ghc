@@ -459,7 +459,7 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
-  = do { addLocMA checkConName rdrname
+  = do { addLocMN checkConName rdrname
        ; name <-
            lookupLocatedTopConstructorRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
@@ -688,7 +688,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
-     foldlM add_one env [ (locA loc,locA name_loc,name,fixity)
+     foldlM add_one env [ (locA loc,locN name_loc,name,fixity)
                         | L name_loc name <- names ]
 
    add_one env (loc, name_loc, name,fixity) = do
@@ -1238,8 +1238,8 @@ type AnnoBody body
     , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
     , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
     , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
-    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcAnn NoEpAnns
-    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcAnn NoEpAnns
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ EpAnnS NoEpAnns
+    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ EpAnnS NoEpAnns
     , Outputable (body GhcPs)
     )
 
@@ -1375,7 +1375,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
     lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one (L name_loc rdr_name)
-      = setSrcSpanA name_loc $
+      = setSrcSpanN name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
         do names <- lookupLocalTcNames sig_ctxt what rdr_name

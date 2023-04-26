@@ -1475,7 +1475,7 @@ repMaybeLTy m = do
   k_ty <- wrapName kindTyConName
   repMaybeT k_ty repLTy m
 
-repRole :: LocatedAn NoEpAnns (Maybe Role) -> MetaM (Core TH.Role)
+repRole :: LocatedAnS NoEpAnns (Maybe Role) -> MetaM (Core TH.Role)
 repRole (L _ (Just Nominal))          = rep2_nw nominalRName []
 repRole (L _ (Just Representational)) = rep2_nw representationalRName []
 repRole (L _ (Just Phantom))          = rep2_nw phantomRName []
@@ -1522,7 +1522,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
-repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
+repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocN x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur

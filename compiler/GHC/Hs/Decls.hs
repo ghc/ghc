@@ -350,7 +350,7 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey)
+type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey [RealSrcSpan])
 
   -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
@@ -797,7 +797,7 @@ type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
 
 ----------------- Class instances -------------
 
-type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey) -- TODO:AZ:tidy up
+type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey [RealSrcSpan]) -- TODO:AZ:tidy up
 type instance XCClsInstDecl    GhcRn = NoExtField
 type instance XCClsInstDecl    GhcTc = NoExtField
 
@@ -1273,8 +1273,6 @@ type instance XCRoleAnnotDecl GhcTc = NoExtField
 
 type instance XXRoleAnnotDecl (GhcPass _) = DataConCantHappen
 
-type instance Anno (Maybe Role) = SrcAnn NoEpAnns
-
 instance OutputableBndr (IdP (GhcPass p))
        => Outputable (RoleAnnotDecl (GhcPass p)) where
   ppr (RoleAnnotDecl _ ltycon roles)
@@ -1329,7 +1327,7 @@ type instance Anno (WarnDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (Maybe Role) = SrcAnn NoEpAnns
+type instance Anno (Maybe Role) = EpAnnS NoEpAnns
 type instance Anno CCallConv   = SrcSpan
 type instance Anno Safety      = SrcSpan
 type instance Anno CExportSpec = SrcSpan

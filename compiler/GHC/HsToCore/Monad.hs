@@ -22,7 +22,7 @@ module GHC.HsToCore.Monad (
         duplicateLocalDs, newSysLocalDs,
         newSysLocalsDs, newUniqueId,
         newFailLocalDs, newPredVarDs,
-        getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
+        getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA, putSrcSpanDsI,
         mkNamePprCtxDs,
         newUnique,
         UniqSupply, newUniqueSupply,
@@ -429,8 +429,11 @@ putSrcSpanDs (UnhelpfulSpan {}) thing_inside
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
 
-putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
+putSrcSpanDsA :: EpAnnS ann -> DsM a -> DsM a
 putSrcSpanDsA loc = putSrcSpanDs (locA loc)
+
+putSrcSpanDsI :: SrcSpanAnn' ann -> DsM a -> DsM a
+putSrcSpanDsI loc = putSrcSpanDs (locI loc)
 
 -- | Emit a diagnostic for the current source location. In case the diagnostic is a warning,
 -- the latter will be ignored and discarded if the relevant 'WarningFlag' is not set in the DynFlags.

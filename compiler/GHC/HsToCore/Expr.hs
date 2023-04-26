@@ -711,7 +711,7 @@ dsDo ctx stmts
 
            ; rhss' <- sequence rhss
 
-           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
+           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocI stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
                    = putSrcSpanDs (getLocA pat) $
@@ -756,14 +756,14 @@ dsDo ctx stmts
         rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
         mfix_arg     = noLocA $ HsLam noExtField
-                           (MG { mg_alts = noLocA [mkSimpleMatch
+                           (MG { mg_alts = noLocI [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Generated
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLocA $ HsDo body_ty
-                                ctx (noLocA (rec_stmts ++ [ret_stmt]))
+                                ctx (noLocI (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
         ret_stmt     = noLocA $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,

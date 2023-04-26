@@ -330,15 +330,15 @@ type ZonkTcM = ZonkT TcM
 -- See Note [Zonking to Type].
 type ZonkBndrTcM = ZonkBndrT TcM
 
-wrapLocZonkMA :: (a -> ZonkTcM b) -> GenLocated (SrcSpanAnn' ann) a
-              -> ZonkTcM (GenLocated (SrcSpanAnn' ann) b)
+wrapLocZonkMA :: (a -> ZonkTcM b) -> GenLocated (EpAnnS ann) a
+              -> ZonkTcM (GenLocated (EpAnnS ann) b)
 wrapLocZonkMA fn (L loc a) = ZonkT $ \ ze ->
   setSrcSpanA loc $
   do { b <- runZonkT (fn a) ze
      ; return (L loc b) }
 
-wrapLocZonkBndrMA :: (a -> ZonkBndrTcM b) -> GenLocated (SrcSpanAnn' ann) a
-                  -> ZonkBndrTcM (GenLocated (SrcSpanAnn' ann) b)
+wrapLocZonkBndrMA :: (a -> ZonkBndrTcM b) -> GenLocated (EpAnnS ann) a
+                  -> ZonkBndrTcM (GenLocated (EpAnnS ann) b)
 wrapLocZonkBndrMA fn (L loc a) = ZonkBndrT $ \ k -> ZonkT $ \ ze ->
   setSrcSpanA loc $
   runZonkT ( runZonkBndrT (fn a) $ \ b -> k (L loc b) ) ze
@@ -851,7 +851,7 @@ zonkLTcSpecPrags ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
                => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
                -> MatchGroup GhcTc (LocatedA (body GhcTc))
                -> ZonkTcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -865,7 +865,7 @@ zonkMatchGroup zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty' origin
                      }) }
 
-zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (LMatch GhcTc (LocatedA (body GhcTc)))
@@ -876,7 +876,7 @@ zonkMatch zBody (L loc match@(Match { m_pats = pats
       ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcAnn NoEpAnns
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ EpAnnS NoEpAnns
           => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
           -> ZonkTcM (GRHSs GhcTc (LocatedA (body GhcTc)))
@@ -1268,8 +1268,9 @@ zonkArithSeq (FromThenTo e1 e2 e3)
        return (FromThenTo new_e1 new_e2 new_e3)
 
 -------------------------------------------------------------------------
-zonkStmts :: Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-          => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
+zonkStmts :: -- Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+          -- =>
+          (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
           -> [LStmt GhcTc (LocatedA (body GhcTc))]
           -> ZonkBndrTcM [LStmt GhcTc (LocatedA (body GhcTc))]
 zonkStmts _ []     = return []
@@ -1277,8 +1278,9 @@ zonkStmts zBody (s:ss) = do { s'  <- wrapLocZonkBndrMA (zonkStmt zBody) s
                             ; ss' <- zonkStmts zBody ss
                             ; return (s' : ss') }
 
-zonkStmt :: Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
-         => (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
+zonkStmt :: -- Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+         -- =>
+         (LocatedA (body GhcTc) -> ZonkTcM (LocatedA (body GhcTc)))
          -> Stmt GhcTc (LocatedA (body GhcTc))
          -> ZonkBndrTcM (Stmt GhcTc (LocatedA (body GhcTc)))
 zonkStmt _ (ParStmt bind_ty stmts_w_bndrs mzip_op bind_op)
@@ -1326,7 +1328,7 @@ zonkStmt zBody (RecStmt { recS_stmts = L _ segStmts, recS_later_ids = lvs
              ; new_later_rets <- noBinders $ mapM zonkExpr later_rets
              ; new_rec_rets   <- noBinders $ mapM zonkExpr rec_rets
              ; return $
-               RecStmt { recS_stmts = noLocA new_segStmts
+               RecStmt { recS_stmts = noLocI new_segStmts
                        , recS_later_ids = new_lvs
                        , recS_rec_ids = new_rvs, recS_ret_fn = new_ret_id
                        , recS_mfix_fn = new_mfix_id, recS_bind_fn = new_bind_id

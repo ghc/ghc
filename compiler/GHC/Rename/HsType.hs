@@ -393,7 +393,7 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
          -- Use the currently set SrcSpan as the new source location for each Name.
          -- See Note [Source locations for implicitly bound type variables].
        ; loc <- getSrcSpanM
-       ; let loc' = noAnnSrcSpan loc
+       ; let loc' = noAnnSrcSpanN loc
        ; vars <- mapM (newTyVarNameRnImplicit mb_assoc . L loc' . unLoc) implicit_vs
 
        ; bindLocalNamesFV vars $
@@ -591,7 +591,7 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
        ; return (HsTyVar noAnn ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ prom ty1 l_op ty2)
-  = setSrcSpan (getLocA l_op) $
+  = setSrcSpan (getLocN l_op) $
     do  { (l_op', fvs1) <- rnHsTyOp env (ppr ty) l_op
         ; let op_name = unLoc l_op'
         ; fix   <- lookupTyFixityRn l_op'
@@ -978,7 +978,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     --
     --   class C (a :: j) (b :: k) where
     --            ^^^^^^^^^^^^^^^
-    bndrs_loc = case map get_bndr_loc hs_tv_bndrs ++ map getLocA body_kv_occs of
+    bndrs_loc = case map get_bndr_loc hs_tv_bndrs ++ map getLocN body_kv_occs of
       []         -> panic "bindHsQTyVars.bndrs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
@@ -987,9 +987,9 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     -- include surrounding parens. for error messages to be
     -- compatible, we recreate the location from the contents
     get_bndr_loc :: LHsTyVarBndr flag GhcPs -> SrcSpan
-    get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocA ln
+    get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocN ln
     get_bndr_loc (L _ (KindedTyVar _ _ ln lk))
-      = combineSrcSpans (getLocA ln) (getLocA lk)
+      = combineSrcSpans (getLocN ln) (getLocA lk)
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

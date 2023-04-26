@@ -659,7 +659,7 @@ tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
       Just (L loc ds) ->
-        setSrcSpanA loc $ do
+        setSrcSpanI loc $ do
           (ds', tvs) <- tc_deriv_strategy ds
           pure (Just (L loc ds'), tvs)
   where
@@ -772,7 +772,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
+    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocN fam_name))
 
 {- Note [tcFamTyPats: zonking the result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1539,7 +1539,7 @@ splitHsAppTys hs_ty
     go (L _  (HsAppKindTy _ ty at k)) as = go ty (HsTypeArg at k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ prom l op@(L sp _) r)) as
-      = ( L (na2la sp) (HsTyVar noAnn prom op)
+      = ( L (l2l sp) (HsTyVar noAnn prom op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 

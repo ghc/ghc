@@ -723,7 +723,7 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
        ; mfix'  <- addTickSyntaxExpr hpcSrcSpan (recS_mfix_fn stmt)
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
-       ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
+       ; return (stmt { recS_stmts = noLocI stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
@@ -937,7 +937,7 @@ addTickCmdStmt stmt@(RecStmt {})
        ; ret'   <- addTickSyntaxExpr hpcSrcSpan (recS_ret_fn stmt)
        ; mfix'  <- addTickSyntaxExpr hpcSrcSpan (recS_mfix_fn stmt)
        ; bind'  <- addTickSyntaxExpr hpcSrcSpan (recS_bind_fn stmt)
-       ; return (stmt { recS_stmts = noLocA stmts', recS_ret_fn = ret'
+       ; return (stmt { recS_stmts = noLocI stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 addTickCmdStmt ApplicativeStmt{} =
   panic "ToDo: addTickCmdStmt ApplicativeLastStmt"

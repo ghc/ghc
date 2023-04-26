@@ -667,7 +667,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         outer_mod' = mkHomeModule home_unit mod_name
         inner_mod = homeModuleNameInstantiation home_unit mod_name
         src_filename  = ms_hspp_file mod_summary
-        real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
+        real_loc = realSrcLocSpan (mkRealSrcLoc (mkFastString src_filename) 1 1)
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     massert (isHomeModule home_unit outer_mod)
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)

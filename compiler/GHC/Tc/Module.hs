@@ -285,7 +285,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                                                      ++ import_decls))
         ; let { mkImport mod_name = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclImportList = Just (Exactly, noLocA [])}}
+                  { ideclImportList = Just (Exactly, noLocI [])}}
         ; let { withReason t imps = map (,text t) imps }
         ; let { all_imports = withReason "is implicitly imported" prel_imports
                   ++ withReason "is directly imported" import_decls
@@ -1838,7 +1838,7 @@ generateMainBinding tcg_env main_name = do
     { traceTc "checkMain found" (ppr main_name)
     ; (io_ty, res_ty) <- getIOType
     ; let loc = getSrcSpan main_name
-          main_expr_rn = L (noAnnSrcSpan loc) (HsVar noExtField (L (noAnnSrcSpan loc) main_name))
+          main_expr_rn = L (noAnnSrcSpan loc) (HsVar noExtField (L (noAnnSrcSpanN loc) main_name))
     ; (ev_binds, main_expr) <- setMainCtxt main_name io_ty $
                                tcCheckMonoExpr main_expr_rn io_ty
 
@@ -2173,7 +2173,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
-        ; let loc' = noAnnSrcSpan $ locA loc
+        ; let loc' = noAnnSrcSpanN $ locA loc
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) [] rn_expr
@@ -2441,7 +2441,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLocA (mkLastStmt ret_expr)]
 
       ; return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLocA (HsDo io_ret_ty GhciStmtCtxt (noLocA stmts)))
+                     noLocA (HsDo io_ret_ty GhciStmtCtxt (noLocI stmts)))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -2772,7 +2772,7 @@ tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
-    setSrcSpanA loc          $
+    setSrcSpanN loc          $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.

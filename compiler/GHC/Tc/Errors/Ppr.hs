@@ -205,7 +205,7 @@ instance Diagnostic TcRnMessage where
     TcRnDuplicateWarningDecls d rdr_name
       -> mkSimpleDecorated $
            vcat [text "Multiple warning declarations for" <+> quotes (ppr rdr_name),
-                 text "also at " <+> ppr (getLocA d)]
+                 text "also at " <+> ppr (getLocN d)]
     TcRnSimplifierTooManyIterations simples limit wc
       -> mkSimpleDecorated $
            hang (text "solveWanteds: too many iterations"
@@ -337,7 +337,7 @@ instance Diagnostic TcRnMessage where
                2 (vcat $ map pprLBind . bagToList $ binds)
           where
             pprLoc loc = parens (text "defined at" <+> ppr loc)
-            pprLBind :: CollectPass GhcRn => GenLocated (SrcSpanAnn' a) (HsBindLR GhcRn idR) -> SDoc
+            pprLBind :: CollectPass GhcRn => LocatedAnS a (HsBindLR GhcRn idR) -> SDoc
             pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders CollNoDictBinders bind)
                                         <+> pprLoc (locA loc)
     TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty
@@ -3307,7 +3307,7 @@ dodgy_msg kind tc ie
 dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
 dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii
   where
-    ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
+    ii = noLocA (IEName noExtField $ noLocN $ greName tc_gre)
 
 pprTypeDoesNotHaveFixedRuntimeRep :: Type -> FixedRuntimeRepProvenance -> SDoc
 pprTypeDoesNotHaveFixedRuntimeRep ty prov =

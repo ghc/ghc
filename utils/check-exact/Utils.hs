@@ -20,7 +20,6 @@ module Utils
   where
 
 import Control.Monad (when)
-import Data.Function
 import Data.Maybe (isJust)
 import Data.Ord (comparing)
 
@@ -31,6 +30,7 @@ import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
+import GHC.Data.Bag
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -120,23 +120,23 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
     fc = co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp Strict.Nothing)
+undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan (RealSrcSpan sp Strict.Nothing))
   where
-    (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
+    (l,c) = undelta (ss2pos anc) dp (LayoutStartCol 0)
     len = length (keywordToString kw)
     sp = range2rs ((l,c),(l,c+len))
 
 -- ---------------------------------------------------------------------
 
 adjustDeltaForOffset :: LayoutStartCol -> DeltaPos -> DeltaPos
-adjustDeltaForOffset _colOffset                      dp@(SameLine _) = dp
+adjustDeltaForOffset _colOffset              dp@(SameLine _) = dp
 adjustDeltaForOffset (LayoutStartCol colOffset) (DifferentLine l c)
   = DifferentLine l (c - colOffset)
 
 -- ---------------------------------------------------------------------
 
-ss2pos :: RealSrcSpan -> Pos
-ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
+-- ss2pos :: RealSrcSpan -> Pos
+-- ss2pos ss = (srcSpanStartLine ss,srcSpanStartCol ss)
 
 ss2posEnd :: RealSrcSpan -> Pos
 ss2posEnd ss = (srcSpanEndLine ss,srcSpanEndCol ss)
@@ -171,6 +171,20 @@ isPointSrcSpan ss = spanLength ss == 0
                   && srcSpanStartLine ss == srcSpanEndLine ss
 
 -- ---------------------------------------------------------------------
+
+-- | A GHC comment includes the span of the preceding token.  Take an
+-- original comment, and convert the 'Anchor to have a have a
+-- `MovedAnchor` operation based on the original location, only if it
+-- does not already have one.
+commentOrigDelta :: LEpaComment -> LEpaComment
+commentOrigDelta (L (EpaSpan (RealSrcSpan la _)) (GHC.EpaComment t pp))
+  = (L (EpaDelta (origDelta la pp) []) (GHC.EpaComment t pp))
+commentOrigDelta c = c
+
+commentOrigDelta' :: Comment -> Comment
+commentOrigDelta' (Comment s (EpaSpan (RealSrcSpan la _)) pp co)
+  = Comment s (EpaDelta (origDelta la pp) []) pp co
+commentOrigDelta' c = c
 
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
 origDelta pos pp = op
@@ -220,9 +234,17 @@ insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
 insertCppComments (L l p) cs = L l p'
   where
     an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
-      (EpAnn a an ocs) -> EpAnn a an (EpaComments cs')
+      (EpAnn a an ocs) -> EpAnn a an cs'
         where
-          cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
+          -- cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
+          pc = priorComments ocs
+          fc = getFollowingComments ocs
+          cs' = case fc of
+            [] -> EpaComments $ sortEpaComments $ pc ++ fc ++ cs
+            (L ac _:_) -> EpaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
+                                              (sortEpaComments $ fc ++ cs_after)
+                   where
+                     (cs_before,cs_after) = break (\(L l _) ->   (ss2pos $ anchor l) < (ss2pos $ anchor ac) ) cs
       unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
@@ -233,7 +255,6 @@ ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDoc
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
 tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
@@ -248,7 +269,6 @@ comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
 mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
-mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
 mkComment :: String -> Anchor -> RealSrcSpan -> Comment
@@ -262,7 +282,8 @@ normaliseCommentText (x:xs) = x:normaliseCommentText xs
 
 -- |Must compare without span filenames, for CPP injected comments with fake filename
 cmpComments :: Comment -> Comment -> Ordering
-cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+-- cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+cmpComments (Comment _ l1 _ _) (Comment _ l2 _ _) = compare l1 l2
 
 -- |Sort, comparing without span filenames, for CPP injected comments with fake filename
 sortComments :: [Comment] -> [Comment]
@@ -272,14 +293,16 @@ sortComments cs = sortBy cmpComments cs
 sortEpaComments :: [LEpaComment] -> [LEpaComment]
 sortEpaComments cs = sortBy cmp cs
   where
-    cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    -- cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
+    cmp (L l1 _) (L l2 _) = compare l1 l2
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
-mkKWComment kw (EpaSpan ss _)
-  = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
+mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
+  = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
 mkKWComment kw (EpaDelta dp _)
-  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
+  = Comment (keywordToString kw) (EpaDelta dp []) placeholderRealSpan (Just kw)
+mkKWComment _ _ = error "mkKWComment on UnhelpfulSpan"
 
 -- | Detects a comment which originates from a specific keyword.
 isKWComment :: Comment -> Bool
@@ -288,8 +311,8 @@ isKWComment c = isJust (commentOrigin c)
 noKWComments :: [Comment] -> [Comment]
 noKWComments = filter (\c -> not (isKWComment c))
 
-sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
-sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
+-- sortAnchorLocated :: [GenLocated Anchor a] -> [GenLocated Anchor a]
+-- sortAnchorLocated = sortBy (compare `on` (anchor . getLoc))
 
 -- | Calculates the distance from the start of a string to the end of
 -- a string.
@@ -341,18 +364,21 @@ name2String = showPprUnsafe
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
+locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan "locatedAnAnchor" l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
-setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
-setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
+setAnchorAnI :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAnI (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
   = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
+setAnchorAnI (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+
+setAnchorAn :: LocatedAnS an a -> Anchor -> EpAnnComments -> LocatedAnS an a
+setAnchorAn (L (EpAnnS _ an _) a) anc cs = (L (EpAnnS anc an cs) a)
 
 setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
 setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
@@ -365,13 +391,14 @@ setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
 setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
 setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
   where
-    anc' = anc { anchor_op = UnchangedAnchor }
+    -- anc' = anc { anchor_op = UnchangedAnchor }
+    anc' = anc
     an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
 
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
 moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
-moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
+moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpanI l
 moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc mempty cs) l
 
 -- ---------------------------------------------------------------------
@@ -393,8 +420,7 @@ addEpAnnLoc (AddEpAnn _ l) = l
 
 -- TODO: move this to GHC
 anchorToEpaLocation :: Anchor -> EpaLocation
-anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r Strict.Nothing
-anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
+anchorToEpaLocation anc = anc
 
 -- ---------------------------------------------------------------------
 -- Horrible hack for dealing with some things still having a SrcSpan,
@@ -421,25 +447,80 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 -}
 
+-- TODO:AZ get rid of this
 hackSrcSpanToAnchor :: SrcSpan -> Anchor
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
-hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
-  = if s <= 0 && e <= 0
-    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
-      `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-    else Anchor r UnchangedAnchor
+hackSrcSpanToAnchor (RealSrcSpan r mb)
+  = case mb of
+    (Strict.Just (BufSpan (BufPos s) (BufPos e))) ->
+      if s <= 0 && e <= 0
+      -- then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+      then EpaDelta (deltaPos (-s) (-e)) []
+        `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
+      -- else Anchor r UnchangedAnchor
+      else EpaSpan (RealSrcSpan r mb)
+    _ -> EpaSpan (RealSrcSpan r mb)
 
+-- TODO:AZ get rid of this
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
-hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
-hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
-  = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
-      `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
-  where
-    s = - (getDeltaLine dp)
-    e = - (deltaColumn dp)
+-- hackAnchorToSrcSpan (EpaSpan r _) = RealSrcSpan (setRealSrcSpanBufSpan r) Strict.Nothing
+-- hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
+hackAnchorToSrcSpan (EpaSpan ss) = ss
+hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 
- -- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+
+orderedDeclsBinds
+  :: AnnSortKey [DeclTag]
+  -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+  -> [LHsDecl GhcPs]
+orderedDeclsBinds sortKey binds sigs =
+  case sortKey of
+    NoAnnSortKey ->
+      sortBy (\a b -> compare (realSrcSpan "orderedDecls" $ getLocA a)
+                              (realSrcSpan "orderedDecls" $ getLocA b)) (binds ++ sigs)
+    AnnSortKey keys ->
+      let
+        go [] _ _                      = []
+        go (ValDTag:ks) (b:bs) ss = b : go ks bs ss
+        go (SigDTag:ks) bs (s:ss) = s : go ks bs ss
+        go (_:ks) bs ss           =     go ks bs ss
+      in
+        go keys binds sigs
+
+hsDeclsLocalBinds :: HsLocalBinds GhcPs -> [LHsDecl GhcPs]
+hsDeclsLocalBinds lb = case lb of
+    HsValBinds _ (ValBinds sortKey bs sigs) ->
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+    HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
+    HsIPBinds {}       -> []
+    EmptyLocalBinds {} -> []
+
+hsDeclsValBinds :: (HsValBindsLR GhcPs GhcPs) -> [LHsDecl GhcPs]
+hsDeclsValBinds (ValBinds sortKey bs sigs) =
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+hsDeclsValBinds XValBindsLR{} = error "hsDeclsValBinds"
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LSig' into a 'LHsDecl'
+wrapSig :: LSig GhcPs -> LHsDecl GhcPs
+wrapSig (L l s) = L l (SigD NoExtField s)
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LHsBind' into a 'LHsDecl'
+wrapDecl :: LHsBind GhcPs -> LHsDecl GhcPs
+wrapDecl (L l s) = L l (ValD NoExtField s)
+-- ---------------------------------------------------------------------
 
 showAst :: (Data a) => a -> String
 showAst ast

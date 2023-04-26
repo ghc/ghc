@@ -200,7 +200,7 @@ newTopSrcBinder (L loc rdr_name)
     if isExternalName name then
       do { this_mod <- getModule
          ; unless (this_mod == nameModule name)
-                  (addErrAt (locA loc) (TcRnBindingOfExistingName rdr_name))
+                  (addErrAt (locN loc) (TcRnBindingOfExistingName rdr_name))
          ; return name }
     else   -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
       do { this_mod <- getModule
@@ -209,7 +209,7 @@ newTopSrcBinder (L loc rdr_name)
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do  { this_mod <- getModule
         ; unless (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
-                 (addErrAt (locA loc) (TcRnBindingOfExistingName rdr_name))
+                 (addErrAt (locN loc) (TcRnBindingOfExistingName rdr_name))
         -- When reading External Core we get Orig names as binders,
         -- but they should agree with the module gotten from the monad
         --
@@ -232,11 +232,11 @@ newTopSrcBinder (L loc rdr_name)
         -- the RdrName, not from the environment.  In principle, it'd be fine to
         -- have an arbitrary mixture of external core definitions in a single module,
         -- (apart from module-initialisation issues, perhaps).
-        ; newGlobalBinder rdr_mod rdr_occ (locA loc) }
+        ; newGlobalBinder rdr_mod rdr_occ (locN loc) }
 
   | otherwise
   = do  { when (isQual rdr_name)
-                 (addErrAt (locA loc) (badQualBndrErr rdr_name))
+                 (addErrAt (locN loc) (badQualBndrErr rdr_name))
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we get a confusing "M.T is not in scope" error later
 
@@ -245,11 +245,11 @@ newTopSrcBinder (L loc rdr_name)
                 -- We are inside a TH bracket, so make an *Internal* name
                 -- See Note [Top-level Names in Template Haskell decl quotes] in GHC.Rename.Names
              do { uniq <- newUnique
-                ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
+                ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locN loc)) }
           else
              do { this_mod <- getModule
-                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locA loc))
-                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locA loc) }
+                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locN loc))
+                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locN loc) }
         }
 
 {-
@@ -985,20 +985,20 @@ we'll miss the fact that the qualified import is redundant.
 -}
 
 
-lookupLocatedOccRn :: GenLocated (SrcSpanAnn' ann) RdrName
-                   -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRn :: LocatedN RdrName
+                   -> TcRn (LocatedN Name)
 lookupLocatedOccRn = wrapLocMA lookupOccRn
 
-lookupLocatedOccRnConstr :: GenLocated (SrcSpanAnn' ann) RdrName
-                         -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnConstr :: LocatedN RdrName
+                         -> TcRn (LocatedN Name)
 lookupLocatedOccRnConstr = wrapLocMA lookupOccRnConstr
 
-lookupLocatedOccRnRecField :: GenLocated (SrcSpanAnn' ann) RdrName
-                           -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnRecField :: LocatedAnS ann RdrName
+                           -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnRecField = wrapLocMA lookupOccRnRecField
 
-lookupLocatedOccRnNone :: GenLocated (SrcSpanAnn' ann) RdrName
-                       -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
+lookupLocatedOccRnNone :: LocatedAnS ann RdrName
+                       -> TcRn (LocatedAnS ann Name)
 lookupLocatedOccRnNone = wrapLocMA lookupOccRnNone
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
@@ -2073,7 +2073,7 @@ instance Outputable HsSigCtxt where
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig GhcPs
-               -> LocatedA RdrName -> RnM (LocatedA Name)
+               -> LocatedN RdrName -> RnM (LocatedN Name)
 lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 
 lookupSigOccRnN :: HsSigCtxt
@@ -2085,8 +2085,8 @@ lookupSigOccRnN ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 lookupSigCtxtOccRn :: HsSigCtxt
                    -> SDoc         -- ^ description of thing we're looking up,
                                    -- like "type family"
-                   -> GenLocated (SrcSpanAnn' ann) RdrName
-                   -> RnM (GenLocated (SrcSpanAnn' ann) Name)
+                   -> GenLocated (EpAnnS ann) RdrName
+                   -> RnM (GenLocated (EpAnnS ann) Name)
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
     do { let also_try_tycons = False
@@ -2341,11 +2341,11 @@ lookupSyntaxNames :: [Name]                         -- Standard names
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (HsVar noExtField . noLocA) std_names, emptyFVs)
+             return (map (HsVar noExtField . noLocN) std_names, emptyFVs)
         else
           do { usr_names <-
                  mapM (lookupOccRnNone . mkRdrUnqual . nameOccName) std_names
-             ; return (map (HsVar noExtField . noLocA) usr_names, mkFVs usr_names) } }
+             ; return (map (HsVar noExtField . noLocN) usr_names, mkFVs usr_names) } }
 
 
 {-

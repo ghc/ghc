@@ -254,7 +254,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocN ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -1259,7 +1259,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
              ds_expr = HsLet noExtField noHsTok let_binds noHsTok (L gen case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase noExtField record_expr (mkMatchGroup Generated (wrapGenSpan matches))
+             case_expr = HsCase noExtField record_expr (mkMatchGroup Generated (wrapGenSpanI matches))
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat relevant_cons
 

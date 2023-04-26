@@ -77,7 +77,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
-import GHC.Parser.Annotation (noLocA)
+import GHC.Parser.Annotation (noLocI)
 import GHC.Hs.Extension ( GhcRn )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
@@ -211,9 +211,9 @@ data IfaceBooleanFormula
 fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula IfLclName
 fromIfaceBooleanFormula = \case
     IfVar nm     -> Var    nm
-    IfAnd ibfs   -> And    (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfOr ibfs    -> Or     (map (noLocA . fromIfaceBooleanFormula) ibfs)
-    IfParens ibf -> Parens (noLocA . fromIfaceBooleanFormula $ ibf)
+    IfAnd ibfs   -> And    (map (noLocI . fromIfaceBooleanFormula) ibfs)
+    IfOr ibfs    -> Or     (map (noLocI . fromIfaceBooleanFormula) ibfs)
+    IfParens ibf -> Parens (noLocI . fromIfaceBooleanFormula $ ibf)
 
 data IfaceTyConParent
   = IfNoParent
@@ -590,8 +590,8 @@ fromIfaceWarnings = \case
 
 fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
-    IfWarningTxt mb_cat src strs -> WarningTxt (noLoc <$> mb_cat) (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
-    IfDeprecatedTxt src strs -> DeprecatedTxt (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+    IfWarningTxt mb_cat src strs -> WarningTxt (noLoc <$> mb_cat) src (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+    IfDeprecatedTxt src strs -> DeprecatedTxt src (noLoc <$> map fromIfaceStringLiteralWithNames strs)
 
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)

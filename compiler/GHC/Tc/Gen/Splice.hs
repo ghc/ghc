@@ -1002,7 +1002,7 @@ runAnnotation target expr = do
               ; let loc' = noAnnSrcSpan loc
               ; let specialised_to_annotation_wrapper_expr
                       = L loc' (mkHsWrap wrapper
-                                 (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
+                                 (HsVar noExtField (L (noAnnSrcSpanN loc) to_annotation_wrapper_id)))
               ; return (L loc' (HsApp noComments
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })

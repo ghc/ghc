@@ -604,7 +604,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- For some reason we don't have a location for the equation
          -- itself, so we make do with the location of family name
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (na2la $ getLoc fam_lname) eqn)
+                                        (L (l2l $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
@@ -1385,7 +1385,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))
+wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocN id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1986,7 +1986,7 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpan bndr_loc)
+       ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpanN bndr_loc)
                                                         (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
@@ -2209,7 +2209,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                  -- Copy the inline pragma (if any) from the default method
                  -- to this version. Note [INLINE and default methods]
 
-              fn   = noLocA (idName sel_id)
+              fn   = noLocN (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderForAllTyFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
@@ -2458,4 +2458,3 @@ instDeclCtxt2 dfun_ty
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
-

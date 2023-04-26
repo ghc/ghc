@@ -395,7 +395,7 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
         to_matches    = [mkHsCaseAlt pat rhs | (pat,rhs) <- to_alts  ]
-        loc'          = noAnnSrcSpan loc
+        loc'          = noAnnSrcSpanN loc
         loc''         = noAnnSrcSpan loc
         datacons      = tyConDataCons tycon
 

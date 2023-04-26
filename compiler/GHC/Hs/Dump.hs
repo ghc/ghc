@@ -69,6 +69,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` annotationTrailingAnn
               `extQ` annotationEpaLocation
               `extQ` annotationNoEpAnns
+              `extQ` annotationListItem
               `extQ` addEpAnn
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` sourceText
@@ -144,7 +145,7 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               _                -> parens $ text "SourceText" <+> text "blanked"
 
             epaAnchor :: EpaLocation -> SDoc
-            epaAnchor (EpaSpan r _) = parens $ text "EpaSpan" <+> realSrcSpan r
+            epaAnchor (EpaSpan s) = parens $ text "EpaSpan" <+> srcSpan s
             epaAnchor (EpaDelta d cs) = case ba of
               NoBlankEpAnnotations -> parens $ text "EpaDelta" <+> deltaPos d <+> showAstData' cs
               BlankEpAnnotations -> parens $ text "EpaDelta" <+> deltaPos d <+> text "blanked"
@@ -266,6 +267,9 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             annotationNoEpAnns :: EpAnn NoEpAnns -> SDoc
             annotationNoEpAnns = annotation' (text "EpAnn NoEpAnns")
 
+            annotationListItem:: EpAnnS AnnListItem -> SDoc
+            annotationListItem = annotation'' (text "EpAnnS AnnListItem")
+
             annotation' :: forall a .(Data a, Typeable a)
                        => SDoc -> EpAnn a -> SDoc
             annotation' tag anns = case ba of
@@ -273,10 +277,17 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
              NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
                                                $$ vcat (gmapQ showAstData' anns)
 
+            annotation'' :: forall a .(Data a, Typeable a)
+                       => SDoc -> EpAnnS a -> SDoc
+            annotation'' tag anns = case ba of
+             BlankEpAnnotations -> parens (text "blanked:" <+> tag)
+             NoBlankEpAnnotations -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
+
             -- -------------------------
 
-            srcSpanAnnA :: SrcSpanAnn' (EpAnn AnnListItem) -> SDoc
-            srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
+            srcSpanAnnA :: (EpAnnS AnnListItem) -> SDoc
+            srcSpanAnnA = locatedEpAnn'' (text "SrcSpanAnnA")
 
             srcSpanAnnL :: SrcSpanAnn' (EpAnn AnnList) -> SDoc
             srcSpanAnnL = locatedAnn'' (text "SrcSpanAnnL")
@@ -287,8 +298,8 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
             srcSpanAnnC :: SrcSpanAnn' (EpAnn AnnContext) -> SDoc
             srcSpanAnnC = locatedAnn'' (text "SrcSpanAnnC")
 
-            srcSpanAnnN :: SrcSpanAnn' (EpAnn NameAnn) -> SDoc
-            srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
+            srcSpanAnnN :: EpAnnS NameAnn -> SDoc
+            srcSpanAnnN = locatedEpAnn'' (text "SrcSpanAnnN")
 
             locatedAnn'' :: forall a. (Typeable a, Data a)
               => SDoc -> SrcSpanAnn' a -> SDoc
@@ -302,6 +313,20 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                       -> text "SrcSpanAnn" <+> showAstData' ann
                               <+> srcSpan s
                 Nothing -> text "locatedAnn:unmatched" <+> tag
+                           <+> (parens $ text (showConstr (toConstr ss)))
+
+            locatedEpAnn'' :: forall a. (Typeable a, Data a)
+              => SDoc -> EpAnnS a -> SDoc
+            locatedEpAnn'' tag ss = parens $
+              case cast ss of
+                Just (anns :: EpAnnS a) ->
+                  case ba of
+                    BlankEpAnnotations
+                      -> parens (text "blanked:" <+> tag)
+                    NoBlankEpAnnotations
+                      -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
+                Nothing -> text "locatedEpAnn:unmatched" <+> tag
                            <+> (parens $ text (showConstr (toConstr ss)))
 
 

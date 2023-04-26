@@ -646,7 +646,7 @@ def onlyHsParLocs(x):
     This function tries to extract all such location infos from the typechecked AST.
     """
     ls = x.split("\n")
-    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[1:])
+    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[5:])
                       if hspar.strip().startswith("(HsPar")
                         and not "<no location info>" in loc)
     return '\n'.join(filteredLines)

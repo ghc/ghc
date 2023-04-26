@@ -414,7 +414,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
   AsPat x (L nm_loc name) at pat -> do
         { mult_wrap <- checkManyPattern pat_ty
             -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
-        ; (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
+        ; (wrap, bndr_id) <- setSrcSpanN nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat (pat_ty `scaledSet`(mkCheckExpType $ idType bndr_id))
                                  penv pat thing_inside
@@ -661,7 +661,7 @@ AST is used for the subtraction operation.
             <- tcSyntaxOpGen orig minus [SynType pat_exp_ty, SynRho] SynAny $
                \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
-                  ; (wrap, bndr_id) <- setSrcSpanA nm_loc $
+                  ; (wrap, bndr_id) <- setSrcSpanN nm_loc $
                                      tcPatBndr penv name (unrestricted $ mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
@@ -905,7 +905,7 @@ tcDataConPat (L con_span con_name) data_con pat_ty_scaled
         ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
 
           -- Add the stupid theta
-        ; setSrcSpanA con_span $ addDataConStupidTheta data_con ctxt_res_tys
+        ; setSrcSpanN con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
         -- Check that this isn't a GADT pattern match
         -- in situations in which that isn't allowed.

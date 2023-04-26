@@ -310,11 +310,11 @@ tcLookupAxiom name = do
 tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
 tcLookupLocatedGlobalId = addLocMA tcLookupId
 
-tcLookupLocatedClass :: LocatedA Name -> TcM Class
-tcLookupLocatedClass = addLocMA tcLookupClass
+tcLookupLocatedClass :: LocatedN Name -> TcM Class
+tcLookupLocatedClass = addLocMN tcLookupClass
 
 tcLookupLocatedTyCon :: LocatedN Name -> TcM TyCon
-tcLookupLocatedTyCon = addLocMA tcLookupTyCon
+tcLookupLocatedTyCon = addLocMN tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming & casts).
@@ -984,11 +984,11 @@ newDFunName clas tys loc
         ; newGlobalBinder mod dfun_occ loc }
 
 newFamInstTyConName :: LocatedN Name -> [Type] -> TcM Name
-newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
+newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locN loc) name [tys]
 
 newFamInstAxiomName :: LocatedN Name -> [[Type]] -> TcM Name
 newFamInstAxiomName (L loc name) branches
-  = mk_fam_inst_name mkInstTyCoOcc (locA loc) name branches
+  = mk_fam_inst_name mkInstTyCoOcc (locN loc) name branches
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss

@@ -527,7 +527,7 @@ locOnly (RealSrcSpan span _) = do
   pure [Node e span []]
 locOnly _ = pure []
 
-mkScopeA :: SrcSpanAnn' ann -> Scope
+mkScopeA :: EpAnnS ann -> Scope
 mkScopeA l = mkScope (locA l)
 
 mkScope :: SrcSpan -> Scope
@@ -537,11 +537,14 @@ mkScope _ = NoScope
 mkLScope :: Located a -> Scope
 mkLScope = mkScope . getLoc
 
-mkLScopeA :: GenLocated (SrcSpanAnn' a) e -> Scope
+mkLScopeA :: LocatedAnS a e -> Scope
 mkLScopeA = mkScope . locA . getLoc
 
+mkLScopeI :: GenLocated (SrcAnn a) e -> Scope
+mkLScopeI = mkScope . locI . getLoc
+
 mkLScopeN :: LocatedN a -> Scope
-mkLScopeN = mkScope . getLocA
+mkLScopeN = mkScope . getLocN
 
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope
@@ -557,10 +560,18 @@ mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni
 {-# INLINEABLE makeNodeA #-}
 makeNodeA
   :: (Monad m, Data a)
-  => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
-  -> SrcSpanAnn' ann         -- ^ return an empty list if this is unhelpful
+  => a                  -- ^ helps fill in 'nodeAnnotations' (with 'Data')
+  -> EpAnnS ann         -- ^ return an empty list if this is unhelpful
   -> ReaderT NodeOrigin m [HieAST b]
 makeNodeA x spn = makeNode x (locA spn)
+
+{-# INLINEABLE makeNodeI #-}
+makeNodeI
+  :: (Monad m, Data a)
+  => a                  -- ^ helps fill in 'nodeAnnotations' (with 'Data')
+  -> SrcAnn ann         -- ^ return an empty list if this is unhelpful
+  -> ReaderT NodeOrigin m [HieAST b]
+makeNodeI x spn = makeNode x (locI spn)
 
 {-# INLINEABLE makeNode #-}
 makeNode

@@ -1,4 +1,5 @@
 module EmptyMostly where
+-- foo
    { ;;;
      ;;x=let{;;;;;y=2;;z=3;;;;}in y;
    -- ;;;;

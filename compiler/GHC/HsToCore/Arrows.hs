@@ -810,7 +810,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     -- implemented as `arr \case {}`.
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLamCase EpAnnNotUsed LamCase
-        (MG { mg_alts = noLocA []
+        (MG { mg_alts = noLocI []
             , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty Generated
             }))
 

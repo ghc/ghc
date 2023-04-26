@@ -64,7 +64,7 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module
 
-import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat)
+import GHC.Rename.Utils (genHsVar, genLHsApp, genWildPat)
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
@@ -878,7 +878,7 @@ mkOneRecordSelector all_cons idDetails fl has_sel
   where
     loc      = getSrcSpan sel_name
     loc'     = noAnnSrcSpan loc
-    locn     = noAnnSrcSpan loc
+    locn     = noAnnSrcSpanN loc
     locc     = noAnnSrcSpan loc
     lbl      = flLabel fl
     sel_name = flSelector fl
@@ -959,7 +959,8 @@ mkOneRecordSelector all_cons idDetails fl has_sel
                             [genWildPat]
                             (genLHsApp
                                 (genHsVar (getName rEC_SEL_ERROR_ID))
-                                (genLHsLit msg_lit))]
+                                -- (genLHsLit msg_lit))]
+                                (nlHsLit msg_lit))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we

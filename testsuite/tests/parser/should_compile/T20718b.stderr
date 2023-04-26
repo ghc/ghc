@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T20718b.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T20718b.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T20718b.hs:4:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T20718b.hs:4:16-20 }))]
@@ -19,33 +17,25 @@
        { T20718b.hs:7:1-21 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { T20718b.hs:1:1-19 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718b.hs:1:1-19 })
        (EpaComment
         (EpaLineComment
          "-- header comment 1")
         { T20718b.hs:1:1 }))
      ,(L
-       (Anchor
-        { T20718b.hs:2:1-19 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718b.hs:2:1-19 })
        (EpaComment
         (EpaLineComment
          "-- header comment 2")
         { T20718b.hs:1:1-19 }))
      ,(L
-       (Anchor
-        { T20718b.hs:6:1-21 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718b.hs:6:1-21 })
        (EpaComment
         (EpaLineComment
          "-- trailing comment 1")
         { T20718b.hs:4:16-20 }))
      ,(L
-       (Anchor
-        { T20718b.hs:7:1-21 }
-        (UnchangedAnchor))
+       (EpaSpan { T20718b.hs:7:1-21 })
        (EpaComment
         (EpaLineComment
          "-- trailing comment 2")
@@ -57,10 +47,13 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T20718b.hs:4:8-14 })
+    ((EpAnnS
+      (EpaSpan { T20718b.hs:4:8-14 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: T20718b}))
   (Nothing)
   []
   []))
-
-

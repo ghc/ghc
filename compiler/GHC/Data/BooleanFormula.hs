@@ -24,7 +24,8 @@ import Data.Data
 
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
-import GHC.Parser.Annotation ( LocatedL )
+import GHC.Utils.Binary
+import GHC.Parser.Annotation ( LocatedL, noLocI )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
@@ -242,3 +243,22 @@ pprBooleanFormulaNormal = go
     go (Or [])    = keyword $ text "FALSE"
     go (Or xs)    = fsep $ intersperse vbar (map (go . unLoc) xs)
     go (Parens x) = parens (go $ unLoc x)
+
+
+----------------------------------------------------------------------
+-- Binary
+----------------------------------------------------------------------
+
+instance Binary a => Binary (BooleanFormula a) where
+  put_ bh (Var x)    = putByte bh 0 >> put_ bh x
+  put_ bh (And xs)   = putByte bh 1 >> put_ bh (unLoc <$> xs)
+  put_ bh (Or  xs)   = putByte bh 2 >> put_ bh (unLoc <$> xs)
+  put_ bh (Parens x) = putByte bh 3 >> put_ bh (unLoc x)
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> Var                  <$> get bh
+      1 -> And    . fmap noLocI <$> get bh
+      2 -> Or     . fmap noLocI <$> get bh
+      _ -> Parens . noLocI      <$> get bh
