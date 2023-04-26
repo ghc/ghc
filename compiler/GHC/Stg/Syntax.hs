@@ -880,10 +880,9 @@ pprStgExpr opts e = case e of
              , hang (text "} in ") 2 (pprStgExpr opts expr)
              ]
 
-   StgTick _tickish expr -> sdocOption sdocSuppressTicks $ \case
+   StgTick tickish expr -> sdocOption sdocSuppressTicks $ \case
       True  -> pprStgExpr opts expr
-      False -> pprStgExpr opts expr
-        -- XXX sep [ ppr tickish, pprStgExpr opts expr ]
+      False -> sep [ ppr tickish, pprStgExpr opts expr ]
 
    -- Don't indent for a single case alternative.
    StgCase expr bndr alt_type [alt]
