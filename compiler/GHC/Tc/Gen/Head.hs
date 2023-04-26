@@ -48,7 +48,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcLookupDataFamInst )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
-import GHC.Core.UsageEnv      ( unitUE )
+import GHC.Core.UsageEnv      ( singleUsageUE )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Solver          ( InferMode(..), simplifyInfer )
 import GHC.Tc.Utils.Env
@@ -1091,7 +1091,7 @@ tc_infer_id id_name
 check_local_id :: Id -> TcM ()
 check_local_id id
   = do { checkThLocalId id
-       ; tcEmitBindingUsage $ unitUE (idName id) OneTy }
+       ; tcEmitBindingUsage $ singleUsageUE id }
 
 check_naughty :: OccName -> TcId -> TcM ()
 check_naughty lbl id
