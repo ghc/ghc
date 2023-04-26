@@ -180,4 +180,4 @@ globalOccs jst = do
               let g = GlobalOcc i gid 1
               in go (addToUFM_C inc gids i g) is
 
-  pure $ go emptyUFM (identsS jst)
+  pure $ go emptyUFM (identsS $ satJStat jst)
