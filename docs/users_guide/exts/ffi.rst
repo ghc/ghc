@@ -126,7 +126,7 @@ types may be used as arguments to FFI calls, subject to these
 restrictions:
 
 * Valid arguments for ``foreign import unsafe`` FFI calls: ``Array#``,
-  ``SmallArray#``, ``ArrayArray#``, ``ByteArray#``, and the mutable
+  ``SmallArray#``, ``ByteArray#``, and the mutable
   counterparts of these types.
 * Valid arguments for ``foreign import safe`` FFI calls: ``ByteArray#``
   and ``MutableByteArray#``. The byte array must be
@@ -174,10 +174,6 @@ are:
    +--------------------------------+-----------+-------------+-----------+---------------+
    | ``MutableSmallArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
    +--------------------------------+-----------+-------------+-----------+---------------+
-   | ``ArrayArray#``                | Unsound   | Unsound     | Sound     | Unsound       |
-   +--------------------------------+-----------+-------------+-----------+---------------+
-   | ``MutableArrayArray#``         | Unsound   | Unsound     | Sound     | Unsound       |
-   +--------------------------------+-----------+-------------+-----------+---------------+
    | unpinned ``ByteArray#``        | Unsound   | Unsound     | Sound     | Unsound       |
    +--------------------------------+-----------+-------------+-----------+---------------+
    | unpinned ``MutableByteArray#`` | Unsound   | Unsound     | Sound     | Sound         |
@@ -210,32 +206,32 @@ anything from ``Rts.h``::
 In other situations, the C function may need knowledge of the RTS
 closure types. The following example sums the first element of
 each ``ByteArray#`` (interpreting the bytes as an array of ``CInt``)
-element of an ``ArrayArray##`` [3]_::
+element of an ``Array# ByteArray#`` [3]_::
 
     // C source, must include the RTS to make the struct StgArrBytes
-    // available along with its fields: ptrs and payload.
+    // available along with its fields, such as `payload`.
     #include "Rts.h"
-    int sum_first (StgArrBytes **bufs) {
-      StgArrBytes **bufs = (StgArrBytes**)bufsTmp;
+    int sum_first (StgArrBytes **bufs, StgWord sz) {
       int res = 0;
-      for(StgWord ix = 0;ix < arr->ptrs;ix++) {
+      for(StgWord ix = 0; ix < sz; ix++) {
         res = res + ((int*)(bufs[ix]->payload))[0];
       }
       return res;
     }
 
-    -- Haskell source, all elements in the argument array must be
-    -- either ByteArray# or MutableByteArray#. This is not enforced
-    -- by the type system in this example since ArrayArray is untyped.
+    -- Haskell source
     foreign import ccall unsafe "sum_first"
-      sumFirst :: ArrayArray# -> IO CInt
+      sumFirst :: Array# ByteArray# -> CInt -> IO CInt
 
-Although GHC allows the user to pass all unlifted boxed types to
-foreign functions, some of them are not amenable to useful work.
-Although ``Array#`` is unlifted, the elements in its payload are
-lifted, and a foreign C function cannot safely force thunks. Consequently,
-a foreign C function may not dereference any of the addresses that comprise
-the payload of the ``Array#``.
+    sumFirst' :: Array# ByteArray# -> IO CInt
+    sumFirst' arr = sumFirst arr (sizeofArray# arr)
+
+Although GHC allows the user to pass all unlifted boxed types to foreign
+functions, some of them are not amenable to useful work.  Although ``Array#``
+is unlifted, the elements in its payload can be lifted, and a foreign C
+function cannot safely force thunks. Consequently, a foreign C function may not
+dereference any of the addresses that comprise the payload of ``Array# a`` if
+``a`` has a lifted representation.
 
 .. _ffi-newtype-io:
 
@@ -1136,4 +1132,5 @@ byte array can be pinned as a result of three possible causes:
   as reading bytes from a ``MutableByteArray#``. Users should prefer
   ``GHC.Exts.readWord8Array#`` for this.
 .. [3] As in [2]_, the FFI is not actually needed for this. ``GHC.Exts``
-  includes primitives for reading from on ``ArrayArray#``.
+   includes primitives for reading from an ``Array# a``, such as
+   ``GHC.Exts.indexArray#``.
