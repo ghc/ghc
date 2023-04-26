@@ -1,5 +1,5 @@
 
-overloadedrecfldswasrunnowfail06.hs:11:11: error:
+overloadedrecfldswasrunnowfail06.hs:11:11: error: [GHC-87543]
     Ambiguous occurrence ‘x’
     It could refer to
        either the field ‘x’ of record ‘S’,
@@ -9,7 +9,7 @@ overloadedrecfldswasrunnowfail06.hs:11:11: error:
            or the field ‘x’ of record ‘U’,
               defined at overloadedrecfldswasrunnowfail06.hs:8:18
 
-overloadedrecfldswasrunnowfail06.hs:13:11: error:
+overloadedrecfldswasrunnowfail06.hs:13:11: error: [GHC-87543]
     Ambiguous occurrence ‘x’
     It could refer to
        either the field ‘x’ of record ‘S’,
@@ -19,7 +19,7 @@ overloadedrecfldswasrunnowfail06.hs:13:11: error:
            or the field ‘x’ of record ‘U’,
               defined at overloadedrecfldswasrunnowfail06.hs:8:18
 
-overloadedrecfldswasrunnowfail06.hs:15:13: error:
+overloadedrecfldswasrunnowfail06.hs:15:13: error: [GHC-87543]
     Ambiguous occurrence ‘x’
     It could refer to
        either the field ‘x’ of record ‘S’,
@@ -29,7 +29,7 @@ overloadedrecfldswasrunnowfail06.hs:15:13: error:
            or the field ‘x’ of record ‘U’,
               defined at overloadedrecfldswasrunnowfail06.hs:8:18
 
-overloadedrecfldswasrunnowfail06.hs:21:20: error:
+overloadedrecfldswasrunnowfail06.hs:21:20: error: [GHC-87543]
     Ambiguous occurrence ‘x’
     It could refer to
        either the field ‘x’ of record ‘S’,

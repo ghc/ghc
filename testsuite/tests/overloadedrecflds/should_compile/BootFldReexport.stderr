@@ -1,5 +1,5 @@
 
-BootFldReexport.hs:8:9: error:
+BootFldReexport.hs:8:9: error: [GHC-87543]
     Ambiguous occurrence ‘fld’
     It could refer to
        either ‘BootFldReexport_N.fld’,

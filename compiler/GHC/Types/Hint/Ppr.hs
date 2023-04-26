@@ -232,6 +232,8 @@ instance Outputable GhcHint where
            pp_args = hsep (map ppr args)
     SuggestSafeHaskell
       -> text "Enable Safe Haskell through either Safe, Trustworthy or Unsafe."
+    SuggestRemoveRecordWildcard
+      -> text "Omit the" <+> quotes (text "..")
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

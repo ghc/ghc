@@ -1,5 +1,5 @@
 
-mod152.hs:2:26: error:
+mod152.hs:2:26: error: [GHC-87543]
     Ambiguous occurrence ‘id’
     It could refer to either ‘Prelude.id’,
                              imported from ‘Prelude’ at mod152.hs:2:8

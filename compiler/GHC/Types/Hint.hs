@@ -434,6 +434,11 @@ data GhcHint
     -}
   | SuggestSafeHaskell
 
+    {-| Suggest removing a record wildcard from a pattern when it doesn't
+        bind anything useful.
+    -}
+  | SuggestRemoveRecordWildcard
+
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
 -- to instantiate a particular signature, where the first argument is

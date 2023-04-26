@@ -42,7 +42,7 @@ import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( mapFvRn
-                        , checkDupRdrNames, checkDupRdrNamesN
+                        , checkDupRdrNames
                         , warnUnusedLocalBinds
                         , warnForallIdentifier
                         , checkUnusedRecordWildcard
@@ -719,7 +719,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
          -- from the left-hand side
             case details of
                PrefixCon _ vars ->
-                   do { checkDupRdrNamesN vars
+                   do { checkDupRdrNames vars
                       ; names <- mapM lookupPatSynBndr vars
                       ; return ( (pat', PrefixCon noTypeArgs names)
                                , mkFVs (map unLoc names)) }
@@ -877,7 +877,7 @@ rnMethodBinds :: Bool                   -- True <=> is a class declaration
 --   * the default method bindings in a class decl
 --   * the method bindings in an instance decl
 rnMethodBinds is_cls_decl cls ktv_names binds sigs
-  = do { checkDupRdrNamesN (collectMethodBinders binds)
+  = do { checkDupRdrNames (collectMethodBinders binds)
              -- Check that the same method is not given twice in the
              -- same instance decl      instance C T where
              --                       f x = ...
@@ -1038,18 +1038,17 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
                           <+> quotes (ppr v1))
 
 renameSig _ (SpecInstSig (_, src) ty)
-  = do  { checkInferredVars doc inf_msg ty
+  = do  { checkInferredVars doc ty
         ; (new_ty, fvs) <- rnHsSigType doc TypeLevel ty
           -- Check if there are any nested `forall`s or contexts, which are
           -- illegal in the type of an instance declaration (see
           -- Note [No nested foralls or contexts in instance types] in
           -- GHC.Hs.Type).
-        ; addNoNestedForallsContextsErr doc (text "SPECIALISE instance type")
+        ; addNoNestedForallsContextsErr doc NFC_Specialize
             (getLHsInstDeclHead new_ty)
         ; return (SpecInstSig (noAnn, src) new_ty,fvs) }
   where
     doc = SpecInstSigCtx
-    inf_msg = Just (text "Inferred type variables are not allowed")
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids
 -- so, in the top-level case (when mb_names is Nothing)

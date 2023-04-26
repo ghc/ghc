@@ -1,7 +1,7 @@
 [1 of 2] Compiling T17420A          ( T17420A.hs, T17420A.o )
 [2 of 2] Compiling T17420           ( T17420.hs, T17420.o )
 
-T17420.hs:6:17: error:
+T17420.hs:6:17: error: [GHC-87543]
     Ambiguous occurrence ‘name’
     It could refer to
        either the field ‘name’ of record ‘Dog’,

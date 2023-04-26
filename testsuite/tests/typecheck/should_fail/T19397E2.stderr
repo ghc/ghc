@@ -1,5 +1,5 @@
 
-T19397E2.hs:1:1: error:
+T19397E2.hs:1:1: error: [GHC-87543]
     Ambiguous occurrence ‘main’
     It could refer to
        either ‘T19397S.main’,

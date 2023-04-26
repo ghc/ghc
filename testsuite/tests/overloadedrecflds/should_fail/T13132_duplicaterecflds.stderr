@@ -1,5 +1,5 @@
 
-T13132_duplicaterecflds.hs:7:16: error:
+T13132_duplicaterecflds.hs:7:16: error: [GHC-87543]
     Ambiguous occurrence ‘runContT’
     It could refer to
        either the field ‘runContT’ of record ‘ContT’,
@@ -13,7 +13,7 @@ T13132_duplicaterecflds.hs:9:11: error: [GHC-46878]
           namely ‘y’ [infixl 9]
         in the section: ‘`runContT` x `y` x’
 
-T13132_duplicaterecflds.hs:9:12: error:
+T13132_duplicaterecflds.hs:9:12: error: [GHC-87543]
     Ambiguous occurrence ‘runContT’
     It could refer to
        either the field ‘runContT’ of record ‘ContT’,

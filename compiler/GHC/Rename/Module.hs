@@ -30,7 +30,7 @@ import GHC.Rename.Bind
 import GHC.Rename.Doc
 import GHC.Rename.Env
 import GHC.Rename.Utils ( mapFvRn, bindLocalNames
-                        , checkDupRdrNamesN, bindLocalNamesFV
+                        , checkDupRdrNames, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , newLocalBndrsRn
                         , noNestedForallsContextsErr
@@ -605,7 +605,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { checkInferredVars ctxt inf_err inst_ty
+  = do { checkInferredVars ctxt inst_ty
        ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
              -- Check if there are any nested `forall`s or contexts, which are
@@ -613,7 +613,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              -- Note [No nested foralls or contexts in instance types] in
              -- GHC.Hs.Type)...
              mb_nested_msg = noNestedForallsContextsErr
-                               (text "Instance head") head_ty'
+                               NFC_InstanceHead head_ty'
              -- ...then check if the instance head is actually headed by a
              -- class type constructor...
              eith_cls = case hsTyGetAppHead_maybe head_ty' of
@@ -669,7 +669,6 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     to remove the context).
   where
     ctxt    = GenericCtx $ text "an instance declaration"
-    inf_err = Just (text "Inferred type variables are not allowed")
 
     -- The instance is malformed. We'd still like to make *some* progress
     -- (rather than failing outright), so we report an error and continue for
@@ -1177,20 +1176,19 @@ rnSrcDerivDecl :: DerivDecl GhcPs -> RnM (DerivDecl GhcRn, FreeVars)
 rnSrcDerivDecl (DerivDecl _ ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
        ; unless standalone_deriv_ok (addErr TcRnUnexpectedStandaloneDerivingDecl)
-       ; checkInferredVars ctxt inf_err nowc_ty
+       ; checkInferredVars ctxt nowc_ty
        ; (mds', ty', fvs) <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt ty
          -- Check if there are any nested `forall`s or contexts, which are
          -- illegal in the type of an instance declaration (see
          -- Note [No nested foralls or contexts in instance types] in
          -- GHC.Hs.Type).
        ; addNoNestedForallsContextsErr ctxt
-           (text "Standalone-derived instance head")
+           NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noAnn ty' mds' overlap, fvs) }
   where
     ctxt    = DerivDeclCtx
-    inf_err = Just (text "Inferred type variables are not allowed")
     loc = getLocA nowc_ty
     nowc_ty = dropWildCards ty
 
@@ -1219,7 +1217,7 @@ rnHsRuleDecl (HsRule { rd_ext  = (_, st)
                      , rd_rhs  = rhs })
   = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
        ; mapM_ warnForallIdentifier rdr_names_w_loc
-       ; checkDupRdrNamesN rdr_names_w_loc
+       ; checkDupRdrNames rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
        ; let doc = RuleCtx (unLoc rule_name)
@@ -1819,7 +1817,7 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
         ; let sig_rdr_names_w_locs =
                 [op | L _ (ClassOpSig _ False ops _) <- sigs
                     , op <- ops]
-        ; checkDupRdrNamesN sig_rdr_names_w_locs
+        ; checkDupRdrNames sig_rdr_names_w_locs
                 -- Typechecker is responsible for checking that we only
                 -- give default-method bindings for things in this class.
                 -- The renamer *could* check this for class decls, but can't
@@ -2191,14 +2189,13 @@ rnLHsDerivingClause doc
 
     rn_clause_pred :: LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
     rn_clause_pred pred_ty = do
-      let inf_err = Just (text "Inferred type variables are not allowed")
-      checkInferredVars doc inf_err pred_ty
+      checkInferredVars doc pred_ty
       ret@(pred_ty', _) <- rnHsSigType doc TypeLevel pred_ty
       -- Check if there are any nested `forall`s, which are illegal in a
       -- `deriving` clause.
       -- See Note [No nested foralls or contexts in instance types]
       -- (Wrinkle: Derived instances) in GHC.Hs.Type.
-      addNoNestedForallsContextsErr doc (text "Derived class type")
+      addNoNestedForallsContextsErr doc NFC_DerivedClassType
         (getLHsInstDeclHead pred_ty')
       pure ret
 
@@ -2233,7 +2230,7 @@ rnLDerivStrategy doc mds thing_inside
         AnyclassStrategy _ -> boring_case (AnyclassStrategy noExtField)
         NewtypeStrategy  _ -> boring_case (NewtypeStrategy noExtField)
         ViaStrategy (XViaStrategyPs _ via_ty) ->
-          do checkInferredVars doc inf_err via_ty
+          do checkInferredVars doc via_ty
              (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsSig { sig_bndrs = via_outer_bndrs
                        , sig_body  = via_body } = unLoc via_ty'
@@ -2243,11 +2240,9 @@ rnLDerivStrategy doc mds thing_inside
              -- See Note [No nested foralls or contexts in instance types]
              -- (Wrinkle: Derived instances) in GHC.Hs.Type.
              addNoNestedForallsContextsErr doc
-               (quotes (text "via") <+> text "type") via_body
+               NFC_ViaType via_body
              (thing, fvs2) <- bindLocalNamesFV via_tvs thing_inside
              pure (ViaStrategy via_ty', thing, fvs1 `plusFV` fvs2)
-
-    inf_err = Just (text "Inferred type variables are not allowed")
 
     boring_case :: ds -> RnM (ds, a, FreeVars)
     boring_case ds = do
@@ -2501,7 +2496,7 @@ rnConDecl (ConDeclGADT { con_names   = names
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
          -- in GHC.Hs.Type.
        ; addNoNestedForallsContextsErr ctxt
-           (text "GADT constructor type signature") new_res_ty
+           NFC_GadtConSig new_res_ty
 
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
 

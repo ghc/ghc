@@ -1,5 +1,5 @@
 
-overloadedrecfldsfail02.hs:8:18: error:
+overloadedrecfldsfail02.hs:8:18: error: [GHC-87543]
     Ambiguous occurrence ‘x’
     It could refer to
        either the field ‘x’ of record ‘R’,

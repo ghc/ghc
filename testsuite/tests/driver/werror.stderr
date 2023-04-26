@@ -2,7 +2,7 @@
 werror.hs:6:1: error: [GHC-38417] [-Wmissing-signatures (in -Wall), Werror=missing-signatures]
     Top-level binding with no type signature: main :: IO ()
 
-werror.hs:7:13: error: [-Wunused-local-binds (in -Wextra, -Wunused-binds), Werror=unused-local-binds]
+werror.hs:7:13: error: [GHC-40910] [-Wunused-local-binds (in -Wextra, -Wunused-binds), Werror=unused-local-binds]
     Defined but not used: ‘main’
 
 werror.hs:7:13: error: [GHC-63397] [-Wname-shadowing (in -Wall), Werror=name-shadowing]
@@ -16,7 +16,7 @@ werror.hs:8:1: error: [GHC-94817] [-Wtabs (in -Wdefault), Werror=tabs]
 werror.hs:10:1: error: [GHC-38417] [-Wmissing-signatures (in -Wall), Werror=missing-signatures]
     Top-level binding with no type signature: f :: [a1] -> [a2]
 
-werror.hs:10:1: error: [-Wunused-top-binds (in -Wextra, -Wunused-binds), Werror=unused-top-binds]
+werror.hs:10:1: error: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds), Werror=unused-top-binds]
     Defined but not used: ‘f’
 
 werror.hs:10:1: error: [GHC-62161] [-Wincomplete-patterns (in -Wextra), Werror=incomplete-patterns]

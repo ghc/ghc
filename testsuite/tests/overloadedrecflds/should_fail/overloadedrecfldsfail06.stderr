@@ -1,12 +1,12 @@
 [1 of 3] Compiling OverloadedRecFldsFail06_A ( OverloadedRecFldsFail06_A.hs, OverloadedRecFldsFail06_A.o )
 
-OverloadedRecFldsFail06_A.hs:9:15: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+OverloadedRecFldsFail06_A.hs:9:15: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: data constructor ‘MkUnused’
 
-OverloadedRecFldsFail06_A.hs:9:42: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+OverloadedRecFldsFail06_A.hs:9:42: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: record field of MkUnused ‘unused2’
 
-OverloadedRecFldsFail06_A.hs:9:59: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+OverloadedRecFldsFail06_A.hs:9:59: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: record field of MkUnused ‘used_locally’
 [2 of 3] Compiling Main             ( overloadedrecfldsfail06.hs, overloadedrecfldsfail06.o )
 

@@ -114,6 +114,8 @@ module GHC.Tc.Errors.Types (
   , ImportLookupReason (..)
   , UnusedImportReason (..)
   , UnusedImportName (..)
+  , NestedForallsContextsIn(..)
+  , UnusedNameProv(..)
   ) where
 
 import GHC.Prelude
@@ -139,7 +141,7 @@ import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
-import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar)
+import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
 import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
@@ -3907,6 +3909,134 @@ data TcRnMessage where
   TcRnIllegalDataCon :: !RdrName -- ^ The constructor name
                      -> TcRnMessage
 
+  {-| TcRnNestedForallsContexts is an error indicating that multiple foralls or
+    contexts are nested/curried where this is not supported,
+    like @∀ x. ∀ y.@ instead of @∀ x y.@.
+
+    Test cases:
+      T12087, T14320, T16114, T16394, T16427, T18191, T18240a, T18240b, T18455, T5951
+  -}
+  TcRnNestedForallsContexts :: !NestedForallsContextsIn -> TcRnMessage
+
+  {-| TcRnRedundantRecordWildcard is a warning indicating that a pattern uses
+    a record wildcard even though all of the record's fields are bound explicitly.
+
+    Test cases:
+      T15957_Fail
+  -}
+  TcRnRedundantRecordWildcard :: TcRnMessage
+
+  {-| TcRnUnusedRecordWildcard is a warning indicating that a pattern uses
+    a record wildcard while none of the fields bound by it are used.
+
+    Test cases:
+      T15957_Fail
+  -}
+  TcRnUnusedRecordWildcard :: ![Name] -- ^ The names bound by the wildcard
+                           -> TcRnMessage
+
+  {-| TcRnUnusedName is a warning indicating that a defined or imported name
+    is not used in the module.
+
+    Test cases:
+      ds053, mc10, overloadedrecfldsfail05, overloadedrecfldsfail06, prog018,
+      read014, rn040, rn041, rn047, rn063, T13839, T13839a, T13919, T17171b,
+      T17a, T17b, T17d, T17e, T18470, T1972, t22391, t22391j, T2497, T3371,
+      T3449, T7145b, T7336, TH_recover_warns, unused_haddock, WarningGroups,
+      werror
+  -}
+  TcRnUnusedName :: !OccName -- ^ The unused name
+                 -> !UnusedNameProv -- ^ The provenance of the name
+                 -> TcRnMessage
+
+  {-| TcRnQualifiedBinder is an error indicating that a qualified name
+    was used in binding position.
+
+    Test cases:
+      mod62, rnfail021, rnfail034, rnfail039, rnfail046
+  -}
+  TcRnQualifiedBinder :: !RdrName -- ^ The name used as a binder
+                      -> TcRnMessage
+
+  {-| TcRnTypeApplicationsDisabled is an error indicating that a type
+    application was used while the extension TypeApplications was disabled.
+
+    Test cases:
+      T12411, T12446, T15527, T16133, T18251c
+  -}
+  TcRnTypeApplicationsDisabled :: !TypeOrKind -- ^ Type or kind application
+                               -> !(HsType GhcPs) -- ^ The type being applied
+                               -> TcRnMessage
+
+  {-| TcRnInvalidRecordField is an error indicating that a record field was
+    used that doesn't exist in a constructor.
+
+    Test cases:
+      T13644, T13847, T17469, T8448, T8570, tcfail083, tcfail084
+  -}
+  TcRnInvalidRecordField :: !Name -- ^ The constructor name
+                         -> !FieldLabelString -- ^ The name of the field
+                         -> TcRnMessage
+
+  {-| TcRnTupleTooLarge is an error indicating that the arity of a tuple
+    exceeds mAX_TUPLE_SIZE.
+
+    Test cases:
+      T18723a, T18723b, T18723c, T6148a, T6148b, T6148c, T6148d
+  -}
+  TcRnTupleTooLarge :: !Int -- ^ The arity of the tuple
+                    -> TcRnMessage
+
+  {-| TcRnCTupleTooLarge is an error indicating that the arity of a constraint
+    tuple exceeds mAX_CTUPLE_SIZE.
+
+    Test cases:
+      T10451
+  -}
+  TcRnCTupleTooLarge :: !Int -- ^ The arity of the constraint tuple
+                     -> TcRnMessage
+
+  {-| TcRnIllegalInferredTyVars is an error indicating that some type variables
+    were quantified as inferred (like @∀ {a}.@) in a place where this is not
+    allowed, like in an instance declaration.
+
+    Test cases:
+      ExplicitSpecificity5, ExplicitSpecificity6, ExplicitSpecificity8,
+      ExplicitSpecificity9
+  -}
+  TcRnIllegalInferredTyVars :: !(NE.NonEmpty (HsTyVarBndr Specificity GhcPs))
+                              -- ^ The offending type variables
+                           -> TcRnMessage
+
+  {-| TcRnAmbiguousName is an error indicating that an unbound name
+    might refer to multiple names in scope.
+
+    Test cases:
+      BootFldReexport, DRFUnused, duplicaterecfldsghci01, GHCiDRF, mod110,
+      mod151, mod152, mod153, mod164, mod165, NoFieldSelectorsFail,
+      overloadedrecfldsfail02, overloadedrecfldsfail04, overloadedrecfldsfail11,
+      overloadedrecfldsfail12, overloadedrecfldsfail13,
+      overloadedrecfldswasrunnowfail06, rnfail044, T11167_ambig,
+      T11167_ambiguous_fixity, T13132_duplicaterecflds, T15487, T16745, T17420,
+      T18999_NoDisambiguateRecordFields, T19397E1, T19397E2, T23010_fail,
+      tcfail037
+  -}
+  TcRnAmbiguousName :: !RdrName -- ^ The name
+                    -> !(NE.NonEmpty GlobalRdrElt) -- ^ The possible matches
+                    -> TcRnMessage
+
+  {-| TcRnBindingNameConflict is an error indicating that multiple local or
+    top-level bindings have the same name.
+
+    Test cases:
+      dsrun006, mdofail002, mdofail003, mod23, mod24, qq006, rnfail001,
+      rnfail004, SimpleFail6, T14114, T16110_Fail1, tcfail038, TH_spliceD1
+  -}
+  TcRnBindingNameConflict :: !RdrName -- ^ The conflicting name
+                          -> !(NE.NonEmpty SrcSpan)
+                             -- ^ The locations of the duplicates
+                          -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -5414,3 +5544,26 @@ data UnusedImportReason where
   UnusedImportSome :: ![UnusedImportName] -- ^ The unsed names
                    -> UnusedImportReason
   deriving (Generic)
+
+-- | Different places in which a nested foralls/contexts error might occur.
+data NestedForallsContextsIn
+  -- | Nested forall in @SPECIALISE instance@
+  = NFC_Specialize
+  -- | Nested forall in @deriving via@ (via-type)
+  | NFC_ViaType
+  -- | Nested forall in the type of a GADT constructor
+  | NFC_GadtConSig
+  -- | Nested forall in an instance head
+  | NFC_InstanceHead
+  -- | Nested forall in a standalone deriving instance head
+  | NFC_StandaloneDerivedInstanceHead
+  -- | Nested forall in deriving class type
+  | NFC_DerivedClassType
+
+-- | Provenance of an unused name.
+data UnusedNameProv
+  = UnusedNameTopDecl
+  | UnusedNameImported !ModuleName
+  | UnusedNameTypePattern
+  | UnusedNameMatch
+  | UnusedNameLocalBind

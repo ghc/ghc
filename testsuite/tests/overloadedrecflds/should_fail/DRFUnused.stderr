@@ -1,5 +1,5 @@
 
-DRFUnused.hs:18:5: error:
+DRFUnused.hs:18:5: error: [GHC-87543]
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’ of record ‘S’, defined at DRFUnused.hs:10:16

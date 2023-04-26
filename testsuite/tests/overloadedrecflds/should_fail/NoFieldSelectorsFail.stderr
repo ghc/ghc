@@ -1,5 +1,5 @@
 
-NoFieldSelectorsFail.hs:9:14: error:
+NoFieldSelectorsFail.hs:9:14: error: [GHC-87543]
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’ of record ‘Foo’,

@@ -1,5 +1,5 @@
 
-tcfail037.hs:7:11: error:
+tcfail037.hs:7:11: error: [GHC-87543]
     Ambiguous occurrence ‘+’
     It could refer to either ‘Prelude.+’,
                              imported from ‘Prelude’ at tcfail037.hs:3:8-17

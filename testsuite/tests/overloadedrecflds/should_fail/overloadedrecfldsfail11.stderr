@@ -1,7 +1,7 @@
 [1 of 3] Compiling OverloadedRecFldsFail11_A ( OverloadedRecFldsFail11_A.hs, OverloadedRecFldsFail11_A.o )
 [2 of 3] Compiling Main             ( overloadedrecfldsfail11.hs, overloadedrecfldsfail11.o )
 
-overloadedrecfldsfail11.hs:5:15: error:
+overloadedrecfldsfail11.hs:5:15: error: [GHC-87543]
     Ambiguous occurrence ‘foo’
     It could refer to
        either the field ‘foo’ of record ‘S’,

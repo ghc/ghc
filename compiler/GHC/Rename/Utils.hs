@@ -9,7 +9,7 @@ This module contains miscellaneous functions related to renaming.
 -}
 
 module GHC.Rename.Utils (
-        checkDupRdrNames, checkDupRdrNamesN, checkShadowedRdrNames,
+        checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize, checkCTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
@@ -44,7 +44,6 @@ import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 -- import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -53,19 +52,16 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..), IntegralLit )
 import GHC.Utils.Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated) )
+import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated), TypeOrKind )
 import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
-import Data.List (find, sortBy)
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
 import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Data.Bag
 import qualified Data.List as List
 
 {-
@@ -111,14 +107,7 @@ bindLocalNamesFV names enclosed_scope
 checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNames rdr_names_w_loc
-  = mapM_ (dupNamesErr getLocA) dups
-  where
-    (_, dups) = removeDupsOn unLoc rdr_names_w_loc
-
-checkDupRdrNamesN :: [LocatedN RdrName] -> RnM ()
--- Check for duplicated names in a binding group
-checkDupRdrNamesN rdr_names_w_loc
-  = mapM_ (dupNamesErr getLocA) dups
+  = mapM_ (\ ns -> dupNamesErr (getLocA <$> ns) (unLoc <$> ns)) dups
   where
     (_, dups) = removeDupsOn unLoc rdr_names_w_loc
 
@@ -129,7 +118,7 @@ checkDupNames names = check_dup_names (filterOut isSystemName names)
 
 check_dup_names :: [Name] -> RnM ()
 check_dup_names names
-  = mapM_ (dupNamesErr nameSrcSpan) dups
+  = mapM_ (\ ns -> dupNamesErr (nameSrcSpan <$> ns) (getRdrName <$> ns)) dups
   where
     (_, dups) = removeDupsOn nameOccName names
 
@@ -192,19 +181,15 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
 -- @{a}@, but @forall a. [a] -> [a]@ would be accepted.
 -- See @Note [Unobservably inferred type variables]@.
 checkInferredVars :: HsDocContext
-                  -> Maybe SDoc
-                  -- ^ The error msg if the signature is not allowed to contain
-                  --   manually written inferred variables.
                   -> LHsSigType GhcPs
                   -> RnM ()
-checkInferredVars _    Nothing    _  = return ()
-checkInferredVars ctxt (Just msg) ty =
+checkInferredVars ctxt ty =
   let bndrs = sig_ty_bndrs ty
-  in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
-    Nothing -> return ()
-    Just _  -> addErr $
+  in case filter ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
+    [] -> return ()
+    iv : ivs -> addErr $
       TcRnWithHsDocContext ctxt $
-      mkTcRnUnknownMessage $ mkPlainError noHints msg
+      TcRnIllegalInferredTyVars (iv NE.:| ivs)
   where
     sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs}))
@@ -287,7 +272,9 @@ Note [No nested foralls or contexts in instance types] in GHC.Hs.Type).
 --   "GHC.Rename.Module" and 'renameSig' in "GHC.Rename.Bind").
 --   See @Note [No nested foralls or contexts in instance types]@ in
 --   "GHC.Hs.Type".
-noNestedForallsContextsErr :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, TcRnMessage)
+noNestedForallsContextsErr :: NestedForallsContextsIn
+                           -> LHsType GhcRn
+                           -> Maybe (SrcSpan, TcRnMessage)
 noNestedForallsContextsErr what lty =
   case ignoreParens lty of
     L l (HsForAllTy { hst_tele = tele })
@@ -304,12 +291,13 @@ noNestedForallsContextsErr what lty =
     _ -> Nothing
   where
     nested_foralls_contexts_err =
-      mkTcRnUnknownMessage $ mkPlainError noHints $
-      what <+> text "cannot contain nested"
-      <+> quotes forAllLit <> text "s or contexts"
+      TcRnNestedForallsContexts what
 
 -- | A common way to invoke 'noNestedForallsContextsErr'.
-addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
+addNoNestedForallsContextsErr :: HsDocContext
+                              -> NestedForallsContextsIn
+                              -> LHsType GhcRn
+                              -> RnM ()
 addNoNestedForallsContextsErr ctxt what lty =
   whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
     addErrAt l $ TcRnWithHsDocContext ctxt err_msg
@@ -395,13 +383,7 @@ checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
 --
 -- The `..` here doesn't bind any variables as `x` is already bound.
 warnRedundantRecordWildcard :: RnM ()
-warnRedundantRecordWildcard =
-  whenWOptM Opt_WarnRedundantRecordWildcards $
-    let msg = mkTcRnUnknownMessage $
-                mkPlainDiagnostic (WarningWithFlag Opt_WarnRedundantRecordWildcards)
-                                  noHints
-                                  redundantWildcardWarning
-    in addDiagnostic msg
+warnRedundantRecordWildcard = addDiagnostic TcRnRedundantRecordWildcard
 
 
 -- | Produce a warning when no variables bound by a `..` pattern are used.
@@ -418,21 +400,19 @@ warnUnusedRecordWildcard :: [Name] -> FreeVars -> RnM ()
 warnUnusedRecordWildcard ns used_names = do
   let used = filter (`elemNameSet` used_names) ns
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
-  warnIf (null used)
-    unusedRecordWildcardWarning
+  warnIf (null used) (TcRnUnusedRecordWildcard ns)
 
 
 
 warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
   :: [Name] -> FreeVars -> RnM ()
-warnUnusedLocalBinds   = check_unused Opt_WarnUnusedLocalBinds
-warnUnusedMatches      = check_unused Opt_WarnUnusedMatches
-warnUnusedTypePatterns = check_unused Opt_WarnUnusedTypePatterns
+warnUnusedLocalBinds   = check_unused UnusedNameLocalBind
+warnUnusedMatches      = check_unused UnusedNameMatch
+warnUnusedTypePatterns = check_unused UnusedNameTypePattern
 
-check_unused :: WarningFlag -> [Name] -> FreeVars -> RnM ()
-check_unused flag bound_names used_names
-  = whenWOptM flag (warnUnused flag (filterOut (`elemNameSet` used_names)
-                                               bound_names))
+check_unused :: UnusedNameProv -> [Name] -> FreeVars -> RnM ()
+check_unused prov bound_names used_names
+  = warnUnused prov (filterOut (`elemNameSet` used_names) bound_names)
 
 warnForallIdentifier :: LocatedN RdrName -> RnM ()
 warnForallIdentifier (L l rdr_name@(Unqual occ))
@@ -447,33 +427,30 @@ warnUnusedGREs :: [GlobalRdrElt] -> RnM ()
 warnUnusedGREs gres = mapM_ warnUnusedGRE gres
 
 -- NB the Names must not be the names of record fields!
-warnUnused :: WarningFlag -> [Name] -> RnM ()
-warnUnused flag names =
-    mapM_ (\ nm -> warnUnused1 flag nm (nameOccName nm)) names
+warnUnused :: UnusedNameProv -> [Name] -> RnM ()
+warnUnused prov names =
+  mapM_ (\ nm -> warnUnused1 prov nm (nameOccName nm)) names
 
-warnUnused1 :: WarningFlag -> Name -> OccName -> RnM ()
-warnUnused1 flag child child_occ
+warnUnused1 :: UnusedNameProv -> Name -> OccName -> RnM ()
+warnUnused1 prov child child_occ
   = when (reportable child child_occ) $
-    addUnusedWarning flag
-                     child_occ (nameSrcSpan child)
-                     (text $ "Defined but not used" ++ opt_str)
-  where
-    opt_str = case flag of
-                Opt_WarnUnusedTypePatterns -> " on the right hand side"
-                _ -> ""
+    warn_unused_name prov (nameSrcSpan child) child_occ
+
+warn_unused_name :: UnusedNameProv -> SrcSpan -> OccName -> RnM ()
+warn_unused_name prov span child_occ =
+  addDiagnosticAt span (TcRnUnusedName child_occ prov)
 
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
 warnUnusedGRE gre@(GRE { gre_lcl = lcl, gre_imp = is })
-  | lcl       = warnUnused1 Opt_WarnUnusedTopBinds nm occ
+  | lcl       = warnUnused1 UnusedNameTopDecl nm occ
   | otherwise = when (reportable nm occ) (mapM_ warn is)
   where
     occ = greOccName gre
     nm = greName gre
-    warn spec = addUnusedWarning Opt_WarnUnusedTopBinds occ span msg
-        where
-           span = importSpecLoc spec
-           pp_mod = quotes (ppr (importSpecModule spec))
-           msg = text "Imported from" <+> pp_mod <+> text "but not used"
+    warn spec =
+      warn_unused_name (UnusedNameImported (importSpecModule spec)) span occ
+      where
+        span = importSpecLoc spec
 
 -- | Should we report the fact that this 'Name' is unused? The
 -- 'OccName' may differ from 'nameOccName' due to
@@ -486,29 +463,6 @@ reportable child child_occ
              -- from Data.Tuple
   | otherwise
   = not (startsWithUnderscore child_occ)
-
-addUnusedWarning :: WarningFlag -> OccName -> SrcSpan -> SDoc -> RnM ()
-addUnusedWarning flag occ span msg = do
-  let diag = mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag flag) noHints $
-        sep [msg <> colon,
-             nest 2 $ pprNonVarNameSpace (occNameSpace occ)
-                            <+> quotes (ppr occ)]
-  addDiagnosticAt span diag
-
-unusedRecordWildcardWarning :: TcRnMessage
-unusedRecordWildcardWarning =
-  mkTcRnUnknownMessage $ mkPlainDiagnostic (WarningWithFlag Opt_WarnUnusedRecordWildcards) noHints $
-    wildcardDoc $ text "No variables bound in the record wildcard match are used"
-
-redundantWildcardWarning :: SDoc
-redundantWildcardWarning =
-  wildcardDoc $ text "Record wildcard does not bind any new variables"
-
-wildcardDoc :: SDoc -> SDoc
-wildcardDoc herald =
-  herald
-    $$ nest 2 (text "Possible fix" <> colon <+> text "omit the"
-                                            <+> quotes (text ".."))
 
 {-
 Note [Skipping ambiguity errors at use sites of local declarations]
@@ -560,78 +514,23 @@ addNameClashErrRn rdr_name gres
     num_flds     = length flds
     num_non_flds = length non_flds
 
-mkNameClashErr :: Outputable a
-               => a -> NE.NonEmpty GlobalRdrElt -> TcRnMessage
-mkNameClashErr rdr_name gres =
-  mkTcRnUnknownMessage $ mkPlainError noHints $
-    (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
-          , text "It could refer to"
-          , nest 3 (vcat (msg1 : msgs)) ])
+mkNameClashErr :: RdrName -> NE.NonEmpty GlobalRdrElt -> TcRnMessage
+mkNameClashErr rdr_name gres = TcRnAmbiguousName rdr_name gres
+
+dupNamesErr :: NE.NonEmpty SrcSpan -> NE.NonEmpty RdrName -> RnM ()
+dupNamesErr locs names
+  = addErrAt big_loc (TcRnBindingNameConflict (NE.head names) locs)
   where
-    np1 NE.:| nps = gres
-    msg1 =  text "either" <+> ppr_gre np1
-    msgs = [text "    or" <+> ppr_gre np | np <- nps]
-    ppr_gre gre = sep [ pp_gre_name gre <> comma
-                      , pprNameProvenance gre]
-
-    -- When printing the name, take care to qualify it in the same
-    -- way as the provenance reported by pprNameProvenance, namely
-    -- the head of 'gre_imp'.  Otherwise we get confusing reports like
-    --   Ambiguous occurrence ‘null’
-    --   It could refer to either ‘T15487a.null’,
-    --                            imported from ‘Prelude’ at T15487.hs:1:8-13
-    --                     or ...
-    -- See #15487
-    pp_gre_name gre
-      | isRecFldGRE gre
-      = text "the field" <+> quotes (ppr occ) <+> parent_info
-      | otherwise
-      = quotes (pp_qual <> dot <> ppr occ)
-      where
-        occ = greOccName gre
-        parent_info = case gre_par gre of
-          NoParent -> empty
-          ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
-        pp_qual
-            | gre_lcl gre
-            = ppr (nameModule $ greName gre)
-            | Just imp  <- headMaybe $ gre_imp gre
-                -- This 'imp' is the one that
-                -- pprNameProvenance chooses
-            , ImpDeclSpec { is_as = mod } <- is_decl imp
-            = ppr mod
-            | otherwise
-            = pprPanic "addNameClassErrRn" (ppr gre)
-              -- Invariant: either 'lcl' is True or 'iss' is non-empty
-
-
-dupNamesErr :: Outputable n => (n -> SrcSpan) -> NE.NonEmpty n -> RnM ()
-dupNamesErr get_loc names
-  = addErrAt big_loc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [text "Conflicting definitions for" <+> quotes (ppr (NE.head names)),
-          locations]
-  where
-    locs      = map get_loc (NE.toList names)
-    big_loc   = foldr1 combineSrcSpans locs
-    locations = text "Bound at:" <+> vcat (map ppr (sortBy SrcLoc.leftmost_smallest locs))
+    big_loc = foldr1 combineSrcSpans locs
 
 badQualBndrErr :: RdrName -> TcRnMessage
-badQualBndrErr rdr_name
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-  text "Qualified name in binding position:" <+> ppr rdr_name
+badQualBndrErr rdr_name = TcRnQualifiedBinder rdr_name
 
-typeAppErr :: String -> LHsType GhcPs -> TcRnMessage
-typeAppErr what (L _ k)
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Illegal visible" <+> text what <+> text "application"
-            <+> quotes (char '@' <> ppr k))
-       2 (text "Perhaps you intended to use TypeApplications")
+typeAppErr :: TypeOrKind -> LHsType GhcPs -> TcRnMessage
+typeAppErr what (L _ k) = TcRnTypeApplicationsDisabled what k
 
 badFieldConErr :: Name -> FieldLabelString -> TcRnMessage
-badFieldConErr con field
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    hsep [text "Constructor" <+> quotes (ppr con),
-          text "does not have field", quotes (ppr field)]
+badFieldConErr con field = TcRnInvalidRecordField con field
 
 -- | Ensure that a boxed or unboxed tuple has arity no larger than
 -- 'mAX_TUPLE_SIZE'.
@@ -640,10 +539,7 @@ checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE
   = return ()
   | otherwise
-  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
-                 nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
-                 nest 2 (text "Workaround: use nested tuples or define a data type")]
+  = addErr (TcRnTupleTooLarge tup_size)
 
 -- | Ensure that a constraint tuple has arity no larger than 'mAX_CTUPLE_SIZE'.
 checkCTupSize :: Int -> TcM ()
@@ -651,10 +547,7 @@ checkCTupSize tup_size
   | tup_size <= mAX_CTUPLE_SIZE
   = return ()
   | otherwise
-  = addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (text "Constraint tuple arity too large:" <+> int tup_size
-                  <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
-               2 (text "Instead, use a nested tuple")
+  = addErr (TcRnCTupleTooLarge tup_size)
 
 {- *********************************************************************
 *                                                                      *

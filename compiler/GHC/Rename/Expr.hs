@@ -56,6 +56,7 @@ import GHC.Driver.Session
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( nilDataConName )
 
+import GHC.Types.Basic (TypeOrKind (TypeLevel))
 import GHC.Types.FieldLabel
 import GHC.Types.Fixity
 import GHC.Types.Id.Make
@@ -324,7 +325,7 @@ rnExpr (HsApp x fun arg)
 
 rnExpr (HsAppType _ fun at arg)
   = do { type_app <- xoptM LangExt.TypeApplications
-       ; unless type_app $ addErr $ typeAppErr "type" $ hswc_body arg
+       ; unless type_app $ addErr $ typeAppErr TypeLevel $ hswc_body arg
        ; (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
        ; return (HsAppType NoExtField fun' at arg', fvFun `plusFV` fvArg) }

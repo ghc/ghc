@@ -1,5 +1,5 @@
 
-T18999_NoDisambiguateRecordFields.hs:6:13: error:
+T18999_NoDisambiguateRecordFields.hs:6:13: error: [GHC-87543]
     Ambiguous occurrence ‘not’
     It could refer to
        either ‘Prelude.not’,

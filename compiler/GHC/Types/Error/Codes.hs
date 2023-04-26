@@ -586,6 +586,18 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDuplicateDecls"                            = 29916
   GhcDiagnosticCode "TcRnPackageImportsDisabled"                    = 10032
   GhcDiagnosticCode "TcRnIllegalDataCon"                            = 78448
+  GhcDiagnosticCode "TcRnNestedForallsContexts"                     = 71492
+  GhcDiagnosticCode "TcRnRedundantRecordWildcard"                   = 15932
+  GhcDiagnosticCode "TcRnUnusedRecordWildcard"                      = 83475
+  GhcDiagnosticCode "TcRnUnusedName"                                = 40910
+  GhcDiagnosticCode "TcRnQualifiedBinder"                           = 28329
+  GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
+  GhcDiagnosticCode "TcRnInvalidRecordField"                        = 53822
+  GhcDiagnosticCode "TcRnTupleTooLarge"                             = 94803
+  GhcDiagnosticCode "TcRnCTupleTooLarge"                            = 89347
+  GhcDiagnosticCode "TcRnIllegalInferredTyVars"                     = 54832
+  GhcDiagnosticCode "TcRnAmbiguousName"                             = 87543
+  GhcDiagnosticCode "TcRnBindingNameConflict"                       = 10498
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317

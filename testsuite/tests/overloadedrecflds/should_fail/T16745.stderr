@@ -3,7 +3,7 @@
 [3 of 4] Compiling T16745D          ( T16745D.hs, T16745D.o )
 [4 of 4] Compiling T16745A          ( T16745A.hs, T16745A.o )
 
-T16745A.hs:8:9: error:
+T16745A.hs:8:9: error: [GHC-87543]
     Ambiguous occurrence ‘field’
     It could refer to
        either ‘T16745B.field’,

@@ -1,5 +1,5 @@
 
-T17171b.hs:4:1: warning: [-Wunused-top-binds]
+T17171b.hs:4:1: warning: [GHC-40910] [-Wunused-top-binds]
     Defined but not used: ‘main’
   |
 4 | main = putStrLn "NoMain"

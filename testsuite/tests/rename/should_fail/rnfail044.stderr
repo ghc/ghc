@@ -1,5 +1,5 @@
 
-rnfail044.hs:5:12: error:
+rnfail044.hs:5:12: error: [GHC-87543]
     Ambiguous occurrence ‘splitAt’
     It could refer to
        either ‘Prelude.splitAt’,

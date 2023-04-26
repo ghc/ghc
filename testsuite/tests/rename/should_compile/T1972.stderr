@@ -9,5 +9,5 @@ T1972.hs:15:3: warning: [GHC-63397] [-Wname-shadowing (in -Wall)]
       (and originally defined in ‘Data.Traversable’)
       defined at T1972.hs:17:1
 
-T1972.hs:21:10: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+T1972.hs:21:10: warning: [GHC-40910] [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘c’

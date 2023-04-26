@@ -1,4 +1,4 @@
 
-T12446.hs:4:5: error:
+T12446.hs:4:5: error: [GHC-23482]
     Illegal visible type application ‘@(_ ~ _)’
-      Perhaps you intended to use TypeApplications
+    Suggested fix: Perhaps you intended to use TypeApplications

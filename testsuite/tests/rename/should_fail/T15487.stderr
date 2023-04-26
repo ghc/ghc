@@ -1,5 +1,5 @@
 
-T15487.hs:7:9: error:
+T15487.hs:7:9: error: [GHC-87543]
     Ambiguous occurrence ‘null’
     It could refer to
        either ‘Prelude.null’,

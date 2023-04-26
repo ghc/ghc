@@ -1,5 +1,5 @@
 
-mod164.hs:9:5:
+mod164.hs:9:5: [GHC-87543]
     Ambiguous occurrence ‘D1’
     It could refer to either ‘Mod164_A.D1’,
                              imported from ‘Mod164_A’ at mod164.hs:4:1-15

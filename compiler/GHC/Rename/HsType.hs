@@ -49,7 +49,7 @@ import GHC.Hs
 import GHC.Rename.Env
 import GHC.Rename.Doc
 import GHC.Rename.Utils  ( mapFvRn, bindLocalNamesFV
-                         , typeAppErr, newLocalBndrRn, checkDupRdrNamesN
+                         , typeAppErr, newLocalBndrRn, checkDupRdrNames
                          , checkShadowedRdrNames, warnForallIdentifier )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
@@ -686,7 +686,7 @@ rnHsTyKi env (HsAppTy _ ty1 ty2)
 
 rnHsTyKi env (HsAppKindTy _ ty at k)
   = do { kind_app <- xoptM LangExt.TypeApplications
-       ; unless kind_app (addErr (typeAppErr "kind" k))
+       ; unless kind_app (addErr (typeAppErr KindLevel k))
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2) <- rnLHsTyKi (env {rtke_level = KindLevel }) k
        ; return (HsAppKindTy noExtField ty' at k', fvs1 `plusFV` fvs2) }
@@ -1184,7 +1184,7 @@ bindLHsTyVarBndrs :: (OutputableBndrFlag flag 'Renamed)
                   -> RnM (b, FreeVars)
 bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
-       ; checkDupRdrNamesN tv_names_w_loc
+       ; checkDupRdrNames tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs

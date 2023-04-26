@@ -33,7 +33,7 @@ src/Lib.hs:6:1: warning: [GHC-66111] [-Wunused-imports (in -Wextra)]
 src/Lib.hs:8:1: warning: [GHC-38417] [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature: blah :: Integer
 
-src/Lib.hs:8:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+src/Lib.hs:8:1: warning: [GHC-40910] [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘blah’
 
 src/Lib.hs:8:8: warning: [GHC-18042] [-Wtype-defaults (in -Wall)]

@@ -86,6 +86,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.List.SetOps ( nubOrdBy )
 import GHC.Data.Maybe
+import GHC.Settings.Constants (mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1790,6 +1791,74 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalDataCon name
       -> mkSimpleDecorated $
          hsep [text "Illegal data constructor name", quotes (ppr name)]
+    TcRnNestedForallsContexts entity
+      -> mkSimpleDecorated $
+         what <+> text "cannot contain nested"
+         <+> quotes forAllLit <> text "s or contexts"
+         where
+           what = case entity of
+             NFC_Specialize -> text "SPECIALISE instance type"
+             NFC_ViaType -> quotes (text "via") <+> text "type"
+             NFC_GadtConSig -> text "GADT constructor type signature"
+             NFC_InstanceHead -> text "Instance head"
+             NFC_StandaloneDerivedInstanceHead -> text "Standalone-derived instance head"
+             NFC_DerivedClassType -> text "Derived class type"
+    TcRnRedundantRecordWildcard
+      -> mkSimpleDecorated $
+         text "Record wildcard does not bind any new variables"
+    TcRnUnusedRecordWildcard _
+      -> mkSimpleDecorated $
+         text "No variables bound in the record wildcard match are used"
+    TcRnUnusedName name reason
+      -> mkSimpleDecorated $
+         pprUnusedName name reason
+    TcRnQualifiedBinder rdr_name
+      -> mkSimpleDecorated $
+         text "Qualified name in binding position:" <+> ppr rdr_name
+    TcRnTypeApplicationsDisabled tok t
+      -> mkSimpleDecorated $
+         text "Illegal visible" <+> text what <+> text "application"
+         <+> quotes (char '@' <> ppr t)
+         where
+           what = case tok of
+             TypeLevel -> "type"
+             KindLevel -> "kind"
+    TcRnInvalidRecordField con field
+      -> mkSimpleDecorated $
+         hsep [text "Constructor" <+> quotes (ppr con),
+               text "does not have field", quotes (ppr field)]
+    TcRnTupleTooLarge tup_size
+      -> mkSimpleDecorated $
+         sep [text "A" <+> int tup_size <> text "-tuple is too large for GHC",
+              nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
+              nest 2 (text "Workaround: use nested tuples or define a data type")]
+    TcRnCTupleTooLarge tup_size
+      -> mkSimpleDecorated $
+         hang (text "Constraint tuple arity too large:" <+> int tup_size
+               <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
+            2 (text "Instead, use a nested tuple")
+    TcRnIllegalInferredTyVars _
+      -> mkSimpleDecorated $
+         text "Inferred type variables are not allowed"
+    TcRnAmbiguousName name gres
+      -> mkSimpleDecorated $
+         vcat [ text "Ambiguous occurrence" <+> quotes (ppr name)
+              , text "It could refer to"
+              , nest 3 (vcat (msg1 : msgs)) ]
+         where
+           np1 NE.:| nps = gres
+           msg1 =  text "either" <+> ppr_gre np1
+           msgs = [text "    or" <+> ppr_gre np | np <- nps]
+           ppr_gre gre = sep [ pprAmbiguousGreName gre <> comma
+                             , pprNameProvenance gre]
+    TcRnBindingNameConflict name locs
+      -> mkSimpleDecorated $
+         vcat [text "Conflicting definitions for" <+> quotes (ppr name),
+               locations]
+         where
+           locations =
+             text "Bound at:"
+             <+> vcat (map ppr (sortBy leftmost_smallest (NE.toList locs)))
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2386,7 +2455,35 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnIllegalDataCon{}
       -> ErrorWithoutFlag
-
+    TcRnNestedForallsContexts{}
+      -> ErrorWithoutFlag
+    TcRnRedundantRecordWildcard
+      -> WarningWithFlag Opt_WarnRedundantRecordWildcards
+    TcRnUnusedRecordWildcard{}
+      -> WarningWithFlag Opt_WarnUnusedRecordWildcards
+    TcRnUnusedName _ prov
+      -> WarningWithFlag $ case prov of
+        UnusedNameTopDecl -> Opt_WarnUnusedTopBinds
+        UnusedNameImported _ -> Opt_WarnUnusedTopBinds
+        UnusedNameTypePattern -> Opt_WarnUnusedTypePatterns
+        UnusedNameMatch -> Opt_WarnUnusedMatches
+        UnusedNameLocalBind -> Opt_WarnUnusedLocalBinds
+    TcRnQualifiedBinder{}
+      -> ErrorWithoutFlag
+    TcRnTypeApplicationsDisabled{}
+      -> ErrorWithoutFlag
+    TcRnInvalidRecordField{}
+      -> ErrorWithoutFlag
+    TcRnTupleTooLarge{}
+      -> ErrorWithoutFlag
+    TcRnCTupleTooLarge{}
+      -> ErrorWithoutFlag
+    TcRnIllegalInferredTyVars{}
+      -> ErrorWithoutFlag
+    TcRnAmbiguousName{}
+      -> ErrorWithoutFlag
+    TcRnBindingNameConflict{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3023,6 +3120,30 @@ instance Diagnostic TcRnMessage where
     TcRnPackageImportsDisabled
       -> [suggestExtension LangExt.PackageImports]
     TcRnIllegalDataCon{}
+      -> noHints
+    TcRnNestedForallsContexts{}
+      -> noHints
+    TcRnRedundantRecordWildcard
+      -> [SuggestRemoveRecordWildcard]
+    TcRnUnusedRecordWildcard{}
+      -> [SuggestRemoveRecordWildcard]
+    TcRnUnusedName{}
+      -> noHints
+    TcRnQualifiedBinder{}
+      -> noHints
+    TcRnTypeApplicationsDisabled{}
+      -> [suggestExtension LangExt.TypeApplications]
+    TcRnInvalidRecordField{}
+      -> noHints
+    TcRnTupleTooLarge{}
+      -> noHints
+    TcRnCTupleTooLarge{}
+      -> noHints
+    TcRnIllegalInferredTyVars{}
+      -> noHints
+    TcRnAmbiguousName{}
+      -> noHints
+    TcRnBindingNameConflict{}
       -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
@@ -5280,3 +5401,53 @@ pprUnusedImport decl = \case
         case par of
           ParentIs p -> pprNameUnqualified p <> parens (ppr fld_occ)
           NoParent   -> ppr fld_occ
+
+pprUnusedName :: OccName -> UnusedNameProv -> SDoc
+pprUnusedName name reason =
+  sep [ msg <> colon
+      , nest 2 $ pprNonVarNameSpace (occNameSpace name)
+                 <+> quotes (ppr name)]
+  where
+    msg = case reason of
+      UnusedNameTopDecl ->
+        defined
+      UnusedNameImported mod ->
+        text "Imported from" <+> quotes (ppr mod) <+> text "but not used"
+      UnusedNameTypePattern ->
+        defined <+> text "on the right hand side"
+      UnusedNameMatch ->
+        defined
+      UnusedNameLocalBind ->
+        defined
+    defined = text "Defined but not used"
+
+-- When printing the name, take care to qualify it in the same
+-- way as the provenance reported by pprNameProvenance, namely
+-- the head of 'gre_imp'.  Otherwise we get confusing reports like
+--   Ambiguous occurrence ‘null’
+--   It could refer to either ‘T15487a.null’,
+--                            imported from ‘Prelude’ at T15487.hs:1:8-13
+--                     or ...
+-- See #15487
+pprAmbiguousGreName :: GlobalRdrElt -> SDoc
+pprAmbiguousGreName gre
+  | isRecFldGRE gre
+  = text "the field" <+> quotes (ppr occ) <+> parent_info
+  | otherwise
+  = quotes (pp_qual <> dot <> ppr occ)
+  where
+    occ = greOccName gre
+    parent_info = case gre_par gre of
+      NoParent -> empty
+      ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
+    pp_qual
+        | gre_lcl gre
+        = ppr (nameModule $ greName gre)
+        | Just imp  <- headMaybe $ gre_imp gre
+            -- This 'imp' is the one that
+            -- pprNameProvenance chooses
+        , ImpDeclSpec { is_as = mod } <- is_decl imp
+        = ppr mod
+        | otherwise
+        = pprPanic "addNameClassErrRn" (ppr gre)
+          -- Invariant: either 'lcl' is True or 'iss' is non-empty
