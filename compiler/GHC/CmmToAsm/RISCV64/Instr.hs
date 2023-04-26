@@ -42,6 +42,9 @@ data Instr
     LA Reg CLabel
   | -- jump pseudo-instruction
     J Target
+  | -- call pseudo-instruction
+    CALL CLabel
+  | JALR Reg
   | -- copy register
     MV Reg Reg
 
@@ -49,6 +52,7 @@ data Target
   = TBlock BlockId
   | TReg Reg
   | TLabel CLabel
+  deriving Show
 
 allocMoreStack ::
   Int ->
@@ -104,6 +108,8 @@ regUsageOfInstr platform instr = case instr of
   -- Looks like J doesn't change registers (beside PC)
   -- This might be wrong.
   J {} -> none
+  CALL {} -> usage([],[(RegReal . realRegSingle) 1]) -- call sets register x1 (ra)
+  JALR reg -> usage([reg],[(RegReal . realRegSingle) 1]) -- call sets register x1 (ra)
   where
     none = usage ([], [])
     -- filtering the usage is necessary, otherwise the register
@@ -138,6 +144,8 @@ patchRegsOfInstr instr env = case instr of
   -- Looks like J doesn't change registers (beside PC)
   -- This might be wrong.
   J {} -> instr
+  CALL {} -> instr
+  JALR reg -> JALR (env reg)
   MV dst src -> MV (env dst) (env src)
 
 -- | Checks whether this instruction is a jump/branch instruction.
@@ -150,8 +158,12 @@ isJumpishInstr ANN {} = False
 isJumpishInstr DELTA {} = False
 isJumpishInstr LDATA {} = False
 isJumpishInstr NEWBLOCK {} = False
+isJumpishInstr MV {} = False
+isJumpishInstr LA {} = False
 isJumpishInstr LI {} = False
 isJumpishInstr J {} = True
+isJumpishInstr CALL {} = True
+isJumpishInstr JALR {} = True
 
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
@@ -224,6 +236,8 @@ isMetaInstr instr =
     LA {} -> False
     J {} -> False
     MV {} -> False
+    CALL {} -> False
+    JALR {} -> False
 
 -- | Copy the value in a register to another one.
 --      Must work for all register classes.
@@ -251,6 +265,8 @@ takeRegRegMoveInstr LI {} = Nothing
 takeRegRegMoveInstr LA {} = Nothing
 takeRegRegMoveInstr J {} = Nothing
 takeRegRegMoveInstr (MV dst src) = Just (src, dst)
+takeRegRegMoveInstr CALL {} = Nothing
+takeRegRegMoveInstr JALR {} = Nothing
 
 -- | Make an unconditional jump instruction.
 --      For architectures with branch delay slots, its ok to put

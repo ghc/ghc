@@ -142,9 +142,11 @@ pprInstr platform instr = case instr of
   PUSH_STACK_FRAME -> error "pprInstr: PUSH_STACK_FRAME"
   POP_STACK_FRAME -> error "pprInstr: POP_STACK_FRAME"
   J label -> line $ pprJ label
+  CALL label -> line $ text "\tcall" <+> pprAsmLabel platform label
+  JALR reg -> line $ text "\tjalr" <+> text "ra" <> char ',' <+> pprReg reg <> char ',' <+> char '0'
   LI reg immediate -> line $ pprLI reg immediate
-  LA reg label -> error $ "pprInstr: LA " ++ show reg ++ " " ++ show label
-  MV dst src -> error $ "pprInstr: MV " ++ show dst ++ " " ++ show src
+  LA reg label -> line $ text "\tla" <+> pprReg reg <> char ',' <+> pprAsmLabel platform label
+  MV dst src -> line $ text "\tmv" <+> pprReg dst <> char ',' <+> pprReg src
   where
     pprLI :: IsLine doc => Reg -> Integer -> doc
     pprLI reg immediate = text "\tli" <+> pprReg reg <> char ',' <+> (text.show) immediate

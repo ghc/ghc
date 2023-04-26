@@ -23,6 +23,7 @@ import GHC.Platform.Regs
 import GHC.Utils.Panic
 import GHC.Cmm.BlockId
 import GHC.Utils.Trace
+import Debug.Trace
 
 -- | Don't try to compile all GHC Cmm files in the beginning.
 -- Ignore them. There's a flag to decide we really want to emit something.
@@ -226,6 +227,7 @@ annExpr e instr {- debugIsOn -} = ANN (text . show $ e) instr
 generateJumpTableForInstr :: Instr
                           -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr _ = Nothing
+
 genCCall
     :: ForeignTarget      -- function to call
     -> [CmmFormal]        -- where to put the result
@@ -251,9 +253,10 @@ genCCall target dest_regs arg_regs = do
         (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
         -- ... if it's not a label--well--let's compute the expression into a
         -- register and jump to that. See Note [PLT vs GOT relocations]
-        e ->  do
-          (reg, _format, reg_code) <- getSomeReg expr
-          pure (TReg reg, reg_code)
+        e -> trace ("genCCall - target : " ++ show e ++ " - " ++ showPprUnsafe (pdoc platform e)) $
+              do
+              (reg, _format, reg_code) <- getSomeReg expr
+              pure (TReg reg, reg_code)
       -- compute the code and register logic for all arg_regs.
       -- this will give us the format information to match on.
       arg_regs' <- mapM getSomeReg arg_regs
@@ -287,15 +290,20 @@ genCCall target dest_regs arg_regs = do
 --                               , POP_STACK_FRAME
 --                               , DELTA 0 ]
 
-      let code =    call_target_code          -- compute the label (possibly into a register)
-            `appOL` moveStackDown (stackSpace `div` 8)
-            `appOL` passArgumentsCode         -- put the arguments into x0, ...
-            `appOL` (unitOL $ J call_target) -- jump
+      traceM $ "genCCall - call_target : " ++ show call_target
+
+      let code = call_target_code          -- compute the label (possibly into a register)
+            `appOL` passArgumentsCode         -- put the arguments into a0, ...
+            `appOL` mkCall call_target -- jump
             `appOL` readResultsCode           -- parse the results into registers
-            `appOL` moveStackUp (stackSpace `div` 8)
       return code
     e -> error $ "TODO genCCall" ++ showSDocUnsafe (pdoc platform e)
   where
+    mkCall :: Target -> OrdList Instr
+    mkCall (TLabel label) = unitOL $ CALL label
+    mkCall (TReg reg) = unitOL $ JALR reg
+    mkCall t = error $ "mkCall - " ++ show t
+
     passArguments :: [Reg] -> [Reg] -> [(Reg, Format, ForeignHint, InstrBlock)] -> Int -> [Reg] -> InstrBlock -> NatM (Int, [Reg], InstrBlock)
     passArguments _ _ [] stackSpace accumRegs accumCode = return (stackSpace, accumRegs, accumCode)
     passArguments (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
