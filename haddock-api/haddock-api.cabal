@@ -63,6 +63,7 @@ library
                , ghc-boot
                , mtl
                , transformers
+               , ghc-debug-stub
 
   hs-source-dirs: src
 

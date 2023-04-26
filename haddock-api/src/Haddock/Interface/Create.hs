@@ -64,7 +64,7 @@ import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail as Avail
-import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv)
+import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv, occNameString)
 import GHC.Types.Name.Env (lookupNameEnv)
 import GHC.Types.Name.Reader (GlobalRdrEnv, greMangledName, lookupGlobalRdrEnv)
 import GHC.Types.Name.Set (elemNameSet, mkNameSet)
@@ -79,6 +79,8 @@ import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic (pprPanic)
 import GHC.Unit.Module.Warnings
 import GHC.Types.Unique.Map
+
+import Debug.Trace
 
 newtype IfEnv m = IfEnv
   {
@@ -206,7 +208,17 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     Nothing -> do
       tell [ "Warning: Renamed source is not available" ]
       pure []
-    Just dx ->
+    Just dx -> do
+      let showDecl :: LHsDecl GhcRn -> String
+          showDecl (L _ (SigD _ _)) = "Signature"
+          showDecl (L _ (ValD _ _)) = "Value"
+          showDecl (L _ (TyClD _ _))= "Type or Class"
+          showDecl _                = "Other"
+      traceM $
+        "NUM DECLS in mod " ++ moduleString tcg_mod ++ ": " ++ show (length $ topDecls dx)
+        ++ " DOC LENGTHS: " ++ show (map (\(_,ds) -> length ds) (topDecls dx))
+        ++ " DECL TYPES: " ++ show (map (showDecl . fst) (topDecls dx))
+
       pure (topDecls dx)
 
   -- Derive final options to use for haddocking this module
@@ -647,7 +659,7 @@ mkExportItems
   maps fixMap unrestricted_imp_mods splices exportList allExports
   instIfaceMap dflags =
   case exportList of
-    Nothing      ->
+    Nothing      -> do
       fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre
         exportedNames decls maps fixMap splices instIfaceMap dflags
         allExports
@@ -676,7 +688,7 @@ mkExportItems
       , not (null mods)
       = concat <$> traverse (moduleExport thisMod dflags modMap instIfaceMap) mods
 
-    lookupExport (_, avails) =
+    lookupExport (_, avails) = traceShow (map (occNameString . nameOccName . availName) avails) $
       concat <$> traverse availExport (nubAvails avails)
 
     availExport avail =
@@ -842,7 +854,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
     findDecl :: AvailInfo -> IfM m ([LHsDecl GhcRn], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl avail
-      | m == semMod =
+      | m == semMod = traceShow ("m == semMod: " ++ show (m == semMod) ++ ", findDecl - m: " ++ show (moduleString m) ++ ", semMod: " ++ show (moduleString semMod) ++ ", is_sig: " ++ show is_sig) $
           case M.lookup n declMap of
             Just ds -> return (ds, lookupDocs avail warnings docMap argMap)
             Nothing
