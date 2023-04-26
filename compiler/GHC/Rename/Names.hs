@@ -320,7 +320,7 @@ rnImportDecl this_mod
                                      , ideclQualified = qual_style
                                      , ideclExt = XImportDeclPass { ideclImplicit = implicit }
                                      , ideclAs = as_mod, ideclImportList = imp_details }), import_reason)
-  = setSrcSpanA loc $ do
+  = setSrcSpan (locA loc) $ do
 
     case raw_pkg_qual of
       NoRawPkgQual -> pure ()
@@ -1239,7 +1239,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, [GlobalRdrElt])]
     lookup_lie (L loc ieRdr)
-        = setSrcSpanA loc $
+        = setSrcSpan (locA loc) $
           do (stuff, warns) <- liftM (fromMaybe ([],[])) $
                                run_lookup (lookup_ie ieRdr)
              mapM_ (addTcRnDiagnostic <=< warning_msg) warns
@@ -2085,14 +2085,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (la2e l)   (L (l2l l) n))
-  | otherwise             = L l (IEName    noExtField (L (l2l l) n))
+  | isDataOcc $ occName n = L l (IEPattern (epaLocationFromEpAnnS l) (L (l2l l) n))
+  | otherwise             = L l (IEName    noExtField                (L (l2l l) n))
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (la2e l)   (L (l2l l) n))
-  | otherwise                   = L l (IEName noExtField (L (l2l l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (epaLocationFromEpAnnS l) (L (l2l l) n))
+  | otherwise                   = L l (IEName noExtField         (L (l2l l) n))
   where occ = occName n
 
 {-

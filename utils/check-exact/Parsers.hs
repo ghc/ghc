@@ -46,6 +46,7 @@ module Parsers (
         ) where
 
 import Preprocess
+import Utils
 
 import Data.Functor (void)
 
@@ -279,6 +280,7 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
       (GHC.EpAnn a an ocs) -> GHC.EpAnn a an (rebalance ocs)
       unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' } }
+          -- `debug` ("fixModuleTrailingComments: p=" ++ showAst p)
 
     rebalance :: GHC.EpAnnComments -> GHC.EpAnnComments
     rebalance cs = cs'
@@ -292,6 +294,8 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
               (prior,f) = break bf fc
               cs'' = GHC.EpaCommentsBalanced (pc <> prior) f
             in cs''
+            -- in cs
+                 -- `debug` ("rebalance: (pc,fc, prior,f):" ++ showAst (pc,fc, prior,f))
           _ -> cs
 
 -- | Internal function. Initializes DynFlags value for parsing.

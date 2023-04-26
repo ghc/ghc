@@ -255,9 +255,12 @@ mkMaps env instances decls =
              -> ( [(Name, [HsDoc GhcRn])]
                 , [(Name, IntMap (HsDoc GhcRn))]
                 )
-    mappings (L (SrcSpanAnn _ (RealSrcSpan l _)) decl, doc) =
+    mappings (L (EpAnnS anc _ _ ) decl, doc) =
            (dm, am)
       where
+        l = case anc of
+          EpaSpan (RealSrcSpan s _) -> Just s
+          _ -> Nothing
         args = declTypeDocs decl
 
         subs :: [(Name, [HsDoc GhcRn], IntMap (HsDoc GhcRn))]
@@ -269,14 +272,14 @@ mkMaps env instances decls =
         ns = names l decl
         dm = [(n, d) | (n, d) <- zip ns (repeat doc) ++ zip subNs subDocs, not $ all (isEmptyDocString . hsDocString) d]
         am = [(n, args) | n <- ns] ++ zip subNs subArgs
-    mappings (L (SrcSpanAnn _ (UnhelpfulSpan _)) _, _) = ([], [])
 
     instanceMap :: Map RealSrcSpan Name
     instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
 
-    names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
+    names :: Maybe RealSrcSpan -> HsDecl GhcRn -> [Name]
     names _ (InstD _ d) = maybeToList $ lookupSrcSpan (getInstLoc d) instanceMap
-    names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
+    names (Just l) (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
+    names Nothing  (DerivD {}) = []
     names _ decl = getMainDeclBinder env decl
 
 {-
@@ -509,18 +512,19 @@ ungroup group_ =
 -- | Collect docs and attach them to the right declarations.
 --
 -- A declaration may have multiple doc strings attached to it.
-collectDocs :: forall p. UnXRec p => [LHsDecl p] -> [(LHsDecl p, [HsDoc p])]
+-- collectDocs :: forall p. UnXRec p => [LHsDecl p] -> [(LHsDecl p, [HsDoc p])]
+collectDocs :: [LHsDecl GhcRn] -> [(LHsDecl GhcRn, [HsDoc GhcRn])]
 -- ^ This is an example.
 collectDocs = go [] Nothing
   where
     go docs mprev decls = case (decls, mprev) of
-      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (unLoc s:docs) Nothing ds
-      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [unLoc s] Nothing ds
-      ((unXRec @p -> DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (unLoc s:docs) mprev ds
-      (d                                  : ds, Nothing)   -> go docs (Just d) ds
-      (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
-      ([]                                     , Nothing)   -> []
-      ([]                                     , Just prev) -> finished prev docs []
+      ((L _ (DocD _ (DocCommentNext s))) : ds, Nothing)   -> go (unLoc s:docs) Nothing ds
+      ((L _ (DocD _ (DocCommentNext s))) : ds, Just prev) -> finished prev docs $ go [unLoc s] Nothing ds
+      ((L _ (DocD _ (DocCommentPrev s))) : ds, mprev)     -> go (unLoc s:docs) mprev ds
+      (d                                 : ds, Nothing)   -> go docs (Just d) ds
+      (d                                 : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
+      ([]                                    , Nothing)   -> []
+      ([]                                    , Just prev) -> finished prev docs []
 
     finished decl docs rest = (decl, reverse docs) : rest
 

@@ -58,33 +58,33 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T20718.hs:3:8-13 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20718.hs:3:8-13 })
+    ((EpAnnS
+      (EpaSpan { T20718.hs:3:8-13 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: T20718}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T20718.hs:8:1-5 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T20718.hs:8:1-5 })
+    ((EpAnnS
+      (EpaSpan { T20718.hs:8:1-5 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     (ValD
      (NoExtField)
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnn
-                    (EpaSpan { T20718.hs:8:1 })
-                    (NameAnnTrailing
-                     [])
-                    (EpaComments
-                     [])) { T20718.hs:8:1 })
+       ((EpAnnS
+         (EpaSpan { T20718.hs:8:1 })
+         (NameAnnTrailing
+          [])
+         (EpaComments
+          [])))
        (Unqual
         {OccName: x}))
       (MG
@@ -101,12 +101,12 @@
                      (EpaComments
                       [])) { T20718.hs:8:1-5 })
         [(L
-          (SrcSpanAnn (EpAnn
-                       (EpaSpan { T20718.hs:8:1-5 })
-                       (AnnListItem
-                        [])
-                       (EpaComments
-                        [])) { T20718.hs:8:1-5 })
+          ((EpAnnS
+            (EpaSpan { T20718.hs:8:1-5 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (Match
            (EpAnn
             (EpaSpan { T20718.hs:8:1-5 })
@@ -115,12 +115,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnn
-                          (EpaSpan { T20718.hs:8:1 })
-                          (NameAnnTrailing
-                           [])
-                          (EpaComments
-                           [])) { T20718.hs:8:1 })
+             ((EpAnnS
+               (EpaSpan { T20718.hs:8:1 })
+               (NameAnnTrailing
+                [])
+               (EpaComments
+                [])))
              (Unqual
               {OccName: x}))
             (Prefix)
@@ -130,13 +130,11 @@
             (EpaComments
              [])
             [(L
-              (SrcSpanAnn
-               (EpAnn
-                (EpaSpan { T20718.hs:8:3-5 })
-                (NoEpAnns)
-                (EpaComments
-                 []))
-               { T20718.hs:8:3-5 })
+              (EpAnnS
+               (EpaSpan { T20718.hs:8:3-5 })
+               (NoEpAnns)
+               (EpaComments
+                []))
               (GRHS
                (EpAnn
                 (EpaSpan { T20718.hs:8:3-5 })
@@ -147,12 +145,12 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnn
-                             (EpaSpan { T20718.hs:8:5 })
-                             (AnnListItem
-                              [])
-                             (EpaComments
-                              [])) { T20718.hs:8:5 })
+                ((EpAnnS
+                  (EpaSpan { T20718.hs:8:5 })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])))
                 (HsOverLit
                  (EpAnn
                   (EpaSpan { T20718.hs:8:5 })

@@ -1958,7 +1958,7 @@ checkValidInstance ctxt hs_type ty = case tau of
   TyConApp tc inst_tys
     | Just clas <- tyConClass_maybe tc
     -> do
-        { setSrcSpanA head_loc $
+        { setSrcSpan (locA head_loc) $
           checkValidInstHead ctxt clas inst_tys
 
         ; traceTc "checkValidInstance {" (ppr ty)

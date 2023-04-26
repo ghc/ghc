@@ -572,15 +572,15 @@ splitHsFunType ty = go ty
       = let
           (anns, cs, args, res) = splitHsFunType ty
           anns' = anns ++ annParen2AddEpAnn an
-          cs' = cs S.<> epAnnComments (ann l) S.<> epAnnComments an
+          cs' = cs S.<> s_comments l S.<> epAnnComments an
         in (anns', cs', args, res)
 
     go (L ll (HsFunTy (EpAnn _ _ cs) mult x y))
       | (anns, csy, args, res) <- splitHsFunType y
-      = (anns, csy S.<> epAnnComments (ann ll), HsScaled mult x':args, res)
+      = (anns, csy S.<> s_comments ll, HsScaled mult x':args, res)
       where
         L l t = x
-        x' = L (addCommentsToSrcAnn l cs) t
+        x' = L (addCommentsToEpAnnS l cs) t
 
     go other = ([], emptyComments, [], other)
 

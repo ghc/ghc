@@ -989,7 +989,7 @@ instance HasHaddock (LocatedA (HsType GhcPs)) where
 
       -- (Eq a, Num a) => t
       HsQualTy x lhs rhs -> do
-        registerHdkA lhs
+        registerHdkI lhs
         rhs' <- addHaddock rhs
         pure $ L l (HsQualTy x lhs rhs')
 
@@ -1155,8 +1155,11 @@ registerLocHdkA l = HdkA (getBufSpan l) (pure ())
 -- A small wrapper over registerLocHdkA.
 --
 -- See Note [Adding Haddock comments to the syntax tree].
-registerHdkA :: GenLocated (SrcSpanAnn' a) e -> HdkA ()
+registerHdkA :: LocatedAnS a e -> HdkA ()
 registerHdkA a = registerLocHdkA (getLocA a)
+
+registerHdkI :: GenLocated (SrcSpanAnn'  a) e -> HdkA ()
+registerHdkI a = registerLocHdkA (getLocA a)
 
 -- Modify the action of a HdkA computation.
 hoistHdkA :: (HdkM a -> HdkM b) -> HdkA a -> HdkA b
@@ -1517,7 +1520,7 @@ flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
     mapLL (\d -> DocD noExtField d) all_docs
   ]
 
-cmpBufSpanA :: GenLocated (SrcSpanAnn' a1) a2 -> GenLocated (SrcSpanAnn' a3) a2 -> Ordering
+cmpBufSpanA :: LocatedAnS a1 a2 -> LocatedAnS a3 a2 -> Ordering
 cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
 
 {- *********************************************************************

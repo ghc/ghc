@@ -485,7 +485,7 @@ rnExpr (RecordCon { rcon_con = con_id
                             ; return (L l (fld { hfbRHS = arg' }), fvs) }
 
 rnExpr (RecordUpd { rupd_expr = L l expr, rupd_flds = rbinds })
-  = setSrcSpanA l $
+  = setSrcSpan (locA l) $
     case rbinds of
 
       -- 'OverloadedRecordUpdate' is not in effect. Regular record update.
@@ -973,7 +973,7 @@ methodNamesGRHSs (GRHSs _ grhss _) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
 
-methodNamesGRHS :: LocatedAn NoEpAnns (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
+methodNamesGRHS :: LocatedAnS NoEpAnns (GRHS GhcRn (LHsCmd GhcRn)) -> CmdNeeds
 methodNamesGRHS (L _ (GRHS _ _ rhs)) = methodNamesLCmd rhs
 
 ---------------------------------------------------
@@ -1132,13 +1132,13 @@ rnStmtsWithFreeVars mDoExpr@(HsDoStmt MDoExpr{}) rnBody (nonEmpty -> Just stmts)
 
 rnStmtsWithFreeVars ctxt rnBody (lstmt@(L loc _) : lstmts) thing_inside
   | null lstmts
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { lstmt' <- checkLastStmt ctxt lstmt
        ; rnStmt ctxt rnBody lstmt' thing_inside }
 
   | otherwise
   = do { ((stmts1, (stmts2, thing)), fvs)
-            <- setSrcSpanA loc                  $
+            <- setSrcSpan (locA loc)  $
                do { checkStmt ctxt lstmt
                   ; rnStmt ctxt rnBody lstmt $ \ bndrs1 ->
                     rnStmtsWithFreeVars ctxt rnBody lstmts  $ \ bndrs2 ->

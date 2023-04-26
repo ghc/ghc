@@ -196,7 +196,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
     setSrcSpan (getLocA class_name) $
-    do  { clas <- tcLookupLocatedClass (la2la class_name)
+    do  { clas <- tcLookupLocatedClass class_name
 
         -- We make a separate binding for each default method.
         -- At one time I used a single AbsBinds for all of them, thus

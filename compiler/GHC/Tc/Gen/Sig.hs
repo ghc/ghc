@@ -198,13 +198,13 @@ tcTySig (L _ (XSig (IdSig id)))
        ; return [TcIdSig sig] }
 
 tcTySig (L loc (TypeSig _ names sig_ty))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { sigs <- sequence [ tcUserTypeSig (locA loc) sig_ty (Just name)
                           | L _ name <- names ]
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { tpsigs <- sequence [ tcPatSynSig name sig_ty
                             | L _ name <- names ]
        ; return (map TcPatSynSig tpsigs) }
@@ -644,7 +644,7 @@ addInlinePrags poly_id prags_for_me
             -- and inl2 is a user NOINLINE pragma; we don't want to complain
          warn_multiple_inlines inl2 inls
        | otherwise
-       = setSrcSpanA loc $
+       = setSrcSpan (locA loc) $
          let dia = TcRnMultipleInlinePragmas poly_id inl1 (inl2 NE.:| inls)
          in addDiagnosticTc dia
 

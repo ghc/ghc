@@ -1280,8 +1280,6 @@ type instance XCRoleAnnotDecl GhcTc = NoExtField
 
 type instance XXRoleAnnotDecl (GhcPass _) = DataConCantHappen
 
-type instance Anno (Maybe Role) = SrcAnn NoEpAnns
-
 instance OutputableBndr (IdP (GhcPass p))
        => Outputable (RoleAnnotDecl (GhcPass p)) where
   ppr (RoleAnnotDecl _ ltycon roles)
@@ -1336,7 +1334,7 @@ type instance Anno (WarnDecls (GhcPass p)) = SrcSpanAnnA
 type instance Anno (WarnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (AnnDecl (GhcPass p)) = SrcSpanAnnA
 type instance Anno (RoleAnnotDecl (GhcPass p)) = SrcSpanAnnA
-type instance Anno (Maybe Role) = SrcAnn NoEpAnns
+type instance Anno (Maybe Role) = EpAnnS NoEpAnns
 type instance Anno CCallConv   = SrcSpan
 type instance Anno Safety      = SrcSpan
 type instance Anno CExportSpec = SrcSpan

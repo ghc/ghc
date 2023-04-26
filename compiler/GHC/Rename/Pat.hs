@@ -154,7 +154,7 @@ liftCpsWithCont = CpsRn
 wrapSrcSpanCps :: (a -> CpsRn b) -> LocatedA a -> CpsRn (LocatedA b)
 -- Set the location, and also wrap it around the value returned
 wrapSrcSpanCps fn (L loc a)
-  = CpsRn (\k -> setSrcSpanA loc $
+  = CpsRn (\k -> setSrcSpan (locA loc) $
                  unCpsRn (fn a) $ \v ->
                  k (L loc v))
 
@@ -556,7 +556,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
-  = do { new_name <- newPatName mk (la2la rdr)
+  = do { new_name <- newPatName mk rdr
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
@@ -793,7 +793,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                               { hfbLHS = L loc (FieldOcc _ (L ll lbl))
                               , hfbRHS = arg
                               , hfbPun = pun }))
-      = do { sel <- setSrcSpanA loc $ lookupRecFieldOcc parent lbl
+      = do { sel <- setSrcSpan (locA loc) $ lookupRecFieldOcc parent lbl
            ; let arg_rdr = mkRdrUnqual $ recFieldToVarOcc $ occName sel
                  -- Discard any module qualifier (#11662)
            ; arg' <- if pun
@@ -945,7 +945,7 @@ rnHsRecUpdFields flds
                                  , hfbPun = pun })):flds)
         = do { let lbl = ambiguousFieldOccRdrName f
              ; (arg' :: LHsExpr GhcPs) <- if pun
-                       then do { setSrcSpanA loc $
+                       then do { setSrcSpan (locA loc) $
                                  checkErr pun_ok (TcRnIllegalFieldPunning (L (locA loc) lbl))
                                  -- Discard any module qualifier (#11662)
                                ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)

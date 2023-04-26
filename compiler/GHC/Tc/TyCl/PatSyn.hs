@@ -83,7 +83,7 @@ tcPatSynDecl :: LocatedA (PatSynBind GhcRn GhcRn)
              -> TcPragEnv -- See Note [Pragmas for pattern synonyms]
              -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcPatSynDecl (L loc psb@(PSB { psb_id = L _ name })) sig_fn prag_fn
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
     recoverM (recoverPSB psb) $

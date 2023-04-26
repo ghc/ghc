@@ -1722,7 +1722,7 @@ kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
   -- Called only for declarations without a signature (no CUSKs or SAKs here)
 kcLTyClDecl (L loc decl)
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { tycon <- tcLookupTcTyCon tc_name   -- Always a MonoTcTyCon
        ; traceTc "kcTyClDecl {" (ppr tc_name)
        ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
@@ -2523,7 +2523,7 @@ tcTyClDecl roles_info (L loc decl)
       _ -> pprPanic "tcTyClDecl" (ppr thing)
 
   | otherwise
-  = setSrcSpanA loc $ tcAddDeclCtxt decl $
+  = setSrcSpan (locA loc) $ tcAddDeclCtxt decl $
     do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
        ; (tc, deriv_infos) <- tcTyClDecl1 Nothing roles_info decl
        ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
@@ -2732,7 +2732,7 @@ tcDefaultAssocDecl fam_tc
                                    , feqn_pats  = hs_pats
                                    , feqn_rhs   = hs_rhs_ty }})]
   = -- See Note [Type-checking default assoc decls]
-    setSrcSpanA loc $
+    setSrcSpan (locA loc) $
     tcAddFamInstCtxt (text "default type instance") tc_name $
     do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
@@ -3007,7 +3007,7 @@ tcInjectivity _ Nothing
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
 tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
        -- Fail eagerly to avoid reporting injectivity errors when
@@ -3161,7 +3161,7 @@ kcTyFamInstEqn tc_fam_tc
                    , feqn_bndrs = outer_bndrs
                    , feqn_pats  = hs_pats
                    , feqn_rhs   = hs_rhs_ty }))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
            , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
@@ -3192,7 +3192,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                    , feqn_bndrs  = outer_bndrs
                    , feqn_pats   = hs_pats
                    , feqn_rhs    = hs_rhs_ty }))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr loc, ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
@@ -5173,7 +5173,7 @@ checkValidRoleAnnots role_annots tc
           TcRnMissingRoleAnnotation name vis_roles
       Just (decl@(L loc (RoleAnnotDecl _ _ the_role_annots))) ->
           addRoleAnnotCtxt name $
-          setSrcSpanA loc $ do
+          setSrcSpan (locA loc) $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
           ; unless role_annots_ok $ addErrTc $ TcRnRoleAnnotationsDisabled tc
           ; checkTc (vis_vars `equalLength` the_role_annots)
@@ -5227,7 +5227,7 @@ checkValidRoleAnnots role_annots tc
 -- Expected 0, got 1:
 --
 
-checkRoleAnnot :: TyVar -> LocatedAn NoEpAnns (Maybe Role) -> Role -> TcM ()
+checkRoleAnnot :: TyVar -> LocatedAnS NoEpAnns (Maybe Role) -> Role -> TcM ()
 checkRoleAnnot _  (L _ Nothing)   _  = return ()
 checkRoleAnnot tv (L _ (Just r1)) r2
   = when (r1 /= r2) $
@@ -5404,7 +5404,7 @@ classOpCtxt sel_id tau = sep [text "When checking the class method:",
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
 illegalRoleAnnotDecl (L loc role)
   = setErrCtxt [] $
-    setSrcSpanA loc $
+    setSrcSpan (locA loc) $
     addErrTc $ TcRnIllegalRoleAnnotation role
 
 addTyConCtxt :: TyCon -> TcM a -> TcM a

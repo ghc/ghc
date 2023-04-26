@@ -20,22 +20,22 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T23315.hsig:1:11-16 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T23315.hsig:1:11-16 })
+    ((EpAnnS
+      (EpaSpan { T23315.hsig:1:11-16 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     {ModuleName: T23315}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T23315.hsig:2:1-12 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T23315.hsig:2:1-12 })
+    ((EpAnnS
+      (EpaSpan { T23315.hsig:2:1-12 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     (DocD
      (NoExtField)
      (DocCommentNext
@@ -52,12 +52,12 @@
           []))
         [])))))
   ,(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T23315.hsig:3:1-7 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T23315.hsig:3:1-7 })
+    ((EpAnnS
+      (EpaSpan { T23315.hsig:3:1-7 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     (SigD
      (NoExtField)
      (TypeSig
@@ -69,34 +69,34 @@
        (EpaComments
         []))
       [(L
-        (SrcSpanAnn (EpAnn
-                     (EpaSpan { T23315.hsig:3:1 })
-                     (NameAnnTrailing
-                      [])
-                     (EpaComments
-                      [])) { T23315.hsig:3:1 })
+        ((EpAnnS
+          (EpaSpan { T23315.hsig:3:1 })
+          (NameAnnTrailing
+           [])
+          (EpaComments
+           [])))
         (Unqual
          {OccName: a}))]
       (HsWC
        (NoExtField)
        (L
-        (SrcSpanAnn (EpAnn
-                     (EpaSpan { T23315.hsig:3:6-7 })
-                     (AnnListItem
-                      [])
-                     (EpaComments
-                      [])) { T23315.hsig:3:6-7 })
+        ((EpAnnS
+          (EpaSpan { T23315.hsig:3:6-7 })
+          (AnnListItem
+           [])
+          (EpaComments
+           [])))
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
          (L
-          (SrcSpanAnn (EpAnn
-                       (EpaSpan { T23315.hsig:3:6-7 })
-                       (AnnListItem
-                        [])
-                       (EpaComments
-                        [])) { T23315.hsig:3:6-7 })
+          ((EpAnnS
+            (EpaSpan { T23315.hsig:3:6-7 })
+            (AnnListItem
+             [])
+            (EpaComments
+             [])))
           (HsTupleTy
            (EpAnn
             (EpaSpan { T23315.hsig:3:6-7 })
@@ -109,12 +109,12 @@
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L
-    (SrcSpanAnn (EpAnn
-                 (EpaSpan { T23315.hsig:4:1-14 })
-                 (AnnListItem
-                  [])
-                 (EpaComments
-                  [])) { T23315.hsig:4:1-14 })
+    ((EpAnnS
+      (EpaSpan { T23315.hsig:4:1-14 })
+      (AnnListItem
+       [])
+      (EpaComments
+       [])))
     (DocD
      (NoExtField)
      (DocCommentPrev

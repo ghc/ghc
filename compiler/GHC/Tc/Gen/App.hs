@@ -144,7 +144,7 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   | (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
-    setSrcSpanA loc     $
+    setSrcSpan (locA loc) $
     do { do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
        ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
@@ -777,12 +777,12 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
   = do { in_generated_code <- inGeneratedCode
        ; case ctxt of
            VACall fun arg_no _ | not in_generated_code
-             -> setSrcSpanA arg_loc                    $
+             -> setSrcSpan (locA arg_loc)              $
                 addErrCtxt (funAppCtxt fun arg arg_no) $
                 thing_inside
 
-           _ -> setSrcSpanA arg_loc $
-                addExprCtxt arg     $  -- Auto-suppressed if arg_loc is generated
+           _ -> setSrcSpan (locA arg_loc) $
+                addExprCtxt arg  $  -- Auto-suppressed if arg_loc is generated
                 thing_inside }
 
 {- *********************************************************************

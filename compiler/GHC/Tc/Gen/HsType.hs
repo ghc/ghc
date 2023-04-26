@@ -461,7 +461,7 @@ tc_lhs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- Returns also an implication for the unsolved constraints
 tc_lhs_sig_type skol_info full_hs_ty@(L loc (HsSig { sig_bndrs = hs_outer_bndrs
                                                    , sig_body = hs_ty })) ctxt_kind
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { (tc_lvl, wanted, (exp_kind, (outer_bndrs, ty)))
               <- pushLevelAndSolveEqualitiesX "tc_lhs_sig_type" $
                  -- See Note [Failure in local type signatures]
@@ -603,7 +603,7 @@ tc_top_lhs_type :: TypeOrKind -> UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Used for both types and kinds
 tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
                                                , sig_body = body }))
-  = setSrcSpanA loc $
+  = setSrcSpan (locA loc) $
     do { traceTc "tc_top_lhs_type {" (ppr sig_ty)
        ; skol_info <- mkSkolemInfo skol_info_anon
        ; (tclvl, wanted, (outer_bndrs, ty))
@@ -663,7 +663,7 @@ tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
       Just (L loc ds) ->
-        setSrcSpanA loc $ do
+        setSrcSpan (locA loc) $ do
           (ds', tvs) <- tc_deriv_strategy ds
           pure (Just (L loc ds'), tvs)
   where
@@ -842,7 +842,7 @@ tcInferLHsTypeKind :: LHsType GhcRn -> TcM (TcType, TcKind)
 -- Eagerly instantiate any trailing invisible binders
 tcInferLHsTypeKind lhs_ty@(L loc hs_ty)
   = addTypeCtxt lhs_ty $
-    setSrcSpanA loc    $  -- Cover the tcInstInvisibleTyBinders
+    setSrcSpan (locA loc)    $  -- Cover the tcInstInvisibleTyBinders
     do { (res_ty, res_kind) <- tc_infer_hs_type typeLevelMode hs_ty
        ; tcInstInvisibleTyBinders res_ty res_kind }
   -- See Note [Do not always instantiate eagerly in types]
@@ -1020,7 +1020,7 @@ missing any patterns.
 -- level.
 tc_infer_lhs_type :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 tc_infer_lhs_type mode (L span ty)
-  = setSrcSpanA span $
+  = setSrcSpan (locA span) $
     tc_infer_hs_type mode ty
 
 ---------------------------
@@ -1140,7 +1140,7 @@ tcLHsType hs_ty exp_kind
 
 tc_lhs_type :: TcTyMode -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_lhs_type mode (L span ty) exp_kind
-  = setSrcSpanA span $
+  = setSrcSpan (locA span) $
     tc_hs_type mode ty exp_kind
 
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
@@ -1239,7 +1239,7 @@ tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
                     [] -> (liftedTypeKind, BoxedTuple)
          -- In the [] case, it's not clear what the kind is, so guess *
 
-       ; tys' <- sequence [ setSrcSpanA loc $
+       ; tys' <- sequence [ setSrcSpan (locA loc) $
                             checkExpectedKind hs_ty ty kind arg_kind
                           | ((L loc hs_ty),ty,kind) <- zip3 hs_tys tys kinds ]
 
@@ -4013,7 +4013,7 @@ tcPartialContext _ Nothing = return ([], Nothing)
 tcPartialContext mode (Just (L _ hs_theta))
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc ty@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
-  = do { wc_tv_ty <- setSrcSpanA wc_loc $
+  = do { wc_tv_ty <- setSrcSpan (locA wc_loc) $
                      tcAnonWildCardOcc YesExtraConstraint mode ty constraintKind
        ; theta <- mapM (tc_lhs_pred mode) hs_theta1
        ; return (theta, Just wc_tv_ty) }

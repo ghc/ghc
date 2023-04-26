@@ -343,7 +343,7 @@ instance Diagnostic TcRnMessage where
                2 (vcat $ map pprLBind . bagToList $ binds)
           where
             pprLoc loc = parens (text "defined at" <+> ppr loc)
-            pprLBind :: CollectPass GhcRn => GenLocated (SrcSpanAnn' a) (HsBindLR GhcRn idR) -> SDoc
+            pprLBind :: CollectPass GhcRn => LocatedAnS a (HsBindLR GhcRn idR) -> SDoc
             pprLBind (L loc bind) = pprWithCommas ppr (collectHsBindBinders CollNoDictBinders bind)
                                         <+> pprLoc (locA loc)
     TcRnPartialTypeSigTyVarMismatch n1 n2 fn_name hs_ty

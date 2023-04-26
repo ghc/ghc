@@ -608,7 +608,7 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
 deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
-  = setSrcSpanA loc                       $
+  = setSrcSpan (locA loc)                 $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
