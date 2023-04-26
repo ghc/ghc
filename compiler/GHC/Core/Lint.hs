@@ -3210,7 +3210,7 @@ varCallSiteUsage :: Id -> LintM UsageEnv
 varCallSiteUsage id =
   do m <- getUEAliases
      return $ case lookupNameEnv m (getName id) of
-         Nothing    -> unitUE id OneTy
+         Nothing    -> singleUsageUE id
          Just id_ue -> id_ue
 
 ensureEqTys :: LintedType -> LintedType -> SDoc -> LintM ()
