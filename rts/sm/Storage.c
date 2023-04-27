@@ -965,7 +965,7 @@ move_STACK (StgStack *src, StgStack *dest)
     dest->sp = (StgPtr)dest->sp + diff;
 }
 
-STATIC_INLINE void
+void
 accountAllocation(Capability *cap, W_ n)
 {
     TICK_ALLOC_HEAP_NOCTR(WDS(n));

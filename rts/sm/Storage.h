@@ -125,6 +125,8 @@ StgWord genLiveBlocks (generation *gen);
 StgWord calcTotalLargeObjectsW (void);
 StgWord calcTotalCompactW (void);
 
+void accountAllocation(Capability *cap, W_ n);
+
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals
    ------------------------------------------------------------------------- */
