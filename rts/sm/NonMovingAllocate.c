@@ -253,5 +253,9 @@ void *nonmovingAllocateGC(Capability *cap, StgWord sz)
 GNUC_ATTR_HOT
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
+    // Handle "bytes allocated" accounting in the same way we
+    // do in Storage.c:allocate. See #23312.
+    accountAllocation(cap, sz);
+    cap->total_allocated += sz;
     return nonmovingAllocate_(SM_LOCK, cap, sz);
 }
