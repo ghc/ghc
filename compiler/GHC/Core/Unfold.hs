@@ -234,6 +234,7 @@ inlineBoringOk e
     go credit (Case scrut _ _ [Alt _ _ rhs]) -- See Note [Inline unsafeCoerce]
       | isUnsafeEqualityProof scrut        = go credit rhs
     go _      (Var {})                     = boringCxtOk
+    go _      (Lit l)                      = litIsTrivial l && boringCxtOk
     go _      _                            = boringCxtNotOk
 
 calcUnfoldingGuidance
