@@ -1053,18 +1053,11 @@ notWorthFloating e abs_vars
     go (Cast e _)  n = go e n
     go (App e arg) n
        -- See Note [Floating applications to coercions]
-       | Type {} <- arg = go e n
-       | n==0           = False
-       | is_triv arg    = go e (n-1)
-       | otherwise      = False
-    go _ _              = False
-
-    is_triv (Lit {})              = True        -- Treat all literals as trivial
-    is_triv (Var {})              = True        -- (ie not worth floating)
-    is_triv (Cast e _)            = is_triv e
-    is_triv (App e (Type {}))     = is_triv e   -- See Note [Floating applications to coercions]
-    is_triv (Tick t e)            = not (tickishIsCode t) && is_triv e
-    is_triv _                     = False
+       | Type {} <- arg    = go e n
+       | n==0              = False
+       | exprIsTrivial arg = go e (n-1)
+       | otherwise         = False
+    go _ _                 = False
 
 {-
 Note [Floating literals]
