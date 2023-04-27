@@ -1115,7 +1115,7 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     -- squash_pair_fn = \ ((env1_ids), ~(rec_ids)) -> (env_ids)
 
-    rec_id <- newSysLocalDs (LambdaBound ManyTy) rec_ty -- ROMES:TODO: seems like ti would be let here... didn't inspect
+    rec_id <- newSysLocalDs (LambdaBound ManyTy) rec_ty -- ROMES:TODO: It's lambda here because of call to mkBigTupleSelector which uses rec_id as case_binder? at least while we don't have a notion of case bound variables
     let
         env1_id_set = fv_stmts `uniqDSetMinusUniqSet` rec_id_set
         env1_ids = dVarSetElems env1_id_set

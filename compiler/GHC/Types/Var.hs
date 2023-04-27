@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns #-}
+             PatternSynonyms, BangPatterns, GADTs #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |
@@ -54,6 +54,7 @@ module GHC.Types.Var (
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
         idInfo, idDetails,
+        idScope, ppr_id_scope, -- ROMES: Todoremove
         lazySetIdInfo, setIdDetails, globaliseId,
         setIdExported, setIdNotExported, setIdBinding,
         updateIdTypeButNotMults,
@@ -109,6 +110,7 @@ module GHC.Types.Var (
         ) where
 
 import GHC.Prelude
+import GHC.Stack (callStack)
 
 import {-# SOURCE #-}   GHC.Core.UsageEnv ( UsageEnv, nonDetMults, mapUE, mapUEM )
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing )
@@ -269,22 +271,25 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
+        -- ROMES:TODO: merge binding and scope?
         idBinding  :: IdBinding,        -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
 
-data IdBinding
-  = LambdaBound !Mult -- ^ includes lambda-bound and constructor fields---pattern bound
-  | LetBound UsageEnv -- ^ a local let binding has a usage env bc it might have free linear variables in its body
-  | GlobalBinding -- ^ Romes:Always Many multiplicity? (global let binding cannot have free linear variables in its body)
+data IdBinding where
+  LambdaBound :: !Mult -> IdBinding -- ^ includes lambda-bound and constructor fields---pattern bound
+  LetBound    :: HasCallStack => UsageEnv -> IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
+  -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
+  -- Might no longer make sense to merge with IdScope at all
 
 instance Outputable IdBinding where
   ppr (LambdaBound m) = text "LambdaBound" <+> ppr m
-  ppr (LetBound ue)   = text "LetBound UsageEnv" -- <+> ppr ue
-  ppr (GlobalBinding)   = text "GlobalBinding" -- <+> ppr ue
+  ppr (LetBound ue)   = text "LetBound" <+> ppr (nonDetMults ue) <+> prettyCallStackDoc callStack
 
 -- | Identifier Scope
+-- ROMES:TODO: Merge with IdBinding and extend Note [GlobalId/LocaLId]
+-- The note makes it clear that all bindings have a provenance as such...?
 data IdScope    -- See Note [GlobalId/LocalId]
   = GlobalId
   | LocalId ExportFlag
@@ -420,7 +425,8 @@ varUnique var = mkUniqueGrimily (realUnique var)
 -- in Note [Multiplicity of let binders]
 varMultMaybe :: Var -> Maybe Mult
 varMultMaybe (Id { idBinding = LambdaBound mult }) = Just mult
-varMultMaybe _ = Nothing
+varMultMaybe (Id { idBinding = LetBound mult }) = pprTrace "varMultMaybe:failed" (prettyCallStackDoc callStack) $ Nothing
+varMultMaybe _ = pprTrace "varMultMaybe:NotAnId" empty $ Nothing
 
 -- | Returns all the multiplicities from a variable
 -- In the case of a lambda bound var, this will be the only multiplicity, in
@@ -430,7 +436,6 @@ varMults (Id { idBinding = idB }) =
   case idB of
     LambdaBound x -> [x]
     LetBound ue -> nonDetMults ue -- the order of the multiplicities does not matter
-    GlobalBinding -> []
 varMults _ = panic "varMults"
 
 setVarUnique :: Var -> Unique -> Var
@@ -1219,7 +1224,6 @@ updateIdTypeAndMults f id@(Id { varType = ty
     !binding' = case binding of
                   LambdaBound mult -> LambdaBound (f mult)
                   LetBound ue      -> LetBound (mapUE f ue)
-                  GlobalBinding    -> GlobalBinding
 updateIdTypeAndMults _ other = pprPanic "updateIdTypeAndMult" (ppr other)
 
 -- | As 'updateIdTypeAndMults' -- the monadic version.
@@ -1230,7 +1234,6 @@ updateIdTypeAndMultsM f id@(Id { varType = ty
        ; !binding' <- case binding of
                         LambdaBound mult -> LambdaBound <$> f mult
                         LetBound ue      -> LetBound    <$> mapUEM f ue
-                        GlobalBinding    -> pure GlobalBinding
        ; return (id { varType = ty', idBinding = binding' }) }
 updateIdTypeAndMultsM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 

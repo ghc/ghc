@@ -528,7 +528,7 @@ unfold_coerce bndrs lhs rhs = do
             let ty' = mkTyConApp eqReprPrimTyCon [k, k, t1, t2]
                 v'  = mkLocalCoVar
                         (mkDerivedInternalName mkRepEqOcc u (getName v))
-                        (LetBound zeroUE) ty'
+                        (LambdaBound ManyTy) ty'
                 box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
                       [k, t1, t2] `App`
                       Coercion (mkCoVarCo v')

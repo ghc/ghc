@@ -166,7 +166,7 @@ import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv (UsageEnv)
+import GHC.Core.UsageEnv
 
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -211,29 +211,28 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
-idMult :: Id -> Mult
+idMult :: HasCallStack => Id -> Mult
 idMult x = case Var.varMultMaybe x of
-             Nothing   -> pprPanic "idMult" (ppr x)
+             Nothing   -> pprPanic "idMult" (ppr x <+> ppr (Var.idDetails x) <+> Var.ppr_id_scope (Var.idScope x) <+> ppr (Var.idBinding x))
              Just mult -> mult
 
 idUsageEnv :: Id -> UsageEnv
 idUsageEnv x = case Var.idBinding x of
              LambdaBound _ -> pprPanic "idUsageEnv" (ppr x)
              LetBound ue -> ue
-             GlobalBinding -> pprPanic "idUsageEnv" (ppr x)
 
 -- ROMES: Scaled Types seem to be used mainly in data cons; I think Scaled
 -- things remain as they are, bc they seem to only occur in places where the Id is definitely a lambda bound (or datacon, which would be the same) variable
-idScaledType :: Id -> Scaled Type
+idScaledType :: HasCallStack => Id -> Scaled Type
 idScaledType id = Scaled (idMult id) (idType id)
 
 -- | ROMES:TODO: For now, we keep scaling as is where it is used, but I think
 -- some occurrences might no longer need scaling like this
--- (see Note [Scaling in case-of-case] and other usage sites)
+-- (update Note [Scaling in case-of-case] and other usage sites)
 scaleIdBy :: Mult -> Id -> Id
-scaleIdBy m id = case Var.varMultMaybe id of
-                   Nothing -> panic "ROMES:TODO: Trying to scale let-bound Id. This should be possible, its just not implemented yet"
-                   Just idMult -> setIdBinding id (LambdaBound (m `mkMultMul` idMult))
+scaleIdBy m id = case Var.idBinding id of
+                   LetBound   ue -> setIdBinding id (LetBound (mapUE (m `mkMultMul`) ue))
+                   LambdaBound w -> setIdBinding id (LambdaBound (m `mkMultMul` w))
 
 -- | Like 'scaleIdBy', but skips non-Ids. Useful for scaling
 -- a mixed list of ids and tyvars.
@@ -401,14 +400,14 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) GlobalBinding ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) (LetBound zeroUE) ty -- Top-level binding is a closed let-bound expression, hence zeroUE
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkScaledTemplateLocal i (unrestricted ty)
 
 mkScaledTemplateLocal :: Int -> Scaled Type -> Id
-mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (LambdaBound w) ty -- ROMES:...Scaled things are always lambda bound
+mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (LambdaBound w) ty -- ROMES:...Scaled things are always lambda bound?
    -- "OrCoVar" since this is used in a superclass selector,
    -- and "~" and "~~" have coercion "superclasses".
 

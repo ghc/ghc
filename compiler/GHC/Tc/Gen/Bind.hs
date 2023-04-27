@@ -251,7 +251,7 @@ tcHsBootSigs binds sigs
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
 ------------------------
-tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
+tcLocalBinds :: HasCallStack => HsLocalBinds GhcRn -> TcM thing
              -> TcM (HsLocalBinds GhcTc, thing)
 
 tcLocalBinds (EmptyLocalBinds x) thing_inside
@@ -298,7 +298,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
-tcValBinds :: TopLevelFlag
+tcValBinds :: HasCallStack => TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
            -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
@@ -335,7 +335,7 @@ tcValBinds top_lvl binds sigs thing_inside
     prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
 
 ------------------------
-tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
+tcBindGroups :: HasCallStack => TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
              -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 -- Typecheck a whole lot of value bindings,
@@ -375,7 +375,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 --
 
 ------------------------
-tc_group :: forall thing.
+tc_group :: forall thing. HasCallStack =>
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
          -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
@@ -439,7 +439,7 @@ recursivePatSynErr
 recursivePatSynErr loc binds
   = failAt loc $ TcRnRecursivePatternSynonym binds
 
-tc_single :: forall thing.
+tc_single :: forall thing. HasCallStack =>
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTc, thing)
@@ -489,7 +489,7 @@ mkEdges sig_fn binds
                                      , bndr <- collectHsBindBinders CollNoDictBinders bind ]
 
 ------------------------
-tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
+tcPolyBinds :: HasCallStack => TopLevelFlag -> TcSigFun -> TcPragEnv
             -> RecFlag         -- Whether the group is really recursive
             -> RecFlag         -- Whether it's recursive after breaking
                                -- dependencies based on type signatures
@@ -710,7 +710,7 @@ it's all cool; each signature has distinct type variables from the renamer.)
 ********************************************************************* -}
 
 tcPolyInfer
-  :: RecFlag       -- Whether it's recursive after breaking
+  :: HasCallStack => RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
@@ -1278,16 +1278,15 @@ for a non-overloaded function.
                          tcMonoBinds
 *                                                                      *
 ************************************************************************
-
-@tcMonoBinds@ deals with a perhaps-recursive group of HsBinds.
-The signatures have been dealt with already.
 -}
 
 data MonoBindInfo = MBI { mbi_poly_name :: Name
                         , mbi_sig       :: Maybe TcIdSigInst
                         , mbi_mono_id   :: TcId }
 
-tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking purposes
+-- | @tcMonoBinds@ deals with a perhaps-recursive group of HsBinds.
+-- The signatures have been dealt with already.
+tcMonoBinds :: HasCallStack => RecFlag  -- Whether the binding is recursive for typechecking purposes
                         -- i.e. the binders are mentioned in their RHSs, and
                         --      we are not rescued by a type signature
             -> TcSigFun -> LetBndrSpec
@@ -1311,7 +1310,7 @@ tcMonoBinds is_rec sig_fn no_gen
                           -- function so that in type error messages we show the
                           -- type of the thing whose rhs we are type checking
                        tcMatchesFun (L nm_loc name) matches exp_ty
-       ; mono_id <- newLetBndr no_gen name zeroUE rhs_ty' -- ROMES:TODO: zeroUE!
+        ; mono_id <- newLetBndr no_gen name zeroUE rhs_ty' -- ROMES:TODO: zeroUE!
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,

@@ -118,9 +118,9 @@ isJoinBC (BC_Join {}) = True
 *                                                                      *
                 The SimplCont and DupFlag types
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
-A SimplCont allows the simplifier to traverse the expression in a
+{- | A SimplCont allows the simplifier to traverse the expression in a
 zipper-like fashion.  The SimplCont represents the rest of the expression,
 "above" the point of interest.
 
@@ -138,8 +138,7 @@ Key points:
     evaluation contexts do).  E.g. Just [] is not a SimplCont
 
   * A SimplCont describes a context that *does not* bind
-    any variables.  E.g. \x. [] is not a SimplCont
--}
+    any variables.  E.g. \x. [] is not a SimplCont -}
 
 data SimplCont
   = Stop                -- ^ Stop[e] = e
@@ -527,13 +526,15 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 -- The scaling factor at the hole of E[] is used to determine how a binder
 -- should be scaled if it commutes with E. This appears, in particular, in the
 -- case-of-case transformation.
-contHoleScaling :: SimplCont -> Mult
+contHoleScaling :: HasCallStack => SimplCont -> Mult
 contHoleScaling (Stop _ _ _) = OneTy
 contHoleScaling (CastIt _ k) = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
-  = idMult id `mkMultMul` contHoleScaling k
+  -- = idMult id `mkMultMul` contHoleScaling k
+  = contHoleScaling k -- ROMES:TODO!!!: Scaling doesn't make that much sense for now that some variables we might not have a multiplicity per say
 contHoleScaling (Select { sc_bndr = id, sc_cont = k })
-  = idMult id `mkMultMul` contHoleScaling k
+  -- = idMult id `mkMultMul` contHoleScaling k
+  = contHoleScaling k
 contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
   = w `mkMultMul` contHoleScaling k
   where
@@ -2530,7 +2531,8 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
   , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        <- stripTicksTop tickishFloatable deflt_rhs
   , inner_scrut_var == outer_bndr
-  = do  { tick (CaseMerge outer_bndr)
+  = pprTrace "mkCase" (ppr outer_bndr <+> ppr (idBinding outer_bndr) <+> ppr inner_bndr <+> ppr (idBinding inner_bndr)) $
+    do  { tick (CaseMerge outer_bndr)
 
         ; let wrap_alt (Alt con args rhs) = assert (outer_bndr `notElem` args)
                                             (Alt con args (wrap_rhs rhs))
@@ -2709,7 +2711,7 @@ in GHC.Core.Opt.ConstantFold)
 --      Catch-all
 --------------------------------------------------
 mkCase3 _mode scrut bndr alts_ty alts
-  = return (Case scrut bndr alts_ty alts)
+  = pprTrace "mkCase3" (ppr bndr <+> ppr (idBinding bndr)) $ return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in
 -- GHC.Core.Opt.Exitify

@@ -36,11 +36,11 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad
 import GHC.Utils.Logger as Logger
-import GHC.Utils.Misc      ( count )
+import GHC.Utils.Misc      ( count, HasCallStack )
 import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
-import GHC.Core.Multiplicity        ( pattern ManyTy )
+import GHC.Core.UsageEnv   ( zeroUE )
 import GHC.Exts( oneShot )
 
 {-
@@ -209,7 +209,7 @@ newId :: FastString -> IdBinding -> Type -> SimplM Id
 newId fs w ty = mkSysLocalOrCoVarM fs w ty
 
 -- | Make a join id with given type and arity but without call-by-value annotations.
-newJoinId :: [Var] -> Type -> SimplM Id
+newJoinId :: HasCallStack => [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty
   = do { uniq <- getUniqueM
        ; let name       = mkSystemVarName uniq (fsLit "$j")
@@ -221,7 +221,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name (LambdaBound ManyTy) join_id_ty id_info) } -- ROMES: What are the IdBindings of JoinPoints? We are not taking them into account, yet?
+       ; return (mkLocalVar details name (LetBound zeroUE) join_id_ty id_info) } -- ROMES:TODO: What are the IdBindings of JoinPoints? Should we consider them explicitly for join points or treat as lets?
 
 {-
 ************************************************************************

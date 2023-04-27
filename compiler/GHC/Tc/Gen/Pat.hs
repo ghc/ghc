@@ -253,7 +253,7 @@ tcPatBndr _ bndr_name pat_ty
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
-newLetBndr :: LetBndrSpec -> Name -> UsageEnv -> TcType -> TcM TcId
+newLetBndr :: HasCallStack => LetBndrSpec -> Name -> UsageEnv -> TcType -> TcM TcId
 -- Make up a suitable Id for the pattern-binder.
 -- See Note [Typechecking pattern bindings], item (4) in GHC.Tc.Gen.Bind
 --

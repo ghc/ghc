@@ -755,7 +755,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs (LambdaBound ManyTy) tuple_ty -- ROMES:TODO: selector binders are lambda bound?
+  = do { tuple_var  <- newSysLocalDs (LambdaBound ManyTy) tuple_ty -- ROMES:TODO: selector binders are lambda bound? yes since they're used ahead in mkBigTupleSelectorSolo?
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr

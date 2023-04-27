@@ -29,6 +29,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv (zeroUE)
 
 import GHC.Types.Id
 import GHC.Types.Id.Make
@@ -366,7 +367,7 @@ dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal (fsLit "$wccall") work_uniq GlobalBinding worker_ty
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq (LetBound zeroUE) worker_ty -- Top level ids are closed so have zeroUE
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args

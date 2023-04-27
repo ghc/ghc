@@ -1850,6 +1850,9 @@ GHC.Core.Multiplicity above this module.
 -}
 
 -- | A shorthand for data with an attached 'Mult' element (the multiplicity).
+-- ROMES:TODO: We need to give correct semantics to Scaled, It no longer makes
+-- sense for Scaled to have a Mult.  Either it has a list of Mults, or the only
+-- things that can be Scaled are somehow LambdaBound...
 data Scaled a = Scaled !Mult a
   deriving (Data.Data)
   -- You might think that this would be a natural candidate for

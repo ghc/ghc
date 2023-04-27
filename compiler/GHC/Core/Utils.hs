@@ -157,12 +157,13 @@ coreAltsType :: [CoreAlt] -> Type
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "coreAltsType"
 
-mkLamType  :: HasDebugCallStack => Var -> Type -> Type
+-- mkLamType  :: HasDebugCallStack => Var -> Type -> Type
+mkLamType  :: HasCallStack => Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
 -- Always uses Inferred binders.
-mkLamTypes :: [Var] -> Type -> Type
+mkLamTypes :: HasCallStack => [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v body_ty
@@ -174,15 +175,16 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v Required) body_ty
 
    | otherwise
-   = mkFunctionType mult (varType v) body_ty
+   = pprTrace "mkLamType" (ppr $ idBinding v) $ mkFunctionType mult (varType v) body_ty
      where
        mult = case varMultMaybe v of
                 -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
                 -- ... it could prove pretty invasive...
-                Nothing -> panic "mkLamType: lambda bound var should be annotated with LambdaBound"
+                Nothing -> pprPanic "mkLamType" (ppr v <+> ppr (idBinding v))
+                  -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
                 Just m  -> m
 
-mkLamTypes vs ty = foldr mkLamType ty vs
+mkLamTypes vs ty = pprTrace "mkLamTypes" (ppr vs) $ foldr mkLamType ty vs
 
 {-
 Note [Type bindings]
@@ -510,10 +512,10 @@ bindNonRec bndr rhs body
   | isCoVar bndr                       = if isCoArg rhs then let_bind
     {- See Note [Binding coercions] -}                  else case_bind
   | isJoinId bndr                      = let_bind
-  | needsCaseBinding (idType bndr) rhs = case_bind
+  | needsCaseBinding (idType bndr) rhs = pprTrace "bindNonRec:needsCaseBinding:" (ppr bndr <+> ppr (idBinding bndr)) case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs bndr body
+    case_bind = mkDefaultCase rhs (setIdBinding bndr (LambdaBound ManyTy)) body
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this
@@ -541,7 +543,9 @@ mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
 -- Make (case x of y { DEFAULT -> e }
 mkDefaultCase scrut case_bndr body
-  = Case scrut case_bndr (exprType body) [Alt DEFAULT [] body]
+  = pprTrace "mkDefaultCase bndr is LambdaBound?" (ppr $ isJust (varMultMaybe case_bndr)) $
+    assertPpr (isJust (varMultMaybe case_bndr)) (text "mkDefaultCase:Case binder is marked LetBound!") $
+    Case scrut case_bndr (exprType body) [Alt DEFAULT [] body]
 
 mkSingleAltCase :: CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
 -- Use this function if possible, when building a case,

@@ -1680,7 +1680,6 @@ mkFunResCo role id res_co
     mult   = multToCo $ case idBinding id of 
                           LambdaBound m -> m
                           LetBound _ -> panic "mkFunResCo"
-                          GlobalBinding -> panic "global"
     -- ROMES:
     -- to make (arg %π -> res1) ~r (arg %π -> res2), we need π.
     --
