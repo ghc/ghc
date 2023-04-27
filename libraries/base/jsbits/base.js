@@ -878,8 +878,7 @@ function h$__hscore_readdir(d,o,dst_a,dst_o) {
   }
   const e = d.readSync();
 
-  if (!dst_a.arr) dst_a.arr = [];
-  dst_a.arr[dst_o*2] = [e,0];
+  PUT_ADDR(dst_a,dst_o*2,e,0);
   return 0;
 }
 

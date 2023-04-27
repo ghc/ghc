@@ -602,47 +602,6 @@ function h$hs_iconv_close(iconv) {
   return 0;
 }
 
-// ptr* -> ptr (array)
-function h$derefPtrA(ptr, ptr_off) {
-  return ptr.arr[ptr_off][0];
-}
-// ptr* -> ptr (offset)
-function h$derefPtrO(ptr, ptr_off) {
-  return ptr.arr[ptr_off][1];
-}
-
-// word** -> word    ptr[x][y]
-function h$readPtrPtrU32(ptr, ptr_off, x, y) {
-  x = x || 0;
-  y = y || 0;
-  var arr = ptr.arr[ptr_off + 4 * x];
-  return arr[0].dv.getInt32(arr[1] + 4 * y, true);
-}
-
-// char** -> char   ptr[x][y]
-function h$readPtrPtrU8(ptr, ptr_off, x, y) {
-  x = x || 0;
-  y = y || 0;
-  var arr = ptr.arr[ptr_off + 4 * x];
-  return arr[0].dv.getUint8(arr[1] + y);
-}
-
-// word**   ptr[x][y] = v
-function h$writePtrPtrU32(ptr, ptr_off, v, x, y) {
-  x = x || 0;
-  y = y || 0;
-  var arr = ptr.arr[ptr_off + 4 * x];
-  arr[0].dv.putInt32(arr[1] + y, v);
-}
-
-// unsigned char** ptr[x][y] = v
-function h$writePtrPtrU8(ptr, ptr_off, v, x, y) {
-  x = x || 0;
-  y = y || 0;
-  var arr = ptr.arr[ptr_off+ 4 * x];
-  arr[0].dv.putUint8(arr[1] + y, v);
-}
-
 // convert JavaScript String to a Haskell String
 #ifdef GHCJS_PROF
 function h$toHsString(str, cc) {

@@ -302,10 +302,9 @@ function h$buildCCPtr(o) {
 #ifdef GHCJS_TRACE_PROF
   cc.myTag = "cc pointer";
 #endif
-  cc.arr = [];
-  cc.arr[h$ccLabel_offset]  = [h$encodeUtf8(o.label),   0];
-  cc.arr[h$ccModule_offset] = [h$encodeUtf8(o.module),  0];
-  cc.arr[h$ccsrcloc_offset] = [h$encodeUtf8(o.srcloc),  0];
+  PUT_ADDR(cc, h$ccLabel_offset,  h$encodeUtf8(o.label),  0);
+  PUT_ADDR(cc, h$ccModule_offset, h$encodeUtf8(o.module), 0);
+  PUT_ADDR(cc, h$ccsrcloc_offset, h$encodeUtf8(o.srcloc), 0);
   return cc;
 }
 

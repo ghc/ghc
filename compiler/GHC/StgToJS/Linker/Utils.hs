@@ -138,6 +138,10 @@ genCommonCppDefs profiling = mconcat
       then "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset), h$CCS_SYSTEM))\n"
       else "#define MK_PTR(val,offset) (h$c2(h$baseZCGHCziPtrziPtr_con_e, (val), (offset)))\n"
 
+  -- Put Addr# in ByteArray# or at Addr# (same thing)
+  , "#define PUT_ADDR(a,o,va,vo) if (!(a).arr) (a).arr = []; (a).arr[o] = va; (a).dv.setInt32(o,vo,true);\n"
+  , "#define GET_ADDR(a,o,ra,ro) var ra = (((a).arr && (a).arr[o]) ? (a).arr[o] : null_); var ro = (a).dv.getInt32(o,true);\n"
+
   -- Data.Maybe.Maybe
   , "#define HS_NOTHING h$baseZCGHCziMaybeziNothing\n"
   , "#define IS_NOTHING(cl) ((cl).f === h$baseZCGHCziMaybeziNothing_con_e)\n"
