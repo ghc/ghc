@@ -310,16 +310,16 @@ numericEnumFromThen n m = go 0
 
 numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
 {-# INLINE numericEnumFromTo #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
-numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
+numericEnumFromTo n m   = let !to = m + 1/2 in takeWhile (<= to) (numericEnumFrom n)
 
 numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
 {-# INLINE numericEnumFromThenTo #-}  -- See Note [Inline Enum method helpers] in GHC.Enum
-numericEnumFromThenTo e1 e2 e3
+numericEnumFromThenTo e1 e2 !e3
     = takeWhile predicate (numericEnumFromThen e1 e2)
                                 where
-                                 mid = (e2 - e1) / 2
-                                 predicate | e2 >= e1  = (<= e3 + mid)
-                                           | otherwise = (>= e3 + mid)
+                                 !mid = (e2 - e1) / 2
+                                 !predicate | e2 >= e1  = (<= e3 + mid)
+                                            | otherwise = (>= e3 + mid)
 
 {- Note [Numeric Stability of Enumerating Floating Numbers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
