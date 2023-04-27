@@ -479,3 +479,8 @@ test('T23024', normal, multimod_compile, ['T23024', '-O -v0'])
 test('T23026', normal, compile, ['-O'])
 test('T23267', [expect_broken(23267), only_ways(['ghci']), extra_hc_opts('-fno-unoptimized-core-for-interpreter -fspec-constr')], ghci_script, ['T23267.script'])
 test('T23362', normal, compile, ['-O'])
+test('T23307', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T23307b', normal, compile, ['-O'])
+test('T23307c', normal, compile, ['-O'])
+

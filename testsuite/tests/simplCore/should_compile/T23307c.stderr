@@ -1,0 +1,5 @@
+
+T23307c.hs:7:13: warning: [GHC-40091]
+    • Ignoring unusable UNPACK pragma on the first argument of ‘LCon’
+    • In the definition of data constructor ‘LCon’
+      In the data type declaration for ‘Loop’
