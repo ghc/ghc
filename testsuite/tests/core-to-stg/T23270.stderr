@@ -1,0 +1,46 @@
+
+==================== CorePrep ====================
+Result size of CorePrep
+  = {terms: 29, types: 19, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 14, types: 10, coercions: 0, joins: 0/0}
+T23270.f :: forall a. GHC.Maybe.Maybe a -> GHC.Types.Int
+[GblId, Arity=1, Unf=OtherCon []]
+T23270.f
+  = \ (@a) (x [Occ=Once1!] :: GHC.Maybe.Maybe a) ->
+      case x of {
+        GHC.Maybe.Nothing -> GHC.Types.I# 0#;
+        GHC.Maybe.Just _ [Occ=Dead] ->
+          case "T23270.hs:4:7-28|case"# of sat [Occ=Once1] { __DEFAULT ->
+          case Control.Exception.Base.patError @GHC.Types.LiftedRep @() sat
+          of {}
+          }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule1 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3 :: GHC.Prim.Addr#
+[GblId, Unf=OtherCon []]
+$trModule3 = "T23270"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4 :: GHC.Types.TrName
+[GblId, Unf=OtherCon []]
+$trModule4 = GHC.Types.TrNameS $trModule3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T23270.$trModule :: GHC.Types.Module
+[GblId, Unf=OtherCon []]
+T23270.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+
+
