@@ -1053,8 +1053,7 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
         arg_ty' = case mb_co of
                     { Just redn -> scaledSet arg_ty (reductionReducedType redn)
                     ; Nothing   -> arg_ty }
-  , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
-  , shouldUnpackTy bang_opts unpk_prag fam_envs arg_ty'
+  , shouldUnpackArgTy bang_opts unpk_prag fam_envs arg_ty'
   = if bang_opt_unbox_disable bang_opts
     then HsStrict True -- Not unpacking because of -O0
                        -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon
@@ -1329,69 +1328,95 @@ mkUbxSumAltTy :: [Type] -> Type
 mkUbxSumAltTy [ty] = ty
 mkUbxSumAltTy tys  = mkTupleTy Unboxed tys
 
-shouldUnpackTy :: BangOpts -> SrcUnpackedness -> FamInstEnvs -> Scaled Type -> Bool
+shouldUnpackArgTy :: BangOpts -> SrcUnpackedness -> FamInstEnvs -> Scaled Type -> Bool
 -- True if we ought to unpack the UNPACK the argument type
 -- See Note [Recursive unboxing]
 -- We look "deeply" inside rather than relying on the DataCons
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
-shouldUnpackTy bang_opts prag fam_envs ty
-  | Just data_cons <- unpackable_type_datacons (scaledThing ty)
-  = all (ok_con_args emptyNameSet) data_cons && should_unpack data_cons
+shouldUnpackArgTy bang_opts prag fam_envs arg_ty
+  | Just data_cons <- unpackable_type_datacons (scaledThing arg_ty)
+  , all ok_con data_cons                -- Returns True only if we can't get a
+                                        -- loop involving these data cons
+  , should_unpack prag arg_ty data_cons -- ...hence the call to dataConArgUnpack in
+                                        --    should_unpack won't loop
+       -- See Wrinkle (W1b) of Note [Recursive unboxing] for this loopy stuff
+  = True
+
   | otherwise
   = False
   where
-    ok_con_args :: NameSet -> DataCon -> Bool
-    ok_con_args dcs con
-       | dc_name `elemNameSet` dcs
-       = False
-       | otherwise
-       = all (ok_arg dcs')
-             (dataConOrigArgTys con `zip` dataConSrcBangs con)
-          -- NB: dataConSrcBangs gives the *user* request;
-          -- We'd get a black hole if we used dataConImplBangs
+    ok_con :: DataCon -> Bool      -- True <=> OK to unpack
+    ok_con top_con                 -- False <=> not safe
+      = ok_args emptyNameSet top_con
        where
-         dc_name = getName con
-         dcs' = dcs `extendNameSet` dc_name
+         top_con_name = getName top_con
 
-    ok_arg :: NameSet -> (Scaled Type, HsSrcBang) -> Bool
-    ok_arg dcs (Scaled _ ty, bang)
-      = not (attempt_unpack bang) || ok_ty dcs norm_ty
-      where
-        norm_ty = topNormaliseType fam_envs ty
+         ok_args dcs con
+           = all (ok_arg dcs) $
+             (dataConOrigArgTys con `zip` dataConSrcBangs con)
+             -- NB: dataConSrcBangs gives the *user* request;
+             -- We'd get a black hole if we used dataConImplBangs
 
-    ok_ty :: NameSet -> Type -> Bool
-    ok_ty dcs ty
-      | Just data_cons <- unpackable_type_datacons ty
-      = all (ok_con_args dcs) data_cons
-      | otherwise
-      = True        -- NB True here, in contrast to False at top level
+         ok_arg :: NameSet -> (Scaled Type, HsSrcBang) -> Bool
+         ok_arg dcs (Scaled _ ty, HsSrcBang _ unpack_prag str_prag)
+           | strict_field str_prag
+           , Just data_cons <- unpackable_type_datacons (topNormaliseType fam_envs ty)
+           , should_unpack_conservative unpack_prag data_cons  -- Wrinkle (W3)
+           = all (ok_rec_con dcs) data_cons                    --  of Note [Recursive unboxing]
+           | otherwise
+           = True        -- NB True here, in contrast to False at top level
 
-    attempt_unpack :: HsSrcBang -> Bool
-    attempt_unpack (HsSrcBang _ SrcUnpack NoSrcStrict)
-      = bang_opt_strict_data bang_opts
-    attempt_unpack (HsSrcBang _ SrcUnpack SrcStrict)
-      = True
-    attempt_unpack (HsSrcBang _  NoSrcUnpack SrcStrict)
-      = True  -- Be conservative
-    attempt_unpack (HsSrcBang _  NoSrcUnpack NoSrcStrict)
-      = bang_opt_strict_data bang_opts -- Be conservative
-    attempt_unpack _ = False
+         -- See Note [Recursive unboxing]
+         --   * Do not look at the HsImplBangs to `con`; see Wrinkle (W1a)
+         --   * For the "at the root" comments see Wrinkle (W2)
+         ok_rec_con dcs con
+           | dc_name == top_con_name   = False  -- Recursion at the root
+           | dc_name `elemNameSet` dcs = True   -- Not at the root
+           | otherwise                 = ok_args (dcs `extendNameSet` dc_name) con
+           where
+             dc_name = getName con
 
-    -- Determine whether we ought to unpack a field based on user annotations if present and heuristics if not.
-    should_unpack data_cons =
+    strict_field :: SrcStrictness -> Bool
+    -- True <=> strict field
+    strict_field NoSrcStrict = bang_opt_strict_data bang_opts
+    strict_field SrcStrict   = True
+    strict_field SrcLazy     = False
+
+    -- Determine whether we ought to unpack a field,
+    -- based on user annotations if present.
+    -- A conservative version of should_unpack that doesn't look at how
+    -- many fields the field would unpack to... because that leads to a loop.
+    -- "Conservative" = err on the side of saying "yes".
+    should_unpack_conservative :: SrcUnpackedness -> [DataCon] -> Bool
+    should_unpack_conservative SrcNoUnpack _   = False  -- {-# NOUNPACK #-}
+    should_unpack_conservative SrcUnpack   _   = True   -- {-# NOUNPACK #-}
+    should_unpack_conservative NoSrcUnpack dcs = not (is_sum dcs)
+        -- is_sum: we never unpack sums without a pragma; otherwise be conservative
+
+    -- Determine whether we ought to unpack a field,
+    -- based on user annotations if present, and heuristics if not.
+    should_unpack :: SrcUnpackedness -> Scaled Type -> [DataCon] -> Bool
+    should_unpack prag arg_ty data_cons =
       case prag of
         SrcNoUnpack -> False -- {-# NOUNPACK #-}
         SrcUnpack   -> True  -- {-# UNPACK #-}
         NoSrcUnpack -- No explicit unpack pragma, so use heuristics
-          | (_:_:_) <- data_cons
-          -> False -- don't unpack sum types automatically, but they can be unpacked with an explicit source UNPACK.
-          | otherwise
+          | is_sum data_cons
+          -> False -- Don't unpack sum types automatically, but they can
+                   -- be unpacked with an explicit source UNPACK.
+          | otherwise   -- Wrinkle (W4) of Note [Recursive unboxing]
           -> bang_opt_unbox_strict bang_opts
              || (bang_opt_unbox_small bang_opts
                  && rep_tys `lengthAtMost` 1)  -- See Note [Unpack one-wide fields]
-      where (rep_tys, _) = dataConArgUnpack ty
+      where
+        (rep_tys, _) = dataConArgUnpack arg_ty
 
+    is_sum :: [DataCon] -> Bool
+    -- We never unpack sum types automatically
+    -- (Product types, we do. Empty types are weeded out by unpackable_type_datacons.)
+    is_sum (_:_:_) = True
+    is_sum _       = False
 
 -- Given a type already assumed to have been normalized by topNormaliseType,
 -- unpackable_type_datacons ty = Just datacons
@@ -1403,11 +1428,11 @@ shouldUnpackTy bang_opts prag fam_envs ty
 unpackable_type_datacons :: Type -> Maybe [DataCon]
 unpackable_type_datacons ty
   | Just (tc, _) <- splitTyConApp_maybe ty
-  , not (isNewTyCon tc)
-    -- Even though `ty` has been normalised, it could still
-    -- be a /recursive/ newtype, so we must check for that
+  , not (isNewTyCon tc)  -- Even though `ty` has been normalised, it could still
+                         -- be a /recursive/ newtype, so we must check for that
   , Just cons <- tyConDataCons_maybe tc
-  , not (null cons)
+  , not (null cons)      -- Don't upack nullary sums; no need.
+                         -- They already take zero bits
   , all (null . dataConExTyCoVars) cons
   = Just cons -- See Note [Unpacking GADTs and existentials]
   | otherwise
@@ -1463,20 +1488,74 @@ But be careful not to try to unbox this!
         data T = MkT {-# UNPACK #-} !T Int
 Because then we'd get an infinite number of arguments.
 
-Here is a more complicated case:
-        data S = MkS {-# UNPACK #-} !T Int
-        data T = MkT {-# UNPACK #-} !S Int
-Each of S and T must decide independently whether to unpack
-and they had better not both say yes. So they must both say no.
-
-Also behave conservatively when there is no UNPACK pragma
-        data T = MkS !T Int
-with -funbox-strict-fields or -funbox-small-strict-fields
-we need to behave as if there was an UNPACK pragma there.
-
-But it's the *argument* type that matters. This is fine:
+Note that it's the *argument* type that matters. This is fine:
         data S = MkS S !Int
 because Int is non-recursive.
+
+Wrinkles:
+
+(W1a) We have to be careful that the compiler doesn't go into a loop!
+      First, we must not look at the HsImplBang decisions of data constructors
+      in the same mutually recursive group.  E.g.
+         data S = MkS {-# UNPACK #-} !T Int
+         data T = MkT {-# UNPACK #-} !S Int
+      Each of S and T must decide /independently/ whether to unpack
+      and they had better not both say yes. So they must both say no.
+      (We could detect when we leave the group, and /then/ we can rely on
+      HsImplBangs; but that requires more plumbing.)
+
+(W1b) Here is another way the compiler might go into a loop (test T23307b):
+         data data T = MkT !S Int
+         data S = MkS !T
+     Suppose we call `shouldUnpackArgTy` on the !S arg of `T`.  In `should_unpack`
+     we ask if the number of fields that `MkS` unpacks to is small enough
+     (via rep_tys `lengthAtMost` 1).  But how many field /does/ `MkS` unpack
+     to?  Well it depends on the unpacking decision we make for `MkS`, which
+     in turn depends on `MkT`, which we are busy deciding. Black holes beckon.
+
+     So we /first/ call `ok_con` on `MkS` (and `ok_con` is conservative;
+     see `should_unpack_conservative`), and only /then/ call `should_unpack`.
+     Tricky!
+
+(W2) As #23307 shows,  we /do/ want to unpack the second arg of the Yes
+     data constructor in this example, despite the recursion in List:
+       data Stream a   = Cons a !(Stream a)
+       data Unconsed a = Unconsed a !(Stream a)
+       data MUnconsed a = No | Yes {-# UNPACK #-} !(Unconsed a)
+     When looking at
+       {-# UNPACK #-} (Unconsed a)
+     we can take Unconsed apart, but then get into a loop with Stream.
+     That's fine: we can still take Unconsed apart.  It's only if we
+     have a loop /at the root/ that we must not unpack.
+
+(W3) Moreover (W2) can apply even if there is a recursive loop:
+       data List a = Nil | Cons {-# UNPACK #-} !(Unconsed a)
+       data Unconsed a = Unconsed a !(List a)
+     Here there is mutual recursion between `Unconsed` and `List`; and yet
+     we can unpack the field of `Cons` because we will not unpack the second
+     field of `Unconsed`: we never unpack a sum type without an explicit
+     pragma (see should_unpack).
+
+(W4) Consider
+        data T = MkT !Wombat
+        data Wombat = MkW {-# UNPACK #-} !S Int
+        data S = MkS {-# NOUNPACK #-} !Wombat Int
+     Suppose we are deciding whether to unpack the first field of MkT, by
+     calling (shouldUnpackArgTy Wombat).  Then we'll try to unpack the !S field
+     of MkW, and be stopped by the {-# NOUNPACK #-}, and all is fine; we can
+     unpack MkT.
+
+     If that NOUNPACK had been a UNPACK, though, we'd get a loop, and would
+     decide not to unpack the Wombat field of MkT.
+
+     But what if there was no pragma in `data S`?  Then we /still/ decide not
+     to unpack the Wombat field of MkT (at least when auto-unpacking is on),
+     because we don't know for sure which decision will be taken for the
+     Wombat field of MkS.
+
+     TL;DR when there is no pragma, behave as if there was a UNPACK, at least
+     when auto-unpacking is on.  See `should_unpack` in `shouldUnpackArgTy`.
+
 
 ************************************************************************
 *                                                                      *
