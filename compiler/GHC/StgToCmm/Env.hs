@@ -10,7 +10,7 @@
 module GHC.StgToCmm.Env (
         CgIdInfo,
 
-        litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
+        mkCgIdInfo, litIdInfo, lneIdInfo, rhsIdInfo, mkRhsInit,
         idInfoToAmode,
 
         addBindC, addBindsC,

@@ -87,12 +87,7 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
-import GHC.Core.Utils   ( exprType, exprIsHNF
-                        , exprOkForSpeculation
-                        , exprIsTopLevelBindable
-                        , collectMakeStaticArgs
-                        , mkLamTypes, extendInScopeSetBndrs
-                        )
+import GHC.Core.Utils
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe, isOneShotBndr )
 import GHC.Core.FVs     -- all of it
 import GHC.Core.Subst

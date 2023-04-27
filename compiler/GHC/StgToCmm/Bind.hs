@@ -123,26 +123,10 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
   -- StgStdThunks.cmm.
   gen_code _ closure_label
     | null args
-    , StgApp f [arg] <- stripStgTicksTopE (not . tickishIsCode) body
-    , Just unpack <- is_string_unpack_op f
-    = do arg' <- getArgAmode (NonVoid arg)
-         case arg' of
-           CmmLit lit -> do
-             let info = CmmInfoTable
-                   { cit_lbl = unpack
-                   , cit_rep = HeapRep True 0 1 Thunk
-                   , cit_prof = NoProfilingInfo
-                   , cit_srt = Nothing
-                   , cit_clo = Nothing
-                   }
-             emitDecl $ CmmData (Section Data closure_label) $
-                 CmmStatics closure_label info ccs [] [lit]
-           _ -> panic "cgTopRhsClosure.gen_code"
-    where
-      is_string_unpack_op f
-        | idName f == unpackCStringName     = Just mkRtsUnpackCStringLabel
-        | idName f == unpackCStringUtf8Name = Just mkRtsUnpackCStringUtf8Label
-        | otherwise                         = Nothing
+    , Just gen <- isUnpackCStringClosure body
+    = do (info, lit) <- gen
+         emitDecl $ CmmData (Section Data closure_label) $
+             CmmStatics closure_label info ccs [] [lit]
 
   gen_code lf_info _closure_label
    = do { profile <- getProfile
@@ -167,6 +151,41 @@ cgTopRhsClosure platform rec id ccs upd_flag args body =
 
   unLit (CmmLit l) = l
   unLit _ = panic "unLit"
+
+isUnpackCStringClosure :: CgStgExpr -> Maybe (FCode (CmmInfoTable, CmmLit))
+isUnpackCStringClosure body = case stripStgTicksTopE (not . tickishIsCode) body of
+  StgApp f [arg]
+    | Just unpack <- is_string_unpack_op f
+    -> Just $ do
+        arg' <- getArgAmode (NonVoid arg)
+        case arg' of
+          CmmLit lit -> do
+            let info = CmmInfoTable
+                  { cit_lbl = unpack
+                  , cit_rep = HeapRep True 0 1 Thunk
+                  , cit_prof = NoProfilingInfo
+                  , cit_srt = Nothing
+                  , cit_clo = Nothing
+                  }
+            return (info, lit)
+          _ -> panic "isUnpackCStringClosure: not a lit"
+  StgCase (StgLit l) b _ [alt]
+    -- In -O0, we might get strings that haven't been floated to top-level, e.g.,
+    --   case "undefined"# of sat {
+    --     __DEFAULT -> unpackCString# sat
+    --   }
+    -- This case is supposed to catch that.
+    | Just gen <- isUnpackCStringClosure (alt_rhs alt)
+    -> Just $ do
+        e <- cgLit l
+        addBindC (mkCgIdInfo b mkLFStringLit e)
+        gen
+  _ -> Nothing
+  where
+    is_string_unpack_op f
+      | idName f == unpackCStringName     = Just mkRtsUnpackCStringLabel
+      | idName f == unpackCStringUtf8Name = Just mkRtsUnpackCStringUtf8Label
+      | otherwise                         = Nothing
 
 ------------------------------------------------------------------------
 --              Non-top-level bindings

@@ -628,11 +628,14 @@ cpeBind top_lvl env (Rec pairs)
                            bndrs1 rhss
 
        ; let (floats_s, rhss1) = unzip stuff
-             all_pairs = foldrOL add_float (bndrs1 `zip` rhss1)
-                                           (concatFloats floats_s)
+             -- Glom all floats into the Rec, *except* FloatStrings which can
+             -- (and must, because unlifted!) float further.
+             (string_floats, all_pairs) =
+               foldrOL add_float (emptyFloats, bndrs1 `zip` rhss1)
+                                 (concatFloats floats_s)
        -- use env below, so that we reset cpe_rec_ids
        ; return (extendCorePrepEnvList env (bndrs `zip` bndrs1),
-                 unitFloat (FloatLet (Rec all_pairs)),
+                 string_floats `addFloat` FloatLet (Rec all_pairs),
                  Nothing) }
 
   | otherwise -- See Note [Join points and floating]
@@ -650,9 +653,10 @@ cpeBind top_lvl env (Rec pairs)
 
         -- Flatten all the floats, and the current
         -- group into a single giant Rec
-    add_float (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
-    add_float (FloatLet (Rec prs1))   prs2 = prs1 ++ prs2
-    add_float b                       _    = pprPanic "cpeBind" (ppr b)
+    add_float (FloatLet (NonRec b r)) (ss, prs2) = (ss, (b,r)    : prs2)
+    add_float (FloatLet (Rec prs1))   (ss, prs2) = (ss, prs1    ++ prs2)
+    add_float s@FloatString{}         (ss, prs2) = (addFloat ss s, prs2)
+    add_float b                       _          = pprPanic "cpeBind" (ppr b)
 
 ---------------
 cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
@@ -1444,36 +1448,66 @@ the continuation may not be a manifest lambda.
 
 Note [ANF-ising literal string arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Consider a program like,
+Consider a Core program like,
 
     data Foo = Foo Addr#
-
     foo = Foo "turtle"#
 
-When we go to ANFise this we might think that we want to float the string
-literal like we do any other non-trivial argument. This would look like,
-
-    foo = u\ [] case "turtle"# of s { __DEFAULT__ -> Foo s }
-
-However, this 1) isn't necessary since strings are in a sense "trivial"; and 2)
-wreaks havoc on the CAF annotations that we produce here since we the result
-above is caffy since it is updateable. Ideally at some point in the future we
-would like to just float the literal to the top level as suggested in #11312,
+String literals are non-trivial, see 'GHC.Types.Literal.litIsTrivial', hence
+they are non-atomic in STG.
+With -O1, FloatOut is likely to have floated most of these strings to top-level,
+not least to give CSE a chance to deduplicate strings early (before the
+linker, that is).
+(Notable exceptions seem to be applications of 'unpackAppendCString#'.)
+But with -O0, there is no FloatOut, so CorePrep must do the ANFisation to
 
     s = "turtle"#
     foo = Foo s
 
-However, until then we simply add a special case excluding literals from the
-floating done by cpeArg.
--}
+(String literals are the only kind of binding allowed at top-level and hence
+their floats are `OkToSpec` like lifted bindings, whereas all other unlifted
+floats are `IfUnboxedOk` so that they don't float to top-level.)
 
--- | Is an argument okay to CPE?
-okCpeArg :: CoreExpr -> Bool
--- Don't float literals. See Note [ANF-ising literal string arguments].
-okCpeArg (Lit _) = False
--- Do not eta expand a trivial argument
-okCpeArg expr    = not (exprIsTrivial expr)
+This appears to lead to bad code if the arg is under a lambda, because CorePrep
+doesn't float out of RHSs, e.g., (T23270)
+
+    foo x = ... patError "turtle"# ...
+==> foo x = ... case "turtle"# of s { __DEFAULT -> petError s } ...
+
+This looks bad because it evals an HNF on every call.
+But actually, it doesn't, because "turtle"# is already an HNF. Here is the Cmm:
+
+  [section ""cstring" . cB4_str" {
+       cB4_str:
+           I8[] "turtle"
+   }
+  ...
+  _sAG::I64 = cB4_str;
+  R2 = _sAG::I64;
+  Sp = Sp + 8;
+  call Control.Exception.Base.patError_info(R2) args: 8, res: 0, upd: 8;
+
+Wrinkles:
+
+(FS1) It is crucial that we float out String literals out of RHSs that could
+      become values, e.g.,
+
+        let t = case "turtle"# of s { __DEFAULT -> MkT s }
+        in f t
+
+      where `MkT :: Addr# -> T`. We want
+
+        let s = "turtle"#; t = MkT s
+        in f t
+
+      because the former allocates an extra thunk for `t`.
+      Normally, the `case turtle# of s ...` becomes a `FloatCase` and
+      we don't float `FloatCase` outside of (recursive) RHSs, so we get the
+      former program (this is the 'allLazyNested' test in 'wantFloatNested').
+      That is what we use `FloatString` for: It is essentially a `FloatCase`
+      which is always ok-to-spec/can be regarded as a non-allocating value and
+      thus be floated aggressively to expose more value bindings.
+-}
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
@@ -1489,12 +1523,15 @@ cpeArg env dmd arg
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
 
-       ; if okCpeArg arg2
-         then do { v <- newVar arg_ty
+       -- Now ANF-ise any non-trivial argument
+       -- NB: "non-trivial" includes string literals;
+       -- see Note [ANF-ising literal string arguments]
+       ; if exprIsTrivial arg2
+         then return (floats2, arg2)
+         else do { v <- newVar arg_ty
                  ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
                        arg_float = mkFloat env dmd is_unlifted v arg3
                  ; return (addFloat floats2 arg_float, varToCoreExpr v) }
-         else return (floats2, arg2)
        }
 
 {-
@@ -1718,24 +1755,37 @@ where marking recursive DFuns (of undecidable *instances*) strict in dictionary
 -}
 
 data FloatingBind
-  = FloatLet CoreBind    -- Rhs of bindings are CpeRhss
-                         -- They are always of lifted type;
-                         -- unlifted ones are done with FloatCase
+  -- | Rhs of bindings are CpeRhss
+  -- They are always of lifted type;
+  -- unlifted ones are done with FloatCase
+  = FloatLet CoreBind
 
- | FloatCase
-      CpeBody         -- Always ok-for-speculation
-      Id              -- Case binder
-      AltCon [Var]    -- Single alternative
-      Bool            -- Ok-for-speculation; False of a strict,
-                      -- but lifted binding
+  -- | Float a literal string binding.
+  -- INVARIANT: The `CoreExpr` matches `Lit (LitString bs)`.
+  --            It's just more convenient to keep around the expr rather than
+  --            the wrapped `bs` and reallocate the expr.
+  -- This is a special case of `FloatCase` that is unconditionally ok-for-spec.
+  -- We want to float out strings quite aggressively out of RHSs if doing so
+  -- saves allocation of a thunk ('wantFloatNested'); see Wrinkle (FS1)
+  -- in Note [ANF-ising literal string arguments].
+  | FloatString !CoreExpr !Id
 
- -- | See Note [Floating Ticks in CorePrep]
- | FloatTick CoreTickish
+  | FloatCase
+       CpeBody         -- ^ Scrutinee
+       Id              -- ^ Case binder
+       AltCon [Var]    -- ^ Single alternative
+       Bool            -- ^ Ok-for-speculation; False of a strict,
+                       --   but lifted binding that is not OK for
+                       --   Note [Speculative evaluation].
+
+  -- | See Note [Floating Ticks in CorePrep]
+  | FloatTick CoreTickish
 
 data Floats = Floats OkToSpec (OrdList FloatingBind)
 
 instance Outputable FloatingBind where
   ppr (FloatLet b) = ppr b
+  ppr (FloatString e b) = text "string" <> braces (ppr b <> char '=' <> ppr e)
   ppr (FloatCase r b k bs ok) = text "case" <> braces (ppr ok) <+> ppr r
                                 <+> text "of"<+> ppr b <> text "@"
                                 <> case bs of
@@ -1749,26 +1799,30 @@ instance Outputable Floats where
 
 instance Outputable OkToSpec where
   ppr OkToSpec    = text "OkToSpec"
-  ppr IfUnboxedOk = text "IfUnboxedOk"
+  ppr IfUnliftedOk = text "IfUnliftedOk"
   ppr NotOkToSpec = text "NotOkToSpec"
 
 -- Can we float these binds out of the rhs of a let?  We cache this decision
 -- to avoid having to recompute it in a non-linear way when there are
 -- deeply nested lets.
 data OkToSpec
-   = OkToSpec           -- Lazy bindings of lifted type
-   | IfUnboxedOk        -- A mixture of lazy lifted bindings and n
-                        -- ok-to-speculate unlifted bindings
-   | NotOkToSpec        -- Some not-ok-to-speculate unlifted bindings
+   = OkToSpec           -- ^ Lazy bindings of lifted type. Float as you please
+   | IfUnliftedOk       -- ^ A mixture of lazy lifted bindings and n
+                        -- ok-to-speculate unlifted bindings.
+                        -- Float out of lets, but not to top-level!
+   | NotOkToSpec        -- ^ Some not-ok-to-speculate unlifted bindings
 
 mkFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat env dmd is_unlifted bndr rhs
-  | is_strict || ok_for_spec -- See Note [Speculative evaluation]
-  , not is_hnf  = FloatCase rhs bndr DEFAULT [] ok_for_spec
-    -- Don't make a case for a HNF binding, even if it's strict
-    -- Otherwise we get  case (\x -> e) of ...!
+  | Lit LitString{} <- rhs = FloatString rhs bndr
 
-  | is_unlifted = FloatCase rhs bndr DEFAULT [] True
+  | is_strict || ok_for_spec
+  , not is_hnf             = FloatCase rhs bndr DEFAULT [] ok_for_spec
+      -- See Note [Speculative evaluation]
+      -- Don't make a case for a HNF binding, even if it's strict
+      -- Otherwise we get  case (\x -> e) of ...!
+
+  | is_unlifted            = FloatCase rhs bndr DEFAULT [] True
       -- we used to assertPpr ok_for_spec (ppr rhs) here, but it is now disabled
       -- because exprOkForSpeculation isn't stable under ANF-ing. See for
       -- example #19489 where the following unlifted expression:
@@ -1783,8 +1837,8 @@ mkFloat env dmd is_unlifted bndr rhs
       --
       -- which isn't ok-for-spec because of the let-expression.
 
-  | is_hnf      = FloatLet (NonRec bndr                       rhs)
-  | otherwise   = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
+  | is_hnf                 = FloatLet (NonRec bndr                       rhs)
+  | otherwise              = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]
   where
     is_hnf      = exprIsHNF rhs
@@ -1803,6 +1857,7 @@ wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
     mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [Alt con bs body]
+    mk_bind (FloatString rhs bndr)        body = Case rhs bndr (exprType body) [Alt DEFAULT [] body]
     mk_bind (FloatLet bind)               body = Let bind body
     mk_bind (FloatTick tickish)           body = mkTick tickish body
 
@@ -1810,15 +1865,19 @@ addFloat :: Floats -> FloatingBind -> Floats
 addFloat (Floats ok_to_spec floats) new_float
   = Floats (combine ok_to_spec (check new_float)) (floats `snocOL` new_float)
   where
-    check (FloatLet {})  = OkToSpec
+    check FloatLet {}   = OkToSpec
+    check FloatTick{}   = OkToSpec
+    check FloatString{} = OkToSpec
     check (FloatCase _ _ _ _ ok_for_spec)
-      | ok_for_spec = IfUnboxedOk
-      | otherwise   = NotOkToSpec
-    check FloatTick{}    = OkToSpec
+      | ok_for_spec     = IfUnliftedOk
+      | otherwise       = NotOkToSpec
         -- The ok-for-speculation flag says that it's safe to
         -- float this Case out of a let, and thereby do it more eagerly
-        -- We need the top-level flag because it's never ok to float
-        -- an unboxed binding to the top level
+        -- We need the IfUnliftedOk flag because it's never ok to float
+        -- an unlifted binding to the top level.
+        -- There is one exception: String literals! But those will become
+        -- FloatString and thus OkToSpec.
+        -- See Note [ANF-ising literal string arguments]
 
 unitFloat :: FloatingBind -> Floats
 unitFloat = addFloat emptyFloats
@@ -1831,11 +1890,11 @@ concatFloats :: [Floats] -> OrdList FloatingBind
 concatFloats = foldr (\ (Floats _ bs1) bs2 -> appOL bs1 bs2) nilOL
 
 combine :: OkToSpec -> OkToSpec -> OkToSpec
-combine NotOkToSpec _ = NotOkToSpec
-combine _ NotOkToSpec = NotOkToSpec
-combine IfUnboxedOk _ = IfUnboxedOk
-combine _ IfUnboxedOk = IfUnboxedOk
-combine _ _           = OkToSpec
+combine NotOkToSpec _  = NotOkToSpec
+combine _ NotOkToSpec  = NotOkToSpec
+combine IfUnliftedOk _ = IfUnliftedOk
+combine _ IfUnliftedOk = IfUnliftedOk
+combine _ _            = OkToSpec
 
 deFloatTop :: Floats -> [CoreBind]
 -- For top level only; we don't expect any FloatCases
@@ -1843,6 +1902,7 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b)               bs = get_bind b                 : bs
+    get (FloatString body var)     bs = get_bind (NonRec var body) : bs
     get (FloatCase body var _ _ _) bs = get_bind (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
@@ -1868,6 +1928,10 @@ canFloat (Floats ok_to_spec fs) rhs
     go fbs_out (fb@(FloatLet _) : fbs_in)
       = go (fbs_out `snocOL` fb) fbs_in
 
+    go fbs_out (fb@FloatString{} : fbs_in)
+      -- See Note [ANF-ising literal string arguments]
+      = go (fbs_out `snocOL` fb) fbs_in
+
     go fbs_out (ft@FloatTick{} : fbs_in)
       = go (fbs_out `snocOL` ft) fbs_in
 
@@ -1875,10 +1939,10 @@ canFloat (Floats ok_to_spec fs) rhs
 
 
 wantFloatNested :: RecFlag -> Demand -> Bool -> Floats -> CpeRhs -> Bool
-wantFloatNested is_rec dmd is_unlifted floats rhs
+wantFloatNested is_rec dmd rhs_is_unlifted floats rhs
   =  isEmptyFloats floats
   || isStrUsedDmd dmd
-  || is_unlifted
+  || rhs_is_unlifted
   || (allLazyNested is_rec floats && exprIsHNF rhs)
         -- Why the test for allLazyNested?
         --      v = f (x `divInt#` y)
@@ -1890,9 +1954,9 @@ allLazyTop (Floats OkToSpec _) = True
 allLazyTop _                   = False
 
 allLazyNested :: RecFlag -> Floats -> Bool
-allLazyNested _      (Floats OkToSpec    _) = True
-allLazyNested _      (Floats NotOkToSpec _) = False
-allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
+allLazyNested _      (Floats OkToSpec    _)  = True
+allLazyNested _      (Floats NotOkToSpec _)  = False
+allLazyNested is_rec (Floats IfUnliftedOk _) = isNonRec is_rec
 
 {-
 ************************************************************************
@@ -2271,6 +2335,8 @@ wrapTicks (Floats flag floats0) expr =
           = assert (tickishPlace t == PlaceNonLam)
             (floats, if any (flip tickishContains t) ticks
                      then ticks else t:ticks)
+        go (floats, ticks) f@FloatString{}
+          = (f:floats, ticks) -- don't need to wrap the tick around the string; nothing to execute.
         go (floats, ticks) f
           = (foldr wrap f (reverse ticks):floats, ticks)
 
