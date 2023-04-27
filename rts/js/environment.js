@@ -158,20 +158,19 @@ function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
   } else {
     argc_v.dv.setInt32(argc_off, c, true);
     var argv = h$newByteArray(4*c);
-    argv.arr = [];
     for(var i=0;i<h$programArgs().length;i++) {
-      argv.arr[4*i] = [ h$encodeUtf8(h$programArgs()[i]), 0 ];
+      PUT_ADDR(argv,4*i,h$encodeUtf8(h$programArgs()[i]),0);
     }
-    if(!argv_v.arr) { argv_v.arr = []; }
-    argv_v.arr[argv_off] = [argv, 0];
+    PUT_ADDR(argv_v,argv_off,argv,0);
   }
 }
 
 function h$setProgArgv(n, ptr_d, ptr_o) {
   args = [];
   for(var i=0;i<n;i++) {
-    var p = ptr_d.arr[ptr_o+4*i];
-    var arg = h$decodeUtf8z(p[0], p[1]);
+    var off = ptr_o+4*i;
+    GET_ADDR(ptr_d,off,p,o);
+    var arg = h$decodeUtf8z(p, o);
     args.push(arg);
   }
   h$programArgs_ = args;
@@ -218,9 +217,10 @@ function h$__hscore_environ() {
         }
         if(env.length === 0) return null;
         var p = h$newByteArray(4*env.length+1);
-        p.arr = [];
-        for(i=0;i<env.length;i++) p.arr[4*i] = [h$encodeUtf8(env[i]), 0];
-        p.arr[4*env.length] = [null, 0];
+        for(i=0;i<env.length;i++) {
+          PUT_ADDR(p,4*i,h$encodeUtf8(env[i]),0);
+        }
+        PUT_ADDR(p,4*env.length,null,0);
         RETURN_UBX_TUP2(p, 0);
     }
 #endif
@@ -435,9 +435,8 @@ function h$localtime_r(timep_v, timep_o, result_v, result_o) {
   result_v.dv.setInt32(result_o + 28, 0, true); // fixme yday 1-365 (366?)
   result_v.dv.setInt32(result_o + 32, -1, true); // dst information unknown
   result_v.dv.setInt32(result_o + 40, 0, true); // gmtoff?
-  if(!result_v.arr) result_v.arr = [];
-  result_v.arr[result_o + 40] = [h$myTimeZone, 0];
-  result_v.arr[result_o + 48] = [h$myTimeZone, 0];
+  PUT_ADDR(result_v,result_o+40, h$myTimeZone, 0);
+  PUT_ADDR(result_v,result_o+48, h$myTimeZone, 0);
   RETURN_UBX_TUP2(result_v, result_o);
 }
 var h$__hscore_localtime_r = h$localtime_r;

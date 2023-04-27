@@ -16,7 +16,7 @@ function h$hs_spt_insert(key1,key2,key3,key4,ref) {
         ba.i3[1] = key1;
         ba.i3[2] = key4;
         ba.i3[3] = key3;
-	h$static_pointer_table_keys.push([ba,0]);
+	h$static_pointer_table_keys.push(ba);
         h$retain({ root: ref, _key: -1 });
     }
     var s = h$static_pointer_table;
@@ -33,8 +33,9 @@ function h$hs_spt_key_count() {
 
 function h$hs_spt_keys(tgt_d, tgt_o, n) {
     var ks = h$static_pointer_table_keys;
-    if(!tgt_d.arr) tgt_d.arr = [];
-    for(var i=0;(i<n&&i<ks.length);i++) tgt_d.arr[tgt_o+4*i] = ks[i];
+    for(var i=0;(i<n&&i<ks.length);i++) {
+      PUT_ADDR(tgt_d, tgt_o+4*i, ks[i], 0);
+    }
     return Math.min(n,ks.length);
 }
 

@@ -563,6 +563,20 @@ function h$copyMutableByteArray(a1,o1,a2,o2,n) {
       a2.u8[o2+i] = a1.u8[o1+i];
     }
   }
+
+  // also update sub-array for Addr# support
+  if (!a1.arr) return;
+  if (!a2.arr) { a2.arr = [] };
+
+  if (o1 < o2) {
+    for (var i=n-1;i>=0;i--) {
+      a2.arr[o2+i] = a1.arr[o1+i] || null;
+    }
+  } else {
+    for (var i=0;i<n;i++) {
+      a2.arr[o2+i] = a1.arr[o1+i] || null;
+    }
+  }
 }
 
 //////////////////////////////////////////////////////////
@@ -961,7 +975,7 @@ function h$strlen(a_v, a_o) {
 }
 
 function h$newArray(len, e) {
-    var r = [];
+    var r = new Array(len);
     r.__ghcjsArray = true;
     r.m = 0;
     if(e === null) e = r;
@@ -986,6 +1000,7 @@ function h$newByteArray(len) {
          , f3: new Float32Array(buf)
          , f6: new Float64Array(buf)
          , dv: new DataView(buf)
+         , arr: [] // for Addr# array part
          , m: 0
          }
 }
@@ -1457,13 +1472,11 @@ function h$pext64(src_b, src_a, mask_b, mask_a) {
 }
 
 function h$checkOverlapByteArray(a1, o1, a2, o2, n) {
-  if (n == 0) return true;
-  if (a1 == a2) {
-    if (o1 < o2) {
-      return o1 + n - 1 < o2;
-    } else {
-      return o2 + n - 1 < o1;
-    }
-  }
+  if (n == 0)    return true;
+  if (a1 !== a2) return true;
+  if (o1 === o2) return true;
+
+  if (o1 < o2)   return o2 - o1 >= n;
+  if (o1 > o2)   return o1 - o2 >= n;
   return true;
 }
