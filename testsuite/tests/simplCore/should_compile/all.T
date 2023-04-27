@@ -467,3 +467,8 @@ test('T22802', normal, compile, ['-O'])
 test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
 test('T23012', normal, compile, ['-O'])
 test('T23024', normal, multimod_compile, ['T23024', '-O -v0'])
+test('T23307', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
+test('T23307b', normal, compile, ['-O'])
+test('T23307c', normal, compile, ['-O'])
+
