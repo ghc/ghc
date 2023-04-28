@@ -152,7 +152,7 @@ pprInstr platform instr = case instr of
     pprLI reg immediate = text "\tli" <+> pprReg reg <> char ',' <+> (text.show) immediate
 
     pprReg :: IsLine doc => Reg -> doc
-    pprReg (RegReal (RealRegSingle r)) = text "x" <> (text.show) r
+    pprReg (RegReal (RealRegSingle regNo)) = (text.regNoToName) regNo
     pprReg (RegVirtual r) = panic $ "RISCV64.Ppr.ppr: Unexpected virtual register " ++ show r
 
     pprJ :: IsLine doc => Target -> doc
@@ -164,6 +164,7 @@ pprInstr platform instr = case instr of
     pprBlockId blockId = pprAsmLabel platform (mkLocalBlockLabel (getUnique blockId))
 
 
+
 -- aarch64 GNU as uses // for comments.
 asmComment :: SDoc -> SDoc
 asmComment c = whenPprDebug $ text "#" <+> c
@@ -173,3 +174,70 @@ asmDoubleslashComment c = whenPprDebug $ text "//" <+> c
 
 asmMultilineComment :: SDoc -> SDoc
 asmMultilineComment c = whenPprDebug $ text "/*" $+$ c $+$ text "*/"
+
+regNoToName :: RegNo -> String
+regNoToName  0 = "zero"
+regNoToName  1 = "ra"
+regNoToName  2 = "sp"
+regNoToName  3 = "gp"
+regNoToName  4 = "tp"
+regNoToName  5 = "t0"
+regNoToName  6 = "t1"
+regNoToName  7 = "t2"
+regNoToName  8 = "s0"
+regNoToName  9 = "s1"
+regNoToName 10 = "a0"
+regNoToName 11 = "a1"
+regNoToName 12 = "a2"
+regNoToName 13 = "a3"
+regNoToName 14 = "a4"
+regNoToName 15 = "a5"
+regNoToName 16 = "a6"
+regNoToName 17 = "a7"
+regNoToName 18 = "s2"
+regNoToName 19 = "s3"
+regNoToName 20 = "s4"
+regNoToName 21 = "s5"
+regNoToName 22 = "s6"
+regNoToName 23 = "s7"
+regNoToName 24 = "s8"
+regNoToName 25 = "s9"
+regNoToName 26 = "s10"
+regNoToName 27 = "s11"
+regNoToName 28 = "t3"
+regNoToName 29 = "t4"
+regNoToName 30 = "t5"
+regNoToName 31 = "t6"
+regNoToName 32 = "ft0"
+regNoToName 33 = "ft1"
+regNoToName 34 = "ft2"
+regNoToName 35 = "ft3"
+regNoToName 36 = "ft4"
+regNoToName 37 = "ft5"
+regNoToName 38 = "ft6"
+regNoToName 39 = "ft7"
+regNoToName 40 = "fs0"
+regNoToName 41 = "fs1"
+regNoToName 42 = "fa0"
+regNoToName 43 = "fa1"
+regNoToName 44 = "fa2"
+regNoToName 45 = "fa3"
+regNoToName 46 = "fa4"
+regNoToName 47 = "fa5"
+regNoToName 48 = "fa6"
+regNoToName 49 = "fa7"
+regNoToName 50 = "fs2"
+regNoToName 51 = "fs3"
+regNoToName 52 = "fs4"
+regNoToName 53 = "fs5"
+regNoToName 54 = "fs6"
+regNoToName 55 = "fs7"
+regNoToName 56 = "fs8"
+regNoToName 57 = "fs9"
+regNoToName 58 = "fs10"
+regNoToName 59 = "fs11"
+regNoToName 60 = "ft8"
+regNoToName 61 = "ft9"
+regNoToName 62 = "ft10"
+regNoToName 63 = "ft11"
+regNoToName regNo = panic $ "RISCV64: regToName: Unknown register number " ++ show regNo
