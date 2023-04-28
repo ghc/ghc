@@ -338,6 +338,7 @@ unblock:
     // just run the thread now, if the BH is not really available,
     // we'll block again.
     tso->why_blocked = NotBlocked;
+    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
     appendToRunQueue(cap,tso);
 
     // We used to set the context switch flag here, which would

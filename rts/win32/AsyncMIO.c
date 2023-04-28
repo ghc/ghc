@@ -322,6 +322,7 @@ start:
                         // Terminates the run queue + this inner for-loop.
                         tso->_link = END_TSO_QUEUE;
                         tso->why_blocked = NotBlocked;
+                        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
                         // save the StgAsyncIOResult in the
                         // stg_block_async_info stack frame, because
                         // the block_info field will be overwritten by
