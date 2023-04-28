@@ -75,9 +75,25 @@ Note [Imported unlifted nullary datacon wrappers must have correct LFInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As described in `Note [Conveying CAF-info and LFInfo between modules]`,
 imported unlifted nullary datacons must have their LambdaFormInfo set to
-reflect the fact that they are evaluated . This is necessary as otherwise
+reflect the fact that they are evaluated. This is necessary as otherwise
 references to them may be passed untagged to code that expects tagged
-references.
+references because of the unlifted nature of the argument.
+
+For example, in
+
+   type T :: UnliftedType
+   data T = T1
+          | T2
+
+   f :: T -> Int
+   f x = case x of T1 -> 1; T2 -> 2
+
+`f` expects `x` to be evaluated and properly tagged due to its unliftedness.
+We can guarantee all occurrences of `T1` and `T2` are considered evaluated and
+are properly tagged by giving them the `LFCon` LambdaFormInfo which indicates
+they are fully saturated constructor applications.
+(The LambdaFormInfo is used to tag the pointer with the tag of the
+constructor, in `litIdInfo`)
 
 What may be less obvious is that this must be done for not only datacon
 workers but also *wrappers*. The reason is found in this program
@@ -109,11 +125,9 @@ pointer to `fieldsSam`. This is problematic as `fieldsSam` may take advantage
 of the unlifted nature of its arguments by omitting handling of the zero
 tag when scrutinising them.
 
-The fix is straightforward: extend the logic in `mkLFImported` to cover
-(nullary) datacon wrappers as well as workers. This is safe because we
-know that the wrapper of a nullary datacon will be in WHNF, even if it
-includes equalities evidence (since such equalities are not runtime
-relevant). This fixed #23146.
+The fix is straightforward: ensure we always construct a /correct/ LFInfo for
+datacon workers and wrappers, and populate the `lfInfo` with it. See
+Note [LFInfo of DataCon workers and wrappers]. This fixed #23146.
 
 See also Note [The LFInfo of Imported Ids]
 -}

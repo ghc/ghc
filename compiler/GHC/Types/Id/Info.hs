@@ -123,7 +123,8 @@ infixl  1 `setRuleInfo`,
           `setCafInfo`,
           `setDmdSigInfo`,
           `setCprSigInfo`,
-          `setDemandInfo`
+          `setDemandInfo`,
+          `setLFInfo`
 {-
 ************************************************************************
 *                                                                      *
@@ -401,7 +402,12 @@ data IdInfo
         --
         -- See documentation of the getters for what these packed fields mean.
         lfInfo          :: !(Maybe LambdaFormInfo),
-        -- ^ See Note [The LFInfo of Imported Ids] in GHC.StgToCmm.Closure
+        -- ^ If lfInfo = Just info, then the `info` is guaranteed /correct/.
+        --   If lfInfo = Nothing, then we do not have a `LambdaFormInfo` for this Id,
+        --                so (for imported Ids) we make a conservative version.
+        --                See Note [The LFInfo of Imported Ids] in GHC.StgToCmm.Closure
+        -- For locally-defined Ids other than DataCons, the `lfInfo` field is always Nothing.
+        -- See also Note [LFInfo of DataCon workers and wrappers]
 
         -- See documentation of the getters for what these packed fields mean.
         tagSig          :: !(Maybe TagSig)
