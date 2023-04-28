@@ -251,7 +251,7 @@ static void collectDeadWeakPtrs (generation *gen, StgWeak **dead_weak_ptr_list)
  */
 static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_threads)
 {
-    StgTSO *t, *tmp, *next;
+    StgTSO *t, *next;
     bool flag = false;
 
     for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
@@ -272,11 +272,13 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
             t->global_link = END_TSO_QUEUE;
             continue;
         default:
-            tmp = t;
+        {
+            StgTSO *tmp = t;
             evacuate((StgClosure **)&tmp);
             tmp->global_link = *resurrected_threads;
             *resurrected_threads = tmp;
             flag = true;
+        }
         }
     }
 
@@ -387,18 +389,21 @@ static bool tidyWeakList(generation *gen)
 }
 
 /*
- * Walk over the `old_threads` list of the given generation and move any
- * reachable threads onto the `threads` list.
+ * Walk over the given generation's thread list and promote TSOs which are
+ * reachable via the heap. This will move the TSO from gen->old_threads to
+ * new_gen->threads.
+ *
+ * This has the side-effect of updating the global thread list to account for
+ * indirections introduced by evacuation.
  */
 static void tidyThreadList (generation *gen)
 {
-    StgTSO *t, *tmp, *next, **prev;
+    StgTSO *next;
+    StgTSO **prev = &gen->old_threads;
 
-    prev = &gen->old_threads;
+    for (StgTSO *t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
 
-    for (t = gen->old_threads; t != END_TSO_QUEUE; t = next) {
-
-        tmp = (StgTSO *)isAlive((StgClosure *)t);
+        StgTSO *tmp = (StgTSO *)isAlive((StgClosure *)t);
 
         if (tmp != NULL) {
             t = tmp;
@@ -426,10 +431,9 @@ static void tidyThreadList (generation *gen)
             *prev = next;
 
             // move this thread onto the correct threads list.
-            generation *new_gen;
-            new_gen = Bdescr((P_)t)->gen;
+            generation *new_gen = Bdescr((P_)t)->gen;
             t->global_link = new_gen->threads;
-            new_gen->threads  = t;
+            new_gen->threads = t;
         }
     }
 }

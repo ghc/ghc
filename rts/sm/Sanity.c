@@ -740,11 +740,10 @@ checkSTACK (StgStack *stack)
 void
 checkTSO(StgTSO *tso)
 {
-    StgTSO *next = tso->_link;
     const StgInfoTable *info = (const StgInfoTable*) tso->_link->header.info;
     load_load_barrier();
 
-    ASSERT(next == END_TSO_QUEUE ||
+    ASSERT(tso->_link == END_TSO_QUEUE ||
            info == &stg_MVAR_TSO_QUEUE_info ||
            info == &stg_TSO_info ||
            info == &stg_WHITEHOLE_info); // used to happen due to STM doing
