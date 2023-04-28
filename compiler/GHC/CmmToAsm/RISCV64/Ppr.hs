@@ -158,6 +158,7 @@ pprInstr platform instr = case instr of
     pprJ :: IsLine doc => Target -> doc
     pprJ (TBlock label) = text "\tj" <+> pprBlockId label
     pprJ (TLabel label) = text "\tj" <+> pprAsmLabel platform label
+    pprJ (TReg reg) = panic $ "RISCV64 - Ppr.pprJ: Cannot J (jump) to registers. Requested register " ++ show reg
 
     pprBlockId:: IsLine doc => BlockId -> doc
     pprBlockId blockId = pprAsmLabel platform (mkLocalBlockLabel (getUnique blockId))

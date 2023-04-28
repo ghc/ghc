@@ -29,6 +29,7 @@ mkVirtualReg u format
    | not (isFloatFormat format) = VirtualRegI u
    | otherwise
    = case format of
-        FF32    -> VirtualRegD u
-        FF64    -> VirtualRegD u
-        _       -> panic "RISCV64.mkVirtualReg"
+       -- TODO: Do we really need to widen FF32?
+       FF32    -> VirtualRegD u
+       FF64    -> VirtualRegD u
+       _       -> panic "RISCV64.mkVirtualReg"
