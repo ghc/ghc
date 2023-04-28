@@ -929,6 +929,7 @@ minusWcompatOpts :: [WarningFlag]
 minusWcompatOpts
     = [ Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
+      , Opt_WarnNonCanonicalMonadInstances
       , Opt_WarnCompatUnqualifiedImports
       , Opt_WarnTypeEqualityOutOfScope
       ]

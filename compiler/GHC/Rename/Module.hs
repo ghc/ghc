@@ -22,7 +22,6 @@ import {-# SOURCE #-} GHC.Rename.Expr( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSpliceDecl, rnTopSpliceDecls )
 
 import GHC.Hs
-import GHC.Types.Error
 import GHC.Types.FieldLabel
 import GHC.Types.Name.Reader
 import GHC.Rename.HsType
@@ -452,11 +451,9 @@ checkCanonicalInstances :: Name -> LHsSigType GhcRn -> LHsBinds GhcRn -> RnM ()
 checkCanonicalInstances cls poly_ty mbinds = do
     whenWOptM Opt_WarnNonCanonicalMonadInstances
         $ checkCanonicalMonadInstances
-        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
 
     whenWOptM Opt_WarnNonCanonicalMonoidInstances
         $ checkCanonicalMonoidInstances
-        "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
 
   where
     -- Warn about unsound/non-canonical 'Applicative'/'Monad' instance
@@ -472,19 +469,17 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --  * Warn if 'pure' is defined backwards (i.e. @pure = return@).
     --  * Warn if '(*>)' is defined backwards (i.e. @(*>) = (>>)@).
     --
-    checkCanonicalMonadInstances refURL
+    checkCanonicalMonadInstances
       | cls == applicativeClassName =
           forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == pureAName, isAliasMG mg == Just returnMName
-                      -> addWarnNonCanonicalMethod1 refURL
-                            Opt_WarnNonCanonicalMonadInstances "pure" "return"
+                      -> addWarnNonCanonicalMonad NonCanonical_Pure
 
                       | name == thenAName, isAliasMG mg == Just thenMName
-                      -> addWarnNonCanonicalMethod1 refURL
-                            Opt_WarnNonCanonicalMonadInstances "(*>)" "(>>)"
+                      -> addWarnNonCanonicalMonad NonCanonical_ThenA
 
                   _ -> return ()
 
@@ -494,12 +489,10 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == returnMName, isAliasMG mg /= Just pureAName
-                      -> addWarnNonCanonicalMethod2 refURL
-                            Opt_WarnNonCanonicalMonadInstances "return" "pure"
+                      -> addWarnNonCanonicalMonad NonCanonical_Return
 
                       | name == thenMName, isAliasMG mg /= Just thenAName
-                      -> addWarnNonCanonicalMethod2 refURL
-                            Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
+                      -> addWarnNonCanonicalMonad NonCanonical_ThenM
 
                   _ -> return ()
 
@@ -518,15 +511,14 @@ checkCanonicalInstances cls poly_ty mbinds = do
     --
     --  * Warn if '(<>)' is defined backwards (i.e. @(<>) = mappend@).
     --
-    checkCanonicalMonoidInstances refURL
+    checkCanonicalMonoidInstances
       | cls == semigroupClassName =
           forM_ (bagToList mbinds) $ \(L loc mbind) -> setSrcSpanA loc $
               case mbind of
                   FunBind { fun_id      = L _ name
                           , fun_matches = mg }
                       | name == sappendName, isAliasMG mg == Just mappendName
-                      -> addWarnNonCanonicalMethod1 refURL
-                            Opt_WarnNonCanonicalMonoidInstances "(<>)" "mappend"
+                      -> addWarnNonCanonicalMonoid NonCanonical_Sappend
 
                   _ -> return ()
 
@@ -536,9 +528,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
                   FunBind { fun_id = L _ name
                           , fun_matches = mg }
                       | name == mappendName, isAliasMG mg /= Just sappendName
-                      -> addWarnNonCanonicalMethod2 refURL
-                            Opt_WarnNonCanonicalMonoidInstances
-                            "mappend" "(<>)"
+                      -> addWarnNonCanonicalMonoid NonCanonical_Mappend
 
                   _ -> return ()
 
@@ -554,51 +544,14 @@ checkCanonicalInstances cls poly_ty mbinds = do
         , HsVar _ lrhsName  <- unLoc body  = Just (unLoc lrhsName)
     isAliasMG _ = Nothing
 
-    -- got "lhs = rhs" but expected something different
-    addWarnNonCanonicalMethod1 refURL flag lhs rhs = do
-        let dia = mkTcRnUnknownMessage $
-              mkPlainDiagnostic (WarningWithFlag flag) noHints $
-                vcat [ text "Noncanonical" <+>
-                       quotes (text (lhs ++ " = " ++ rhs)) <+>
-                       text "definition detected"
-                     , instDeclCtxt1 poly_ty
-                     , text "Move definition from" <+>
-                       quotes (text rhs) <+>
-                       text "to" <+> quotes (text lhs)
-                     , text "See also:" <+>
-                       text refURL
-                     ]
-        addDiagnostic dia
+    addWarnNonCanonicalMonoid reason =
+      addWarnNonCanonicalDefinition (NonCanonicalMonoid reason)
 
-    -- expected "lhs = rhs" but got something else
-    addWarnNonCanonicalMethod2 refURL flag lhs rhs = do
-        let dia = mkTcRnUnknownMessage $
-              mkPlainDiagnostic (WarningWithFlag flag) noHints $
-                vcat [ text "Noncanonical" <+>
-                       quotes (text lhs) <+>
-                       text "definition detected"
-                     , instDeclCtxt1 poly_ty
-                     , quotes (text lhs) <+>
-                       text "will eventually be removed in favour of" <+>
-                       quotes (text rhs)
-                     , text "Either remove definition for" <+>
-                       quotes (text lhs) <+> text "(recommended)" <+>
-                       text "or define as" <+>
-                       quotes (text (lhs ++ " = " ++ rhs))
-                     , text "See also:" <+>
-                       text refURL
-                     ]
-        addDiagnostic dia
+    addWarnNonCanonicalMonad reason =
+      addWarnNonCanonicalDefinition (NonCanonicalMonad reason)
 
-    -- stolen from GHC.Tc.TyCl.Instance
-    instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
-    instDeclCtxt1 hs_inst_ty
-      = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
-
-    inst_decl_ctxt :: SDoc -> SDoc
-    inst_decl_ctxt doc = hang (text "in the instance declaration for")
-                         2 (quotes doc <> text ".")
-
+    addWarnNonCanonicalDefinition reason =
+      addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeVars)
 rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds

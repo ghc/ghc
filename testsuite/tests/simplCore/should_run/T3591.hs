@@ -1,4 +1,4 @@
-{- 
+{-
     Copyright 2009 Mario Blazevic
 
     This file is part of the Streaming Component Combinators (SCC) project.
@@ -20,7 +20,7 @@
 -- | Module "Trampoline" defines the pipe computations and their basic building blocks.
 
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, MultiParamTypeClasses,
-             TypeFamilies, KindSignatures, FlexibleContexts, 
+             TypeFamilies, KindSignatures, FlexibleContexts,
              FlexibleInstances, OverlappingInstances, UndecidableInstances
  #-}
 
@@ -75,11 +75,10 @@ instance Functor Identity where
     fmap = liftM
 
 instance Applicative Identity where
-    pure  = return
+    pure a = Identity a
     (<*>) = ap
 
 instance Monad Identity where
-    return a = Identity a
     m >>= k  = k (runIdentity m)
 
 newtype Trampoline m s r = Trampoline {bounce :: m (TrampolineState m s r)}
@@ -89,11 +88,10 @@ instance (Monad m, Functor s) => Functor (Trampoline m s) where
   fmap = liftM
 
 instance (Monad m, Functor s) => Applicative (Trampoline m s) where
-  pure  = return
+  pure x = Trampoline (return (Done x))
   (<*>) = ap
 
 instance (Monad m, Functor s) => Monad (Trampoline m s) where
-   return x = Trampoline (return (Done x))
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))
@@ -111,7 +109,7 @@ instance Functor (Await x) where
 
 data EitherFunctor l r x = LeftF (l x) | RightF (r x)
 instance (Functor l, Functor r) => Functor (EitherFunctor l r) where
-   fmap f v = trace "fmap Either" $ 
+   fmap f v = trace "fmap Either" $
               case v of
                 LeftF l  -> trace "fmap LeftF" $ LeftF (fmap f l)
                 RightF r -> trace "fmap RightF" $ RightF (fmap f r)
@@ -178,7 +176,7 @@ liftOut :: forall m a d x. (Monad m, Functor a, AncestorFunctor a d) => Trampoli
 liftOut (Trampoline ma) = trace "liftOut" $ Trampoline (liftM inject ma)
    where inject :: TrampolineState m a x -> TrampolineState m d x
          inject (Done x) = Done x
-         inject (Suspend a) = trace "inject suspend" $ Suspend (liftFunctor $ trace "calling fmap" $ 
+         inject (Suspend a) = trace "inject suspend" $ Suspend (liftFunctor $ trace "calling fmap" $
                               fmap liftOut (trace "poking a" a))
 
 data Sink (m :: Type -> Type) a x =

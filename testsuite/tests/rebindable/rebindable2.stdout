@@ -1,18 +1,18 @@
 start test test_do failure
-++ >>
+++ *>
 ++ >>=
 ++ fail
 -- fail
 -- >>=
--- >>
+-- *>
 end test test_do failure
 start test test_do success
-++ >>
+++ *>
 ++ >>=
-++ return
--- return
+++ pure
+-- pure
 -- >>=
--- >>
+-- *>
 end test test_do success
 start test test_fromInteger
 135

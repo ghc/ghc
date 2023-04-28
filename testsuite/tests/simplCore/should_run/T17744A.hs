@@ -17,10 +17,9 @@ instance Functor (Parser t) where
    fmap f p = apply (fmap f) p
 
 instance Applicative (Parser t) where
-   pure = return
+   pure = Result mempty
 
 instance Monad (Parser t) where
-   return = Result mempty
    Result s r >>= f = feed s (f r)
    p >>= f = apply (>>= f) p
 

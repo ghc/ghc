@@ -34,12 +34,9 @@ import Control.Monad (MonadPlus(..),liftM)
 
 -- | The monad transformer that allows a monad to generate XML values.
 newtype XMLGenT m a = XMLGenT (m a)
-  deriving (Monad, Functor, MonadIO, MonadPlus, MonadWriter w, MonadReader r,
-            MonadState s, MonadRWS r w s, MonadCont, MonadError e)
-
-instance Monad m => Applicative (XMLGenT m) where
-  pure  = return
-  (<*>) = ap
+  deriving (Monad, Functor, Applicative, MonadIO, MonadPlus, MonadWriter w,
+            MonadReader r, MonadState s, MonadRWS r w s, MonadCont,
+            MonadError e)
 
 instance Monad m => Alternative (XMLGenT m) where
 

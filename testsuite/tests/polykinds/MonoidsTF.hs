@@ -103,11 +103,10 @@ instance (MId (→) m ~ (), MComp (→) m ~ (,), Monoidy (→) m)
   mempty = munit ()
 
 instance Applicative Wrapper where
-  pure  = return
+  pure x = runNT munit $ Id x
   (<*>) = ap
 
 instance Monad Wrapper where
-  return x = runNT munit $ Id x
   x >>= f = runNT mjoin $ FC (f `fmap` x)
 
 -- And so the following works:

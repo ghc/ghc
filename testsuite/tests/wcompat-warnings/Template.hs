@@ -13,3 +13,18 @@ instance Semi.Semigroup S where
 instance Monoid S where
   S a `mappend` S b = S (a+b)
   mempty = S 0
+
+newtype M a = M a
+
+instance Functor M where
+  fmap = undefined
+
+instance Applicative M where
+  liftA2 = undefined
+  pure = return
+  (*>) = (>>)
+
+instance Monad M where
+  return = undefined
+  (>>=) = undefined
+  (>>) = undefined

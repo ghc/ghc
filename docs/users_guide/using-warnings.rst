@@ -163,6 +163,7 @@ as ``-Wno-...`` for every individual warning in the group.
 
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
+        * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wcompat-unqualified-imports`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
 
@@ -566,7 +567,7 @@ of ``-W(no-)*``.
 
     :since: 8.0
 
-    :default: off
+    :default: on
 
     Warn if noncanonical ``Applicative`` or ``Monad`` instances
     declarations are detected.
@@ -583,6 +584,8 @@ of ``-W(no-)*``.
 
      * Warn if ``pure`` is defined backwards (i.e. ``pure = return``).
      * Warn if ``(*>)`` is defined backwards (i.e. ``(*>) = (>>)``).
+
+    This warning is  part of the :ghc-flag:`-Wcompat` option group.
 
 .. ghc-flag:: -Wnoncanonical-monadfail-instances
     :shortdesc: *(deprecated)*
@@ -610,6 +613,8 @@ of ``-W(no-)*``.
 
     :since: 8.0
 
+    :default: on
+
     Warn if noncanonical ``Semigroup`` or ``Monoid`` instances
     declarations are detected.
 
@@ -625,8 +630,7 @@ of ``-W(no-)*``.
 
      * Warn if ``(<>)`` is defined backwards (i.e. ``(<>) = mappend``).
 
-    This warning is off by default. However, it is part of the
-    :ghc-flag:`-Wcompat` option group.
+    This warning is  part of the :ghc-flag:`-Wcompat` option group.
 
 .. ghc-flag:: -Wmissing-monadfail-instances
     :shortdesc: *(deprecated)*

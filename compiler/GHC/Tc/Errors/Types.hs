@@ -116,6 +116,9 @@ module GHC.Tc.Errors.Types (
   , UnusedImportName (..)
   , NestedForallsContextsIn(..)
   , UnusedNameProv(..)
+  , NonCanonicalDefinition(..)
+  , NonCanonical_Monoid(..)
+  , NonCanonical_Monad(..)
   ) where
 
 import GHC.Prelude
@@ -4037,6 +4040,19 @@ data TcRnMessage where
                              -- ^ The locations of the duplicates
                           -> TcRnMessage
 
+  {-| TcRnNonCanonicalDefinition is a warning indicating that an instance
+    defines an implementation for a method that should not be defined in a way
+    that deviates from its default implementation, for example because it has
+    been scheduled to be absorbed into another method, like @pure@ making
+    @return@ obsolete.
+
+    Test cases:
+      WCompatWarningsOn, WCompatWarningsOff, WCompatWarningsOnOff
+  -}
+  TcRnNonCanonicalDefinition :: !NonCanonicalDefinition -- ^ Specifics
+                             -> !(LHsSigType GhcRn) -- ^ The instance type
+                             -> TcRnMessage
+
   deriving Generic
 
 -- | Things forbidden in @type data@ declarations.
@@ -5567,3 +5583,34 @@ data UnusedNameProv
   | UnusedNameTypePattern
   | UnusedNameMatch
   | UnusedNameLocalBind
+
+-- | Different reasons for TcRnNonCanonicalDefinition.
+data NonCanonicalDefinition =
+  -- | Related to @(<>)@ and @mappend@.
+  NonCanonicalMonoid NonCanonical_Monoid
+  |
+  -- | Related to @(*>)@/@(>>)@ and @pure@/@return@.
+  NonCanonicalMonad NonCanonical_Monad
+  deriving (Generic)
+
+-- | Possible cases for the -Wnoncanonical-monoid-instances.
+data NonCanonical_Monoid =
+  -- | @(<>) = mappend@ was defined.
+  NonCanonical_Sappend
+  |
+  -- | @mappend@ was defined as something other than @(<>)@.
+  NonCanonical_Mappend
+
+-- | Possible cases for the -Wnoncanonical-monad-instances.
+data NonCanonical_Monad =
+  -- | @pure = return@ was defined.
+  NonCanonical_Pure
+  |
+  -- | @(*>) = (>>)@ was defined.
+  NonCanonical_ThenA
+  |
+  -- | @return@ was defined as something other than @pure@.
+  NonCanonical_Return
+  |
+  -- | @(>>)@ was defined as something other than @(*>)@.
+  NonCanonical_ThenM

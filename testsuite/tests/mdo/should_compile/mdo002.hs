@@ -13,11 +13,10 @@ instance Functor X where
   fmap f (X a) = X (f a)
 
 instance Applicative X where
-  pure  = return
+  pure  = X
   (<*>) = ap
 
 instance Monad X where
-  return      = X
   (X a) >>= f = f a
 
 instance MonadFix X where

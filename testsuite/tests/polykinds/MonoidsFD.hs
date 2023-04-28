@@ -25,7 +25,7 @@ class Monoidy to comp id m | m to → comp id where
 
 -- We use functional dependencies to help the typechecker understand that
 -- m and ~> uniquely determine comp (times) and id.
--- 
+--
 -- This kind of type class would not have been possible in previous
 -- versions of GHC; with the new kind system, however, we can abstract
 -- over kinds!2 Now, let’s create types for the additive and
@@ -89,18 +89,17 @@ instance Monoidy (→) (,) () m ⇒ Monoid m where
   mempty = munit ()
 
 instance Applicative Wrapper where
-  pure  = return
+  pure x = runNT munit $ Id x
   (<*>) = ap
 
 -- instance (Functor m, Monoidy NT FC Id m) ⇒ Monad m where
 instance Monad Wrapper where
-   return x = runNT munit $ Id x
    x >>= f = runNT mjoin $ FC (f `fmap` x)
 
 -- And so the following works:
 
 test3
- = do { print (mappend mempty (Sum 2))  
+ = do { print (mappend mempty (Sum 2))
              -- Sum 2
       ; print (mappend (Product 2) (Product 3))
              -- Product 6

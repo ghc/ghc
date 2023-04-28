@@ -1859,6 +1859,9 @@ instance Diagnostic TcRnMessage where
            locations =
              text "Bound at:"
              <+> vcat (map ppr (sortBy leftmost_smallest (NE.toList locs)))
+    TcRnNonCanonicalDefinition reason inst_ty
+      -> mkSimpleDecorated $
+         pprNonCanonicalDefinition inst_ty reason
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2484,6 +2487,11 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnBindingNameConflict{}
       -> ErrorWithoutFlag
+    TcRnNonCanonicalDefinition (NonCanonicalMonoid _) _
+      -> WarningWithFlag Opt_WarnNonCanonicalMonoidInstances
+    TcRnNonCanonicalDefinition (NonCanonicalMonad _) _
+      -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
+
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3145,6 +3153,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnBindingNameConflict{}
       -> noHints
+    TcRnNonCanonicalDefinition reason _
+      -> suggestNonCanonicalDefinition reason
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
@@ -5451,3 +5461,78 @@ pprAmbiguousGreName gre
         | otherwise
         = pprPanic "addNameClassErrRn" (ppr gre)
           -- Invariant: either 'lcl' is True or 'iss' is non-empty
+
+pprNonCanonicalDefinition :: LHsSigType GhcRn
+                          -> NonCanonicalDefinition
+                          -> SDoc
+pprNonCanonicalDefinition inst_ty = \case
+  NonCanonicalMonoid sub -> case sub of
+    NonCanonical_Sappend ->
+      msg1 "(<>)" "mappend"
+    NonCanonical_Mappend ->
+      msg2 "mappend" "(<>)"
+  NonCanonicalMonad sub -> case sub of
+    NonCanonical_Pure ->
+      msg1 "pure" "return"
+    NonCanonical_ThenA ->
+      msg1 "(*>)" "(>>)"
+    NonCanonical_Return ->
+      msg2 "return" "pure"
+    NonCanonical_ThenM ->
+      msg2 "(>>)" "(*>)"
+  where
+    msg1 :: String -> String -> SDoc
+    msg1 lhs rhs =
+      vcat [ text "Noncanonical" <+>
+            quotes (text (lhs ++ " = " ++ rhs)) <+>
+            text "definition detected"
+          , inst
+          ]
+
+    msg2 :: String -> String -> SDoc
+    msg2 lhs rhs =
+      vcat [ text "Noncanonical" <+>
+            quotes (text lhs) <+>
+            text "definition detected"
+          , inst
+          , quotes (text lhs) <+>
+            text "will eventually be removed in favour of" <+>
+            quotes (text rhs)
+          ]
+
+    inst = instDeclCtxt1 inst_ty
+
+    -- stolen from GHC.Tc.TyCl.Instance
+    instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+    instDeclCtxt1 hs_inst_ty
+      = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+
+    inst_decl_ctxt :: SDoc -> SDoc
+    inst_decl_ctxt doc = hang (text "in the instance declaration for")
+                         2 (quotes doc <> text ".")
+
+suggestNonCanonicalDefinition :: NonCanonicalDefinition -> [GhcHint]
+suggestNonCanonicalDefinition reason =
+  [action doc]
+  where
+    action = case reason of
+      NonCanonicalMonoid sub -> case sub of
+        NonCanonical_Sappend -> move sappendName mappendName
+        NonCanonical_Mappend -> remove mappendName sappendName
+      NonCanonicalMonad sub -> case sub of
+        NonCanonical_Pure -> move pureAName returnMName
+        NonCanonical_ThenA -> move thenAName thenMName
+        NonCanonical_Return -> remove returnMName pureAName
+        NonCanonical_ThenM -> remove thenMName thenAName
+
+    move = SuggestMoveNonCanonicalDefinition
+    remove = SuggestRemoveNonCanonicalDefinition
+
+    doc = case reason of
+      NonCanonicalMonoid _ -> doc_monoid
+      NonCanonicalMonad _ -> doc_monad
+
+    doc_monoid =
+      "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
+    doc_monad =
+      "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"

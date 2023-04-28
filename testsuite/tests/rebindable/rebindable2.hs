@@ -24,16 +24,15 @@ module Main where
           };
         instance (Applicative TM) where
           {
-            pure  = return;
+            pure a = MkTM (debugFunc "pure" (Prelude.pure a));
+            (*>) ma mb = MkTM (debugFunc "*>" ((Prelude.*>) (unTM ma) (unTM mb)));
             (<*>) = ap;
           };
         instance (Monad TM) where
                 {
-                return a = MkTM (debugFunc "return" (Prelude.return a));
-
+                return = pure;
                 (>>=) ma amb = MkTM (debugFunc ">>=" ((Prelude.>>=) (unTM ma) (\a -> unTM (amb a))));
-
-                (>>) ma mb = MkTM (debugFunc ">>" ((Prelude.>>) (unTM ma) (unTM mb)));
+                (>>) = (*>)
                 };
         instance (MonadFail TM) where
                 {

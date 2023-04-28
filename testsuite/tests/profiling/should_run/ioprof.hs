@@ -10,13 +10,13 @@ newtype M s a = M { unM :: s -> (s,a) }
 instance Monad (M s) where
   (M m) >>= k = M $ \s -> case m s of
                             (s',a) -> unM (k a) s'
-  return a = M $ \s -> (s,a)
+
 
 instance Functor (M s) where
     fmap = liftM
 
 instance Applicative (M s) where
-    pure  = return
+    pure a = M $ \s -> (s,a)
     (<*>) = ap
 
 errorM :: String -> M s a

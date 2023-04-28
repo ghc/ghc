@@ -598,6 +598,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalInferredTyVars"                     = 54832
   GhcDiagnosticCode "TcRnAmbiguousName"                             = 87543
   GhcDiagnosticCode "TcRnBindingNameConflict"                       = 10498
+  GhcDiagnosticCode "NonCanonicalMonoid"                            = 50928
+  GhcDiagnosticCode "NonCanonicalMonad"                             = 22705
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -856,6 +858,7 @@ type family ConRecursInto con where
   ConRecursInto "DodgyImportsHiding"       = 'Just ImportLookupReason
   ConRecursInto "TcRnImportLookup"         = 'Just ImportLookupReason
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
+  ConRecursInto "TcRnNonCanonicalDefinition" = 'Just NonCanonicalDefinition
 
     --
     -- TH errors

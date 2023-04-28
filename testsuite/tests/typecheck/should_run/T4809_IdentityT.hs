@@ -19,9 +19,8 @@ data XML
 -- * IdentityT Monad Transformer
 
 newtype IdentityT m a = IdentityT { runIdentityT :: m a }
-    deriving (Functor, Monad, MonadIO, MonadPlus)
+    deriving (Functor, Applicative, Monad, MonadIO, MonadPlus)
 
-instance Monad m => Applicative (IdentityT m) where
 instance Monad m => Alternative (IdentityT m) where
 
 instance MonadTrans IdentityT where

@@ -18,7 +18,10 @@ newtype StrictPrim s a
 
 instance Applicative (StrictPrim s) where
     {-# INLINE pure #-}
-    pure = return
+    pure !x = StrictPrim ( \ !s -> (# s, x #))
+
+    {-# INLINE (*>) #-}
+    (!m) *> (!k) = do { _ <- m ;  k }
 
     {-# INLINE (<*>) #-}
     (<*>) a b = do f <- a ; v <- b ; return $! (f $! v)
@@ -31,11 +34,6 @@ instance Functor (StrictPrim s) where
 
 
 instance Monad (StrictPrim s) where
-    {-# INLINE return #-}
-    return !x = StrictPrim ( \ !s -> (# s, x #))
-
-    {-# INLINE (>>) #-}
-    (!m) >> (!k) = do { _ <- m ;  k }
 
     {-# INLINE (>>=) #-}
     (StrictPrim !m) >>= (!k) =

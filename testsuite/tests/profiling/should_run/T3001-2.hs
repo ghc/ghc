@@ -90,21 +90,19 @@ instance Functor PutM where
         fmap f m = Put $ let PairS a w = unPut m in PairS (f a) w
 
 instance Monad PutM where
-    return a = Put $ PairS a mempty
-
     m >>= k  = Put $
         let PairS a w  = unPut m
             PairS b w' = unPut (k a)
         in PairS b (w `mappend` w')
 
-    m >> k  = Put $
+instance Applicative PutM where
+    pure a = Put $ PairS a mempty
+    (<*>) = ap
+
+    m *> k  = Put $
         let PairS _ w  = unPut m
             PairS b w' = unPut k
         in PairS b (w `mappend` w')
-
-instance Applicative PutM where
-    pure  = return
-    (<*>) = ap
 
 tell :: Builder -> Put
 tell b = Put $ PairS () b
@@ -189,9 +187,6 @@ joinZ bb lb
     | otherwise = L.Chunk bb lb
 
 instance Monad Get where
-    return a  = Get (\s -> (a, s))
-    {-# INLINE return #-}
-
     m >>= k   = Get (\s -> let (a, s') = unGet m s
                            in unGet (k a) s')
     {-# INLINE (>>=) #-}
@@ -200,7 +195,9 @@ instance MonadFail Get where
     fail      = error "failDesc"
 
 instance Applicative Get where
-    pure  = return
+    pure a  = Get (\s -> (a, s))
+    {-# INLINE pure #-}
+
     (<*>) = ap
 
 getZ :: Get S

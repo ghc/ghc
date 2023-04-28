@@ -234,6 +234,17 @@ instance Outputable GhcHint where
       -> text "Enable Safe Haskell through either Safe, Trustworthy or Unsafe."
     SuggestRemoveRecordWildcard
       -> text "Omit the" <+> quotes (text "..")
+    SuggestMoveNonCanonicalDefinition lhs rhs refURL ->
+      text "Move definition from" <+>
+      quotes (pprPrefixUnqual rhs) <+>
+      text "to" <+> quotes (pprPrefixUnqual lhs) $$
+      text "See also:" <+> text refURL
+    SuggestRemoveNonCanonicalDefinition lhs rhs refURL ->
+      text "Either remove definition for" <+>
+      quotes (pprPrefixUnqual lhs) <+> text "(recommended)" <+>
+      text "or define as" <+>
+      quotes (pprPrefixUnqual lhs <+> text "=" <+> pprPrefixUnqual rhs) $$
+      text "See also:" <+> text refURL
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
@@ -343,3 +354,7 @@ pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
     pp_ns rdr | ns /= tried_ns = pprNameSpace ns
               | otherwise      = empty
       where ns = rdrNameSpace rdr
+
+pprPrefixUnqual :: Name -> SDoc
+pprPrefixUnqual name =
+  pprPrefixOcc (getOccName name)

@@ -438,6 +438,21 @@ data GhcHint
         bind anything useful.
     -}
   | SuggestRemoveRecordWildcard
+    {-| Suggest moving a method implementation to a different instance to its
+      superclass that defines the canonical version of the method.
+    -}
+  | SuggestMoveNonCanonicalDefinition
+    Name -- ^ move the implementation from this method
+    Name -- ^ ... to this method
+    String -- ^ Documentation URL
+
+    {-| Suggest removing a method implementation when a superclass defines the
+      canonical version of that method.
+    -}
+  | SuggestRemoveNonCanonicalDefinition
+    Name -- ^ method with non-canonical implementation
+    Name -- ^ possible other method to use as the RHS instead
+    String -- ^ Documentation URL
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way
