@@ -34,6 +34,7 @@ import qualified GHC.CmmToAsm.X86.Regs       as X86
 import qualified GHC.CmmToAsm.X86.RegInfo    as X86
 import qualified GHC.CmmToAsm.PPC.Regs       as PPC
 import qualified GHC.CmmToAsm.AArch64.Regs   as AArch64
+import qualified GHC.CmmToAsm.RISCV64.Regs as RISCV64
 
 
 targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> Int
@@ -107,7 +108,7 @@ targetMkVirtualReg platform
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
-      ArchRISCV64   -> panic "targetMkVirtualReg ArchRISCV64"
+      ArchRISCV64   -> RISCV64.mkVirtualReg
       ArchLoongArch64->panic "targetMkVirtualReg ArchLoongArch64"
       ArchJavaScript-> panic "targetMkVirtualReg ArchJavaScript"
       ArchWasm32    -> panic "targetMkVirtualReg ArchWasm32"
