@@ -96,6 +96,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
+import GHC.Data.Maybe (isNothing)
 
 import Data.Coerce (coerce)
 import qualified Data.ByteString.Char8 as BS8
@@ -255,130 +256,67 @@ mkApLFInfo id upd_flag arity
         (mightBeFunTy (idType id))
 
 -------------
+-- | Make a 'LambdaFormInfo' for an imported Id.
+--   See Note [The LFInfo of Imported Ids]
 mkLFImported :: Id -> LambdaFormInfo
 mkLFImported id =
     -- See Note [Conveying CAF-info and LFInfo between modules] in
     -- GHC.StgToCmm.Types
     case idLFInfo_maybe id of
       Just lf_info ->
-        -- Use the LambdaFormInfo from the interface
+        -- Use the existing LambdaFormInfo
         lf_info
       Nothing
-        -- Interface doesn't have a LambdaFormInfo, so make a conservative one from the type.
-        -- See Note [The LFInfo of Imported Ids]; The order of the guards musn't be changed!
+        -- Doesn't have a LambdaFormInfo, but we know it must be 'LFReEntrant' from its arity
         | arity > 0
         -> LFReEntrant TopLevel arity True ArgUnknown
 
-        | Just con <- isDataConId_maybe id
-          -- See Note [Imported unlifted nullary datacon wrappers must have correct LFInfo] in GHC.StgToCmm.Types
-          -- and Note [The LFInfo of Imported Ids] below
-        -> assert (hasNoNonZeroWidthArgs con) $
-           LFCon con   -- An imported nullary constructor
-                       -- We assume that the constructor is evaluated so that
-                       -- the id really does point directly to the constructor
-
+        -- We can't be sure of the LambdaFormInfo of this imported Id,
+        -- so make a conservative one from the type.
         | otherwise
-        -> mkLFArgument id -- Not sure of exact arity
+        -> assert (isNothing (isDataConId_maybe id)) $ -- See Note [LFInfo of DataCon workers and wrappers] in GHC.Types.Id.Make
+           mkLFArgument id -- Not sure of exact arity
   where
     arity = idFunRepArity id
-    hasNoNonZeroWidthArgs = all (isZeroBitTy . scaledThing) . dataConRepArgTys
 
 {-
 Note [The LFInfo of Imported Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As explained in Note [Conveying CAF-info and LFInfo between modules] and
-Note [Imported unlifted nullary datacon wrappers must have correct LFInfo], the
-LambdaFormInfo records the details of a closure representation and is often,
-when optimisations are enabled, serialized to the interface of a module.
+As explained in Note [Conveying CAF-info and LFInfo between modules]
+the LambdaFormInfo records the details of a closure representation and is
+often, when optimisations are enabled, serialized to the interface of a module.
 
-In particular, the `lfInfo` field of the `IdInfo` field of an `Id`
-* For Ids defined in this module: is `Nothing`
-* For imported Ids:
+In particular, the `lfInfo` field of the `IdInfo` field of an `Id`:
+* For DataCon workers and wrappers is populated as described in
+Note [LFInfo of DataCon workers and wrappers] in GHC.Types.Id.Make
+* For other Ids defined in the module being compiled: is `Nothing`
+* For other imported Ids:
   * is (Just lf_info) if the LFInfo was serialised into the interface file
     (typically, when the exporting module was compiled with -O)
   * is Nothing if it wasn't serialised
 
-However, when an interface doesn't have a LambdaFormInfo for some imported Id
-(so that its `lfInfo` field is `Nothing`), we can conservatively create one
-using `mkLFImported`.
-
 The LambdaFormInfo we give an Id is used in determining how to tag its pointer
-(see `litIdInfo`). Therefore, it's crucial we re-construct a LambdaFormInfo as
-faithfully as possible or otherwise risk having pointers incorrectly tagged,
-which can lead to performance issues and even segmentation faults (see #23231
-and #23146). In particular, saturated data constructor applications *must* be
-unambiguously given `LFCon`, and the invariant
+(see `litIdInfo` and `lfDynTag`). Therefore, it's crucial we attribute a correct
+LambdaFormInfo to imported Ids, or otherwise risk having pointers incorrectly
+tagged which can lead to performance issues and even segmentation faults (see
+#23231 and Note [Imported unlifted nullary datacon wrappers must have correct LFInfo]).
 
-  If the LFInfo (serialised or built with mkLFImported) says LFCon, then it
-  really is a static data constructor, and similar for LFReEntrant
+In particular, saturated data constructor applications *must* be unambiguously
+given `LFCon`, and if the LFInfo says LFCon, then it really is a static data
+constructor, and similar for LFReEntrant.
 
-must be upheld.
+In `mkLFImported`, we construct a LambdaFormInfo for imported Ids as follows:
 
-In `mkLFImported`, we make a conservative approximation to the real
-LambdaFormInfo as follows:
-
-(1) Ids with an `idFunRepArity > 0` are `LFReEntrant` and pointers to them are
-tagged (by `litIdInfo`) with the corresponding arity.
-    - This is also true of data con wrappers and workers with arity > 0,
-    regardless of the runtime relevance of the arguments
-    - For example, `Just :: a -> Maybe a` is given `LFReEntrant`
-               and `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too
-
-(2) Data constructors with `idFunRepArity == 0` should be given `LFCon` because
-they are fully saturated data constructor applications and pointers to them
-should be tagged with the constructor index.
-
-(2.1) A datacon *wrapper* with zero arity must be a fully saturated application
-of the worker to zero-width arguments only (which are dropped after unarisation)
-
-(2.2) A datacon *worker* with zero arity is trivially fully saturated, it takes
-no arguments whatsoever (not even zero-width args)
-
-To ensure we properly give `LFReEntrant` to data constructors with some arity,
-and `LFCon` only to data constructors with zero arity, we must first check for
-`arity > 0` and only afterwards `isDataConId` -- the order of the guards in
-`mkLFImported` is quite important.
-
-As an example, consider the following data constructors:
-
-  data T1 a where
-    TCon1 :: {-# UNPACK #-} !(a :~: True) -> T1 a
-
-  data T2 a where
-    TCon2 :: {-# UNPACK #-} !() -> T2 a
-
-  data T3 a where
-    TCon3 :: T3 '[]
-
-`TCon1`'s wrapper has a lifted equality argument, which is non-zero-width, while
-the worker has an unlifted equality argument, which is zero-width.
-
-`TCon2`'s wrapper has a lifted equality argument, which is non-zero-width,
-while the worker has no arguments.
-
-`TCon3`'s wrapper has no arguments, and the worker has 1 zero-width argument;
-their Core representation:
-
-  $WTCon3 :: T3 '[]
-  $WTCon3 = TCon3 @[] <Refl>
-
-  TCon3 :: forall (a :: * -> *). (a ~# []) => T a
-  TCon3 = /\a. \(co :: a~#[]). TCon3 co
-
-For `TCon1`, both the wrapper and worker will be given `LFReEntrant` since they
-both have arity == 1.
-
-For `TCon2`, the wrapper will be given `LFReEntrant` since it has arity == 1
-while the worker is `LFCon` since its arity == 0
-
-For `TCon3`, the wrapper will be given `LFCon` since its arity == 0 and the
-worker `LFReEntrant` since its arity == 1
-
-One might think we could give *workers* with only zero-width-args the `LFCon`
-LambdaFormInfo, e.g. give `LFCon` to the worker of `TCon1` and `TCon3`.
-However, these workers, albeit rarely used, are unambiguously functions
--- which makes `LFReEntrant`, the LambdaFormInfo we give them, correct.
-See also the discussion in #23158.
+(1) If the `lfInfo` field contains an LFInfo, we use that LFInfo which is
+correct by construction (the invariant being that if it exists, it is correct):
+  (1.1) Either it was serialised to the interface we're importing the Id from,
+  (1.2) Or it's a DataCon worker or wrapper and its LFInfo was constructed
+        according to Note [LFInfo of DataCon workers and wrappers]
+(2) When the `lfInfo` field is `Nothing`
+  (2.1) If the `idFunRepArity` of the Id is known and is greater than 0, then
+  the Id is unambiguously a function and is given `LFReEntrant`, and pointers
+  to this Id will be tagged (by `litIdInfo`) with the corresponding arity.
+  (2.2) Otherwise, we can make a conservative estimate from the type.
 
 -}
 

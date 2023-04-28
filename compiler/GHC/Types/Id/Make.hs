@@ -65,6 +65,7 @@ import GHC.Core.DataCon
 
 import GHC.Types.Literal
 import GHC.Types.SourceText
+import GHC.Types.RepType ( countFunRepArgs )
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Types.ForeignCall
@@ -86,6 +87,10 @@ import GHC.Utils.Panic.Plain
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import Data.List        ( zipWith4 )
+
+-- A bit of a shame we must import these here
+import GHC.StgToCmm.Types (LambdaFormInfo(..))
+import GHC.Runtime.Heap.Layout (ArgDescr(ArgUnknown))
 
 {-
 ************************************************************************
@@ -595,10 +600,17 @@ mkDataConWorkId wkr_name data_con
                    `setInlinePragInfo`     wkr_inline_prag
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
+                   `setLFInfo`             wkr_lf_info
           -- No strictness: see Note [Data-con worker strictness] in GHC.Core.DataCon
 
     wkr_inline_prag = defaultInlinePragma { inl_rule = ConLike }
     wkr_arity = dataConRepArity data_con
+
+    -- See Note [LFInfo of DataCon workers and wrappers]
+    wkr_lf_info
+      | wkr_arity == 0 = LFCon data_con
+      | otherwise      = LFReEntrant TopLevel (countFunRepArgs wkr_arity wkr_ty) True ArgUnknown
+                                            -- LFInfo stores post-unarisation arity
 
     ----------- Workers for newtypes --------------
     univ_tvs = dataConUnivTyVars data_con
@@ -608,6 +620,8 @@ mkDataConWorkId wkr_name data_con
                   `setArityInfo` 1      -- Arity 1
                   `setInlinePragInfo`     dataConWrapperInlinePragma
                   `setUnfoldingInfo`      newtype_unf
+                               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+                  `setLFInfo` (panic "mkDataConWorkId: we shouldn't look at LFInfo for newtype worker ids")
     id_arg1      = mkScaledTemplateLocal 1 (head arg_tys)
     res_ty_args  = mkTyCoVarTys univ_tvs
     newtype_unf  = assertPpr (null ex_tcvs && isSingleton arg_tys)
@@ -618,6 +632,89 @@ mkDataConWorkId wkr_name data_con
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
 {-
+Note [LFInfo of DataCon workers and wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As noted in Note [The LFInfo of Imported Ids] in GHC.StgToCmm.Closure, it's
+crucial that saturated data con applications are given an LFInfo of `LFCon`.
+
+Since for data constructors we never serialise the worker and the wrapper (only
+the data type declaration), we never serialise their lambda form info either.
+
+Therefore, when making data constructors workers and wrappers, we construct a
+correct `LFInfo` for them right away, and put it it in the `lfInfo` field of the
+worker/wrapper Id, ensuring that:
+
+  The `lfInfo` field of a DataCon worker or wrapper is always populated with the correct LFInfo.
+
+How do we construct a /correct/ LFInfo for workers and wrappers?
+(Remember: `LFCon` means "a saturated constructor application")
+
+(1) Data constructor workers and wrappers with arity > 0 are unambiguously
+functions and should be given `LFReEntrant`, regardless of the runtime
+relevance of the arguments.
+  - For example, `Just :: a -> Maybe a` is given `LFReEntrant`,
+             and `HNil :: (a ~# '[]) -> HList a` is given `LFReEntrant` too.
+
+(2) A datacon /worker/ with zero arity is trivially fully saturated -- it takes
+no arguments whatsoever (not even zero-width args), so it is given `LFCon`.
+
+(3) Perhaps surprisingly, a datacon /wrapper/ can be an `LFCon`. See Wrinkle (W1) below.
+A datacon /wrapper/ with zero arity must be a fully saturated application of
+the worker to zero-width arguments only (which are dropped after unarisation),
+and therefore is also given `LFCon`.
+
+For example, consider the following data constructors:
+
+  data T1 a where
+    TCon1 :: {-# UNPACK #-} !(a :~: True) -> T1 a
+
+  data T2 a where
+    TCon2 :: {-# UNPACK #-} !() -> T2 a
+
+  data T3 a where
+    TCon3 :: T3 '[]
+
+`TCon1`'s wrapper has a lifted argument, which is non-zero-width, while the
+worker has an unlifted equality argument, which is zero-width.
+
+`TCon2`'s wrapper has a lifted argument, which is non-zero-width, while the
+worker has no arguments.
+
+Wrinkle (W1). Perhaps surprisingly, it is possible for the /wrapper/ to be an
+`LFCon` even though the /worker/ is not. Consider `T3` above. Here is the
+Core representation of the worker and wrapper:
+
+  $WTCon3 :: T3 '[]             -- Wrapper
+  $WTCon3 = TCon3 @[] <Refl>    -- A saturated constructor application: LFCon
+
+  TCon3 :: forall (a :: * -> *). (a ~# []) => T a   -- Worker
+  TCon3 = /\a. \(co :: a~#[]). TCon3 co             -- A function: LFReEntrant
+
+For `TCon1`, both the wrapper and worker will be given `LFReEntrant` since they
+both have arity == 1.
+
+For `TCon2`, the wrapper will be given `LFReEntrant` since it has arity == 1
+while the worker is `LFCon` since its arity == 0
+
+For `TCon3`, the wrapper will be given `LFCon` since its arity == 0 and the
+worker `LFReEntrant` since its arity == 1
+
+One might think we could give *workers* with only zero-width-args the `LFCon`
+LambdaFormInfo, e.g. give `LFCon` to the worker of `TCon1` and `TCon3`.
+However, these workers are unambiguously functions
+-- which makes `LFReEntrant`, the LambdaFormInfo we give them, correct.
+See also the discussion in #23158.
+
+Wrinkles:
+
+(W1) Why do we panic when generating `LFInfo` for newtype workers and wrappers?
+
+  We don't generate code for newtype workers/wrappers, so we should never have to
+  look at their LFInfo (and in general we can't; they may be representation-polymorphic).
+
+See also the Note [Imported unlifted nullary datacon wrappers must have correct LFInfo]
+in GHC.StgToCmm.Types.
+
 -------------------------------------------------
 --         Data constructor representation
 --
@@ -709,10 +806,19 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
+                         `setLFInfo`            wrap_lf_info
 
              -- The signature is purely for passes like the Simplifier, not for
              -- DmdAnal itself; see Note [DmdAnal for DataCon wrappers].
              wrap_sig = mkClosedDmdSig wrap_arg_dmds topDiv
+
+             -- See Note [LFInfo of DataCon workers and wrappers]
+             wrap_lf_info
+               | wrap_arity == 0  = LFCon data_con
+               -- See W1 in Note [LFInfo of DataCon workers and wrappers]
+               | isNewTyCon tycon = panic "mkDataConRep: we shouldn't look at LFInfo for newtype wrapper ids"
+               | otherwise        = LFReEntrant TopLevel (countFunRepArgs wrap_arity wrap_ty) True ArgUnknown
+                                                      -- LFInfo stores post-unarisation arity
 
              wrap_arg_dmds =
                replicate (length theta) topDmd ++ map mk_dmd arg_ibangs

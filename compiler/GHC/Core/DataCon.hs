@@ -586,12 +586,22 @@ Function call 'dataConKindEqSpec' returns [k'~k]
 
 Note [DataCon arities]
 ~~~~~~~~~~~~~~~~~~~~~~
-A `DataCon`'s source arity and core representation arity may differ:
-`dcSourceArity` does not take constraints into account, but `dcRepArity` does.
+A `DataCon`'s source and core representation may differ, meaning the source
+arity (`dcSourceArity`) and the core representation arity (`dcRepArity`) may
+differ too.
 
-The additional arguments taken into account by `dcRepArity` include quantified
-dictionaries and coercion arguments, lifted and unlifted (despite the unlifted
-coercion arguments having a zero-width runtime representation).
+Note that the source arity isn't exactly the number of arguments the data con
+/wrapper/ has, since `dcSourceArity` doesn't count constraints -- which may
+appear in the wrapper through `DatatypeContexts`, or if the constructor stores a
+dictionary. In this sense, the source arity counts the number of non-constraint
+arguments that appear at the source level.
+  On the other hand, the Core representation arity is the number of arguments
+of the data constructor in its Core representation, which is also the number
+of arguments of the data con /worker/.
+
+The arity might differ since `dcRepArity` takes into account arguments such as
+quantified dictionaries and coercion arguments, lifted and unlifted (despite
+the unlifted coercion arguments having a zero-width runtime representation).
 For example:
    MkT :: Ord a => a -> T a
     dcSourceArity = 1
@@ -600,6 +610,15 @@ For example:
    MkU :: (b ~ '[]) => U b
     dcSourceArity = 0
     dcRepArity    = 1
+
+The arity might also differ due to unpacking, for example, consider the
+following datatype and its wrapper and worker's type:
+   data V = MkV !() !Int
+   $WMkV :: () -> Int -> V
+     MkV :: Int# -> V
+As you see, because of unpacking we have both dropped the unit argument and
+unboxed the Int. In this case, the source arity (which is the arity of the
+wrapper) is 2, while the Core representation arity (the arity of the worker) is 1.
 
 
 Note [DataCon user type variable binders]

@@ -271,8 +271,8 @@ isTagged v = do
                             TagProper -> True
                             TagTagged -> True
                             TagTuple _ -> True -- Consider unboxed tuples tagged.
-        False -- Imported
-            -> return $!
+        -- Imported
+        False -> return $!
                 -- Determine whether it is tagged from the LFInfo of the imported id.
                 -- See Note [The LFInfo of Imported Ids]
                 case mkLFImported v of

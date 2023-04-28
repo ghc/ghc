@@ -124,6 +124,10 @@ unwrapType ty
       | otherwise
       = NS_Done
 
+-- | Count the arity of a function post-unarisation, including zero-width arguments.
+--
+-- The post-unarisation arity may be larger than the arity of the original
+-- function type. See Note [Unarisation].
 countFunRepArgs :: Arity -> Type -> RepArity
 countFunRepArgs 0 _
   = 0
