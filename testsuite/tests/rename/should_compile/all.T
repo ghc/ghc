@@ -210,3 +210,4 @@ test('GHCINullaryRecordWildcard', combined_output, ghci_script, ['GHCINullaryRec
 test('GHCIImplicitImportNullaryRecordWildcard', combined_output, ghci_script, ['GHCIImplicitImportNullaryRecordWildcard.script'])
 test('T22122', [expect_broken(22122), extra_files(['T22122_aux.hs'])], multimod_compile, ['T22122', '-v0'])
 test('T23240', [req_th, extra_files(['T23240_aux.hs'])], multimod_compile, ['T23240', '-v0'])
+test('T23318', normal, compile, ['-Wduplicate-exports'])

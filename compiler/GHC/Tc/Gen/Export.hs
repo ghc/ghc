@@ -356,55 +356,51 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie occs ie@(IEThingAll ann n')
         = do
-            (n, kids) <- lookup_ie_all ie n'
-            let name = unLoc n
+            (par, kids) <- lookup_ie_all ie n'
+            let name = greName par
                 avails = map greName kids
-            occs' <- check_occs occs ie kids
+            occs' <- check_occs occs ie (par:kids)
             return $ Just
               ( occs'
-              , IEThingAll ann (replaceLWrappedName n' (unLoc n))
+              , IEThingAll ann (replaceLWrappedName n' name)
               , AvailTC name (name:avails))
 
     lookup_ie occs ie@(IEThingWith ann l wc sub_rdrs)
         = do
-            (lname, subs, with_gres)
+            (par_gre, subs, with_gres)
               <- addExportErrCtxt ie $ lookup_ie_with l sub_rdrs
 
-            (_, wc_gres) <-
+            wc_gres <-
               case wc of
-                NoIEWildcard -> return (lname, [])
-                IEWildcard _ -> lookup_ie_all ie l
+                NoIEWildcard -> return []
+                IEWildcard _ -> snd <$> lookup_ie_all ie l
 
-            let name = unLoc lname
-                all_names = name : map greName (with_gres ++ wc_gres)
-                gres = localVanillaGRE NoParent name
-                         -- localVanillaGRE might not be correct here,
-                         -- but these GREs are only passed to check_occs
-                         -- which only needs the correct Name for the GREs...
-                     :  with_gres ++ wc_gres
+            let par = greName par_gre
+                all_names = par : map greName (with_gres ++ wc_gres)
+                gres = par_gre : with_gres ++ wc_gres
 
             occs' <- check_occs occs ie gres
             return $ Just $
               ( occs'
-              , IEThingWith ann (replaceLWrappedName l name) wc subs
-              , AvailTC name all_names)
+              , IEThingWith ann (replaceLWrappedName l par) wc subs
+              , AvailTC par all_names)
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
 
     lookup_ie_with :: LIEWrappedName GhcPs -> [LIEWrappedName GhcPs]
-                   -> RnM (Located Name, [LIEWrappedName GhcRn], [GlobalRdrElt])
-    lookup_ie_with (L l rdr) sub_rdrs =
+                   -> RnM (GlobalRdrElt, [LIEWrappedName GhcRn], [GlobalRdrElt])
+    lookup_ie_with (L _ rdr) sub_rdrs =
       do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
          ; let name = greName gre
          ; kids <- lookupChildrenExport name sub_rdrs
          ; if isUnboundName name
-           then return (L (locA l) name, [], [gre])
-           else return (L (locA l) name, map fst kids, map snd kids) }
+           then return (gre, [], [gre])
+           else return (gre, map fst kids, map snd kids) }
 
     lookup_ie_all :: IE GhcPs -> LIEWrappedName GhcPs
-                  -> RnM (Located Name, [GlobalRdrElt])
-    lookup_ie_all ie (L l rdr) =
+                  -> RnM (GlobalRdrElt, [GlobalRdrElt])
+    lookup_ie_all ie (L _ rdr) =
       do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
          ; let name = greName gre
                gres = findChildren kids_env name
@@ -415,7 +411,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             else -- This occurs when you export T(..), but
                  -- only import T abstractly, or T is a synonym.
                  addErr (TcRnExportHiddenComponents ie)
-         ; return (L (locA l) name, gres) }
+         ; return (gre, gres) }
 
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (Maybe (IE GhcRn))
@@ -663,8 +659,9 @@ checkPatSynParent parent NoParent gre
 
 {-===========================================================================-}
 
--- | Check that the each of the given 'GlobalRdrElt's does not appear multiple
--- times in the 'ExportOccMap', as per Note [Exporting duplicate declarations].
+-- | Insert the given 'GlobalRdrElt's into the 'ExportOccMap', checking that
+-- each of the given 'GlobalRdrElt's does not appear multiple times in
+-- the 'ExportOccMap', as per Note [Exporting duplicate declarations].
 check_occs :: ExportOccMap -> IE GhcPs -> [GlobalRdrElt] -> RnM ExportOccMap
 check_occs occs ie gres
   -- 'gres' are the entities specified by 'ie'
