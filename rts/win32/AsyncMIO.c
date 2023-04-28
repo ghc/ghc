@@ -327,6 +327,7 @@ start:
                         // the block_info field will be overwritten by
                         // pushOnRunQueue().
                         tso->stackobj->sp[1] = (W_)tso->block_info.async_result;
+                        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
                         pushOnRunQueue(&MainCapability, tso);
                         break;
                     }

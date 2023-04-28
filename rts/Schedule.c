@@ -2590,6 +2590,7 @@ resumeThread (void *task_)
 
     /* Reset blocking status */
     tso->why_blocked  = NotBlocked;
+    tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
 
     if ((tso->flags & TSO_BLOCKEX) == 0) {
         // avoid locking the TSO if we don't have to

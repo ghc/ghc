@@ -261,6 +261,7 @@ static void notifyIOCompletion(Capability *cap, StgAsyncIOOp *aiop)
                  */
                 StgTSO *tso      = aiop->notify.tso;
                 tso->why_blocked = NotBlocked;
+                tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
                 tso->_link       = END_TSO_QUEUE;
                 pushOnRunQueue(cap, tso);
             }

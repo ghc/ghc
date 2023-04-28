@@ -297,8 +297,8 @@ void setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target);
 void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* -----------------------------------------------------------------------------
-   Invariants:
-
+   Note [TSO invariants]
+   ~~~~~~~~~~~~~~~~~~~~~
    An active thread has the following properties:
 
       tso->stack < tso->sp < tso->stack+tso->stack_size
@@ -313,7 +313,8 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
         tso->why_blocked       tso->block_info      location
         ----------------------------------------------------------------------
-        NotBlocked             END_TSO_QUEUE        runnable_queue, or running
+        NotBlocked             END_TSO_QUEUE        running
+        NotBlocked             prev TSO             runnable_queue (block_info.prev back-link)
 
         BlockedOnBlackHole     MessageBlackHole *   TSO->bq
 

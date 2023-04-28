@@ -106,6 +106,7 @@ static bool wakeUpSleepingThreads (Capability *cap, LowResTime now)
         }
         iomgr->sleeping_queue = tso->_link;
         RELAXED_STORE(&tso->why_blocked, NotBlocked);
+        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
         tso->_link = END_TSO_QUEUE;
         IF_DEBUG(scheduler, debugBelch("Waking up sleeping thread %"
                                        FMT_StgThreadID "\n", tso->id));
@@ -437,6 +438,7 @@ awaitCompletedTimeoutsOrIOSelect(Capability *cap, bool wait)
                       debugBelch("Waking up blocked thread %" FMT_StgThreadID "\n",
                                  tso->id));
                   tso->why_blocked = NotBlocked;
+                  tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
                   tso->_link = END_TSO_QUEUE;
                   pushOnRunQueue(cap,tso);
                   break;

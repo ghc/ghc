@@ -722,6 +722,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 
  done:
   RELAXED_STORE(&tso->why_blocked, NotBlocked);
+  tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
   appendToRunQueue(cap, tso);
 }
 
@@ -1087,6 +1088,7 @@ done:
     // wake it up
     if (tso->why_blocked != NotBlocked) {
         tso->why_blocked = NotBlocked;
+        tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
         appendToRunQueue(cap,tso);
     }
 

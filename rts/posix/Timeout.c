@@ -122,6 +122,7 @@ static void notifyTimeoutCompletion(Capability *cap, StgTimeout *timeout)
         {
             StgTSO *tso      = timeout->notify.tso;
             tso->why_blocked = NotBlocked;
+            tso->block_info.closure = (StgClosure *)END_TSO_QUEUE;
             tso->_link       = END_TSO_QUEUE;
             pushOnRunQueue(cap, tso);
             break;
@@ -226,4 +227,3 @@ struct timespec *timeoutInNanoseconds(CapIOManager *iomgr, bool wait,
 #endif
 
 #endif // defined(IOMGR_ENABLED_POLL)
-

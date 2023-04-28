@@ -767,7 +767,6 @@ checkSTACK (StgStack *stack)
  *
  * See #19146.
  */
-
 void
 checkTSO(StgTSO *tso)
 {
@@ -786,6 +785,14 @@ checkTSO(StgTSO *tso)
         || tso->why_blocked == NotBlocked
         ) {
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->block_info.closure));
+    }
+
+    /* See Note [TSO invariants] in TSO.h */
+    if (tso->why_blocked == NotBlocked) {
+      // When on a run queue we use block_info.prev as the back-link.
+      // Otherwise (running) we expect END_TSO_QUEUE.
+      ASSERT(tso->block_info.closure == (StgClosure *)END_TSO_QUEUE ||
+             get_itbl(tso->block_info.closure) == &stg_TSO_info);
     }
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(tso->bq));
