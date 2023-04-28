@@ -46,6 +46,7 @@ bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
 void printThreadBlockage (StgTSO *tso);
 void printThreadStatus (StgTSO *t);
 void printAllThreads (void);
+void printGlobalThreads(void);
 void printThreadQueue (StgTSO *t);
 #endif
 
