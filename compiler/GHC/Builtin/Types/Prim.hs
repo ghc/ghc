@@ -759,7 +759,7 @@ Wrinkles
 
 (W2) We need two absent-error Ids, aBSENT_ERROR_ID for types of kind Type, and
      aBSENT_CONSTRAINT_ERROR_ID for vaues of kind Constraint.  Ditto noInlineId
-     vs noInlieConstraintId in GHC.Types.Id.Make; see Note [inlineId magic].
+     vs noInlineConstraintId in GHC.Types.Id.Make; see Note [inlineId magic].
 
 (W3) We need a TypeOrConstraint flag in LitRubbish.
 
@@ -802,7 +802,7 @@ irretrievably overlap with:
 
 Wrinkles
 
-(W1) In GHC.Core.RoughMap.roughMtchTyConName we are careful to map
+(W1) In GHC.Core.RoughMap.roughMatchTyConName we are careful to map
      TYPE and CONSTRAINT to the same rough-map key.  Reason:
      If we insert (F @Constraint tys) into a FamInstEnv, and look
      up (F @Type tys'), we /must/ ensure that the (C @Constraint tys)

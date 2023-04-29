@@ -300,6 +300,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- Constraint solver diagnostic codes
   GhcDiagnosticCode "BadTelescope"                                  = 97739
   GhcDiagnosticCode "UserTypeError"                                 = 64725
+  GhcDiagnosticCode "UnsatisfiableError"                            = 22250
   GhcDiagnosticCode "ReportHoleError"                               = 88464
   GhcDiagnosticCode "UntouchableVariable"                           = 34699
   GhcDiagnosticCode "FixedRuntimeRepError"                          = 55287

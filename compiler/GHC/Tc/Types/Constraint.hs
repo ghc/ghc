@@ -16,7 +16,8 @@ module GHC.Tc.Types.Constraint (
         isPendingScDict, pendingScDict_maybe,
         superClassesMightHelp, getPendingWantedScs,
         isWantedCt, isGivenCt,
-        isUserTypeError, getUserTypeErrorMsg,
+        isTopLevelUserTypeError, containsUserTypeError, getUserTypeErrorMsg,
+        isUnsatisfiableCt_maybe,
         ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
@@ -118,8 +119,8 @@ import GHC.Core.TyCo.Ppr
 import GHC.Utils.FV
 import GHC.Types.Var.Set
 import GHC.Driver.Session (DynFlags(reductionDepth))
+import GHC.Builtin.Names
 import GHC.Types.Basic
-import GHC.Types.Unique
 import GHC.Types.Unique.Set
 
 import GHC.Utils.Outputable
@@ -134,7 +135,7 @@ import Data.Coerce
 import Data.Monoid ( Endo(..) )
 import qualified Data.Semigroup as S
 import Control.Monad ( msum, when )
-import Data.Maybe ( mapMaybe )
+import Data.Maybe ( mapMaybe, isJust )
 import Data.List.NonEmpty ( NonEmpty )
 
 -- these are for CheckTyEqResult
@@ -957,7 +958,7 @@ Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
 -- | A constraint is considered to be a custom type error, if it contains
 -- custom type errors anywhere in it.
 -- See Note [Custom type errors in constraints]
-getUserTypeErrorMsg :: PredType -> Maybe Type
+getUserTypeErrorMsg :: PredType -> Maybe ErrorMsgType
 getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
                                   : map getUserTypeErrorMsg (subTys pred)
   where
@@ -971,10 +972,30 @@ getUserTypeErrorMsg pred = msum $ userTypeError_maybe pred
                               Just (_,ts) -> ts
                  (t,ts) -> t : ts
 
-isUserTypeError :: PredType -> Bool
-isUserTypeError pred = case getUserTypeErrorMsg pred of
-                             Just _ -> True
-                             _      -> False
+-- | Is this an user error message type, i.e. either the form @TypeError err@ or
+-- @Unsatisfiable err@?
+isTopLevelUserTypeError :: PredType -> Bool
+isTopLevelUserTypeError pred =
+  isJust (userTypeError_maybe pred) || isJust (isUnsatisfiableCt_maybe pred)
+
+-- | Does this constraint contain an user error message?
+--
+-- That is, the type is either of the form @Unsatisfiable err@, or it contains
+-- a type of the form @TypeError msg@, either at the top level or nested inside
+-- the type.
+containsUserTypeError :: PredType -> Bool
+containsUserTypeError pred =
+  isJust (getUserTypeErrorMsg pred) || isJust (isUnsatisfiableCt_maybe pred)
+
+-- | Is this type an unsatisfiable constraint?
+-- If so, return the error message.
+isUnsatisfiableCt_maybe :: Type -> Maybe ErrorMsgType
+isUnsatisfiableCt_maybe t
+  | Just (tc, [msg]) <- splitTyConApp_maybe t
+  , tc `hasKey` unsatisfiableClassNameKey
+  = Just msg
+  | otherwise
+  = Nothing
 
 isPendingScDict :: Ct -> Bool
 isPendingScDict (CDictCan { cc_pend_sc = f }) = pendingFuel f
@@ -1297,12 +1318,16 @@ insolubleEqCt _                                  = False
 -- nested custom type errors: it only detects @TypeError msg :: Constraint@,
 -- and not e.g. @Eq (TypeError msg)@.
 insolubleCt :: Ct -> Bool
-insolubleCt ct
-  | Just _ <- userTypeError_maybe (ctPred ct)
-  -- Don't use 'isUserTypeErrorCt' here, as that function is too eager:
-  -- the TypeError might appear inside a type family application
-  -- which might later reduce, but we only want to return 'True'
+insolubleCt ct = isTopLevelUserTypeError (ctPred ct) || insolubleEqCt ct
+  where
+  -- NB: 'isTopLevelUserTypeError' detects constraints of the form "TypeError msg"
+  -- and "Unsatisfiable msg". It deliberately does not detect TypeError
+  -- nested in a type (e.g. it does not use "containsUserTypeError"), as that
+  -- would be too eager: the TypeError might appear inside a type family
+  -- application which might later reduce, but we only want to return 'True'
   -- for constraints that are definitely insoluble.
+  --
+  -- For example: Num (F Int (TypeError "msg")), where F is a type family.
   --
   -- Test case: T11503, with the 'Assert' type family:
   --
@@ -1310,9 +1335,6 @@ insolubleCt ct
   -- > type family Assert check errMsg where
   -- >   Assert 'True  _errMsg = ()
   -- >   Assert _check errMsg  = errMsg
-  = True
-  | otherwise
-  = insolubleEqCt ct
 
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]

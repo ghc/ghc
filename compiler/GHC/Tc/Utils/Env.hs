@@ -462,7 +462,7 @@ tcLookup name = do
     local_env <- getLclTypeEnv
     case lookupNameEnv local_env name of
         Just thing -> return thing
-        Nothing    -> (AGlobal <$> tcLookupGlobal name)
+        Nothing    -> AGlobal <$> tcLookupGlobal name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
 tcLookupTyVar name

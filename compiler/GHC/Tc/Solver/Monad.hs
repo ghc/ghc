@@ -59,7 +59,8 @@ module GHC.Tc.Solver.Monad (
     getTopEnv, getGblEnv, getLclEnv, setLclEnv,
     getTcEvBindsVar, getTcLevel,
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
-    tcLookupClass, tcLookupId,
+    tcLookupClass, tcLookupId, tcLookupTyCon,
+
 
     -- Inerts
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
@@ -134,7 +135,9 @@ import qualified GHC.Tc.Utils.Monad    as TcM
 import qualified GHC.Tc.Utils.TcMType  as TcM
 import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified GHC.Tc.Utils.Env      as TcM
-       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl
+       ( checkWellStaged, tcGetDefaultTys
+       , tcLookupClass, tcLookupId, tcLookupTyCon
+       , topIdLvl
        , tcInitTidyEnv )
 
 import GHC.Driver.Session
@@ -150,6 +153,8 @@ import GHC.Tc.Types
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Unify
+
+import GHC.Builtin.Names ( unsatisfiableClassNameKey )
 
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep as Rep
@@ -536,17 +541,25 @@ getInnermostGivenEqLevel :: TcS TcLevel
 getInnermostGivenEqLevel = do { inert <- getInertCans
                               ; return (inert_given_eq_lvl inert) }
 
+-- | Retrieves all insoluble constraints from the inert set,
+-- specifically including Given constraints.
+--
+-- This consists of:
+--
+--  - insoluble equalities, such as @Int ~# Bool@;
+--  - constraints that are top-level custom type errors, of the form
+--    @TypeError msg@, but not constraints such as @Eq (TypeError msg)@
+--    in which the type error is nested;
+--  - unsatisfiable constraints, of the form @Unsatisfiable msg@.
+--
+-- The inclusion of Givens is important for pattern match warnings, as we
+-- want to consider a pattern match that introduces insoluble Givens to be
+-- redundant (see Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver).
 getInertInsols :: TcS Cts
--- Returns insoluble equality constraints and TypeError constraints,
--- specifically including Givens.
---
--- Note that this function only inspects irreducible constraints;
--- a DictCan constraint such as 'Eq (TypeError msg)' is not
--- considered to be an insoluble constraint by this function.
---
--- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver.
 getInertInsols = do { inert <- getInertCans
-                    ; return $ filterBag insolubleCt (inert_irreds inert) }
+                    ; let irreds = inert_irreds inert
+                          unsats = findDictsByTyConKey (inert_dicts inert) unsatisfiableClassNameKey
+                    ; return $ unsats `unionBags` filterBag insolubleCt irreds }
 
 getInertGivens :: TcS [Ct]
 -- Returns the Given constraints in the inert set
@@ -1355,6 +1368,9 @@ tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
 
 tcLookupId :: Name -> TcS Id
 tcLookupId n = wrapTcS $ TcM.tcLookupId n
+
+tcLookupTyCon :: Name -> TcS TyCon
+tcLookupTyCon n = wrapTcS $ TcM.tcLookupTyCon n
 
 -- Any use of this function is a bit suspect, because it violates the
 -- pure veneer of TcS. But it's just about warnings around unused imports

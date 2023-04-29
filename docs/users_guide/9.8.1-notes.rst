@@ -93,6 +93,21 @@ Compiler
   with each other, communicating via the system semaphore specified by
   the flag argument.
 
+- GHC Proposal `#433
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst>`_
+  has been implemented. This adds the class ``Unsatisfiable :: ErrorMessage -> Constraint``
+  to the ``GHC.TypeError`` module. Constraints of the form ``Unsatisfiable msg``
+  provide a mechanism for custom type errors that reports the errors in a more
+  predictable behaviour than ``TypeError``, as these constraints are
+  handled purely during constraint solving.
+
+  For example: ::
+
+      instance Unsatisfiable (Text "There is no Eq instance for functions") => Eq (a -> b) where
+        (==) = unsatisfiable
+
+  This allows errors to be reported when users use the instance, even when
+  type errors are being deferred.
 
 GHCi
 ~~~~

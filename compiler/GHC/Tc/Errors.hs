@@ -588,6 +588,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+                 -- (Handles TypeError and Unsatisfiable)
 
               , given_eq_spec
               , ("insoluble2",      utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -643,7 +644,12 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
     non_tv_eq _ (EqPred NomEq ty1 _) = not (isTyVarTy ty1)
     non_tv_eq _ _                    = False
 
-    is_user_type_error item _ = isUserTypeError (errorItemPred item)
+    -- Catch TypeError and Unsatisfiable.
+    -- Here, we want any nested TypeErrors to bubble up, so we use
+    -- 'containsUserTypeError' and not 'isTopLevelUserTypeError'.
+    --
+    -- See also Note [Implementation of Unsatisfiable constraints], point (F).
+    is_user_type_error item _ = containsUserTypeError (errorItemPred item)
 
     is_homo_equality _ (EqPred _ ty1 ty2)
       = typeKind ty1 `tcEqType` typeKind ty2
@@ -786,8 +792,129 @@ Currently, the constraints to ignore are:
 
    If there is any trouble, checkValidFamInst bleats, aborting compilation.
 
--}
+Note [Implementation of Unsatisfiable constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Unsatisfiable constraint was introduced in GHC proposal #433 (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst).
+See Note [The Unsatisfiable constraint] in GHC.TypeError.
 
+Its implementation consists of the following:
+
+  A. The definitions.
+
+     The Unsatisfiable class is defined in GHC.TypeError, in base.
+     It consists of the following definitions:
+
+       type Unsatisfiable :: ErrorMessage -> Constraint
+       class Unsatisfiable msg where
+         unsatisfiableLifted :: a
+
+       unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+       unsatisfiable = unsatisfiableLifted @msg @((##) -> a) (##)
+
+     The class TyCon as well as the unsatisfiable Id have known-key Names
+     in GHC; they are not wired-in.
+
+  B. Unsatisfiable instances.
+
+     The Unsatisfiable typeclass has no instances (see GHC.Tc.Instance.Class.matchGlobalInst).
+
+     Users are prevented from writing instances in GHC.Tc.Validity.check_special_inst_head.
+     This is done using the same mechanism as for, say, Coercible or WithDict.
+
+  C. Using [G] Unsatisfiable msg to solve any Wanted.
+
+     In GHC.Tc.Solver.simplifyTopWanteds, after defaulting happens, when an
+     implication contains Givens of the form [G] Unsatisfiable msg, and the
+     implication supports term-level evidence (as per Note [Coercion evidence only]
+     in GHC.Tc.Types.Evidence), we use any such Given to solve all the Wanteds
+     in that implication. See GHC.Tc.Solver.useUnsatisfiableGivens.
+
+     The way we construct the evidence terms is slightly complicated by
+     Type vs Constraint considerations; see Note [Evidence terms from Unsatisfiable Givens]
+     in GHC.Tc.Solver.
+
+     The proposal explains why this happens after defaulting: if there are other
+     ways to solve the Wanteds, we would prefer to use that, as that will make
+     user programs "as defined as possible".
+
+     Wrinkle [Ambiguity]
+
+       We also use an Unsatisfiable Given to solve Wanteds when performing an
+       ambiguity check. See the call to "useUnsatisfiableGivens" in
+       GHC.Tc.Solver.simplifyAmbiguityCheck.
+
+       This is, for example, required to typecheck the definition
+       of "unsatisfiable" itself:
+
+         unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+
+       The ambiguity check on this type signature will produce
+
+         [G] Unsatisfiable msg1, [W] Unsatisfiable msg2
+
+       and we want to ensure the Given solves the Wanted, to accept the definition.
+
+       NB:
+
+         An alternative would be to add a functional dependency on Unsatisfiable:
+
+           class Unsatisfiable msg | -> msg
+
+         Then we would unify msg1 and msg2 in the above constraint solving problem,
+         and would be able to solve the Wanted using the Given in the normal way.
+         However, adding such a functional dependency solely for this purpose
+         could have undesirable consequences. For example, one might have
+
+           [W] Unsatisfiable (Text "msg1"), [W] Unsatisfiable (Text "msg2")
+
+         and W-W fundep interaction would produce the insoluble constraint
+
+           [W] "msg1" ~ "msg2"
+
+         which we definitely wouldn't want to report to the user.
+
+  D. Adding "meth = unsatisfiable @msg" method bindings.
+
+     When a class instance has an "Unsatisfiable msg" constraint in its context,
+     and the user has omitted methods (which don't have any default implementations),
+     we add method bindings of the form "meth = unsatisfiable @msg".
+     See GHC.Tc.TyCl.Instance.tcMethods, in particular "tc_default".
+
+     Example:
+
+         class C a where { op :: a -> a }
+         instance Unsatisfiable Msg => C [a] where {}
+
+       elaborates to
+
+         instance Unsatisfiable Msg => C [a] where { op = unsatisfiable @Msg }
+
+       due to the (Unsatisfiable Msg) constraint in the instance context.
+
+     We also switch off the "missing methods" warning in this situation.
+     See "checkMinimalDefinition" in GHC.Tc.TyCl.Instance.tcMethods.
+
+  E. Switching off functional dependency coverage checks when there is
+     an "Unsatisfiable msg" context.
+
+     This is because we want to allow users to rule out certain instances with
+     an "unsatisfiable" error, even when that would violate a functional
+     dependency. For example:
+
+       class C a b | a -> b
+       instance Unsatisfiable (Text "No") => C a b
+
+     See GHC.Tc.Instance.FunDeps.checkInstCoverage.
+
+  F. Error reporting of "Unsatisfiable msg" constraints.
+
+     This is done in GHC.Tc.Errors.reportWanteds: we detect when a constraint
+     is of the form "Unsatisfiable msg" and just emit the custom message
+     as an error to the user.
+
+     This is the only way that "Unsatisfiable msg" constraints are reported,
+     which makes their behaviour much more predictable than TypeError.
+-}
 
 
 --------------------------------------------
@@ -922,10 +1049,15 @@ mkUserTypeErrorReporter ctxt
                         ; addDeferredBinding ctxt err item }
 
 mkUserTypeError :: ErrorItem -> TcSolverReportMsg
-mkUserTypeError item =
-  case getUserTypeErrorMsg (errorItemPred item) of
-    Just msg -> UserTypeError msg
-    Nothing  -> pprPanic "mkUserTypeError" (ppr item)
+mkUserTypeError item
+  | Just msg <- getUserTypeErrorMsg pty
+  = UserTypeError msg
+  | Just msg <- isUnsatisfiableCt_maybe pty
+  = UnsatisfiableError msg
+  | otherwise
+  = pprPanic "mkUserTypeError" (ppr item)
+  where
+    pty = errorItemPred item
 
 mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]

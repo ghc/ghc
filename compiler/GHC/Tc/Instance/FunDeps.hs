@@ -37,6 +37,7 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Compare( eqTypes, eqType )
 import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
 
+import GHC.Tc.Types.Constraint ( isUnsatisfiableCt_maybe )
 import GHC.Tc.Utils.TcType( transSuperClasses )
 
 import GHC.Types.Var.Set
@@ -401,6 +402,15 @@ checkInstCoverage :: Bool   -- Be liberal
 --    Just msg => coverage problem described by msg
 
 checkInstCoverage be_liberal clas theta inst_taus
+  | any (isJust . isUnsatisfiableCt_maybe) theta
+  -- As per [GHC proposal #433](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst),
+  -- we skip checking the coverage condition if there is an "Unsatisfiable"
+  -- constraint in the instance context.
+  --
+  -- See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors,
+  -- point (E).
+  = IsValid
+  | otherwise
   = allValid (map fundep_ok fds)
   where
     (tyvars, fds) = classTvsFds clas

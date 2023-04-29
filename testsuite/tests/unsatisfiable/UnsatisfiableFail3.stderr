@@ -1,0 +1,21 @@
+
+UnsatisfiableFail3.hs:26:7: error: [GHC-22250]
+    • Equality is not reflexive on Double
+    • In the expression: reflexiveEq 0 (0 :: Double)
+      In an equation for ‘foo’: foo = reflexiveEq 0 (0 :: Double)
+
+UnsatisfiableFail3.hs:28:7: error: [GHC-22250]
+    • Can't compare functions with reflexiveEq
+    • In the expression: reflexiveEq (\ (x :: Int) -> x + 1)
+      In an equation for ‘bar’: bar = reflexiveEq (\ (x :: Int) -> x + 1)
+
+UnsatisfiableFail3.hs:41:8: error: [GHC-22250]
+    • Equality is not reflexive on Double
+    • In the expression: reflexiveEq' 0 (0 :: Double)
+      In an equation for ‘foo'’: foo' = reflexiveEq' 0 (0 :: Double)
+
+UnsatisfiableFail3.hs:43:8: error: [GHC-22250]
+    • Can't compare functions with reflexiveEq'
+    • In the expression: reflexiveEq' (\ (x :: Int) -> x + 1)
+      In an equation for ‘bar'’:
+          bar' = reflexiveEq' (\ (x :: Int) -> x + 1)

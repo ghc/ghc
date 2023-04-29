@@ -4,7 +4,8 @@
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans
-    DictMap, emptyDictMap, findDictsByClass, addDict,
+    DictMap, emptyDictMap, addDict,
+    findDictsByTyConKey, findDictsByClass,
     addDictsByClass, delDict, foldDicts, filterDicts, findDict,
     dictsToBag, partitionDicts,
 
@@ -24,6 +25,9 @@ import GHC.Prelude
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
+
+import GHC.Types.Unique
+import GHC.Types.Unique.DFM
 
 import GHC.Core.Class
 import GHC.Core.Map.Type
@@ -140,9 +144,12 @@ findDict m loc cls tys
   = findTcApp m (classTyCon cls) tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
-findDictsByClass m cls
-  | Just tm <- lookupDTyConEnv m (classTyCon cls) = foldTM consBag tm emptyBag
-  | otherwise                                     = emptyBag
+findDictsByClass m cls = findDictsByTyConKey m (getUnique $ classTyCon cls)
+
+findDictsByTyConKey :: DictMap a -> Unique -> Bag a
+findDictsByTyConKey m tc
+  | Just tm <- lookupUDFM_Directly m tc = foldTM consBag tm emptyBag
+  | otherwise                           = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
 delDict m cls tys = delTcApp m (classTyCon cls) tys

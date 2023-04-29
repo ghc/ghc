@@ -18,7 +18,7 @@ module GHC.Data.Bag (
         concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, nonEmptyToBag, bagToList, headMaybe, mapAccumBagL,
-        concatMapBag, concatMapBagPair, mapMaybeBag, unzipBag,
+        concatMapBag, concatMapBagPair, mapMaybeBag, mapMaybeBagM, unzipBag,
         mapBagM, mapBagM_, lookupBag,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
@@ -231,6 +231,17 @@ mapMaybeBag f (UnitBag x)     = case f x of
                                   Just y  -> UnitBag y
 mapMaybeBag f (TwoBags b1 b2) = unionBags (mapMaybeBag f b1) (mapMaybeBag f b2)
 mapMaybeBag f (ListBag xs)    = listToBag $ mapMaybe f (toList xs)
+
+mapMaybeBagM :: Monad m => (a -> m (Maybe b)) -> Bag a -> m (Bag b)
+mapMaybeBagM _ EmptyBag        = return EmptyBag
+mapMaybeBagM f (UnitBag x)     = do r <- f x
+                                    return $ case r of
+                                      Nothing -> EmptyBag
+                                      Just y  -> UnitBag y
+mapMaybeBagM f (TwoBags b1 b2) = do r1 <- mapMaybeBagM f b1
+                                    r2 <- mapMaybeBagM f b2
+                                    return $ unionBags r1 r2
+mapMaybeBagM f (ListBag xs)    = listToBag <$> mapMaybeM f (toList xs)
 
 mapBagM :: Monad m => (a -> m b) -> Bag a -> m (Bag b)
 mapBagM _ EmptyBag        = return EmptyBag

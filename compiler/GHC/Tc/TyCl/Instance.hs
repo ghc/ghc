@@ -6,6 +6,8 @@
 
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -48,6 +50,7 @@ import GHC.Tc.Deriv
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
+import GHC.Builtin.Names ( unsatisfiableIdName )
 import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
 import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
@@ -1785,6 +1788,9 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
     hs_sig_fn = mkHsSigFun sigs
     inst_loc  = getSrcSpan dfun_id
 
+    unsat_thetas =
+      mapMaybe (\ id -> (id,) <$> isUnsatisfiableCt_maybe (idType id)) dfun_ev_vars
+
     ----------------------
     tc_item :: ClassOpItem -> TcM (Id, LHsBind GhcTc, Maybe Implication)
     tc_item (sel_id, dm_info)
@@ -1813,8 +1819,29 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
            ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
                                        inst_tys sel_id
            ; dflags <- getDynFlags
-           ; let meth_bind = mkVarBind meth_id $
-                             mkLHsWrap lam_wrapper (error_rhs dflags)
+           ; meth_rhs <-
+               if
+                  -- If the instance has an "Unsatisfiable msg" context,
+                  -- add method bindings that use "unsatisfiable".
+                  --
+                  -- See Note [Implementation of Unsatisfiable constraints],
+                  -- in GHC.Tc.Errors, point (D).
+                  | (theta_id,unsat_msg):_ <- unsat_thetas
+                  -> do { unsat_id <- tcLookupId unsatisfiableIdName
+                        -- Recall that unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+                        --
+                        -- So we need to instantiate the forall and pass the dictionary evidence.
+                        ; return $ L inst_loc' $
+                            wrapId
+                            (   mkWpEvApps [EvExpr $ Var theta_id]
+                            <.> mkWpTyApps [getRuntimeRep meth_tau, unsat_msg, meth_tau])
+                            unsat_id }
+
+                  -- Otherwise, add bindings whose RHS is an error
+                  -- "No explicit nor default method for class operation 'meth'".
+                  | otherwise
+                  -> return $ error_rhs dflags
+           ; let meth_bind = mkVarBind meth_id $ mkLHsWrap lam_wrapper meth_rhs
            ; return (meth_id, meth_bind, Nothing) }
       where
         inst_loc' = noAnnSrcSpan inst_loc
@@ -1829,13 +1856,18 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
                                               (unsafeMkByteString (error_string dflags))))
         meth_tau     = classMethodInstTy sel_id inst_tys
         error_string dflags = showSDoc dflags
-                              (hcat [ppr inst_loc, vbar, ppr sel_id ])
+                              (hcat [ppr inst_loc, vbar, quotes (ppr sel_id) ])
         lam_wrapper  = mkWpTyLams tyvars <.> mkWpEvLams dfun_ev_vars
 
     ----------------------
     -- Check if one of the minimal complete definitions is satisfied
     checkMinimalDefinition
-      = whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
+      = when (null unsat_thetas) $
+        -- Don't warn if there is an "Unsatisfiable" constraint in the context.
+        --
+        -- See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors,
+        -- point (D).
+        whenIsJust (isUnsatisfied methodExists (classMinimalDef clas)) $
         warnUnsatisfiedMinimalDefinition
 
     methodExists meth = isJust (findMethodBind meth binds prag_fn)

@@ -121,17 +121,18 @@ matchGlobalInst :: DynFlags
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> TcM ClsInstResult
 matchGlobalInst dflags short_cut clas tys
-  | cls_name == knownNatClassName     = matchKnownNat    dflags short_cut clas tys
-  | cls_name == knownSymbolClassName  = matchKnownSymbol dflags short_cut clas tys
-  | cls_name == knownCharClassName    = matchKnownChar   dflags short_cut clas tys
-  | isCTupleClass clas                = matchCTuple                       clas tys
-  | cls_name == typeableClassName     = matchTypeable                     clas tys
-  | cls_name == withDictClassName     = matchWithDict                          tys
-  | clas `hasKey` heqTyConKey         = matchHeteroEquality                    tys
-  | clas `hasKey` eqTyConKey          = matchHomoEquality                      tys
-  | clas `hasKey` coercibleTyConKey   = matchCoercible                         tys
-  | cls_name == hasFieldClassName     = matchHasField    dflags short_cut clas tys
-  | otherwise                         = matchInstEnv     dflags short_cut clas tys
+  | cls_name == knownNatClassName      = matchKnownNat    dflags short_cut clas tys
+  | cls_name == knownSymbolClassName   = matchKnownSymbol dflags short_cut clas tys
+  | cls_name == knownCharClassName     = matchKnownChar   dflags short_cut clas tys
+  | isCTupleClass clas                 = matchCTuple                       clas tys
+  | cls_name == typeableClassName      = matchTypeable                     clas tys
+  | cls_name == withDictClassName      = matchWithDict                          tys
+  | clas `hasKey` heqTyConKey          = matchHeteroEquality                    tys
+  | clas `hasKey` eqTyConKey           = matchHomoEquality                      tys
+  | clas `hasKey` coercibleTyConKey    = matchCoercible                         tys
+  | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys
+  | cls_name == unsatisfiableClassName = return NoInstance -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
+  | otherwise                          = matchInstEnv     dflags short_cut clas tys
   where
     cls_name = className clas
 

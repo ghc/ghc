@@ -20,6 +20,10 @@
   * Add `COMPLETE` pragmas to the `TypeRep`, `SSymbol`, `SChar`, and `SNat` pattern synonyms.
       ([CLC proposal #149](https://github.com/haskell/core-libraries-committee/issues/149))
   * Make `($)` representation polymorphic ([CLC proposal #132](https://github.com/haskell/core-libraries-committee/issues/132))
+  * Implemented [GHC Proposal #433](https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst),
+    adding the class `Unsatisfiable :: ErrorMessage -> TypeError`` to `GHC.TypeError`,
+    which provides a mechanism for custom type errors that reports the errors in
+    a more predictable behaviour than ``TypeError``.
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1

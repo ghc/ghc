@@ -1,0 +1,22 @@
+
+UnsatisfiableFail4.hs:12:27: error: [GHC-83865]
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the first argument of ‘Maybe’, namely ‘Maybe’
+      In the type signature: y :: Maybe Maybe
+      In the expression:
+        let
+          y :: Maybe Maybe
+          y = unsatisfiable
+        in unsatisfiable
+
+UnsatisfiableFail4.hs:18:27: error: [GHC-83865]
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    • In the first argument of ‘Maybe’, namely ‘Maybe’
+      In the type signature: y :: _ => Maybe Maybe
+      In the expression:
+        let
+          y :: _ => Maybe Maybe
+          y = unsatisfiable
+        in unsatisfiable

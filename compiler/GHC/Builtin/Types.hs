@@ -1999,7 +1999,7 @@ data BoxingInfo b
     --        recall: data Int = I# Int#
     --
     --      BI_Box { bi_data_con = MkInt8Box, bi_inst_con = MkInt8Box @ty
-    --             , bi_boxed_type = Int8Box ty }A
+    --             , bi_boxed_type = Int8Box ty }
     --        recall: data Int8Box (a :: TYPE Int8Rep) = MkIntBox a
 
 boxingDataCon :: Type -> BoxingInfo b

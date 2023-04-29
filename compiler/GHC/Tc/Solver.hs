@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf, RecursiveDo #-}
+{-# LANGUAGE MultiWayIf, RecursiveDo, TupleSections #-}
 
 module GHC.Tc.Solver(
        InferMode(..), simplifyInfer, findInferredDiff,
@@ -31,11 +31,15 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 import GHC.Core.Class
+import GHC.Core
+import GHC.Core.DataCon
+import GHC.Core.InstEnv ( Coherence(IsCoherent) )
+import GHC.Core.Make
 import GHC.Driver.Session
-import GHC.Tc.Utils.Instantiate
+import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Name
-import GHC.Types.Id( idType )
+import GHC.Types.Id
 import GHC.Utils.Outputable
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
@@ -58,22 +62,25 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
-import GHC.Builtin.Types ( liftedRepTy, liftedDataConTy )
+import GHC.Builtin.Types
 import GHC.Core.Unify    ( tcMatchTyKi )
+import GHC.Unit.Module ( getModule )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Var
 import GHC.Types.Var.Set
-import GHC.Types.Basic    ( IntWithInf, intGtLimit
-                          , DefaultingStrategy(..), NonStandardDefaultingStrategy(..) )
+import GHC.Types.Basic
+import GHC.Types.Id.Make  ( unboxedUnitExpr )
 import GHC.Types.Error
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Control.Monad.Trans.Class        ( lift )
+import Control.Monad.Trans.State.Strict ( StateT(runStateT), put )
 import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
-import GHC.Data.Maybe     ( mapMaybe, isJust )
+import GHC.Data.Maybe     ( mapMaybe )
 
 {-
 *********************************************************************************
@@ -487,7 +494,11 @@ simplifyTopWanteds wanteds
   = do { wc_first_go <- nestTcS (solveWanteds wanteds)
                             -- This is where the main work happens
        ; dflags <- getDynFlags
-       ; try_tyvar_defaulting dflags wc_first_go }
+       ; wc_defaulted <- try_tyvar_defaulting dflags wc_first_go
+
+       -- See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors,
+       -- point (C).
+       ; useUnsatisfiableGivens wc_defaulted }
   where
     try_tyvar_defaulting :: DynFlags -> WantedConstraints -> TcS WantedConstraints
     try_tyvar_defaulting dflags wc
@@ -538,6 +549,149 @@ simplifyTopWanteds wanteds
       = return wc
       | otherwise
       = defaultCallStacks wc
+
+-- | If an implication contains a Given of the form @Unsatisfiable msg@, use
+-- it to solve all Wanteds within the implication.
+--
+-- This does a complete walk over the implication tree.
+--
+-- See point (C) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
+useUnsatisfiableGivens :: WantedConstraints -> TcS WantedConstraints
+useUnsatisfiableGivens wc =
+  do { (final_wc, did_work) <- (`runStateT` False) $ go_wc wc
+     ; if did_work
+       then nestTcS (solveWanteds final_wc)
+       else return final_wc }
+  where
+    go_wc (WC { wc_simple = wtds, wc_impl = impls, wc_errors = errs })
+      = do impls' <- mapMaybeBagM go_impl impls
+           return $ WC { wc_simple = wtds, wc_impl = impls', wc_errors = errs }
+    go_impl impl
+      | isSolvedStatus (ic_status impl)
+      = return $ Just impl
+      -- Is there a Given with type "Unsatisfiable msg"?
+      -- If so, use it to solve all other Wanteds.
+      | unsat_given:_ <- mapMaybe unsatisfiableEv_maybe (ic_given impl)
+      = do { put True
+           ; lift $ solveImplicationUsingUnsatGiven unsat_given impl }
+      -- Otherwise, recurse.
+      | otherwise
+      = do { wcs' <- go_wc (ic_wanted impl)
+           ; lift $ setImplicationStatus $ impl { ic_wanted = wcs' } }
+
+-- | Is this evidence variable the evidence for an 'Unsatisfiable' constraint?
+--
+-- If so, return the variable itself together with the error message type.
+unsatisfiableEv_maybe :: EvVar -> Maybe (EvVar, Type)
+unsatisfiableEv_maybe v = (v,) <$> isUnsatisfiableCt_maybe (idType v)
+
+-- | We have an implication with an 'Unsatisfiable' Given; use that Given to
+-- solve all the other Wanted constraints, including those nested within
+-- deeper implications.
+solveImplicationUsingUnsatGiven :: (EvVar, Type) -> Implication -> TcS (Maybe Implication)
+solveImplicationUsingUnsatGiven
+  unsat_given@(given_ev,_)
+  impl@(Implic { ic_wanted = wtd, ic_tclvl = tclvl, ic_binds = ev_binds_var, ic_need_inner = inner })
+  | isCoEvBindsVar ev_binds_var
+  -- We can't use Unsatisfiable evidence in kinds.
+  -- See Note [Coercion evidence only] in GHC.Tc.Types.Evidence.
+  = return $ Just impl
+  | otherwise
+  = do { wcs <- nestImplicTcS ev_binds_var tclvl $ go_wc wtd
+       ; setImplicationStatus $
+         impl { ic_wanted = wcs
+              , ic_need_inner = inner `extendVarSet` given_ev } }
+  where
+    go_wc :: WantedConstraints -> TcS WantedConstraints
+    go_wc wc@(WC { wc_simple = wtds, wc_impl = impls })
+      = do { mapBagM_ go_simple wtds
+           ; impls <- mapMaybeBagM (solveImplicationUsingUnsatGiven unsat_given) impls
+           ; return $ wc { wc_simple = emptyBag, wc_impl = impls } }
+    go_simple :: Ct -> TcS ()
+    go_simple ct = case ctEvidence ct of
+      CtWanted { ctev_pred = pty, ctev_dest = dst }
+        -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
+              ; setWantedEvTerm dst IsCoherent $ EvExpr ev_expr }
+      _ -> return ()
+
+-- | Create an evidence expression for an arbitrary constraint using
+-- evidence for an "Unsatisfiable" Given.
+--
+-- See Note [Evidence terms from Unsatisfiable Givens]
+unsatisfiableEvExpr :: (EvVar, ErrorMsgType) -> PredType -> TcS EvExpr
+unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
+  = do { mod <- getModule
+         -- If we're typechecking GHC.TypeError, return a bogus expression;
+         -- it's only used for the ambiguity check, which throws the evidence away anyway.
+         -- This avoids problems with circularity; where we are trying to look
+         -- up the "unsatisfiable" Id while we are in the middle of typechecking it.
+       ; if mod == gHC_TYPEERROR then return (Var unsat_ev) else
+    do { unsatisfiable_id <- tcLookupId unsatisfiableIdName
+
+         -- See Note [Evidence terms from Unsatisfiable Givens]
+         -- for a description of what evidence term we are constructing here.
+
+       ; let -- (##) -=> wtd_ty
+             fun_ty = mkFunTy visArgConstraintLike ManyTy unboxedUnitTy wtd_ty
+             mkDictBox = case boxingDataCon fun_ty of
+               BI_Box { bi_data_con = mkDictBox } -> mkDictBox
+               _ -> pprPanic "unsatisfiableEvExpr: no DictBox!" (ppr wtd_ty)
+             dictBox = dataConTyCon mkDictBox
+       ; ev_bndr <- mkSysLocalM (fsLit "ct") ManyTy fun_ty
+             -- Dict ((##) -=> wtd_ty)
+       ; let scrut_ty = mkTyConApp dictBox [fun_ty]
+             -- unsatisfiable @{LiftedRep} @given_msg @(Dict ((##) -=> wtd_ty)) unsat_ev
+             scrut =
+               mkCoreApps (Var unsatisfiable_id)
+                 [ Type liftedRepTy
+                 , Type given_msg
+                 , Type scrut_ty
+                 , Var unsat_ev ]
+             -- case scrut of { MkDictBox @((##) -=> wtd_ty)) ct -> ct (# #) }
+             ev_expr =
+               mkWildCase scrut (unrestricted $ scrut_ty) wtd_ty
+               [ Alt (DataAlt mkDictBox) [ev_bndr] $
+                   mkCoreApps (Var ev_bndr) [unboxedUnitExpr]
+               ]
+        ; return ev_expr } }
+
+{- Note [Evidence terms from Unsatisfiable Givens]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An Unsatisfiable Given constraint, of the form [G] Unsatisfiable msg, should be
+able to solve ANY Wanted constraint whatsoever.
+
+Recall that we have
+
+  unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep)
+                .  Unsatisfiable msg => a
+
+We want to use this function, together with the evidence
+[G] unsat_ev :: Unsatisfiable msg, to solve any other constraint [W] wtd_ty.
+
+We could naively think that a valid evidence term for the Wanted might be:
+
+  wanted_ev = unsatisfiable @{rep} @msg @wtd_ty unsat_ev
+
+Unfortunately, this is a kind error: "wtd_ty :: CONSTRAINT rep", but
+"unsatisfiable" expects the third type argument to be of kind "TYPE rep".
+
+Instead, we use a boxing data constructor to box the constraint into a type.
+In the end, we construct the following evidence for the implication:
+
+  [G] unsat_ev :: Unsatisfiable msg
+    ==>
+      [W] wtd_ev :: wtd_ty
+
+  wtd_ev =
+    case unsatisfiable @{LiftedRep} @msg @(Dict ((##) -=> wtd_ty)) unsat_ev of
+      MkDictBox ct -> ct (# #)
+
+Note that we play the same trick with the function arrow -=> that we did
+in order to define "unsatisfiable" in terms of "unsatisfiableLifted", as described
+in Note [The Unsatisfiable representation-polymorphism trick] in base:GHC.TypeError.
+This allows us to indirectly box constraints with different representations
+(such as primitive equality constraints).
+-}
 
 -- | Default any remaining @CallStack@ constraints to empty @CallStack@s.
 defaultCallStacks :: WantedConstraints -> TcS WantedConstraints
@@ -845,8 +999,11 @@ last example above.
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
   = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
-       ; (final_wc, _) <- runTcS $ solveWanteds wanteds
+       ; (final_wc, _) <- runTcS $ useUnsatisfiableGivens =<< solveWanteds wanteds
              -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
+             -- Note: we do still use Unsatisfiable Givens to solve Wanteds,
+             -- see Wrinkle [Ambiguity] under point (C) of
+             -- Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
 
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
@@ -2785,9 +2942,9 @@ findUnnecessaryGivens info need_inner givens
 
     unused_givens = filterOut is_used givens
 
-    is_used given =   is_type_error given
-                  ||  (given `elemVarSet` need_inner)
-                  ||  (in_instance_decl && is_improving (idType given))
+    is_used given =  is_type_error given
+                  || given `elemVarSet` need_inner
+                  || (in_instance_decl && is_improving (idType given))
 
     minimal_givens = mkMinimalBySCs evVarPred givens
     is_minimal = (`elemVarSet` mkVarSet minimal_givens)
@@ -2796,7 +2953,7 @@ findUnnecessaryGivens info need_inner givens
       | otherwise        = filterOut is_minimal givens
 
     -- See #15232
-    is_type_error = isJust . userTypeError_maybe . idType
+    is_type_error id = isTopLevelUserTypeError (idType id)
 
     is_improving pred -- (transSuperClasses p) does not include p
       = any isImprovementPred (pred : transSuperClasses pred)

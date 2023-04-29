@@ -76,6 +76,7 @@ module GHC.Core.Type (
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
+        ErrorMsgType,
         userTypeError_maybe, pprUserTypeErrorTy,
 
         coAxNthLHS,
@@ -1229,9 +1230,12 @@ isLitTy ty
   | LitTy l <- coreFullView ty = Just l
   | otherwise                  = Nothing
 
+-- | A type of kind 'ErrorMessage' (from the 'GHC.TypeError' module).
+type ErrorMsgType = Type
+
 -- | Is this type a custom user error?
--- If so, give us the kind and the error message.
-userTypeError_maybe :: Type -> Maybe Type
+-- If so, give us the error message.
+userTypeError_maybe :: Type -> Maybe ErrorMsgType
 userTypeError_maybe t
   = do { (tc, _kind : msg : _) <- splitTyConApp_maybe t
           -- There may be more than 2 arguments, if the type error is
@@ -1241,7 +1245,7 @@ userTypeError_maybe t
        ; return msg }
 
 -- | Render a type corresponding to a user type error into a SDoc.
-pprUserTypeErrorTy :: Type -> SDoc
+pprUserTypeErrorTy :: ErrorMsgType -> SDoc
 pprUserTypeErrorTy ty =
   case splitTyConApp_maybe ty of
 
@@ -1266,7 +1270,6 @@ pprUserTypeErrorTy ty =
 
     -- An unevaluated type function
     _ -> ppr ty
-
 
 {- *********************************************************************
 *                                                                      *

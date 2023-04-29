@@ -3438,6 +3438,8 @@ pprTcSolverReportMsg _ (BadTelescope telescope skols) =
     sorted_tvs = scopedSort skols
 pprTcSolverReportMsg _ (UserTypeError ty) =
   pprUserTypeErrorTy ty
+pprTcSolverReportMsg _ (UnsatisfiableError ty) =
+  pprUserTypeErrorTy ty
 pprTcSolverReportMsg ctxt (ReportHoleError hole err) =
   pprHoleError ctxt hole err
 pprTcSolverReportMsg ctxt

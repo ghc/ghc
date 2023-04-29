@@ -150,7 +150,7 @@ import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
 import GHC.Core.TyCon (TyCon, Role)
-import GHC.Core.Type (Kind, Type, ThetaType, PredType)
+import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
 import GHC.Utils.Misc (capitalise, filterOut)
@@ -4482,7 +4482,10 @@ data TcSolverReportMsg
   --   err = ()
   --
   -- Test cases: CustomTypeErrors0{1,2,3,4,5}, T12104.
-  | UserTypeError Type
+  | UserTypeError ErrorMsgType -- ^ the message to report
+
+  -- | Report a Wanted constraint of the form "Unsatisfiable msg".
+  | UnsatisfiableError ErrorMsgType -- ^ the message to report
 
   -- | We want to report an out of scope variable or a typed hole.
   -- See 'HoleError'.

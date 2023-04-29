@@ -1,16 +1,25 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-|
-This module exports the TypeError family, which is used to provide custom type
-errors, and the ErrorMessage kind used to define these custom error messages.
-This is a type-level analogue to the term level error function.
+This module exports:
+
+  - The 'TypeError' type family, which is used to provide custom type
+    errors. This is a type-level analogue to the term level error function.
+  - The 'ErrorMessage' kind, used to define custom error messages.
+  - The 'Unsatisfiable' constraint, a more principled variant of 'TypeError'
+    which gives a more predictable way of reporting custom type errors.
 
 @since 4.17.0.0
 -}
@@ -19,15 +28,15 @@ module GHC.TypeError
   ( ErrorMessage (..)
   , TypeError
   , Assert
+  , Unsatisfiable, unsatisfiable
   ) where
 
 import Data.Bool
 import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Base
-import GHC.Types (Constraint, Symbol)
+import GHC.Types (TYPE, Constraint, Symbol)
 
-{-
-Note [Custom type errors]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Custom type errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 TypeError is used to provide custom type errors, similar to the term-level
 error function. TypeError is somewhat magical: when the constraint solver
 encounters a constraint where the RHS is TypeError, it reports the error to
@@ -85,9 +94,8 @@ infixl 6 :<>:
 -- @since 4.9.0.0
 type family TypeError (a :: ErrorMessage) :: b where
 
-{-
-Note [Getting good error messages from boolean comparisons]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Getting good error messages from boolean comparisons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to write types like
 
   f :: forall (x :: Int) (y :: Int). (x <= y) => T x -> T y
@@ -139,3 +147,50 @@ type family Assert check errMsg where
   Assert 'True _      = ()
   Assert _     errMsg = errMsg
   -- See Note [Getting good error messages from boolean comparisons]
+
+{- Note [The Unsatisfiable constraint]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The class `Unsatisfiable :: ErrorMessage -> Constraint` provides a mechanism
+for custom type errors that reports the errors in a more predictable behaviour
+than `TypeError`, as these constraints are handled purely during constraint solving.
+
+The details are laid out in GHC Proposal #433 (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst).
+
+See Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors for
+details of the implementation in GHC.
+
+Note [The Unsatisfiable representation-polymorphism trick]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The class method `unsatisfiableLifted :: forall (a::Type). Unsatisfiable msg => a`
+works only for lifted types `a`.  What if we want an unsatisfiable value of type
+`Int#`, say?  The function `unsatisfiable` has a representation-polymoprhic type
+   unsatisfiable :: forall {rep} (msg :: ErrorMessage) (b :: TYPE rep).
+                    Unsatisfiable msg => b
+and yet is defined in terms of `unsatisfiableLifted`.  How? By instantiating
+`unsatisfiableLifted` at type `(##) -> b`, and applying the result to `(##)`.
+Very cunning!
+-}
+
+-- | An unsatisfiable constraint. Similar to 'TypeError' when used at the
+-- 'Constraint' kind, but reports errors in a more predictable manner.
+--
+-- See also the 'unsatisfiable' function.
+--
+-- @since 4.19.0.0@.
+type Unsatisfiable :: ErrorMessage -> Constraint
+class Unsatisfiable msg where
+  unsatisfiableLifted :: a
+
+-- | Prove anything within a context with an 'Unsatisfiable' constraint.
+--
+-- This is useful for filling in instance methods when there is an 'Unsatisfiable'
+-- constraint in the instance head, e.g.:
+--
+-- > instance Unsatisfiable (Text "No Eq instance for functions") => Eq (a -> b) where
+--     (==) = unsatisfiable
+--
+-- @since 4.19.0.0@.
+unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+unsatisfiable = unsatisfiableLifted @msg @((##) -> a) (##)
+  -- See Note [The Unsatisfiable representation-polymorphism trick]
+

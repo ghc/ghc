@@ -503,6 +503,10 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- "Unsatisfiable" constraint
+        , unsatisfiableClassName
+        , unsatisfiableIdName
+
         -- Unsafe coercion proofs
         , unsafeEqualityProofName
         , unsafeEqualityTyConName
@@ -1452,6 +1456,13 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPEERROR (fsLit "ShowType") typeErrorShowTypeDataConKey
 
+-- "Unsatisfiable" constraint
+unsatisfiableClassName, unsatisfiableIdName :: Name
+unsatisfiableClassName =
+  clsQual gHC_TYPEERROR (fsLit "Unsatisfiable") unsatisfiableClassNameKey
+unsatisfiableIdName =
+  varQual gHC_TYPEERROR (fsLit "unsatisfiable") unsatisfiableIdNameKey
+
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
   unsafeReflDataConName :: Name
@@ -1993,9 +2004,13 @@ uFloatTyConKey  = mkPreludeTyConUnique 161
 uIntTyConKey    = mkPreludeTyConUnique 162
 uWordTyConKey   = mkPreludeTyConUnique 163
 
+-- "Unsatisfiable" constraint
+unsatisfiableClassNameKey :: Unique
+unsatisfiableClassNameKey = mkPreludeTyConUnique 170
+
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
-errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
+errorMessageTypeErrorFamKey = mkPreludeTyConUnique 181
 
 coercibleTyConKey :: Unique
 coercibleTyConKey = mkPreludeTyConUnique 183
@@ -2547,6 +2562,10 @@ unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
 getFieldClassOpKey, setFieldClassOpKey :: Unique
 getFieldClassOpKey = mkPreludeMiscIdUnique 572
 setFieldClassOpKey = mkPreludeMiscIdUnique 573
+
+-- "Unsatisfiable" constraints
+unsatisfiableIdNameKey :: Unique
+unsatisfiableIdNameKey = mkPreludeMiscIdUnique 580
 
 ------------------------------------------------------
 -- ghc-bignum uses 600-699 uniques
