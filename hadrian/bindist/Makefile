@@ -106,7 +106,7 @@ lib/settings : config.mk
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
 	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
-	@echo ',("unlit command", "$$topdir/bin/unlit")' >> $@
+	@echo ',("unlit command", "$$topdir/bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@
 	@echo ',("target platform string", "$(TARGETPLATFORM)")' >> $@
 	@echo ',("target os", "$(HaskellTargetOs)")' >> $@
