@@ -131,7 +131,7 @@ test('linker_error3', [extra_files(['linker_error.c']),
 
 ######################################
 test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
-                 , req_rts_linker
+                 , unless(have_dynamic(), skip)
                  # this needs runtime infrastructure to do in ghci:
                  #  '-rdynamic' ghc, load modules only via dlopen(RTLD_BLOBAL) and more.
                  , omit_ways(['ghci'])
