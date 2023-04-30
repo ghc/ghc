@@ -24,6 +24,8 @@ import GHC.Utils.Panic
 import GHC.Cmm.BlockId
 import GHC.Utils.Trace
 import Debug.Trace
+import Data.Word (Word64)
+import GHC.Float (castDoubleToWord64)
 
 -- | Don't try to compile all GHC Cmm files in the beginning.
 -- Ignore them. There's a flag to decide we really want to emit something.
@@ -111,7 +113,7 @@ stmtToInstrs stmt = do
     a -> error $ "TODO: stmtToInstrs " ++ (showSDocUnsafe . pdoc platform) a
 
 assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
-assignReg_FltCode _ _ _ = error "TODO: assignReg_FltCode"
+assignReg_FltCode = assignReg_IntCode
 
 -- TODO: Format parameter unused
 assignReg_IntCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
@@ -122,7 +124,7 @@ assignReg_IntCode _ reg src
     r <- getRegister src
     return $ case r of
       Any _ code              -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` code dst
-      Fixed format freg fcode -> error "TODO: assignReg_IntCode - Fixed"
+      Fixed _format freg fcode -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` (fcode `snocOL` MV dst freg)
 
 -- | Grab the Reg for a CmmReg
 getRegisterReg :: Platform -> CmmReg -> Reg
@@ -168,6 +170,17 @@ getRegister' config plat expr
         CmmInt i W64 ->
           return (Any II64 (\dst -> unitOL $ annExpr expr (LI dst i)))
         CmmInt i w -> error ("TODO: getRegister' CmmInt " ++ show i ++ show w ++ " " ++show expr)
+        CmmFloat f W64 -> do
+          let word = castDoubleToWord64 (fromRational f) :: Word64
+          tmp <- getNewRegNat (intFormat W64)
+          return (Any FF64 (\dst -> toOL [
+                                          annExpr expr$
+                                            LI tmp (fromIntegral word),
+                                            FMV_D_X dst tmp
+                                          ]
+                      )
+                 )
+
         CmmLabel lbl ->
           return (Any II64 (\dst -> unitOL $ annExpr expr (LA dst lbl)))
         e -> error ("TODO: getRegister' other " ++ show e)
@@ -313,8 +326,15 @@ genCCall target dest_regs arg_regs = do
                        code_r `snocOL`
                        ann (text "Pass gp argument: " <> ppr r) mov
       passArguments gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
+    passArguments gpRegs (fpReg:fpRegs) ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isFloatFormat format = do
+      traceM $ "passArguments - float reg " ++ show r
+      let w = formatToWidth format
+          mov = FMV_D fpReg r
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass fp argument: " <> ppr r) mov
+      passArguments gpRegs fpRegs args stackSpace (fpReg:accumRegs) accumCode'
     passArguments _ _ _ _ _ _ = error $ "TODO: passArguments"
-
 
     readResults :: [Reg] -> [Reg] -> [LocalReg] -> [Reg]-> InstrBlock -> NatM ([Reg], InstrBlock)
     readResults _ _ [] accumRegs accumCode = return (accumRegs, accumCode)

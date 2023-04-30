@@ -47,6 +47,9 @@ data Instr
   | JALR Reg
   | -- copy register
     MV Reg Reg
+  | FMV_S Reg Reg
+  | FMV_D Reg Reg
+  | FMV_D_X Reg Reg
 
 data Target
   = TBlock BlockId
@@ -105,6 +108,9 @@ regUsageOfInstr platform instr = case instr of
   LI dst _ -> usage ([], [dst])
   LA dst _ -> usage ([], [dst])
   MV dst src -> usage ([src], [dst])
+  FMV_S dst src -> usage ([src], [dst])
+  FMV_D dst src -> usage ([src], [dst])
+  FMV_D_X dst src -> usage ([src], [dst])
   -- Looks like J doesn't change registers (beside PC)
   -- This might be wrong.
   J {} -> none
@@ -147,6 +153,9 @@ patchRegsOfInstr instr env = case instr of
   CALL {} -> instr
   JALR reg -> JALR (env reg)
   MV dst src -> MV (env dst) (env src)
+  FMV_S dst src -> FMV_S (env dst) (env src)
+  FMV_D dst src -> FMV_D (env dst) (env src)
+  FMV_D_X dst src -> FMV_D_X (env dst) (env src)
 
 -- | Checks whether this instruction is a jump/branch instruction.
 --      One that can change the flow of control in a way that the
@@ -159,6 +168,9 @@ isJumpishInstr DELTA {} = False
 isJumpishInstr LDATA {} = False
 isJumpishInstr NEWBLOCK {} = False
 isJumpishInstr MV {} = False
+isJumpishInstr FMV_S {} = False
+isJumpishInstr FMV_D {} = False
+isJumpishInstr FMV_D_X {} = False
 isJumpishInstr LA {} = False
 isJumpishInstr LI {} = False
 isJumpishInstr J {} = True
@@ -236,6 +248,9 @@ isMetaInstr instr =
     LA {} -> False
     J {} -> False
     MV {} -> False
+    FMV_S {} -> False
+    FMV_D {} -> False
+    FMV_D_X {} -> False
     CALL {} -> False
     JALR {} -> False
 
@@ -265,6 +280,9 @@ takeRegRegMoveInstr LI {} = Nothing
 takeRegRegMoveInstr LA {} = Nothing
 takeRegRegMoveInstr J {} = Nothing
 takeRegRegMoveInstr (MV dst src) = Just (src, dst)
+takeRegRegMoveInstr (FMV_S dst src) = Just (src, dst)
+takeRegRegMoveInstr (FMV_D dst src) = Just (src, dst)
+takeRegRegMoveInstr (FMV_D_X _ _) = Nothing -- Just (src, dst)
 takeRegRegMoveInstr CALL {} = Nothing
 takeRegRegMoveInstr JALR {} = Nothing
 

@@ -147,13 +147,16 @@ pprInstr platform instr = case instr of
   LI reg immediate -> line $ pprLI reg immediate
   LA reg label -> line $ text "\tla" <+> pprReg reg <> char ',' <+> pprAsmLabel platform label
   MV dst src -> line $ text "\tmv" <+> pprReg dst <> char ',' <+> pprReg src
+  FMV_S dst src -> line $ text "\tfmv.s" <+> pprReg dst <> char ',' <+> pprReg src
+  FMV_D dst src -> line $ text "\tfmv.d" <+> pprReg dst <> char ',' <+> pprReg src
+  FMV_D_X dst src -> line $ text "\tfmv.d.x" <+> pprReg dst <> char ',' <+> pprReg src
   where
     pprLI :: IsLine doc => Reg -> Integer -> doc
     pprLI reg immediate = text "\tli" <+> pprReg reg <> char ',' <+> (text.show) immediate
 
     pprReg :: IsLine doc => Reg -> doc
     pprReg (RegReal (RealRegSingle regNo)) = (text.regNoToName) regNo
-    pprReg (RegVirtual r) = panic $ "RISCV64.Ppr.ppr: Unexpected virtual register " ++ show r
+    pprReg virtualReg = (text . showPprUnsafe) virtualReg
 
     pprJ :: IsLine doc => Target -> doc
     pprJ (TBlock label) = text "\tj" <+> pprBlockId label
