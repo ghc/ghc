@@ -448,10 +448,16 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 -- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
 -- [1,2,3,4,5]
 --
--- If the order of outputs does not matter and there exists @instance Ord a@,
--- it's faster to use
+-- If there exists @instance Ord a@, it's faster to use `nubOrd` from the `containers` package
+-- ([link to the latest online documentation](https://hackage.haskell.org/package/containers/docs/Data-Containers-ListUtils.html#v:nubOrd)),
+-- which takes only \(\mathcal{O}(n \log d)\) time where `d` is the number of
+-- distinct elements in the list.
+--
+-- Another approach to speed up 'nub' is to use
 -- 'map' @Data.List.NonEmpty.@'Data.List.NonEmpty.head' . @Data.List.NonEmpty.@'Data.List.NonEmpty.group' . 'sort',
--- which takes only \(\mathcal{O}(n \log n)\) time.
+-- which takes \(\mathcal{O}(n \log n)\) time, requires @instance Ord a@ and doesn't
+-- preserve the order.
+
 --
 nub                     :: (Eq a) => [a] -> [a]
 nub                     =  nubBy (==)
