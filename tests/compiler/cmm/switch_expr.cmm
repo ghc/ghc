@@ -1,0 +1,52 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$CC" "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe"
+
+#include "Cmm.h"
+#include "Types.h"
+
+
+main (I64 argc) {
+    _switch: // global
+        switch [0 .. 7] argc {
+            case 0 : goto _a0;
+            case 1 : goto _a1;
+            case 2 : goto _a2;
+            case 3 : goto _a3;
+            case 4 : goto _a4;
+            case 5 : goto _a5;
+            case 6 : goto _a6;
+            case 7 : goto _a7;
+            default: {goto _c;}
+        }   // CmmSwitch
+    _a0: // global
+        foreign "C" printf("A0\n");
+        goto _end;
+    _a1: // global
+        foreign "C" printf("A1\n");
+        goto _end;
+    _a2: // global
+        foreign "C" printf("A2\n");
+        goto _end;
+    _a3: // global
+        foreign "C" printf("A3\n");
+        goto _end;
+    _a4: // global
+        foreign "C" printf("A4\n");
+        goto _end;
+    _a5: // global
+        foreign "C" printf("A5\n");
+        goto _end;
+    _a6: // global
+        foreign "C" printf("A6\n");
+        goto _end;
+    _a7: // global
+        foreign "C" printf("A7\n");
+        goto _end;
+    _c: // global
+        foreign "C" printf("C\n");
+        goto _end;
+
+    _end:
+        foreign "C" exit(0::I64);
+}
