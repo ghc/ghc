@@ -1709,6 +1709,8 @@ pprDynamicLinkerAsmLabel !platform dllInfo ppLbl =
       | platformArch platform == ArchAArch64
       = ppLbl
 
+      | platformArch platform == ArchRISCV64
+      = ppLbl
 
       | platformArch platform == ArchX86_64
       = case dllInfo of
