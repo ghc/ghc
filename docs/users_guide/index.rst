@@ -27,6 +27,7 @@ Contents:
    wasm
    bugs
    eventlog-formats
+   glossary
    editing-guide
 
 
