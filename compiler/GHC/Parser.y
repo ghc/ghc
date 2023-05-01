@@ -751,7 +751,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 -- Exported parsers
 %name parseModuleNoHaddock module
-%name parseSignature signature
+%name parseSignatureNoHaddock signature
 %name parseImport importdecl
 %name parseStatement e_stmt
 %name parseDeclaration topdecl
@@ -4416,17 +4416,28 @@ pvL :: MonadP m => m (LocatedAn t a) -> m (Located a)
 pvL a = do { av <- a
            ; return (reLoc av) }
 
--- | Parse a Haskell module with Haddock comments.
--- This is done in two steps:
+-- | Parse a Haskell module with Haddock comments. This is done in two steps:
 --
 -- * 'parseModuleNoHaddock' to build the AST
 -- * 'addHaddockToModule' to insert Haddock comments into it
 --
--- This is the only parser entry point that deals with Haddock comments.
--- The other entry points ('parseDeclaration', 'parseExpression', etc) do
--- not insert them into the AST.
+-- This and the signature module parser are the only parser entry points that
+-- deal with Haddock comments. The other entry points ('parseDeclaration',
+-- 'parseExpression', etc) do not insert them into the AST.
 parseModule :: P (Located (HsModule GhcPs))
 parseModule = parseModuleNoHaddock >>= addHaddockToModule
+
+-- | Parse a Haskell signature module with Haddock comments. This is done in two
+-- steps:
+--
+-- * 'parseSignatureNoHaddock' to build the AST
+-- * 'addHaddockToModule' to insert Haddock comments into it
+--
+-- This and the module parser are the only parser entry points that deal with
+-- Haddock comments. The other entry points ('parseDeclaration',
+-- 'parseExpression', etc) do not insert them into the AST.
+parseSignature :: P (Located (HsModule GhcPs))
+parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
 commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
 commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
