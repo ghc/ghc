@@ -1,0 +1,112 @@
+
+==================== Parser AST ====================
+
+(L
+ { T23315.hsig:1:1 }
+ (HsModule
+  (XModulePs
+   (EpAnn
+    (Anchor
+     { T23315.hsig:1:1 }
+     (UnchangedAnchor))
+    (AnnsModule
+     [(AddEpAnn AnnSignature (EpaSpan { T23315.hsig:1:1-9 }))
+     ,(AddEpAnn AnnWhere (EpaSpan { T23315.hsig:1:18-22 }))]
+      []
+     (Nothing))
+    (EpaComments
+     []))
+   (VirtualBraces
+    (1))
+   (Nothing)
+   (Nothing))
+  (Just
+   (L
+    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:1:11-16 })
+    {ModuleName: T23315}))
+  (Nothing)
+  []
+  [(L
+    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:2:1-12 })
+    (DocD
+     (NoExtField)
+     (DocCommentNext
+      (L
+       { T23315.hsig:2:1-12 }
+       (WithHsDocIdentifiers
+        (MultiLineDocString
+         (HsDocStringNext)
+         (:|
+          (L
+           { T23315.hsig:2:5-12 }
+           (HsDocStringChunk
+            " My unit"))
+          []))
+        [])))))
+  ,(L
+    (SrcSpanAnn (EpAnn
+                 (Anchor
+                  { T23315.hsig:3:1-7 }
+                  (UnchangedAnchor))
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T23315.hsig:3:1-7 })
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (EpAnn
+       (Anchor
+        { T23315.hsig:3:1 }
+        (UnchangedAnchor))
+       (AnnSig
+        (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
+        [])
+       (EpaComments
+        []))
+      [(L
+        (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:1 })
+        (Unqual
+         {OccName: a}))]
+      (HsWC
+       (NoExtField)
+       (L
+        (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:6-7 })
+        (HsSig
+         (NoExtField)
+         (HsOuterImplicit
+          (NoExtField))
+         (L
+          (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:6-7 })
+          (HsTupleTy
+           (EpAnn
+            (Anchor
+             { T23315.hsig:3:6 }
+             (UnchangedAnchor))
+            (AnnParen
+             (AnnParens)
+             (EpaSpan { T23315.hsig:3:6 })
+             (EpaSpan { T23315.hsig:3:7 }))
+            (EpaComments
+             []))
+           (HsBoxedOrConstraintTuple)
+           []))))))))
+  ,(L
+    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:4:1-14 })
+    (DocD
+     (NoExtField)
+     (DocCommentPrev
+      (L
+       { T23315.hsig:4:1-14 }
+       (WithHsDocIdentifiers
+        (MultiLineDocString
+         (HsDocStringPrevious)
+         (:|
+          (L
+           { T23315.hsig:4:5-14 }
+           (HsDocStringChunk
+            " More docs"))
+          []))
+        [])))))]))
+
+
