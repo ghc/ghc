@@ -1086,6 +1086,102 @@ freeReg REG_D6    = False
 
 freeReg _ = True
 
+#elif defined(MACHREGS_riscv64)
+
+-- zero reg
+freeReg 0 = False
+-- link register
+freeReg 1 = False
+-- stack pointer
+freeReg 2 = False
+-- global pointer
+freeReg 3 = False
+-- thread pointer
+freeReg 4 = False
+-- frame pointer
+freeReg 8 = False
+
+# if defined(REG_Base)
+freeReg REG_Base  = False
+# endif
+# if defined(REG_Sp)
+freeReg REG_Sp    = False
+# endif
+# if defined(REG_SpLim)
+freeReg REG_SpLim = False
+# endif
+# if defined(REG_Hp)
+freeReg REG_Hp    = False
+# endif
+# if defined(REG_HpLim)
+freeReg REG_HpLim = False
+# endif
+
+# if defined(REG_R1)
+freeReg REG_R1    = False
+# endif
+# if defined(REG_R2)
+freeReg REG_R2    = False
+# endif
+# if defined(REG_R3)
+freeReg REG_R3    = False
+# endif
+# if defined(REG_R4)
+freeReg REG_R4    = False
+# endif
+# if defined(REG_R5)
+freeReg REG_R5    = False
+# endif
+# if defined(REG_R6)
+freeReg REG_R6    = False
+# endif
+# if defined(REG_R7)
+freeReg REG_R7    = False
+# endif
+# if defined(REG_R8)
+freeReg REG_R8    = False
+# endif
+
+# if defined(REG_F1)
+freeReg REG_F1    = False
+# endif
+# if defined(REG_F2)
+freeReg REG_F2    = False
+# endif
+# if defined(REG_F3)
+freeReg REG_F3    = False
+# endif
+# if defined(REG_F4)
+freeReg REG_F4    = False
+# endif
+# if defined(REG_F5)
+freeReg REG_F5    = False
+# endif
+# if defined(REG_F6)
+freeReg REG_F6    = False
+# endif
+
+# if defined(REG_D1)
+freeReg REG_D1    = False
+# endif
+# if defined(REG_D2)
+freeReg REG_D2    = False
+# endif
+# if defined(REG_D3)
+freeReg REG_D3    = False
+# endif
+# if defined(REG_D4)
+freeReg REG_D4    = False
+# endif
+# if defined(REG_D5)
+freeReg REG_D5    = False
+# endif
+# if defined(REG_D6)
+freeReg REG_D6    = False
+# endif
+
+freeReg _ = True
+
 #else
 
 freeReg = panic "freeReg not defined for this platform"
