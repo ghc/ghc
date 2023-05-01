@@ -1,7 +1,8 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE LambdaCase    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,9 +31,11 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.JStg.Monad
 import GHC.JS.Transform
 import GHC.JS.Make
+import GHC.JS.Ident
 
 import GHC.StgToJS.Apply
 import GHC.StgToJS.Arg
@@ -63,7 +66,7 @@ import GHC.Stg.Utils
 
 import GHC.Builtin.PrimOps
 
-import GHC.Core
+import GHC.Core hiding (Var)
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.Arity (isOneShotBndr)
@@ -87,7 +90,7 @@ import Control.Monad
 import Control.Arrow ((&&&))
 
 -- | Evaluate an expression in the given expression context (continuation)
-genExpr :: HasDebugCallStack => ExprCtx -> CgStgExpr -> G (JStat, ExprResult)
+genExpr :: HasDebugCallStack => ExprCtx -> CgStgExpr -> G (JStgStat, ExprResult)
 genExpr ctx stg = case stg of
   StgApp f args -> genApp ctx f args
   StgLit l      -> do
@@ -127,7 +130,7 @@ genExpr ctx stg = case stg of
 genBind :: HasDebugCallStack
         => ExprCtx
         -> CgStgBinding
-        -> G (JStat, ExprCtx)
+        -> G (JStgStat, ExprCtx)
 genBind ctx bndr =
   case bndr of
     StgNonRec b r -> do
@@ -143,7 +146,7 @@ genBind ctx bndr =
    where
      ctx' = ctxClearLneFrame ctx
 
-     assign :: Id -> CgStgRhs -> G (Maybe JStat)
+     assign :: Id -> CgStgRhs -> G (Maybe JStgStat)
      assign b (StgRhsClosure _ _ccs {-[the_fv]-} _upd [] expr _typ)
        | let strip = snd . stripStgTicksTop (not . tickishIsCode)
        , StgCase (StgApp scrutinee []) _ (AlgAlt _) [GenStgAlt (DataAlt _) params sel_expr] <- strip expr
@@ -183,7 +186,7 @@ genBind ctx bndr =
 genBindLne :: HasDebugCallStack
            => ExprCtx
            -> CgStgBinding
-           -> G (JStat, ExprCtx)
+           -> G (JStgStat, ExprCtx)
 genBindLne ctx bndr = do
   -- compute live variables and the offsets where they will be stored in the
   -- stack
@@ -227,17 +230,20 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
         maybe (panic "genEntryLne: updatable binder not found in let-no-escape frame")
               ((payloadSize-) . fst)
               (L.find ((==i) . fst . snd) (zip [0..] vars))
-      bh | isUpdatable update =
-             jVar (\x -> mconcat
-              [ x |= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
-              , IfStat x (ReturnStat x) mempty
-              ])
-         | otherwise = mempty
-  lvs  <- popLneFrame True payloadSize ctx
-  body <- genBody ctx R1 args body typ
-  ei@(TxtI eii) <- identForEntryId i
+      mk_bh :: G JStgStat
+      mk_bh | isUpdatable update =
+              do x <- Var <$> freshIdent
+                 return $ mconcat
+                   [ x |= ApplExpr (var "h$bh_lne") [Sub sp (toJExpr myOffset), toJExpr (payloadSize+1)]
+                   , IfStat x (ReturnStat x) mempty
+                   ]
+            | otherwise = pure mempty
+  blk_hl <- mk_bh
+  locals <- popLneFrame True payloadSize ctx
+  body   <- genBody ctx R1 args body typ
+  ei@(identFS -> eii) <- identForEntryId i
   sr   <- genStaticRefsRhs rhs
-  let f = (bh <> lvs <> body)
+  let f = (blk_hl <> locals <> body)
   emitClosureInfo $
     ClosureInfo ei
                 (CIRegs 0 $ concatMap idJSRep args)
@@ -246,16 +252,16 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
                     map (stackSlotType . fst) (ctxLneFrameVars ctx))
                 CIStackFrame
                 sr
-  emitToplevel (jFunction ei [] f)
+  emitToplevel (FuncStat ei [] f)
 genEntryLne ctx i (StgRhsCon cc con _mu _ticks args _typ) = resetSlots $ do
   let payloadSize = ctxLneFrameSize ctx
-  ei@(TxtI _eii) <- identForEntryId i
+  ei <- identForEntryId i
   -- di <- varForDataConWorker con
   ii <- freshIdent
   p  <- popLneFrame True payloadSize ctx
   args' <- concatMapM genArg args
   ac    <- allocCon ii con cc args'
-  emitToplevel (jFunction ei [] (mconcat [decl ii, p, ac, r1 |= toJExpr ii, returnStack]))
+  emitToplevel (FuncStat ei [] (mconcat [decl ii, p, ac, r1 |= toJExpr ii, returnStack]))
 
 -- | Generate the entry function for a local closure
 genEntry :: HasDebugCallStack => ExprCtx -> Id -> CgStgRhs -> G ()
@@ -266,7 +272,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) =
   llv   <- verifyRuntimeReps live
   upd   <- genUpdFrame upd_flag i
   body  <- genBody entryCtx R2 args body typ
-  ei@(TxtI eii) <- identForEntryId i
+  ei@(identFS -> eii) <- identForEntryId i
   et    <- genEntryType args
   setcc <- ifProfiling $
              if et == CIThunk
@@ -279,7 +285,7 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) =
                                 (fixedLayout $ map (unaryTypeJSRep . idType) live)
                                 et
                                 sr
-  emitToplevel (jFunction ei [] (mconcat [ll, llv, upd, setcc, body]))
+  emitToplevel (FuncStat ei [] (mconcat [ll, llv, upd, setcc, body]))
   where
     entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
@@ -298,7 +304,7 @@ genBody :: HasDebugCallStack
          -> [Id]
          -> CgStgExpr
          -> Type
-         -> G JStat
+         -> G JStgStat
 genBody ctx startReg args e typ = do
   -- load arguments into local variables
   la <- do
@@ -360,7 +366,7 @@ resultSize ty = result
 
 -- | Ensure that the set of identifiers has valid 'RuntimeRep's. This function
 -- returns a no-op when 'csRuntimeAssert' in 'StgToJSConfig' is False.
-verifyRuntimeReps :: HasDebugCallStack => [Id] -> G JStat
+verifyRuntimeReps :: HasDebugCallStack => [Id] -> G JStgStat
 verifyRuntimeReps xs = do
   runtime_assert <- csRuntimeAssert <$> getSettings
   if not runtime_assert
@@ -387,7 +393,7 @@ verifyRuntimeReps xs = do
 -- registers. This assumes these data fields have already been populated in the
 -- registers. For the empty, singleton, and binary case use register 1, for any
 -- more use as many registers as necessary.
-loadLiveFun :: [Id] -> G JStat
+loadLiveFun :: [Id] -> G JStgStat
 loadLiveFun l = do
    l' <- concat <$> mapM identsForId l
    case l' of
@@ -409,11 +415,11 @@ loadLiveFun l = do
                , l''
                ]
   where
-        loadLiveVar d n v = let ident = TxtI (dataFieldName n)
+        loadLiveVar d n v = let ident = global (dataFieldName n)
                             in  v ||= SelExpr d ident
 
 -- | Pop a let-no-escape frame off the stack
-popLneFrame :: Bool -> Int -> ExprCtx -> G JStat
+popLneFrame :: Bool -> Int -> ExprCtx -> G JStgStat
 popLneFrame inEntry size ctx = do
   -- calculate the new stack size
   let ctx' = ctxLneShrinkStack ctx size
@@ -429,7 +435,7 @@ popLneFrame inEntry size ctx = do
   popSkipI skip is
 
 -- | Generate an updated given an 'Id'
-genUpdFrame :: UpdateFlag -> Id -> G JStat
+genUpdFrame :: UpdateFlag -> Id -> G JStgStat
 genUpdFrame u i
   | isReEntrant u   = pure mempty
   | isOneShotBndr i = maybeBh
@@ -449,7 +455,7 @@ genUpdFrame u i
 -- Useful for making sure that the object is not accidentally entered multiple
 -- times
 --
-bhSingleEntry :: StgToJSConfig -> JStat
+bhSingleEntry :: StgToJSConfig -> JStgStat
 bhSingleEntry _settings = mconcat
   [ r1 .^ closureEntry_  |= var "h$blackholeTrap"
   , r1 .^ closureField1_ |= undefined_
@@ -473,7 +479,7 @@ genStaticRefs lv
     sv = liveStatic lv
 
     getStaticRef :: Id -> G (Maybe FastString)
-    getStaticRef = fmap (fmap itxt . listToMaybe) . identsForId
+    getStaticRef = fmap (fmap identFS . listToMaybe) . identsForId
 
 -- | Reorder the things we need to push to reuse existing stack values as much
 -- as possible True if already on the stack at that location
@@ -506,7 +512,7 @@ optimizeFree offset ids = do
   return $ map (\(i,n,_,b) -> (i,n,b)) allSlots
 
 -- | Allocate local closures
-allocCls :: Maybe JStat -> [(Id, CgStgRhs)] -> G JStat
+allocCls :: Maybe JStgStat -> [(Id, CgStgRhs)] -> G JStgStat
 allocCls dynMiddle xs = do
    (stat, dyn) <- partitionWithM toCl xs
    ac <- allocDynAll False dynMiddle dyn
@@ -514,7 +520,7 @@ allocCls dynMiddle xs = do
   where
     -- left = static, right = dynamic
     toCl :: (Id, CgStgRhs)
-         -> G (Either JStat (Ident,JExpr,[JExpr],CostCentreStack))
+         -> G (Either JStgStat (Ident,JStgExpr,[JStgExpr],CostCentreStack))
     -- statics
     {- making zero-arg constructors static is problematic, see #646
        proper candidates for this optimization should have been floated
@@ -551,7 +557,7 @@ genCase :: HasDebugCallStack
         -> AltType
         -> [CgStgAlt]
         -> LiveVars
-        -> G (JStat, ExprResult)
+        -> G (JStgStat, ExprResult)
 genCase ctx bnd e at alts l
   | snd (isInlineExpr (ctxEvaluatedIds ctx) e) = do
       bndi <- identsForId bnd
@@ -593,7 +599,7 @@ genRet :: HasDebugCallStack
        -> AltType
        -> [CgStgAlt]
        -> LiveVars
-       -> G JStat
+       -> G JStgStat
 genRet ctx e at as l = freshIdent >>= f
   where
     allRefs :: [Id]
@@ -605,8 +611,8 @@ genRet ctx e at as l = freshIdent >>= f
     isLne i    = ctxIsLneBinding ctx i || ctxIsLneLiveVar ctx' i
     nonLne     = filter (not . isLne) (dVarSetElems l)
 
-    f :: Ident -> G JStat
-    f r@(TxtI ri)    =  do
+    f :: Ident -> G JStgStat
+    f r@(identFS -> ri)    =  do
       pushLne  <- pushLneFrame lneLive ctx
       saveCCS  <- ifProfilingM $ push [jCurrentCCS]
       free     <- optimizeFree 0 nonLne
@@ -623,7 +629,7 @@ genRet ctx e at as l = freshIdent >>= f
                        ++ if prof then [ObjV] else map stackSlotType lneVars)
                     CIStackFrame
                     sr
-      emitToplevel $ jFunction r [] fun'
+      emitToplevel $ FuncStat r [] fun'
       return (pushLne <> saveCCS <> pushRet)
     fst3 ~(x,_,_)  = x
 
@@ -634,7 +640,7 @@ genRet ctx e at as l = freshIdent >>= f
       _              -> [PtrV]
 
     -- special case for popping CCS but preserving stack size
-    pop_handle_CCS :: [(JExpr, StackSlot)] -> G JStat
+    pop_handle_CCS :: [(JStgExpr, StackSlot)] -> G JStgStat
     pop_handle_CCS [] = return mempty
     pop_handle_CCS xs = do
       -- grab the slots from 'xs' and push
@@ -664,9 +670,9 @@ genAlts :: HasDebugCallStack
         => ExprCtx        -- ^ lhs to assign expression result to
         -> Id             -- ^ id being matched
         -> AltType        -- ^ type
-        -> Maybe [JExpr]  -- ^ if known, fields in datacon from earlier expression
+        -> Maybe [JStgExpr]  -- ^ if known, fields in datacon from earlier expression
         -> [CgStgAlt]     -- ^ the alternatives
-        -> G (JStat, ExprResult)
+        -> G (JStgStat, ExprResult)
 genAlts ctx e at me alts = do
   (st, er) <- case at of
 
@@ -751,7 +757,7 @@ genAlts ctx e at me alts = do
 -- | If 'StgToJSConfig.csRuntimeAssert' is set, then generate an assertion that
 -- asserts the pattern match is valid, e.g., the match is attempted on a
 -- Boolean, a Data Constructor, or some number.
-verifyMatchRep :: HasDebugCallStack => Id -> AltType -> G JStat
+verifyMatchRep :: HasDebugCallStack => Id -> AltType -> G JStgStat
 verifyMatchRep x alt = do
   runtime_assert <- csRuntimeAssert <$> getSettings
   if not runtime_assert
@@ -766,7 +772,7 @@ verifyMatchRep x alt = do
 -- i.e., a possible code path from an 'StgAlt'
 data Branch a = Branch
   { branch_expr   :: a
-  , branch_stat   :: JStat
+  , branch_stat   :: JStgStat
   , branch_result :: ExprResult
   }
   deriving (Eq,Functor)
@@ -794,17 +800,17 @@ normalizeBranches ctx brs
 -- | Load an unboxed tuple. "Loading" means getting all 'Idents' from the input
 -- ID's, declaring them as variables in JS land and binding them, in order, to
 -- 'es'.
-loadUbxTup :: [JExpr] -> [Id] -> Int -> G JStat
+loadUbxTup :: [JStgExpr] -> [Id] -> Int -> G JStgStat
 loadUbxTup es bs _n = do
   bs' <- concatMapM identsForId bs
   return $ declAssignAll bs' es
 
-mkSw :: [JExpr] -> [Branch (Maybe [JExpr])] -> JStat
+mkSw :: [JStgExpr] -> [Branch (Maybe [JStgExpr])] -> JStgStat
 mkSw [e] cases = mkSwitch e (fmap (fmap (fmap head)) cases)
 mkSw es cases  = mkIfElse es cases
 
 -- | Switch for pattern matching on constructors or prims
-mkSwitch :: JExpr -> [Branch (Maybe JExpr)] -> JStat
+mkSwitch :: JStgExpr -> [Branch (Maybe JStgExpr)] -> JStgStat
 mkSwitch e cases
   | [Branch (Just c1) s1 _] <- n
   , [Branch _ s2 _] <- d
@@ -829,7 +835,7 @@ mkSwitch e cases
 -- | if/else for pattern matching on things that js cannot switch on
 -- the list of branches is expected to have the default alternative
 -- first, if it exists
-mkIfElse :: [JExpr] -> [Branch (Maybe [JExpr])] -> JStat
+mkIfElse :: [JStgExpr] -> [Branch (Maybe [JStgExpr])] -> JStgStat
 mkIfElse e s = go (L.reverse s)
     where
       go = \case
@@ -842,7 +848,7 @@ mkIfElse e s = go (L.reverse s)
 --
 -- > mkEq [l0,l1,l2] [r0,r1,r2] = (l0 === r0) && (l1 === r1) && (l2 === r2)
 --
-mkEq :: [JExpr] -> [JExpr] -> JExpr
+mkEq :: [JStgExpr] -> [JStgExpr] -> JStgExpr
 mkEq es1 es2
   | length es1 == length es2 = foldl1 (InfixExpr LAndOp) (zipWith (InfixExpr StrictEqOp) es1 es2)
   | otherwise                = panic "mkEq: incompatible expressions"
@@ -850,7 +856,7 @@ mkEq es1 es2
 mkAlgBranch :: ExprCtx   -- ^ toplevel id for the result
             -> Id        -- ^ datacon to match
             -> CgStgAlt  -- ^ match alternative with binders
-            -> G (Branch (Maybe JExpr))
+            -> G (Branch (Maybe JStgExpr))
 mkAlgBranch top d alt
   | DataAlt dc <- alt_con alt
   , isUnboxableCon dc
@@ -876,50 +882,52 @@ mkAlgBranch top d alt
 mkPrimIfBranch :: ExprCtx
                -> [JSRep]
                -> CgStgAlt
-               -> G (Branch (Maybe [JExpr]))
+               -> G (Branch (Maybe [JStgExpr]))
 mkPrimIfBranch top _vt alt =
   (\ic (ej,er) -> Branch ic ej er) <$> ifCond (alt_con alt) <*> genExpr top (alt_rhs alt)
 
 -- fixme are bool things always checked correctly here?
-ifCond :: AltCon -> G (Maybe [JExpr])
+ifCond :: AltCon -> G (Maybe [JStgExpr])
 ifCond = \case
   DataAlt da -> return $ Just [toJExpr (dataConTag da)]
   LitAlt l   -> Just <$> genLit l
   DEFAULT    -> return Nothing
 
-caseCond :: AltCon -> G (Maybe JExpr)
+caseCond :: AltCon -> G (Maybe JStgExpr)
 caseCond = \case
+-- fixme use single tmp var for all branches
   DEFAULT    -> return Nothing
   DataAlt da -> return $ Just (toJExpr $ dataConTag da)
   LitAlt l   -> genLit l >>= \case
     [e] -> pure (Just e)
-    es  -> pprPanic "caseCond: expected single-variable literal" (ppr $ satJExpr Nothing <$> es)
+    es  -> pprPanic "caseCond: expected single-variable literal" (ppr $ jStgExprToJS <$> es)
 
--- fixme use single tmp var for all branches
 -- | Load parameters from constructor
-loadParams :: JExpr -> [Id] -> G JStat
+loadParams :: JStgExpr -> [Id] -> G JStgStat
 loadParams from args = do
   as <- concat <$> zipWithM (\a u -> map (,u) <$> identsForId a) args use
-  return $ case as of
-    []                 -> mempty
-    [(x,u)]            -> loadIfUsed (from .^ closureField1_) x  u
-    [(x1,u1),(x2,u2)]  -> mconcat
+  case as of
+    []                 -> return mempty
+    [(x,u)]            -> return $ loadIfUsed (from .^ closureField1_) x  u
+    [(x1,u1),(x2,u2)]  -> return $ mconcat
                             [ loadIfUsed (from .^ closureField1_) x1 u1
                             , loadIfUsed (from .^ closureField2_) x2 u2
                             ]
-    ((x,u):xs)         -> mconcat
-                            [ loadIfUsed (from .^ closureField1_) x u
-                            , jVar (\d -> mconcat [ d |= from .^ closureField2_
-                                                  , loadConVarsIfUsed d xs
-                                                  ])
-                            ]
+    ((x,u):xs)         -> do d <- Var <$> freshIdent
+                             return $ mconcat
+                               [ loadIfUsed (from .^ closureField1_) x u
+                               , mconcat [ d |= from .^ closureField2_
+                                         , loadConVarsIfUsed d xs
+                                         ]
+                               ]
   where
     use = repeat True -- fixme clean up
+
     loadIfUsed fr tgt True = tgt ||= fr
     loadIfUsed  _ _   _    = mempty
 
     loadConVarsIfUsed fr cs = mconcat $ zipWith f cs [(1::Int)..]
-      where f (x,u) n = loadIfUsed (SelExpr fr (TxtI (dataFieldName n))) x u
+      where f (x,u) n = loadIfUsed (SelExpr fr (global (dataFieldName n))) x u
 
 -- | Determine if a branch will end in a continuation or not. If not the inline
 -- branch must be normalized. See 'normalizeBranches'
@@ -935,19 +943,19 @@ branchResult = \case
 
 -- | Push return arguments onto the stack. The 'Bool' tracks whether the value
 -- is already on the stack or not, used in 'StgToJS.Stack.pushOptimized'.
-pushRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> JExpr -> G JStat
+pushRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> JStgExpr -> G JStgStat
 pushRetArgs free fun = do
   rs <- mapM (\(i,n,b) -> (\es->(es!!(n-1),b)) <$> genIdArg i) free
   pushOptimized (rs++[(fun,False)])
 
 -- | Load the return arguments then pop the stack frame
-loadRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> G JStat
+loadRetArgs :: HasDebugCallStack => [(Id,Int,Bool)] -> G JStgStat
 loadRetArgs free = do
   ids <- mapM (\(i,n,_b) -> (!! (n-1)) <$> genIdStackArgI i) free
   popSkipI 1 ids
 
 -- | allocate multiple, possibly mutually recursive, closures
-allocDynAll :: Bool -> Maybe JStat -> [(Ident,JExpr,[JExpr],CostCentreStack)] -> G JStat
+allocDynAll :: Bool -> Maybe JStgStat -> [(Ident,JStgExpr,[JStgExpr],CostCentreStack)] -> G JStgStat
 {-
 XXX remove use of template and enable in-place init again
 allocDynAll haveDecl middle [(to,entry,free,cc)]
@@ -957,13 +965,14 @@ allocDynAll haveDecl middle [(to,entry,free,cc)]
 allocDynAll haveDecl middle cls = do
   settings <- getSettings
   let
+    middle' :: JStgStat
     middle' = fromMaybe mempty middle
 
     decl_maybe i e
       | haveDecl  = toJExpr i |= e
       | otherwise = i ||= e
 
-    makeObjs :: G JStat
+    makeObjs :: G JStgStat
     makeObjs =
       fmap mconcat $ forM cls $ \(i,f,_,cc) -> do
       ccs <- maybeToList <$> costCentreStackLbl cc
@@ -978,7 +987,8 @@ allocDynAll haveDecl middle cls = do
             else ApplExpr (var "h$c") (f : fmap (ValExpr . JVar) ccs)
         ]
 
-    fillObjs = mconcat $ map fillObj cls
+    fillObjs :: [JStgStat]
+    fillObjs = map fillObj cls
     fillObj (i,_,es,_)
       | csInlineAlloc settings || length es > 24 =
           case es of
@@ -1004,25 +1014,29 @@ allocDynAll haveDecl middle cls = do
                         , toJExpr i .^ closureField2_ |= fillFun es
                         ]
 
+    fillFun :: [JStgExpr] -> JStgExpr
     fillFun [] = null_
     fillFun es = ApplExpr (allocData (length es)) es
 
-    checkObjs | csAssertRts settings  = mconcat $
-                map (\(i,_,_,_) -> ApplStat (ValExpr (JVar (TxtI "h$checkObj"))) [toJExpr i]) cls
+    checkObjs :: [JStgStat]
+    checkObjs | csAssertRts settings  =
+                map (\(i,_,_,_) -> ApplStat (var "h$checkObj") [Var i]) cls
               | otherwise = mempty
 
   objs <- makeObjs
-  pure $ mconcat [objs, middle', fillObjs, checkObjs]
+  return $ mconcat [objs, middle', mconcat fillObjs, mconcat checkObjs]
 
 -- | Generate a primop. This function wraps around the real generator
 -- 'GHC.StgToJS.genPrim', handling the 'ExprCtx' and all arguments before
 -- generating the primop.
-genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> Type -> G (JStat, ExprResult)
+genPrimOp :: ExprCtx -> PrimOp -> [StgArg] -> Type -> G (JStgStat, ExprResult)
 genPrimOp ctx op args t = do
   as <- concatMapM genArg args
   prof <- csProf <$> getSettings
   bound <- csBoundsCheck <$> getSettings
+  let prim_gen = withTag "h$PRM" $ genPrim prof bound t op (concatMap typex_expr $ ctxTarget ctx) as
   -- fixme: should we preserve/check the primreps?
-  return $ case genPrim prof bound t op (concatMap typex_expr $ ctxTarget ctx) as of
+  jsm <- liftIO initJSM
+  return $ case runJSM jsm prim_gen of
              PrimInline s -> (s, ExprInline Nothing)
              PRPrimCall s -> (s, ExprCont)

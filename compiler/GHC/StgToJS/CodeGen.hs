@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | JavaScript code generator
 module GHC.StgToJS.CodeGen
@@ -13,7 +14,8 @@ import GHC.Prelude
 import GHC.Driver.Flags (DumpFlag (Opt_D_dump_js))
 
 import GHC.JS.Ppr
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Make
 import GHC.JS.Transform
 import GHC.JS.Optimizer
@@ -134,7 +136,7 @@ genUnits m ss spt_entries foreign_stubs = do
         staticInit <-
           initStaticPtrs spt_entries
         let stat = ( jsOptimize .
-                     satJStat (Just $ modulePrefix m 1)
+                     jStgStatToJS
                    $ mconcat (reverse glbl) <> staticInit)
         let syms = [moduleGlobalSymbol m]
         let oi = ObjBlock
@@ -196,11 +198,11 @@ genUnits m ss spt_entries foreign_stubs = do
                     => CgStgTopBinding
                     -> Int
                     -> G (Maybe LinkableUnit)
-      generateBlock top_bind n = case top_bind of
+      generateBlock top_bind _n = case top_bind of
         StgTopStringLit bnd str -> do
           bids <- identsForId bnd
           case bids of
-            [(TxtI b1t),(TxtI b2t)] -> do
+            [(identFS -> b1t),(identFS -> b2t)] -> do
               -- [e1,e2] <- genLit (MachStr str)
               emitStatic b1t (StaticUnboxed (StaticUnboxedString str)) Nothing
               emitStatic b2t (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
@@ -208,9 +210,9 @@ genUnits m ss spt_entries foreign_stubs = do
               si        <- State.gets (ggsStatic . gsGroup)
               let body = mempty -- mconcat (reverse extraTl) <> b1 ||= e1 <> b2 ||= e2
               let stat =  jsOptimize
-                          $ satJStat (Just $ modulePrefix m n) body
+                          $ jStgStatToJS body
               let ids = [bnd]
-              syms <- (\(TxtI i) -> [i]) <$> identForId bnd
+              syms <- (\(identFS -> i) -> [i]) <$> identForId bnd
               let oi = ObjBlock
                         { oiSymbols  = syms
                         , oiClInfo   = []
@@ -246,9 +248,9 @@ genUnits m ss spt_entries foreign_stubs = do
               topDeps  = collectTopIds decl
               required = hasExport decl
               stat     = jsOptimize
-                         . satJStat (Just $ modulePrefix m n)
+                         . jStgStatToJS
                          $ mconcat (reverse extraTl) <> tl
-          syms <- mapM (fmap (\(TxtI i) -> i) . identForId) topDeps
+          syms <- mapM (fmap (\(identFS -> i) -> i) . identForId) topDeps
           let oi = ObjBlock
                     { oiSymbols  = syms
                     , oiClInfo   = ci
@@ -271,23 +273,19 @@ genUnits m ss spt_entries foreign_stubs = do
           pure $! seqList topDeps `seq` seqList allDeps `seq` Just lu
 
 -- | variable prefix for the nth block in module
-modulePrefix :: Module -> Int -> FastString
-modulePrefix m n =
-  let encMod = zEncodeString . moduleNameString . moduleName $ m
-  in  mkFastString $ "h$" ++ encMod ++ "_id_" ++ show n
 
-genToplevel :: CgStgBinding -> G JStat
+genToplevel :: CgStgBinding -> G JStgStat
 genToplevel (StgNonRec bndr rhs) = genToplevelDecl bndr rhs
 genToplevel (StgRec bs)          =
   mconcat <$> mapM (\(bndr, rhs) -> genToplevelDecl bndr rhs) bs
 
-genToplevelDecl :: Id -> CgStgRhs -> G JStat
+genToplevelDecl :: Id -> CgStgRhs -> G JStgStat
 genToplevelDecl i rhs = do
   s1 <- resetSlots (genToplevelConEntry i rhs)
   s2 <- resetSlots (genToplevelRhs i rhs)
   return (s1 <> s2)
 
-genToplevelConEntry :: Id -> CgStgRhs -> G JStat
+genToplevelConEntry :: Id -> CgStgRhs -> G JStgStat
 genToplevelConEntry i rhs = case rhs of
    StgRhsCon _cc con _mu _ts _args _typ
      | isDataConWorkId i
@@ -297,7 +295,7 @@ genToplevelConEntry i rhs = case rhs of
        -> genSetConInfo i dc (stgRhsLive rhs) -- srt
    _ -> pure mempty
 
-genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStat
+genSetConInfo :: HasDebugCallStack => Id -> DataCon -> LiveVars -> G JStgStat
 genSetConInfo i d l {- srt -} = do
   ei <- identForDataConEntryId i
   sr <- genStaticRefs l
@@ -314,10 +312,10 @@ genSetConInfo i d l {- srt -} = do
                          (dataConRepArgTys d)
         -- concatMap (map slotTyToType . repTypeSlots . repType) (dataConRepArgTys d)
 
-mkDataEntry :: Ident -> JStat
+mkDataEntry :: Ident -> JStgStat
 mkDataEntry i = FuncStat i [] returnStack
 
-genToplevelRhs :: Id -> CgStgRhs -> G JStat
+genToplevelRhs :: Id -> CgStgRhs -> G JStgStat
 -- general cases:
 genToplevelRhs i rhs = case rhs of
   StgRhsCon cc con _mu _tys args _typ -> do
@@ -332,10 +330,11 @@ genToplevelRhs i rhs = case rhs of
        - order by increasing use
        - prepend loading lives var to body: body can stay the same
     -}
-    eid@(TxtI eidt) <- identForEntryId i
-    (TxtI idt)   <- identForId i
+    eid  <- identForEntryId i
+    idt  <- identFS <$> identForId i
     body <- genBody (initExprCtx i) R2 args body typ
-    global_occs <- globalOccs (satJStat (Just "ghcjs_tmp_sat_") body)
+    global_occs <- globalOccs body
+    let eidt = identFS eid
     let lidents = map global_ident global_occs
     let lids    = map global_id    global_occs
     let lidents' = map identFS lidents

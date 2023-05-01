@@ -570,12 +570,14 @@ Library
         GHC.Iface.Tidy.StaticPtrTable
         GHC.IfaceToCore
         GHC.Iface.Type
+        GHC.JS.Ident
         GHC.JS.Make
         GHC.JS.Optimizer
         GHC.JS.Ppr
         GHC.JS.Syntax
+        GHC.JS.JStg.Syntax
+        GHC.JS.JStg.Monad
         GHC.JS.Transform
-        GHC.JS.Unsat.Syntax
         GHC.Linker
         GHC.Linker.Config
         GHC.Linker.Deps

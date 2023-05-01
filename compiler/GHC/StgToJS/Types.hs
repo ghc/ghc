@@ -22,7 +22,8 @@ module GHC.StgToJS.Types where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Make
 import GHC.JS.Ppr ()
@@ -60,12 +61,12 @@ data GenState = GenState
   , gsIdents    :: !IdCache               -- ^ hash consing for identifiers from a Unique
   , gsUnfloated :: !(UniqFM Id CgStgExpr) -- ^ unfloated arguments
   , gsGroup     :: GenGroupState          -- ^ state for the current binding group
-  , gsGlobal    :: [JStat]                -- ^ global (per module) statements (gets included when anything else from the module is used)
+  , gsGlobal    :: [JStgStat]             -- ^ global (per module) statements (gets included when anything else from the module is used)
   }
 
 -- | The JS code generator state relevant for the current binding group
 data GenGroupState = GenGroupState
-  { ggsToplevelStats :: [JStat]        -- ^ extra toplevel statements for the binding group
+  { ggsToplevelStats :: [JStgStat]     -- ^ extra toplevel statements for the binding group
   , ggsClosureInfo   :: [ClosureInfo]  -- ^ closure metadata (info tables) for the binding group
   , ggsStatic        :: [StaticInfo]   -- ^ static (CAF) data in our binding group
   , ggsStack         :: [StackSlot]    -- ^ stack info for the current expression
@@ -147,7 +148,7 @@ newtype CIStatic = CIStaticRefs { staticRefs :: [FastString] }
 --   note: only works after all top-level objects have been created
 instance ToJExpr CIStatic where
   toJExpr (CIStaticRefs [])  = null_ -- [je| null |]
-  toJExpr (CIStaticRefs rs)  = toJExpr (map TxtI rs)
+  toJExpr (CIStaticRefs rs)  = toJExpr (map global rs)
 
 -- | JS primitive representations
 data JSRep
@@ -338,28 +339,23 @@ data JSFFIType
 -- | Typed expression
 data TypedExpr = TypedExpr
   { typex_typ  :: !PrimRep
-  , typex_expr :: [JExpr]
+  , typex_expr :: [JStgExpr]
   }
-
--- FIXME: temporarily removed until JStg replaces JStat
--- instance Outputable TypedExpr where
---   ppr x = text "TypedExpr: " <+> ppr (typex_expr x)
---           $$  text "PrimReps: " <+> ppr (typex_typ x)
 
 -- | A Primop result is either an inlining of some JS payload, or a primitive
 -- call to a JS function defined in Shim files in base.
 data PrimRes
-  = PrimInline JStat  -- ^ primop is inline, result is assigned directly
-  | PRPrimCall JStat  -- ^ primop is async call, primop returns the next
-                      -- function to run. result returned to stack top in
-                      -- registers
+  = PrimInline JStgStat  -- ^ primop is inline, result is assigned directly
+  | PRPrimCall JStgStat  -- ^ primop is async call, primop returns the next
+                         -- function to run. result returned to stack top in
+                         -- registers
 
 data ExprResult
   = ExprCont
-  | ExprInline (Maybe [JExpr])
+  | ExprInline (Maybe [JStgExpr])
   deriving (Eq)
 
-newtype ExprValData = ExprValData [JExpr]
+newtype ExprValData = ExprValData [JStgExpr]
   deriving newtype (Eq)
 
 -- | A Closure is one of six types

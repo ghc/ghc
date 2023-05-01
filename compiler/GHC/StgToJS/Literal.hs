@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module GHC.StgToJS.Literal
   ( genLit
@@ -9,8 +10,9 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
 import GHC.JS.Make
+import GHC.JS.Ident
 
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
@@ -34,15 +36,15 @@ import Data.Char (ord)
 --  * Addr# (Null and Strings): array and offset
 --  * 64-bit values: high 32-bit, low 32-bit
 --  * labels: call to h$mkFunctionPtr and 0, or function name and 0
-genLit :: HasDebugCallStack => Literal -> G [JExpr]
+genLit :: HasDebugCallStack => Literal -> G [JStgExpr]
 genLit = \case
   LitChar c     -> return [ toJExpr (ord c) ]
   LitString str ->
-    freshIdent >>= \strLit@(TxtI strLitT) ->
-      freshIdent >>= \strOff@(TxtI strOffT) -> do
+    freshIdent >>= \strLit@(identFS -> strLitT) ->
+      freshIdent >>= \strOff@(identFS -> strOffT) -> do
         emitStatic strLitT (StaticUnboxed (StaticUnboxedString str)) Nothing
         emitStatic strOffT (StaticUnboxed (StaticUnboxedStringOffset str)) Nothing
-        return [ ValExpr (JVar strLit), ValExpr (JVar strOff) ]
+        return [ Var strLit, Var strOff ]
   LitNullAddr              -> return [ null_, ValExpr (JInt 0) ]
   LitNumber nt v           -> case nt of
     LitNumInt     -> return [ toJExpr v ]
@@ -63,7 +65,7 @@ genLit = \case
                                                   [var (mkRawSymbol True name)]
                                        , ValExpr (JInt 0)
                                        ]
-    | otherwise              -> return [ toJExpr (TxtI (mkRawSymbol True name))
+    | otherwise              -> return [ toJExpr (global (mkRawSymbol True name))
                                        , ValExpr (JInt 0)
                                        ]
   LitRubbish {} -> return [ null_ ]
@@ -95,7 +97,7 @@ genStaticLit = \case
   l -> pprPanic "genStaticLit" (ppr l)
 
 -- make an unsigned 32 bit number from this unsigned one, lower 32 bits
-toU32Expr :: Integer -> JExpr
+toU32Expr :: Integer -> JStgExpr
 toU32Expr i = Int (i Bits..&. 0xFFFFFFFF) .>>>. 0
 
 -- make an unsigned 32 bit number from this unsigned one, lower 32 bits

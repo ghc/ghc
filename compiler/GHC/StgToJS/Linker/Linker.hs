@@ -41,8 +41,10 @@ import GHC.Platform.Host (hostPlatformArchOS)
 
 import GHC.JS.Make
 import GHC.JS.Optimizer
-import GHC.JS.Unsat.Syntax
-import qualified GHC.JS.Syntax as Sat
+import GHC.JS.Ident
+import GHC.JS.JStg.Syntax
+import GHC.JS.JStg.Monad
+import qualified GHC.JS.Syntax as JS
 import GHC.JS.Transform
 
 import GHC.Driver.DynFlags (DynFlags(..))
@@ -217,8 +219,10 @@ jsLink lc_cfg cfg logger out link_plan = do
 
       -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
+        jsm <- initJSM
         withFile (out </> "rts.js") WriteMode $ \h -> do
-          void $ hPutJS (csPrettyRender cfg) h (rts cfg)
+          void $
+            hPutJS (csPrettyRender cfg) h (jsOptimize $ runJSM jsm $ jStgStatToJS <$> rts cfg)
 
       -- link dependencies' JS files into lib.js
       withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
@@ -410,7 +414,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
 -- | Compiled module
 data ModuleCode = ModuleCode
   { mc_module   :: !Module
-  , mc_js_code  :: !Sat.JStat
+  , mc_js_code  :: !JS.JStat
   , mc_exports  :: !B.ByteString        -- ^ rendered exports
   , mc_closures :: ![ClosureInfo]
   , mc_statics  :: ![StaticInfo]
@@ -423,14 +427,14 @@ data ModuleCode = ModuleCode
 -- up into global "metadata" for the whole link.
 data CompactedModuleCode = CompactedModuleCode
   { cmc_module  :: !Module
-  , cmc_js_code :: !Sat.JStat
+  , cmc_js_code :: !JS.JStat
   , cmc_exports :: !B.ByteString        -- ^ rendered exports
   }
 
 -- | Output JS statements and return the output size in bytes.
-hPutJS :: Bool -> Handle -> Sat.JStat -> IO Integer
+hPutJS :: Bool -> Handle -> JS.JStat -> IO Integer
 hPutJS render_pretty h = \case
-  Sat.BlockStat [] -> pure 0
+  JS.BlockStat [] -> pure 0
   x                -> do
     before <- hTell h
     if render_pretty
@@ -475,7 +479,7 @@ renderLinker h render_pretty mods js_files = do
     pure (mod_mod, mod_size)
 
   -- commoned up metadata
-  !meta_length <- fromIntegral <$> putJS (jsOptimize $ satJStat Nothing meta)
+  !meta_length <- fromIntegral <$> putJS (jsOptimize meta)
 
   -- module exports
   mapM_ (putBS . cmc_exports) compacted_mods
@@ -805,7 +809,7 @@ diffDeps
   -> ([UnitId], Set ExportedFun) -- ^ New units and functions to link
   -> ([UnitId], Set ExportedFun) -- ^ Diff
 diffDeps pkgs (deps_pkgs,deps_funs) =
-  ( filter   linked_pkg deps_pkgs
+  ( filter linked_pkg deps_pkgs
   , S.filter linked_fun deps_funs
   )
   where
@@ -1034,7 +1038,7 @@ jsFileNeedsCpp fn = do
 --
 -- Performs link time optimizations and produces one JStat per module plus some
 -- commoned up initialization code.
-linkModules :: [ModuleCode] -> ([CompactedModuleCode], JStat)
+linkModules :: [ModuleCode] -> ([CompactedModuleCode], JS.JStat)
 linkModules mods = (compact_mods, meta)
   where
     compact_mods = map compact mods
@@ -1061,7 +1065,7 @@ linkModules mods = (compact_mods, meta)
             -- render metadata as individual statements
             [ mconcat (map staticDeclStat statics)
             , mconcat (map staticInitStat statics)
-            , mconcat (map (closureInfoStat debug) infos)
+            , jStgStatToJS $ mconcat (map (closureInfoStat debug) infos)
             ]
 
 -- | Only keep a single StaticInfo with a given name
@@ -1081,8 +1085,9 @@ nubStaticInfo = go emptyUniqSet
 -- | Initialize a global object.
 --
 -- All global objects have to be declared (staticInfoDecl) first.
-staticInitStat :: StaticInfo -> JStat
+staticInitStat :: StaticInfo -> JS.JStat
 staticInitStat (StaticInfo i sv mcc) =
+  jStgStatToJS $
   case sv of
     StaticData con args         -> appS "h$sti" $ add_cc_arg
                                     [ var i
@@ -1112,10 +1117,10 @@ staticInitStat (StaticInfo i sv mcc) =
       Just cc -> as ++ [toJExpr cc]
 
 -- | declare and do first-pass init of a global object (create JS object for heap objects)
-staticDeclStat :: StaticInfo -> JStat
-staticDeclStat (StaticInfo global_name static_value _) = decl
+staticDeclStat :: StaticInfo -> JS.JStat
+staticDeclStat (StaticInfo global_name static_value _) = jStgStatToJS decl
   where
-    global_ident = TxtI global_name
+    global_ident = global global_name
     decl_init v  = global_ident ||= v
     decl_no_init = appS "h$di" [toJExpr global_ident]
 

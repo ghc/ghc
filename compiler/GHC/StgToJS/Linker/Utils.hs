@@ -51,8 +51,8 @@ import GHC.Builtin.Types
 import Language.Haskell.Syntax.Basic
 import GHC.Types.Name
 import GHC.StgToJS.Ids
+import GHC.JS.Ident
 import GHC.Core.DataCon
-import GHC.JS.Unsat.Syntax
 import GHC.Data.FastString
 
 -- | Retrieve library directories provided by the @UnitId@ in @UnitState@
@@ -93,7 +93,7 @@ genMkTup profiling n = mconcat
   where
     xs = take n $ map (("x" <>) . Char8.pack . show) ([1..] :: [Int])
     sn = Char8.pack $ show n
-    TxtI symbol = makeIdentForId (dataConWorkId $ tupleDataCon Boxed n) Nothing IdConEntry mod
+    symbol = identFS $ makeIdentForId (dataConWorkId $ tupleDataCon Boxed n) Nothing IdConEntry mod
     name = tupleDataConName Boxed n
     mod = case nameModule_maybe name of
       Just m -> m

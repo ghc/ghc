@@ -16,12 +16,14 @@ module GHC.StgToJS.Regs
   , jsReg
   , maxReg
   , minReg
+  , register
+  , foreignRegister
   )
 where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 
 import GHC.Data.FastString
@@ -78,13 +80,13 @@ instance ToJExpr StgRet where
 -- helpers
 ---------------------------------------------------
 
-sp :: JExpr
+sp :: JStgExpr
 sp = toJExpr Sp
 
-stack :: JExpr
+stack :: JStgExpr
 stack = toJExpr Stack
 
-r1, r2, r3, r4 :: JExpr
+r1, r2, r3, r4 :: JStgExpr
 r1 = toJExpr R1
 r2 = toJExpr R2
 r3 = toJExpr R3
@@ -97,7 +99,7 @@ jsRegToInt = (+1) . fromEnum
 intToJSReg :: Int -> StgReg
 intToJSReg r = toEnum (r - 1)
 
-jsReg :: Int -> JExpr
+jsReg :: Int -> JStgExpr
 jsReg r = toJExpr (intToJSReg r)
 
 maxReg :: Int
@@ -114,12 +116,12 @@ regsFromR1 = enumFrom R1
 regsFromR2 :: [StgReg]
 regsFromR2 = tail regsFromR1
 
--- | List of registers, starting from R1 as JExpr
-jsRegsFromR1 :: [JExpr]
+-- | List of registers, starting from R1 as JStgExpr
+jsRegsFromR1 :: [JStgExpr]
 jsRegsFromR1 = fmap toJExpr regsFromR1
 
 -- | List of registers, starting from R2 as JExpr
-jsRegsFromR2 :: [JExpr]
+jsRegsFromR2 :: [JStgExpr]
 jsRegsFromR2 = tail jsRegsFromR1
 
 ---------------------------------------------------
@@ -127,7 +129,7 @@ jsRegsFromR2 = tail jsRegsFromR1
 ---------------------------------------------------
 
 -- cache JExpr representing StgReg
-registers :: Array StgReg JExpr
+registers :: Array StgReg JStgExpr
 registers = listArray (minBound, maxBound) (map regN regsFromR1)
   where
     regN r
@@ -136,7 +138,15 @@ registers = listArray (minBound, maxBound) (map regN regsFromR1)
                             (toJExpr ((fromEnum r) - 32))
 
 -- cache JExpr representing StgRet
-rets :: Array StgRet JExpr
+rets :: Array StgRet JStgExpr
 rets = listArray (minBound, maxBound) (map retN (enumFrom Ret1))
   where
     retN = var . mkFastString . ("h$"++) . map toLower . show
+
+-- | Given a register, return the JS syntax object representing that register
+register :: StgReg -> JStgExpr
+register i = registers ! i
+
+-- | Given a register, return the JS syntax object representing that register
+foreignRegister :: StgRet -> JStgExpr
+foreignRegister i = rets ! i

@@ -1,4 +1,5 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase   #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,7 +31,8 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Make
 
 import GHC.StgToJS.DataCon
@@ -127,23 +129,23 @@ genStaticArg a = case a of
          | i == falseDataConId =
              return [StaticLitArg (BoolLit False)]
          | isMultiVar r        =
-             map (\(TxtI t) -> StaticObjArg t) <$> mapM (identForIdN i) [1..varSize r] -- this seems wrong, not an obj?
-         | otherwise           = (\(TxtI it) -> [StaticObjArg it]) <$> identForId i
+             map (\(identFS -> t) -> StaticObjArg t) <$> mapM (identForIdN i) [1..varSize r] -- this seems wrong, not an obj?
+         | otherwise           = (\(identFS -> it) -> [StaticObjArg it]) <$> identForId i
 
        unfloated :: CgStgExpr -> G [StaticArg]
        unfloated (StgLit l) = map StaticLitArg <$> genStaticLit l
        unfloated (StgConApp dc _n args _)
          | isBoolDataCon dc || isUnboxableCon dc =
              (:[]) . allocUnboxedConStatic dc . concat <$> mapM genStaticArg args -- fixme what is allocunboxedcon?
-         | null args = (\(TxtI t) -> [StaticObjArg t]) <$> identForId (dataConWorkId dc)
+         | null args = (\(identFS -> t) -> [StaticObjArg t]) <$> identForId (dataConWorkId dc)
          | otherwise = do
              as       <- concat <$> mapM genStaticArg args
-             (TxtI e) <- identForDataConWorker dc
+             e <- identFS <$> identForDataConWorker dc
              return [StaticConArg e as]
        unfloated x = pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
 -- | Generate JS code for an StgArg
-genArg :: HasDebugCallStack => StgArg -> G [JExpr]
+genArg :: HasDebugCallStack => StgArg -> G [JStgExpr]
 genArg a = case a of
   StgLitArg l -> genLit l
   StgVarArg i -> do
@@ -162,7 +164,7 @@ genArg a = case a of
      r :: HasDebugCallStack => JSRep
      r = primRepToJSRep $ stgArgRep1 a
 
-     unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
+     unfloated :: HasDebugCallStack => CgStgExpr -> G [JStgExpr]
      unfloated = \case
       StgLit l -> genLit l
       StgConApp dc _n args _
@@ -176,8 +178,8 @@ genArg a = case a of
            return [allocDynamicE inl_alloc e as Nothing]
       x -> pprPanic "genArg: unexpected unfloated expression" (pprStgExpr panicStgPprOpts x)
 
--- | Generate a Var as JExpr
-genIdArg :: HasDebugCallStack => Id -> G [JExpr]
+-- | Generate a Var as JStgExpr
+genIdArg :: HasDebugCallStack => Id -> G [JStgExpr]
 genIdArg i = genArg (StgVarArg i)
 
 -- | Generate an Id as an Ident
@@ -198,7 +200,7 @@ genIdStackArgI i = zipWith f [1..] <$> genIdArgI i
 
 -- | Allocate Static Constructors
 allocConStatic :: HasDebugCallStack => Ident -> CostCentreStack -> DataCon -> [StgArg] -> G ()
-allocConStatic (TxtI to) cc con args = do
+allocConStatic (identFS -> to) cc con args = do
   as <- mapM genStaticArg args
   cc' <- costCentreStackLbl cc
   allocConStatic' cc' (concat as)
@@ -212,7 +214,7 @@ allocConStatic (TxtI to) cc con args = do
       | isBoolDataCon con && dataConTag con == 2 =
            emitStatic to (StaticUnboxed $ StaticUnboxedBool True) cc'
       | otherwise = do
-           (TxtI e) <- identForDataConWorker con
+           e <- identFS <$> identForDataConWorker con
            emitStatic to (StaticData e []) cc'
     allocConStatic' cc' [x]
       | isUnboxableCon con =
@@ -231,7 +233,7 @@ allocConStatic (TxtI to) cc con args = do
                 (a0:a1:_) -> flip (emitStatic to) cc' =<< allocateStaticList [a0] a1
                 _         -> panic "allocConStatic: invalid args for consDataCon"
               else do
-                (TxtI e) <- identForDataConWorker con
+                e <- identFS <$> identForDataConWorker con
                 emitStatic to (StaticData e xs) cc'
 
 -- | Allocate unboxed constructors
@@ -272,14 +274,14 @@ allocateStaticList xs a@(StgVarArg i)
 allocateStaticList _ _ = panic "allocateStaticList: unexpected literal in list"
 
 -- | Generate JS code corresponding to a static arg
-jsStaticArg :: StaticArg -> JExpr
+jsStaticArg :: StaticArg -> JStgExpr
 jsStaticArg = \case
   StaticLitArg l      -> toJExpr l
-  StaticObjArg t      -> ValExpr (JVar (TxtI t))
+  StaticObjArg t      -> var t
   StaticConArg c args ->
-    allocDynamicE False (ValExpr . JVar . TxtI $ c) (map jsStaticArg args) Nothing
+    allocDynamicE False (var c) (map jsStaticArg args) Nothing
 
 -- | Generate JS code corresponding to a list of static args
-jsStaticArgs :: [StaticArg] -> JExpr
+jsStaticArgs :: [StaticArg] -> JStgExpr
 jsStaticArgs = ValExpr . JList . map jsStaticArg
 

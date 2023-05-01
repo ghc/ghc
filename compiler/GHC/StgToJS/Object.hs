@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE Rank2Types                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 -- only for DB.Binary instances on Module
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -83,7 +84,7 @@ import System.IO
 
 import GHC.Settings.Constants (hiVersion)
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.Ident
 import qualified GHC.JS.Syntax as Sat
 import GHC.StgToJS.Types
 
@@ -497,8 +498,8 @@ instance Binary Sat.JVal where
     n -> error ("Binary get bh Sat.JVal: invalid tag: " ++ show n)
 
 instance Binary Ident where
-  put_ bh (TxtI xs) = put_ bh xs
-  get bh = TxtI <$> get bh
+  put_ bh (identFS -> xs) = put_ bh xs
+  get  bh                = global <$> get bh
 
 instance Binary ClosureInfo where
   put_ bh (ClosureInfo v regs name layo typ static) = do

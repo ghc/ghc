@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module GHC.StgToJS.Profiling
   ( initCostCentres
@@ -26,8 +27,10 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.Syntax
+import qualified GHC.JS.JStg.Syntax as JStg
 import GHC.JS.Make
+import GHC.JS.Ident
 
 import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
@@ -58,12 +61,13 @@ emitCostCentreDecl cc = do
       label  = costCentreUserName cc
       modl   = moduleNameString $ moduleName $ cc_mod cc
       loc    = renderWithContext defaultSDocContext (ppr (costCentreSrcSpan cc))
-      js     = ccsLbl ||= UOpExpr NewOp (ApplExpr (var "h$CC")
-                                                  [ toJExpr label
-                                                  , toJExpr modl
-                                                  , toJExpr loc
-                                                  , toJExpr is_caf
-                                                  ])
+      js     = JStg.DeclStat ccsLbl
+        (Just (JStg.UOpExpr JStg.NewOp (JStg.ApplExpr (JStg.var "h$CC")
+                               [ toJExpr label
+                               , toJExpr modl
+                               , toJExpr loc
+                               , toJExpr is_caf
+                               ])))
   emitGlobal js
 
 emitCostCentreStackDecl :: CostCentreStack -> G ()
@@ -72,43 +76,49 @@ emitCostCentreStackDecl ccs =
       Just cc -> do
         ccsLbl <- singletonCCSLbl cc
         ccLbl  <- costCentreLbl cc
-        let js = ccsLbl ||= UOpExpr NewOp (ApplExpr (var "h$CCS") [null_, toJExpr ccLbl])
+        let js =
+              JStg.DeclStat ccsLbl
+              (Just (JStg.UOpExpr JStg.NewOp
+                     (JStg.ApplExpr (JStg.var "h$CCS") [null_, toJExpr ccLbl])))
         emitGlobal js
       Nothing -> pprPanic "emitCostCentreStackDecl" (ppr ccs)
 
 --------------------------------------------------------------------------------
 -- Entering to cost-centres
 
-enterCostCentreFun :: CostCentreStack -> JStat
+enterCostCentreFun :: CostCentreStack -> JStg.JStgStat
 enterCostCentreFun ccs
-  | isCurrentCCS ccs = ApplStat (var "h$enterFunCCS") [jCurrentCCS, r1 .^ "cc"]
+  | isCurrentCCS ccs = JStg.ApplStat (JStg.var "h$enterFunCCS")
+                       [jCurrentCCS, JStg.SelExpr r1 (global "cc")]
   | otherwise = mempty -- top-level function, nothing to do
 
-enterCostCentreThunk :: JStat
-enterCostCentreThunk = ApplStat (var "h$enterThunkCCS") [r1 .^ "cc"]
+enterCostCentreThunk :: JStg.JStgStat
+enterCostCentreThunk = JStg.ApplStat (JStg.var "h$enterThunkCCS") [JStg.SelExpr r1 (global "cc")]
 
-setCC :: CostCentre -> Bool -> Bool -> G JStat
+setCC :: CostCentre -> Bool -> Bool -> G JStg.JStgStat
 setCC cc _tick True = do
-  ccI@(TxtI _ccLbl) <- costCentreLbl cc
+  ccI@(identFS -> _ccLbl) <- costCentreLbl cc
   addDependency $ OtherSymb (cc_mod cc)
                             (moduleGlobalSymbol $ cc_mod cc)
-  return $ jCurrentCCS |= ApplExpr (var "h$pushCostCentre") [jCurrentCCS, toJExpr ccI]
+  return $ jCurrentCCS |= JStg.ApplExpr (JStg.var "h$pushCostCentre") [ jCurrentCCS
+                                                                      , JStg.Var ccI
+                                                                      ]
 setCC _cc _tick _push = return mempty
 
-pushRestoreCCS :: JStat
-pushRestoreCCS = ApplStat (var "h$pushRestoreCCS") []
+pushRestoreCCS :: JStg.JStgStat
+pushRestoreCCS = JStg.ApplStat (JStg.var "h$pushRestoreCCS") []
 
 --------------------------------------------------------------------------------
 -- Some cost-centre stacks to be used in generator
 
-jCurrentCCS :: JExpr
-jCurrentCCS = var "h$currentThread" .^ "ccs"
+jCurrentCCS :: JStg.JStgExpr
+jCurrentCCS = JStg.SelExpr (JStg.var "h$currentThread") (global "ccs")
 
-jCafCCS :: JExpr
-jCafCCS = var "h$CAF"
+jCafCCS :: JStg.JStgExpr
+jCafCCS = JStg.var "h$CAF"
 
-jSystemCCS :: JExpr
-jSystemCCS = var "h$CCS_SYSTEM"
+jSystemCCS :: JStg.JStgExpr
+jSystemCCS = JStg.var "h$CCS_SYSTEM"
 --------------------------------------------------------------------------------
 -- Helpers for generating profiling related things
 
@@ -125,8 +135,8 @@ ifProfilingM m = do
     prof <- profiling
     if prof then m else return mempty
 
--- | If profiling is enabled, then use input JStat, else ignore
-profStat :: StgToJSConfig -> JStat -> JStat
+-- | If profiling is enabled, then use input JStgStat, else ignore
+profStat :: StgToJSConfig -> JStg.JStgStat -> JStg.JStgStat
 profStat cfg e = if csProf cfg then e else mempty
 --------------------------------------------------------------------------------
 -- Generating cost-centre and cost-centre stack variables
@@ -140,7 +150,7 @@ costCentreLbl' cc = do
     moduleNameColons (moduleName curModl) ++ "_" ++ if isCafCC cc then "CAF_ccs" else lbl
 
 costCentreLbl :: CostCentre -> G Ident
-costCentreLbl cc = TxtI . mkFastString <$> costCentreLbl' cc
+costCentreLbl cc = global . mkFastString <$> costCentreLbl' cc
 
 costCentreStackLbl' :: CostCentreStack -> G (Maybe String)
 costCentreStackLbl' ccs = do
@@ -154,7 +164,7 @@ costCentreStackLbl' ccs = do
             Nothing -> pure Nothing
 
 costCentreStackLbl :: CostCentreStack -> G (Maybe Ident)
-costCentreStackLbl ccs = fmap (TxtI . mkFastString) <$> costCentreStackLbl' ccs
+costCentreStackLbl ccs = fmap (global . mkFastString) <$> costCentreStackLbl' ccs
 
 singletonCCSLbl' :: CostCentre -> G String
 singletonCCSLbl' cc = do
@@ -168,11 +178,11 @@ singletonCCSLbl' cc = do
               ]
 
 singletonCCSLbl :: CostCentre -> G Ident
-singletonCCSLbl cc = TxtI . mkFastString <$> singletonCCSLbl' cc
+singletonCCSLbl cc = global . mkFastString <$> singletonCCSLbl' cc
 
-ccsVarJ :: CostCentreStack -> G (Maybe JExpr)
+ccsVarJ :: CostCentreStack -> G (Maybe JStg.JStgExpr)
 ccsVarJ ccs = do
   prof <- profiling
   if prof
-    then fmap (ValExpr . JVar) <$> costCentreStackLbl ccs
+    then fmap (JStg.ValExpr . JStg.JVar) <$> costCentreStackLbl ccs
     else pure Nothing

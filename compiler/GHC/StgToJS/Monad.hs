@@ -24,8 +24,8 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
-import qualified GHC.JS.Syntax as Sat
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Transform
 
 import GHC.StgToJS.Types
@@ -69,7 +69,7 @@ modifyGroup f = State.modify mod_state
     mod_state s = s { gsGroup = f (gsGroup s) }
 
 -- | emit a global (for the current module) toplevel statement
-emitGlobal :: JStat -> G ()
+emitGlobal :: JStgStat -> G ()
 emitGlobal stat = State.modify (\s -> s { gsGlobal = stat : gsGlobal s })
 
 -- | add a dependency on a particular symbol to the current group
@@ -79,7 +79,7 @@ addDependency symbol = modifyGroup mod_group
     mod_group g = g { ggsExtraDeps = S.insert symbol (ggsExtraDeps g) }
 
 -- | emit a top-level statement for the current binding group
-emitToplevel :: JStat -> G ()
+emitToplevel :: JStgStat -> G ()
 emitToplevel s = modifyGroup mod_group
   where
     mod_group g = g { ggsToplevelStats = s : ggsToplevelStats g}
@@ -138,7 +138,7 @@ emptyIdCache = IdCache M.empty
 
 
 
-assertRtsStat :: G JStat -> G JStat
+assertRtsStat :: G JStgStat -> G JStgStat
 assertRtsStat stat = do
   s <- State.gets gsSettings
   if csAssertRts s then stat else pure mempty
@@ -159,9 +159,9 @@ data GlobalOcc = GlobalOcc
   , global_count :: !Word
   }
 
--- | Return number of occurrences of every global id used in the given JStat.
+-- | Return number of occurrences of every global id used in the given JStgStat.
 -- Sort by increasing occurrence count.
-globalOccs :: Sat.JStat -> G [GlobalOcc]
+globalOccs :: JStgStat -> G [GlobalOcc]
 globalOccs jst = do
   GlobalIdCache gidc <- getGlobalIdCache
   -- build a map form Ident Unique to (Ident, Id, Count)

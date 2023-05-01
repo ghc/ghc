@@ -43,7 +43,8 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Symbols
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Make
 
 import GHC.Core.DataCon
@@ -72,13 +73,13 @@ freshUnique = do
     writeFastMutInt id_gen (v+1)
     pure v
 
--- | Get fresh local Ident of the form: h$$unit:module_uniq
+-- | Get fresh module-local Ident of the form: h$$unit:module_uniq
 freshIdent :: G Ident
 freshIdent = do
   i <- freshUnique
   mod <- State.gets gsModule
   let !name = mkFreshJsSymbol mod i
-  return (TxtI name)
+  return (global name)
 
 
 -- | Generate unique Ident for the given ID (uncached!)
@@ -99,7 +100,7 @@ freshIdent = do
 -- Int64#), Addr#, StablePtr#, unboxed tuples, etc.
 --
 makeIdentForId :: Id -> Maybe Int -> IdType -> Module -> Ident
-makeIdentForId i num id_type current_module = TxtI ident
+makeIdentForId i num id_type current_module = global ident
   where
     exported = isExportedId i
     name     = getName i
@@ -197,15 +198,15 @@ identForDataConEntryId i = cachedIdentForId i Nothing IdConEntry
 
 
 -- | Retrieve default variable name for the given Id
-varForId :: Id -> G JExpr
+varForId :: Id -> G JStgExpr
 varForId i = toJExpr <$> identForId i
 
 -- | Retrieve default variable name for the given Id with sub index
-varForIdN :: Id -> Int -> G JExpr
+varForIdN :: Id -> Int -> G JStgExpr
 varForIdN i n = toJExpr <$> identForIdN i n
 
 -- | Retrieve all the JS vars for the given Id
-varsForId :: Id -> G [JExpr]
+varsForId :: Id -> G [JStgExpr]
 varsForId i = case typeSize (idType i) of
   0 -> pure mempty
   1 -> (:[]) <$> varForId i
@@ -213,11 +214,11 @@ varsForId i = case typeSize (idType i) of
 
 
 -- | Retrieve entry variable name for the given Id
-varForEntryId :: Id -> G JExpr
+varForEntryId :: Id -> G JStgExpr
 varForEntryId i = toJExpr <$> identForEntryId i
 
 -- | Retrieve datacon entry variable name for the given Id
-varForDataConEntryId :: Id -> G JExpr
+varForDataConEntryId :: Id -> G JStgExpr
 varForDataConEntryId i = ValExpr . JVar <$> identForDataConEntryId i
 
 
@@ -226,11 +227,11 @@ identForDataConWorker :: DataCon -> G Ident
 identForDataConWorker d = identForDataConEntryId (dataConWorkId d)
 
 -- | Retrieve datacon worker entry variable name for the given datacon
-varForDataConWorker :: DataCon -> G JExpr
+varForDataConWorker :: DataCon -> G JStgExpr
 varForDataConWorker d = varForDataConEntryId (dataConWorkId d)
 
 -- | Declare all js vars for the id
-declVarsForId :: Id -> G JStat
+declVarsForId :: Id -> G JStgStat
 declVarsForId  i = case typeSize (idType i) of
   0 -> return mempty
   1 -> decl <$> identForId i

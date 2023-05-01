@@ -38,7 +38,7 @@ where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 import GHC.StgToJS.Types
 import GHC.Data.FastString
@@ -67,87 +67,87 @@ entryConTag_ = "a"
 entryFunArity_ :: FastString
 entryFunArity_ = "a"
 
-jTyObject :: JExpr
+jTyObject :: JStgExpr
 jTyObject = jString "object"
 
-closureType :: JExpr -> JExpr
+closureType :: JStgExpr -> JStgExpr
 closureType = entryClosureType . closureEntry
 
-entryClosureType :: JExpr -> JExpr
+entryClosureType :: JStgExpr -> JStgExpr
 entryClosureType f = f .^ entryClosureType_
 
-isObject :: JExpr -> JExpr
+isObject :: JStgExpr -> JStgExpr
 isObject c = typeof c .===. String "object"
 
-isThunk :: JExpr -> JExpr
+isThunk :: JStgExpr -> JStgExpr
 isThunk c = closureType c .===. toJExpr Thunk
 
-isThunk' :: JExpr -> JExpr
+isThunk' :: JStgExpr -> JStgExpr
 isThunk' f = entryClosureType f .===. toJExpr Thunk
 
-isBlackhole :: JExpr -> JExpr
+isBlackhole :: JStgExpr -> JStgExpr
 isBlackhole c = closureType c .===. toJExpr Blackhole
 
-isFun :: JExpr -> JExpr
+isFun :: JStgExpr -> JStgExpr
 isFun c = closureType c .===. toJExpr Fun
 
-isFun' :: JExpr -> JExpr
+isFun' :: JStgExpr -> JStgExpr
 isFun' f = entryClosureType f .===. toJExpr Fun
 
-isPap :: JExpr -> JExpr
+isPap :: JStgExpr -> JStgExpr
 isPap c = closureType c .===. toJExpr Pap
 
-isPap' :: JExpr -> JExpr
+isPap' :: JStgExpr -> JStgExpr
 isPap' f = entryClosureType f .===. toJExpr Pap
 
-isCon :: JExpr -> JExpr
+isCon :: JStgExpr -> JStgExpr
 isCon c = closureType c .===. toJExpr Con
 
-isCon' :: JExpr -> JExpr
+isCon' :: JStgExpr -> JStgExpr
 isCon' f = entryClosureType f .===. toJExpr Con
 
-conTag :: JExpr -> JExpr
+conTag :: JStgExpr -> JStgExpr
 conTag = conTag' . closureEntry
 
-conTag' :: JExpr -> JExpr
+conTag' :: JStgExpr -> JStgExpr
 conTag' f = f .^ entryConTag_
 
 -- | Get closure entry function
-closureEntry :: JExpr -> JExpr
+closureEntry :: JStgExpr -> JStgExpr
 closureEntry p = p .^ closureEntry_
 
 -- | Get closure metadata
-closureMeta :: JExpr -> JExpr
+closureMeta :: JStgExpr -> JStgExpr
 closureMeta p = p .^ closureMeta_
 
 -- | Get closure cost-center
-closureCC :: JExpr -> JExpr
+closureCC :: JStgExpr -> JStgExpr
 closureCC p = p .^ closureCC_
 
 -- | Get closure extra field 1
-closureField1 :: JExpr -> JExpr
+closureField1 :: JStgExpr -> JStgExpr
 closureField1 p = p .^ closureField1_
 
 -- | Get closure extra field 2
-closureField2 :: JExpr -> JExpr
+closureField2 :: JStgExpr -> JStgExpr
 closureField2 p = p .^ closureField2_
 
 -- number of  arguments (arity & 0xff = arguments, arity >> 8 = number of registers)
-funArity :: JExpr -> JExpr
+funArity :: JStgExpr -> JStgExpr
 funArity = funArity' . closureEntry
 
 -- function arity with raw reference to the entry
-funArity' :: JExpr -> JExpr
+funArity' :: JStgExpr -> JStgExpr
 funArity' f = f .^ entryFunArity_
 
 -- arity of a partial application
-papArity :: JExpr -> JExpr
+papArity :: JStgExpr -> JStgExpr
 papArity cp = closureField1 (closureField2 cp)
 
 funOrPapArity
-  :: JExpr       -- ^ heap object
-  -> Maybe JExpr -- ^ reference to entry, if you have one already (saves a c.f lookup twice)
-  -> JExpr       -- ^ arity tag (tag >> 8 = registers, tag & 0xff = arguments)
+  :: JStgExpr       -- ^ heap object
+  -> Maybe JStgExpr -- ^ reference to entry, if you have one already (saves a c.f lookup twice)
+  -> JStgExpr       -- ^ arity tag (tag >> 8 = registers, tag & 0xff = arguments)
 funOrPapArity c = \case
   Nothing -> ((IfExpr (toJExpr (isFun c))) (toJExpr (funArity c)))
              (toJExpr (papArity c))

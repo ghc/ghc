@@ -26,7 +26,7 @@ import GHC.StgToJS.Object
 import GHC.StgToJS.Types
 import GHC.StgToJS.Ids
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.Ident
 
 import GHC.Types.Id
 import GHC.Types.Unique
@@ -139,7 +139,7 @@ genDependencyData mod units = do
             let k = getKey . getUnique $ i
                 addEntry :: StateT DependencyDataCache G ExportedFun
                 addEntry = do
-                  (TxtI idTxt) <- lift (identForId i)
+                  idTxt <- identFS <$> lift (identForId i)
                   lookupExternalFun (Just k) (OtherSymb m idTxt)
             in  if m == mod
                    then pprPanic "local id not found" (ppr m)
@@ -159,7 +159,7 @@ genDependencyData mod units = do
 
       lookupExportedId :: Id -> StateT DependencyDataCache G ExportedFun
       lookupExportedId i = do
-        (TxtI idTxt) <- lift (identForId i)
+        idTxt <- identFS <$> lift (identForId i)
         lookupExternalFun (Just . getKey . getUnique $ i) (OtherSymb mod idTxt)
 
       lookupExportedOther :: FastString -> StateT DependencyDataCache G ExportedFun

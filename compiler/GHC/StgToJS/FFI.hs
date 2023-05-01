@@ -5,16 +5,14 @@
 module GHC.StgToJS.FFI
   ( genPrimCall
   , genForeignCall
-  , saturateFFI
   )
 where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
+import GHC.JS.Ident
 import GHC.JS.Make
-import GHC.JS.Transform
-import qualified GHC.JS.Syntax as Sat
 
 import GHC.StgToJS.Arg
 import GHC.StgToJS.ExprCtx
@@ -44,7 +42,7 @@ import Data.Char
 import Data.Monoid
 import qualified Data.List as L
 
-genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStat, ExprResult)
+genPrimCall :: ExprCtx -> PrimCall -> [StgArg] -> Type -> G (JStgStat, ExprResult)
 genPrimCall ctx (PrimCall lbl _) args t = do
   j <- parseFFIPattern False False False ("h$" ++ unpackFS lbl) t (concatMap typex_expr $ ctxTarget ctx) args
   return (j, ExprInline Nothing)
@@ -69,9 +67,9 @@ parseFFIPattern :: Bool  -- ^ catch exception and convert them to haskell except
                 -> Bool  -- ^ using javascript calling convention
                 -> String
                 -> Type
-                -> [JExpr]
+                -> [JStgExpr]
                 -> [StgArg]
-                -> G JStat
+                -> G JStgStat
 parseFFIPattern catchExcep async jscc pat t es as
   | catchExcep = do
       c <- parseFFIPatternA async jscc pat t es as
@@ -81,7 +79,7 @@ parseFFIPattern catchExcep async jscc pat t es as
       --  } catch(except) {
       --    return h$throwJSException(except);
       --  }
-      let ex = TxtI "except"
+      let ex = global "except"
       return (TryStat c ex (ReturnStat (ApplExpr (var "h$throwJSException") [toJExpr ex])) mempty)
   | otherwise  = parseFFIPatternA async jscc pat t es as
 
@@ -89,9 +87,9 @@ parseFFIPatternA :: Bool  -- ^ async
                  -> Bool  -- ^ using JavaScript calling conv
                  -> String
                  -> Type
-                 -> [JExpr]
+                 -> [JStgExpr]
                  -> [StgArg]
-                 -> G JStat
+                 -> G JStgStat
 -- async calls get an extra callback argument
 -- call it with the result
 parseFFIPatternA True True pat t es as  = do
@@ -122,13 +120,13 @@ parseFFIPatternA _async javascriptCc pat t es as =
 
 -- parseFFIPatternA _ _ _ _ _ _ = error "parseFFIPattern: non-JavaScript pattern must be synchronous"
 
-parseFFIPattern' :: Maybe JExpr -- ^ Nothing for sync, Just callback for async
-                 -> Bool        -- ^ javascript calling convention used
-                 -> String      -- ^ pattern called
-                 -> Type        -- ^ return type
-                 -> [JExpr]     -- ^ expressions to return in (may be more than necessary)
-                 -> [StgArg]    -- ^ arguments
-                 -> G JStat
+parseFFIPattern' :: Maybe JStgExpr -- ^ Nothing for sync, Just callback for async
+                 -> Bool           -- ^ javascript calling convention used
+                 -> String         -- ^ pattern called
+                 -> Type           -- ^ return type
+                 -> [JStgExpr]     -- ^ expressions to return in (may be more than necessary)
+                 -> [StgArg]       -- ^ arguments
+                 -> G JStgStat
 parseFFIPattern' callback javascriptCc pat t ret args
   | not javascriptCc = mkApply pat
   | otherwise = mkApply pat
@@ -153,16 +151,16 @@ parseFFIPattern' callback javascriptCc pat t ret args
          (stats, as) <- unzip <$> mapM (genFFIArg javascriptCc) args
          cs <- getSettings
          return $ traceCall cs as <> mconcat stats <> ApplStat f' (concat as)
-        where f' = toJExpr (TxtI $ mkFastString f)
+        where f' = toJExpr (global $ mkFastString f)
     copyResult rs = mconcat $ zipWith (\t r -> toJExpr r |= toJExpr t) (enumFrom Ret1) rs
 
     traceCall cs as
         | csTraceForeign cs = ApplStat (var "h$traceForeign") [toJExpr pat, toJExpr as]
         | otherwise         = mempty
 
--- generate arg to be passed to FFI call, with marshalling JStat to be run
+-- generate arg to be passed to FFI call, with marshalling JStgStat to be run
 -- before the call
-genFFIArg :: Bool -> StgArg -> G (JStat, [JExpr])
+genFFIArg :: Bool -> StgArg -> G (JStgStat, [JStgExpr])
 genFFIArg _isJavaScriptCc (StgLitArg l) = (mempty,) <$> genLit l
 genFFIArg isJavaScriptCc a@(StgVarArg i)
     | not isJavaScriptCc &&
@@ -177,16 +175,13 @@ genFFIArg isJavaScriptCc a@(StgVarArg i)
      arg_ty = stgArgType a
      r      = unaryTypeJSRep arg_ty
 
-saturateFFI :: Int -> JStat -> Sat.JStat
-saturateFFI u = satJStat (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)
-
 genForeignCall :: HasDebugCallStack
                => ExprCtx
                -> ForeignCall
                -> Type
-               -> [JExpr]
+               -> [JStgExpr]
                -> [StgArg]
-               -> G (JStat, ExprResult)
+               -> G (JStgStat, ExprResult)
 genForeignCall _ctx
                (CCall (CCallSpec (StaticTarget _ tgt Nothing True)
                                    JavaScriptCallConv

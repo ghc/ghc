@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -59,7 +60,7 @@ hdd :: SBS.ShortByteString
 hdd = SBS.pack (map (fromIntegral . ord) "h$$")
 
 ghcjsRenderJsI :: IsLine doc => RenderJs doc -> Ident -> doc
-ghcjsRenderJsI _ (TxtI fs)
+ghcjsRenderJsI _ (identFS -> fs)
   -- Fresh symbols are prefixed with "h$$". They aren't explicitly referred by
   -- name in user code, only in compiled code. Hence we can rename them if we do
   -- it consistently in all the linked code.

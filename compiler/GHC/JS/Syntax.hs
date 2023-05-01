@@ -62,40 +62,41 @@ module GHC.JS.Syntax
   , Ident(..)
   , JLabel
   -- * pattern synonyms over JS operators
-  , pattern JNew
-  , pattern JNot
-  , pattern JNegate
-  , pattern JAdd
-  , pattern JSub
-  , pattern JMul
-  , pattern JDiv
-  , pattern JMod
-  , pattern JBOr
-  , pattern JBAnd
-  , pattern JBXor
-  , pattern JBNot
-  , pattern JLOr
-  , pattern JLAnd
-  , pattern SatInt
-  , pattern JString
-  , pattern JPreInc
-  , pattern JPostInc
-  , pattern JPreDec
-  , pattern JPostDec
+  , pattern New
+  , pattern Not
+  , pattern Negate
+  , pattern Add
+  , pattern Sub
+  , pattern Mul
+  , pattern Div
+  , pattern Mod
+  , pattern BOr
+  , pattern BAnd
+  , pattern BXor
+  , pattern BNot
+  , pattern LOr
+  , pattern LAnd
+  , pattern Int
+  , pattern String
+  , pattern Var
+  , pattern PreInc
+  , pattern PostInc
+  , pattern PreDec
+  , pattern PostDec
   -- * Utility
   , SaneDouble(..)
-  , jassignAll
-  , jassignAllEqual
-  , jvar
+  , var
+  , true_
+  , false_
   ) where
 
 import GHC.Prelude
 
-import GHC.JS.Unsat.Syntax (Ident(..))
+import GHC.JS.Ident
+
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
 import GHC.Types.SaneDouble
-import GHC.Utils.Misc
 
 import Control.DeepSeq
 
@@ -170,90 +171,93 @@ data JExpr
   deriving (Eq, Typeable, Generic)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
---   AST. Each pattern wraps @JUOp@ and @JOp@ into a @JExpr@s to save typing and
+--   AST. Each pattern wraps @UOp@ and @Op@ into a @JExpr@s to save typing and
 --   for convienience. In addition we include a string wrapper for JS string
 --   and Integer literals.
 
 -- | pattern synonym for a unary operator new
-pattern JNew :: JExpr -> JExpr
-pattern JNew x = UOpExpr NewOp x
+pattern New :: JExpr -> JExpr
+pattern New x = UOpExpr NewOp x
 
 -- | pattern synonym for prefix increment @++x@
-pattern JPreInc :: JExpr -> JExpr
-pattern JPreInc x = UOpExpr PreIncOp x
+pattern PreInc :: JExpr -> JExpr
+pattern PreInc x = UOpExpr PreIncOp x
 
 -- | pattern synonym for postfix increment @x++@
-pattern JPostInc :: JExpr -> JExpr
-pattern JPostInc x = UOpExpr PostIncOp x
+pattern PostInc :: JExpr -> JExpr
+pattern PostInc x = UOpExpr PostIncOp x
 
 -- | pattern synonym for prefix decrement @--x@
-pattern JPreDec :: JExpr -> JExpr
-pattern JPreDec x = UOpExpr PreDecOp x
+pattern PreDec :: JExpr -> JExpr
+pattern PreDec x = UOpExpr PreDecOp x
 
 -- | pattern synonym for postfix decrement @--x@
-pattern JPostDec :: JExpr -> JExpr
-pattern JPostDec x = UOpExpr PostDecOp x
+pattern PostDec :: JExpr -> JExpr
+pattern PostDec x = UOpExpr PostDecOp x
 
 -- | pattern synonym for logical not @!@
-pattern JNot :: JExpr -> JExpr
-pattern JNot x = UOpExpr NotOp x
+pattern Not :: JExpr -> JExpr
+pattern Not x = UOpExpr NotOp x
 
 -- | pattern synonym for unary negation @-@
-pattern JNegate :: JExpr -> JExpr
-pattern JNegate x = UOpExpr NegOp x
+pattern Negate :: JExpr -> JExpr
+pattern Negate x = UOpExpr NegOp x
 
 -- | pattern synonym for addition @+@
-pattern JAdd :: JExpr -> JExpr -> JExpr
-pattern JAdd x y = InfixExpr AddOp x y
+pattern Add :: JExpr -> JExpr -> JExpr
+pattern Add x y = InfixExpr AddOp x y
 
 -- | pattern synonym for subtraction @-@
-pattern JSub :: JExpr -> JExpr -> JExpr
-pattern JSub x y = InfixExpr SubOp x y
+pattern Sub :: JExpr -> JExpr -> JExpr
+pattern Sub x y = InfixExpr SubOp x y
 
 -- | pattern synonym for multiplication @*@
-pattern JMul :: JExpr -> JExpr -> JExpr
-pattern JMul x y = InfixExpr MulOp x y
+pattern Mul :: JExpr -> JExpr -> JExpr
+pattern Mul x y = InfixExpr MulOp x y
 
 -- | pattern synonym for division @*@
-pattern JDiv :: JExpr -> JExpr -> JExpr
-pattern JDiv x y = InfixExpr DivOp x y
+pattern Div :: JExpr -> JExpr -> JExpr
+pattern Div x y = InfixExpr DivOp x y
 
 -- | pattern synonym for remainder @%@
-pattern JMod :: JExpr -> JExpr -> JExpr
-pattern JMod x y = InfixExpr ModOp x y
+pattern Mod :: JExpr -> JExpr -> JExpr
+pattern Mod x y = InfixExpr ModOp x y
 
 -- | pattern synonym for Bitwise Or @|@
-pattern JBOr :: JExpr -> JExpr -> JExpr
-pattern JBOr x y = InfixExpr BOrOp x y
+pattern BOr :: JExpr -> JExpr -> JExpr
+pattern BOr x y = InfixExpr BOrOp x y
 
 -- | pattern synonym for Bitwise And @&@
-pattern JBAnd :: JExpr -> JExpr -> JExpr
-pattern JBAnd x y = InfixExpr BAndOp x y
+pattern BAnd :: JExpr -> JExpr -> JExpr
+pattern BAnd x y = InfixExpr BAndOp x y
 
 -- | pattern synonym for Bitwise XOr @^@
-pattern JBXor :: JExpr -> JExpr -> JExpr
-pattern JBXor x y = InfixExpr BXorOp x y
+pattern BXor :: JExpr -> JExpr -> JExpr
+pattern BXor x y = InfixExpr BXorOp x y
 
 -- | pattern synonym for Bitwise Not @~@
-pattern JBNot :: JExpr -> JExpr
-pattern JBNot x = UOpExpr BNotOp x
+pattern BNot :: JExpr -> JExpr
+pattern BNot x = UOpExpr BNotOp x
 
 -- | pattern synonym for logical Or @||@
-pattern JLOr :: JExpr -> JExpr -> JExpr
-pattern JLOr x y = InfixExpr LOrOp x y
+pattern LOr :: JExpr -> JExpr -> JExpr
+pattern LOr x y = InfixExpr LOrOp x y
 
 -- | pattern synonym for logical And @&&@
-pattern JLAnd :: JExpr -> JExpr -> JExpr
-pattern JLAnd x y = InfixExpr LAndOp x y
+pattern LAnd :: JExpr -> JExpr -> JExpr
+pattern LAnd x y = InfixExpr LAndOp x y
 
 -- | pattern synonym to create integer values
-pattern SatInt :: Integer -> JExpr
-pattern SatInt x = ValExpr (JInt x)
+pattern Int :: Integer -> JExpr
+pattern Int x = ValExpr (JInt x)
 
 -- | pattern synonym to create string values
-pattern JString :: FastString -> JExpr
-pattern JString x = ValExpr (JStr x)
+pattern String :: FastString -> JExpr
+pattern String x = ValExpr (JStr x)
 
+-- | pattern synonym to create a local variable reference
+pattern Var :: Ident -> JExpr
+pattern Var x = ValExpr (JVar x)
 
 --------------------------------------------------------------------------------
 --                            Values
@@ -334,18 +338,14 @@ data AOp
 
 instance NFData AOp
 
---------------------------------------------------------------------------------
---                            Helper Functions
---------------------------------------------------------------------------------
+-- | construct a JS variable reference
+var :: FastString -> JExpr
+var = Var . global
 
-jassignAllEqual :: [JExpr] -> [JExpr] -> JStat
-jassignAllEqual xs ys = mconcat (zipWithEqual "assignAllEqual" go xs ys)
-  where go l r = AssignStat l AssignOp r
+-- | The JS literal 'true'
+true_ :: JExpr
+true_ = var "true"
 
-jassignAll :: [JExpr] -> [JExpr] -> JStat
-jassignAll xs ys = mconcat $ zipWith go xs ys
-  where go l r = AssignStat l AssignOp r
-
-jvar :: FastString -> JExpr
-jvar = ValExpr . JVar . TxtI
-
+-- | The JS literal 'false'
+false_ :: JExpr
+false_ = var "false"

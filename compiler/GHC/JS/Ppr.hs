@@ -67,9 +67,8 @@ where
 
 import GHC.Prelude
 
+import GHC.JS.Ident
 import GHC.JS.Syntax
-import GHC.JS.Transform
-
 
 import Data.Char (isControl, ord)
 import Data.List (sortOn)
@@ -117,10 +116,10 @@ jsToDoc = jsToDocR defaultRenderJs
 -- | Render a syntax tree as a pretty-printable document, using a given prefix
 -- to all generated names. Use this with distinct prefixes to ensure distinct
 -- generated names between independent calls to render(Prefix)Js.
-renderPrefixJs :: (JsToDoc a, JMacro a) => a -> SDoc
+renderPrefixJs :: (JsToDoc a) => a -> SDoc
 renderPrefixJs = renderPrefixJs' defaultRenderJs
 
-renderPrefixJs' :: (JsToDoc a, JMacro a, JsRender doc) => RenderJs doc -> a -> doc
+renderPrefixJs' :: (JsToDoc a, JsRender doc) => RenderJs doc -> a -> doc
 renderPrefixJs' r = jsToDocR r
 
 --------------------------------------------------------------------------------
@@ -247,7 +246,7 @@ defRenderJsV r = \case
   JFunc is b -> parens $ hangBrace (text "function" <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
 
 defRenderJsI :: JsRender doc => RenderJs doc -> Ident -> doc
-defRenderJsI _ (TxtI t) = ftext t
+defRenderJsI _  t = ftext (identFS t)
 
 aOpText :: AOp -> FastString
 aOpText = \case

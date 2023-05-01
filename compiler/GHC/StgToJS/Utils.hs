@@ -46,7 +46,7 @@ import GHC.Prelude
 import GHC.StgToJS.Types
 import GHC.StgToJS.ExprCtx
 
-import GHC.JS.Unsat.Syntax
+import GHC.JS.JStg.Syntax
 import GHC.JS.Make
 import GHC.JS.Transform
 
@@ -85,11 +85,11 @@ import Data.Set (Set)
 import Data.Monoid
 
 
-assignToTypedExprs :: [TypedExpr] -> [JExpr] -> JStat
+assignToTypedExprs :: [TypedExpr] -> [JStgExpr] -> JStgStat
 assignToTypedExprs tes es =
   assignAllEqual (concatMap typex_expr tes) es
 
-assignTypedExprs :: [TypedExpr] -> [TypedExpr] -> JStat
+assignTypedExprs :: [TypedExpr] -> [TypedExpr] -> JStgStat
 assignTypedExprs tes es =
   let prim_tes = concatMap typex_expr tes
       prim_es  = concatMap typex_expr es
@@ -99,12 +99,12 @@ assignTypedExprs tes es =
                (ppr (map typex_typ tes) $$ ppr (map typex_typ es))
                (assignAllEqual prim_tes prim_es)
 
-assignToExprCtx :: ExprCtx -> [JExpr] -> JStat
+assignToExprCtx :: ExprCtx -> [JStgExpr] -> JStgStat
 assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
 
 -- | Assign first expr only (if it exists), performing coercions between some
 -- PrimReps (e.g. StablePtr# and Addr#).
-assignCoerce1 :: [TypedExpr] -> [TypedExpr] -> JStat
+assignCoerce1 :: [TypedExpr] -> [TypedExpr] -> JStgStat
 assignCoerce1 [x] [y] = assignCoerce x y
 assignCoerce1 []  []  = mempty
 assignCoerce1 _x _y   = pprPanic "assignCoerce1"
@@ -115,7 +115,7 @@ assignCoerce1 _x _y   = pprPanic "assignCoerce1"
                                 ])
 
 -- | Assign p2 to p1 with optional coercion
-assignCoerce :: TypedExpr -> TypedExpr -> JStat
+assignCoerce :: TypedExpr -> TypedExpr -> JStgStat
 -- Coercion between StablePtr# and Addr#
 assignCoerce (TypedExpr AddrRep [a_val, a_off]) (TypedExpr (BoxedRep (Just Unlifted)) [sptr]) = mconcat
     [ a_val |= var "h$stablePtrBuf"
@@ -246,22 +246,22 @@ primRepSize p = jsRepSlots (primRepToJSRep p)
 
 -- | Associate the given values to each RrimRep in the given order, taking into
 -- account the number of slots per PrimRep
-assocPrimReps :: [PrimRep] -> [JExpr] -> [(PrimRep, [JExpr])]
+assocPrimReps :: [PrimRep] -> [JStgExpr] -> [(PrimRep, [JStgExpr])]
 assocPrimReps []     _  = []
 assocPrimReps (r:rs) vs = case (primRepSize r,vs) of
   (NoSlot,   xs)     -> (r,[])    : assocPrimReps rs xs
   (OneSlot,  x:xs)   -> (r,[x])   : assocPrimReps rs xs
   (TwoSlots, x:y:xs) -> (r,[x,y]) : assocPrimReps rs xs
-  err                -> pprPanic "assocPrimReps" (ppr $ map (satJExpr Nothing) <$> err)
+  err                -> pprPanic "assocPrimReps" (ppr $ map jStgExprToJS <$> err)
 
 -- | Associate the given values to the Id's PrimReps, taking into account the
 -- number of slots per PrimRep
-assocIdPrimReps :: Id -> [JExpr] -> [(PrimRep, [JExpr])]
+assocIdPrimReps :: Id -> [JStgExpr] -> [(PrimRep, [JStgExpr])]
 assocIdPrimReps i = assocPrimReps (idPrimReps i)
 
 -- | Associate the given JExpr to the Id's PrimReps, taking into account the
 -- number of slots per PrimRep
-assocIdExprs :: Id -> [JExpr] -> [TypedExpr]
+assocIdExprs :: Id -> [JStgExpr] -> [TypedExpr]
 assocIdExprs i es = fmap (uncurry TypedExpr) (assocIdPrimReps i es)
 
 mkArityTag :: Int -> Int -> Int

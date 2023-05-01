@@ -14,7 +14,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.JS.Unsat.Syntax
+-- Module      :  GHC.JS.JStg.Syntax
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file LICENSE)
 --
@@ -27,37 +27,19 @@
 --
 -- * Domain and Purpose
 --
---     GHC.JS.Unsat.Syntax defines the Syntax for the JS backend in GHC. It
---     comports with the [ECMA-262](https://tc39.es/ecma262/) although not every
---     production rule of the standard is represented. Code in this module is a
---     fork of [JMacro](https://hackage.haskell.org/package/jmacro) (BSD 3
---     Clause) by Gershom Bazerman, heavily modified to accomodate GHC's
---     constraints.
+--     GHC.JS.JStg.Syntax defines the eDSL that the JS backend's runtime system
+--     is written in. Nothing fancy, its just a straightforward deeply embedded
+--     DSL.
 --
---
--- * Strategy
---
---     Nothing fancy in this module, this is a classic deeply embeded AST for
---     JS. We define numerous ADTs and pattern synonyms to make pattern matching
---     and constructing ASTs easier.
---
---
--- * Consumers
---
---     The entire JS backend consumes this module, e.g., the modules in
---     GHC.StgToJS.\*. Please see 'GHC.JS.Make' for a module which provides
---     helper functions that use the deeply embedded DSL defined in this module
---     to provide some of the benefits of a shallow embedding.
 -----------------------------------------------------------------------------
-module GHC.JS.Unsat.Syntax
+module GHC.JS.JStg.Syntax
   ( -- * Deeply embedded JS datatypes
-    JStat(..)
-  , JExpr(..)
+    JStgStat(..)
+  , JStgExpr(..)
   , JVal(..)
-  , JOp(..)
-  , JUOp(..)
-  , Ident(..)
-  , identFS
+  , Op(..)
+  , AOp(..)
+  , UOp(..)
   , JsLabel
   -- * pattern synonyms over JS operators
   , pattern New
@@ -76,65 +58,31 @@ module GHC.JS.Unsat.Syntax
   , pattern LAnd
   , pattern Int
   , pattern String
+  , pattern Var
   , pattern PreInc
   , pattern PostInc
   , pattern PreDec
   , pattern PostDec
-  -- * Ident supply
-  , IdentSupply(..)
-  , newIdentSupply
-  , pseudoSaturate
   -- * Utility
   , SaneDouble(..)
+  , pattern Func
+  , var
   ) where
 
 import GHC.Prelude
 
+import GHC.JS.Ident
+
 import Control.DeepSeq
 
-import Data.Function
 import Data.Data
-import Data.Word
 import qualified Data.Semigroup as Semigroup
 
 import GHC.Generics
 
 import GHC.Data.FastString
-import GHC.Utils.Monad.State.Strict
-import GHC.Types.Unique
 import GHC.Types.Unique.Map
 import GHC.Types.SaneDouble
-
--- | A supply of identifiers, possibly empty
-newtype IdentSupply a
-  = IS {runIdentSupply :: State [Ident] a}
-  deriving Typeable
-
-instance NFData (IdentSupply a) where rnf IS{} = ()
-
-inIdentSupply :: (State [Ident] a -> State [Ident] b) -> IdentSupply a -> IdentSupply b
-inIdentSupply f x = IS $ f (runIdentSupply x)
-
-instance Functor IdentSupply where
-    fmap f x = inIdentSupply (fmap f) x
-
-newIdentSupply :: Maybe FastString -> [Ident]
-newIdentSupply Nothing    = newIdentSupply (Just "jmId")
-newIdentSupply (Just pfx) = [ TxtI (mconcat [pfx,"_",mkFastString (show x)])
-                            | x <- [(0::Word64)..]
-                            ]
-
--- | Given a Pseudo-saturate a value with garbage @<<unsatId>>@ identifiers.
-pseudoSaturate :: IdentSupply a -> a
-pseudoSaturate x = evalState (runIdentSupply x) $ newIdentSupply (Just "<<unsatId>>")
-
-instance Eq a => Eq (IdentSupply a) where
-    (==) = (==) `on` pseudoSaturate
-instance Ord a => Ord (IdentSupply a) where
-    compare = compare `on` pseudoSaturate
-instance Show a => Show (IdentSupply a) where
-    show x = "(" ++ show (pseudoSaturate x) ++ ")"
-
 
 --------------------------------------------------------------------------------
 --                            Statements
@@ -142,43 +90,42 @@ instance Show a => Show (IdentSupply a) where
 -- | JavaScript statements, see the [ECMA262
 -- Reference](https://tc39.es/ecma262/#sec-ecmascript-language-statements-and-declarations)
 -- for details
-data JStat
-  = DeclStat   !Ident !(Maybe JExpr)         -- ^ Variable declarations: var foo [= e]
-  | ReturnStat JExpr                         -- ^ Return
-  | IfStat     JExpr JStat JStat             -- ^ If
-  | WhileStat  Bool JExpr JStat              -- ^ While, bool is "do" when True
-  | ForStat    JStat JExpr JStat JStat       -- ^ For
-  | ForInStat  Bool Ident JExpr JStat        -- ^ For-in, bool is "each' when True
-  | SwitchStat JExpr [(JExpr, JStat)] JStat  -- ^ Switch
-  | TryStat    JStat Ident JStat JStat       -- ^ Try
-  | BlockStat  [JStat]                       -- ^ Blocks
-  | ApplStat   JExpr [JExpr]                 -- ^ Application
-  | UOpStat JUOp JExpr                       -- ^ Unary operators
-  | AssignStat JExpr JExpr                   -- ^ Binding form: @foo = bar@
-  | UnsatBlock (IdentSupply JStat)           -- ^ /Unsaturated/ blocks see 'pseudoSaturate'
-  | LabelStat JsLabel JStat                  -- ^ Statement Labels, makes me nostalgic for qbasic
-  | BreakStat (Maybe JsLabel)                -- ^ Break
-  | ContinueStat (Maybe JsLabel)             -- ^ Continue
-  | FuncStat   !Ident [Ident] JStat          -- ^ an explicit function definition
+data JStgStat
+  = DeclStat   !Ident !(Maybe JStgExpr)         -- ^ Variable declarations: var foo [= e]
+  | ReturnStat JStgExpr                         -- ^ Return
+  | IfStat     JStgExpr JStgStat JStgStat       -- ^ If
+  | WhileStat  Bool JStgExpr JStgStat           -- ^ While, bool is "do" when True
+  | ForStat    JStgStat JStgExpr JStgStat JStgStat -- ^ For
+  | ForInStat  Bool Ident JStgExpr JStgStat     -- ^ For-in, bool is "each' when True
+  | SwitchStat JStgExpr [(JStgExpr, JStgStat)] JStgStat  -- ^ Switch
+  | TryStat    JStgStat Ident JStgStat JStgStat          -- ^ Try
+  | BlockStat  [JStgStat]                       -- ^ Blocks
+  | ApplStat   JStgExpr [JStgExpr]              -- ^ Application
+  | UOpStat UOp JStgExpr                        -- ^ Unary operators
+  | AssignStat JStgExpr AOp JStgExpr            -- ^ Binding form: @foo = bar@
+  | LabelStat JsLabel JStgStat                  -- ^ Statement Labels, makes me nostalgic for qbasic
+  | BreakStat (Maybe JsLabel)                   -- ^ Break
+  | ContinueStat (Maybe JsLabel)                -- ^ Continue
+  | FuncStat   !Ident [Ident] JStgStat          -- ^ an explicit function definition
   deriving (Eq, Typeable, Generic)
 
--- | A Label used for 'JStat', specifically 'BreakStat', 'ContinueStat' and of
+-- | A Label used for 'JStgStat', specifically 'BreakStat', 'ContinueStat' and of
 -- course 'LabelStat'
 type JsLabel = LexicalFastString
 
-instance Semigroup JStat where
-  (<>) = appendJStat
+instance Semigroup JStgStat where
+  (<>) = appendJStgStat
 
-instance Monoid JStat where
+instance Monoid JStgStat where
   mempty = BlockStat []
 
--- | Append a statement to another statement. 'appendJStat' only returns a
--- 'JStat' that is /not/ a 'BlockStat' when either @mx@ or @my is an empty
+-- | Append a statement to another statement. 'appendJStgStat' only returns a
+-- 'JStgStat' that is /not/ a 'BlockStat' when either @mx@ or @my is an empty
 -- 'BlockStat'. That is:
 -- > (BlockStat [] , y           ) = y
 -- > (x            , BlockStat []) = x
-appendJStat :: JStat -> JStat -> JStat
-appendJStat mx my = case (mx,my) of
+appendJStgStat :: JStgStat -> JStgStat -> JStgStat
+appendJStgStat mx my = case (mx,my) of
   (BlockStat [] , y           ) -> y
   (x            , BlockStat []) -> x
   (BlockStat xs , BlockStat ys) -> BlockStat $ xs ++ ys
@@ -191,105 +138,109 @@ appendJStat mx my = case (mx,my) of
 --                            Expressions
 --------------------------------------------------------------------------------
 -- | JavaScript Expressions
-data JExpr
+data JStgExpr
   = ValExpr    JVal                 -- ^ All values are trivially expressions
-  | SelExpr    JExpr Ident          -- ^ Selection: Obj.foo, see 'GHC.JS.Make..^'
-  | IdxExpr    JExpr JExpr          -- ^ Indexing:  Obj[foo], see 'GHC.JS.Make..!'
-  | InfixExpr  JOp JExpr JExpr      -- ^ Infix Expressions, see 'JExpr'
-                                    --   pattern synonyms
-  | UOpExpr    JUOp JExpr           -- ^ Unary Expressions
-  | IfExpr     JExpr JExpr JExpr    -- ^ If-expression
-  | ApplExpr   JExpr [JExpr]        -- ^ Application
-  | UnsatExpr  (IdentSupply JExpr)  -- ^ An /Saturated/ expression.
-                                    --   See 'pseudoSaturate'
+  | SelExpr    JStgExpr Ident       -- ^ Selection: Obj.foo, see 'GHC.JS.Make..^'
+  | IdxExpr    JStgExpr JStgExpr    -- ^ Indexing:  Obj[foo], see 'GHC.JS.Make..!'
+  | InfixExpr  Op JStgExpr JStgExpr -- ^ Infix Expressions, see 'JStgExpr' pattern synonyms
+  | UOpExpr    UOp JStgExpr               -- ^ Unary Expressions
+  | IfExpr     JStgExpr JStgExpr JStgExpr  -- ^ If-expression
+  | ApplExpr   JStgExpr [JStgExpr]         -- ^ Application
   deriving (Eq, Typeable, Generic)
 
 -- * Useful pattern synonyms to ease programming with the deeply embedded JS
---   AST. Each pattern wraps @JUOp@ and @JOp@ into a @JExpr@s to save typing and
+--   AST. Each pattern wraps @UOp@ and @Op@ into a @JStgExpr@s to save typing and
 --   for convienience. In addition we include a string wrapper for JS string
 --   and Integer literals.
 
 -- | pattern synonym for a unary operator new
-pattern New :: JExpr -> JExpr
+pattern New :: JStgExpr -> JStgExpr
 pattern New x = UOpExpr NewOp x
 
 -- | pattern synonym for prefix increment @++x@
-pattern PreInc :: JExpr -> JExpr
+pattern PreInc :: JStgExpr -> JStgExpr
 pattern PreInc x = UOpExpr PreIncOp x
 
 -- | pattern synonym for postfix increment @x++@
-pattern PostInc :: JExpr -> JExpr
+pattern PostInc :: JStgExpr -> JStgExpr
 pattern PostInc x = UOpExpr PostIncOp x
 
 -- | pattern synonym for prefix decrement @--x@
-pattern PreDec :: JExpr -> JExpr
+pattern PreDec :: JStgExpr -> JStgExpr
 pattern PreDec x = UOpExpr PreDecOp x
 
 -- | pattern synonym for postfix decrement @--x@
-pattern PostDec :: JExpr -> JExpr
+pattern PostDec :: JStgExpr -> JStgExpr
 pattern PostDec x = UOpExpr PostDecOp x
 
 -- | pattern synonym for logical not @!@
-pattern Not :: JExpr -> JExpr
+pattern Not :: JStgExpr -> JStgExpr
 pattern Not x = UOpExpr NotOp x
 
 -- | pattern synonym for unary negation @-@
-pattern Negate :: JExpr -> JExpr
+pattern Negate :: JStgExpr -> JStgExpr
 pattern Negate x = UOpExpr NegOp x
 
 -- | pattern synonym for addition @+@
-pattern Add :: JExpr -> JExpr -> JExpr
+pattern Add :: JStgExpr -> JStgExpr -> JStgExpr
 pattern Add x y = InfixExpr AddOp x y
 
 -- | pattern synonym for subtraction @-@
-pattern Sub :: JExpr -> JExpr -> JExpr
+pattern Sub :: JStgExpr -> JStgExpr -> JStgExpr
 pattern Sub x y = InfixExpr SubOp x y
 
 -- | pattern synonym for multiplication @*@
-pattern Mul :: JExpr -> JExpr -> JExpr
+pattern Mul :: JStgExpr -> JStgExpr -> JStgExpr
 pattern Mul x y = InfixExpr MulOp x y
 
 -- | pattern synonym for division @*@
-pattern Div :: JExpr -> JExpr -> JExpr
+pattern Div :: JStgExpr -> JStgExpr -> JStgExpr
 pattern Div x y = InfixExpr DivOp x y
 
 -- | pattern synonym for remainder @%@
-pattern Mod :: JExpr -> JExpr -> JExpr
+pattern Mod :: JStgExpr -> JStgExpr -> JStgExpr
 pattern Mod x y = InfixExpr ModOp x y
 
 -- | pattern synonym for Bitwise Or @|@
-pattern BOr :: JExpr -> JExpr -> JExpr
+pattern BOr :: JStgExpr -> JStgExpr -> JStgExpr
 pattern BOr x y = InfixExpr BOrOp x y
 
 -- | pattern synonym for Bitwise And @&@
-pattern BAnd :: JExpr -> JExpr -> JExpr
+pattern BAnd :: JStgExpr -> JStgExpr -> JStgExpr
 pattern BAnd x y = InfixExpr BAndOp x y
 
 -- | pattern synonym for Bitwise XOr @^@
-pattern BXor :: JExpr -> JExpr -> JExpr
+pattern BXor :: JStgExpr -> JStgExpr -> JStgExpr
 pattern BXor x y = InfixExpr BXorOp x y
 
 -- | pattern synonym for Bitwise Not @~@
-pattern BNot :: JExpr -> JExpr
+pattern BNot :: JStgExpr -> JStgExpr
 pattern BNot x = UOpExpr BNotOp x
 
 -- | pattern synonym for logical Or @||@
-pattern LOr :: JExpr -> JExpr -> JExpr
+pattern LOr :: JStgExpr -> JStgExpr -> JStgExpr
 pattern LOr x y = InfixExpr LOrOp x y
 
 -- | pattern synonym for logical And @&&@
-pattern LAnd :: JExpr -> JExpr -> JExpr
+pattern LAnd :: JStgExpr -> JStgExpr -> JStgExpr
 pattern LAnd x y = InfixExpr LAndOp x y
 
 
 -- | pattern synonym to create integer values
-pattern Int :: Integer -> JExpr
+pattern Int :: Integer -> JStgExpr
 pattern Int x = ValExpr (JInt x)
 
 -- | pattern synonym to create string values
-pattern String :: FastString -> JExpr
+pattern String :: FastString -> JStgExpr
 pattern String x = ValExpr (JStr x)
 
+-- | pattern synonym to create a local variable reference
+pattern Var :: Ident -> JStgExpr
+pattern Var x = ValExpr (JVar x)
+
+-- | pattern synonym to create an anonymous function
+pattern Func :: [Ident] -> JStgStat -> JStgExpr
+pattern Func args body = ValExpr (JFunc args body)
 
 --------------------------------------------------------------------------------
 --                            Values
@@ -297,15 +248,14 @@ pattern String x = ValExpr (JStr x)
 -- | JavaScript values
 data JVal
   = JVar     Ident                      -- ^ A variable reference
-  | JList    [JExpr]                    -- ^ A JavaScript list, or what JS
+  | JList    [JStgExpr]                 -- ^ A JavaScript list, or what JS
                                         --   calls an Array
   | JDouble  SaneDouble                 -- ^ A Double
   | JInt     Integer                    -- ^ A BigInt
   | JStr     FastString                 -- ^ A String
   | JRegEx   FastString                 -- ^ A Regex
-  | JHash    (UniqMap FastString JExpr) -- ^ A JS HashMap: @{"foo": 0}@
-  | JFunc    [Ident] JStat              -- ^ A function
-  | UnsatVal (IdentSupply JVal)         -- ^ An /Saturated/ value, see 'pseudoSaturate'
+  | JHash    (UniqMap FastString JStgExpr) -- ^ A JS HashMap: @{"foo": 0}@
+  | JFunc    [Ident] JStgStat              -- ^ A function
   deriving (Eq, Typeable, Generic)
 
 --------------------------------------------------------------------------------
@@ -313,7 +263,7 @@ data JVal
 --------------------------------------------------------------------------------
 -- | JS Binary Operators. We do not deeply embed the comma operator and the
 -- assignment operators
-data JOp
+data Op
   = EqOp            -- ^ Equality:              `==`
   | StrictEqOp      -- ^ Strict Equality:       `===`
   | NeqOp           -- ^ InEquality:            `!=`
@@ -339,10 +289,10 @@ data JOp
   | InOp            -- ^ @in@
   deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
 
-instance NFData JOp
+instance NFData Op
 
 -- | JS Unary Operators
-data JUOp
+data UOp
   = NotOp           -- ^ Logical Not: @!@
   | BNotOp          -- ^ Bitwise Not: @~@
   | NegOp           -- ^ Negation:    @-@
@@ -358,18 +308,17 @@ data JUOp
   | PostDecOp       -- ^ Postfix Decrement: @x--@
   deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
 
-instance NFData JUOp
+instance NFData UOp
 
---------------------------------------------------------------------------------
---                            Identifiers
---------------------------------------------------------------------------------
--- We use FastString for identifiers in JS backend
+-- | JS Unary Operators
+data AOp
+  = AssignOp    -- ^ Vanilla  Assignment: =
+  | AddAssignOp -- ^ Addition Assignment: +=
+  | SubAssignOp -- ^ Subtraction Assignment: -=
+  deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
 
--- | A newtype wrapper around 'FastString' for JS identifiers.
-newtype Ident = TxtI { itxt :: FastString }
- deriving stock   (Show, Eq)
- deriving newtype (Uniquable)
+instance NFData AOp
 
-identFS :: Ident -> FastString
-identFS = \case
-  TxtI fs -> fs
+-- | construct a JS variable reference
+var :: FastString -> JStgExpr
+var = Var . global
