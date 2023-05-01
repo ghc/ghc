@@ -132,6 +132,11 @@ cmmMakeDynamicReference config referenceKind lbl
               addImport symbolPtr
               return $ cmmMakePicReference config symbolPtr
 
+        AccessViaSymbolPtr | ArchRISCV64 <- platformArch platform -> do
+              let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
+              addImport symbolPtr
+              return $ cmmMakePicReference config symbolPtr
+
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
@@ -163,6 +168,10 @@ cmmMakePicReference config lbl
   -- the global offset table (GOT).
   | ArchAArch64 <- platformArch platform
   = CmmLit $ CmmLabel lbl
+
+  | ArchRISCV64 <- platformArch platform
+  = CmmLit $ CmmLabel lbl
+
 
   | OSAIX <- platformOS platform
   = CmmMachOp (MO_Add W32)
