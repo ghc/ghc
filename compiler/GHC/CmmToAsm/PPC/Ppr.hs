@@ -786,6 +786,9 @@ pprInstr platform instr = case instr of
    OR reg1 reg2 ri
       -> pprLogic platform (text "or") reg1 reg2 ri
 
+   ORC reg1 reg2 reg3
+      -> pprLogic platform (text "orc") reg1 reg2 (RIReg reg3)
+
    XOR reg1 reg2 ri
       -> pprLogic platform (text "xor") reg1 reg2 ri
 
