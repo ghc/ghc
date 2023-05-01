@@ -34,7 +34,7 @@ import qualified GHC.CmmToAsm.X86.Regs       as X86
 import qualified GHC.CmmToAsm.X86.RegInfo    as X86
 import qualified GHC.CmmToAsm.PPC.Regs       as PPC
 import qualified GHC.CmmToAsm.AArch64.Regs   as AArch64
-
+import qualified GHC.CmmToAsm.RV64.Regs   as RV64
 
 targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> Int
 targetVirtualRegSqueeze platform
@@ -49,7 +49,7 @@ targetVirtualRegSqueeze platform
       ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
-      ArchRISCV64   -> panic "targetVirtualRegSqueeze ArchRISCV64"
+      ArchRISCV64   -> RV64.virtualRegSqueeze
       ArchLoongArch64->panic "targetVirtualRegSqueeze ArchLoongArch64"
       ArchJavaScript-> panic "targetVirtualRegSqueeze ArchJavaScript"
       ArchWasm32    -> panic "targetVirtualRegSqueeze ArchWasm32"
@@ -69,7 +69,7 @@ targetRealRegSqueeze platform
       ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
-      ArchRISCV64   -> panic "targetRealRegSqueeze ArchRISCV64"
+      ArchRISCV64   -> RV64.realRegSqueeze
       ArchLoongArch64->panic "targetRealRegSqueeze ArchLoongArch64"
       ArchJavaScript-> panic "targetRealRegSqueeze ArchJavaScript"
       ArchWasm32    -> panic "targetRealRegSqueeze ArchWasm32"
@@ -88,7 +88,7 @@ targetClassOfRealReg platform
       ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
       ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
-      ArchRISCV64   -> panic "targetClassOfRealReg ArchRISCV64"
+      ArchRISCV64   -> RV64.classOfRealReg
       ArchLoongArch64->panic "targetClassOfRealReg ArchLoongArch64"
       ArchJavaScript-> panic "targetClassOfRealReg ArchJavaScript"
       ArchWasm32    -> panic "targetClassOfRealReg ArchWasm32"
@@ -107,7 +107,7 @@ targetMkVirtualReg platform
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
-      ArchRISCV64   -> panic "targetMkVirtualReg ArchRISCV64"
+      ArchRISCV64   -> RV64.mkVirtualReg
       ArchLoongArch64->panic "targetMkVirtualReg ArchLoongArch64"
       ArchJavaScript-> panic "targetMkVirtualReg ArchJavaScript"
       ArchWasm32    -> panic "targetMkVirtualReg ArchWasm32"
@@ -126,7 +126,7 @@ targetRegDotColor platform
       ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
       ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
-      ArchRISCV64   -> panic "targetRegDotColor ArchRISCV64"
+      ArchRISCV64   -> RV64.regDotColor
       ArchLoongArch64->panic "targetRegDotColor ArchLoongArch64"
       ArchJavaScript-> panic "targetRegDotColor ArchJavaScript"
       ArchWasm32    -> panic "targetRegDotColor ArchWasm32"
