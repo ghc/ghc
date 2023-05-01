@@ -368,18 +368,36 @@ Note [Core letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The Core letrec invariant:
 
-    The right hand sides of all
-      /top-level/ or /recursive/
-    bindings must be of lifted type
-
-    There is one exception to this rule, top-level @let@s are
-    allowed to bind primitive string literals: see
-    Note [Core top-level string literals].
+  The right hand sides of all /top-level/ or /recursive/
+  bindings must be of lifted type
 
 See "Type#type_classification" in GHC.Core.Type
-for the meaning of "lifted" vs. "unlifted").
+for the meaning of "lifted" vs. "unlifted".
 
-For the non-top-level, non-recursive case see Note [Core let-can-float invariant].
+For the non-top-level, non-recursive case see
+Note [Core let-can-float invariant].
+
+At top level, however, there are two exceptions to this rule:
+
+(TL1) A top-level binding is allowed to bind primitive string literal,
+      (which is unlifted).  See Note [Core top-level string literals].
+
+(TL2) In Core, we generate a top-level binding for every non-newtype data
+constructor worker or wrapper
+      e.g.   data T = MkT Int
+      we generate
+             MkT :: Int -> T
+             MkT = \x. MkT x
+      (This binding looks recursive, but isn't; it defines a top-level, curried
+      function whose body just allocates and returns the data constructor.)
+
+      But if (a) the data contructor is nullary and (b) the data type is unlifted,
+      this binding is unlifted.
+      e.g.   data S :: UnliftedType where { S1 :: S, S2 :: S -> S }
+      we generate
+             S1 :: S   -- A top-level unlifted binding
+             S1 = S1
+      We allow this top-level unlifted binding to exist.
 
 Note [Core let-can-float invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
