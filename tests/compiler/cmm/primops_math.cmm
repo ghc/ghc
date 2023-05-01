@@ -1,0 +1,111 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$HC" -no-hs-main "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe" | FileCheck "$1" -check-prefix=CHECK-RUN-A64
+
+#include "Cmm.h"
+
+// TODO: most of the unsigned test don't really test unsigned.
+
+// CHECK-A64: .globl main
+// CHECK-A64: main:
+main () {
+    R1 = 7; R2 = 3;
+    R4 = -7; R5 = -3;
+
+    // CHECK-RUN-A64: 7 + 3 => 10
+    R3 = R1 `add` R2;
+    foreign "C" printf("%d + %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 - 3 => 4
+    R3 = R1 `sub` R2;
+    foreign "C" printf("%d - %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 = 3 => 0
+    R3 = R1 `eq` R2;
+    foreign "C" printf("%d = %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 * 3 => 21
+    R3 = R1 `mul` R2;
+    foreign "C" printf("%d * %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: -(7+3) => -10
+    R3 = %neg(R1+R2);
+    foreign "C" printf("-(%d+%d) => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 / 3 => 2
+    R3 = R1 `quot` R2;
+    foreign "C" printf("%d / %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 % 3 => 1
+    R3 = R1 `rem` R2;
+    foreign "C" printf("%d %% %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 / 3 => 2
+    R3 = R1 `divu` R2;
+    foreign "C" printf("(unsigned): %d / %d => %d\n", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 % 3 => 1
+    R3 = R1 `modu` R2;
+    foreign "C" printf("(unsigned): %d %% %d => %d\n", R1, R2, R3);
+
+    // Signed >=, <=, >, <
+    // CHECK-RUN-A64: 7 >= 3 => 1
+    R3 = R1 `ge` R2;
+    foreign "C" printf("%d >= %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 <= 3 => 0
+    R3 = R1 `le` R2;
+    foreign "C" printf("%d <= %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 > 3 => 1
+    R3 = R1 `gt` R2;
+    foreign "C" printf("%d > %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 < 3 => 0
+    R3 = R1 `lt` R2;
+    foreign "C" printf("%d < %d => %d", R1, R2, R3);
+
+    // Unsigned >=, <=, >, <
+    // CHECK-RUN-A64: 7 >= 3 => 1
+    R3 = R1 `geu` R2;
+    foreign "C" printf("(unsigned): %d >= %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 <= 3 => 0
+    R3 = R1 `leu` R2;
+    foreign "C" printf("(unsigned): %d <= %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 > 3 => 1
+    R3 = R1 `gtu` R2;
+    foreign "C" printf("(unsigned): %d > %d => %d", R1, R2, R3);
+
+    // CHECK-RUN-A64: 7 < 3 => 0
+    R3 = R1 `ltu` R2;
+    foreign "C" printf("(unsigned): %d < %d => %d", R1, R2, R3);
+
+    // Logical ops: and, or, xor, com, shl, shrl, shra
+    R3 = R1 `and` R2;
+    foreign "C" printf("%d and %d => %d", R1, R2, R3);
+
+    R3 = R1 `or` R2;
+    foreign "C" printf("%d or %d => %d", R1, R2, R3);
+
+    R3 = R1 `xor` R2;
+    foreign "C" printf("%d xor %d => %d", R1, R2, R3);
+
+    // R3 = R1 `com` R2;
+    // foreign "C" printf("%d com %d => %d", R1, R2, R3);
+
+    R3 = R1 `shl` R2;
+    foreign "C" printf("%d shl %d => %d", R1, R2, R3);
+
+    R3 = R1 `shrl` R2;
+    foreign "C" printf("%d shrl %d => %d", R1, R2, R3);
+
+    R3 = R1 `shra` R2;
+    foreign "C" printf("%d shra %d => %d", R1, R2, R3);
+
+
+
+
+    foreign "C" exit(0::I64);
+}

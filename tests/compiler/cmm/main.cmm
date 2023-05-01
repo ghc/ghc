@@ -1,0 +1,27 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$CC" "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe"
+/*
+ * This is a very basic cmm example. For a more in-depth discussion see
+ * GHC/Cmm/Parser.y.  This file emulates a main function in Cmm.  Note
+ * that we can't use return. This will most of the time require a StackSlot,
+ * which isn't implemented in most code gen backends.
+ *
+ * To compile:
+ *
+ *   $HC -cpp -dcmm-lint -keep-s-file -c main.cmm
+ *   $CC main.o -o main
+ *
+ * Note: We use $CC to compile, the reson is that this allows us to depend on
+ *       the default crt0, ..., files; and we get functions like exit.
+ *
+ * Note2: The Cmm.h include (which requires the -cpp flag to $HC), this
+ *        allows us to use I64, I32, ...
+ */
+#include "Cmm.h"
+
+// CHECK-A64: .type main, @function
+// CHECK-A64-NEXT: main:
+main ( I32 argc, I32 argv_ptr ) {
+    foreign "C" exit(0::I64);
+}

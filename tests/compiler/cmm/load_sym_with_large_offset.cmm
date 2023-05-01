@@ -1,0 +1,9 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+
+test () {
+    // CHECK-A64: mov w18, #4273
+    // CHECK-A64: adrp x23, stg_INTLIKE_closure
+    // CHECK-A64: add x23, x23, :lo12:stg_INTLIKE_closure
+    // CHECK-A64: add x23, x23, x18
+    R2 = stg_INTLIKE_closure+4273;
+}

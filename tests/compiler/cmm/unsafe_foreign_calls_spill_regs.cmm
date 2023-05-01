@@ -1,0 +1,50 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+// Original failing cmm:
+//
+// (_ckSs::F32) = call MO_F32_ExpM1(_shwV::F32);   // CmmUnsafeForeignCall
+//
+// One issue with the cmm parser is, that we can't build the following expressions
+// the parser will deconstruct them into arg0 <- arg0_expr; f(arg0); instead of f(arg0_expr)
+//
+// (_ckSz::F32) = call MO_F32_Log(%MO_F_Neg_W32(_ckSs::F32));   // CmmUnsafeForeignCall
+// (_ckqE::F64) = call MO_F64_Log(2.0 :: W64);   // CmmUnsafeForeignCall
+// (_cjE1::F64) = call MO_F64_Atan(%MO_F_Quot_W64(_shFv::F64, _shFw::F64));   // CmmUnsafeForeignCall
+//
+//
+foreign_calls () {
+    F32 x, y;
+    x = F1;
+
+    // Some variables to ensure we use up all the registers.
+    F32 a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t;
+    a = F1; b = F1; c = F1; d = F1; e = F1; f = F1; g = F1; h = F1; i = F1;
+    j = F1; k = F1; l = F1; m = F1; n = F1; o = F1; p = F1; q = F1; r = F1;
+    s = F1; t = F1;
+    // Some integer register
+    I64 _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
+    _a = R1; _b = R1; _c = R1; _d = R1; _e = R1; _f = R1; _g = R1; _h = R1;
+    _i = R1; _j = R1; _k = R1; _l = R1; _m = R1; _n = R1; _o = R1; _p = R1;
+    _q = R1; _r = R1; _s = R1; _t = R1; _u = R1; _v = R1; _w = R1; _x = R1; _y = R1; _z = R1;
+
+    // CHECK-A64: adrp x11, expm1f
+    // CHECK-A64: add x11, x11, :lo12:expm1f
+    // CHECK-A64: fmov s0, s2
+    // CHECK-A64: blr x11
+    (y) = prim %expM132f(F1);
+    // CHECK-A64: fmov s8, s30
+    F1 = y;
+    F2 = y;
+    (y) = prim %log32f(%fneg(x));
+
+    prim %log64f(2.0);
+
+    prim %atan64f(%fquot(D1,D2));
+
+    // make sure a..t stay alive!
+    F3 = a + b + c + d + e + f + g + h + i + j + k + l + m + n + o + p + q + r + s + t;
+    R2 = _a + _b + _c + _d + _e + _f + _g + _h + _i + _j + _k + _l + _m + _n
+            + _o + _p + _q + _r + _s + _t + _u + _v + _w + _x + _y + _z;
+}

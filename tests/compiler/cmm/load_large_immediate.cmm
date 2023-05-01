@@ -1,0 +1,28 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+large() {
+    // CHECK-A64:      mov x23, #52428
+    // CHECK-A64-NEXT: movk x23, #52428, lsl #16
+    // CHECK-A64-NEXT: movk x23, #52428, lsl #32
+    // CHECK-A64-NEXT: movk x23, #3276, lsl #48
+    R2 = 922337203685477580;
+
+    // CHECK-A64:      mov x23, #52429
+    R2 = 922337203685477581;
+
+    // CHECK-A64:      mov x18, #11544
+    // CHECK-A64-NEXT: movk x18, #21572, lsl #16
+    // CHECK-A64-NEXT: movk x18, #8699, lsl #32
+    // CHECK-A64-NEXT: movk x18, #16393, lsl #48
+    // CHECK-A64-NEXT: fmov d12, x18
+    D1 = 3.141592653589793;
+
+    // CHECK-A64:      mov x18, #11544
+    // CHECK-A64-NEXT: movk x18, #21572, lsl #16
+    // CHECK-A64-NEXT: movk x18, #8699, lsl #32
+    // CHECK-A64-NEXT: movk x18, #16377, lsl #48
+    // CHECK-A64-NEXT: fmov d12, x18
+    D1 = 1.5707963267948966;
+}

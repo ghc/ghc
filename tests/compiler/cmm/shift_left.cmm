@@ -1,0 +1,15 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+shift_left () {
+    I64 a, b, c, d, e, f;
+    a = 1;
+    b = 1;
+    c = 1;
+    d = 1;
+    // CHECK-A64: lsl x18, x18, x14
+    // CHECK-A64: lsl x18, x18, x17
+    // CHECK-A64: lsl x18, x18, x17
+    R2 = (((((a << 1 | b) << 1) | c) << 1) | d);
+}

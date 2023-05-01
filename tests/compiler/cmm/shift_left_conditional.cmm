@@ -1,0 +1,13 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+// Original failing cmm:
+//
+// R1 = I64[(%MO_F_Gt_W32(F32[Sp + 8], F32[R1 + 7]) << 3) + ghczmprim_GHCziTypes_Bool_closure_tbl];   // CmmAssign
+//
+shift_left_conditional () {
+    // CHECK-A64: fcmp s31, s30
+    // CHECK-A64-NEXT: cset w18, gt
+    R1 = %fgt(F32[Sp], F32[R1]) << 3;
+}
