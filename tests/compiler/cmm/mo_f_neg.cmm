@@ -1,0 +1,14 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+f_neg_same_reg () {
+    // CHECK-A64: neg x22, x22
+    R1 = %neg(R1);
+
+    // CHECK-A64: fneg s8, s8
+    F1 = %fneg(F1);
+
+    // CHECK-A64: fneg d12, d12
+    D1 = %fneg(D1);
+}

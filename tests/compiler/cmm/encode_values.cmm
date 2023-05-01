@@ -1,0 +1,30 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$CC" "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe" | FileCheck "$1" -check-prefix=CHECK-RUN-A64
+
+#include "Cmm.h"
+#include "Types.h"
+
+main () {
+    R1 = 123454321;
+    F1 = 0.12345::F32;
+    D1 = 3.123456789123456789;
+    D2 = 1.234567891234567890;
+
+    // Let's see that the c string ends up as a symbol
+    // CHECK-A64: c1_str:
+    // CHECK-A64-NEXT: .string "%d\n%1.10f\n%.20f\n%.20f\n"
+
+    // CHECK-RUN-A64: 123454321
+    // The following is WRONG. We need to promote Float to Double when
+    // calling a C function. However for now, and for compatibility, we
+    // don't promote.
+
+    // CHECK-RUN-A64-NEXT: 0.0000000000
+    // CHECK-RUN-A64-NEXT: 3.12345678912345681155
+    // CHECK-RUN-A64-NEXT: 1.23456789123456789348
+
+    foreign "C" printf("%d\n%1.10f\n%.20f\n%.20f\n", R1, F1, D1, D2);
+
+    foreign "C" exit(0::I64);
+}
