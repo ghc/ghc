@@ -251,6 +251,7 @@ data Instr
     | ANDC    Reg Reg Reg           -- AND with complement, dst = src1 & ~ src2
     | NAND    Reg Reg Reg           -- dst, src1, src2
     | OR      Reg Reg RI            -- dst, src1, src2
+    | ORC     Reg Reg Reg           -- OR with complement, dst = src1 | ~ src2
     | ORIS    Reg Reg Imm           -- OR Immediate Shifted dst, src1, src2
     | XOR     Reg Reg RI            -- dst, src1, src2
     | XORIS   Reg Reg Imm           -- XOR Immediate Shifted dst, src1, src2
@@ -356,6 +357,7 @@ regUsageOfInstr platform instr
     ANDC    reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
     NAND    reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
     OR      reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
+    ORC     reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
     ORIS    reg1 reg2 _     -> usage ([reg2], [reg1])
     XOR     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
     XORIS   reg1 reg2 _     -> usage ([reg2], [reg1])
@@ -456,6 +458,7 @@ patchRegsOfInstr instr env
     ANDC    reg1 reg2 reg3  -> ANDC (env reg1) (env reg2) (env reg3)
     NAND    reg1 reg2 reg3  -> NAND (env reg1) (env reg2) (env reg3)
     OR      reg1 reg2 ri    -> OR  (env reg1) (env reg2) (fixRI ri)
+    ORC     reg1 reg2 reg3  -> ORC (env reg1) (env reg2) (env reg3)
     ORIS    reg1 reg2 imm   -> ORIS (env reg1) (env reg2) imm
     XOR     reg1 reg2 ri    -> XOR (env reg1) (env reg2) (fixRI ri)
     XORIS   reg1 reg2 imm   -> XORIS (env reg1) (env reg2) imm
