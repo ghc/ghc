@@ -46,6 +46,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
+import GHC.Tc.TyCl.Class ( substATBndrs )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate( newFamInst )
 import GHC.Tc.Utils.Env
@@ -2100,8 +2101,8 @@ gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
         newFamInst SynFamilyInst axiom
       where
         fam_tvs     = tyConTyVars fam_tc
-        rep_lhs_tys = substTyVars lhs_subst fam_tvs
-        rep_rhs_tys = substTyVars rhs_subst fam_tvs
+        (_, rep_lhs_tys) = substATBndrs lhs_subst fam_tvs
+        (_, rep_rhs_tys) = substATBndrs rhs_subst fam_tvs
         rep_rhs_ty  = mkTyConApp fam_tc rep_rhs_tys
         rep_tcvs    = tyCoVarsOfTypesList rep_lhs_tys
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
