@@ -22,6 +22,7 @@ module GHC.Tc.TyCl.Class
    , instDeclCtxt2
    , instDeclCtxt3
    , tcATDefault
+   , substATBndrs
    )
 where
 
@@ -42,7 +43,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Build( TcMethInfo )
 
-import GHC.Core.Type     ( piResultTys )
+import GHC.Core.Type     ( extendTvSubstWithClone, piResultTys )
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity
 import GHC.Core.Class
@@ -58,7 +59,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Var
-import GHC.Types.Var.Env
+import GHC.Types.Var.Env ( lookupVarEnv )
 import GHC.Types.SourceFile (HscSource(..))
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
@@ -501,8 +502,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
    --            instance C [x]
    -- Then we want to generate the decl:   type F [x] b = ()
   | Just (rhs_ty, _loc) <- defs
-  = do { let (subst', pat_tys') = mapAccumL subst_tv inst_subst
-                                            (tyConTyVars fam_tc)
+  = do { let (subst', pat_tys') = substATBndrs inst_subst (tyConTyVars fam_tc)
              rhs'     = substTyUnchecked subst' rhs_ty
              tcv' = tyCoVarsOfTypesList pat_tys'
              (tv', cv') = partition isTyVar tcv'
@@ -525,14 +525,73 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
   | otherwise  -- defs = Nothing
   = do { warnMissingAT (tyConName fam_tc)
        ; return [] }
+
+-- | Apply a substitution to the type variable binders of an associated type
+-- family. This is used to compute default instances for associated type
+-- families (see 'tcATDefault') as well as @newtype@-derived associated type
+-- family instances (see @gen_Newtype_fam_insts@ in "GHC.Tc.Deriv.Generate").
+--
+-- As a concrete example, consider the following class and associated type
+-- family:
+--
+-- @
+--   class C k (a :: k) where
+--     type F k a (b :: k) :: Type
+--     type F j p q = (Proxy @j p, Proxy @j (q :: j))
+-- @
+--
+-- If a user defines this instance:
+--
+-- @
+-- instance C (Type -> Type) Maybe where {}
+-- @
+--
+-- Then in order to typecheck the default @F@ instance, we must apply the
+-- substitution @[k :-> (Type -> Type), a :-> Maybe]@ to @F@'s binders, which
+-- are @[k, a, (b :: k)]@. The result should look like this:
+--
+-- @
+--   type F (Type -> Type) Maybe (b :: Type -> Type) =
+--     (Proxy @(Type -> Type) Maybe, Proxy @(Type -> Type) (b :: Type -> Type))
+-- @
+--
+-- Making this work requires some care. There are two cases:
+--
+-- 1. If we encounter a type variable in the domain of the substitution (e.g.,
+--    @k@ or @a@), then we apply the substitution directly.
+--
+-- 2. Otherwise, we substitute into the type variable's kind (e.g., turn
+--    @b :: k@ to @b :: Type -> Type@). We then return an extended substitution
+--    where the old @b@ (of kind @k@) maps to the new @b@ (of kind @Type -> Type@).
+--
+--    This step is important to do in case there are later occurrences of @b@,
+--    which we must ensure have the correct kind. Otherwise, we might end up
+--    with @Proxy \@(Type -> Type) (b :: k)@ on the right-hand side of the
+--    default instance, which would be completely wrong.
+--
+-- Contrast 'substATBndrs' function with similar substitution functions:
+--
+-- * 'substTyVars' does not substitute into the kinds of each type variable,
+--   nor does it extend the substitution. 'substTyVars' is meant for occurrences
+--   of type variables, whereas 'substATBndr's is meant for binders.
+--
+-- * 'substTyVarBndrs' does substitute into kinds and extends the substitution,
+--   but it does not apply the substitution to the variables themselves. As
+--   such, 'substTyVarBndrs' returns a list of 'TyVar's rather than a list of
+--   'Type's.
+substATBndrs :: Subst -> [TyVar] -> (Subst, [Type])
+substATBndrs = mapAccumL substATBndr
   where
-    subst_tv subst tc_tv
+    substATBndr :: Subst -> TyVar -> (Subst, Type)
+    substATBndr subst tc_tv
+        -- Case (1) in the Haddocks
       | Just ty <- lookupVarEnv (getTvSubstEnv subst) tc_tv
       = (subst, ty)
+        -- Case (2) in the Haddocks
       | otherwise
-      = (extendTvSubst subst tc_tv ty', ty')
+      = (extendTvSubstWithClone subst tc_tv tc_tv', mkTyVarTy tc_tv')
       where
-        ty' = mkTyVarTy (updateTyVarKind (substTyUnchecked subst) tc_tv)
+        tc_tv' = updateTyVarKind (substTy subst) tc_tv
 
 warnMissingAT :: Name -> TcM ()
 warnMissingAT name
