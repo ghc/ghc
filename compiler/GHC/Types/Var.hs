@@ -283,6 +283,16 @@ data IdBinding where
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
   -- Might no longer make sense to merge with IdScope at all
 
+{-
+Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)
+  data BindingSite
+      = LambdaBind  -- ^ The x in   (\x. e)
+      | CaseBind    -- ^ The x in   case scrut of x { (y,z) -> ... }
+      | CasePatBind -- ^ The y,z in case scrut of x { (y,z) -> ... }
+      | LetBind     -- ^ The x in   (let x = rhs in e)
+      deriving Eq
+-}
+
 instance Outputable IdBinding where
   ppr (LambdaBound m) = text "LambdaBound" <+> ppr m
   ppr (LetBound ue)   = text "LetBound" <+> ppr (nonDetMults ue) <+> prettyCallStackDoc callStack

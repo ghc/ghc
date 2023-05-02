@@ -1698,6 +1698,11 @@ lintIdBndr top_lvl bind_site id thing_inside
                 (text "Non-local Id binder" <+> ppr id)
                 -- See Note [Checking for global Ids]
 
+       -- Check that the binding site matches the binding provenance of the id
+       -- (we do this regardless of -dlinear-core-lint as it should always be true?)
+       ; checkL (matchesBindingSite (idBinding id) bind_site)
+                (text "Core Id binding doesn't match binding site" <+> ppr (idBinding id) <+> ppr bind_site)
+
        -- Check that if the binder is nested, it is not marked as exported
        ; checkL (not (isExportedId id) || is_top_lvl)
            (mkNonTopExportedMsg id)
@@ -1738,6 +1743,12 @@ lintIdBndr top_lvl bind_site id thing_inside
     is_let_bind = case bind_site of
                     LetBind -> True
                     _       -> False
+
+    matchesBindingSite :: IdBinding -> BindingSite -> Bool
+    matchesBindingSite (LetBound _) LetBind = True
+    matchesBindingSite (LambdaBound _) LambdaBind = True
+    -- ROMES:TODO: Other binding sites!
+    matchesBindingSite _ _ = False
 
 {-
 %************************************************************************
@@ -3132,11 +3143,13 @@ noFixedRuntimeRepChecks thing_inside
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> fromBoxedLResult (Just (le_flags env), errs)
 
+-- | Check whether a condition holds or otherwise fail linting with the
+-- supplied error message
 checkL :: Bool -> SDoc -> LintM ()
 checkL True  _   = return ()
 checkL False msg = failWithL msg
 
--- like checkL, but relevant to type checking
+-- | Like 'checkL', but relevant to type checking
 lintL :: Bool -> SDoc -> LintM ()
 lintL = checkL
 
