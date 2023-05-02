@@ -2201,13 +2201,14 @@ static void read_debug_flags(const char* arg)
     }
     // -Dx also turns on -v.  Use -l to direct trace
     // events to the .eventlog file instead.
-    RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+    if (RtsFlags.TraceFlags.tracing == TRACE_NONE) {
+        RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+    }
 
-   // sanity implies zero_on_gc
-   if(RtsFlags.DebugFlags.sanity){
-        RtsFlags.DebugFlags.zero_on_gc = true;
-   }
-
+    // sanity implies zero_on_gc
+    if(RtsFlags.DebugFlags.sanity){
+         RtsFlags.DebugFlags.zero_on_gc = true;
+    }
 }
 #endif
 
