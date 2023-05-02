@@ -215,6 +215,21 @@
 #define LDV_STATE_USE           0x40000000
 #endif /* SIZEOF_VOID_P */
 
+/* See Note [Debugging predicates for pointers] in ClosureMacros.h */
+#if !defined(INVALID_GHC_POINTER)
+#if !defined(DEBUG)
+#define INVALID_GHC_POINTER 0x0
+#elif SIZEOF_VOID_P== 4
+/* N.B. this may result in false-negatives from LOOKS_LIKE_PTR on some
+ * platforms since this is a valid user-space address.
+ */
+#define INVALID_GHC_POINTER 0xaaaaaaaa
+#else
+/* N.B. this is typically a kernel-mode address on 64-bit platforms */
+#define INVALID_GHC_POINTER 0xaaaaaaaaaaaaaaaa
+#endif
+#endif
+
 /* -----------------------------------------------------------------------------
    TSO related constants
    -------------------------------------------------------------------------- */

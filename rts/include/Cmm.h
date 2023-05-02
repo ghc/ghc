@@ -607,16 +607,20 @@
 #define BITMAP_SIZE(bitmap) ((bitmap) & BITMAP_SIZE_MASK)
 #define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
 
+#define LOOKS_LIKE_PTR(p) ((p) != NULL && (p) != INVALID_GHC_POINTER)
+
 /* Debugging macros */
 #define LOOKS_LIKE_INFO_PTR(p)                                  \
-   ((p) != NULL &&                                              \
+   (LOOKS_LIKE_PTR(p) &&                                        \
     LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
 
 #define LOOKS_LIKE_INFO_PTR_NOT_NULL(p)                         \
    ( (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&     \
      (TO_W_(%INFO_TYPE(%STD_INFO(p))) <  N_CLOSURE_TYPES))
 
-#define LOOKS_LIKE_CLOSURE_PTR(p) (LOOKS_LIKE_INFO_PTR(GET_INFO(UNTAG(p))))
+#define LOOKS_LIKE_CLOSURE_PTR(p)                               \
+   ( LOOKS_LIKE_PTR(p) &&                                       \
+     LOOKS_LIKE_INFO_PTR(GET_INFO(UNTAG(p))))
 
 /*
  * The layout of the StgFunInfoExtra part of an info table changes
