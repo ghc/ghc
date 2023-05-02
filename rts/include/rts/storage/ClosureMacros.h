@@ -253,22 +253,35 @@ EXTERN_INLINE StgClosure *TAG_CLOSURE(StgWord tag,StgClosure * p)
 #define MK_FORWARDING_PTR(p) (((StgWord)p) | 1)
 #define UN_FORWARDING_PTR(p) (((StgWord)p) - 1)
 
-/* -----------------------------------------------------------------------------
-   DEBUGGING predicates for pointers
+/*
+ * Note [Debugging predicates for pointers]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * LOOKS_LIKE_PTR(p)         returns False if p is definitely not a valid pointer
+ * LOOKS_LIKE_INFO_PTR(p)    returns False if p is definitely not an info ptr
+ * LOOKS_LIKE_CLOSURE_PTR(p) returns False if p is definitely not a closure ptr
+ *
+ * These macros are complete but not sound.  That is, they might
+ * return false positives.  Do not rely on them to distinguish info
+ * pointers from closure pointers, for example.
+ *
+ * We for the most part don't use address-space predicates these days, for
+ * portability reasons, and the fact that code/data can be scattered about the
+ * address space in a dynamically-linked environment.  Our best option is to
+ * look at the alleged info table and see whether it seems to make sense.
+ *
+ * The one exception here is the use of INVALID_GHC_POINTER, which catches
+ * the bit-pattern used by `+RTS -DZ` to zero freed memory (that is 0xaaaaa...).
+ * In the case of most 64-bit platforms, this INVALID_GHC_POINTER is a
+ * kernel-mode address, making this check free of false-negatives. On the other
+ * hand, on 32-bit platforms this typically isn't the case. Consequently, we
+ * only use this check in the DEBUG RTS.
+ */
 
-   LOOKS_LIKE_INFO_PTR(p)    returns False if p is definitely not an info ptr
-   LOOKS_LIKE_CLOSURE_PTR(p) returns False if p is definitely not a closure ptr
-
-   These macros are complete but not sound.  That is, they might
-   return false positives.  Do not rely on them to distinguish info
-   pointers from closure pointers, for example.
-
-   We don't use address-space predicates these days, for portability
-   reasons, and the fact that code/data can be scattered about the
-   address space in a dynamically-linked environment.  Our best option
-   is to look at the alleged info table and see whether it seems to
-   make sense...
-   -------------------------------------------------------------------------- */
+EXTERN_INLINE bool LOOKS_LIKE_PTR (const void* p);
+EXTERN_INLINE bool LOOKS_LIKE_PTR (const void* p)
+{
+    return p && (p != (const void*) INVALID_GHC_POINTER);
+}
 
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
@@ -280,12 +293,13 @@ EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR_NOT_NULL (StgWord p)
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p);
 EXTERN_INLINE bool LOOKS_LIKE_INFO_PTR (StgWord p)
 {
-    return p && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
+    return LOOKS_LIKE_PTR((const void*) p) && (IS_FORWARDING_PTR(p) || LOOKS_LIKE_INFO_PTR_NOT_NULL(p));
 }
 
 EXTERN_INLINE bool LOOKS_LIKE_CLOSURE_PTR (const void *p);
 EXTERN_INLINE bool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
+    if (!LOOKS_LIKE_PTR(p)) return false;
     const StgInfoTable *info = RELAXED_LOAD(&UNTAG_CONST_CLOSURE((const StgClosure *) (p))->header.info);
     return LOOKS_LIKE_INFO_PTR((StgWord) info);
 }
