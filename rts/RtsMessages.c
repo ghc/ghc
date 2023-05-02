@@ -186,7 +186,12 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
 #endif
 
 #if defined(TRACING)
-  if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG) endEventLogging();
+  if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG) {
+    // Use flushAllCapsEventsBufs rather than endEventLogging here since
+    // the latter insists on acquiring all capabilities to flush the eventlog;
+    // this would deadlock if we barfed during a GC.
+    flushAllCapsEventsBufs();
+  }
 #endif
 
   abort();
