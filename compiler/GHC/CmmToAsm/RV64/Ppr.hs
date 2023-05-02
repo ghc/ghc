@@ -537,7 +537,7 @@ pprInstr platform instr = case instr of
 
   LDR _f o1 (OpImm (ImmCLbl lbl)) ->
     -- fixing this is _really_ annoyin we need to generate code like:
-    -- 1:	auipc x16, %pcrel_hi(<lbl>)
+    -- 1: auipc x16, %pcrel_hi(<lbl>)
     --    addi x16, x16, %pcrel_lo(1b)
     -- I really dislike this (refer back to label 1 syntax from the assembler.)
     --
