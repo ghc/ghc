@@ -19,4 +19,7 @@ C.hs:6:7: error: [GHC-88464]
     Variable not in scope: variableNotInScope :: ()
 Failed, two modules loaded.
 [3 of 3] Compiling C                ( C.hs, interpreted )
+
+C.hs:6:7: error: [GHC-88464]
+    Variable not in scope: variableNotInScope :: ()
 Failed, two modules loaded.
