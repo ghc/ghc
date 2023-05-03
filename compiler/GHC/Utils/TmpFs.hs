@@ -13,6 +13,7 @@ module GHC.Utils.TmpFs
     , cleanTempDirs
     , cleanTempFiles
     , cleanCurrentModuleTempFiles
+    , keepCurrentModuleTempFiles
     , addFilesToClean
     , changeTempFilesLifetime
     , newTempName
@@ -171,6 +172,32 @@ cleanTempFiles logger tmpfs
             } -> ( emptyPathsToClean
                   , Set.toList cm_paths ++ Set.toList gs_paths)
       remove to_delete
+
+-- | Keep all the paths in @tmp_files_to_clean@ and @tmp_subdirs_to_clean@
+-- that have lifetime TFL_CurrentModule. This function is used when `-keep-tmp-files` is
+-- used in an OPTIONS_GHC pragma.
+-- This function removes the temporary file from the TmpFs so we no longer remove
+-- it at the env when cleanTempFiles is called.
+keepCurrentModuleTempFiles :: HasCallStack => Logger -> TmpFs -> IO ()
+keepCurrentModuleTempFiles logger tmpfs
+   = mask_
+   $ do to_keep_files <- keep  (tmp_files_to_clean tmpfs)
+        to_keep_subdirs <- keep  (tmp_subdirs_to_clean tmpfs)
+        -- Remove any folders which contain any files we want to keep from the
+        -- directories we are tracking. A new temporary directory will be created
+        -- the next time a temporary file is needed (by perhaps another module).
+        keepDirs (to_keep_files ++ to_keep_subdirs) (tmp_dirs_to_clean tmpfs)
+  where
+    keepDirs keeps ref = do
+      let keep_dirs = Set.fromList (map takeDirectory keeps)
+      atomicModifyIORef' ref  $ \m -> (Map.filter (\fp -> fp `Set.notMember` keep_dirs) m, ())
+
+    keep ref = do
+        to_keep <- atomicModifyIORef' ref $
+            \ptc@PathsToClean{ptcCurrentModule = cm_paths} ->
+                (ptc {ptcCurrentModule = Set.empty}, Set.toList cm_paths)
+        debugTraceMsg logger 2 (text "Keeping:" <+> hsep (map text to_keep))
+        return to_keep
 
 -- | Delete all paths in @tmp_files_to_clean@ and @tmp_subdirs_to_clean@
 -- That have lifetime TFL_CurrentModule.

@@ -792,4 +792,21 @@ T22669:
 	! test -f T22669.o-boot
 
 
+T23339:
+	$(RM) T23339.hi
+	$(RM) T23339$(OBJSUFFIX)
+	$(RM) -rf "$(PWD)/tmp"
+	mkdir -p tmp
+	TMPDIR="$(PWD)/tmp" "$(TEST_HC)" $(TEST_HC_OPTS) -v0 T23339.hs
+	find . -name "*.s" -exec cat {} \; | grep ".string"
+
+T23339B:
+	$(RM) T23339.hi
+	$(RM) T23339$(OBJSUFFIX)
+	$(RM) -rf "$(PWD)/tmp"
+	mkdir -p tmp
+	TMPDIR="$(PWD)/tmp" "$(TEST_HC)" $(TEST_HC_OPTS) -v0 T23339B.hs
+	# Check that the file is kept and is the right one
+	find . -name "*.s" -exec cat {} \; | grep ".string"
+
 

@@ -780,8 +780,6 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
       Failed -> loadFinish upsweep_ok
       Succeeded -> do
           liftIO $ debugTraceMsg logger 2 (text "Upsweep completely successful.")
-          -- Clean up after ourselves
-          liftIO $ cleanCurrentModuleTempFilesMaybe logger (hsc_tmpfs hsc_env1) dflags
           loadFinish upsweep_ok
 
 
@@ -2418,8 +2416,9 @@ cyclicModuleErr mss
 
 cleanCurrentModuleTempFilesMaybe :: MonadIO m => Logger -> TmpFs -> DynFlags -> m ()
 cleanCurrentModuleTempFilesMaybe logger tmpfs dflags =
-  unless (gopt Opt_KeepTmpFiles dflags) $
-    liftIO $ cleanCurrentModuleTempFiles logger tmpfs
+  if gopt Opt_KeepTmpFiles dflags
+    then liftIO $ keepCurrentModuleTempFiles logger tmpfs
+    else liftIO $ cleanCurrentModuleTempFiles logger tmpfs
 
 
 addDepsToHscEnv ::  [HomeModInfo] -> HscEnv -> HscEnv
