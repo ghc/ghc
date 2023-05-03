@@ -2329,18 +2329,21 @@ withDeferredDiagnostics f = do
           let action = logMsg logger msgClass srcSpan msg
           case msgClass of
             MCDiagnostic SevWarning _reason _code
-              -> atomicModifyIORef' warnings $ \i -> (action: i, ())
+              -> atomicModifyIORef' warnings $ \(!i) -> (action: i, ())
             MCDiagnostic SevError _reason _code
-              -> atomicModifyIORef' errors   $ \i -> (action: i, ())
+              -> atomicModifyIORef' errors   $ \(!i) -> (action: i, ())
             MCFatal
-              -> atomicModifyIORef' fatals   $ \i -> (action: i, ())
+              -> atomicModifyIORef' fatals   $ \(!i) -> (action: i, ())
             _ -> action
 
         printDeferredDiagnostics = liftIO $
           forM_ [warnings, errors, fatals] $ \ref -> do
             -- This IORef can leak when the dflags leaks, so let us always
-            -- reset the content.
-            actions <- atomicModifyIORef' ref $ \i -> ([], i)
+            -- reset the content. The lazy variant is used here as we want to force
+            -- this error if the IORef is ever accessed again, rather than now.
+            -- See #20981 for an issue which discusses this general issue.
+            let landmine = if debugIsOn then panic "withDeferredDiagnostics: use after free" else []
+            actions <- atomicModifyIORef ref $ \i -> (landmine, i)
             sequence_ $ reverse actions
 
     MC.bracket
