@@ -1,7 +1,8 @@
 
 import GHC.Cmm.Expr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
-    || defined(MACHREGS_powerpc) || defined(MACHREGS_aarch64))
+    || defined(MACHREGS_powerpc) || defined(MACHREGS_aarch64) \
+    || defined(MACHREGS_riscv64))
 import GHC.Utils.Panic.Plain
 #endif
 import GHC.Platform.Reg
