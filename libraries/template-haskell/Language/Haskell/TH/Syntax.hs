@@ -6,6 +6,7 @@
              Trustworthy, DeriveFunctor, BangPatterns, RecordWildCards, ImplicitParams #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -54,7 +55,7 @@ import Data.Ratio
 import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
-                          TYPE, RuntimeRep(..) )
+                          TYPE, RuntimeRep(..), Multiplicity (..) )
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
@@ -65,7 +66,6 @@ import Prelude hiding (Applicative(..))
 import Foreign.ForeignPtr
 import Foreign.C.String
 import Foreign.C.Types
-import GHC.Stack
 
 #if __GLASGOW_HASKELL__ >= 901
 import GHC.Types ( Levity(..) )
@@ -1067,8 +1067,7 @@ instance Lift (Fixed.Fixed a) where
     ex <- lift x
     return (ConE mkFixedName `AppE` ex)
     where
-      mkFixedName =
-        mkNameG DataName "base" "Data.Fixed" "MkFixed"
+      mkFixedName = 'Fixed.MkFixed
 
 instance Integral a => Lift (Ratio a) where
   liftTyped x = unsafeCodeCoerce (lift x)
@@ -1139,19 +1138,8 @@ instance Lift ByteArray where
       ptr :: ForeignPtr Word8
       ptr = ForeignPtr (byteArrayContents# pb) (PlainPtr (unsafeCoerce# pb))
 
-
--- We can't use a TH quote in this module because we're in the template-haskell
--- package, so we conconct this quite defensive solution to make the correct name
--- which will work if the package name or module name changes in future.
 addrToByteArrayName :: Name
-addrToByteArrayName = helper
-  where
-    helper :: HasCallStack => Name
-    helper =
-      case getCallStack ?callStack of
-        [] -> error "addrToByteArrayName: empty call stack"
-        (_, SrcLoc{..}) : _ -> mkNameG_v srcLocPackage srcLocModule "addrToByteArray"
-
+addrToByteArrayName = 'addrToByteArray
 
 addrToByteArray :: Int -> Addr# -> ByteArray
 addrToByteArray (I# len) addr = runST $ ST $
@@ -1371,23 +1359,24 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 
 
 trueName, falseName :: Name
-trueName  = mkNameG DataName "ghc-prim" "GHC.Types" "True"
-falseName = mkNameG DataName "ghc-prim" "GHC.Types" "False"
+trueName  = 'True
+falseName = 'False
 
 nothingName, justName :: Name
-nothingName = mkNameG DataName "base" "GHC.Maybe" "Nothing"
-justName    = mkNameG DataName "base" "GHC.Maybe" "Just"
+nothingName = 'Nothing
+justName    = 'Just
 
 leftName, rightName :: Name
-leftName  = mkNameG DataName "base" "Data.Either" "Left"
-rightName = mkNameG DataName "base" "Data.Either" "Right"
+leftName  = 'Left
+rightName = 'Right
 
 nonemptyName :: Name
-nonemptyName = mkNameG DataName "base" "GHC.Base" ":|"
+nonemptyName = '(:|)
 
 oneName, manyName :: Name
-oneName  = mkNameG DataName "ghc-prim" "GHC.Types" "One"
-manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
+oneName  = 'One
+manyName = 'Many
+
 -----------------------------------------------------
 --
 --              Generic Lift implementations
