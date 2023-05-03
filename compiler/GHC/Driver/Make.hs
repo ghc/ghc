@@ -772,10 +772,10 @@ load' mhmi_cache how_much mHscMessage mod_graph = do
     worker_limit <- liftIO $ mkWorkerLimit dflags
 
     setSession $ hscUpdateHUG (unitEnv_map pruneHomeUnitEnv) hsc_env
-    (upsweep_ok, hsc_env1) <- withDeferredDiagnostics $ do
+    (upsweep_ok, new_deps) <- withDeferredDiagnostics $ do
       hsc_env <- getSession
       liftIO $ upsweep worker_limit hsc_env mhmi_cache mHscMessage (toCache pruned_cache) build_plan
-    setSession hsc_env1
+    modifySession (addDepsToHscEnv new_deps)
     case upsweep_ok of
       Failed -> loadFinish upsweep_ok
       Succeeded -> do
@@ -1248,14 +1248,13 @@ upsweep
     -> Maybe Messager
     -> M.Map ModNodeKeyWithUid HomeModInfo
     -> [BuildPlan]
-    -> IO (SuccessFlag, HscEnv)
+    -> IO (SuccessFlag, [HomeModInfo])
 upsweep n_jobs hsc_env hmi_cache mHscMessage old_hpt build_plan = do
     (cycle, pipelines, collect_result) <- interpretBuildPlan (hsc_HUG hsc_env) hmi_cache old_hpt build_plan
     runPipelines n_jobs hsc_env mHscMessage pipelines
     res <- collect_result
 
     let completed = [m | Just (Just m) <- res]
-    let hsc_env' = addDepsToHscEnv completed hsc_env
 
     -- Handle any cycle in the original compilation graph and return the result
     -- of the upsweep.
@@ -1263,10 +1262,10 @@ upsweep n_jobs hsc_env hmi_cache mHscMessage old_hpt build_plan = do
         Just mss -> do
           let logger = hsc_logger hsc_env
           liftIO $ fatalErrorMsg logger (cyclicModuleErr mss)
-          return (Failed, hsc_env)
+          return (Failed, [])
         Nothing  -> do
           let success_flag = successIf (all isJust res)
-          return (success_flag, hsc_env')
+          return (success_flag, completed)
 
 toCache :: [HomeModInfo] -> M.Map (ModNodeKeyWithUid) HomeModInfo
 toCache hmis = M.fromList ([(miKey $ hm_iface hmi, hmi) | hmi <- hmis])
