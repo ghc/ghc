@@ -319,4 +319,6 @@ test('T21869', [js_broken(22261), when(unregisterised(), skip)], makefile_test, 
 test('T22044', normal, makefile_test, [])
 test('T22048', [only_ways(['normal']), grep_errmsg("_rule")], compile, ["-O -fomit-interface-pragmas -ddump-simpl"])
 test('T21722', normal, compile_fail, ['-fno-show-error-context'])
-test('T22669', normal, makefile_test, [])
+test('T22669', js_skip, makefile_test, [])
+test('T23339', js_skip, makefile_test, [])
+test('T23339B', [extra_files(['T23339.hs']), js_skip], makefile_test, [])
