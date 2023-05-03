@@ -42,7 +42,7 @@
 #include "GC.h"
 #include "Evac.h"
 #include "NonMovingAllocate.h"
-#include "sm/NonMovingMark.h"
+#include "NonMovingMark.h"
 #if defined(ios_HOST_OS) || defined(darwin_HOST_OS)
 #include "Hash.h"
 #endif
@@ -365,11 +365,20 @@ listGenBlocks (ListBlocksCb cb, void *user, generation* gen)
     cb(user, gen->compact_blocks_in_import);
 }
 
+static void
+listSegmentBlocks (ListBlocksCb cb, void *user, struct NonmovingSegment *seg)
+{
+  while (seg) {
+    cb(user, Bdescr((StgPtr) seg));
+    seg = seg->link;
+  }
+}
+
 // Traverse all the different places that the rts stores blocks
 // and call a callback on each of them.
 void listAllBlocks (ListBlocksCb cb, void *user)
 {
-  uint32_t g, i;
+  uint32_t g, i, s;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (i = 0; i < getNumCapabilities(); i++) {
           cb(user, getCapability(i)->mut_lists[g]);
@@ -389,6 +398,24 @@ void listAllBlocks (ListBlocksCb cb, void *user)
       }
       cb(user, getCapability(i)->pinned_object_blocks);
       cb(user, getCapability(i)->pinned_object_empty);
+
+      // list capabilities' current segments
+      if(RtsFlags.GcFlags.useNonmoving) {
+        for (s = 0; s < NONMOVING_ALLOCA_CNT; s++) {
+          listSegmentBlocks(cb, user, getCapability(i)->current_segments[s]);
+        }
+      }
+  }
+
+  // list blocks on the nonmoving heap
+  if(RtsFlags.GcFlags.useNonmoving) {
+    for(s = 0; s < NONMOVING_ALLOCA_CNT; s++) {
+      listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].filled);
+      listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].saved_filled);
+      listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].active);
+    }
+    cb(user, nonmoving_large_objects);
+    cb(user, nonmoving_compact_objects);
   }
 }
 
