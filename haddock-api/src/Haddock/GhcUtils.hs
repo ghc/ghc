@@ -27,9 +27,10 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char ( isSpace )
-import Data.Foldable ( toList )
+import Data.Foldable ( toList, foldl' )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( mapMaybe, fromMaybe )
+import qualified Data.Set as Set
 
 import Haddock.Types( DocName, DocNameI, XRecCond )
 
@@ -47,7 +48,7 @@ import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
 import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Core.Type     ( isRuntimeRepVar )
+import GHC.Core.Type     ( isRuntimeRepVar, binderVar )
 import GHC.Builtin.Types( liftedRepTy )
 
 import           GHC.Data.StringBuffer ( StringBuffer )
@@ -647,6 +648,27 @@ tryCppLine !loc !buf = spanSpace (S.prevChar buf '\n' == '\n') loc buf
         ('\n', b') -> (splitStringBuffer buf b', advanceSrcLoc l '\n', b')
 
         (c   , b') -> spanCppLine (advanceSrcLoc l c) b'
+
+-------------------------------------------------------------------------------
+-- * Names in a 'Type'
+-------------------------------------------------------------------------------
+
+-- | Given a 'Type', return a set of 'Name's coming from the 'TyCon's within
+-- the type.
+typeNames :: Type -> Set.Set Name
+typeNames ty = go ty Set.empty
+  where
+    go :: Type -> Set.Set Name -> Set.Set Name
+    go t acc =
+      case t of
+        TyVarTy {} -> acc
+        AppTy t1 t2 ->  go t2 $ go t1 acc
+        FunTy _ _ t1 t2 -> go t2 $ go t1 acc
+        TyConApp tcon args -> foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
+        ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
+        LitTy _ -> acc
+        CastTy t' _ -> go t' acc
+        CoercionTy {} -> acc
 
 -------------------------------------------------------------------------------
 -- * Free variables of a 'Type'

@@ -44,8 +44,6 @@ import Prelude hiding ((<>))
 
 import Haddock.Doc (combineDocumentation)
 
--- import Debug.Trace
-
 {- SAMPLE OUTPUT
 
 \haddockmoduleheading{\texttt{Data.List}}

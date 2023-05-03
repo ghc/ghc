@@ -227,7 +227,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
       liftIO $ renderStep logger dflags unit_state flags sinceQual qual packages ifaces
 
     -- If we were not given any input files, error if documentation was
-    -- requested?
+    -- requested
     else do
       when (any (`elem` [Flag_Html, Flag_Hoogle, Flag_LaTeX]) flags) $
         throwE "No input file(s)."
@@ -278,7 +278,7 @@ readPackagesAndProcessModules flags files = do
     -- Whether or not we bypass the interface file version check
     let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
 
-    -- Read package dependency interface files supplied with --read-interface and
+    -- Read package dependency interface files supplied with --read-interface
     name_cache <- hsc_NC <$> getSession
     packages <- liftIO $ readInterfaceFiles name_cache (readIfaceArgs flags) noChecks
 
@@ -502,7 +502,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
 
             pkgVer =
               fromMaybe (makeVersion []) mpkgVer
-          in ppHoogle dflags' unit_state pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "

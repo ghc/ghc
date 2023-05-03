@@ -44,8 +44,10 @@ import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runW
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
+import qualified Data.Set as Set
 import Documentation.Haddock.Types
 import GHC.Types.Fixity (Fixity(..))
+import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Var (Specificity)
 
 import GHC
@@ -68,6 +70,7 @@ type DeclMap       = Map Name [LHsDecl GhcRn]
 type InstMap       = Map RealSrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
+type WarningMap    = Map Name (Doc Name)
 
 
 -----------------------------------------------------------------------------
@@ -101,7 +104,7 @@ data Interface = Interface
   , ifaceRnDoc           :: !(Documentation DocName)
 
     -- | Haddock options for this module (prune, ignore-exports, etc).
-  , ifaceOptions         :: ![DocOption]
+  , ifaceOptions         :: [DocOption]
 
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
@@ -120,34 +123,33 @@ data Interface = Interface
 
   , ifaceFixMap          :: !(Map Name Fixity)
 
-  , ifaceExportItems     :: ![ExportItem GhcRn]
-  , ifaceRnExportItems   :: ![ExportItem DocNameI]
+  , ifaceExportItems     :: [ExportItem GhcRn]
+  , ifaceRnExportItems   :: [ExportItem DocNameI]
 
     -- | All names exported by the module.
-  , ifaceExports         :: ![Name]
+  , ifaceExports         :: [Name]
 
     -- | All \"visible\" names exported by the module.
     -- A visible name is a name that will show up in the documentation of the
     -- module.
-  , ifaceVisibleExports  :: ![Name]
+  , ifaceVisibleExports  :: [Name]
 
     -- | Aliases of module imports as in @import A.B.C as C@.
   , ifaceModuleAliases   :: !AliasMap
 
     -- | Instances exported by the module.
-  , ifaceInstances       :: ![ClsInst]
-  , ifaceFamInstances    :: ![FamInst]
+  , ifaceInstances       :: [HaddockClsInst]
 
     -- | Orphan instances
-  , ifaceOrphanInstances :: ![DocInstance GhcRn]
-  , ifaceRnOrphanInstances :: ![DocInstance DocNameI]
+  , ifaceOrphanInstances :: [DocInstance GhcRn]
+  , ifaceRnOrphanInstances :: [DocInstance DocNameI]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
-  , ifaceHaddockCoverage :: !(Int, Int)
+  , ifaceHaddockCoverage :: (Int, Int)
 
     -- | Warnings for things defined in this module.
-  , ifaceWarningMap :: !WarningMap
+  , ifaceWarningMap :: WarningMap
 
     -- | Tokenized source code of module (available if Haddock is invoked with
     -- source generation flag).
@@ -155,7 +157,6 @@ data Interface = Interface
   , ifaceDynFlags :: !DynFlags
   }
 
-type WarningMap = Map Name (Doc Name)
 
 
 -- | A subset of the fields of 'Interface' that we store in the interface
@@ -358,6 +359,12 @@ data Wrap n
   | Backticked { unwrap :: n }     -- ^ add backticks around the name
   deriving (Show, Functor, Foldable, Traversable)
 
+instance NFData n => NFData (Wrap n) where
+  rnf w = case w of
+    Unadorned n     -> rnf n
+    Parenthesized n -> rnf n
+    Backticked n    -> rnf n
+
 -- | Useful for debugging
 instance Outputable n => Outputable (Wrap n) where
   ppr (Unadorned n)     = ppr n
@@ -376,6 +383,58 @@ instance HasOccName DocName where
 -----------------------------------------------------------------------------
 -- * Instances
 -----------------------------------------------------------------------------
+
+data HaddockClsInst = HaddockClsInst
+    { haddockClsInstPprHoogle :: Maybe String
+    , haddockClsInstName      :: Name
+    , haddockClsInstClsName   :: Name
+    , haddockClsInstIsOrphan  :: Bool
+    , haddockClsInstHead      :: ([Int], SName, [SimpleType])
+    , haddockClsInstSynified  :: InstHead GhcRn
+    , haddockClsInstTyNames   :: Set.Set Name
+    }
+
+-- | TODO: This instance is not lawful. We leave the 'InstHead' segment of the
+-- class instance evaluated only to WHNF. This should probably be fixed.
+instance NFData HaddockClsInst where
+  rnf (HaddockClsInst h n cn o hd s ns) =
+              h
+    `deepseq` n
+    `deepseq` cn
+    `deepseq` o
+    `deepseq` hd
+    `deepseq` s
+    `seq`     ns
+    `deepseq` ()
+
+-- | Stable name for stable comparisons. GHC's `Name` uses unstable
+-- ordering based on their `Unique`'s.
+newtype SName = SName Name
+  deriving newtype NFData
+
+instance Eq SName where
+  SName n1 == SName n2 = n1 `stableNameCmp` n2 == EQ
+
+instance Ord SName where
+  SName n1 `compare` SName n2 = n1 `stableNameCmp` n2
+
+-- | Simplified type for sorting types, ignoring qualification (not visible
+-- in Haddock output) and unifying special tycons with normal ones.
+-- For the benefit of the user (looks nice and predictable) and the
+-- tests (which prefer output to be deterministic).
+data SimpleType = SimpleType SName [SimpleType]
+                | SimpleIntTyLit Integer
+                | SimpleStringTyLit String
+                | SimpleCharTyLit Char
+                  deriving (Eq,Ord)
+
+instance NFData SimpleType where
+  rnf st =
+    case st of
+      SimpleType sn sts   -> sn `deepseq` sts `deepseq` ()
+      SimpleIntTyLit i    -> rnf i
+      SimpleStringTyLit s -> rnf s
+      SimpleCharTyLit c   -> rnf c
 
 -- | The three types of instances
 data InstType name
@@ -470,6 +529,12 @@ type MDoc id = MetaDoc (Wrap (ModuleName, OccName)) (Wrap id)
 
 type DocMarkup id a = DocMarkupH (Wrap (ModuleName, OccName)) id a
 
+instance NFData Meta where
+  rnf (Meta v p) = v `deepseq` p `deepseq` ()
+
+instance NFData id => NFData (MDoc id) where
+  rnf (MetaDoc m d) = m `deepseq` d `deepseq` ()
+
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where
   rnf doc = case doc of
@@ -533,6 +598,21 @@ exampleToString :: Example -> String
 exampleToString (Example expression result) =
     ">>> " ++ expression ++ "\n" ++  unlines result
 
+instance NFData name => NFData (HaddockModInfo name) where
+  rnf (HaddockModInfo{..}) =
+              hmi_description
+    `deepseq` hmi_copyright
+    `deepseq` hmi_license
+    `deepseq` hmi_maintainer
+    `deepseq` hmi_stability
+    `deepseq` hmi_portability
+    `deepseq` hmi_safety
+    `deepseq` hmi_language
+    `deepseq` hmi_extensions
+    `deepseq` ()
+
+instance NFData LangExt.Extension
+
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)
   , hmi_copyright   :: Maybe String
@@ -544,7 +624,6 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_language    :: Maybe Language
   , hmi_extensions  :: [LangExt.Extension]
   }
-
 
 emptyHaddockModInfo :: HaddockModInfo a
 emptyHaddockModInfo = HaddockModInfo

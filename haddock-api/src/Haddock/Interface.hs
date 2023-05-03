@@ -42,7 +42,7 @@ import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
 import Haddock.Types (DocOption (..), Documentation (..), ExportItem (..), IfaceMap, InstIfaceMap, Interface, LinkEnv,
                       expItemDecl, expItemMbDoc, ifaceDoc, ifaceExportItems, ifaceExports, ifaceHaddockCoverage,
-                      ifaceInstances, ifaceMod, ifaceOptions, ifaceVisibleExports, instMod, throwE)
+                      ifaceInstances, ifaceMod, ifaceOptions, ifaceVisibleExports, instMod, throwE, haddockClsInstName)
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad (unless, when)
@@ -107,6 +107,7 @@ processModules verbosity modules flags extIfaces = do
         Set.unions $ map (Set.fromList . ifaceExports) $
         filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
       mods = Set.fromList $ map ifaceMod interfaces
+
   out verbosity verbose "Attaching instances..."
   interfaces' <- {-# SCC attachInstances #-}
                  withTimingM "attachInstances" (const ()) $ do
@@ -426,7 +427,7 @@ buildHomeLinks ifaces = foldl' upd Map.empty (reverse ifaces)
         foldl' keep_old old_env exported_names
       | otherwise = foldl' keep_new old_env exported_names
       where
-        exported_names = ifaceVisibleExports iface ++ map getName (ifaceInstances iface)
+        exported_names = ifaceVisibleExports iface ++ map haddockClsInstName (ifaceInstances iface)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env

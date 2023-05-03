@@ -22,6 +22,7 @@ module Haddock.Interface.LexParseRn
   ) where
 
 import Control.Arrow
+import Control.DeepSeq
 import Control.Monad
 import Data.Functor
 import Data.List ((\\), maximumBy)
@@ -44,24 +45,25 @@ processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
 processDocStrings dflags pkg gre strs = do
   mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags pkg gre) strs
-  case mdoc of
-    -- We check that we don't have any version info to render instead
-    -- of just checking if there is no comment: there may not be a
-    -- comment but we still want to pass through any meta data.
-    MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
-    x -> pure (Just x)
+  force <$>
+    case mdoc of
+      -- We check that we don't have any version info to render instead
+      -- of just checking if there is no comment: there may not be a
+      -- comment but we still want to pass through any meta data.
+      MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
+      x -> pure (Just x)
 
 processDocStringParas :: DynFlags -> Maybe Package -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
-processDocStringParas dflags pkg gre hds =
-  overDocF (rename dflags gre) $ parseParas dflags pkg (renderHsDocString hds)
+processDocStringParas dflags pkg gre hds = force <$>
+  overDocF (rename dflags gre) (parseParas dflags pkg (renderHsDocString hds))
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
 processDocString dflags gre hds =
-  processDocStringFromString dflags gre (renderHsDocString hds)
+  force <$> processDocStringFromString dflags gre (renderHsDocString hds)
 
 processDocStringFromString :: DynFlags -> GlobalRdrEnv -> String -> ErrMsgM (Doc Name)
 processDocStringFromString dflags gre hds =
-  rename dflags gre $ parseString dflags hds
+  force <$> rename dflags gre (parseString dflags hds)
 
 processModuleHeader :: DynFlags -> Maybe Package -> GlobalRdrEnv -> SafeHaskellMode -> Maybe HsDocString
                     -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
@@ -82,10 +84,13 @@ processModuleHeader dflags pkgName gre safety mayStr = do
   let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = EnumSet.toList (extensionFlags dflags) \\ languageExtensions (language dflags)
-  return (hmi { hmi_safety = Just $ showPpr dflags safety
-              , hmi_language = language dflags
-              , hmi_extensions = flags
-              } , doc)
+  return $ force
+    (hmi { hmi_safety = Just $ showPpr dflags safety
+         , hmi_language = language dflags
+         , hmi_extensions = flags
+         }
+    , doc
+    )
   where
     failure = (emptyHaddockModInfo, Nothing)
 
@@ -105,7 +110,7 @@ rename dflags gre = rn
   where
     rn d = case d of
       DocAppend a b -> DocAppend <$> rn a <*> rn b
-      DocParagraph doc -> DocParagraph <$> rn doc
+      DocParagraph p -> DocParagraph <$> rn p
       DocIdentifier i -> do
         let NsRdrName ns x = unwrap i
             occ = rdrNameOcc x
@@ -150,14 +155,14 @@ rename dflags gre = rn
           -- There are multiple names available.
           gres -> ambiguous dflags i gres
 
-      DocWarning doc -> DocWarning <$> rn doc
-      DocEmphasis doc -> DocEmphasis <$> rn doc
-      DocBold doc -> DocBold <$> rn doc
-      DocMonospaced doc -> DocMonospaced <$> rn doc
+      DocWarning dw -> DocWarning <$> rn dw
+      DocEmphasis de -> DocEmphasis <$> rn de
+      DocBold db -> DocBold <$> rn db
+      DocMonospaced dm -> DocMonospaced <$> rn dm
       DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
       DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
-      DocCodeBlock doc -> DocCodeBlock <$> rn doc
+      DocCodeBlock dcb -> DocCodeBlock <$> rn dcb
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
       DocModule (ModLink m l) -> DocModule . ModLink m <$> traverse rn l
       DocHyperlink (Hyperlink u l) -> DocHyperlink . Hyperlink u <$> traverse rn l

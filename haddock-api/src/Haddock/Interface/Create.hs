@@ -31,15 +31,18 @@
 module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
-import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
+import Haddock.Backends.Hoogle (outWith)
+import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl, synifyInstHead)
 import Haddock.GhcUtils (addClassContext, filterSigNames, lHsQTyVarsToTypes, mkEmptySigType, moduleString, parents,
-                         pretty, restrictTo, sigName, unL)
+                         pretty, restrictTo, sigName, unL, typeNames)
+import Haddock.Interface.AttachInstances (instHead)
 import Haddock.Interface.LexParseRn
 import Haddock.Options (Flag (..), modulePackageInfo)
 import Haddock.Types hiding (liftErrMsg)
 import Haddock.Utils (replace)
 
 import Control.Applicative ((<|>))
+import Control.DeepSeq
 import Control.Monad.Reader (MonadReader (..), ReaderT, asks, runReaderT)
 import Control.Monad.Writer.Strict hiding (tell)
 import Data.Bitraversable (bitraverse)
@@ -53,10 +56,12 @@ import Data.Maybe (catMaybes, fromJust, isJust, mapMaybe, maybeToList)
 import Data.Traversable (for)
 
 import GHC hiding (lookupName)
+import GHC.Core (isOrphan)
 import GHC.Core.Class (ClassMinimalDef, classMinimalDef)
 import GHC.Core.ConLike (ConLike (..))
+import GHC.Core.InstEnv
 import GHC.Data.FastString (unpackFS)
-import GHC.Driver.Ppr (showSDoc)
+import GHC.Driver.Ppr (showSDoc, showSDocForUser)
 import GHC.HsToCore.Docs hiding (mkMaps, unionArgMaps)
 import GHC.IORef (readIORef)
 import GHC.Stack (HasCallStack)
@@ -64,7 +69,7 @@ import GHC.Tc.Types hiding (IfM)
 import GHC.Tc.Utils.Monad (finalSafeMode)
 import GHC.Types.Avail hiding (avail)
 import qualified GHC.Types.Avail as Avail
-import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv, occNameString)
+import GHC.Types.Name (getOccString, getSrcSpan, isDataConName, isValName, nameIsLocalOrFrom, nameOccName, emptyOccEnv)
 import GHC.Types.Name.Env (lookupNameEnv)
 import GHC.Types.Name.Reader (GlobalRdrEnv, greMangledName, lookupGlobalRdrEnv)
 import GHC.Types.Name.Set (elemNameSet, mkNameSet)
@@ -79,8 +84,7 @@ import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic (pprPanic)
 import GHC.Unit.Module.Warnings
 import GHC.Types.Unique.Map
-
-import Debug.Trace
+import qualified Data.Set as Set
 
 newtype IfEnv m = IfEnv
   {
@@ -208,18 +212,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     Nothing -> do
       tell [ "Warning: Renamed source is not available" ]
       pure []
-    Just dx -> do
-      let showDecl :: LHsDecl GhcRn -> String
-          showDecl (L _ (SigD _ _)) = "Signature"
-          showDecl (L _ (ValD _ _)) = "Value"
-          showDecl (L _ (TyClD _ _))= "Type or Class"
-          showDecl _                = "Other"
-      traceM $
-        "NUM DECLS in mod " ++ moduleString tcg_mod ++ ": " ++ show (length $ topDecls dx)
-        ++ " DOC LENGTHS: " ++ show (map (\(_,ds) -> length ds) (topDecls dx))
-        ++ " DECL TYPES: " ++ show (map (showDecl . fst) (topDecls dx))
-
-      pure (topDecls dx)
+    Just dx -> pure (topDecls dx)
 
   -- Derive final options to use for haddocking this module
   doc_opts <- liftErrMsg $ mkDocOpts (haddockOptions ms_hspp_opts) flags tcg_mod
@@ -237,7 +230,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
 
     -- All the exported Names of this module.
     exported_names :: [Name]
-    exported_names =
+    !exported_names = force $
       concatMap availNamesWithSelectors tcg_exports
 
     -- Module imports of the form `import X`. Note that there is
@@ -289,7 +282,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
 
   let
     visible_names :: [Name]
-    visible_names = mkVisibleNames maps export_items doc_opts
+    !visible_names = force $ mkVisibleNames maps export_items doc_opts
 
     -- Measure haddock documentation coverage.
     pruned_export_items :: [ExportItem GhcRn]
@@ -303,6 +296,9 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
 
     aliases :: Map Module ModuleName
     aliases = mkAliasMap unit_state tcg_rn_imports
+
+    insts :: [HaddockClsInst]
+    !insts = force $ map (fromClsInst (Flag_Hoogle `elem` flags) dflags unit_state) tcg_insts
 
   return $! Interface
     {
@@ -320,16 +316,15 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     , ifaceRnArgMap          = M.empty
     , ifaceExportItems       = if OptPrune `elem` doc_opts then
                                  pruned_export_items else export_items
-    , ifaceRnExportItems     = [] -- Filled in renameInterface
+    , ifaceRnExportItems     = [] -- Filled in renameInterfaceRn
     , ifaceExports           = exported_names
     , ifaceVisibleExports    = visible_names
     , ifaceDeclMap           = decl_map
     , ifaceFixMap            = fixities
     , ifaceModuleAliases     = aliases
-    , ifaceInstances         = tcg_insts
-    , ifaceFamInstances      = tcg_fam_insts
+    , ifaceInstances         = insts
     , ifaceOrphanInstances   = [] -- Filled in attachInstances
-    , ifaceRnOrphanInstances = [] -- Filled in attachInstances
+    , ifaceRnOrphanInstances = [] -- Filled in renameInterfaceRn
     , ifaceHaddockCoverage   = coverage
     , ifaceWarningMap        = warnings
     , ifaceDynFlags          = dflags
@@ -411,6 +406,53 @@ lookupModuleDyn state pkg_qual mdlName = case pkg_qual of
   NoPkgQual    -> case lookupModuleInAllUnits state mdlName of
     (m,_):_ -> m
     [] -> Module.mkModule Module.mainUnit mdlName
+
+-- | Prune a 'ClsInst' down to a 'HaddockClsInst'. The goal is to remove as much
+-- unnecessary information from the 'ClsInst' as possible by precomputing the
+-- information we eventually want from it.
+fromClsInst
+  :: Bool
+  -- ^ Was Hoogle output requested?
+  -> DynFlags
+  -- ^ GHC session dynflags
+  -> UnitState
+  -- ^ GHC session dynflags
+  -> ClsInst
+  -- ^ Class instance to convert
+  -> HaddockClsInst
+  -- ^ Resulting Haddock class instance
+fromClsInst doHoogle dflags unitState inst =
+    HaddockClsInst
+      { haddockClsInstPprHoogle =
+          if doHoogle then Just (ppInstance inst) else Nothing
+      , haddockClsInstName = getName inst
+      , haddockClsInstClsName = getName cls
+      , haddockClsInstIsOrphan = isOrphan $ is_orphan inst
+      , haddockClsInstSynified = synifyInstHead instSig
+      , haddockClsInstHead = instHead instSig
+      , haddockClsInstTyNames =
+          foldl' (\ns t -> ns `Set.union` typeNames t) Set.empty tys
+      }
+  where
+    instSig :: ([TyVar], [Type], Class, [Type])
+    instSig@(_,_,cls,tys) = instanceSig inst
+
+    ppInstance :: ClsInst -> String
+    ppInstance i =
+        dropComment $ outWith (showSDocForUser dflags unitState alwaysQualify) i'
+      where
+        -- As per #168, we don't want safety information about the class
+        -- in Hoogle output. The easiest way to achieve this is to set the
+        -- safety information to a state where the Outputable instance
+        -- produces no output which means no overlap and unsafe (or [safe]
+        -- is generated).
+        i' = i { is_flag = OverlapFlag { overlapMode = NoOverlap NoSourceText
+                                        , isSafeOverlap = False } }
+
+        dropComment :: String -> String
+        dropComment (' ':'-':'-':' ':_) = []
+        dropComment (x:xs) = x : dropComment xs
+        dropComment [] = []
 
 
 -------------------------------------------------------------------------------
@@ -497,9 +539,11 @@ mkMaps :: DynFlags
 mkMaps dflags pkgName gre instances decls thDocs = do
   (a, b, c) <- unzip3 <$> traverse mappings decls
   (th_a, th_b) <- thMappings
-  pure ( th_a `M.union` f' (map (nubByName fst) a)
-       , fmap intmap2mapint $
-           th_b `unionArgMaps` (f (filterMapping (not . IM.null) b))
+  pure ( force $
+           th_a `M.union` f' (map (nubByName fst) a)
+       , force $
+           fmap intmap2mapint $
+             th_b `unionArgMaps` (f (filterMapping (not . IM.null) b))
        , f  (filterMapping (not . null) c)
        , instanceMap
        )
@@ -618,8 +662,6 @@ unionArgMaps a b = M.foldrWithKey go b a
 -- Declarations
 --------------------------------------------------------------------------------
 
-
-
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
 mkFixMap group_ =
@@ -688,8 +730,7 @@ mkExportItems
       , not (null mods)
       = concat <$> traverse (moduleExport thisMod dflags modMap instIfaceMap) mods
 
-    lookupExport (_, avails) = traceShow (map (occNameString . nameOccName . availName) avails) $
-      concat <$> traverse availExport (nubAvails avails)
+    lookupExport (_, avails) = concat <$> traverse availExport (nubAvails avails)
 
     availExport avail =
       availExportItem is_sig modMap thisMod semMod warnings exportedNames
@@ -854,7 +895,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
 
     findDecl :: AvailInfo -> IfM m ([LHsDecl GhcRn], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl avail
-      | m == semMod = traceShow ("m == semMod: " ++ show (m == semMod) ++ ", findDecl - m: " ++ show (moduleString m) ++ ", semMod: " ++ show (moduleString semMod) ++ ", is_sig: " ++ show is_sig) $
+      | m == semMod =
           case M.lookup n declMap of
             Just ds -> return (ds, lookupDocs avail warnings docMap argMap)
             Nothing
