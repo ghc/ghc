@@ -1560,7 +1560,7 @@ noUserInlineSpec _                = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
-defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
+defaultInlinePragma = InlinePragma { inl_src = SourceText $ fsLit "{-# INLINE"
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
                                    , inl_inline = NoUserInlinePrag

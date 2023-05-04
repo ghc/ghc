@@ -196,12 +196,12 @@ instance Outputable (WarningTxt pass) where
     ppr (WarningTxt _ lsrc ws)
       = case unLoc lsrc of
           NoSourceText   -> pp_ws ws
-          SourceText src -> text src <+> pp_ws ws <+> text "#-}"
+          SourceText src -> ftext src <+> pp_ws ws <+> text "#-}"
 
     ppr (DeprecatedTxt lsrc  ds)
       = case unLoc lsrc of
           NoSourceText   -> pp_ws ds
-          SourceText src -> text src <+> pp_ws ds <+> text "#-}"
+          SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
 instance Binary (WarningTxt GhcRn) where
     put_ bh (WarningTxt c s w) = do

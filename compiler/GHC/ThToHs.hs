@@ -331,10 +331,10 @@ cvtDec (InstanceD o ctxt ty decs)
   where
   overlap pragma =
     case pragma of
-      TH.Overlaps      -> Hs.Overlaps     (SourceText "OVERLAPS")
-      TH.Overlappable  -> Hs.Overlappable (SourceText "OVERLAPPABLE")
-      TH.Overlapping   -> Hs.Overlapping  (SourceText "OVERLAPPING")
-      TH.Incoherent    -> Hs.Incoherent   (SourceText "INCOHERENT")
+      TH.Overlaps      -> Hs.Overlaps     (SourceText $ fsLit "OVERLAPS")
+      TH.Overlappable  -> Hs.Overlappable (SourceText $ fsLit "OVERLAPPABLE")
+      TH.Overlapping   -> Hs.Overlapping  (SourceText $ fsLit "OVERLAPPING")
+      TH.Incoherent    -> Hs.Incoherent   (SourceText $ fsLit "INCOHERENT")
 
 
 
@@ -803,8 +803,8 @@ cvtForD (ImportF callconv safety from nm ty) =
           -- and are inserted verbatim, analogous to mkImport in GHC.Parser.PostProcess
           |  callconv == TH.Prim || callconv == TH.JavaScript
           -> mk_imp (CImport (L l $ quotedSourceText from) (L l (cvt_conv callconv)) (L l safety') Nothing
-                             (CFunction (StaticTarget (SourceText from)
-                                                      (mkFastString from) Nothing
+                             (CFunction (StaticTarget (SourceText fromtxt)
+                                                      fromtxt Nothing
                                                       True)))
           |  Just impspec <- parseCImport (L l (cvt_conv callconv)) (L l safety')
                                           (mkFastString (TH.nameBase nm))
@@ -813,6 +813,7 @@ cvtForD (ImportF callconv safety from nm ty) =
           |  otherwise
           -> failWith $ InvalidCCallImpent from }
   where
+    fromtxt = mkFastString from
     mk_imp impspec
       = do { nm' <- vNameN nm
            ; ty' <- cvtSigType ty
@@ -830,8 +831,9 @@ cvtForD (ExportF callconv as nm ty)
   = do  { nm' <- vNameN nm
         ; ty' <- cvtSigType ty
         ; l <- getL
-        ; let e = CExport (L l (SourceText as)) (L l (CExportStatic (SourceText as)
-                                                (mkFastString as)
+        ; let astxt = mkFastString as
+        ; let e = CExport (L l (SourceText astxt)) (L l (CExportStatic (SourceText astxt)
+                                                astxt
                                                 (cvt_conv callconv)))
         ; return $ ForeignExport { fd_e_ext = noAnn
                                  , fd_name = nm'
@@ -856,9 +858,9 @@ cvtPragmaD (InlineP nm inline rm phases)
          -- (e.g., `INLINE`d pattern synonyms, cf. #23203)
          nm' <- vcNameN nm
        ; let dflt = dfltActivation inline
-       ; let src TH.NoInline  = "{-# NOINLINE"
-             src TH.Inline    = "{-# INLINE"
-             src TH.Inlinable = "{-# INLINABLE"
+       ; let src TH.NoInline  = fsLit "{-# NOINLINE"
+             src TH.Inline    = fsLit "{-# INLINE"
+             src TH.Inlinable = fsLit "{-# INLINABLE"
        ; let ip   = InlinePragma { inl_src    = toSrcTxt inline
                                  , inl_inline = cvtInline inline (toSrcTxt inline)
                                  , inl_rule   = cvtRuleMatch rm
@@ -876,20 +878,20 @@ cvtPragmaD (OpaqueP nm)
                                , inl_act    = NeverActive
                                , inl_sat    = Nothing }
                   where
-                    srcTxt = SourceText "{-# OPAQUE"
+                    srcTxt = SourceText $ fsLit "{-# OPAQUE"
        ; returnJustLA $ Hs.SigD noExtField $ InlineSig noAnn nm' ip }
 
 cvtPragmaD (SpecialiseP nm ty inline phases)
   = do { nm' <- vNameN nm
        ; ty' <- cvtSigType ty
-       ; let src TH.NoInline  = "{-# SPECIALISE NOINLINE"
-             src TH.Inline    = "{-# SPECIALISE INLINE"
-             src TH.Inlinable = "{-# SPECIALISE INLINE"
+       ; let src TH.NoInline  = fsLit "{-# SPECIALISE NOINLINE"
+             src TH.Inline    = fsLit "{-# SPECIALISE INLINE"
+             src TH.Inlinable = fsLit "{-# SPECIALISE INLINE"
        ; let (inline', dflt, srcText) = case inline of
                Just inline1 -> (cvtInline inline1 (toSrcTxt inline1), dfltActivation inline1,
                                 toSrcTxt inline1)
                Nothing      -> (NoUserInlinePrag,   AlwaysActive,
-                                SourceText "{-# SPECIALISE")
+                                SourceText $ fsLit "{-# SPECIALISE")
                where
                 toSrcTxt a = SourceText $ src a
        ; let ip = InlinePragma { inl_src    = srcText
@@ -902,7 +904,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
 cvtPragmaD (SpecialiseInstP ty)
   = do { ty' <- cvtSigType ty
        ; returnJustLA $ Hs.SigD noExtField $
-         SpecInstSig (noAnn, (SourceText "{-# SPECIALISE")) ty' }
+         SpecInstSig (noAnn, (SourceText $ fsLit "{-# SPECIALISE")) ty' }
 
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
@@ -921,7 +923,7 @@ cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
                           , rd_lhs  = lhs'
                           , rd_rhs  = rhs' }
        ; returnJustLA $ Hs.RuleD noExtField
-            $ HsRules { rds_ext = (noAnn, SourceText "{-# RULES")
+            $ HsRules { rds_ext = (noAnn, SourceText $ fsLit "{-# RULES")
                       , rds_rules = [rule] }
 
           }
@@ -937,7 +939,7 @@ cvtPragmaD (AnnP target exp)
            n' <- vcName n
            wrapParLA ValueAnnProvenance n'
        ; returnJustLA $ Hs.AnnD noExtField
-                     $ HsAnnotation (noAnn, (SourceText "{-# ANN")) target' exp'
+                     $ HsAnnotation (noAnn, (SourceText $ fsLit "{-# ANN")) target' exp'
        }
 
 -- NB: This is the only place in GHC.ThToHs that makes use of the `setL`
@@ -1405,7 +1407,7 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- "GHC.ThToHs", hence panic
 
 quotedSourceText :: String -> SourceText
-quotedSourceText s = SourceText $ "\"" ++ s ++ "\""
+quotedSourceText s = SourceText $ fsLit $ "\"" ++ s ++ "\""
 
 cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
 cvtPats pats = mapM cvtPat pats

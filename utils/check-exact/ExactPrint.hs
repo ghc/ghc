@@ -477,7 +477,7 @@ class (Typeable a) => ExactPrint a where
 
 printSourceText :: (Monad m, Monoid w) => SourceText -> String -> EP w m ()
 printSourceText (NoSourceText) txt   =  printStringAdvance txt >> return ()
-printSourceText (SourceText   txt) _ =  printStringAdvance txt >> return ()
+printSourceText (SourceText   txt) _ =  printStringAdvance (unpackFS txt) >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -564,7 +564,7 @@ printStringAtAAC capture (EpaDelta d cs) s = do
 
 markExternalSourceText :: (Monad m, Monoid w) => SrcSpan -> SourceText -> String -> EP w m ()
 markExternalSourceText l NoSourceText txt   = printStringAtRs (realSrcSpan l) txt >> return ()
-markExternalSourceText l (SourceText txt) _ = printStringAtRs (realSrcSpan l) txt >> return ()
+markExternalSourceText l (SourceText txt) _ = printStringAtRs (realSrcSpan l) (unpackFS txt) >> return ()
 
 -- ---------------------------------------------------------------------
 
@@ -658,21 +658,21 @@ markAnnCloseP an = markEpAnnLMS' an lapr_close AnnClose (Just "#-}")
 
 markAnnOpenP :: (Monad m, Monoid w) => EpAnn AnnPragma -> SourceText -> String -> EP w m (EpAnn AnnPragma)
 markAnnOpenP an NoSourceText txt   = markEpAnnLMS' an lapr_open AnnOpen (Just txt)
-markAnnOpenP an (SourceText txt) _ = markEpAnnLMS' an lapr_open AnnOpen (Just txt)
+markAnnOpenP an (SourceText txt) _ = markEpAnnLMS' an lapr_open AnnOpen (Just $ unpackFS txt)
 
 markAnnOpen :: (Monad m, Monoid w) => EpAnn [AddEpAnn] -> SourceText -> String -> EP w m (EpAnn [AddEpAnn])
 markAnnOpen an NoSourceText txt   = markEpAnnLMS an lidl AnnOpen (Just txt)
-markAnnOpen an (SourceText txt) _ = markEpAnnLMS an lidl AnnOpen (Just txt)
+markAnnOpen an (SourceText txt) _ = markEpAnnLMS an lidl AnnOpen (Just $ unpackFS txt)
 
 markAnnOpen' :: (Monad m, Monoid w)
   => Maybe EpaLocation -> SourceText -> String -> EP w m (Maybe EpaLocation)
 markAnnOpen' ms NoSourceText txt   = printStringAtMLoc' ms txt
-markAnnOpen' ms (SourceText txt) _ = printStringAtMLoc' ms txt
+markAnnOpen' ms (SourceText txt) _ = printStringAtMLoc' ms $ unpackFS txt
 
 markAnnOpen'' :: (Monad m, Monoid w)
   => EpaLocation -> SourceText -> String -> EP w m EpaLocation
 markAnnOpen'' el NoSourceText txt   = printStringAtAA el txt
-markAnnOpen'' el (SourceText txt) _ = printStringAtAA el txt
+markAnnOpen'' el (SourceText txt) _ = printStringAtAA el $ unpackFS txt
 
 -- ---------------------------------------------------------------------
 {-
@@ -1795,7 +1795,7 @@ instance ExactPrint (RuleDecls GhcPs) where
     an0 <-
       case src of
         NoSourceText      -> markEpAnnLMS an lidl AnnOpen  (Just "{-# RULES")
-        SourceText srcTxt -> markEpAnnLMS an lidl AnnOpen  (Just srcTxt)
+        SourceText srcTxt -> markEpAnnLMS an lidl AnnOpen  (Just $ unpackFS srcTxt)
     rules' <- markAnnotated rules
     an1 <- markEpAnnLMS an0 lidl AnnClose (Just "#-}")
     return (HsRules (an1,src) rules')
@@ -2715,7 +2715,7 @@ instance ExactPrint (HsExpr GhcPs) where
     printStringAtLsDelta (SameLine 0) "#"
     case src of
       NoSourceText   -> printStringAtLsDelta (SameLine 0) (unpackFS l)
-      SourceText txt -> printStringAtLsDelta (SameLine 0) txt
+      SourceText txt -> printStringAtLsDelta (SameLine 0) (unpackFS txt)
     return x
 
   exact x@(HsIPVar _ (HsIPName n))
@@ -2727,7 +2727,7 @@ instance ExactPrint (HsExpr GhcPs) where
                 HsFractional (FL { fl_text = src }) -> src
                 HsIsString src _          -> src
     case str of
-      SourceText s -> printStringAdvance s >> return ()
+      SourceText s -> printStringAdvance (unpackFS s) >> return ()
       NoSourceText -> withPpr x >> return ()
     return x
 
@@ -3909,7 +3909,7 @@ instance ExactPrint (HsType GhcPs) where
         NoSourceText -> return an
         SourceText src -> do
           debugM $ "HsBangTy: src=" ++ showAst src
-          an0 <- markEpAnnLMS an lid AnnOpen  (Just src)
+          an0 <- markEpAnnLMS an lid AnnOpen  (Just $ unpackFS src)
           an1 <- markEpAnnLMS an0 lid AnnClose (Just "#-}")
           debugM $ "HsBangTy: done unpackedness"
           return an1
@@ -4678,7 +4678,7 @@ instance ExactPrint (HsOverLit GhcPs) where
                 HsIsString src _ -> src
     in
       case str of
-        SourceText s -> printStringAdvance s >> return ol
+        SourceText s -> printStringAdvance (unpackFS s) >> return ol
         NoSourceText -> return ol
 
 -- ---------------------------------------------------------------------
@@ -4710,11 +4710,11 @@ hsLit2String lit =
 
 toSourceTextWithSuffix :: (Show a) => SourceText -> a -> String -> String
 toSourceTextWithSuffix (NoSourceText)    alt suffix = show alt ++ suffix
-toSourceTextWithSuffix (SourceText txt) _alt suffix = txt ++ suffix
+toSourceTextWithSuffix (SourceText txt) _alt suffix = unpackFS txt ++ suffix
 
 sourceTextToString :: SourceText -> String -> String
 sourceTextToString NoSourceText alt   = alt
-sourceTextToString (SourceText txt) _ = txt
+sourceTextToString (SourceText txt) _ = unpackFS txt
 
 -- ---------------------------------------------------------------------
 

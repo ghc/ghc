@@ -3,6 +3,7 @@
 -- argument.
 module Main where
 
+import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Types.SourceText
 import Data.Data
@@ -46,32 +47,32 @@ testOneFile libdir fileName = do
 
      doHsLit :: HsLit GhcPs -> [String]
      doHsLit (HsChar       (SourceText src) c)
-       = ["HsChar [" ++ src ++ "] " ++ show c]
+       = ["HsChar [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsCharPrim   (SourceText src) c)
-       = ["HsCharPrim [" ++ src ++ "] " ++ show c]
+       = ["HsCharPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsString     (SourceText src) c)
-       = ["HsString [" ++ src ++ "] " ++ show c]
+       = ["HsString [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsStringPrim (SourceText src) c)
-       = ["HsStringPrim [" ++ src ++ "] " ++ show c]
+       = ["HsStringPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsInt  _     (IL (SourceText src) _ c))
-       = ["HsInt [" ++ src ++ "] " ++ show c]
+       = ["HsInt [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsIntPrim (SourceText src) c)
-       = ["HsIntPrim [" ++ src ++ "] " ++ show c]
+       = ["HsIntPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsWordPrim   (SourceText src) c)
-       = ["HsWordPrim [" ++ src ++ "] " ++ show c]
+       = ["HsWordPrim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsInt64Prim  (SourceText src) c)
-       = ["HsInt64Prim [" ++ src ++ "] " ++ show c]
+       = ["HsInt64Prim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsWord64Prim (SourceText src) c)
-       = ["HsWord64Prim [" ++ src ++ "] " ++ show c]
+       = ["HsWord64Prim [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit (HsInteger  (SourceText src) c _)
-       = ["HsInteger [" ++ src ++ "] " ++ show c]
+       = ["HsInteger [" ++ unpackFS src ++ "] " ++ show c]
      doHsLit _ = []
 
      doOverLit :: OverLitVal -> [String]
      doOverLit (HsIntegral  (IL (SourceText src) _ c))
-       = ["HsIntegral [" ++ src ++ "] " ++ show c]
+       = ["HsIntegral [" ++ unpackFS src ++ "] " ++ show c]
      doOverLit (HsIsString  (SourceText src) c)
-       = ["HsIsString [" ++ src ++ "] " ++ show c]
+       = ["HsIsString [" ++ unpackFS src ++ "] " ++ show c]
      doOverLit _ = []
 
 pp a = showPprUnsafe a

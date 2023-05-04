@@ -668,7 +668,7 @@ tryCastWorkerWrapper env _ _ _ bndr rhs  -- All other bindings
 mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 -- See Note [Cast worker/wrapper]
 mkCastWrapperInlinePrag (InlinePragma { inl_inline = fn_inl, inl_act = fn_act, inl_rule = rule_info })
-  = InlinePragma { inl_src    = SourceText "{-# INLINE"
+  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
                  , inl_inline = fn_inl       -- See Note [Worker/wrapper for INLINABLE functions]
                  , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]

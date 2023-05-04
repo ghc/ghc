@@ -2717,7 +2717,8 @@ parseCImport cconv safety nm str sourceText =
              ((mk Nothing <$> cimp nm) +++
               (do h <- munch1 hdr_char
                   skipSpaces
-                  mk (Just (Header (SourceText h) (mkFastString h)))
+                  let src = mkFastString h
+                  mk (Just (Header (SourceText src) src))
                       <$> cimp nm))
          ]
        skipSpaces
@@ -3116,7 +3117,7 @@ mkLHsOpTy prom x op y =
   in L loc (mkHsOpTy prom x op y)
 
 mkMultTy :: LHsToken "%" GhcPs -> LHsType GhcPs -> LHsUniToken "->" "→" GhcPs -> HsArrow GhcPs
-mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText "1") 1))) arr
+mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
   -- See #18888 for the use of (SourceText "1") above
   = HsLinearArrow (HsPct1 (L locOfPct1 HsTok) arr)
   where
