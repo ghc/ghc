@@ -396,7 +396,7 @@ data StackFrame =
 
   | CatchFrame
       { info_tbl            :: !StgInfoTable
-      , exceptions_blocked  :: Word
+      , exceptions_blocked  :: !Word
       , handler             :: !Closure
       }
 
@@ -439,8 +439,8 @@ data StackFrame =
 
   | RetFun
       { info_tbl            :: !StgInfoTable
-      , retFunType          :: RetFunType
-      , retFunSize          :: Word
+      , retFunType          :: !RetFunType
+      , retFunSize          :: !Word
       , retFunFun           :: !Closure
       , retFunPayload       :: ![Closure]
       }
