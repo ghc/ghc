@@ -171,7 +171,7 @@ instance (OutputableBndrId p
                                 GhcTc -> dataConCantHappen ext
             in case mSrcText of
                   NoSourceText   -> text "{-# SOURCE #-}"
-                  SourceText src -> text src <+> text "#-}"
+                  SourceText src -> ftext src <+> text "#-}"
         ppr_imp _ NotBoot = empty
 
         pp_spec Nothing             = empty

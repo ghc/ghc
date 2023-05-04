@@ -913,7 +913,7 @@ ppOverlapPragma mb =
     Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
   where
     maybe_stext NoSourceText     alt = text alt
-    maybe_stext (SourceText src) _   = text src <+> text "#-}"
+    maybe_stext (SourceText src) _   = ftext src <+> text "#-}"
 
 
 instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
@@ -1219,7 +1219,7 @@ type instance XXWarnDecl    (GhcPass _) = DataConCantHappen
 instance OutputableBndrId p
         => Outputable (WarnDecls (GhcPass p)) where
     ppr (Warnings ext decls)
-      = text src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
+      = ftext src <+> vcat (punctuate comma (map ppr decls)) <+> text "#-}"
       where src = case ghcPass @p of
               GhcPs | (_, SourceText src) <- ext -> src
               GhcRn | SourceText src <- ext -> src

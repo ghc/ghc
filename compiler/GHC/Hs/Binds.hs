@@ -756,7 +756,7 @@ ppr_sig (InlineSig _ var inl)
   = ppr_pfx <+> pprInline inl <+> pprPrefixOcc (unLoc var) <+> text "#-}"
     where
       ppr_pfx = case inlinePragmaSource inl of
-        SourceText src -> text src
+        SourceText src -> ftext src
         NoSourceText   -> text "{-#" <+> inlinePragmaName (inl_inline inl)
 ppr_sig (SpecInstSig (_, src) ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
@@ -828,7 +828,7 @@ pragBrackets doc = text "{-#" <+> doc <+> text "#-}"
 -- | Using SourceText in case the pragma was spelled differently or used mixed
 -- case
 pragSrcBrackets :: SourceText -> String -> SDoc -> SDoc
-pragSrcBrackets (SourceText src) _   doc = text src <+> doc <+> text "#-}"
+pragSrcBrackets (SourceText src) _   doc = ftext src <+> doc <+> text "#-}"
 pragSrcBrackets NoSourceText     alt doc = text alt <+> doc <+> text "#-}"
 
 pprVarSig :: (OutputableBndr id) => [id] -> SDoc -> SDoc

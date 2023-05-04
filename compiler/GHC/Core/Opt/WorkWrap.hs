@@ -20,6 +20,8 @@ import GHC.Core.Type
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Core.SimpleOpt
 
+import GHC.Data.FastString
+
 import GHC.Types.Var
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -819,7 +821,7 @@ mkWWBindPair ww_opts fn_id fn_info fn_args fn_body work_uniq div
                    NoInline _  -> inl_act fn_inl_prag
                    _           -> inl_act wrap_prag
 
-    work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
+    work_prag = InlinePragma { inl_src = SourceText $ fsLit "{-# INLINE"
                              , inl_inline = fn_inline_spec
                              , inl_sat    = Nothing
                              , inl_act    = work_act
@@ -887,7 +889,7 @@ mkStrWrapperInlinePrag :: InlinePragma -> [CoreRule] -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_inline = fn_inl
                                      , inl_act    = fn_act
                                      , inl_rule   = rule_info }) rules
-  = InlinePragma { inl_src    = SourceText "{-# INLINE"
+  = InlinePragma { inl_src    = SourceText $ fsLit "{-# INLINE"
                  , inl_sat    = Nothing
 
                  , inl_inline = fn_inl
