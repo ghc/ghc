@@ -20,8 +20,12 @@ module GHC.Exts.Heap.Closures (
     , closureSize
 
     -- * Stack
-    , StgStackClosure(..)
-    , StackFrame(..)
+    , StgStackClosure
+    , GenStgStackClosure(..)
+    , StackFrame
+    , GenStackFrame(..)
+    , StackField
+    , GenStackField(..)
 
     -- * Boxes
     , Box(..)
@@ -374,54 +378,63 @@ data GenClosure b
 -- primitives and one for closures. This turned out to be a nightmare with lots
 -- of pattern matches and leaking data structures to enable access to primitives
 -- on the stack...
-data  StgStackClosure = StgStackClosure
+type StgStackClosure = GenStgStackClosure Box
+
+data GenStgStackClosure b = GenStgStackClosure
       { ssc_info            :: !StgInfoTable
       , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
       , ssc_stack_dirty     :: !Word8 -- ^ non-zero => dirty
       , ssc_stack_marking   :: !Word8
-      , ssc_stack           :: ![StackFrame]
+      , ssc_stack           :: ![GenStackFrame b]
       }
-      deriving Show
+  deriving (Show, Generic)
+
+type StackField = GenStackField Box
+
+data GenStackField b
+    -- | A non-pointer field
+    = StackWord !Word
+    -- | A pointer field
+    | StackBox  !b
+  deriving (Show, Generic)
+
+type StackFrame = GenStackFrame Box
 
 -- | A single stack frame
---
--- It doesn't use `Box`es because that would require a `Box` constructor for
--- primitive values (bitmap encoded payloads), which introduces lots of pattern
--- matches and complicates the whole implementation (and breaks existing code.)
-data StackFrame =
+data GenStackFrame b =
    UpdateFrame
       { info_tbl           :: !StgInfoTable
-      , updatee            :: !Closure
+      , updatee            :: !b
       }
 
   | CatchFrame
       { info_tbl            :: !StgInfoTable
       , exceptions_blocked  :: !Word
-      , handler             :: !Closure
+      , handler             :: !b
       }
 
   | CatchStmFrame
       { info_tbl            :: !StgInfoTable
-      , catchFrameCode      :: !Closure
-      , handler             :: !Closure
+      , catchFrameCode      :: !b
+      , handler             :: !b
       }
 
   | CatchRetryFrame
       { info_tbl            :: !StgInfoTable
       , running_alt_code    :: !Word
-      , first_code          :: !Closure
-      , alt_code            :: !Closure
+      , first_code          :: !b
+      , alt_code            :: !b
       }
 
   | AtomicallyFrame
       { info_tbl            :: !StgInfoTable
-      , atomicallyFrameCode :: !Closure
-      , result              :: !Closure
+      , atomicallyFrameCode :: !b
+      , result              :: !b
       }
 
   | UnderflowFrame
       { info_tbl            :: !StgInfoTable
-      , nextChunk           :: !StgStackClosure
+      , nextChunk           :: !(GenStgStackClosure b)
       }
 
   | StopFrame
@@ -429,26 +442,26 @@ data StackFrame =
 
   | RetSmall
       { info_tbl            :: !StgInfoTable
-      , stack_payload       :: ![Closure]
+      , stack_payload       :: ![GenStackField b]
       }
 
   | RetBig
       { info_tbl            :: !StgInfoTable
-      , stack_payload       :: ![Closure]
+      , stack_payload       :: ![GenStackField b]
       }
 
   | RetFun
       { info_tbl            :: !StgInfoTable
       , retFunType          :: !RetFunType
       , retFunSize          :: !Word
-      , retFunFun           :: !Closure
-      , retFunPayload       :: ![Closure]
+      , retFunFun           :: !b
+      , retFunPayload       :: ![GenStackField b]
       }
 
   |  RetBCO
       { info_tbl            :: !StgInfoTable
-      , bco                 :: !Closure -- must be a BCOClosure
-      , bcoArgs             :: ![Closure]
+      , bco                 :: !b -- is always a BCOClosure
+      , bcoArgs             :: ![GenStackField b]
       }
   deriving (Show, Generic)
 
