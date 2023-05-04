@@ -1175,7 +1175,7 @@ pprUsage usage@UsageHomeModule{}
         )
 pprUsage usage@UsageFile{}
   = hsep [text "addDependentFile",
-          doubleQuotes (text (usg_file_path usage)),
+          doubleQuotes (ftext (usg_file_path usage)),
           ppr (usg_file_hash usage)]
 pprUsage usage@UsageMergedRequirement{}
   = hsep [text "merged", ppr (usg_mod usage), ppr (usg_mod_hash usage)]

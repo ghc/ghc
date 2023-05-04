@@ -21,6 +21,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Data.FastString
+
 import GHC.Types.SafeHaskell
 import GHC.Types.Name
 
@@ -275,7 +277,7 @@ data Usage
   -- | A file upon which the module depends, e.g. a CPP #include, or using TH's
   -- 'addDependentFile'
   | UsageFile {
-        usg_file_path  :: FilePath,
+        usg_file_path  :: FastString,
         -- ^ External file dependency. From a CPP #include or TH
         -- addDependentFile. Should be absolute.
         usg_file_hash  :: Fingerprint,
