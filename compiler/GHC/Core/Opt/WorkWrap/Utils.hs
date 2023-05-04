@@ -675,13 +675,11 @@ canUnboxResult fam_envs ty cpr
                                 -- type constructor via a .hs-boot file (#8743)
   , let dc = dcs `getNth` (con_tag - fIRST_TAG)
   , null (dataConExTyCoVars dc) -- no existentials;
-                                -- See Note [Which types are unboxed?]
+                                -- See (CPR1) in Note [Which types are unboxed?]
                                 -- and GHC.Core.Opt.CprAnal.argCprType
                                 -- where we also check this.
-  , all isLinear (dataConInstArgTys dc tc_args)
-  -- Deactivates CPR worker/wrapper splits on constructors with non-linear
-  -- arguments, for the moment, because they require unboxed tuple with variable
-  -- multiplicity fields.
+  , null (dataConTheta dc) -- no constraints;
+                           -- See (CPR2) in Note [Which types are unboxed?]
   = DoUnbox (DataConPatContext { dcpc_dc = dc, dcpc_tc_args = tc_args
                                , dcpc_co = co, dcpc_args = arg_cprs })
 
@@ -691,13 +689,6 @@ canUnboxResult fam_envs ty cpr
   where
     -- See Note [non-algebraic or open body type warning]
     open_body_ty_warning = warnPprTrace True "canUnboxResult: non-algebraic or open body type" (ppr ty) Nothing
-
-isLinear :: Scaled a -> Bool
-isLinear (Scaled w _ ) =
-  case w of
-    OneTy -> True
-    _     -> False
-
 
 {- Note [Which types are unboxed?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -720,24 +711,27 @@ Worker/wrapper will unbox
        * is not recursive (as per 'isRecDataCon')
        * (might have multiple constructors, in contrast to (1))
        * the applied data constructor *does not* bind existentials
+       * nor does it bind constraints (equalities or dictionaries)
      We can transform
      > f x y = let ... in D a b
      to
      > $wf x y = let ... in (# a, b #)
      via 'mkWWcpr'.
 
-     NB: We don't allow existentials for CPR W/W, because we don't have unboxed
-     dependent tuples (yet?). Otherwise, we could transform
+     (CPR1).  We don't allow existentials for CPR W/W, because we don't have
+     unboxed dependent tuples (yet?). Otherwise, we could transform
      > f x y = let ... in D @ex (a :: ..ex..) (b :: ..ex..)
      to
      > $wf x y = let ... in (# @ex, (a :: ..ex..), (b :: ..ex..) #)
 
+     (CPR2) we don't allow constraints for CPR W/W, because an unboxed tuple
+     contains types of kind `TYPE rr`, but not of kind `CONSTRAINT rr`.
+     This is annoying; there is no real reason for this except that we don't
+     have TYPE/CONSTAINT polymorphism.  See Note [TYPE and CONSTRAINT]
+     in GHC.Builtin.Types.Prim.
+
 The respective tests are in 'canUnboxArg' and
 'canUnboxResult', respectively.
-
-Note that the data constructor /can/ have evidence arguments: equality
-constraints, type classes etc.  So it can be GADT.  These evidence
-arguments are simply value arguments, and should not get in the way.
 
 Note [mkWWstr and unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

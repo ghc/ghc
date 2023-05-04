@@ -763,6 +763,11 @@ Wrinkles
 
 (W3) We need a TypeOrConstraint flag in LitRubbish.
 
+(W4) In the CPR transformation, we can't unbox constructors with constraint
+     arguments because unboxed tuples (# …, … #) currently only supports fields
+     of type TYPE rr. See (CPR2) in Note [Which types are unboxed?] in
+     GHC.Core.Opt.WorkWrap.Utils.
+
 Note [Type and Constraint are not apart]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Type and Constraint are not equal (eqType) but they are not /apart/
