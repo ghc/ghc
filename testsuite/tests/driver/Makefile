@@ -798,15 +798,15 @@ T23339:
 	$(RM) -rf "$(PWD)/tmp"
 	mkdir -p tmp
 	TMPDIR="$(PWD)/tmp" "$(TEST_HC)" $(TEST_HC_OPTS) -v0 T23339.hs
-	find . -name "*.s" -exec cat {} \; | grep ".string"
+	find . -name "*.c" -exec cat {} \; | grep "init__ip_init"
 
 T23339B:
 	$(RM) T23339.hi
 	$(RM) T23339$(OBJSUFFIX)
 	$(RM) -rf "$(PWD)/tmp"
 	mkdir -p tmp
-	TMPDIR="$(PWD)/tmp" "$(TEST_HC)" $(TEST_HC_OPTS) -v0 T23339B.hs
+	TMPDIR="$(PWD)/tmp" "$(TEST_HC)" $(TEST_HC_OPTS) -v0 T23339B.hs -finfo-table-map
 	# Check that the file is kept and is the right one
-	find . -name "*.s" -exec cat {} \; | grep ".string"
+	find . -name "*.c" -exec cat {} \; | grep "init__ip_init"
 
 

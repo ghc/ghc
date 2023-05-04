@@ -1,2 +1,1 @@
-	.string "T23339"
-	.string "main"
+void T23339_init__ip_init (void)
