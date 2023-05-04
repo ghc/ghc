@@ -994,14 +994,40 @@ GarbageCollect (struct GcConfig config,
   commitMBlockFreeing();
 
   if (major_gc) {
-      W_ need_prealloc, need_live, need, got;
+      W_ need_prealloc, need_copied_live, need_uncopied_live, need, got, extra_needed;
       uint32_t i;
 
-      need_live = 0;
+      need_copied_live = 0;
+      need_uncopied_live = 0;
       for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
-          need_live += genLiveBlocks(&generations[i]);
+          need_copied_live += genLiveCopiedBlocks(&generations[i]);
+          need_uncopied_live += genLiveUncopiedBlocks(&generations[i]);
       }
-      need_live = stg_max(RtsFlags.GcFlags.minOldGenSize, need_live);
+
+      debugTrace(DEBUG_gc, "(before) copied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
+
+
+      // minOldGenSize states that the size of the oldest generation must be at least
+      // as big as a certain value, so make sure to save enough memory for that.
+      extra_needed = 0;
+      if (RtsFlags.GcFlags.minOldGenSize >= need_copied_live + need_uncopied_live){
+        extra_needed = RtsFlags.GcFlags.minOldGenSize - (need_copied_live + need_uncopied_live);
+      }
+      debugTrace(DEBUG_gc, "(minOldGen: %d; extra_needed: %d", RtsFlags.GcFlags.minOldGenSize, extra_needed);
+
+      // If oldest gen is uncopying in some manner (compact or non-moving) then
+      // add the extra requested by minOldGenSize to uncopying portion of memory.
+      // Otherwise, the last generation is copying so add it to copying portion.
+      if (oldest_gen -> compact || RtsFlags.GcFlags.useNonmoving) {
+        need_uncopied_live += extra_needed;
+      }
+      else {
+        need_copied_live += extra_needed;
+      }
+
+      ASSERT(need_uncopied_live + need_copied_live >= RtsFlags.GcFlags.minOldGenSize );
+
+      debugTrace(DEBUG_gc, "(after) copyied_live: %d; uncopied_live: %d", need_copied_live, need_uncopied_live );
 
       need_prealloc = 0;
       for (i = 0; i < n_nurseries; i++) {
@@ -1027,14 +1053,19 @@ GarbageCollect (struct GcConfig config,
 
       debugTrace(DEBUG_gc, "factors: %f %d %f", RtsFlags.GcFlags.oldGenFactor, consec_idle_gcs, scaled_factor  );
 
-      // Unavoidable need depends on GC strategy
+      // Unavoidable need for copying memory depends on GC strategy
       // * Copying need 2 * live
       // * Compacting need 1.x * live (we choose 1.2)
-      // * Nonmoving needs ~ 1.x * live
-      double unavoidable_need_factor = (oldest_gen->compact || RtsFlags.GcFlags.useNonmoving)
-                                          ? 1.2 : 2;
-      W_ scaled_needed = (scaled_factor + unavoidable_need_factor) * need_live;
-      debugTrace(DEBUG_gc, "factors_2: %f %d", unavoidable_need_factor, scaled_needed);
+      double unavoidable_copied_need_factor = (oldest_gen->compact)
+                                              ? 1.2 : 2;
+
+      // Unmoving blocks (compacted, pinned, nonmoving GC blocks) are not going
+      // to be copied so don't need to save 2* the memory for them.
+      double unavoidable_uncopied_need_factor = 1.2;
+
+      W_ scaled_needed = ((scaled_factor + unavoidable_copied_need_factor) * need_copied_live)
+                       + ((scaled_factor + unavoidable_uncopied_need_factor) * need_uncopied_live);
+      debugTrace(DEBUG_gc, "factors_2: %f %d", ((scaled_factor + unavoidable_copied_need_factor) * need_copied_live), ((scaled_factor + unavoidable_uncopied_need_factor) * need_uncopied_live));
       need = need_prealloc + scaled_needed;
 
       /* Also, if user set heap size, do not drop below it.
