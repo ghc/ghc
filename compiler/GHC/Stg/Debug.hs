@@ -16,7 +16,7 @@ import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Types.IPE
 import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameString, nameSrcSpan)
+import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan)
 import GHC.Data.FastString
 
 import Control.Monad (when)
@@ -29,7 +29,7 @@ import Control.Applicative
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
-data SpanWithLabel = SpanWithLabel RealSrcSpan String
+data SpanWithLabel = SpanWithLabel RealSrcSpan LexicalFastString
 
 data StgDebugOpts = StgDebugOpts
   { stgDebug_infoTableMap              :: !Bool
@@ -74,7 +74,7 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e t) = do
     -- If the name has a span, use that initially as the source position in-case
     -- we don't get anything better.
     with_span = case nameSrcSpan name of
-                  RealSrcSpan pos _ -> withSpan (pos, occNameString (getOccName name))
+                  RealSrcSpan pos _ -> withSpan (pos, LexicalFastString $ occNameFS (getOccName name))
                   _ -> id
   e' <- with_span $ collectExpr e
   recordInfo bndr e'
@@ -92,7 +92,7 @@ recordInfo bndr new_rhs = do
     -- A span from the ticks surrounding the new_rhs
     best_span = quickSourcePos thisFile new_rhs
     -- A back-up span if the bndr had a source position, many do not (think internally generated ids)
-    bndr_span = (\s -> SpanWithLabel s (occNameString (getOccName bndr)))
+    bndr_span = (\s -> SpanWithLabel s (LexicalFastString $ occNameFS (getOccName bndr)))
                   <$> srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))
   recordStgIdPosition bndr best_span bndr_span
 

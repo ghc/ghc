@@ -839,7 +839,7 @@ data InfoProvEnt = InfoProvEnt
                                -- The rendered Haskell type of the closure the table represents
                                , infoProvModule :: !Module
                                -- Origin module
-                               , infoTableProv :: !(Maybe (RealSrcSpan, String)) }
+                               , infoTableProv :: !(Maybe (RealSrcSpan, LexicalFastString)) }
                                -- Position and information about the info table
                                deriving (Eq, Ord)
 

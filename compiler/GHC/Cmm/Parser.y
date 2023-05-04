@@ -1501,7 +1501,7 @@ withSourceNote :: Located a -> Located b -> CmmParse c -> CmmParse c
 withSourceNote a b parse = do
   name <- getName
   case combineSrcSpans (getLoc a) (getLoc b) of
-    RealSrcSpan span _ -> code (emitTick (SourceNote span name)) >> parse
+    RealSrcSpan span _ -> code (emitTick (SourceNote span $ LexicalFastString $ mkFastString name)) >> parse
     _other           -> parse
 
 -- -----------------------------------------------------------------------------

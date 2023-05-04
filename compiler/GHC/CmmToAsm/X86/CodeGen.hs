@@ -196,10 +196,10 @@ basicBlockCodeGen block = do
   -- Generate location directive
   dbg <- getDebugBlock (entryLabel block)
   loc_instrs <- case dblSourceTick =<< dbg of
-    Just (SourceNote span name)
+    Just (SourceNote span (LexicalFastString name))
       -> do fileId <- getFileId (srcSpanFile span)
             let line = srcSpanStartLine span; col = srcSpanStartCol span
-            return $ unitOL $ LOCATION fileId line col name
+            return $ unitOL $ LOCATION fileId line col (unpackFS name)
     _ -> return nilOL
   (mid_instrs,mid_bid) <- stmtsToInstrs id stmts
   (!tail_instrs,_) <- stmtToInstrs mid_bid tail

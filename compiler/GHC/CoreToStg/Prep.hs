@@ -314,7 +314,7 @@ mkDataConWorkers generate_debug_info mod_loc data_tycons
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")
      where tick span  = Tick $ SourceNote span $
-             renderWithContext defaultSDocContext $ ppr name
+             LexicalFastString $ mkFastString $ renderWithContext defaultSDocContext $ ppr name
            span1 file = realSrcLocSpan $ mkRealSrcLoc (mkFastString file) 1 1
 
 {-

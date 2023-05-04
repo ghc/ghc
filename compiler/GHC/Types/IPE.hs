@@ -9,6 +9,7 @@ module GHC.Types.IPE (
 import GHC.Prelude
 
 import GHC.Types.Name
+import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Core.DataCon
 
@@ -20,7 +21,7 @@ import qualified Data.Map.Strict as Map
 
 -- | Position and information about an info table.
 -- For return frames these are the contents of a 'CoreSyn.SourceNote'.
-type IpeSourceLocation = (RealSrcSpan, String)
+type IpeSourceLocation = (RealSrcSpan, LexicalFastString)
 
 -- | A map from a 'Name' to the best approximate source position that
 -- name arose from.
