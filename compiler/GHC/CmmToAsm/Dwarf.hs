@@ -6,6 +6,7 @@ import GHC.Prelude
 
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr
+import GHC.Data.FastString
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
 import GHC.Types.Tickish   ( CmmTickish, GenTickish(..) )
 import GHC.Cmm.DebugBlock
@@ -177,7 +178,8 @@ procToDwarf :: NCGConfig -> DebugBlock -> DwarfInfo
 procToDwarf config prc
   = DwarfSubprogram { dwChildren = map (blockToDwarf config) (dblBlocks prc)
                     , dwName     = case dblSourceTick prc of
-                         Just s@SourceNote{} -> sourceName s
+                         Just s@SourceNote{} -> case sourceName s of
+                            LexicalFastString s -> unpackFS s
                          _otherwise -> show (dblLabel prc)
                     , dwLabel    = dblCLabel prc
                     , dwParent   = fmap mkAsmTempDieLabel

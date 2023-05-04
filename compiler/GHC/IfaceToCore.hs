@@ -1651,7 +1651,7 @@ tcIfaceExpr (IfaceTick tickish expr) = do
 tcIfaceTickish :: IfaceTickish -> IfM lcl CoreTickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
-tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
+tcIfaceTickish (IfaceSource src name)   = return (SourceNote src (LexicalFastString name))
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal

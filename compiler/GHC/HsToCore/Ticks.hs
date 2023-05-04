@@ -1182,24 +1182,23 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
         , tick_label = boxLabel
         }
 
-      cc_name | topOnly   = head decl_path
-              | otherwise = concat (intersperse "." decl_path)
+      cc_name | topOnly   = mkFastString $ head decl_path
+              | otherwise = mkFastString $ concat (intersperse "." decl_path)
 
   env <- getEnv
   case tickishType env of
     HpcTicks -> HpcTick (this_mod env) <$> addMixEntry me
 
     ProfNotes -> do
-      let nm = mkFastString cc_name
-      flavour <- mkHpcCCFlavour <$> getCCIndexM nm
-      let cc = mkUserCC nm (this_mod env) pos flavour
+      flavour <- mkHpcCCFlavour <$> getCCIndexM cc_name
+      let cc = mkUserCC cc_name (this_mod env) pos flavour
           count = countEntries && tte_countEntries env
       return $ ProfNote cc count True{-scopes-}
 
     Breakpoints -> Breakpoint noExtField <$> addMixEntry me <*> pure ids
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
-      return $ SourceNote pos' cc_name
+      return $ SourceNote pos' $ LexicalFastString cc_name
 
     _otherwise -> panic "mkTickish: bad source span!"
 

@@ -25,6 +25,7 @@ module GHC.Types.Tickish (
 ) where
 
 import GHC.Prelude
+import GHC.Data.FastString
 
 import GHC.Core.Type
 
@@ -153,8 +154,8 @@ data GenTickish pass =
   -- necessary to enable optimizations.
   | SourceNote
     { sourceSpan :: RealSrcSpan -- ^ Source covered
-    , sourceName :: String      -- ^ Name for source location
-                                --   (uses same names as CCs)
+    , sourceName :: LexicalFastString  -- ^ Name for source location
+                                       --   (uses same names as CCs)
     }
 
 deriving instance Eq (GenTickish 'TickishPassCore)

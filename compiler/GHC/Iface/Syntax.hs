@@ -45,6 +45,7 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey,
                            constraintKindTyConKey )
 import GHC.Types.Unique ( hasKey )
@@ -577,7 +578,7 @@ data IfaceExpr
 data IfaceTickish
   = IfaceHpcTick Module Int                -- from HpcTick x
   | IfaceSCC     CostCentre Bool Bool      -- from ProfNote
-  | IfaceSource  RealSrcSpan String        -- from SourceNote
+  | IfaceSource  RealSrcSpan FastString        -- from SourceNote
   -- no breakpoints: we never export these into interface files
 
 data IfaceAlt = IfaceAlt IfaceConAlt [IfLclName] IfaceExpr
