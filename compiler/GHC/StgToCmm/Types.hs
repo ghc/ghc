@@ -53,7 +53,7 @@ make a conservative assumption, but that is bad: e.g.
   #16559, #15155, and wiki: commentary/rts/haskell-execution/pointer-tagging
 
   Conservative assumption here is made when we import an Id without a
-  LambdaFormInfo in the interface, in GHC.StgToCmm.Closure.mkLFImported.
+  LambdaFormInfo in the interface, in GHC.StgToCmm.Closure.importedIdLFInfo.
 
 So we arrange to always serialise this information into the interface file.  The
 moving parts are:

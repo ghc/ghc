@@ -28,7 +28,7 @@ module GHC.StgToCmm.Closure (
         LambdaFormInfo,         -- Abstract
         StandardFormInfo,        -- ...ditto...
         mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
-        mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
+        mkApLFInfo, importedIdLFInfo, mkLFArgument, mkLFLetNoEscape,
         mkLFStringLit,
         lfDynTag,
         isLFThunk, isLFReEntrant, lfUpdatable,
@@ -256,10 +256,10 @@ mkApLFInfo id upd_flag arity
         (mightBeFunTy (idType id))
 
 -------------
--- | Make a 'LambdaFormInfo' for an imported Id.
+-- | The 'LambdaFormInfo' of an imported Id.
 --   See Note [The LFInfo of Imported Ids]
-mkLFImported :: Id -> LambdaFormInfo
-mkLFImported id =
+importedIdLFInfo :: Id -> LambdaFormInfo
+importedIdLFInfo id =
     -- See Note [Conveying CAF-info and LFInfo between modules] in
     -- GHC.StgToCmm.Types
     case idLFInfo_maybe id of
@@ -305,7 +305,7 @@ In particular, saturated data constructor applications *must* be unambiguously
 given `LFCon`, and if the LFInfo says LFCon, then it really is a static data
 constructor, and similar for LFReEntrant.
 
-In `mkLFImported`, we construct a LambdaFormInfo for imported Ids as follows:
+In `importedIdLFInfo`, we construct a LambdaFormInfo for imported Ids as follows:
 
 (1) If the `lfInfo` field contains an LFInfo, we use that LFInfo which is
 correct by construction (the invariant being that if it exists, it is correct):
