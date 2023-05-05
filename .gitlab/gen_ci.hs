@@ -363,7 +363,7 @@ distroVariables Alpine = mconcat
     -- T10458, ghcilink002: due to #17869
     -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
     -- (see Note [Object unloading]).
-  , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
+  , "BROKEN_TESTS" =: "encoding004 T10458 linker_unload_native"
   ]
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
@@ -789,11 +789,18 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , standardBuilds AArch64 (Linux Debian10)
      , allowFailureGroup (addValidateRule ARMLabel (standardBuilds ARMv7 (Linux Debian10)))
      , standardBuilds I386 (Linux Debian9)
-     , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
-     , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
+     -- Fully static build, in theory usable on any linux distribution.
+     , allowFailureGroup (fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) static))
+     , disableValidate (fullyStaticBrokenTests (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt)))
+     -- Dynamically linked build, suitable for building your own static executables on alpine
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine) vanilla)
      ]
 
   where
+
+    -- ghcilink002 broken due to #17869
+    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 ")
+
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
 
     tsan_jobs =

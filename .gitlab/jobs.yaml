@@ -661,12 +661,74 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-alpine3_12-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate",
+      "BROKEN_TESTS": "encoding004 T10458 linker_unload_native",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -723,7 +785,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -2236,13 +2298,76 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
+      "XZ_OPT": "-9"
+    }
+  },
+  "release-x86_64-linux-alpine3_12-release": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "1 year",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-release.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release",
+      "BROKEN_TESTS": "encoding004 T10458 linker_unload_native",
+      "BUILD_FLAVOUR": "release",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "IGNORE_PERF_FAILURES": "all",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-release",
       "XZ_OPT": "-9"
     }
   },
@@ -2299,7 +2424,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -3217,12 +3342,73 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static"
+    }
+  },
+  "x86_64-linux-alpine3_12-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-alpine3_12-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-alpine3_12-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate",
+      "BROKEN_TESTS": "encoding004 T10458 linker_unload_native",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--disable-ld-override ",
+      "HADRIAN_ARGS": "--docs=no-sphinx",
+      "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "TEST_ENV": "x86_64-linux-alpine3_12-validate"
     }
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
@@ -3278,7 +3464,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
-      "BROKEN_TESTS": "encoding004 T10458 ghcilink002 linker_unload_native",
+      "BROKEN_TESTS": "ghcilink002  encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
