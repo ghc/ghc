@@ -365,15 +365,15 @@ data GenClosure b
 
     -- | A primitive word from a bitmap encoded stack frame payload
     --
-    -- The type itself cannot be restored (i.e. it might also represent a byte
-    -- or an int).
+    -- The type itself cannot be restored (i.e. it might represent a Word8#
+    -- or an Int#).
   |  UnknownTypeWordSizedPrimitive
         { wordVal :: !Word }
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 -- | A decoded @StgStack@ with `StackFrame`s
 --
--- This is separate from it's `Closure` incarnation, as unification would
+-- This is separate from its `Closure` incarnation, as unification would
 -- require two kinds of boxes for bitmap encoded stack content: One for
 -- primitives and one for closures. This turned out to be a nightmare with lots
 -- of pattern matches and leaking data structures to enable access to primitives
