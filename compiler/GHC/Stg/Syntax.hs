@@ -237,6 +237,52 @@ StgConApp and StgPrimApp --- saturated applications
 
 There are specialised forms of application, for constructors, primitives, and
 literals.
+
+Note [Constructor applications in STG]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After the unarisation pass:
+* In `StgConApp` and `StgRhsCon` and `StgAlt` we filter out the void arguments,
+  leaving only non-void ones.
+* In `StgApp` and `StgOpApp` we retain void arguments.
+
+We can do this because we know that `StgConApp` and `StgRhsCon` are saturated applications,
+so we lose no information by dropping those void args.  In contrast, in `StgApp` we need the
+ void argument to compare the number of args in the call with the arity of the function.
+
+This is an open design choice.  We could instead choose to treat all these applications
+consistently (keeping the void args).  But for some reason we don't, and this Note simply
+documents that design choice.
+
+As an example, consider:
+
+        data T a = MkT !Int a Void#
+
+The wrapper's representation and the worker's representation (i.e. the
+datacon's Core representation) are respectively:
+
+        $WMkT :: Int  -> a -> Void# -> T a
+        MkT   :: Int# -> a -> Void# -> T a
+
+T would end up being used in STG post-unarise as:
+
+  let x = MkT 1# y
+  in ...
+      case x of
+        MkT int a -> ...
+
+The Void# argument is dropped. In essence we only generate binders for runtime
+relevant values.
+
+We also flatten out unboxed tuples in this process. See the unarise
+pass for details on how this is done. But as an example consider
+`data S = MkS Bool (# Bool | Char #)` which when matched on would
+result in an alternative with three binders like this
+
+    MkS bool tag tpl_field ->
+
+See Note [Translating unboxed sums to unboxed tuples] and Note [Unarisation]
+for the details of this transformation.
+
 -}
 
   | StgLit      Literal
@@ -245,7 +291,7 @@ literals.
         -- which can't be let-bound
   | StgConApp   DataCon
                 ConstructorNumber
-                [StgArg] -- Saturated. (After Unarisation, [NonVoid StgArg])
+                [StgArg] -- Saturated. See Note [Constructor applications in STG]
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
@@ -422,7 +468,7 @@ important):
                         -- are not allocated.
         ConstructorNumber
         [StgTickish]
-        [StgArg]        -- Args
+        [StgArg]        -- Saturated Args. See Note [Constructor applications in STG]
         Type            -- Type, for rewriting to an StgRhsClosure
 
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that

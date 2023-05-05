@@ -141,7 +141,19 @@ becomes
         case e of { T a' b -> let a = I# a' in ... }
 
 To keep ourselves sane, we name the different versions of the data constructor
-differently, as follows.
+differently, as follows in Note [Data Constructor Naming].
+
+The `dcRepType` field of a `DataCon` contains the type of the representation of
+the constructor /worker/, also called the Core representation.
+
+The Core representation may differ from the type of the constructor /wrapper/
+(built by `mkDataConRep`). Besides unpacking (as seen in the example above),
+dictionaries and coercions become explict arguments in the Core representation
+of a constructor.
+
+Note that this representation is still *different* from runtime
+representation. (Which is what STG uses after unarise).
+See Note [Constructor applications in STG] in GHC.Stg.Syntax.
 
 
 Note [Data Constructor Naming]
@@ -209,7 +221,8 @@ Note [Data constructor workers and wrappers]
 * See Note [Data Constructor Naming] for how the worker and wrapper
   are named
 
-* Neither_ the worker _nor_ the wrapper take the dcStupidTheta dicts as arguments
+* The workers don't take the dcStupidTheta dicts as arguments, while the
+  wrappers currently do
 
 * The wrapper (if it exists) takes dcOrigArgTys as its arguments.
   The worker takes dataConRepArgTys as its arguments
@@ -528,7 +541,7 @@ data DataCon
                                 --      forall a x y. (a~(x,y), x~y, Ord x) =>
                                 --        x -> y -> T a
                                 -- (this is *not* of the constructor wrapper Id:
-                                --  see Note [Data con representation] below)
+                                --  see Note [Data constructor representation])
         -- Notice that the existential type parameters come *second*.
         -- Reason: in a case expression we may find:
         --      case (e :: T t) of
@@ -987,51 +1000,6 @@ we consult HsImplBang:
 
 The boolean flag is used only for this warning.
 See #11270 for motivation.
-
-Note [Data con representation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The dcRepType field contains the type of the representation of a constructor
-This may differ from the type of the constructor *Id* (built
-by MkId.mkDataConId) for two reasons:
-        a) the constructor Id may be overloaded, but the dictionary isn't stored
-           e.g.    data Eq a => T a = MkT a a
-
-        b) the constructor may store an unboxed version of a strict field.
-
-So whenever this module talks about the representation of a data constructor
-what it means is the DataCon with all Unpacking having been applied.
-We can think of this as the Core representation.
-
-Here's an example illustrating the Core representation:
-        data Ord a => T a = MkT Int! a Void#
-Here
-        T :: Ord a => Int -> a -> Void# -> T a
-but the rep type is
-        Trep :: Int# -> a -> Void# -> T a
-Actually, the unboxed part isn't implemented yet!
-
-Note that this representation is still *different* from runtime
-representation. (Which is what STG uses after unarise).
-
-This is how T would end up being used in STG post-unarise:
-
-  let x = T 1# y
-  in ...
-      case x of
-        T int a -> ...
-
-The Void# argument is dropped and the boxed int is replaced by an unboxed
-one. In essence we only generate binders for runtime relevant values.
-
-We also flatten out unboxed tuples in this process. See the unarise
-pass for details on how this is done. But as an example consider
-`data S = MkS Bool (# Bool | Char #)` which when matched on would
-result in an alternative with three binders like this
-
-    MkS bool tag tpl_field ->
-
-See Note [Translating unboxed sums to unboxed tuples] and Note [Unarisation]
-for the details of this transformation.
 
 
 ************************************************************************
