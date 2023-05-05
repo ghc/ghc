@@ -52,7 +52,7 @@ import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Monad ( modifySession )
-import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..) )
+import GHC.Driver.Make ( newIfaceCache, ModIfaceCache(..), AnyDiagnostic(..) )
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Diagnostic
 import qualified GHC
@@ -2176,7 +2176,7 @@ doLoad retain_context howmuch = do
               liftIO $ do hSetBuffering stdout NoBuffering
                           hSetBuffering stderr NoBuffering) $ \_ -> do
       hmis <- ifaceCache <$> getGHCiState
-      ok <- trySuccess $ GHC.loadWithCache (Just hmis) howmuch
+      ok <- trySuccess $ GHC.loadWithCache (Just hmis) (AnyDiagnostic . GHCiMessage) howmuch
       afterLoad ok retain_context
       return ok
 

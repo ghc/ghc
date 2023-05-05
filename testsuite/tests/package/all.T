@@ -22,3 +22,4 @@ test('T4806', normalise_version('containers'), compile_fail, ['-ignore-package c
 test('T4806a', normalise_version('deepseq', 'containers'), compile_fail, ['-ignore-package deepseq'])
 test('T22884', normalise_version('text'), compile_fail, ['-hide-package text'])
 test('T22884_interactive', normalise_version('text'), ghci_script, ['T22884_interactive.script'])
+test('T4806_interactive', [extra_files(['T4806.hs']), normalise_version('containers')], ghci_script, ['T4806_interactive.script'])

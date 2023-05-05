@@ -21,6 +21,10 @@ module GHC.Tc.Errors.Ppr
   , inHsDocContext
   , TcRnMessageOpts(..)
   , pprTyThingUsedWrong
+
+  -- | Useful when overriding message printing.
+  , messageWithInfoDiagnosticMessage
+  , messageWithHsDocContext
   )
   where
 
@@ -127,12 +131,8 @@ instance Diagnostic TcRnMessage where
                   (tcOptsShowContext opts)
                   (diagnosticMessage opts msg)
     TcRnWithHsDocContext ctxt msg
-      -> if tcOptsShowContext opts
-         then main_msg `unionDecoratedSDoc` ctxt_msg
-         else main_msg
-      where
-        main_msg = diagnosticMessage opts msg
-        ctxt_msg = mkSimpleDecorated (inHsDocContext ctxt)
+      -> messageWithHsDocContext opts ctxt (diagnosticMessage opts msg)
+
     TcRnSolverReport msg _ _
       -> mkSimpleDecorated $ pprSolverReportWithCtxt msg
     TcRnRedundantConstraints redundants (info, show_info)
@@ -3129,6 +3129,14 @@ messageWithInfoDiagnosticMessage unit_state ErrInfo{..} show_ctxt important =
   let err_info' = map (pprWithUnitState unit_state) ([errInfoContext | show_ctxt] ++ [errInfoSupplementary])
       in (mapDecoratedSDoc (pprWithUnitState unit_state) important) `unionDecoratedSDoc`
          mkDecorated err_info'
+
+messageWithHsDocContext :: TcRnMessageOpts -> HsDocContext -> DecoratedSDoc -> DecoratedSDoc
+messageWithHsDocContext opts ctxt main_msg = do
+      if tcOptsShowContext opts
+         then main_msg `unionDecoratedSDoc` ctxt_msg
+         else main_msg
+      where
+        ctxt_msg = mkSimpleDecorated (inHsDocContext ctxt)
 
 dodgy_msg :: Outputable ie => SDoc -> GlobalRdrElt -> ie -> SDoc
 dodgy_msg kind tc ie

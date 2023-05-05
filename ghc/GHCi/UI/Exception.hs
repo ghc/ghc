@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-module GHCi.UI.Exception(printGhciException) where
+module GHCi.UI.Exception(printGhciException, GHCiMessage(..)) where
 
 import GHC.Prelude
 
@@ -57,16 +57,31 @@ instance Diagnostic GHCiMessage where
 ghciDiagnosticMessage :: GhcMessageOpts -> GhcMessage -> DecoratedSDoc
 ghciDiagnosticMessage ghc_opts msg =
   case msg of
-    GhcTcRnMessage (TcRnInterfaceError err) ->
-      case ghciInterfaceError err of
-        Just sdoc -> mkSimpleDecorated sdoc
-        Nothing -> diagnosticMessage ghc_opts msg
+    GhcTcRnMessage msg -> tcRnMessage (tcMessageOpts ghc_opts) msg
     GhcDriverMessage  (DriverInterfaceError err) ->
       case ghciInterfaceError err of
         Just sdoc -> mkSimpleDecorated sdoc
         Nothing -> diagnosticMessage ghc_opts msg
-    _ -> diagnosticMessage ghc_opts msg
+    GhcPsMessage  {} -> diagnosticMessage ghc_opts msg
+    GhcDsMessage  {} -> diagnosticMessage ghc_opts msg
+    GhcUnknownMessage  {} -> diagnosticMessage ghc_opts msg
   where
+    tcRnMessage tc_opts tc_msg =
+      case tc_msg of
+        TcRnInterfaceError err ->
+          case ghciInterfaceError err of
+            Just sdoc -> mkSimpleDecorated sdoc
+            Nothing -> diagnosticMessage ghc_opts msg
+        TcRnMessageWithInfo unit_state msg_with_info ->
+          case msg_with_info of
+           TcRnMessageDetailed err_info wrapped_msg
+             -> messageWithInfoDiagnosticMessage unit_state err_info
+                  (tcOptsShowContext tc_opts)
+                  (tcRnMessage tc_opts wrapped_msg)
+        TcRnWithHsDocContext ctxt wrapped_msg ->
+          messageWithHsDocContext tc_opts ctxt (tcRnMessage tc_opts wrapped_msg)
+        _ -> diagnosticMessage ghc_opts msg
+
     opts = tcOptsIfaceOpts (tcMessageOpts ghc_opts)
 
     ghciInterfaceError (Can'tFindInterface err looking_for) =
