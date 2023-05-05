@@ -370,7 +370,7 @@ tcApp rn_expr exp_res_ty
                  -- is on we must call tcSubType.
                  -- Zonk app_res_rho first, because QL may have instantiated some
                  -- delta variables to polytypes, and tcSubType doesn't expect that
-                 do { app_res_rho <- zonkQuickLook do_ql app_res_rho
+                 do { app_res_rho <- liftIO $ zonkQuickLook do_ql app_res_rho
                     ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
 
        -- Typecheck the value arguments
@@ -410,7 +410,7 @@ quickLookKeys :: [Unique]
 -- See Note [Quick Look for particular Ids]
 quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 
-zonkQuickLook :: Bool -> TcType -> TcM TcType
+zonkQuickLook :: Bool -> TcType -> IO TcType
 -- After all Quick Look unifications are done, zonk to ensure that all
 -- instantiation variables are substituted away
 --
@@ -427,7 +427,7 @@ zonkQuickLook do_ql ty
 -- zonkArg is used *only* during debug-tracing, to make it easier to
 -- see what is going on.  For that reason, it is not a full zonk: add
 -- more if you need it.
-zonkArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
+zonkArg :: HsExprArg 'TcpInst -> IO (HsExprArg 'TcpInst)
 zonkArg eva@(EValArg { eva_arg_ty = Scaled m ty })
   = do { ty' <- zonkTcType ty
        ; return (eva { eva_arg_ty = Scaled m ty' }) }

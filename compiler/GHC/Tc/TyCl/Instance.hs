@@ -952,10 +952,10 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
 
        ; final_tvs         <- zonkTcTyVarsToTcTyVars final_tvs
-       ; lhs_ty            <- zonkTcType  lhs_ty
-       ; master_res_kind   <- zonkTcType  master_res_kind
-       ; instance_res_kind <- zonkTcType  instance_res_kind
-       ; stupid_theta      <- zonkTcTypes stupid_theta
+       ; lhs_ty            <- liftIO $ zonkTcType  lhs_ty
+       ; master_res_kind   <- liftIO $ zonkTcType  master_res_kind
+       ; instance_res_kind <- liftIO $ zonkTcType  instance_res_kind
+       ; stupid_theta      <- liftIO $ zonkTcTypes stupid_theta
 
        -- Check that res_kind is OK with checkDataKindSig.  We need to
        -- check that it's ok because res_kind can come from a user-written

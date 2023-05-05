@@ -1788,6 +1788,8 @@ lookupTyVarX (ZonkEnv { ze_tv_env = tv_env }) tv
        Just tv -> tv
        Nothing -> pprPanic "lookupTyVarOcc" (ppr tv $$ ppr tv_env)
 
+
+
 commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> TcM Type
 -- Only monadic so we can do tc-tracing
 commitFlexi flexi tv zonked_kind

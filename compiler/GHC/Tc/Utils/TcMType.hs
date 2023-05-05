@@ -154,6 +154,7 @@ import Control.Monad
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
 import GHC.Types.Name.Reader
+import Data.IORef
 
 {-
 ************************************************************************
@@ -391,7 +392,7 @@ unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 -- itself is needed only for printing.)
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
-checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
+checkCoercionHole :: CoVar -> Coercion -> IO Coercion
 checkCoercionHole cv co
   | debugIsOn
   = do { cv_ty <- zonkTcType (varType cv)
@@ -956,7 +957,7 @@ isUnfilledMetaTyVar tv
 
 --------------------
 -- Works with both type and kind variables
-writeMetaTyVar :: HasDebugCallStack => TcTyVar -> TcType -> TcM ()
+writeMetaTyVar :: HasDebugCallStack => TcTyVar -> TcType -> IO ()
 -- Write into a currently-empty MetaTyVar
 
 writeMetaTyVar tyvar ty
@@ -974,20 +975,20 @@ writeMetaTyVar tyvar ty
   = massertPpr False (text "Writing to non-meta tyvar" <+> ppr tyvar)
 
 --------------------
-writeMetaTyVarRef :: HasDebugCallStack => TcTyVar -> TcRef MetaDetails -> TcType -> TcM ()
+writeMetaTyVarRef :: HasDebugCallStack => TcTyVar -> TcRef MetaDetails -> TcType -> IO ()
 -- Here the tyvar is for error checking only;
 -- the ref cell must be for the same tyvar
 writeMetaTyVarRef tyvar ref ty
   | not debugIsOn
-  = do { traceTc "writeMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
-                                   <+> text ":=" <+> ppr ty)
-       ; writeTcRef ref (Indirect ty) }
+  = do { --traceTc "writeMetaTyVar" (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)
+         --                          <+> text ":=" <+> ppr ty)
+        writeIORef ref (Indirect ty) }
 
   -- Everything from here on only happens if DEBUG is on
   -- Need to zonk 'ty' because we may only recently have promoted
   -- its free meta-tyvars (see Solver.Interact.tryToSolveByUnification)
   | otherwise
-  = do { meta_details <- readMutVar ref;
+  = do { meta_details <- readIORef ref;
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
        ; zonked_ty      <- zonkTcType ty
@@ -1003,7 +1004,7 @@ writeMetaTyVarRef tyvar ref ty
                               <+> text ":="
                               <+> ppr ty <+> text "::" <+> (ppr zonked_ty_kind) )
 
-       ; traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
+       --; traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
 
        -- Check for double updates
        ; massertPpr (isFlexi meta_details) (double_upd_msg meta_details)
@@ -1015,7 +1016,7 @@ writeMetaTyVarRef tyvar ref ty
        ; massertPpr kind_check_ok kind_msg
 
        -- Do the write
-       ; writeMutVar ref (Indirect ty) }
+       ; writeIORef ref (Indirect ty) }
   where
     tv_kind = tyVarKind tyvar
 
@@ -1506,7 +1507,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
       = return dv  -- We have met this tyvar already
 
       | otherwise
-      = do { tv_kind <- zonkTcType (tyVarKind tv)
+      = do { tv_kind <- liftIO $ zonkTcType (tyVarKind tv)
                  -- This zonk is annoying, but it is necessary, both to
                  -- ensure that the collected candidates have zonked kinds
                  -- (#15795) and to make the naughty check
@@ -1797,11 +1798,11 @@ zonkAndSkolemise skol_info tyvar
      -- We want to preserve the binding location of the original TyVarTv.
      -- This is important for error messages. If we don't do this, then
      -- we get bad locations in, e.g., typecheck/should_fail/T2688
-  = do { zonked_tyvar <- zonkTcTyVarToTcTyVar tyvar
+  = do { zonked_tyvar <- liftIO $ zonkTcTyVarToTcTyVar tyvar
        ; skolemiseQuantifiedTyVar skol_info zonked_tyvar }
 
   | otherwise
-  = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $
+  = assertPpr (isImmutableTyVar tyvar || isCoVar tyvar) (pprTyVar tyvar) $ liftIO $
     zonkTyCoVarKind tyvar
 
 skolemiseQuantifiedTyVar :: SkolemInfo -> TcTyVar -> TcM TcTyVar
@@ -1826,7 +1827,7 @@ skolemiseQuantifiedTyVar skol_info tv
         -- type declarations, each with its own skol_info. The first
         -- will skolemise it, but the other uses must update its
         -- skolem info (#22379)
-        -> do { kind <- zonkTcType (tyVarKind tv)
+        -> do { kind <- liftIO $ zonkTcType (tyVarKind tv)
               ; let details = SkolemTv skol_info lvl False
                     name = tyVarName tv
               ; return (mkTcTyVar name kind details) }
@@ -1851,19 +1852,19 @@ defaultTyVar def_strat tv
   | isRuntimeRepVar tv
   , default_ns_vars
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
-       ; writeMetaTyVar tv liftedRepTy
+       ; liftIO $ writeMetaTyVar tv liftedRepTy
        ; return True }
 
   | isLevityVar tv
   , default_ns_vars
   = do { traceTc "Defaulting a Levity var to Lifted" (ppr tv)
-       ; writeMetaTyVar tv liftedDataConTy
+       ; liftIO $ writeMetaTyVar tv liftedDataConTy
        ; return True }
 
   | isMultiplicityVar tv
   , default_ns_vars
   = do { traceTc "Defaulting a Multiplicity var to Many" (ppr tv)
-       ; writeMetaTyVar tv manyDataConTy
+       ; liftIO $ writeMetaTyVar tv manyDataConTy
        ; return True }
 
   | isConcreteTyVar tv
@@ -1894,7 +1895,7 @@ defaultTyVar def_strat tv
     default_kind_var kv
       | isLiftedTypeKind (tyVarKind kv)
       = do { traceTc "Defaulting a kind var to *" (ppr kv)
-           ; writeMetaTyVar kv liftedTypeKind
+           ; liftIO $ writeMetaTyVar kv liftedTypeKind
            ; return True }
       | otherwise
       = do { addErr $ TcRnCannotDefaultKindVar kv' (tyVarKind kv')
@@ -1967,7 +1968,7 @@ skolemiseUnboundMetaTyVar skol_info tv
     do  { check_empty tv
         ; tc_lvl <- getTcLevel   -- Get the location and level from "here"
         ; here   <- getSrcSpanM  -- i.e. where we are generalising
-        ; kind   <- zonkTcType (tyVarKind tv)
+        ; kind   <- liftIO $ zonkTcType (tyVarKind tv)
         ; let tv_name = tyVarName tv
               -- See Note [Skolemising and identity]
               final_name | isSystemName tv_name
@@ -1979,7 +1980,7 @@ skolemiseUnboundMetaTyVar skol_info tv
               final_tv   = mkTcTyVar final_name kind details
 
         ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
-        ; writeMetaTyVar tv (mkTyVarTy final_tv)
+        ; liftIO $ writeMetaTyVar tv (mkTyVarTy final_tv)
         ; return final_tv }
   where
     check_empty tv       -- [Sept 04] Check for non-empty.
@@ -2291,7 +2292,7 @@ promoteMetaTyVarTo tclvl tv
     tcTyVarLevel tv `strictlyDeeperThan` tclvl
   = do { cloned_tv <- cloneMetaTyVar tv
        ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
-       ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
+       ; liftIO $ writeMetaTyVar tv (mkTyVarTy rhs_tv)
        ; traceTc "promoteTyVar" (ppr tv <+> text "-->" <+> ppr rhs_tv)
        ; return True }
    | otherwise
@@ -2314,7 +2315,7 @@ promoteTyVarSet tvs
 *                                                                      *
 ********************************************************************* -}
 
-zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
+zonkTcTypeAndFV :: TcType -> IO DTyCoVarSet
 -- Zonk a type and take its free variables
 -- With kind polymorphism it can be essential to zonk *first*
 -- so that we find the right set of free variables.  Eg
@@ -2324,7 +2325,7 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcType ty
 
-zonkTyCoVar :: TyCoVar -> TcM TcType
+zonkTyCoVar :: TyCoVar -> IO TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
@@ -2335,28 +2336,28 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
    -- GHC.Tc.Gen.HsType.bindTyClTyVars, but it seems
    -- painful to make them into TcTyVars there
 
-zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet
+zonkTyCoVarsAndFV :: TyCoVarSet -> IO TyCoVarSet
 zonkTyCoVarsAndFV tycovars
   = tyCoVarsOfTypes <$> mapM zonkTyCoVar (nonDetEltsUniqSet tycovars)
   -- It's OK to use nonDetEltsUniqSet here because we immediately forget about
   -- the ordering by turning it into a nondeterministic set and the order
   -- of zonking doesn't matter for determinism.
 
-zonkDTyCoVarSetAndFV :: DTyCoVarSet -> TcM DTyCoVarSet
+zonkDTyCoVarSetAndFV :: DTyCoVarSet -> IO DTyCoVarSet
 zonkDTyCoVarSetAndFV tycovars
   = mkDVarSet <$> (zonkTyCoVarsAndFVList $ dVarSetElems tycovars)
 
 -- Takes a list of TyCoVars, zonks them and returns a
 -- deterministically ordered list of their free variables.
-zonkTyCoVarsAndFVList :: [TyCoVar] -> TcM [TyCoVar]
+zonkTyCoVarsAndFVList :: [TyCoVar] -> IO [TyCoVar]
 zonkTyCoVarsAndFVList tycovars
   = tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
 
-zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
+zonkTcTyVars :: [TcTyVar] -> IO [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 
 -----------------  Types
-zonkTyCoVarKind :: TyCoVar -> TcM TyCoVar
+zonkTyCoVarKind :: TyCoVar -> IO TyCoVar
 zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind') }
 
@@ -2368,7 +2369,7 @@ zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
 ************************************************************************
 -}
 
-zonkImplication :: Implication -> TcM Implication
+zonkImplication :: Implication -> IO Implication
 zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_given  = given
                                , ic_wanted = wanted
@@ -2383,23 +2384,25 @@ zonkImplication implic@(Implic { ic_skols  = skols
                         , ic_wanted = wanted'
                         , ic_info   = info' }) }
 
-zonkEvVar :: EvVar -> TcM EvVar
+zonkEvVar :: EvVar -> IO EvVar
 zonkEvVar var = updateIdTypeAndMultM zonkTcType var
 
 
-zonkWC :: WantedConstraints -> TcM WantedConstraints
+type Zonk = IO
+
+zonkWC :: WantedConstraints -> Zonk WantedConstraints
 zonkWC wc = zonkWCRec wc
 
-zonkWCRec :: WantedConstraints -> TcM WantedConstraints
+zonkWCRec :: WantedConstraints -> Zonk WantedConstraints
 zonkWCRec (WC { wc_simple = simple, wc_impl = implic, wc_errors = errs })
   = do { simple' <- zonkSimples simple
        ; implic' <- mapBagM zonkImplication implic
        ; errs'   <- mapBagM zonkDelayedError errs
        ; return (WC { wc_simple = simple', wc_impl = implic', wc_errors = errs' }) }
 
-zonkSimples :: Cts -> TcM Cts
+zonkSimples :: Cts -> Zonk Cts
 zonkSimples cts = do { cts' <- mapBagM zonkCt cts
-                     ; traceTc "zonkSimples done:" (ppr cts')
+--                     ; traceTc "zonkSimples done:" (ppr cts')
                      ; return cts' }
 
 zonkDelayedError :: DelayedError -> TcM DelayedError
@@ -2497,16 +2500,16 @@ zonkSkolemInfoAnon skol_info = return skol_info
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable
 --      type variable and zonks the kind too
-zonkTcType  :: TcType -> TcM TcType
-zonkTcTypes :: [TcType] -> TcM [TcType]
-zonkCo      :: Coercion -> TcM Coercion
+zonkTcType  :: TcType -> IO TcType
+zonkTcTypes :: [TcType] -> IO [TcType]
+zonkCo      :: Coercion -> IO Coercion
 
 (zonkTcType, zonkTcTypes, zonkCo, _)
   = mapTyCo zonkTcTypeMapper
 
 -- | A suitable TyCoMapper for zonking a type during type-checking,
 -- before all metavars are filled in.
-zonkTcTypeMapper :: TyCoMapper () TcM
+zonkTcTypeMapper :: TyCoMapper () IO
 zonkTcTypeMapper = TyCoMapper
   { tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
@@ -2514,16 +2517,16 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
   , tcm_tycon      = zonkTcTyCon }
   where
-    hole :: () -> CoercionHole -> TcM Coercion
+    hole :: () -> CoercionHole -> IO Coercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
-      = do { contents <- readTcRef ref
+      = do { contents <- readIORef ref
            ; case contents of
                Just co -> do { co' <- zonkCo co
                              ; checkCoercionHole cv co' }
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
-zonkTcTyCon :: TcTyCon -> TcM TcTyCon
+zonkTcTyCon :: TcTyCon -> IO TcTyCon
 -- Only called on TcTyCons
 -- A non-poly TcTyCon may have unification
 -- variables that need zonking, but poly ones cannot
@@ -2532,7 +2535,7 @@ zonkTcTyCon tc
                          ; return (setTcTyConKind tc tck') }
  | otherwise        = return tc
 
-zonkTcTyVar :: TcTyVar -> TcM TcType
+zonkTcTyVar :: TcTyVar -> IO TcType
 -- Simply look through all Flexis
 zonkTcTyVar tv
   | isTcTyVar tv
@@ -2540,11 +2543,11 @@ zonkTcTyVar tv
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
       MetaTv { mtv_ref = ref }
-         -> do { cts <- readMutVar ref
+         -> do { cts <- readIORef ref
                ; case cts of
                     Flexi       -> zonk_kind_and_return
                     Indirect ty -> do { zty <- zonkTcType ty
-                                      ; writeTcRef ref (Indirect zty)
+                                      ; writeIORef ref (Indirect zty)
                                         -- See Note [Sharing in zonking]
                                       ; return zty } }
 
@@ -2556,10 +2559,10 @@ zonkTcTyVar tv
 
 -- Variant that assumes that any result of zonking is still a TyVar.
 -- Should be used only on skolems and TyVarTvs
-zonkTcTyVarsToTcTyVars :: HasDebugCallStack => [TcTyVar] -> TcM [TcTyVar]
+zonkTcTyVarsToTcTyVars :: HasDebugCallStack => [TcTyVar] -> IO [TcTyVar]
 zonkTcTyVarsToTcTyVars = mapM zonkTcTyVarToTcTyVar
 
-zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
+zonkTcTyVarToTcTyVar :: HasDebugCallStack => TcTyVar -> IO TcTyVar
 zonkTcTyVarToTcTyVar tv
   = do { ty <- zonkTcTyVar tv
        ; let tv' = case getTyVar_maybe ty of
@@ -2568,15 +2571,15 @@ zonkTcTyVarToTcTyVar tv
                                           (ppr tv $$ ppr ty)
        ; return tv' }
 
-zonkInvisTVBinder :: VarBndr TcTyVar spec -> TcM (VarBndr TcTyVar spec)
+zonkInvisTVBinder :: VarBndr TcTyVar spec -> IO (VarBndr TcTyVar spec)
 zonkInvisTVBinder (Bndr tv spec) = do { tv' <- zonkTcTyVarToTcTyVar tv
                                       ; return (Bndr tv' spec) }
 
 -- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> TcM TcId
+zonkId :: TcId -> IO TcId
 zonkId id = Id.updateIdTypeAndMultM zonkTcType id
 
-zonkCoVar :: CoVar -> TcM CoVar
+zonkCoVar :: CoVar -> IO CoVar
 zonkCoVar = zonkId
 
 {- Note [Sharing in zonking]
@@ -2606,18 +2609,18 @@ But c.f Note [Sharing when zonking to Type] in GHC.Tc.Utils.Zonk.
 ************************************************************************
 -}
 
-zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
+zonkTidyTcType :: TidyEnv -> TcType -> IO (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
 
-zonkTidyTcTypes :: TidyEnv -> [TcType] -> TcM (TidyEnv, [TcType])
+zonkTidyTcTypes :: TidyEnv -> [TcType] -> IO (TidyEnv, [TcType])
 zonkTidyTcTypes = zonkTidyTcTypes' []
   where zonkTidyTcTypes' zs env [] = return (env, reverse zs)
         zonkTidyTcTypes' zs env (ty:tys)
           = do { (env', ty') <- zonkTidyTcType env ty
                ; zonkTidyTcTypes' (ty':zs) env' tys }
 
-zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
+zonkTidyOrigin :: TidyEnv -> CtOrigin -> IO (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfoAnon skol_info
        ; let skol_info2 = tidySkolemInfoAnon env skol_info1
@@ -2666,12 +2669,12 @@ zonkTidyOrigin env (WantedSuperclassOrigin pty orig)
        ; return (env2, WantedSuperclassOrigin pty' orig') }
 zonkTidyOrigin env orig = return (env, orig)
 
-zonkTidyOrigins :: TidyEnv -> [CtOrigin] -> TcM (TidyEnv, [CtOrigin])
+zonkTidyOrigins :: TidyEnv -> [CtOrigin] -> IO (TidyEnv, [CtOrigin])
 zonkTidyOrigins = mapAccumLM zonkTidyOrigin
 
 zonkTidyFRRInfos :: TidyEnv
                  -> [FixedRuntimeRepErrorInfo]
-                 -> TcM (TidyEnv, [FixedRuntimeRepErrorInfo])
+                 -> IO (TidyEnv, [FixedRuntimeRepErrorInfo])
 zonkTidyFRRInfos = go []
   where
     go zs env [] = return (env, reverse zs)

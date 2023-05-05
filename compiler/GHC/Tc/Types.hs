@@ -854,7 +854,7 @@ getLclEnvLoc = tcl_loc
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
 lclEnvInGeneratedCode = tcl_in_gen_code
 
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
+type ErrCtxt = (Bool, TidyEnv -> IO (TidyEnv, SDoc))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction
