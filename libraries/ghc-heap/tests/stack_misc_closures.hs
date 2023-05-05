@@ -16,7 +16,9 @@ import Data.Functor
 import Debug.Trace
 import GHC.Exts
 import GHC.Exts.Heap
+import GHC.Exts.Heap (getBoxedClosureData)
 import GHC.Exts.Heap.Closures
+import GHC.Exts.Heap.Closures (GenStackFrame (retFunFun), StackField)
 import GHC.Exts.Stack
 import GHC.Exts.Stack.Decode
 import GHC.IO (IO (..))
@@ -26,7 +28,6 @@ import System.Info
 import System.Mem
 import TestUtils
 import Unsafe.Coerce (unsafeCoerce)
-import GHC.Exts.Heap.Closures (StackFrame(info_tbl))
 
 foreign import prim "any_update_framezh" any_update_frame# :: SetupFunction
 
@@ -164,7 +165,7 @@ main = do
       RetSmall {..} -> do
         assertEqual (tipe info_tbl) RET_SMALL
         assertEqual (length stack_payload) 1
-        assertConstrClosure 1 (head stack_payload)
+        assertConstrClosure 1 $ (stackFieldClosure . head) stack_payload
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 14"
   testSize any_ret_small_closure_frame# 2
@@ -174,7 +175,7 @@ main = do
       RetSmall {..} -> do
         assertEqual (tipe info_tbl) RET_SMALL
         assertEqual (length stack_payload) maxSmallBitmapBits
-        let wds = map getWordFromConstr01 stack_payload
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) stack_payload
         assertEqual wds [1 .. maxSmallBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 16"
@@ -207,7 +208,7 @@ main = do
       RetBig {..} -> do
         assertEqual (tipe info_tbl) RET_BIG
         assertEqual (length stack_payload) minBigBitmapBits
-        let wds = map getWordFromConstr01 stack_payload
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) stack_payload
         assertEqual wds [1 .. minBigBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 22"
@@ -219,7 +220,7 @@ main = do
         assertEqual (tipe info_tbl) RET_BIG
         let closureCount = fromIntegral $ bitsInWord + 1
         assertEqual (length stack_payload) closureCount
-        let wds = map getWordFromConstr01 stack_payload
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) stack_payload
         assertEqual wds [1 .. (fromIntegral closureCount)]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 24"
@@ -243,7 +244,8 @@ main = do
         assertEqual (tipe info_tbl) RET_FUN
         assertEqual retFunType ARG_GEN
         assertEqual retFunSize 9
-        case retFunFun of
+        retFunFun' <- getBoxedClosureData retFunFun
+        case retFunFun' of
           FunClosure {..} -> do
             assertEqual (tipe info) FUN_STATIC
             assertEqual (null dataArgs) True
@@ -252,7 +254,7 @@ main = do
             assertEqual (null ptrArgs) (os /= "darwin")
           e -> error $ "Wrong closure type: " ++ show e
         assertEqual (length retFunPayload) 9
-        let wds = map getWordFromConstr01 retFunPayload
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) retFunPayload
         assertEqual wds [1 .. 9]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 27"
@@ -264,14 +266,15 @@ main = do
         assertEqual (tipe info_tbl) RET_FUN
         assertEqual retFunType ARG_GEN_BIG
         assertEqual retFunSize 59
-        case retFunFun of
+        retFunFun' <- getBoxedClosureData retFunFun
+        case retFunFun' of
           FunClosure {..} -> do
             assertEqual (tipe info) FUN_STATIC
             assertEqual (null dataArgs) True
             assertEqual (null ptrArgs) True
           e -> error $ "Wrong closure type: " ++ show e
         assertEqual (length retFunPayload) 59
-        let wds = map getWordFromConstr01 retFunPayload
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) retFunPayload
         assertEqual wds [1 .. 59]
   traceM "Test 29"
   testSize any_ret_fun_arg_gen_big_frame# (3 + 59)
@@ -281,16 +284,17 @@ main = do
       RetBCO {..} -> do
         assertEqual (tipe info_tbl) RET_BCO
         assertEqual (length bcoArgs) 1
-        let wds = map getWordFromConstr01 bcoArgs
+        wds <- mapM (getWordFromConstr01 . stackFieldClosure) bcoArgs
         assertEqual wds [3]
-        case bco of
+        bco' <- getBoxedClosureData bco
+        case bco' of
           BCOClosure {..} -> do
             assertEqual (tipe info) BCO
             assertEqual arity 3
             assertEqual size 7
-            assertArrWordsClosure [1] =<< getBoxedClosureData instrs
-            assertArrWordsClosure [2] =<< getBoxedClosureData literals
-            assertMutArrClosure [3] =<< getBoxedClosureData bcoptrs
+            assertArrWordsClosure [1] instrs
+            assertArrWordsClosure [2] literals
+            assertMutArrClosure [3] bcoptrs
             assertEqual
               [ 1, -- StgLargeBitmap size in words
                 0 -- StgLargeBitmap first words
@@ -362,60 +366,62 @@ getStackSnapshot :: SetupFunction -> IO StackSnapshot
 getStackSnapshot action# = IO $ \s ->
   case action# s of (# s1, stack #) -> (# s1, StackSnapshot stack #)
 
-assertConstrClosure :: HasCallStack => Word -> Closure -> IO ()
-assertConstrClosure w c = case c of
-  ConstrClosure {..} -> do
-    assertEqual (tipe info) CONSTR_0_1
-    assertEqual dataArgs [w]
-    assertEqual (null ptrArgs) True
-  e -> error $ "Wrong closure type: " ++ show e
+assertConstrClosure :: HasCallStack => Word -> Box -> IO ()
+assertConstrClosure w c =
+  getBoxedClosureData c >>= \case
+    ConstrClosure {..} -> do
+      assertEqual (tipe info) CONSTR_0_1
+      assertEqual dataArgs [w]
+      assertEqual (null ptrArgs) True
+    e -> error $ "Wrong closure type: " ++ show e
 
-assertArrWordsClosure :: HasCallStack => [Word] -> Closure -> IO ()
-assertArrWordsClosure wds c = case c of
-  ArrWordsClosure {..} -> do
-    assertEqual (tipe info) ARR_WORDS
-    assertEqual arrWords wds
-  e -> error $ "Wrong closure type: " ++ show e
+assertArrWordsClosure :: HasCallStack => [Word] -> Box -> IO ()
+assertArrWordsClosure wds c =
+  getBoxedClosureData c >>= \case
+    ArrWordsClosure {..} -> do
+      assertEqual (tipe info) ARR_WORDS
+      assertEqual arrWords wds
+    e -> error $ "Wrong closure type: " ++ show e
 
-assertMutArrClosure :: HasCallStack => [Word] -> Closure -> IO ()
-assertMutArrClosure wds c = case c of
-  MutArrClosure {..} -> do
-    assertEqual (tipe info) MUT_ARR_PTRS_FROZEN_CLEAN
-    xs <- mapM getBoxedClosureData mccPayload
-    assertEqual wds $ map getWordFromConstr01 xs
-  e -> error $ "Wrong closure type: " ++ show e
+assertMutArrClosure :: HasCallStack => [Word] -> Box -> IO ()
+assertMutArrClosure wds c =
+  getBoxedClosureData c >>= \case
+    MutArrClosure {..} -> do
+      assertEqual (tipe info) MUT_ARR_PTRS_FROZEN_CLEAN
+      assertEqual wds =<< mapM getWordFromConstr01 mccPayload
+    e -> error $ "Wrong closure type: " ++ show e
 
-assertFun01Closure :: HasCallStack => Word -> Closure -> IO ()
-assertFun01Closure w c = case c of
-  FunClosure {..} -> do
-    assertEqual (tipe info) FUN_0_1
-    assertEqual dataArgs [w]
-    assertEqual (null ptrArgs) True
-  e -> error $ "Wrong closure type: " ++ show e
+assertFun01Closure :: HasCallStack => Word -> Box -> IO ()
+assertFun01Closure w c =
+  getBoxedClosureData c >>= \case
+    FunClosure {..} -> do
+      assertEqual (tipe info) FUN_0_1
+      assertEqual dataArgs [w]
+      assertEqual (null ptrArgs) True
+    e -> error $ "Wrong closure type: " ++ show e
 
-getWordFromConstr01 :: HasCallStack => Closure -> Word
-getWordFromConstr01 c = case c of
-  ConstrClosure {..} -> head dataArgs
-  e -> error $ "Wrong closure type: " ++ show e
+getWordFromConstr01 :: HasCallStack => Box -> IO Word
+getWordFromConstr01 c =
+  getBoxedClosureData c >>= \case
+    ConstrClosure {..} -> pure $ head dataArgs
+    e -> error $ "Wrong closure type: " ++ show e
 
-getWordFromBlackhole :: HasCallStack => Closure -> IO Word
-getWordFromBlackhole c = case c of
-  BlackholeClosure {..} -> getWordFromConstr01 <$> getBoxedClosureData indirectee
-  -- For test stability reasons: Expect that the blackhole might have been
-  -- resolved.
-  ConstrClosure {..} -> pure $ head dataArgs
-  e -> error $ "Wrong closure type: " ++ show e
+getWordFromBlackhole :: HasCallStack => Box -> IO Word
+getWordFromBlackhole c =
+  getBoxedClosureData c >>= \case
+    BlackholeClosure {..} -> getWordFromConstr01 indirectee
+    -- For test stability reasons: Expect that the blackhole might have been
+    -- resolved.
+    ConstrClosure {..} -> pure $ head dataArgs
+    e -> error $ "Wrong closure type: " ++ show e
 
-getWordFromUnknownTypeWordSizedPrimitive :: HasCallStack => Closure -> Word
-getWordFromUnknownTypeWordSizedPrimitive c = case c of
-  UnknownTypeWordSizedPrimitive {..} -> wordVal
-  e -> error $ "Wrong closure type: " ++ show e
+-- TODO: Inline
+getWordFromUnknownTypeWordSizedPrimitive :: HasCallStack => StackField -> Word
+getWordFromUnknownTypeWordSizedPrimitive = stackFieldWord
 
-assertUnknownTypeWordSizedPrimitive :: HasCallStack => Word -> Closure -> IO ()
-assertUnknownTypeWordSizedPrimitive w c = case c of
-  UnknownTypeWordSizedPrimitive {..} -> do
-    assertEqual wordVal w
-  e -> error $ "Wrong closure type: " ++ show e
+assertUnknownTypeWordSizedPrimitive :: HasCallStack => Word -> StackField -> IO ()
+assertUnknownTypeWordSizedPrimitive w stackField =
+  assertEqual (stackFieldWord stackField) w
 
 unboxSingletonTuple :: (# StackSnapshot# #) -> StackSnapshot#
 unboxSingletonTuple (# s# #) = s#
@@ -425,6 +431,14 @@ minBigBitmapBits = 1 + maxSmallBitmapBits
 
 maxSmallBitmapBits :: Num a => a
 maxSmallBitmapBits = fromIntegral maxSmallBitmapBits_c
+
+stackFieldClosure :: HasCallStack => StackField -> Box
+stackFieldClosure (StackBox b) = b
+stackFieldClosure w = error $ "Expected closure in a Box, got: " ++ show w
+
+stackFieldWord :: HasCallStack => StackField -> Word
+stackFieldWord (StackWord w) = w
+stackFieldWord c = error $ "Expected word, got: " ++ show c
 
 -- | A function with 59 arguments
 --
