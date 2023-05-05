@@ -8,6 +8,7 @@ module GHC.Tc.Solver.Canonical(
      unifyWanted,
      makeSuperClasses,
      StopOrContinue(..), stopWith, continueWith, andWhenContinue,
+     rewriteEqEvidence,
      solveCallStack    -- For GHC.Tc.Solver
   ) where
 

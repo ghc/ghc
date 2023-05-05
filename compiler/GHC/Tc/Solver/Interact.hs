@@ -35,6 +35,7 @@ import GHC.Core.Type as Type
 import GHC.Core.InstEnv     ( DFunInstType )
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.Reduction
 import GHC.Core.Predicate
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
@@ -2010,7 +2011,7 @@ doTopReactOther work_item
   | otherwise
   = do { res <- matchLocalInst pred loc
        ; case res of
-           OneInst {} -> chooseInstance work_item res
+           OneInst {} -> chooseInstance ev res
            _          -> continueWith work_item }
 
   where
@@ -2025,21 +2026,44 @@ doTopReactOther work_item
 ********************************************************************-}
 
 doTopReactEqPred :: Ct -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
-doTopReactEqPred work_item eq_rel t1 t2
+doTopReactEqPred work_item eq_rel lhs rhs
   -- See Note [Looking up primitive equalities in quantified constraints]
-  | Just (cls, tys) <- boxEqPred eq_rel t1 t2
-  = do { res <- matchLocalInst (mkClassPred cls tys) loc
-       ; case res of
-           OneInst { cir_mk_ev = mk_ev }
-             -> chooseInstance work_item
-                    (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
-           _ -> continueWith work_item }
-
-  | otherwise
-  = continueWith work_item
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; ics <- getInertCans
+       ; if isWanted ev                       -- Never look up Givens in quantified constraints
+         && not (null (inert_insts ics))      -- Shortcut common case
+         && not (isCoEvBindsVar ev_binds_var) -- See Note [Instances in no-evidence implications]
+         then try_for_qci
+         else continueWith work_item }
   where
     ev   = ctEvidence work_item
     loc = ctEvLoc ev
+
+    role = eqRelRole eq_rel
+    try_for_qci  -- First try looking for (lhs ~ rhs)
+       | Just (cls, tys) <- boxEqPred eq_rel lhs rhs
+       = do { res <- matchLocalInst (mkClassPred cls tys) loc
+            ; traceTcS "final_qci_check:1" (ppr (mkClassPred cls tys))
+            ; case res of
+                OneInst { cir_mk_ev = mk_ev }
+                  -> chooseInstance ev (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
+                _ -> try_swapping }
+       | otherwise
+       = continueWith work_item
+
+    try_swapping  -- Now try looking for (rhs ~ lhs)  (see #23333)
+       | Just (cls, tys) <- boxEqPred eq_rel rhs lhs
+       = do { res <- matchLocalInst (mkClassPred cls tys) loc
+            ; traceTcS "final_qci_check:2" (ppr (mkClassPred cls tys))
+            ; case res of
+                OneInst { cir_mk_ev = mk_ev }
+                  -> do { ev' <- rewriteEqEvidence emptyRewriterSet ev IsSwapped
+                                      (mkReflRedn role rhs) (mkReflRedn role lhs)
+                        ; chooseInstance ev' (res { cir_mk_ev = mk_eq_ev cls tys mk_ev }) }
+                _ -> do { traceTcS "final_qci_check:3" (ppr work_item)
+                        ; continueWith work_item }}
+       | otherwise
+       = continueWith work_item
 
     mk_eq_ev cls tys mk_ev evs
       = case (mk_ev evs) of
@@ -2279,7 +2303,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                OneInst { cir_what = what }
                   -> do { insertSafeOverlapFailureTcS what work_item
                         ; addSolvedDict what ev cls xis
-                        ; chooseInstance work_item lkup_res }
+                        ; chooseInstance ev lkup_res }
                _  -> -- NoInstance or NotSure
                      -- We didn't solve it; so try functional dependencies with
                      -- the instance environment
@@ -2312,27 +2336,23 @@ tryLastResortProhibitedSuperclass inerts
 tryLastResortProhibitedSuperclass _ work_item
   = continueWith work_item
 
-chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
+chooseInstance :: CtEvidence -> ClsInstResult -> TcS (StopOrContinue Ct)
 chooseInstance work_item
                (OneInst { cir_new_theta = theta
                         , cir_what      = what
                         , cir_mk_ev     = mk_ev })
-  = do { traceTcS "doTopReact/found instance for" $ ppr ev
+  = do { traceTcS "doTopReact/found instance for" $ ppr work_item
        ; deeper_loc <- checkInstanceOK loc what pred
        ; checkReductionDepth deeper_loc pred
-       ; evb <- getTcEvBindsVar
-       ; if isCoEvBindsVar evb
-         then continueWith work_item
-                  -- See Note [Instances in no-evidence implications]
-         else
-           do { evc_vars <- mapM (newWanted deeper_loc (ctRewriters work_item)) theta
-              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
-              ; emitWorkNC (freshGoals evc_vars)
-              ; stopWith ev "Dict/Top (solved wanted)" }}
+       ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
+                    (ppr work_item)
+       ; evc_vars <- mapM (newWanted deeper_loc (ctEvRewriters work_item)) theta
+       ; setEvBindIfWanted work_item (mk_ev (map getEvExpr evc_vars))
+       ; emitWorkNC (freshGoals evc_vars)
+       ; stopWith work_item "Dict/Top (solved wanted)" }
   where
-     ev         = ctEvidence work_item
-     pred       = ctEvPred ev
-     loc        = ctEvLoc ev
+     pred       = ctEvPred work_item
+     loc        = ctEvLoc work_item
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
