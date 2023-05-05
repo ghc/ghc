@@ -186,7 +186,7 @@ main = do
       RetSmall {..} -> do
         assertEqual (tipe info_tbl) RET_SMALL
         assertEqual (length stack_payload) maxSmallBitmapBits
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive stack_payload
+        let wds = map stackFieldWord stack_payload
         assertEqual wds [1 .. maxSmallBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 18"
@@ -197,7 +197,7 @@ main = do
       RetBig {..} -> do
         assertEqual (tipe info_tbl) RET_BIG
         assertEqual (length stack_payload) minBigBitmapBits
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive stack_payload
+        let wds = map stackFieldWord stack_payload
         assertEqual wds [1 .. minBigBitmapBits]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 20"
@@ -234,7 +234,7 @@ main = do
         assertEqual retFunSize 1
         assertFun01Closure 1 retFunFun
         assertEqual (length retFunPayload) 1
-        let wds = map getWordFromUnknownTypeWordSizedPrimitive retFunPayload
+        let wds = map stackFieldWord retFunPayload
         assertEqual wds [1]
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 26"
@@ -414,10 +414,6 @@ getWordFromBlackhole c =
     -- resolved.
     ConstrClosure {..} -> pure $ head dataArgs
     e -> error $ "Wrong closure type: " ++ show e
-
--- TODO: Inline
-getWordFromUnknownTypeWordSizedPrimitive :: HasCallStack => StackField -> Word
-getWordFromUnknownTypeWordSizedPrimitive = stackFieldWord
 
 assertUnknownTypeWordSizedPrimitive :: HasCallStack => Word -> StackField -> IO ()
 assertUnknownTypeWordSizedPrimitive w stackField =
