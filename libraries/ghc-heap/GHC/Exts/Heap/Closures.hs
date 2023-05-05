@@ -371,15 +371,20 @@ data GenClosure b
         { wordVal :: !Word }
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
--- | A decoded @StgStack@ with `StackFrame`s
---
--- This is separate from its `Closure` incarnation, as unification would
--- require two kinds of boxes for bitmap encoded stack content: One for
--- primitives and one for closures. This turned out to be a nightmare with lots
--- of pattern matches and leaking data structures to enable access to primitives
--- on the stack...
 type StgStackClosure = GenStgStackClosure Box
 
+-- | A decoded @StgStack@ with `StackFrame`s
+--
+-- Stack related data structures (`GenStgStackClosure`, `GenStackField`,
+-- `GenStackFrame`) are defined separately from `GenClosure` as their related
+-- functions are very different. Though, both are closures in the sense of RTS
+-- structures, their decoding logic differs: While it's safe to keep a reference
+-- to a heap closure, the garbage collector does not update references to stack
+-- located closures.
+--
+-- Additionally, stack frames don't appear outside of the stack. Thus, keeping
+-- `GenStackFrame` and `GenClosure` separated, makes these types more precise
+-- (in the sense what values to expect.)
 data GenStgStackClosure b = GenStgStackClosure
       { ssc_info            :: !StgInfoTable
       , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
@@ -387,16 +392,17 @@ data GenStgStackClosure b = GenStgStackClosure
       , ssc_stack_marking   :: !Word8
       , ssc_stack           :: ![GenStackFrame b]
       }
-  deriving (Show, Generic)
+  deriving (Foldable, Functor, Generic, Show, Traversable)
 
 type StackField = GenStackField Box
 
+-- | Bitmap-encoded payload on the stack
 data GenStackField b
     -- | A non-pointer field
     = StackWord !Word
     -- | A pointer field
     | StackBox  !b
-  deriving (Show, Generic)
+  deriving (Foldable, Functor, Generic, Show, Traversable)
 
 type StackFrame = GenStackFrame Box
 
@@ -460,10 +466,10 @@ data GenStackFrame b =
 
   |  RetBCO
       { info_tbl            :: !StgInfoTable
-      , bco                 :: !b -- is always a BCOClosure
+      , bco                 :: !b -- ^ always a BCOClosure
       , bcoArgs             :: ![GenStackField b]
       }
-  deriving (Show, Generic)
+  deriving (Foldable, Functor, Generic, Show, Traversable)
 
 -- | Fun types according to @FunTypes.h@
 -- This `Enum` must be aligned with the values in @FunTypes.h@.

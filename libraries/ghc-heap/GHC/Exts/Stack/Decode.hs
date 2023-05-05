@@ -57,21 +57,28 @@ As the StgStack closure is moved as whole, the relative offsets inside it stay
 the same. (Though, the absolute addresses change!)
 
 Decoding
-====================
+========
 
 Stack frames are defined by their `StackSnapshot#` (`StgStack*` in RTS) and
 their relative offset. This tuple is described by `StackFrameLocation`.
 
-`StackFrame` is an ADT for decoded stack frames. Where it points to heap located
-closures or primitive Words (in bitmap encoded payloads), `Closure` is used to
-describe the referenced payload.
+`StackFrame` is an ADT for decoded stack frames. Regarding payload and fields we
+have to deal with three cases:
+
+- If the payload can only be a closure, we put it in a `Box` for later decoding
+  by the heap closure functions.
+
+- If the payload can either be a closure or a word-sized value (this happens for
+  bitmap-encoded payloads), we use a `StackField` which is a sum type to
+  represent either a `Word` or a `Box`.
+
+- Fields that are just simple (i.e. non-closure) values are decoded as such.
 
 The decoding happens in two phases:
 
 1. The whole stack is decoded into `StackFrameLocation`s.
 
-2. All `StackFrameLocation`s are decoded into `StackFrame`s which have
-`Closure`s as fields/references.
+2. All `StackFrameLocation`s are decoded into `StackFrame`s.
 
 `StackSnapshot#` parameters are updated by the garbage collector and thus safe
 to hand around.
@@ -79,22 +86,6 @@ to hand around.
 The head of the stack frame array has offset (index) 0. To traverse the stack
 frames the latest stack frame's offset is incremented by the closure size. The
 unit of the offset is machine words (32bit or 64bit.)
-
-Boxes
-=====
-
-`Closure` makes extensive usage of `Box`es. Unfortunately, we cannot simply apply the
-same here:
-
-- Bitmap encoded payloads can be either words or closure pointers.
-
-- Underflow frames point to `StgStack` closures.
-
-These three cases are hard to encode in boxes. Additionally, introducing new box
-types would break existing box usages. Thus, the stack is decoded unboxed, while
-the referenced `Closure`s use boxes. This seems to be a good compromise between
-optimization (with boxes) and simplicity (by leaving out the mentioned special
-cases.)
 
 IO
 ==
