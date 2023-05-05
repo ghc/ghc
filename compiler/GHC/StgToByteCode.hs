@@ -81,8 +81,10 @@ import Data.Coerce (coerce)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import Data.IntMap (IntMap)
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import qualified Data.List.NonEmpty as NE
 import qualified GHC.Data.FiniteMap as Map
 import Data.Ord
 import GHC.Stack.CCS
@@ -296,8 +298,8 @@ argBits platform (rep : args)
   | isFollowableArg rep  = False : argBits platform args
   | otherwise = replicate (argRepSizeW platform rep) True ++ argBits platform args
 
-non_void :: [ArgRep] -> [ArgRep]
-non_void = filter nv
+non_void :: NonEmpty ArgRep -> [ArgRep]
+non_void = NE.filter nv
   where nv V = False
         nv _ = True
 
@@ -464,7 +466,7 @@ returnUnliftedAtom d s p e = do
                  StgLitArg lit -> typePrimRepArgs (literalType lit)
                  StgVarArg i   -> bcIdPrimReps i
     (push, szb) <- pushAtom d p e
-    ret <- returnUnliftedReps d s szb reps
+    ret <- returnUnliftedReps d s szb (NE.toList $! reps)
     return (push `appOL` ret)
 
 -- return an unlifted value from the top of the stack
@@ -867,7 +869,7 @@ doCase d s p scrut bndr alts
         (bndr_size, call_info, args_offsets)
            | ubx_tuple_frame =
                let bndr_ty = primRepCmmType platform
-                   bndr_reps = filter (not.isVoidRep) (bcIdPrimReps bndr)
+                   bndr_reps = NE.filter (not.isVoidRep) (bcIdPrimReps bndr)
                    (call_info, args_offsets) =
                        layoutNativeCall profile NativeTupleReturn 0 bndr_ty bndr_reps
                in ( wordsToBytes platform (nativeCallSize call_info)
@@ -1660,9 +1662,8 @@ maybe_getCCallReturnRep fn_ty
                          (pprType fn_ty)
      in
        case r_reps of
-         []            -> panic "empty typePrimRepArgs"
-         [VoidRep]     -> Nothing
-         [rep]         -> Just rep
+         VoidRep :| [] -> Nothing
+         rep     :| [] -> Just rep
 
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
@@ -2117,7 +2118,7 @@ idSizeCon platform var
     isUnboxedSumType (idType var) =
     wordsToBytes platform .
     WordOff . sum . map (argRepSizeW platform . toArgRep platform) .
-    bcIdPrimReps $ var
+    NE.toList . bcIdPrimReps $ var
   | otherwise = ByteOff (primRepSizeB platform (bcIdPrimRep var))
 
 bcIdArgRep :: Platform -> Id -> ArgRep
@@ -2125,13 +2126,13 @@ bcIdArgRep platform = toArgRep platform . bcIdPrimRep
 
 bcIdPrimRep :: Id -> PrimRep
 bcIdPrimRep id
-  | [rep] <- typePrimRepArgs (idType id)
+  | rep :| [] <- typePrimRepArgs (idType id)
   = rep
   | otherwise
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
 
 
-bcIdPrimReps :: Id -> [PrimRep]
+bcIdPrimReps :: Id -> NonEmpty PrimRep
 bcIdPrimReps id = typePrimRepArgs (idType id)
 
 repSizeWords :: Platform -> PrimRep -> WordOff
@@ -2189,8 +2190,8 @@ atomRep platform e = toArgRep platform (atomPrimRep e)
 mkStackOffsets :: ByteOff -> [ByteOff] -> [ByteOff]
 mkStackOffsets original_depth szsb = tail (scanl' (+) original_depth szsb)
 
-typeArgReps :: Platform -> Type -> [ArgRep]
-typeArgReps platform = map (toArgRep platform) . typePrimRepArgs
+typeArgReps :: Platform -> Type -> NonEmpty ArgRep
+typeArgReps platform = NE.map (toArgRep platform) . typePrimRepArgs
 
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad

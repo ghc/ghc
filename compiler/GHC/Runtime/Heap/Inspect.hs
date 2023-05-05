@@ -889,12 +889,12 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
            return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
       | otherwise
       = case typePrimRepArgs ty of
-          [rep_ty] ->  do
+          rep_ty :| [] ->  do
             (ptr_i, arr_i, term0)  <- go_rep ptr_i arr_i ty rep_ty
             (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
             return (ptr_i, arr_i, term0 : terms1)
-          rep_tys -> do
-           (ptr_i, arr_i, terms0) <- go_unary_types ptr_i arr_i rep_tys
+          rep_ty :| rep_tys -> do
+           (ptr_i, arr_i, terms0) <- go_unary_types ptr_i arr_i (rep_ty:rep_tys)
            (ptr_i, arr_i, terms1) <- go ptr_i arr_i tys
            return (ptr_i, arr_i, unboxedTupleTerm ty terms0 : terms1)
 
