@@ -65,6 +65,8 @@ interfaceErrorHints = \ case
     missingInterfaceErrorHints err
   Can'tFindNameInInterface {} ->
     noHints
+  CircularImport {} ->
+    noHints
 
 missingInterfaceErrorHints :: MissingInterfaceError -> [GhcHint]
 missingInterfaceErrorHints = \case
@@ -85,6 +87,8 @@ interfaceErrorReason :: IfaceMessage -> DiagnosticReason
 interfaceErrorReason (Can'tFindInterface err _)
   = missingInterfaceErrorReason err
 interfaceErrorReason (Can'tFindNameInInterface {})
+  = ErrorWithoutFlag
+interfaceErrorReason (CircularImport {})
   = ErrorWithoutFlag
 
 missingInterfaceErrorReason :: MissingInterfaceError -> DiagnosticReason
@@ -287,6 +291,9 @@ interfaceErrorDiagnostic opts = \ case
       LookingForSig sig ->
         hang (text "Could not find interface file for signature" <+> quotes (ppr sig) <> colon)
           2 (missingInterfaceErrorDiagnostic opts err)
+  CircularImport mod ->
+    text "Circular imports: module" <+> quotes (ppr mod)
+    <+> text "depends on itself"
 
 readInterfaceErrorDiagnostic :: ReadInterfaceError -> SDoc
 readInterfaceErrorDiagnostic = \ case

@@ -719,6 +719,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "NoUnitIdMatching"                              = 51294
   GhcDiagnosticCode "NotAModule"                                    = 35235
   GhcDiagnosticCode "Can'tFindNameInInterface"                      = 83249
+  GhcDiagnosticCode "CircularImport"                                = 75429
   GhcDiagnosticCode "HiModuleNameMismatchWarn"                      = 53693
   GhcDiagnosticCode "ExceptionOccurred"                             = 47808
 

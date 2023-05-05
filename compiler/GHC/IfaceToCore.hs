@@ -605,18 +605,13 @@ tcHiBootIface hsc_src mod
                              (LookingForHiBoot mod)
                 in failWithTc (TcRnInterfaceError diag)
               -- The hi-boot file has mysteriously disappeared.
-              NotBoot -> failWithTc (mkTcRnUnknownMessage $ mkPlainError noHints moduleLoop)
+              NotBoot -> failWithTc (TcRnInterfaceError (CircularImport mod))
               -- Someone below us imported us!
               -- This is a loop with no hi-boot in the way
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
                  <+> text "to compare against the Real Thing"
-
-    moduleLoop = text "Circular imports: module" <+> quotes (ppr mod)
-                     <+> text "depends on itself"
-
-
 
 mkSelfBootInfo :: ModIface -> ModDetails -> TcRn SelfBootInfo
 mkSelfBootInfo iface mds

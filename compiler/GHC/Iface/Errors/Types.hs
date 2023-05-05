@@ -45,6 +45,7 @@ data IfaceMessage
   | Can'tFindNameInInterface
       Name
       [TyThing] -- possibly relevant TyThings
+  | CircularImport !Module
   deriving Generic
 
 data MissingInterfaceError
