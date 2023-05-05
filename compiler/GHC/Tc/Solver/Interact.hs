@@ -1264,7 +1264,7 @@ doTopReactOther work_item
   | otherwise
   = do { res <- matchLocalInst pred loc
        ; case res of
-           OneInst {} -> chooseInstance work_item res
+           OneInst {} -> chooseInstance ev res
            _          -> continueWith work_item }
 
   where

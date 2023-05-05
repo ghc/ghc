@@ -69,7 +69,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                OneInst { cir_what = what }
                   -> do { insertSafeOverlapFailureTcS what work_item
                         ; addSolvedDict what ev cls xis
-                        ; chooseInstance work_item lkup_res }
+                        ; chooseInstance ev lkup_res }
                _  -> -- NoInstance or NotSure
                      -- We didn't solve it; so try functional dependencies
                      tryFunDeps work_item }
@@ -113,28 +113,24 @@ tryLastResortProhibitedSuperclass inerts
 tryLastResortProhibitedSuperclass _ work_item
   = continueWith work_item
 
-chooseInstance :: Ct -> ClsInstResult -> TcS (StopOrContinue Ct)
+chooseInstance :: CtEvidence -> ClsInstResult -> TcS (StopOrContinue Ct)
 chooseInstance work_item
                (OneInst { cir_new_theta   = theta
                         , cir_what        = what
                         , cir_mk_ev       = mk_ev
                         , cir_coherence   = coherence })
-  = do { traceTcS "doTopReact/found instance for" $ ppr ev
+  = do { traceTcS "doTopReact/found instance for" $ ppr work_item
        ; deeper_loc <- checkInstanceOK loc what pred
        ; checkReductionDepth deeper_loc pred
-       ; evb <- getTcEvBindsVar
-       ; if isCoEvBindsVar evb
-         then continueWith work_item
-                  -- See Note [Instances in no-evidence implications]
-         else
-           do { evc_vars <- mapM (newWanted deeper_loc (ctRewriters work_item)) theta
-              ; setEvBindIfWanted ev coherence (mk_ev (map getEvExpr evc_vars))
-              ; emitWorkNC (freshGoals evc_vars)
-              ; stopWith ev "Dict/Top (solved wanted)" }}
+       ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
+                    (ppr work_item)
+       ; evc_vars <- mapM (newWanted deeper_loc (ctEvRewriters work_item)) theta
+       ; setEvBindIfWanted work_item coherence (mk_ev (map getEvExpr evc_vars))
+       ; emitWorkNC (freshGoals evc_vars)
+       ; stopWith work_item "Dict/Top (solved wanted)" }
   where
-     ev         = ctEvidence work_item
-     pred       = ctEvPred ev
-     loc        = ctEvLoc ev
+     pred = ctEvPred work_item
+     loc  = ctEvLoc work_item
 
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
@@ -159,27 +155,6 @@ checkInstanceOK loc what pred
        = setCtLocOrigin loc (ScOrigin what NotNakedSc)
        | otherwise
        = loc
-
-{- Note [Instances in no-evidence implications]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In #15290 we had
-  [G] forall p q. Coercible p q => Coercible (m p) (m q))
-  [W] forall <no-ev> a. m (Int, IntStateT m a)
-                          ~R#
-                        m (Int, StateT Int m a)
-
-The Given is an ordinary quantified constraint; the Wanted is an implication
-equality that arises from
-  [W] (forall a. t1) ~R# (forall a. t2)
-
-But because the (t1 ~R# t2) is solved "inside a type" (under that forall a)
-we can't generate any term evidence.  So we can't actually use that
-lovely quantified constraint.  Alas!
-
-This test arranges to ignore the instance-based solution under these
-(rare) circumstances.   It's sad, but I  really don't see what else we can do.
--}
-
 
 matchClassInst :: DynFlags -> InertSet
                -> Class -> [Type]
