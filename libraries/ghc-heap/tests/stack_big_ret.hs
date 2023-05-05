@@ -49,11 +49,12 @@ main = do
   let xs = zip [1 ..] cs
   mapM_ (uncurry checkArg) xs
 
-checkArg :: Word -> Closure -> IO ()
-checkArg w bp =
-  case bp of
-    UnknownTypeWordSizedPrimitive _ -> error "Unexpected payload type from bitmap."
-    c -> do
+checkArg :: Word -> StackField -> IO ()
+checkArg w sf =
+  case sf of
+    StackWord _ -> error "Unexpected payload type from bitmap."
+    StackBox b -> do
+      c <- getBoxedClosureData b
       assertEqual CONSTR_0_1 $ (tipe . info) c
       assertEqual "I#" (name c)
       assertEqual "ghc-prim" (pkg c)
