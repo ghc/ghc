@@ -424,7 +424,7 @@ distroVariables Alpine = mconcat
     -- T10458, ghcilink002: due to #17869
     -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
     -- (see Note [Object unloading]).
-  , "BROKEN_TESTS" =: "encoding004 T10458 ghcilink002 linker_unload_native"
+  , "BROKEN_TESTS" =: "encoding004 T10458 linker_unload_native"
   ]
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
@@ -903,8 +903,11 @@ job_groups =
      , standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla)
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
      , standardBuildsWithConfig I386 (Linux Debian9) (splitSectionsBroken vanilla)
-     , standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static)
-     , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
+     -- Fully static build, in theory usable on any linux distribution.
+     , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static))
+     -- Dynamically linked build, suitable for building your own static executables on alpine
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken vanilla))
+     , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
         )
@@ -919,6 +922,10 @@ job_groups =
      ]
 
   where
+
+    -- ghcilink002 broken due to #17869
+    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 ")
+
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
 
     tsan_jobs =
