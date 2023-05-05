@@ -149,7 +149,7 @@ getCgIdInfo id
                       | otherwise
                       = pprPanic "GHC.StgToCmm.Env: label not found" (ppr id <+> dcolon <+> ppr (idType id))
               in return $
-                  litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
+                  litIdInfo platform id (importedIdLFInfo id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug, id is neither in local binds nor is external
         }}}

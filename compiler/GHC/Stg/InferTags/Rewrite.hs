@@ -36,7 +36,7 @@ import GHC.Core            ( AltCon(..) )
 import GHC.Core.Type
 
 import GHC.StgToCmm.Types
-import GHC.StgToCmm.Closure (mkLFImported)
+import GHC.StgToCmm.Closure (importedIdLFInfo)
 
 import GHC.Stg.Utils
 import GHC.Stg.Syntax as StgSyn
@@ -275,7 +275,7 @@ isTagged v = do
         False -> return $!
                 -- Determine whether it is tagged from the LFInfo of the imported id.
                 -- See Note [The LFInfo of Imported Ids]
-                case mkLFImported v of
+                case importedIdLFInfo v of
                     -- Function, applied not entered.
                     LFReEntrant {}
                         -> True
