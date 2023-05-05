@@ -2647,23 +2647,45 @@ finishEqCt work_item@(EqCt { eq_lhs = lhs, eq_rhs = rhs, eq_eq_rel = eq_rel })
 final_qci_check :: Ct -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
 -- The "final QCI check" checks to see if we have
 --    [W] t1 ~# t2
--- and a Given quantified contraint like (forall a b. blah => a :~: b)
+-- and a Given quantified contraint like (forall a b. blah => a ~ b)
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
 final_qci_check work_ct eq_rel lhs rhs
-  | isWanted ev
-  , Just (cls, tys) <- boxEqPred eq_rel lhs rhs
-  = do { res <- matchLocalInst (mkClassPred cls tys) loc
-       ; case res of
-           OneInst { cir_mk_ev = mk_ev }
-             -> chooseInstance work_ct
-                    (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
-           _ -> continueWith work_ct }
-
-  | otherwise
-  = continueWith work_ct
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; ics <- getInertCans
+       ; if isWanted ev                       -- Never look up Givens in quantified constraints
+         && not (null (inert_insts ics))      -- Shortcut common case
+         && not (isCoEvBindsVar ev_binds_var) -- See Note [Instances in no-evidence implications]
+         then try_for_qci
+         else continueWith work_ct }
   where
     ev  = ctEvidence work_ct
     loc = ctEvLoc ev
+    role = eqRelRole eq_rel
+
+    try_for_qci  -- First try looking for (lhs ~ rhs)
+       | Just (cls, tys) <- boxEqPred eq_rel lhs rhs
+       = do { res <- matchLocalInst (mkClassPred cls tys) loc
+            ; traceTcS "final_qci_check:1" (ppr (mkClassPred cls tys))
+            ; case res of
+                OneInst { cir_mk_ev = mk_ev }
+                  -> chooseInstance ev (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
+                _ -> try_swapping }
+       | otherwise
+       = continueWith work_ct
+
+    try_swapping  -- Now try looking for (rhs ~ lhs)  (see #23333)
+       | Just (cls, tys) <- boxEqPred eq_rel rhs lhs
+       = do { res <- matchLocalInst (mkClassPred cls tys) loc
+            ; traceTcS "final_qci_check:2" (ppr (mkClassPred cls tys))
+            ; case res of
+                OneInst { cir_mk_ev = mk_ev }
+                  -> do { ev' <- rewriteEqEvidence emptyRewriterSet ev IsSwapped
+                                      (mkReflRedn role rhs) (mkReflRedn role lhs)
+                        ; chooseInstance ev' (res { cir_mk_ev = mk_eq_ev cls tys mk_ev }) }
+                _ -> do { traceTcS "final_qci_check:3" (ppr work_ct)
+                        ; continueWith work_ct }}
+       | otherwise
+       = continueWith work_ct
 
     mk_eq_ev cls tys mk_ev evs
       | sc_id : rest <- classSCSelIds cls  -- Just one superclass for this
@@ -2671,6 +2693,27 @@ final_qci_check work_ct eq_rel lhs rhs
           EvExpr e -> EvExpr (Var sc_id `mkTyApps` tys `App` e)
           ev       -> pprPanic "mk_eq_ev" (ppr ev)
       | otherwise = pprPanic "finishEqCt" (ppr work_ct)
+
+{- Note [Instances in no-evidence implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #15290 we had
+  [G] forall p q. Coercible p q => Coercible (m p) (m q))   -- Quantified
+  [W] forall <no-ev> a. m (Int, IntStateT m a)
+                          ~R#
+                        m (Int, StateT Int m a)
+
+The Given is an ordinary quantified constraint; the Wanted is an implication
+equality that arises from
+  [W] (forall a. t1) ~R# (forall a. t2)
+
+But because the (t1 ~R# t2) is solved "inside a type" (under that forall a)
+we can't generate any term evidence.  So we can't actually use that
+lovely quantified constraint.  Alas!
+
+This test arranges to ignore the instance-based solution under these
+(rare) circumstances.   It's sad, but I  really don't see what else we can do.
+-}
+
 
 {-
 **********************************************************************

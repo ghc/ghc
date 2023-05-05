@@ -1713,8 +1713,8 @@ just a coercion? i.e. evTermCoercion_maybe returns Nothing.
 Consider [G] forall a. blah => a ~ T
          [W] S ~# T
 
-Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~
-T) in the quantified constraints, and wraps the (boxed) evidence it
+Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~ T)
+in the quantified constraints, and wraps the (boxed) evidence it
 gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
 that term into a coercion, so we add a value binding
     h = eq_sel (...)
