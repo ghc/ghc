@@ -474,7 +474,7 @@ getRuleQuantCts :: WantedConstraints -> (Cts, WantedConstraints)
 --   and attempt to solve them from the quantified constraints.  That
 --   nearly works, but fails for a constraint like (d :: Eq Int).
 --   We /do/ want to quantify over it, but the short-cut solver
---   (see GHC.Tc.Solver.Interact Note [Shortcut solving]) ignores the quantified
+--   (see GHC.Tc.Solver.Dict Note [Shortcut solving]) ignores the quantified
 --   and instead solves from the top level.
 --
 --   So we must partition the WantedConstraints ourselves

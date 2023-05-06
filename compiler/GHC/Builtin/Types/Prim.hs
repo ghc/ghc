@@ -1037,8 +1037,8 @@ Here's what's unusual about it:
  * It is "naturally coherent". This means that the solver won't hesitate to
    solve a goal of type (a ~~ b) even if there is, say (Int ~~ c) in the
    context. (Normally, it waits to learn more, just in case the given
-   influences what happens next.) See Note [Naturally coherent classes]
-   in GHC.Tc.Solver.Interact.
+   influences what happens next.) See Note [Solving equality classes]
+   in GHC.Tc.Solver.Dict
 
  * It always terminates. That is, in the UndecidableInstances checks, we
    don't worry if a (~~) constraint is too big, as we know that solving
@@ -1047,7 +1047,7 @@ Here's what's unusual about it:
 On the other hand, this behaves just like any class w.r.t. eager superclass
 unpacking in the solver. So a lifted equality given quickly becomes an unlifted
 equality given. This is good, because the solver knows all about unlifted
-equalities. There is some special-casing in GHC.Tc.Solver.Interact.matchClassInst to
+equalities. There is some special-casing in GHC.Tc.Solver.Dict.matchClassInst to
 pretend that there is an instance of this class, as we can't write the instance
 in Haskell.
 

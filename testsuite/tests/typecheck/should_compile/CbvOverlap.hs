@@ -2,7 +2,7 @@
 
 module CbvOverlap where
 
--- This is concerned with Note [Type variable cycles in Givens] and class lookup
+-- This is concerned with Note [Type equality cycles] and class lookup
 
 class C a where
   meth :: a -> ()

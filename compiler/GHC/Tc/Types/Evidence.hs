@@ -661,7 +661,7 @@ important) are solved in three steps:
 
 1. Explicit, user-written occurrences of `?stk :: CallStack`
    which have IPOccOrigin, are solved directly from the given IP,
-   just like a regular IP; see GHC.Tc.Solver.Interact.interactDict.
+   just like a regular IP; see GHC.Tc.Solver.Dict.tryInertDicts.
 
    For example, the occurrence of `?stk` in
 
@@ -691,7 +691,7 @@ important) are solved in three steps:
         [W] d1 : IP "stk" CallStack
      with CtOrigin = OccurrenceOf "foo"
 
-   * We /solve/ this constraint, in GHC.Tc.Solver.Canonical.canClassNC
+   * We /solve/ this constraint, in GHC.Tc.Solver.Dict.canDictNC
      by emitting a NEW Wanted
         [W] d2 :: IP "stk" CallStack
      with CtOrigin = IPOccOrigin
@@ -777,7 +777,7 @@ Important Details:
 
 - When we emit a new wanted CallStack from rule (2) we set its origin to
   `IPOccOrigin ip_name` instead of the original `OccurrenceOf func`
-  (see GHC.Tc.Solver.Interact.interactDict).
+  (see GHC.Tc.Solver.Dict.tryInertDicts).
 
   This is a bit shady, but is how we ensure that the new wanted is
   solved like a regular IP.

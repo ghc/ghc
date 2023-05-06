@@ -598,7 +598,7 @@ of the target constraint (C ty1 .. tyn). The search works like this.
 (IL0) If there are any local Givens that match (potentially unifying
       any metavariables, even untouchable ones) the target constraint,
       the search fails. See Note [Instance and Given overlap] in
-      GHC.Tc.Solver.Interact.
+      GHC.Tc.Solver.Dict.
 
 (IL1) Find all instances `I` that *match* the target constraint; that is, the target
       constraint is a substitution instance of `I`. These instance declarations are

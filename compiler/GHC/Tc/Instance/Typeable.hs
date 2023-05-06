@@ -94,7 +94,7 @@ The overall plan is this:
    interface file to find its type, value, etc
 
 4. Solve Typeable constraints.  This is done by a custom Typeable solver,
-   currently in GHC.Tc.Solver.Interact, that use M.$tcT so solve (Typeable T).
+   currently in GHC.Tc.Instance.Class, that use M.$tcT so solve (Typeable T).
 
 There are many wrinkles:
 

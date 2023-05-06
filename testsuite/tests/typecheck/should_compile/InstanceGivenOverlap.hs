@@ -3,7 +3,7 @@
 
 module InstanceGivenOverlap where
 
--- See Note [Instance and Given overlap] in GHC.Tc.Solver.Interact.
+-- See Note [Instance and Given overlap] in GHC.Tc.Solver.Dict.
 -- This tests the Note when the Wanted contains a type family.
 
 class P a

@@ -50,7 +50,7 @@ TcCoercibleFail.hs:30:9: error: [GHC-18872]
 
 TcCoercibleFail.hs:35:8: error:
     • Reduction stack overflow; size = 201
-      When simplifying the following type: Age
+      When simplifying the following type: Fix (Either Age)
       Use -freduction-depth=0 to disable this check
       (any upper bound you could choose might fail unpredictably with
        minor updates to GHC, so disabling the check is recommended if

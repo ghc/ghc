@@ -46,10 +46,10 @@ import GHC.Builtin.Names
 import GHC.Tc.Errors
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Evidence
-import GHC.Tc.Solver.Interact
-import GHC.Tc.Solver.Canonical   ( makeSuperClasses, solveCallStack )
-import GHC.Tc.Solver.Rewrite     ( rewriteType )
-import GHC.Tc.Utils.Unify        ( buildTvImplication )
+import GHC.Tc.Solver.Solve   ( solveSimpleGivens, solveSimpleWanteds )
+import GHC.Tc.Solver.Dict    ( makeSuperClasses, solveCallStack )
+import GHC.Tc.Solver.Rewrite ( rewriteType )
+import GHC.Tc.Utils.Unify    ( buildTvImplication )
 import GHC.Tc.Utils.TcMType as TcM
 import GHC.Tc.Utils.Monad   as TcM
 import GHC.Tc.Solver.InertSet
@@ -153,7 +153,7 @@ simplifyTop wanteds
        ; binds2 <- reportUnsolved final_wc
 
        ; traceTc "reportUnsolved (unsafe overlapping) {" empty
-       ; unless (isEmptyCts unsafe_ol) $ do {
+       ; unless (isEmptyBag unsafe_ol) $ do {
            -- grab current error messages and clear, warnAllUnsolved will
            -- update error messages which we'll grab and then restore saved
            -- messages.
@@ -161,7 +161,7 @@ simplifyTop wanteds
            ; saved_msg <- TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var emptyMessages
 
-           ; warnAllUnsolved $ emptyWC { wc_simple = unsafe_ol }
+           ; warnAllUnsolved $ emptyWC { wc_simple = fmap CDictCan unsafe_ol }
 
            ; whyUnsafe <- getWarningMessages <$> TcM.readTcRef errs_var
            ; TcM.writeTcRef errs_var saved_msg
@@ -277,8 +277,8 @@ floatKindEqualities wc = float_wc emptyVarSet wc
       = Nothing
       where
         is_floatable ct
-           | insolubleEqCt ct = False
-           | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
+           | insolubleCt ct = False
+           | otherwise      = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag DelayedError)
     float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_given_eqs = given_eqs
@@ -870,12 +870,12 @@ How is this implemented? It's complicated! So we'll step through it all:
     list of instances that are unsafe to overlap. When the method call is safe,
     the list is null.
 
- 2) `GHC.Tc.Solver.Interact.matchClassInst` -- This module drives the instance resolution
+ 2) `GHC.Tc.Solver.Dict.matchClassInst` -- This module drives the instance resolution
     / dictionary generation. The return type is `ClsInstResult`, which either
     says no instance matched, or one found, and if it was a safe or unsafe
     overlap.
 
- 3) `GHC.Tc.Solver.Interact.doTopReactDict` -- Takes a dictionary / class constraint and
+ 3) `GHC.Tc.Solver.Dict.tryInstances` -- Takes a dictionary / class constraint and
      tries to resolve it by calling (in part) `matchClassInst`. The resolving
      mechanism has a work list (of constraints) that it process one at a time. If
      the constraint can't be resolved, it's added to an inert set. When compiling
@@ -998,25 +998,18 @@ last example above.
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
 simplifyAmbiguityCheck ty wanteds
-  = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
+  = do { traceTc "simplifyAmbiguityCheck {" $
+         text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds
+
        ; (final_wc, _) <- runTcS $ useUnsatisfiableGivens =<< solveWanteds wanteds
              -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
              -- Note: we do still use Unsatisfiable Givens to solve Wanteds,
              -- see Wrinkle [Ambiguity] under point (C) of
              -- Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors.
 
-       ; traceTc "End simplifyAmbiguityCheck }" empty
+       ; discardResult (reportUnsolved final_wc)
 
-       -- Normally report all errors; but with -XAllowAmbiguousTypes
-       -- report only insoluble ones, since they represent genuinely
-       -- inaccessible code
-       ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
-       ; traceTc "reportUnsolved(ambig) {" empty
-       ; unless (allow_ambiguous && not (insolubleWC final_wc))
-                (discardResult (reportUnsolved final_wc))
-       ; traceTc "reportUnsolved(ambig) }" empty
-
-       ; return () }
+       ; traceTc "End simplifyAmbiguityCheck }" empty }
 
 ------------------
 simplifyInteractive :: WantedConstraints -> TcM (Bag EvBind)
@@ -2706,7 +2699,7 @@ and suppose during type inference we obtain an implication constraint:
 To solve this implication constraint, we first expand one layer of the superclass
 of Given constraints, but not for Wanted constraints.
 (See Note [Eagerly expand given superclasses] and Note [Why adding superclasses can help]
-in GHC.Tc.Solver.Canonical.) We thus get:
+in GHC.Tc.Solver.Dict.) We thus get:
 
     [G] g1 :: C a
     [G] g2 :: C [a]    -- new superclass layer from g1
@@ -2795,7 +2788,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                -- The insoluble stuff might be in one sub-implication
                -- and other unsolved goals in another; and we want to
                -- solve the latter as much as possible
-  = do { inerts <- getTcSInerts
+  = do { inerts <- getInertSet
        ; traceTcS "solveImplication {" (ppr imp $$ text "Inerts" <+> ppr inerts)
 
        -- commented out; see `where` clause below
@@ -3232,7 +3225,7 @@ others).
 
 * When two Givens are the same, we drop the evidence for the one
   that requires more superclass selectors. This is done
-  according to Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
+  according to Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
 
 * The ic_need fields of an Implic records in-scope (given) evidence
   variables bound by the context, that were needed to solve this
@@ -3274,7 +3267,7 @@ others).
     All three will discover that they have two [G] Eq a constraints:
     one as given and one extracted from the Ord a constraint. They will
     both discard the latter, as noted above and in
-    Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
+    Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
 
     The body of f uses the [G] Eq a, but not the [G] Ord a. It will
     report a redundant Ord a using the logic for case (a).
@@ -3396,7 +3389,7 @@ approximateWC float_past_equalities wc
 
     is_floatable encl_eqs skol_tvs ct
        | isGivenCt ct                                = False
-       | insolubleEqCt ct                            = False
+       | insolubleCt ct                              = False
        | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
        | otherwise
        = case classifyPredType (ctPred ct) of

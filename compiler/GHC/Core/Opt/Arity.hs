@@ -1874,7 +1874,7 @@ The no-crap way is
   \(y::Int). let j' :: Int -> Bool
                  j' x = e y
              in b[j'/j] y
-where I have written to stress that j's type has
+where I have written b[j'/j] to stress that j's type has
 changed.  Note that (of course!) we have to push the application
 inside the RHS of the join as well as into the body.  AND if j
 has an unfolding we have to push it into there too.  AND j might

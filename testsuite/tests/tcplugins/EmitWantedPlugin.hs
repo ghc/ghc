@@ -30,7 +30,7 @@ import GHC.Tc.Plugin
 import GHC.Tc.Types
   ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
-  ( Ct(..), ctLoc, ctEvCoercion, mkNonCanonical )
+  ( Ct(..), DictCt(..), ctLoc, ctEvCoercion, mkNonCanonical )
 import GHC.Tc.Types.Evidence
   ( EvBindsVar, EvTerm(EvExpr) )
 
@@ -61,9 +61,9 @@ solver args defs _ev _gs ws = do
   pure $ TcPluginOk solved new
 
 solveCt :: PluginDefs -> Ct -> TcPluginM ( Maybe ( (EvTerm, Ct), Ct ) )
-solveCt ( PluginDefs {..} ) ct@( CDictCan { cc_class, cc_tyargs } )
-  | className cc_class == className myClass
-  , [tyArg] <- cc_tyargs
+solveCt ( PluginDefs {..} ) ct@( CDictCan (DictCt { di_cls, di_tys } ))
+  | className di_cls == className myClass
+  , [tyArg] <- di_tys
   = do
       new_wanted_ctev <- newWanted (ctLoc ct) (mkPrimEqPred tyArg unitTy)
       let

@@ -1818,7 +1818,7 @@ FunTy will be built without being able to purely extract the RuntimeReps.
 Because the PKTI does not guarantee that the RuntimeReps are available in a FunTy,
 we must be aware of this when splitting: splitTyConApp and splitAppTy will *not*
 split a FunTy if the RuntimeReps are not available. See also Note [Decomposing FunTy]
-in GHC.Tc.Solver.Canonical.
+in GHC.Tc.Solver.Equality.
 
 Note [mkAppTyM]
 ~~~~~~~~~~~~~~~

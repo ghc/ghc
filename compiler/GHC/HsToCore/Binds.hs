@@ -1406,7 +1406,7 @@ ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
-  = -- See Note [Typeable for Nat and Symbol] in GHC.Tc.Solver.Interact
+  = -- See Note [Typeable for Nat and Symbol] in GHC.Tc.Instance.Class
     do { fun  <- dsLookupGlobalId tr_fun
        ; dict <- dsEvTerm ev       -- Of type KnownNat/KnownSymbol
        ; return (mkApps (mkTyApps (Var fun) [ty]) [ dict ]) }

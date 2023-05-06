@@ -733,8 +733,8 @@ itself not purely syntactic; it accounts for CastTys;
 see Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
 
 Unlike the "impure unifiers" in the typechecker (the eager unifier in
-GHC.Tc.Utils.Unify, and the constraint solver itself in GHC.Tc.Solver.Canonical), the pure
-unifier does /not/ work up to ~.
+GHC.Tc.Utils.Unify, and the constraint solver itself in GHC.Tc.Solver.Equality),
+the pure unifier does /not/ work up to ~.
 
 The algorithm implemented here is rather delicate, and we depend on it
 to uphold certain properties. This is a summary of these required

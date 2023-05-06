@@ -20,7 +20,7 @@ import GHC.Tc.Plugin
 import GHC.Tc.Types
   ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
-  ( Ct(..) )
+  ( Ct(..), DictCt(..) )
 import GHC.Tc.Types.Evidence
   ( EvBindsVar, EvTerm(EvExpr) )
 
@@ -49,10 +49,10 @@ solver _args defs _ev _gs ws = do
   pure $ TcPluginOk solved []
 
 solveCt :: PluginDefs -> Ct -> TcPluginM ( Maybe (EvTerm, Ct) )
-solveCt ( PluginDefs {..} ) ct@( CDictCan { cc_class } )
-  | className cc_class == className nullary
+solveCt ( PluginDefs {..} ) ct@( CDictCan (DictCt { di_cls } ))
+  | className di_cls == className nullary
   , let
       evTerm :: EvTerm
-      evTerm = EvExpr $ mkCoreConApps ( classDataCon cc_class ) []
+      evTerm = EvExpr $ mkCoreConApps ( classDataCon di_cls ) []
   = pure $ Just ( evTerm, ct )
 solveCt _ ct = pure Nothing
