@@ -906,6 +906,9 @@ class Outputable a where
 -- There's no Outputable for Char; it's too easy to use Outputable
 -- on String and have ppr "hello" rendered as "h,e,l,l,o".
 
+instance Outputable Void where
+    ppr _ = text "<<Void>>"
+
 instance Outputable Bool where
     ppr True  = text "True"
     ppr False = text "False"

@@ -771,7 +771,7 @@ Proposal 29).
 newMetaTyVarName :: FastString -> TcM Name
 -- Makes a /System/ Name, which is eagerly eliminated by
 -- the unifier; see GHC.Tc.Utils.Unify.nicer_to_update_tv1, and
--- GHC.Tc.Solver.Canonical.canEqTyVarTyVar (nicer_to_update_tv2)
+-- GHC.Tc.Solver.Equality.canEqTyVarTyVar (nicer_to_update_tv2)
 newMetaTyVarName str
   = newSysName (mkTyVarOccFS str)
 
@@ -873,7 +873,7 @@ cloneAnonMetaTyVar info tv kind
         ; return tyvar }
 
 -- Make a new CycleBreakerTv. See Note [Type equality cycles]
--- in GHC.Tc.Solver.Canonical.
+-- in GHC.Tc.Solver.Equality
 newCycleBreakerTyVar :: TcKind -> TcM TcTyVar
 newCycleBreakerTyVar kind
   = do { details <- newMetaDetails CycleBreakerTv
@@ -988,7 +988,7 @@ writeMetaTyVarRef tyvar ref ty
 
   -- Everything from here on only happens if DEBUG is on
   -- Need to zonk 'ty' because we may only recently have promoted
-  -- its free meta-tyvars (see Solver.Interact.tryToSolveByUnification)
+  -- its free meta-tyvars (see GHC.Tc.Utils.Unify.checkPromoteFreeVars)
   | otherwise
   = do { meta_details <- readMutVar ref;
        -- Zonk kinds to allow the error check to work
@@ -2448,24 +2448,24 @@ will be canonicalised again, so there is little benefit in keeping the
 CEqCan structure.
 
 NB: Constraints are always rewritten etc by the canonicaliser in
-@GHC.Tc.Solver.Canonical@ even if they come in as CDictCan. Only canonical constraints that
-are actually in the inert set carry all the guarantees. So it is okay if zonkCt
-creates e.g. a CDictCan where the cc_tyars are /not/ fully reduced.
--}
+GHC.Tc.Solver.Solve.solveCt even if they come in as CDictCan. Only canonical
+constraints that are actually in the inert set carry all the guarantees. So it
+is okay if zonkCt creates e.g. a CDictCan where the cc_tyars are /not/ fully
+reduced.  -}
 
 zonkCt :: Ct -> TcM Ct
 -- See Note [zonkCt behaviour]
-zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
+zonkCt (CDictCan dict@(DictCt { di_ev = ev, di_tys = args }))
   = do { ev'   <- zonkCtEvidence ev
        ; args' <- mapM zonkTcType args
-       ; return $ ct { cc_ev = ev', cc_tyargs = args' } }
+       ; return (CDictCan (dict { di_ev = ev', di_tys = args' })) }
 
 zonkCt (CEqCan (EqCt { eq_ev = ev }))
   = mkNonCanonical <$> zonkCtEvidence ev
 
-zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_reason flag
+zonkCt (CIrredCan ir@(IrredCt { ir_ev = ev })) -- Preserve the cc_reason flag
   = do { ev' <- zonkCtEvidence ev
-       ; return (ct { cc_ev = ev' }) }
+       ; return (CIrredCan (ir { ir_ev = ev' })) }
 
 zonkCt ct
   = do { fl' <- zonkCtEvidence (ctEvidence ct)
@@ -2694,7 +2694,7 @@ zonkTidyFRRInfos = go []
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct
 -- Used only in error reporting
-tidyCt env ct = ct { cc_ev = tidyCtEvidence env (ctEvidence ct) }
+tidyCt env ct = updCtEvidence (tidyCtEvidence env) ct
 
 tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
@@ -2792,16 +2792,19 @@ naughtyQuantification orig_ty tv escapees
 
 zonkCtRewriterSet :: Ct -> TcM Ct
 zonkCtRewriterSet ct
-  | isGiven ev = return ct
+  | isGivenCt ct
+  = return ct
   | otherwise
   = case ct of
-      CQuantCan {}                    -> return ct
-      CEqCan eq@(EqCt { eq_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
-                                            ; return (CEqCan (eq { eq_ev = ev' })) }
-      _ ->  do { ev' <- zonkCtEvRewriterSet ev
-               ; return (ct { cc_ev = ev' }) }
-  where
-    ev = ctEvidence ct
+      CEqCan eq@(EqCt { eq_ev = ev })       -> do { ev' <- zonkCtEvRewriterSet ev
+                                                  ; return (CEqCan (eq { eq_ev = ev' })) }
+      CIrredCan ir@(IrredCt { ir_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
+                                                  ; return (CIrredCan (ir { ir_ev = ev' })) }
+      CDictCan di@(DictCt { di_ev = ev })   -> do { ev' <- zonkCtEvRewriterSet ev
+                                                  ; return (CDictCan (di { di_ev = ev' })) }
+      CQuantCan {}     -> return ct
+      CNonCanonical ev -> do { ev' <- zonkCtEvRewriterSet ev
+                             ; return (CNonCanonical ev') }
 
 zonkCtEvRewriterSet :: CtEvidence -> TcM CtEvidence
 zonkCtEvRewriterSet ev@(CtGiven {})

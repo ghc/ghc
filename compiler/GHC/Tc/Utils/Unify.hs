@@ -2203,7 +2203,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
                      Just uref -> updTcRef uref (tv1 :)
                  ; return (mkNomReflCo ty2) }  -- Unification is always Nominal
 
-         else -- The kinds don't match yet, so give up defer instead.
+         else -- The kinds don't match yet, so defer instead.
               do { writeTcRef def_eq_ref def_eqs
                      -- Since we are discarding co_k, also discard any constraints
                      -- emitted by kind unification; they are just useless clutter.
@@ -2366,7 +2366,7 @@ Needless to say, all there are wrinkles:
 
   * In the constraint solver, we track where Given equalities occur
     and use that to guard unification in
-    GHC.Tc.Solver.Canonical.touchabilityAndShapeTest. More details in
+    GHC.Tc.Utils.Unify.touchabilityAndShapeTest. More details in
     Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 
     Historical note: in the olden days (pre 2021) the constraint solver
@@ -2387,7 +2387,7 @@ This is a surprisingly tricky question!
 
 The question is answered by swapOverTyVars, which is used
   - in the eager unifier, in GHC.Tc.Utils.Unify.uUnfilledVar1
-  - in the constraint solver, in GHC.Tc.Solver.Canonical.canEqCanLHS2
+  - in the constraint solver, in GHC.Tc.Solver.Equality.canEqCanLHS2
 
 First note: only swap if you have to!
    See Note [Avoid unnecessary swaps]
@@ -2528,31 +2528,6 @@ better in practice.
 
 Revisited in Nov '20, along with removing flattening variables. Problem
 is still present, and the solution is still the same.
-
-Note [Type synonyms and the occur check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generally speaking we try to update a variable with type synonyms not
-expanded, which improves later error messages, unless looking
-inside a type synonym may help resolve a spurious occurs check
-error. Consider:
-          type A a = ()
-
-          f :: (A a -> a -> ()) -> ()
-          f = \ _ -> ()
-
-          x :: ()
-          x = f (\ x p -> p x)
-
-We will eventually get a constraint of the form t ~ A t. The ok function above will
-properly expand the type (A t) to just (), which is ok to be unified with t. If we had
-unified with the original type A t, we would lead the type checker into an infinite loop.
-
-Hence, if the occurs check fails for a type synonym application, then (and *only* then),
-the ok function expands the synonym to detect opportunities for occurs check success using
-the underlying definition of the type synonym.
-
-The same applies later on in the constraint interaction code; see GHC.Tc.Solver.Interact,
-function @occ_check_ok@.
 
 Note [Non-TcTyVars in GHC.Tc.Utils.Unify]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3272,7 +3247,7 @@ promote_meta_tyvar info dest_lvl occ_tv
 touchabilityAndShapeTest :: TcLevel -> TcTyVar -> TcType -> Bool
 -- This is the key test for untouchability:
 -- See Note [Unification preconditions] in GHC.Tc.Utils.Unify
--- and Note [Solve by unification] in GHC.Tc.Solver.Interact
+-- and Note [Solve by unification] in GHC.Tc.Solver.Equality
 -- True <=> touchability and shape are OK
 touchabilityAndShapeTest given_eq_lvl tv rhs
   | MetaTv { mtv_info = info, mtv_tclvl = tv_lvl } <- tcTyVarDetails tv

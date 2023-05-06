@@ -4,17 +4,17 @@
 -- | Utility types used within the constraint solver
 module GHC.Tc.Solver.Types (
     -- Inert CDictCans
-    DictMap, emptyDictMap, addDict,
+    DictMap, emptyDictMap,
     findDictsByTyConKey, findDictsByClass,
-    addDictsByClass, delDict, foldDicts, filterDicts, findDict,
-    dictsToBag, partitionDicts,
+    foldDicts, findDict,
+    dictsToBag,
 
     FunEqMap, emptyFunEqs, findFunEq, insertFunEq,
     findFunEqsByTyCon,
 
     TcAppMap, emptyTcAppMap, isEmptyTcAppMap,
     insertTcApp, alterTcApp, filterTcAppMap,
-    tcAppMapToBag, foldTcAppMap,
+    tcAppMapToBag, foldTcAppMap, delTcApp,
 
     EqualCtList, filterEqualCtList, addToEqualCtList
 
@@ -133,9 +133,6 @@ emptyDictMap = emptyTcAppMap
 
 findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
 findDict m loc cls tys
-  | hasIPSuperClasses cls tys -- See Note [Tuples hiding implicit parameters]
-  = Nothing
-
   | Just {} <- isCallStackPred cls tys
   , isPushCallStackOrigin (ctLocOrigin loc)
   = Nothing             -- See Note [Solving CallStack constraints]
@@ -151,56 +148,14 @@ findDictsByTyConKey m tc
   | Just tm <- lookupUDFM_Directly m tc = foldTM consBag tm emptyBag
   | otherwise                           = emptyBag
 
-delDict :: DictMap a -> Class -> [Type] -> DictMap a
-delDict m cls tys = delTcApp m (classTyCon cls) tys
-
-addDict :: DictMap a -> Class -> [Type] -> a -> DictMap a
-addDict m cls tys item = insertTcApp m (classTyCon cls) tys item
-
-addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
-addDictsByClass m cls items
-  = extendDTyConEnv m (classTyCon cls) (foldr add emptyTM items)
-  where
-    add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
-    add ct _ = pprPanic "addDictsByClass" (ppr ct)
-
-filterDicts :: (Ct -> Bool) -> DictMap Ct -> DictMap Ct
-filterDicts f m = filterTcAppMap f m
-
-partitionDicts :: (Ct -> Bool) -> DictMap Ct -> (Bag Ct, DictMap Ct)
-partitionDicts f m = foldTcAppMap k m (emptyBag, emptyDictMap)
-  where
-    k ct (yeses, noes) | f ct      = (ct `consBag` yeses, noes)
-                       | otherwise = (yeses,              add ct noes)
-    add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) m
-      = addDict m cls tys ct
-    add ct _ = pprPanic "partitionDicts" (ppr ct)
-
 dictsToBag :: DictMap a -> Bag a
 dictsToBag = tcAppMapToBag
 
 foldDicts :: (a -> b -> b) -> DictMap a -> b -> b
 foldDicts = foldTcAppMap
 
-{- Note [Tuples hiding implicit parameters]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f,g :: (?x::Int, C a) => a -> a
-   f v = let ?x = 4 in g v
-
-The call to 'g' gives rise to a Wanted constraint (?x::Int, C a).
-We must /not/ solve this from the Given (?x::Int, C a), because of
-the intervening binding for (?x::Int).  #14218.
-
-We deal with this by arranging that we always fail when looking up a
-tuple constraint that hides an implicit parameter. Note that this applies
-  * both to the inert_dicts (lookupInertDict)
-  * and to the solved_dicts (looukpSolvedDict)
-An alternative would be not to extend these sets with such tuple
-constraints, but it seemed more direct to deal with the lookup.
-
-Note [Solving CallStack constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Solving CallStack constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Overview of implicit CallStacks] in GHc.Tc.Types.Evidence.
 
 Suppose f :: HasCallStack => blah.  Then
@@ -212,7 +167,7 @@ Suppose f :: HasCallStack => blah.  Then
     IP "callStack" CallStack
   See Note [Overview of implicit CallStacks] in GHC.Tc.Types.Evidence
 
-* We cannonicalise such constraints, in GHC.Tc.Solver.Canonical.canClassNC, by
+* We cannonicalise such constraints, in GHC.Tc.Solver.Dict.canDictNC, by
   pushing the call-site info on the stack, and changing the CtOrigin
   to record that has been done.
    Bind:  s1 = pushCallStack <site-info> s2

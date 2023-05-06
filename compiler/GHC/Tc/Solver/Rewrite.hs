@@ -92,9 +92,9 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, RewriterSet)
 runRewrite loc flav eq_rel thing_inside
   = do { rewriters_ref <- newTcRef emptyRewriterSet
-       ; let fmode = RE { re_loc  = loc
-                        , re_flavour = flav
-                        , re_eq_rel = eq_rel
+       ; let fmode = RE { re_loc       = loc
+                        , re_flavour   = flav
+                        , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref
@@ -316,7 +316,7 @@ For example, see the RTRNotFollowed case in rewriteTyVar.
 
 Why have these invariants on rewriting? Because we sometimes use typeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
-GHC.Tc.Solver.Canonical.canEqCanLHS).
+GHC.Tc.Solver.Equality.canEqCanLHS).
 
 Rewriting is always homogeneous. That is, the kind of the result of rewriting is
 always the same as the kind of the input, modulo zonking. More formally:
@@ -514,7 +514,7 @@ rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
 
         -- Important: look at the *reduced* type, so that any unzonked variables
         -- in kinds are gone and the getRuntimeRep succeeds.
-        -- cf. Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical.
+        -- cf. Note [Decomposing FunTy] in GHC.Tc.Solver.Equality.
        ; let arg_rep = getRuntimeRep (reductionReducedType arg_redn)
              res_rep = getRuntimeRep (reductionReducedType res_redn)
 
@@ -668,7 +668,7 @@ rewrite_vector ki roles tys
 
 {- Note [Do not rewrite newtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We flirted with unwrapping newtypes in the rewriter -- see GHC.Tc.Solver.Canonical
+We flirted with unwrapping newtypes in the rewriter -- see GHC.Tc.Solver.Equality
 Note [Unwrap newtypes first]. But that turned out to be a bad idea because
 of recursive newtypes, as that Note says.  So be careful if you re-add it!
 
@@ -1057,8 +1057,9 @@ This means that rewriting must be recursive, but it does allow
   [G] b ~ Maybe c
 
 This avoids "saturating" the Givens, which can save a modest amount of work.
-It is easy to implement, in GHC.Tc.Solver.Interact.kick_out, by only kicking out an inert
-only if (a) the work item can rewrite the inert AND
+It is easy to implement, in GHC.Tc.Solver.InertSet.kickOutRewritableLHS, by
+only kicking out an inert only if
+        (a) the work item can rewrite the inert AND
         (b) the inert cannot rewrite the work item
 
 This is significantly harder to think about. It can save a LOT of work

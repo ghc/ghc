@@ -105,7 +105,7 @@ module GHC.Tc.Utils.Monad(
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
   emitConstraints, emitStaticConstraints, emitSimple, emitSimples,
-  emitImplication, emitImplications, emitInsoluble,
+  emitImplication, emitImplications,
   emitDelayedErrors, emitHole, emitHoles, emitNotConcreteError,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
@@ -1827,12 +1827,6 @@ emitImplications ct
   = unless (isEmptyBag ct) $
     do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`addImplics` ct) }
-
-emitInsoluble :: Ct -> TcM ()
-emitInsoluble ct
-  = do { traceTc "emitInsoluble" (ppr ct)
-       ; lie_var <- getConstraintVar
-       ; updTcRef lie_var (`addInsols` unitBag ct) }
 
 emitDelayedErrors :: Bag DelayedError -> TcM ()
 emitDelayedErrors errs

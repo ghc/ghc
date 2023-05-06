@@ -1082,7 +1082,7 @@ That is the entire point of qlUnify!   Wrinkles:
   calling unifyKind, producing a coercion perhaps emitting some deferred
   equality constraints.  That is /different/ from the approach we use in
   the main constraint solver for heterogeneous equalities; see Note
-  [Equalities with incompatible kinds] in Solver.Canonical
+  [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
 
   Why different? Because:
   - We can't use qlUnify to solve the kind constraint because qlUnify

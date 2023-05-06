@@ -233,19 +233,20 @@ so we can take their type variables into account as part of the
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
   | wantAmbiguityCheck ctxt
-  = do { traceTc "Ambiguity check for" (ppr ty)
+  = do { traceTc "Ambiguity check for {" (ppr ty)
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
-       ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
-                            captureConstraints $
-                            tcSubTypeAmbiguity ctxt ty ty
-                            -- See Note [Ambiguity check and deep subsumption]
-                            -- in GHC.Tc.Utils.Unify
-       ; simplifyAmbiguityCheck ty wanted
+       ; unless allow_ambiguous $
+         do { (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
+                                 captureConstraints $
+                                 tcSubTypeAmbiguity ctxt ty ty
+                                 -- See Note [Ambiguity check and deep subsumption]
+                                 -- in GHC.Tc.Utils.Unify
+            ; simplifyAmbiguityCheck ty wanted }
 
-       ; traceTc "Done ambiguity check for" (ppr ty) }
+       ; traceTc "} Done ambiguity check for" (ppr ty) }
 
   | otherwise
   = return ()
@@ -1230,7 +1231,7 @@ e.g.   module A where
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
-  | isEqPredClass cls    -- (~) and (~~) are classified as classes,
+  | isEqualityClass cls  -- (~) and (~~) and Coercible are classified as classes,
                          -- but here we want to treat them as equalities
   = -- Equational constraints are valid in all contexts, and
     -- we do not need to check e.g. for FlexibleContexts here, so just do nothing
@@ -1301,9 +1302,9 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A type signature like
    f :: Eq [(a,b)] => a -> b
-is very fragile, for reasons described at length in GHC.Tc.Solver.Interact
+is very fragile, for reasons described at length in GHC.Tc.Solver.Dict
 Note [Instance and Given overlap].  As that Note discusses, for the
-most part the clever stuff in GHC.Tc.Solver.Interact means that we don't use a
+most part the clever stuff in GHC.Tc.Solver.Dict means that we don't use a
 top-level instance if a local Given might fire, so there is no
 fragility. But if we /infer/ the type of a local let-binding, things
 can go wrong (#11948 is an example, discussed in the Note).
@@ -1315,7 +1316,7 @@ class constraints.
 The warning only fires if the constraint in the signature
 matches the top-level instances in only one way, and with no
 unifiers -- that is, under the same circumstances that
-GHC.Tc.Solver.Interact.matchInstEnv fires an interaction with the top
+GHC.Tc.Instance.Class.matchInstEnv fires an interaction with the top
 level instances.  For example (#13526), consider
 
   instance {-# OVERLAPPABLE #-} Eq (T a) where ...
@@ -1696,7 +1697,7 @@ the middle:
 Note [Validity checking of HasField instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The HasField class has magic constraint solving behaviour (see Note
-[HasField instances] in GHC.Tc.Solver.Interact).  However, we permit users to
+[HasField instances] in GHC.Tc.Instance.Class).  However, we permit users to
 declare their own instances, provided they do not clash with the
 built-in behaviour.  In particular, we forbid:
 

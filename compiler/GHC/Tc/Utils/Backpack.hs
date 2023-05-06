@@ -209,24 +209,25 @@ check_inst sig_inst@(ClsInst { is_dfun = dfun_id }) = do
     -- TODO: This could be very well generalized to support instance
     -- declarations in boot files.
     tcg_env <- getGblEnv
+    lcl_env <- getLclEnv
+
     -- NB: Have to tug on the interface, not necessarily
     -- tugged... but it didn't work?
     mapM_ tcLookupImported_maybe (nameSetElemsStable (orphNamesOfClsInst sig_inst))
 
     -- Based off of 'simplifyDeriv'
-    let origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
     (skol_info, tvs_skols, inst_theta, cls, inst_tys) <- tcSkolDFunType (idType dfun_id)
     (tclvl,cts) <- pushTcLevelM $ do
+       given_ids <- mapM newEvVar inst_theta
+       let given_loc = mkGivenLoc topTcLevel skol_info lcl_env
+           givens = [ CtGiven { ctev_pred = idType given_id
+                              -- Doesn't matter, make something up
+                              , ctev_evar = given_id
+                              , ctev_loc  = given_loc  }
+                    | given_id <- given_ids ]
+           origin    = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
        wanted <- newWanted origin (Just TypeLevel) (mkClassPred cls inst_tys)
-       givens <- forM inst_theta $ \given -> do
-           loc <- getCtLocM origin (Just TypeLevel)
-           new_ev <- newEvVar given
-           return CtGiven { ctev_pred = given
-                          -- Doesn't matter, make something up
-                          , ctev_evar = new_ev
-                          , ctev_loc = loc
-                          }
-       return $ wanted : givens
+       return (wanted : givens)
     unsolved <- simplifyWantedsTcM cts
 
     (implic, _) <- buildImplicationFor tclvl skol_info tvs_skols [] unsolved

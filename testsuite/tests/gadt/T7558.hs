@@ -6,3 +6,11 @@ data T a b where
 
 f :: T a a -> Bool
 f (MkT x y) = [x,y] `seq` True
+
+{- We get
+
+[G] a ~ Maybe a
+[W] a ~ Maybe a
+
+We can solve the Wanted from the Given
+-}

@@ -622,7 +622,7 @@ substitutions until the next run of the simplifier.
       case (df @Int) of (co :: a ~# b) -> blah
   Which is very exotic, and I think never encountered; but see
   Note [Equality superclasses in quantified constraints]
-  in GHC.Tc.Solver.Canonical
+  in GHC.Tc.Solver.Dict
 
 Note [Representation polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

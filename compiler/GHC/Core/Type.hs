@@ -1619,7 +1619,7 @@ splitTyConAppNoView_maybe ty
 -- (e.g. `FunTy (a :: k) Int`, since the kind of @a@ isn't of
 -- the form `TYPE rep`.  This isn't usually a problem but may
 -- be temporarily the cas during canonicalization:
---     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
+--     see Note [Decomposing FunTy] in GHC.Tc.Solver.Equality
 --     and Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
 --         Wrinkle around FunTy
 --

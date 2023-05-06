@@ -6,9 +6,6 @@
 --    [W] C (F a0) a0, F a0 ~ Bool
 -- Currently (Oct 16) I've disabled this because it seems like
 -- overkill.
---
--- See Note Note [No reduction for Derived class constraints]
--- in GHC.Tc.Solver.Interact
 
 module Foo where
 

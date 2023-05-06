@@ -427,7 +427,7 @@ See also:
  * [Injectivity annotation] in GHC.Hs.Decls
  * [Renaming injectivity annotation] in GHC.Rename.Module
  * [Verifying injectivity annotation] in GHC.Core.FamInstEnv
- * [Type inference for type families with injectivity] in GHC.Tc.Solver.Interact
+ * [Type inference for type families with injectivity] in GHC.Tc.Solver.Equality
 
 Note [Sharing nullary TyConApps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1979,7 +1979,7 @@ isTypeDataTyCon (TyCon { tyConDetails = details })
 -- (where r is the role passed in):
 --   If (T a1 b1 c1) ~r (T a2 b2 c2), then (a1 ~r1 a2), (b1 ~r2 b2), and (c1 ~r3 c2)
 -- (where r1, r2, and r3, are the roles given by tyConRolesX tc r)
--- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Canonical"
+-- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Equality"
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon (TyCon { tyConDetails = details }) role
   = go details role
@@ -2003,7 +2003,7 @@ isInjectiveTyCon (TyCon { tyConDetails = details }) role
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where r is the role passed in):
 --   If (T tys ~r t), then (t's head ~r T).
--- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Canonical"
+-- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Equality"
 --
 -- NB: at Nominal role, isGenerativeTyCon is simple:
 --     isGenerativeTyCon tc Nominal

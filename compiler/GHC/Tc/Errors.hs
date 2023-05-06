@@ -465,8 +465,9 @@ mkErrorItem ct
              -> do { rewriters' <- zonkRewriterSet rewriters
                    ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
 
-       ; let m_reason = case ct of CIrredCan { cc_reason = reason } -> Just reason
-                                   _                                -> Nothing
+       ; let m_reason = case ct of
+                CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
+                _                                          -> Nothing
 
        ; return $ Just $ EI { ei_pred     = ctPred ct
                             , ei_evdest   = m_evdest
@@ -605,7 +606,7 @@ reportWanteds ctxt tc_lvl wc@(WC { wc_simple = simples, wc_impl = implics
                   -- where alpha is untouchable; and representational equalities
                   -- Prefer homogeneous equalities over hetero, because the
                   -- former might be holding up the latter.
-                  -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Canonical
+                  -- See Note [Equalities with incompatible kinds] in GHC.Tc.Solver.Equality
               , ("Homo eqs",      is_homo_equality,  True,  mkGroupReporter mkEqErr)
               , ("Other eqs",     is_equality,       True,  mkGroupReporter mkEqErr)
               ]
@@ -1758,7 +1759,7 @@ reportEqErr ctxt item ty1 ty2
                       , mismatchAmbiguityInfo = eqInfos
                       , mismatchCoercibleInfo = mb_coercible_info }
   where
-    mismatch = misMatchOrCND False ctxt item ty1 ty2
+    mismatch = misMatchOrCND ctxt item ty1 ty2
     eqInfos  = eqInfoMsgs ty1 ty2
 
 coercible_msg :: TcType -> TcType -> TcM (Maybe CoercibleMsg)
@@ -1814,7 +1815,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   = return (mkBlockedEqErr item, [])
 
   | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
-                       -- swapped in Solver.Canonical.canEqTyVarHomo
+                       -- swapped in Solver.Equality.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || errorItemEqRel item == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
@@ -1906,7 +1907,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
-    headline_msg = misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
+    headline_msg = misMatchOrCND ctxt item ty1 ty2
     mismatch_msg = mkMismatchMsg item ty1 ty2
     add_sig      = maybeToList $ suggestAddSig ctxt ty1 ty2
 
@@ -1934,8 +1935,6 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
     check_eq_result = case ei_m_reason item of
       Just (NonCanonicalReason result) -> result
       _                                -> cteOK
-
-    insoluble_occurs_check = check_eq_result `cterHasProblem` cteInsolubleOccurs
 
 eqInfoMsgs :: TcType -> TcType -> [AmbiguityInfo]
 -- Report (a) ambiguity if either side is a type function application
@@ -1970,11 +1969,11 @@ eqInfoMsgs ty1 ty2
               | otherwise
               = Nothing
 
-misMatchOrCND :: Bool -> SolverReportErrCtxt -> ErrorItem
+misMatchOrCND :: SolverReportErrCtxt -> ErrorItem
               -> TcType -> TcType -> MismatchMsg
 -- If oriented then ty1 is actual, ty2 is expected
-misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
-  | insoluble_occurs_check  -- See Note [Insoluble occurs check]
+misMatchOrCND ctxt item ty1 ty2
+  | insoluble_item   -- See Note [Insoluble mis-match]
     || (isRigidTy ty1 && isRigidTy ty2)
     || (ei_flavour item == Given)
     || null givens
@@ -1986,6 +1985,10 @@ misMatchOrCND insoluble_occurs_check ctxt item ty1 ty2
   = CouldNotDeduce givens (item :| []) (Just $ CND_Extra level ty1 ty2)
 
   where
+    insoluble_item = case ei_m_reason item of
+                       Nothing -> False
+                       Just r  -> isInsolubleReason r
+
     level   = ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
     givens  = [ given | given <- getUserGivens ctxt, ic_given_eqs given /= NoGivenEqs ]
               -- Keep only UserGivens that have some equalities.
@@ -2143,8 +2146,8 @@ shouldPprWithExplicitKinds _ty1 _ty2 (TypeEqOrigin { uo_actual = act
 shouldPprWithExplicitKinds ty1 ty2 _ct
   = tcEqTypeVis ty1 ty2
 
-{- Note [Insoluble occurs check]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Insoluble mis-match]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider [G] a ~ [a],  [W] a ~ [a] (#13674).  The Given is insoluble
 so we don't use it for rewriting.  The Wanted is also insoluble, and
 we don't solve it from the Given.  It's very confusing to say
@@ -2153,7 +2156,9 @@ we don't solve it from the Given.  It's very confusing to say
 And indeed even thinking about the Givens is silly; [W] a ~ [a] is
 just as insoluble as Int ~ Bool.
 
-Conclusion: if there's an insoluble occurs check (cteInsolubleOccurs)
+Exactly the same is true if we have [G] Int ~ Bool, [W] Int ~ Bool.
+
+Conclusion: if there's an insoluble constraint (isInsolubleReason),
 then report it directly, not in the "cannot deduce X from Y" form.
 This is done in misMatchOrCND (via the insoluble_occurs_check arg)
 

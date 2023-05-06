@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Tc.Instance.Class (
-     matchGlobalInst,
+     matchGlobalInst, matchEqualityInst,
      ClsInstResult(..),
      safeOverlap, instanceReturnsDictCon,
      AssocInstInfo(..), isNotAssociated,
@@ -120,6 +120,9 @@ matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> TcM ClsInstResult
+-- Precondition: Class does not satisfy GHC.Core.Predicate.isEqualityClass
+-- (That is handled by a separate code path: see GHC.Tc.Solver.Dict.solveDict,
+--  which calls solveEqualityDict for equality classes.)
 matchGlobalInst dflags short_cut clas tys
   | cls_name == knownNatClassName      = matchKnownNat    dflags short_cut clas tys
   | cls_name == knownSymbolClassName   = matchKnownSymbol dflags short_cut clas tys
@@ -127,9 +130,6 @@ matchGlobalInst dflags short_cut clas tys
   | isCTupleClass clas                 = matchCTuple                       clas tys
   | cls_name == typeableClassName      = matchTypeable                     clas tys
   | cls_name == withDictClassName      = matchWithDict                          tys
-  | clas `hasKey` heqTyConKey          = matchHeteroEquality                    tys
-  | clas `hasKey` eqTyConKey           = matchHomoEquality                      tys
-  | clas `hasKey` coercibleTyConKey    = matchCoercible                         tys
   | cls_name == hasFieldClassName      = matchHasField    dflags short_cut clas tys
   | cls_name == unsatisfiableClassName = return NoInstance -- See (B) in Note [Implementation of Unsatisfiable constraints] in GHC.Tc.Errors
   | otherwise                          = matchInstEnv     dflags short_cut clas tys
@@ -267,9 +267,10 @@ Conceptually, this class has infinitely many instances:
   instance KnownNat 2       where natSing = SNat 2
   ...
 
-In practice, we solve `KnownNat` predicates in the type-checker
-(see GHC.Tc.Solver.Interact) because we can't have infinitely many instances.
-The evidence (aka "dictionary") for `KnownNat` is of the form `EvLit (EvNum n)`.
+In practice, we solve `KnownNat` predicates in the type-checker (see
+`matchKnownNat` in this module) because we can't have infinitely many
+instances.  The evidence (aka "dictionary") for `KnownNat` is of the
+form `EvLit (EvNum n)`.
 
 We make the following assumptions about dictionaries in GHC:
   1. The "dictionary" for classes with a single method---like `KnownNat`---is
@@ -646,7 +647,7 @@ doFunTy clas ty mult arg_ty ret_ty
     preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
     mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
                         EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
-    mk_ev _ = panic "GHC.Tc.Solver.Interact.doFunTy"
+    mk_ev _ = panic "GHC.Tc.Instance.Class.doFunTy"
 
 
 -- | Representation for type constructor applied to some kinds.
@@ -797,33 +798,25 @@ if you'd written
 ***********************************************************************-}
 
 -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
-matchHeteroEquality :: [Type] -> TcM ClsInstResult
--- Solves (t1 ~~ t2)
-matchHeteroEquality args
-  = return (OneInst { cir_new_theta   = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev       = evDataConApp heqDataCon args
-                    , cir_coherence   = IsCoherent
-                    , cir_what        = BuiltinEqInstance })
+matchEqualityInst :: Class -> [Type] -> (DataCon, Role, Type, Type)
+-- Precondition: `cls` satisfies GHC.Core.Predicate.isEqualityClass
+-- See Note [Solving equality classes] in GHC.Tc.Solver.Dict
+matchEqualityInst cls args
+  | cls `hasKey` eqTyConKey  -- Solves (t1 ~ t2)
+  , [_,t1,t2] <- args
+  = (eqDataCon, Nominal, t1, t2)
 
-matchHomoEquality :: [Type] -> TcM ClsInstResult
--- Solves (t1 ~ t2)
-matchHomoEquality args@[k,t1,t2]
-  = return (OneInst { cir_new_theta   = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
-                    , cir_mk_ev       = evDataConApp eqDataCon args
-                    , cir_coherence   = IsCoherent
-                    , cir_what        = BuiltinEqInstance })
-matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
+  | cls `hasKey` heqTyConKey -- Solves (t1 ~~ t2)
+  , [_,_,t1,t2] <- args
+  = (heqDataCon,  Nominal, t1, t2)
 
--- See also Note [The equality types story] in GHC.Builtin.Types.Prim
-matchCoercible :: [Type] -> TcM ClsInstResult
-matchCoercible args@[k, t1, t2]
-  = return (OneInst { cir_new_theta   = [ mkTyConApp eqReprPrimTyCon args' ]
-                    , cir_mk_ev       = evDataConApp coercibleDataCon args
-                    , cir_coherence   = IsCoherent
-                    , cir_what        = BuiltinEqInstance })
-  where
-    args' = [k, k, t1, t2]
-matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
+  | cls `hasKey` coercibleTyConKey  -- Solves (Coercible t1 t2)
+  , [_, t1, t2] <- args
+  = (coercibleDataCon, Representational, t1, t2)
+
+  | otherwise  -- Does not satisfy the precondition
+  = pprPanic "matchEqualityInst" (ppr (mkClassPred cls args))
+
 
 {- ********************************************************************
 *                                                                     *

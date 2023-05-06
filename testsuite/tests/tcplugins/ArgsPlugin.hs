@@ -26,7 +26,7 @@ import GHC.Tc.Plugin
 import GHC.Tc.Types
   ( TcPluginSolveResult(..) )
 import GHC.Tc.Types.Constraint
-  ( Ct(..) )
+  ( Ct(..), DictCt(..) )
 import GHC.Tc.Types.Evidence
   ( EvBindsVar, EvTerm(EvExpr) )
 import GHC.Platform
@@ -69,14 +69,14 @@ solver args defs _ev _gs ws = do
   pure $ TcPluginOk solved []
 
 solveCt :: Platform -> PluginDefs -> Integer -> Ct -> TcPluginM ( Maybe (EvTerm, Ct) )
-solveCt platform ( PluginDefs {..} ) i ct@( CDictCan { cc_class, cc_tyargs } )
-  | className cc_class == className myClass
-  , [tyArg] <- cc_tyargs
+solveCt platform ( PluginDefs {..} ) i ct@(CDictCan (DictCt { di_cls, di_tys } ))
+  | className di_cls == className myClass
+  , [tyArg] <- di_tys
   , tyArg `eqType` integerTy
   , let
       evTerm :: EvTerm
       evTerm = EvExpr $
-        mkCoreConApps ( classDataCon cc_class )
+        mkCoreConApps ( classDataCon di_cls )
          [ Type integerTy, mkIntegerExpr platform i ]
   = pure $ Just ( evTerm, ct )
 solveCt _ _ _ ct = pure Nothing

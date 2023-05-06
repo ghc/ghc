@@ -1113,7 +1113,7 @@ to see `Annotated` in the call stack.
 This is achieve easily, but a bit trickily.  When we instantiate
 Annotated's "required" constraints, in tcPatSynPat, give them a
 CtOrigin of (OccurrenceOf "Annotated"). That way the special magic
-in GHC.Tc.Solver.Canonical.canClassNC which deals with CallStack
+in GHC.Tc.Solver.Dict.solveCallStack which deals with CallStack
 constraints will kick in: that logic only fires on constraints
 whose Origin is (OccurrenceOf f).
 

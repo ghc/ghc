@@ -324,7 +324,7 @@ The old setup was:
   See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
 
 * Typechecker equality, as implemented by tcEqType.
-  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
+  GHC.Tc.Solver.Equality.canonicaliseEquality also respects typechecker equality.
 
 Typechecker equality implied definitional equality: if two types are equal
 according to typechecker equality, then they are also equal according to

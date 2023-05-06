@@ -732,10 +732,10 @@ Library
         GHC.Tc.Module
         GHC.Tc.Plugin
         GHC.Tc.Solver
-        GHC.Tc.Solver.Canonical
         GHC.Tc.Solver.Rewrite
         GHC.Tc.Solver.InertSet
-        GHC.Tc.Solver.Interact
+        GHC.Tc.Solver.Solve
+        GHC.Tc.Solver.Irred
         GHC.Tc.Solver.Equality
         GHC.Tc.Solver.Dict
         GHC.Tc.Solver.Monad

@@ -161,8 +161,8 @@ module GHC.Tc.Utils.TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPrimPred, isIPLikePred, isEqPred, isEqPredClass,
-  mkClassPred,
+  isClassPred, isEqPrimPred, isIPLikePred, isEqPred,
+  isEqualityClass, mkClassPred,
   tcSplitQuantPredTy, tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isFixedRuntimeRepKind,
   isVisiblePiTyBinder, isInvisiblePiTyBinder,
@@ -668,7 +668,7 @@ data MetaInfo
 
    | CycleBreakerTv  -- Used to fix occurs-check problems in Givens
                      -- See Note [Type equality cycles] in
-                     -- GHC.Tc.Solver.Canonical
+                     -- GHC.Tc.Solver.Equality
 
    | ConcreteTv ConcreteTvOrigin
         -- ^ A unification variable that can only be unified
@@ -1856,7 +1856,7 @@ Then
 Notice that in the recursive-superclass case we include C again at
 the end of the chain.  One could exclude C in this case, but
 the code is more awkward and there seems no good reason to do so.
-(However C.f. GHC.Tc.Solver.Canonical.mk_strict_superclasses, which /does/
+(However C.f. GHC.Tc.Solver.Dict.mk_strict_superclasses, which /does/
 appear to do so.)
 
 The algorithm is expand( so_far, pred ):
@@ -2538,11 +2538,10 @@ isTerminatingClass cls
   = isIPClass cls    -- Implicit parameter constraints always terminate because
                      -- there are no instances for them --- they are only solved
                      -- by "local instances" in expressions
-    || isEqPredClass cls
+    || isEqualityClass cls
     || cls `hasKey` typeableClassKey
             -- Typeable constraints are bigger than they appear due
             -- to kind polymorphism, but we can never get instance divergence this way
-    || cls `hasKey` coercibleTyConKey
     || cls `hasKey` unsatisfiableClassNameKey
 
 allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool

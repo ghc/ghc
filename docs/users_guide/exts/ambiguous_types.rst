@@ -107,11 +107,7 @@ the :extension:`TypeApplications` extension to specify the types. For example: :
 Here ``a`` is ambiguous in the definition of ``D`` but later specified
 to be `Int` using type applications.
 
-:extension:`AllowAmbiguousTypes` allows you to switch off the ambiguity check.
-However, even with ambiguity checking switched off, GHC will complain about a
-function that can *never* be called, such as this one: ::
-
-      f :: (Int ~ Bool) => a -> a
+:extension:`AllowAmbiguousTypes` allows you to switch off the ambiguity check altogether.
 
 Sometimes :extension:`AllowAmbiguousTypes` does not mix well with :extension:`RankNTypes`.
 For example: ::

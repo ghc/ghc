@@ -1655,7 +1655,7 @@ Answer:
        it is the superclass of an unblocked dictionary (wrinkle (W1)),
        that is Paterson-smaller than the instance head.
 
-    This is implemented in GHC.Tc.Solver.Canonical.mk_strict_superclasses
+    This is implemented in GHC.Tc.Solver.Dict.mk_strict_superclasses
     (in the mk_given_loc helper function).
 
   * Superclass "Wanted" constraints have CtOrigin of (ScOrigin NakedSc)
@@ -1679,12 +1679,12 @@ However, we want to provide a migration strategy for users, to avoid suddenly
 breaking their code going when upgrading to GHC 9.6. To this effect, we temporarily
 continue to allow the constraint solver to create these potentially non-terminating
 solutions, but emit a loud warning when doing so: see
-GHC.Tc.Solver.Interact.tryLastResortProhibitedSuperclass.
+GHC.Tc.Solver.Dict.tryLastResortProhibitedSuperclass.
 
 Users can silence the warning by manually adding the necessary constraint to the
 context. GHC will then keep this user-written Given, dropping the Given arising
 from superclass expansion which has greater SC depth, as explained in
-Note [Replacement vs keeping] in GHC.Tc.Solver.Interact.
+Note [Replacement vs keeping] in GHC.Tc.Solver.Dict.
 
 Note [Silent superclass arguments] (historical interest only)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

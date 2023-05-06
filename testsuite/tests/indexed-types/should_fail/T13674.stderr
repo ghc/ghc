@@ -17,20 +17,3 @@ T13674.hs:56:21: error: [GHC-25897]
         y :: GF m (bound at T13674.hs:56:17)
         x :: GF m (bound at T13674.hs:56:6)
         bar :: GF m -> GF m -> GF m (bound at T13674.hs:56:1)
-
-T13674.hs:56:31: error: [GHC-25897]
-    • Couldn't match type ‘m’ with ‘Lcm m m’
-      Expected: GF m
-        Actual: GF (Lcm m m)
-      ‘m’ is a rigid type variable bound by
-        the type signature for:
-          bar :: forall (m :: Nat). KnownNat m => GF m -> GF m -> GF m
-        at T13674.hs:55:1-44
-    • In the first argument of ‘(\\)’, namely ‘foo y x’
-      In the first argument of ‘(\\)’, namely ‘foo y x \\ lcmNat @m @m’
-      In the second argument of ‘(-)’, namely
-        ‘foo y x \\ lcmNat @m @m \\ Sub @() (lcmIsIdempotent @m)’
-    • Relevant bindings include
-        y :: GF m (bound at T13674.hs:56:17)
-        x :: GF m (bound at T13674.hs:56:6)
-        bar :: GF m -> GF m -> GF m (bound at T13674.hs:56:1)

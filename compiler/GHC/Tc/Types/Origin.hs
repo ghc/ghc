@@ -480,7 +480,7 @@ data CtOrigin
 
         ScDepth         -- ^ The number of superclass selections necessary to
                         -- get this constraint; see Note [Replacement vs keeping]
-                        -- in GHC.Tc.Solver.Interact
+                        -- in GHC.Tc.Solver.Dict
 
         Bool   -- ^ True => "blocked": cannot use this to solve naked superclass Wanteds
                --                      i.e. ones with (ScOrigin _ NakedSc)
@@ -608,7 +608,7 @@ data CtOrigin
   | CycleBreakerOrigin
       CtOrigin   -- origin of the original constraint
 
-      -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Canonical
+      -- See Detail (7) of Note [Type equality cycles] in GHC.Tc.Solver.Equality
   | FRROrigin
       FixedRuntimeRepOrigin
 

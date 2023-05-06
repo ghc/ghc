@@ -1,5 +1,5 @@
 
-Defer01.hs:11:40: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:10:40: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘Char’ with ‘[Char]’
       Expected: String
         Actual: Char
@@ -7,16 +7,16 @@ Defer01.hs:11:40: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
       In the second argument of ‘(>>)’, namely ‘putStr ','’
       In the expression: putStr "Hello World" >> putStr ','
 
-Defer01.hs:14:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:13:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 
-Defer01.hs:25:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
+Defer01.hs:24:1: warning: [GHC-94210] [-Woverlapping-patterns (in -Wdefault)]
     Pattern match has inaccessible right hand side
     In an equation for ‘c’: c (C2 x) = ...
 
-Defer01.hs:25:4: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
+Defer01.hs:24:4: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • Inaccessible code in
         a pattern with constructor: C2 :: Bool -> C Bool,
         in an equation for ‘c’
@@ -24,49 +24,44 @@ Defer01.hs:25:4: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
     • In the pattern: C2 x
       In an equation for ‘c’: c (C2 x) = True
 
-Defer01.hs:31:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:30:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
     • The function ‘e’ is applied to one value argument,
         but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
-    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
+    • Relevant bindings include f :: t (bound at Defer01.hs:30:1)
 
-Defer01.hs:34:8: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:33:8: warning: [GHC-25897] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Char’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           h :: forall a. a -> (Char, Char)
-        at Defer01.hs:33:1-21
+        at Defer01.hs:32:1-21
     • In the expression: x
       In the expression: (x, 'c')
       In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
-        x :: a (bound at Defer01.hs:34:3)
-        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
+        x :: a (bound at Defer01.hs:33:3)
+        h :: a -> (Char, Char) (bound at Defer01.hs:33:1)
 
-Defer01.hs:39:17: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:38:17: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
       In the first argument of ‘seq’, namely ‘(not (K a))’
       In the expression: seq (not (K a)) ()
     • Relevant bindings include
-        a :: a (bound at Defer01.hs:39:3)
-        i :: a -> () (bound at Defer01.hs:39:1)
+        a :: a (bound at Defer01.hs:38:3)
+        i :: a -> () (bound at Defer01.hs:38:1)
 
-Defer01.hs:47:7: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
-    • In the expression: x
-      In an equation for ‘k’: k x = x
-
-Defer01.hs:50:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:49:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type: IO a0
                   with actual type: Char -> IO ()
     • Probable cause: ‘putChar’ is applied to too few arguments
       In the first argument of ‘(>>)’, namely ‘putChar’
       In the expression: putChar >> putChar 'p'
       In an equation for ‘l’: l = putChar >> putChar 'p'
-*** Exception: Defer01.hs:11:40: error: [GHC-83865]
+*** Exception: Defer01.hs:10:40: error: [GHC-83865]
     • Couldn't match type ‘Char’ with ‘[Char]’
       Expected: String
         Actual: Char
@@ -74,12 +69,12 @@ Defer01.hs:50:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
       In the second argument of ‘(>>)’, namely ‘putStr ','’
       In the expression: putStr "Hello World" >> putStr ','
 (deferred type error)
-*** Exception: Defer01.hs:14:5: error: [GHC-83865]
+*** Exception: Defer01.hs:13:5: error: [GHC-83865]
     • Couldn't match expected type ‘Int’ with actual type ‘Char’
     • In the expression: 'p'
       In an equation for ‘a’: a = 'p'
 (deferred type error)
-*** Exception: Defer01.hs:18:9: error: [GHC-39999]
+*** Exception: Defer01.hs:17:9: error: [GHC-39999]
     • No instance for ‘Eq B’ arising from a use of ‘==’
     • In the expression: x == x
       In an equation for ‘b’: b x = x == x
@@ -92,43 +87,43 @@ Defer01.hs:50:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • In the first argument of ‘c’, namely ‘(C2 True)’
       In the first argument of ‘print’, namely ‘(c (C2 True))’
       In the expression: print (c (C2 True))
-*** Exception: Defer01.hs:28:5: error: [GHC-39999]
+*** Exception: Defer01.hs:27:5: error: [GHC-39999]
     • No instance for ‘Num (a -> a)’ arising from the literal ‘1’
         (maybe you haven't applied a function to enough arguments?)
     • In the expression: 1
       In an equation for ‘d’: d = 1
 (deferred type error)
-*** Exception: Defer01.hs:31:5: error: [GHC-83865]
+*** Exception: Defer01.hs:30:5: error: [GHC-83865]
     • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
     • The function ‘e’ is applied to one value argument,
         but its type ‘Char’ has none
       In the expression: e 'q'
       In an equation for ‘f’: f = e 'q'
-    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
+    • Relevant bindings include f :: t (bound at Defer01.hs:30:1)
 (deferred type error)
-*** Exception: Defer01.hs:34:8: error: [GHC-25897]
+*** Exception: Defer01.hs:33:8: error: [GHC-25897]
     • Couldn't match expected type ‘Char’ with actual type ‘a’
       ‘a’ is a rigid type variable bound by
         the type signature for:
           h :: forall a. a -> (Char, Char)
-        at Defer01.hs:33:1-21
+        at Defer01.hs:32:1-21
     • In the expression: x
       In the expression: (x, 'c')
       In an equation for ‘h’: h x = (x, 'c')
     • Relevant bindings include
-        x :: a (bound at Defer01.hs:34:3)
-        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
+        x :: a (bound at Defer01.hs:33:3)
+        h :: a -> (Char, Char) (bound at Defer01.hs:33:1)
 (deferred type error)
-*** Exception: Defer01.hs:39:17: error: [GHC-83865]
+*** Exception: Defer01.hs:38:17: error: [GHC-83865]
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
       In the first argument of ‘seq’, namely ‘(not (K a))’
       In the expression: seq (not (K a)) ()
     • Relevant bindings include
-        a :: a (bound at Defer01.hs:39:3)
-        i :: a -> () (bound at Defer01.hs:39:1)
+        a :: a (bound at Defer01.hs:38:3)
+        i :: a -> () (bound at Defer01.hs:38:1)
 (deferred type error)
-*** Exception: Defer01.hs:43:5: error: [GHC-39999]
+*** Exception: Defer01.hs:42:5: error: [GHC-39999]
     • No instance for ‘MyClass a1’ arising from a use of ‘myOp’
     • In the expression: myOp 23
       In an equation for ‘j’: j = myOp 23
@@ -139,7 +134,7 @@ Defer01.hs:50:5: warning: [GHC-83865] [-Wdeferred-type-errors (in -Wdefault)]
     • In the first argument of ‘print’, namely ‘(k 2)’
       In the expression: print (k 2)
       In an equation for ‘it’: it = print (k 2)
-*** Exception: Defer01.hs:50:5: error: [GHC-83865]
+*** Exception: Defer01.hs:49:5: error: [GHC-83865]
     • Couldn't match expected type: IO a0
                   with actual type: Char -> IO ()
     • Probable cause: ‘putChar’ is applied to too few arguments

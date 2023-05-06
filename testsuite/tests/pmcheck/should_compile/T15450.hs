@@ -1,5 +1,6 @@
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE GADTs #-}
+
 module T15450 where
 
 f :: (Int ~ Bool) => Bool -> a

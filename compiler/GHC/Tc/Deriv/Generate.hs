@@ -1810,7 +1810,7 @@ prove it *without computing any term evidence* (hence the <no-ev>). Alas, we
 *must* generate a term-level evidence binding in order to instantiate the
 quantified constraint! In response, GHC currently chooses not to use such
 a quantified constraint.
-See Note [Instances in no-evidence implications] in GHC.Tc.Solver.Interact.
+See Note [Instances in no-evidence implications] in GHC.Tc.Solver.Equality.
 
 But this isn't the death knell for combining QuantifiedConstraints with GND.
 On the contrary, if we generate GND bindings in a slightly different way, then
