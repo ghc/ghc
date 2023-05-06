@@ -33,7 +33,7 @@ module GHC.Tc.Solver.Monad (
 
     -- The pipeline
     StopOrContinue(..), continueWith, stopWith, andWhenContinue,
-    startAgainWith,
+    startAgainWith, SolverStage(Stage, runSolverStage),
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -207,7 +207,7 @@ import GHC.Data.Graph.Directed
 ********************************************************************* -}
 
 data StopOrContinue a
-  = StartAgain a      -- Constraint is not solved, but some unifications
+  = StartAgain Ct     -- Constraint is not solved, but some unifications
                       --   happened, so go back to the beginning of the pipeline
 
   | ContinueWith a    -- The constraint was not solved, although it may have
@@ -223,7 +223,23 @@ instance Outputable a => Outputable (StopOrContinue a) where
   ppr (ContinueWith w) = text "ContinueWith" <+> ppr w
   ppr (StartAgain w)   = text "StartAgain" <+> ppr w
 
-startAgainWith :: a -> TcS (StopOrContinue a)
+newtype SolverStage a = Stage { runSolverStage :: TcS (StopOrContinue a) }
+  deriving( Functor )
+
+instance Applicative SolverStage where
+  pure x = Stage (return (ContinueWith x))
+  (<*>)  = ap
+
+instance Monad SolverStage where
+  return          = pure
+  (Stage m) >>= k = Stage $
+                    do { soc <- m
+                       ; case soc of
+                           StartAgain x   -> return (StartAgain x)
+                           Stop ev d      -> return (Stop ev d)
+                           ContinueWith x -> runSolverStage (k x) }
+
+startAgainWith :: Ct -> TcS (StopOrContinue a)
 startAgainWith ct = return (StartAgain ct)
 
 continueWith :: a -> TcS (StopOrContinue a)
@@ -434,7 +450,7 @@ kickOutAfterFillingCoercionHole hole
              n_kicked           = lengthBag kicked_out
 
        ; unless (n_kicked == 0) $
-         do { updWorkListTcS (extendWorkListCts kicked_out)
+         do { updWorkListTcS (extendWorkListCts (fmap CIrredCan kicked_out))
             ; csTraceTcS $
               hang (text "Kick out, hole =" <+> ppr hole)
                  2 (vcat [ text "n-kicked =" <+> int n_kicked
@@ -443,16 +459,16 @@ kickOutAfterFillingCoercionHole hole
 
        ; setInertCans ics' }
   where
-    kick_out :: InertCans -> (Cts, InertCans)
+    kick_out :: InertCans -> (Bag IrredCt, InertCans)
     kick_out ics@(IC { inert_irreds = irreds })
       = (irreds_to_kick, ics { inert_irreds = irreds_to_keep })
       where
         (irreds_to_kick, irreds_to_keep) = partitionBag kick_ct irreds
 
-    kick_ct :: Ct -> Bool
+    kick_ct :: IrredCt -> Bool
          -- True: kick out; False: keep.
     kick_ct ct
-      | CIrredCan { cc_ev = ev, cc_reason = reason } <- ct
+      | IrredCt { ir_ev = ev, ir_reason = reason } <- ct
       , CtWanted { ctev_rewriters = RewriterSet rewriters } <- ev
       , NonCanonicalReason ctyeq <- reason
       , ctyeq `cterHasProblem` cteCoercionHole
@@ -545,7 +561,7 @@ updInertSafehask :: (DictMap Ct -> DictMap Ct) -> TcS ()
 updInertSafehask upd_fn
   = updInertCans $ \ ics -> ics { inert_safehask = upd_fn (inert_safehask ics) }
 
-updInertIrreds :: (Cts -> Cts) -> TcS ()
+updInertIrreds :: (Bag IrredCt -> Bag IrredCt) -> TcS ()
 -- Modify the inert set with the supplied function
 updInertIrreds upd_fn
   = updInertCans $ \ ics -> ics { inert_irreds = upd_fn (inert_irreds ics) }
@@ -572,19 +588,20 @@ getInnermostGivenEqLevel = do { inert <- getInertCans
 -- want to consider a pattern match that introduces insoluble Givens to be
 -- redundant (see Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver).
 getInertInsols :: TcS Cts
-getInertInsols = do { inert <- getInertCans
-                    ; let irreds = inert_irreds inert
-                          unsats = findDictsByTyConKey (inert_dicts inert) unsatisfiableClassNameKey
-                    ; return $ unsats `unionBags` filterBag insolubleCt irreds }
+getInertInsols
+  = do { inert <- getInertCans
+       ; let insols = filterBag insolubleIrredCt (inert_irreds inert)
+             unsats = findDictsByTyConKey (inert_dicts inert) unsatisfiableClassNameKey
+       ; return $ unsats `unionBags` fmap CIrredCan insols }
 
 getInertGivens :: TcS [Ct]
 -- Returns the Given constraints in the inert set
 getInertGivens
   = do { inerts <- getInertCans
-       ; let all_cts = foldIrreds (:) (inert_irreds inerts)
-                     $ foldDicts  (:) (inert_dicts inerts)
-                     $ foldFunEqs ((:) . CEqCan) (inert_funeqs inerts)
-                     $ foldTyEqs  ((:) . CEqCan) (inert_eqs inerts)
+       ; let all_cts = foldIrreds ((:) . CIrredCan) (inert_irreds inerts)
+                     $ foldDicts  (:)               (inert_dicts inerts)
+                     $ foldFunEqs ((:) . CEqCan)    (inert_funeqs inerts)
+                     $ foldTyEqs  ((:) . CEqCan)    (inert_eqs inerts)
                      $ []
        ; return (filter isGivenCt all_cts) }
 
@@ -659,10 +676,10 @@ getUnsolvedInerts
 
       ; let unsolved_tv_eqs  = foldTyEqs add_if_unsolved_eq tv_eqs emptyCts
             unsolved_fun_eqs = foldFunEqs add_if_unsolved_eq fun_eqs emptyCts
-            unsolved_irreds  = Bag.filterBag isWantedCt irreds
+            unsolved_irreds  = Bag.filterBag (isWanted . irredCtEvidence) irreds
             unsolved_dicts   = foldDicts add_if_unsolved idicts emptyCts
-            unsolved_others  = unionManyBags [ unsolved_irreds
-                                             , unsolved_dicts ]
+            unsolved_others  = fmap CIrredCan unsolved_irreds `unionBags`
+                               unsolved_dicts
 
       ; implics <- getWorkListImplics
 
@@ -684,9 +701,9 @@ getUnsolvedInerts
     add_if_unsolved_eq eq_ct cts | isWanted (eq_ev eq_ct) = CEqCan eq_ct `consCts` cts
                                  | otherwise              = cts
 
-getHasGivenEqs :: TcLevel           -- TcLevel of this implication
-               -> TcS ( HasGivenEqs -- are there Given equalities?
-                      , Cts )       -- Insoluble equalities arising from givens
+getHasGivenEqs :: TcLevel             -- TcLevel of this implication
+               -> TcS ( HasGivenEqs   -- are there Given equalities?
+                      , InertIrreds ) -- Insoluble equalities arising from givens
 -- See Note [Tracking Given equalities] in GHC.Tc.Solver.InertSet
 getHasGivenEqs tclvl
   = do { inerts@(IC { inert_irreds       = irreds
@@ -712,8 +729,9 @@ getHasGivenEqs tclvl
               , text "Insols:" <+> ppr given_insols]
        ; return (has_ge, given_insols) }
   where
-    insoluble_given_equality ct
-       = insolubleEqCt ct && isGivenCt ct
+    insoluble_given_equality :: IrredCt -> Bool
+    insoluble_given_equality irred
+       = insolubleIrredCt irred && isGiven (irredCtEvidence irred)
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
 -- ^ Remove inert constraints from the 'InertCans', for use when a
@@ -727,16 +745,10 @@ removeInertCt is ct =
     CDictCan  { cc_class = cl, cc_tyargs = tys } ->
       is { inert_dicts = delDict (inert_dicts is) cl tys }
 
-    CEqCan    eq_ct  -> delEq is eq_ct
-
-    CIrredCan {}     -> is { inert_irreds = filterBag (not . eqCt ct) $ inert_irreds is }
-
+    CEqCan    eq_ct  -> delEq    is eq_ct
+    CIrredCan ir_ct  -> delIrred is ir_ct
     CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
-
-eqCt :: Ct -> Ct -> Bool
--- Equality via ctEvId
-eqCt c c' = ctEvId c == ctEvId c'
 
 -- | Looks up a family application in the inerts.
 lookupFamAppInert :: (CtFlavourRole -> Bool)  -- can it rewrite the target?
@@ -819,15 +831,6 @@ dropFromFamAppCache varset
     check :: Reduction -> Bool
     check redn
       = not (anyFreeVarsOfCo (`elemVarSet` varset) $ reductionCoercion redn)
-
-{- *********************************************************************
-*                                                                      *
-                   Irreds
-*                                                                      *
-********************************************************************* -}
-
-foldIrreds :: (Ct -> b -> b) -> Cts -> b -> b
-foldIrreds k irreds z = foldr k z irreds
 
 {-
 ************************************************************************

@@ -18,16 +18,18 @@ module GHC.Tc.Types.Constraint (
         isWantedCt, isGivenCt,
         isTopLevelUserTypeError, containsUserTypeError, getUserTypeErrorMsg,
         isUnsatisfiableCt_maybe,
-        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
+        ctEvidence, updCtEvidence,
+        ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
-        mkNonCanonical, mkNonCanonicalCt, mkGivens,
-        mkIrredCt,
+        mkNonCanonical, mkGivens,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         ctEvRewriters,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+
+        IrredCt(..), mkIrredCt, ctIrredCt, irredCtEvidence, irredCtPred,
 
         ExpansionFuel, doNotExpand, consumeFuel, pendingFuel,
         assertFuelPrecondition, assertFuelPreconditionStrict,
@@ -54,8 +56,8 @@ module GHC.Tc.Types.Constraint (
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
         addNotConcreteError, addDelayedErrors,
-        tyCoVarsOfWC,
-        tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt, insolubleCt,
+        tyCoVarsOfWC, tyCoVarsOfWCList,
+        insolubleWantedCt, insolubleEqCt, insolubleCt, insolubleIrredCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
@@ -207,30 +209,10 @@ data Ct
           --                    (b) those superclasses are not yet explored
     }
 
-  | CIrredCan {  -- These stand for yet-unusable predicates
-      cc_ev     :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_reason :: CtIrredReason
-
-        -- For the might-be-soluble case, the ctev_pred of the evidence is
-        -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
-        --      or   (lhs1 ~ ty2)  where the CEqCan    kind invariant (TyEq:K) fails
-        -- See Note [CIrredCan constraints]
-
-        -- The definitely-insoluble case is for things like
-        --    Int ~ Bool      tycons don't match
-        --    a ~ [a]         occurs check
-    }
-
-  | CNonCanonical {        -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
-      cc_ev  :: CtEvidence
-    }
-
-  | CEqCan EqCt         -- A canonical equality constraint
-
-  | CQuantCan QCInst       -- A quantified constraint
-      -- NB: I expect to make more of the cases in Ct
-      --     look like this, with the payload in an
-      --     auxiliary type
+  | CNonCanonical CtEvidence   -- See Note [NonCanonical Semantics] in GHC.Tc.Solver.Monad
+  | CIrredCan     IrredCt      -- A "irreducible" constraint (non-canonical)
+  | CEqCan        EqCt         -- A canonical equality constraint
+  | CQuantCan     QCInst       -- A quantified constraint
 
 {- Note [Canonical equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -306,6 +288,29 @@ data CanEqLHS
 instance Outputable CanEqLHS where
   ppr (TyVarLHS tv)              = ppr tv
   ppr (TyFamLHS fam_tc fam_args) = ppr (mkTyConApp fam_tc fam_args)
+
+------------
+data IrredCt    -- These stand for yet-unusable predicates
+                -- See Note [CIrredCan constraints]
+  = IrredCt { ir_ev     :: CtEvidence   -- See Note [Ct/evidence invariant]
+            , ir_reason :: CtIrredReason }
+
+mkIrredCt :: CtIrredReason -> CtEvidence -> Ct
+mkIrredCt reason ev = CIrredCan (IrredCt { ir_ev = ev, ir_reason = reason })
+
+irredCtEvidence :: IrredCt -> CtEvidence
+irredCtEvidence = ir_ev
+
+irredCtPred :: IrredCt -> PredType
+irredCtPred = ctEvPred . irredCtEvidence
+
+ctIrredCt :: CtIrredReason -> Ct -> IrredCt
+ctIrredCt _      (CIrredCan ir) = ir
+ctIrredCt reason ct             = IrredCt { ir_ev = ctEvidence ct
+                                          , ir_reason = reason }
+
+instance Outputable IrredCt where
+  ppr irred = ppr (CIrredCan irred)
 
 ------------
 data QCInst  -- A much simplified version of ClsInst
@@ -461,12 +466,17 @@ data CtIrredReason
     -- in GHC.Core.TyCon.
     -- INVARIANT: The constraint is an equality constraint between two TyConApps
 
+  | PluginReason
+    -- ^ a typechecker plugin returned this in the pluginBagCts field
+    -- of TcPluginProgress
+
 instance Outputable CtIrredReason where
   ppr IrredShapeReason          = text "(irred)"
   ppr (NonCanonicalReason cter) = ppr cter
   ppr ReprEqReason              = text "(repr)"
   ppr ShapeMismatchReason       = text "(shape)"
   ppr AbstractTyConReason       = text "(abstc)"
+  ppr PluginReason              = text "(plugin)"
 
 -- | Are we sure that more solving will never solve this constraint?
 isInsolubleReason :: CtIrredReason -> Bool
@@ -475,6 +485,7 @@ isInsolubleReason (NonCanonicalReason cter) = cterIsInsoluble cter
 isInsolubleReason ReprEqReason              = False
 isInsolubleReason ShapeMismatchReason       = True
 isInsolubleReason AbstractTyConReason       = True
+isInsolubleReason PluginReason              = True
 
 ------------------------------------------------------------------------------
 --
@@ -675,13 +686,7 @@ Type-level holes have no evidence at all.
 -}
 
 mkNonCanonical :: CtEvidence -> Ct
-mkNonCanonical ev = CNonCanonical { cc_ev = ev }
-
-mkNonCanonicalCt :: Ct -> Ct
-mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
-
-mkIrredCt :: CtIrredReason -> CtEvidence -> Ct
-mkIrredCt reason ev = CIrredCan { cc_ev = ev, cc_reason = reason }
+mkNonCanonical ev = CNonCanonical ev
 
 mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
@@ -692,9 +697,20 @@ mkGivens loc ev_ids
                                        , ctev_loc = loc })
 
 ctEvidence :: Ct -> CtEvidence
-ctEvidence (CQuantCan (QCI { qci_ev = ev })) = ev
-ctEvidence (CEqCan (EqCt { eq_ev = ev }))    = ev
-ctEvidence ct                                = cc_ev ct
+ctEvidence (CQuantCan (QCI { qci_ev = ev }))    = ev
+ctEvidence (CEqCan (EqCt { eq_ev = ev }))       = ev
+ctEvidence (CIrredCan (IrredCt { ir_ev = ev })) = ev
+ctEvidence (CNonCanonical ev)                   = ev
+ctEvidence (CDictCan { cc_ev = ev })            = ev
+
+updCtEvidence :: (CtEvidence -> CtEvidence) -> Ct -> Ct
+updCtEvidence upd ct
+ = case ct of
+     CQuantCan qci@(QCI { qci_ev = ev })   -> CQuantCan (qci { qci_ev = upd ev })
+     CEqCan eq@(EqCt { eq_ev = ev })       -> CEqCan    (eq { eq_ev = upd ev })
+     CIrredCan ir@(IrredCt { ir_ev = ev }) -> CIrredCan (ir { ir_ev = upd ev })
+     CNonCanonical ev                      -> CNonCanonical (upd ev)
+     CDictCan { cc_ev = ev }               -> ct { cc_ev = upd ev }
 
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
@@ -753,7 +769,7 @@ instance Outputable Ct where
          CDictCan { cc_pend_sc = psc }
             | psc > 0       -> text "CDictCan" <> parens (text "psc" <+> ppr psc)
             | otherwise     -> text "CDictCan"
-         CIrredCan { cc_reason = reason } -> text "CIrredCan" <> ppr reason
+         CIrredCan (IrredCt { ir_reason = reason }) -> text "CIrredCan" <> ppr reason
          CQuantCan (QCI { qci_pend_sc = psc })
             | psc > 0  -> text "CQuantCan"  <> parens (text "psc" <+> ppr psc)
             | otherwise -> text "CQuantCan"
@@ -1168,9 +1184,9 @@ addSimples wc cts
 addImplics :: WantedConstraints -> Bag Implication -> WantedConstraints
 addImplics wc implic = wc { wc_impl = wc_impl wc `unionBags` implic }
 
-addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
-addInsols wc cts
-  = wc { wc_simple = wc_simple wc `unionBags` cts }
+addInsols :: WantedConstraints -> Bag IrredCt -> WantedConstraints
+addInsols wc insols
+  = wc { wc_simple = wc_simple wc `unionBags` fmap CIrredCan insols }
 
 addHoles :: WantedConstraints -> Bag Hole -> WantedConstraints
 addHoles wc holes
@@ -1305,8 +1321,12 @@ insolubleEqCt :: Ct -> Bool
 --                   True for  Int ~ F a Int
 --               but False for  Maybe Int ~ F a Int Int
 --               (where F is an arity-1 type function)
-insolubleEqCt (CIrredCan { cc_reason = reason }) = isInsolubleReason reason
-insolubleEqCt _                                  = False
+insolubleEqCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
+insolubleEqCt _                 = False
+
+insolubleIrredCt :: IrredCt -> Bool
+insolubleIrredCt (IrredCt { ir_reason = reason })
+  = isInsolubleReason reason
 
 -- | Returns True of equality constraints that are definitely insoluble,
 -- as well as TypeError constraints.

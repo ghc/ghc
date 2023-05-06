@@ -113,7 +113,7 @@ tryLastResortProhibitedSuperclass inerts
 tryLastResortProhibitedSuperclass _ work_item
   = continueWith work_item
 
-chooseInstance :: CtEvidence -> ClsInstResult -> TcS (StopOrContinue Ct)
+chooseInstance :: CtEvidence -> ClsInstResult -> TcS (StopOrContinue a)
 chooseInstance work_item
                (OneInst { cir_new_theta   = theta
                         , cir_what        = what

@@ -92,9 +92,9 @@ runRewriteCtEv ev
 runRewrite :: CtLoc -> CtFlavour -> EqRel -> RewriteM a -> TcS (a, RewriterSet)
 runRewrite loc flav eq_rel thing_inside
   = do { rewriters_ref <- newTcRef emptyRewriterSet
-       ; let fmode = RE { re_loc  = loc
-                        , re_flavour = flav
-                        , re_eq_rel = eq_rel
+       ; let fmode = RE { re_loc       = loc
+                        , re_flavour   = flav
+                        , re_eq_rel    = eq_rel
                         , re_rewriters = rewriters_ref }
        ; res <- runRewriteM thing_inside fmode
        ; rewriters <- readTcRef rewriters_ref

@@ -175,9 +175,9 @@ runTcPluginsGiven
        ; if null givens then return [] else
     do { p <- runTcPluginSolvers solvers (givens,[])
        ; let (solved_givens, _) = pluginSolvedCts p
-             insols             = pluginBadCts p
-       ; updInertCans (removeInertCts solved_givens)
-       ; updInertIrreds (\irreds -> extendCtsList irreds insols)
+             insols             = map (ctIrredCt PluginReason) (pluginBadCts p)
+       ; updInertCans   (removeInertCts solved_givens)
+       ; updInertIrreds (extendIrreds insols)
        ; return (pluginNewCts p) } } }
 
 -- | Given a bag of (rewritten, zonked) wanteds, invoke the plugins on
@@ -283,11 +283,11 @@ runTcPluginSolvers solvers all_cts
         (xs `without` cts, ys `without` cts)
 
     without :: [Ct] -> [Ct] -> [Ct]
-    without = deleteFirstsBy eqCt
+    without = deleteFirstsBy eq_ct
 
-    eqCt :: Ct -> Ct -> Bool
-    eqCt c c' = ctFlavour c == ctFlavour c'
-             && ctPred c `tcEqType` ctPred c'
+    eq_ct :: Ct -> Ct -> Bool
+    eq_ct c c' = ctFlavour c == ctFlavour c'
+              && ctPred c `tcEqType` ctPred c'
 
     add :: [(EvTerm,Ct)] -> SolvedCts -> SolvedCts
     add xs scs = foldl' addOne scs xs
@@ -298,11 +298,8 @@ runTcPluginSolvers solvers all_cts
       CtWanted {} -> (givens, (ev,ct):wanteds)
 
 
-type WorkItem = Ct
-type SimplifierStage = WorkItem -> TcS (StopOrContinue Ct)
-
-runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
-                  -> WorkItem                   -- The work item
+runSolverPipeline :: [(String, Ct -> SolverStage Ct)] -- The pipeline
+                  -> Ct                               -- The work item
                   -> TcS ()
 -- Run this item down the pipeline, leaving behind new work and inerts
 runSolverPipeline full_pipeline workItem
@@ -330,12 +327,12 @@ runSolverPipeline full_pipeline workItem
            StartAgain ct -> pprPanic "runSolverPipeline: StartAgain" (ppr ct)
        }
   where
-    run_pipeline :: [(String,SimplifierStage)] -> Ct -> TcS (StopOrContinue Ct)
+    run_pipeline :: [(String, Ct -> SolverStage Ct)] -> Ct -> TcS (StopOrContinue Ct)
     run_pipeline [] ct = return (ContinueWith ct)
     run_pipeline ((stage_name,stage):stages) ct
       = do { traceTcS ("runStage " ++ stage_name ++ " {")
                       (text "workitem   = " <+> ppr ct)
-           ; res <- stage ct
+           ; res <- runSolverStage (stage ct)
            ; traceTcS ("end stage " ++ stage_name ++ " }") (ppr res)
            ; case res of
                Stop {}         -> return res
@@ -367,10 +364,10 @@ React with (a ~ Int)   ==> IR (ContinueWith (F Int ~ b)) True []
 React with (F Int ~ b) ==> IR Stop True []    -- after substituting we re-canonicalize and get nothing
 -}
 
-thePipeline :: [(String,SimplifierStage)]
-thePipeline = [ ("canonicalization",        GHC.Tc.Solver.Canonical.canonicalize)
-              , ("interact with inerts",    interactWithInertsStage)
-              , ("top-level reactions",     topReactionsStage) ]
+thePipeline :: [(String, Ct -> SolverStage Ct)]
+thePipeline = [ ("canonicalization",     GHC.Tc.Solver.Canonical.canonicalize)
+              , ("interact with inerts", interactWithInertsStage)
+              , ("top-level reactions",  topReactionsStage) ]
 
 {-
 *********************************************************************************
@@ -407,16 +404,17 @@ or, equivalently,
 
 -- Interaction result of  WorkItem <~> Ct
 
-interactWithInertsStage :: WorkItem -> TcS (StopOrContinue Ct)
+interactWithInertsStage :: Ct -> SolverStage Ct
 -- Precondition: if the workitem is a CEqCan then it will not be able to
 -- react with anything at this stage (except, maybe, via a type family
 -- dependency)
 
 interactWithInertsStage wi
-  = do { inerts <- getTcSInerts
+  = Stage $
+    do { inerts <- getTcSInerts
        ; let ics = inert_cans inerts
        ; case wi of
-             CIrredCan    {} -> interactIrred   ics wi
+             CIrredCan ir_ct -> interactIrred   ics ir_ct
              CDictCan     {} -> interactDict    ics wi
              CEqCan       {} -> continueWith wi  -- "Canonicalisation" stage is
                                                  -- full solver for equalities
@@ -633,19 +631,20 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- we can rewrite them. We can never improve using this:
 -- if we want ty1 :: Constraint and have ty2 :: Constraint it clearly does not
 -- mean that (ty1 ~ ty2)
-interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
+interactIrred :: InertCans -> IrredCt -> TcS (StopOrContinue Ct)
 
-interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
+interactIrred inerts irred_w@(IrredCt { ir_ev = ev_w, ir_reason = reason })
   | isInsolubleReason reason
                -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
-  = continueWith ct_w
+  = carry_on
 
   | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
-  , ((ct_i, swap) : _rest) <- bagToList matching_irreds
+  , ((irred_i, swap) : _rest) <- bagToList matching_irreds
         -- See Note [Multiple matching irreds]
-  , let ev_i = ctEvidence ct_i
+  , let ev_i = irredCtEvidence irred_i
+        ct_i = CIrredCan irred_i
   = do { traceTcS "iteractIrred" $
          vcat [ text "wanted:" <+> (ppr ct_w $$ ppr (ctOrigin ct_w))
               , text "inert: " <+> (ppr ct_i $$ ppr (ctOrigin ct_i)) ]
@@ -654,61 +653,20 @@ interactIrred inerts ct_w@(CIrredCan { cc_ev = ev_w, cc_reason = reason })
                             ; return (Stop ev_w (text "Irred equal:KeepInert" <+> ppr ct_w)) }
             KeepWork ->  do { setEvBindIfWanted ev_i IsCoherent (swap_me swap ev_w)
                             ; updInertIrreds (\_ -> others)
-                            ; continueWith ct_w } }
+                            ; carry_on } }
 
   | otherwise
-  = continueWith ct_w
+  = carry_on
 
   where
+    ct_w = CIrredCan irred_w
+    carry_on = continueWith ct_w
+
     swap_me :: SwapFlag -> CtEvidence -> EvTerm
     swap_me swap ev
       = case swap of
            NotSwapped -> ctEvTerm ev
            IsSwapped  -> evCoercion (mkSymCo (evTermCoercion (ctEvTerm ev)))
-
-interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
-
-findMatchingIrreds :: Cts -> CtEvidence -> (Bag (Ct, SwapFlag), Bag Ct)
-findMatchingIrreds irreds ev
-  | EqPred eq_rel1 lty1 rty1 <- classifyPredType pred
-    -- See Note [Solving irreducible equalities]
-  = partitionBagWith (match_eq eq_rel1 lty1 rty1) irreds
-  | otherwise
-  = partitionBagWith match_non_eq irreds
-  where
-    pred = ctEvPred ev
-    match_non_eq ct
-      | ctPred ct `tcEqTypeNoKindCheck` pred = Left (ct, NotSwapped)
-      | otherwise                            = Right ct
-
-    match_eq eq_rel1 lty1 rty1 ct
-      | EqPred eq_rel2 lty2 rty2 <- classifyPredType (ctPred ct)
-      , eq_rel1 == eq_rel2
-      , Just swap <- match_eq_help lty1 rty1 lty2 rty2
-      = Left (ct, swap)
-      | otherwise
-      = Right ct
-
-    match_eq_help lty1 rty1 lty2 rty2
-      | lty1 `tcEqTypeNoKindCheck` lty2, rty1 `tcEqTypeNoKindCheck` rty2
-      = Just NotSwapped
-      | lty1 `tcEqTypeNoKindCheck` rty2, rty1 `tcEqTypeNoKindCheck` lty2
-      = Just IsSwapped
-      | otherwise
-      = Nothing
-
-{- Note [Solving irreducible equalities]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#14333)
-  [G] a b ~R# c d
-  [W] c d ~R# a b
-Clearly we should be able to solve this! Even though the constraints are
-not decomposable. We solve this when looking up the work-item in the
-irreducible constraints to look for an identical one.  When doing this
-lookup, findMatchingIrreds spots the equality case, and matches either
-way around. It has to return a swap-flag so we can generate evidence
-that is the right way round too.
--}
 
 {-
 *********************************************************************************
@@ -1229,11 +1187,12 @@ I can think of two ways to fix this:
 **********************************************************************
 -}
 
-topReactionsStage :: WorkItem -> TcS (StopOrContinue Ct)
+topReactionsStage :: Ct -> SolverStage Ct
 -- The work item does not react with the inert set,
 -- so try interaction with top-level instances.
 topReactionsStage work_item
-  = do { traceTcS "doTopReact" (ppr work_item)
+  = Stage $
+    do { traceTcS "doTopReact" (ppr work_item)
        ; case work_item of
 
            CDictCan {} ->

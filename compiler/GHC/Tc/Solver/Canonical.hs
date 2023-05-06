@@ -86,17 +86,17 @@ last time through, so we can skip the classification step.
 -- Top-level canonicalization
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-canonicalize :: Ct -> TcS (StopOrContinue Ct)
-canonicalize (CNonCanonical { cc_ev = ev })
-  = {-# SCC "canNC" #-}
-    canNC ev
+canonicalize :: Ct -> SolverStage Ct
+canonicalize (CNonCanonical ev)
+  = canNC ev
 
-canonicalize (CEqCan can_eq_ct) = solveCanonicalEquality can_eq_ct
+canonicalize (CEqCan can_eq_ct)
+  = solveCanonicalEquality can_eq_ct
 
 canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
-  = canForAll ev pend_sc
+  = Stage $ canForAll ev pend_sc
 
-canonicalize (CIrredCan { cc_ev = ev })
+canonicalize (CIrredCan (IrredCt { ir_ev = ev }))
   = canNC ev
     -- Instead of rewriting the evidence before classifying, it's possible we
     -- can make progress without the rewrite. Try this first.
@@ -109,20 +109,15 @@ canonicalize (CIrredCan { cc_ev = ev })
 canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
                        , cc_tyargs = xis, cc_pend_sc = pend_sc })
   = {-# SCC "canClass" #-}
-    canClass ev cls xis pend_sc
+    Stage $ canClass ev cls xis pend_sc
 
-canNC :: CtEvidence -> TcS (StopOrContinue Ct)
+canNC :: CtEvidence -> SolverStage Ct
 canNC ev =
   case classifyPredType pred of
-      ClassPred cls tys     -> do traceTcS "canEvNC:cls" (ppr cls <+> ppr tys)
-                                  canClassNC ev cls tys
-      EqPred eq_rel ty1 ty2 -> do traceTcS "canEvNC:eq" (ppr ty1 $$ ppr ty2)
-                                  solveNonCanonicalEquality    ev eq_rel ty1 ty2
-      IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
-                                  canIrred ev
-      ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
-                                  canForAllNC ev tvs th p
-
+      ClassPred cls tys     -> Stage $ canClassNC ev cls tys
+      EqPred eq_rel ty1 ty2 -> solveNonCanonicalEquality ev eq_rel ty1 ty2
+      IrredPred {}          -> Stage $ canIrred ev
+      ForAllPred tvs th p   -> Stage $ canForAllNC ev tvs th p
   where
     pred = ctEvPred ev
 

@@ -465,8 +465,9 @@ mkErrorItem ct
              -> do { rewriters' <- zonkRewriterSet rewriters
                    ; return (not (isEmptyRewriterSet rewriters'), Just dest) }
 
-       ; let m_reason = case ct of CIrredCan { cc_reason = reason } -> Just reason
-                                   _                                -> Nothing
+       ; let m_reason = case ct of
+                CIrredCan (IrredCt { ir_reason = reason }) -> Just reason
+                _                                          -> Nothing
 
        ; return $ Just $ EI { ei_pred     = ctPred ct
                             , ei_evdest   = m_evdest

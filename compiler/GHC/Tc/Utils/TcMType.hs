@@ -2463,9 +2463,9 @@ zonkCt ct@(CDictCan { cc_ev = ev, cc_tyargs = args })
 zonkCt (CEqCan (EqCt { eq_ev = ev }))
   = mkNonCanonical <$> zonkCtEvidence ev
 
-zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_reason flag
+zonkCt (CIrredCan ir@(IrredCt { ir_ev = ev })) -- Preserve the cc_reason flag
   = do { ev' <- zonkCtEvidence ev
-       ; return (ct { cc_ev = ev' }) }
+       ; return (CIrredCan (ir { ir_ev = ev' })) }
 
 zonkCt ct
   = do { fl' <- zonkCtEvidence (ctEvidence ct)
@@ -2694,7 +2694,7 @@ zonkTidyFRRInfos = go []
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct
 -- Used only in error reporting
-tidyCt env ct = ct { cc_ev = tidyCtEvidence env (ctEvidence ct) }
+tidyCt env ct = updCtEvidence (tidyCtEvidence env) ct
 
 tidyCtEvidence :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't
@@ -2792,16 +2792,18 @@ naughtyQuantification orig_ty tv escapees
 
 zonkCtRewriterSet :: Ct -> TcM Ct
 zonkCtRewriterSet ct
-  | isGiven ev = return ct
+  | isGivenCt ct = return ct
   | otherwise
   = case ct of
-      CQuantCan {}                    -> return ct
-      CEqCan eq@(EqCt { eq_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
-                                            ; return (CEqCan (eq { eq_ev = ev' })) }
-      _ ->  do { ev' <- zonkCtEvRewriterSet ev
-               ; return (ct { cc_ev = ev' }) }
-  where
-    ev = ctEvidence ct
+      CEqCan eq@(EqCt { eq_ev = ev })       -> do { ev' <- zonkCtEvRewriterSet ev
+                                                  ; return (CEqCan (eq { eq_ev = ev' })) }
+      CIrredCan ir@(IrredCt { ir_ev = ev }) -> do { ev' <- zonkCtEvRewriterSet ev
+                                                  ; return (CIrredCan (ir { ir_ev = ev' })) }
+      CNonCanonical ev        -> do { ev' <- zonkCtEvRewriterSet ev
+                                    ; return (CNonCanonical ev') }
+      CDictCan { cc_ev = ev } -> do { ev' <- zonkCtEvRewriterSet ev
+                                    ; return (ct { cc_ev = ev' }) }
+      CQuantCan {}            -> return ct
 
 zonkCtEvRewriterSet :: CtEvidence -> TcM CtEvidence
 zonkCtEvRewriterSet ev@(CtGiven {})

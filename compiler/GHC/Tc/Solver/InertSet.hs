@@ -31,6 +31,10 @@ module GHC.Tc.Solver.InertSet (
     partitionInertEqs, partitionFunEqs,
     foldFunEqs,
 
+    -- * Inert Irreds
+    InertIrreds, delIrred, extendIrreds, foldIrreds,
+    findMatchingIrreds,
+
     -- * Kick-out
     kickOutRewritableLHS,
 
@@ -51,6 +55,7 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Basic( SwapFlag(..) )
 
 import GHC.Core.Reduction
 import GHC.Core.Predicate
@@ -319,7 +324,7 @@ emptyInertCans
        , inert_dicts        = emptyDictMap
        , inert_safehask     = emptyDictMap
        , inert_insts        = []
-       , inert_irreds       = emptyCts }
+       , inert_irreds       = emptyBag }
 
 emptyInert :: InertSet
 emptyInert
@@ -1131,7 +1136,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
               -- in GHC.Tc.Solver
 
-       , inert_irreds :: Cts
+       , inert_irreds :: InertIrreds
               -- Irreducible predicates that cannot be made canonical,
               --     and which don't interact with others (e.g.  (c a))
               -- and insoluble predicates (e.g.  Int ~ Bool, or a ~ [a])
@@ -1152,6 +1157,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
 type InertEqs    = DTyVarEnv EqualCtList
 type InertFunEqs = FunEqMap  EqualCtList
+type InertIrreds = Bag IrredCt
 
 instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
@@ -1174,7 +1180,7 @@ instance Outputable InertCans where
         text "Dictionaries =" <+> pprBag (dictsToBag dicts)
       , ppUnless (isEmptyTcAppMap safehask) $
         text "Safe Haskell unsafe overlap =" <+> pprBag (dictsToBag safehask)
-      , ppUnless (isEmptyCts irreds) $
+      , ppUnless (isEmptyBag irreds) $
         text "Irreds =" <+> pprBag irreds
       , ppUnless (null insts) $
         text "Given instances =" <+> vcat (map ppr insts)
@@ -1274,6 +1280,74 @@ extendFunEqs fun_eqs eq_ct@(EqCt { eq_lhs = TyFamLHS tc args })
   = addCanFunEq fun_eqs tc args eq_ct
 extendFunEqs _       other = pprPanic "extendFunEqs" (ppr other)
 
+
+{- *********************************************************************
+*                                                                      *
+                   Inert Irreds
+*                                                                      *
+********************************************************************* -}
+
+extendIrreds :: [IrredCt] -> InertIrreds -> InertIrreds
+extendIrreds extras irreds
+  | null extras = irreds
+  | otherwise   = irreds `unionBags` listToBag extras
+
+delIrred :: InertCans -> IrredCt -> InertCans
+-- Remove a particular (Given) Irred, on the instructions of a plugin
+-- For some reason this is done vis the evidence Id, not the type
+-- Compare delEq.  I have not idea why
+delIrred ics (IrredCt { ir_ev = ev })
+  = ics { inert_irreds = filterBag keep (inert_irreds ics) }
+  where
+    ev_id = ctEvEvId ev
+    keep (IrredCt { ir_ev = ev' }) = ev_id == ctEvEvId ev'
+
+foldIrreds :: (IrredCt -> b -> b) -> InertIrreds -> b -> b
+foldIrreds k irreds z = foldr k z irreds
+
+findMatchingIrreds :: InertIrreds -> CtEvidence
+                   -> (Bag (IrredCt, SwapFlag), InertIrreds)
+findMatchingIrreds irreds ev
+  | EqPred eq_rel1 lty1 rty1 <- classifyPredType pred
+    -- See Note [Solving irreducible equalities]
+  = partitionBagWith (match_eq eq_rel1 lty1 rty1) irreds
+  | otherwise
+  = partitionBagWith match_non_eq irreds
+  where
+    pred = ctEvPred ev
+    match_non_eq irred
+      | irredCtPred irred `tcEqTypeNoKindCheck` pred = Left (irred, NotSwapped)
+      | otherwise                                    = Right irred
+
+    match_eq eq_rel1 lty1 rty1 irred
+      | EqPred eq_rel2 lty2 rty2 <- classifyPredType (irredCtPred irred)
+      , eq_rel1 == eq_rel2
+      , Just swap <- match_eq_help lty1 rty1 lty2 rty2
+      = Left (irred, swap)
+      | otherwise
+      = Right irred
+
+    match_eq_help lty1 rty1 lty2 rty2
+      | lty1 `tcEqTypeNoKindCheck` lty2, rty1 `tcEqTypeNoKindCheck` rty2
+      = Just NotSwapped
+      | lty1 `tcEqTypeNoKindCheck` rty2, rty1 `tcEqTypeNoKindCheck` lty2
+      = Just IsSwapped
+      | otherwise
+      = Nothing
+
+{- Note [Solving irreducible equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#14333)
+  [G] a b ~R# c d
+  [W] c d ~R# a b
+Clearly we should be able to solve this! Even though the constraints are
+not decomposable. We solve this when looking up the work-item in the
+irreducible constraints to look for an identical one.  When doing this
+lookup, findMatchingIrreds spots the equality case, and matches either
+way around. It has to return a swap-flag so we can generate evidence
+that is the right way round too.
+-}
+
 {- *********************************************************************
 *                                                                      *
                 Adding to and removing from the inert set
@@ -1290,10 +1364,10 @@ addInertItem tc_lvl
        TyFamLHS tc tys -> ics { inert_funeqs = addCanFunEq funeqs tc tys eq_ct }
        TyVarLHS tv     -> ics { inert_eqs    = addTyEq eqs tv eq_ct }
 
-addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) item@(CIrredCan {})
-  = updateGivenEqs tc_lvl item $   -- An Irred might turn out to be an
+addInertItem tc_lvl ics@(IC { inert_irreds = irreds }) ct@(CIrredCan irred)
+  = updateGivenEqs tc_lvl ct $   -- An Irred might turn out to be an
                                    -- equality, so we play safe
-    ics { inert_irreds = irreds `snocBag` item }
+    ics { inert_irreds = irreds `snocBag` irred }
 
 addInertItem _ ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
   = ics { inert_dicts = addDict (inert_dicts ics) cls tys item }
@@ -1358,7 +1432,7 @@ kickOutRewritableLHS new_fr new_lhs
     -- constraints, which perhaps may have become soluble after new_lhs
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
-    kicked_out = (dicts_out `andCts` irs_out)
+    kicked_out = (dicts_out `andCts` fmap CIrredCan irs_out)
                   `extendCtsList` insts_out
                   `extendCtsList` map CEqCan tv_eqs_out
                   `extendCtsList` map CEqCan feqs_out
@@ -1366,7 +1440,7 @@ kickOutRewritableLHS new_fr new_lhs
     (tv_eqs_out, tv_eqs_in) = partitionInertEqs kick_out_eq tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs   kick_out_eq funeqmap
     (dicts_out,  dicts_in)  = partitionDicts    kick_out_ct dictmap
-    (irs_out,    irs_in)    = partitionBag      kick_out_ct irreds
+    (irs_out,    irs_in)    = partitionBag      (kick_out_ct . CIrredCan) irreds
       -- Kick out even insolubles: See Note [Rewrite insolubles]
       -- Of course we must kick out irreducibles like (c a), in case
       -- we can rewrite 'c' to something more useful
@@ -1577,8 +1651,8 @@ noGivenNewtypeReprEqs :: TyCon -> InertSet -> Bool
 noGivenNewtypeReprEqs tc inerts
   = not (anyBag might_help (inert_irreds (inert_cans inerts)))
   where
-    might_help ct
-      = case classifyPredType (ctPred ct) of
+    might_help irred
+      = case classifyPredType (ctEvPred (irredCtEvidence irred)) of
           EqPred ReprEq t1 t2
              | Just (tc1,_) <- tcSplitTyConApp_maybe t1
              , tc == tc1
