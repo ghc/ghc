@@ -296,7 +296,20 @@ printClosure( const StgClosure *obj )
             debugBelch(")\n");
             break;
         }
- 
+
+     case ATOMICALLY_FRAME:
+        {
+            StgAtomicallyFrame* frame = (StgAtomicallyFrame*)obj;
+            debugBelch("ATOMICALLY_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
+            debugBelch(",");
+            printPtr((StgPtr)frame->code);
+            debugBelch(",");
+            printPtr((StgPtr)frame->result);
+            debugBelch(")\n");
+            break;
+        }
+
     case CATCH_RETRY_FRAME:
         {
             StgCatchRetryFrame* frame = (StgCatchRetryFrame*)obj;
@@ -319,19 +332,6 @@ printClosure( const StgClosure *obj )
             printPtr((StgPtr)frame->code);
             debugBelch(",");
             printPtr((StgPtr)frame->handler);
-            debugBelch(")\n");
-            break;
-        }
-
-    case ATOMICALLY_FRAME:
-        {
-            StgAtomicallyFrame* frame = (StgAtomicallyFrame*)obj;
-            debugBelch("ATOMICALLY_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)frame));
-            debugBelch(",");
-            printPtr((StgPtr)frame->code);
-            debugBelch(",");
-            printPtr((StgPtr)frame->result);
             debugBelch(")\n");
             break;
         }
@@ -715,17 +715,17 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
             debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun->fun, (int)fun_info->f.fun_type);
             switch (fun_info->f.fun_type) {
             case ARG_GEN:
-                printSmallBitmap(spBottom, &ret_fun->payload,
+                printSmallBitmap(spBottom, (StgPtr) &ret_fun->payload,
                                  BITMAP_BITS(fun_info->f.b.bitmap),
                                  BITMAP_SIZE(fun_info->f.b.bitmap));
                 break;
             case ARG_GEN_BIG:
-                printLargeBitmap(spBottom, &ret_fun->payload,
+                printLargeBitmap(spBottom, (StgPtr) &ret_fun->payload,
                                  GET_FUN_LARGE_BITMAP(fun_info),
                                  GET_FUN_LARGE_BITMAP(fun_info)->size);
                 break;
             default:
-                printSmallBitmap(spBottom, &ret_fun->payload,
+                printSmallBitmap(spBottom, (StgPtr) &ret_fun->payload,
                                  BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]),
                                  BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]));
                 break;
