@@ -279,6 +279,24 @@ printClosure( const StgClosure *obj )
             break;
         }
 
+    case UNDERFLOW_FRAME:
+        {
+            StgUnderflowFrame* u = (StgUnderflowFrame*)obj;
+            debugBelch("UNDERFLOW_FRAME(");
+            printPtr((StgPtr)u->next_chunk);
+            debugBelch(")\n");
+            break;
+        }
+
+    case STOP_FRAME:
+        {
+            StgStopFrame* u = (StgStopFrame*)obj;
+            debugBelch("STOP_FRAME(");
+            printPtr((StgPtr)GET_INFO((StgClosure *)u));
+            debugBelch(")\n");
+            break;
+        }
+ 
     case CATCH_RETRY_FRAME:
         {
             StgCatchRetryFrame* frame = (StgCatchRetryFrame*)obj;
@@ -314,63 +332,6 @@ printClosure( const StgClosure *obj )
             printPtr((StgPtr)frame->code);
             debugBelch(",");
             printPtr((StgPtr)frame->result);
-            debugBelch(")\n");
-            break;
-        }
-
-    case UNDERFLOW_FRAME:
-        {
-            StgUnderflowFrame* u = (StgUnderflowFrame*)obj;
-            debugBelch("UNDERFLOW_FRAME(");
-            printPtr((StgPtr)u->next_chunk);
-            debugBelch(")\n");
-            break;
-        }
-
-    case STOP_FRAME:
-        {
-            StgStopFrame* u = (StgStopFrame*)obj;
-            debugBelch("STOP_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)u));
-            debugBelch(")\n");
-            break;
-        }
-
-    case ATOMICALLY_FRAME:
-        {
-            StgAtomicallyFrame* u = (StgAtomicallyFrame*)obj;
-            debugBelch("ATOMICALLY_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)u));
-            debugBelch(",");
-            printPtr((StgPtr)u->code);
-            debugBelch(",");
-            printPtr((StgPtr)u->result);
-            debugBelch(")\n");
-            break;
-        }
-
-    case CATCH_RETRY_FRAME:
-        {
-            StgCatchRetryFrame* u = (StgCatchRetryFrame*)obj;
-            debugBelch("CATCH_RETRY_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)u));
-            debugBelch(",");
-            printPtr((StgPtr)u->first_code);
-            debugBelch(",");
-            printPtr((StgPtr)u->alt_code);
-            debugBelch(")\n");
-            break;
-        }
-
-    case CATCH_STM_FRAME:
-        {
-            StgCatchSTMFrame* u = (StgCatchSTMFrame*)obj;
-            debugBelch("CATCH_STM_FRAME(");
-            printPtr((StgPtr)GET_INFO((StgClosure *)u));
-            debugBelch(",");
-            printPtr((StgPtr)u->code);
-            debugBelch(",");
-            printPtr((StgPtr)u->handler);
             debugBelch(")\n");
             break;
         }
@@ -618,9 +579,6 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
         case UPDATE_FRAME:
         case CATCH_FRAME:
-        case CATCH_RETRY_FRAME:
-        case CATCH_STM_FRAME:
-        case ATOMICALLY_FRAME:
         case UNDERFLOW_FRAME:
         case STOP_FRAME:
         case ATOMICALLY_FRAME:
