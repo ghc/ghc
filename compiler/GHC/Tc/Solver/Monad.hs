@@ -354,7 +354,7 @@ addInertCan ct =
     do { traceTcS "addInertCan {" $
          text "Trying to insert new inert item:" <+> ppr ct
        ; mkTcS (\TcSEnv{tcs_abort_on_insoluble=abort_flag} ->
-                 when (abort_flag && insolubleEqCt ct) TcM.failM)
+                 when (abort_flag && insolubleCt ct) TcM.failM)
        ; ics <- getInertCans
        ; ics <- maybeKickOut ics ct
        ; tclvl <- getTcLevel

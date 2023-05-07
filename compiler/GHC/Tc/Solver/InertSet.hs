@@ -42,7 +42,10 @@ module GHC.Tc.Solver.InertSet (
     CycleBreakerVarStack,
     pushCycleBreakerVarStack,
     addCycleBreakerBindings,
-    forAllCycleBreakerBindings_
+    forAllCycleBreakerBindings_,
+
+    -- * Solving one from another
+    InteractResult(..), solveOneFromTheOther
 
   ) where
 
@@ -65,15 +68,17 @@ import GHC.Core.Class( Class )
 import GHC.Core.TyCon
 import GHC.Core.Unify
 
-import GHC.Data.Bag
 import GHC.Utils.Misc       ( partitionWith )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Data.Maybe
+import GHC.Data.Bag
 
 import Data.List.NonEmpty ( NonEmpty(..), (<|) )
 import qualified Data.List.NonEmpty as NE
-import GHC.Utils.Panic.Plain
-import GHC.Data.Maybe
+import Data.Function ( on )
+
 import Control.Monad      ( forM_ )
 
 {-
@@ -1945,3 +1950,198 @@ forAllCycleBreakerBindings_ :: Monad m
 forAllCycleBreakerBindings_ (top_env :| _rest_envs) action
   = forM_ top_env (uncurry action)
 {-# INLINABLE forAllCycleBreakerBindings_ #-}  -- to allow SPECIALISE later
+
+
+{- *********************************************************************
+*                                                                      *
+         Solving one from another
+*                                                                      *
+********************************************************************* -}
+
+data InteractResult
+   = KeepInert   -- Keep the inert item, and solve the work item from it
+                 -- (if the latter is Wanted; just discard it if not)
+   | KeepWork    -- Keep the work item, and solve the inert item from it
+
+instance Outputable InteractResult where
+  ppr KeepInert = text "keep inert"
+  ppr KeepWork  = text "keep work-item"
+
+solveOneFromTheOther :: Ct  -- Inert    (Dict or Irred)
+                     -> Ct  -- WorkItem (same predicate as inert)
+                     -> InteractResult
+-- Precondition:
+-- * inert and work item represent evidence for the /same/ predicate
+-- * Both are CDictCan or CIrredCan
+--
+-- We can always solve one from the other: even if both are wanted,
+-- although we don't rewrite wanteds with wanteds, we can combine
+-- two wanteds into one by solving one from the other
+
+solveOneFromTheOther ct_i ct_w
+  | CtWanted { ctev_loc = loc_w } <- ev_w
+  , prohibitedSuperClassSolve loc_i loc_w
+  -- See Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance
+  = -- Inert must be Given
+    KeepWork
+
+  | CtWanted {} <- ev_w
+  = -- Inert is Given or Wanted
+    case ev_i of
+      CtGiven {} -> KeepInert
+        -- work is Wanted; inert is Given: easy choice.
+
+      CtWanted {} -- Both are Wanted
+        -- If only one has no pending superclasses, use it
+        -- Otherwise we can get infinite superclass expansion (#22516)
+        -- in silly cases like   class C T b => C a b where ...
+        | not is_psc_i, is_psc_w     -> KeepInert
+        | is_psc_i,     not is_psc_w -> KeepWork
+
+        -- If only one is a WantedSuperclassOrigin (arising from expanding
+        -- a Wanted class constraint), keep the other: wanted superclasses
+        -- may be unexpected by users
+        | not is_wsc_orig_i, is_wsc_orig_w     -> KeepInert
+        | is_wsc_orig_i,     not is_wsc_orig_w -> KeepWork
+
+        -- otherwise, just choose the lower span
+        -- reason: if we have something like (abs 1) (where the
+        -- Num constraint cannot be satisfied), it's better to
+        -- get an error about abs than about 1.
+        -- This test might become more elaborate if we see an
+        -- opportunity to improve the error messages
+        | ((<) `on` ctLocSpan) loc_i loc_w -> KeepInert
+        | otherwise                        -> KeepWork
+
+  -- From here on the work-item is Given
+
+  | CtWanted { ctev_loc = loc_i } <- ev_i
+  , prohibitedSuperClassSolve loc_w loc_i
+  = KeepInert   -- Just discard the un-usable Given
+                -- This never actually happens because
+                -- Givens get processed first
+
+  | CtWanted {} <- ev_i
+  = KeepWork
+
+  -- From here on both are Given
+  -- See Note [Replacement vs keeping]
+
+  | lvl_i == lvl_w
+  = same_level_strategy
+
+  | otherwise   -- Both are Given, levels differ
+  = different_level_strategy
+  where
+     ev_i  = ctEvidence ct_i
+     ev_w  = ctEvidence ct_w
+
+     pred  = ctEvPred ev_i
+
+     loc_i  = ctEvLoc ev_i
+     loc_w  = ctEvLoc ev_w
+     orig_i = ctLocOrigin loc_i
+     orig_w = ctLocOrigin loc_w
+     lvl_i  = ctLocLevel loc_i
+     lvl_w  = ctLocLevel loc_w
+
+     is_psc_w = isPendingScDict ct_w
+     is_psc_i = isPendingScDict ct_i
+
+     is_wsc_orig_i = isWantedSuperclassOrigin orig_i
+     is_wsc_orig_w = isWantedSuperclassOrigin orig_w
+
+     different_level_strategy  -- Both Given
+       | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
+       | otherwise         = if lvl_w > lvl_i then KeepInert else KeepWork
+       -- See Note [Replacement vs keeping] part (1)
+       -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
+
+     same_level_strategy -- Both Given
+       = case (orig_i, orig_w) of
+
+           (GivenSCOrigin _ depth_i blocked_i, GivenSCOrigin _ depth_w blocked_w)
+             | blocked_i, not blocked_w -> KeepWork  -- Case 2(a) from
+             | not blocked_i, blocked_w -> KeepInert -- Note [Replacement vs keeping]
+
+             -- Both blocked or both not blocked
+
+             | depth_w < depth_i -> KeepWork   -- Case 2(c) from
+             | otherwise         -> KeepInert  -- Note [Replacement vs keeping]
+
+           (GivenSCOrigin {}, _) -> KeepWork  -- Case 2(b) from Note [Replacement vs keeping]
+
+           _ -> KeepInert  -- Case 2(d) from Note [Replacement vs keeping]
+
+{-
+Note [Replacement vs keeping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have two Given constraints both of type (C tys), say, which should
+we keep?  More subtle than you might think! This is all implemented in
+solveOneFromTheOther.
+
+  1) Constraints come from different levels (different_level_strategy)
+
+      - For implicit parameters we want to keep the innermost (deepest)
+        one, so that it overrides the outer one.
+        See Note [Shadowing of Implicit Parameters]
+
+      - For everything else, we want to keep the outermost one.  Reason: that
+        makes it more likely that the inner one will turn out to be unused,
+        and can be reported as redundant.  See Note [Tracking redundant constraints]
+        in GHC.Tc.Solver.
+
+        It transpires that using the outermost one is responsible for an
+        8% performance improvement in nofib cryptarithm2, compared to
+        just rolling the dice.  I didn't investigate why.
+
+  2) Constraints coming from the same level (i.e. same implication)
+
+       (a) If both are GivenSCOrigin, choose the one that is unblocked if possible
+           according to Note [Solving superclass constraints] in GHC.Tc.TyCl.Instance.
+
+       (b) Prefer constraints that are not superclass selections. Example:
+
+             f :: (Eq a, Ord a) => a -> Bool
+             f x = x == x
+
+           Eager superclass expansion gives us two [G] Eq a constraints. We
+           want to keep the one from the user-written Eq a, not the superclass
+           selection. This means we report the Ord a as redundant with
+           -Wredundant-constraints, not the Eq a.
+
+           Getting this wrong was #20602. See also
+           Note [Tracking redundant constraints] in GHC.Tc.Solver.
+
+       (c) If both are GivenSCOrigin, chooose the one with the shallower
+           superclass-selection depth, in the hope of identifying more correct
+           redundant constraints. This is really a generalization of point (b),
+           because the superclass depth of a non-superclass constraint is 0.
+
+           (If the levels differ, we definitely won't have both with GivenSCOrigin.)
+
+       (d) Finally, when there is still a choice, use KeepInert rather than
+           KeepWork, for two reasons:
+             - to avoid unnecessary munging of the inert set.
+             - to cut off superclass loops; see Note [Superclass loops] in GHC.Tc.Solver.Canonical
+
+Doing the level-check for implicit parameters, rather than making the work item
+always override, is important.  Consider
+
+    data T a where { T1 :: (?x::Int) => T Int; T2 :: T a }
+
+    f :: (?x::a) => T a -> Int
+    f T1 = ?x
+    f T2 = 3
+
+We have a [G] (?x::a) in the inert set, and at the pattern match on T1 we add
+two new givens in the work-list:  [G] (?x::Int)
+                                  [G] (a ~ Int)
+Now consider these steps
+  - process a~Int, kicking out (?x::a)
+  - process (?x::Int), the inner given, adding to inert set
+  - process (?x::a), the outer given, overriding the inner given
+Wrong!  The level-check ensures that the inner implicit parameter wins.
+(Actually I think that the order in which the work-list is processed means
+that this chain of events won't happen, but that's very fragile.)
+-}

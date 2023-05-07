@@ -277,8 +277,8 @@ floatKindEqualities wc = float_wc emptyVarSet wc
       = Nothing
       where
         is_floatable ct
-           | insolubleEqCt ct = False
-           | otherwise        = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
+           | insolubleCt ct = False
+           | otherwise      = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Maybe (Bag Ct, Bag DelayedError)
     float_implic trapping_tvs (Implic { ic_wanted = wanted, ic_given_eqs = given_eqs
@@ -3396,7 +3396,7 @@ approximateWC float_past_equalities wc
 
     is_floatable encl_eqs skol_tvs ct
        | isGivenCt ct                                = False
-       | insolubleEqCt ct                            = False
+       | insolubleCt ct                              = False
        | tyCoVarsOfCt ct `intersectsVarSet` skol_tvs = False
        | otherwise
        = case classifyPredType (ctPred ct) of

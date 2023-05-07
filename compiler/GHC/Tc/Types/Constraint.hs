@@ -57,7 +57,7 @@ module GHC.Tc.Types.Constraint (
         addInsols, dropMisleading, addSimples, addImplics, addHoles,
         addNotConcreteError, addDelayedErrors,
         tyCoVarsOfWC, tyCoVarsOfWCList,
-        insolubleWantedCt, insolubleEqCt, insolubleCt, insolubleIrredCt,
+        insolubleWantedCt, insolubleCt, insolubleIrredCt,
         insolubleImplic, nonDefaultableTyVarsOfWC,
 
         Implication(..), implicationPrototype, checkTelescopeSkol,
@@ -1306,30 +1306,13 @@ insolubleWantedCt ct = insolubleCt ct &&
                        not (arisesFromGivens ct) &&
                        not (isWantedWantedFunDepOrigin (ctOrigin ct))
 
-insolubleEqCt :: Ct -> Bool
--- Returns True of /equality/ constraints
--- that are /definitely/ insoluble
--- It won't detect some definite errors like
---       F a ~ T (F a)
--- where F is a type family, which actually has an occurs check
---
--- The function is tuned for application /after/ constraint solving
---       i.e. assuming canonicalisation has been done
--- E.g.  It'll reply True  for     a ~ [a]
---               but False for   [a] ~ a
--- and
---                   True for  Int ~ F a Int
---               but False for  Maybe Int ~ F a Int Int
---               (where F is an arity-1 type function)
-insolubleEqCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
-insolubleEqCt _                 = False
-
 insolubleIrredCt :: IrredCt -> Bool
+-- Returns True of Irred constraints that are /definitely/ insoluble
 insolubleIrredCt (IrredCt { ir_reason = reason })
   = isInsolubleReason reason
 
--- | Returns True of equality constraints that are definitely insoluble,
--- as well as TypeError constraints.
+-- | Returns True of constraints that are definitely insoluble,
+--   as well as TypeError constraints.
 -- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
 --
 -- This function is critical for accurate pattern-match overlap warnings.
@@ -1338,8 +1321,15 @@ insolubleIrredCt (IrredCt { ir_reason = reason })
 -- Note that this does not traverse through the constraint to find
 -- nested custom type errors: it only detects @TypeError msg :: Constraint@,
 -- and not e.g. @Eq (TypeError msg)@.
+--
+-- The function is tuned for application /after/ constraint solving
+--       i.e. assuming canonicalisation has been done
+-- That's why it looks only for IrredCt, with an insoluble IrredCtReason
 insolubleCt :: Ct -> Bool
-insolubleCt ct = isTopLevelUserTypeError (ctPred ct) || insolubleEqCt ct
+insolubleCt ct
+  | isTopLevelUserTypeError (ctPred ct) = True
+  | CIrredCan ir_ct <- ct               = insolubleIrredCt ir_ct
+  | otherwise                           = False
   where
   -- NB: 'isTopLevelUserTypeError' detects constraints of the form "TypeError msg"
   -- and "Unsatisfiable msg". It deliberately does not detect TypeError

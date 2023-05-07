@@ -2,7 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.Tc.Solver.Equality(
-     solveCanonicalEquality, solveNonCanonicalEquality
+     solveEquality
   ) where
 
 
@@ -10,6 +10,7 @@ import GHC.Prelude
 
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
+import GHC.Tc.Solver.Irred( tryInertIrreds )
 import GHC.Tc.Solver.Dict( matchLocalInst, chooseInstance )
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Types( findFunEqsByTyCon )
@@ -100,14 +101,9 @@ It's as if we treat (->) and (=>) as different type constructors, which
 indeed they are!
 -}
 
-solveCanonicalEquality :: EqCt -> SolverStage Ct
-solveCanonicalEquality (EqCt { eq_ev = ev, eq_eq_rel = eq_rel
-                             , eq_lhs = lhs, eq_rhs = rhs })
-  = solveNonCanonicalEquality ev eq_rel (canEqLHSType lhs) rhs
-
-solveNonCanonicalEquality :: CtEvidence -> EqRel -> Type -> Type
-                          -> SolverStage Ct
-solveNonCanonicalEquality ev eq_rel ty1 ty2
+solveEquality :: CtEvidence -> EqRel -> Type -> Type
+              -> SolverStage Ct
+solveEquality ev eq_rel ty1 ty2
   = do { Pair ty1' ty2' <- zonkEqTypes ev eq_rel ty1 ty2
        ; let ev' | debugIsOn = setCtEvPredType ev $
                                mkPrimEqPredRole (eqRelRole eq_rel) ty1' ty2'
@@ -118,12 +114,12 @@ solveNonCanonicalEquality ev eq_rel ty1 ty2
 
        ; case mb_canon of {
 
-            Left irred_ct -> do { solveIrredEquality irred_ct
+            Left irred_ct -> do { tryInertIrreds irred_ct
                                 ; return (CIrredCan irred_ct) } ;
 
             Right eq_ct   -> do { interactEq eq_ct
                                 ; tryFunDeps eq_ct
-                                ; tryQuantifiedConstraints eq_ct
+                                ; tryQCsEqCt eq_ct
                                 ; return (CEqCan eq_ct) } } }
 
 
@@ -2674,8 +2670,9 @@ See
 -}
 
 --------------------
-solveIrredEquality :: IrredCt -> SolverStage ()
-solveIrredEquality irred@(IrredCt { ir_ev = ev })
+{-
+tryQCsIrredCt :: IrredCt -> SolverStage ()
+tryQCsIrredCt irred@(IrredCt { ir_ev = ev })
   | EqPred eq_rel t1 t2 <- classifyPredType (ctEvPred ev)
   = lookup_eq_in_qcis (CIrredCan irred) eq_rel t1 t2
     -- If the final_qci_check fails, we'll do continueWith on an IrredCt
@@ -2689,10 +2686,11 @@ solveIrredEquality irred@(IrredCt { ir_ev = ev })
                -- this can't happen case, but it's not a hot path, and this is
                -- simple and robust
   = pprPanic "solveIrredEquality" (ppr ev)
+-}
 
 --------------------
-tryQuantifiedConstraints :: EqCt -> SolverStage ()
-tryQuantifiedConstraints work_item@(EqCt { eq_lhs = lhs, eq_rhs = rhs, eq_eq_rel = eq_rel })
+tryQCsEqCt :: EqCt -> SolverStage ()
+tryQCsEqCt work_item@(EqCt { eq_lhs = lhs, eq_rhs = rhs, eq_eq_rel = eq_rel })
   = lookup_eq_in_qcis (CEqCan work_item) eq_rel (canEqLHSType lhs) rhs
 
 --------------------
@@ -2701,6 +2699,8 @@ lookup_eq_in_qcis :: Ct -> EqRel -> TcType -> TcType -> SolverStage ()
 --    [W] t1 ~# t2
 -- and a Given quantified contraint like (forall a b. blah => a ~ b)
 -- Why?  See Note [Looking up primitive equalities in quantified constraints]
+-- See also GHC.Tc.Solver.Canonical
+-- Note [Equality superclasses in quantified constraints]
 lookup_eq_in_qcis work_ct eq_rel lhs rhs
   = Stage $
     do { ev_binds_var <- getTcEvBindsVar

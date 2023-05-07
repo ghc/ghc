@@ -17,7 +17,8 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Solver.Rewrite
 import GHC.Tc.Solver.Monad
-import GHC.Tc.Solver.Equality( solveNonCanonicalEquality, solveCanonicalEquality )
+import GHC.Tc.Solver.Equality( solveEquality )
+import GHC.Tc.Solver.Irred( solveIrred )
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 
@@ -87,39 +88,52 @@ last time through, so we can skip the classification step.
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 canonicalize :: Ct -> SolverStage Ct
-canonicalize (CNonCanonical ev)
-  = canNC ev
+canonicalize (CNonCanonical ev)                   = canNC ev
+canonicalize (CIrredCan (IrredCt { ir_ev = ev })) = canNC ev
 
-canonicalize (CEqCan can_eq_ct)
-  = solveCanonicalEquality can_eq_ct
+canonicalize (CEqCan (EqCt { eq_ev = ev, eq_eq_rel = eq_rel
+                           , eq_lhs = lhs, eq_rhs = rhs }))
+  = solveEquality ev eq_rel (canEqLHSType lhs) rhs
 
 canonicalize (CQuantCan (QCI { qci_ev = ev, qci_pend_sc = pend_sc }))
-  = Stage $ canForAll ev pend_sc
+  = do { ev <- rewriteEvidence ev
+       ; case classifyPredType (ctEvPred ev) of
+           ForAllPred tvs th p -> Stage $ solveForAll ev tvs th p pend_sc
+           _ -> pprPanic "canonicalise" (ppr ev) }
 
-canonicalize (CIrredCan (IrredCt { ir_ev = ev }))
-  = canNC ev
-    -- Instead of rewriting the evidence before classifying, it's possible we
+canonicalize (CDictCan { cc_ev = ev, cc_pend_sc = pend_sc })
+  = do { ev <- rewriteEvidence ev
+       ; case classifyPredType (ctEvPred ev) of
+           ClassPred cls tys -> Stage $ solveClass ev cls tys pend_sc
+           _ -> pprPanic "canonicalise" (ppr ev) }
+
+canNC :: CtEvidence -> SolverStage Ct
+canNC ev
+  = -- Instead of rewriting the evidence before classifying, it's possible we
     -- can make progress without the rewrite. Try this first.
     -- For insolubles (all of which are equalities), do /not/ rewrite the arguments
     -- In #14350 doing so led entire-unnecessary and ridiculously large
     -- type function expansion.  Instead, canEqNC just applies
     -- the substitution to the predicate, and may do decomposition;
     --    e.g. a ~ [a], where [G] a ~ [Int], can decompose
+    case classifyPredType (ctEvPred ev) of {
+        EqPred eq_rel ty1 ty2 -> solveEquality ev eq_rel ty1 ty2 ;
+        _ ->
 
-canonicalize (CDictCan { cc_ev = ev, cc_class  = cls
-                       , cc_tyargs = xis, cc_pend_sc = pend_sc })
-  = {-# SCC "canClass" #-}
-    Stage $ canClass ev cls xis pend_sc
+    -- Do rewriting on the constraint, especially zonking
+    do { ev <- rewriteEvidence ev
+       ; let irred = IrredCt { ir_ev = ev, ir_reason = IrredShapeReason }
 
-canNC :: CtEvidence -> SolverStage Ct
-canNC ev =
-  case classifyPredType pred of
-      ClassPred cls tys     -> Stage $ canClassNC ev cls tys
-      EqPred eq_rel ty1 ty2 -> solveNonCanonicalEquality ev eq_rel ty1 ty2
-      IrredPred {}          -> Stage $ canIrred ev
-      ForAllPred tvs th p   -> Stage $ canForAllNC ev tvs th p
-  where
-    pred = ctEvPred ev
+    -- And then re-classify
+       ; case classifyPredType (ctEvPred ev) of
+           ClassPred cls tys     -> Stage $ solveClassNC ev cls tys
+           ForAllPred tvs th p   -> Stage $ solveForAllNC ev tvs th p
+           IrredPred {}          -> solveIrred irred
+           EqPred eq_rel ty1 ty2 -> solveEquality ev eq_rel ty1 ty2
+              -- This case only happens if (say) `c` is unified with `a ~# b`,
+              -- but that is rare becuase it requires c :: CONSTRAINT UnliftedRep
+
+    }}
 
 {-
 ************************************************************************
@@ -129,19 +143,18 @@ canNC ev =
 ************************************************************************
 -}
 
-canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
--- "NC" means "non-canonical"; that is, we have got here
--- from a NonCanonical constraint, not from a CDictCan
--- Precondition: EvVar is class evidence
-canClassNC ev cls tys
+solveClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
+-- NC: this comes from CNonCanonical or CIrredCan
+-- Precondition: already rewritten by inert set
+solveClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
   = do { dflags <- getDynFlags
        ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev [] [] cls tys
-                           -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
+                   -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
        ; emitWork (listToBag sc_cts)
-       ; canClass ev cls tys doNotExpand }
-                           -- doNotExpand: We have already expanded superclasses for /this/ dict
-                           -- so set the fuel to doNotExpand to avoid repeating expansion
+       ; solveClass ev cls tys doNotExpand }
+         -- doNotExpand: We have already expanded superclasses for /this/ dict
+         -- so set the fuel to doNotExpand to avoid repeating expansion
 
   | CtWanted { ctev_rewriters = rewriters } <- ev
   , Just ip_name <- isCallStackPred cls tys
@@ -167,23 +180,29 @@ canClassNC ev cls tys
                                   (ctLocSpan loc) (ctEvExpr new_ev)
        ; solveCallStack ev ev_cs
 
-       ; canClass new_ev cls tys doNotExpand
-                              -- doNotExpand: No superclasses for class CallStack
-                              -- See invariants in CDictCan.cc_pend_sc
-       }
+       ; solveClass new_ev cls tys doNotExpand }
+         -- doNotExpand: No superclasses for class CallStack
+         -- See invariants in CDictCan.cc_pend_sc
 
   | otherwise
   = do { dflags <- getDynFlags
        ; let fuel | classHasSCs cls = wantedsFuel dflags
                   | otherwise   = doNotExpand
                   -- See Invariants in `CCDictCan.cc_pend_sc`
-       ; canClass ev cls tys fuel
-       }
-
+       ; solveClass ev cls tys fuel }
   where
     loc  = ctEvLoc ev
     orig = ctLocOrigin loc
     pred = ctEvPred ev
+
+solveClass :: CtEvidence -> Class -> [Type] -> ExpansionFuel -> TcS (StopOrContinue Ct)
+solveClass ev cls tys pend_sc
+  = -- Sll classes do *nominal* matching
+    assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
+    continueWith (CDictCan { cc_ev      = ev
+                           , cc_tyargs  = tys
+                           , cc_class   = cls
+                           , cc_pend_sc = pend_sc })
 
 solveCallStack :: CtEvidence -> EvCallStack -> TcS ()
 -- Also called from GHC.Tc.Solver when defaulting call stacks
@@ -195,25 +214,6 @@ solveCallStack ev ev_cs = do
   let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
   setEvBindIfWanted ev IsCoherent ev_tm
 
-canClass :: CtEvidence
-         -> Class -> [Type]
-         -> ExpansionFuel            -- n > 0 <=> un-explored superclasses
-         -> TcS (StopOrContinue Ct)
--- Precondition: EvVar is class evidence
-
-canClass ev cls tys pend_sc
-  = -- all classes do *nominal* matching
-    assertPpr (ctEvRole ev == Nominal) (ppr ev $$ ppr cls $$ ppr tys) $
-    do { (redns@(Reductions _ xis), rewriters) <- rewriteArgsNom ev cls_tc tys
-       ; let redn = mkClassPredRedn cls redns
-       ; rewriteEvidence rewriters ev redn $ \new_ev ->
-    do { traceTcS "canClass" (vcat [ ppr new_ev, ppr (reductionReducedType redn) ])
-       ; continueWith (CDictCan { cc_ev = new_ev
-                                , cc_tyargs = xis
-                                , cc_class = cls
-                                , cc_pend_sc = pend_sc }) }}
-  where
-    cls_tc = classTyCon cls
 
 {- Note [The superclass story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -715,39 +715,7 @@ which looks for primitive equalities specially in the quantified
 constraints.
 
 See also Note [Evidence for quantified constraints] in GHC.Core.Predicate.
-
-
-************************************************************************
-*                                                                      *
-*                      Irreducibles canonicalization
-*                                                                      *
-************************************************************************
 -}
-
-canIrred :: CtEvidence -> TcS (StopOrContinue Ct)
--- Precondition: ty not a tuple and no other evidence form
-canIrred ev
-  = do { let pred = ctEvPred ev
-       ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
-       ; (redn, rewriters) <- rewrite ev pred
-       ; rewriteEvidence rewriters ev redn $ \ new_ev ->
-
-    do { -- Re-classify, in case rewriting has improved its shape
-         -- Code is like the canNC, except
-         -- that the IrredPred branch stops work
-       ; case classifyPredType (ctEvPred new_ev) of
-           ClassPred cls tys     -> canClassNC new_ev cls tys
-           EqPred eq_rel ty1 ty2 -> -- IrredPreds have kind Constraint, so
-                                    -- cannot become EqPreds
-                                    pprPanic "canIrred: EqPred"
-                                      (ppr ev $$ ppr eq_rel $$ ppr ty1 $$ ppr ty2)
-           ForAllPred tvs th p   -> -- this is highly suspect; Quick Look
-                                    -- should never leave a meta-var filled
-                                    -- in with a polytype. This is #18987.
-                                    do traceTcS "canEvNC:forall" (ppr pred)
-                                       canForAllNC ev tvs th p
-           IrredPred {}          -> continueWith $
-                                    mkIrredCt IrredShapeReason new_ev } }
 
 {- *********************************************************************
 *                                                                      *
@@ -827,16 +795,18 @@ type signature.
 
 -}
 
-canForAllNC :: CtEvidence -> [TyVar] -> TcThetaType -> TcPredType
-            -> TcS (StopOrContinue Ct)
-canForAllNC ev tvs theta pred
+solveForAllNC :: CtEvidence -> [TyVar] -> TcThetaType -> TcPredType
+              -> TcS (StopOrContinue Ct)
+-- NC: this came from CNonCanonical, so we have not yet expanded superclasses
+-- Precondition: already rewritten by inert set
+solveForAllNC ev tvs theta pred
   | isGiven ev  -- See Note [Eagerly expand given superclasses]
   , Just (cls, tys) <- cls_pred_tys_maybe
   = do { dflags <- getDynFlags
        ; sc_cts <- mkStrictSuperClasses (givensFuel dflags) ev tvs theta cls tys
        -- givensFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
        ; emitWork (listToBag sc_cts)
-       ; canForAll ev doNotExpand }
+       ; solveForAll ev tvs theta pred doNotExpand }
        -- doNotExpand: as we have already (eagerly) expanded superclasses for this class
 
   | otherwise
@@ -847,27 +817,13 @@ canForAllNC ev tvs theta pred
                   -- qcsFuel dflags: See Note [Expanding Recursive Superclasses and ExpansionFuel]
                   -- See Note [Quantified constraints]
                   | otherwise = doNotExpand
-       ; canForAll ev fuel }
+       ; solveForAll ev tvs theta pred fuel }
   where
     cls_pred_tys_maybe = getClassPredTys_maybe pred
 
-canForAll :: CtEvidence -> ExpansionFuel -> TcS (StopOrContinue Ct)
--- We have a constraint (forall as. blah => C tys)
-canForAll ev fuel
-  = do { -- First rewrite it to apply the current substitution
-       ; (redn, rewriters) <- rewrite ev (ctEvPred ev)
-       ; rewriteEvidence rewriters ev redn $ \ new_ev ->
-
-    do { -- Now decompose into its pieces and solve it
-         -- (It takes a lot less code to rewrite before decomposing.)
-       ; case classifyPredType (ctEvPred new_ev) of
-           ForAllPred tvs theta pred
-              -> solveForAll new_ev tvs theta pred fuel
-           _  -> pprPanic "canForAll" (ppr new_ev)
-    } }
-
 solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> ExpansionFuel
             -> TcS (StopOrContinue Ct)
+-- Precondition: already rewritten by inert set
 solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
             tvs theta pred _fuel
   = -- See Note [Solving a Wanted forall-constraint]
@@ -966,12 +922,7 @@ we'll find a match in the InstEnv.
 ************************************************************************
 -}
 
-rewriteEvidence :: RewriterSet  -- ^ See Note [Wanteds rewrite Wanteds]
-                                -- in GHC.Tc.Types.Constraint
-                -> CtEvidence   -- ^ old evidence
-                -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
-                -> (CtEvidence -> TcS (StopOrContinue Ct))
-                -> TcS (StopOrContinue Ct)
+rewriteEvidence :: CtEvidence -> SolverStage CtEvidence
 -- (rewriteEvidence old_ev new_pred co do_next)
 -- Main purpose: create new evidence for new_pred;
 --                 unless new_pred is cached already
@@ -1005,33 +956,42 @@ the rewriter set. We check this with an assertion.
  -}
 
 
-rewriteEvidence rewriters old_ev (Reduction co new_pred) do_next
+rewriteEvidence ev
+  = Stage $ do { traceTcS "rewriteEvidence" (ppr ev)
+               ; (redn, rewriters) <- rewrite ev (ctEvPred ev)
+               ; finish_rewrite ev redn rewriters }
+
+finish_rewrite :: CtEvidence   -- ^ old evidence
+               -> Reduction    -- ^ new predicate + coercion, of type <type of old evidence> ~ new predicate
+               -> RewriterSet  -- ^ See Note [Wanteds rewrite Wanteds]
+                               -- in GHC.Tc.Types.Constraint
+               -> TcS (StopOrContinue CtEvidence)
+finish_rewrite old_ev (Reduction co new_pred) rewriters
   | isReflCo co -- See Note [Rewriting with Refl]
   = assert (isEmptyRewriterSet rewriters) $
-    do_next (setCtEvPredType old_ev new_pred)
+    continueWith (setCtEvPredType old_ev new_pred)
 
-rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
-                (Reduction co new_pred) do_next
+finish_rewrite ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
+                (Reduction co new_pred) rewriters
   = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
     do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
-       ; do_next new_ev }
+       ; continueWith new_ev }
   where
     -- mkEvCast optimises ReflCo
     new_tm = mkEvCast (evId old_evar)
                 (downgradeRole Representational (ctEvRole ev) co)
 
-rewriteEvidence new_rewriters
-                ev@(CtWanted { ctev_dest = dest
+finish_rewrite ev@(CtWanted { ctev_dest = dest
                              , ctev_loc = loc
                              , ctev_rewriters = rewriters })
-                (Reduction co new_pred) do_next
+                (Reduction co new_pred) new_rewriters
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ctEvRole ev)
        ; setWantedEvTerm dest IsCoherent $
             mkEvCast (getEvExpr mb_new_ev)
                      (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
        ; case mb_new_ev of
-            Fresh  new_ev -> do_next new_ev
+            Fresh  new_ev -> continueWith new_ev
             Cached _      -> stopWith ev "Cached wanted" }
   where
     rewriters' = rewriters S.<> new_rewriters
