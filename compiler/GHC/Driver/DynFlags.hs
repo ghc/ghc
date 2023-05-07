@@ -413,6 +413,8 @@ data DynFlags = DynFlags {
   useUnicode            :: Bool,
   useColor              :: OverridingBool,
   canUseColor           :: Bool,
+  useErrorLinks         :: OverridingBool,
+  canUseErrorLinks      :: Bool,
   colScheme             :: Col.Scheme,
 
   -- | what kind of {-# SCC #-} to add automatically
@@ -513,6 +515,8 @@ initDynFlags dflags = do
         useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = stderrSupportsAnsiColors,
+        -- if the terminal supports color, we assume it supports links as well
+        canUseErrorLinks = stderrSupportsAnsiColors,
         colScheme     = colScheme',
         tmpDir        = TempDir tmp_dir
         }
@@ -679,6 +683,8 @@ defaultDynFlags mySettings =
         useUnicode = False,
         useColor = Auto,
         canUseColor = False,
+        useErrorLinks = Auto,
+        canUseErrorLinks = False,
         colScheme = Col.defaultScheme,
         profAuto = NoProfAuto,
         callerCcFilters = [],
@@ -1191,7 +1197,6 @@ defaultFlags settings
     -- Default floating flags (see Note [RHS Floating])
     ++ [ Opt_LocalFloatOut, Opt_LocalFloatOutTopLevel ]
 
-
     ++ default_PIC platform
 
     ++ validHoleFitDefaults
@@ -1479,7 +1484,6 @@ versionedFilePath platform = uniqueSubdir platform
 
 -- SDoc
 -------------------------------------------
-
 -- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags style = SDC
@@ -1490,6 +1494,7 @@ initSDocContext dflags style = SDC
   , sdocDefaultDepth                = pprUserLength dflags
   , sdocLineLength                  = pprCols dflags
   , sdocCanUseUnicode               = useUnicode dflags
+  , sdocPrintErrIndexLinks          = overrideWith (canUseErrorLinks dflags) (useErrorLinks dflags)
   , sdocHexWordLiterals             = gopt Opt_HexWordLiterals dflags
   , sdocPprDebug                    = dopt Opt_D_ppr_debug dflags
   , sdocPrintUnicodeSyntax          = gopt Opt_PrintUnicodeSyntax dflags

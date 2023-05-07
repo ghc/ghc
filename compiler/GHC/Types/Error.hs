@@ -603,9 +603,18 @@ mkLocMessageWarningGroups show_warn_groups msg_class locn msg
                   -> brackets msg
               _   -> empty
 
+          ppr_with_hyperlink code =
+            -- this is a bit hacky, but we assume that if the terminal supports colors
+            -- then it should also support links
+            sdocOption (\ ctx -> sdocPrintErrIndexLinks ctx) $
+              \ use_hyperlinks ->
+                 if use_hyperlinks
+                 then ppr $ LinkedDiagCode code
+                 else ppr code
+
           code_doc =
             case msg_class of
-              MCDiagnostic _ _ (Just code) -> brackets (coloured msg_colour $ ppr code)
+              MCDiagnostic _ _ (Just code) -> brackets (coloured msg_colour $ ppr_with_hyperlink code)
               _                            -> empty
 
           flag_msg :: Severity -> DiagnosticReason -> Maybe SDoc
@@ -813,5 +822,23 @@ instance Show DiagnosticCode where
   show (DiagnosticCode prefix c) =
     prefix ++ "-" ++ printf "%05d" c
       -- pad the numeric code to have at least 5 digits
+
 instance Outputable DiagnosticCode where
   ppr code = text (show code)
+
+-- | A newtype that is a witness to the `-fprint-error-index-links` flag. It
+-- alters the @Outputable@ instance to emit @DiagnosticCode@ as ANSI hyperlinks
+-- to the HF error index
+newtype LinkedDiagCode = LinkedDiagCode DiagnosticCode
+
+instance Outputable LinkedDiagCode where
+  ppr (LinkedDiagCode d@DiagnosticCode{}) = linkEscapeCode d
+
+-- | Wrap the link in terminal escape codes specified by OSC 8.
+linkEscapeCode :: DiagnosticCode -> SDoc
+linkEscapeCode d = text "\ESC]8;;" <> hfErrorLink d -- make the actual link
+                   <> text "\ESC\\" <> ppr d <> text "\ESC]8;;\ESC\\" -- the rest is the visible text
+
+-- | create a link to the HF error index given an error code.
+hfErrorLink :: DiagnosticCode -> SDoc
+hfErrorLink errorCode = text "https://errors.haskell.org/messages/" <> ppr errorCode

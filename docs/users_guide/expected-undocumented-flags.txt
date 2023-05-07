@@ -41,6 +41,9 @@
 -fdiagnostics-color=always
 -fdiagnostics-color=auto
 -fdiagnostics-color=never
+-fprint-error-index-links=always
+-fprint-error-index-links=auto
+-fprint-error-index-links=never
 -fembed-manifest
 -fextended-default-rules
 -ffast-pap-calls

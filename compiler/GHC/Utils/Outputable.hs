@@ -396,6 +396,7 @@ data SDocContext = SDC
   , sdocCanUseUnicode               :: !Bool
       -- ^ True if Unicode encoding is supported
       -- and not disabled by GHC_NO_UNICODE environment variable
+  , sdocPrintErrIndexLinks          :: !Bool
   , sdocHexWordLiterals             :: !Bool
   , sdocPprDebug                    :: !Bool
   , sdocPrintUnicodeSyntax          :: !Bool
@@ -457,6 +458,7 @@ defaultSDocContext = SDC
   , sdocDefaultDepth                = 5
   , sdocLineLength                  = 100
   , sdocCanUseUnicode               = False
+  , sdocPrintErrIndexLinks          = False
   , sdocHexWordLiterals             = False
   , sdocPprDebug                    = False
   , sdocPrintUnicodeSyntax          = False

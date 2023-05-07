@@ -50,6 +50,9 @@ TEST_HC_OPTS += -fshow-warning-groups
 TEST_HC_OPTS += -fdiagnostics-color=never
 TEST_HC_OPTS += -fno-diagnostics-show-caret
 
+# don't generate error index links for the GHC testsuite
+TEST_HC_OPTS += -fprint-error-index-links=never
+
 # See #15278.
 TEST_HC_OPTS += -Werror=compat
 

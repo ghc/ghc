@@ -244,7 +244,7 @@ testRules = do
         ghcFlags        <- runTestGhcFlags
         let ghciFlags = ghcFlags ++ unwords
               [ "--interactive", "-v0", "-ignore-dot-ghci"
-              , "-fno-ghci-history"
+              , "-fno-ghci-history", "-fprint-error-index-links=never"
               ]
         ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
         ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)

@@ -26,7 +26,7 @@ T11247:
 T17171a:
 	'$(RUNGHC)' --ghc-arg=-Wall T17171a.hs
 T17171b:
-	'$(RUNGHC)' --ghc-arg=-Wall T17171b.hs
+	'$(RUNGHC)' --ghc-arg=-Wall -fprint-error-index-links=never T17171b.hs
 
 T-signals-child:
 	-'$(RUNGHC)' T-signals-child.hs --runghc '$(RUNGHC)'

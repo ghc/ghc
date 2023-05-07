@@ -1314,6 +1314,13 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fdiagnostics-color=never"
       (NoArg (upd (\d -> d { useColor = Never })))
 
+  , make_ord_flag defFlag "fprint-error-index-links=auto"
+      (NoArg (upd (\d -> d { useErrorLinks = Auto })))
+  , make_ord_flag defFlag "fprint-error-index-links=always"
+      (NoArg (upd (\d -> d { useErrorLinks = Always })))
+  , make_ord_flag defFlag "fprint-error-index-links=never"
+      (NoArg (upd (\d -> d { useErrorLinks = Never })))
+
   -- Suppress all that is suppressible in core dumps.
   -- Except for uniques, as some simplifier phases introduce new variables that
   -- have otherwise identical names.

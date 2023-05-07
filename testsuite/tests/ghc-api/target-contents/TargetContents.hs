@@ -34,6 +34,7 @@ main = do
     (dflags1, xs, warn) <- parseDynamicFlags logger dflags0 $ map noLoc $
         [ "-outputdir", "./outdir"
         , "-fno-diagnostics-show-caret"
+        , "-fprint-error-index-links=never"
         ] ++ args
     _ <- setSessionDynFlags dflags1
 

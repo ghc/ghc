@@ -1470,6 +1470,20 @@ messages and in GHCi:
     error occurred. This controls whether the part of the error message which
     says "In the equation..", "In the pattern.." etc is displayed or not.
 
+.. ghc-flag:: -fprint-error-index-links=⟨always|auto|never⟩
+    :shortdesc: Whether to emit diagnostic codes as ANSI hyperlinks to the
+                Haskell Error Index.
+    :type: dynamic
+    :category: verbosity
+
+    :default: auto
+
+    Controls whether GHC will emit error indices as ANSI hyperlinks to the
+    `Haskell Error Index <https://errors.haskell.org/>`_. When set to auto, this
+    flag will render hyperlinks if the terminal is capable; when set to always,
+    this flag will render the hyperlinks regardless of the capabilities of the
+    terminal.
+
 .. ghc-flag:: -ferror-spans
     :shortdesc: Output full span in error messages
     :type: dynamic
