@@ -1307,13 +1307,6 @@ insolubleWantedCt ct = insolubleCt ct &&
                        not (arisesFromGivens ct) &&
                        not (isWantedWantedFunDepOrigin (ctOrigin ct))
 
-insolubleEqIrredCt :: IrredCt -> Bool
--- True of Irred constraints that are
---   a) definitely insoluble
---   b) not (TypeError msg)
-insolubleEqIrredCt (IrredCt { ir_reason = reason })
-  = isInsolubleReason reason
-
 insolubleIrredCt :: IrredCt -> Bool
 -- Returns True of Irred constraints that are /definitely/ insoluble
 --
