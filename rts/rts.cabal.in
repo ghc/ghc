@@ -99,6 +99,7 @@ library
         js/verify.js
         js/weak.js
         js/globals.js
+        js/time.js
 
       install-includes: HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                         ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
