@@ -67,7 +67,10 @@ fingerprintDynFlags hsc_env this_mod nameio =
         ticky =
           map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
 
-        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel, callerCcFilters))
+        -- Other flags which affect code generation
+        codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
+
+        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags
