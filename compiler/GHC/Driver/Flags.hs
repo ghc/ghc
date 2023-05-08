@@ -5,6 +5,7 @@ module GHC.Driver.Flags
    , GeneralFlag(..)
    , Language(..)
    , optimisationFlags
+   , codeGenFlags
 
    -- * Warnings
    , WarningGroup(..)
@@ -484,15 +485,11 @@ data GeneralFlag
    | Opt_G_NoOptCoercion
    deriving (Eq, Show, Enum)
 
--- Check whether a flag should be considered an "optimisation flag"
--- for purposes of recompilation avoidance (see
--- Note [Ignoring some flag changes] in GHC.Iface.Recomp.Flags). Being listed here is
--- not a guarantee that the flag has no other effect. We could, and
--- perhaps should, separate out the flags that have some minor impact on
--- program semantics and/or error behavior (e.g., assertions), but
--- then we'd need to go to extra trouble (and an additional flag)
--- to allow users to ignore the optimisation level even though that
--- means ignoring some change.
+-- | The set of flags which affect optimisation for the purposes of
+-- recompilation avoidance. Specifically, these include flags which
+-- affect code generation but not the semantics of the program.
+--
+-- See Note [Ignoring some flag changes] in GHC.Iface.Recomp.Flags)
 optimisationFlags :: EnumSet GeneralFlag
 optimisationFlags = EnumSet.fromList
    [ Opt_CallArity
@@ -524,16 +521,12 @@ optimisationFlags = EnumSet.fromList
    , Opt_EnableRewriteRules
    , Opt_RegsGraph
    , Opt_RegsIterative
-   , Opt_PedanticBottoms
    , Opt_LlvmTBAA
-   , Opt_LlvmFillUndefWithGarbage
    , Opt_IrrefutableTuples
    , Opt_CmmSink
    , Opt_CmmElimCommonBlocks
    , Opt_AsmShortcutting
-   , Opt_OmitYields
    , Opt_FunToThunk
-   , Opt_DictsStrict
    , Opt_DmdTxDictSel
    , Opt_Loopification
    , Opt_CfgBlocklayout
@@ -542,8 +535,47 @@ optimisationFlags = EnumSet.fromList
    , Opt_WorkerWrapper
    , Opt_WorkerWrapperUnlift
    , Opt_SolveConstantDicts
+   ]
+
+-- | The set of flags which affect code generation and can change a program's
+-- runtime behavior (other than performance). These include flags which affect:
+--
+--  * user visible debugging information (e.g. info table provenance)
+--  * the ability to catch runtime errors (e.g. -fignore-asserts)
+--  * the runtime result of the program (e.g. -fomit-yields)
+--  * which code or interface file declarations are emitted
+--
+-- We also considered placing flags which affect asympototic space behavior
+-- (e.g. -ffull-laziness) however this would mean that changing optimisation
+-- levels would trigger recompilation even with -fignore-optim-changes,
+-- regressing #13604.
+--
+-- Also, arguably Opt_IgnoreAsserts should be here as well; however, we place
+-- it instead in 'optimisationFlags' since it is implied by @-O[12]@ and
+-- therefore would also break #13604.
+--
+-- See #23369.
+codeGenFlags :: EnumSet GeneralFlag
+codeGenFlags = EnumSet.fromList
+   [ -- Flags that affect runtime result
+     Opt_EagerBlackHoling
+   , Opt_ExcessPrecision
+   , Opt_DictsStrict
+   , Opt_PedanticBottoms
+   , Opt_OmitYields
+
+     -- Flags that affect generated code
+   , Opt_ExposeAllUnfoldings
+   , Opt_NoTypeableBinds
+
+     -- Flags that affect catching of runtime errors
    , Opt_CatchNonexhaustiveCases
-   , Opt_IgnoreAsserts
+   , Opt_LlvmFillUndefWithGarbage
+   , Opt_DoTagInferenceChecks
+
+     -- Flags that affect debugging information
+   , Opt_DistinctConstructorTables
+   , Opt_InfoTableMap
    ]
 
 data WarningFlag =
