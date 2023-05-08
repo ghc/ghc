@@ -330,18 +330,6 @@ if test x"$TablesNextToCode" = xYES; then
 fi
 AC_SUBST(TablesNextToCode)
 
-dnl ** Does target have runtime linker support?
-dnl --------------------------------------------------------------
-case "$target" in
-    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux|riscv64-*|wasm*|javascript-*|loongarch64-*)
-        TargetHasRTSLinker=NO
-        ;;
-    *)
-        TargetHasRTSLinker=YES
-        ;;
-esac
-AC_SUBST(TargetHasRTSLinker)
-
 # Requires FPTOOLS_SET_PLATFORMS_VARS to be run first.
 FP_FIND_ROOT
 

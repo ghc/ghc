@@ -134,7 +134,10 @@ inTreeCompilerArgs stg = do
     libdir           <- System.FilePath.normalise . (top -/-)
                     <$> stageLibPath stg
 
-    rtsLinker <- (== "YES") <$> setting TargetHasRtsLinker
+    -- For this information, we need to query ghc --info, however, that would
+    -- require building ghc, which we don't want to do here. Therefore, the
+    -- logic from `platformHasRTSLinker` is duplicated here.
+    let rtsLinker = not $ arch `elem` ["powerpc", "powerpc64", "powerpc64le", "s390x", "riscv64", "loongarch64", "javascript", "wasm32"]
 
     return TestCompilerArgs{..}
 

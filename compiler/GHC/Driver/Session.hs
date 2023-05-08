@@ -4830,8 +4830,9 @@ compilerInfo dflags
        ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ platformNcgSupported (targetPlatform dflags)),
-       ("Target default backend",      show $ platformDefaultBackend (targetPlatform dflags)),
+       ("Have native code generator",  showBool $ platformNcgSupported platform),
+       ("target has RTS linker",       showBool $ platformHasRTSLinker platform),
+       ("Target default backend",      show     $ platformDefaultBackend platform),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.

@@ -20,9 +20,6 @@ bootstrap_target=@TargetPlatform@
 
 bootstrap_llvm_target=@LlvmTarget@
 
-TargetHasRTSLinker=@TargetHasRTSLinker@
-AC_SUBST(TargetHasRTSLinker)
-
 TargetHasLibm=@TargetHasLibm@
 AC_SUBST(TargetHasLibm)
 

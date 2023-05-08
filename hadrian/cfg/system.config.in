@@ -173,7 +173,6 @@ target-word-big-endian = @TargetWordBigEndian@
 target-has-gnu-nonexec-stack = @TargetHasGnuNonexecStack@
 target-has-ident-directive = @TargetHasIdentDirective@
 target-has-subsections-via-symbols = @TargetHasSubsectionsViaSymbols@
-target-has-rts-linker = @TargetHasRTSLinker@
 target-has-libm = @TargetHasLibm@
 target-arm-version    = @ARM_ISA@
 

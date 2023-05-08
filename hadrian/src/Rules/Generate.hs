@@ -448,7 +448,6 @@ generateSettings = do
         , ("target has GNU nonexec stack", expr $ lookupSystemConfig "target-has-gnu-nonexec-stack")
         , ("target has .ident directive", expr $ lookupSystemConfig "target-has-ident-directive")
         , ("target has subsections via symbols", expr $ lookupSystemConfig "target-has-subsections-via-symbols")
-        , ("target has RTS linker", expr $ lookupSystemConfig "target-has-rts-linker")
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
         , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
         , ("LLVM target", getSetting LlvmTarget)

@@ -79,7 +79,6 @@ data Setting = BuildArch
              | TargetOsHaskell
              | TargetArmVersion
              | TargetWordSize
-             | TargetHasRtsLinker
              | BourneShell
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
@@ -181,7 +180,6 @@ setting key = lookupSystemConfig $ case key of
     TargetArchHaskell  -> "target-arch-haskell"
     TargetOsHaskell    -> "target-os-haskell"
     TargetWordSize     -> "target-word-size"
-    TargetHasRtsLinker -> "target-has-rts-linker"
     BourneShell        -> "bourne-shell"
 
 bootIsStage0 :: Stage -> Stage
