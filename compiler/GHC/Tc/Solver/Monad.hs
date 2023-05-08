@@ -730,8 +730,9 @@ getHasGivenEqs tclvl
        ; return (has_ge, given_insols) }
   where
     insoluble_given_equality :: IrredCt -> Bool
-    insoluble_given_equality irred
-       = insolubleIrredCt irred && isGiven (irredCtEvidence irred)
+    -- Check for unreachability; specifically do not include UserError/Unsatisfiable
+    insoluble_given_equality (IrredCt { ir_ev = ev, ir_reason = reason })
+       = isInsolubleReason reason && isGiven ev
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
 -- ^ Remove inert constraints from the 'InertCans', for use when a

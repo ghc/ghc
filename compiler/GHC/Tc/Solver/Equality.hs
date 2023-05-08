@@ -114,12 +114,16 @@ solveEquality ev eq_rel ty1 ty2
 
        ; case mb_canon of {
 
-            Left irred_ct -> do { tryInertIrreds irred_ct
+            -- An IrredCt equality may be insoluble; but maybe not!
+            -- E.g.  m a ~R# m b  is not canonical, but may be
+            --       solved by a quantified constraint (T15290)
+            Left irred_ct -> do { tryInertIrreds  irred_ct
+                                ; tryQCsIrredEqCt irred_ct
                                 ; return (CIrredCan irred_ct) } ;
 
-            Right eq_ct   -> do { interactEq eq_ct
-                                ; tryFunDeps eq_ct
-                                ; tryQCsEqCt eq_ct
+            Right eq_ct   -> do { tryInertEqs eq_ct
+                                ; tryFunDeps  eq_ct
+                                ; tryQCsEqCt  eq_ct
                                 ; return (CEqCan eq_ct) } } }
 
 
@@ -2477,7 +2481,7 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
 {-
 **********************************************************************
 *                                                                    *
-                   interactEq
+                   tryInertEqs
 *                                                                    *
 **********************************************************************
 
@@ -2517,8 +2521,8 @@ But it's not so simple:
   call to strictly_more_visible.
 -}
 
-interactEq :: EqCt -> SolverStage ()
-interactEq work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
+tryInertEqs :: EqCt -> SolverStage ()
+tryInertEqs work_item@(EqCt { eq_ev = ev, eq_eq_rel = eq_rel })
   = Stage $
     do { inerts <- getInertCans
        ; if | Just (ev_i, swapped) <- inertsCanDischarge inerts work_item
@@ -2670,23 +2674,16 @@ See
 -}
 
 --------------------
-{-
-tryQCsIrredCt :: IrredCt -> SolverStage ()
-tryQCsIrredCt irred@(IrredCt { ir_ev = ev })
+tryQCsIrredEqCt :: IrredCt -> SolverStage ()
+tryQCsIrredEqCt irred@(IrredCt { ir_ev = ev })
   | EqPred eq_rel t1 t2 <- classifyPredType (ctEvPred ev)
   = lookup_eq_in_qcis (CIrredCan irred) eq_rel t1 t2
-    -- If the final_qci_check fails, we'll do continueWith on an IrredCt
-    -- That in turn will go down the Irred pipeline, so which deals with
-    -- the case where we have [G] Coercible (m a) (m b), and [W] m a ~R# m b
-    -- When we de-pipeline Irreds we may have to adjust here
 
-  | otherwise  -- All the calls come from in this module, where we deal
-               -- only with equalities, so ctEvPred ev) must be an equality.
-               -- Indeed, we could pass eq_rel, t1, t2 as arguments, to avoid
-               -- this can't happen case, but it's not a hot path, and this is
-               -- simple and robust
+  | otherwise  -- All the calls come from in this module, where we deal only with
+               -- equalities, so ctEvPred ev) must be an equality. Indeed, we could
+               -- pass eq_rel, t1, t2 as arguments, to avoid this can't-happen case,
+               -- but it's not a hot path, and this is simple and robust
   = pprPanic "solveIrredEquality" (ppr ev)
--}
 
 --------------------
 tryQCsEqCt :: EqCt -> SolverStage ()

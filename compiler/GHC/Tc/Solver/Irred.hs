@@ -3,7 +3,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module GHC.Tc.Solver.Irred(
-     solveIrred, tryInertIrreds
+     solveIrred, tryInertIrreds, tryQCsIrredCt
   ) where
 
 import GHC.Prelude

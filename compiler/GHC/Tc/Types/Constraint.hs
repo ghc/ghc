@@ -443,31 +443,32 @@ instance Outputable NotConcreteError where
 -- | Used to indicate extra information about why a CIrredCan is irreducible
 data CtIrredReason
   = IrredShapeReason
-      -- ^ this constraint has a non-canonical shape (e.g. @c Int@, for a variable @c@)
+      -- ^ This constraint has a non-canonical shape (e.g. @c Int@, for a variable @c@)
+      -- Also used for (U
 
   | NonCanonicalReason CheckTyEqResult
-   -- ^ an equality where some invariant other than (TyEq:H) of 'CEqCan' is not satisfied;
+   -- ^ An equality where some invariant other than (TyEq:H) of 'CEqCan' is not satisfied;
    -- the 'CheckTyEqResult' states exactly why
 
   | ReprEqReason
-    -- ^ an equality that cannot be decomposed because it is representational.
+    -- ^ An equality that cannot be decomposed because it is representational.
     -- Example: @a b ~R# Int@.
     -- These might still be solved later.
     -- INVARIANT: The constraint is a representational equality constraint
 
   | ShapeMismatchReason
-    -- ^ a nominal equality that relates two wholly different types,
+    -- ^ A nominal equality that relates two wholly different types,
     -- like @Int ~# Bool@ or @a b ~# 3@.
     -- INVARIANT: The constraint is a nominal equality constraint
 
   | AbstractTyConReason
-    -- ^ an equality like @T a b c ~ Q d e@ where either @T@ or @Q@
+    -- ^ An equality like @T a b c ~ Q d e@ where either @T@ or @Q@
     -- is an abstract type constructor. See Note [Skolem abstract data]
     -- in GHC.Core.TyCon.
     -- INVARIANT: The constraint is an equality constraint between two TyConApps
 
   | PluginReason
-    -- ^ a typechecker plugin returned this in the pluginBagCts field
+    -- ^ A typechecker plugin returned this in the pluginBadCts field
     -- of TcPluginProgress
 
 instance Outputable CtIrredReason where
@@ -1306,14 +1307,15 @@ insolubleWantedCt ct = insolubleCt ct &&
                        not (arisesFromGivens ct) &&
                        not (isWantedWantedFunDepOrigin (ctOrigin ct))
 
-insolubleIrredCt :: IrredCt -> Bool
--- Returns True of Irred constraints that are /definitely/ insoluble
-insolubleIrredCt (IrredCt { ir_reason = reason })
+insolubleEqIrredCt :: IrredCt -> Bool
+-- True of Irred constraints that are
+--   a) definitely insoluble
+--   b) not (TypeError msg)
+insolubleEqIrredCt (IrredCt { ir_reason = reason })
   = isInsolubleReason reason
 
--- | Returns True of constraints that are definitely insoluble,
---   as well as TypeError constraints.
--- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
+insolubleIrredCt :: IrredCt -> Bool
+-- Returns True of Irred constraints that are /definitely/ insoluble
 --
 -- This function is critical for accurate pattern-match overlap warnings.
 -- See Note [Pattern match warnings with insoluble Givens] in GHC.Tc.Solver
@@ -1321,16 +1323,9 @@ insolubleIrredCt (IrredCt { ir_reason = reason })
 -- Note that this does not traverse through the constraint to find
 -- nested custom type errors: it only detects @TypeError msg :: Constraint@,
 -- and not e.g. @Eq (TypeError msg)@.
---
--- The function is tuned for application /after/ constraint solving
---       i.e. assuming canonicalisation has been done
--- That's why it looks only for IrredCt, with an insoluble IrredCtReason
-insolubleCt :: Ct -> Bool
-insolubleCt ct
-  | isTopLevelUserTypeError (ctPred ct) = True
-  | CIrredCan ir_ct <- ct               = insolubleIrredCt ir_ct
-  | otherwise                           = False
-  where
+insolubleIrredCt (IrredCt { ir_ev = ev, ir_reason = reason })
+  =  isInsolubleReason reason
+  || isTopLevelUserTypeError (ctEvPred ev)
   -- NB: 'isTopLevelUserTypeError' detects constraints of the form "TypeError msg"
   -- and "Unsatisfiable msg". It deliberately does not detect TypeError
   -- nested in a type (e.g. it does not use "containsUserTypeError"), as that
@@ -1346,6 +1341,18 @@ insolubleCt ct
   -- > type family Assert check errMsg where
   -- >   Assert 'True  _errMsg = ()
   -- >   Assert _check errMsg  = errMsg
+
+-- | Returns True of constraints that are definitely insoluble,
+--   as well as TypeError constraints.
+-- Can return 'True' for Given constraints, unlike 'insolubleWantedCt'.
+--
+-- The function is tuned for application /after/ constraint solving
+--       i.e. assuming canonicalisation has been done
+-- That's why it looks only for IrredCt; all insoluble constraints
+-- are put into CIrredCan
+insolubleCt :: Ct -> Bool
+insolubleCt (CIrredCan ir_ct) = insolubleIrredCt ir_ct
+insolubleCt _                 = False
 
 -- | Does this hole represent an "out of scope" error?
 -- See Note [Insoluble holes]
