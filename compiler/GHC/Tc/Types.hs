@@ -1592,7 +1592,7 @@ instance Outputable TcIdSigInfo where
     ppr (CompleteSig { sig_bndr = bndr })
         = ppr bndr <+> dcolon <+> ppr (idType bndr)
     ppr (PartialSig { psig_name = name, psig_hs_ty = hs_ty })
-        = text "psig" <+> ppr name <+> dcolon <+> ppr hs_ty
+        = text "[partial signature]" <+> ppr name <+> dcolon <+> ppr hs_ty
 
 instance Outputable TcIdSigInst where
     ppr (TISI { sig_inst_sig = sig, sig_inst_skols = skols
