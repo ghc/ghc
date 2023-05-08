@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns        #-}
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
@@ -46,6 +47,7 @@ import Haddock.Options
 import Haddock.Utils
 import Haddock.GhcUtils (modifySessionDynFlags, setOutputDir)
 
+import Control.DeepSeq (force)
 import Control.Monad hiding (forM_)
 import Control.Monad.IO.Class (MonadIO(..))
 import Data.Bifunctor (second)
@@ -55,9 +57,9 @@ import Data.List (find, isPrefixOf, nub)
 import Control.Exception
 import Data.Maybe
 import Data.IORef
-import Data.Map (Map)
+import Data.Map.Strict (Map)
 import Data.Version (makeVersion)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import System.IO
 import System.Exit
 import System.FilePath
@@ -73,9 +75,9 @@ import System.Directory (doesDirectoryExist, getTemporaryDirectory)
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
-import GHC.Driver.Session hiding (projectVersion, verbosity)
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Env
+import GHC.Driver.Session hiding (projectVersion, verbosity)
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Types.Name.Cache
@@ -197,7 +199,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   ghc flags' $ withDir $ do
     dflags <- getDynFlags
     logger <- getLogger
-    unit_state <- hsc_units <$> getSession
+    !unit_state <- hsc_units <$> getSession
 
     -- If any --show-interface was used, show the given interfaces
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
@@ -771,8 +773,10 @@ hypSrcWarnings flags = do
 
 updateHTMLXRefs :: [(FilePath, InterfaceFile)] -> IO ()
 updateHTMLXRefs packages = do
-  writeIORef html_xrefs_ref (Map.fromList mapping)
-  writeIORef html_xrefs_ref' (Map.fromList mapping')
+  let !modMap     = force $ Map.fromList mapping
+      !modNameMap = force $ Map.fromList mapping'
+  writeIORef html_xrefs_ref  modMap
+  writeIORef html_xrefs_ref' modNameMap
   where
     mapping = [ (instMod iface, html) | (html, ifaces) <- packages
               , iface <- ifInstalledIfaces ifaces ]

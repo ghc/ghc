@@ -40,14 +40,11 @@ import Haddock.Interface.Create (createInterface1, runIfM)
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
-import Haddock.Types (DocOption (..), Documentation (..), ExportItem (..), IfaceMap, InstIfaceMap, Interface, LinkEnv,
-                      expItemDecl, expItemMbDoc, ifaceDoc, ifaceExportItems, ifaceExports, ifaceHaddockCoverage,
-                      ifaceInstances, ifaceMod, ifaceOptions, ifaceVisibleExports, instMod, throwE, haddockClsInstName)
+import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad (unless, when)
-import Control.Monad.IO.Class (MonadIO)
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef, IORef)
 import Data.List (foldl', isPrefixOf, nub)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (for)
@@ -64,7 +61,7 @@ import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Plugins
 import GHC.Tc.Types (TcGblEnv (..), TcM)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
-import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
+import GHC.Tc.Utils.Monad (getTopEnv)
 import GHC.Unit.Module.Graph
 import GHC.Utils.Error (withTiming)
 
@@ -91,7 +88,10 @@ processModules verbosity modules flags extIfaces = do
   liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
 #endif
 
+  dflags <- getDynFlags
+
   out verbosity verbose "Creating interfaces..."
+
 
   -- Map from a module to a corresponding installed interface
   let instIfaceMap :: InstIfaceMap
@@ -129,7 +129,7 @@ processModules verbosity modules flags extIfaces = do
     withTimingM "renameAllInterfaces" (const ()) $
       for interfaces' $ \i -> do
         withTimingM ("renameInterface: " <+> pprModuleName (moduleName (ifaceMod i))) (const ()) $
-          renameInterface ignoredSymbolSet links warnings i
+          renameInterface dflags ignoredSymbolSet links warnings (Flag_Hoogle `elem` flags) i
 
   return (interfaces'', homeLinks)
 
@@ -150,10 +150,15 @@ createIfaces
     -> Ghc ([Interface], ModuleSet)
     -- ^ Resulting interfaces
 createIfaces verbosity modules flags instIfaceMap = do
-  (haddockPlugin, getIfaces, getModules) <- liftIO $ plugin
-    verbosity flags instIfaceMap
+  -- Initialize the IORefs for the interface map and the module set
+  (ifaceMapRef, moduleSetRef) <- liftIO $ do
+    m <- newIORef Map.empty
+    s <- newIORef emptyModuleSet
+    return (m, s)
 
   let
+    haddockPlugin = plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef
+
     installHaddockPlugin :: HscEnv -> HscEnv
     installHaddockPlugin hsc_env =
       let
@@ -178,8 +183,11 @@ createIfaces verbosity modules flags instIfaceMap = do
       throwE "Cannot typecheck modules"
     Succeeded -> do
       modGraph <- GHC.getModuleGraph
-      ifaceMap  <- liftIO getIfaces
-      moduleSet <- liftIO getModules
+
+      (ifaceMap, moduleSet) <- liftIO $ do
+        m <- readIORef ifaceMapRef
+        s <- readIORef moduleSetRef
+        return (m, s)
 
       let
         -- We topologically sort the module graph including boot files,
@@ -245,23 +253,18 @@ createIfaces verbosity modules flags instIfaceMap = do
 -- interfaces. Due to the plugin nature we benefit from GHC's capabilities to
 -- parallelize the compilation process.
 plugin
-  :: MonadIO m
-  => Verbosity
+  :: Verbosity
   -- ^ Verbosity requested by the Haddock caller
   -> [Flag]
   -- ^ Command line flags which Hadddock was invoked with
   -> InstIfaceMap
   -- ^ Map from module to corresponding installed interface file
-  -> m
-     (
-       StaticPlugin -- the plugin to install with GHC
-     , m IfaceMap  -- get the processed interfaces
-     , m ModuleSet -- get the loaded modules
-     )
-plugin verbosity flags instIfaceMap = liftIO $ do
-  ifaceMapRef  <- newIORef Map.empty
-  moduleSetRef <- newIORef emptyModuleSet
-
+  -> IORef IfaceMap
+  -- ^ The 'IORef' to write the interface map to
+  -> IORef ModuleSet
+  -- ^ The 'IORef' to write the module set to
+  -> StaticPlugin -- the plugin to install with GHC
+plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef =
   let
     processTypeCheckedResult :: ModSummary -> TcGblEnv -> TcM ()
     processTypeCheckedResult mod_summary tc_gbl_env
@@ -282,29 +285,21 @@ plugin verbosity flags instIfaceMap = liftIO $ do
 
             atomicModifyIORef' moduleSetRef $ \xs ->
               (modules `unionModuleSet` xs, ())
-
-    staticPlugin :: StaticPlugin
-    staticPlugin = StaticPlugin
+  in
+    StaticPlugin
       {
         spPlugin = PluginWithArgs
         {
           paPlugin = defaultPlugin
           {
             renamedResultAction = keepRenamedSource
-          , typeCheckResultAction = \_ mod_summary tc_gbl_env -> setGblEnv tc_gbl_env $ do
+          , typeCheckResultAction = \_ mod_summary tc_gbl_env -> do
               processTypeCheckedResult mod_summary tc_gbl_env
               pure tc_gbl_env
           }
         , paArguments = []
         }
       }
-
-  pure
-    ( staticPlugin
-    , liftIO (readIORef ifaceMapRef)
-    , liftIO (readIORef moduleSetRef)
-    )
-
 
 processModule1
   :: Verbosity
@@ -375,9 +370,10 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
     undocumentedExports :: [String]
     undocumentedExports =
       [ formatName (locA s) n
-      | ExportDecl { expItemDecl = L s n
-                   , expItemMbDoc = (Documentation Nothing _, _)
-                   } <- ifaceExportItems interface
+      | ExportDecl ExportD
+          { expDDecl = L s n
+          , expDMbDoc = (Documentation Nothing _, _)
+          } <- ifaceExportItems interface
       ]
         where
           formatName :: SrcSpan -> HsDecl GhcRn -> String

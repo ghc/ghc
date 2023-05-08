@@ -22,7 +22,6 @@ module Haddock.Interface.LexParseRn
   ) where
 
 import Control.Arrow
-import Control.DeepSeq
 import Control.Monad
 import Data.Functor
 import Data.List ((\\), maximumBy)
@@ -45,25 +44,24 @@ processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
                   -> ErrMsgM (Maybe (MDoc Name))
 processDocStrings dflags pkg gre strs = do
   mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags pkg gre) strs
-  force <$>
-    case mdoc of
-      -- We check that we don't have any version info to render instead
-      -- of just checking if there is no comment: there may not be a
-      -- comment but we still want to pass through any meta data.
-      MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
-      x -> pure (Just x)
+  case mdoc of
+    -- We check that we don't have any version info to render instead
+    -- of just checking if there is no comment: there may not be a
+    -- comment but we still want to pass through any meta data.
+    MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
+    x -> pure (Just x)
 
 processDocStringParas :: DynFlags -> Maybe Package -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
-processDocStringParas dflags pkg gre hds = force <$>
-  overDocF (rename dflags gre) (parseParas dflags pkg (renderHsDocString hds))
+processDocStringParas dflags pkg gre hds =
+    overDocF (rename dflags gre) (parseParas dflags pkg (renderHsDocString hds))
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
 processDocString dflags gre hds =
-  force <$> processDocStringFromString dflags gre (renderHsDocString hds)
+    processDocStringFromString dflags gre (renderHsDocString hds)
 
 processDocStringFromString :: DynFlags -> GlobalRdrEnv -> String -> ErrMsgM (Doc Name)
 processDocStringFromString dflags gre hds =
-  force <$> rename dflags gre (parseString dflags hds)
+    rename dflags gre (parseString dflags hds)
 
 processModuleHeader :: DynFlags -> Maybe Package -> GlobalRdrEnv -> SafeHaskellMode -> Maybe HsDocString
                     -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
@@ -84,7 +82,7 @@ processModuleHeader dflags pkgName gre safety mayStr = do
   let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = EnumSet.toList (extensionFlags dflags) \\ languageExtensions (language dflags)
-  return $ force
+  return
     (hmi { hmi_safety = Just $ showPpr dflags safety
          , hmi_language = language dflags
          , hmi_extensions = flags

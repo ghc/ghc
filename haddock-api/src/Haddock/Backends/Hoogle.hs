@@ -15,7 +15,11 @@
 -- http://www.haskell.org/hoogle/
 -----------------------------------------------------------------------------
 module Haddock.Backends.Hoogle (
+    -- * Main entry point to Hoogle output generation
     ppHoogle
+
+    -- * Utilities for generating Hoogle output during interface creation
+  , ppExportD
   , outWith
   ) where
 
@@ -55,7 +59,8 @@ ppHoogle dflags package version synopsis prologue ifaces odir = do
                    docWith dflags' (drop 2 $ dropWhile (/= ':') synopsis) prologue ++
                    ["@package " ++ package] ++
                    ["@version " ++ showVersion version
-                   | not (null (versionBranch version)) ] ++
+                   | not (null (versionBranch version))
+                   ] ++
                    concat [ppModule dflags' i | i <- ifaces, OptHide `notElem` ifaceOptions i]
     createDirectoryIfMissing True odir
     writeUtf8File (odir </> filename) (unlines contents)
@@ -64,9 +69,14 @@ ppModule :: DynFlags -> Interface -> [String]
 ppModule dflags iface =
   "" : ppDocumentation dflags (ifaceDoc iface) ++
   ["module " ++ moduleString (ifaceMod iface)] ++
-  concatMap (ppExport dflags) (ifaceExportItems iface) ++
+  concatMap ppExportItem (ifaceRnExportItems $ iface) ++
   map (fromMaybe "" . haddockClsInstPprHoogle) (ifaceInstances iface)
 
+-- | If the export item is an 'ExportDecl', get the attached Hoogle textual
+-- database entries for that export declaration.
+ppExportItem :: ExportItem DocNameI -> [String]
+ppExportItem (ExportDecl RnExportD { rnExpDHoogle = o }) = o
+ppExportItem _                                           = []
 
 ---------------------------------------------------------------------
 -- Utility functions
@@ -116,28 +126,37 @@ commaSeparate dflags = showSDoc dflags . interpp'SP
 ---------------------------------------------------------------------
 -- How to print each export
 
-ppExport :: DynFlags -> ExportItem GhcRn -> [String]
-ppExport dflags ExportDecl { expItemDecl    = L _ decl
-                           , expItemPats    = bundledPats
-                           , expItemMbDoc   = mbDoc
-                           , expItemSubDocs = subdocs
-                           , expItemFixities = fixities
-                           } = concat [ ppDocumentation dflags dc ++ f d
-                                      | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
-                                      ] ++
-                               ppFixities
-    where
-        f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
-        f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
-        f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
-        f (TyClD _ (FamDecl _ d)) = ppFam dflags d
-        f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] typ]
-        f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] typ]
-        f (SigD _ sig) = ppSig dflags sig
-        f _ = []
+ppExportD :: DynFlags -> ExportD GhcRn -> [String]
+ppExportD dflags
+    ExportD
+      { expDDecl     = L _ decl
+      , expDPats     = bundledPats
+      , expDMbDoc    = mbDoc
+      , expDSubDocs  = subdocs
+      , expDFixities = fixities
+      }
+  = let
+      -- Since Hoogle is line based, we want to avoid breaking long lines.
+      dflags' = dflags{ pprCols = maxBound }
+    in
+      concat
+        [ ppDocumentation dflags' dc ++ f d
+        | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
+        ] ++ ppFixities
+  where
+    f :: HsDecl GhcRn -> [String]
+    f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
+    f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
+    f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
+    f (TyClD _ (FamDecl _ d)) = ppFam dflags d
+    f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] typ]
+    f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] typ]
+    f (SigD _ sig) = ppSig dflags sig
+    f _ = []
 
-        ppFixities = concatMap (ppFixity dflags) fixities
-ppExport _ _ = []
+    ppFixities :: [String]
+    ppFixities = concatMap (ppFixity dflags) fixities
+
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc dflags sig subdocs = case sig of

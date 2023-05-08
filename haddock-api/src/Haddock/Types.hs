@@ -66,7 +66,7 @@ type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
 type DocMap a      = Map Name (MDoc a)
 type ArgMap a      = Map Name (Map Int (MDoc a))
 type SubMap        = Map Name [Name]
-type DeclMap       = Map Name [LHsDecl GhcRn]
+type DeclMap       = Map Name DeclMapEntry
 type InstMap       = Map RealSrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
@@ -109,17 +109,12 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: !(Map Name [LHsDecl GhcRn])
+  , ifaceDeclMap         :: !DeclMap
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
   , ifaceDocMap          :: !(DocMap Name)
   , ifaceArgMap          :: !(ArgMap Name)
-
-    -- | Documentation of declarations originating from the module (including
-    -- subordinates).
-  , ifaceRnDocMap        :: !(DocMap DocName)
-  , ifaceRnArgMap        :: !(ArgMap DocName)
 
   , ifaceFixMap          :: !(Map Name Fixity)
 
@@ -141,7 +136,7 @@ data Interface = Interface
   , ifaceInstances       :: [HaddockClsInst]
 
     -- | Orphan instances
-  , ifaceOrphanInstances :: [DocInstance GhcRn]
+  , ifaceOrphanInstances   :: [DocInstance GhcRn]
   , ifaceRnOrphanInstances :: [DocInstance DocNameI]
 
     -- | The number of haddockable and haddocked items in the module, as a
@@ -154,6 +149,7 @@ data Interface = Interface
     -- | Tokenized source code of module (available if Haddock is invoked with
     -- source generation flag).
   , ifaceHieFile :: !(Maybe FilePath)
+
   , ifaceDynFlags :: !DynFlags
   }
 
@@ -216,32 +212,7 @@ toInstalledIface interface = InstalledInterface
 data ExportItem name
 
   -- | An exported declaration.
-  = ExportDecl
-      {
-        -- | A declaration.
-        expItemDecl :: !(LHsDecl name)
-
-        -- | Bundled patterns for a data type declaration
-      , expItemPats :: ![(HsDecl name, DocForDecl (IdP name))]
-
-        -- | Maybe a doc comment, and possibly docs for arguments (if this
-        -- decl is a function or type-synonym).
-      , expItemMbDoc :: !(DocForDecl (IdP name))
-
-        -- | Subordinate names, possibly with documentation.
-      , expItemSubDocs :: ![(IdP name, DocForDecl (IdP name))]
-
-        -- | Instances relevant to this declaration, possibly with
-        -- documentation.
-      , expItemInstances :: ![DocInstance name]
-
-        -- | Fixity decls relevant to this declaration (including subordinates).
-      , expItemFixities :: ![(IdP name, Fixity)]
-
-        -- | Whether the ExportItem is from a TH splice or not, for generating
-        -- the appropriate type of Source link.
-      , expItemSpliced :: !Bool
-      }
+  = ExportDecl (XExportDecl name)
 
   -- | An exported entity for which we have no documentation (perhaps because it
   -- resides in another package).
@@ -249,7 +220,7 @@ data ExportItem name
       { expItemName :: !(IdP name)
 
         -- | Subordinate names.
-      , expItemSubs :: ![IdP name]
+      , expItemSubs :: [IdP name]
       }
 
   -- | A section heading.
@@ -271,9 +242,66 @@ data ExportItem name
   -- | A cross-reference to another module.
   | ExportModule !Module
 
+-- | A type family mapping a name type index to types of export declarations.
+-- The pre-renaming type index ('GhcRn') is mapped to the type of export
+-- declarations which do not include Hoogle output ('ExportD'), since Hoogle output is
+-- generated during the Haddock renaming step. The post-renaming type index
+-- ('DocNameI') is mapped to the type of export declarations which do include
+-- Hoogle output ('RnExportD').
+type family XExportDecl x where
+  XExportDecl GhcRn    = ExportD GhcRn
+  XExportDecl DocNameI = RnExportD
+
+-- | Represents an export declaration that Haddock has discovered to be exported
+-- from a module. The @name@ index indicated whether the declaration has been
+-- renamed such that each 'Name' points to it's optimal link destination.
+data ExportD name = ExportD
+      {
+        -- | A declaration.
+        expDDecl :: !(LHsDecl name)
+
+        -- | Bundled patterns for a data type declaration
+      , expDPats :: [(HsDecl name, DocForDecl (IdP name))]
+
+        -- | Maybe a doc comment, and possibly docs for arguments (if this
+        -- decl is a function or type-synonym).
+      , expDMbDoc :: !(DocForDecl (IdP name))
+
+        -- | Subordinate names, possibly with documentation.
+      , expDSubDocs :: [(IdP name, DocForDecl (IdP name))]
+
+        -- | Instances relevant to this declaration, possibly with
+        -- documentation.
+      , expDInstances :: [DocInstance name]
+
+        -- | Fixity decls relevant to this declaration (including subordinates).
+      , expDFixities :: [(IdP name, Fixity)]
+
+        -- | Whether the ExportD is from a TH splice or not, for generating
+        -- the appropriate type of Source link.
+      , expDSpliced :: !Bool
+      }
+
+-- | Represents export declarations that have undergone renaming such that every
+-- 'Name' in the declaration points to an optimal link destination. Since Hoogle
+-- output is also generated during the renaming step, each declaration is also
+-- attached to its Hoogle textual database entries, /if/ Hoogle output is
+-- enabled and the module is not hidden in the generated documentation using the
+-- @{-# OPTIONS_HADDOCK hide #-}@ pragma.
+data RnExportD = RnExportD
+      {
+        -- | The renamed export declaration
+        rnExpDExpD :: !(ExportD DocNameI)
+
+      -- | If Hoogle textbase (textual database) output is enabled, the text
+      -- output lines for this declaration. If Hoogle output is not enabled, the
+      -- list will be empty.
+      , rnExpDHoogle :: [String]
+      }
+
 data Documentation name = Documentation
-  { documentationDoc :: Maybe (MDoc name)
-  , documentationWarning :: !(Maybe (Doc name))
+  { documentationDoc     :: Maybe (MDoc name)
+  , documentationWarning :: Maybe (Doc name)
   } deriving Functor
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
@@ -284,6 +312,32 @@ type DocForDecl name = (Documentation name, FnArgsDoc name)
 noDocForDecl :: DocForDecl name
 noDocForDecl = (Documentation Nothing Nothing, mempty)
 
+-- | As we build the declaration map, we really only care to track whether we
+-- have only seen a value declaration for a 'Name', or anything else. This type
+-- is used to represent those cases. If the only declaration attached to a
+-- 'Name' is a 'ValD', we will consult the GHC interface file to determine the
+-- type of the value, and attach the 'SrcSpan' from the 'EValD' constructor to
+-- it. If we see any other type of declaration for the 'Name', we can just use
+-- it.
+--
+-- This type saves us from storing /every/ declaration we see for a given 'Name'
+-- in the map, which is unnecessary and very problematic for overall memory
+-- usage.
+data DeclMapEntry
+    = EValD !SrcSpan
+    | EOther (LHsDecl GhcRn)
+
+instance Semigroup DeclMapEntry where
+  (EValD _)   <> e         = e
+  e           <> _         = e
+
+-- | Transform a declaration into a 'DeclMapEntry'. If it is a 'ValD'
+-- declaration, only the source location will be noted (since that is all we
+-- care to store in the 'DeclMap' due to the way top-level bindings with no type
+-- signatures are handled). Otherwise, the entire declaration will be kept.
+toDeclMapEntry :: LHsDecl GhcRn -> DeclMapEntry
+toDeclMapEntry (L l (ValD _ _)) = EValD (locA l)
+toDeclMapEntry d                = EOther d
 
 -----------------------------------------------------------------------------
 -- * Cross-referencing

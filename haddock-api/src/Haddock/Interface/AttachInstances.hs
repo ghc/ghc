@@ -102,7 +102,7 @@ attachToExportItem
   -> Ghc (ExportItem GhcRn)
 attachToExportItem index expInfo getInstDoc getFixity export =
   case attachFixities export of
-    e@ExportDecl { expItemDecl = L eSpan (TyClD _ d) } -> do
+    ExportDecl e@(ExportD { expDDecl = L eSpan (TyClD _ d) }) -> do
       insts <-
         let mb_instances  = lookupNameEnv index (tcdName d)
             cls_instances = maybeToList mb_instances >>= fst
@@ -139,18 +139,27 @@ attachToExportItem index expInfo getInstDoc getFixity export =
           let mkBug = (text "haddock-bug:" <+>) . text
           putMsgM (sep $ map mkBug famInstErrs)
           return $ cls_insts ++ cleanFamInsts
-      return $ e { expItemInstances = insts }
+      return $ ExportDecl e { expDInstances = insts }
     e -> return e
   where
-    attachFixities e@ExportDecl{ expItemDecl = L _ d
-                               , expItemPats = patsyns
-                               , expItemSubDocs = subDocs
-                               } = e { expItemFixities =
-      nubByName fst $ expItemFixities e ++
-      [ (n',f) | n <- getMainDeclBinder emptyOccEnv d
-               , n' <- n : (map fst subDocs ++ patsyn_names)
-               , f <- maybeToList (getFixity n')
-      ] }
+    attachFixities
+        ( ExportDecl
+          ( e@ExportD
+              { expDDecl = L _ d
+              , expDPats = patsyns
+              , expDSubDocs = subDocs
+              }
+          )
+        )
+      = ExportDecl e
+          { expDFixities =
+              nubByName fst $ expDFixities e ++
+              [ (n',f)
+              | n <- getMainDeclBinder emptyOccEnv d
+              , n' <- n : (map fst subDocs ++ patsyn_names)
+              , f <- maybeToList (getFixity n')
+              ]
+          }
       where
         patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
 

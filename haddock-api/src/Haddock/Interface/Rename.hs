@@ -20,6 +20,7 @@ module Haddock.Interface.Rename (renameInterface) where
 
 import Data.Traversable (mapM)
 
+import Haddock.Backends.Hoogle (ppExportD)
 import Haddock.GhcUtils
 import Haddock.Types hiding (runWriter)
 
@@ -48,7 +49,9 @@ import GHC.Types.Basic ( TopLevelFlag(..) )
 -- The renamed output gets written into fields in the Haddock interface record
 -- that were previously left empty.
 renameInterface
-  :: Map.Map (Maybe String) (Set.Set String)
+  :: DynFlags
+  -- ^ GHC session dyn flags
+  -> Map.Map (Maybe String) (Set.Set String)
   -- ^ Ignored symbols. A map from module names to unqualified names. Module
   -- 'Just M' mapping to name 'f' means that link warnings should not be
   -- generated for occurances of specifically 'M.f'. Module 'Nothing' mapping to
@@ -58,15 +61,23 @@ renameInterface
   -- module 'M' if 'M' is the preferred link destination for name 'n'.
   -> Bool
   -- ^ Are warnings enabled?
+  -> Bool
+  -- ^ Is Hoogle output enabled?
   -> Interface
   -- ^ The interface we are renaming.
   -> Ghc Interface
   -- ^ The renamed interface. Note that there is nothing really special about
   -- this being in the 'Ghc' monad. This could very easily be any 'MonadIO' or
   -- even pure, depending on the link warnings are reported.
-renameInterface ignoreSet renamingEnv warnings iface = do
+renameInterface dflags ignoreSet renamingEnv warnings hoogle iface = do
     let (iface', warnedNames) =
-          runRnM mdl localLinkEnv warnName $ renameInterfaceRn iface
+          runRnM
+            dflags
+            mdl
+            localLinkEnv
+            warnName
+            (hoogle && not (OptHide `elem` ifaceOptions iface))
+            (renameInterfaceRn iface)
     reportMissingLinks mdl warnedNames
     return iface'
   where
@@ -139,17 +150,29 @@ newtype RnM a = RnM { unRnM :: ReaderT RnMEnv (Writer (Set.Set Name)) a }
 -- | The renaming monad environment. Stores the linking environment (mapping
 -- names to modules), the link warning predicate, and the current module.
 data RnMEnv = RnMEnv
-    { rnLinkEnv      :: LinkEnv
+    { -- | The linking environment (map from names to modules)
+      rnLinkEnv      :: LinkEnv
+
+      -- | Link warning predicate (whether failing to find a link destination
+      -- for a given name should result in a warning)
     , rnWarnName     :: (Name -> Bool)
+
+      -- | The current module
     , rnModuleString :: String
+
+      -- | Should Hoogle output be generated for this module?
+    , rnHoogleOutput :: Bool
+
+      -- | GHC Session DynFlags, necessary for Hoogle output generation
+    , rnDynFlags :: DynFlags
     }
 
 -- | Run the renamer action in a renaming environment built using the given
 -- module, link env, and link warning predicate. Returns the renamed value along
 -- with a set of 'Name's that were not renamed and should be warned for (i.e.
 -- they satisfied the link warning predicate).
-runRnM :: Module -> LinkEnv -> (Name -> Bool) -> RnM a -> (a, Set.Set Name)
-runRnM mdl linkEnv warnName rn =
+runRnM :: DynFlags -> Module -> LinkEnv -> (Name -> Bool) -> Bool -> RnM a -> (a, Set.Set Name)
+runRnM dflags mdl linkEnv warnName hoogleOutput rn =
     runWriter $ runReaderT (unRnM rn) rnEnv
   where
     rnEnv :: RnMEnv
@@ -157,6 +180,8 @@ runRnM mdl linkEnv warnName rn =
       { rnLinkEnv      = linkEnv
       , rnWarnName     = warnName
       , rnModuleString = moduleString mdl
+      , rnHoogleOutput = hoogleOutput
+      , rnDynFlags     = dflags
       }
 
 --------------------------------------------------------------------------------
@@ -167,16 +192,18 @@ runRnM mdl linkEnv warnName rn =
 renameInterfaceRn :: Interface -> RnM Interface
 renameInterfaceRn iface = do
   exportItems <- renameExportItems (ifaceExportItems iface)
-  docMap      <- mapM renameDoc (ifaceDocMap iface)
-  argMap      <- mapM (mapM renameDoc) (ifaceArgMap iface)
   orphans     <- mapM renameDocInstance (ifaceOrphanInstances iface)
   finalModDoc <- renameDocumentation (ifaceDoc iface)
   pure $! iface
     { ifaceRnDoc             = finalModDoc
-    , ifaceRnDocMap          = docMap
-    , ifaceRnArgMap          = argMap
+
+    -- The un-renamed export items are not used after renaming
     , ifaceRnExportItems     = exportItems
+    , ifaceExportItems       = []
+
+    -- The un-renamed orphan instances are not used after renaming
     , ifaceRnOrphanInstances = orphans
+    , ifaceOrphanInstances   = []
     }
 
 -- | Lookup a 'Name' in the renaming environment.
@@ -216,7 +243,15 @@ renameExportItem item = case item of
   ExportGroup lev id_ doc -> do
     doc' <- renameDoc doc
     return (ExportGroup lev id_ doc')
-  ExportDecl decl pats doc subs instances fixities splice -> do
+  ExportDecl ed@(ExportD decl pats doc subs instances fixities splice) -> do
+    -- If Hoogle output should be generated, generate it
+    RnMEnv{..} <- ask
+    let hoogleOut =
+          if rnHoogleOutput then
+            ppExportD rnDynFlags ed
+          else
+            []
+
     decl' <- renameLDecl decl
     pats' <- renamePats pats
     doc'  <- renameDocForDecl doc
@@ -225,7 +260,12 @@ renameExportItem item = case item of
     fixities' <- forM fixities $ \(name, fixity) -> do
       name' <- lookupRn name
       return (name', fixity)
-    return (ExportDecl decl' pats' doc' subs' instances' fixities' splice)
+
+    return $
+      ExportDecl RnExportD
+        { rnExpDExpD   = ExportD decl' pats' doc' subs' instances' fixities' splice
+        , rnExpDHoogle = hoogleOut
+        }
   ExportNoDecl x subs -> do
     x'    <- lookupRn x
     subs' <- mapM lookupRn subs

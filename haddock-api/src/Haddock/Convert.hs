@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, PatternGuards, TypeFamilies #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE TypeFamilies  #-}
+{-# LANGUAGE BangPatterns  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Convert
@@ -639,7 +643,7 @@ synifyType _ vs (TyConApp tc tys)
       = mk_app_tys (HsTyVar noAnn prom $ noLocA (getName tc))
                    vis_tys
       where
-        prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
+        !prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
         mk_app_tys ty_app ty_args =
           foldl (\t1 t2 -> noLocA $ HsAppTy noExtField t1 t2)
                 (noLocA ty_app)
