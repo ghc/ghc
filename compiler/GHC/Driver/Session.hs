@@ -60,6 +60,7 @@ module GHC.Driver.Session (
         makeDynFlagsConsistent,
         positionIndependent,
         optimisationFlags,
+        codeGenFlags,
         setFlagsFromEnvFile,
         pprDynFlagsDiff,
         flagSpecOf,
