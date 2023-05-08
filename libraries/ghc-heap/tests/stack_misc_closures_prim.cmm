@@ -1,0 +1,231 @@
+#include "Cmm.h"
+
+any_update_framezh() {
+    P_ stack;
+    (stack) = ccall any_update_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_catch_framezh() {
+    P_ stack;
+    (stack) = ccall any_catch_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_catch_stm_framezh() {
+    P_ stack;
+    (stack) = ccall any_catch_stm_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_catch_retry_framezh() {
+    P_ stack;
+    (stack) = ccall any_catch_retry_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_atomically_framezh() {
+    P_ stack;
+    (stack) = ccall any_atomically_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_small_prim_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_small_prim_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_small_prims_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_small_prims_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_small_closure_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_small_closure_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_small_closures_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_small_closures_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_big_prims_min_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_big_prims_min_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_big_closures_min_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_big_closures_min_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_big_closures_two_words_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_big_closures_two_words_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_fun_arg_n_prim_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_fun_arg_n_prim_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_fun_arg_gen_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_fun_arg_gen_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_ret_fun_arg_gen_big_framezh() {
+    P_ stack;
+    (stack) = ccall any_ret_fun_arg_gen_big_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_bco_framezh() {
+    P_ stack;
+    (stack) = ccall any_bco_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+any_underflow_framezh() {
+    P_ stack;
+    (stack) = ccall any_underflow_frame(MyCapability() "ptr");
+    return (stack);
+}
+
+INFO_TABLE_RET ( test_small_ret_full_p, RET_SMALL, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,
+P_ ptr11, P_ ptr12, P_ ptr13, P_ ptr14, P_ ptr15, P_ ptr16, P_ ptr17, P_ ptr18, P_ ptr19, P_ ptr20,
+P_ ptr21, P_ ptr22, P_ ptr23, P_ ptr24, P_ ptr25, P_ ptr26, P_ ptr27
+)
+#elif SIZEOF_VOID_P == 8
+P_ ptr1, P_ ptr2, P_ ptr3, P_ ptr4, P_ ptr5, P_ ptr6, P_ ptr7, P_ ptr8, P_ ptr9, P_ ptr10,
+P_ ptr11, P_ ptr12, P_ ptr13, P_ ptr14, P_ ptr15, P_ ptr16, P_ ptr17, P_ ptr18, P_ ptr19, P_ ptr20,
+P_ ptr21, P_ ptr22, P_ ptr23, P_ ptr24, P_ ptr25, P_ ptr26, P_ ptr27, P_ ptr28, P_ ptr29, P_ ptr30,
+P_ ptr31, P_ ptr32, P_ ptr33, P_ ptr34, P_ ptr35, P_ ptr36, P_ ptr37, P_ ptr38, P_ ptr39, P_ ptr40,
+P_ ptr41, P_ ptr42, P_ ptr43, P_ ptr44, P_ ptr45, P_ ptr46, P_ ptr47, P_ ptr48, P_ ptr49, P_ ptr50,
+P_ ptr51, P_ ptr52, P_ ptr53, P_ ptr54, P_ ptr55, P_ ptr56, P_ ptr57, P_ ptr58
+)
+#endif
+    return (/* no return values */)
+{
+    return ();
+}
+
+INFO_TABLE_RET ( test_small_ret_full_n, RET_SMALL, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
+W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
+W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27
+)
+#elif SIZEOF_VOID_P == 8
+W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
+W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
+W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27, W_ n28, W_ n29, W_ n30,
+W_ n31, W_ n32, W_ n33, W_ n34, W_ n35, W_ n36, W_ n37, W_ n38, W_ n39, W_ n40,
+W_ n41, W_ n42, W_ n43, W_ n44, W_ n45, W_ n46, W_ n47, W_ n48, W_ n49, W_ n50,
+W_ n51, W_ n52, W_ n53, W_ n54, W_ n55, W_ n56, W_ n57, W_ n58
+)
+#endif
+    return (/* no return values */)
+{
+    return ();
+}
+
+// Size of this large bitmap closure is: max size of small bitmap + 1
+INFO_TABLE_RET ( test_big_ret_min_n, RET_BIG, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
+W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
+W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27, W_ n28
+#elif SIZEOF_VOID_P == 8
+W_ n1, W_ n2, W_ n3, W_ n4, W_ n5, W_ n6, W_ n7, W_ n8, W_ n9, W_ n10,
+W_ n11, W_ n12, W_ n13, W_ n14, W_ n15, W_ n16, W_ n17, W_ n18, W_ n19, W_ n20,
+W_ n21, W_ n22, W_ n23, W_ n24, W_ n25, W_ n26, W_ n27, W_ n28, W_ n29, W_ n30,
+W_ n31, W_ n32, W_ n33, W_ n34, W_ n35, W_ n36, W_ n37, W_ n38, W_ n39, W_ n40,
+W_ n41, W_ n42, W_ n43, W_ n44, W_ n45, W_ n46, W_ n47, W_ n48, W_ n49, W_ n50,
+W_ n51, W_ n52, W_ n53, W_ n54, W_ n55, W_ n56, W_ n57, W_ n58, W_ n59
+#endif
+)
+    return (/* no return values */)
+{
+    return ();
+}
+
+// Size of this large bitmap closure is: max size of small bitmap + 1
+INFO_TABLE_RET ( test_big_ret_min_p, RET_BIG, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28
+#elif SIZEOF_VOID_P == 8
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28, P_ p29, P_ p30,
+P_ p31, P_ p32, P_ p33, P_ p34, P_ p35, P_ p36, P_ p37, P_ p38, P_ p39, P_ p40,
+P_ p41, P_ p42, P_ p43, P_ p44, P_ p45, P_ p46, P_ p47, P_ p48, P_ p49, P_ p50,
+P_ p51, P_ p52, P_ p53, P_ p54, P_ p55, P_ p56, P_ p57, P_ p58, P_ p59
+#endif
+)
+    return (/* no return values */)
+{
+    return ();
+}
+
+// Size of this large bitmap closure is: max size of bits in machine word + 1.
+// This results in a two word StgLargeBitmap.
+INFO_TABLE_RET ( test_big_ret_two_words_p, RET_BIG, W_ info_ptr,
+#if SIZEOF_VOID_P == 4
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28, P_ p29, P_ p30,
+P_ p31, P_ p32, P_ p33
+#elif SIZEOF_VOID_P == 8
+P_ p1, P_ p2, P_ p3, P_ p4, P_ p5, P_ p6, P_ p7, P_ p8, P_ p9, P_ p10,
+P_ p11, P_ p12, P_ p13, P_ p14, P_ p15, P_ p16, P_ p17, P_ p18, P_ p19, P_ p20,
+P_ p21, P_ p22, P_ p23, P_ p24, P_ p25, P_ p26, P_ p27, P_ p28, P_ p29, P_ p30,
+P_ p31, P_ p32, P_ p33, P_ p34, P_ p35, P_ p36, P_ p37, P_ p38, P_ p39, P_ p40,
+P_ p41, P_ p42, P_ p43, P_ p44, P_ p45, P_ p46, P_ p47, P_ p48, P_ p49, P_ p50,
+P_ p51, P_ p52, P_ p53, P_ p54, P_ p55, P_ p56, P_ p57, P_ p58, P_ p59, P_ p60,
+P_ p61, P_ p62, P_ p63, P_ p64, P_ p65
+#endif
+)
+    return (/* no return values */)
+{
+    return ();
+}
+
+// A BLACKHOLE without any code. Just a placeholder to keep the GC happy.
+INFO_TABLE( test_fake_blackhole, 1, 0, BLACKHOLE, "BLACKHOLE", "BLACKHOLE")
+    (P_ node)
+{
+    return ();
+}
+
+INFO_TABLE_RET ( test_ret_fun, RET_FUN, W_ info_ptr, W_ size, P_ fun, P_ payload)
+    return (/* no return values */)
+{
+    return ();
+}
+
+INFO_TABLE_FUN ( test_arg_n_fun_0_1, 0 , 0, FUN_0_1, "FUN_0_1", "FUN_0_1", 1,  ARG_N)
+    return (/* no return values */)
+{
+    return ();
+}
+
+INFO_TABLE_RET( test_ret_bco, RET_BCO)
+    return (/* no return values */)
+{
+    return ();
+}
