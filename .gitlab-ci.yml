@@ -1048,7 +1048,7 @@ ghcup-metadata-nightly:
   rules:
     - if: $NIGHTLY
 
-# Update the
+# Update the ghcup metadata with information about this nightly pipeline
 ghcup-metadata-nightly-push:
   stage: deploy
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
@@ -1072,11 +1072,8 @@ ghcup-metadata-nightly-push:
     - git commit -m "Update metadata"
     - git push gitlab_origin HEAD:updates -o ci.skip
   rules:
-    - if: $NIGHTLY
     # Only run the update on scheduled nightly pipelines, ie once a day
-    - if: $CI_PIPELINE_SOURCE == "schedule"
-    # And only update the metadata for master branch
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: $NIGHTLY && $CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == "master"
 
 
 ghcup-metadata-release:
