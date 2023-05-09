@@ -41,11 +41,10 @@ import GHC.Utils.Outputable
 
 import Data.List        ( mapAccumL )
 
-{-
+{- |
 Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 -}
-
 floatInwards :: Platform -> CoreProgram -> CoreProgram
 floatInwards platform binds = map (fi_top_bind platform) binds
   where
@@ -144,7 +143,7 @@ instance Outputable FloatInBind where
   ppr (FB bvs fvs _) = text "FB" <> braces (sep [ text "bndrs =" <+> ppr bvs
                                                 , text "fvs =" <+> ppr fvs ])
 
-fiExpr :: Platform
+fiExpr :: HasCallStack => Platform
        -> RevFloatInBinds   -- Binds we're trying to drop
                             -- as far "inwards" as possible
        -> CoreExprWithFVs   -- Input expr
@@ -806,7 +805,7 @@ floatedBindsFVs binds = mapUnionDVarSet fbFVs binds
 fbFVs :: FloatInBind -> DVarSet
 fbFVs (FB _ fvs _) = fvs
 
-wrapFloats :: RevFloatInBinds -> CoreExpr -> CoreExpr
+wrapFloats :: HasCallStack => RevFloatInBinds -> CoreExpr -> CoreExpr
 -- Remember RevFloatInBinds is in *reverse* dependency order
 wrapFloats []               e = e
 wrapFloats (FB _ _ fl : bs) e = wrapFloats bs (wrapFloat fl e)

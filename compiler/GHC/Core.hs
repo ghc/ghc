@@ -6,6 +6,7 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GADTs, StandaloneDeriving #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
@@ -270,9 +271,12 @@ type Arg b = Expr b
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data Alt b
-    = Alt AltCon [b] (Expr b)
-    deriving (Data)
+-- data Alt b
+--     = Alt AltCon [b] (Expr b)
+--     deriving (Data)
+data Alt b where
+    Alt :: HasCallStack => AltCon -> [b] -> (Expr b) -> Alt b
+deriving instance Data b => Data (Alt b)
 
 -- | A case alternative constructor (i.e. pattern match)
 
@@ -2222,7 +2226,7 @@ data AnnExpr' bndr annot
   | AnnCoercion Coercion
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
-data AnnAlt bndr annot = AnnAlt AltCon [bndr] (AnnExpr bndr annot)
+data AnnAlt bndr annot = HasCallStack => AnnAlt AltCon [bndr] (AnnExpr bndr annot)
 
 -- | A clone of the 'Bind' type but allowing annotation at every tree node
 data AnnBind bndr annot

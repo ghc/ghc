@@ -86,7 +86,11 @@ import Data.List( partition )
 ************************************************************************
 -}
 
-tcLetPat :: (Name -> Maybe TcId)
+-- The issue being we're incorrectly calling tcLetPat for case bound variables...
+-- ROMES:TODO:! Document that we don't consider case binder variables to be Let
+-- bound, we consider them lambda bound, or Case bound. (this is also in the
+-- definition of PatCtxt)
+tcLetPat :: HasCallStack => (Name -> Maybe TcId)
          -> LetBndrSpec
          -> LPat GhcRn -> Scaled ExpSigmaTypeFRR
          -> TcM a
@@ -103,7 +107,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat_ty penv pat thing_inside }
 
 -----------------
-tcPats :: HsMatchContext GhcTc
+tcPats :: HasCallStack => HsMatchContext GhcTc
        -> [LPat GhcRn]             -- ^ atterns
        -> [Scaled ExpSigmaTypeFRR] -- ^ types of the patterns
        -> TcM a                    -- ^ checker for the body
@@ -211,7 +215,7 @@ inPatBind (PE { pe_ctxt = LamPat {} }) = False
 *                                                                      *
 ********************************************************************* -}
 
-tcPatBndr :: PatEnv -> Name -> Scaled ExpSigmaTypeFRR -> TcM (HsWrapper, TcId)
+tcPatBndr :: HasCallStack => PatEnv -> Name -> Scaled ExpSigmaTypeFRR -> TcM (HsWrapper, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
@@ -238,7 +242,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkNomReflCo bndr_ty, bndr_ty) }
        ; let bndr_mult = scaledMult exp_pat_ty
-       ; bndr_id <- newLetBndr no_gen bndr_name (unitUE bndr_name bndr_mult) bndr_ty -- ROMES:TODO: Likely incorrect
+       -- ; massert (isOneTy bndr_mult) -- ROMES:It's not necessary, it's just that we won't add it to the usage environment in case it is ManyTy. Do this in a helper UsageEnv "builder"
+       ; bndr_id <- newLetBndr no_gen bndr_name zeroUE bndr_ty -- ROMES:TODO: UE is incorrect here, we were previously doing unitUE bndr_name bndr_mult. What now? -- Keep zeroUE until it compiles
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
                                           , ppr exp_pat_ty, ppr bndr_ty, ppr co
                                           , ppr bndr_id ])
@@ -248,7 +253,7 @@ tcPatBndr _ bndr_name pat_ty
   = do { let pat_mult = scaledMult pat_ty
        ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name (LambdaBound pat_mult) pat_ty) } -- ROMES:TODO: Pat Mult Lambda bound?
+       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name (LambdaBound pat_mult) pat_ty) } -- ROMES:TODO: Pat Mult Lambda bound, rather should really be binder of binding Pattern? PatCtxt agrees this is LambdaBound
                -- We should not have "OrCoVar" here, this is a bug (#17545)
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
@@ -343,7 +348,7 @@ tcMultiple tc_pat penv args thing_inside
         ; loop penv args }
 
 --------------------
-tc_lpat :: Scaled ExpSigmaTypeFRR
+tc_lpat :: HasCallStack => Scaled ExpSigmaTypeFRR
         -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpanA span $
@@ -351,7 +356,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_lpats :: [Scaled ExpSigmaTypeFRR]
+tc_lpats :: HasCallStack => [Scaled ExpSigmaTypeFRR]
          -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
   = assertPpr (equalLength pats tys) (ppr pats $$ ppr tys) $
@@ -364,7 +369,7 @@ tc_lpats tys penv pats
 checkManyPattern :: Scaled a -> TcM HsWrapper
 checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin ManyTy (scaledMult pat_ty)
 
-tc_pat  :: Scaled ExpSigmaTypeFRR
+tc_pat  :: HasCallStack => Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type
         -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern

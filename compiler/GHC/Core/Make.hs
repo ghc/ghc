@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
+{-# LANGUAGE GADTs #-}
+
 -- | Handy functions for creating much Core syntax
 module GHC.Core.Make (
         -- * Constructing normal syntax
@@ -732,7 +734,7 @@ mkSmallTupleCase vars body scrut_var scrut
 
 data FloatBind
   = FloatLet  CoreBind
-  | FloatCase CoreExpr Id AltCon [Var]
+  | HasCallStack => FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
       -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
 
@@ -741,7 +743,7 @@ instance Outputable FloatBind where
   ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> text "of" <+> ppr b)
                                 2 (ppr c <+> ppr bs)
 
-wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
+wrapFloat :: HasCallStack => FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
 wrapFloat (FloatCase e b con bs) body = mkSingleAltCase e b con bs body
 

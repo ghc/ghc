@@ -258,8 +258,9 @@ tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
-  = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
+tcLocalBinds h@(HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
+  = pprTrace "tcLocalBinds:HsValBinds" (ppr h) $
+    do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
         ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
@@ -439,6 +440,7 @@ recursivePatSynErr
 recursivePatSynErr loc binds
   = failAt loc $ TcRnRecursivePatternSynonym binds
 
+-- | ROMES:TODO: Document
 tc_single :: forall thing. HasCallStack =>
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
@@ -709,6 +711,7 @@ it's all cool; each signature has distinct type variables from the renamer.)
 *                                                                      *
 ********************************************************************* -}
 
+-- | ROMES:TODO: Document...
 tcPolyInfer
   :: HasCallStack => RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
@@ -716,7 +719,8 @@ tcPolyInfer
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [TcId])
 tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
-  = do { (tclvl, wanted, (binds', mono_infos))
+  = pprTrace "tcPolyInfer" (ppr bind_list) $
+    do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
@@ -1696,6 +1700,7 @@ We typecheck pattern bindings as follows.  First tcLhs does this:
        Result: the type of the binder is always at pc_lvl. This is
        crucial.
 
+      ROMES:TODO: Update note, they're not all let bound, for our definition of let bound
   4. Throughout, when we are making up an Id for the pattern-bound variables
      (newLetBndr), we have two cases:
 

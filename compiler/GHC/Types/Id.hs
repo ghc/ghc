@@ -143,7 +143,7 @@ import GHC.Types.Var( Id, CoVar, JoinId,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId,
             isId, isLocalId, isGlobalId, isExportedId,
-            setIdBinding, -- used to be setIdMult
+            setIdBinding,
             updateIdTypeAndMults, updateIdTypeButNotMults, updateIdTypeAndMultsM,
             IdBinding(..)
             )

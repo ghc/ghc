@@ -94,7 +94,7 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 -}
 
-tcMatchesFun :: LocatedN Name -- MatchContext Id
+tcMatchesFun :: HasCallStack => LocatedN Name -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
@@ -209,7 +209,7 @@ type AnnoBody body
     )
 
 -- | Type-check a MatchGroup.
-tcMatches :: (AnnoBody body ) => TcMatchCtxt body
+tcMatches :: HasCallStack => (AnnoBody body ) => TcMatchCtxt body
           -> [Scaled ExpSigmaTypeFRR] -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
@@ -239,7 +239,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     }) }
 
 -------------
-tcMatch :: (AnnoBody body) => TcMatchCtxt body
+tcMatch :: HasCallStack => (AnnoBody body) => TcMatchCtxt body
         -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
@@ -265,7 +265,7 @@ tcMatch ctxt pat_tys rhs_ty match
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
 -------------
-tcGRHSs :: AnnoBody body
+tcGRHSs :: HasCallStack => AnnoBody body
         => TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
         -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 

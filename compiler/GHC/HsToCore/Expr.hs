@@ -197,19 +197,26 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        { let rhs' = core_wrap (mkOptTickBox tick rhs)
        ; return (bindNonRec fun rhs' body) } }
 
-dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
+dsUnliftedBind p@(PatBind { pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = (ty, _) }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
        ; let upat = unLoc pat
-             eqn = EqnInfo { eqn_pats = [upat],
+             eqn = pprTrace "dsUnliftedBind" (ppr p $$ ppr upat) $ EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar ManyTy upat
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
+                    --
+                    -- romes: Why in a let binder? Sometimes it will end up in a
+                    -- case binder (see bindNonRec and matchOneConLike).
+
+         -- ROMES:TODO: I will need to make this correct here... this transformation seems suspicious
+         -- Matching will turn a group of equations and matching ids into a group of case expressions?
+         -- It seems really weird for the eqn to have let bound variables, if they're patterns...?
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 

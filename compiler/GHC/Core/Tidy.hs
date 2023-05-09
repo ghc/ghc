@@ -229,8 +229,9 @@ tidyExpr env (Lam b e)
 
 ------------  Case alternatives  --------------
 tidyAlt :: TidyEnv -> CoreAlt -> CoreAlt
-tidyAlt env (Alt con vs rhs)
-  = tidyBndrs env vs    =: \ (env', vs) ->
+tidyAlt env a@(Alt con vs rhs)
+  = pprTrace "tidyAlt" (ppr a $$ ppr (map (\x -> (idBinding x, x)) vs) $$ callStackDoc) $
+    tidyBndrs env vs    =: \ (env', vs) ->
     (Alt con vs (tidyExpr env' rhs))
 
 ------------  Tickish  --------------
@@ -277,16 +278,16 @@ tidyVarOcc :: TidyEnv -> Var -> Var
 tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 
 -- tidyBndr is used for lambda and case binders
-tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
+tidyBndr :: HasCallStack => TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
   | isTyCoVar var = tidyVarBndr env var
   | otherwise     = tidyIdBndr env var
 
-tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
+tidyBndrs :: HasCallStack => TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- Non-top-level variables, not covars
-tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr :: HasCallStack => TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
   = -- Do this pattern match strictly, otherwise we end up holding on to
     -- stuff in the OccName.

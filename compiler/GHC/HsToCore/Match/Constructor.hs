@@ -29,6 +29,7 @@ import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
+import GHC.Types.Var (pprIdWithBinding)
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
@@ -92,7 +93,7 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 -}
 
-matchConFamily :: NonEmpty Id
+matchConFamily :: HasCallStack => NonEmpty Id
                -> Type
                -> NonEmpty (NonEmpty EquationInfo)
                -> DsM (MatchResult CoreExpr)
@@ -126,7 +127,7 @@ matchPatSyn (var :| vars) ty eqns
 
 type ConArgPats = HsConPatDetails GhcTc
 
-matchOneConLike :: [Id]
+matchOneConLike :: HasCallStack => [Id]
                 -> Type
                 -> Mult
                 -> NonEmpty EquationInfo
@@ -190,8 +191,16 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 
         ; match_results <- mapM (match_group arg_vars) groups
 
+        ; pprTraceM "matchOneConLike" (text "Dicts:" <+> ppr (map pprIdWithBinding dicts1) $$ text "Args:" <+> ppr (map pprIdWithBinding arg_vars))
+        -- ROMES:TODO: Understand better if we could determine this elsewhere, but:
+        --
+        -- The provenence of the variables put in the alt_bndrs is not
+        -- necessarily correct, as it may come from a variable which was
+        -- originally let bound and will now be lambda bound.
+        -- See comments in dsUnliftedBind too.
+        ; let arg_vars' = map (`setIdBinding` (LambdaBound ManyTy)) arg_vars -- ROMES:TODO: Not ManyTy!! It depends on the constructor!
         ; return $ MkCaseAlt{ alt_pat = con1,
-                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
+                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars', -- these arg_vars contain variables that were originally let bound
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
@@ -243,12 +252,12 @@ same_fields flds1 flds2
 
 
 -----------------
-selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
+selectConMatchVars :: HasCallStack => [Scaled Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys con
   = case con of
       RecCon {}      -> newSysLocalsDs arg_tys
-      PrefixCon _ ps -> selectMatchVars (zipMults arg_tys ps)
-      InfixCon p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
+      PrefixCon _ ps -> pprTrace "selectConMatchVars:InfixCon" (ppr ps) $ selectMatchVars (zipMults arg_tys ps)
+      InfixCon p1 p2 -> pprTrace "selectConMatchVars:InfixCon" (ppr p1 <+> ppr p2) $ selectMatchVars (zipMults arg_tys [p1, p2])
   where
     zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
 

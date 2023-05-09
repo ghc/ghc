@@ -507,6 +507,10 @@ bindNonRec :: HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- that give Core Lint a heart attack, although actually
 -- the simplifier deals with them perfectly well. See
 -- also 'GHC.Core.Make.mkCoreLet'
+--
+-- We must be careful about the idBinding of the binder. If we make the let
+-- binder into a case binder, we must update the idBinding to reflect that,
+-- since it must change from LetBound to CaseBound
 bindNonRec bndr rhs body
   | isTyVar bndr                       = let_bind
   | isCoVar bndr                       = if isCoArg rhs then let_bind
@@ -515,7 +519,7 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = pprTrace "bindNonRec:needsCaseBinding:" (ppr bndr <+> ppr (idBinding bndr)) case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs (setIdBinding bndr (LambdaBound ManyTy)) body
+    case_bind = mkDefaultCase rhs (setIdBinding bndr (maybe (LambdaBound ManyTy) LambdaBound (varMultMaybe bndr))) body -- ROMES:TODO: Explain
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this
@@ -543,11 +547,10 @@ mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
 -- Make (case x of y { DEFAULT -> e }
 mkDefaultCase scrut case_bndr body
-  = pprTrace "mkDefaultCase bndr is LambdaBound?" (ppr $ isJust (varMultMaybe case_bndr)) $
-    assertPpr (isJust (varMultMaybe case_bndr)) (text "mkDefaultCase:Case binder is marked LetBound!") $
+  = assertPpr (isJust (varMultMaybe case_bndr)) (text "mkDefaultCase:Case binder is marked LetBound!") $
     Case scrut case_bndr (exprType body) [Alt DEFAULT [] body]
 
-mkSingleAltCase :: CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
+mkSingleAltCase :: HasCallStack => CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
 -- Use this function if possible, when building a case,
 -- because it ensures that the type on the Case itself
 -- doesn't mention variables bound by the case

@@ -85,7 +85,7 @@ import qualified Data.Map as Map
 ************************************************************************
 
 The function @match@ is basically the same as in the Wadler chapter
-from "The Implementation of Functional Programming Languages",
+from "The Implementation of Functional Programming Languages" (Chapter 5),
 except it is monadised, to carry around the name supply, info about
 annotations, etc.
 
@@ -180,7 +180,8 @@ See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 
 type MatchId = Id   -- See Note [Match Ids]
 
-match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
+-- | Described by the comment block above
+match :: HasCallStack => [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
                           -- ^ See Note [Match Ids]
                           --
                           -- ^ Note that the Match Ids carry not only a name, but
@@ -880,7 +881,22 @@ the expression (in this case, it will end up recursively calling 'matchWrapper'
 on the user-written case statement).
 -}
 
-matchEquations  :: HsMatchContext GhcRn
+-- | Matching will turn a group of pattern-matching equations and MatchId's
+-- into a group of case expressions
+--
+-- For example:
+--
+-- mappairs f [] ys = []
+-- mappairs f (x:xs) [] = []
+-- mappairs f (x:xs) (y:ys) = f x y : mappairs f xs ys
+-- ==>
+-- mappairs = \f -> \xs' -> \ys' ->
+--            case xs' of
+--              [] -> []
+--              (x:xs) -> case ys' of
+--                          [] -> []
+--                          (y:ys) -> f x y : mappairs f xs ys
+matchEquations  :: HasCallStack => HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty

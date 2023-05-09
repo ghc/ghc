@@ -8,7 +8,9 @@ import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import GHC.Hs.Extension ( GhcTc, GhcRn )
 
-match   :: [Id]
+import GHC.Stack (HasCallStack)
+
+match   :: HasCallStack => [Id]
         -> Type
         -> [EquationInfo]
         -> DsM (MatchResult CoreExpr)

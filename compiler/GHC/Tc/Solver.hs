@@ -638,7 +638,7 @@ unsatisfiableEvExpr (unsat_ev, given_msg) wtd_ty
                BI_Box { bi_data_con = mkDictBox } -> mkDictBox
                _ -> pprPanic "unsatisfiableEvExpr: no DictBox!" (ppr wtd_ty)
              dictBox = dataConTyCon mkDictBox
-       ; ev_bndr <- mkSysLocalM (fsLit "ct") ManyTy fun_ty
+       ; ev_bndr <- mkSysLocalM (fsLit "ct") (LambdaBound ManyTy) fun_ty
              -- Dict ((##) -=> wtd_ty)
        ; let scrut_ty = mkTyConApp dictBox [fun_ty]
              -- unsatisfiable @{LiftedRep} @given_msg @(Dict ((##) -=> wtd_ty)) unsat_ev

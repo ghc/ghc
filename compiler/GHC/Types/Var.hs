@@ -59,7 +59,7 @@ module GHC.Types.Var (
         setIdExported, setIdNotExported, setIdBinding,
         updateIdTypeButNotMults,
         updateIdTypeAndMults, updateIdTypeAndMultsM,
-        IdBinding(..), idBinding,
+        IdBinding(..), idBinding, pprIdWithBinding,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -282,6 +282,9 @@ data IdBinding where
   LetBound    :: HasCallStack => UsageEnv -> IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
   -- Might no longer make sense to merge with IdScope at all
+
+pprIdWithBinding :: Id -> SDoc
+pprIdWithBinding x = ppr x <> text "[" <> ppr (idBinding x) <> text "]"
 
 {-
 Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)

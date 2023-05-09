@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GADTs #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -60,6 +61,7 @@ import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Types.Id.Make
 import GHC.Types.Id
+import GHC.Types.Var (pprIdWithBinding)
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -124,16 +126,16 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
+selectMatchVars :: HasCallStack => [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
-selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
+selectMatchVar :: HasCallStack => Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = return (localiseId (unLoc var))
+selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -284,7 +286,7 @@ mkCoPrimCaseMatchResult var ty match_alts
          do body <- runMatchResult fail mr
             return (Alt (LitAlt lit) [] body)
 
-data CaseAlt a = MkCaseAlt{ alt_pat :: a,
+data CaseAlt a = HasCallStack => MkCaseAlt{ alt_pat :: a,
                             alt_bndrs :: [Var],
                             alt_wrapper :: HsWrapper,
                             alt_result :: MatchResult CoreExpr }
@@ -367,7 +369,7 @@ mkDataConCase var ty alts@(alt1 :| _)
                      , alt_result = match_result } =
       flip adjustMatchResultDs match_result $ \body -> do
         case dataConBoxer con of
-          Nothing -> return (Alt (DataAlt con) args body)
+          Nothing -> pprTrace "mk_alt" (ppr (map (\x -> (idBinding x, x)) args)) $ return (Alt (DataAlt con) args body)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
