@@ -30,17 +30,12 @@ module Haddock.Types (
   , HsDocString, LHsDocString
   , Fixity(..)
   , module Documentation.Haddock.Types
-
-  -- $ Reexports
-  , runWriter
-  , tell
  ) where
 
 import Control.DeepSeq
 import Control.Exception (throw)
 import Control.Monad.Catch
-import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runWriter, runWriterT)
+import Control.Monad.State.Strict
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
@@ -74,9 +69,8 @@ type WarningMap    = Map Name (Doc Name)
 
 
 -----------------------------------------------------------------------------
--- * Interface
+-- * Interfaces and Interface creation
 -----------------------------------------------------------------------------
-
 
 -- | 'Interface' holds all information used to render a single Haddock page.
 -- It represents the /interface/ of a module. The core business of Haddock
@@ -153,8 +147,6 @@ data Interface = Interface
   , ifaceDynFlags :: !DynFlags
   }
 
-
-
 -- | A subset of the fields of 'Interface' that we store in the interface
 -- files.
 data InstalledInterface = InstalledInterface
@@ -188,7 +180,6 @@ data InstalledInterface = InstalledInterface
   , instFixMap           :: Map Name Fixity
   }
 
-
 -- | Convert an 'Interface' to an 'InstalledInterface'
 toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface
@@ -203,6 +194,72 @@ toInstalledIface interface = InstalledInterface
   , instFixMap           = ifaceFixMap           interface
   }
 
+
+-- | A monad in which we create Haddock interfaces. Not to be confused with
+-- `GHC.Tc.Types.IfM` which is used to write GHC interfaces.
+--
+-- In the past `createInterface` was running in the `Ghc` monad but proved hard
+-- to sustain as soon as we moved over for Haddock to be a plugin. Also abstracting
+-- over the Ghc specific clarifies where side effects happen.
+newtype IfM m a = IfM { unIfM :: StateT (IfEnv m) m a }
+
+deriving newtype instance Functor m                => Functor (IfM m)
+deriving newtype instance (Monad m, Applicative m) => Applicative (IfM m)
+deriving newtype instance Monad m                  => Monad (IfM m)
+deriving newtype instance MonadIO m                => MonadIO (IfM m)
+deriving newtype instance Monad m                  => MonadState (IfEnv m) (IfM m)
+
+-- | Interface creation environment. The name sets are used primarily during
+-- processing of doc strings to avoid emitting the same type of warning for the
+-- same name twice. This was previously done using a Writer monad and then
+-- nubbing the list of warning messages after accumulation. This new approach
+-- was implemented to avoid the nubbing of potentially large lists of strings.
+data IfEnv m = IfEnv
+  {
+    -- | Lookup names in the environment.
+    ifeLookupName :: Name -> m (Maybe TyThing)
+
+    -- | Names which we have warned about for being out of scope
+  , ifeOutOfScopeNames :: !(Set.Set String)
+
+    -- | Names which we have warned about for being ambiguous
+  , ifeAmbiguousNames  :: !(Set.Set String)
+
+    -- | Named which we have warned about for being inappropriately namespaced
+    -- as values
+  , ifeInvalidValues   :: !(Set.Set String)
+  }
+
+-- | Run an `IfM` action.
+runIfM
+  :: (Monad m)
+  -- | Lookup a global name in the current session. Used in cases
+  -- where declarations don't
+  => (Name -> m (Maybe TyThing))
+  -- | The action to run.
+  -> IfM m a
+  -- | Result and accumulated error/warning messages.
+  -> m a
+runIfM lookup_name action = do
+  let
+    if_env = IfEnv
+      {
+        ifeLookupName      = lookup_name
+      , ifeOutOfScopeNames = Set.empty
+      , ifeAmbiguousNames  = Set.empty
+      , ifeInvalidValues   = Set.empty
+      }
+  evalStateT (unIfM action) if_env
+
+-- | Look up a name in the current environment
+lookupName :: Monad m => Name -> IfM m (Maybe TyThing)
+lookupName name = IfM $ do
+  lookup_name <- gets ifeLookupName
+  lift (lookup_name name)
+
+-- | Very basic logging function that simply prints to stdout
+warn :: MonadIO m => String -> IfM m ()
+warn msg = liftIO $ putStrLn msg
 
 -----------------------------------------------------------------------------
 -- * Export items & declarations
@@ -766,23 +823,11 @@ data SinceQual
 -- * Error handling
 -----------------------------------------------------------------------------
 
-
--- A monad which collects error messages, locally defined to avoid a dep on mtl
-
-
-type ErrMsg = String
-type ErrMsgM = Writer [ErrMsg]
-
-
--- Exceptions
-
-
 -- | Haddock's own exception type.
 data HaddockException
   = HaddockException String
   | WithContext [String] SomeException
   deriving Typeable
-
 
 instance Show HaddockException where
   show (HaddockException str) = str
@@ -800,29 +845,6 @@ withExceptionContext ctxt =
         WithContext ctxts se -> throwM $ WithContext (ctxt:ctxts) se
           ) .
   handle (throwM . WithContext [ctxt])
-
--- In "Haddock.Interface.Create", we need to gather
--- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
--- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
--- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = ErrMsgGhc { unErrMsgGhc :: WriterT [ErrMsg] Ghc a }
-
-
-deriving newtype instance Functor ErrMsgGhc
-deriving newtype instance Applicative ErrMsgGhc
-deriving newtype instance Monad ErrMsgGhc
-deriving newtype instance (MonadWriter [ErrMsg]) ErrMsgGhc
-deriving newtype instance MonadIO ErrMsgGhc
-
-
-runWriterGhc :: ErrMsgGhc a -> Ghc (a, [ErrMsg])
-runWriterGhc = runWriterT . unErrMsgGhc
-
-liftGhcToErrMsgGhc :: Ghc a -> ErrMsgGhc a
-liftGhcToErrMsgGhc = ErrMsgGhc . lift
-
-liftErrMsg :: ErrMsgM a -> ErrMsgGhc a
-liftErrMsg = writer . runWriter
 
 -----------------------------------------------------------------------------
 -- * Pass sensitive types

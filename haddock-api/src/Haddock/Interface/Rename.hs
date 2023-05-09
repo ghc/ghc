@@ -22,7 +22,7 @@ import Data.Traversable (mapM)
 
 import Haddock.Backends.Hoogle (ppExportD)
 import Haddock.GhcUtils
-import Haddock.Types hiding (runWriter)
+import Haddock.Types
 
 import GHC.Data.Bag (emptyBag)
 import GHC hiding (NoLink)

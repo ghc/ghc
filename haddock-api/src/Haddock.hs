@@ -171,7 +171,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
-  -- Inject `-j` into ghc options, if given
+  -- Inject `-j` into ghc options, if given to Haddock
   flags' <- pure $ case optParCount flags'' of
     Nothing       -> flags''
     Just Nothing  -> Flag_OptGhc "-j" : flags''
@@ -426,14 +426,14 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
     unwire m = m { moduleUnit = unwireUnit unit_state (moduleUnit m) }
 
   reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
-    let warn = hPutStrLn stderr . ("Warning: " ++)
+    let warn' = hPutStrLn stderr . ("Warning: " ++)
     case readP_to_S parseHoleyModule mod_str of
       [(m, "")]
         | Just iface <- Map.lookup m installedMap
         -> return [iface]
         | otherwise
-        -> warn ("Cannot find reexported module '" ++ mod_str ++ "'") >> return []
-      _ -> warn ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
+        -> warn' ("Cannot find reexported module '" ++ mod_str ++ "'") >> return []
+      _ -> warn' ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
 
   libDir   <- getHaddockLibDir flags
   prologue <- getPrologue dflags' flags
@@ -562,20 +562,19 @@ readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
 -- compilation and linking. Then run the given 'Ghc' action.
 withGhc' :: String -> Bool -> [String] -> (DynFlags -> Ghc a) -> IO a
 withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
-  logger <- getLogger
-  dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
+    logger <- getLogger
+    dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
 
-  -- We disable pattern match warnings because than can be very
-  -- expensive to check
-  let dynflags'' = unsetPatternMatchWarnings $
-        updOptLevel 0 dynflags'
-  -- ignore the following return-value, which is a list of packages
-  -- that may need to be re-linked: Haddock doesn't do any
-  -- dynamic or static linking at all!
-  _ <- setSessionDynFlags dynflags''
-  ghcActs dynflags''
+    -- We disable pattern match warnings because than can be very
+    -- expensive to check
+    let dynflags'' = unsetPatternMatchWarnings $ updOptLevel 0 dynflags'
+
+    -- ignore the following return-value, which is a list of packages
+    -- that may need to be re-linked: Haddock doesn't do any
+    -- dynamic or static linking at all!
+    _ <- setSessionDynFlags dynflags''
+    ghcActs dynflags''
   where
-
     -- ignore sublists of flags that start with "+RTS" and end in "-RTS"
     --
     -- See https://github.com/haskell/haddock/issues/666
@@ -585,7 +584,6 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
             go "+RTS" func _ = func False
             go _      func False = func False
             go arg    func True = arg : func True
-
 
     parseGhcFlags :: MonadIO m => Logger -> DynFlags -> m DynFlags
     parseGhcFlags logger dynflags = do
@@ -745,28 +743,30 @@ shortcutFlags flags = do
 -- | Generate some warnings about potential misuse of @--hyperlinked-source@.
 hypSrcWarnings :: [Flag] -> IO ()
 hypSrcWarnings flags = do
-
     when (hypSrc && any isSourceUrlFlag flags) $
         hPutStrLn stderr $ concat
             [ "Warning: "
             , "--source-* options are ignored when "
             , "--hyperlinked-source is enabled."
             ]
-
     when (not hypSrc && any isSourceCssFlag flags) $
         hPutStrLn stderr $ concat
             [ "Warning: "
             , "source CSS file is specified but "
             , "--hyperlinked-source is disabled."
             ]
-
   where
+    hypSrc :: Bool
     hypSrc = Flag_HyperlinkedSource `elem` flags
+
+    isSourceUrlFlag :: Flag -> Bool
     isSourceUrlFlag (Flag_SourceBaseURL _) = True
     isSourceUrlFlag (Flag_SourceModuleURL _) = True
     isSourceUrlFlag (Flag_SourceEntityURL _) = True
     isSourceUrlFlag (Flag_SourceLEntityURL _) = True
     isSourceUrlFlag _ = False
+
+    isSourceCssFlag :: Flag -> Bool
     isSourceCssFlag (Flag_SourceCss _) = True
     isSourceCssFlag _ = False
 

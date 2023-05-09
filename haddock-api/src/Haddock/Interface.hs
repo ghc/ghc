@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, OverloadedStrings, BangPatterns, NamedFieldPuns #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE TupleSections     #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -36,7 +40,7 @@ module Haddock.Interface (
 
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1, runIfM)
+import Haddock.Interface.Create (createInterface1)
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
@@ -45,7 +49,7 @@ import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad (unless, when)
 import Data.IORef (atomicModifyIORef', newIORef, readIORef, IORef)
-import Data.List (foldl', isPrefixOf, nub)
+import Data.List (foldl', isPrefixOf)
 import Data.Maybe (mapMaybe)
 import Data.Traversable (for)
 import Text.Printf (printf)
@@ -185,8 +189,8 @@ createIfaces verbosity modules flags instIfaceMap = do
       modGraph <- GHC.getModuleGraph
 
       (ifaceMap, moduleSet) <- liftIO $ do
-        m <- readIORef ifaceMapRef
-        s <- readIORef moduleSetRef
+        m <- atomicModifyIORef' ifaceMapRef (Map.empty,)
+        s <- atomicModifyIORef' moduleSetRef (Set.empty,)
         return (m, s)
 
       let
@@ -323,7 +327,7 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
 
     unit_state = hsc_units hsc_env
 
-  (!interface, messages) <- do
+  !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
       withTiming logger "createInterface" (const ()) $
@@ -345,7 +349,6 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       , unQualOK gre -- In scope unqualified
       ]
 
-  liftIO $ mapM_ putStrLn (nub messages)
   dflags <- getDynFlags
 
   let
@@ -418,10 +421,12 @@ buildHomeLinks :: [Interface] -> LinkEnv
 buildHomeLinks ifaces = foldl' upd Map.empty (reverse ifaces)
   where
     upd old_env iface
-      | OptHide    `elem` ifaceOptions iface = old_env
+      | OptHide `elem` ifaceOptions iface =
+          old_env
       | OptNotHome `elem` ifaceOptions iface =
-        foldl' keep_old old_env exported_names
-      | otherwise = foldl' keep_new old_env exported_names
+          foldl' keep_old old_env exported_names
+      | otherwise =
+          foldl' keep_new old_env exported_names
       where
         exported_names = ifaceVisibleExports iface ++ map haddockClsInstName (ifaceInstances iface)
         mdl            = ifaceMod iface
