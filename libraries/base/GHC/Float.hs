@@ -279,7 +279,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
--- Neither addition not multiplication are associative or distributive:
+-- Neither addition nor multiplication are associative or distributive:
 --
 -- >>> (0.1 + 0.1 :: Float) + 0.5 == 0.1 + (0.1 + 0.5)
 -- False
@@ -533,7 +533,7 @@ instance  Show Float  where
 --
 -- This instance implements IEEE 754 standard with all its usual pitfalls
 -- about NaN, infinities and negative zero.
--- Neither addition not multiplication are associative or distributive:
+-- Neither addition nor multiplication are associative or distributive:
 --
 -- >>> (0.1 + 0.1) + 0.4 == 0.1 + (0.1 + 0.4)
 -- False

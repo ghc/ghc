@@ -163,6 +163,13 @@ instance Enum (Fixed a) where
     enumFromThenTo (MkFixed a) (MkFixed b) (MkFixed c) = fmap MkFixed (enumFromThenTo a b c)
 
 -- | @since 2.01
+--
+-- Multiplication is not associative or distributive:
+--
+-- >>> (0.2 * 0.6 :: Deci) * 0.9 == 0.2 * (0.6 * 0.9)
+-- False
+-- >>> (0.1 + 0.1 :: Deci) * 0.5 == 0.1 * 0.5 + 0.1 * 0.5
+-- False
 instance (HasResolution a) => Num (Fixed a) where
     (MkFixed a) + (MkFixed b) = MkFixed (a + b)
     (MkFixed a) - (MkFixed b) = MkFixed (a - b)
