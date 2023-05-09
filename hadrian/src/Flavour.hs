@@ -232,10 +232,12 @@ enableProfiledGhc flavour =
 disableDynamicGhcPrograms :: Flavour -> Flavour
 disableDynamicGhcPrograms flavour = flavour { dynamicGhcPrograms = pure False }
 
--- | Don't build libraries in profiled 'Way's.
+-- | Don't build libraries in dynamic 'Way's.
 disableDynamicLibs :: Flavour -> Flavour
 disableDynamicLibs flavour =
-  flavour { libraryWays = prune $ libraryWays flavour
+  flavour { libraryWays = prune $ libraryWays flavour,
+            rtsWays = prune $ rtsWays flavour,
+            dynamicGhcPrograms = pure False
           }
   where
     prune :: Ways -> Ways
@@ -295,18 +297,8 @@ enableBootNonmovingGc = addArgs $ mconcat
 -- for static linking.
 fullyStatic :: Flavour -> Flavour
 fullyStatic flavour =
-    addArgs staticExec
-    $ flavour { dynamicGhcPrograms = return False
-              , libraryWays = prune $ libraryWays flavour
-              , rtsWays     = prune $ rtsWays flavour }
+    addArgs staticExec $ disableDynamicLibs flavour
   where
-    -- Remove any Way that contains a WayUnit of Dynamic
-    prune :: Ways -> Ways
-    prune = fmap $ Set.filter staticCompatible
-
-    staticCompatible :: Way -> Bool
-    staticCompatible = not . wayUnit Dynamic
-
     staticExec :: Args
     {- Some packages, especially iserv, seem to force a set of build ways,
      - including some that are dynamic (in Rules.BinaryDist).  Trying to
@@ -315,7 +307,7 @@ fullyStatic flavour =
      - the Ways will need to include a Way that's not explicitly dynamic
      - (like "vanilla").
      -}
-    staticExec = staticCompatible <$> getWay ? mconcat
+    staticExec = mconcat
         {-
          - Disable dynamic linking by the built ghc executable because the
          - statically-linked musl doesn't support dynamic linking, but will
