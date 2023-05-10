@@ -152,6 +152,7 @@ Library
         Data.Proxy
         Data.Ratio
         Data.Semigroup
+        Data.Show
         Data.STRef
         Data.STRef.Lazy
         Data.STRef.Strict

@@ -1597,6 +1597,26 @@ module Data.Semigroup where
   stimesIdempotentMonoid :: forall b a. (GHC.Real.Integral b, GHC.Base.Monoid a) => b -> a -> a
   stimesMonoid :: forall b a. (GHC.Real.Integral b, GHC.Base.Monoid a) => b -> a -> a
 
+module Data.Show where
+  -- Safety: Safe-Inferred
+  type Show :: * -> Constraint
+  class Show a
+    ...
+  type ShowS :: *
+  type ShowS = GHC.Base.String -> GHC.Base.String
+  show :: Show a => a -> GHC.Base.String
+  showChar :: GHC.Types.Char -> ShowS
+  showCommaSpace :: ShowS
+  showList :: Show a => [a] -> ShowS
+  showLitChar :: GHC.Types.Char -> ShowS
+  showLitString :: GHC.Base.String -> ShowS
+  showMultiLineString :: GHC.Base.String -> [GHC.Base.String]
+  showParen :: GHC.Types.Bool -> ShowS -> ShowS
+  showSpace :: ShowS
+  showString :: GHC.Base.String -> ShowS
+  shows :: Show a => a -> ShowS
+  showsPrec :: Show a => GHC.Types.Int -> a -> ShowS
+
 module Data.String where
   -- Safety: Trustworthy
   type IsString :: * -> Constraint
