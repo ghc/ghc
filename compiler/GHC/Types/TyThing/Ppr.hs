@@ -26,9 +26,9 @@ import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
 import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp )
 
+import GHC.Iface.Decl   ( tyThingToIfaceDecl )
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
-import GHC.Iface.Make ( tyThingToIfaceDecl )
 
 import GHC.Utils.Outputable
 

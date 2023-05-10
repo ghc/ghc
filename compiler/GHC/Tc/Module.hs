@@ -98,10 +98,10 @@ import GHC.Rename.Module
 import GHC.Rename.Doc
 import GHC.Rename.Utils ( mkNameClashErr )
 
-import GHC.Iface.Syntax   ( ShowSub(..), showToHeader )
-import GHC.Iface.Type     ( ShowForAllFlag(..) )
+import GHC.Iface.Decl    ( coAxiomToIfaceDecl )
+import GHC.Iface.Syntax  ( ShowSub(..), showToHeader )
+import GHC.Iface.Type    ( ShowForAllFlag(..) )
 import GHC.Iface.Env     ( externaliseName )
-import GHC.Iface.Make   ( coAxiomToIfaceDecl )
 import GHC.Iface.Load
 
 import GHC.Builtin.Types ( mkListTy, anyTypeOfKind )

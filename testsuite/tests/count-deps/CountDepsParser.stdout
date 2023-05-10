@@ -143,6 +143,7 @@ GHC.HsToCore.Errors.Types
 GHC.HsToCore.Pmc.Ppr
 GHC.HsToCore.Pmc.Solver.Types
 GHC.HsToCore.Pmc.Types
+GHC.Iface.Decl
 GHC.Iface.Errors.Ppr
 GHC.Iface.Errors.Types
 GHC.Iface.Ext.Fields

@@ -511,6 +511,7 @@ Library
         GHC.Hs.Type
         GHC.Hs.Utils
         GHC.Iface.Binary
+        GHC.Iface.Decl
         GHC.Iface.Env
         GHC.Iface.Errors
         GHC.Iface.Errors.Types
