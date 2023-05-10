@@ -113,6 +113,26 @@ extern char **environ;
  * by the RtsSymbols entry. To avoid this we introduce a horrible special case
  * in `ghciInsertSymbolTable`, ensure that `atexit` is never overridden.
  */
+/*
+ * Note [Symbols for MinGW's printf]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The printf offered by Microsoft's libc implementation, msvcrt, is quite
+ * incomplete, lacking support for even %ull. Consequently mingw-w64 offers its
+ * own implementation which we enable. However, to be thread-safe the
+ * implementation uses _lock_file. This would be fine except msvcrt.dll doesn't
+ * export _lock_file, only numbered versions do (e.g. msvcrt90.dll).
+ *
+ * To work around this mingw-w64 packages a static archive of msvcrt which
+ * includes their own implementation of _lock_file. However, this means that
+ * the archive contains things which the dynamic library does not; consequently
+ * we need to ensure that the runtime linker provides this symbol.
+ *
+ * It's all just so terrible.
+ *
+ * See also:
+ * https://sourceforge.net/p/mingw-w64/wiki2/gnu%20printf/
+ * https://sourceforge.net/p/mingw-w64/discussion/723797/thread/55520785/
+ */
 /* Note [_iob_func symbol]
  * ~~~~~~~~~~~~~~~~~~~~~~~
  * Microsoft in VS2013 to VS2015 transition made a backwards incompatible change
@@ -150,6 +170,12 @@ extern char **environ;
       SymI_NeedsProto(__mingw_module_is_dll)             \
       RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf_s)) \
+      RTS_WIN64_ONLY(SymI_HasProto(__stdio_common_vswprintf)) \
+      RTS_WIN64_ONLY(SymI_HasProto(_errno))  \
+      /* see Note [Symbols for MinGW's printf] */        \
+      SymI_HasProto(_lock_file)                          \
+      SymI_HasProto(_unlock_file)                        \
       SymI_HasProto(__mingw_vsnwprintf)                  \
       /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
