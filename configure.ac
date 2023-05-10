@@ -934,6 +934,9 @@ AC_CHECK_DECLS([program_invocation_short_name], , ,
 [#define _GNU_SOURCE 1
 #include <errno.h>])
 
+dnl ** check for mingwex library
+AC_CHECK_LIB([mingwex],[closedir])
+
 dnl ** check for math library
 dnl    Keep that check as early as possible.
 dnl    as we need to know whether we need libm
