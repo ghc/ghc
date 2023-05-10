@@ -18,7 +18,9 @@
 
 
 module GHC.Num
-   ( module GHC.Num
+   ( Num(..)
+   , subtract
+   , quotRemInteger
    , module GHC.Num.Integer
    , module GHC.Num.Natural
     -- reexported for backward compatibility
