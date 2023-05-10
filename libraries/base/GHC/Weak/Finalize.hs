@@ -11,6 +11,7 @@ module GHC.Weak.Finalize
       -- this handler will be ignored.
       setFinalizerExceptionHandler
     , getFinalizerExceptionHandler
+    , printToHandleFinalizerExceptionHandler
       -- * Internal
     , runFinalizerBatch
     ) where
@@ -20,6 +21,8 @@ import GHC.Exception
 import GHC.IORef
 import {-# SOURCE #-} GHC.Conc.Sync (labelThreadByteArray#, myThreadId)
 import GHC.IO (catchException, unsafePerformIO)
+import {-# SOURCE #-} GHC.IO.Handle.Types (Handle)
+import {-# SOURCE #-} GHC.IO.Handle.Text (hPutStrLn)
 import GHC.Encoding.UTF8 (utf8EncodeByteArray#)
 
 data ByteArray = ByteArray ByteArray#
@@ -79,3 +82,13 @@ getFinalizerExceptionHandler = readIORef finalizerExceptionHandler
 -- @since 4.18.0.0
 setFinalizerExceptionHandler :: (SomeException -> IO ()) -> IO ()
 setFinalizerExceptionHandler = writeIORef finalizerExceptionHandler
+
+-- | An exception handler for 'Handle' finalization that prints the error to
+-- the given 'Handle', but doesn't rethrow it.
+--
+-- @since 4.18.0.0
+printToHandleFinalizerExceptionHandler :: Handle -> SomeException -> IO ()
+printToHandleFinalizerExceptionHandler hdl se =
+    hPutStrLn hdl msg `catchException` (\(SomeException _) -> return ())
+  where
+    msg = "Exception during weak pointer finalization (ignored): " ++ displayException se ++ "\n"

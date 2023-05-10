@@ -31,7 +31,8 @@ module GHC.Weak (
         -- 'setFinalizerExceptionHandler'. Note that any exceptions thrown by
         -- this handler will be ignored.
         setFinalizerExceptionHandler,
-        getFinalizerExceptionHandler
+        getFinalizerExceptionHandler,
+        printToHandleFinalizerExceptionHandler
     ) where
 
 import GHC.Base

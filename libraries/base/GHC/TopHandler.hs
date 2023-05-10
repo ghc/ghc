@@ -84,7 +84,7 @@ runMainIO main =
       main_thread_id <- myThreadId
       weak_tid <- mkWeakThreadId main_thread_id
 
-    --setFinalizerExceptionHandler printToStderrFinalizerExceptionHandler
+      --setFinalizerExceptionHandler (printToHandleFinalizerExceptionHandler stderr)
       -- For the time being, we don't install any exception handler for
       -- Handle finalization. Instead, the user should set one manually.
 
