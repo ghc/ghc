@@ -71,6 +71,7 @@ module System.Mem.Weak (
         -- this handler will be ignored.
         setFinalizerExceptionHandler,
         getFinalizerExceptionHandler,
+        printToHandleFinalizerExceptionHandler,
 
         -- * A precise semantics
 
