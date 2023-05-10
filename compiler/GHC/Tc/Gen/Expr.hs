@@ -55,7 +55,7 @@ import GHC.Tc.Gen.Bind        ( tcLocalBinds )
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs )
 import GHC.Core.FamInstEnv    ( FamInstEnvs )
 import GHC.Rename.Expr        ( mkExpandedExpr )
-import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls )
+import GHC.Rename.Env         ( addUsedGRE, getUpdFieldLbls, DeprecationWarnings(EnableDeprecationWarnings) )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match
@@ -1417,7 +1417,7 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
              -- Mark the record fields as used, now that we have disambiguated.
              -- There is no risk of duplicate deprecation warnings, as we have
              -- not marked the GREs as used previously.
-           ; setSrcSpanA loc $ mapM_ (addUsedGRE True) mb_gre
+           ; setSrcSpanA loc $ mapM_ (addUsedGRE EnableDeprecationWarnings) mb_gre
            ; sel <- tcLookupId $ flSelector $ fieldGRELabel fl
            ; let L loc af = hfbLHS upd
                  lbl      = ambiguousFieldOccRdrName af

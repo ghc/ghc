@@ -54,6 +54,7 @@ module GHC.Rename.Env (
         lookupQualifiedDoName, lookupNameWithQualifier,
 
         -- Constructing usage information
+        DeprecationWarnings(..),
         addUsedGRE, addUsedGREs, addUsedDataCons,
 
 
@@ -406,7 +407,8 @@ lookupInstDeclBndr cls what rdr
                 -- to use a qualified name for the method
                 -- (Although it'd make perfect sense.)
        ; mb_name <- lookupSubBndrOcc
-                          False -- False => we don't give deprecated
+                          DisableDeprecationWarnings
+                                -- we don't give deprecated
                                 -- warnings when a deprecated class
                                 -- method is defined. We only warn
                                 -- when it's used
@@ -551,7 +553,7 @@ lookupRecFieldOcc mb_con rdr_name
                         , text "rdr_name:" <+> ppr rdr_name
                         , text "flds:" <+> ppr flds
                         , text "mb_gre:" <+> ppr mb_gre ]
-               ; mapM_ (addUsedGRE True) mb_gre
+               ; mapM_ (addUsedGRE EnableDeprecationWarnings) mb_gre
                ; return $ flSelector . fieldGRELabel <$> mb_gre }
        ; case mb_nm of
           { Nothing  -> do { addErr (badFieldConErr con lbl)
@@ -681,7 +683,7 @@ lookupGlobalOccRn will find it.
 
 
 -- | Used in export lists to lookup the children.
-lookupSubBndrOcc_helper :: Bool -> Bool -> Name -> RdrName
+lookupSubBndrOcc_helper :: Bool -> DeprecationWarnings -> Name -> RdrName
                         -> RnM ChildLookupResult
 lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
   | isUnboundName parent
@@ -842,7 +844,7 @@ instance Outputable ChildLookupResult where
     = text "IncorrectParent"
       <+> hsep [ppr p, ppr $ greName g, ppr ns]
 
-lookupSubBndrOcc :: Bool
+lookupSubBndrOcc :: DeprecationWarnings
                  -> Name     -- Parent
                  -> SDoc
                  -> RdrName
@@ -1407,7 +1409,7 @@ lookupFieldGREs env (L loc rdr)
 lookupGlobalOccRn_overloaded :: RdrName -> RnM (Maybe GlobalRdrElt)
 lookupGlobalOccRn_overloaded rdr_name =
   lookupExactOrOrig_maybe rdr_name id $
-    do { res <- lookupGreRn_helper (IncludeFields WantNormal) rdr_name
+    do { res <- lookupGreRn_helper (IncludeFields WantNormal) rdr_name EnableDeprecationWarnings
        ; case res of
            GreNotFound        -> lookupOneQualifiedNameGHCi WantNormal rdr_name
            OneNameMatch gre   -> return $ Just gre
@@ -1627,7 +1629,7 @@ lookupGreRn_maybe :: WhichGREs GREInfo -> RdrName -> RnM (Maybe GlobalRdrElt)
 -- Uses addUsedRdrName to record use and deprecations
 lookupGreRn_maybe which_gres rdr_name
   = do
-      res <- lookupGreRn_helper which_gres rdr_name
+      res <- lookupGreRn_helper which_gres rdr_name EnableDeprecationWarnings
       case res of
         OneNameMatch gre ->  return $ Just gre
         MultipleNames gres -> do
@@ -1663,12 +1665,12 @@ is enabled then we defer the selection until the typechecker.
 
 
 -- Internal Function
-lookupGreRn_helper :: WhichGREs GREInfo -> RdrName -> RnM GreLookupResult
-lookupGreRn_helper which_gres rdr_name
+lookupGreRn_helper :: WhichGREs GREInfo -> RdrName -> DeprecationWarnings -> RnM GreLookupResult
+lookupGreRn_helper which_gres rdr_name warn_if_deprec
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName which_gres env rdr_name of
             []    -> return GreNotFound
-            [gre] -> do { addUsedGRE True gre
+            [gre] -> do { addUsedGRE warn_if_deprec gre
                         ; return (OneNameMatch gre) }
             -- Don't record usage for ambiguous names
             -- until we know which is meant
@@ -1680,7 +1682,7 @@ lookupGreAvailRn :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Uses addUsedRdrName to record use and deprecations
 lookupGreAvailRn rdr_name
   = do
-      mb_gre <- lookupGreRn_helper (IncludeFields WantNormal) rdr_name
+      mb_gre <- lookupGreRn_helper (IncludeFields WantNormal) rdr_name DisableDeprecationWarnings
       case mb_gre of
         GreNotFound ->
           do
@@ -1726,11 +1728,18 @@ addUsedDataCons rdr_env tycon
                 | dc <- tyConDataCons tycon
                 , Just gre <- [lookupGRE_Name rdr_env (dataConName dc)] ]
 
-addUsedGRE :: Bool -> GlobalRdrElt-> RnM ()
+-- | Whether to report deprecation warnings when registering a used GRE
+data DeprecationWarnings
+  = DisableDeprecationWarnings
+  | EnableDeprecationWarnings
+
+addUsedGRE :: DeprecationWarnings -> GlobalRdrElt-> RnM ()
 -- Called for both local and imported things
 -- Add usage *and* warn if deprecated
 addUsedGRE warn_if_deprec gre
-  = do { when warn_if_deprec (warnIfDeprecated gre)
+  = do { case warn_if_deprec of
+           EnableDeprecationWarnings  -> warnIfDeprecated gre
+           DisableDeprecationWarnings -> return ()
        ; unless (isLocalGRE gre) $
          do { env <- getGblEnv
             ; traceRn "addUsedGRE" (ppr gre)
@@ -2065,7 +2074,7 @@ lookupBindGroupOcc ctxt what rdr_name
                           else lookup_top (`elemNameSet` ns)
   where
     lookup_cls_op cls
-      = lookupSubBndrOcc True cls doc rdr_name
+      = lookupSubBndrOcc EnableDeprecationWarnings cls doc rdr_name
       where
         doc = text "method of class" <+> quotes (ppr cls)
 

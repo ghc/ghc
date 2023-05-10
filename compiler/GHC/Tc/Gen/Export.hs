@@ -167,10 +167,6 @@ rnExports :: Bool       -- False => no 'module M(..) where' header at all
 rnExports explicit_mod exports
  = checkNoErrs $   -- Fail if anything in rnExports finds
                    -- an error fails, to avoid error cascade
-   updTopFlags wopt_unset_all_custom $
-       -- Do not report deprecations arising from the export
-       -- list, to avoid bleating about re-exporting a deprecated
-       -- thing (especially via 'module Foo' export item)
    do   { hsc_env <- getTopEnv
         ; tcg_env <- getGblEnv
         ; let dflags = hsc_dflags hsc_env
@@ -336,73 +332,70 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -------------
     lookup_ie :: ExportOccMap -> IE GhcPs -> RnM (Maybe (ExportOccMap, IE GhcRn, AvailInfo))
-    lookup_ie occs ie@(IEVar ann (L l rdr))
-        = do mb_gre <- lookupGreAvailRn $ ieWrappedName rdr
+    lookup_ie occs ie@(IEVar ann l)
+        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
                occs' <- check_occs occs ie [gre]
-               return (occs', IEVar ann (L l (replaceWrappedName rdr name)), avail)
+               return (occs', IEVar ann (replaceLWrappedName l name), avail)
 
-    lookup_ie occs ie@(IEThingAbs ann (L l rdr))
-        = do mb_gre <- lookupGreAvailRn $ ieWrappedName rdr
+    lookup_ie occs ie@(IEThingAbs ann l)
+        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
                occs' <- check_occs occs ie [gre]
                return ( occs'
-                      , IEThingAbs ann (L l (replaceWrappedName rdr name))
+                      , IEThingAbs ann (replaceLWrappedName l name)
                       , avail)
 
-    lookup_ie occs ie@(IEThingAll ann n')
-        = do
-            (par, kids) <- lookup_ie_all ie n'
-            let name = greName par
-                avails = map greName kids
-            occs' <- check_occs occs ie (par:kids)
-            return $ Just
-              ( occs'
-              , IEThingAll ann (replaceLWrappedName n' name)
-              , AvailTC name (name:avails))
+    lookup_ie occs ie@(IEThingAll ann l)
+        = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
+             for mb_gre $ \ par -> do
+               all_kids <- lookup_ie_kids_all ie l par
+               let name = greName par
+                   kids_avails = map greName all_kids
+               occs' <- check_occs occs ie (par:all_kids)
+               return ( occs'
+                       , IEThingAll ann (replaceLWrappedName l name)
+                       , AvailTC name (name:kids_avails))
 
     lookup_ie occs ie@(IEThingWith ann l wc sub_rdrs)
-        = do
-            (par_gre, subs, with_gres)
-              <- addExportErrCtxt ie $ lookup_ie_with l sub_rdrs
+        = do mb_gre <- addExportErrCtxt ie
+                     $ lookupGreAvailRn $ lieWrappedName l
+             for mb_gre $ \ par -> do
+               (subs, with_kids)
+                 <- addExportErrCtxt ie
+                  $ lookup_ie_kids_with par sub_rdrs
 
-            wc_gres <-
-              case wc of
-                NoIEWildcard -> return []
-                IEWildcard _ -> snd <$> lookup_ie_all ie l
+               wc_kids <-
+                 case wc of
+                   NoIEWildcard -> return []
+                   IEWildcard _ -> lookup_ie_kids_all ie l par
 
-            let par = greName par_gre
-                all_names = par : map greName (with_gres ++ wc_gres)
-                gres = par_gre : with_gres ++ wc_gres
-
-            occs' <- check_occs occs ie gres
-            return $ Just $
-              ( occs'
-              , IEThingWith ann (replaceLWrappedName l par) wc subs
-              , AvailTC par all_names)
+               let name = greName par
+                   all_kids = with_kids ++ wc_kids
+                   kids_avails = map greName all_kids
+               occs' <- check_occs occs ie (par:all_kids)
+               return ( occs'
+                       , IEThingWith ann (replaceLWrappedName l name) wc subs
+                       , AvailTC name (name:kids_avails))
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
 
-    lookup_ie_with :: LIEWrappedName GhcPs -> [LIEWrappedName GhcPs]
-                   -> RnM (GlobalRdrElt, [LIEWrappedName GhcRn], [GlobalRdrElt])
-    lookup_ie_with (L _ rdr) sub_rdrs =
-      do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
-         ; let name = greName gre
+    lookup_ie_kids_with :: GlobalRdrElt -> [LIEWrappedName GhcPs]
+                   -> RnM ([LIEWrappedName GhcRn], [GlobalRdrElt])
+    lookup_ie_kids_with gre sub_rdrs =
+      do { let name = greName gre
          ; kids <- lookupChildrenExport name sub_rdrs
-         ; if isUnboundName name
-           then return (gre, [], [gre])
-           else return (gre, map fst kids, map snd kids) }
+         ; return (map fst kids, map snd kids) }
 
-    lookup_ie_all :: IE GhcPs -> LIEWrappedName GhcPs
-                  -> RnM (GlobalRdrElt, [GlobalRdrElt])
-    lookup_ie_all ie (L _ rdr) =
-      do { gre <- lookupGlobalOccRn $ ieWrappedName rdr
-         ; let name = greName gre
+    lookup_ie_kids_all :: IE GhcPs -> LIEWrappedName GhcPs -> GlobalRdrElt
+                  -> RnM [GlobalRdrElt]
+    lookup_ie_kids_all ie (L _ rdr) gre =
+      do { let name = greName gre
                gres = findChildren kids_env name
          ; addUsedKids (ieWrappedName rdr) gres
          ; when (null gres) $
@@ -411,7 +404,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
             else -- This occurs when you export T(..), but
                  -- only import T abstractly, or T is a synonym.
                  addErr (TcRnExportHiddenComponents ie)
-         ; return (gre, gres) }
+         ; return gres }
 
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (Maybe (IE GhcRn))
@@ -510,7 +503,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
-              lkup v = lookupSubBndrOcc_helper False True
+              lkup v = lookupSubBndrOcc_helper False DisableDeprecationWarnings -- Do not report export list deprecations
                         spec_parent (setRdrNameSpace bareName v)
 
           name <-  combineChildLookupResult $ map lkup $
