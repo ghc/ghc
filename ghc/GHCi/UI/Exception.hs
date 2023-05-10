@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-module GHCi.UI.Exception(printGhciException) where
+module GHCi.UI.Exception(printGhciException, GHCiMessage(..)) where
 
 import GHC.Prelude
 import GHC.Utils.Logger
