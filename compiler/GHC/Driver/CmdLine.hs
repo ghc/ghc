@@ -146,7 +146,7 @@ addErr :: Monad m => String -> EwM m ()
 addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` Err (L loc e), ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn msg = addFlagWarn $ DriverUnknownMessage $ UnknownDiagnostic $
+addWarn msg = addFlagWarn $ DriverUnknownMessage $ mkSimpleUnknownDiagnostic $
   mkPlainDiagnostic WarningWithoutFlag noHints $ text msg
 
 addFlagWarn :: Monad m => DriverMessage -> EwM m ()

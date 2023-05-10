@@ -5,10 +5,12 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Tc.Errors.Types (
   -- * Main types
     TcRnMessage(..)
+  , TcRnMessageOpts(..)
   , mkTcRnUnknownMessage
   , TcRnMessageDetailed(..)
   , TypeDataForbids(..)
@@ -195,6 +197,11 @@ import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)
 import GHC.Iface.Errors.Types
 
+data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
+                                       , tcOptsIfaceOpts   :: !IfaceMessageOpts
+                                       }
+
+
 {-
 Note [Migrating TcM Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -251,14 +258,14 @@ data TcRnMessageDetailed
 
 mkTcRnUnknownMessage :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts)
                      => a -> TcRnMessage
-mkTcRnUnknownMessage diag = TcRnUnknownMessage (UnknownDiagnostic diag)
+mkTcRnUnknownMessage diag = TcRnUnknownMessage (mkSimpleUnknownDiagnostic diag)
 
 -- | An error which might arise during typechecking/renaming.
 data TcRnMessage where
   {-| Simply wraps an unknown 'Diagnostic' message @a@. It can be used by plugins
       to provide custom diagnostic messages originated during typechecking/renaming.
   -}
-  TcRnUnknownMessage :: UnknownDiagnostic -> TcRnMessage
+  TcRnUnknownMessage :: (UnknownDiagnostic (DiagnosticOpts TcRnMessage)) -> TcRnMessage
 
   {-| Wrap an 'IfaceMessage' to a 'TcRnMessage' for when we attempt to load interface
       files during typechecking but encounter an error. -}

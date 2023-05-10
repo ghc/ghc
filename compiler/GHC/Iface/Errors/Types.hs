@@ -16,6 +16,8 @@ module GHC.Iface.Errors.Types (
 
   , BuildingCabalPackage(..)
 
+  , IfaceMessageOpts(..)
+
   ) where
 
 import GHC.Prelude
@@ -31,6 +33,9 @@ import GHC.Exception.Type (SomeException)
 
 import GHC.Generics ( Generic )
 import GHC.Unit.Module.Location
+
+data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
+                                         }
 
 data InterfaceLookingFor
   = LookingForName   !Name

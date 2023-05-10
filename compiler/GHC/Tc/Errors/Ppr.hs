@@ -112,20 +112,18 @@ import Data.Ord ( comparing )
 import Data.Bifunctor
 
 
-data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
-                                       , tcOptsIfaceOpts   :: !IfaceMessageOpts
-                                       }
-
 defaultTcRnMessageOpts :: TcRnMessageOpts
 defaultTcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext = True
                                          , tcOptsIfaceOpts = defaultDiagnosticOpts @IfaceMessage }
 
+instance HasDefaultDiagnosticOpts TcRnMessageOpts where
+  defaultOpts = defaultTcRnMessageOpts
+
 instance Diagnostic TcRnMessage where
   type DiagnosticOpts TcRnMessage = TcRnMessageOpts
-  defaultDiagnosticOpts = defaultTcRnMessageOpts
   diagnosticMessage opts = \case
-    TcRnUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    TcRnUnknownMessage (UnknownDiagnostic f m)
+      -> diagnosticMessage (f opts) m
     TcRnMessageWithInfo unit_state msg_with_info
       -> case msg_with_info of
            TcRnMessageDetailed err_info msg

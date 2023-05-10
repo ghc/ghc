@@ -39,10 +39,9 @@ import Data.List.NonEmpty (NonEmpty((:|)))
 
 instance Diagnostic PsMessage where
   type DiagnosticOpts PsMessage = NoDiagnosticOpts
-  defaultDiagnosticOpts = NoDiagnosticOpts
-  diagnosticMessage _ = \case
-    PsUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+  diagnosticMessage opts = \case
+    PsUnknownMessage (UnknownDiagnostic f m)
+      -> diagnosticMessage (f opts) m
 
     PsHeaderMessage m
       -> psHeaderMessageDiagnostic m

@@ -42,12 +42,14 @@ suggestInstantiatedWith :: ModuleName -> GenInstantiations UnitId -> [Instantiat
 suggestInstantiatedWith pi_mod_name insts =
   [ InstantiationSuggestion k v | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name) : insts) ]
 
-instance Diagnostic GhcMessage where
-  type DiagnosticOpts GhcMessage = GhcMessageOpts
-  defaultDiagnosticOpts = GhcMessageOpts (defaultDiagnosticOpts @PsMessage)
+instance HasDefaultDiagnosticOpts GhcMessageOpts where
+  defaultOpts = GhcMessageOpts (defaultDiagnosticOpts @PsMessage)
                                          (defaultDiagnosticOpts @TcRnMessage)
                                          (defaultDiagnosticOpts @DsMessage)
                                          (defaultDiagnosticOpts @DriverMessage)
+
+instance Diagnostic GhcMessage where
+  type DiagnosticOpts GhcMessage = GhcMessageOpts
   diagnosticMessage opts = \case
     GhcPsMessage m
       -> diagnosticMessage (psMessageOpts opts) m
@@ -57,8 +59,8 @@ instance Diagnostic GhcMessage where
       -> diagnosticMessage (dsMessageOpts opts) m
     GhcDriverMessage m
       -> diagnosticMessage (driverMessageOpts opts) m
-    GhcUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    GhcUnknownMessage (UnknownDiagnostic f m)
+      -> diagnosticMessage (f opts) m
 
   diagnosticReason = \case
     GhcPsMessage m
@@ -86,12 +88,14 @@ instance Diagnostic GhcMessage where
 
   diagnosticCode = constructorCode
 
+instance HasDefaultDiagnosticOpts DriverMessageOpts where
+  defaultOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
+
 instance Diagnostic DriverMessage where
   type DiagnosticOpts DriverMessage = DriverMessageOpts
-  defaultDiagnosticOpts = DriverMessageOpts (defaultDiagnosticOpts @PsMessage) (defaultDiagnosticOpts @IfaceMessage)
   diagnosticMessage opts = \case
-    DriverUnknownMessage (UnknownDiagnostic @e m)
-      -> diagnosticMessage (defaultDiagnosticOpts @e) m
+    DriverUnknownMessage (UnknownDiagnostic f m)
+      -> diagnosticMessage (f opts) m
     DriverPsHeaderMessage m
       -> diagnosticMessage (psDiagnosticOpts opts) m
     DriverMissingHomeModules uid missing buildingCabalPackage

@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Types.Error
    ( -- * Messages
@@ -27,6 +28,9 @@ module GHC.Types.Error
    , Severity (..)
    , Diagnostic (..)
    , UnknownDiagnostic (..)
+   , mkSimpleUnknownDiagnostic
+   , mkUnknownDiagnostic
+   , embedUnknownDiagnostic
    , DiagnosticMessage (..)
    , DiagnosticReason (..)
    , DiagnosticHint (..)
@@ -37,6 +41,8 @@ module GHC.Types.Error
 
    , pprDiagnostic
 
+   , HasDefaultDiagnosticOpts(..)
+   , defaultDiagnosticOpts
    , NoDiagnosticOpts(..)
 
    -- * Hints and refactoring actions
@@ -209,6 +215,16 @@ mapDecoratedSDoc :: (SDoc -> SDoc) -> DecoratedSDoc -> DecoratedSDoc
 mapDecoratedSDoc f (Decorated s1) =
   Decorated (map f s1)
 
+class HasDefaultDiagnosticOpts opts where
+  defaultOpts :: opts
+
+
+defaultDiagnosticOpts :: forall opts . HasDefaultDiagnosticOpts (DiagnosticOpts opts) => DiagnosticOpts opts
+defaultDiagnosticOpts = defaultOpts @(DiagnosticOpts opts)
+
+
+
+
 -- | A class identifying a diagnostic.
 -- Dictionary.com defines a diagnostic as:
 --
@@ -218,11 +234,10 @@ mapDecoratedSDoc f (Decorated s1) =
 -- A 'Diagnostic' carries the /actual/ description of the message (which, in
 -- GHC's case, it can be an error or a warning) and the /reason/ why such
 -- message was generated in the first place.
-class Diagnostic a where
+class (HasDefaultDiagnosticOpts (DiagnosticOpts a)) => Diagnostic a where
 
   -- | Type of configuration options for the diagnostic.
   type DiagnosticOpts a
-  defaultDiagnosticOpts :: DiagnosticOpts a
 
   -- | Extract the error message text from a 'Diagnostic'.
   diagnosticMessage :: DiagnosticOpts a -> a -> DecoratedSDoc
@@ -250,21 +265,39 @@ class Diagnostic a where
   diagnosticCode    :: a -> Maybe DiagnosticCode
 
 -- | An existential wrapper around an unknown diagnostic.
-data UnknownDiagnostic where
-  UnknownDiagnostic :: (DiagnosticOpts a ~ NoDiagnosticOpts, Diagnostic a, Typeable a)
-                    => a -> UnknownDiagnostic
+data UnknownDiagnostic opts where
+  UnknownDiagnostic :: (Diagnostic a, Typeable a)
+                    => (opts -> DiagnosticOpts a) -- Inject the options of the outer context
+                                                  -- into the options for the wrapped diagnostic.
+                    -> a
+                    -> UnknownDiagnostic opts
 
-instance Diagnostic UnknownDiagnostic where
-  type DiagnosticOpts UnknownDiagnostic = NoDiagnosticOpts
-  defaultDiagnosticOpts = NoDiagnosticOpts
-  diagnosticMessage _ (UnknownDiagnostic diag) = diagnosticMessage NoDiagnosticOpts diag
-  diagnosticReason    (UnknownDiagnostic diag) = diagnosticReason  diag
-  diagnosticHints     (UnknownDiagnostic diag) = diagnosticHints   diag
-  diagnosticCode      (UnknownDiagnostic diag) = diagnosticCode    diag
+instance HasDefaultDiagnosticOpts opts => Diagnostic (UnknownDiagnostic opts) where
+  type DiagnosticOpts (UnknownDiagnostic opts) = opts
+  diagnosticMessage opts (UnknownDiagnostic f diag) = diagnosticMessage (f opts) diag
+  diagnosticReason    (UnknownDiagnostic _ diag) = diagnosticReason  diag
+  diagnosticHints     (UnknownDiagnostic _ diag) = diagnosticHints   diag
+  diagnosticCode      (UnknownDiagnostic _ diag) = diagnosticCode    diag
 
 -- A fallback 'DiagnosticOpts' which can be used when there are no options
 -- for a particular diagnostic.
 data NoDiagnosticOpts = NoDiagnosticOpts
+instance HasDefaultDiagnosticOpts NoDiagnosticOpts where
+  defaultOpts = NoDiagnosticOpts
+
+-- | Make a "simple" unknown diagnostic which doesn't have any configuration options.
+mkSimpleUnknownDiagnostic :: (Diagnostic a, Typeable a, DiagnosticOpts a ~ NoDiagnosticOpts) => a -> UnknownDiagnostic b
+mkSimpleUnknownDiagnostic = UnknownDiagnostic (const NoDiagnosticOpts)
+
+-- | Make an unknown diagnostic which uses the same options as the context it will be embedded into.
+mkUnknownDiagnostic :: (Typeable a, Diagnostic a) => a -> UnknownDiagnostic (DiagnosticOpts a)
+mkUnknownDiagnostic = UnknownDiagnostic id
+
+-- | Embed a more complicated diagnostic which requires a potentially different options type.
+embedUnknownDiagnostic :: (Diagnostic a, Typeable a) => (opts -> DiagnosticOpts a) -> a -> UnknownDiagnostic opts
+embedUnknownDiagnostic = UnknownDiagnostic
+
+--------------------------------------------------------------------------------
 
 pprDiagnostic :: forall e . Diagnostic e => e -> SDoc
 pprDiagnostic e = vcat [ ppr (diagnosticReason e)
@@ -290,7 +323,6 @@ data DiagnosticMessage = DiagnosticMessage
 
 instance Diagnostic DiagnosticMessage where
   type DiagnosticOpts DiagnosticMessage = NoDiagnosticOpts
-  defaultDiagnosticOpts = NoDiagnosticOpts
   diagnosticMessage _ = diagMessage
   diagnosticReason  = diagReason
   diagnosticHints   = diagHints

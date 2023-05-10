@@ -29,8 +29,6 @@ newtype GHCiMessage = GHCiMessage { getGhciMessage :: GhcMessage }
 instance Diagnostic GHCiMessage where
   type DiagnosticOpts GHCiMessage = DiagnosticOpts GhcMessage
 
-  defaultDiagnosticOpts = defaultDiagnosticOpts @GhcMessage
-
   diagnosticMessage opts (GHCiMessage msg) = diagnosticMessage opts msg
 
   diagnosticReason (GHCiMessage msg) = diagnosticReason msg
@@ -38,5 +36,3 @@ instance Diagnostic GHCiMessage where
   diagnosticHints (GHCiMessage msg) = diagnosticHints msg
 
   diagnosticCode (GHCiMessage msg)  = diagnosticCode msg
-
-

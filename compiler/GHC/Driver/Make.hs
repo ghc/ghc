@@ -27,7 +27,7 @@
 -- -----------------------------------------------------------------------------
 module GHC.Driver.Make (
         depanal, depanalE, depanalPartial, checkHomeUnitsClosed,
-        load, loadWithCache, load', LoadHowMuch(..), ModIfaceCache(..), noIfaceCache, newIfaceCache,
+        load, loadWithCache, load', AnyGhcDiagnostic, LoadHowMuch(..), ModIfaceCache(..), noIfaceCache, newIfaceCache,
         instantiationNodes,
 
         downsweep,
@@ -495,6 +495,7 @@ mkBatchMsg hsc_env =
     then batchMultiMsg
     else batchMsg
 
+type AnyGhcDiagnostic = UnknownDiagnostic (DiagnosticOpts GhcMessage)
 
 loadWithCache :: GhcMonad m => Maybe ModIfaceCache -> LoadHowMuch -> m SuccessFlag
 loadWithCache cache how_much = do
