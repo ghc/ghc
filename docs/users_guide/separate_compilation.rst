@@ -542,9 +542,17 @@ Redirecting temporary files
     .. index::
         single: TMPDIR environment variable
 
-    Alternatively, use your :envvar:`TMPDIR` environment variable. Set it to the
-    name of the directory where temporary files should be put. GCC and other
-    programs will honour the :envvar:`TMPDIR` variable as well.
+    Alternatively, on unix, use your :envvar:`TMPDIR` environment variable. Set it to the
+    name of the directory where temporary files should be put.
+
+    On Windows the environment variables :envvar:`TMP`, :envar:`TEMP`,
+    :envvar:`USERPROFILE` are consulted in that order in order to determine the
+    directory for temporary files.
+
+    The cross-platform way to specify the temporary directory is to use the
+    command-line flag.
+
+
 
 .. _hi-options:
 
