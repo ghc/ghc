@@ -174,6 +174,11 @@ Runtime system
   Instead of ``Left ..``, use the constructor ``RegularRecUpdFields``, and instead
   of ``Right ..``, use the constructor ``OverloadedRecUpdFields``.
 
+- The ``loadWithCache`` function now takes an extra argument which allows API users
+  to embed GHC diagnostics in their own diagnostic type before they are printed.
+  This allows how messages are rendered and explained to users to be modified.
+  We use this functionality in GHCi to modify how some messages are displayed.
+
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 

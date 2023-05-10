@@ -107,6 +107,7 @@ import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.Bag (unitBag)
 import qualified GHC.Data.Strict as Strict
+import GHC.Types.Error
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -2177,7 +2178,9 @@ doLoad retain_context howmuch = do
               liftIO $ do hSetBuffering stdout NoBuffering
                           hSetBuffering stderr NoBuffering) $ \_ -> do
       hmis <- ifaceCache <$> getGHCiState
-      ok <- trySuccess $ GHC.loadWithCache (Just hmis) howmuch
+      -- If GHCi message gets its own configuration at some stage then this will need to be
+      -- modified to 'embedUnknownDiagnostic'.
+      ok <- trySuccess $ GHC.loadWithCache (Just hmis) (mkUnknownDiagnostic . GHCiMessage) howmuch
       afterLoad ok retain_context
       return ok
 
