@@ -6,6 +6,7 @@ module GHC.Core.UsageEnv
   , bottomUE
   , deleteUE
   , lookupUE
+  , popUE
   , scaleUE
   , scaleUsage
   , supUE
@@ -103,6 +104,9 @@ lookupUE (UsageEnv e has_bottom) x =
   case lookupNameEnv e (getName x) of
     Just w  -> MUsage w
     Nothing -> if has_bottom then Bottom else Zero
+
+popUE :: NamedThing n => UsageEnv -> n -> (Usage, UsageEnv)
+popUE ue x = (lookupUE ue x, deleteUE ue x)
 
 instance Outputable UsageEnv where
   ppr (UsageEnv ne b) = text "UsageEnv:" <+> ppr ne <+> ppr b
