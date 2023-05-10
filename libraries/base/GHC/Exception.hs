@@ -23,16 +23,33 @@
 -----------------------------------------------------------------------------
 
 module GHC.Exception
-       ( module GHC.Exception.Type
-       , throw
-       , ErrorCall(..,ErrorCall)
-       , errorCallException
-       , errorCallWithCallStackException
-         -- re-export CallStack and SrcLoc from GHC.Types
-       , CallStack, fromCallSiteList, getCallStack, prettyCallStack
-       , prettyCallStackLines, showCCSStack
-       , SrcLoc(..), prettySrcLoc
-       ) where
+    ( -- * 'Exception' class
+      Exception(..)
+
+      -- * 'SomeException'
+    , SomeException(..)
+
+      -- * Throwing
+    , throw
+
+      -- * Concrete exceptions
+      -- ** Arithmetic exceptions
+    , ArithException(..)
+    , divZeroException
+    , overflowException
+    , ratioZeroDenomException
+    , underflowException
+      -- ** 'ErrorCall'
+    , ErrorCall(..,ErrorCall)
+    , errorCallException
+    , errorCallWithCallStackException
+
+      -- * Reexports
+      -- Re-export CallStack and SrcLoc from GHC.Types
+    , CallStack, fromCallSiteList, getCallStack, prettyCallStack
+    , prettyCallStackLines, showCCSStack
+    , SrcLoc(..), prettySrcLoc
+    ) where
 
 import GHC.Base
 import GHC.Show
