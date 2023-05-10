@@ -36,20 +36,16 @@ import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-
-
 import GHC.Iface.Errors.Types
-
-data IfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles :: !Bool -- ^ Whether to show files we tried to look for or not when printing loader errors
-                                         }
 
 defaultIfaceMessageOpts :: IfaceMessageOpts
 defaultIfaceMessageOpts = IfaceMessageOpts { ifaceShowTriedFiles = False }
 
+instance HasDefaultDiagnosticOpts IfaceMessageOpts where
+  defaultOpts = defaultIfaceMessageOpts
 
 instance Diagnostic IfaceMessage where
   type DiagnosticOpts IfaceMessage = IfaceMessageOpts
-  defaultDiagnosticOpts = defaultIfaceMessageOpts
   diagnosticMessage opts reason = mkSimpleDecorated $
          interfaceErrorDiagnostic opts reason
 

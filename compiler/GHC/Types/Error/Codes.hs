@@ -20,13 +20,13 @@ module GHC.Types.Error.Codes
   where
 
 import GHC.Prelude
-import GHC.Types.Error  ( DiagnosticCode(..), UnknownDiagnostic (..), diagnosticCode )
+import GHC.Types.Error  ( DiagnosticCode(..), UnknownDiagnostic (..), diagnosticCode, NoDiagnosticOpts )
 
 import GHC.Hs.Extension ( GhcRn )
 
 import GHC.Core.InstEnv (LookupInstanceErrReason)
 import GHC.Iface.Errors.Types
-import GHC.Driver.Errors.Types   ( DriverMessage )
+import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessageOpts, DriverMessageOpts )
 import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Tc.Errors.Types
@@ -855,12 +855,12 @@ type family ConRecursInto con where
   ConRecursInto "GhcPsMessage"             = 'Just PsMessage
   ConRecursInto "GhcTcRnMessage"           = 'Just TcRnMessage
   ConRecursInto "GhcDsMessage"             = 'Just DsMessage
-  ConRecursInto "GhcUnknownMessage"        = 'Just UnknownDiagnostic
+  ConRecursInto "GhcUnknownMessage"        = 'Just (UnknownDiagnostic GhcMessageOpts)
 
   ----------------------------------
   -- Constructors of DriverMessage
 
-  ConRecursInto "DriverUnknownMessage"     = 'Just UnknownDiagnostic
+  ConRecursInto "DriverUnknownMessage"     = 'Just (UnknownDiagnostic DriverMessageOpts)
   ConRecursInto "DriverPsHeaderMessage"    = 'Just PsMessage
   ConRecursInto "DriverInterfaceError"     = 'Just IfaceMessage
 
@@ -875,13 +875,13 @@ type family ConRecursInto con where
   ----------------------------------
   -- Constructors of PsMessage
 
-  ConRecursInto "PsUnknownMessage"         = 'Just UnknownDiagnostic
+  ConRecursInto "PsUnknownMessage"         = 'Just (UnknownDiagnostic NoDiagnosticOpts)
   ConRecursInto "PsHeaderMessage"          = 'Just PsHeaderMessage
 
   ----------------------------------
   -- Constructors of TcRnMessage
 
-  ConRecursInto "TcRnUnknownMessage"       = 'Just UnknownDiagnostic
+  ConRecursInto "TcRnUnknownMessage"       = 'Just (UnknownDiagnostic TcRnMessageOpts)
 
     -- Recur into TcRnMessageWithInfo to get the underlying TcRnMessage
   ConRecursInto "TcRnMessageWithInfo"      = 'Just TcRnMessageDetailed
@@ -961,7 +961,7 @@ type family ConRecursInto con where
   ----------------------------------
   -- Constructors of DsMessage
 
-  ConRecursInto "DsUnknownMessage"         = 'Just UnknownDiagnostic
+  ConRecursInto "DsUnknownMessage"         = 'Just (UnknownDiagnostic NoDiagnosticOpts)
 
   ----------------------------------
   -- Constructors of ImportLookupBad
@@ -1050,11 +1050,11 @@ instance KnownConstructor con => ConstructorCode con f 'Nothing where
 -- If we recur into the 'UnknownDiagnostic' existential datatype,
 -- unwrap the existential and obtain the error code.
 instance {-# OVERLAPPING #-}
-         ( ConRecursInto con ~ 'Just UnknownDiagnostic
-         , HasType UnknownDiagnostic con f )
-      => ConstructorCode con f ('Just UnknownDiagnostic) where
-  gconstructorCode diag = case getType @UnknownDiagnostic @con @f diag of
-    UnknownDiagnostic diag -> diagnosticCode diag
+         ( ConRecursInto con ~ 'Just (UnknownDiagnostic opts)
+         , HasType (UnknownDiagnostic opts) con f )
+      => ConstructorCode con f ('Just (UnknownDiagnostic opts)) where
+  gconstructorCode diag = case getType @(UnknownDiagnostic opts) @con @f diag of
+    UnknownDiagnostic _ diag -> diagnosticCode diag
 
 -- (*) Recursive instance: Recur into the given type.
 instance ( ConRecursInto con ~ 'Just ty, HasType ty con f

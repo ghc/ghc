@@ -23,9 +23,7 @@ import GHC.Driver.Errors.Ppr ()
 import GHC.Tc.Errors.Types
 import GHC.HsToCore.Errors.Types
 import GHC.Types.Error
-import GHC.Tc.Errors.Ppr
 import GHC.Iface.Errors.Types
-import GHC.Iface.Errors.Ppr
 
 -- | Initialise the general configuration for printing diagnostic messages
 -- For example, this configuration controls things like whether warnings are

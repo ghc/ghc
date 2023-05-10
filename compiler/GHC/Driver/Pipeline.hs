@@ -103,7 +103,7 @@ import GHC.Runtime.Loader      ( initializePlugins )
 
 
 import GHC.Types.Basic       ( SuccessFlag(..), ForeignSrcLang(..) )
-import GHC.Types.Error       ( singleMessage, getMessages, UnknownDiagnostic (..) )
+import GHC.Types.Error       ( singleMessage, getMessages, mkSimpleUnknownDiagnostic, defaultDiagnosticOpts )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -162,7 +162,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
     handler (ProgramError msg) =
       return $ Left $ singleMessage $
         mkPlainErrorMsgEnvelope srcspan $
-        DriverUnknownMessage $ UnknownDiagnostic $ mkPlainError noHints $ text msg
+        DriverUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError noHints $ text msg
     handler ex = throwGhcExceptionIO ex
 
     to_driver_messages :: Messages GhcMessage -> Messages DriverMessage
