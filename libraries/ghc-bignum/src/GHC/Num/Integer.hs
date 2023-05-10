@@ -20,7 +20,131 @@
 --
 -- The 'Integer' type.
 
-module GHC.Num.Integer where
+module GHC.Num.Integer
+    ( Integer(..)
+    , integerCheck
+    , integerCheck#
+
+      -- * Useful constants
+    , integerZero
+    , integerOne
+
+      -- * Conversion with...
+      -- ** 'Int'
+    , integerFromInt#
+    , integerFromInt
+    , integerToInt#
+    , integerToInt
+      -- ** 'BigNat'
+    , integerFromBigNat#
+    , integerFromBigNatNeg#
+    , integerFromBigNatSign#
+    , integerToBigNatSign#
+    , integerToBigNatClamp#
+      -- ** 'Word'
+    , integerFromWord#
+    , integerFromWord
+    , integerFromWordNeg#
+    , integerFromWordSign#
+    , integerToWord#
+    , integerToWord
+      -- ** 'Natural'
+    , integerFromNatural
+    , integerToNaturalClamp
+    , integerToNatural
+    , integerToNaturalThrow
+      -- ** 'Int64'/'Word64'
+    , integerFromInt64#
+    , integerFromWord64#
+    , integerToInt64#
+    , integerToWord64#
+      -- ** Floating-point
+    , integerDecodeDouble#
+    , integerEncodeDouble#
+    , integerEncodeDouble
+    , integerEncodeFloat#
+      -- ** 'Addr#'
+    , integerToAddr#
+    , integerToAddr
+    , integerFromAddr#
+    , integerFromAddr
+      -- ** Limbs
+    , integerFromWordList
+    , integerToMutableByteArray#
+    , integerToMutableByteArray
+    , integerFromByteArray#
+    , integerFromByteArray
+
+      -- * Predicates
+    , integerIsNegative#
+    , integerIsNegative
+    , integerIsZero
+    , integerIsOne
+
+      -- * Comparison
+    , integerNe
+    , integerEq
+    , integerLe
+    , integerLt
+    , integerGt
+    , integerGe
+    , integerEq#
+    , integerNe#
+    , integerGt#
+    , integerLe#
+    , integerLt#
+    , integerGe#
+    , integerCompare
+
+      -- * Arithmetic
+    , integerSub
+    , integerAdd
+    , integerMul
+    , integerNegate
+    , integerAbs
+    , integerSignum
+    , integerSignum#
+    , integerQuotRem#
+    , integerQuotRem
+    , integerQuot
+    , integerRem
+    , integerDivMod#
+    , integerDivMod
+    , integerDiv
+    , integerMod
+    , integerGcd
+    , integerLcm
+    , integerSqr
+    , integerLog2#
+    , integerLog2
+    , integerLogBaseWord#
+    , integerLogBaseWord
+    , integerLogBase#
+    , integerLogBase
+    , integerIsPowerOf2#
+    , integerGcde#
+    , integerGcde
+    , integerRecipMod#
+    , integerPowMod#
+
+      -- * Bit operations
+    , integerPopCount#
+    , integerBit#
+    , integerBit
+    , integerTestBit#
+    , integerTestBit
+    , integerShiftR#
+    , integerShiftR
+    , integerShiftL#
+    , integerShiftL
+    , integerOr
+    , integerXor
+    , integerAnd
+    , integerComplement
+
+      -- * Miscellaneous
+    , integerSizeInBase#
+    ) where
 
 #include "MachDeps.h"
 #include "WordSize.h"
