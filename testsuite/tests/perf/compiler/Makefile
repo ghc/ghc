@@ -32,3 +32,8 @@ MultiLayerModulesTH_OneShot_Prep: MultiLayerModulesTH_Make_Prep
 InstanceMatching:
 	./genMatchingTest 0
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code -fwrite-interface Defs.hs
+
+T22744:
+	./genT22744
+	'$(TEST_HC)' $(TEST_HC_OPTS) T22744.hs
+
