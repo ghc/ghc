@@ -906,6 +906,25 @@ module Data.Either where
   partitionEithers :: forall a b. [Either a b] -> ([a], [b])
   rights :: forall a b. [Either a b] -> [b]
 
+module Data.Enum where
+  -- Safety: Safe-Inferred
+  type Bounded :: * -> Constraint
+  class Bounded a where
+    minBound :: a
+    maxBound :: a
+    {-# MINIMAL minBound, maxBound #-}
+  type Enum :: * -> Constraint
+  class Enum a where
+    succ :: a -> a
+    pred :: a -> a
+    toEnum :: GHC.Types.Int -> a
+    fromEnum :: a -> GHC.Types.Int
+    enumFrom :: a -> [a]
+    enumFromThen :: a -> a -> [a]
+    enumFromTo :: a -> a -> [a]
+    enumFromThenTo :: a -> a -> a -> [a]
+    {-# MINIMAL toEnum, fromEnum #-}
+
 module Data.Eq where
   -- Safety: Trustworthy
   type Eq :: * -> Constraint
@@ -11579,6 +11598,30 @@ instance GHC.Enum.Bounded GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Unico
 instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Enum.Bounded (a Data.Type.Equality.:~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Enum.Bounded (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (t :: k). GHC.Enum.Bounded (Data.Proxy.Proxy t) -- Defined in ‘Data.Proxy’
+instance GHC.Enum.Bounded GHC.Types.Bool -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.Char -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.Int -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.Levity -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.Ordering -- Defined in ‘GHC.Enum’
+instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Solo a) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j k. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j k l. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j k l m. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j k l m n. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m, GHC.Enum.Bounded n) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i j k l m n o. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m, GHC.Enum.Bounded n, GHC.Enum.Bounded o) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -- Defined in ‘GHC.Enum’
+instance forall a b. (GHC.Enum.Bounded a, GHC.Enum.Bounded b) => GHC.Enum.Bounded (a, b) -- Defined in ‘GHC.Enum’
+instance forall a b c. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c) => GHC.Enum.Bounded (a, b, c) -- Defined in ‘GHC.Enum’
+instance forall a b c d. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d) => GHC.Enum.Bounded (a, b, c, d) -- Defined in ‘GHC.Enum’
+instance forall a b c d e. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e) => GHC.Enum.Bounded (a, b, c, d, e) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f) => GHC.Enum.Bounded (a, b, c, d, e, f) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g) => GHC.Enum.Bounded (a, b, c, d, e, f, g) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h) -- Defined in ‘GHC.Enum’
+instance forall a b c d e f g h i. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i) -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded () -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.VecCount -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.VecElem -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.Types.Word -- Defined in ‘GHC.Enum’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Enum.Bounded (f (g a)) => GHC.Enum.Bounded (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
 instance GHC.Enum.Bounded GHC.Int.Int16 -- Defined in ‘GHC.Int’
@@ -11604,30 +11647,6 @@ instance GHC.Enum.Bounded GHC.Word.Word8 -- Defined in ‘GHC.Word’
 instance GHC.Enum.Bounded Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Enum.Bounded Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance [safe] GHC.Enum.Bounded GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
-instance GHC.Enum.Bounded GHC.Types.Bool -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.Char -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.Int -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.Levity -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.Ordering -- Defined in ‘GHC.Enum’
-instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Solo a) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j k. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j k l. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j k l m. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j k l m n. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m, GHC.Enum.Bounded n) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i j k l m n o. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i, GHC.Enum.Bounded j, GHC.Enum.Bounded k, GHC.Enum.Bounded l, GHC.Enum.Bounded m, GHC.Enum.Bounded n, GHC.Enum.Bounded o) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -- Defined in ‘GHC.Enum’
-instance forall a b. (GHC.Enum.Bounded a, GHC.Enum.Bounded b) => GHC.Enum.Bounded (a, b) -- Defined in ‘GHC.Enum’
-instance forall a b c. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c) => GHC.Enum.Bounded (a, b, c) -- Defined in ‘GHC.Enum’
-instance forall a b c d. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d) => GHC.Enum.Bounded (a, b, c, d) -- Defined in ‘GHC.Enum’
-instance forall a b c d e. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e) => GHC.Enum.Bounded (a, b, c, d, e) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f) => GHC.Enum.Bounded (a, b, c, d, e, f) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g) => GHC.Enum.Bounded (a, b, c, d, e, f, g) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h) -- Defined in ‘GHC.Enum’
-instance forall a b c d e f g h i. (GHC.Enum.Bounded a, GHC.Enum.Bounded b, GHC.Enum.Bounded c, GHC.Enum.Bounded d, GHC.Enum.Bounded e, GHC.Enum.Bounded f, GHC.Enum.Bounded g, GHC.Enum.Bounded h, GHC.Enum.Bounded i) => GHC.Enum.Bounded (a, b, c, d, e, f, g, h, i) -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded () -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.VecCount -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.VecElem -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Types.Word -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
 instance GHC.Enum.Bounded GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
 instance GHC.Enum.Bounded GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
@@ -11641,6 +11660,18 @@ instance GHC.Enum.Enum GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Unicode�
 instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Enum.Enum (a Data.Type.Equality.:~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Enum.Enum (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (s :: k). GHC.Enum.Enum (Data.Proxy.Proxy s) -- Defined in ‘Data.Proxy’
+instance GHC.Enum.Enum GHC.Types.Bool -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.Char -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.Int -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Num.Integer.Integer -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.Levity -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Num.Natural.Natural -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.Ordering -- Defined in ‘GHC.Enum’
+instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Solo a) -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum () -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.VecCount -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.VecElem -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.Types.Word -- Defined in ‘GHC.Enum’
 instance forall k (a :: k). GHC.Enum.Enum (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Enum.Enum (f (g a)) => GHC.Enum.Enum (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
 instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
@@ -11666,18 +11697,6 @@ instance GHC.Enum.Enum Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Enum.Enum Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance [safe] GHC.Enum.Enum GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Enum.Enum GHC.Event.Windows.ConsoleEvent.ConsoleEvent -- Defined in ‘GHC.Event.Windows.ConsoleEvent’
-instance GHC.Enum.Enum GHC.Types.Bool -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.Char -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.Int -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Num.Integer.Integer -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.Levity -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Num.Natural.Natural -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.Ordering -- Defined in ‘GHC.Enum’
-instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Solo a) -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum () -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.VecCount -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.VecElem -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Enum GHC.Types.Word -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Enum.Enum GHC.Types.Float -- Defined in ‘GHC.Float’
 instance GHC.Enum.Enum GHC.Generics.Associativity -- Defined in ‘GHC.Generics’

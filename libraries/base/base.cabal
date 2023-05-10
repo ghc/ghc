@@ -127,6 +127,7 @@ Library
         Data.Dynamic
         Data.Either
         Data.Eq
+        Data.Enum
         Data.Fixed
         Data.Foldable
         Data.Foldable1
