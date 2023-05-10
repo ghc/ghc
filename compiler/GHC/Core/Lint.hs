@@ -1194,13 +1194,13 @@ checkCanEtaExpand _ _ _
 checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
 checkLinearity body_ue lam_var =
   case varMultMaybe lam_var of
-    Just mult -> do ensureSubUsage lhs mult (err_msg mult)
-                    return $ deleteUE body_ue lam_var
+    Just mult -> do
+      let (lhs, body_ue') = popUE body_ue lam_var
+          err_msg = text "Linearity failure in lambda:" <+> ppr lam_var
+                    $$ ppr lhs <+> text "⊈" <+> ppr mult
+      ensureSubUsage lhs mult err_msg
+      return body_ue'
     Nothing    -> return body_ue -- A type variable
-  where
-    lhs = lookupUE body_ue lam_var
-    err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
-                $$ ppr lhs <+> text "⊈" <+> ppr mult
 
 {- Note [Join points and casts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1551,17 +1551,24 @@ lintCoreAlt :: Var              -- Case binder
             -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoreAlt _ _ _ alt_ty (Alt DEFAULT args rhs) =
+lintCoreAlt case_bndr _ scrut_mult alt_ty (Alt DEFAULT args rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
-     ; lintAltExpr rhs alt_ty }
+     ; rhs_ue <- lintAltExpr rhs alt_ty
+     ; let (case_bndr_usage, rhs_ue') = popUE rhs_ue case_bndr
+           err_msg = text "Linearity failure in the DEFAULT clause:" <+> ppr case_bndr
+                     $$ ppr case_bndr_usage <+> text "⊈" <+> ppr scrut_mult
+     ; ensureSubUsage case_bndr_usage scrut_mult err_msg
+     ; return rhs_ue' }
 
-lintCoreAlt _case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
+lintCoreAlt case_bndr scrut_ty _ alt_ty (Alt (LitAlt lit) args rhs)
   | litIsLifted lit
   = failWithL integerScrutinisedMsg
   | otherwise
   = do { lintL (null args) (mkDefaultArgsMsg args)
        ; ensureEqTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)
-       ; lintAltExpr rhs alt_ty }
+       ; rhs_ue <- lintAltExpr rhs alt_ty
+       ; return (deleteUE rhs_ue case_bndr) -- No need for linearity checks
+       }
   where
     lit_ty = literalType lit
 
@@ -3184,9 +3191,14 @@ inCasePat = LintM $ \ env errs -> fromBoxedLResult (Just (is_case_pat env), errs
 
 addInScopeId :: Id -> LintedType -> LintM a -> LintM a
 addInScopeId id linted_ty m
-  = LintM $ \ env@(LE { le_ids = id_set, le_joins = join_set }) errs ->
+  = LintM $ \ env@(LE { le_ids = id_set, le_joins = join_set, le_ue_aliases = aliases }) errs ->
     unLintM m (env { le_ids   = extendVarEnv id_set id (id, linted_ty)
-                   , le_joins = add_joins join_set }) errs
+                   , le_joins = add_joins join_set
+                   , le_ue_aliases = delFromNameEnv aliases (idName id) }) errs
+                   -- When shadowing an alias, we need to make sure the Id is no longer
+                   -- classified as such. E.g. in
+                   -- let x = <e1> in case x of x { _DEFAULT -> <e2> }
+                   -- Occurrences of 'x' in e2 shouldn't count as occurrences of e1.
   where
     add_joins join_set
       | isJoinId id = extendVarSet join_set id -- Overwrite with new arity

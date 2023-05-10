@@ -1175,7 +1175,7 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
        -- e.g. (x', e1), (y', e2), ...
        ; let mk_upd_id :: Name -> LHsFieldBind GhcTc fld (LHsExpr GhcRn) -> TcM (Name, (TcId, LHsExpr GhcRn))
              mk_upd_id fld_nm (L _ rbind)
-               = do { let Scaled m arg_ty = lookupNameEnv_NF arg_ty_env fld_nm
+               = do { let Scaled _ arg_ty = lookupNameEnv_NF arg_ty_env fld_nm
                           nm_occ = rdrNameOcc . nameRdrName $ fld_nm
                           actual_arg_ty = substTy subst arg_ty
                           rhs = hfbRHS rbind
@@ -1186,11 +1186,17 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
                       -- (As we will typecheck the let-bindings later, we can drop this coercion here.)
                       -- See RepPolyRecordUpdate test.
                     ; nm <- newNameAt nm_occ generatedSrcSpan
-                    ; let id = mkLocalId nm m actual_arg_ty
+                    ; let id = mkLocalId nm ManyTy actual_arg_ty
                       -- NB: create fresh names to avoid any accidental shadowing
                       -- occurring in the RHS expressions when creating the let bindings:
                       --
                       --  let x1 = e1; x2 = e2; ...
+                      --
+                      -- Above, we use multiplicity Many rather than the one associated to arg_ty.
+                      -- Normally, there shouldn't be a difference, since it's a let binding.
+                      -- But -XStrict can convert the let to a case, and this causes issues
+                      -- in test LinearRecUpd. Since we don't support linear record updates,
+                      -- using Many is simple and safe.
                     ; return (fld_nm, (id, rhs))
                     }
              arg_ty_env = mkNameEnv
