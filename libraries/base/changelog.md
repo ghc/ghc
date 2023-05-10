@@ -25,6 +25,7 @@
     adding the class `Unsatisfiable :: ErrorMessage -> TypeError` to `GHC.TypeError`,
     which provides a mechanism for custom type errors that reports the errors in
     a more predictable behaviour than `TypeError`.
+  * Add more instances for `Compose`: `Enum`, `Bounded`, `Num`, `Real`, `Integral` ([CLC proposal #160](https://github.com/haskell/core-libraries-committee/issues/160))
   * Make `(&)` representation polymorphic in the return type ([CLC proposal #158](https://github.com/haskell/core-libraries-committee/issues/158))
   * Implement `GHC.IORef.atomicSwapIORef` via a new dedicated primop `atomicSwapMutVar#` ([CLC proposal #139](https://github.com/haskell/core-libraries-committee/issues/139))
 

@@ -156,3 +156,14 @@ instance (TestEquality f) => TestEquality (Compose f g) where
     case testEquality x y of -- :: Maybe (g x :~: g y)
       Just Refl -> Just Refl -- :: Maybe (x :~: y)
       Nothing   -> Nothing
+
+-- | @since 4.19.0.0
+deriving instance Enum (f (g a)) => Enum (Compose f g a)
+-- | @since 4.19.0.0
+deriving instance Bounded (f (g a)) => Bounded (Compose f g a)
+-- | @since 4.19.0.0
+deriving instance Num (f (g a)) => Num (Compose f g a)
+-- | @since 4.19.0.0
+deriving instance Real (f (g a)) => Real (Compose f g a)
+-- | @since 4.19.0.0
+deriving instance Integral (f (g a)) => Integral (Compose f g a)
