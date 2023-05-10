@@ -960,6 +960,8 @@ AC_CHECK_DECLS([ctime_r], , ,
 #define _POSIX_C_SOURCE 199506L
 #include <time.h>])
 
+dnl ** check for mingwex library
+AC_CHECK_LIB([mingwex],[closedir])
 
 dnl ** check for math library
 dnl    Keep that check as early as possible.
