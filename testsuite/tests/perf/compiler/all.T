@@ -670,3 +670,14 @@ test('RecordUpdPerf',
      ],
      multimod_compile,
      ['RecordUpdPerf', '-fno-code -v0'])
+
+test('T22744',
+     [ collect_compiler_stats('peak_megabytes_allocated',20),
+       req_interp,
+       pre_cmd('$MAKE -s --no-print-directory T22744'),
+       extra_files(['genT22744']),
+       compile_timeout_multiplier(2)
+     ],
+     multimod_compile,
+     ['T22744', '-v0'])
+
