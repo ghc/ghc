@@ -78,7 +78,7 @@ WrapperBinsDir=${bindir}
 
 # N.B. this is duplicated from includes/ghc.mk.
 lib/settings : config.mk
-	$(call removeFiles,$@)
+	@rm -f $@
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
 	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
