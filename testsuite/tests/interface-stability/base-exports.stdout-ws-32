@@ -9027,8 +9027,6 @@ module GHC.Real where
     recip :: a -> a
     fromRational :: Rational -> a
     {-# MINIMAL fromRational, (recip | (/)) #-}
-  type FractionalExponentBase :: *
-  data FractionalExponentBase = Base2 | Base10
   type Integral :: * -> Constraint
   class (Real a, GHC.Enum.Enum a) => Integral a where
     quot :: a -> a -> a
@@ -9056,9 +9054,7 @@ module GHC.Real where
     floor :: forall b. Integral b => a -> b
     {-# MINIMAL properFraction #-}
   (^) :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a
-  (^%^) :: forall a. Integral a => Rational -> a -> Rational
   (^^) :: forall a b. (Fractional a, Integral b) => a -> b -> a
-  (^^%^^) :: forall a. Integral a => Rational -> a -> Rational
   denominator :: forall a. Ratio a -> a
   divZeroError :: forall a. a
   even :: forall a. Integral a => a -> GHC.Types.Bool
@@ -9072,7 +9068,6 @@ module GHC.Real where
   lcm :: forall a. Integral a => a -> a -> a
   mkRationalBase10 :: Rational -> GHC.Num.Integer.Integer -> Rational
   mkRationalBase2 :: Rational -> GHC.Num.Integer.Integer -> Rational
-  mkRationalWithExponentBase :: Rational -> GHC.Num.Integer.Integer -> FractionalExponentBase -> Rational
   notANumber :: Rational
   numerator :: forall a. Ratio a -> a
   numericEnumFrom :: forall a. Fractional a => a -> [a]
@@ -9081,8 +9076,6 @@ module GHC.Real where
   numericEnumFromTo :: forall a. (GHC.Classes.Ord a, Fractional a) => a -> a -> [a]
   odd :: forall a. Integral a => a -> GHC.Types.Bool
   overflowError :: forall a. a
-  powImpl :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a
-  powImplAcc :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a -> a
   ratioPrec :: GHC.Types.Int
   ratioPrec1 :: GHC.Types.Int
   ratioZeroDenominatorError :: forall a. a
