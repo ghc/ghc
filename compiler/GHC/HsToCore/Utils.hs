@@ -110,7 +110,7 @@ selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
--- (selectMatchVars ps tys) chooses variables of type tys
+-- | (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
 -- we try to use that, to save inventing lots of fresh variables.
 --
@@ -125,11 +125,19 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --      f (T2 i) (y::a)   = 0
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
-
 selectMatchVars :: HasCallStack => [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
+-- | 'selectMatchVar' chooses a variable to use for matching against the pattern.
+--
+-- In particular, for as-patterns and variable patterns we can re-use the
+-- existing variable, while for other patterns we must invent a fresh variable.
+--
+-- For the following example patterns,
+--  (1) let !(x@(C a b)) = ... -- `x` is chosen
+--  (2) let ~y = ...           -- `y` is chosen
+--  (3) let (a,b) = ...        -- fresh `z` is chosen
 selectMatchVar :: HasCallStack => Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
