@@ -205,6 +205,8 @@ Runtime system
 ``base`` library
 ----------------
 
+Below is a list of major changes in ``base``. See the ``base`` changelog for a full list.
+
 - Exceptions thrown by weak pointer finalizers can now be reported by setting
   a global exception handler, using ``GHC.Weak.Finalize.setFinalizerExceptionHandler``.
   The default behaviour is unchanged (exceptions are ignored and not reported).
