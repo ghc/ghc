@@ -1196,27 +1196,42 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
     hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     imp_occ_env = mkImportOccEnv hsc_env decl_spec all_avails
 
-    -- Look up a RdrName used in an import, failing if it is ambiguous
-    -- (e.g. because it refers to multiple record fields)
-    lookup_name :: IE GhcPs -> RdrName -> IELookupM ImpOccItem
-    lookup_name ie rdr = do
-        xs <- lookup_names ie rdr
-        case xs of
-          [cax] -> return cax
-          _     -> failLookupWith (AmbiguousImport rdr (map imp_item xs))
+    -- Look up a parent (type constructor, class or data constructor)
+    -- in an import.
+    lookup_parent :: IE GhcPs -> RdrName -> IELookupM ImpOccItem
+    lookup_parent ie rdr =
+      assertPpr (not $ isVarNameSpace ns)
+        (vcat [ text "filterImports lookup_parent: unexpected variable"
+              , text "rdr:" <+> ppr rdr
+              , text "namespace:" <+> pprNameSpace ns ]) $
+      do { xs <- lookup_names ie rdr
+         ; case xs of
+            cax :| [] -> return cax
+            _         -> pprPanic "filter_imports lookup_parent ambiguous" $
+                           vcat [ text "rdr:" <+> ppr rdr
+                                , text "lookups:" <+> ppr (fmap imp_item xs) ] }
+              -- Looking up non-variables is always unambiguous,
+              -- as there can be at most one corresponding item
+              -- in the imp_occ_env.
+              -- See item (1) of Note [Exporting duplicate declarations]
+              -- in GHC.Tc.Gen.Export.
+      where
+        occ = rdrNameOcc rdr
+        ns  = occNameSpace occ
 
     -- Look up a RdrName used in an import, returning multiple values if there
     -- are several fields with the same name exposed by the module
-    lookup_names :: IE GhcPs -> RdrName -> IELookupM [ImpOccItem]
+    lookup_names :: IE GhcPs -> RdrName -> IELookupM (NonEmpty ImpOccItem)
     lookup_names ie rdr
        | isQual rdr
        = failLookupWith (QualImportError rdr)
-       | null lookups
-       = failLookupWith (BadImport ie BadImportIsParent)
        | otherwise
-       = return $ concatMap nonDetNameEnvElts lookups
+       = case lookups of
+           []         -> failLookupWith (BadImport ie BadImportIsParent)
+           item:items -> return $ item :| items
       where
-        lookups = lookupOccEnv_WithFields imp_occ_env (rdrNameOcc rdr)
+        lookups = concatMap nonDetNameEnvElts
+                $ lookupOccEnv_WithFields imp_occ_env (rdrNameOcc rdr)
 
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, [GlobalRdrElt])]
     lookup_lie (L loc ieRdr)
@@ -1248,10 +1263,9 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               Succeeded a -> return (Just a)
 
             lookup_err_msg err = case err of
-              BadImport ie sub -> badImportItemErr iface decl_spec ie sub all_avails
-              IllegalImport -> pure ImportLookupIllegal
+              BadImport ie sub    -> badImportItemErr iface decl_spec ie sub all_avails
+              IllegalImport       -> pure ImportLookupIllegal
               QualImportError rdr -> pure (ImportLookupQualified rdr)
-              AmbiguousImport rdr xs -> pure (ImportLookupAmbiguous rdr xs)
 
         -- For each import item, we convert its RdrNames to Names,
         -- and at the same time compute all the GlobalRdrElt corresponding
@@ -1269,12 +1283,12 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
             -- See Note [Importing DuplicateRecordFields]
             xs <- lookup_names ie (ieWrappedName n)
             return ( [ (IEVar noExtField (L l (replaceWrappedName n name)), [gre])
-                     | ImpOccItem { imp_item = gre } <- xs
+                     | ImpOccItem { imp_item = gre } <- NE.toList xs
                      , let name = greName gre ]
                    , [] )
 
         IEThingAll _ (L l tc) -> do
-            ImpOccItem gre child_gres _ <- lookup_name ie $ ieWrappedName tc
+            ImpOccItem gre child_gres _ <- lookup_parent ie $ ieWrappedName tc
             let name = greName gre
                 warns
 
@@ -1299,19 +1313,19 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
             -> let tc = ieWrappedName tc'
-                   tc_name = lookup_name ie tc
-                   dc_name = lookup_name ie (setRdrNameSpace tc srcDataName)
+                   tc_name = lookup_parent ie tc
+                   dc_name = lookup_parent ie (setRdrNameSpace tc srcDataName)
                in
                case catIELookupM [ tc_name, dc_name ] of
                  []    -> failLookupWith (BadImport ie BadImportIsParent)
                  names -> return ([mkIEThingAbs tc' l (imp_item name) | name <- names], [])
             | otherwise
-            -> do ImpOccItem { imp_item = gre } <- lookup_name ie (ieWrappedName tc')
+            -> do ImpOccItem { imp_item = gre } <- lookup_parent ie (ieWrappedName tc')
                   return ([mkIEThingAbs tc' l gre], [])
 
         IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns -> do
            ImpOccItem { imp_item = gre, imp_bundled = subnames }
-               <- lookup_name (IEThingAbs noAnn ltc) (ieWrappedName rdr_tc)
+               <- lookup_parent (IEThingAbs noAnn ltc) (ieWrappedName rdr_tc)
            let name = greName gre
 
            -- Look up the children in the sub-names of the parent
@@ -1358,7 +1372,6 @@ data IELookupError
   = QualImportError RdrName
   | BadImport (IE GhcPs) BadImportIsSubordinate
   | IllegalImport
-  | AmbiguousImport RdrName [GlobalRdrElt] -- e.g. a duplicated field name as a top-level import
 
 failLookupWith :: IELookupError -> IELookupM a
 failLookupWith err = Failed err
