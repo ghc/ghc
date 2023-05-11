@@ -143,7 +143,7 @@ selectMatchVar :: HasCallStack => Mult -> Pat GhcTc -> DsM Id
 selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId (unLoc var))
+selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId ((unLoc var) `setIdBinding` (LambdaBound ManyTy))) -- ROMES:TODO: see comment below about match variables being put in cases
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -151,8 +151,9 @@ selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWit
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
-selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: provenance isn't so trivial in match var?
+selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return ((unLoc var) `setIdBinding` (LambdaBound ManyTy))) -- ROMES:TODO: Are match variables always put in cases? If yes, then this could be a way to guarantee match variables are lambda bound/case bound
+-- selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
+selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: Can match variables end up in lets and cases?, I think yes.
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,7 +301,7 @@ data CaseAlt a = HasCallStack => MkCaseAlt{ alt_pat :: a,
                             alt_result :: MatchResult CoreExpr }
 
 mkCoAlgCaseMatchResult
-  :: Id -- ^ Scrutinee
+  :: HasCallStack => Id -- ^ Scrutinee
   -> Type -- ^ Type of exp
   -> NonEmpty (CaseAlt DataCon) -- ^ Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult CoreExpr
@@ -310,7 +311,7 @@ mkCoAlgCaseMatchResult var ty match_alts
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
-  = mkDataConCase var ty match_alts
+  = pprTrace "mkCoAlgCaseMatchResult" (pprIdWithBinding var) $ mkDataConCase var ty match_alts
   where
     isNewtype = isNewTyCon (dataConTyCon (alt_pat alt1))
 
@@ -348,9 +349,9 @@ mkPatSynCase var ty alt fail = do
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
 
-mkDataConCase :: Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
+mkDataConCase :: HasCallStack => Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
 mkDataConCase var ty alts@(alt1 :| _)
-    = liftA2 mk_case mk_default mk_alts
+    = pprTrace "mkDataConCase" (ppr var <+> ppr (idBinding var)) $ liftA2 mk_case mk_default mk_alts
     -- The liftA2 combines the failability of all the alternatives and the default
   where
     con1          = alt_pat alt1
@@ -365,7 +366,7 @@ mkDataConCase var ty alts@(alt1 :| _)
                                           -- (not that splitTyConApp does, these days)
 
     mk_case :: Maybe CoreAlt -> [CoreAlt] -> CoreExpr
-    mk_case def alts = mkWildCase (Var var) (idScaledType var) ty $
+    mk_case def alts = mkWildCase (Var var) (pprTrace "mk_case:var" (pprIdWithBinding var) $ idScaledType var) ty $
       maybeToList def ++ alts
 
     mk_alts :: MatchResult [CoreAlt]

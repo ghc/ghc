@@ -93,17 +93,36 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 -}
 
+-- | Turn group of equations for a single constructor into a case expression?
+--
+-- Example:
+--
+-- data T = C Int Int | D Bool
+--
+-- ROMES: Doesn't seem quite right, perhaps each group can only have 1 expr it's deconstructing?
+-- let C a b = <expr>
+--     D c   = <expr> -- not sure about this second one, I think it's wrong here, just adding it bc I'm unsure.
+--  in ...
+--
+-- ==>
+--
+-- case <expr> of
+--    C a b -> ...
+--    D c   -> ... -- not sure about this second constructor being correct 
+--
+-- Relevant notes seem to be [Match Ids] and [Localise pattern binders]
 matchConFamily :: HasCallStack => NonEmpty Id
                -> Type
                -> NonEmpty (NonEmpty EquationInfo)
                -> DsM (MatchResult CoreExpr)
 -- Each group of eqns is for a single constructor
 matchConFamily (var :| vars) ty groups
-  = do let mult = idMult var
+  = pprTrace "matchConFamily" (ppr var <+> hsep (map ppr vars) $$ ppr (map idBinding (var:vars)) $$ ppr groups) $
+    do let !mult = idMult var
            -- Each variable in the argument list correspond to one column in the
            -- pattern matching equations. Its multiplicity is the context
            -- multiplicity of the pattern. We extract that multiplicity, so that
-           -- 'matchOneconLike' knows the context multiplicity, in case it needs
+           -- 'matchOneConLike' knows the context multiplicity, in case it needs
            -- to come up with new variables.
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult) groups
        return (mkCoAlgCaseMatchResult var ty alts)
@@ -198,9 +217,16 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
         -- necessarily correct, as it may come from a variable which was
         -- originally let bound and will now be lambda bound.
         -- See comments in dsUnliftedBind too.
-        ; let arg_vars' = map (`setIdBinding` (LambdaBound ManyTy)) arg_vars -- ROMES:TODO: Not ManyTy!! It depends on the constructor!
+        --
+        -- ROMES:TODO:No,! We should only set LambdaBound x if we have a
+        -- LetBound var, otherwise it already has a multiplicity? Or should we
+        -- simply recompute it completely here?
+        --
+        -- What if the only case putting us here really is dsUnliftedBind? Try to make the change there.
+        -- ; let arg_vars' = map (`setIdBinding` (LambdaBound ManyTy)) arg_vars -- ROMES:TODO: Not ManyTy!! It depends on the constructor! Don't always overwrite?
+        -- ...these arg_vars sometimes contain variables that were originally let bound, when do we make the change passing let bound variables to matchEquations? Should we always discern it here?
         ; return $ MkCaseAlt{ alt_pat = con1,
-                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars', -- these arg_vars contain variables that were originally let bound
+                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where

@@ -280,6 +280,7 @@ data Var
 data IdBinding where
   LambdaBound :: !Mult -> IdBinding -- ^ includes lambda-bound and constructor fields---pattern bound
   LetBound    :: HasCallStack => UsageEnv -> IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
+  -- ROMES:TODO: What about type variables? LambdaBound too? Do type variables have a multiplicity?
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
   -- Might no longer make sense to merge with IdScope at all
 

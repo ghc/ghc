@@ -395,7 +395,7 @@ newSysLocalDs = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
 
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
-newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs (LambdaBound w) t) -- Scaled -> LambdaBound
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs (LambdaBound w) t) -- Scaled -> LambdaBound?
 
 {-
 We can also reach out and either set/grab location information from

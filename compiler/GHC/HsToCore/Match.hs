@@ -371,6 +371,7 @@ Among other things in the resulting Pattern:
 The bindings created by the above patterns are put into the returned wrapper
 instead.
 
+-- ROMES:TODO: Do something about this, lambda bound can become let bound for irrefutable patterns
 This means a definition of the form:
   f x = rhs
 when called with v get's desugared to the equivalent of:
@@ -881,8 +882,9 @@ the expression (in this case, it will end up recursively calling 'matchWrapper'
 on the user-written case statement).
 -}
 
+-- No wait, doesn't seem quite right?
 -- | Matching will turn a group of pattern-matching equations and MatchId's
--- into a group of case expressions
+-- into a case expression
 --
 -- For example:
 --
@@ -896,6 +898,8 @@ on the user-written case statement).
 --              (x:xs) -> case ys' of
 --                          [] -> []
 --                          (y:ys) -> f x y : mappairs f xs ys
+--
+-- See also 'match'
 matchEquations  :: HasCallStack => HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
@@ -1026,7 +1030,7 @@ groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInf
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
+  = NEL.groupBy same_gp $ [pprTrace "groupEquations" (ppr (firstPat eqn)) $! (patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool

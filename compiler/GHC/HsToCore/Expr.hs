@@ -217,6 +217,12 @@ dsUnliftedBind p@(PatBind { pat_lhs = pat, pat_rhs = grhss
          -- ROMES:TODO: I will need to make this correct here... this transformation seems suspicious
          -- Matching will turn a group of equations and matching ids into a group of case expressions?
          -- It seems really weird for the eqn to have let bound variables, if they're patterns...?
+         --
+         -- Should match equations ever move a let bound var into a case bound position?
+         -- If not, then it is never its responsibility to update the IdBindings
+         --
+         -- It seems in matchConFamily is where we treat C x# y# = ... ==> case rhs of C x# y# -> ..?
+       ; pprTraceM "dsUnliftedBind:eqn" (ppr var <+> ppr eqn)
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 

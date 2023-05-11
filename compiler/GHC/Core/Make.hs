@@ -182,7 +182,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (LambdaBound w) ty -- ROMES: for now we consider wildcards to be lambdabound
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (LambdaBound w) ty -- ROMES: just tepmorarily now we consider wildcards to be lambdabound
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 

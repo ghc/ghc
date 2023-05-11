@@ -223,6 +223,7 @@ idUsageEnv x = case Var.idBinding x of
 
 -- ROMES: Scaled Types seem to be used mainly in data cons; I think Scaled
 -- things remain as they are, bc they seem to only occur in places where the Id is definitely a lambda bound (or datacon, which would be the same) variable
+-- Truly horrendous that this might fail like this, not how we'll leave it... at least return an optional value
 idScaledType :: HasCallStack => Id -> Scaled Type
 idScaledType id = Scaled (idMult id) (idType id)
 

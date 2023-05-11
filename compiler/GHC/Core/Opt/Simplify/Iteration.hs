@@ -809,14 +809,14 @@ prepareRhs env top_lvl occ rhs0
 
     anfise other = return (emptyLetFloats, other)
 
-makeTrivialArg :: HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats, ArgSpec)
+makeTrivialArg :: HasCallStack => HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats, ArgSpec)
 makeTrivialArg env arg@(ValArg { as_arg = e, as_dmd = dmd })
   = do { (floats, e') <- makeTrivial env NotTopLevel dmd (fsLit "arg") e
        ; return (floats, arg { as_arg = e' }) }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
 
-makeTrivial :: HasDebugCallStack
+makeTrivial :: HasCallStack => HasDebugCallStack
             => SimplEnv -> TopLevelFlag -> Demand
             -> FastString  -- ^ A "friendly name" to build the new binder from
             -> OutExpr
@@ -3676,7 +3676,12 @@ mkDupableContWithDmds env _
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
-       ; mkDupableStrictBind env bndr' join_body res_ty }
+         -- romes: The `x` becomes an arg of the join point, so it should move
+         -- from let bound to lambda bound (with which multiplicity? ROMES:TODO).
+         -- (Note [Duplicating StrictBind] explains the transformation)
+             bndr'' = bndr' `setIdBinding` LambdaBound ManyTy
+
+       ; mkDupableStrictBind env bndr'' join_body res_ty }
 
 mkDupableContWithDmds env _
     (StrictArg { sc_fun = fun, sc_cont = cont
@@ -3792,7 +3797,9 @@ mkDupableContWithDmds env _
                                       -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
 
-mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
+-- ROMES:TODO: What does this function do?
+-- Refer to Note [Dupable StrictBind]? StrictBind con?
+mkDupableStrictBind :: HasCallStack => SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
 mkDupableStrictBind env arg_bndr join_rhs res_ty
   | exprIsTrivial join_rhs   -- See point (2) of Note [Duplicating join points]
