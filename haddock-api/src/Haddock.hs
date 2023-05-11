@@ -85,8 +85,6 @@ import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
 import GHC.Data.FastString
 
-import GHC.Debug.Stub
-
 --------------------------------------------------------------------------------
 -- * Exception handling
 --------------------------------------------------------------------------------
@@ -149,7 +147,7 @@ handleGhcExceptions =
 --
 -- > main = getArgs >>= haddock
 haddock :: [String] -> IO ()
-haddock args = withGhcDebug $ haddockWithGhc withGhc args
+haddock args = haddockWithGhc withGhc args
 
 haddockWithGhc :: (forall a. [Flag] -> Ghc a -> IO a) -> [String] -> IO ()
 haddockWithGhc ghc args = handleTopExceptions $ do
