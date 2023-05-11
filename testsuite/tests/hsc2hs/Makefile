@@ -52,9 +52,9 @@ T11004:
 T12504:
 	'$(HSC2HS)' $(HSC2HS_OPTS) T12504/path/to/$@.hsc
 ifeq "$(WINDOWS)" "YES"
-	grep '{-# LINE 1 \"T12504\\\\path\\\\to\\\\$@\.hsc\" #-}' T12504/path/to/$@.hs
+	grep '{-# LINE 1 "T12504\\\\path\\\\to\\\\$@\.hsc" #-}' T12504/path/to/$@.hs
 else
-	grep '{-# LINE 1 \"T12504/path/to/$@\.hsc\" #-}' T12504/path/to/$@.hs
+	grep '{-# LINE 1 "T12504/path/to/$@\.hsc" #-}' T12504/path/to/$@.hs
 endif
 
 .PHONY: T15758

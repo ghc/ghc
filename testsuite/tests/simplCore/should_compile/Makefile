@@ -254,7 +254,7 @@ str-rules:
 # g should have been collapsed into one defininition by CSE.
 .PHONY: T13340
 T13340:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep -c '\+#'
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep -Ec '\+#'
 
 
 # We expect to see all dictionaries specialized away.
