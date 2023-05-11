@@ -1,4 +1,10 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -41,8 +47,12 @@ import Data.Map (Map)
 import Data.Data (Data)
 import qualified Data.Set as Set
 import Documentation.Haddock.Types
+import qualified GHC.Data.Strict as Strict
 import GHC.Types.Fixity (Fixity(..))
 import GHC.Types.Name (stableNameCmp)
+import GHC.Types.Name.Reader (RdrName(..))
+import GHC.Types.SourceText (SourceText(..))
+import GHC.Types.SrcLoc (BufSpan(..), BufPos(..))
 import GHC.Types.Var (Specificity)
 
 import GHC
@@ -361,6 +371,9 @@ data Documentation name = Documentation
   , documentationWarning :: Maybe (Doc name)
   } deriving Functor
 
+instance NFData name => NFData (Documentation name) where
+  rnf (Documentation d w) = d `deepseq` w `deepseq` ()
+
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (MDoc name)
@@ -409,6 +422,9 @@ data NsRdrName = NsRdrName
   { namespace :: !Namespace
   , rdrName :: !RdrName
   }
+
+instance NFData NsRdrName where
+  rnf (NsRdrName ns rdrN) = ns `seq` rdrN `deepseq` ()
 
 -- | Extends 'Name' with cross-reference information.
 data DocName
@@ -1003,3 +1019,124 @@ type instance XCInjectivityAnn DocNameI = NoExtField
 type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
+
+-----------------------------------------------------------------------------
+-- * NFData instances for GHC types
+-----------------------------------------------------------------------------
+
+instance NFData RdrName where
+  rnf (Unqual on) = rnf on
+  rnf (Qual mn on) = mn `deepseq` on `deepseq` ()
+  rnf (Orig m on) = m `deepseq` on `deepseq` ()
+  rnf (Exact n) = rnf n
+
+instance NFData SourceText where
+  rnf NoSourceText   = ()
+  rnf (SourceText s) = rnf s
+
+instance NFData FixityDirection where
+  rnf InfixL = ()
+  rnf InfixR = ()
+  rnf InfixN = ()
+
+instance NFData Fixity where
+  rnf (Fixity sourceText n dir) =
+    sourceText `deepseq` n `deepseq` dir `deepseq` ()
+
+instance NFData ann => NFData (SrcSpanAnn' ann) where
+  rnf (SrcSpanAnn a ss) = a `deepseq` ss `deepseq` ()
+
+instance NFData (EpAnn NameAnn) where
+  rnf EpAnnNotUsed = ()
+  rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()
+
+instance NFData NameAnn where
+  rnf (NameAnn a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnCommas a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnBars a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnOnly a b c d) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` ()
+  rnf (NameAnnRArrow a b) =
+              a
+    `deepseq` b
+    `deepseq` ()
+  rnf (NameAnnQuote a b c) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` ()
+  rnf (NameAnnTrailing a) = rnf a
+
+instance NFData TrailingAnn where
+  rnf (AddSemiAnn epaL)  = rnf epaL
+  rnf (AddCommaAnn epaL) = rnf epaL
+  rnf (AddVbarAnn epaL)  = rnf epaL
+
+instance NFData NameAdornment where
+  rnf NameParens     = ()
+  rnf NameParensHash = ()
+  rnf NameBackquotes = ()
+  rnf NameSquare     = ()
+
+instance NFData EpaLocation where
+  rnf (EpaSpan ss bs)  = ss `seq` bs `deepseq` ()
+  rnf (EpaDelta dp lc) = dp `seq` lc `deepseq` ()
+
+instance NFData EpAnnComments where
+  rnf (EpaComments cs) = rnf cs
+  rnf (EpaCommentsBalanced cs1 cs2) = cs1 `deepseq` cs2 `deepseq` ()
+
+instance NFData EpaComment where
+  rnf (EpaComment t rss) = t `deepseq` rss `seq` ()
+
+instance NFData EpaCommentTok where
+  rnf (EpaDocComment ds)  = rnf ds
+  rnf (EpaDocOptions s)   = rnf s
+  rnf (EpaLineComment s)  = rnf s
+  rnf (EpaBlockComment s) = rnf s
+  rnf EpaEofComment       = ()
+
+
+instance NFData a => NFData (Strict.Maybe a) where
+  rnf Strict.Nothing  = ()
+  rnf (Strict.Just x) = rnf x
+
+instance NFData BufSpan where
+  rnf (BufSpan p1 p2) = p1 `deepseq` p2 `deepseq` ()
+
+instance NFData BufPos where
+  rnf (BufPos n) = rnf n
+
+instance NFData Anchor where
+  rnf (Anchor ss op) = ss `seq` op `deepseq` ()
+
+instance NFData AnchorOperation where
+  rnf UnchangedAnchor  = ()
+  rnf (MovedAnchor dp) = rnf dp
+
+instance NFData DeltaPos where
+  rnf (SameLine n)        = rnf n
+  rnf (DifferentLine n m) = n `deepseq` m `deepseq` ()
+

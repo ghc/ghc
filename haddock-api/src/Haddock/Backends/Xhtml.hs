@@ -15,6 +15,7 @@
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE BangPatterns     #-}
 
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
@@ -45,18 +46,19 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import qualified Data.ByteString.Builder as Builder
+import Control.DeepSeq       (force)
 import Data.Bifunctor        ( bimap )
 import Data.Char             ( toUpper, isSpace )
 import Data.Either           ( partitionEithers )
-import Data.Foldable         ( traverse_)
+import Data.Foldable         ( traverse_, foldl')
 import Data.List             ( sortBy, isPrefixOf, intersperse )
 import Data.Maybe
 import System.Directory
 import System.FilePath hiding ( (</>) )
 import qualified System.IO as IO
 import qualified System.FilePath as FilePath
-import Data.Map              ( Map )
-import qualified Data.Map as Map hiding ( Map )
+import Data.Map.Strict       (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set hiding ( Set )
 import Data.Ord              ( comparing )
 
@@ -625,14 +627,34 @@ ppHtmlIndex odir doctitle _maybe_package themes
     -- that export that entity.  Each of the modules exports the entity
     -- in a visible or invisible way (hence the Bool).
     full_index :: Map String (Map GHC.Name [(Module,Bool)])
-    full_index = Map.fromListWith (flip (Map.unionWith (++)))
-                 (concatMap getIfaceIndex ifaces)
-
-    getIfaceIndex iface =
-      [ (getOccString name
-         , Map.fromList [(name, [(mdl, name `Set.member` visible)])])
-         | name <- instExports iface ]
+    full_index = foldl' f Map.empty ifaces
       where
+        f :: Map String (Map Name [(Module, Bool)])
+          -> InstalledInterface
+          -> Map String (Map Name [(Module, Bool)])
+        f !idx iface =
+          Map.unionWith
+            (Map.unionWith (\a b -> let !x = force $ a ++ b in x))
+            idx
+            (getIfaceIndex iface)
+
+
+    getIfaceIndex :: InstalledInterface -> Map String (Map Name [(Module, Bool)])
+    getIfaceIndex iface =
+        foldl' f Map.empty (instExports iface)
+      where
+        f :: Map String (Map Name [(Module, Bool)])
+          -> Name
+          -> Map String (Map Name [(Module, Bool)])
+        f !idx name =
+          let !vis =  name `Set.member` visible
+          in
+            Map.insertWith
+              (Map.unionWith (++))
+              (getOccString name)
+              (Map.singleton name [(mdl, vis)])
+              idx
+
         mdl = instMod iface
         visible = Set.fromList (instVisibleExports iface)
 

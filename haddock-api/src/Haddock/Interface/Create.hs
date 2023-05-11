@@ -205,7 +205,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     liftIO $ extractTHDocs <$> readIORef tcg_th_docs
 
   -- Process the top-level module header documentation.
-  (!info, header_doc) <- processModuleHeader dflags pkg_name
+  (!info, !header_doc) <- force <$> processModuleHeader dflags pkg_name
     tcg_rdr_env safety (fmap hsDocString thMbDocStr <|> (hsDocString . unLoc <$> tcg_doc_hdr))
 
   -- Warnings on declarations in this module
@@ -564,7 +564,7 @@ mkMaps dflags pkgName gre instances decls thDocs = do
             m'   <- traverse (processDocStringParas dflags pkgName gre) m
             pure (doc', m')
 
-      (doc, args) <- declDoc docStrs (fmap hsDocString (declTypeDocs decl))
+      (!doc, !args) <- force <$> declDoc docStrs (fmap hsDocString (declTypeDocs decl))
 
       let
           subs :: [(Name, [HsDocString], IntMap HsDocString)]
@@ -676,18 +676,18 @@ mkExportItems
     Just exports -> fmap concat $ mapM lookupExport exports
   where
     lookupExport (IEGroup _ lev docStr, _) = do
-      doc <- processDocString dflags gre (hsDocString . unLoc $ docStr)
+      !doc <- force <$> processDocString dflags gre (hsDocString . unLoc $ docStr)
       return [ExportGroup lev "" doc]
 
     lookupExport (IEDoc _ docStr, _) = do
-      doc <- processDocStringParas dflags pkgName gre (hsDocString . unLoc $ docStr)
+      !doc <- force <$> processDocStringParas dflags pkgName gre (hsDocString . unLoc $ docStr)
       return [ExportDoc doc]
 
     lookupExport (IEDocNamed _ str, _) =
       findNamedDoc str [ unL d | d <- decls ] >>= \case
         Nothing -> return  []
         Just docStr -> do
-          doc <- processDocStringParas dflags pkgName gre docStr
+          !doc <- force <$> processDocStringParas dflags pkgName gre docStr
           return [ExportDoc doc]
 
     lookupExport (IEModuleContents _ (L _ mod_name), _)
@@ -827,21 +827,24 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
           bundledPatSyns <- findBundledPatterns avail
 
           let
-            patSynNames =
+            !patSynNames = force $
               concatMap (getMainDeclBinder emptyOccEnv . fst) bundledPatSyns
 
-            fixities =
+            !fixities = force
                 [ (n, f)
                 | n <- availName avail : fmap fst subs ++ patSynNames
                 , Just f <- [M.lookup n fixMap]
                 ]
 
+            !doc'  = force doc
+            !subs' = force subs
+
           return
             [ ExportDecl ExportD
                 { expDDecl      = restrictTo (fmap fst subs) extractedDecl
                 , expDPats      = bundledPatSyns
-                , expDMbDoc     = doc
-                , expDSubDocs   = subs
+                , expDMbDoc     = doc'
+                , expDSubDocs   = subs'
                 , expDInstances = []
                 , expDFixities  = fixities
                 , expDSpliced   = False
@@ -851,14 +854,18 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
       | otherwise = for subs $ \(sub, sub_doc) -> do
           extractedDecl <- availDecl sub decl
 
+          let
+            !fixities = force [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
+            !subDoc   = force sub_doc
+
           return $
             ExportDecl ExportD
               { expDDecl      = extractedDecl
               , expDPats      = []
-              , expDMbDoc     = sub_doc
+              , expDMbDoc     = subDoc
               , expDSubDocs   = []
               , expDInstances = []
-              , expDFixities  = [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
+              , expDFixities  = fixities
               , expDSpliced   = False
               }
 
@@ -1052,10 +1059,10 @@ fullModuleContents is_sig modMap pkgName thisMod semMod warnings gre exportedNam
   (concat . concat) `fmap` (for decls $ \decl -> do
     case decl of
       (L _ (DocD _ (DocGroup lev docStr))) -> do
-        doc <- processDocString dflags gre (hsDocString . unLoc $ docStr)
+        !doc <- force <$> processDocString dflags gre (hsDocString . unLoc $ docStr)
         return [[ExportGroup lev "" doc]]
       (L _ (DocD _ (DocCommentNamed _ docStr))) -> do
-        doc <- processDocStringParas dflags pkgName gre (hsDocString . unLoc $ docStr)
+        !doc <- force <$> processDocStringParas dflags pkgName gre (hsDocString . unLoc $ docStr)
         return [[ExportDoc doc]]
       (L _ (ValD _ valDecl))
         | name:_ <- collectHsBindBinders CollNoDictBinders valDecl

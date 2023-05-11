@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
@@ -22,11 +23,12 @@ import Haddock.Types
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
+import Control.DeepSeq (force)
 import Data.Foldable (foldl')
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import GHC.Data.FastString (unpackFS)
@@ -110,7 +112,7 @@ attachToExportItem index expInfo getInstDoc getFixity export =
             fam_insts = [ ( synFamInst
                           , getInstDoc n
                           , spanNameE n synFamInst (L (locA eSpan) (tcdName d))
-                          , nameModule_maybe n
+                          , mb_mdl
                           )
                         | i <- sortBy (comparing instFam) fam_instances
                         , let n = getName i
@@ -118,11 +120,12 @@ attachToExportItem index expInfo getInstDoc getFixity export =
                         , not $ any (isTypeHidden expInfo) (fi_tys i)
                         , let opaque = isTypeHidden expInfo (fi_rhs i)
                         , let synFamInst = synifyFamInst i opaque
+                        , let !mb_mdl = force $ nameModule_maybe n
                         ]
             cls_insts = [ ( synClsInst
                           , getInstDoc n
                           , spanName n synClsInst (L (locA eSpan) (tcdName d))
-                          , nameModule_maybe n
+                          , mb_mdl
                           )
                         | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                         , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
@@ -131,6 +134,7 @@ attachToExportItem index expInfo getInstDoc getFixity export =
                                   (getName cls)
                                   (foldl' (\acc t -> acc `Set.union` typeNames t) Set.empty tys)
                         , let synClsInst = synifyInstHead i
+                        , let !mb_mdl = force $ nameModule_maybe n
                         ]
               -- fam_insts but with failing type fams filtered out
             cleanFamInsts = [ (fi, n, L l r, m) | (Right fi, n, L l (Right r), m) <- fam_insts ]
@@ -152,18 +156,26 @@ attachToExportItem index expInfo getInstDoc getFixity export =
           )
         )
       = ExportDecl e
-          { expDFixities =
-              nubByName fst $ expDFixities e ++
-              [ (n',f)
-              | n <- getMainDeclBinder emptyOccEnv d
-              , n' <- n : (map fst subDocs ++ patsyn_names)
-              , f <- maybeToList (getFixity n')
-              ]
+          { expDFixities = fixities
           }
       where
+        fixities :: [(Name, Fixity)]
+        !fixities = force . Map.toList $ foldl' f Map.empty all_names
+
+        f :: Map.Map Name Fixity -> Name -> Map.Map Name Fixity
+        f !fs n = Map.alter (<|> getFixity n) n fs
+
+        patsyn_names :: [Name]
         patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
 
+        all_names :: [Name]
+        all_names =
+             getMainDeclBinder emptyOccEnv d
+          ++ map fst subDocs
+          ++ patsyn_names
+
     attachFixities e = e
+
     -- spanName: attach the location to the name that is the same file as the instance location
     spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
         let s1 = getSrcSpan s

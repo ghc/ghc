@@ -436,7 +436,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
       _ -> warn' ("Cannot parse reexported module flag '" ++ mod_str ++ "'") >> return [])
 
   libDir   <- getHaddockLibDir flags
-  prologue <- getPrologue dflags' flags
+  !prologue <- force <$> getPrologue dflags' flags
   themes   <- getThemes libDir flags >>= either bye return
 
   let withQuickjump = Flag_QuickJumpIndex `elem` flags

@@ -23,6 +23,7 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
+import Control.DeepSeq (force)
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), DefMethSpec(..), TopLevelFlag(..) )
 import GHC.Types.SourceText (SourceText(..))
@@ -455,8 +456,9 @@ synifyIdSig
   -> [TyVar]          -- ^ free variables in the type to convert
   -> Id               -- ^ the 'Id' from which to get the type signature
   -> Sig GhcRn
-synifyIdSig prr s vs i = TypeSig noAnn [synifyNameN i] (synifySigWcType s vs t)
+synifyIdSig prr s vs i = TypeSig noAnn [n] (synifySigWcType s vs t)
   where
+    !n = force $ synifyNameN i
     t = defaultType prr (varType i)
 
 -- | Turn a 'ClassOpItem' into a list of signatures. The list returned is going

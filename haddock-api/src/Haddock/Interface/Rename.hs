@@ -31,6 +31,7 @@ import GHC.Types.Name.Reader (RdrName(Exact))
 import GHC.Builtin.Types (eqTyCon_RDR)
 
 import Control.Applicative
+import Control.DeepSeq (force)
 import Control.Monad hiding (mapM)
 import Control.Monad.Reader
 import Control.Monad.Writer.CPS
@@ -246,7 +247,7 @@ renameExportItem item = case item of
   ExportDecl ed@(ExportD decl pats doc subs instances fixities splice) -> do
     -- If Hoogle output should be generated, generate it
     RnMEnv{..} <- ask
-    let hoogleOut =
+    let !hoogleOut = force $
           if rnHoogleOutput then
             ppExportD rnDynFlags ed
           else
