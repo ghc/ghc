@@ -1505,7 +1505,7 @@ piResultTys ty orig_args@(arg:args)
         -- c.f. #15473
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
-applyTysX :: [TyVar] -> Type -> [Type] -> Type
+applyTysX :: HasDebugCallStack => [TyVar] -> Type -> [Type] -> Type
 -- applyTysX beta-reduces (/\tvs. body_ty) arg_tys
 -- Assumes that (/\tvs. body_ty) is closed
 applyTysX tvs body_ty arg_tys
