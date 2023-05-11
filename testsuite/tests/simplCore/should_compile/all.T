@@ -471,4 +471,4 @@ test('T23307', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress
 test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppress-uniques'])
 test('T23307b', normal, compile, ['-O'])
 test('T23307c', normal, compile, ['-O'])
-
+test('T23362', normal, compile, ['-O'])

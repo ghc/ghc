@@ -1355,7 +1355,7 @@ mkProofIrrelCo r kco        g1 g2 = mkUnivCo (ProofIrrelProv kco) r
 -- | Converts a coercion to be nominal, if possible.
 -- See Note [Role twiddling functions]
 setNominalRole_maybe :: Role -- of input coercion
-                     -> Coercion -> Maybe Coercion
+                     -> Coercion -> Maybe CoercionN
 setNominalRole_maybe r co
   | r == Nominal = Just co
   | otherwise = setNominalRole_maybe_helper co
@@ -1380,10 +1380,19 @@ setNominalRole_maybe r co
       = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper (ForAllCo tv kind_co co)
       = ForAllCo tv kind_co <$> setNominalRole_maybe_helper co
-    setNominalRole_maybe_helper (SelCo n co)
+    setNominalRole_maybe_helper (SelCo cs co) =
       -- NB, this case recurses via setNominalRole_maybe, not
       -- setNominalRole_maybe_helper!
-      = SelCo n <$> setNominalRole_maybe (coercionRole co) co
+      case cs of
+        SelTyCon n _r ->
+          -- Remember to update the role in SelTyCon to nominal;
+          -- not doing this caused #23362.
+          -- See the typing rule in Note [SelCo] in GHC.Core.TyCo.Rep.
+          SelCo (SelTyCon n Nominal) <$> setNominalRole_maybe (coercionRole co) co
+        SelFun fs ->
+          SelCo (SelFun fs) <$> setNominalRole_maybe (coercionRole co) co
+        SelForAll ->
+          pprPanic "setNominalRole_maybe: the coercion should already be nominal" (ppr co)
     setNominalRole_maybe_helper (InstCo co arg)
       = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
