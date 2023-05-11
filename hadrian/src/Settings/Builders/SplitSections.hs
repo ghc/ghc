@@ -30,7 +30,7 @@ splitSectionsArgs = do
     ( mconcat
         [ builder (Ghc CompileHs) ? arg "-fsplit-sections"
         , builder MergeObjects ? ifM (expr isWinTarget)
-            (pure ["-t", "driver/utils/merge_sections_pe.ld"])
-            (pure ["-t", "driver/utils/merge_sections.ld"])
+            (pure ["-T", "driver/utils/merge_sections_pe.ld"])
+            (pure ["-T", "driver/utils/merge_sections.ld"])
         ]
     ) else mempty
