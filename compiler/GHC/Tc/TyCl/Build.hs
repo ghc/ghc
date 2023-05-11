@@ -18,7 +18,7 @@ module GHC.Tc.TyCl.Build (
 import GHC.Prelude
 
 import GHC.Iface.Env
-import GHC.Builtin.Types( isCTupleTyConName, unboxedUnitTy )
+import GHC.Builtin.Types
 
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
@@ -65,11 +65,12 @@ mkNewTyConRhs tycon_name tycon con
     tvs      = tyConTyVars tycon
     roles    = tyConRoles tycon
     res_kind = tyConResKind tycon
-    con_arg_ty = case dataConRepArgTys con of
-                   [arg_ty] -> scaledThing arg_ty
-                   tys -> pprPanic "mkNewTyConRhs" (ppr con <+> ppr tys)
-    rhs_ty = substTyWith (dataConUnivTyVars con)
-                         (mkTyVarTys tvs) con_arg_ty
+    rhs_ty
+      -- Only try if the newtype is actually valid (see "otherwise" below).
+      | [Scaled _ arg_ty] <- dataConRepArgTys con
+      , null $ dataConExTyCoVars con
+      = substTyWith (dataConUnivTyVars con)
+                         (mkTyVarTys tvs) arg_ty
         -- Instantiate the newtype's RHS with the
         -- type variables from the tycon
         -- NB: a newtype DataCon has a type that must look like
@@ -78,6 +79,13 @@ mkNewTyConRhs tycon_name tycon con
         -- the newtype arising from   class Foo a => Bar a where {}
         -- has a single argument (Foo a) that is a *type class*, so
         -- dataConInstOrigArgTys returns [].
+      | otherwise
+      -- If the newtype is invalid (e.g. doesn't have a single argument),
+      -- we fake up a type here. The newtype will get rejected once we're
+      -- outside the knot-tied loop, in GHC.Tc.TyCl.checkNewDataCon.
+      -- See the various test cases in T23308.
+      = unitTy -- Might be ill-kinded, but checkNewDataCon should reject this
+               -- whole declaration soon enough, before that causes any problems.
 
     -- Eta-reduce the newtype
     -- See Note [Newtype eta] in GHC.Core.TyCon

@@ -4542,30 +4542,39 @@ checkNewDataCon :: DataCon -> TcM ()
 -- But they are caught earlier, by GHC.Tc.Gen.HsType.checkDataKindSig
 checkNewDataCon con
   = do  { show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
+        ; checkNoErrs $
+          -- Fail here if the newtype is invalid: subsequent code in
+          -- checkValidDataCon can fall over if it comes across an invalid newtype.
+     do { case arg_tys of
+            [Scaled arg_mult _] ->
+              unless (ok_mult arg_mult) $
+              addErrTc $
+              TcRnIllegalNewtype con show_linear_types IsNonLinear
+            _ ->
+              addErrTc $
+              TcRnIllegalNewtype con show_linear_types (DoesNotHaveSingleField $ length arg_tys)
 
-        ; checkTc (isSingleton arg_tys) $
-          TcRnIllegalNewtype con show_linear_types (DoesNotHaveSingleField $ length arg_tys)
+          -- Add an error if the newtype is a GADt or has existentials.
+          --
+          -- If the newtype is a GADT, the GADT error is enough;
+          -- we don't need to *also* complain about existentials.
+        ; if not (null eq_spec)
+          then addErrTc $ TcRnIllegalNewtype con show_linear_types IsGADT
+          else unless (null ex_tvs) $
+               addErrTc $
+               TcRnIllegalNewtype con show_linear_types HasExistentialTyVar
 
-        ; checkTc (ok_mult (scaledMult arg_ty1)) $
-          TcRnIllegalNewtype con show_linear_types IsNonLinear
-
-        ; checkTc (null eq_spec) $
-          TcRnIllegalNewtype con show_linear_types IsGADT
-
-        ; checkTc (null theta) $
+        ; unless (null theta) $
+          addErrTc $
           TcRnIllegalNewtype con show_linear_types HasConstructorContext
 
-        ; checkTc (null ex_tvs) $
-          TcRnIllegalNewtype con show_linear_types HasExistentialTyVar
-
-        ; checkTc (all ok_bang (dataConSrcBangs con)) $
-          TcRnIllegalNewtype con show_linear_types HasStrictnessAnnotation
-    }
+        ; unless (all ok_bang (dataConSrcBangs con)) $
+          addErrTc $
+          TcRnIllegalNewtype con show_linear_types HasStrictnessAnnotation } }
   where
+
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
       = dataConFullSig con
-
-    (arg_ty1 : _) = arg_tys
 
     ok_bang (HsSrcBang _ _ SrcStrict) = False
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
