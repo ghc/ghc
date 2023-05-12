@@ -123,10 +123,6 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("PUSH_G   " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n" );
          pc += 1; break;
-      case bci_PUSH_ALTS:
-         debugBelch("PUSH_ALTS  " ); printPtr( ptrs[instrs[pc]] );
-         debugBelch("\n");
-         pc += 1; break;
       case bci_PUSH_ALTS_P:
          debugBelch("PUSH_ALTS_P  " ); printPtr( ptrs[instrs[pc]] );
          debugBelch("\n");
@@ -408,9 +404,6 @@ disInstr ( StgBCO *bco, int pc )
          debugBelch("ENTER\n");
          break;
 
-      case bci_RETURN:
-         debugBelch("RETURN\n" );
-         break;
       case bci_RETURN_P:
          debugBelch("RETURN_P\n" );
          break;

@@ -34,7 +34,6 @@
 #define bci_PUSH16_W                    9
 #define bci_PUSH32_W                    10
 #define bci_PUSH_G                      11
-#define bci_PUSH_ALTS                   12
 #define bci_PUSH_ALTS_P                 13
 #define bci_PUSH_ALTS_N                 14
 #define bci_PUSH_ALTS_F                 15
@@ -81,7 +80,6 @@
 #define bci_CCALL                       56
 #define bci_SWIZZLE                     57
 #define bci_ENTER                       58
-#define bci_RETURN                      59
 #define bci_RETURN_P                    60
 #define bci_RETURN_N                    61
 #define bci_RETURN_F                    62
