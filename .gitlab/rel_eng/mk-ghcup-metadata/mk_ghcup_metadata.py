@@ -276,6 +276,8 @@ def main() -> None:
     else:
         with open(args.metadata, 'r') as file:
             ghcup_metadata = yaml.safe_load(file)
+            if  args.version in ghcup_metadata['ghcupDownloads']['GHC']:
+                raise RuntimeError("Refusing to override existing version in metadata")
             ghcup_metadata['ghcupDownloads']['GHC'][args.version] = new_yaml
             print(yaml.dump(ghcup_metadata))
 
