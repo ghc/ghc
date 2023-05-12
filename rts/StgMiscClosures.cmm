@@ -126,18 +126,6 @@ INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
 {
     Sp_adj(-2);
     Sp(1) = R1;
-    Sp(0) = stg_enter_info;
-    jump stg_yield_to_interpreter [];
-}
-
-/*
- * When the returned value is a pointer, but unlifted, in R1 ...
- */
-INFO_TABLE_RET( stg_ctoi_R1unpt, RET_BCO )
-    /* explicit stack */
-{
-    Sp_adj(-2);
-    Sp(1) = R1;
     Sp(0) = stg_ret_p_info;
     jump stg_yield_to_interpreter [];
 }

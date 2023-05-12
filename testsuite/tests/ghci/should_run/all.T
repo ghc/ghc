@@ -85,3 +85,5 @@ test('T21052', just_ghci, ghci_script, ['T21052.script'])
 test('T21300', just_ghci, ghci_script, ['T21300.script'])
 test('UnliftedDataType2', just_ghci, compile_and_run, [''])
 
+test('T22958a', just_ghci, compile_and_run, [''])
+test('T22958b', just_ghci, compile_and_run, [''])

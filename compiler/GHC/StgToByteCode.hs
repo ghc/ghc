@@ -319,7 +319,7 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, RETURN])
+    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, RETURN P])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -480,9 +480,9 @@ returnUnliftedReps d s szb reps = do
         non_void VoidRep = False
         non_void _ = True
     ret <- case filter non_void reps of
-             -- use RETURN_UBX for unary representations
-             []    -> return (unitOL $ RETURN_UNLIFTED V)
-             [rep] -> return (unitOL $ RETURN_UNLIFTED (toArgRep platform rep))
+             -- use RETURN for nullary/unary representations
+             []    -> return (unitOL $ RETURN V)
+             [rep] -> return (unitOL $ RETURN (toArgRep platform rep))
              -- otherwise use RETURN_TUPLE with a tuple descriptor
              nv_reps -> do
                let (call_info, args_offsets) = layoutNativeCall profile NativeTupleReturn 0 (primRepCmmType platform) nv_reps
@@ -526,7 +526,7 @@ schemeE
     :: StackDepth -> Sequel -> BCEnv -> CgStgExpr -> BcM BCInstrList
 schemeE d s p (StgLit lit) = returnUnliftedAtom d s p (StgLitArg lit)
 schemeE d s p (StgApp x [])
-   | not (usePlainReturn (idType x)) = returnUnliftedAtom d s p (StgVarArg x)
+   | isUnliftedType (idType x) = returnUnliftedAtom d s p (StgVarArg x)
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(StgApp {}) = schemeT d s p e
 schemeE d s p e@(StgConApp {}) = schemeT d s p e
@@ -681,8 +681,8 @@ schemeT d s p (StgOpApp (StgPrimOp op) args _ty)
 schemeT d s p (StgOpApp (StgPrimCallOp (PrimCall label unit)) args result_ty)
    = generatePrimCall d s p label (Just unit) result_ty args
 
-   -- Case 2: Unboxed tuple
 schemeT d s p (StgConApp con _cn args _tys)
+   -- Case 2: Unboxed tuple
    | isUnboxedTupleDataCon con || isUnboxedSumDataCon con
    = returnUnboxedTuple d s p args
 
@@ -691,7 +691,7 @@ schemeT d s p (StgConApp con _cn args _tys)
    = do alloc_con <- mkConAppCode d s p con args
         platform <- profilePlatform <$> getProfile
         return (alloc_con         `appOL`
-                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL` RETURN)
+                mkSlideW 1 (bytesToWords platform $ d - s) `snocOL` RETURN P)
 
    -- Case 4: Tail call of function
 schemeT d s p (StgApp fn args)
@@ -831,13 +831,10 @@ doCase d s p scrut bndr alts
         -- have the same runtime rep. We have more efficient specialized
         -- return frames for the situations with one non-void element.
 
+        non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
         ubx_tuple_frame =
           (isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty) &&
           length non_void_arg_reps > 1
-
-        ubx_frame = not ubx_tuple_frame && not (usePlainReturn bndr_ty)
-
-        non_void_arg_reps = non_void (typeArgReps platform bndr_ty)
 
         profiling
           | Just interp <- hsc_interp hsc_env
@@ -847,7 +844,8 @@ doCase d s p scrut bndr alts
         -- Top of stack is the return itbl, as usual.
         -- underneath it is the pointer to the alt_code BCO.
         -- When an alt is entered, it assumes the returned value is
-        -- on top of the itbl.
+        -- on top of the itbl; see Note [Return convention for non-tuple values]
+        -- for details.
         ret_frame_size_b :: StackDepth
         ret_frame_size_b | ubx_tuple_frame =
                              (if profiling then 5 else 4) * wordSize platform
@@ -861,7 +859,6 @@ doCase d s p scrut bndr alts
         -- The size of the return frame info table pointer if one exists
         unlifted_itbl_size_b :: StackDepth
         unlifted_itbl_size_b | ubx_tuple_frame = wordSize platform
-                             | ubx_frame       = wordSize platform
                              | otherwise       = 0
 
         (bndr_size, call_info, args_offsets)
@@ -1052,17 +1049,11 @@ doCase d s p scrut bndr alts
        then do tuple_bco <- emitBc (tupleBCO platform call_info args_offsets)
                return (PUSH_ALTS_TUPLE alt_bco' call_info tuple_bco
                        `consOL` scrut_code)
-       else let push_alts
-                  | not ubx_frame
-                  = PUSH_ALTS alt_bco'
-                  | otherwise
-                  = let unlifted_rep =
-                          case non_void_arg_reps of
-                            []    -> V
-                            [rep] -> rep
-                            _     -> panic "schemeE(StgCase).push_alts"
-                    in PUSH_ALTS_UNLIFTED alt_bco' unlifted_rep
-            in return (push_alts `consOL` scrut_code)
+       else let scrut_rep = case non_void_arg_reps of
+                  []    -> V
+                  [rep] -> rep
+                  _     -> panic "schemeE(StgCase).push_alts"
+            in return (PUSH_ALTS alt_bco' scrut_rep `consOL` scrut_code)
 
 
 -- -----------------------------------------------------------------------------
@@ -1133,21 +1124,38 @@ layoutNativeCall profile call_type start_off arg_ty reps =
                   (orig_stk_params ++ map get_byte_off new_stk_params)
      )
 
-{-
-  We use the plain return convention (ENTER/PUSH_ALTS) for
-  lifted types and unlifted algebraic types.
+{- Note [Return convention for non-tuple values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The RETURN and ENTER instructions are used to return values. RETURN directly
+returns the value at the top of the stack while ENTER evaluates it first (so
+RETURN is only used when the result is already known to be evaluated), but the
+end result is the same: control returns to the enclosing stack frame with the
+result at the top of the stack.
 
-  Other types use PUSH_ALTS_UNLIFTED/PUSH_ALTS_TUPLE which expect
-  additional data on the stack.
- -}
-usePlainReturn :: Type -> Bool
-usePlainReturn t
-  | isUnboxedTupleType t || isUnboxedSumType t = False
-  | otherwise = typePrimRep t == [LiftedRep] ||
-                (typePrimRep t == [UnliftedRep] && isAlgType t)
+The PUSH_ALTS instruction pushes a two-word stack frame that receives a single
+lifted value. Its payload is a BCO that is executed when control returns, with
+the stack set up as if a RETURN instruction had just been executed: the returned
+value is at the top of the stack, and beneath it is the two-word frame being
+returned to. It is the continuation BCO’s job to pop its own frame off the
+stack, so the simplest possible continuation consists of two instructions:
 
-{- Note [unboxed tuple bytecodes and tuple_BCO]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SLIDE 1 2   -- pop the return frame off the stack, keeping the returned value
+    RETURN P    -- return the returned value to our caller
+
+RETURN and PUSH_ALTS are not really instructions but are in fact representation-
+polymorphic *families* of instructions indexed by ArgRep. ENTER, however, is a
+single real instruction, since it is only used to return lifted values, which
+are always pointers.
+
+The RETURN, ENTER, and PUSH_ALTS instructions are only used when the returned
+value has nullary or unary representation. Returning/receiving an unboxed
+tuple (or, indirectly, an unboxed sum, since unboxed sums have been desugared to
+unboxed tuples by Unarise) containing two or more results uses the special
+RETURN_TUPLE/PUSH_ALTS_TUPLE instructions, which use a different return
+convention. See Note [unboxed tuple bytecodes and tuple_BCO] for details.
+
+Note [unboxed tuple bytecodes and tuple_BCO]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   We have the bytecode instructions RETURN_TUPLE and PUSH_ALTS_TUPLE to
   return and receive arbitrary unboxed tuples, respectively. These
   instructions use the helper data tuple_BCO and call_info.
@@ -1583,7 +1591,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)
          wrapup       = mkSlideW (trunc16W r_sizeW) (d_after_r_min_s - r_sizeW)
-                        `snocOL` RETURN_UNLIFTED (toArgRep platform r_rep)
+                        `snocOL` RETURN (toArgRep platform r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
      return (
          push_args `appOL`
@@ -1697,7 +1705,6 @@ as a consequence.  The [Name] is a list of the constructors of this
 
 The code we generate is this:
                 push arg
-                push bogus-word
 
                 TESTEQ_I 0 L1
                   PUSH_G <lbl for first data con>
@@ -1715,13 +1722,6 @@ The code we generate is this:
 
         L_exit: SLIDE 1 n
                 ENTER
-
-The 'bogus-word' push is because TESTEQ_I expects the top of the stack
-to have an info-table, and the next word to have the value to be
-tested.  This is very weird, but it's the way it is right now.  See
-Interpreter.c.  We don't actually need an info-table here; we just
-need to have the argument to be one-from-top on the stack, hence pushing
-a 1-word null. See #8383.
 -}
 
 
@@ -1747,14 +1747,10 @@ implement_tagToId d s p arg names
            slide_ws = bytesToWords platform (d - s + arg_bytes)
 
        return (push_arg
-               `appOL` unitOL (PUSH_UBX LitNullAddr 1)
-                   -- Push bogus word (see Note [Implementing tagToEnum#])
                `appOL` concatOL steps
                `appOL` toOL [ LABEL label_fail, CASEFAIL,
                               LABEL label_exit ]
-               `appOL` mkSlideW 1 (slide_ws + 1)
-                   -- "+1" to account for bogus word
-                   --      (see Note [Implementing tagToEnum#])
+               `appOL` mkSlideW 1 slide_ws
                `appOL` unitOL ENTER)
   where
         mkStep l_exit (my_label, next_label, n, name_for_n)

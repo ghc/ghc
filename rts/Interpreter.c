@@ -283,6 +283,14 @@ StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
 
 #endif
 
+// Compute the pointer tag for the constructor and tag the pointer;
+// see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure.
+//
+// Note: we need to update this if we change the tagging strategy.
+STATIC_INLINE StgClosure *tagConstr(StgClosure *con) {
+    return TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
+}
+
 static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_p_info,
     (W_)&stg_ap_pp_info,
@@ -363,11 +371,22 @@ interpretBCO (Capability* cap)
     // ------------------------------------------------------------------------
     // Case 3:
     //
-    //       We have an unlifted value to return.  See comment before
-    //       do_return_lifted, below.
+    //       We have a pointer to return.  See comment before
+    //       do_return_pointer, below.
+    //
+    else if (SpW(0) == (W_)&stg_ret_p_info) {
+      tagged_obj = (StgClosure *)SpW(1);
+      Sp_addW(2);
+      goto do_return_pointer;
+    }
+
+    // ------------------------------------------------------------------------
+    // Case 4:
+    //
+    //       We have a nonpointer to return.
     //
     else {
-        goto do_return_unlifted;
+        goto do_return_nonpointer;
     }
 
     // Evaluate the object on top of the stack.
@@ -412,6 +431,11 @@ eval_obj:
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_NOCAF:
+        // The value is already evaluated, so we can just return it. However,
+        // before we do, we MUST ensure that the pointer is tagged, because we
+        // might return to a native `case` expression, which assumes the returned
+        // pointer is tagged so it can use the tag to select an alternative.
+        tagged_obj = tagConstr(obj);
         break;
 
     case FUN:
@@ -533,16 +557,16 @@ eval_obj:
     }
 
     // ------------------------------------------------------------------------
-    // We now have an evaluated object (tagged_obj).  The next thing to
+    // We now have a pointer to return (tagged_obj).  The next thing to
     // do is return it to the stack frame on top of the stack.
-do_return:
+do_return_pointer:
     obj = UNTAG_CLOSURE(tagged_obj);
-    ASSERT(closure_HNF(obj));
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(obj));
 
     IF_DEBUG(interpreter,
              debugBelch(
              "\n---------------------------------------------------------------\n");
-             debugBelch("Returning: "); printObj(obj);
+             debugBelch("Returning closure: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
 #if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
@@ -567,7 +591,7 @@ do_return:
             info == (StgInfoTable *)&stg_restore_cccs_eval_info) {
             cap->r.rCCCS = (CostCentreStack*)SpW(1);
             Sp_addW(2);
-            goto do_return;
+            goto do_return_pointer;
         }
 
         if (info == (StgInfoTable *)&stg_ap_v_info) {
@@ -621,7 +645,7 @@ do_return:
         updateThunk(cap, cap->r.rCurrentTSO,
                     ((StgUpdateFrame *)Sp)->updatee, tagged_obj);
         Sp_addW(sizeofW(StgUpdateFrame));
-        goto do_return;
+        goto do_return_pointer;
 
     case RET_BCO:
         // Returning to an interpreted continuation: put the object on
@@ -631,7 +655,7 @@ do_return:
         SpW(0) = (W_)tagged_obj;
         obj = (StgClosure*)SpW(2);
         ASSERT(get_itbl(obj)->type == BCO);
-        goto run_BCO_return;
+        goto run_BCO_return_pointer;
 
     default:
     do_return_unrecognised:
@@ -644,7 +668,7 @@ do_return:
             );
         Sp_subW(2);
         SpW(1) = (W_)tagged_obj;
-        SpW(0) = (W_)&stg_enter_info;
+        SpW(0) = (W_)&stg_ret_p_info;
         RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
     }
@@ -672,12 +696,11 @@ do_return:
     // We're only interested in the case when the real return address
     // is a BCO; otherwise we'll return to the scheduler.
 
-do_return_unlifted:
+do_return_nonpointer:
     {
         int offset;
 
         ASSERT(    SpW(0) == (W_)&stg_ret_v_info
-                || SpW(0) == (W_)&stg_ret_p_info
                 || SpW(0) == (W_)&stg_ret_n_info
                 || SpW(0) == (W_)&stg_ret_f_info
                 || SpW(0) == (W_)&stg_ret_d_info
@@ -688,7 +711,7 @@ do_return_unlifted:
         IF_DEBUG(interpreter,
              debugBelch(
              "\n---------------------------------------------------------------\n");
-             debugBelch("Returning unlifted\n");
+             debugBelch("Returning nonpointer\n");
              debugBelch("Sp = %p\n", Sp);
 #if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
@@ -705,12 +728,13 @@ do_return_unlifted:
         switch (get_itbl((StgClosure*)(Sp_plusW(offset)))->type) {
 
         case RET_BCO:
-            // Returning to an interpreted continuation: put the object on
-            // the stack, and start executing the BCO.
+            // Returning to an interpreted continuation: pop the return frame
+            // so the returned value is at the top of the stack, and start
+            // executing the BCO.
             INTERP_TICK(it_retto_BCO);
             obj = (StgClosure*)SpW(offset+1);
             ASSERT(get_itbl(obj)->type == BCO);
-            goto run_BCO_return_unlifted;
+            goto run_BCO_return_nonpointer;
 
         default:
         {
@@ -815,7 +839,7 @@ do_apply:
                 SET_HDR(new_pap,&stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)new_pap;
                 Sp_addW(m);
-                goto do_return;
+                goto do_return_pointer;
             }
         }
 
@@ -858,7 +882,7 @@ do_apply:
                 SET_HDR(pap, &stg_PAP_info,cap->r.rCCCS);
                 tagged_obj = (StgClosure *)pap;
                 Sp_addW(m);
-                goto do_return;
+                goto do_return_pointer;
             }
         }
 
@@ -917,10 +941,10 @@ do_apply:
     // to do:
 
 
-run_BCO_return:
+run_BCO_return_pointer:
     // Heap check
     if (doYouWantToGC(cap)) {
-        Sp_subW(1); SpW(0) = (W_)&stg_enter_info;
+        Sp_subW(1); SpW(0) = (W_)&stg_ret_p_info;
         RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
     }
     // Stack checks aren't necessary at return points, the stack use
@@ -928,7 +952,7 @@ run_BCO_return:
 
     goto run_BCO;
 
-run_BCO_return_unlifted:
+run_BCO_return_nonpointer:
     // Heap check
     if (doYouWantToGC(cap)) {
         RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
@@ -973,6 +997,9 @@ run_BCO_return_unlifted:
     }
 #endif
 
+    if (SpW(0) != (W_)&stg_ret_t_info) {
+      Sp_addW(1);
+    }
     goto run_BCO;
 
 run_BCO_fun:
@@ -1274,24 +1301,11 @@ run_BCO:
             goto nextInsn;
         }
 
-        case bci_PUSH_ALTS: {
+        case bci_PUSH_ALTS_P: {
             int o_bco  = BCO_GET_LARGE_ARG;
             Sp_subW(2);
             SpW(1) = BCO_PTR(o_bco);
             SpW(0) = (W_)&stg_ctoi_R1p_info;
-#if defined(PROFILING)
-            Sp_subW(2);
-            SpW(1) = (W_)cap->r.rCCCS;
-            SpW(0) = (W_)&stg_restore_cccs_info;
-#endif
-            goto nextInsn;
-        }
-
-        case bci_PUSH_ALTS_P: {
-            int o_bco  = BCO_GET_LARGE_ARG;
-            SpW(-2) = (W_)&stg_ctoi_R1unpt_info;
-            SpW(-1) = BCO_PTR(o_bco);
-            Sp_subW(2);
 #if defined(PROFILING)
             Sp_subW(2);
             SpW(1) = (W_)cap->r.rCCCS;
@@ -1678,19 +1692,7 @@ run_BCO:
             StgInfoTable *con_itbl = (StgInfoTable*) BCO_LIT(o_itbl);
             SET_HDR(con, con_itbl, cap->r.rCCCS);
 
-            // Note [Data constructor dynamic tags]
-            // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-            // compute the pointer tag for the constructor and tag the pointer
-            //
-            //     - 1..(TAG_MASK-1): for first TAG_MASK-1 constructors
-            //     - TAG_MASK:        look in info table
-            //
-            // Note: we need to update this if we change the tagging strategy
-            //
-            // For full details of the invariants on tagging, see
-            // https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
-
-            StgClosure* tagged_con = TAG_CLOSURE(stg_min(TAG_MASK, 1 + GET_TAG(con)), con);
+            StgClosure* tagged_con = tagConstr(con);
             SpW(0) = (W_)tagged_con;
 
             IF_DEBUG(interpreter,
@@ -1721,60 +1723,54 @@ run_BCO:
         }
 
         case bci_TESTLT_I: {
-            // There should be an Int at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            I_ stackInt = (I_)SpW(1);
+            I_ stackInt = (I_)SpW(0);
             if (stackInt >= (I_)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_I64: {
-            // There should be an Int64 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt64 stackInt = (*(StgInt64*)Sp_plusW(1));
+            StgInt64 stackInt = (*(StgInt64*)Sp);
             if (stackInt >= BCO_LITI64(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_I32: {
-            // There should be an Int32 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt32 stackInt = (*(StgInt32*)Sp_plusW(1));
+            StgInt32 stackInt = (*(StgInt32*)Sp);
             if (stackInt >= (StgInt32)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_I16: {
-            // There should be an Int16 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt16 stackInt = (*(StgInt16*)Sp_plusW(1));
+            StgInt16 stackInt = (*(StgInt16*)Sp);
             if (stackInt >= (StgInt16)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_I8: {
-            // There should be an Int8 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt8 stackInt = (*(StgInt8*)Sp_plusW(1));
+            StgInt8 stackInt = (*(StgInt8*)Sp);
             if (stackInt >= (StgInt8)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTEQ_I: {
-            // There should be an Int at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            I_ stackInt = (I_)SpW(1);
+            I_ stackInt = (I_)SpW(0);
             if (stackInt != (I_)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1782,10 +1778,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_I64: {
-            // There should be an Int64 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt64 stackInt = (*(StgInt64*)Sp_plusW(1));
+            StgInt64 stackInt = (*(StgInt64*)Sp);
             if (stackInt != BCO_LITI64(discr)) {
                 bciPtr = failto;
             }
@@ -1793,10 +1788,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_I32: {
-            // There should be an Int32 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt32 stackInt = (*(StgInt32*)Sp_plusW(1));
+            StgInt32 stackInt = (*(StgInt32*)Sp);
             if (stackInt != (StgInt32)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1804,10 +1798,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_I16: {
-            // There should be an Int16 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt16 stackInt = (*(StgInt16*)Sp_plusW(1));
+            StgInt16 stackInt = (*(StgInt16*)Sp);
             if (stackInt != (StgInt16)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1815,10 +1808,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_I8: {
-            // There should be an Int8 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgInt8 stackInt = (*(StgInt8*)Sp_plusW(1));
+            StgInt8 stackInt = (*(StgInt8*)Sp);
             if (stackInt != (StgInt8)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1826,60 +1818,54 @@ run_BCO:
         }
 
         case bci_TESTLT_W: {
-            // There should be a Word at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            W_ stackWord = (W_)SpW(1);
+            W_ stackWord = (W_)SpW(0);
             if (stackWord >= (W_)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_W64: {
-            // There should be a Word64 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord64 stackWord = (*(StgWord64*)Sp_plusW(1));
+            StgWord64 stackWord = (*(StgWord64*)Sp);
             if (stackWord >= BCO_LITW64(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_W32: {
-            // There should be a Word32 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord32 stackWord = (*(StgWord32*)Sp_plusW(1));
+            StgWord32 stackWord = (*(StgWord32*)Sp);
             if (stackWord >= (StgWord32)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_W16: {
-            // There should be a Word16 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord16 stackWord = (*(StgWord16*)Sp_plusW(1));
+            StgWord16 stackWord = (*(StgWord16*)Sp);
             if (stackWord >= (StgWord16)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTLT_W8: {
-            // There should be a Word8 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord8 stackWord = (*(StgWord8*)Sp_plusW(1));
+            StgWord8 stackWord = (*(StgWord8*)Sp);
             if (stackWord >= (StgWord8)BCO_LIT(discr))
                 bciPtr = failto;
             goto nextInsn;
         }
 
         case bci_TESTEQ_W: {
-            // There should be a Word at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            W_ stackWord = (W_)SpW(1);
+            W_ stackWord = (W_)SpW(0);
             if (stackWord != (W_)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1887,10 +1873,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_W64: {
-            // There should be a Word64 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord64 stackWord = (*(StgWord64*)Sp_plusW(1));
+            StgWord64 stackWord = (*(StgWord64*)Sp);
             if (stackWord != BCO_LITW64(discr)) {
                 bciPtr = failto;
             }
@@ -1898,10 +1883,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_W32: {
-            // There should be a Word32 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord32 stackWord = (*(StgWord32*)Sp_plusW(1));
+            StgWord32 stackWord = (*(StgWord32*)Sp);
             if (stackWord != (StgWord32)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1909,10 +1893,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_W16: {
-            // There should be a Word16 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord16 stackWord = (*(StgWord16*)Sp_plusW(1));
+            StgWord16 stackWord = (*(StgWord16*)Sp);
             if (stackWord != (StgWord16)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1920,10 +1903,9 @@ run_BCO:
         }
 
         case bci_TESTEQ_W8: {
-            // There should be a Word8 at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
-            StgWord8 stackWord = (*(StgWord8*)Sp_plusW(1));
+            StgWord8 stackWord = (*(StgWord8*)Sp);
             if (stackWord != (StgWord8)BCO_LIT(discr)) {
                 bciPtr = failto;
             }
@@ -1931,11 +1913,10 @@ run_BCO:
         }
 
         case bci_TESTLT_D: {
-            // There should be a Double at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             StgDouble stackDbl, discrDbl;
-            stackDbl = PK_DBL( & SpW(1) );
+            stackDbl = PK_DBL( & SpW(0) );
             discrDbl = PK_DBL( & BCO_LIT(discr) );
             if (stackDbl >= discrDbl) {
                 bciPtr = failto;
@@ -1944,11 +1925,10 @@ run_BCO:
         }
 
         case bci_TESTEQ_D: {
-            // There should be a Double at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             StgDouble stackDbl, discrDbl;
-            stackDbl = PK_DBL( & SpW(1) );
+            stackDbl = PK_DBL( & SpW(0) );
             discrDbl = PK_DBL( & BCO_LIT(discr) );
             if (stackDbl != discrDbl) {
                 bciPtr = failto;
@@ -1957,11 +1937,10 @@ run_BCO:
         }
 
         case bci_TESTLT_F: {
-            // There should be a Float at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             StgFloat stackFlt, discrFlt;
-            stackFlt = PK_FLT( & SpW(1) );
+            stackFlt = PK_FLT( & SpW(0) );
             discrFlt = PK_FLT( & BCO_LIT(discr) );
             if (stackFlt >= discrFlt) {
                 bciPtr = failto;
@@ -1970,11 +1949,10 @@ run_BCO:
         }
 
         case bci_TESTEQ_F: {
-            // There should be a Float at SpW(1), and an info table at SpW(0).
             int discr   = BCO_GET_LARGE_ARG;
             int failto  = BCO_GET_LARGE_ARG;
             StgFloat stackFlt, discrFlt;
-            stackFlt = PK_FLT( & SpW(1) );
+            stackFlt = PK_FLT( & SpW(0) );
             discrFlt = PK_FLT( & BCO_LIT(discr) );
             if (stackFlt != discrFlt) {
                 bciPtr = failto;
@@ -1995,40 +1973,36 @@ run_BCO:
             }
             goto eval;
 
-        case bci_RETURN:
+        case bci_RETURN_P:
             tagged_obj = (StgClosure *)SpW(0);
             Sp_addW(1);
-            goto do_return;
+            goto do_return_pointer;
 
-        case bci_RETURN_P:
-            Sp_subW(1);
-            SpW(0) = (W_)&stg_ret_p_info;
-            goto do_return_unlifted;
         case bci_RETURN_N:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_n_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         case bci_RETURN_F:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_f_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         case bci_RETURN_D:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_d_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         case bci_RETURN_L:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_l_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         case bci_RETURN_V:
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_v_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         case bci_RETURN_T: {
             /* tuple_info and tuple_bco must already be on the stack */
             Sp_subW(1);
             SpW(0) = (W_)&stg_ret_t_info;
-            goto do_return_unlifted;
+            goto do_return_nonpointer;
         }
 
         case bci_SWIZZLE: {
