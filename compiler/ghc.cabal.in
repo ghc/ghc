@@ -708,6 +708,7 @@ Library
         GHC.Tc.Errors.Hole.FitTypes
         GHC.Tc.Errors.Ppr
         GHC.Tc.Errors.Types
+        GHC.Tc.Errors.Types.PromotionErr
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow
@@ -740,6 +741,11 @@ Library
         GHC.Tc.Solver.Types
         GHC.Tc.TyCl
         GHC.Tc.TyCl.Build
+        GHC.Tc.Types.LclEnv
+        GHC.Tc.Types.TcIdSigInfo
+        GHC.Tc.Types.TH
+        GHC.Tc.Types.TcRef
+        GHC.Tc.Types.TcTyThing
         GHC.Tc.TyCl.Class
         GHC.Tc.TyCl.Instance
         GHC.Tc.TyCl.PatSyn

@@ -56,7 +56,8 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing )
+import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode )
+import GHC.Tc.Types.TcTyThing
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -103,7 +104,6 @@ import Data.List ( groupBy, sortBy, tails
 import Data.Ord ( comparing )
 import Data.Bifunctor
 import qualified Language.Haskell.TH as TH
-import {-# SOURCE #-} GHC.Tc.Types (pprTcTyThingCategory)
 import GHC.Iface.Errors.Types
 import GHC.Iface.Errors.Ppr
 

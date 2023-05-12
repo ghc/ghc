@@ -68,7 +68,7 @@ module GHC.Tc.Types.Constraint (
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth, isGivenLoc,
         setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        pprCtLoc,
+        pprCtLoc, CtLocEnv(..),
 
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
@@ -141,6 +141,7 @@ import Data.List.NonEmpty ( NonEmpty )
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
+
 
 
 {-
@@ -2417,9 +2418,11 @@ dictionaries don't appear in the original source code.
 -}
 
 data CtLoc = CtLoc { ctl_origin   :: CtOrigin
-                   , ctl_env      :: TcLclEnv
+                   , ctl_env      :: CtLocEnv
                    , ctl_t_or_k   :: Maybe TypeOrKind  -- OK if we're not sure
                    , ctl_depth    :: !SubGoalDepth }
+
+data CtLocEnv = CtLocEnv { ct_ctxt :: [()], ctl_loc :: RealSrcSpan, ctl_bndrs :: TcBinderStack, ctl_tclvl :: TcLevel }
 
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
