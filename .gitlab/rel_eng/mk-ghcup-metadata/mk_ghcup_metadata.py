@@ -104,7 +104,7 @@ def linux_platform(arch, opsys):
     return PlatformSpec( opsys, 'ghc-{version}-{arch}-unknown-linux'.format(version="{version}", arch=arch) )
 
 
-base_url = 'https://gitlab.haskell.org/ghc/ghc/-/jobs/{job_id}/artifacts/raw/{artifact_name}'
+base_url = 'https://gitlab.haskell.org/api/v4/projects/1/jobs/{job_id}/artifacts/{artifact_name}'
 
 
 hash_cache = {}
