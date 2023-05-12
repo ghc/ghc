@@ -88,8 +88,7 @@ data BCInstr
    | PUSH_BCO     (ProtoBCO Name)
 
    -- Push an alt continuation
-   | PUSH_ALTS          (ProtoBCO Name)
-   | PUSH_ALTS_UNLIFTED (ProtoBCO Name) ArgRep
+   | PUSH_ALTS          (ProtoBCO Name) ArgRep
    | PUSH_ALTS_TUPLE    (ProtoBCO Name) -- continuation
                         !NativeCallInfo
                         (ProtoBCO Name) -- tuple return BCO
@@ -197,9 +196,10 @@ data BCInstr
 
    -- To Infinity And Beyond
    | ENTER
-   | RETURN                 -- return a lifted value
-   | RETURN_UNLIFTED ArgRep -- return an unlifted value, here's its rep
-   | RETURN_TUPLE           -- return an unboxed tuple (info already on stack)
+   | RETURN ArgRep -- return a non-tuple value, here's its rep; see
+                   -- Note [Return convention for non-tuple values] in GHC.StgToByteCode
+   | RETURN_TUPLE  -- return an unboxed tuple (info already on stack); see
+                   -- Note [unboxed tuple bytecodes and tuple_BCO] in GHC.StgToByteCode
 
    -- Breakpoints
    | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
@@ -274,8 +274,7 @@ instance Outputable BCInstr where
                                                <> ppr op
    ppr (PUSH_BCO bco)        = hang (text "PUSH_BCO") 2 (ppr bco)
 
-   ppr (PUSH_ALTS bco)       = hang (text "PUSH_ALTS") 2 (ppr bco)
-   ppr (PUSH_ALTS_UNLIFTED bco pk) = hang (text "PUSH_ALTS_UNLIFTED" <+> ppr pk) 2 (ppr bco)
+   ppr (PUSH_ALTS bco pk)    = hang (text "PUSH_ALTS" <+> ppr pk) 2 (ppr bco)
    ppr (PUSH_ALTS_TUPLE bco call_info tuple_bco) =
                                hang (text "PUSH_ALTS_TUPLE" <+> ppr call_info)
                                     2
@@ -352,8 +351,7 @@ instance Outputable BCInstr where
    ppr (SWIZZLE stkoff n)    = text "SWIZZLE " <+> text "stkoff" <+> ppr stkoff
                                                <+> text "by" <+> ppr n
    ppr ENTER                 = text "ENTER"
-   ppr RETURN                = text "RETURN"
-   ppr (RETURN_UNLIFTED pk)  = text "RETURN_UNLIFTED  " <+> ppr pk
+   ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
    ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> mb_uniq <+> text "<cc>"
      where mb_uniq = sdocOption sdocSuppressUniques $ \case
@@ -389,10 +387,8 @@ bciStackUse PUSH32_W{}            = 1  -- takes exactly 1 word
 bciStackUse PUSH_G{}              = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}            = 1
-bciStackUse (PUSH_ALTS bco)       = 2 {- profiling only, restore CCCS -} +
+bciStackUse (PUSH_ALTS bco _)     = 2 {- profiling only, restore CCCS -} +
                                     3 + protoBCOStackUse bco
-bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 {- profiling only, restore CCCS -} +
-                                         4 + protoBCOStackUse bco
 bciStackUse (PUSH_ALTS_TUPLE bco info _) =
    -- (tuple_bco, call_info word, cont_bco, stg_ctoi_t)
    -- tuple
@@ -452,8 +448,7 @@ bciStackUse TESTEQ_P{}            = 0
 bciStackUse CASEFAIL{}            = 0
 bciStackUse JMP{}                 = 0
 bciStackUse ENTER{}               = 0
-bciStackUse RETURN{}              = 0
-bciStackUse RETURN_UNLIFTED{}     = 1 -- pushes stg_ret_X for some X
+bciStackUse RETURN{}              = 1 -- pushes stg_ret_X for some X
 bciStackUse RETURN_TUPLE{}        = 1 -- pushes stg_ret_t header
 bciStackUse CCALL{}               = 0
 bciStackUse PRIMCALL{}            = 1 -- pushes stg_primcall

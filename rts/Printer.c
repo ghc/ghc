@@ -652,8 +652,6 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
             if (c == (StgWord)&stg_ctoi_R1p_info) {
                 debugBelch("stg_ctoi_R1p_info" );
-            } else if (c == (StgWord)&stg_ctoi_R1unpt_info) {
-                debugBelch("stg_ctoi_R1unpt_info" );
             } else if (c == (StgWord)&stg_ctoi_R1n_info) {
                 debugBelch("stg_ctoi_R1n_info" );
             } else if (c == (StgWord)&stg_ctoi_F1_info) {

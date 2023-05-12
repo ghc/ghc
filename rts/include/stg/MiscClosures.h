@@ -82,7 +82,6 @@ RTS_RET(stg_prompt_frame);
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
 RTS_RET(stg_ctoi_R1p);
-RTS_RET(stg_ctoi_R1unpt);
 RTS_RET(stg_ctoi_R1n);
 RTS_RET(stg_ctoi_F1);
 RTS_RET(stg_ctoi_D1);
