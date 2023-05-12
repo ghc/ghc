@@ -42,7 +42,8 @@ import GHC.Rename.Utils ( warnUnusedTopBinds )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Zonk.TcType
+import GHC.Tc.Types.LclEnv
+import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
@@ -670,7 +671,7 @@ extendGlobalRdrEnvRn new_gres new_fixities
         ; isGHCi <- getIsGHCi
         ; let rdr_env  = tcg_rdr_env gbl_env
               fix_env  = tcg_fix_env gbl_env
-              th_bndrs = tcl_th_bndrs lcl_env
+              th_bndrs = getLclEnvThBndrs lcl_env
               th_lvl   = thLevel stage
 
               -- Delete new_occs from global and local envs
@@ -679,7 +680,7 @@ extendGlobalRdrEnvRn new_gres new_fixities
               -- See Note [GlobalRdrEnv shadowing]
               inBracket = isBrackStage stage
 
-              lcl_env_TH = lcl_env { tcl_rdr = minusLocalRdrEnv (tcl_rdr lcl_env) new_gres_env }
+              lcl_env_TH = modifyLclCtxt (\lcl_env -> lcl_env { tcl_rdr = minusLocalRdrEnv (tcl_rdr lcl_env) new_gres_env }) lcl_env
                            -- See Note [GlobalRdrEnv shadowing]
 
               lcl_env2 | inBracket = lcl_env_TH
@@ -690,9 +691,9 @@ extendGlobalRdrEnvRn new_gres new_fixities
               rdr_env1 | want_shadowing = shadowNames False rdr_env new_gres_env
                        | otherwise      = rdr_env
 
-              lcl_env3 = lcl_env2 { tcl_th_bndrs = extendNameEnvList th_bndrs
+              lcl_env3 = modifyLclCtxt (\lcl_env -> lcl_env { tcl_th_bndrs = extendNameEnvList th_bndrs
                                                        [ ( n, (TopLevel, th_lvl) )
-                                                       | n <- new_names ] }
+                                                       | n <- new_names ] }) lcl_env2
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
 

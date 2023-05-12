@@ -23,7 +23,7 @@ import GHC.Driver.Flags ( DumpFlag(Opt_D_dump_tc_trace) )
 
 import GHC.Types.SrcLoc ( SrcSpan )
 
-import GHC.Tc.Types.TcBinder ( TcBinderStack )
+import GHC.Tc.Types.BasicTypes ( TcBinderStack )
 import GHC.Tc.Utils.TcType   ( TcLevel )
 
 import GHC.Utils.Logger

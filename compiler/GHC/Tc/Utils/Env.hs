@@ -86,8 +86,8 @@ import GHC.Iface.Load
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
---import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.LclEnv
 
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
@@ -485,7 +485,7 @@ tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- the same level as the lookup.  Only used in one place...
 tcLookupLocalIds ns
   = do { env <- getLclEnv
-       ; return (map (lookup (tcl_env env)) ns) }
+       ; return (map (lookup (getLclEnvTypeEnv env)) ns) }
   where
     lookup lenv name
         = case lookupNameEnv lenv name of
@@ -513,7 +513,7 @@ tcExtendKindEnvList :: [(Name, TcTyThing)] -> TcM r -> TcM r
 -- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
 tcExtendKindEnvList things thing_inside
   = do { traceTc "tcExtendKindEnvList" (ppr things)
-       ; updLclEnv upd_env thing_inside }
+       ; updLclCtxt upd_env thing_inside }
   where
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
 
@@ -521,7 +521,7 @@ tcExtendKindEnv :: NameEnv TcTyThing -> TcM r -> TcM r
 -- A variant of tcExtendKindEvnList
 tcExtendKindEnv extra_env thing_inside
   = do { traceTc "tcExtendKindEnv" (ppr extra_env)
-       ; updLclEnv upd_env thing_inside }
+       ; updLclCtxt upd_env thing_inside }
   where
     upd_env env = env { tcl_env = tcl_env env `plusNameEnv` extra_env }
 
@@ -632,9 +632,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- that are bound together with extra_env and should not be regarded
 -- as free in the types of extra_env.
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
-        ; updLclEnv upd_lcl_env thing_inside }
+        ; updLclCtxt upd_lcl_env thing_inside }
   where
-    upd_lcl_env env0@(TcLclEnv { tcl_th_ctxt  = stage
+    upd_lcl_env env0@(TcLclCtxt { tcl_th_ctxt  = stage
                                , tcl_rdr      = rdr_env
                                , tcl_th_bndrs = th_bndrs
                                , tcl_env      = lcl_type_env })
@@ -655,8 +655,8 @@ tc_extend_local_env top_lvl extra_env thing_inside
         thlvl = (top_lvl, thLevel stage)
 
 
-tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
-tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
+tcExtendLocalTypeEnv :: [(Name, TcTyThing)] -> TcLclCtxt -> TcLclCtxt
+tcExtendLocalTypeEnv tc_ty_things lcl_env@(TcLclCtxt { tcl_env = lcl_type_env })
   = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
 
 {- *********************************************************************
@@ -668,7 +668,7 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
 tcExtendBinderStack :: [TcBinder] -> TcM a -> TcM a
 tcExtendBinderStack bndrs thing_inside
   = do { traceTc "tcExtendBinderStack" (ppr bndrs)
-       ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
+       ; updLclCtxt (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
 
 {- *********************************************************************
@@ -1064,14 +1064,14 @@ pprBinders bndrs  = pprWithCommas ppr bndrs
 notFound :: Name -> TcM TyThing
 notFound name
   = do { lcl_env <- getLclEnv
-       ; let stage = tcl_th_ctxt lcl_env
+       ; let stage = getLclEnvThStage lcl_env
        ; case stage of   -- See Note [Out of scope might be a staging error]
            Splice {}
              | isUnboundName name -> failM  -- If the name really isn't in scope
                                             -- don't report it again (#11941)
              | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
            _ -> failWithTc $
-                mkTcRnNotInScope (getRdrName name) (NotInScopeTc (tcl_env lcl_env))
+                mkTcRnNotInScope (getRdrName name) (NotInScopeTc (getLclEnvTypeEnv lcl_env))
                        -- Take care: printing the whole gbl env can
                        -- cause an infinite loop, in the case where we
                        -- are in the middle of a recursive TyCon/Class group;

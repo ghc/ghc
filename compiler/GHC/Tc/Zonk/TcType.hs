@@ -67,9 +67,9 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Tc.Types.TcBinder
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.Monad
 

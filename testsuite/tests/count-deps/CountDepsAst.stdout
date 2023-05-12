@@ -189,15 +189,26 @@ GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
 GHC.Tc.Errors.Ppr
 GHC.Tc.Errors.Types
+GHC.Tc.Errors.Types.PromotionErr
 GHC.Tc.Solver.InertSet
 GHC.Tc.Solver.Types
 GHC.Tc.Types
 GHC.Tc.Types.Constraint
+GHC.Tc.Types.CtLocEnv
 GHC.Tc.Types.Evidence
+GHC.Tc.Types.LclEnv
 GHC.Tc.Types.Origin
 GHC.Tc.Types.Rank
+<<<<<<< HEAD
 GHC.Tc.Types.TcBinder
 GHC.Tc.Types.TcRef
+=======
+GHC.Tc.Types.TH
+GHC.Tc.Types.TcBinder
+GHC.Tc.Types.TcIdSigInfo
+GHC.Tc.Types.TcRef
+GHC.Tc.Types.TcTyThing
+>>>>>>> 25c29c8cde1 (Big TcLclEnv and CtLoc refactoring)
 GHC.Tc.Utils.TcType
 GHC.Tc.Zonk.Monad
 GHC.Types.Annotations

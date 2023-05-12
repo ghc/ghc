@@ -1,5 +1,4 @@
-
-module GHC.Tc.Types.TcRef where
+module GHC.Tc.Types.TcRef (TcRef, newTcRef, readTcRef, writeTcRef, updTcRef, updTcRefM) where
 
 import GHC.Prelude
 

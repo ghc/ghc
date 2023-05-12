@@ -397,7 +397,7 @@ solveForAll :: CtEvidence -> [TcTyVar] -> TcThetaType -> PredType -> ExpansionFu
 solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
             tvs theta pred _fuel
   = -- See Note [Solving a Wanted forall-constraint]
-    setSrcSpan (getLclEnvLoc $ ctLocEnv loc) $
+    setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)

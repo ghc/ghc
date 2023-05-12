@@ -49,6 +49,7 @@ import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
@@ -2012,7 +2013,7 @@ tcLookupTh :: Name -> TcM TcTyThing
 -- tcLookup, failure is a bug.
 tcLookupTh name
   = do  { (gbl_env, lcl_env) <- getEnvs
-        ; case lookupNameEnv (tcl_env lcl_env) name of {
+        ; case lookupNameEnv (getLclEnvTypeEnv lcl_env) name of {
                 Just thing -> return thing;
                 Nothing    ->
 

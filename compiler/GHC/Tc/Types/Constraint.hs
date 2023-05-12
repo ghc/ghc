@@ -73,6 +73,9 @@ module GHC.Tc.Types.Constraint (
         setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
         pprCtLoc, adjustCtLoc, adjustCtLocTyConBinder,
 
+        -- CtLocEnv
+        CtLocEnv(..), setCtLocEnvLoc, setCtLocEnvLvl, getCtLocEnvLoc, getCtLocEnvLvl, ctLocEnvInGeneratedCode,
+
         -- CtEvidence
         CtEvidence(..), TcEvDest(..),
         isWanted, isGiven,
@@ -103,9 +106,6 @@ module GHC.Tc.Types.Constraint (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Tc.Types ( TcLclEnv, setLclEnvTcLevel, getLclEnvTcLevel
-                                   , setLclEnvLoc, getLclEnvLoc )
-
 import GHC.Core.Predicate
 import GHC.Core.Type
 import GHC.Core.Coercion
@@ -117,6 +117,7 @@ import GHC.Types.Var
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.CtLocEnv
 
 import GHC.Core
 
@@ -145,6 +146,7 @@ import Data.List.NonEmpty ( NonEmpty )
 -- these are for CheckTyEqResult
 import Data.Word  ( Word8 )
 import Data.List  ( intersperse )
+
 
 
 {-
@@ -1460,12 +1462,12 @@ data Implication
                                  -- Note [Avoid -Winaccessible-code when deriving]
                                  -- in GHC.Tc.TyCl.Instance
 
-      ic_env   :: TcLclEnv,
-                                 -- Records the TcLClEnv at the time of creation.
+      ic_env   :: !CtLocEnv,
+                                 -- Records the context at the time of creation.
                                  --
-                                 -- The TcLclEnv gives the source location
-                                 -- and error context for the implication, and
-                                 -- hence for all the given evidence variables.
+                                 -- This provides all the information needed about
+                                 -- the context to report the source of errors linked
+                                 -- to this implication.
 
       ic_wanted :: WantedConstraints,  -- The wanteds
                                        -- See Invariant (WantedInf) in GHC.Tc.Utils.TcType
@@ -1486,15 +1488,15 @@ data Implication
       ic_status   :: ImplicStatus
     }
 
-implicationPrototype :: Implication
-implicationPrototype
+implicationPrototype :: CtLocEnv -> Implication
+implicationPrototype ct_loc_env
    = Implic { -- These fields must be initialised
               ic_tclvl      = panic "newImplic:tclvl"
             , ic_binds      = panic "newImplic:binds"
             , ic_info       = panic "newImplic:info"
-            , ic_env        = panic "newImplic:env"
             , ic_warn_inaccessible = panic "newImplic:warn_inaccessible"
 
+            , ic_env        = ct_loc_env
               -- The rest have sensible default values
             , ic_skols      = []
             , ic_given      = []
@@ -2500,17 +2502,11 @@ dictionaries don't appear in the original source code.
 
 -}
 
-data CtLoc
-  = CtLoc { ctl_origin   :: CtOrigin
-          , ctl_env      :: TcLclEnv
-          , ctl_t_or_k   :: Maybe TypeOrKind  -- Used only to improve error messages
-          , ctl_depth    :: !SubGoalDepth }
-
-  -- The TcLclEnv includes particularly
-  --    source location:  tcl_loc   :: RealSrcSpan
-  --    context:          tcl_ctxt  :: [ErrCtxt]
-  --    binder stack:     tcl_bndrs :: TcBinderStack
-  --    level:            tcl_tclvl :: TcLevel
+data CtLoc = CtLoc { ctl_origin   :: CtOrigin
+                   , ctl_env      :: CtLocEnv -- Everything we need to know about
+                                              -- the context this Ct arose in.
+                   , ctl_t_or_k   :: Maybe TypeOrKind  -- OK if we're not sure
+                   , ctl_depth    :: !SubGoalDepth }
 
 mkKindEqLoc :: TcType -> TcType   -- original *types* being compared
             -> CtLoc -> CtLoc
@@ -2546,18 +2542,18 @@ toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
 toInvisibleLoc :: CtLoc -> CtLoc
 toInvisibleLoc loc = updateCtLocOrigin loc toInvisibleOrigin
 
-mkGivenLoc :: TcLevel -> SkolemInfoAnon -> TcLclEnv -> CtLoc
+mkGivenLoc :: TcLevel -> SkolemInfoAnon -> CtLocEnv -> CtLoc
 mkGivenLoc tclvl skol_info env
   = CtLoc { ctl_origin   = GivenOrigin skol_info
-          , ctl_env      = setLclEnvTcLevel env tclvl
+          , ctl_env      = setCtLocEnvLvl env tclvl
           , ctl_t_or_k   = Nothing    -- this only matters for error msgs
           , ctl_depth    = initialSubGoalDepth }
 
-ctLocEnv :: CtLoc -> TcLclEnv
+ctLocEnv :: CtLoc -> CtLocEnv
 ctLocEnv = ctl_env
 
 ctLocLevel :: CtLoc -> TcLevel
-ctLocLevel loc = getLclEnvTcLevel (ctLocEnv loc)
+ctLocLevel loc = getCtLocEnvLvl (ctLocEnv loc)
 
 ctLocDepth :: CtLoc -> SubGoalDepth
 ctLocDepth = ctl_depth
@@ -2566,13 +2562,13 @@ ctLocOrigin :: CtLoc -> CtOrigin
 ctLocOrigin = ctl_origin
 
 ctLocSpan :: CtLoc -> RealSrcSpan
-ctLocSpan (CtLoc { ctl_env = lcl}) = getLclEnvLoc lcl
+ctLocSpan (CtLoc { ctl_env = lcl}) = getCtLocEnvLoc lcl
 
 ctLocTypeOrKind_maybe :: CtLoc -> Maybe TypeOrKind
 ctLocTypeOrKind_maybe = ctl_t_or_k
 
 setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
-setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setLclEnvLoc lcl loc)
+setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setCtLocRealLoc lcl loc)
 
 bumpCtLocDepth :: CtLoc -> CtLoc
 bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }
@@ -2584,7 +2580,7 @@ updateCtLocOrigin :: CtLoc -> (CtOrigin -> CtOrigin) -> CtLoc
 updateCtLocOrigin ctl@(CtLoc { ctl_origin = orig }) upd
   = ctl { ctl_origin = upd orig }
 
-setCtLocEnv :: CtLoc -> TcLclEnv -> CtLoc
+setCtLocEnv :: CtLoc -> CtLocEnv -> CtLoc
 setCtLocEnv ctl env = ctl { ctl_env = env }
 
 pprCtLoc :: CtLoc -> SDoc
@@ -2592,4 +2588,4 @@ pprCtLoc :: CtLoc -> SDoc
 -- Not an instance of Outputable because of the "arising from" prefix
 pprCtLoc (CtLoc { ctl_origin = o, ctl_env = lcl})
   = sep [ pprCtOrigin o
-        , text "at" <+> ppr (getLclEnvLoc lcl)]
+        , text "at" <+> ppr (getCtLocEnvLoc lcl)]

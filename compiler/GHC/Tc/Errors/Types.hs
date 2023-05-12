@@ -155,9 +155,8 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
-import {-# SOURCE #-} GHC.Tc.Types ( TcIdSigInfo, TcTyThing
-                                   , SpliceType, SpliceOrBracket )
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
+import GHC.Tc.Errors.Types.PromotionErr
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
@@ -195,7 +194,7 @@ import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
-import GHC.Utils.Misc (capitalise, filterOut)
+import GHC.Utils.Misc (filterOut)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
 import GHC.Data.Pair
@@ -207,11 +206,15 @@ import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import GHC.Unit.Module.Warnings (WarningCategory, WarningTxt)
 import qualified Language.Haskell.TH.Syntax as TH
-import GHC.Unit.Module.ModIface
 
 import GHC.Generics ( Generic )
 import GHC.Types.Name.Env (NameEnv)
 import GHC.Iface.Errors.Types
+import GHC.Unit.Module.ModIface (ModIface)
+import GHC.Tc.Types.TH
+import GHC.Tc.Types.BasicTypes
+
+
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        , tcOptsIfaceOpts   :: !IfaceMessageOpts
@@ -5322,46 +5325,6 @@ discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
 
-data PromotionErr
-  = TyConPE          -- TyCon used in a kind before we are ready
-                     --     data T :: T -> * where ...
-  | ClassPE          -- Ditto Class
-
-  | FamDataConPE     -- Data constructor for a data family
-                     -- See Note [AFamDataCon: not promoting data family constructors]
-                     -- in GHC.Tc.Utils.Env.
-  | ConstrainedDataConPE ThetaType -- Data constructor with a context
-                                   -- See Note [No constraints in kinds] in GHC.Tc.Validity
-  | PatSynPE         -- Pattern synonyms
-                     -- See Note [Don't promote pattern synonyms] in GHC.Tc.Utils.Env
-
-  | RecDataConPE     -- Data constructor in a recursive loop
-                     -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
-  | TermVariablePE   -- See Note [Promoted variables in types]
-  | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
-
-instance Outputable PromotionErr where
-  ppr ClassPE              = text "ClassPE"
-  ppr TyConPE              = text "TyConPE"
-  ppr PatSynPE             = text "PatSynPE"
-  ppr FamDataConPE         = text "FamDataConPE"
-  ppr (ConstrainedDataConPE theta) = text "ConstrainedDataConPE" <+> parens (ppr theta)
-  ppr RecDataConPE         = text "RecDataConPE"
-  ppr NoDataKindsDC        = text "NoDataKindsDC"
-  ppr TermVariablePE       = text "TermVariablePE"
-
-pprPECategory :: PromotionErr -> SDoc
-pprPECategory = text . capitalise . peCategory
-
-peCategory :: PromotionErr -> String
-peCategory ClassPE              = "class"
-peCategory TyConPE              = "type constructor"
-peCategory PatSynPE             = "pattern synonym"
-peCategory FamDataConPE         = "data constructor"
-peCategory ConstrainedDataConPE{} = "data constructor"
-peCategory RecDataConPE         = "data constructor"
-peCategory NoDataKindsDC        = "data constructor"
-peCategory TermVariablePE       = "term variable"
 
 -- | Stores the information to be reported in a representation-polymorphism
 -- error message.

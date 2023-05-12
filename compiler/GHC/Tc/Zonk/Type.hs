@@ -93,6 +93,8 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
 
+import GHC.Tc.Types.BasicTypes
+
 import GHC.Data.Maybe
 import GHC.Data.Bag
 

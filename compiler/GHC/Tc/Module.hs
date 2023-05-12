@@ -1622,7 +1622,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
          XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
-        updLclEnv (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
+        updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {
 
                 -- Foreign import declarations next.
@@ -2028,7 +2028,7 @@ runTcInteractive hsc_env thing_inside
                         -- so that instance visibility is done correctly
                    , tcg_imports      = imports }
 
-                 lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
+                 lcl_env' = modifyLclCtxt (tcExtendLocalTypeEnv lcl_ids) lcl_env
 
        ; updEnvs upd_envs thing_inside }
   where

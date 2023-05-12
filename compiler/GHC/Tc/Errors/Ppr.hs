@@ -62,9 +62,6 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types
-  ( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing, pprTcTyThingCategory
-  , SpliceType(..), SpliceOrBracket(..))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -118,6 +115,8 @@ import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
+import GHC.Tc.Types.TH
+import GHC.Tc.Types.BasicTypes
 
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
@@ -3660,7 +3659,7 @@ pprTcSolverReportMsg _ (UntouchableVariable tv implic)
         , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
         , nest 2 $ text "bound by" <+> ppr skol_info
         , nest 2 $ text "at" <+>
-          ppr (getLclEnvLoc (ic_env implic)) ]
+          ppr (getCtLocEnvLoc (ic_env implic)) ]
 pprTcSolverReportMsg _ (BlockedEquality item) =
   vcat [ hang (text "Cannot use equality for substitution:")
            2 (ppr (errorItemPred item))
@@ -3852,7 +3851,7 @@ pprTcSolverReportMsg (CEC {cec_encl = implics}) (OverlappingInstances item match
              _  -> Just $ hang (pprTheta ev_vars_matching)
                             2 (sep [ text "bound by" <+> ppr skol_info
                                    , text "at" <+>
-                                     ppr (getLclEnvLoc (ic_env implic)) ])
+                                     ppr (getCtLocEnvLoc (ic_env implic)) ])
         where ev_vars_matching = [ pred
                                  | ev_var <- evvars
                                  , let pred = evVarPred ev_var
@@ -3908,7 +3907,7 @@ pprCannotUnifyVariableReason _ (SkolemEscape item implic esc_skols) =
          <+> text "bound by"
        , nest 2 $ ppr (ic_info implic)
        , nest 2 $ text "at" <+>
-         ppr (getLclEnvLoc (ic_env implic)) ] ]
+         ppr (getCtLocEnvLoc (ic_env implic)) ] ]
   where
     what = text $ levelString $
            ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel
@@ -4697,7 +4696,7 @@ pp_givens givens
              -- See Note [Suppress redundant givens during error reporting]
              -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr (getLclEnvLoc (ic_env implic)) ])
+                       , text "at" <+> ppr (getCtLocEnvLoc (ic_env implic)) ])
 
 {- *********************************************************************
 *                                                                      *
@@ -4718,7 +4717,7 @@ pprArising ct_loc
   | otherwise         = pprCtOrigin orig
   where
     orig = ctLocOrigin ct_loc
-    in_generated_code = lclEnvInGeneratedCode (ctLocEnv ct_loc)
+    in_generated_code = ctLocEnvInGeneratedCode (ctLocEnv ct_loc)
     suppress_origin
       | isGivenOrigin orig = True
       | otherwise          = case orig of
