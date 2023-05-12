@@ -83,6 +83,7 @@ import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
@@ -1063,7 +1064,7 @@ tc_infer_hs_type _ (XHsType ty)
        -- Raw uniques since we go from NameEnv to TvSubstEnv.
        let subst_prs :: [(Unique, TcTyVar)]
            subst_prs = [ (getUnique nm, tv)
-                       | ATyVar nm tv <- nonDetNameEnvElts (tcl_env env) ]
+                       | ATyVar nm tv <- nonDetNameEnvElts (getLclEnvTypeEnv env) ]
            subst = mkTvSubst
                      (mkInScopeSetList $ map snd subst_prs)
                      (listToUFM_Directly $ map (fmap mkTyVarTy) subst_prs)

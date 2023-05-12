@@ -43,8 +43,6 @@ import GHC.Prelude
 
 import GHC.Tc.Utils.TcType
 
-import GHC.Hs
-
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -70,6 +68,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import GHC.Hs
 
 {- *********************************************************************
 *                                                                      *

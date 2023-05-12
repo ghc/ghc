@@ -96,6 +96,7 @@ import GHC.Data.Bag
 import Control.Monad
 import Control.Monad.Trans.Class ( lift )
 import Data.IORef -- SLD TODO: don't use the generic IORef names
+import GHC.Tc.Types.TcBinder
 
 {- *********************************************************************
 *                                                                      *

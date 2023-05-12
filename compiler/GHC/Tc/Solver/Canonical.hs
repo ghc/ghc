@@ -53,7 +53,6 @@ import GHC.Data.Bag
 
 import Data.Maybe ( isJust )
 import qualified Data.Semigroup as S
-import GHC.Tc.Utils.Monad (getLclEnvLoc)
 
 {-
 ************************************************************************
@@ -877,7 +876,7 @@ solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> ExpansionFuel
 solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_loc = loc })
             tvs theta pred _fuel
   = -- See Note [Solving a Wanted forall-constraint]
-    setSrcSpan (getLclEnvLoc $ ctLocEnv loc) $
+    setSrcSpan (getCtLocEnvLoc $ ctLocEnv loc) $
     -- This setSrcSpan is important: the emitImplicationTcS uses that
     -- TcLclEnv for the implication, and that in turn sets the location
     -- for the Givens when solving the constraint (#21006)

@@ -51,6 +51,7 @@ import GHC.Data.Pair
 
 import Control.Monad.IO.Class
 import Data.IORef -- SLD TODO: this should be removed in favour
+import GHC.Tc.Types.TcBinder
                   -- of using some kind of TcRef definitions
 
 {- *********************************************************************

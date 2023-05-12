@@ -344,8 +344,7 @@ newImplication :: TcM Implication
 newImplication
   = do env <- getLclEnv
        warn_inaccessible <- woptM Opt_WarnInaccessibleCode
-       return (implicationPrototype { ic_env = env
-                                    , ic_warn_inaccessible = warn_inaccessible })
+       return (implicationPrototype (mkCtLocEnv env)) { ic_warn_inaccessible = warn_inaccessible }
 
 {-
 ************************************************************************

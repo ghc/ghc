@@ -73,6 +73,7 @@ import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
+import GHC.Tc.Types.LclEnv
 import GHC.Tc.Utils.Monad
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Builtin.Types
@@ -1028,7 +1029,7 @@ lookupLocalOccThLvl_maybe :: Name -> RnM (Maybe (TopLevelFlag, ThLevel))
 -- Just look in the local environment
 lookupLocalOccThLvl_maybe name
   = do { lcl_env <- getLclEnv
-       ; return (lookupNameEnv (tcl_th_bndrs lcl_env) name) }
+       ; return (lookupNameEnv (getLclEnvThBndrs lcl_env) name) }
 
 -- lookupOccRn' looks up an occurrence of a RdrName, and uses its argument to
 -- determine what kind of suggestions should be displayed if it is not in scope

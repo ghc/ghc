@@ -1106,7 +1106,7 @@ tcCheckGivens inerts given_ids = do
   (sat, new_inerts) <- runTcSInerts inerts $ do
     traceTcS "checkGivens {" (ppr inerts <+> ppr given_ids)
     lcl_env <- TcS.getLclEnv
-    let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) lcl_env
+    let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
     let given_cts = mkGivens given_loc (bagToList given_ids)
     -- See Note [Superclasses and satisfiability]
     solveSimpleGivens given_cts
@@ -1449,7 +1449,7 @@ findInferredDiff annotated_theta inferred_theta
     do { lcl_env   <- TcM.getLclEnv
        ; given_ids <- mapM TcM.newEvVar annotated_theta
        ; wanteds   <- newWanteds AnnOrigin inferred_theta
-       ; let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) lcl_env
+       ; let given_loc = mkGivenLoc topTcLevel (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
              given_cts = mkGivens given_loc given_ids
 
        ; (residual, _) <- runTcS $
@@ -3703,7 +3703,7 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       | Just subst <- mb_subst
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
-           ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) lcl_env
+           ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
            -- Equality constraints are possible due to type defaulting plugins
            ; wanted_evs <- sequence [ newWantedNC loc rewriters pred'
                                     | wanted <- wanteds

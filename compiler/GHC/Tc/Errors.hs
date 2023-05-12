@@ -333,7 +333,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
                                  , ic_given  = given
                                  , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
-                                 , ic_env    = tcl_env
+                                 , ic_env    = ct_loc_env
                                  , ic_tclvl  = tc_lvl })
   | BracketSkol <- info
   , not insoluble
@@ -348,12 +348,12 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
            , text "skols:     " <+> pprTyVars tvs
            , text "tidy skols:" <+> pprTyVars tvs' ]
 
-       ; when bad_telescope $ reportBadTelescope ctxt tcl_env info tvs
+       ; when bad_telescope $ reportBadTelescope ctxt ct_loc_env info tvs
                -- Do /not/ use the tidied tvs because then are in the
                -- wrong order, so tidying will rename things wrongly
        ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
-         warnRedundantConstraints ctxt' tcl_env info' dead_givens }
+         warnRedundantConstraints ctxt' ct_loc_env info' dead_givens }
   where
     insoluble    = isInsolubleStatus status
     (env1, tvs') = tidyVarBndrs (cec_tidy ctxt) $
@@ -387,7 +387,7 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
               IC_BadTelescope -> True
               _               -> False
 
-warnRedundantConstraints :: SolverReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
+warnRedundantConstraints :: SolverReportErrCtxt -> CtLocEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
 warnRedundantConstraints ctxt env info redundant_evs
  | null redundant_evs
@@ -396,24 +396,21 @@ warnRedundantConstraints ctxt env info redundant_evs
  | SigSkol user_ctxt _ _ <- info
  -- When dealing with a user-written type signature,
  -- we want to add "In the type signature for f".
- = restoreLclEnv env $
-   setSrcSpan (redundantConstraintsSpan user_ctxt) $
-   report_redundant_msg True
-                  --  ^^^^ add "In the type signature..."
+ = report_redundant_msg True (setCtLocEnvLoc env (redundantConstraintsSpan user_ctxt))
+                             --  ^^^^ add "In the type signature..."
 
  | otherwise
  -- But for InstSkol there already *is* a surrounding
  -- "In the instance declaration for Eq [a]" context
  -- and we don't want to say it twice. Seems a bit ad-hoc
- = restoreLclEnv env
- $ report_redundant_msg False
+ = report_redundant_msg False env
                  --   ^^^^^ don't add "In the type signature..."
  where
    report_redundant_msg :: Bool -- whether to add "In the type signature..." to the diagnostic
+                        -> CtLocEnv
                         -> TcRn ()
-   report_redundant_msg show_info
-     = do { lcl_env <- getLclEnv
-          ; msg <-
+   report_redundant_msg show_info lcl_env
+     = do { msg <-
               mkErrorReport
                 lcl_env
                 (TcRnRedundantConstraints redundant_evs (info, show_info))
@@ -421,7 +418,7 @@ warnRedundantConstraints ctxt env info redundant_evs
                 []
           ; reportDiagnostic msg }
 
-reportBadTelescope :: SolverReportErrCtxt -> TcLclEnv -> SkolemInfoAnon -> [TcTyVar] -> TcM ()
+reportBadTelescope :: SolverReportErrCtxt -> CtLocEnv -> SkolemInfoAnon -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol telescope) skols
   = do { msg <- mkErrorReport
                   env
@@ -977,13 +974,13 @@ keepThisHole sev hole
                          SevIgnore -> False
                          _         -> True
 
--- | zonkTidyTcLclEnvs takes a bunch of 'TcLclEnv's, each from a Hole.
+-- | zonkTidyTcLclEnvs takes a bunch of 'CtLocEnv's, each from a Hole.
 -- It returns a ('Name' :-> 'Type') mapping which gives the zonked, tidied
--- type for each Id in any of the binder stacks in the  'TcLclEnv's.
+-- type for each Id in any of the binder stacks in the  'CtLocEnv's.
 -- Since there is a huge overlap between these stacks, is is much,
 -- much faster to do them all at once, avoiding duplication.
-zonkTidyTcLclEnvs :: TidyEnv -> [TcLclEnv] -> ZonkM (TidyEnv, NameEnv Type)
-zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap tcl_bndrs lcls)
+zonkTidyTcLclEnvs :: TidyEnv -> [CtLocEnv] -> ZonkM (TidyEnv, NameEnv Type)
+zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap ctl_bndrs lcls)
   where
     go envs tc_bndr = case tc_bndr of
           TcTvBndr {} -> return envs
@@ -1265,7 +1262,7 @@ tryReporter ctxt (str, keep_me,  suppress_after, reporter) items = case nonEmpty
 
 -- | Wrap an input 'TcRnMessage' with additional contextual information,
 -- such as relevant bindings or valid hole fits.
-mkErrorReport :: TcLclEnv
+mkErrorReport :: CtLocEnv
               -> TcRnMessage
                   -- ^ The main payload of the message.
               -> Maybe SolverReportErrCtxt
@@ -1276,7 +1273,7 @@ mkErrorReport :: TcLclEnv
                   -- ^ Supplementary information, to be added at the end of the message.
               -> TcM (MsgEnvelope TcRnMessage)
 mkErrorReport tcl_env msg mb_ctxt supplementary
-  = do { mb_context <- traverse (\ ctxt -> mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)) mb_ctxt
+  = do { mb_context <- traverse (\ ctxt -> mkErrInfo (cec_tidy ctxt) (ctl_ctxt tcl_env)) mb_ctxt
        ; unit_state <- hsc_units <$> getTopEnv
        ; hfdc <- getHoleFitDispConfig
        ; let
@@ -1286,7 +1283,7 @@ mkErrorReport tcl_env msg mb_ctxt supplementary
                (vcat $ map (pprSolverReportSupplementary hfdc) supplementary)
        ; let detailed_msg = mkDetailedMessage err_info msg
        ; mkTcRnMessage
-           (RealSrcSpan (tcl_loc tcl_env) Strict.Nothing)
+           (RealSrcSpan (ctl_loc tcl_env) Strict.Nothing)
            (TcRnMessageWithInfo unit_state $ detailed_msg) }
 
 
@@ -1441,7 +1438,7 @@ mkHoleError :: NameEnv Type -> [ErrorItem] -> SolverReportErrCtxt -> Hole -> TcM
 mkHoleError _ _tidy_simples ctxt hole@(Hole { hole_occ = occ, hole_loc = ct_loc })
   | isOutOfScopeHole hole
   = do { (imp_errs, hints)
-           <- unknownNameSuggestions (tcl_rdr lcl_env) WL_Anything occ
+           <- unknownNameSuggestions (ctl_rdr lcl_env) WL_Anything occ
        ; let
              err    = SolverReportWithCtxt ctxt (ReportHoleError hole $ OutOfScopeHole imp_errs)
              report = SolverReport err [] hints
@@ -1570,7 +1567,7 @@ givenConstraints :: SolverReportErrCtxt -> [(Type, RealSrcSpan)]
 givenConstraints ctxt
   = do { implic@Implic{ ic_given = given } <- cec_encl ctxt
        ; constraint <- given
-       ; return (varType constraint, tcl_loc (ic_env implic)) }
+       ; return (varType constraint, getCtLocEnvLoc (ic_env implic)) }
 
 ----------------
 
@@ -2480,7 +2477,7 @@ relevantBindings want_filtering ctxt item
 
 -- slightly more general version, to work also with holes
 relevant_bindings :: Bool
-                  -> TcLclEnv
+                  -> CtLocEnv
                   -> NameEnv Type -- Cache of already zonked and tidied types
                   -> TyCoVarSet
                   -> TcM RelevantBindings
@@ -2489,13 +2486,13 @@ relevant_bindings want_filtering lcl_env lcl_name_env ct_tvs
        ; traceTc "relevant_bindings" $
            vcat [ ppr ct_tvs
                 , pprWithCommas id [ ppr id <+> dcolon <+> ppr (idType id)
-                                   | TcIdBndr id _ <- tcl_bndrs lcl_env ]
+                                   | TcIdBndr id _ <- ctl_bndrs lcl_env ]
                 , pprWithCommas id
-                    [ ppr id | TcIdBndr_ExpType id _ _ <- tcl_bndrs lcl_env ] ]
+                    [ ppr id | TcIdBndr_ExpType id _ _ <- ctl_bndrs lcl_env ] ]
 
        ; go dflags (maxRelevantBinds dflags)
                     emptyVarSet (RelevantBindings [] False)
-                    (removeBindingShadowing $ tcl_bndrs lcl_env)
+                    (removeBindingShadowing $ ctl_bndrs lcl_env)
          -- tcl_bndrs has the innermost bindings first,
          -- which are probably the most relevant ones
   }

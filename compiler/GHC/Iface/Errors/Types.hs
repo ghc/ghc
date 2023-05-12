@@ -20,12 +20,14 @@ module GHC.Iface.Errors.Types (
 
 import GHC.Prelude
 
-import GHC.Hs
 import GHC.Types.Name (Name)
 import GHC.Types.TyThing (TyThing)
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
 import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnitReason, UnitInfo)
 import GHC.Exception.Type (SomeException)
+import GHC.Unit.Types
+    ( IsBootInterface )
+import Language.Haskell.Syntax.Module.Name ( ModuleName )
 
 
 

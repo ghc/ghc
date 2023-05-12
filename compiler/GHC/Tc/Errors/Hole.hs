@@ -552,7 +552,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
 getLocalBindings :: TidyEnv -> CtLoc -> TcM [Id]
 getLocalBindings tidy_orig ct_loc
  = do { (env1, _) <- liftZonkM $ zonkTidyOrigin tidy_orig (ctLocOrigin ct_loc)
-      ; go env1 [] (removeBindingShadowing $ tcl_bndrs lcl_env) }
+      ; go env1 [] (removeBindingShadowing $ ctl_bndrs lcl_env) }
   where
     lcl_env = ctLocEnv ct_loc
 

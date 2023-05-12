@@ -61,6 +61,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Instance.Family
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.LclEnv
 
 import GHC.Builtin.Types (oneDataConTy,  unitTy, makeRecoveryTyCon )
 
@@ -2853,7 +2854,7 @@ tcTySynRhs :: RolesInfo -> Name
 tcTySynRhs roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ tc_bndrs res_kind ->
     do { env <- getLclEnv
-       ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
+       ; traceTc "tc-syn" (ppr tc_name $$ ppr (getLclEnvRdrEnv env))
        ; rhs_ty <- pushLevelAndSolveEqualities skol_info tc_bndrs $
                    tcCheckLHsType hs_ty (TheKind res_kind)
 
