@@ -15,3 +15,5 @@ test('js-callback02', normal, compile_and_run, [''])
 test('js-callback03', normal, compile_and_run, [''])
 test('js-callback04', js_skip, compile_and_run, [''])
 test('js-callback05', js_skip, compile_and_run, [''])
+
+test('T23346', normal, compile_and_run, [''])

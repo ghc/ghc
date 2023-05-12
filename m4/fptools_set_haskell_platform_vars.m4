@@ -119,7 +119,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS_SHELL_FUNCTIONS],
             test -z "[$]2" || eval "[$]2=OSHurd"
             ;;
         ghcjs|js)
-            test -z "[$]2" || eval "[$]2=OSUnknown"
+            test -z "[$]2" || eval "[$]2=OSGhcjs"
             ;;
         *)
             echo "Unknown OS '[$]1'"

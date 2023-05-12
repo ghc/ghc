@@ -98,6 +98,7 @@ data OS
    | OSAIX
    | OSHurd
    | OSWasi
+   | OSGhcjs
    deriving (Read, Show, Eq, Ord)
 
 
@@ -157,3 +158,4 @@ stringEncodeOS = \case
   OSAIX       -> "aix"
   OSHurd      -> "hurd"
   OSWasi      -> "wasi"
+  OSGhcjs     -> "ghcjs"
