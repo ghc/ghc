@@ -274,7 +274,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkTyConAppCo, mkAppCo
    , mkForAllCo, mkFunCo2, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkSelCo, mkLRCo, mkInstCo
-   , mkKindCo, mkSubCo, mkFunCo
+   , mkKindCo, mkSubCo, mkFunCo, funRole
    , decomposePiCos, coercionKind
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo
@@ -1331,9 +1331,12 @@ tyConAppFunCo_maybe :: HasDebugCallStack => Role -> TyCon -> [Coercion]
                     -> Maybe Coercion
 -- ^ Return Just if this TyConAppCo should be represented as a FunCo
 tyConAppFunCo_maybe r tc cos
-  | Just (af, mult, arg, res) <- ty_con_app_fun_maybe (mkReflCo r manyDataConTy) tc cos
-            = Just (mkFunCo r af mult arg res)
-  | otherwise = Nothing
+  | Just (af, mult, arg, res) <- ty_con_app_fun_maybe mult_refl tc cos
+  = Just (mkFunCo r af mult arg res)
+  | otherwise
+  = Nothing
+  where
+    mult_refl = mkReflCo (funRole r SelMult) manyDataConTy
 
 ty_con_app_fun_maybe :: (HasDebugCallStack, Outputable a) => a -> TyCon -> [a]
                      -> Maybe (FunTyFlag, a, a, a)
