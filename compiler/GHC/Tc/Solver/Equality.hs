@@ -239,7 +239,8 @@ can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
   = -- Rewrite the two types and try again
     do { (redn1@(Reduction _ xi1), rewriters1) <- rewrite ev ps_ty1
        ; (redn2@(Reduction _ xi2), rewriters2) <- rewrite ev ps_ty2
-       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped
+                     (ps_ty1,redn1) (ps_ty2,redn2)
        ; traceTcS "can_eq_nc: go round again" (ppr new_ev $$ ppr xi1 $$ ppr xi2)
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
@@ -633,10 +634,12 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co1), ty1') ty2 ps_ty2
          -- through newtypes is tantamount to using their constructors.
        ; recordUsedGREs gres
 
-       ; let redn1 = mkReduction co1 ty1'
+       ; let redn1 = mkReduction (mkDehydrateCo co1) ty1'
+             -- TODO: eliminate dehydration
+
 
        ; new_ev <- rewriteEqEvidence emptyRewriterSet ev' swapped
-                     redn1 (mkReflRedn Representational ps_ty2)
+                     (ty1, redn1) (ps_ty2,mkReflRedn ps_ty2)
 
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
 
@@ -712,11 +715,9 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
        ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
-                      (mkGReflLeftRedn role ty1 co1)
-                      (mkReflRedn role ps_ty2)
+                      (mkCastTy ty1 co1, mkGReflLeftRedn ty1 co1)
+                      (ps_ty2, mkReflRedn ps_ty2)
        ; can_eq_nc rewritten new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
-  where
-    role = eqRelRole eq_rel
 
 ------------------------
 canTyConApp :: CtEvidence -> EqRel
@@ -1304,7 +1305,8 @@ canEqFailure ev ReprEq ty1 ty2
             -- new equalities become available
        ; traceTcS "canEqFailure with ReprEq" $
          vcat [ ppr ev, ppr redn1, ppr redn2 ]
-       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped
+                     (ty1,redn1) (ty2,redn2)
        ; continueWith (mkIrredCt ReprEqReason new_ev) }
 
 -- | Call when canonicalizing an equality fails with utterly no hope.
@@ -1315,7 +1317,8 @@ canEqHardFailure ev ty1 ty2
   = do { traceTcS "canEqHardFailure" (ppr ty1 $$ ppr ty2)
        ; (redn1, rewriters1) <- rewriteForErrors ev ty1
        ; (redn2, rewriters2) <- rewriteForErrors ev ty2
-       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
+       ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped
+                     (ty1,redn1) (ty2,redn2)
        ; continueWith (mkIrredCt ShapeMismatchReason new_ev) }
 
 {-
@@ -1506,8 +1509,8 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               -- Otherwise we might put something in the inert set that isn't inert
          then startAgainWith (mkNonCanonical ev)
          else
-    do { let lhs_redn = mkReflRedn role ps_xi1
-             rhs_redn = mkGReflRightRedn role xi2 mb_sym_kind_co
+    do { let lhs_redn = mkReflRedn ps_xi1
+             rhs_redn = mkGReflRightRedn xi2 mb_sym_kind_co
              mb_sym_kind_co = case swapped of
                                 NotSwapped -> mkSymCo kind_co
                                 IsSwapped  -> kind_co
@@ -1515,7 +1518,8 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
        ; traceTcS "Hetero equality gives rise to kind equality"
            (ppr swapped $$
             ppr kind_co <+> dcolon <+> sep [ ppr ki1, text "~#", ppr ki2 ])
-       ; type_ev <- rewriteEqEvidence rewriters ev swapped lhs_redn rhs_redn
+       ; type_ev <- rewriteEqEvidence rewriters ev swapped
+                      (xi1,lhs_redn) (xi2,rhs_redn)
 
        ; let new_xi2 = mkCastTy ps_xi2 mb_sym_kind_co
        ; canEqCanLHSHomo type_ev eq_rel NotSwapped lhs1 ps_xi1 new_xi2 new_xi2 }}
@@ -1540,7 +1544,6 @@ canEqCanLHSHetero ev eq_rel swapped lhs1 ps_xi1 ki1 xi2 ps_xi2 ki2
               ; return (kind_co, rewriterSetFromCts cts, not (null unifs)) }
 
     xi1  = canEqLHSType lhs1
-    role = eqRelRole eq_rel
 
 canEqCanLHSHomo :: CtEvidence          -- lhs ~ rhs
                                        -- or, if swapped: rhs ~ lhs
@@ -1626,7 +1629,6 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
          else finish_without_swapping } }
   where
     sym_mco = mkSymMCo mco
-    role    = eqRelRole eq_rel
     lhs1_ty  = canEqLHSType lhs1
     lhs2_ty  = canEqLHSType lhs2
 
@@ -1639,9 +1641,10 @@ canEqCanLHS2 ev eq_rel swapped lhs1 ps_xi1 lhs2 ps_xi2 mco
     --      where grefl1 : lhs1 ~ lhs1 |> sym co
     --            grefl2 : lhs2 ~ lhs2 |> co
     finish_with_swapping
-      = do { let lhs1_redn = mkGReflRightMRedn role lhs1_ty sym_mco
-                 lhs2_redn = mkGReflLeftMRedn  role lhs2_ty mco
-           ; new_ev <-rewriteEqEvidence emptyRewriterSet ev swapped lhs1_redn lhs2_redn
+      = do { let lhs1_redn = mkGReflRightMRedn lhs1_ty sym_mco
+                 lhs2_redn = mkGReflLeftMRedn  lhs2_ty mco
+           ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
+                       (lhs1_ty, lhs1_redn) (mkCastTyMCo lhs2_ty mco, lhs2_redn)
            ; canEqCanLHSFinish new_ev eq_rel IsSwapped lhs2 (ps_xi1 `mkCastTyMCo` sym_mco) }
 
     put_tyvar_on_lhs = isWanted ev && eq_rel == NomEq
@@ -1772,7 +1775,7 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
               -> canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 
               | otherwise
-              -> tryIrredInstead reason ev eq_rel swapped lhs rhs ;
+              -> tryIrredInstead reason ev swapped lhs rhs ;
 
             PuOK _ rhs_redn ->
 
@@ -1783,10 +1786,11 @@ canEqCanLHSFinish_try_unification ev eq_rel swapped lhs rhs
          -- We unify alpha := Int, and set co := <Int>.  No need to
          -- swap to   co = sym co'
          --           co' = <Int>
-         new_ev <- if isReflCo (reductionCoercion rhs_redn)
+         new_ev <- if isReflDCo (reductionDCoercion rhs_redn)
                    then return ev
-                   else rewriteEqEvidence emptyRewriterSet ev swapped
-                            (mkReflRedn Nominal (mkTyVarTy tv)) rhs_redn
+                   else let lhs = mkTyVarTy tv
+                            in rewriteEqEvidence emptyRewriterSet ev swapped
+                            (lhs, mkReflRedn lhs) (rhs, rhs_redn)
 
        ; let tv_ty     = mkTyVarTy tv
              final_rhs = reductionReducedType rhs_redn
@@ -1848,12 +1852,12 @@ canEqCanLHSFinish_no_unification ev eq_rel swapped lhs rhs
 --              -> swapAndFinish ev eq_rel swapped lhs_ty can_rhs
 --              | otherwise
 
-              -> tryIrredInstead reason ev eq_rel swapped lhs rhs
+              -> tryIrredInstead reason ev swapped lhs rhs
 
             PuOK _ rhs_redn
               -> do { new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
-                                   (mkReflRedn (eqRelRole eq_rel) lhs_ty)
-                                   rhs_redn
+                                   (lhs_ty, mkReflRedn lhs_ty)
+                                   (rhs, rhs_redn)
 
                     -- Important: even if the coercion is Refl,
                     --   * new_ev has reductionReducedType on the RHS
@@ -1871,30 +1875,28 @@ swapAndFinish :: CtEvidence -> EqRel -> SwapFlag
 -- mentions alpha, it would not be a canonical constraint as-is.
 -- We want to flip it to (F tys ~ a), whereupon it is canonical
 swapAndFinish ev eq_rel swapped lhs_ty can_rhs
-  = do { new_ev <- rewriteEqEvidence emptyRewriterSet ev (flipSwap swapped)
-                       (mkReflRedn role (canEqLHSType can_rhs))
-                       (mkReflRedn role lhs_ty)
+  = do { let rhs = canEqLHSType can_rhs
+       ; new_ev <- rewriteEqEvidence emptyRewriterSet ev (flipSwap swapped)
+                       (rhs, mkReflRedn rhs)
+                       (lhs_ty, mkReflRedn lhs_ty)
        ; interactEq (EqCt { eq_ev  = new_ev, eq_eq_rel = eq_rel
                           , eq_lhs = can_rhs, eq_rhs = lhs_ty }) }
-  where
-    role = eqRelRole eq_rel
 
 ----------------------
-tryIrredInstead :: CheckTyEqResult -> CtEvidence -> EqRel -> SwapFlag
+tryIrredInstead :: CheckTyEqResult -> CtEvidence -> SwapFlag
                 -> CanEqLHS -> TcType -> TcS (StopOrContinue Ct)
 -- We have a non-canonical equality
 -- We still swap it if 'swapped' says so, so that it is oriented
 -- in the direction that the error message reporting machinery
 -- expects it; e.g.  (m ~ t m) rather than (t m ~ m)
 -- This is not very important, and only affects error reporting.
-tryIrredInstead reason ev eq_rel swapped lhs rhs
+tryIrredInstead reason ev swapped lhs rhs
   = do { traceTcS "cantMakeCanonical" (ppr reason $$ ppr lhs $$ ppr rhs)
+       ; let lhs_ty = canEqLHSType lhs
        ; new_ev <- rewriteEqEvidence emptyRewriterSet ev swapped
-                       (mkReflRedn role (canEqLHSType lhs))
-                       (mkReflRedn role rhs)
+                       (lhs_ty, mkReflRedn lhs_ty)
+                       (rhs, mkReflRedn rhs)
        ; solveIrredEquality (NonCanonicalReason reason) new_ev }
-  where
-    role = eqRelRole eq_rel
 
 -----------------------
 -- | Solve a reflexive equality constraint
@@ -2386,8 +2388,8 @@ rewriteEqEvidence :: RewriterSet        -- New rewriters
                   -> CtEvidence         -- Old evidence :: olhs ~ orhs (not swapped)
                                         --              or orhs ~ olhs (swapped)
                   -> SwapFlag
-                  -> Reduction          -- lhs_co :: olhs ~ nlhs
-                  -> Reduction          -- rhs_co :: orhs ~ nrhs
+                  -> (Type, Reduction)  -- lhs_co :: olhs ~ nlhs
+                  -> (Type, Reduction)  -- rhs_co :: orhs ~ nrhs
                   -> TcS CtEvidence     -- Of type nlhs ~ nrhs
 -- With reductions (Reduction lhs_co nlhs) (Reduction rhs_co nrhs),
 -- rewriteEqEvidence yields, for a given equality (Given g olhs orhs):
@@ -2404,10 +2406,11 @@ rewriteEqEvidence :: RewriterSet        -- New rewriters
 --      w : orhs ~ olhs = rhs_co ; sym w1 ; sym lhs_co
 --
 -- It's all a form of rewriteEvidence, specialised for equalities
-rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reduction rhs_co nrhs)
+rewriteEqEvidence new_rewriters old_ev swapped (olhs, lhs_redn@(Reduction lhs_dco nlhs))
+                                               (orhs, rhs_redn@(Reduction rhs_dco nrhs))
   | NotSwapped <- swapped
-  , isReflCo lhs_co      -- See Note [Rewriting with Refl]
-  , isReflCo rhs_co
+  , isReflDCo lhs_dco      -- See Note [Rewriting with Refl]
+  , isReflDCo rhs_dco
   = return (setCtEvPredType old_ev new_pred)
 
   | CtGiven { ctev_evar = old_evar } <- old_ev
@@ -2437,6 +2440,8 @@ rewriteEqEvidence new_rewriters old_ev swapped (Reduction lhs_co nlhs) (Reductio
   where
     new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
     loc      = ctEvLoc old_ev
+    lhs_co = mkHydrateReductionDCoercion (ctEvRole old_ev) olhs lhs_redn
+    rhs_co = mkHydrateReductionDCoercion (ctEvRole old_ev) orhs rhs_redn
 
 {-
 **********************************************************************
@@ -2678,7 +2683,6 @@ final_qci_check work_ct eq_rel lhs rhs
   where
     ev  = ctEvidence work_ct
     loc = ctEvLoc ev
-    role = eqRelRole eq_rel
 
     try_for_qci  -- First try looking for (lhs ~ rhs)
        | Just (cls, tys) <- boxEqPred eq_rel lhs rhs
@@ -2698,7 +2702,7 @@ final_qci_check work_ct eq_rel lhs rhs
             ; case res of
                 OneInst { cir_mk_ev = mk_ev }
                   -> do { ev' <- rewriteEqEvidence emptyRewriterSet ev IsSwapped
-                                      (mkReflRedn role rhs) (mkReflRedn role lhs)
+                                      (rhs, mkReflRedn rhs) (lhs, mkReflRedn lhs)
                         ; chooseInstance ev' (res { cir_mk_ev = mk_eq_ev cls tys mk_ev }) }
                 _ -> do { traceTcS "final_qci_check:3" (ppr work_ct)
                         ; continueWith work_ct }}

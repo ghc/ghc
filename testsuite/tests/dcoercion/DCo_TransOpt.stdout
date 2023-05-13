@@ -1,0 +1,80 @@
+OK:   lhs 1, rhs 1
+      Refl
+OK:   lhs 1, rhs 2
+      3
+OK:   lhs 1, rhs 3
+      13
+OK:   lhs 1, rhs 4
+      TC
+OK:   lhs 1, rhs 5
+      4 ; TC
+OK:   lhs 1, rhs 6
+      TC ; TC
+OK:   lhs 1, rhs 7
+      4 ; TC ; TC
+OK:   lhs 1, rhs 8
+      100
+OK:   lhs 2, rhs 1
+      3
+OK:   lhs 2, rhs 2
+      6
+OK:   lhs 2, rhs 3
+      16
+OK:   lhs 2, rhs 4
+      3 ; TC
+OK:   lhs 2, rhs 5
+      7 ; TC
+OK:   lhs 2, rhs 6
+      3 ; TC ; TC
+OK:   lhs 2, rhs 7
+      7 ; TC ; TC
+OK:   lhs 2, rhs 8
+      103
+OK:   lhs 3, rhs 1
+      TC ; 3
+OK:   lhs 3, rhs 2
+      TC ; 6
+OK:   lhs 3, rhs 3
+      TC ; 16
+OK:   lhs 3, rhs 4
+      TC ; 3 ; TC
+OK:   lhs 3, rhs 5
+      TC ; 7 ; TC
+OK:   lhs 3, rhs 6
+      TC ; 3 ; TC ; TC
+OK:   lhs 3, rhs 7
+      TC ; 7 ; TC ; TC
+OK:   lhs 3, rhs 8
+      TC ; 103
+OK:   lhs 4, rhs 1
+      TC ; TC ; 3
+OK:   lhs 4, rhs 2
+      TC ; TC ; 6
+OK:   lhs 4, rhs 3
+      TC ; TC ; 16
+OK:   lhs 4, rhs 4
+      TC ; TC ; 3 ; TC
+OK:   lhs 4, rhs 5
+      TC ; TC ; 7 ; TC
+OK:   lhs 4, rhs 6
+      TC ; TC ; 3 ; TC ; TC
+OK:   lhs 4, rhs 7
+      TC ; TC ; 7 ; TC ; TC
+OK:   lhs 4, rhs 8
+      TC ; TC ; 103
+OK:   lhs 5, rhs 1
+      TC ; TC ; 3
+OK:   lhs 5, rhs 2
+      TC ; TC ; 6
+OK:   lhs 5, rhs 3
+      TC ; TC ; 16
+OK:   lhs 5, rhs 4
+      TC ; TC ; 3 ; TC
+OK:   lhs 5, rhs 5
+      TC ; TC ; 7 ; TC
+OK:   lhs 5, rhs 6
+      TC ; TC ; 3 ; TC ; TC
+OK:   lhs 5, rhs 7
+      TC ; TC ; 7 ; TC ; TC
+OK:   lhs 5, rhs 8
+      TC ; TC ; 103

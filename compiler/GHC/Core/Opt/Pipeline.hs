@@ -199,7 +199,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
         runWhen (profiling && gopt Opt_ProfLateInlineCcs dflags) $ CoreAddLateCcs
 
     core_todo =
-     [
+       [
     -- We want to do the static argument transform before full laziness as it
     -- may expose extra opportunities to float things outwards. However, to fix
     -- up the output of the transformation we need at do at least one simplify

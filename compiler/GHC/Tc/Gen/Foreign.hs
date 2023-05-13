@@ -137,10 +137,10 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
       | (bndrs, inner_ty) <- splitForAllForAllTyBinders ty
       , not (null bndrs)
       = do redn <- go role rec_nts inner_ty
-           return $ mkHomoForAllRedn bndrs redn
+           return $ mkHomoForAllRedn bndrs inner_ty redn
 
       | otherwise -- see Note [Don't recur in normaliseFfiType']
-      = return $ mkReflRedn role ty
+      = return $ mkReflRedn ty
 
     go_tc_app :: Role -> RecTcChecker -> TyCon -> [Type]
               -> WriterT (Bag GlobalRdrElt) TcM Reduction
@@ -168,13 +168,13 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
                  Just gre ->
                    do { redn <- go role rec_nts' nt_rhs
                       ; tell (unitBag gre)
-                      ; return $ nt_co `mkTransRedn` redn } }
+                      ; return $ mkDehydrateCoercionRedn nt_co `mkTransRedn` redn } } -- AMG TODO
 
         | isFamilyTyCon tc              -- Expand open tycons
-        , Reduction co ty <- normaliseTcApp env role tc tys
-        , not (isReflexiveCo co)
+        , redn0@(Reduction dco ty) <- normaliseTcApp env role tc tys
+        , not (isReflexiveDCo role (mkTyConApp tc tys) dco ty)
         = do redn <- go role rec_nts ty
-             return $ co `mkTransRedn` redn
+             return $ redn0 `mkTransRedn` redn
 
         | otherwise
         = nothing -- see Note [Don't recur in normaliseFfiType']
@@ -184,12 +184,12 @@ normaliseFfiType' env ty0 = runWriterT $ go Representational initRecTc ty0
             = do { args <- unzipRedns <$>
                             zipWithM ( \ ty r -> go r rec_nts ty )
                                      tys (tyConRoleListX role tc)
-                 ; return $ mkTyConAppRedn role tc args }
+                 ; return $ mkTyConAppRedn tc args }
           nt_co  = mkUnbranchedAxInstCo role (newTyConCo tc) tys []
           nt_rhs = newTyConInstRhs tc tys
 
           ty      = mkTyConApp tc tys
-          nothing = return $ mkReflRedn role ty
+          nothing = return $ mkReflRedn ty
 
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc
@@ -252,7 +252,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
-       ; (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
+       ; (redn@(Reduction _ norm_sig_ty), gres) <- normaliseFfiType sig_ty
        ; let
              -- Drop the foralls before inspecting the
              -- structure of the foreign type.
@@ -272,10 +272,12 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
        ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
-       ; let fi_decl = ForeignImport { fd_name = L nloc id
-                                     , fd_sig_ty = undefined
-                                     , fd_i_ext = mkSymCo norm_co
-                                     , fd_fi = imp_decl' }
+       ; let co = mkSymCo $ mkHydrateReductionDCoercion Representational sig_ty redn
+             fi_decl =
+               ForeignImport { fd_name = L nloc id
+                             , fd_sig_ty = undefined
+                             , fd_i_ext = co
+                             , fd_fi = imp_decl' }
        ; return (id, L dloc fi_decl, gres) }
 tcFImport d = pprPanic "tcFImport" (ppr d)
 
@@ -411,7 +413,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
     rhs <- tcCheckPolyExpr (nlHsVar nm) sig_ty
 
-    (Reduction norm_co norm_sig_ty, gres) <- normaliseFfiType sig_ty
+    (redn@(Reduction _ norm_sig_ty), gres) <- normaliseFfiType sig_ty
 
     spec' <- tcCheckFEType norm_sig_ty spec
 
@@ -428,7 +430,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     return ( mkVarBind id rhs
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined
-                           , fd_e_ext = norm_co
+                           , fd_e_ext = mkHydrateReductionDCoercion Representational sig_ty redn
                            , fd_fe = spec' }
            , gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)

@@ -1010,31 +1010,40 @@ the rewriter set. We check this with an assertion.
  -}
 
 
-rewriteEvidence rewriters old_ev (Reduction co new_pred) do_next
-  | isReflCo co -- See Note [Rewriting with Refl]
+rewriteEvidence rewriters old_ev (Reduction dco new_pred) do_next
+  | isReflDCo dco -- See Note [Rewriting with Refl]
   = assert (isEmptyRewriterSet rewriters) $
     do_next (setCtEvPredType old_ev new_pred)
 
 rewriteEvidence rewriters ev@(CtGiven { ctev_evar = old_evar, ctev_loc = loc })
-                (Reduction co new_pred) do_next
+                          (Reduction dco new_pred) do_next
   = assert (isEmptyRewriterSet rewriters) $ -- this is a Given, not a wanted
-    do { new_ev <- newGivenEvVar loc (new_pred, new_tm)
+    do { let
+          old_pred = ctEvPred ev
+          dco' = downgradeDCoToRepresentational (ctEvRole ev) old_pred dco new_pred
+          co   = mkHydrateDCo Representational old_pred dco' new_pred
+
+          -- mkEvCast optimises ReflCo
+          new_tm = mkEvCast (evId old_evar) co
+       ; new_ev <- newGivenEvVar loc (new_pred, new_tm)
        ; do_next new_ev }
-  where
-    -- mkEvCast optimises ReflCo
-    new_tm = mkEvCast (evId old_evar)
-                (downgradeRole Representational (ctEvRole ev) co)
 
 rewriteEvidence new_rewriters
                 ev@(CtWanted { ctev_dest = dest
                              , ctev_loc = loc
                              , ctev_rewriters = rewriters })
-                (Reduction co new_pred) do_next
+                (Reduction dco new_pred) do_next
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
-       ; massert (coercionRole co == ctEvRole ev)
+       ; let
+          old_pred = ctEvPred ev
+          dco' = downgradeDCoToRepresentational (ctEvRole ev) old_pred dco new_pred
+          co   = mkHydrateDCo Representational old_pred dco' new_pred
+          -- NB: this call to mkHydrateDCo is OK, because of the invariant
+          -- on the LHS type stored in a Reduction. See Note [The Reduction type]
+          -- in GHC.Core.Reduction.
+
        ; setWantedEvTerm dest IsCoherent $
-            mkEvCast (getEvExpr mb_new_ev)
-                     (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
+            (mkEvCast (getEvExpr mb_new_ev) (mkSymCo co))
        ; case mb_new_ev of
             Fresh  new_ev -> do_next new_ev
             Cached _      -> stopWith ev "Cached wanted" }

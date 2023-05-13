@@ -79,7 +79,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
 
-  zonkTcType, zonkTcTypes, zonkCo,
+  zonkTcType, zonkTcTypes, zonkCo, zonkCtEvidence,
   zonkTyCoVarKind,
   zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
@@ -404,7 +404,7 @@ unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 -- itself is needed only for printing.)
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
-checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
+checkCoercionHole :: HasDebugCallStack => CoVar -> Coercion -> TcM Coercion
 checkCoercionHole cv co
   | debugIsOn
   = do { cv_ty <- zonkTcType (varType cv)
@@ -412,8 +412,10 @@ checkCoercionHole cv co
        ; return $
          assertPpr (ok cv_ty)
                    (text "Bad coercion hole" <+>
-                    ppr cv <> colon <+> vcat [ ppr t1, ppr t2, ppr role
-                                             , ppr cv_ty ])
+                    ppr cv <> colon <+> vcat [ text "t1:" <+> ppr t1
+                                             , text "t2:" <+> ppr t2
+                                             , text "role:" <+> ppr role
+                                             , text "cv_ty:" <+> ppr cv_ty ])
          co }
   | otherwise
   = return co
@@ -1542,26 +1544,43 @@ collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
                      -> VarSet -- bound variables
                      -> CandidatesQTvs -> Coercion
                      -> TcM CandidatesQTvs
-collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
+collect_cand_qtvs_co orig_ty cur_lvl bound dv = fst $ collect_cand_qtvs_co_dco orig_ty cur_lvl bound dv
+
+collect_cand_qtvs_dco :: TcType -- original type at top of recursion; for errors
+                      -> TcLevel
+                      -> VarSet -- bound variables
+                      -> CandidatesQTvs -> DCoercion
+                      -> TcM CandidatesQTvs
+collect_cand_qtvs_dco orig_ty cur_lvl bound dv = snd $ collect_cand_qtvs_co_dco orig_ty cur_lvl bound dv
+
+collect_cand_qtvs_co_dco :: TcType -- original type at top of recursion; for errors
+                         -> TcLevel
+                         -> VarSet -- bound variables
+                         -> CandidatesQTvs
+                         -> (Coercion -> TcM CandidatesQTvs, DCoercion -> TcM CandidatesQTvs)
+collect_cand_qtvs_co_dco orig_ty cur_lvl bound dv = (go_co dv, go_dco dv)
   where
-    go_co dv (Refl ty)               = collect_cand_qtvs orig_ty True cur_lvl bound dv ty
-    go_co dv (GRefl _ ty mco)        = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
-                                          ; go_mco dv1 mco }
-    go_co dv (TyConAppCo _ _ cos)    = foldlM go_co dv cos
-    go_co dv (AppCo co1 co2)         = foldlM go_co dv [co1, co2]
+    go_co :: CandidatesQTvs -> Coercion -> TcM CandidatesQTvs
+    go_co dv (Refl ty)             = collect_cand_qtvs orig_ty True cur_lvl bound dv ty
+    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv ty
+                                        go_mco dv1 mco
+    go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
+    go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
-    go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
-    go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2)   = do { dv1 <- go_prov dv prov
-                                          ; dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t1
-                                          ; collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2 }
-    go_co dv (SymCo co)              = go_co dv co
-    go_co dv (TransCo co1 co2)       = foldlM go_co dv [co1, co2]
-    go_co dv (SelCo _ co)            = go_co dv co
-    go_co dv (LRCo _ co)             = go_co dv co
-    go_co dv (InstCo co1 co2)        = foldlM go_co dv [co1, co2]
-    go_co dv (KindCo co)             = go_co dv co
-    go_co dv (SubCo co)              = go_co dv co
+    go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
+    go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
+    go_co dv (HydrateDCo _ t1 dco _) = do dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv t1
+                                          go_dco dv1 dco
+    go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov go_co dv prov
+                                        dv2 <- collect_cand_qtvs orig_ty True cur_lvl bound dv1 t1
+                                        collect_cand_qtvs orig_ty True cur_lvl bound dv2 t2
+    go_co dv (SymCo co)            = go_co dv co
+    go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (SelCo _ co)          = go_co dv co
+    go_co dv (LRCo _ co)           = go_co dv co
+    go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]
+    go_co dv (KindCo co)           = go_co dv co
+    go_co dv (SubCo co)            = go_co dv co
 
     go_co dv (HoleCo hole)
       = do m_co <- unpackCoercionHole_maybe hole
@@ -1575,13 +1594,33 @@ collect_cand_qtvs_co orig_ty cur_lvl bound = go_co
       = do { dv1 <- go_co dv kind_co
            ; collect_cand_qtvs_co orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
 
+    go_dco :: CandidatesQTvs -> DCoercion -> TcM CandidatesQTvs
+    go_dco dv ReflDCo                = return dv
+    go_dco dv (GReflRightDCo co)     = go_co dv co
+    go_dco dv (GReflLeftDCo  co)     = go_co dv co
+    go_dco dv (TyConAppDCo cos)      = foldlM go_dco dv cos
+    go_dco dv (AppDCo co1 co2)       = foldlM go_dco dv [co1, co2]
+    go_dco dv AxiomInstDCo{}         = return dv
+    go_dco dv StepsDCo{}             = return dv
+    go_dco dv (TransDCo co1 co2)     = foldlM go_dco dv [co1, co2]
+    go_dco dv (CoVarDCo cv)          = go_cv dv cv
+
+    go_dco dv (ForAllDCo tcv kind_dco co)
+      = do { dv1 <- go_dco dv kind_dco
+           ; collect_cand_qtvs_dco orig_ty cur_lvl (bound `extendVarSet` tcv) dv1 co }
+
+    go_dco dv (DehydrateCo co)       = go_co dv co
+    go_dco dv (UnivDCo prov rhs)     = do dv1 <- go_prov go_dco dv prov
+                                          collect_cand_qtvs orig_ty True cur_lvl bound dv1 rhs
+    go_dco dv (SubDCo dco)           = go_dco dv dco
+
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
 
-    go_prov dv (PhantomProv co)    = go_co dv co
-    go_prov dv (ProofIrrelProv co) = go_co dv co
-    go_prov dv (PluginProv _)      = return dv
-    go_prov dv (CorePrepProv _)    = return dv
+    go_prov collect dv (PhantomProv co)    = collect dv co
+    go_prov collect dv (ProofIrrelProv co) = collect dv co
+    go_prov _       dv (PluginProv _)      = return dv
+    go_prov _       dv (CorePrepProv _)    = return dv
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv
@@ -2831,7 +2870,7 @@ zonkRewriterSet (RewriterSet set)
 
     check_ty :: Type -> UnfilledCoercionHoleMonoid
     check_co :: Coercion -> UnfilledCoercionHoleMonoid
-    (check_ty, _, check_co, _) = foldTyCo folder ()
+    (check_ty, _, check_co, _, _, _) = foldTyCo folder ()
 
     folder :: TyCoFolder () UnfilledCoercionHoleMonoid
     folder = TyCoFolder { tcf_view  = noView

@@ -16,7 +16,15 @@ import GHCi.Message (EvalOpts(..))
 -- | Initialise coercion optimiser configuration from DynFlags
 initOptCoercionOpts :: DynFlags -> OptCoercionOpts
 initOptCoercionOpts dflags = OptCoercionOpts
-   { optCoercionEnabled = not (hasNoOptCoercion dflags)
+   { optCoercionOpts
+       = if hasNoOptCoercion dflags
+         then Nothing
+         else
+            let dco_method =
+                 if hasKeepDCoercions dflags
+                 then OptDCos { skipDCoOpt = True }
+                 else HydrateDCos
+            in Just dco_method
    }
 
 -- | Initialise Simple optimiser configuration from DynFlags

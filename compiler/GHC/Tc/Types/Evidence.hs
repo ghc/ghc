@@ -40,6 +40,7 @@ module GHC.Tc.Types.Evidence (
   -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion, TcMCoercionN, TcMCoercionR,
+  TcDCoercion,
   Role(..), LeftOrRight(..), pickLR,
   maybeSymCo,
   unwrapIP, wrapIP,
@@ -109,6 +110,7 @@ type TcCoercionP  = CoercionP    -- a phantom coercion
 type TcMCoercion  = MCoercion
 type TcMCoercionN = MCoercionN  -- nominal
 type TcMCoercionR = MCoercionR  -- representational
+type TcDCoercion  = DCoercion
 
 -- | If a 'SwapFlag' is 'IsSwapped', flip the orientation of a coercion
 maybeSymCo :: SwapFlag -> TcCoercion -> TcCoercion

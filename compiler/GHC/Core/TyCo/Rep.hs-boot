@@ -9,8 +9,9 @@ import {-# SOURCE #-} GHC.Core.TyCon ( TyCon )
 data Type
 data Coercion
 data FunSel
+data DCoercion
 data CoSel
-data UnivCoProvenance
+data UnivCoProvenance co
 data TyLit
 data MCoercion
 

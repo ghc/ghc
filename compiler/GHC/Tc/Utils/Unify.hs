@@ -2685,7 +2685,7 @@ mkOccFolders :: TcTyVar -> (TcType -> Bool, TcCoercion -> Bool)
 -- No expansion of type synonyms
 mkOccFolders lhs_tv = (getAny . check_ty, getAny . check_co)
   where
-    !(check_ty, _, check_co, _) = foldTyCo occ_folder emptyVarSet
+    !(check_ty, _, check_co, _, _check_dco, _) = foldTyCo occ_folder emptyVarSet
     occ_folder = TyCoFolder { tcf_view  = noView  -- Don't expand synonyms
                             , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                             , tcf_hole  = do_hole
@@ -2786,7 +2786,7 @@ pprPur (PuFail prob) = text "PuFail:" <> ppr prob
 pprPur (PuOK {})     = text "PuOK"
 
 okCheckRefl :: TcType -> TcM (PuResult a Reduction)
-okCheckRefl ty = return (PuOK emptyBag (mkReflRedn Nominal ty))
+okCheckRefl ty = return (PuOK emptyBag (mkReflRedn ty))
 
 failCheckWith :: CheckTyEqResult -> TcM (PuResult a b)
 failCheckWith p = return (PuFail p)
@@ -2898,9 +2898,12 @@ checkTyEqRhs flags ty
        -> failCheckWith impredicativeProblem -- Not allowed (TyEq:F)
        | otherwise
        -> do { w_res <- checkTyEqRhs flags w
+          --   ; a_rep <- fmap reductionDCoercion <$> checkTyEqRhs flags (getRuntimeRep a)
              ; a_res <- checkTyEqRhs flags a
+          --   ; r_rep <- fmap reductionDCoercion <$> checkTyEqRhs flags (getRuntimeRep r)
              ; r_res <- checkTyEqRhs flags r
-             ; return (mkFunRedn Nominal af <$> w_res <*> a_res <*> r_res) }
+             ; return (mkFunRedn af <$> w_res <*> pure ReflDCo <*> pure ReflDCo <*> a_res <*> r_res) }
+               -- SLD TODO not sure about this
 
       AppTy fun arg -> do { fun_res <- checkTyEqRhs flags fun
                           ; arg_res <- checkTyEqRhs flags arg
@@ -2908,10 +2911,10 @@ checkTyEqRhs flags ty
 
       CastTy ty co  -> do { ty_res <- checkTyEqRhs flags ty
                           ; co_res <- checkCo flags co
-                          ; return (mkCastRedn1 Nominal ty <$> co_res <*> ty_res) }
+                          ; return (mkCastRedn1 <$> co_res <*> ty_res) }
 
       CoercionTy co -> do { co_res <- checkCo flags co
-                          ; return (mkReflCoRedn Nominal <$> co_res) }
+                          ; return (mkReflCoRedn <$> co_res) }
 
       ForAllTy {}
          | tef_foralls flags -> okCheckRefl ty
@@ -3095,7 +3098,7 @@ checkTyConApp flags@(TEF { tef_unifying = unifying, tef_foralls = foralls_ok })
 recurseIntoTyConApp :: TyEqFlags a -> TyCon -> [TcType] -> TcM (PuResult a Reduction)
 recurseIntoTyConApp flags tc tys
   = do { tys_res <- mapCheck (checkTyEqRhs flags) tys
-       ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
+       ; return (mkTyConAppRedn tc <$> tys_res) }
 
 -------------------
 checkFamApp :: TyEqFlags a
@@ -3123,12 +3126,12 @@ checkFamApp flags@(TEF { tef_unifying = unifying, tef_occurs = occ_prob
       TEFA_Recurse
         -> do { tys_res <- mapCheck (checkTyEqRhs arg_flags) tys
               ; traceTc "under" (ppr tc $$ pprPur tys_res $$ ppr flags)
-              ; return (mkTyConAppRedn Nominal tc <$> tys_res) }
+              ; return (mkTyConAppRedn tc <$> tys_res) }
 
       TEFA_Break breaker    -- Recurse; and break if there is a problem
         -> do { tys_res <- mapCheck (checkTyEqRhs arg_flags) tys
               ; case tys_res of
-                  PuOK cts redns -> return (PuOK cts (mkTyConAppRedn Nominal tc redns))
+                  PuOK cts redns -> return (PuOK cts (mkTyConAppRedn tc redns))
                   PuFail {}      -> breaker fam_app }
   where
     arg_flags = famAppArgFlags flags

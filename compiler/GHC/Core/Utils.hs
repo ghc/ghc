@@ -2385,9 +2385,9 @@ isEmptyTy ty
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
   | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty
-                           `orElse` (mkReflRedn Representational ty)
+                               `orElse` (mkReflRedn ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
-  = Just (tc, tc_args, co)
+  = Just (tc, tc_args, mkHydrateDCo Representational ty co ty1)
 normSplitTyConApp_maybe _ _ = Nothing
 
 {-

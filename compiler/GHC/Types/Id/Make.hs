@@ -1048,9 +1048,9 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
-  | let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
+  | let mb_redn= topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of
+        arg_ty' = case mb_redn of
                     { Just redn -> scaledSet arg_ty (reductionReducedType redn)
                     ; Nothing   -> arg_ty }
   , all (not . isNewTyCon . fst) (splitTyConApp_maybe $ scaledThing arg_ty')
@@ -1058,9 +1058,10 @@ dataConSrcToImplBang bang_opts fam_envs arg_ty
   = if bang_opt_unbox_disable bang_opts
     then HsStrict True -- Not unpacking because of -O0
                        -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon
-    else case mb_co of
+    else case mb_redn of
            Nothing   -> HsUnpack Nothing
-           Just redn -> HsUnpack (Just $ reductionCoercion redn)
+           Just redn -> HsUnpack $ Just $
+                        mkHydrateReductionDCoercion Representational (scaledThing arg_ty) redn
 
   | otherwise -- Record the strict-but-no-unpack decision
   = HsStrict False

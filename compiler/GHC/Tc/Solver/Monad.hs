@@ -762,7 +762,8 @@ lookupFamAppInert rewrite_pred fam_tc tys
       | Just ecl <- findFunEq inert_funeqs fam_tc tys
       , Just (EqCt { eq_ev = ctev, eq_rhs = rhs })
           <- find (rewrite_pred . eqCtFlavourRole) ecl
-      = Just (mkReduction (ctEvCoercion ctev) rhs, ctEvFlavourRole ctev)
+      = Just (mkReduction (mkDehydrateCo (ctEvCoercion ctev)) rhs -- SLD TODO: avoid dehydrating?
+             ,ctEvFlavourRole ctev)
       | otherwise = Nothing
 
 lookupInInerts :: CtLoc -> TcPredType -> TcS (Maybe CtEvidence)
@@ -812,7 +813,6 @@ lookupFamAppCache fam_tc tys
            Nothing -> return Nothing }
 
 extendFamAppCache :: TyCon -> [Type] -> Reduction -> TcS ()
--- NB: co :: rhs ~ F tys, to match expectations of rewriter
 extendFamAppCache tc xi_args stuff@(Reduction _ ty)
   = do { dflags <- getDynFlags
        ; when (gopt Opt_FamAppCache dflags) $
@@ -831,7 +831,7 @@ dropFromFamAppCache varset
   where
     check :: Reduction -> Bool
     check redn
-      = not (anyFreeVarsOfCo (`elemVarSet` varset) $ reductionCoercion redn)
+      = not (anyFreeVarsOfDCo (`elemVarSet` varset) $ reductionDCoercion redn)
 
 {- *********************************************************************
 *                                                                      *
@@ -892,15 +892,16 @@ data TcSEnv
 
 ---------------
 newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
-  deriving (Functor)
-
-instance MonadFix TcS where
-  mfix k = TcS $ \env -> mfix (\x -> unTcS (k x) env)
 
 -- | Smart constructor for 'TcS', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
 mkTcS :: (TcSEnv -> TcM a) -> TcS a
 mkTcS f = TcS (oneShot f)
+
+-- Use the one-shot trick for the functor instance of 'TcS'.
+instance Functor TcS where
+  fmap f m = mkTcS $ \env ->
+    fmap f $ unTcS m env
 
 instance Applicative TcS where
   pure x = mkTcS $ \_ -> return x
@@ -912,6 +913,9 @@ instance Monad TcS where
 
 instance MonadIO TcS where
   liftIO act = TcS $ \_env -> liftIO act
+
+instance MonadFix TcS where
+  mfix k = TcS $ \env -> mfix (\x -> unTcS (k x) env)
 
 instance MonadFail TcS where
   fail err  = mkTcS $ \_ -> fail err
@@ -2103,7 +2107,7 @@ checkTouchableTyVarEq ev lhs_tv rhs
   | simpleUnifyCheck True lhs_tv rhs
     -- True <=> type families are ok on the RHS
   = do { traceTcS "checkTouchableTyVarEq: simple-check wins" (ppr lhs_tv $$ ppr rhs)
-       ; return (pure (mkReflRedn Nominal rhs)) }
+       ; return (pure (mkReflRedn rhs)) }
 
   | otherwise
   = do { traceTcS "checkTouchableTyVarEq {" (ppr lhs_tv $$ ppr rhs)
@@ -2165,8 +2169,8 @@ checkTouchableTyVarEq ev lhs_tv rhs
                                    , ctev_dest      = HoleDest hole
                                    , ctev_loc       = cb_loc
                                    , ctev_rewriters = ctEvRewriters ev }
-           ; return (PuOK (singleCt (mkNonCanonical new_ev))
-                          (mkReduction (HoleCo hole) new_tv_ty)) } }
+                 redn = mkDehydrateCoercionRedn (HoleCo hole)
+           ; return (PuOK (singleCt (mkNonCanonical new_ev)) redn) } }
 
     -- See Detail (7) of the Note
     cb_loc = updateCtLocOrigin (ctEvLoc ev) CycleBreakerOrigin
@@ -2231,7 +2235,7 @@ checkTypeEq ev eq_rel lhs rhs
     break_given fam_app
       = do { new_tv <- TcM.newCycleBreakerTyVar (typeKind fam_app)
            ; return (PuOK (unitBag (new_tv, fam_app))
-                          (mkReflRedn Nominal (mkTyVarTy new_tv))) }
+                          (mkReflRedn (mkTyVarTy new_tv))) }
                     -- Why reflexive? See Detail (4) of the Note
 
     ---------------------------

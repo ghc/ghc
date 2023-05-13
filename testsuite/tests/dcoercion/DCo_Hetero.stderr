@@ -1,5 +1,9 @@
 
+<<<<<<< HEAD
 DCo_Hetero.hs:24:10: warning: [GHC-06201] [-Wmissing-methods (in -Wdefault)]
+=======
+DCo_Hetero.hs:24:10: warning: [-Wmissing-methods (in -Wdefault)]
+>>>>>>> efc617419c (Directed coercions)
     • No explicit implementation for
         ‘fromEnum’
     • In the instance declaration for ‘Enum (a :~~: b)’
