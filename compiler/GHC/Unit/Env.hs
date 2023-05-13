@@ -78,7 +78,7 @@ import GHC.Utils.Panic.Plain
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import GHC.Utils.Misc (HasDebugCallStack)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic (pprPanic)
 import GHC.Unit.Module.ModIface

@@ -13,7 +13,7 @@ module GHC.Driver.Config.Diagnostic
 where
 
 import GHC.Driver.Flags
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Prelude
 
 import GHC.Utils.Outputable

@@ -232,7 +232,7 @@ import {-# SOURCE #-} GHC.Tc.Types.Origin
   , FixedRuntimeRepOrigin, FixedRuntimeRepContext )
 
 -- others:
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?

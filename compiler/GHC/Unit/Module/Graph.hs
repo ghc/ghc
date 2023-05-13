@@ -51,7 +51,7 @@ import GHC.Data.Maybe
 import GHC.Data.Graph.Directed
 
 import GHC.Driver.Backend
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Types.SourceFile ( hscSourceString )
 

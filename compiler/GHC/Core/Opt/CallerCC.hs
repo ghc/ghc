@@ -26,7 +26,7 @@ import qualified Text.ParserCombinators.ReadP as P
 
 import GHC.Prelude
 import GHC.Utils.Outputable as Outputable
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
 import GHC.Types.Name hiding (varName)

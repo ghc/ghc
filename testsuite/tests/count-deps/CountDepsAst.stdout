@@ -106,6 +106,7 @@ GHC.Driver.CmdLine
 GHC.Driver.Config.Core.Lint
 GHC.Driver.Config.Diagnostic
 GHC.Driver.Config.Logger
+GHC.Driver.DynFlags
 GHC.Driver.Env
 GHC.Driver.Env.KnotVars
 GHC.Driver.Env.Types
