@@ -16,6 +16,7 @@
   * Add `Data.Functor.unzip` ([CLC proposal #88](https://github.com/haskell/core-libraries-committee/issues/88))
   * Add `System.Mem.Weak.{get,set}FinalizerExceptionHandler`, which allows the user to set the global handler invoked by when a `Weak` pointer finalizer throws an exception. ([CLC proposal #126](https://github.com/haskell/core-libraries-committee/issues/126))
   * Add `System.Mem.Weak.printToHandleFinalizerExceptionHandler`, which can be used with `setFinalizerExceptionHandler` to print exceptions thrown by finalizers to the given `Handle`. ([CLC proposal #126](https://github.com/haskell/core-libraries-committee/issues/126))
+  * Add `Data.List.unsnoc` ([CLC proposal #165](https://github.com/haskell/core-libraries-committee/issues/165))
   * Implement more members of `instance Foldable (Compose f g)` explicitly.
       ([CLC proposal #57](https://github.com/haskell/core-libraries-committee/issues/57))
   * Add `Eq` and `Ord` instances for `SSymbol`, `SChar`, and `SNat`.

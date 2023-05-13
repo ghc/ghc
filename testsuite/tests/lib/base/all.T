@@ -8,3 +8,4 @@ test('executablePath', [extra_run_opts(config.os), js_broken(22261), when(arch('
 test('T17472', normal, compile_and_run, [''])
 test('T19569b', normal, compile_and_run, [''])
 test('Monoid_ByteArray', normal, compile_and_run, [''])
+test('Unsnoc', normal, compile_and_run, [''])

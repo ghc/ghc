@@ -26,6 +26,7 @@ module Data.OldList
    , tail
    , init
    , uncons
+   , unsnoc
    , singleton
    , null
    , length

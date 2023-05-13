@@ -31,7 +31,7 @@ module GHC.List (
    -- Other functions
    foldl1', concat, concatMap,
    map, (++), filter, lookup,
-   head, last, tail, init, uncons, (!?), (!!),
+   head, last, tail, init, uncons, unsnoc, (!?), (!!),
    scanl, scanl1, scanl', scanr, scanr1,
    iterate, iterate', repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break, reverse,
@@ -97,11 +97,11 @@ badHead = errorEmptyList "head"
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
--- | \(\mathcal{O}(1)\). Decompose a list into its head and tail.
+-- | \(\mathcal{O}(1)\). Decompose a list into its 'head' and 'tail'.
 --
 -- * If the list is empty, returns 'Nothing'.
 -- * If the list is non-empty, returns @'Just' (x, xs)@,
--- where @x@ is the head of the list and @xs@ its tail.
+-- where @x@ is the 'head' of the list and @xs@ its 'tail'.
 --
 -- @since 4.8.0.0
 --
@@ -114,6 +114,41 @@ badHead = errorEmptyList "head"
 uncons                  :: [a] -> Maybe (a, [a])
 uncons []               = Nothing
 uncons (x:xs)           = Just (x, xs)
+
+-- | \(\mathcal{O}(n)\). Decompose a list into 'init' and 'last'.
+--
+-- * If the list is empty, returns 'Nothing'.
+-- * If the list is non-empty, returns @'Just' (xs, x)@,
+-- where @xs@ is the 'init'ial part of the list and @x@ is its 'last' element.
+--
+-- @since 4.19.0.0
+--
+-- >>> unsnoc []
+-- Nothing
+-- >>> unsnoc [1]
+-- Just ([],1)
+-- >>> unsnoc [1, 2, 3]
+-- Just ([1,2],3)
+--
+-- Laziness:
+--
+-- >>> fst <$> unsnoc [undefined]
+-- Just []
+-- >>> head . fst <$> unsnoc (1 : undefined)
+-- Just *** Exception: Prelude.undefined
+-- >>> head . fst <$> unsnoc (1 : 2 : undefined)
+-- Just 1
+--
+-- 'unsnoc' is dual to 'uncons': for a finite list @xs@
+--
+-- > unsnoc xs = (\(hd, tl) -> (reverse tl, hd)) <$> uncons (reverse xs)
+--
+unsnoc :: [a] -> Maybe ([a], a)
+-- The lazy pattern ~(a, b) is important to be productive on infinite lists
+-- and not to be prone to stack overflows.
+-- Expressing the recursion via 'foldr' provides for list fusion.
+unsnoc = foldr (\x -> Just . maybe ([], x) (\(~(a, b)) -> (x : a, b))) Nothing
+{-# INLINABLE unsnoc #-}
 
 -- | \(\mathcal{O}(1)\). Extract the elements after the head of a list, which
 -- must be non-empty.
@@ -143,8 +178,7 @@ tail []                 =  errorEmptyList "tail"
 -- >>> last []
 -- *** Exception: Prelude.last: empty list
 --
--- WARNING: This function is partial. You can use 'reverse' with case-matching,
--- 'uncons' or 'listToMaybe' instead.
+-- WARNING: This function is partial. Consider using 'unsnoc' instead.
 last                    :: HasCallStack => [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -172,8 +206,7 @@ lastError = errorEmptyList "last"
 -- >>> init []
 -- *** Exception: Prelude.init: empty list
 --
--- WARNING: This function is partial. You can use 'reverse' with case-matching
--- or 'uncons' instead.
+-- WARNING: This function is partial. Consider using 'unsnoc' instead.
 init                    :: HasCallStack => [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
