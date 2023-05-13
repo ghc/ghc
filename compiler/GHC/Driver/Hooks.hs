@@ -32,7 +32,7 @@ where
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Pipeline.Phases
 
 import GHC.Hs.Decls

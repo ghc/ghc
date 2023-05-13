@@ -24,7 +24,7 @@ import GHC.Prelude
 import Data.Bifunctor
 import Data.Typeable
 
-import GHC.Driver.Session (DynFlags, PackageArg, gopt)
+import GHC.Driver.DynFlags (DynFlags, PackageArg, gopt)
 import GHC.Driver.Flags (GeneralFlag (Opt_BuildingCabalPackage))
 import GHC.Types.Error
 import GHC.Unit.Module

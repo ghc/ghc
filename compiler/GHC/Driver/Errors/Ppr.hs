@@ -13,7 +13,7 @@ import GHC.Prelude
 
 import GHC.Driver.Errors.Types
 import GHC.Driver.Flags
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr ()
 import GHC.Types.Error

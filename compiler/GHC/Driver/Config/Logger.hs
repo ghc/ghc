@@ -5,7 +5,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Utils.Logger (LogFlags (..))
 import GHC.Utils.Outputable

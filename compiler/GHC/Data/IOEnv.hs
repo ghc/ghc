@@ -34,7 +34,7 @@ module GHC.Data.IOEnv (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.IO (catchException)
 import GHC.Utils.Exception

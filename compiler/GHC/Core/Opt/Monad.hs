@@ -40,7 +40,7 @@ module GHC.Core.Opt.Monad (
 
 import GHC.Prelude hiding ( read )
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 
 import GHC.Core.Rules     ( RuleBase, RuleEnv, mkRuleEnv )

@@ -27,7 +27,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Unit.Types
 import GHC.Unit.Module

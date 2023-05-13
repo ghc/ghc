@@ -41,7 +41,7 @@ import GHC.Unit.Module.Env
 import GHC.Unit.Module.ModGuts( ModGuts(..) )
 import GHC.Unit.Module.Deps( Dependencies(..) )
 
-import GHC.Driver.Session( DynFlags )
+import GHC.Driver.DynFlags( DynFlags )
 import GHC.Driver.Ppr( showSDoc )
 
 import GHC.Core         -- All of it

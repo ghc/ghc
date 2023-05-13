@@ -19,7 +19,7 @@ import GHC.Prelude
 
 import GHC.Hs
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import {-# SOURCE #-} GHC.Driver.Plugins
 
 import GHC.Runtime.Eval.Types ( IcGlobalRdrEnv(..), Resume )
