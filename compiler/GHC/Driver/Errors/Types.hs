@@ -35,6 +35,7 @@ import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Hs.Extension          (GhcTc)
 
 import Language.Haskell.Syntax.Decls (RuleDecl)
+import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Generics ( Generic )
 
@@ -371,6 +372,16 @@ data DriverMessage where
   DriverHomePackagesNotClosed :: ![UnitId] -> DriverMessage
 
   DriverInterfaceError :: !IfaceMessage -> DriverMessage
+
+  DriverInconsistentDynFlags :: String -> DriverMessage
+
+  DriverSafeHaskellIgnoredExtension :: !LangExt.Extension -> DriverMessage
+
+  DriverPackageTrustIgnored :: DriverMessage
+
+  DriverUnrecognisedFlag :: String -> DriverMessage
+
+  DriverDeprecatedFlag :: String -> String -> DriverMessage
 
 deriving instance Generic DriverMessage
 

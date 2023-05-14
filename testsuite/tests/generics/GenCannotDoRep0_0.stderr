@@ -1,5 +1,5 @@
 
-GenCannotDoRep0_0.hs:6:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+GenCannotDoRep0_0.hs:6:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 GenCannotDoRep0_0.hs:13:45: error: [GHC-16437]

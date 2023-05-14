@@ -1,5 +1,5 @@
 
-tcfail137.hs:1:14: warning: [-Wdeprecated-flags (in -Wdefault)]
+tcfail137.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 
 tcfail137.hs:8:5: error: [GHC-39999]

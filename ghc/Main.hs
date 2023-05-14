@@ -23,6 +23,7 @@ import GHC.Driver.Backend
 import GHC.Driver.CmdLine
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -163,7 +164,7 @@ main = do
                 Right postLoadMode ->
                     main' postLoadMode units dflags argv3 flagWarnings
 
-main' :: PostLoadMode -> [String] -> DynFlags -> [Located String] -> [Warn]
+main' :: PostLoadMode -> [String] -> DynFlags -> [Located String] -> Messages DriverMessage
       -> Ghc ()
 main' postLoadMode units dflags0 args flagWarnings = do
   let args' = case postLoadMode of
@@ -243,12 +244,13 @@ main' postLoadMode units dflags0 args flagWarnings = do
 
   GHC.prettyPrintGhcErrors logger4 $ do
 
-  let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
+  let diag_opts = initDiagOpts dflags4
+  let flagWarnings' = GhcDriverMessage <$> mconcat [flagWarnings, dynamicFlagWarnings]
 
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger4 (initPrintConfig dflags4) (initDiagOpts dflags4) flagWarnings'
+         liftIO $ printOrThrowDiagnostics logger4 (initPrintConfig dflags4) diag_opts flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -573,7 +575,7 @@ isCompManagerMode _             = False
 parseModeFlags :: [Located String]
                -> IO (Mode, [String],
                       [Located String],
-                      [Warn])
+                      Messages DriverMessage)
 parseModeFlags args = do
   ((leftover, errs1, warns), (mModeFlag, units, errs2, flags')) <-
         processCmdLineP mode_flags (Nothing, [], [], []) args
@@ -787,7 +789,7 @@ initMulti unitArgsFiles  = do
     handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger (initPrintConfig dflags2) (initDiagOpts dflags2) warns
+         liftIO $ printOrThrowDiagnostics logger (initPrintConfig dflags2) (initDiagOpts dflags2) (GhcDriverMessage <$> warns)
 
     let (dflags3, srcs, objs) = parseTargetFiles dflags2 (map unLoc fileish_args)
         dflags4 = offsetDynFlags dflags3

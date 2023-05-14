@@ -1,5 +1,5 @@
 
-when making flags consistent: warning:
+when making flags consistent: warning: [GHC-74335]
     Optimization flags are incompatible with the byte-code interpreter; optimization flags ignored.
 
 <interactive>:10:25: error: [GHC-39999]

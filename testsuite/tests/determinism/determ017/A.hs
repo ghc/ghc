@@ -19,6 +19,7 @@
 
 -- | Module "Trampoline" defines the pipe computations and their basic building blocks.
 
+{-# OPTIONS -w #-}
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, MultiParamTypeClasses,
              TypeFamilies, KindSignatures, FlexibleContexts,
              FlexibleInstances, OverlappingInstances, UndecidableInstances
@@ -40,7 +41,6 @@
   And that gives an infinite loop in the type checker!
 -}
 
-{-# OPTIONS -w #-}
 
 module A where
 

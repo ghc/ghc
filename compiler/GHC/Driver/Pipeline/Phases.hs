@@ -7,7 +7,6 @@ import GHC.Prelude
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Env.Types
 import GHC.Driver.Session
-import GHC.Driver.CmdLine
 import GHC.Types.SourceFile
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Status
@@ -29,7 +28,7 @@ import GHC.Unit.Home.ModInfo
 -- phase if the inputs have been modified.
 data TPhase res where
   T_Unlit :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
-  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, Messages PsMessage, [Warn])
+  T_FileArgs :: HscEnv -> FilePath -> TPhase (DynFlags, Messages PsMessage, Messages DriverMessage)
   T_Cpp   :: PipeEnv -> HscEnv -> FilePath -> TPhase FilePath
   T_HsPp  :: PipeEnv -> HscEnv -> FilePath -> FilePath -> TPhase FilePath
   T_HscRecomp :: PipeEnv -> HscEnv -> FilePath -> HscSource -> TPhase (HscEnv, ModSummary, HscRecompStatus)

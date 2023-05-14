@@ -46,6 +46,7 @@ import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.PatSyn
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
@@ -3145,7 +3146,7 @@ newDynFlags interactive_only minus_opts = do
       idflags0 <- GHC.getInteractiveDynFlags
       (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
 
-      liftIO $ handleFlagWarnings logger (initPrintConfig idflags1) (initDiagOpts idflags1) warns
+      liftIO $ printOrThrowDiagnostics logger (initPrintConfig idflags1) (initDiagOpts idflags1) (GhcDriverMessage <$> warns)
       when (not $ null leftovers)
            (throwGhcException . CmdLineError
             $ "Some flags have not been recognized: "

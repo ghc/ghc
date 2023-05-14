@@ -1,5 +1,5 @@
 
-T3731.hs:4:15: warning: [-Wdeprecated-flags (in -Wdefault)]
+T3731.hs:4:15: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
 
 T3731.hs:122:32: error: [GHC-39999]

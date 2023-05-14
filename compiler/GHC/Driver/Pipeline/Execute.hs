@@ -28,7 +28,6 @@ import GHC.Unit.Module.Status
 import GHC.Unit.Module.ModIface
 import GHC.Driver.Backend
 import GHC.Driver.Session
-import GHC.Driver.CmdLine
 import GHC.Unit.Module.ModSummary
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.SrcLoc
@@ -683,7 +682,7 @@ runUnlitPhase hsc_env input_fn output_fn = do
 
     return output_fn
 
-getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, Messages PsMessage, [Warn]))
+getFileArgs :: HscEnv -> FilePath -> IO ((DynFlags, Messages PsMessage, Messages DriverMessage))
 getFileArgs hsc_env input_fn = do
   let dflags0 = hsc_dflags hsc_env
       parser_opts = initParserOpts dflags0

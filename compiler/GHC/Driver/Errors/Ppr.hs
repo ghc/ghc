@@ -222,6 +222,19 @@ instance Diagnostic DriverMessage where
                                   ++ map (\uid -> text "-" <+> ppr uid) needed_unit_ids)
     DriverInterfaceError reason -> diagnosticMessage (ifaceDiagnosticOpts opts) reason
 
+    DriverInconsistentDynFlags msg
+      -> mkSimpleDecorated $ text msg
+    DriverSafeHaskellIgnoredExtension ext
+      -> let arg = text "-X" <> ppr ext
+         in mkSimpleDecorated $ arg <+> text "is not allowed in Safe Haskell; ignoring" <+> arg
+    DriverPackageTrustIgnored
+      -> mkSimpleDecorated $ text "-fpackage-trust ignored; must be specified with a Safe Haskell flag"
+
+    DriverUnrecognisedFlag arg
+      -> mkSimpleDecorated $ text $ "unrecognised warning flag: -" ++ arg
+    DriverDeprecatedFlag arg msg
+      -> mkSimpleDecorated $ text $ arg ++ " is deprecated: " ++ msg
+
   diagnosticReason = \case
     DriverUnknownMessage m
       -> diagnosticReason m
@@ -276,6 +289,16 @@ instance Diagnostic DriverMessage where
     DriverHomePackagesNotClosed {}
       -> ErrorWithoutFlag
     DriverInterfaceError reason -> diagnosticReason reason
+    DriverInconsistentDynFlags {}
+      -> WarningWithoutFlag
+    DriverSafeHaskellIgnoredExtension {}
+      -> WarningWithoutFlag
+    DriverPackageTrustIgnored {}
+      -> WarningWithoutFlag
+    DriverUnrecognisedFlag {}
+      -> WarningWithFlag Opt_WarnUnrecognisedWarningFlags
+    DriverDeprecatedFlag {}
+      -> WarningWithFlag Opt_WarnDeprecatedFlags
 
   diagnosticHints = \case
     DriverUnknownMessage m
@@ -333,5 +356,15 @@ instance Diagnostic DriverMessage where
     DriverHomePackagesNotClosed {}
       -> noHints
     DriverInterfaceError reason -> diagnosticHints reason
+    DriverInconsistentDynFlags {}
+      -> noHints
+    DriverSafeHaskellIgnoredExtension {}
+      -> noHints
+    DriverPackageTrustIgnored {}
+      -> noHints
+    DriverUnrecognisedFlag {}
+      -> noHints
+    DriverDeprecatedFlag {}
+      -> noHints
 
   diagnosticCode = constructorCode

@@ -1,5 +1,5 @@
 
-SafeLang07.hs:2:14: warning:
+SafeLang07.hs:2:14: warning: [GHC-98887]
     -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
 
 SafeLang07.hs:15:1: error: [GHC-87110]

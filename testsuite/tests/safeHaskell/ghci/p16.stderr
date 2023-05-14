@@ -1,5 +1,5 @@
 
-<no location info>: warning:
+<no location info>: warning: [GHC-98887]
     -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
 
 <interactive>:16:29: error: [GHC-82023]
