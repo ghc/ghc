@@ -737,7 +737,7 @@ preprocessPipeline pipe_env hsc_env input_fn = do
 
   let print_config = initPrintConfig dflags3
   liftIO (printOrThrowDiagnostics (hsc_logger hsc_env) print_config (initDiagOpts dflags3) (GhcPsMessage <$> p_warns3))
-  liftIO (handleFlagWarnings (hsc_logger hsc_env) print_config (initDiagOpts dflags3) warns3)
+  liftIO (printOrThrowDiagnostics (hsc_logger hsc_env) print_config (initDiagOpts dflags3) (GhcDriverMessage <$> warns3))
   return (dflags3, pp_fn)
 
 

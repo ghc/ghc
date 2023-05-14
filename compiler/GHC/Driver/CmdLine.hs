@@ -17,7 +17,7 @@ module GHC.Driver.CmdLine
       Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag, hoistFlag,
       errorsToGhcException,
 
-      Err(..), Warn(..), WarnReason(..),
+      Err(..), Warn, warnsToMessages,
 
       EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM
     ) where
@@ -25,14 +25,15 @@ module GHC.Driver.CmdLine
 import GHC.Prelude
 
 import GHC.Utils.Misc
-import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Data.Bag
 import GHC.Types.SrcLoc
-import GHC.Utils.Json
-
-import GHC.Types.Error ( DiagnosticReason(..) )
+import GHC.Types.Error
+import GHC.Utils.Error
+import GHC.Driver.Errors.Types
+import GHC.Driver.Errors.Ppr ()
+import GHC.Utils.Outputable (text)
 
 import Data.Function
 import Data.List (sortBy, intercalate, stripPrefix)
@@ -107,32 +108,16 @@ data OptKind m                             -- Suppose the flag is -f
 --         The EwM monad
 --------------------------------------------------------
 
--- | Used when filtering warnings: if a reason is given
--- it can be filtered out when displaying.
-data WarnReason
-  = NoReason
-  | ReasonDeprecatedFlag
-  | ReasonUnrecognisedFlag
-  deriving (Eq, Show)
-
-instance Outputable WarnReason where
-  ppr = text . show
-
-instance ToJson WarnReason where
-  json NoReason = JSNull
-  json reason   = JSString $ show reason
-
 -- | A command-line error message
 newtype Err  = Err { errMsg :: Located String }
 
 -- | A command-line warning message and the reason it arose
-data Warn = Warn
-  {   warnReason :: DiagnosticReason,
-      warnMsg    :: Located String
-  }
+--
+-- This used to be own type, but now it's just @'MsgEnvelope' 'DriverMessage'@.
+type Warn = Located DriverMessage
 
 type Errs  = Bag Err
-type Warns = Bag Warn
+type Warns = [Warn]
 
 -- EwM ("errors and warnings monad") is a monad
 -- transformer for m that adds an (err, warn) state
@@ -152,7 +137,7 @@ instance MonadIO m => MonadIO (EwM m) where
     liftIO = liftEwM . liftIO
 
 runEwM :: EwM m a -> m (Errs, Warns, a)
-runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag emptyBag
+runEwM action = unEwM action (panic "processArgs: no arg yet") emptyBag mempty
 
 setArg :: Located String -> EwM m () -> EwM m ()
 setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
@@ -161,11 +146,12 @@ addErr :: Monad m => String -> EwM m ()
 addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` Err (L loc e), ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn = addFlagWarn WarningWithoutFlag
+addWarn msg = addFlagWarn $ DriverUnknownMessage $ UnknownDiagnostic $
+  mkPlainDiagnostic WarningWithoutFlag noHints $ text msg
 
-addFlagWarn :: Monad m => DiagnosticReason -> String -> EwM m ()
-addFlagWarn reason msg = EwM $
-  (\(L loc _) es ws -> return (es, ws `snocBag` Warn reason (L loc msg), ()))
+addFlagWarn :: Monad m => DriverMessage -> EwM m ()
+addFlagWarn msg = EwM
+  (\(L loc _) es ws -> return (es, L loc msg : ws, ()))
 
 getArg :: Monad m => EwM m String
 getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
@@ -176,6 +162,10 @@ getCurLoc = EwM (\(L loc _) es ws -> return (es, ws, loc))
 liftEwM :: Monad m => m a -> EwM m a
 liftEwM action = EwM (\_ es ws -> do { r <- action; return (es, ws, r) })
 
+warnsToMessages :: DiagOpts -> [Warn] -> Messages DriverMessage
+warnsToMessages diag_opts = foldr
+  (\(L loc w) ws -> addMessage (mkPlainMsgEnvelope diag_opts loc w) ws)
+  emptyMessages
 
 --------------------------------------------------------
 --         Processing arguments
@@ -187,10 +177,10 @@ processArgs :: Monad m
             -> (FilePath -> EwM m [Located String]) -- ^ response file handler
             -> m ( [Located String],  -- spare args
                    [Err],  -- errors
-                   [Warn] ) -- warnings
+                   Warns ) -- warnings
 processArgs spec args handleRespFile = do
     (errs, warns, spare) <- runEwM action
-    return (spare, bagToList errs, bagToList warns)
+    return (spare, bagToList errs, warns)
   where
     action = process args []
 

@@ -297,6 +297,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DriverCannotImportFromUntrustedPackage"        = 75165
   GhcDiagnosticCode "DriverRedirectedNoMain"                        = 95379
   GhcDiagnosticCode "DriverHomePackagesNotClosed"                   = 03271
+  GhcDiagnosticCode "DriverInconsistentDynFlags"                    = 74335
+  GhcDiagnosticCode "DriverSafeHaskellIgnoredExtension"             = 98887
+  GhcDiagnosticCode "DriverPackageTrustIgnored"                     = 83552
+  GhcDiagnosticCode "DriverUnrecognisedFlag"                        = 93741
+  GhcDiagnosticCode "DriverDeprecatedFlag"                          = 53692
 
   -- Constraint solver diagnostic codes
   GhcDiagnosticCode "BadTelescope"                                  = 97739

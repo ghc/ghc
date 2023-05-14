@@ -235,8 +235,10 @@ import GHC.Unit.Parser
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Driver.DynFlags
+import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Flags
 import GHC.Driver.Backend
+import GHC.Driver.Errors.Types
 import GHC.Driver.Plugins.External
 import GHC.Settings.Config
 import GHC.Core.Unfold
@@ -247,6 +249,7 @@ import GHC.Utils.Constants (debugIsOn)
 import GHC.Utils.GlobalVars
 import GHC.Data.Maybe
 import GHC.Data.Bool
+import GHC.Types.Error
 import GHC.Utils.Monad
 import GHC.Types.SrcLoc
 import GHC.Types.SafeHaskell
@@ -356,7 +359,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 -- -----------------------------------------------------------------------------
 -- DynFlags
-
 
 {- Note [RHS Floating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -545,14 +547,14 @@ combineSafeFlags a b | a == Sf_None         = return b
 --     * function to test if the flag is on
 --     * function to turn the flag off
 unsafeFlags, unsafeFlagsForInfer
-  :: [(String, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
-unsafeFlags = [ ("-XGeneralizedNewtypeDeriving", newDerivOnLoc,
+  :: [(LangExt.Extension, DynFlags -> SrcSpan, DynFlags -> Bool, DynFlags -> DynFlags)]
+unsafeFlags = [ (LangExt.GeneralizedNewtypeDeriving, newDerivOnLoc,
                     xopt LangExt.GeneralizedNewtypeDeriving,
                     flip xopt_unset LangExt.GeneralizedNewtypeDeriving)
-              , ("-XDerivingVia", deriveViaOnLoc,
+              , (LangExt.DerivingVia, deriveViaOnLoc,
                     xopt LangExt.DerivingVia,
                     flip xopt_unset LangExt.DerivingVia)
-              , ("-XTemplateHaskell", thOnLoc,
+              , (LangExt.TemplateHaskell, thOnLoc,
                     xopt LangExt.TemplateHaskell,
                     flip xopt_unset LangExt.TemplateHaskell)
               ]
@@ -753,7 +755,7 @@ updOptLevel n = fst . updOptLevelChanged n
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
 parseDynamicFlagsCmdLine :: MonadIO m => DynFlags -> [Located String]
-                         -> m (DynFlags, [Located String], [Warn])
+                         -> m (DynFlags, [Located String], Messages DriverMessage)
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
 parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
@@ -763,7 +765,7 @@ parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
 parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
-                       -> m (DynFlags, [Located String], [Warn])
+                       -> m (DynFlags, [Located String], Messages DriverMessage)
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
@@ -813,9 +815,9 @@ parseDynamicFlagsFull
     -> Bool                          -- ^ are the arguments from the command line?
     -> DynFlags                      -- ^ current dynamic flags
     -> [Located String]              -- ^ arguments to parse
-    -> m (DynFlags, [Located String], [Warn])
+    -> m (DynFlags, [Located String], Messages DriverMessage)
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
-  ((leftover, errs, warns), dflags1) <- processCmdLineP activeFlags dflags0 args
+  ((leftover, errs, cli_warns), dflags1) <- processCmdLineP activeFlags dflags0 args
 
   -- See Note [Handling errors when parsing command-line flags]
   let rdr = renderWithContext (initSDocContext dflags0 defaultUserStyle)
@@ -840,28 +842,29 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   liftIO $ setUnsafeGlobalDynFlags dflags3
 
-  let warns' = map (Warn WarningWithoutFlag) (consistency_warnings ++ sh_warns)
+  -- create message envelopes using final DynFlags: #23402
+  let diag_opts = initDiagOpts dflags3
+      warns = warnsToMessages diag_opts $ mconcat [consistency_warnings, sh_warns, cli_warns]
 
-  return (dflags3, leftover, warns' ++ warns)
+  return (dflags3, leftover, warns)
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.
 --
 -- The bool is to indicate if we are parsing command line flags (false means
 -- file pragma). This allows us to generate better warnings.
-safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Located String])
+safeFlagCheck :: Bool -> DynFlags -> (DynFlags, [Warn])
 safeFlagCheck _ dflags | safeLanguageOn dflags = (dflagsUnset, warns)
   where
     -- Handle illegal flags under safe language.
-    (dflagsUnset, warns) = foldl' check_method (dflags, []) unsafeFlags
+    (dflagsUnset, warns) = foldl' check_method (dflags, mempty) unsafeFlags
 
-    check_method (df, warns) (str,loc,test,fix)
-        | test df   = (fix df, warns ++ safeFailure (loc df) str)
+    check_method (df, warns) (ext,loc,test,fix)
+        | test df   = (fix df, safeFailure (loc df) ext :  warns)
         | otherwise = (df, warns)
 
-    safeFailure loc str
-       = [L loc $ str ++ " is not allowed in Safe Haskell; ignoring "
-           ++ str]
+    safeFailure loc ext
+       = L loc $ DriverSafeHaskellIgnoredExtension ext
 
 safeFlagCheck cmdl dflags =
   case safeInferOn dflags of
@@ -874,11 +877,10 @@ safeFlagCheck cmdl dflags =
     (dflags', warn)
       | not (safeHaskellModeEnabled dflags) && not cmdl && packageTrustOn dflags
       = (gopt_unset dflags Opt_PackageTrust, pkgWarnMsg)
-      | otherwise = (dflags, [])
+      | otherwise = (dflags, mempty)
 
-    pkgWarnMsg = [L (pkgTrustOnLoc dflags') $
-                    "-fpackage-trust ignored;" ++
-                    " must be specified with a Safe Haskell flag"]
+    pkgWarnMsg :: [Warn]
+    pkgWarnMsg = [ L (pkgTrustOnLoc dflags') DriverPackageTrustIgnored ]
 
     -- Have we inferred Unsafe? See Note [Safe Haskell Inference] in GHC.Driver.Main
     -- Force this to avoid retaining reference to old DynFlags value
@@ -1894,7 +1896,7 @@ warningControls set unset set_werror unset_fatal xs =
 customOrUnrecognisedWarning :: String -> (WarningCategory -> DynP ()) -> Flag (CmdLineP DynFlags)
 customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
   where
-    action :: String -> EwM (CmdLineP DynFlags) ()
+    action :: String -> DynP ()
     action flag
       | validWarningCategory cat = custom cat
       | otherwise = unrecognised flag
@@ -1902,9 +1904,11 @@ customOrUnrecognisedWarning prefix custom = defHiddenFlag prefix (Prefix action)
         cat = mkWarningCategory (mkFastString flag)
 
     unrecognised flag = do
+      -- #23402 and #12056
+      -- for unrecognised flags we consider current dynflags, not the final one.
+      -- But if final state says to not report unrecognised flags, they won't anyway.
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addFlagWarn (WarningWithFlag Opt_WarnUnrecognisedWarningFlags) $
-        "unrecognised warning flag: -" ++ prefix ++ flag
+      when f $ addFlagWarn (DriverUnrecognisedFlag (prefix ++ flag))
 
 -- See Note [Supporting CLI completion]
 package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
@@ -2089,11 +2093,10 @@ mkFlag turn_on flagPrefix f (dep, (FlagSpec name flag extra_action mode))
     = (dep,
        Flag (flagPrefix ++ name) (NoArg (f flag >> extra_action turn_on)) mode)
 
--- here to avoid module cycle with GHC.Driver.CmdLine
-deprecate :: Monad m => String -> EwM m ()
+deprecate :: String -> DynP ()
 deprecate s = do
     arg <- getArg
-    addFlagWarn (WarningWithFlag Opt_WarnDeprecatedFlags) (arg ++ " is deprecated: " ++ s)
+    addFlagWarn (DriverDeprecatedFlag arg s)
 
 deprecatedForExtension :: String -> TurnOnFlag -> String
 deprecatedForExtension lang turn_on
@@ -3589,7 +3592,7 @@ T10052 and #10052).
 -- | Resolve any internal inconsistencies in a set of 'DynFlags'.
 -- Returns the consistent 'DynFlags' as well as a list of warnings
 -- to report to the user.
-makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Located String])
+makeDynFlagsConsistent :: DynFlags -> (DynFlags, [Warn])
 -- Whenever makeDynFlagsConsistent does anything, it starts over, to
 -- ensure that a later change doesn't invalidate an earlier check.
 -- Be careful not to introduce potential loops!
@@ -3675,11 +3678,11 @@ makeDynFlagsConsistent dflags
  , Nothing <- outputFile dflags
  = pgmError "--output must be specified when using --merge-objs"
 
- | otherwise = (dflags, [])
+ | otherwise = (dflags, mempty)
     where loc = mkGeneralSrcSpan (fsLit "when making flags consistent")
           loop updated_dflags warning
               = case makeDynFlagsConsistent updated_dflags of
-                (dflags', ws) -> (dflags', L loc warning : ws)
+                (dflags', ws) -> (dflags', L loc (DriverInconsistentDynFlags warning) : ws)
           platform = targetPlatform dflags
           arch = platformArch platform
           os   = platformOS   platform

@@ -1710,9 +1710,9 @@ markUnsafeInfer tcg_env whyUnsafe = do
                                     (vcat $ badInsts $ tcg_insts tcg_env)
                          ]
     badFlags df   = concatMap (badFlag df) unsafeFlagsForInfer
-    badFlag df (str,loc,on,_)
+    badFlag df (ext,loc,on,_)
         | on df     = [mkLocMessage MCOutput (loc df) $
-                            text str <+> text "is not allowed in Safe Haskell"]
+                            text "-X" <> ppr ext <+> text "is not allowed in Safe Haskell"]
         | otherwise = []
     badInsts insts = concatMap badInst insts
 

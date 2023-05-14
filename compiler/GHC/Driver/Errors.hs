@@ -2,20 +2,16 @@
 module GHC.Driver.Errors (
     printOrThrowDiagnostics
   , printMessages
-  , handleFlagWarnings
   , mkDriverPsHeaderMessage
   ) where
 
 import GHC.Driver.Errors.Types
-import GHC.Data.Bag
 import GHC.Prelude
-import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.Error
 import GHC.Utils.Error
 import GHC.Utils.Outputable (hang, ppr, ($$),  text, mkErrStyle, sdocStyle, updSDocContext )
 import GHC.Utils.Logger
-import qualified GHC.Driver.CmdLine as CmdLine
 
 printMessages :: forall a . Diagnostic a => Logger -> DiagnosticOpts a -> DiagOpts -> Messages a -> IO ()
 printMessages logger msg_opts opts msgs
@@ -37,19 +33,6 @@ printMessages logger msg_opts opts msgs
                [h] -> main_msg $$ hang (text "Suggested fix:") 2 (ppr h)
                hs  -> main_msg $$ hang (text "Suggested fixes:") 2
                                        (formatBulleted  $ mkDecorated . map ppr $ hs)
-
-handleFlagWarnings :: Logger -> GhcMessageOpts -> DiagOpts -> [CmdLine.Warn] -> IO ()
-handleFlagWarnings logger print_config opts warns = do
-  let -- It would be nicer if warns :: [Located SDoc], but that
-      -- has circular import problems.
-      bag = listToBag [ mkPlainMsgEnvelope opts loc $
-                        GhcDriverMessage $
-                        DriverUnknownMessage $
-                        UnknownDiagnostic $
-                        mkPlainDiagnostic reason noHints $ text warn
-                      | CmdLine.Warn reason (L loc warn) <- warns ]
-
-  printOrThrowDiagnostics logger print_config opts (mkMessages bag)
 
 -- | Given a bag of diagnostics, turn them into an exception if
 -- any has 'SevError', or print them out otherwise.

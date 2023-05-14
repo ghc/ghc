@@ -108,7 +108,7 @@ doBackpack [src_filename] = do
     liftIO $ checkProcessArgsResult unhandled_flags
     let print_config = initPrintConfig dflags
     liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcPsMessage <$> p_warns)
-    liftIO $ handleFlagWarnings logger print_config (initDiagOpts dflags) warns
+    liftIO $ printOrThrowDiagnostics logger print_config (initDiagOpts dflags) (GhcDriverMessage <$> warns)
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename

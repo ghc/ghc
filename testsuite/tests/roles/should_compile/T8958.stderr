@@ -1,5 +1,5 @@
 
-T8958.hs:2:31: warning: [-Wdeprecated-flags (in -Wdefault)]
+T8958.hs:2:31: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 TYPE CONSTRUCTORS
   newtype Map{2} :: * -> * -> *

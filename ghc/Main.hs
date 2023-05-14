@@ -23,6 +23,7 @@ import GHC.Driver.Backend
 import GHC.Driver.CmdLine
 import GHC.Driver.Env
 import GHC.Driver.Errors
+import GHC.Driver.Errors.Types
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -243,12 +244,13 @@ main' postLoadMode units dflags0 args flagWarnings = do
 
   GHC.prettyPrintGhcErrors logger4 $ do
 
-  let flagWarnings' = flagWarnings ++ dynamicFlagWarnings
+  let diag_opts = initDiagOpts dflags4
+  let flagWarnings' = GhcDriverMessage <$> mconcat [warnsToMessages diag_opts flagWarnings, dynamicFlagWarnings]
 
   handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger4 (initPrintConfig dflags4) (initDiagOpts dflags4) flagWarnings'
+         liftIO $ printOrThrowDiagnostics logger4 (initPrintConfig dflags4) diag_opts flagWarnings'
 
   liftIO $ showBanner postLoadMode dflags4
 
@@ -787,7 +789,7 @@ initMulti unitArgsFiles  = do
     handleSourceError (\e -> do
        GHC.printException e
        liftIO $ exitWith (ExitFailure 1)) $ do
-         liftIO $ handleFlagWarnings logger (initPrintConfig dflags2) (initDiagOpts dflags2) warns
+         liftIO $ printOrThrowDiagnostics logger (initPrintConfig dflags2) (initDiagOpts dflags2) (GhcDriverMessage <$> warns)
 
     let (dflags3, srcs, objs) = parseTargetFiles dflags2 (map unLoc fileish_args)
         dflags4 = offsetDynFlags dflags3
