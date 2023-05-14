@@ -684,18 +684,6 @@ void traceHeapProfSampleString(StgWord8 profile_id,
 
 void traceIPE(const InfoProvEnt *ipe)
 {
-#if defined(DEBUG)
-    if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
-        ACQUIRE_LOCK(&trace_utx);
-
-        tracePreface();
-        debugBelch("IPE: table_name %s, closure_desc %s, ty_desc %s, label %s, module %s, srcloc %s:%s\n",
-                   ipe->prov.table_name, ipe->prov.closure_desc, ipe->prov.ty_desc,
-                   ipe->prov.label, ipe->prov.module, ipe->prov.src_file, ipe->prov.src_span);
-
-        RELEASE_LOCK(&trace_utx);
-    } else
-#endif
     if (eventlog_enabled) {
         postIPE(ipe);
     }
