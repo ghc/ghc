@@ -23,7 +23,7 @@ module GHC.Tc.Errors.Hole
    , sortHoleFitsBySize
 
 
-   -- Re-exported from GHC.Tc.Errors.Hole.FitTypes
+   -- Re-exported from GHC.Tc.Errors.Hole.Plugin
    , HoleFitPlugin (..), HoleFitPluginR (..)
    )
 where
@@ -78,6 +78,7 @@ import GHC.Iface.Load  ( loadInterfaceForName )
 import GHC.Builtin.Utils (knownKeyNames)
 
 import GHC.Tc.Errors.Hole.FitTypes
+import GHC.Tc.Errors.Hole.Plugin
 import qualified Data.Set as Set
 import GHC.Types.SrcLoc
 import GHC.Data.FastString (NonDetFastString(..))

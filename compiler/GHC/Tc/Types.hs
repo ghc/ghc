@@ -112,7 +112,7 @@ import GHC.Hs
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.Plugin ( HoleFitPlugin )
 import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )
