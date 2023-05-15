@@ -1,4 +1,0 @@
-cradle:
-  cabal:
-    - path: "src"
-      component: "lib:haddock-library"
