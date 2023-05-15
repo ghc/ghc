@@ -1328,21 +1328,18 @@ data ShowSub
 newtype AltPpr = AltPpr (Maybe (OccName -> SDoc))
 
 data ShowHowMuch
-  = ShowHeader AltPpr -- ^Header information only, not rhs
-  | ShowSome [OccName] AltPpr
-  -- ^ Show only some sub-components. Specifically,
-  --
-  -- [@\[\]@] Print all sub-components.
-  -- [@(n:ns)@] Print sub-component @n@ with @ShowSub = ns@;
-  -- elide other sub-components to @...@
-  -- May 14: the list is max 1 element long at the moment
+  = ShowHeader AltPpr -- ^ Header information only, not rhs
+  | ShowSome (Maybe (OccName -> Bool)) AltPpr
+  -- ^ Show the declaration and its RHS. The @Maybe@ predicate
+  -- allows filtering of the sub-components which should be printing;
+  -- any sub-components filtered out will be elided with @...@.
   | ShowIface
-  -- ^Everything including GHC-internal information (used in --show-iface)
+  -- ^ Everything including GHC-internal information (used in --show-iface)
 
 instance Outputable ShowHowMuch where
-  ppr (ShowHeader _)    = text "ShowHeader"
-  ppr ShowIface         = text "ShowIface"
-  ppr (ShowSome occs _) = text "ShowSome" <+> ppr occs
+  ppr (ShowHeader _) = text "ShowHeader"
+  ppr ShowIface      = text "ShowIface"
+  ppr (ShowSome _ _) = text "ShowSome"
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
