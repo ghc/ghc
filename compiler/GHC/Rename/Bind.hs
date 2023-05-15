@@ -26,7 +26,10 @@ module GHC.Rename.Bind (
    rnMethodBinds, renameSigs,
    rnMatchGroup, rnGRHSs, rnGRHS, rnSrcFixityDecl,
    makeMiniFixityEnv, MiniFixityEnv,
-   HsSigCtxt(..)
+   HsSigCtxt(..),
+
+   -- Utility for hs-boot files
+   rejectBootDecls
    ) where
 
 import GHC.Prelude
@@ -56,6 +59,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.List.SetOps    ( findDupsEq )
 import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
@@ -199,9 +203,19 @@ rnTopBindsLHSBoot fix_env binds
   = do  { topBinds <- rnTopBindsLHS fix_env binds
         ; case topBinds of
             ValBinds x mbinds sigs ->
-              do  { mapM_ bindInHsBootFileErr mbinds
+              do  { rejectBootDecls HsBoot BootBindsPs (bagToList $ mbinds)
                   ; pure (ValBinds x emptyBag sigs) }
             _ -> pprPanic "rnTopBindsLHSBoot" (ppr topBinds) }
+
+rejectBootDecls :: HsBootOrSig
+                -> (NonEmpty (LocatedA decl) -> BadBootDecls)
+                -> [LocatedA decl]
+                -> TcM ()
+rejectBootDecls _ _ [] = return ()
+rejectBootDecls hsc_src what (decl@(L loc _) : decls)
+  = addErrAt (locA loc)
+  $ TcRnIllegalHsBootOrSigDecl hsc_src
+      (what $ decl :| decls)
 
 rnTopBindsBoot :: NameSet -> HsValBindsLR GhcRn GhcPs
                -> RnM (HsValBinds GhcRn, DefUses)
@@ -1383,9 +1397,6 @@ dupSigDeclErr pairs@((L loc _, _) :| _)
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)
   = addErrAt (locA loc) $ TcRnMisplacedSigDecl sig
-
-bindInHsBootFileErr :: LHsBindLR GhcRn GhcPs -> RnM ()
-bindInHsBootFileErr (L loc _) = addErrAt (locA loc) TcRnBindInBootFile
 
 nonStdGuardErr :: (Outputable body,
                    Anno (Stmt GhcRn body) ~ SrcSpanAnnA)

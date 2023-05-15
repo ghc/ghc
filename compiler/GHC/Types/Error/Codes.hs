@@ -24,6 +24,8 @@ import GHC.Types.Error  ( DiagnosticCode(..), UnknownDiagnostic (..), diagnostic
 
 import GHC.Hs.Extension ( GhcRn )
 
+import GHC.Core.InstEnv (LookupInstanceErrReason)
+import GHC.Iface.Errors.Types
 import GHC.Driver.Errors.Types   ( DriverMessage )
 import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
@@ -37,8 +39,7 @@ import GHC.Exts     ( proxy# )
 import GHC.Generics
 import GHC.TypeLits ( Symbol, TypeError, ErrorMessage(..) )
 import GHC.TypeNats ( Nat, KnownNat, natVal' )
-import GHC.Core.InstEnv (LookupInstanceErrReason)
-import GHC.Iface.Errors.Types
+
 
 {- Note [Diagnostic codes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -359,7 +360,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTagToEnumResTyNotAnEnum"                   = 49356
   GhcDiagnosticCode "TcRnTagToEnumResTyTypeData"                    = 96189
   GhcDiagnosticCode "TcRnArrowIfThenElsePredDependsOnResultTy"      = 55868
-  GhcDiagnosticCode "TcRnIllegalHsBootFileDecl"                     = 58195
+  GhcDiagnosticCode "TcRnIllegalHsBootOrSigDecl"                    = 58195
   GhcDiagnosticCode "TcRnRecursivePatternSynonym"                   = 72489
   GhcDiagnosticCode "TcRnPartialTypeSigTyVarMismatch"               = 88793
   GhcDiagnosticCode "TcRnPartialTypeSigBadQuantifier"               = 94185
@@ -507,7 +508,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
   GhcDiagnosticCode "TcRnUnsatisfiedMinimalDef"                     = 06201
   GhcDiagnosticCode "TcRnMisplacedInstSig"                          = 06202
-  GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
   GhcDiagnosticCode "TcRnIllegalFamilyInstance"                     = 06204
   GhcDiagnosticCode "TcRnMissingClassAssoc"                         = 06205
   GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
@@ -522,7 +522,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDuplicateSigDecl"                          = 31744
   GhcDiagnosticCode "TcRnMisplacedSigDecl"                          = 87866
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
-  GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
   GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = 36038
   GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = 12222
@@ -600,6 +599,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindingNameConflict"                       = 10498
   GhcDiagnosticCode "NonCanonicalMonoid"                            = 50928
   GhcDiagnosticCode "NonCanonicalMonad"                             = 22705
+  GhcDiagnosticCode "TcRnUnexpectedDeclarationSplice"               = 17599
+  GhcDiagnosticCode "TcRnImplicitImportOfPrelude"                   = 20540
+  GhcDiagnosticCode "TcRnMissingMain"                               = 67120
+  GhcDiagnosticCode "TcRnGhciUnliftedBind"                          = 17999
+  GhcDiagnosticCode "TcRnGhciMonadLookupFail"                       = 44990
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -773,6 +777,14 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "EmptyStmtsGroupInDoNotation"                   = 82311
   GhcDiagnosticCode "EmptyStmtsGroupInArrowNotation"                = 19442
 
+  -- HsBoot and Hsig errors
+  GhcDiagnosticCode "MissingBootDefinition"                         = 63610
+  GhcDiagnosticCode "MissingBootExport"                             = 91999
+  GhcDiagnosticCode "MissingBootInstance"                           = 79857
+  GhcDiagnosticCode "BadReexportedBootThing"                        = 12424
+  GhcDiagnosticCode "BootMismatchedIdTypes"                         = 11890
+  GhcDiagnosticCode "BootMismatchedTyCons"                          = 15843
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
@@ -784,6 +796,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
   GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
+  GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
+  GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
 
 {- *********************************************************************
 *                                                                      *
@@ -871,6 +885,11 @@ type family ConRecursInto con where
 
   ConRecursInto "TcRnInterfaceError"       = 'Just IfaceMessage
   ConRecursInto "Can'tFindInterface"       = 'Just MissingInterfaceError
+
+    -- HsBoot and Hsig errors
+  ConRecursInto "TcRnBootMismatch"         = 'Just BootMismatch
+  ConRecursInto "MissingBootThing"         = 'Just MissingBootThing
+  ConRecursInto "BootMismatch"             = 'Just BootMismatchWhat
 
     ------------------
     -- FFI errors

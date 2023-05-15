@@ -94,7 +94,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     let name = getName real_thing
     -- TODO: Distinguish between signature merging and signature
     -- implementation cases.
-    checkBootDeclM False sig_thing real_thing
+    checkBootDeclM Hsig sig_thing real_thing
     real_fixity <- lookupFixityRn name
     let sig_fixity = case mi_fix_fn (mi_final_exts sig_iface) (occName name) of
                         Nothing -> defaultFixity
@@ -159,7 +159,7 @@ checkHsigIface tcg_env gre_env sig_iface
 
       -- The hsig did NOT define this function; that means it must
       -- be a reexport.  In this case, make sure the 'Name' of the
-      -- reexport matches the 'Name exported here.
+      -- reexport matches the 'Name' exported here.
       | [gre] <- lookupGRE_OccName (AllNameSpaces WantNormal) gre_env (nameOccName name) = do
         let name' = greName gre
         when (name /= name') $ do
@@ -174,11 +174,11 @@ checkHsigIface tcg_env gre_env sig_iface
                          -> getLocA e
                        _ -> nameSrcSpan name
             addErrAt loc
-                (badReexportedBootThing False name name')
+              (TcRnBootMismatch Hsig $ BadReexportedBootThing name name')
       -- This should actually never happen, but whatever...
       | otherwise =
         addErrAt (nameSrcSpan name)
-            (missingBootThing False name "exported by")
+            (missingBootThing Hsig name MissingBootExport)
 
 -- Note [Fail before checking instances in checkHsigIface]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -917,9 +917,9 @@ exportOccs = concatMap (map nameOccName . availNames)
 impl_msg :: UnitState -> Module -> InstantiatedModule -> SDoc
 impl_msg unit_state impl_mod (Module req_uid req_mod_name)
    = pprWithUnitState unit_state $
-      text "while checking that" <+> ppr impl_mod <+>
-      text "implements signature" <+> ppr req_mod_name <+>
-      text "in" <+> ppr req_uid
+      text "While checking that" <+> quotes (ppr impl_mod) <+>
+      text "implements signature" <+> quotes (ppr req_mod_name) <+>
+      text "in" <+> quotes (ppr req_uid) <> dot
 
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified

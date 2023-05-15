@@ -250,7 +250,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Utils.Error( Validity'(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.IORef
+import Data.IORef ( IORef )
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.List ( partition, nub, (\\) )
 

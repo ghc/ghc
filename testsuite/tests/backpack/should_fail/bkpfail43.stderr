@@ -17,4 +17,4 @@ bkpfail43.out\p\p-HVmFlcYSefiK5n1aDP1v7x\..\A.hi:1:1: error: [GHC-39999]
           -- Defined at bkpfail43.bkp:3:18
         is provided by ‘q:A’
         (maybe you haven't applied a function to enough arguments?)
-    • while checking that q:A implements signature A in p[A=q:A]
+    • While checking that ‘q:A’ implements signature ‘A’ in ‘p[A=q:A]’.

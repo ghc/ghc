@@ -119,6 +119,21 @@ module GHC.Tc.Errors.Types (
   , NonCanonicalDefinition(..)
   , NonCanonical_Monoid(..)
   , NonCanonical_Monad(..)
+
+    -- * Errors for hs-boot and signature files
+  , BadBootDecls(..)
+  , MissingBootThing(..), missingBootThing
+  , BootMismatch(..)
+  , BootMismatchWhat(..)
+  , BootTyConMismatch(..)
+  , BootAxiomBranchMismatch(..)
+  , BootClassMismatch(..)
+  , BootMethodMismatch(..)
+  , BootATMismatch(..)
+  , BootDataMismatch(..)
+  , BootDataConMismatch(..)
+  , SynAbstractDataError(..)
+  , BootListMismatch(..), BootListMismatches
   ) where
 
 import GHC.Prelude
@@ -142,6 +157,7 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name (Name, OccName, getSrcLoc, getSrcSpan)
 import qualified GHC.Types.Name.Occurrence as OccName
 import GHC.Types.Name.Reader
+import GHC.Types.SourceFile (HsBootOrSig(..))
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing (TyThing)
 import GHC.Types.Var (Id, TyCoVar, TyVar, TcTyVar, CoVar, Specificity)
@@ -149,16 +165,16 @@ import GHC.Types.Var.Env (TidyEnv)
 import GHC.Types.Var.Set (TyVarSet, VarSet)
 import GHC.Unit.Types (Module)
 import GHC.Utils.Outputable
-import GHC.Core.Class (Class, ClassMinimalDef)
+import GHC.Core.Class (Class, ClassMinimalDef, ClassOpItem, ClassATItem)
 import GHC.Core.Coercion (Coercion)
 import GHC.Core.Coercion.Axiom (CoAxBranch)
 import GHC.Core.ConLike (ConLike)
 import GHC.Core.DataCon (DataCon, FieldLabel)
 import GHC.Core.FamInstEnv (FamInst)
-import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst)
+import GHC.Core.InstEnv (LookupInstanceErrReason, ClsInst, DFunId)
 import GHC.Core.PatSyn (PatSyn)
 import GHC.Core.Predicate (EqRel, predTypeEqRel)
-import GHC.Core.TyCon (TyCon, Role)
+import GHC.Core.TyCon (TyCon, Role, FamTyConFlav, AlgTyConRhs)
 import GHC.Core.Type (Kind, Type, ThetaType, PredType, ErrorMsgType)
 import GHC.Driver.Backend (Backend)
 import GHC.Unit.State (UnitState)
@@ -775,14 +791,62 @@ data TcRnMessage where
   -}
   TcRnArrowIfThenElsePredDependsOnResultTy :: TcRnMessage
 
-  {-| TcRnIllegalHsBootFileDecl is an error that occurs when an hs-boot file
+  {-| TcRnIllegalHsBootOrSigDecl is an error that occurs when an hs-boot file
       contains declarations that are not allowed, such as bindings.
 
-      Example(s): None
+      Examples:
 
-     Test cases: None
+        -- A.hs-boot
+        f :: Int -> Int
+        f x = 2 * x -- binding not allowed
+
+        -- B.hs-boot
+        type family F a where { F Int = Bool }
+          -- type family equations not allowed
+
+        -- C.hsig
+        bar :: Int -> Int
+        {-# RULES forall x. bar x = x #-} -- RULES not allowed
+
+
+     Test cases:
+
+       - bindings: T19781
+       - class instance body: none
+       - type family instance: HsBootFam
+       - splice: none
+       - foreign declaration: none
+       - default declaration: none
+       - RULEs: none
   -}
-  TcRnIllegalHsBootFileDecl :: TcRnMessage
+  TcRnIllegalHsBootOrSigDecl :: !HsBootOrSig -> !BadBootDecls -> TcRnMessage
+
+  {-| TcRnBootMismatch is a family of errors that occur when there is a
+      mismatch between the hs-boot and hs files.
+
+     Examples:
+
+       -- A.hs-boot
+       foo :: Int -> Bool
+       data D = MkD
+
+       -- A.hs
+       foo :: Int -> Char
+       foo = chr
+
+       data D = MkD Int
+
+      Test cases:
+
+        - missing export: bkpcabal06, bkpfail{01,05,09,16,35}, rnfail{047,055}
+        - missing definition: none
+        - missing instance: T14075
+        - mismatch in exports: bkpfail{03,19}
+        - conflicting definitions: bkpcabal02,
+           bkpfail{04,06,07,10,12,133,14,15,17,22,23,25,26,27,41,42,45,47,50,52,53,54},
+           T19244{a,b}, T23344, ClosedFam3, rnfail055
+  -}
+  TcRnBootMismatch :: !HsBootOrSig -> !BootMismatch -> TcRnMessage
 
   {-| TcRnRecursivePatternSynonym is an error that occurs when a pattern synonym
       is defined in terms of itself, either directly or indirectly.
@@ -1524,7 +1588,7 @@ data TcRnMessage where
   -}
   TcRnFieldUpdateInvalidType :: [(FieldLabelString,TcType)] -> TcRnMessage
 
-  {- TcRnMissingStrictFields is an error occurring when a record field marked
+  {-| TcRnMissingStrictFields is an error occurring when a record field marked
      as strict is omitted when constructing said record.
 
      Example(s):
@@ -1586,7 +1650,7 @@ data TcRnMessage where
                          -- ^ the reason this record update was rejected
                       -> TcRnMessage
 
-  {- TcRnStaticFormNotClosed is an error pertaining to terms that are marked static
+  {-| TcRnStaticFormNotClosed is an error pertaining to terms that are marked static
      using the -XStaticPointers extension but which are not closed terms.
 
      Example(s):
@@ -1921,7 +1985,7 @@ data TcRnMessage where
                                  -- (so we should give a Template Haskell hint)
                          -> TcRnMessage
 
-  {- TcRnForeignImportPrimExtNotSet is an error occurring when a foreign import
+  {-| TcRnForeignImportPrimExtNotSet is an error occurring when a foreign import
      is declared using the @prim@ calling convention without having turned on
      the -XGHCForeignImportPrim extension.
 
@@ -1932,7 +1996,7 @@ data TcRnMessage where
   -}
   TcRnForeignImportPrimExtNotSet :: ForeignImport GhcRn -> TcRnMessage
 
-  {- TcRnForeignImportPrimSafeAnn is an error declaring that the safe/unsafe
+  {-| TcRnForeignImportPrimSafeAnn is an error declaring that the safe/unsafe
      annotation should not be used with @prim@ foreign imports.
 
      Example(s):
@@ -1942,7 +2006,7 @@ data TcRnMessage where
   -}
   TcRnForeignImportPrimSafeAnn :: ForeignImport GhcRn -> TcRnMessage
 
-  {- TcRnForeignFunctionImportAsValue is an error explaining that foreign @value@
+  {-| TcRnForeignFunctionImportAsValue is an error explaining that foreign @value@
      imports cannot have function types.
 
      Example(s):
@@ -1952,7 +2016,7 @@ data TcRnMessage where
   -}
   TcRnForeignFunctionImportAsValue :: ForeignImport GhcRn -> TcRnMessage
 
-  {- TcRnFunPtrImportWithoutAmpersand is a warning controlled by @-Wdodgy-foreign-imports@
+  {-| TcRnFunPtrImportWithoutAmpersand is a warning controlled by @-Wdodgy-foreign-imports@
      that informs the user of a possible missing @&@ in the declaration of a
      foreign import with a 'FunPtr' return type.
 
@@ -1963,7 +2027,7 @@ data TcRnMessage where
   -}
   TcRnFunPtrImportWithoutAmpersand :: ForeignImport GhcRn -> TcRnMessage
 
-  {- TcRnIllegalForeignDeclBackend is an error occurring when a foreign import declaration
+  {-| TcRnIllegalForeignDeclBackend is an error occurring when a foreign import declaration
      is not compatible with the code generation backend being used.
 
      Example(s): None
@@ -1976,7 +2040,7 @@ data TcRnMessage where
     -> ExpectedBackends
     -> TcRnMessage
 
-  {- TcRnUnsupportedCallConv informs the user that the calling convention specified
+  {-| TcRnUnsupportedCallConv informs the user that the calling convention specified
      for a foreign export declaration is not compatible with the target platform.
      It is a warning controlled by @-Wunsupported-calling-conventions@ in the case of
      @stdcall@ but is otherwise considered an error.
@@ -1989,7 +2053,7 @@ data TcRnMessage where
                           -> UnsupportedCallConvention
                           -> TcRnMessage
 
-  {- TcRnIllegalForeignType is an error for when a type appears in a foreign
+  {-| TcRnIllegalForeignType is an error for when a type appears in a foreign
      function signature that is not compatible with the FFI.
 
      Example(s): None
@@ -2007,7 +2071,7 @@ data TcRnMessage where
   -}
   TcRnIllegalForeignType :: !(Maybe ArgOrResult) -> !IllegalForeignTypeReason -> TcRnMessage
 
-  {- TcRnInvalidCIdentifier indicates a C identifier that is not valid.
+  {-| TcRnInvalidCIdentifier indicates a C identifier that is not valid.
 
      Example(s):
      foreign import prim safe "not valid" cmm_test2 :: Int# -> Int#
@@ -2016,7 +2080,7 @@ data TcRnMessage where
   -}
   TcRnInvalidCIdentifier :: !CLabelString -> TcRnMessage
 
-  {- TcRnExpectedValueId is an error occurring when something that is not a
+  {-| TcRnExpectedValueId is an error occurring when something that is not a
       value identifier is used where one is expected.
 
      Example(s): none
@@ -2025,7 +2089,7 @@ data TcRnMessage where
   -}
   TcRnExpectedValueId :: !TcTyThing -> TcRnMessage
 
-  {- TcRnRecSelectorEscapedTyVar is an error indicating that a record field selector
+  {-| TcRnRecSelectorEscapedTyVar is an error indicating that a record field selector
      containing an existential type variable is used as a function rather than in
      a pattern match.
 
@@ -2038,7 +2102,7 @@ data TcRnMessage where
   -}
   TcRnRecSelectorEscapedTyVar :: !OccName -> TcRnMessage
 
-  {- TcRnPatSynNotBidirectional is an error for when a non-bidirectional pattern
+  {-| TcRnPatSynNotBidirectional is an error for when a non-bidirectional pattern
      synonym is used as a constructor.
 
      Example(s):
@@ -2051,7 +2115,7 @@ data TcRnMessage where
   -}
   TcRnPatSynNotBidirectional :: !Name -> TcRnMessage
 
-  {- TcRnSplicePolymorphicLocalVar is the error that occurs when the expression
+  {-| TcRnSplicePolymorphicLocalVar is the error that occurs when the expression
      inside typed template haskell brackets is a polymorphic local variable.
 
      Example(s):
@@ -2061,7 +2125,7 @@ data TcRnMessage where
   -}
   TcRnSplicePolymorphicLocalVar :: !Id -> TcRnMessage
 
-  {- TcRnIllegalDerivingItem is an error for when something other than a type class
+  {-| TcRnIllegalDerivingItem is an error for when something other than a type class
      appears in a deriving statement.
 
      Example(s):
@@ -2071,7 +2135,7 @@ data TcRnMessage where
   -}
   TcRnIllegalDerivingItem :: !(LHsSigType GhcRn) -> TcRnMessage
 
-  {- TcRnUnexpectedAnnotation indicates the erroroneous use of an annotation such
+  {-| TcRnUnexpectedAnnotation indicates the erroroneous use of an annotation such
      as strictness, laziness, or unpacking.
 
      Example(s):
@@ -2083,7 +2147,7 @@ data TcRnMessage where
   -}
   TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsSrcBang -> TcRnMessage
 
-  {- TcRnIllegalRecordSyntax is an error indicating an illegal use of record syntax.
+  {-| TcRnIllegalRecordSyntax is an error indicating an illegal use of record syntax.
 
      Example(s):
      data T = T Int { field :: Int }
@@ -2093,7 +2157,7 @@ data TcRnMessage where
   -}
   TcRnIllegalRecordSyntax :: Either (HsType GhcPs) (HsType GhcRn) -> TcRnMessage
 
-  {- TcRnUnexpectedTypeSplice is an error for a typed template haskell splice
+  {-| TcRnUnexpectedTypeSplice is an error for a typed Template Haskell splice
      appearing unexpectedly.
 
      Example(s): none
@@ -2102,7 +2166,16 @@ data TcRnMessage where
   -}
   TcRnUnexpectedTypeSplice :: !(HsType GhcRn) -> TcRnMessage
 
-  {- TcRnInvalidVisibleKindArgument is an error for a kind application on a
+  {-| TcRnUnexpectedDeclarationSplice is an error that occurs when a Template Haskell
+      splice appears inside top-level declarations added with 'addTopDecls'.
+
+      Example(s): none
+
+      Test cases: none
+  -}
+  TcRnUnexpectedDeclarationSplice :: TcRnMessage
+
+  {-| TcRnInvalidVisibleKindArgument is an error for a kind application on a
      target type that cannot accept it.
 
      Example(s):
@@ -2124,7 +2197,7 @@ data TcRnMessage where
     -> !Type -- ^ Target of the kind application
     -> TcRnMessage
 
-  {- TcRnTooManyBinders is an error for a type constructor that is declared with
+  {-| TcRnTooManyBinders is an error for a type constructor that is declared with
      more arguments then its kind specifies.
 
      Example(s):
@@ -2135,7 +2208,7 @@ data TcRnMessage where
   -}
   TcRnTooManyBinders :: !Kind -> ![LHsTyVarBndr () GhcRn] -> TcRnMessage
 
-  {- TcRnDifferentNamesForTyVar is an error that indicates different names being
+  {-| TcRnDifferentNamesForTyVar is an error that indicates different names being
      used for the same type variable.
 
      Example(s):
@@ -2150,7 +2223,7 @@ data TcRnMessage where
   -}
   TcRnDifferentNamesForTyVar :: !Name -> !Name -> TcRnMessage
 
-  {- TcRnInvalidReturnKind is an error for a data declaration that has a kind signature
+  {-| TcRnInvalidReturnKind is an error for a data declaration that has a kind signature
      with an invalid result kind.
 
      Example(s):
@@ -2197,7 +2270,7 @@ data TcRnMessage where
     -> Bool -- ^ Whether enabling -XPolyKinds should be suggested
     -> TcRnMessage
 
-  {- TcRnClassKindNotConstraint is an error for a type class that has a kind that
+  {-| TcRnClassKindNotConstraint is an error for a type class that has a kind that
      is not equivalent to Constraint.
 
      Example(s):
@@ -2208,7 +2281,7 @@ data TcRnMessage where
   -}
   TcRnClassKindNotConstraint :: !Kind -> TcRnMessage
 
-  {- TcRnUnpromotableThing is an error that occurs when the user attempts to
+  {-| TcRnUnpromotableThing is an error that occurs when the user attempts to
      use the promoted version of something which is not promotable.
 
      Example(s):
@@ -2243,7 +2316,7 @@ data TcRnMessage where
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
 
-  {- TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
+  {-| TcRnMatchesHaveDiffNumArgs is an error occurring when something has matches
      that have different numbers of arguments
 
      Example(s):
@@ -2295,7 +2368,7 @@ data TcRnMessage where
   -}
   TcRnDataKindsError :: TypeOrKind -> HsType GhcPs -> TcRnMessage
 
-  {- TcRnCannotBindScopedTyVarInPatSig is an error stating that scoped type
+  {-| TcRnCannotBindScopedTyVarInPatSig is an error stating that scoped type
      variables cannot be used in pattern bindings.
 
      Example(s):
@@ -2305,7 +2378,7 @@ data TcRnMessage where
   -}
   TcRnCannotBindScopedTyVarInPatSig :: !(NE.NonEmpty (Name, TcTyVar)) -> TcRnMessage
 
-  {- TcRnCannotBindTyVarsInPatBind is an error for when type
+  {-| TcRnCannotBindTyVarsInPatBind is an error for when type
      variables are introduced in a pattern binding
 
      Example(s):
@@ -2316,7 +2389,7 @@ data TcRnMessage where
   -}
   TcRnCannotBindTyVarsInPatBind :: !(NE.NonEmpty (Name, TcTyVar)) -> TcRnMessage
 
-  {- TcRnTooManyTyArgsInConPattern is an error occurring when a constructor pattern
+  {-| TcRnTooManyTyArgsInConPattern is an error occurring when a constructor pattern
      has more than the expected number of type arguments
 
      Example(s):
@@ -2331,7 +2404,7 @@ data TcRnMessage where
     -> !Int -- ^ Actual number of args
     -> TcRnMessage
 
-  {- TcRnMultipleInlinePragmas is a warning signifying that multiple inline pragmas
+  {-| TcRnMultipleInlinePragmas is a warning signifying that multiple inline pragmas
      reference the same definition.
 
      Example(s):
@@ -2348,7 +2421,7 @@ data TcRnMessage where
     -> !(NE.NonEmpty (LocatedA InlinePragma)) -- ^ Other pragmas
     -> TcRnMessage
 
-  {- TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear
+  {-| TcRnUnexpectedPragmas is a warning that occurs when unexpected pragmas appear
      in the source.
 
      Example(s):
@@ -2357,7 +2430,7 @@ data TcRnMessage where
   -}
   TcRnUnexpectedPragmas :: !Id -> !(NE.NonEmpty (LSig GhcRn)) -> TcRnMessage
 
-  {- TcRnNonOverloadedSpecialisePragma is a warning for a specialise pragma being
+  {-| TcRnNonOverloadedSpecialisePragma is a warning for a specialise pragma being
      placed on a definition that is not overloaded.
 
      Example(s):
@@ -2370,7 +2443,7 @@ data TcRnMessage where
   -}
   TcRnNonOverloadedSpecialisePragma :: !(LIdP GhcRn) -> TcRnMessage
 
-  {- TcRnSpecialiseNotVisible is a warning that occurs when the subject of a
+  {-| TcRnSpecialiseNotVisible is a warning that occurs when the subject of a
      SPECIALISE pragma has a definition that is not visible from the current module.
 
      Example(s): none
@@ -2379,7 +2452,7 @@ data TcRnMessage where
   -}
   TcRnSpecialiseNotVisible :: !Name -> TcRnMessage
 
-  {- TcRnPragmaWarning is a warning that can happen when usage of something
+  {-| TcRnPragmaWarning is a warning that can happen when usage of something
      is warned or deprecated by pragma.
 
     Test cases:
@@ -2695,7 +2768,7 @@ data TcRnMessage where
   -}
   TcRnCannotRepresentType :: !UnrepresentableTypeDescr -> !Type -> TcRnMessage
 
-  {-| TcRnRunSpliceFailure is an error indicating that a template haskell splice
+  {-| TcRnRunSpliceFailure is an error indicating that a Template Haskell splice
       failed to be converted into a valid expression.
 
       Example(s):
@@ -2738,7 +2811,7 @@ data TcRnMessage where
     -> !String -- Error body
     -> TcRnMessage
 
-  {- | TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
+  {-| TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
        is missing methods that are required by the minimal definition.
 
        Example:
@@ -2779,7 +2852,7 @@ data TcRnMessage where
   -}
   TcRnUnsatisfiedMinimalDef :: ClassMinimalDef -> TcRnMessage
 
-  {- | 'TcRnMisplacedInstSig' is an error that happens when a method in
+  {-| 'TcRnMisplacedInstSig' is an error that happens when a method in
        a class instance is given a type signature, but the user has not
        enabled the @InstanceSigs@ extension.
 
@@ -2787,21 +2860,14 @@ data TcRnMessage where
        testsuite/tests/module/mod45
   -}
   TcRnMisplacedInstSig :: Name -> (LHsSigType GhcRn) -> TcRnMessage
-  {- | 'TcRnBadBootFamInstDecl' is an error that is triggered by a
-       type family instance being declared in an hs-boot file.
-
-       Test case:
-       testsuite/tests/indexed-types/should_fail/HsBootFam
-  -}
-  TcRnBadBootFamInstDecl :: {} -> TcRnMessage
-  {- | 'TcRnIllegalFamilyInstance' is an error that occurs when an associated
+  {-| 'TcRnIllegalFamilyInstance' is an error that occurs when an associated
        type or data family is given a top-level instance.
 
        Test case:
        testsuite/tests/indexed-types/should_fail/T3092
   -}
   TcRnIllegalFamilyInstance :: TyCon -> TcRnMessage
-  {- | 'TcRnMissingClassAssoc' is an error that occurs when a class instance
+  {-| 'TcRnMissingClassAssoc' is an error that occurs when a class instance
        for a class with an associated type or data family is missing a corresponding
        family instance declaration.
 
@@ -2809,7 +2875,7 @@ data TcRnMessage where
        testsuite/tests/indexed-types/should_fail/SimpleFail7
   -}
   TcRnMissingClassAssoc :: TyCon -> TcRnMessage
-  {- | 'TcRnNotOpenFamily' is an error that is triggered by attempting to give
+  {-| 'TcRnNotOpenFamily' is an error that is triggered by attempting to give
        a top-level (open) type family instance for a closed type family.
 
        Test cases:
@@ -2945,7 +3011,7 @@ data TcRnMessage where
   -}
   TcRnSectionWithoutParentheses :: HsExpr GhcPs -> TcRnMessage
 
-  {- TcRnBindingOfExistingName is an error triggered by an attempt to rebind
+  {-| TcRnBindingOfExistingName is an error triggered by an attempt to rebind
      built-in syntax, punned list or tuple syntax, or a name quoted via Template Haskell.
 
      Examples:
@@ -3094,17 +3160,6 @@ data TcRnMessage where
      Test cases: rename/should_fail/RnDefaultSigFail
   -}
   TcRnUnexpectedDefaultSig :: Sig GhcPs -> TcRnMessage
-
-  {-| TcRnBindInBootFile is an error triggered by a binding in hs-boot file.
-
-     Example:
-
-       -- in an .hs-boot file:
-       x = 3
-
-     Test cases: rename/should_fail/T19781
-  -}
-  TcRnBindInBootFile :: TcRnMessage
 
   {-| TcRnDuplicateMinimalSig is an error triggered by two or more minimal
       signatures for one type class.
@@ -4053,6 +4108,65 @@ data TcRnMessage where
   TcRnNonCanonicalDefinition :: !NonCanonicalDefinition -- ^ Specifics
                              -> !(LHsSigType GhcRn) -- ^ The instance type
                              -> TcRnMessage
+  {-| TcRnImplicitImportOfPrelude is a warning, controlled by @Wimplicit-prelude@,
+      that is triggered upon an implicit import of the @Prelude@ module.
+
+      Example:
+
+        {-# OPTIONS_GHC -fwarn-implicit-prelude #-}
+        module M where {}
+
+      Test case: rn055
+
+  -}
+  TcRnImplicitImportOfPrelude :: TcRnMessage
+
+  {-| TcRnMissingMain is an error that occurs when a Main module does
+      not define a main function (named @main@ by default, but overridable
+      with the @main-is@ command line flag).
+
+      Example:
+
+        module Main where {}
+
+      Test cases:
+        T414, T7765, readFail021, rnfail007, T13839b, T17171a, T16453E1, tcfail030,
+        T19397E3, T19397E4
+
+  -}
+  TcRnMissingMain
+    :: !Bool -- ^ whether the module has an explicit export list
+    -> !Module
+    -> !OccName -- ^ the expected name of the main function
+    -> TcRnMessage
+
+  {-| TcRnGhciUnliftedBind is an error that occurs when a user attempts to
+      bind an unlifted value in GHCi.
+
+      Example (in GHCi):
+
+        let a = (# 1#, 3# #)
+
+      Test cases: T9140, T19035b
+  -}
+  TcRnGhciUnliftedBind :: !Id -> TcRnMessage
+
+  {-| TcRnGhciMonadLookupFail is an error that occurs when the user sets
+      the GHCi monad, using the GHC API 'setGHCiMonad' function, but GHC
+      can't find which monad the user is referring to.
+
+      Example:
+
+        import GHC ( setGHCiMonad )
+
+        ... setGHCiMonad "NoSuchThing"
+
+      Test cases: none
+  -}
+  TcRnGhciMonadLookupFail
+    :: String -- ^ the textual name of the monad requested by the user
+    -> Maybe [GlobalRdrElt] -- ^ lookup result
+    -> TcRnMessage
 
   deriving Generic
 
@@ -4492,6 +4606,185 @@ instance Outputable Exported where
   ppr IsNotExported = text "IsNotExported"
   ppr IsExported    = text "IsExported"
 
+-- | What declarations were not allowed in an hs-boot or hsig file?
+data BadBootDecls
+  = BootBindsPs      !(NE.NonEmpty (LHsBindLR GhcRn GhcPs))
+  | BootBindsRn      !(NE.NonEmpty (LHsBindLR GhcRn GhcRn))
+  | BootInstanceSigs !(NE.NonEmpty (LSig GhcRn))
+  | BootFamInst      !TyCon
+  | BootSpliceDecls  !(NE.NonEmpty (LocatedA (HsUntypedSplice GhcPs)))
+  | BootForeignDecls !(NE.NonEmpty (LForeignDecl GhcRn))
+  | BootDefaultDecls !(NE.NonEmpty (LDefaultDecl GhcRn))
+  | BootRuleDecls    !(NE.NonEmpty (LRuleDecls GhcRn))
+
+-- | A mismatch between an hs-boot or signature file and its implementing module.
+data BootMismatch
+  -- | Something defined or exported by an hs-boot or signature file
+  -- is missing from the implementing module.
+  = MissingBootThing !Name !MissingBootThing
+
+  -- | A typeclass instance is declared in the hs-boot file but
+  -- it is not present in the implementing module.
+  | MissingBootInstance !DFunId -- ^ the boot instance 'DFunId'
+    -- NB: we never trigger this for hsig files, as in that case we do
+    -- a full round of constraint solving, and a missing instance gets reported
+    -- as an unsolved Wanted constraint with a 'InstProvidedOrigin' 'CtOrigin'.
+    -- See GHC.Tc.Utils.Backpack.check_inst.
+
+  -- | A mismatch between an hsig file and its implementing module
+  -- in the 'Name' that a particular re-export refers to.
+  | BadReexportedBootThing !Name !Name
+
+  -- | A mismatch between the declaration of something in the hs-boot or
+  -- signature file and its implementation, e.g. a type mismatch or
+  -- a type family implemented as a class.
+  | BootMismatch
+      !TyThing -- ^ boot thing
+      !TyThing -- ^ real thing
+      !BootMismatchWhat
+  deriving Generic
+
+-- | Something from the hs-boot or signature file is missing from the
+-- implementing module.
+data MissingBootThing
+  -- | Something defined in the hs-boot or signature file is not defined in the
+  -- implementing module.
+  = MissingBootDefinition
+  -- | Something exported by the hs-boot or signature file is not exported by the
+  -- implementing module.
+  | MissingBootExport
+  deriving Generic
+
+missingBootThing :: HsBootOrSig -> Name -> MissingBootThing -> TcRnMessage
+missingBootThing src nm thing =
+  TcRnBootMismatch src (MissingBootThing nm thing)
+
+-- | A mismatch of two 'TyThing's between an hs-boot or signature file
+-- and its implementing module.
+data BootMismatchWhat
+  -- | The 'Id's have different types.
+  = BootMismatchedIdTypes !Id -- ^ boot 'Id'
+                          !Id -- ^ real 'Id'
+  -- | Two 'TyCon's aren't compatible.
+  | BootMismatchedTyCons !TyCon -- ^ boot 'TyCon'
+                         !TyCon -- ^ real 'TyCon'
+                         !(NE.NonEmpty BootTyConMismatch)
+  deriving Generic
+
+-- | An error in the implementation of an abstract datatype using
+-- a type synonym.
+data SynAbstractDataError
+  -- | The type synony was not nullary.
+  = SynAbsDataTySynNotNullary
+  -- | The type synonym RHS contained invalid types, e.g.
+  -- a type family or a forall.
+  | SynAbstractDataInvalidRHS !(NE.NonEmpty Type)
+
+-- | Mismatched implementation of a 'TyCon' in an hs-boot or signature file.
+data BootTyConMismatch
+  -- | The 'TyCon' kinds differ.
+  = TyConKindMismatch
+  -- | The 'TyCon' 'Role's aren't compatible.
+  | TyConRoleMismatch !Bool -- ^ True <=> role subtype check
+  -- | Two type synonyms have different RHSs.
+  | TyConSynonymMismatch !Kind !Kind
+  -- | The two 'TyCon's are of a different flavour, e.g. one is
+  -- a data family and the other is a type family.
+  | TyConFlavourMismatch !FamTyConFlav !FamTyConFlav
+  -- | The equations of a type family don't match.
+  | TyConAxiomMismatch !(BootListMismatches CoAxBranch BootAxiomBranchMismatch)
+  -- | The type family injectivity annotations don't match.
+  | TyConInjectivityMismatch
+  -- | The 'TyCon's are both datatype 'TyCon's, but they have diferent 'DataCon's.
+  | TyConMismatchedData !AlgTyConRhs !AlgTyConRhs !BootDataMismatch
+  -- | The 'TyCon's are both 'Class' 'TyCon's, but the classes don't match.
+  | TyConMismatchedClasses !Class !Class !BootClassMismatch
+  -- | The 'TyCon's are something completely different.
+  | TyConsVeryDifferent
+  -- | An abstract 'TyCon' is implemented using a type synonym in an invalid
+  -- manner. See 'SynAbstractDataError'.
+  | SynAbstractData !SynAbstractDataError
+
+
+-- | Utility datatype to record errors when checking compatibity
+-- between two lists of things, e.g. class methods, associated types,
+-- type family equations, etc.
+data BootListMismatch item err
+  -- | Different number of items.
+  = MismatchedLength
+  -- | The item at the given position in the list differs.
+  | MismatchedThing !Int !item !item !err
+
+type BootListMismatches item err =
+  NE.NonEmpty (BootListMismatch item err)
+
+data BootAxiomBranchMismatch
+  -- | The quantified variables in an equation don't match.
+  --
+  -- Example: the quantification of @a@ in
+  --
+  --   @type family F a where { forall a. F a = Maybe a }@
+  = MismatchedAxiomBinders
+  -- | The LHSs of an equation don't match.
+  | MismatchedAxiomLHS
+  -- | The RHSs of an equation don't match.
+  | MismatchedAxiomRHS
+
+-- | A mismatch in a class, between its declaration in an hs-boot or signature
+-- file, and its implementation in a source Haskell file.
+data BootClassMismatch
+  -- | The class methods don't match.
+  = MismatchedMethods !(BootListMismatches ClassOpItem BootMethodMismatch)
+  -- | The associated types don't match.
+  | MismatchedATs !(BootListMismatches ClassATItem BootATMismatch)
+  -- | The functional dependencies don't match.
+  | MismatchedFunDeps
+  -- | The superclasses don't match.
+  | MismatchedSuperclasses
+  -- | The @MINIMAL@ pragmas are not compatible.
+  | MismatchedMinimalPragmas
+
+-- | A mismatch in a class method, between its declaration in an hs-boot or signature
+-- file, and its implementation in a source Haskell file.
+data BootMethodMismatch
+  -- | The class method names are different.
+  = MismatchedMethodNames
+  -- | The types of a class method are different.
+  | MismatchedMethodTypes !Type !Type
+  -- | The default method types are not compatible.
+  | MismatchedDefaultMethods !Bool -- ^ True <=> subtype check
+
+-- | A mismatch in an associated type of a class, between its declaration
+-- in an hs-boot or signature file, and its implementation in a source Haskell file.
+data BootATMismatch
+  -- | Two associated types don't match.
+  = MismatchedTyConAT !BootTyConMismatch
+  -- | Two associated type defaults don't match.
+  | MismatchedATDefaultType
+
+-- | A mismatch in a datatype declaration, between an hs-boot file or signature
+-- file and its implementing module.
+data BootDataMismatch
+  -- | A datatype is implemented as a newtype or vice-versa.
+  = MismatchedNewtypeVsData
+  -- | The constructors don't match.
+  | MismatchedConstructors !(BootListMismatches DataCon BootDataConMismatch)
+  -- | The datatype contexts differ.
+  | MismatchedDatatypeContexts
+
+-- | A mismatch in a data constrcutor, between its declaration in an hs-boot
+-- file or signature file, and its implementation in a source Haskell module.
+data BootDataConMismatch
+  -- | The 'Name's of the 'DataCon's differ.
+  = MismatchedDataConNames
+  -- | The fixities of the 'DataCon's differ.
+  | MismatchedDataConFixities
+  -- | The strictness annotations of the 'DataCon's differ.
+  | MismatchedDataConBangs
+  -- | The 'DataCon's have different field labels.
+  | MismatchedDataConFieldLabels
+  -- | The 'DataCon's have incompatible types.
+  | MismatchedDataConTypes
 
 --------------------------------------------------------------------------------
 --

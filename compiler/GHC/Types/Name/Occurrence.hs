@@ -104,6 +104,9 @@ module GHC.Types.Name.Occurrence (
         unionOccSets, unionManyOccSets, elemOccSet,
         isEmptyOccSet,
 
+        -- * Dealing with main
+        mainOcc, ppMainFn,
+
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
         tidyOccName, avoidClashesOccEnv, delTidyOccEnvList,
@@ -1249,6 +1252,24 @@ tidyOccName env occ@(OccName occ_sp fs)
                      -- If they are the same (n==1), the former wins
                      -- See Note [TidyOccEnv]
 
+
+{-
+************************************************************************
+*                                                                      *
+                            Utilies for "main"
+*                                                                      *
+************************************************************************
+-}
+
+mainOcc :: OccName
+mainOcc = mkVarOccFS (fsLit "main")
+
+ppMainFn :: OccName -> SDoc
+ppMainFn main_occ
+  | main_occ == mainOcc
+  = text "IO action" <+> quotes (ppr main_occ)
+  | otherwise
+  = text "main IO action" <+> quotes (ppr main_occ)
 
 {-
 ************************************************************************

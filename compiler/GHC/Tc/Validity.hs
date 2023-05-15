@@ -66,6 +66,7 @@ import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar )
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.Set( isEmptyUniqSet )
 
@@ -1436,9 +1437,8 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
-       ; is_boot  <- tcIsHsBootOrSig
-       ; is_sig   <- tcIsHsig
-       ; check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
+       ; hsc_src  <- tcHscSource
+       ; check_special_inst_head dflags hsc_src ctxt clas cls_args
        ; checkValidTypePats (classTyCon clas) cls_args
        }
 
@@ -1468,15 +1468,15 @@ in hsig files, where `is_sig` is True.
 
 -}
 
-check_special_inst_head :: DynFlags -> Bool -> Bool
-                        -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+check_special_inst_head :: DynFlags -> HscSource -> UserTypeCtxt
+                        -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
 -- TODO: common up the logic for special typeclasses (see GHC ticket #20441).
-check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
+check_special_inst_head dflags hs_src ctxt clas cls_args
 
-  -- If not in an hs-boot file, abstract classes cannot have instances
+  -- Abstract classes cannot have instances, except in hs-boot or signature files.
   | isAbstractClass clas
-  , not is_boot
+  , hs_src == HsSrcFile
   = failWithTc (TcRnAbstractClassInst clas)
 
   -- Complain about hand-written instances of built-in classes
@@ -1486,7 +1486,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   -- allow a standalone deriving declaration: they are no-ops,
   -- and we warn about them in GHC.Tc.Deriv.deriveStandalone.
   | clas_nm == typeableClassName
-  , not is_sig
+  , not (hs_src == HsigFile)
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc $ TcRnSpecialClassInst clas False
@@ -1495,7 +1495,7 @@ check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
   -- are forbidden outside of signature files (#12837).
   -- Derived instances are forbidden completely (#21087).
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName, knownCharClassName ]
-  , (not is_sig && hand_written_bindings) || derived_instance
+  , (not (hs_src == HsigFile) && hand_written_bindings) || derived_instance
     -- Note [Instances of built-in classes in signature files]
   = failWithTc $ TcRnSpecialClassInst clas False
 

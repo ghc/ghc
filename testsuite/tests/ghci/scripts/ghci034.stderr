@@ -1,2 +1,3 @@
 
-<interactive>:1:1: error: Not in scope: ‘thisIsNotDefined’
+<interactive>:1:1: error: [GHC-76037]
+    Not in scope: ‘thisIsNotDefined’

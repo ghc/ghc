@@ -1,0 +1,36 @@
+-- Check that we can implement abstract data using a data family.
+
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+
+unit p where
+  signature H where
+    import Data.Kind
+    type T :: Bool -> Type
+    data T b
+    turnOff :: T True  -> T False
+    turnOn  :: T False -> T True
+  module A where
+    import H
+    foo :: T True -> T True
+    foo = turnOn . turnOff
+
+unit q where
+  module H where
+    import Data.Kind
+    type D :: Bool -> Type
+    data family D a
+    data instance D True  = DT
+    data instance D False = DF
+    turnOff DT = DF
+    turnOn  DF = DT
+
+    type S = D
+    type T = S
+
+unit r where
+  dependency q
+  dependency p[H=q:H]
+  module N where
+    import A
+    bar = foo . foo

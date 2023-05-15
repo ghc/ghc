@@ -748,27 +748,6 @@ filtering of method signatures. Instead we just check if anything at all is
 filtered and hide it in that case.
 -}
 
-data ShowSub
-  = ShowSub
-      { ss_how_much :: ShowHowMuch
-      , ss_forall :: ShowForAllFlag }
-
--- See Note [Printing IfaceDecl binders]
--- The alternative pretty printer referred to in the note.
-newtype AltPpr = AltPpr (Maybe (OccName -> SDoc))
-
-data ShowHowMuch
-  = ShowHeader AltPpr -- ^Header information only, not rhs
-  | ShowSome [OccName] AltPpr
-  -- ^ Show only some sub-components. Specifically,
-  --
-  -- [@\[\]@] Print all sub-components.
-  -- [@(n:ns)@] Print sub-component @n@ with @ShowSub = ns@;
-  -- elide other sub-components to @...@
-  -- May 14: the list is max 1 element long at the moment
-  | ShowIface
-  -- ^Everything including GHC-internal information (used in --show-iface)
-
 {-
 Note [Printing IfaceDecl binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -781,11 +760,6 @@ binders.
 When printing an interface file (--show-iface), we want to print
 everything unqualified, so we can just print the OccName directly.
 -}
-
-instance Outputable ShowHowMuch where
-  ppr (ShowHeader _)    = text "ShowHeader"
-  ppr ShowIface         = text "ShowIface"
-  ppr (ShowSome occs _) = text "ShowSome" <+> ppr occs
 
 showToHeader :: ShowSub
 showToHeader = ShowSub { ss_how_much = ShowHeader $ AltPpr Nothing

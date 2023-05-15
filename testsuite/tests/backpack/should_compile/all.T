@@ -52,6 +52,7 @@ test('bkp57', normal, backpack_compile, [''])
 test('bkp58', normal, backpack_compile, [''])
 test('bkp59', normal, backpack_compile, [''])
 test('bkp60', normal, backpack_compile, [''])
+test('bkp61', normal, backpack_compile, [''])
 
 test('T13140', normal, backpack_compile, [''])
 test('T13149', expect_broken(13149), backpack_compile, [''])

@@ -1040,9 +1040,8 @@ llvmOptions llvm_config dflags =
 
 -- | What phase to run after one of the backend code generators has run
 hscPostBackendPhase :: HscSource -> Backend -> Phase
-hscPostBackendPhase HsBootFile _    =  StopLn
-hscPostBackendPhase HsigFile _      =  StopLn
-hscPostBackendPhase _ bcknd = backendNormalSuccessorPhase bcknd
+hscPostBackendPhase (HsBootOrSig _) _ =  StopLn
+hscPostBackendPhase HsSrcFile bcknd = backendNormalSuccessorPhase bcknd
 
 
 compileStub :: HscEnv -> FilePath -> IO FilePath

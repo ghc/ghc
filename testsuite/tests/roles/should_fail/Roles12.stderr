@@ -1,11 +1,11 @@
 
-Roles12.hs:6:1: error:
+Roles12.hs:6:1: error: [GHC-15843]
     Type constructor ‘T’ has conflicting definitions in the module
-    and its hs-boot file
+    and its hs-boot file.
     Main module: type role T phantom
                  type T :: * -> *
                  data T a
-    Boot file:   type T :: * -> *
+      Boot file: type T :: * -> *
                  data T a
     The roles do not match.
-    Roles on abstract types default to ‘representational’ in boot files.
+    NB: roles on abstract types default to ‘representational’ in hs-boot files.

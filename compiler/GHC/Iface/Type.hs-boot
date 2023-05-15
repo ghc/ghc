@@ -1,6 +1,7 @@
 module GHC.Iface.Type
    ( IfaceType, IfaceTyCon, IfaceBndr
    , IfaceCoercion, IfaceTyLit, IfaceAppArgs
+   , ShowSub
    )
 where
 
@@ -15,3 +16,4 @@ data IfaceTyCon
 data IfaceTyLit
 data IfaceCoercion
 data IfaceBndr
+data ShowSub

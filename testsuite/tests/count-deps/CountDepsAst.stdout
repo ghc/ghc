@@ -244,6 +244,7 @@ GHC.Types.SrcLoc
 GHC.Types.Target
 GHC.Types.Tickish
 GHC.Types.TyThing
+GHC.Types.TyThing.Ppr
 GHC.Types.TypeEnv
 GHC.Types.Unique
 GHC.Types.Unique.DFM

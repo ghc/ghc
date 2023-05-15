@@ -345,7 +345,7 @@ warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedTopBinds gres
     = whenWOptM Opt_WarnUnusedTopBinds
     $ do env <- getGblEnv
-         let isBoot = tcg_src env == HsBootFile
+         let isBoot = isHsBootFile $ tcg_src env
          let noParent gre = case gre_par gre of
                             NoParent -> True
                             _        -> False

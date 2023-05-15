@@ -1142,8 +1142,8 @@ pprModIface unit_state iface@ModIface{ mi_final_exts = exts }
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"
-    pp_hsc_src HsigFile = text "[hsig]"
-    pp_hsc_src HsSrcFile = Outputable.empty
+    pp_hsc_src HsigFile   = text "[hsig]"
+    pp_hsc_src HsSrcFile  = Outputable.empty
 
 {-
 When printing export lists, we print like this:

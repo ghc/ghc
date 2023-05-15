@@ -869,9 +869,8 @@ foreignJsPipeline pipe_env hsc_env location input_fn = do
   use (T_ForeignJs pipe_env hsc_env location input_fn)
 
 hscPostBackendPipeline :: P m => PipeEnv -> HscEnv -> HscSource -> Backend -> Maybe ModLocation -> FilePath -> m (Maybe FilePath)
-hscPostBackendPipeline _ _ HsBootFile _ _ _   = return Nothing
-hscPostBackendPipeline _ _ HsigFile _ _ _     = return Nothing
-hscPostBackendPipeline pipe_env hsc_env _ bcknd ml input_fn =
+hscPostBackendPipeline _ _ (HsBootOrSig _) _ _ _ = return Nothing
+hscPostBackendPipeline pipe_env hsc_env HsSrcFile bcknd ml input_fn =
   applyPostHscPipeline (backendPostHscPipeline bcknd) pipe_env hsc_env ml input_fn
 
 applyPostHscPipeline

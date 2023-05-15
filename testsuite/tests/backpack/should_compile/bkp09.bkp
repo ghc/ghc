@@ -7,7 +7,7 @@ unit p where
         data T a = MkT (S a)
         data S a = MkS a
 
--- keept his synced up!
+-- keep this synced up!
 unit q where
     signature H where
         data T a = MkT (S a)

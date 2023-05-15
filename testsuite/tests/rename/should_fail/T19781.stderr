@@ -1,6 +1,3 @@
 
-T19781_A.hs-boot:4:1: error: [GHC-11247]
-    Bindings in hs-boot files are not allowed
-
-T19781_A.hs-boot:7:1: error: [GHC-11247]
-    Bindings in hs-boot files are not allowed
+T19781_A.hs-boot:4:1: error: [GHC-58195]
+    Illegal binding in an hs-boot file.

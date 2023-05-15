@@ -33,6 +33,8 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Hs
 
+import GHC.Rename.Bind ( rejectBootDecls )
+
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
@@ -72,6 +74,7 @@ import GHC.Types.Var.Env( TidyEnv, TyVarEnv, mkVarEnv, lookupVarEnv )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 
 import GHC.Utils.Error
@@ -231,9 +234,10 @@ tcCompleteSigs sigs =
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
--- signatures in it.  The renamer checked all this
+-- signatures in it.  The renamer checked all this.
 tcHsBootSigs binds sigs
-  = do  { checkTc (null binds) TcRnIllegalHsBootFileDecl
+  = do  { unless (null binds) $
+            rejectBootDecls HsBoot BootBindsRn (concatMap (bagToList . snd) binds)
         ; concatMapM (addLocMA tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames

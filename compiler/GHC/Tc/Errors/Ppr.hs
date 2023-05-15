@@ -26,6 +26,8 @@ module GHC.Tc.Errors.Ppr
 
 import GHC.Prelude
 
+import qualified Language.Haskell.TH as TH
+
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( boxedRepDataConTyCon, tYPETyCon, filterCTuple )
 
@@ -38,7 +40,7 @@ import GHC.Core.Unify     ( tcMatchTys )
 import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Core.DataCon
-import GHC.Core.Coercion.Axiom (coAxiomTyCon, coAxiomSingleBranch)
+import GHC.Core.Coercion.Axiom (CoAxBranch, coAxiomTyCon, coAxiomSingleBranch)
 import GHC.Core.ConLike
 import GHC.Core.FamInstEnv ( FamInst(..), famInstAxiom, pprFamInst )
 import GHC.Core.InstEnv
@@ -56,7 +58,7 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing )
+import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing, pprTcTyThingCategory )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -71,13 +73,19 @@ import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
+import {-# SOURCE #-} GHC.Types.TyThing.Ppr ( pprTyThingInContext )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Fixity (defaultFixity)
+
+import GHC.Iface.Errors.Types
+import GHC.Iface.Errors.Ppr
+import GHC.Iface.Syntax ( ShowSub(..), ShowForAllFlag(..), showToHeader )
 
 import GHC.Unit.State
 import GHC.Unit.Module
@@ -102,10 +110,7 @@ import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
-import qualified Language.Haskell.TH as TH
-import {-# SOURCE #-} GHC.Tc.Types (pprTcTyThingCategory)
-import GHC.Iface.Errors.Types
-import GHC.Iface.Errors.Ppr
+
 
 data TcRnMessageOpts = TcRnMessageOpts { tcOptsShowContext :: !Bool -- ^ Whether we show the error context or not
                                        , tcOptsIfaceOpts   :: !IfaceMessageOpts
@@ -302,9 +307,24 @@ instance Diagnostic TcRnMessage where
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> mkSimpleDecorated $
            text "Predicate type of `ifThenElse' depends on result type"
-    TcRnIllegalHsBootFileDecl
+    TcRnIllegalHsBootOrSigDecl boot_or_sig decls
       -> mkSimpleDecorated $
-           text "Illegal declarations in an hs-boot file"
+           text "Illegal" <+> what <+> text "in" <+> whr <> dot
+        where
+          what = case decls of
+            BootBindsPs      {} -> text "binding"
+            BootBindsRn      {} -> text "binding"
+            BootInstanceSigs {} -> text "instance body"
+            BootFamInst      {} -> text "family instance"
+            BootSpliceDecls  {} -> text "splice"
+            BootForeignDecls {} -> text "foreign declaration"
+            BootDefaultDecls {} -> text "default declaration"
+            BootRuleDecls    {} -> text "RULE pragma"
+          whr = case boot_or_sig of
+            HsBoot -> text "an hs-boot file"
+            Hsig   -> text "a backpack signature file"
+    TcRnBootMismatch boot_or_sig err ->
+      mkSimpleDecorated $ pprBootMismatch boot_or_sig err
     TcRnRecursivePatternSynonym binds
       -> mkSimpleDecorated $
             hang (text "Recursive pattern synonym definition with following bindings:")
@@ -1265,9 +1285,6 @@ instance Diagnostic TcRnMessage where
                   2 (hang (pprPrefixName name)
                         2 (dcolon <+> ppr hs_ty))
              ]
-    TcRnBadBootFamInstDecl {}
-      -> mkSimpleDecorated $
-        text "Illegal family instance in hs-boot file"
     TcRnIllegalFamilyInstance tycon
       -> mkSimpleDecorated $
         vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
@@ -1392,8 +1409,6 @@ instance Diagnostic TcRnMessage where
     TcRnUnexpectedDefaultSig sig -> mkSimpleDecorated $
       hang (text "Unexpected default signature:")
          2 (ppr sig)
-    TcRnBindInBootFile -> mkSimpleDecorated $
-      text "Bindings in hs-boot files are not allowed"
     TcRnDuplicateMinimalSig sig1 sig2 otherSigs -> mkSimpleDecorated $
       vcat [ text "Multiple minimal complete definitions"
            , text "at" <+> vcat (map ppr $ sortBy leftmost_smallest $ map getLocA sigs)
@@ -1864,6 +1879,37 @@ instance Diagnostic TcRnMessage where
     TcRnNonCanonicalDefinition reason inst_ty
       -> mkSimpleDecorated $
          pprNonCanonicalDefinition inst_ty reason
+    TcRnUnexpectedDeclarationSplice {}
+      -> mkSimpleDecorated $
+         text "Declaration splices are not permitted" <+>
+         text "inside top-level declarations added with" <+>
+         quotes (text "addTopDecls") <> dot
+    TcRnImplicitImportOfPrelude
+      -> mkSimpleDecorated $
+         text "Module" <+> quotes (text "Prelude") <+> text "implicitly imported."
+    TcRnMissingMain explicit_export_list main_mod main_occ
+      -> mkSimpleDecorated $
+         text "The" <+> ppMainFn main_occ
+        <+> text "is not" <+> defOrExp <+> text "module"
+        <+> quotes (ppr main_mod)
+      where
+        defOrExp :: SDoc
+        defOrExp | explicit_export_list = text "exported by"
+                 | otherwise            = text "defined in"
+    TcRnGhciUnliftedBind id
+      -> mkSimpleDecorated $
+         sep [ text "GHCi can't bind a variable of unlifted type:"
+             , nest 2 (pprPrefixOcc id <+> dcolon <+> ppr (idType id)) ]
+    TcRnGhciMonadLookupFail ty lookups
+      -> mkSimpleDecorated $
+         hang (text "Can't find type" <+> pp_ty <> dot $$ ambig_msg)
+           2 (text "When checking that" <+> pp_ty <>
+              text "is a monad that can execute GHCi statements.")
+      where
+        pp_ty = quotes (text ty)
+        ambig_msg = case lookups of
+          Just (_:_:_) -> text "The type is ambiguous."
+          _            -> empty
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -1943,7 +1989,9 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> ErrorWithoutFlag
-    TcRnIllegalHsBootFileDecl
+    TcRnIllegalHsBootOrSigDecl {}
+      -> ErrorWithoutFlag
+    TcRnBootMismatch {}
       -> ErrorWithoutFlag
     TcRnRecursivePatternSynonym{}
       -> ErrorWithoutFlag
@@ -2240,8 +2288,6 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnMisplacedInstSig{}
       -> ErrorWithoutFlag
-    TcRnBadBootFamInstDecl{}
-      -> ErrorWithoutFlag
     TcRnIllegalFamilyInstance{}
       -> ErrorWithoutFlag
     TcRnMissingClassAssoc{}
@@ -2291,8 +2337,6 @@ instance Diagnostic TcRnMessage where
     TcRnMisplacedSigDecl{}
       -> ErrorWithoutFlag
     TcRnUnexpectedDefaultSig{}
-      -> ErrorWithoutFlag
-    TcRnBindInBootFile{}
       -> ErrorWithoutFlag
     TcRnDuplicateMinimalSig{}
       -> ErrorWithoutFlag
@@ -2493,7 +2537,16 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnNonCanonicalMonoidInstances
     TcRnNonCanonicalDefinition (NonCanonicalMonad _) _
       -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
-
+    TcRnUnexpectedDeclarationSplice {}
+      -> ErrorWithoutFlag
+    TcRnImplicitImportOfPrelude {}
+      -> WarningWithFlag Opt_WarnImplicitPrelude
+    TcRnMissingMain {}
+      -> ErrorWithoutFlag
+    TcRnGhciUnliftedBind {}
+      -> ErrorWithoutFlag
+    TcRnGhciMonadLookupFail {}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2573,8 +2626,18 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnArrowIfThenElsePredDependsOnResultTy
       -> noHints
-    TcRnIllegalHsBootFileDecl
+    TcRnIllegalHsBootOrSigDecl {}
       -> noHints
+    TcRnBootMismatch boot_or_sig err
+      | Hsig <- boot_or_sig
+      , BootMismatch _ _ (BootMismatchedTyCons _boot_tc real_tc tc_errs) <- err
+      , any is_synAbsData_etaReduce (NE.toList tc_errs)
+      -> [SuggestEtaReduceAbsDataTySyn real_tc]
+      | otherwise
+      -> noHints
+      where
+        is_synAbsData_etaReduce (SynAbstractData SynAbsDataTySynNotNullary) = True
+        is_synAbsData_etaReduce _ = False
     TcRnRecursivePatternSynonym{}
       -> noHints
     TcRnPartialTypeSigTyVarMismatch{}
@@ -2881,8 +2944,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnMisplacedInstSig{}
       -> [suggestExtension LangExt.InstanceSigs]
-    TcRnBadBootFamInstDecl{}
-      -> noHints
     TcRnIllegalFamilyInstance{}
       -> noHints
     TcRnMissingClassAssoc{}
@@ -2938,8 +2999,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnUnexpectedDefaultSig{}
       -> [suggestExtension LangExt.DefaultSignatures]
-    TcRnBindInBootFile{}
-      -> noHints
     TcRnDuplicateMinimalSig{}
       -> noHints
     TcRnLoopySuperclassSolve wtd_loc wtd_pty
@@ -3157,6 +3216,16 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNonCanonicalDefinition reason _
       -> suggestNonCanonicalDefinition reason
+    TcRnUnexpectedDeclarationSplice {}
+      -> noHints
+    TcRnImplicitImportOfPrelude {}
+      -> noHints
+    TcRnMissingMain {}
+      -> noHints
+    TcRnGhciUnliftedBind {}
+      -> noHints
+    TcRnGhciMonadLookupFail {}
+      -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
@@ -3317,6 +3386,7 @@ ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
 
 pprBindings :: [Name] -> SDoc
 pprBindings = pprWithCommas (quotes . ppr)
+
 
 injectivityErrorHerald :: SDoc
 injectivityErrorHerald =
@@ -5565,3 +5635,250 @@ suggestNonCanonicalDefinition reason =
       "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid"
     doc_monad =
       "https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/monad-of-no-return"
+
+--------------------------------------------------------------------------------
+-- hs-boot mismatch errors
+
+pprBootMismatch :: HsBootOrSig -> BootMismatch -> SDoc
+pprBootMismatch boot_or_sig = \case
+  MissingBootThing nm err ->
+    let def_or_exp = case err of
+          MissingBootDefinition -> text "defined in"
+          MissingBootExport     -> text "exported by"
+    in quotes (ppr nm) <+> text "is exported by the"
+       <+> ppr_boot_or_sig <> comma
+       <+> text "but not"
+       <+> def_or_exp <+> text "the implementing module."
+  MissingBootInstance boot_dfun ->
+    hang (text "instance" <+> ppr (idType boot_dfun))
+       2 (text "is defined in the" <+> ppr ppr_boot_or_sig <> comma <+>
+          text "but not in the implementing module.")
+  BadReexportedBootThing name name' ->
+    withUserStyle alwaysQualify AllTheWay $ vcat
+        [ text "The" <+> ppr_boot_or_sig
+           <+> text "(re)exports" <+> quotes (ppr name)
+        , text "but the implementing module exports a different identifier" <+> quotes (ppr name')
+        ]
+  BootMismatch boot_thing real_thing err ->
+    vcat
+      [ ppr real_thing <+>
+        text "has conflicting definitions in the module"
+      , text "and its" <+> ppr_boot_or_sig <> dot,
+                    text "Main module:" <+> real_doc
+      , (case boot_or_sig of
+          HsBoot -> text "  Boot file:"
+          Hsig   -> text "  Hsig file:") <+> boot_doc
+      , pprBootMismatchWhat boot_or_sig err
+      ]
+      where
+        to_doc
+          = pprTyThingInContext $
+            showToHeader
+              { ss_forall =
+                  case boot_or_sig of
+                    HsBoot -> ShowForAllMust
+                    Hsig   -> ShowForAllWhen }
+
+        real_doc = to_doc real_thing
+        boot_doc = to_doc boot_thing
+
+  where
+    ppr_boot_or_sig = case boot_or_sig of
+      HsBoot -> text "hs-boot file"
+      Hsig   -> text "hsig file"
+
+
+pprBootMismatchWhat :: HsBootOrSig -> BootMismatchWhat -> SDoc
+pprBootMismatchWhat boot_or_sig = \case
+  BootMismatchedIdTypes {} ->
+    text "The two types are different."
+  BootMismatchedTyCons tc1 tc2 errs ->
+    vcat $ map (pprBootTyConMismatch boot_or_sig tc1 tc2) (NE.toList errs)
+
+pprBootTyConMismatch :: HsBootOrSig -> TyCon -> TyCon
+                     -> BootTyConMismatch -> SDoc
+pprBootTyConMismatch boot_or_sig tc1 tc2 = \case
+  TyConKindMismatch ->
+    text "The types have different kinds."
+  TyConRoleMismatch sub_type ->
+    if sub_type
+    then
+      text "The roles are not compatible:" $$
+      text "Main module:" <+> ppr (tyConRoles tc1) $$
+      text "  Hsig file:" <+> ppr (tyConRoles tc2)
+    else
+      text "The roles do not match." $$
+      if boot_or_sig == HsBoot
+      then text "NB: roles on abstract types default to" <+>
+           quotes (text "representational") <+> text "in hs-boot files."
+      else empty
+  TyConSynonymMismatch {} -> empty -- nothing interesting to say
+  TyConFlavourMismatch fam_flav1 fam_flav2 ->
+    whenPprDebug $
+      text "Family flavours" <+> ppr fam_flav1 <+> text "and" <+> ppr fam_flav2 <+>
+      text "do not match"
+  TyConAxiomMismatch ax_errs ->
+    pprBootListMismatches (text "Type family equations do not match:")
+      pprTyConAxiomMismatch ax_errs
+  TyConInjectivityMismatch {} ->
+    text "Injectivity annotations do not match"
+  TyConMismatchedClasses _ _ err ->
+    pprBootClassMismatch boot_or_sig err
+  TyConMismatchedData _rhs1 _rhs2 err ->
+    pprBootDataMismatch err
+  SynAbstractData err ->
+    pprSynAbstractDataError err
+  TyConsVeryDifferent ->
+    empty -- should be obvious to the user what the problem is
+
+pprSynAbstractDataError :: SynAbstractDataError -> SDoc
+pprSynAbstractDataError = \case
+  SynAbsDataTySynNotNullary ->
+    text "Illegal parameterized type synonym in implementation of abstract data."
+  SynAbstractDataInvalidRHS bad_sub_tys ->
+    let msgs = mapMaybe pprInvalidAbstractSubTy (NE.toList bad_sub_tys)
+    in  case msgs of
+      []     -> herald <> dot
+      msg:[] -> hang (herald <> colon)
+                   2 msg
+      _      -> hang (herald <> colon)
+                   2 (vcat $ map (<+> bullet) msgs)
+
+  where
+    herald = text "Illegal implementation of abstract data"
+    pprInvalidAbstractSubTy = \case
+      TyConApp tc _
+        -> assertPpr (isTypeFamilyTyCon tc) (ppr tc) $
+           Just $ text "Invalid type family" <+> quotes (ppr tc) <> dot
+      ty@(ForAllTy {})
+        -> Just $ text "Invalid polymorphic type" <> colon <+> ppr ty <> dot
+      ty@(FunTy af _ _ _)
+        | not (af == FTF_T_T)
+        -> Just $ text "Invalid qualified type" <> colon <+> ppr ty <> dot
+      _ -> Nothing
+
+pprTyConAxiomMismatch :: BootListMismatch CoAxBranch BootAxiomBranchMismatch -> SDoc
+pprTyConAxiomMismatch = \case
+  MismatchedLength ->
+    text "The number of equations differs."
+  MismatchedThing i br1 br2 err ->
+    hang (text "The" <+> speakNth (i+1) <+> text "equations do not match.")
+       2 (pprCoAxBranchMismatch br1 br2 err)
+
+pprCoAxBranchMismatch :: CoAxBranch -> CoAxBranch -> BootAxiomBranchMismatch -> SDoc
+pprCoAxBranchMismatch _br1 _br2 err =
+  text "The" <+> what <+> text "don't match."
+  where
+    what = case err of
+      MismatchedAxiomBinders -> text "variables bound in the equation"
+      MismatchedAxiomLHS     -> text "equation left-hand sides"
+      MismatchedAxiomRHS     -> text "equation right-hand sides"
+
+pprBootListMismatches :: SDoc -- ^ herald
+                      -> (BootListMismatch item err -> SDoc)
+                      -> BootListMismatches item err -> SDoc
+pprBootListMismatches herald ppr_one errs =
+  hang herald 2 msgs
+  where
+    msgs = case errs of
+      err :| [] -> ppr_one err
+      _         -> vcat $ map ((bullet <+>) . ppr_one) $ NE.toList errs
+
+pprBootClassMismatch :: HsBootOrSig -> BootClassMismatch -> SDoc
+pprBootClassMismatch boot_or_sig = \case
+  MismatchedMethods errs ->
+    pprBootListMismatches (text "The class methods do not match:")
+      pprBootClassMethodListMismatch errs
+  MismatchedATs at_errs ->
+    pprBootListMismatches (text "The associated types do not match:")
+      (pprATMismatch boot_or_sig) at_errs
+  MismatchedFunDeps ->
+    text "The functional dependencies do not match."
+  MismatchedSuperclasses ->
+    text "The superclass constraints do not match."
+  MismatchedMinimalPragmas ->
+    text "The MINIMAL pragmas are not compatible."
+
+pprATMismatch :: HsBootOrSig -> BootListMismatch ClassATItem BootATMismatch -> SDoc
+pprATMismatch boot_or_sig = \case
+  MismatchedLength ->
+    text "The number of associated type defaults differs."
+  MismatchedThing i at1 at2 err ->
+    pprATMismatchErr boot_or_sig i at1 at2 err
+
+pprATMismatchErr :: HsBootOrSig -> Int -> ClassATItem -> ClassATItem -> BootATMismatch -> SDoc
+pprATMismatchErr boot_or_sig i (ATI tc1 _) (ATI tc2 _) = \case
+  MismatchedTyConAT err ->
+    hang (text "The associated types differ:")
+       2 $ pprBootTyConMismatch boot_or_sig tc1 tc2 err
+  MismatchedATDefaultType ->
+    text "The types of the" <+> speakNth (i+1) <+>
+    text "associated type default differ."
+
+pprBootClassMethodListMismatch :: BootListMismatch ClassOpItem BootMethodMismatch -> SDoc
+pprBootClassMethodListMismatch = \case
+  MismatchedLength ->
+    text "The number of class methods differs."
+  MismatchedThing _ op1 op2 err ->
+    pprBootClassMethodMismatch op1 op2 err
+
+pprBootClassMethodMismatch :: ClassOpItem -> ClassOpItem -> BootMethodMismatch -> SDoc
+pprBootClassMethodMismatch (op1, _) (op2, _) = \case
+  MismatchedMethodNames ->
+    text "The method names" <+> quotes pname1 <+> text "and"
+                            <+> quotes pname2 <+> text "differ."
+  MismatchedMethodTypes {} ->
+    text "The types of" <+> pname1 <+> text "are different."
+  MismatchedDefaultMethods subtype_check ->
+    if subtype_check
+    then
+      text "The default methods associated with" <+> pname1 <+>
+      text "are not compatible."
+    else
+      text "The default methods associated with" <+> pname1 <+>
+      text "are different."
+  where
+    nm1 = idName op1
+    nm2 = idName op2
+    pname1 = quotes (ppr nm1)
+    pname2 = quotes (ppr nm2)
+
+pprBootDataMismatch :: BootDataMismatch -> SDoc
+pprBootDataMismatch = \case
+  MismatchedNewtypeVsData ->
+    text "Cannot match a" <+> quotes (text "data") <+>
+    text "definition with a" <+> quotes (text "newtype") <+>
+    text "definition."
+  MismatchedConstructors dc_errs ->
+    pprBootListMismatches (text "The constructors do not match:")
+      pprBootDataConMismatch dc_errs
+  MismatchedDatatypeContexts {} ->
+    text "The datatype contexts do not match."
+
+pprBootDataConMismatch :: BootListMismatch DataCon BootDataConMismatch
+                       -> SDoc
+pprBootDataConMismatch = \case
+  MismatchedLength ->
+    text "The number of constructors differs."
+  MismatchedThing _ dc1 dc2 err ->
+    pprBootDataConMismatchErr dc1 dc2 err
+
+pprBootDataConMismatchErr :: DataCon -> DataCon -> BootDataConMismatch -> SDoc
+pprBootDataConMismatchErr dc1 dc2 = \case
+  MismatchedDataConNames ->
+    text "The names" <+> pname1 <+> text "and" <+> pname2 <+> text "differ."
+  MismatchedDataConFixities ->
+    text "The fixities of" <+> pname1 <+> text "differ."
+  MismatchedDataConBangs ->
+    text "The strictness annotations for" <+> pname1 <+> text "differ."
+  MismatchedDataConFieldLabels ->
+    text "The record label lists for" <+> pname1 <+> text "differ."
+  MismatchedDataConTypes ->
+    text "The types for" <+> pname1 <+> text "differ."
+  where
+     name1 = dataConName dc1
+     name2 = dataConName dc2
+     pname1 = quotes (ppr name1)
+     pname2 = quotes (ppr name2)
+
+--------------------------------------------------------------------------------

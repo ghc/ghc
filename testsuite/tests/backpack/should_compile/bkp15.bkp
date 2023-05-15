@@ -22,7 +22,7 @@ unit p where
         -- type instance Elem Int = Bool
         -- pattern Blub n = ("foo", n)
 
--- keept his synced up!
+-- keep this synced up!
 unit q where
     signature H where
         x :: (forall a. a -> a) -> (Int, Bool)

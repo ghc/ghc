@@ -139,9 +139,9 @@ computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
   where
     cid = hsComponentId (unLoc (hsunitName unit))
     reqs = uniqDSetToList (unionManyUniqDSets (map (get_reqs . unLoc) (hsunitBody unit)))
-    get_reqs (DeclD HsigFile (L _ modname) _) = unitUniqDSet modname
     get_reqs (DeclD HsSrcFile _ _) = emptyUniqDSet
     get_reqs (DeclD HsBootFile _ _) = emptyUniqDSet
+    get_reqs (DeclD HsigFile (L _ modname) _) = unitUniqDSet modname
     get_reqs (IncludeD (IncludeDecl (L _ hsuid) _ _)) =
         unitFreeModuleHoles (convertHsComponentId hsuid)
 
@@ -857,9 +857,9 @@ hsModuleToModSummary home_keys pn hsc_src modname
                              (unpackFS unit_fs </>
                               moduleNameSlashes modname)
                               (case hsc_src of
-                                HsigFile -> "hsig"
+                                HsigFile   -> "hsig"
                                 HsBootFile -> "hs-boot"
-                                HsSrcFile -> "hs")
+                                HsSrcFile  -> "hs")
     -- DANGEROUS: bootifying can POISON the module finder cache
     let location = case hsc_src of
                         HsBootFile -> addBootSuffixLocnOut location0

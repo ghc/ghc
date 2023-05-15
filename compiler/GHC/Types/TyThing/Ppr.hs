@@ -28,7 +28,7 @@ import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp )
 
 import GHC.Iface.Decl   ( tyThingToIfaceDecl )
 import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
-  , showToHeader, pprIfaceDecl )
+                        , showToHeader, pprIfaceDecl )
 
 import GHC.Utils.Outputable
 

@@ -15,4 +15,4 @@ bkpfail11.out\sig\sig-HyoWTHt34SDIRGEX0vZ8iN\..\A.hi:1:1: error: [GHC-39999]
         arising when attempting to show that
         instance [safe] GHC.Show.Show T -- Defined at bkpfail11.bkp:5:18
         is provided by ‘mod:A’
-    • while checking that mod:A implements signature A in sig[A=mod:A]
+    • While checking that ‘mod:A’ implements signature ‘A’ in ‘sig[A=mod:A]’.

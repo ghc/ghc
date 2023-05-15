@@ -1681,8 +1681,10 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
             k = NodeKey_Module (msKey ms)
 
             hs_file_for_boot
-              | HsBootFile <- ms_hsc_src ms = Just $ ((ms_unitid ms), NoPkgQual, (GWIB (noLoc $ ms_mod_name ms) NotBoot))
-              | otherwise = Nothing
+              | HsBootFile <- ms_hsc_src ms
+              = Just $ ((ms_unitid ms), NoPkgQual, (GWIB (noLoc $ ms_mod_name ms) NotBoot))
+              | otherwise
+              = Nothing
 
 
         -- This loops over each import in each summary. It is mutually recursive with loopSummaries if we discover
@@ -2207,9 +2209,9 @@ summariseModule hsc_env' home_unit old_summary_map is_boot (L _ wanted_mod) mb_p
         -- annotation, but we don't know if it's a signature or a regular
         -- module until we actually look it up on the filesystem.
         let hsc_src
-              | is_boot == IsBoot = HsBootFile
+              | is_boot == IsBoot           = HsBootFile
               | isHaskellSigFilename src_fn = HsigFile
-              | otherwise = HsSrcFile
+              | otherwise                   = HsSrcFile
 
         when (pi_mod_name /= wanted_mod) $
                 throwE $ singleMessage $ mkPlainErrorMsgEnvelope pi_mod_name_loc
@@ -2534,7 +2536,7 @@ executeCompileNode k n !old_hmi hug mrehydrate_mods mod = do
         -- compiling a signature requires an knot_var for that unit.
         -- If you remove this then a lot of backpack tests fail.
         HsigFile -> Just []
-        _ -> mrehydrate_mods
+        _        -> mrehydrate_mods
 
 {- Rehydration, see Note [Rehydrating Modules] -}
 

@@ -13,6 +13,7 @@ import GHC.Parser.Errors.Basic
 import GHC.Types.Hint
 
 import GHC.Core.FamInstEnv (FamFlavor(..))
+import GHC.Core.TyCon
 import GHC.Hs.Expr ()   -- instance Outputable
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
@@ -245,6 +246,9 @@ instance Outputable GhcHint where
       text "or define as" <+>
       quotes (pprPrefixUnqual lhs <+> text "=" <+> pprPrefixUnqual rhs) $$
       text "See also:" <+> text refURL
+    SuggestEtaReduceAbsDataTySyn tc
+      -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
+        where ppr_tc = quotes (ppr $ tyConName tc)
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"

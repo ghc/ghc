@@ -23,6 +23,7 @@ where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Rename.Bind ( rejectBootDecls )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Bind
 import GHC.Tc.TyCl
@@ -75,6 +76,7 @@ import GHC.Driver.Ppr
 import GHC.Utils.Logger
 import GHC.Data.FastString
 import GHC.Types.Id
+import GHC.Types.SourceFile
 import GHC.Types.SourceText
 import GHC.Data.List.SetOps
 import GHC.Types.Name
@@ -488,7 +490,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
-  = setSrcSpanA loc                      $
+  = setSrcSpanA loc                   $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
@@ -555,11 +557,13 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               all_insts                      = tyfam_insts ++ datafam_insts
 
          -- In hs-boot files there should be no bindings
-        ; let no_binds = isEmptyLHsBinds binds && null uprags
-        ; is_boot <- tcIsHsBootOrSig
-        ; failIfTc (is_boot && not no_binds) TcRnIllegalHsBootFileDecl
-
-        ; return ( [inst_info], all_insts, deriv_infos ) }
+        ; gbl_env <- getGblEnv;
+        ; case tcg_src gbl_env of
+          { HsSrcFile -> return ()
+          ; HsBootOrSig boot_or_sig ->
+             do { rejectBootDecls boot_or_sig BootBindsRn (bagToList binds)
+                ; rejectBootDecls boot_or_sig BootInstanceSigs uprags } }
+        ; return ([inst_info], all_insts, deriv_infos) }
   where
     defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                   `unionNameSet`
@@ -619,9 +623,13 @@ tcFamInstDeclChecks mb_clsinfo fam_tc
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc)
        ; type_families <- xoptM LangExt.TypeFamilies
-       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
+       ; hs_src        <- tcHscSource   -- Are we compiling an hs-boot file?
        ; checkTc type_families (TcRnTyFamsDisabled (TyFamsDisabledInstance fam_tc))
-       ; checkTc (not is_boot) TcRnBadBootFamInstDecl
+       ; case hs_src of
+           HsBootOrSig boot_or_sig ->
+             addErrTc $ TcRnIllegalHsBootOrSigDecl boot_or_sig (BootFamInst fam_tc)
+           HsSrcFile               ->
+             return ()
 
        -- Check that it is a family TyCon, and that
        -- oplevel type instances are not for associated types.

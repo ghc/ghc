@@ -27,11 +27,12 @@ import qualified Data.List.NonEmpty as NE
 
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Typeable
+import Data.Typeable (Typeable)
 import GHC.Unit.Module (ModuleName, Module)
 import GHC.Hs.Extension (GhcTc, GhcRn)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
+import GHC.Core.TyCon (TyCon)
 import GHC.Core.Type (PredType)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
@@ -453,6 +454,9 @@ data GhcHint
     Name -- ^ method with non-canonical implementation
     Name -- ^ possible other method to use as the RHS instead
     String -- ^ Documentation URL
+  {-| Suggest eta-reducing a type synonym used in the implementation
+      of abstract data. -}
+  | SuggestEtaReduceAbsDataTySyn TyCon
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

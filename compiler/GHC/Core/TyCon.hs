@@ -2131,13 +2131,13 @@ isOpenFamilyTyCon (TyCon { tyConDetails = details })
                   _                  -> False
   | otherwise = False
 
--- | Is this a synonym 'TyCon' that can have may have further instances appear?
+-- | Is this a type family 'TyCon' (whether open or closed)?
 isTypeFamilyTyCon :: TyCon -> Bool
 isTypeFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon { famTcFlav = flav } <- details = not (isDataFamFlav flav)
   | otherwise                                   = False
 
--- | Is this a synonym 'TyCon' that can have may have further instances appear?
+-- | Is this a data family 'TyCon'?
 isDataFamilyTyCon :: TyCon -> Bool
 isDataFamilyTyCon (TyCon { tyConDetails = details })
   | FamilyTyCon { famTcFlav = flav } <- details = isDataFamFlav flav
@@ -2158,14 +2158,14 @@ isClosedSynFamilyTyConWithAxiom_maybe (TyCon { tyConDetails = details })
 
 isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe (TyCon { tyConDetails = details })
-  | FamilyTyCon {famTcFlav = BuiltInSynFamTyCon ops } <- details = Just ops
-  | otherwise                                                    = Nothing
+  | FamilyTyCon {famTcFlav = BuiltInSynFamTyCon ops} <- details = Just ops
+  | otherwise                                                   = Nothing
 
 -- | Extract type variable naming the result of injective type family
 tyConFamilyResVar_maybe :: TyCon -> Maybe Name
 tyConFamilyResVar_maybe (TyCon { tyConDetails = details })
   | FamilyTyCon {famTcResVar = res} <- details = res
-  | otherwise                                   = Nothing
+  | otherwise                                  = Nothing
 
 -- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ if @tc@ is an
 -- injective tycon (where @is@ states for which 'tyConBinders' @tc@ is

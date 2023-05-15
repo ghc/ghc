@@ -764,7 +764,7 @@ getLinkDeps hsc_env pls replace_osuf span mods
           let iface = (hm_iface hmi)
               mmod = case mi_hsc_src iface of
                       HsBootFile -> link_boot_mod_error (mi_module iface)
-                      _ -> return $ Just (mi_module iface)
+                      _          -> return $ Just (mi_module iface)
 
           in (mkUniqDSet $ Set.toList $ dep_direct_pkgs (mi_deps iface),) <$>  mmod
         Nothing ->
