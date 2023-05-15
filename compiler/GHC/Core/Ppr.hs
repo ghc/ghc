@@ -689,8 +689,9 @@ instance Outputable (XTickishId pass) => Outputable (GenTickish pass) where
             ppr modl, comma,
             ppr ix,
             text ">"]
-  ppr (Breakpoint _ext ix vars) =
+  ppr (Breakpoint _ext ix vars modl) =
       hcat [text "break<",
+            ppr modl, comma,
             ppr ix,
             text ">",
             parens (hcat (punctuate comma (map ppr vars)))]

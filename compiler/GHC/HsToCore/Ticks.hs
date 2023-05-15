@@ -1195,7 +1195,9 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
           count = countEntries && tte_countEntries env
       return $ ProfNote cc count True{-scopes-}
 
-    Breakpoints -> Breakpoint noExtField <$> addMixEntry me <*> pure ids
+    Breakpoints -> do
+      i <- addMixEntry me
+      pure (Breakpoint noExtField i ids (this_mod env))
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' $ LexicalFastString cc_name

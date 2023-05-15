@@ -561,9 +561,7 @@ toIfaceExpr (Case s x ty as)
   | otherwise               = IfaceCase (toIfaceExpr s) (getOccFS x) (map toIfaceAlt as)
 toIfaceExpr (Let b e)       = IfaceLet (toIfaceBind b) (toIfaceExpr e)
 toIfaceExpr (Cast e co)     = IfaceCast (toIfaceExpr e) (toIfaceCoercion co)
-toIfaceExpr (Tick t e)
-  | Just t' <- toIfaceTickish t = IfaceTick t' (toIfaceExpr e)
-  | otherwise                   = toIfaceExpr e
+toIfaceExpr (Tick t e)      = IfaceTick (toIfaceTickish t) (toIfaceExpr e)
 
 toIfaceOneShot :: Id -> IfaceOneShot
 toIfaceOneShot id | isId id
@@ -573,13 +571,13 @@ toIfaceOneShot id | isId id
                   = IfaceNoOneShot
 
 ---------------------
-toIfaceTickish :: CoreTickish -> Maybe IfaceTickish
-toIfaceTickish (ProfNote cc tick push) = Just (IfaceSCC cc tick push)
-toIfaceTickish (HpcTick modl ix)       = Just (IfaceHpcTick modl ix)
-toIfaceTickish (SourceNote src (LexicalFastString names))  = Just (IfaceSource src names)
-toIfaceTickish (Breakpoint {})         = Nothing
-   -- Ignore breakpoints, since they are relevant only to GHCi, and
-   -- should not be serialised (#8333)
+toIfaceTickish :: CoreTickish -> IfaceTickish
+toIfaceTickish (ProfNote cc tick push) = IfaceSCC cc tick push
+toIfaceTickish (HpcTick modl ix)       = IfaceHpcTick modl ix
+toIfaceTickish (SourceNote src (LexicalFastString names)) =
+  IfaceSource src names
+toIfaceTickish (Breakpoint _ ix fv m) =
+  IfaceBreakpoint ix (toIfaceIdBndr <$> fv) m
 
 ---------------------
 toIfaceBind :: Bind Id -> IfaceBinding IfaceLetBndr

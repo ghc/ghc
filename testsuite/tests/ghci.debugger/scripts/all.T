@@ -1,7 +1,6 @@
 setTestOpts([extra_run_opts('-ignore-dot-ghci'),
              when(config.have_ext_interp, extra_ways(['ghci-ext'])), # test with -fexternal-interpreter
-             normalise_slashes,
-             expect_broken_for(23272, ['ghci-opt'])]) # breakpoints are broken with optimizations, remove when !10448 is merged
+             normalise_slashes])
 
 
 test('print001', normal, ghci_script, ['print001.script'])
@@ -132,3 +131,11 @@ test('T18045', normal, ghci_script, ['T18045.script'])
 test('T19157', normal, ghci_script, ['T19157.script'])
 test('T19355', normal, ghci_script, ['T19355.script'])
 test('T19394', normal, ghci_script, ['T19394.script'])
+test('break030',
+  [
+    extra_files(['../InlinedBreakpoint1.hs', '../InlinedBreakpoint2.hs']),
+    only_ways(['ghci-opt']),
+  ],
+  ghci_script,
+  ['break030.script'],
+)

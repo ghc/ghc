@@ -131,6 +131,7 @@ import Data.IORef
 import Data.Foldable
 import GHC.Builtin.Names (ioTyConName, rOOT_MAIN)
 import GHC.Iface.Errors.Types
+import Language.Haskell.Syntax.Extension (NoExtField (NoExtField))
 
 {-
 This module takes
@@ -1619,10 +1620,13 @@ tcIfaceExpr (IfaceTick tickish expr) = do
         return (Tick tickish' expr')
 
 -------------------------
-tcIfaceTickish :: IfaceTickish -> IfM lcl CoreTickish
+tcIfaceTickish :: IfaceTickish -> IfL CoreTickish
 tcIfaceTickish (IfaceHpcTick modl ix)   = return (HpcTick modl ix)
 tcIfaceTickish (IfaceSCC  cc tick push) = return (ProfNote cc tick push)
 tcIfaceTickish (IfaceSource src name)   = return (SourceNote src (LexicalFastString name))
+tcIfaceTickish (IfaceBreakpoint ix fvs modl) = do
+  fvs' <- bindIfaceIds fvs pure
+  return (Breakpoint NoExtField ix fvs' modl)
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal

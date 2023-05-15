@@ -134,6 +134,7 @@ data GenTickish pass =
                                 --
                                 -- Careful about substitution!  See
                                 -- Note [substTickish] in "GHC.Core.Subst".
+    , breakpointModule :: Module
     }
 
   -- | A source note.

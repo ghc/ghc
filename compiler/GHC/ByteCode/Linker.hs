@@ -22,7 +22,6 @@ import GHC.Runtime.Interpreter
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
-import GHCi.BreakArray
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Names
@@ -56,15 +55,14 @@ linkBCO
   :: Interp
   -> LinkerEnv
   -> NameEnv Int
-  -> RemoteRef BreakArray
   -> UnlinkedBCO
   -> IO ResolvedBCO
-linkBCO interp le bco_ix breakarray
+linkBCO interp le bco_ix
            (UnlinkedBCO _ arity insns bitmap lits0 ptrs0) = do
   -- fromIntegral Word -> Word64 should be a no op if Word is Word64
   -- otherwise it will result in a cast to longlong on 32bit systems.
   lits <- mapM (fmap fromIntegral . lookupLiteral interp le) (ssElts lits0)
-  ptrs <- mapM (resolvePtr interp le bco_ix breakarray) (ssElts ptrs0)
+  ptrs <- mapM (resolvePtr interp le bco_ix) (ssElts ptrs0)
   return (ResolvedBCO isLittleEndian arity insns bitmap
               (listArray (0, fromIntegral (sizeSS lits0)-1) lits)
               (addListToSS emptySS ptrs))
@@ -138,10 +136,9 @@ resolvePtr
   :: Interp
   -> LinkerEnv
   -> NameEnv Int
-  -> RemoteRef BreakArray
   -> BCOPtr
   -> IO ResolvedBCOPtr
-resolvePtr interp le bco_ix breakarray ptr = case ptr of
+resolvePtr interp le bco_ix ptr = case ptr of
   BCOPtrName nm
     | Just ix <- lookupNameEnv bco_ix nm
     -> return (ResolvedBCORef ix) -- ref to another BCO in this group
@@ -162,10 +159,10 @@ resolvePtr interp le bco_ix breakarray ptr = case ptr of
     -> ResolvedBCOStaticPtr <$> lookupPrimOp interp op
 
   BCOPtrBCO bco
-    -> ResolvedBCOPtrBCO <$> linkBCO interp le bco_ix breakarray bco
+    -> ResolvedBCOPtrBCO <$> linkBCO interp le bco_ix bco
 
-  BCOPtrBreakArray
-    -> return (ResolvedBCOPtrBreakArray breakarray)
+  BCOPtrBreakArray breakarray
+    -> withForeignRef breakarray $ \ba -> return (ResolvedBCOPtrBreakArray ba)
 
 linkFail :: String -> String -> IO a
 linkFail who what

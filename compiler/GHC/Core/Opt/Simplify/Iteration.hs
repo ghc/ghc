@@ -1435,8 +1435,8 @@ simplTick env tickish expr cont
 
 
   simplTickish env tickish
-    | Breakpoint ext n ids <- tickish
-          = Breakpoint ext n (map (getDoneId . substId env) ids)
+    | Breakpoint ext n ids modl <- tickish
+          = Breakpoint ext n (map (getDoneId . substId env) ids) modl
     | otherwise = tickish
 
   -- Push type application and coercion inside a tick

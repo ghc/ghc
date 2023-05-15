@@ -53,7 +53,6 @@ import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
-import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Data.FastString
 import GHC.Utils.Panic
@@ -75,6 +74,7 @@ import Control.Monad
 import Data.Char
 
 import GHC.Unit.Module
+import GHC.Unit.Home.ModInfo (lookupHpt)
 
 import Data.Array
 import Data.Coerce (coerce)
@@ -387,27 +387,73 @@ schemeR_wrk fvs nm original_body (args, body)
      emitBc (mkProtoBCO platform nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
--- introduce break instructions for ticked expressions
+-- | Introduce break instructions for ticked expressions.
+-- If no breakpoint information is available, the instruction is omitted.
 schemeER_wrk :: StackDepth -> BCEnv -> CgStgExpr -> BcM BCInstrList
-schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
-  = do  code <- schemeE d 0 p rhs
-        cc_arr <- getCCArray
-        this_mod <- moduleName <$> getCurrentModule
-        platform <- profilePlatform <$> getProfile
-        let idOffSets = getVarOffSets platform d p fvs
-            ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-        let toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
-            toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
-            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
-        newBreakInfo tick_no breakInfo
-        hsc_env <- getHscEnv
-        let cc | Just interp <- hsc_interp hsc_env
-               , interpreterProfiled interp
-               = cc_arr ! tick_no
-               | otherwise = toRemotePtr nullPtr
-        let breakInstr = BRK_FUN (fromIntegral tick_no) (getUnique this_mod) cc
-        return $ breakInstr `consOL` code
+schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs mod) rhs) = do
+  code <- schemeE d 0 p rhs
+  hsc_env <- getHscEnv
+  current_mod <- getCurrentModule
+  current_mod_breaks <- getCurrentModBreaks
+  case break_info hsc_env mod current_mod current_mod_breaks of
+    Nothing -> pure code
+    Just ModBreaks {modBreaks_flags = breaks, modBreaks_module = mod_ptr} -> do
+      cc_arr <- getCCArray
+      platform <- profilePlatform <$> getProfile
+      let idOffSets = getVarOffSets platform d p fvs
+          ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
+          toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+          toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+          breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
+      newBreakInfo tick_no breakInfo
+      let cc | Just interp <- hsc_interp hsc_env
+            , interpreterProfiled interp
+            = cc_arr ! tick_no
+            | otherwise = toRemotePtr nullPtr
+          breakInstr = BRK_FUN breaks (fromIntegral tick_no) mod_ptr cc
+      return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
+
+-- | Determine the GHCi-allocated 'BreakArray' and module pointer for the module
+-- from which the breakpoint originates.
+-- These are stored in 'ModBreaks' as remote pointers in order to allow the BCOs
+-- to refer to pointers in GHCi's address space.
+-- They are initialized in 'GHC.HsToCore.Breakpoints.mkModBreaks', called by
+-- 'GHC.HsToCore.deSugar'.
+--
+-- Breakpoints might be disabled because we're in TH, because
+-- @-fno-break-points@ was specified, or because a module was reloaded without
+-- reinitializing 'ModBreaks'.
+--
+-- If the module stored in the breakpoint is the currently processed module, use
+-- the 'ModBreaks' from the state.
+-- If that is 'Nothing', consider breakpoints to be disabled and skip the
+-- instruction.
+--
+-- If the breakpoint is inlined from another module, look it up in the home
+-- package table.
+-- If the module doesn't exist there, or its module pointer is null (which means
+-- that the 'ModBreaks' value is uninitialized), skip the instruction.
+break_info ::
+  HscEnv ->
+  Module ->
+  Module ->
+  Maybe ModBreaks ->
+  Maybe ModBreaks
+break_info hsc_env mod current_mod current_mod_breaks
+  | mod == current_mod
+  = check_mod_ptr =<< current_mod_breaks
+  | Just hp <- lookupHpt (hsc_HPT hsc_env) (moduleName mod)
+  = check_mod_ptr (getModBreaks hp)
+  | otherwise
+  = Nothing
+  where
+    check_mod_ptr mb
+      | mod_ptr <- modBreaks_module mb
+      , fromRemotePtr mod_ptr /= nullPtr
+      = Just mb
+      | otherwise
+      = Nothing
 
 getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
@@ -603,7 +649,7 @@ schemeE d s p (StgLet _ext binds body) = do
      thunk_codes <- sequence compile_binds
      return (alloc_code `appOL` concatOL thunk_codes `appOL` body_code)
 
-schemeE _d _s _p (StgTick (Breakpoint _ bp_id _) _rhs)
+schemeE _d _s _p (StgTick (Breakpoint _ bp_id _ _) _rhs)
    = panic ("schemeE: Breakpoint without let binding: " ++
             show bp_id ++
             " forgot to run bcPrep?")
@@ -2265,6 +2311,9 @@ newBreakInfo ix info = BcM $ \st ->
 
 getCurrentModule :: BcM Module
 getCurrentModule = BcM $ \st -> return (st, thisModule st)
+
+getCurrentModBreaks :: BcM (Maybe ModBreaks)
+getCurrentModBreaks = BcM $ \st -> return (st, modBreaks st)
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

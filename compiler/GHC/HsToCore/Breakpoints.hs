@@ -19,6 +19,13 @@ import GHC.Utils.Outputable as Outputable
 import Data.List (intersperse)
 import Data.Array
 
+-- | Initialize memory for breakpoint data that is shared between the bytecode
+-- generator and the interpreter.
+--
+-- Since GHCi and the RTS need to interact with breakpoint data and the bytecode
+-- generator needs to encode this information for each expression, the data is
+-- allocated remotely in GHCi's address space and passed to the codegen as
+-- foreign pointers.
 mkModBreaks :: Interp -> Module -> SizedSeq Tick -> IO ModBreaks
 mkModBreaks interp mod extendedMixEntries
   = do
@@ -27,16 +34,18 @@ mkModBreaks interp mod extendedMixEntries
 
     breakArray <- GHCi.newBreakArray interp count
     ccs <- mkCCSArray interp mod count entries
+    mod_ptr <- GHCi.newModuleName interp (moduleName mod)
     let
            locsTicks  = listArray (0,count-1) [ tick_loc  t | t <- entries ]
            varsTicks  = listArray (0,count-1) [ tick_ids  t | t <- entries ]
            declsTicks = listArray (0,count-1) [ tick_path t | t <- entries ]
     return $ emptyModBreaks
-                       { modBreaks_flags = breakArray
-                       , modBreaks_locs  = locsTicks
-                       , modBreaks_vars  = varsTicks
-                       , modBreaks_decls = declsTicks
-                       , modBreaks_ccs   = ccs
+                       { modBreaks_flags  = breakArray
+                       , modBreaks_locs   = locsTicks
+                       , modBreaks_vars   = varsTicks
+                       , modBreaks_decls  = declsTicks
+                       , modBreaks_ccs    = ccs
+                       , modBreaks_module = mod_ptr
                        }
 
 mkCCSArray

@@ -591,8 +591,8 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
 
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish
-substTickish subst (Breakpoint ext n ids)
-   = Breakpoint ext n (map do_one ids)
+substTickish subst (Breakpoint ext n ids modl)
+   = Breakpoint ext n (map do_one ids) modl
  where
     do_one = getIdFromTrivialExpr . lookupIdSubst subst
 substTickish _subst other = other

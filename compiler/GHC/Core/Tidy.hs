@@ -234,8 +234,8 @@ tidyAlt env (Alt con vs rhs)
 
 ------------  Tickish  --------------
 tidyTickish :: TidyEnv -> CoreTickish -> CoreTickish
-tidyTickish env (Breakpoint ext ix ids)
-  = Breakpoint ext ix (map (tidyVarOcc env) ids)
+tidyTickish env (Breakpoint ext ix ids modl)
+  = Breakpoint ext ix (map (tidyVarOcc env) ids) modl
 tidyTickish _   other_tickish       = other_tickish
 
 ------------  Rules  --------------

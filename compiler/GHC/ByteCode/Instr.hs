@@ -19,7 +19,6 @@ import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Utils.Outputable
 import GHC.Types.Name
-import GHC.Types.Unique
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
@@ -31,6 +30,8 @@ import Data.Word
 import GHC.Stack.CCS (CostCentre)
 
 import GHC.Stg.Syntax
+import GHCi.BreakArray (BreakArray)
+import Language.Haskell.Syntax.Module.Name (ModuleName)
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions
@@ -205,7 +206,8 @@ data BCInstr
                    -- Note [unboxed tuple bytecodes and tuple_BCO] in GHC.StgToByteCode
 
    -- Breakpoints
-   | BRK_FUN         !Word16 Unique (RemotePtr CostCentre)
+   | BRK_FUN          (ForeignRef BreakArray) !Word16 (RemotePtr ModuleName)
+                      (RemotePtr CostCentre)
 
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions
@@ -356,10 +358,8 @@ instance Outputable BCInstr where
    ppr ENTER                 = text "ENTER"
    ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
    ppr (RETURN_TUPLE)        = text "RETURN_TUPLE"
-   ppr (BRK_FUN index uniq _cc) = text "BRK_FUN" <+> ppr index <+> mb_uniq <+> text "<cc>"
-     where mb_uniq = sdocOption sdocSuppressUniques $ \case
-             True  -> text "<uniq>"
-             False -> ppr uniq
+   ppr (BRK_FUN _ index _ _) = text "BRK_FUN" <+> text "<breakarray>"
+                               <+> ppr index <+> text "<module>" <+> text "<cc>"
 
 
 

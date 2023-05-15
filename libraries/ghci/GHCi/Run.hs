@@ -94,6 +94,7 @@ run m = case m of
   MkCostCentres mod ccs -> mkCostCentres mod ccs
   CostCentreStackInfo ptr -> ccsToStrings (fromRemotePtr ptr)
   NewBreakArray sz -> mkRemoteRef =<< newBreakArray sz
+  NewBreakModule name -> newModuleName name
   SetupBreakpoint ref ix cnt -> do
     arr <- localRef ref;
     _ <- setupBreakpoint arr ix cnt
@@ -328,7 +329,7 @@ withBreakAction opts breakMVar statusMVar act
         -- as soon as it is hit, or in resetBreakAction below.
 
    onBreak :: BreakpointCallback
-   onBreak ix# uniq# is_exception apStack = do
+   onBreak ix# mod_name# is_exception apStack = do
      tid <- myThreadId
      let resume = ResumeContext
            { resumeBreakMVar = breakMVar
@@ -337,7 +338,13 @@ withBreakAction opts breakMVar statusMVar act
      resume_r <- mkRemoteRef resume
      apStack_r <- mkRemoteRef apStack
      ccs <- toRemotePtr <$> getCCSOf apStack
-     putMVar statusMVar $ EvalBreak is_exception apStack_r (I# ix#) (I# uniq#) resume_r ccs
+     breakpoint <-
+       if is_exception
+       then pure Nothing
+       else do
+         mod_name <- peekCString (Ptr mod_name#)
+         pure (Just (EvalBreakpoint (I# ix#) mod_name))
+     putMVar statusMVar $ EvalBreak apStack_r breakpoint resume_r ccs
      takeMVar breakMVar
 
    resetBreakAction stablePtr = do
@@ -386,7 +393,7 @@ resetStepFlag = poke stepFlag 0
 
 type BreakpointCallback
      = Int#    -- the breakpoint index
-    -> Int#    -- the module uniq
+    -> Addr#   -- pointer to the module name
     -> Bool    -- exception?
     -> HValue  -- the AP_STACK, or exception
     -> IO ()
@@ -432,6 +439,10 @@ foreign import ccall unsafe "mkCostCentre"
 #else
 mkCostCentres _ _ = return []
 #endif
+
+newModuleName :: String -> IO (RemotePtr BreakModule)
+newModuleName name =
+  castRemotePtr . toRemotePtr <$> newCString name
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
 getIdValFromApStack apStack (I# stackDepth) = do

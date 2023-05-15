@@ -25,12 +25,14 @@ module GHC.Runtime.Interpreter
   , mkCostCentres
   , costCentreStackInfo
   , newBreakArray
+  , newModuleName
   , storeBreakpoint
   , breakpointStatus
   , getBreakpointVar
   , getClosure
   , getModBreaks
   , seqHValue
+  , evalBreakInfo
   , interpreterDynamic
   , interpreterProfiled
 
@@ -83,7 +85,6 @@ import GHC.Linker.Types
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
-import GHC.Types.Unique
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
@@ -313,7 +314,7 @@ handleEvalStatus
   -> IO (EvalStatus_ [ForeignHValue] [HValueRef])
 handleEvalStatus interp status =
   case status of
-    EvalBreak a b c d e f -> return (EvalBreak a b c d e f)
+    EvalBreak a b c d -> return (EvalBreak a b c d)
     EvalComplete alloc res ->
       EvalComplete alloc <$> addFinalizer res
  where
@@ -380,6 +381,10 @@ newBreakArray interp size = do
   breakArray <- interpCmd interp (NewBreakArray size)
   mkFinalizedHValue interp breakArray
 
+newModuleName :: Interp -> ModuleName -> IO (RemotePtr ModuleName)
+newModuleName interp mod_name =
+  castRemotePtr <$> interpCmd interp (NewBreakModule (moduleNameString mod_name))
+
 storeBreakpoint :: Interp -> ForeignRef BreakArray -> Int -> Int -> IO ()
 storeBreakpoint interp ref ix cnt = do                               -- #19157
   withForeignRef ref $ \breakarray ->
@@ -409,20 +414,24 @@ seqHValue interp unit_env ref =
     status <- interpCmd interp (Seq hval)
     handleSeqHValueStatus interp unit_env status
 
+evalBreakInfo :: HomePackageTable -> EvalBreakpoint -> BreakInfo
+evalBreakInfo hpt (EvalBreakpoint ix mod_name) =
+  BreakInfo modl ix
+  where
+    modl = mi_module $
+           hm_iface $
+           expectJust "evalBreakInfo" $
+           lookupHpt hpt (mkModuleName mod_name)
+
 -- | Process the result of a Seq or ResumeSeq message.             #2950
 handleSeqHValueStatus :: Interp -> UnitEnv -> EvalStatus () -> IO (EvalResult ())
 handleSeqHValueStatus interp unit_env eval_status =
   case eval_status of
-    (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
+    (EvalBreak _ maybe_break resume_ctxt _) -> do
       -- A breakpoint was hit; inform the user and tell them
       -- which breakpoint was hit.
       resume_ctxt_fhv <- liftIO $ mkFinalizedHValue interp resume_ctxt
-      let hmi = expectJust "handleRunStatus" $
-                  lookupHptDirectly (ue_hpt unit_env)
-                    (mkUniqueGrimily mod_uniq)
-          modl = mi_module (hm_iface hmi)
-          bp | is_exception = Nothing
-             | otherwise = Just (BreakInfo modl ix)
+      let bp = evalBreakInfo (ue_hpt unit_env) <$> maybe_break
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
             (showSDocUnsafe $ sdocBpLoc bp))
