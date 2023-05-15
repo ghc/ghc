@@ -120,7 +120,7 @@ import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.LclEnv
 import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.ErrCtxt
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.Plugin ( HoleFitPlugin )
 import GHC.Tc.Errors.Types
 
 import GHC.Core.Reduction ( Reduction(..) )

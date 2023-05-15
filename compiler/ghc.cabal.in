@@ -717,6 +717,7 @@ Library
         GHC.Tc.Errors
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors.Hole.Plugin
         GHC.Tc.Errors.Ppr
         GHC.Tc.Errors.Types
         GHC.Tc.Errors.Types.PromotionErr

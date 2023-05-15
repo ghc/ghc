@@ -55,6 +55,7 @@ module GHC.Plugins
    , module GHC.Types.Unique.Supply
    , module GHC.Data.FastString
    , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
+   , module GHC.Tc.Errors.Hole.Plugin   -- for hole-fit plugins
    , module GHC.Unit.Module.ModGuts
    , module GHC.Unit.Module.ModSummary
    , module GHC.Unit.Module.ModIface
@@ -148,6 +149,7 @@ import GHC.Tc.Utils.Env ( lookupGlobal )
 import GHC.Types.Name.Cache ( NameCache )
 
 import GHC.Tc.Errors.Hole.FitTypes
+import GHC.Tc.Errors.Hole.Plugin
 
 -- For parse result plugins
 import GHC.Parser.Errors.Types ( PsWarning, PsError )

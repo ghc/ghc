@@ -159,8 +159,8 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Errors.Types.PromotionErr
+import GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
 import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)

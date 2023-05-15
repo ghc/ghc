@@ -82,7 +82,7 @@ import GHC.Parser.Errors.Types (PsWarning, PsError)
 
 import qualified GHC.Tc.Types
 import GHC.Tc.Types ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
-import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR )
+import GHC.Tc.Errors.Hole.Plugin ( HoleFitPluginR )
 
 import GHC.Core.Opt.Monad ( CoreM )
 import GHC.Core.Opt.Pipeline.Types ( CoreToDo )
