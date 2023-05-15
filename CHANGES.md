@@ -1,3 +1,6 @@
+## Changes in 2.28.0
+ * Support qualified and unqualified names in `--ignore-link-symbol`
+
 ## Changes in 2.24.0
 
  * Reify oversaturated data family instances correctly (#1103)

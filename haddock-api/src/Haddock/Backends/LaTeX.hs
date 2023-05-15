@@ -18,6 +18,7 @@ module Haddock.Backends.LaTeX (
 ) where
 
 import Documentation.Haddock.Markup
+import Haddock.Doc (combineDocumentation)
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
@@ -41,10 +42,6 @@ import Data.List            ( sort )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Foldable ( toList )
 import Prelude hiding ((<>))
-
-import Haddock.Doc (combineDocumentation)
-
--- import Debug.Trace
 
 {- SAMPLE OUTPUT
 
@@ -180,7 +177,18 @@ ppLaTeXModule _title odir iface = do
 
 -- | Prints out an entry in a module export list.
 exportListItem :: ExportItem DocNameI -> LaTeX
-exportListItem ExportDecl { expItemDecl = decl, expItemSubDocs = subdocs }
+exportListItem
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+          ( ExportD
+            { expDDecl    = decl
+            , expDSubDocs = subdocs
+            }
+          )
+        }
+      )
+    )
   = let (leader, names) = declNames decl
     in sep (punctuate comma [ leader <+> ppDocBinder name | name <- names ]) <>
          case subdocs of
@@ -215,9 +223,18 @@ processExports (e : es) =
 
 
 isSimpleSig :: ExportItem DocNameI -> Maybe ([DocName], HsSigType DocNameI)
-isSimpleSig ExportDecl { expItemDecl = L _ (SigD _ (TypeSig _ lnames t))
-                       , expItemMbDoc = (Documentation Nothing Nothing, argDocs) }
-  | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCards t))
+isSimpleSig
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+          ExportD
+          { expDDecl  = L _ (SigD _ (TypeSig _ lnames t))
+          , expDMbDoc = (Documentation Nothing Nothing, argDocs)
+          }
+        }
+      )
+    )
+    | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCards t))
 isSimpleSig _ = Nothing
 
 
@@ -229,7 +246,7 @@ isExportModule _ = Nothing
 processExport :: ExportItem DocNameI -> LaTeX
 processExport (ExportGroup lev _id0 doc)
   = ppDocGroup lev (docToLaTeX doc)
-processExport (ExportDecl decl pats doc subdocs insts fixities _splice)
+processExport (ExportDecl (RnExportD (ExportD decl pats doc subdocs insts fixities _splice) _))
   = ppDecl decl pats doc insts subdocs fixities
 processExport (ExportNoDecl y [])
   = ppDocName y
@@ -292,13 +309,9 @@ ppDecl :: LHsDecl DocNameI                         -- ^ decl to print
        -> LaTeX
 
 ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
-  TyClD _ d@FamDecl {}         -> ppFamDecl False doc instances d unicode
-  TyClD _ d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
-  TyClD _ d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
--- Family instances happen via FamInst now
---  TyClD _ d@TySynonym{}
---    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
--- Family instances happen via FamInst now
+  TyClD _ d@FamDecl {}           -> ppFamDecl False doc instances d unicode
+  TyClD _ d@DataDecl {}          -> ppDataDecl pats instances subdocs (Just doc) d unicode
+  TyClD _ d@SynDecl {}           -> ppTySyn (doc, fnArgsDoc) d unicode
   TyClD _ d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
   SigD _ (TypeSig _ lnames ty)   -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCards ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
