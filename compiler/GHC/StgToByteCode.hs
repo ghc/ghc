@@ -1932,8 +1932,7 @@ pushAtom d p (StgVarArg var)
               return (unitOL (PACK con 0), szb)
 
             -- see Note [Generating code for top-level string literal bindings]
-          _ | isUnliftedType (idType var) -> do
-              massert (idType var `eqType` addrPrimTy)
+          _ | idType var `eqType` addrPrimTy ->
               return (unitOL (PUSH_ADDR (getName var)), szb)
 
             | otherwise -> do
