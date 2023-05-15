@@ -124,7 +124,6 @@ import GHC.Core
 import GHC.Core.TyCo.Ppr
 import GHC.Utils.FV
 import GHC.Types.Var.Set
-import GHC.Driver.DynFlags (DynFlags(reductionDepth))
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Types.Unique.Set
@@ -2485,9 +2484,9 @@ bumpSubGoalDepth (SubGoalDepth n) = SubGoalDepth (n + 1)
 maxSubGoalDepth :: SubGoalDepth -> SubGoalDepth -> SubGoalDepth
 maxSubGoalDepth (SubGoalDepth n) (SubGoalDepth m) = SubGoalDepth (n `max` m)
 
-subGoalDepthExceeded :: DynFlags -> SubGoalDepth -> Bool
-subGoalDepthExceeded dflags (SubGoalDepth d)
-  = mkIntWithInf d > reductionDepth dflags
+subGoalDepthExceeded :: IntWithInf -> SubGoalDepth -> Bool
+subGoalDepthExceeded reductionDepth (SubGoalDepth d)
+  = mkIntWithInf d > reductionDepth
 
 {-
 ************************************************************************
