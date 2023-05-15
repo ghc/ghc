@@ -57,7 +57,7 @@ module GHC.Tc.Solver.Monad (
     getSolvedDicts, setSolvedDicts,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
-    getTopEnv, getGblEnv, getLclEnv, setLclEnv,
+    getTopEnv, getGblEnv, getLclEnv, setSrcSpan,
     getTcEvBindsVar, getTcLevel,
     getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
     tcLookupClass, tcLookupId, tcLookupTyCon,
@@ -194,6 +194,7 @@ import Data.IORef
 import Data.List ( mapAccumL )
 import Data.Foldable
 import qualified Data.Semigroup as S
+import GHC.Types.SrcLoc
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -1398,8 +1399,8 @@ getGblEnv = wrapTcS $ TcM.getGblEnv
 getLclEnv :: TcS TcLclEnv
 getLclEnv = wrapTcS $ TcM.getLclEnv
 
-setLclEnv :: TcLclEnv -> TcS a -> TcS a
-setLclEnv env = wrap2TcS (TcM.setLclEnv env)
+setSrcSpan :: RealSrcSpan -> TcS a -> TcS a
+setSrcSpan ss = wrap2TcS (TcM.setSrcSpan (RealSrcSpan ss mempty))
 
 tcLookupClass :: Name -> TcS Class
 tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
