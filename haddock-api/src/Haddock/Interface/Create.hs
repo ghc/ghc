@@ -109,6 +109,8 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
         }
       } = mod_sum
 
+    !ml_hie_file' = force ml_hie_file
+
     TcGblEnv
       {
         tcg_mod
@@ -251,7 +253,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
       ifaceMod               = tcg_mod
     , ifaceIsSig             = is_sig
     , ifaceOrigFilename      = msHsFilePath mod_sum
-    , ifaceHieFile           = Just ml_hie_file
+    , ifaceHieFile           = Just ml_hie_file'
     , ifaceInfo              = info
     , ifaceDoc               = Documentation header_doc mod_warning
     , ifaceRnDoc             = Documentation Nothing Nothing
@@ -830,18 +832,20 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
             !patSynNames = force $
               concatMap (getMainDeclBinder emptyOccEnv . fst) bundledPatSyns
 
-            !fixities = force
-                [ (n, f)
-                | n <- availName avail : fmap fst subs ++ patSynNames
-                , Just f <- [M.lookup n fixMap]
-                ]
-
             !doc'  = force doc
             !subs' = force subs
 
+            !restrictToNames = force $ fmap fst subs'
+
+            !fixities = force
+                [ (n, f)
+                | n <- availName avail : fmap fst subs' ++ patSynNames
+                , Just f <- [M.lookup n fixMap]
+                ]
+
           return
             [ ExportDecl ExportD
-                { expDDecl      = restrictTo (fmap fst subs) extractedDecl
+                { expDDecl      = restrictTo restrictToNames extractedDecl
                 , expDPats      = bundledPatSyns
                 , expDMbDoc     = doc'
                 , expDSubDocs   = subs'
