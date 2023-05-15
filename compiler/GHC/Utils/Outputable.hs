@@ -47,8 +47,8 @@ module GHC.Utils.Outputable (
         blankLine, forAllLit, bullet,
         ($+$),
         cat, fcat,
-        hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
-        ppWhenOption, ppUnlessOption,
+        hang, hangNotEmpty, punctuate, punctuateFinal,
+        ppWhen, ppUnless, ppWhenOption, ppUnlessOption,
         speakNth, speakN, speakNOf, plural, singular,
         isOrAre, doOrDoes, itsOrTheir, thisOrThese, hasOrHave,
         unicodeSyntax,
@@ -153,7 +153,7 @@ import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup (Arg(..))
 import qualified Data.List.NonEmpty as NEL
-import Data.Time
+import Data.Time ( UTCTime )
 import Data.Time.Format.ISO8601
 import Data.Void
 
@@ -841,6 +841,21 @@ punctuate p (d:ds) = go d ds
                    where
                      go d [] = [d]
                      go d (e:es) = (d <> p) : go e es
+
+-- | Punctuate a list, e.g. with commas and dots.
+--
+-- > sep $ punctuateFinal comma dot [text "ab", text "cd", text "ef"]
+-- > ab, cd, ef.
+punctuateFinal :: IsLine doc
+               => doc   -- ^ The interstitial punctuation
+               -> doc   -- ^ The final punctuation
+               -> [doc] -- ^ The list that will have punctuation added between every adjacent pair of elements
+               -> [doc] -- ^ Punctuated list
+punctuateFinal _ _ []     = []
+punctuateFinal p q (d:ds) = go d ds
+  where
+    go d [] = [d <> q]
+    go d (e:es) = (d <> p) : go e es
 
 ppWhen, ppUnless :: IsOutput doc => Bool -> doc -> doc
 {-# INLINE CONLIKE ppWhen #-}

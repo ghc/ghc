@@ -1840,17 +1840,19 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalInferredTyVars _
       -> mkSimpleDecorated $
          text "Inferred type variables are not allowed"
-    TcRnAmbiguousName name gres
+    TcRnAmbiguousName gre_env name gres
       -> mkSimpleDecorated $
-         vcat [ text "Ambiguous occurrence" <+> quotes (ppr name)
+         vcat [ text "Ambiguous occurrence" <+> quotes (ppr name) <> dot
               , text "It could refer to"
-              , nest 3 (vcat (msg1 : msgs)) ]
+              , nest 3 (vcat msgs) ]
          where
            np1 NE.:| nps = gres
-           msg1 =  text "either" <+> ppr_gre np1
-           msgs = [text "    or" <+> ppr_gre np | np <- nps]
-           ppr_gre gre = sep [ pprAmbiguousGreName gre <> comma
-                             , pprNameProvenance gre]
+           msgs = punctuateFinal comma dot $
+                    text "either" <+> ppr_gre np1
+                 : [text "    or" <+> ppr_gre np | np <- nps]
+
+           ppr_gre gre = pprAmbiguousGreName gre_env gre
+
     TcRnBindingNameConflict name locs
       -> mkSimpleDecorated $
          vcat [text "Conflicting definitions for" <+> quotes (ppr name),
@@ -5439,17 +5441,44 @@ pprUnusedName name reason =
 --                            imported from ‘Prelude’ at T15487.hs:1:8-13
 --                     or ...
 -- See #15487
-pprAmbiguousGreName :: GlobalRdrElt -> SDoc
-pprAmbiguousGreName gre
-  | isRecFldGRE gre
-  = text "the field" <+> quotes (ppr occ) <+> parent_info
+pprAmbiguousGreName :: GlobalRdrEnv -> GlobalRdrElt -> SDoc
+pprAmbiguousGreName gre_env gre
+  | IAmRecField fld_info <- gre_info gre
+  = sep [ text "the field" <+> quotes (ppr occ) <+> parent_info fld_info <> comma
+        , pprNameProvenance gre ]
   | otherwise
-  = quotes (pp_qual <> dot <> ppr occ)
+  = sep [ quotes (pp_qual <> dot <> ppr occ) <> comma
+        , pprNameProvenance gre ]
+
   where
     occ = greOccName gre
-    parent_info = case gre_par gre of
-      NoParent -> empty
-      ParentIs { par_is = par_name } -> text "of record" <+> quotes (ppr par_name)
+    parent_info fld_info =
+      case first_con of
+        PatSynName  ps -> text "of pattern synonym" <+> quotes (ppr ps)
+        DataConName {} ->
+          case gre_par gre of
+            ParentIs par
+              -- For a data family, only reporting the family TyCon can be
+              -- unhelpful (see T23301). So we give a bit of additional
+              -- info in that case.
+              | Just par_gre <- lookupGRE_Name gre_env par
+              , IAmTyCon tc_flav <- gre_info par_gre
+              , OpenFamilyFlavour IAmData _ <- tc_flav
+              -> vcat [ ppr_cons
+                      , text "in a data family instance of" <+> quotes (ppr par) ]
+              | otherwise
+              -> text "of record" <+> quotes (ppr par)
+            NoParent -> ppr_cons
+      where
+        cons :: [ConLikeName]
+        cons = nonDetEltsUniqSet $ recFieldCons fld_info
+        first_con :: ConLikeName
+        first_con = head cons
+        ppr_cons :: SDoc
+        ppr_cons = hsep [ text "belonging to data constructor"
+                        , quotes (ppr $ nameOccName $ conLikeName_Name first_con)
+                        , if length cons > 1 then parens (text "among others") else empty
+                        ]
     pp_qual
         | gre_lcl gre
         = ppr (nameModule $ greName gre)

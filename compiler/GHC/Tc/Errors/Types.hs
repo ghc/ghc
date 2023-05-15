@@ -4024,7 +4024,8 @@ data TcRnMessage where
       T18999_NoDisambiguateRecordFields, T19397E1, T19397E2, T23010_fail,
       tcfail037
   -}
-  TcRnAmbiguousName :: !RdrName -- ^ The name
+  TcRnAmbiguousName :: !GlobalRdrEnv
+                    -> !RdrName -- ^ The name
                     -> !(NE.NonEmpty GlobalRdrElt) -- ^ The possible matches
                     -> TcRnMessage
 

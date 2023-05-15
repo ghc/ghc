@@ -9,10 +9,12 @@ data T a = MkT {foo :: Bool, ...}
 True
 
 <interactive>:1:1: error: [GHC-87543]
-    Ambiguous occurrence ‘foo’
+    Ambiguous occurrence ‘foo’.
     It could refer to
-       either the field ‘foo’ of record ‘S’, defined at <interactive>:3:16
-           or the field ‘foo’ of record ‘T’, defined at <interactive>:4:18
+       either the field ‘foo’ of record ‘S’,
+              defined at <interactive>:3:16,
+           or the field ‘foo’ of record ‘T’,
+              defined at <interactive>:4:18.
 type U :: *
 data U = MkU {foo :: Int}
   	-- Defined at <interactive>:12:16

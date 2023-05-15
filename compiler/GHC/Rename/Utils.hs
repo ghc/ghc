@@ -60,9 +60,11 @@ import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
-import qualified Data.List.NonEmpty as NE
 import qualified GHC.LanguageExtensions as LangExt
+
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NE
+
 
 {-
 *********************************************************
@@ -501,7 +503,8 @@ addNameClashErrRn rdr_name gres
   -- already, and we don't want an error cascade.
   = return ()
   | otherwise
-  = addErr $ mkNameClashErr rdr_name gres
+  = do { gre_env <- getGlobalRdrEnv
+       ; addErr $ mkNameClashErr gre_env rdr_name gres }
   where
     -- If all the GREs are defined locally, can we skip reporting an ambiguity
     -- error at use sites, because it will have been reported already? See
@@ -514,8 +517,8 @@ addNameClashErrRn rdr_name gres
     num_flds     = length flds
     num_non_flds = length non_flds
 
-mkNameClashErr :: RdrName -> NE.NonEmpty GlobalRdrElt -> TcRnMessage
-mkNameClashErr rdr_name gres = TcRnAmbiguousName rdr_name gres
+mkNameClashErr :: GlobalRdrEnv -> RdrName -> NE.NonEmpty GlobalRdrElt -> TcRnMessage
+mkNameClashErr gre_env rdr_name gres = TcRnAmbiguousName gre_env rdr_name gres
 
 dupNamesErr :: NE.NonEmpty SrcSpan -> NE.NonEmpty RdrName -> RnM ()
 dupNamesErr locs names

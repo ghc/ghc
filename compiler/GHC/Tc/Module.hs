@@ -989,7 +989,8 @@ checkHiBootIface'
           -- At least 2 matches: report an ambiguity error.
           (gre1,_):(gre2,_):gres_ids -> do
            addErrAt (nameSrcSpan missing_name) $
-             mkNameClashErr (nameRdrName missing_name) (gre1 NE.:| gre2 : map fst gres_ids)
+             mkNameClashErr gre_env (nameRdrName missing_name)
+               (gre1 NE.:| gre2 : map fst gres_ids)
            return Nothing
 
           -- Single match: resolve the issue.
