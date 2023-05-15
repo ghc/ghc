@@ -834,10 +834,13 @@ When printing an interface file (--show-iface), we want to print
 everything unqualified, so we can just print the OccName directly.
 -}
 
+-- | Show a declaration but not its RHS.
 showToHeader :: ShowSub
 showToHeader = ShowSub { ss_how_much = ShowHeader $ AltPpr Nothing
                        , ss_forall = ShowForAllWhen }
 
+-- | Show declaration and its RHS, including GHc-internal information (e.g.
+-- for @--show-iface@).
 showToIface :: ShowSub
 showToIface = ShowSub { ss_how_much = ShowIface
                       , ss_forall = ShowForAllWhen }
@@ -848,18 +851,20 @@ ppShowIface _                                     _   = Outputable.empty
 
 -- show if all sub-components or the complete interface is shown
 ppShowAllSubs :: ShowSub -> SDoc -> SDoc -- See Note [Minimal complete definition]
-ppShowAllSubs (ShowSub { ss_how_much = ShowSome [] _ }) doc = doc
-ppShowAllSubs (ShowSub { ss_how_much = ShowIface })     doc = doc
-ppShowAllSubs _                                         _   = Outputable.empty
+ppShowAllSubs (ShowSub { ss_how_much = ShowSome Nothing _ }) doc
+                                                        = doc
+ppShowAllSubs (ShowSub { ss_how_much = ShowIface }) doc = doc
+ppShowAllSubs _                                     _   = Outputable.empty
 
 ppShowRhs :: ShowSub -> SDoc -> SDoc
 ppShowRhs (ShowSub { ss_how_much = ShowHeader _ }) _   = Outputable.empty
 ppShowRhs _                                        doc = doc
 
 showSub :: HasOccName n => ShowSub -> n -> Bool
-showSub (ShowSub { ss_how_much = ShowHeader _ })     _     = False
-showSub (ShowSub { ss_how_much = ShowSome (n:_) _ }) thing = n == occName thing
-showSub (ShowSub { ss_how_much = _ })              _     = True
+showSub (ShowSub { ss_how_much = ShowHeader _ }) _     = False
+showSub (ShowSub { ss_how_much = ShowSome (Just f) _ }) thing
+                                                       = f (occName thing)
+showSub (ShowSub { ss_how_much = _ })            _     = True
 
 ppr_trim :: [Maybe SDoc] -> [SDoc]
 -- Collapse a group of Nothings to a single "..."

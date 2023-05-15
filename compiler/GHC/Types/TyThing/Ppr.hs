@@ -145,16 +145,24 @@ pprTyThingHdr = pprTyThing showToHeader
 -- parts omitted.
 pprTyThingInContext :: ShowSub -> TyThing -> SDoc
 pprTyThingInContext show_sub thing
-  = go [] thing
+  = case parents thing of
+      -- If there are no parents print everything.
+      [] -> print_it Nothing thing
+      -- If `thing` has a parent, print the parent and only its child `thing`
+      thing':rest -> let subs = map getOccName (thing:rest)
+                         filt = (`elem` subs)
+                     in print_it (Just filt) thing'
   where
-    go ss thing
-      = case tyThingParent_maybe thing of
-          Just parent ->
-            go (getOccName thing : ss) parent
-          Nothing ->
-            pprTyThing
-              (show_sub { ss_how_much = ShowSome ss (AltPpr Nothing) })
-              thing
+    parents = go
+      where
+        go thing =
+          case tyThingParent_maybe thing of
+            Just parent -> parent : go parent
+            Nothing     -> []
+
+    print_it :: Maybe (OccName -> Bool) -> TyThing -> SDoc
+    print_it mb_filt thing =
+      pprTyThing (show_sub { ss_how_much = ShowSome mb_filt (AltPpr Nothing) }) thing
 
 -- | Like 'pprTyThingInContext', but adds the defining location.
 pprTyThingInContextLoc :: TyThing -> SDoc
@@ -171,8 +179,8 @@ pprTyThing ss ty_thing
       pprIfaceDecl ss' (tyThingToIfaceDecl show_linear_types ty_thing)
   where
     ss' = case ss_how_much ss of
-      ShowHeader (AltPpr Nothing)  -> ss { ss_how_much = ShowHeader ppr' }
-      ShowSome xs (AltPpr Nothing) -> ss { ss_how_much = ShowSome xs ppr' }
+      ShowHeader (AltPpr Nothing)    -> ss { ss_how_much = ShowHeader ppr' }
+      ShowSome filt (AltPpr Nothing) -> ss { ss_how_much = ShowSome filt ppr' }
       _                   -> ss
 
     ppr' = AltPpr $ ppr_bndr $ getName ty_thing
