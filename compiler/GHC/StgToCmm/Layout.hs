@@ -64,6 +64,7 @@ import GHC.Data.FastString
 import Control.Monad
 import GHC.StgToCmm.Config (stgToCmmPlatform)
 import GHC.StgToCmm.Types
+import Data.List.NonEmpty (nonEmpty)
 
 ------------------------------------------------------------------------
 --                Call and return sequences
@@ -376,24 +377,25 @@ just more arguments that we are passing on the stack (cml_args).
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
 slowArgs :: Platform -> [(ArgRep, Maybe CmmExpr)] -> DoSCCProfiling -> [(ArgRep, Maybe CmmExpr)]
-slowArgs _ []  _        = mempty
 slowArgs platform args sccProfilingEnabled  -- careful: reps contains voids (V), but args does not
-  | sccProfilingEnabled = save_cccs ++ this_pat ++ slowArgs platform rest_args sccProfilingEnabled
-  | otherwise           =              this_pat ++ slowArgs platform rest_args sccProfilingEnabled
-  where
-    (arg_pat, n)            = slowCallPattern (map fst args)
-    (call_args, rest_args)  = splitAt n args
+  = case nonEmpty args of
+    Nothing -> mempty
+    Just args1
+      | sccProfilingEnabled -> save_cccs ++ this_pat ++ slowArgs platform rest_args sccProfilingEnabled
+      | otherwise           ->              this_pat ++ slowArgs platform rest_args sccProfilingEnabled
+      where
+        (arg_pat, n)            = slowCallPattern (fmap fst args)
+        (call_args, rest_args)  = splitAt n args
 
-    stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
-    this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just $ cccsExpr platform)]
-    save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit $ "stg_restore_cccs_" ++ arg_reps)
-    arg_reps =
-      case maximum (map fst args) of
-        V64 -> "v64"
-        V32 -> "v32"
-        V16 -> "v16"
-        _   -> "d"
+        stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
+        this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
+        save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just $ cccsExpr platform)]
+        save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit $ "stg_restore_cccs_" ++ arg_reps)
+        arg_reps = case maximum (fmap fst args1) of
+            V64 -> "v64"
+            V32 -> "v32"
+            V16 -> "v16"
+            _   -> "d"
 
 
 

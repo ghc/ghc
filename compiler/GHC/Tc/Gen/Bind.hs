@@ -506,7 +506,7 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc closed bind_list
     ; return result }
   where
     binder_names = collectHsBindListBinders CollNoDictBinders bind_list
-    loc = foldr1 combineSrcSpans (map (locA . getLoc) bind_list)
+    loc = foldr1WithDefault noSrcSpan combineSrcSpans (map (locA . getLoc) bind_list)
          -- The mbinds have been dependency analysed and
          -- may no longer be adjacent; so find the narrowest
          -- span that includes them all

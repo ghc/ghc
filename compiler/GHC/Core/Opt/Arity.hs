@@ -7,6 +7,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -- | Arity and eta expansion
 module GHC.Core.Opt.Arity
@@ -87,6 +88,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
+import Data.List.NonEmpty ( nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe( isJust )
 
 {-
@@ -1599,23 +1602,22 @@ arityType env (App fun arg )
         --      f x y = case x of { (a,b) -> e }
         -- The difference is observable using 'seq'
         --
-arityType env (Case scrut bndr _ alts)
-  | exprIsDeadEnd scrut || null alts
-  = botArityType    -- Do not eta expand. See (1) in Note [Dealing with bottom]
+arityType env (Case scrut bndr _ altList)
+  | not $ exprIsDeadEnd scrut, Just alts <- nonEmpty altList
+  = let env' = delInScope env bndr
+        arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
+        alts_type = foldr1 (andArityType env) (NE.map arity_type_alt alts)
+    in if
+      | not (pedanticBottoms env)  -- See (2) in Note [Dealing with bottom]
+      , myExprIsCheap env scrut (Just (idType bndr))
+       -> alts_type
 
-  | not (pedanticBottoms env)  -- See (2) in Note [Dealing with bottom]
-  , myExprIsCheap env scrut (Just (idType bndr))
-  = alts_type
+      | exprOkForSpeculation scrut
+       -> alts_type
 
-  | exprOkForSpeculation scrut
-  = alts_type
-
-  | otherwise            -- In the remaining cases we may not push
-  = addWork alts_type    -- evaluation of the scrutinee in
-  where
-    env' = delInScope env bndr
-    arity_type_alt (Alt _con bndrs rhs) = arityType (delInScopeList env' bndrs) rhs
-    alts_type = foldr1 (andArityType env) (map arity_type_alt alts)
+      | otherwise            -- In the remaining cases we may not push
+       -> addWork alts_type -- evaluation of the scrutinee in
+  | otherwise = botArityType    -- Do not eta expand. See (1) in Note [Dealing with bottom]
 
 arityType env (Let (NonRec b rhs) e)
   = -- See Note [arityType for non-recursive let-bindings]

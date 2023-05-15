@@ -74,6 +74,7 @@ import Data.List (sortOn)
 
 import Numeric(showHex)
 
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
@@ -170,7 +171,7 @@ defRenderJsS r = \case
   SwitchStat e l d     -> hangBrace (text "switch" <+?> parens (jsToDocR r e)) cases
         where l' = map (\(c,s) -> (text "case" <+?> parens (jsToDocR r c) <> colon) $$$ jnest (optBlock r s)) l
                    ++ [(text "default:") $$$ jnest (optBlock r d)]
-              cases = foldl1 ($$$) l'
+              cases = foldl1 ($$$) $ expectNonEmpty "cases" l'
   ReturnStat e      -> text "return" <+> jsToDocR r e
   ApplStat e es     -> jsToDocR r e <> (parens . foldl' (<+?>) empty . punctuate comma $ map (jsToDocR r) es)
   FuncStat i is b   -> hangBrace (text "function" <+> jsToDocR r i

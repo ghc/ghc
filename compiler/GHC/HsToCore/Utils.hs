@@ -205,7 +205,7 @@ shiftEqns = fmap shift
     shift eqn@(EqnDone {}) = pprPanic "shiftEqns" (ppr eqn)
 
 combineEqnRhss :: NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
-combineEqnRhss eqns = return $ foldr1 combineMatchResults $ map eqnMatchResult (NEL.toList eqns)
+combineEqnRhss = pure . foldr1 combineMatchResults . fmap eqnMatchResult
 
 -- Functions on MatchResult CoreExprs
 

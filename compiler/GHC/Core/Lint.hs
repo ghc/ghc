@@ -101,7 +101,7 @@ import GHC.Data.Unboxed
 
 import Control.Monad
 import Data.Foldable      ( for_, toList )
-import Data.List.NonEmpty ( NonEmpty(..), groupWith )
+import Data.List.NonEmpty ( NonEmpty(..), groupWith, nonEmpty )
 import Data.Maybe
 import Data.IntMap.Strict ( IntMap )
 import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
@@ -951,7 +951,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
         ; ((body_type, body_ue), ues) <-
             lintRecBindings NotTopLevel pairs $ \ bndrs' ->
             lintLetBody (BodyOfLetRec bndrs') bndrs' body
-        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
+        ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1WithDefault zeroUE addUE ues)) }
   where
     bndrs = map fst pairs
 
@@ -1243,9 +1243,9 @@ checkRepPolyBuiltinApp fun_id args = checkL (null not_concs) err_msg
 
     max_pos :: Int
     max_pos =
-      case IntMap.keys conc_binder_positions of
-        [] -> 0
-        positions -> maximum positions
+      case nonEmpty $ IntMap.keys conc_binder_positions of
+        Nothing -> 0
+        Just positions -> maximum positions
 
     not_concs :: [(SDoc, ConcreteTvOrigin)]
     not_concs =

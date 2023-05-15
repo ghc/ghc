@@ -66,3 +66,6 @@ unzipPairs (Pair a b : prs) = (a:as, b:bs)
     !(as,bs) = unzipPairs prs
     -- This makes the unzip work eagerly, building no thunks at
     -- the cost of doing all the work up-front.
+
+instance Foldable1 Pair where
+    foldMap1 f (Pair a b) = f a Semi.<> f b

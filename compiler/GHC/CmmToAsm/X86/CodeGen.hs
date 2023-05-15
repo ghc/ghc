@@ -5300,7 +5300,7 @@ genMemSetInlineMaybe align dst c n = do
       if left <= 0 then nilOL
       else curMov `appOL` go4 dst (left - curWidth)
       where
-        possibleWidth = minimum [left, sizeBytes]
+        possibleWidth = min left sizeBytes
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone (ImmInteger (n - left))
         (curMov, curWidth) = gen4 dst_addr possibleWidth
 
@@ -5314,7 +5314,7 @@ genMemSetInlineMaybe align dst c n = do
         in  curMov `appOL` go8 dst reg8byte (left - 8)
       else go4 dst left
       where
-        possibleWidth = minimum [left, sizeBytes]
+        possibleWidth = min left sizeBytes
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone (ImmInteger (n - left))
 
   if fromInteger insns > ncgInlineThresholdMemset config

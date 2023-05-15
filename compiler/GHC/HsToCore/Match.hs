@@ -77,7 +77,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
 import Control.Monad ( zipWithM, unless )
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty(..), nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 
@@ -194,9 +194,7 @@ match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
       -> [EquationInfo]   -- ^ Info about patterns, etc. (type synonym below)
       -> DsM (MatchResult CoreExpr) -- ^ Desugared result!
 
-match [] ty eqns
-  = assertPpr (not (null eqns)) (ppr ty) $
-    combineEqnRhss (NE.fromList eqns)
+match [] ty eqns = maybe (assertPprPanic (ppr ty)) combineEqnRhss $ nonEmpty eqns
 
 match (v:vs) ty eqns    -- Eqns can be empty, but each equation is nonempty
   = assertPpr (all (isInternalName . idName) vars) (ppr vars) $

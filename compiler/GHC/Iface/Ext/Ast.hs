@@ -54,7 +54,6 @@ import GHC.Types.Var.Env
 import GHC.Builtin.Uniques
 import GHC.Iface.Make             ( mkIfaceExports )
 import GHC.Utils.Panic
-import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import qualified GHC.Data.Strict as Strict
@@ -572,9 +571,9 @@ instance HasLoc a => HasLoc (DataDefnCons a) where
 instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
   getHasLoc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
     HsOuterImplicit{} ->
-      foldl1' combineSrcSpans [getHasLoc a, getHasLocList b, getHasLoc c]
+      foldl1' combineSrcSpans (getHasLoc a :| getHasLocList b : getHasLoc c : [])
     HsOuterExplicit{hso_bndrs = tvs} ->
-      foldl1' combineSrcSpans [getHasLoc a, getHasLocList tvs, getHasLocList b, getHasLoc c]
+      foldl1' combineSrcSpans (getHasLoc a :| getHasLocList tvs : getHasLocList b : getHasLoc c : [])
 
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg (GhcPass p) tm ty) where
   getHasLoc (HsValArg _ tm) = getHasLoc tm
@@ -1635,8 +1634,8 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         ]
         where
           context_scope = mkScope $ fromMaybe (noLocA []) context
-          rhs_scope = foldl1' combineScopes $ map mkScope
-            [ getHasLocList deps, getHasLocList sigs, getHasLocList meths, getHasLocList typs, getHasLocList deftyps]
+          rhs_scope = foldl1' combineScopes $ NE.map mkScope
+            ( getHasLocList deps :| getHasLocList sigs : getHasLocList meths : getHasLocList typs : getHasLocList deftyps : [])
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of

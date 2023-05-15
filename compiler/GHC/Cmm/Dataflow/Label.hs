@@ -67,6 +67,7 @@ module GHC.Cmm.Dataflow.Label
 
 import GHC.Prelude
 
+import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
 import GHC.Types.Unique (Uniquable(..), mkUniqueGrimily)
@@ -82,7 +83,6 @@ import qualified GHC.Data.Word64Map.Strict as M
 import GHC.Data.TrieMap
 
 import Data.Word (Word64)
-import Data.List (foldl1')
 
 
 -----------------------------------------------------------------------------
@@ -139,8 +139,7 @@ setUnion (LS x) (LS y) = LS (S.union x y)
 
 {-# INLINE setUnions #-}
 setUnions :: [LabelSet] -> LabelSet
-setUnions [] = setEmpty
-setUnions sets = foldl1' setUnion sets
+setUnions = foldl1WithDefault' setEmpty setUnion
 
 setDifference :: LabelSet -> LabelSet -> LabelSet
 setDifference (LS x) (LS y) = LS (S.difference x y)
@@ -219,8 +218,7 @@ mapUnion (LM x) (LM y) = LM (M.union x y)
 
 {-# INLINE mapUnions #-}
 mapUnions :: [LabelMap a] -> LabelMap a
-mapUnions [] = mapEmpty
-mapUnions maps = foldl1' mapUnion maps
+mapUnions = foldl1WithDefault' mapEmpty mapUnion
 
 mapUnionWithKey :: (Label -> v -> v -> v) -> LabelMap v -> LabelMap v -> LabelMap v
 mapUnionWithKey f (LM x) (LM y) = LM (M.unionWithKey (f . mkHooplLabel) x y)

@@ -949,8 +949,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       where
         -- mappend v1 (mappend v2 ..)
         mkFoldMap :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-        mkFoldMap [] = mempty_Expr
-        mkFoldMap xs = foldr1 (\x y -> nlHsApps mappend_RDR [x,y]) xs
+        mkFoldMap = foldr1WithDefault mempty_Expr (\x y -> nlHsApps mappend_RDR [x,y])
 
     -- See Note [FFoldType and functorLikeTraverse]
     -- Yields NullM an expression if we're folding over an expression
@@ -998,8 +997,7 @@ gen_Foldable_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
       where
         -- v1 && v2 && ..
         mkNull :: [LHsExpr GhcPs] -> LHsExpr GhcPs
-        mkNull [] = true_Expr
-        mkNull xs = foldr1 (\x y -> nlHsApps and_RDR [x,y]) xs
+        mkNull = foldr1WithDefault true_Expr (\x y -> nlHsApps and_RDR [x,y])
 
 data NullM a =
     IsNull   -- Definitely null

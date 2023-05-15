@@ -1,4 +1,4 @@
-
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies   #-}
 
 {-
@@ -565,8 +565,11 @@ dsMcStmt (ParStmt bind_ty blocks mzip_op bind_op) stmts_rest
  = do  { exps_w_tys  <- mapM ds_inner blocks   -- Pairs (exp :: m ty, ty)
        ; mzip_op'    <- dsExpr mzip_op
 
-       ; let -- The pattern variables
-             pats = [ mkBigLHsVarPatTupId bs | ParStmtBlock _ _ bs _ <- toList blocks]
+       ; let parStmtBlockIds :: ParStmtBlock GhcTc GhcTc -> [Id]
+             parStmtBlockIds = \ case
+                 ParStmtBlock _ _ bs _ -> bs
+             -- The pattern variables
+             pats = fmap (mkBigLHsVarPatTupId . parStmtBlockIds) blocks
              -- Pattern with tuples of variables
              -- [v1,v2,v3]  =>  (v1, (v2, v3))
              pat = foldr1 (\p1 p2 -> mkLHsPatTup [p1, p2]) pats

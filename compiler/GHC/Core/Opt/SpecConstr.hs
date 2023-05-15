@@ -1299,8 +1299,7 @@ combineUsage u1 u2 = SCU { scu_calls = combineCalls (scu_calls u1) (scu_calls u2
                            scu_occs  = plusVarEnv_C combineOcc (scu_occs u1) (scu_occs u2) }
 
 combineUsages :: [ScUsage] -> ScUsage
-combineUsages [] = nullUsage
-combineUsages us = foldr1 combineUsage us
+combineUsages = foldr1WithDefault nullUsage combineUsage
 
 lookupOccs :: Traversable f => ScUsage -> f OutVar -> (ScUsage, f ArgOcc)
 lookupOccs (SCU { scu_calls = sc_calls, scu_occs = sc_occs }) bndrs

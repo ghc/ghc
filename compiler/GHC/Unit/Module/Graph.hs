@@ -133,6 +133,8 @@ import GHC.Linker.Static.Utils
 import Data.Bifunctor
 import Data.Function
 import Data.List (sort)
+import Data.List.NonEmpty ( NonEmpty (..) )
+import qualified Data.List.NonEmpty as NE
 import Control.Monad
 
 -- | A '@ModuleGraph@' contains all the nodes from the home package (only). See
@@ -547,12 +549,12 @@ showModMsg dflags recomp (ModuleNode _ mod_summary) =
                hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary
     obj_file = op $ msObjFilePath mod_summary
-    files    = [ obj_file ]
-               ++ [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
+    files    = obj_file
+               :| [ dyn_file | gopt Opt_BuildDynamicToo dflags ]
                ++ [ "interpreted" | gopt Opt_ByteCodeAndObjectCode dflags ]
     message = case backendSpecialModuleSource (backend dflags) recomp of
                 Just special -> text special
-                Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (map text files)
+                Nothing -> foldr1 (\ofile rest -> ofile <> comma <+> rest) (NE.map text files)
 
 --------------------------------------------------------------------------------
 -- * Internal methods for module graph
@@ -581,4 +583,3 @@ extendMG ModuleGraph{..} node =
     , mg_loop_graph = mkTransLoopDeps (node : mg_mss)
     , mg_has_holes = mg_has_holes || maybe False (isHsigFile . ms_hsc_src) (mgNodeModSum node)
     }
-

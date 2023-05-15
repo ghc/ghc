@@ -199,10 +199,12 @@ import GHC.Utils.Monad
 
 import GHC.Exts (oneShot)
 import Control.Monad
+import Data.Foldable hiding ( foldr1 )
 import Data.IORef
 import Data.List ( mapAccumL )
+import Data.List.NonEmpty ( nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe ( isJust )
-import Data.Foldable
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
 import GHC.Rename.Env
@@ -408,11 +410,10 @@ kickOutRewritable ko_spec new_fr
                          , text "Residual inerts =" <+> ppr ics' ]) } }
 
 kickOutAfterUnification :: [TcTyVar] -> TcS ()
-kickOutAfterUnification tvs
-  | null tvs
-  = return ()
-  | otherwise
-  = do { let tv_set = mkVarSet tvs
+kickOutAfterUnification tv_list = case nonEmpty tv_list of
+    Nothing -> return ()
+    Just tvs -> do
+       { let tv_set = mkVarSet tv_list
 
        ; n_kicked <- kickOutRewritable (KOAfterUnify tv_set) (Given, NomEq)
                      -- Given because the tv := xi is given; NomEq because
@@ -420,7 +421,7 @@ kickOutAfterUnification tvs
 
        -- Set the unification flag if we have done outer unifications
        -- that might affect an earlier implication constraint
-       ; let min_tv_lvl = foldr1 minTcLevel (map tcTyVarLevel tvs)
+       ; let min_tv_lvl = foldr1 minTcLevel (NE.map tcTyVarLevel tvs)
        ; ambient_lvl <- getTcLevel
        ; when (ambient_lvl `strictlyDeeperThan` min_tv_lvl) $
          setUnificationFlag min_tv_lvl

@@ -376,7 +376,7 @@ goodToLift cfg top_lvl rec_flag expander pairs scope = decide
       -- We have 5 hardware registers on x86_64 to pass arguments in. Any excess
       -- args are passed on the stack, which means slow memory accesses
       args_spill_on_stack
-        | Just n <- max_n_args = maximum (map n_args rhss) > n
+        | Just n <- max_n_args = any (> n) (map n_args rhss)
         | otherwise = False
 
       -- We only perform the lift if allocations didn't increase.

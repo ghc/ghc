@@ -47,12 +47,13 @@ import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Builtin.Uniques
+import GHC.Utils.Misc
 import GHC.Utils.Monad.State.Strict
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label
 
-import Data.List (nub, foldl1', find)
+import Data.List (nub, find)
 import Data.Maybe
 import Data.IntSet              (IntSet)
 import qualified Data.IntSet    as IntSet
@@ -410,8 +411,7 @@ collateJoinPoints
         , sJumpValidAcc = emptyUFM }
 
 intersects :: [Assoc Store]     -> Assoc Store
-intersects []           = emptyAssoc
-intersects assocs       = foldl1' intersectAssoc assocs
+intersects = foldl1WithDefault' emptyAssoc intersectAssoc
 
 
 -- | See if we have a reg with the same value as this slot in the association table.

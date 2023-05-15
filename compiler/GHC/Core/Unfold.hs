@@ -57,6 +57,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
 import qualified Data.ByteString as BS
+import Data.List.NonEmpty (nonEmpty)
+import qualified Data.List.NonEmpty as NE
 
 -- | Unfolding options
 data UnfoldingOpts = UnfoldingOpts
@@ -581,15 +583,12 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
               (size_up body `addSizeN` sum (map (size_up_alloc . fst) pairs))
               pairs
 
-    size_up (Case e _ _ alts)
-        | null alts
-        = size_up e    -- case e of {} never returns, so take size of scrutinee
-
-    size_up (Case e _ _ alts)
-        -- Now alts is non-empty
-        | Just v <- is_top_arg e -- We are scrutinising an argument variable
-        = let
-            alt_sizes = map size_up_alt alts
+    size_up (Case e _ _ alts) = case nonEmpty alts of
+      Nothing -> size_up e    -- case e of {} never returns, so take size of scrutinee
+      Just alts
+        | Just v <- is_top_arg e -> -- We are scrutinising an argument variable
+          let
+            alt_sizes = NE.map size_up_alt alts
 
                   -- alts_size tries to compute a good discount for
                   -- the case when we are scrutinising an argument variable
@@ -616,14 +615,15 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
                 -- Good to inline if an arg is scrutinised, because
                 -- that may eliminate allocation in the caller
                 -- And it eliminates the case itself
+
+        | otherwise -> size_up e  `addSizeNSD`
+                                foldr (addAltSize . size_up_alt) case_size alts
+
         where
           is_top_arg (Var v) | v `elem` top_args = Just v
           is_top_arg (Cast e _) = is_top_arg e
           is_top_arg _ = Nothing
 
-
-    size_up (Case e _ _ alts) = size_up e  `addSizeNSD`
-                                foldr (addAltSize . size_up_alt) case_size alts
       where
           case_size
            | is_inline_scrut e, lengthAtMost alts 1 = sizeN (-10)

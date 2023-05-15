@@ -238,6 +238,7 @@ import GHC.Exception.Type (SomeException)
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
+import           Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import           Data.Typeable (Typeable)
 import qualified GHC.Internal.TH.Syntax as TH
@@ -1505,7 +1506,7 @@ data TcRnMessage where
 
      Test cases: typecheck/should_fail/T11974b
   -}
-  TcRnBadDefaultType :: Type -> [TyCon] -> TcRnMessage
+  TcRnBadDefaultType :: Type -> NonEmpty TyCon -> TcRnMessage
 
   {-| TcRnPatSynBundledWithNonDataCon is an error that occurs when a module's
       export list bundles a pattern synonym with a type that is not a proper

@@ -70,6 +70,7 @@ import           Control.Arrow (first)
 import           Data.Function (on)
 import qualified Data.IntSet   as IntSet
 import           Data.List     (delete, groupBy, sort, sortBy, (\\))
+import           Data.List.NonEmpty (nonEmpty)
 import           Data.Maybe    (fromMaybe, isJust)
 
 import GHC.Utils.Panic
@@ -167,11 +168,9 @@ class Graph gr where
 
   -- | The minimum and maximum 'Node' in a 'Graph'.
   nodeRange :: gr a b -> (Node,Node)
-  nodeRange g
-    | isEmpty g = panic "nodeRange of empty graph"
-    | otherwise = (minimum vs, maximum vs)
-    where
-      vs = nodes g
+  nodeRange g = case nonEmpty (nodes g) of
+      Nothing -> panic "nodeRange of empty graph"
+      Just vs -> (minimum vs, maximum vs)
 
   -- | A list of all 'LEdge's in the 'Graph'.
   labEdges  :: gr a b -> [LEdge b]

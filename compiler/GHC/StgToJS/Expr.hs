@@ -86,6 +86,7 @@ import qualified GHC.Types.Unique.Map as UM
 
 import qualified GHC.Data.List.SetOps as ListSetOps
 
+import Data.List.NonEmpty (NonEmpty ((:|)))
 import Data.Monoid
 import Data.Maybe
 import Data.Function
@@ -681,7 +682,7 @@ genRet ctx e at as l = freshIdent >>= f
     allRefs :: [Id]
     allRefs =  S.toList . S.unions $ fmap (exprRefs emptyUFM . alt_rhs) as
     lneLive :: Int
-    lneLive    = maximum $ 0 : catMaybes (map (ctxLneBindingStackSize ctx) allRefs)
+    lneLive    = maximum $ 0 :| catMaybes (map (ctxLneBindingStackSize ctx) allRefs)
     ctx'       = ctxLneShrinkStack ctx lneLive
     lneVars    = map fst $ ctxLneFrameVars ctx'
     isLne i    = ctxIsLneBinding ctx i || ctxIsLneLiveVar ctx' i
@@ -917,7 +918,7 @@ mkIfElse e s = go (L.reverse s)
 --
 mkEq :: [JStgExpr] -> [JStgExpr] -> JStgExpr
 mkEq es1 es2
-  | length es1 == length es2 = foldl1 (InfixExpr LAndOp) (zipWith (InfixExpr StrictEqOp) es1 es2)
+  | length es1 == length es2 = L.foldl1 (InfixExpr LAndOp) (zipWith (InfixExpr StrictEqOp) es1 es2)
   | otherwise                = panic "mkEq: incompatible expressions"
 
 mkAlgBranch :: ExprCtx   -- ^ toplevel id for the result

@@ -100,13 +100,14 @@ import GHC.Prelude
 
 import Data.Data
 import Data.Function (on)
-import Data.List (sortBy, foldl1')
+import Data.List (sortBy)
 import Data.Semigroup
 import GHC.Data.FastString
 import GHC.TypeLits (Symbol, KnownSymbol, symbolVal)
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Hs.DocString
+import GHC.Utils.Misc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import qualified GHC.Data.Strict as Strict
@@ -908,8 +909,7 @@ instance HasLoc (EpUniToken tok utok) where
   getHasLoc (EpUniTok l _) = getHasLoc l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
-getHasLocList [] = noSrcSpan
-getHasLocList xs = foldl1' combineSrcSpans $ map getHasLoc xs
+getHasLocList = foldl1WithDefault' noSrcSpan combineSrcSpans . map getHasLoc
 
 -- ---------------------------------------------------------------------
 

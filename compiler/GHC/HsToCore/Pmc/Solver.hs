@@ -95,7 +95,7 @@ import Control.Monad (foldM, forM, guard, mzero, when, filterM)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Coerce
-import Data.Foldable (foldlM, minimumBy, toList)
+import Data.Foldable (foldlM, toList)
 import Data.Monoid   (Any(..))
 import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE

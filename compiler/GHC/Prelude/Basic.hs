@@ -61,7 +61,8 @@ NoImplicitPrelude. There are two motivations for this:
 import qualified Prelude
 import Prelude as X hiding ((<>), Applicative(..), Foldable(..), head, tail, unzip)
 import Control.Applicative (Applicative(..))
-import Data.Foldable as X (Foldable(elem, foldMap, foldr, foldl, foldl', foldr1, foldl1, maximum, minimum, product, sum, null, length))
+import Data.Foldable as X (Foldable (elem, foldMap, foldl, foldl', foldr, length, null, product, sum))
+import Data.Foldable1 as X hiding (head, last)
 import qualified Data.List as List
 import qualified GHC.Data.List.NonEmpty as NE
 import GHC.Stack.Types (HasCallStack)

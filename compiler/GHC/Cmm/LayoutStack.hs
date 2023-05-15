@@ -36,6 +36,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.List (nub)
+import Data.List.NonEmpty ( NonEmpty (..) )
 
 {- Note [Stack Layout]
    ~~~~~~~~~~~~~~~~~~~
@@ -346,7 +347,7 @@ layout cfg procpoints liveness entry entry_args final_stackmaps final_sp_high bl
            this_sp_hwm | isGcJump last0 = 0
                        | otherwise      = sp0 - sp_off
 
-           hwm' = maximum (acc_hwm : this_sp_hwm : map sm_sp (mapElems out))
+           hwm' = maximum (acc_hwm :| this_sp_hwm : map sm_sp (mapElems out))
 
        go bs acc_stackmaps' hwm' (final_blocks ++ acc_blocks)
 
@@ -373,7 +374,7 @@ isGcJump _something_else = False
 
 collectContInfo :: [CmmBlock] -> (ByteOff, LabelMap ByteOff)
 collectContInfo blocks
-  = (maximum ret_offs, mapFromList (catMaybes mb_argss))
+  = (maximum (expectNonEmpty "collectContInfo" ret_offs), mapFromList (catMaybes mb_argss))
  where
   (mb_argss, ret_offs) = mapAndUnzip get_cont blocks
 

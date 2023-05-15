@@ -69,6 +69,7 @@ import GHC.Driver.Env
     ( hsc_home_unit_maybe, HscEnv(hsc_FC, hsc_dflags, hsc_unit_env) )
 import GHC.Driver.Config.Finder
 import qualified Data.Set as Set
+import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified System.OsPath as OsPath
 import qualified Data.List.NonEmpty as NE
 
@@ -204,7 +205,7 @@ findImportedModuleNoHsc fc fopts ue mhome_unit mod_name mb_pkg =
     -- Do not be smart and change this to `foldr orIfNotFound home_import hs` as
     -- that is not the same!! home_import is first because we need to look within ourselves
     -- first before looking at the packages in order.
-    any_home_import = foldr1 orIfNotFound (home_import: map home_pkg_import other_fopts)
+    any_home_import = foldr1 orIfNotFound (home_import:| map home_pkg_import other_fopts)
 
     pkg_import    = findExposedPackageModule fc fopts units  mod_name mb_pkg
 

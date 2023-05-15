@@ -296,9 +296,8 @@ prepareAnnotations hsc_env mb_guts = do
                       . get_mod <$> mb_guts
     let
         other_pkg_anns = eps_ann_env eps
-        ann_env        = foldl1' plusAnnEnv $ catMaybes [mb_this_module_anns,
-                                                         Just home_pkg_anns,
-                                                         Just other_pkg_anns]
+        !ann_env       = maybe id plusAnnEnv mb_this_module_anns $!
+            plusAnnEnv home_pkg_anns other_pkg_anns
     return ann_env
 
 -- | Find the 'TyThing' for the given 'Name' by using all the resources

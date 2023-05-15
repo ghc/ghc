@@ -582,7 +582,7 @@ instance Diagnostic TcRnMessage where
     TcRnBadDefaultType ty deflt_clss
       -> mkSimpleDecorated $
            hang (text "The default type" <+> quotes (ppr ty) <+> text "is not an instance of")
-              2 (foldr1 (\a b -> a <+> text "or" <+> b) (map (quotes. ppr) deflt_clss))
+              2 (foldr1 (\a b -> a <+> text "or" <+> b) (NE.map (quotes. ppr) deflt_clss))
     TcRnPatSynBundledWithNonDataCon
       -> mkSimpleDecorated $
            text "Pattern synonyms can be bundled only with datatypes."
@@ -4346,12 +4346,8 @@ pprMismatchMsg ctxt
     what = levelString (ctLocTypeOrKind_maybe (errorItemCtLoc item) `orElse` TypeLevel)
 
     conc :: [String] -> String
-    conc = foldr1 add_space
+    conc = unwords . filter (not . null)
 
-    add_space :: String -> String -> String
-    add_space s1 s2 | null s1   = s2
-                    | null s2   = s1
-                    | otherwise = s1 ++ (' ' : s2)
 pprMismatchMsg _
   (KindMismatch { kmismatch_what     = thing
                 , kmismatch_expected = exp
@@ -5370,7 +5366,7 @@ pprSkols ctxt zonked_ty_vars
                                       <+> text "type variables"
 
 skolsSpan :: [TcTyVar] -> SrcSpan
-skolsSpan skol_tvs = foldr1 combineSrcSpans (map getSrcSpan skol_tvs)
+skolsSpan skol_tvs = foldr1WithDefault noSrcSpan combineSrcSpans (map getSrcSpan skol_tvs)
 
 {- *********************************************************************
 *                                                                      *

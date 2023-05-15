@@ -61,16 +61,15 @@ import GHC.Types.SourceText
 import GHC.Driver.DynFlags
 
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Unique (sameUnique)
 
 import GHC.Data.FastString
+import qualified GHC.Data.List.NonEmpty as NEL
 
 import Control.Monad
 import Data.Int
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NEL
 import Data.Word
 import GHC.Real ( Ratio(..), numerator, denominator )
 
@@ -713,8 +712,8 @@ matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
         ; lit2_expr   <- dsOverLit lit2
         ; pred_expr   <- dsSyntaxExpr ge    [Var var, lit1_expr]
         ; minusk_expr <- dsSyntaxExpr minus [Var var, lit2_expr]
-        ; let (wraps, eqns') = mapAndUnzip (shift n1) (eqn1:eqns)
-        ; match_result <- match vars ty eqns'
+        ; let (wraps, eqns') = NEL.mapAndUnzip (shift n1) (eqn1:|eqns)
+        ; match_result <- match vars ty (NEL.toList eqns')
         ; return  (mkGuardedMatchResult pred_expr               $
                    mkCoLetMatchResult (NonRec n1 minusk_expr)   $
                    fmap (foldr1 (.) wraps)                      $

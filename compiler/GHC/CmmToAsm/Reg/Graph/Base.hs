@@ -30,6 +30,7 @@ import GHC.Types.Unique
 import GHC.Builtin.Uniques
 import GHC.Utils.Monad (concatMapM)
 
+import Data.List.NonEmpty (NonEmpty (..))
 
 -- Some basic register classes.
 --      These aren't necessarily in 1-to-1 correspondence with the allocatable
@@ -113,7 +114,7 @@ worst regsOfClass regAlias neighbors classN classC
         regsS_conflict
                 = map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
 
-  in    maximum $ map sizeUniqSet $ regsS_conflict
+  in    maximum $ 0 :| map sizeUniqSet regsS_conflict
 
 
 -- | For a node N of classN and neighbors of classesC

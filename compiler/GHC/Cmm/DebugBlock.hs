@@ -52,7 +52,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe
-import Data.List     ( minimumBy, nubBy )
+import Data.List     ( nubBy )
 import Data.List.NonEmpty ( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      ( comparing )

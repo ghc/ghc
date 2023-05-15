@@ -84,6 +84,7 @@ import GHC.Utils.Panic
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
+import Data.List.NonEmpty ( nonEmpty )
 import GHC.Types.Name.Env
 import Data.Graph
 
@@ -447,11 +448,10 @@ mkRewriteCall :: Id -> RuleEnv -> RewriteCall
 -- quite a heavy hammer, so skipping stages is a good plan.
 -- And it's extremely simple to do.
 mkRewriteCall fun rule_env
-  | not (null rules) = TryRules n_required rules
+  | Just rulesNE <- nonEmpty rules = TryRules (maximum $ ruleArity <$> rulesNE) rules
   | canUnfold unf    = TryInlining
   | otherwise        = TryNothing
   where
-    n_required = maximum (map ruleArity rules)
     rules = getRules rule_env fun
     unf   = idUnfolding fun
 

@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications    #-}
@@ -77,7 +78,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad
-import Data.List (unzip4, minimumBy)
+import qualified Data.Foldable as Partial (maximum)
+import Data.List (unzip4)
 import Data.List.NonEmpty ( NonEmpty(..), head, init, last, nonEmpty, scanl, tail )
 import Control.Arrow (first)
 import Data.Ord
@@ -2118,9 +2120,10 @@ mkStmtTreeOptimal stmts =
          case segments [ stmt_arr ! i | i <- [lo..hi] ] of
            [] -> panic "mkStmtTree"
            [_one] -> split lo hi
-           segs -> (StmtTreeApplicative trees, maximum costs)
+           segs -> (StmtTreeApplicative trees, Partial.maximum costs)
              where
                bounds = scanl (\(_,hi) a -> (hi+1, hi + length a)) (0,lo-1) segs
+               -- We know `costs` must be non-empty, as `length segs >= 2` here.
                (trees,costs) = unzip (map (uncurry split) (tail bounds))
 
     -- find the best place to split the segment [lo..hi]
@@ -2139,21 +2142,21 @@ mkStmtTreeOptimal stmts =
          -- in the case that these two have the same cost do we need
          -- to do the exhaustive search.
          --
-         ((before,c1),(after,c2))
-           | hi - lo == 1
-           = ((StmtTreeOne (stmt_arr ! lo), 1),
-              (StmtTreeOne (stmt_arr ! hi), 1))
-           | left_cost < right_cost
-           = ((left,left_cost), (StmtTreeOne (stmt_arr ! hi), 1))
-           | left_cost > right_cost
-           = ((StmtTreeOne (stmt_arr ! lo), 1), (right,right_cost))
-           | otherwise = minimumBy (comparing cost) alternatives
+         ((before,c1),(after,c2)) = case nonEmpty [lo .. hi-1] of
+             Nothing ->
+               ( (StmtTreeOne (stmt_arr ! lo), 1),
+                 (StmtTreeOne (stmt_arr ! hi), 1) )
+             Just ks
+               | left_cost < right_cost
+               -> ((left,left_cost), (StmtTreeOne (stmt_arr ! hi), 1))
+               | left_cost > right_cost
+               -> ((StmtTreeOne (stmt_arr ! lo), 1), (right,right_cost))
+               | otherwise -> minimumBy (comparing cost)
+                 [ (arr ! (lo,k), arr ! (k+1,hi)) | k <- ks ]
            where
              (left, left_cost) = arr ! (lo,hi-1)
              (right, right_cost) = arr ! (lo+1,hi)
              cost ((_,c1),(_,c2)) = c1 + c2
-             alternatives = [ (arr ! (lo,k), arr ! (k+1,hi))
-                            | k <- [lo .. hi-1] ]
 
 
 -- | Turn the ExprStmtTree back into a sequence of statements, using

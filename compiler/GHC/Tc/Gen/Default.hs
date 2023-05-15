@@ -34,7 +34,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad (void)
 import Data.Function (on)
 import Data.List.NonEmpty ( NonEmpty (..), groupBy )
-
+import qualified Data.List.NonEmpty as NE
 
 {- Note [Named default declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,7 +170,7 @@ tcDefaults decls
                Nothing ->
                  do { numTyCon <- tcLookupTyCon numClassName
                     ; let classTyConAndArgKinds cls = (classTyCon cls, [], tyVarKind <$> classTyVars cls)
-                          tyConsAndArgKinds = (numTyCon, [], [liftedTypeKind]) : map classTyConAndArgKinds extra_clss
+                          tyConsAndArgKinds = (numTyCon, [], [liftedTypeKind]) :| map classTyConAndArgKinds extra_clss
                     ; void $ mapAndReportM (check_instance_any tyConsAndArgKinds) tau_tys
                     ; return numTyCon }
                Just cls_name ->
@@ -182,7 +182,7 @@ tcDefaults decls
                     ; (_cls_tvs, cls, cls_tys, cls_arg_kinds) <- tcHsDefault cls_ty
                     ; let clsTyCon = classTyCon cls
                     ; case cls_arg_kinds
-                      of [k] -> void $ mapAndReportM (check_instance_any [(clsTyCon, cls_tys, [k])]) tau_tys
+                      of [k] -> void $ mapAndReportM (check_instance_any (NE.singleton (clsTyCon, cls_tys, [k]))) tau_tys
                          _ -> addErrTc (TcRnNonUnaryTypeclassConstraint DefaultDeclCtxt cls_ty)
                     ; return clsTyCon }
            ; return (decl, def_clsCon, tau_tys) }
@@ -208,10 +208,10 @@ tc_default_ty hs_ty
 -- parameters and the expected kinds of the remaining parameters. We report
 -- an error unless there's only one remaining parameter to fill and the given
 -- type has the expected kind.
-check_instance_any :: [(TyCon, [Type], [Kind])] -> Type -> TcM ()
+check_instance_any :: NonEmpty (TyCon, [Type], [Kind]) -> Type -> TcM ()
 check_instance_any deflt_clss ty
  = do   { oks <- mapM (check_instance ty) deflt_clss
-        ; checkTc (or oks) (TcRnBadDefaultType ty (map fstOf3 deflt_clss))
+        ; checkTc (or oks) (TcRnBadDefaultType ty (NE.map fstOf3 deflt_clss))
         }
 
 check_instance :: Type -> (TyCon, [Type], [Kind]) -> TcM Bool

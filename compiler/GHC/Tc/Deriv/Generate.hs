@@ -263,7 +263,7 @@ gen_Eq_binds loc dit@(DerivInstTys{ dit_rep_tc = tycon
     ------------------------------------------------------------------
     nested_eq_expr []  [] [] = true_Expr
     nested_eq_expr tys as bs
-      = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+      = foldr1 and_Expr $ expectNonEmpty "nested_eq" $ zipWith3Equal "nested_eq" nested_eq tys as bs
       -- Using 'foldr1' here ensures that the derived code is correctly
       -- associated. See #10859.
       where
@@ -955,8 +955,8 @@ gen_Ix_binds loc (DerivInstTys{dit_rep_tc = tycon}) = do
              -- If the product type has no fields, inRange is trivially true
              -- (see #12853).
              then true_Expr
-             else foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range
-                    as_needed bs_needed cs_needed)
+             else foldl1 and_Expr $ expectNonEmpty "singlet_con_inRange" $
+                  zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed
       where
         in_range a b c
           = nlHsApps inRange_RDR [mkLHsVarTuple [a,b] noAnn, nlHsVar c]
@@ -1055,9 +1055,9 @@ gen_Read_binds get_fixity loc dit@(DerivInstTys{dit_rep_tc = tycon})
         rhs | null data_cons -- See Note [Read for empty data types]
             = nlHsVar pfail_RDR
             | otherwise
-            = nlHsApp (nlHsVar parens_RDR)
-                      (foldr1 mk_alt (read_nullary_cons ++
-                                      read_non_nullary_cons))
+            = nlHsApp (nlHsVar parens_RDR) $
+              foldr1 mk_alt $ expectNonEmpty "read_prec" $
+              read_nullary_cons ++ read_non_nullary_cons
 
     read_non_nullary_cons = map read_non_nullary_con non_nullary_cons
 

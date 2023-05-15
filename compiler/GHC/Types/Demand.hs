@@ -1798,8 +1798,7 @@ plusDmdEnv (DE fv1 d1) (DE fv2 d2)
 
 -- | 'DmdEnv' is a monoid via 'plusDmdEnv' and 'nopDmdEnv'; this is its 'msum'
 plusDmdEnvs :: [DmdEnv] -> DmdEnv
-plusDmdEnvs []   = nopDmdEnv
-plusDmdEnvs pdas = foldl1' plusDmdEnv pdas
+plusDmdEnvs = foldl1WithDefault' nopDmdEnv plusDmdEnv
 
 multDmdEnv :: Card -> DmdEnv -> DmdEnv
 multDmdEnv C_11 env          = env

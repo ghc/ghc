@@ -23,6 +23,7 @@ import GHC.Types.Demand
 import GHC.Utils.Misc
 
 import Control.Arrow ( first, second )
+import Data.List.NonEmpty ( NonEmpty (..) )
 
 
 {-
@@ -696,7 +697,7 @@ callArityRecEnv any_boring ae_rhss ae_body
 
 -- See Note [Trimming arity]
 trimArity :: Id -> Arity -> Arity
-trimArity v a = minimum [a, max_arity_by_type, max_arity_by_strsig]
+trimArity v a = minimum (a :| max_arity_by_type : max_arity_by_strsig : [])
   where
     max_arity_by_type = typeArity (idType v)
     max_arity_by_strsig

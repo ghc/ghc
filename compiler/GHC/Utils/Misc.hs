@@ -2,6 +2,8 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Highly random utility functions
 --
@@ -23,7 +25,8 @@ module GHC.Utils.Misc (
 
         dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
 
-        List.foldl1', foldl2, count, countWhile, all2, any2, all2Prefix, all3Prefix,
+        foldl2, count, countWhile, all2, any2, all2Prefix, all3Prefix,
+        foldr1WithDefault, foldl1WithDefault',
 
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
@@ -126,8 +129,9 @@ import Data.Data
 import qualified Data.List as List
 import Data.List.NonEmpty  ( NonEmpty(..), last, nonEmpty )
 
-import GHC.Exts
+import GHC.Exts hiding (toList)
 import GHC.Stack (HasCallStack)
+import GHC.Data.List
 
 import Control.Monad    ( guard )
 import Control.Monad.IO.Class ( MonadIO, liftIO )
@@ -138,6 +142,7 @@ import System.FilePath
 import Data.Bifunctor   ( first, second )
 import Data.Char        ( isUpper, isAlphaNum, isSpace, chr, ord, isDigit, toUpper
                         , isHexDigit, digitToInt )
+import Data.Foldable    ( Foldable (toList) )
 import Data.Int
 import Data.Ratio       ( (%) )
 import Data.Ord         ( comparing )
@@ -322,31 +327,6 @@ mapSnd :: Functor f => (b->c) -> f(a,b) -> f(a,c)
 
 mapFst = fmap . first
 mapSnd = fmap . second
-
-mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
-
-mapAndUnzip _ [] = ([], [])
-mapAndUnzip f (x:xs)
-  = let (r1,  r2)  = f x
-        (rs1, rs2) = mapAndUnzip f xs
-    in
-    (r1:rs1, r2:rs2)
-
-mapAndUnzip3 :: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
-mapAndUnzip3 _ [] = ([], [], [])
-mapAndUnzip3 f (x:xs)
-  = let (r1,  r2,  r3)  = f x
-        (rs1, rs2, rs3) = mapAndUnzip3 f xs
-    in
-    (r1:rs1, r2:rs2, r3:rs3)
-
-mapAndUnzip4 :: (a -> (b, c, d, e)) -> [a] -> ([b], [c], [d], [e])
-mapAndUnzip4 _ [] = ([], [], [], [])
-mapAndUnzip4 f (x:xs)
-  = let (r1,  r2,  r3, r4)  = f x
-        (rs1, rs2, rs3, rs4) = mapAndUnzip4 f xs
-    in
-    (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
 
 zipWithAndUnzip :: (a -> b -> (c,d)) -> [a] -> [b] -> ([c],[d])
 zipWithAndUnzip f (a:as) (b:bs)
@@ -1079,7 +1059,7 @@ readSignificandExponentPair__ r = do
      readFix r = do
         (ds,s)  <- lexDecDigits r
         (ds',t) <- lexDotDigits s
-        return (read (ds++ds'), length ds', t)
+        return (read (toList ds++ds'), length ds', t)
 
      readExp (e:s) | e `elem` "eE" = readExp' s
      readExp s                     = return (0,s)
@@ -1099,8 +1079,8 @@ readSignificandExponentPair__ r = do
      lexDotDigits ('.':s) = return (span' isDigit s)
      lexDotDigits s       = return ("",s)
 
-     nonnull p s = do (cs@(_:_),t) <- return (span' p s)
-                      return (cs,t)
+     nonnull p s = do (c:cs,t) <- return (span' p s)
+                      return (c:|cs,t)
 
      span' _ xs@[]         =  (xs, xs)
      span' p xs@(x:xs')
@@ -1468,3 +1448,15 @@ mapMaybe' f = foldr g []
     g x rest
       | Just y <- f x = y : rest
       | otherwise     = rest
+
+foldr1WithDefault :: Foldable f => a -> (a -> a -> a) -> f a -> a
+foldr1WithDefault defaultA f xs = case nonEmpty (toList xs) of
+    Nothing -> defaultA
+    Just (xs1 :: NonEmpty a) -> foldr1 f xs1
+{-# SPECIALIZE foldr1WithDefault :: a -> (a -> a -> a) -> [a] -> a #-}
+
+foldl1WithDefault' :: Foldable f => a -> (a -> a -> a) -> f a -> a
+foldl1WithDefault' defaultA f xs = case nonEmpty (toList xs) of
+    Nothing -> defaultA
+    Just (xs1 :: NonEmpty a) -> foldl1' f xs1
+{-# SPECIALIZE foldl1WithDefault' :: a -> (a -> a -> a) -> [a] -> a #-}

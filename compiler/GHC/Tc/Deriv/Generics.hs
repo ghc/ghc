@@ -67,8 +67,7 @@ import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Control.Monad (mplus)
 import Data.List (zip4, partition)
-import qualified Data.List as Partial (last)
-import Data.List.NonEmpty (nonEmpty)
+import Data.List.NonEmpty (NonEmpty (..), last, nonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (isJust)
 
@@ -351,8 +350,7 @@ gk2gkDC Gen1 dc tc_args = Gen1_DC $ assert (isTyVarTy last_dc_inst_univ)
                                   $ getTyVar last_dc_inst_univ
   where
     dc_inst_univs = dataConInstUnivs dc tc_args
-    last_dc_inst_univ = assert (not (null dc_inst_univs)) $
-                        Partial.last dc_inst_univs
+    last_dc_inst_univ = last $ expectNonEmpty "gk2gkDC" $ dc_inst_univs
 
 
 -- Bindings for the Generic instance
@@ -378,7 +376,7 @@ mkBindsRep dflags gk loc dit@(DerivInstTys{dit_rep_tc = tycon}) = (binds, sigs)
              | otherwise  = False
              where
                cons       = length datacons
-               max_fields = maximum $ map dataConSourceArity datacons
+               max_fields = maximum $ 0 :| map dataConSourceArity datacons
 
            inline1 f = L loc'' . InlineSig noAnn (L loc' f)
                      $ alwaysInlinePragma { inl_act = ActiveAfter NoSourceText 1 }

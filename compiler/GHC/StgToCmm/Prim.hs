@@ -46,6 +46,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 
 import Control.Monad (liftM, when, unless, zipWithM_)
@@ -2271,17 +2272,21 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
               mkAssign xhyl
                   (mul (topHalf arg_x) (bottomHalf arg_y)),
               mkAssign r
-                  (sum [topHalf    (CmmReg xlyl),
-                        bottomHalf (CmmReg xhyl),
-                        bottomHalf (CmmReg xlyh)]),
+                  (sum $
+                   topHalf    (CmmReg xlyl) :|
+                   bottomHalf (CmmReg xhyl) :
+                   bottomHalf (CmmReg xlyh) :
+                   []),
               mkAssign (CmmLocal res_l)
                   (or (bottomHalf (CmmReg xlyl))
                       (toTopHalf (CmmReg r))),
               mkAssign (CmmLocal res_h)
-                  (sum [mul (topHalf arg_x) (topHalf arg_y),
-                        topHalf (CmmReg xhyl),
-                        topHalf (CmmReg xlyh),
-                        topHalf (CmmReg r)])]
+                  (sum $
+                   mul (topHalf arg_x) (topHalf arg_y) :|
+                   topHalf (CmmReg xhyl) :
+                   topHalf (CmmReg xlyh) :
+                   topHalf (CmmReg r) :
+                   [])]
 genericWordMul2Op _ _ = panic "genericWordMul2Op"
 
 genericIntMul2Op :: GenericOp
@@ -2952,7 +2957,7 @@ emitCopyByteArray copy src src_off dst dst_off n = do
     let byteArrayAlignment = wordAlignment platform
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
-        align = minimum [byteArrayAlignment, srcOffAlignment, dstOffAlignment]
+        align = minimum (byteArrayAlignment :| srcOffAlignment : dstOffAlignment : [])
     dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
     src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
     copy src dst dst_p src_p n align

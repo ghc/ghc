@@ -388,9 +388,10 @@ tryCtDefaultingStrategy :: CtDefaultingStrategy
 -- The composition of all the CtDefaultingStrategies we want
 tryCtDefaultingStrategy
   = foldr1 combineStrategies
-    [ defaultCallStack
-    , defaultExceptionContext
-    , defaultEquality ]
+    ( defaultCallStack :|
+      defaultExceptionContext :
+      defaultEquality :
+      [] )
 
 -- | Default @ExceptionContext@ constraints to @emptyExceptionContext@.
 defaultExceptionContext :: CtDefaultingStrategy

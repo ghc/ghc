@@ -166,6 +166,7 @@ import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
 import Data.Char( isDigit )
 import qualified Data.Monoid as Monoid
+import Data.List.NonEmpty ( NonEmpty (..) )
 import Control.DeepSeq
 
 {-
@@ -248,14 +249,14 @@ pprCoAxBranch = ppr_co_ax_branch ppr_rhs
 ppr_co_ax_branch :: (TidyEnv -> Type -> SDoc)
                  -> TyCon -> CoAxBranch -> SDoc
 ppr_co_ax_branch ppr_rhs fam_tc branch
-  = foldr1 (flip hangNotEmpty 2)
-    [ pprUserForAll (mkForAllTyBinders Inferred bndrs')
+  = foldr1 (flip hangNotEmpty 2) $
+    pprUserForAll (mkForAllTyBinders Inferred bndrs') :|
          -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
-    , pp_lhs <+> ppr_rhs tidy_env ee_rhs
-    , vcat [ text "-- Defined" <+> pp_loc
+    (pp_lhs <+> ppr_rhs tidy_env ee_rhs) :
+    ( vcat [ text "-- Defined" <+> pp_loc
            , ppUnless (null incomps) $ whenPprDebug $
-             text "-- Incomps:" <+> vcat (map (pprCoAxBranch fam_tc) incomps) ]
-    ]
+             text "-- Incomps:" <+> vcat (map (pprCoAxBranch fam_tc) incomps) ] ) :
+    []
   where
     incomps = coAxBranchIncomps branch
     loc = coAxBranchSpan branch

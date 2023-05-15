@@ -65,6 +65,7 @@ import GHC.Builtin.Names( runRWKey )
 import GHC.Unit.Module( Module )
 
 import Data.List (mapAccumL)
+import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 ************************************************************************
@@ -1026,14 +1027,14 @@ occAnalNonRecBody env bndr thing_inside
 -----------------
 occAnalNonRecRhs :: OccEnv -> TopLevelFlag -> ImpRuleEdges
                 -> JoinPointHood -> Id -> CoreExpr
-                 -> ([UsageDetails], Id, CoreExpr)
+                 -> (NonEmpty UsageDetails, Id, CoreExpr)
 occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
   | null rules, null imp_rule_infos
   =  -- Fast path for common case of no rules. This is only worth
      -- 0.1% perf on average, but it's also only a line or two of code
-    ( [adj_rhs_uds, adj_unf_uds],              final_bndr_no_rules,   final_rhs )
+    ( adj_rhs_uds :| adj_unf_uds : [], final_bndr_no_rules, final_rhs )
   | otherwise
-  = (adj_rhs_uds : adj_unf_uds : adj_rule_uds, final_bndr_with_rules, final_rhs )
+  = ( adj_rhs_uds :| adj_unf_uds : adj_rule_uds, final_bndr_with_rules, final_rhs )
   where
     --------- Right hand side ---------
     -- For join points, set occ_encl to OccVanilla, via setTailCtxt.  If we have
