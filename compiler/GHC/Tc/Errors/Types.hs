@@ -137,6 +137,10 @@ module GHC.Tc.Errors.Types (
 
   -- * Zonker errors
   , ZonkerMessage(..)
+
+  -- FFI Errors
+  , IllegalForeignTypeReason(..)
+  , TypeCannotBeMarshaledReason(..)
   ) where
 
 import GHC.Prelude
@@ -150,7 +154,7 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (IllegalForeignTypeReason, TcType, TcSigmaType, TcPredType)
+import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType)
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
@@ -5902,3 +5906,28 @@ data NonCanonical_Monad =
   |
   -- | @(>>)@ was defined as something other than @(*>)@.
   NonCanonical_ThenM
+
+-- FFI error types
+data IllegalForeignTypeReason
+  = TypeCannotBeMarshaled !Type TypeCannotBeMarshaledReason
+  | ForeignDynNotPtr
+      !Type -- ^ Expected type
+      !Type -- ^ Actual type
+  | SafeHaskellMustBeInIO
+  | IOResultExpected
+  | UnexpectedNestedForall
+  | LinearTypesNotAllowed
+  | OneArgExpected
+  | AtLeastOneArgExpected
+  deriving Generic
+
+-- | Reason why a type cannot be marshalled through the FFI.
+data TypeCannotBeMarshaledReason
+  = NotADataType
+  | NewtypeDataConNotInScope !TyCon ![Type]
+  | UnliftedFFITypesNeeded
+  | NotABoxedMarshalableTyCon
+  | ForeignLabelNotAPtr
+  | NotSimpleUnliftedType
+  | NotBoxedKindAny
+  deriving Generic
