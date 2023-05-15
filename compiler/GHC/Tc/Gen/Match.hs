@@ -42,7 +42,7 @@ import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                                        , tcCheckMonoExpr, tcCheckMonoExprNC
                                        , tcCheckPolyExpr )
 
-import GHC.Rename.Utils ( bindLocalNames )
+import GHC.Rename.Utils ( bindLocalNames, isIrrefutableHsPatRn )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
@@ -988,7 +988,7 @@ tcMonadFailOp :: CtOrigin
 -- yet determined.
 tcMonadFailOp orig pat fail_op res_ty = do
     dflags <- getDynFlags
-    if isIrrefutableHsPat dflags pat
+    if isIrrefutableHsPatRn dflags pat
       then return Nothing
       else Just . snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
                             (mkCheckExpType res_ty) $ \_ _ -> return ())

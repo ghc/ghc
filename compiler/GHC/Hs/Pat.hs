@@ -82,8 +82,6 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name, dataName)
-import GHC.Driver.DynFlags (DynFlags, xopt)
-import qualified GHC.LanguageExtensions as LangExt
 import Data.Data
 
 
@@ -502,22 +500,6 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: forall p. (OutputableBndrId p)
-                   => DynFlags -> LPat (GhcPass p) -> Bool
--- (isIrrefutableHsPat p) is true if matching against p cannot fail,
--- in the sense of falling through to the next pattern.
---      (NB: this is not quite the same as the (silly) defn
---      in 3.17.2 of the Haskell 98 report.)
---
--- WARNING: isIrrefutableHsPat returns False if it's in doubt.
--- Specifically on a ConPatIn, which is what it sees for a
--- (LPat Name) in the renamer, it doesn't know the size of the
--- constructor family, so it returns False.  Result: only
--- tuple patterns are considered irrefutable at the renamer stage.
---
--- But if it returns True, the pattern is definitely irrefutable
-isIrrefutableHsPat dflags =
-    isIrrefutableHsPat' (xopt LangExt.Strict dflags)
 
 {-
 Note [-XStrict and irrefutability]
@@ -544,12 +526,23 @@ encounters a LazyPat and -XStrict is enabled.
 
 See also Note [decideBangHood] in GHC.HsToCore.Utils.
 -}
-
-isIrrefutableHsPat' :: forall p. (OutputableBndrId p)
+-- | (isIrrefutableHsPat p) is true if matching against p cannot fail
+-- in the sense of falling through to the next pattern.
+--      (NB: this is not quite the same as the (silly) defn
+--      in 3.17.2 of the Haskell 98 report.)
+--
+-- WARNING: isIrrefutableHsPat returns False if it's in doubt.
+-- Specifically on a ConPatIn, which is what it sees for a
+-- (LPat Name) in the renamer, it doesn't know the size of the
+-- constructor family, so it returns False.  Result: only
+-- tuple patterns are considered irrefutable at the renamer stage.
+--
+-- But if it returns True, the pattern is definitely irrefutable
+isIrrefutableHsPat :: forall p. (OutputableBndrId p)
                     => Bool -- ^ Are we in a @-XStrict@ context?
                             -- See Note [-XStrict and irrefutability]
                     -> LPat (GhcPass p) -> Bool
-isIrrefutableHsPat' is_strict = goL
+isIrrefutableHsPat is_strict = goL
   where
     goL :: LPat (GhcPass p) -> Bool
     goL = go . unLoc
@@ -559,7 +552,7 @@ isIrrefutableHsPat' is_strict = goL
     go (VarPat {})         = True
     go (LazyPat _ p')
       | is_strict
-      = isIrrefutableHsPat' False p'
+      = isIrrefutableHsPat False p'
       | otherwise          = True
     go (BangPat _ pat)     = goL pat
     go (ParPat _ _ pat _)  = goL pat
