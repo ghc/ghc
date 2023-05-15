@@ -1903,7 +1903,7 @@ checkReductionDepth :: CtLoc -> TcType   -- ^ type being reduced
                     -> TcS ()
 checkReductionDepth loc ty
   = do { dflags <- getDynFlags
-       ; when (subGoalDepthExceeded dflags (ctLocDepth loc)) $
+       ; when (subGoalDepthExceeded (reductionDepth dflags) (ctLocDepth loc)) $
          wrapErrTcS $ solverDepthError loc ty }
 
 matchFam :: TyCon -> [Type] -> TcS (Maybe ReductionN)
