@@ -61,7 +61,7 @@ import GHC.Tc.TyCl.Utils
 import GHC.Core.ConLike
 import GHC.Types.FieldLabel
 import GHC.Rename.Env
-import GHC.Rename.Utils (wrapGenSpan)
+import GHC.Rename.Utils (wrapGenSpan, isIrrefutableHsPatRn)
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Driver.DynFlags ( getDynFlags, xopt_FieldSelectors )
@@ -808,7 +808,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
 
              args = map nlVarPat [scrutinee, cont, fail]
              lwpat = noLocA $ WildPat pat_ty
-             cases = if isIrrefutableHsPat dflags lpat
+             cases = if isIrrefutableHsPatRn dflags lpat
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']

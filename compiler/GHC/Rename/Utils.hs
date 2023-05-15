@@ -30,7 +30,9 @@ module GHC.Rename.Utils (
         addNameClashErrRn, mkNameClashErr,
 
         checkInferredVars,
-        noNestedForallsContextsErr, addNoNestedForallsContextsErr
+        noNestedForallsContextsErr, addNoNestedForallsContextsErr,
+
+        isIrrefutableHsPatRn
 )
 
 where
@@ -614,3 +616,8 @@ genFunBind fn ms
             , fun_matches = mkMatchGroup Generated (wrapGenSpan ms)
             , fun_ext = emptyNameSet
             }
+
+isIrrefutableHsPatRn :: forall p. (OutputableBndrId p)
+                  => DynFlags -> LPat (GhcPass p) -> Bool
+isIrrefutableHsPatRn dflags =
+    isIrrefutableHsPat (xopt LangExt.Strict dflags)

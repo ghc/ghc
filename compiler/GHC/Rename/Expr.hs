@@ -47,7 +47,7 @@ import GHC.Rename.Utils ( bindLocalNamesFV, checkDupNames
                         , checkUnusedRecordWildcard
                         , wrapGenSpan, genHsIntegralLit, genHsTyLit
                         , genHsVar, genLHsVar, genHsApp, genHsApps
-                        , genAppType )
+                        , genAppType, isIrrefutableHsPatRn )
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
@@ -2324,7 +2324,7 @@ of a refutable pattern, in order for the types to work out.
 hasRefutablePattern :: DynFlags -> ApplicativeArg GhcRn -> Bool
 hasRefutablePattern dflags (ApplicativeArgOne { app_arg_pattern = pat
                                               , is_body_stmt = False}) =
-                                         not (isIrrefutableHsPat dflags pat)
+                                         not (isIrrefutableHsPatRn dflags pat)
 hasRefutablePattern _ _ = False
 
 isLetStmt :: LStmt (GhcPass a) b -> Bool
@@ -2632,7 +2632,7 @@ monadFailOp pat ctxt = do
     dflags <- getDynFlags
         -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
         -- we should not need to fail.
-    if | isIrrefutableHsPat dflags pat -> return (Nothing, emptyFVs)
+    if | isIrrefutableHsPatRn dflags pat -> return (Nothing, emptyFVs)
 
         -- For non-monadic contexts (e.g. guard patterns, list
         -- comprehensions, etc.) we should not need to fail, or failure is handled in
