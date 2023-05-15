@@ -30,7 +30,6 @@ import GHC.Driver.Errors.Types   ( DriverMessage, GhcMessageOpts, DriverMessageO
 import GHC.Parser.Errors.Types   ( PsMessage, PsHeaderMessage )
 import GHC.HsToCore.Errors.Types ( DsMessage )
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.TcType      ( IllegalForeignTypeReason, TypeCannotBeMarshaledReason )
 import GHC.Unit.Module.Warnings ( WarningTxt )
 import GHC.Utils.Panic.Plain
 
