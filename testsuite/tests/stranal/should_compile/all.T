@@ -93,3 +93,4 @@ test('T22039', normal, compile, [''])
 test('T22388', [ grep_errmsg(r'^\S+\$w\S+') ], compile, ['-dsuppress-uniques -ddump-simpl'])
 # T22997: Just a panic that should not happen
 test('T22997', normal, compile, [''])
+test('T23398', normal, compile, ['-dsuppress-uniques -ddump-simpl -dno-typeable-binds'])

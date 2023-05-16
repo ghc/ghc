@@ -20,7 +20,7 @@ module GHC.Core.Predicate (
 
   -- Class predicates
   mkClassPred, isDictTy, typeDeterminesValue,
-  isClassPred, isEqPredClass, isCTupleClass,
+  isClassPred, isEqPredClass, isCTupleClass, isEqualityClass,
   getClassPredTys, getClassPredTys_maybe,
   classMethodTy, classMethodInstTy,
 
@@ -219,11 +219,6 @@ isEvVarType :: Type -> Bool
 -- See Note [Evidence for quantified constraints]
 isEvVarType ty = isCoVarType ty || isPredTy ty
 
-isEqPredClass :: Class -> Bool
--- True of (~) and (~~)
-isEqPredClass cls =  cls `hasKey` eqTyConKey
-                  || cls `hasKey` heqTyConKey
-
 isClassPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
     Just tc -> isClassTyCon tc
@@ -244,6 +239,20 @@ isEqPrimPred ty = isCoVarType ty
 
 isCTupleClass :: Class -> Bool
 isCTupleClass cls = isTupleTyCon (classTyCon cls)
+
+isEqPredClass :: Class -> Bool
+-- True of (~) and (~~)
+isEqPredClass cls =  cls `hasKey` eqTyConKey
+                  || cls `hasKey` heqTyConKey
+
+isEqualityClass :: Class -> Bool
+-- True of (~), (~~), and Coercible
+-- These all have a single primitive-equality superclass, either (~N# or ~R#)
+isEqualityClass cls
+  = cls `hasKey` heqTyConKey
+    || cls `hasKey` eqTyConKey
+    || cls `hasKey` coercibleTyConKey
+
 
 {- *********************************************************************
 *                                                                      *

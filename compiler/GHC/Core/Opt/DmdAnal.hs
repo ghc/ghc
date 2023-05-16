@@ -16,37 +16,41 @@ where
 
 import GHC.Prelude
 
-import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
+
 import GHC.Core
-import GHC.Core.Multiplicity ( scaledThing )
-import GHC.Utils.Outputable
-import GHC.Types.Var.Env
-import GHC.Types.Var.Set
-import GHC.Types.Basic
-import Data.List        ( mapAccumL )
 import GHC.Core.DataCon
-import GHC.Types.ForeignCall ( isSafeForeignCall )
-import GHC.Types.Id
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Predicate( isClassPred )
+import GHC.Core.Predicate( isEqualityClass, isCTupleClass )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
 import GHC.Core.TyCo.Compare ( eqType )
+import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.Arity ( typeArity )
-import GHC.Utils.Misc
-import GHC.Utils.Panic
-import GHC.Utils.Panic.Plain
+import GHC.Core.Opt.WorkWrap.Utils
+
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.MemoFun
 import GHC.Types.RepType
+import GHC.Types.ForeignCall ( isSafeForeignCall )
+import GHC.Types.Id
+import GHC.Types.Var.Env
+import GHC.Types.Var.Set
+import GHC.Types.Basic
 
+import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Panic.Plain
+import GHC.Utils.Outputable
+
+import Data.List        ( mapAccumL )
 
 {-
 ************************************************************************
@@ -1499,7 +1503,7 @@ bounds-checking.
 
 So we want to give `indexError` a signature like `<1!P(!S,!S)><1!S><S!S>b`
 where the !S (meaning Poly Unboxed C1N) says that the polymorphic arguments
-are unboxed (recursively).  The wrapper for `indexError` won't /acutally/
+are unboxed (recursively).  The wrapper for `indexError` won't /actually/
 unbox them (because their polymorphic type doesn't allow that) but when
 demand-analysing /callers/, we'll behave as if that call needs the args
 unboxed.
@@ -1782,39 +1786,6 @@ applying the strictness demands to the final result of DmdAnal. The result is
 that we get the strict demand signature we wanted even if we can't float
 the case on `x` up through the case on `burble`.
 
-Note [Do not unbox class dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never unbox class dictionaries in worker/wrapper.
-
-1. INLINABLE functions
-   If we have
-      f :: Ord a => [a] -> Int -> a
-      {-# INLINABLE f #-}
-   and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-   (see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
-   which can still be specialised by the type-class specialiser, something like
-      fw :: Ord a => [a] -> Int# -> a
-
-   BUT if f is strict in the Ord dictionary, we might unpack it, to get
-      fw :: (a->a->Bool) -> [a] -> Int# -> a
-   and the type-class specialiser can't specialise that. An example is #6056.
-
-   Historical note: #14955 describes how I got this fix wrong the first time.
-   I got aware of the issue in T5075 by the change in boxity of loop between
-   demand analysis runs.
-
-2. -fspecialise-aggressively.  As #21286 shows, the same phenomenon can occur
-   occur without INLINABLE, when we use -fexpose-all-unfoldings and
-   -fspecialise-aggressively to do vigorous cross-module specialisation.
-
-3. #18421 found that unboxing a dictionary can also make the worker less likely
-   to inline; the inlining heuristics seem to prefer to inline a function
-   applied to a dictionary over a function applied to a bunch of functions.
-
-TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
-a raft of higher-order functions isn't a huge win anyway -- you really want to
-specialise the function.
-
 Note [Worker argument budget]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In 'finaliseArgBoxities' we don't want to generate workers with zillions of
@@ -1998,22 +1969,13 @@ finaliseArgBoxities env fn threshold_arity rhs_dmds div rhs
 
     arg_triples :: [(Type, StrictnessMark, Demand)]
     arg_triples = take threshold_arity $
-                  [ (bndr_ty, NotMarkedStrict, get_dmd bndr bndr_ty)
-                  | bndr <- bndrs
-                  , isRuntimeVar bndr, let bndr_ty = idType bndr ]
+                  [ (idType bndr, NotMarkedStrict, get_dmd bndr)
+                  | bndr <- bndrs, isRuntimeVar bndr ]
 
-    get_dmd :: Id -> Type -> Demand
-    get_dmd bndr bndr_ty
-      | isClassPred bndr_ty = trimBoxity dmd
-        -- See Note [Do not unbox class dictionaries]
-        -- NB: 'ty' has not been normalised, so this will (rightly)
-        --     catch newtype dictionaries too.
-        -- NB: even for bottoming functions, don't unbox dictionaries
-
-      | is_bot_fn = unboxDeeplyDmd dmd
-        -- See Note [Boxity for bottoming functions], case (B)
-
-      | otherwise = dmd
+    get_dmd :: Id -> Demand
+    get_dmd bndr
+      | is_bot_fn = unboxDeeplyDmd dmd -- See Note [Boxity for bottoming functions],
+      | otherwise = dmd                --     case (B)
       where
         dmd = idDemandInfo bndr
 
@@ -2119,6 +2081,12 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
          -- isMarkedStrict: see Note [Unboxing evaluated arguments] in DmdAnal
        -> DontUnbox
 
+       | doNotUnbox ty
+       -> DontUnbox  -- See Note [Do not unbox class dictionaries]
+                     -- NB: 'ty' has not been normalised, so this will (rightly)
+                     --     catch newtype dictionaries too.
+                     -- NB: even for bottoming functions, don't unbox dictionaries
+
        | DefinitelyRecursive <- ae_rec_dc env dc
          -- See Note [Which types are unboxed?]
          -- and Note [Demand analysis for recursive data constructors]
@@ -2128,6 +2096,76 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
        -> DoUnbox (zip3 (dubiousDataConInstArgTys dc tc_args)
                         (dataConRepStrictness dc)
                         dmds)
+
+
+doNotUnbox :: Type -> Bool
+-- Do not unbox class dictionaries, except equality classes and tuples
+-- Note [Do not unbox class dictionaries]
+doNotUnbox arg_ty
+  = case tyConAppTyCon_maybe arg_ty of
+      Just tc | Just cls <- tyConClass_maybe tc
+              -> not (isEqualityClass cls || isCTupleClass cls)
+       -- See (DNB2) and (DNB1) in Note [Do not unbox class dictionaries]
+
+      _ -> False
+
+{- Note [Do not unbox class dictionaries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We never unbox class dictionaries in worker/wrapper.
+
+1. INLINABLE functions
+   If we have
+      f :: Ord a => [a] -> Int -> a
+      {-# INLINABLE f #-}
+   and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
+   (see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
+   which can still be specialised by the type-class specialiser, something like
+      fw :: Ord a => [a] -> Int# -> a
+
+   BUT if f is strict in the Ord dictionary, we might unpack it, to get
+      fw :: (a->a->Bool) -> [a] -> Int# -> a
+   and the type-class specialiser can't specialise that. An example is #6056.
+
+   Historical note: #14955 describes how I got this fix wrong the first time.
+   I got aware of the issue in T5075 by the change in boxity of loop between
+   demand analysis runs.
+
+2. -fspecialise-aggressively.  As #21286 shows, the same phenomenon can occur
+   occur without INLINABLE, when we use -fexpose-all-unfoldings and
+   -fspecialise-aggressively to do vigorous cross-module specialisation.
+
+3. #18421 found that unboxing a dictionary can also make the worker less likely
+   to inline; the inlining heuristics seem to prefer to inline a function
+   applied to a dictionary over a function applied to a bunch of functions.
+
+TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
+a raft of higher-order functions isn't a huge win anyway -- you really want to
+specialise the function.
+
+Wrinkle (DNB1): we /do/ want to unbox tuple dictionaries (#23398)
+     f :: (% Eq a, Show a %) => blah
+  with -fdicts-strict it is great to unbox to
+     $wf :: Eq a => Show a => blah
+  (where I have written out the currying explicitly).  Now we can specialise
+  $wf on the Eq or Show dictionary.  Nothing is lost.
+
+  And something is gained.  It is possible that `f` will look like this:
+     f = /\a. \d:(% Eq a, Show a %). ... f @a (% sel1 d, sel2 d %)...
+  where there is a recurive call to `f`, or to another function that takes the
+  same tuple dictionary, but where the tuple is built from the components of
+  `d`.  The Simplier does not fix this.  But if we unpacked the dictionary
+  we'd get
+     $wf = /\a. \(d1:Eq a) (d2:Show a). let d = (% d1, d2 %)
+             in ...f @a (% sel1 d, sel2 d %)
+  and all the tuple building and taking apart will disappear.
+
+Wrinkle (DNB2): we /do/ wnat to unbox equality dictionaries,
+  for (~), (~~), and Coercible (#23398).  Their payload is a single unboxed
+  coercion.  We never want to specialise on `(t1 ~ t2)`.  All that would do is
+  to make a copy of the function's RHS with a particular coercion.  Unlike
+  normal class methods, that does not unlock any new optimisation
+  opportunities in the specialised RHS.
+-}
 
 {- *********************************************************************
 *                                                                      *
