@@ -311,6 +311,7 @@ Library
         GHC.Core.Opt.Arity
         GHC.Core.Opt.CallArity
         GHC.Core.Opt.CallerCC
+        GHC.Core.Opt.CallerCC.Types
         GHC.Core.Opt.ConstantFold
         GHC.Core.Opt.CprAnal
         GHC.Core.Opt.CSE
