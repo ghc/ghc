@@ -290,7 +290,7 @@ instance Ord NonDetFastString where
 -- representation). Hence it is deterministic from one run to the other.
 newtype LexicalFastString
    = LexicalFastString FastString
-   deriving newtype (Eq, Show)
+   deriving newtype (Eq, Show, NFData)
    deriving stock Data
 
 instance Ord LexicalFastString where

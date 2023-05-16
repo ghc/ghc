@@ -15,23 +15,25 @@ where
 
 import GHC.Prelude
 import GHC.Utils.Binary
+import GHC.Data.FastString
+import GHC.Types.Unique.Map
 
+import Data.Function (on)
+import Data.List (sortBy)
 import Control.Monad
-import Data.Map         ( Map )
-import qualified Data.Map as Map
 import Control.DeepSeq
 
-type FieldName = String
+type FieldName = FastString
 
-newtype ExtensibleFields = ExtensibleFields { getExtensibleFields :: (Map FieldName BinData) }
+newtype ExtensibleFields = ExtensibleFields { getExtensibleFields :: (UniqMap FastString BinData) }
 
 instance Binary ExtensibleFields where
   put_ bh (ExtensibleFields fs) = do
-    put_ bh (Map.size fs :: Int)
+    put_ bh (sizeUniqMap fs :: Int)
 
     -- Put the names of each field, and reserve a space
     -- for a payload pointer after each name:
-    header_entries <- forM (Map.toList fs) $ \(name, dat) -> do
+    header_entries <- forM (sortBy (lexicalCompareFS `on` fst) $ nonDetUniqMapToList fs) $ \(name, dat) -> do
       put_ bh name
       field_p_p <- tellBin bh
       put_ bh field_p_p
@@ -58,13 +60,13 @@ instance Binary ExtensibleFields where
       dat <- get bh
       return (name, dat)
 
-    return . ExtensibleFields . Map.fromList $ fields
+    return . ExtensibleFields . listToUniqMap $ fields
 
 instance NFData ExtensibleFields where
   rnf (ExtensibleFields fs) = rnf fs
 
 emptyExtensibleFields :: ExtensibleFields
-emptyExtensibleFields = ExtensibleFields Map.empty
+emptyExtensibleFields = ExtensibleFields emptyUniqMap
 
 --------------------------------------------------------------------------------
 -- | Reading
@@ -74,7 +76,7 @@ readField name = readFieldWith name get
 
 readFieldWith :: FieldName -> (BinHandle -> IO a) -> ExtensibleFields -> IO (Maybe a)
 readFieldWith name read fields = sequence $ ((read =<<) . dataHandle) <$>
-  Map.lookup name (getExtensibleFields fields)
+  lookupUniqMap (getExtensibleFields fields) name
 
 --------------------------------------------------------------------------------
 -- | Writing
@@ -88,7 +90,7 @@ writeFieldWith name write fields = do
   write bh
   --
   bd <- handleData bh
-  return $ ExtensibleFields (Map.insert name bd $ getExtensibleFields fields)
+  return $ ExtensibleFields (addToUniqMap (getExtensibleFields fields) name bd)
 
 deleteField :: FieldName -> ExtensibleFields -> ExtensibleFields
-deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
+deleteField name (ExtensibleFields fs) = ExtensibleFields $ delFromUniqMap fs name

@@ -303,7 +303,7 @@ mkHieFileWithSource src_file src ms ts rs =
       tcs = tcg_tcs ts
       (asts',arr) = getCompressedAsts tc_binds rs top_ev_binds insts tcs in
   HieFile
-      { hie_hs_file = src_file
+      { hie_hs_file = mkFastString src_file
       , hie_module = ms_mod ms
       , hie_types = arr
       , hie_asts = asts'

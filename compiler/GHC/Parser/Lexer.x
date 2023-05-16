@@ -1614,7 +1614,7 @@ mkHdkCommentPrev loc mkDS =  (HdkCommentPrev ds,ITdocComment ds loc)
 
 mkHdkCommentNamed :: PsSpan -> String -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
 mkHdkCommentNamed loc name mkDS = (HdkCommentNamed name ds, ITdocComment ds loc)
-  where ds = mkDS (HsDocStringNamed name)
+  where ds = mkDS (HsDocStringNamed $ LexicalFastString $ mkFastString name)
 
 mkHdkCommentSection :: PsSpan -> Int -> (HsDocStringDecorator -> HsDocString) -> (HdkComment, Token)
 mkHdkCommentSection loc n mkDS = (HdkCommentSection n ds, ITdocComment ds loc)

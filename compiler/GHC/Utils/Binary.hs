@@ -1,5 +1,7 @@
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -81,7 +83,7 @@ module GHC.Utils.Binary
    FSTable, initFSTable, getDictFastString, putDictFastString,
 
    -- * Newtype wrappers
-   BinSpan(..), BinSrcSpan(..), BinLocated(..)
+   BinSpan(..), BinSrcSpan(..), BinLocated(..), SerialisableChar(..)
   ) where
 
 import GHC.Prelude
@@ -124,6 +126,8 @@ import qualified Data.IntMap as IntMap
 #if MIN_VERSION_base(4,15,0)
 import GHC.ForeignPtr           ( unsafeWithForeignPtr )
 #endif
+
+import GHC.TypeError
 
 type BinArray = ForeignPtr Word8
 
@@ -675,9 +679,20 @@ instance Binary Bool where
     put_ bh b = putByte bh (fromIntegral (fromEnum b))
     get  bh   = do x <- getWord8 bh; return $! (toEnum (fromIntegral x))
 
-instance Binary Char where
-    put_  bh c = put_ bh (fromIntegral (ord c) :: Word32)
-    get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
+instance (TypeError (Text "No instance for Binary Char"
+                :$$: Text "We don't want to serialise Strings into interface files"
+                :$$: Text "Use a compact representation like " :<>: ShowType FastString :<>: Text " instead"
+                :$$: Text "If you really want to serialise you can use " :<>: ShowType SerialisableChar)
+                )
+               => Binary Char where
+    put_ = undefined
+    get = undefined
+
+newtype SerialisableChar = SerialisableChar { getSerialisedChar :: Char }
+
+instance Binary SerialisableChar where
+    put_  bh (SerialisableChar c) = put_ bh (fromIntegral (ord c) :: Word32)
+    get  bh   = do x <- get bh; return $! (SerialisableChar $ chr (fromIntegral (x :: Word32)))
 
 instance Binary Int where
     put_ bh i = put_ bh (fromIntegral i :: Int64)

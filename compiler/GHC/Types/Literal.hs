@@ -254,7 +254,7 @@ for more details.
 -}
 
 instance Binary Literal where
-    put_ bh (LitChar aa)     = do putByte bh 0; put_ bh aa
+    put_ bh (LitChar aa)     = do putByte bh 0; put_ bh $ SerialisableChar aa
     put_ bh (LitString ab)   = do putByte bh 1; put_ bh ab
     put_ bh (LitNullAddr)    = putByte bh 2
     put_ bh (LitFloat ah)    = do putByte bh 3; put_ bh ah
@@ -276,7 +276,7 @@ instance Binary Literal where
             case h of
               0 -> do
                     aa <- get bh
-                    return (LitChar aa)
+                    return (LitChar $ getSerialisedChar aa)
               1 -> do
                     ab <- get bh
                     return (LitString ab)

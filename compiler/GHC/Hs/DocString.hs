@@ -25,6 +25,7 @@ module GHC.Hs.DocString
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Utils.Binary
 import GHC.Utils.Encoding
 import GHC.Utils.Outputable as Outputable hiding ((<>))
@@ -102,7 +103,7 @@ instance Binary HsDocString where
 data HsDocStringDecorator
   = HsDocStringNext -- ^ '|' is the decorator
   | HsDocStringPrevious -- ^ '^' is the decorator
-  | HsDocStringNamed !String -- ^ '$<string>' is the decorator
+  | HsDocStringNamed !LexicalFastString -- ^ '$<string>' is the decorator
   | HsDocStringGroup !Int -- ^ The decorator is the given number of '*'s
   deriving (Eq, Ord, Show, Data)
 
@@ -118,7 +119,7 @@ instance NFData HsDocStringDecorator where
 printDecorator :: HsDocStringDecorator -> String
 printDecorator HsDocStringNext = "|"
 printDecorator HsDocStringPrevious = "^"
-printDecorator (HsDocStringNamed n) = '$':n
+printDecorator (HsDocStringNamed (LexicalFastString n)) = '$':unpackFS n
 printDecorator (HsDocStringGroup n) = replicate n '*'
 
 instance Binary HsDocStringDecorator where

@@ -32,6 +32,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 
+import Data.Bifunctor             (first)
 import qualified Data.Array        as A
 import qualified Data.Array.IO     as A
 import qualified Data.Array.Unsafe as A
@@ -344,7 +345,7 @@ putHieName bh (LocalName occName span) = do
   put_ bh (occName, BinSrcSpan span)
 putHieName bh (KnownKeyName uniq) = do
   putByte bh 2
-  put_ bh $ unpkUnique uniq
+  put_ bh $ (first SerialisableChar $ unpkUnique uniq)
 
 getHieName :: BinHandle -> IO HieName
 getHieName bh = do
@@ -358,5 +359,5 @@ getHieName bh = do
       return $ LocalName occ $ unBinSrcSpan span
     2 -> do
       (c,i) <- get bh
-      return $ KnownKeyName $ mkUnique c i
+      return $ KnownKeyName $ mkUnique (getSerialisedChar c) i
     _ -> panic "GHC.Iface.Ext.Binary.getHieName: invalid tag"

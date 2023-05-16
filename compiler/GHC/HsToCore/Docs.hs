@@ -12,6 +12,7 @@ module GHC.HsToCore.Docs where
 
 import GHC.Prelude
 import GHC.Data.Bag
+import GHC.Data.FastString
 import GHC.Hs.Binds
 import GHC.Hs.Doc
 import GHC.Hs.Decls
@@ -86,7 +87,7 @@ extractDocs dflags
          , docs_args = th_arg_docs `unionArgMaps` arg_map
          , docs_structure = doc_structure
          , docs_named_chunks = named_chunks
-         , docs_haddock_opts = haddockOptions dflags
+         , docs_haddock_opts = fmap mkFastString $ haddockOptions dflags
          , docs_language = language_
          , docs_extensions = exts
          }
@@ -146,7 +147,7 @@ mkDocStructureFromExportList mdl import_avails export_list =
       (IEModuleContents _ lmn, avails) -> moduleExport (unLoc lmn) avails
       (IEGroup _ level doc, _)         -> DsiSectionHeading level (unLoc doc)
       (IEDoc _ doc, _)                 -> DsiDocChunk (unLoc doc)
-      (IEDocNamed _ name, _)           -> DsiNamedChunkRef name
+      (IEDocNamed _ name, _)           -> DsiNamedChunkRef (mkFastString name)
       (_, avails)                      -> DsiExports (nubAvails avails)
 
     moduleExport :: ModuleName -- Alias
@@ -220,12 +221,12 @@ mkDocStructureFromDecls env all_exports decls =
 -- since there would be no way to link to a named chunk.
 getNamedChunks :: Bool -- ^ Do we have an explicit export list?
                -> HsGroup (GhcPass pass)
-               -> Map String (HsDoc (GhcPass pass))
+               -> UniqMap FastString (HsDoc (GhcPass pass))
 getNamedChunks True decls =
-  M.fromList $ flip mapMaybe (unLoc <$> hs_docs decls) $ \case
-    DocCommentNamed name doc -> Just (name, unLoc doc)
+  listToUniqMap $ flip mapMaybe (unLoc <$> hs_docs decls) $ \case
+    DocCommentNamed name doc -> Just (mkFastString name, unLoc doc)
     _                        -> Nothing
-getNamedChunks False _ = M.empty
+getNamedChunks False _ = emptyUniqMap
 
 -- | Create decl and arg doc-maps by looping through the declarations.
 -- For each declaration, find its names, its subordinates, and its doc strings.

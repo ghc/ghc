@@ -227,12 +227,12 @@ putObject
   -> IO ()
 putObject bh mod_name deps os = do
   forM_ magic (putByte bh . fromIntegral . ord)
-  put_ bh (show hiVersion)
+  put_ bh (map SerialisableChar $ show hiVersion)
 
   -- we store the module name as a String because we don't want to have to
   -- decode the FastString table just to decode it when we're looking for an
   -- object in an archive.
-  put_ bh (moduleNameString mod_name)
+  put_ bh (moduleNameFS mod_name)
 
   (bh_fs, _bin_dict, put_dict) <- initFSTable bh
 
@@ -281,12 +281,12 @@ getObjectHeader bh = do
   case is_magic of
     False -> pure (Left "invalid magic header")
     True  -> do
-      is_correct_version <- ((== hiVersion) . read) <$> get bh
+      is_correct_version <- ((== hiVersion) . read . map getSerialisedChar) <$> get bh
       case is_correct_version of
         False -> pure (Left "invalid header version")
         True  -> do
           mod_name <- get bh
-          pure (Right (mkModuleName (mod_name)))
+          pure (Right (mkModuleNameFS mod_name))
 
 
 -- | Parse object body. Must be called after a sucessful getObjectHeader

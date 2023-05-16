@@ -17,6 +17,7 @@ where
 import GHC.Prelude
 
 import GHC.Utils.Binary
+import GHC.Data.FastString
 
 import GHC.Exts (RuntimeRep(..), VecCount(..), VecElem(..))
 #if __GLASGOW_HASKELL__ >= 901
@@ -32,13 +33,13 @@ import Data.Kind (Type)
 
 instance Binary TyCon where
     put_ bh tc = do
-        put_ bh (tyConPackage tc)
-        put_ bh (tyConModule tc)
-        put_ bh (tyConName tc)
+        put_ bh (mkFastString $ tyConPackage tc)
+        put_ bh (mkFastString $ tyConModule tc)
+        put_ bh (mkFastString $ tyConName tc)
         put_ bh (tyConKindArgs tc)
         put_ bh (tyConKindRep tc)
     get bh =
-        mkTyCon <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+        mkTyCon <$> (unpackFS <$> get bh) <*> (unpackFS <$> get bh) <*> (unpackFS <$> get bh) <*> get bh <*> get bh
 
 getSomeTypeRep :: BinHandle -> IO SomeTypeRep
 getSomeTypeRep bh = do
@@ -157,7 +158,7 @@ instance Binary KindRep where
     put_ bh (KindRepApp a b) = putByte bh 2 >> put_ bh a >> put_ bh b
     put_ bh (KindRepFun a b) = putByte bh 3 >> put_ bh a >> put_ bh b
     put_ bh (KindRepTYPE r) = putByte bh 4 >> put_ bh r
-    put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh r
+    put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh (mkFastString r)
 
     get bh = do
         tag <- getByte bh
@@ -167,7 +168,7 @@ instance Binary KindRep where
           2 -> KindRepApp <$> get bh <*> get bh
           3 -> KindRepFun <$> get bh <*> get bh
           4 -> KindRepTYPE <$> get bh
-          5 -> KindRepTypeLit <$> get bh <*> get bh
+          5 -> KindRepTypeLit <$> get bh <*> (unpackFS <$> get bh)
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where

@@ -28,6 +28,7 @@ module GHC.Hs.Doc
 
 import GHC.Prelude
 
+import GHC.Data.FastString
 import GHC.Utils.Binary
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable hiding ((<>))
@@ -40,10 +41,9 @@ import GHC.Driver.Flags
 
 import Control.DeepSeq
 import Data.Data
+import Data.Function (on)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.List.NonEmpty (NonEmpty(..))
 import GHC.LanguageExtensions.Type
 import qualified GHC.Utils.Outputable as O
@@ -123,7 +123,7 @@ type LHsDoc pass = Located (HsDoc pass)
 data DocStructureItem
   = DsiSectionHeading !Int !(HsDoc GhcRn)
   | DsiDocChunk !(HsDoc GhcRn)
-  | DsiNamedChunkRef !(String)
+  | DsiNamedChunkRef !FastString
   | DsiExports !Avails
   | DsiModExport
       !(NonEmpty ModuleName) -- ^ We might re-export avails from multiple
@@ -176,7 +176,7 @@ instance Outputable DocStructureItem where
       , nest 2 (pprHsDocDebug doc)
       ]
     DsiNamedChunkRef name ->
-      text "reference to named chunk:" <+> text name
+      text "reference to named chunk:" <+> ftext name
     DsiExports avails ->
       text "avails:" $$ nest 2 (ppr avails)
     DsiModExport mod_names avails ->
@@ -202,12 +202,12 @@ data Docs = Docs
   , docs_args         :: UniqMap Name (IntMap (HsDoc GhcRn))
     -- ^ Docs for arguments. E.g. function arguments, method arguments.
   , docs_structure    :: DocStructure
-  , docs_named_chunks :: Map String (HsDoc GhcRn)
+  , docs_named_chunks :: UniqMap FastString (HsDoc GhcRn)
     -- ^ Map from chunk name to content.
     --
     -- This map will be empty unless we have an explicit export list from which
     -- we can reference the chunks.
-  , docs_haddock_opts :: Maybe String
+  , docs_haddock_opts :: Maybe FastString
     -- ^ Haddock options from @OPTIONS_HADDOCK@ or from @-haddock-opts@.
   , docs_language     :: Maybe Language
     -- ^ The 'Language' used in the module, for example 'Haskell2010'.
@@ -227,7 +227,7 @@ instance Binary Docs where
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_decls docs)
     put_ bh (sortBy (\a b -> (fst a) `stableNameCmp` fst b) $ nonDetUniqMapToList $ docs_args docs)
     put_ bh (docs_structure docs)
-    put_ bh (Map.toList $ docs_named_chunks docs)
+    put_ bh (sortBy (lexicalCompareFS `on` fst) $ nonDetUniqMapToList $ docs_named_chunks docs)
     put_ bh (docs_haddock_opts docs)
     put_ bh (docs_language docs)
     put_ bh (docs_extensions docs)
@@ -236,7 +236,7 @@ instance Binary Docs where
     decls <- listToUniqMap <$> get bh
     args <- listToUniqMap <$> get bh
     structure <- get bh
-    named_chunks <- Map.fromList <$> get bh
+    named_chunks <- listToUniqMap <$> get bh
     haddock_opts <- get bh
     language <- get bh
     exts <- get bh
@@ -257,7 +257,7 @@ instance Outputable Docs where
         , pprField (ppr . fmap (ppr . map pprHsDocDebug)) "declaration docs" docs_decls
         , pprField (ppr . fmap (pprIntMap ppr pprHsDocDebug)) "arg docs" docs_args
         , pprField (vcat . map ppr) "documentation structure" docs_structure
-        , pprField (pprMap (doubleQuotes . text) pprHsDocDebug) "named chunks"
+        , pprField (ppr . fmap (ppr . pprHsDocDebug)) "named chunks"
                    docs_named_chunks
         , pprField pprMbString "haddock options" docs_haddock_opts
         , pprField ppr "language" docs_language
@@ -268,14 +268,11 @@ instance Outputable Docs where
       pprField :: (a -> SDoc) -> String -> (Docs -> a) -> SDoc
       pprField ppr' heading lbl =
         text heading O.<> colon $$ nest 2 (ppr' (lbl docs))
-      pprMap pprKey pprVal m =
-        vcat $ flip map (Map.toList m) $ \(k, v) ->
-          pprKey k O.<> colon $$ nest 2 (pprVal v)
       pprIntMap pprKey pprVal m =
         vcat $ flip map (IntMap.toList m) $ \(k, v) ->
           pprKey k O.<> colon $$ nest 2 (pprVal v)
       pprMbString Nothing = empty
-      pprMbString (Just s) = text s
+      pprMbString (Just s) = ftext s
       pprMaybe ppr' = \case
         Nothing -> text "Nothing"
         Just x -> text "Just" <+> ppr' x
@@ -286,7 +283,7 @@ emptyDocs = Docs
   , docs_decls = emptyUniqMap
   , docs_args = emptyUniqMap
   , docs_structure = []
-  , docs_named_chunks = Map.empty
+  , docs_named_chunks = emptyUniqMap
   , docs_haddock_opts = Nothing
   , docs_language = Nothing
   , docs_extensions = EnumSet.empty

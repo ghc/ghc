@@ -173,7 +173,7 @@ mkObjectUsage pit plugins fc hug th_links_needed th_pkgs_needed = do
   where
     linkableToUsage (LM _ m uls) = mapM (unlinkedToUsage m) uls
 
-    msg m = moduleNameString (moduleName m) ++ "[TH] changed"
+    msg m = moduleNameFS (moduleName m) `appendFS` fsLit "[TH] changed"
 
     fing mmsg fn = UsageFile (mkFastString fn) <$> lookupFileCache fc fn <*> pure mmsg
 

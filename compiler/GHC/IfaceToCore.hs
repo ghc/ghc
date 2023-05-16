@@ -1514,7 +1514,7 @@ tcIfaceCo = go
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
-tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
+tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv (unpackFS str)
 tcIfaceUnivCoProv (IfaceCorePrepProv b)     = return $ CorePrepProv b
 
 {-

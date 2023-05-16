@@ -94,6 +94,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SafeHaskell
 import GHC.Types.TypeEnv
 import GHC.Types.Unique.DSet
+import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
 import GHC.Types.PkgQual
@@ -109,10 +110,12 @@ import GHC.Unit.Home.ModInfo
 import GHC.Unit.Finder
 import GHC.Unit.Env
 
-import GHC.Data.Maybe
+import GHC.Data.FastString
 
 import Control.Monad
-import Data.Map ( toList )
+import Data.List (sortBy)
+import Data.Function (on)
+import GHC.Data.Maybe
 import System.FilePath
 import System.Directory
 import GHC.Driver.Env.KnotVars
@@ -1219,6 +1222,6 @@ pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedVal
   = ppr target <+> text "annotated by" <+> ppr serialized
 
 pprExtensibleFields :: ExtensibleFields -> SDoc
-pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ toList fs
+pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ sortBy (lexicalCompareFS `on` fst) $ nonDetUniqMapToList fs
   where
-    pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
+    pprField (name, (BinData size _data)) = ftext name <+> text "-" <+> ppr size <+> text "bytes"

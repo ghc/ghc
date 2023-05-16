@@ -8,6 +8,7 @@ module GHC.Iface.Recomp.Flags (
       , fingerprintHpcFlags
     ) where
 
+import Data.Bifunctor (first)
 import GHC.Prelude
 
 import GHC.Driver.Session
@@ -36,7 +37,8 @@ fingerprintDynFlags :: HscEnv -> Module
 
 fingerprintDynFlags hsc_env this_mod nameio =
     let dflags@DynFlags{..} = hsc_dflags hsc_env
-        mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just mainFunIs else Nothing
+        serialisableString = map SerialisableChar
+        mainis   = if mainModIs (hsc_HUE hsc_env) == this_mod then Just (fmap serialisableString mainFunIs) else Nothing
                       -- see #5878
         -- pkgopts  = (homeUnit home_unit, sort $ packageFlags dflags)
         safeHs   = setSafeMode safeHaskell
@@ -51,14 +53,14 @@ fingerprintDynFlags hsc_env this_mod nameio =
         includePathsMinusImplicit = includePaths { includePathsQuoteImplicit = [] }
 
         -- -I, -D and -U flags affect CPP
-        cpp = ( map normalise $ flattenIncludes includePathsMinusImplicit
+        cpp = ( map (serialisableString . normalise) $ flattenIncludes includePathsMinusImplicit
             -- normalise: eliminate spurious differences due to "./foo" vs "foo"
-              , picPOpts dflags
-              , opt_P_signature dflags)
+              , map serialisableString $ picPOpts dflags
+              , first (map serialisableString) $ opt_P_signature dflags)
             -- See Note [Repeated -optP hashing]
 
         -- Note [path flags and recompilation]
-        paths = [ hcSuf ]
+        paths = map serialisableString [ hcSuf ]
 
         -- -fprof-auto etc.
         prof = if sccProfilingEnabled dflags then fromEnum profAuto else 0
@@ -102,7 +104,7 @@ fingerprintHpcFlags dflags@DynFlags{..} nameio =
       let
         -- -fhpc, see https://gitlab.haskell.org/ghc/ghc/issues/11798
         -- hpcDir is output-only, so we should recompile if it changes
-        hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
+        hpc = if gopt Opt_Hpc dflags then Just (map SerialisableChar hpcDir) else Nothing
 
       in computeFingerprint nameio hpc
 

@@ -283,7 +283,7 @@ data Usage
         usg_file_hash  :: Fingerprint,
         -- ^ 'Fingerprint' of the file contents.
 
-        usg_file_label :: Maybe String
+        usg_file_label :: Maybe FastString
         -- ^ An optional string which is used in recompilation messages if
         -- file in question has changed.
 

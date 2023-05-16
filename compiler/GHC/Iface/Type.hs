@@ -402,7 +402,7 @@ data IfaceCoercion
 data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
-  | IfacePluginProv String
+  | IfacePluginProv FastString
   | IfaceCorePrepProv Bool  -- See defn of CorePrepProv
 
 {- Note [Holes in IfaceCoercion]
@@ -1886,7 +1886,7 @@ pprIfaceUnivCoProv (IfacePhantomProv co)
 pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfacePluginProv s)
-  = text "plugin" <+> doubleQuotes (text s)
+  = text "plugin" <+> doubleQuotes (ftext s)
 pprIfaceUnivCoProv (IfaceCorePrepProv _)
   = text "CorePrep"
 
@@ -1952,7 +1952,7 @@ instance Outputable IfaceTyLit where
 instance Binary IfaceTyLit where
   put_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
   put_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
-  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
+  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh (SerialisableChar n)
 
   get bh =
     do tag <- getByte bh
@@ -1962,7 +1962,7 @@ instance Binary IfaceTyLit where
          2 -> do { n <- get bh
                  ; return (IfaceStrTyLit n) }
          3 -> do { n <- get bh
-                 ; return (IfaceCharTyLit n) }
+                 ; return (IfaceCharTyLit $ getSerialisedChar n) }
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where

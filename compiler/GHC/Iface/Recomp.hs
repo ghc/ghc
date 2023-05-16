@@ -777,7 +777,7 @@ checkModUsage fc UsageFile{ usg_file_path = file,
          else return UpToDate
  where
    reason = FileChanged $ unpackFS file
-   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap CustomReason mlabel
+   recomp  = needsRecompileBecause $ fromMaybe reason $ fmap (CustomReason . unpackFS) mlabel
    handler = if debugIsOn
       then \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
       else \_ -> return recomp -- if we can't find the file, just recompile, don't fail

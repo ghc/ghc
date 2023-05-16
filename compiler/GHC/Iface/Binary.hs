@@ -106,12 +106,12 @@ readBinIfaceHeader profile _name_cache checkHiWay traceBinIFace hi_path = do
         (unFixedLength $ binaryInterfaceMagic platform) (unFixedLength magic)
 
     -- Check the interface file version and profile tag.
-    check_ver  <- get bh
+    check_ver  <- map getSerialisedChar <$> get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
-    check_tag <- get bh
+    check_tag <- map getSerialisedChar <$> get bh
     let tag = profileBuildTag profile
     wantedGot "Way" tag check_tag text
     when (checkHiWay == CheckHiWay) $
@@ -179,8 +179,8 @@ writeBinIface profile traceBinIface hi_path mod_iface = do
     put_ bh (binaryInterfaceMagic platform)
 
     -- The version, profile tag, and source hash go next
-    put_ bh (show hiVersion)
-    let tag = profileBuildTag profile
+    put_ bh (map SerialisableChar $ show hiVersion)
+    let tag = map SerialisableChar $ profileBuildTag profile
     put_  bh tag
     put_  bh (mi_src_hash mod_iface)
 

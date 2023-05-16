@@ -65,7 +65,7 @@ Besides saving compilation cycles, @.hie@ files also offer a more stable
 interface than the GHC API.
 -}
 data HieFile = HieFile
-    { hie_hs_file :: FilePath
+    { hie_hs_file :: FastString
     -- ^ Initial Haskell source file path
 
     , hie_module :: Module
