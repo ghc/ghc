@@ -809,7 +809,7 @@ forceOccEnv nf (MkOccEnv fs) = seqEltsUFM (seqEltsUFM nf) fs
 
 --------------------------------------------------------------------------------
 
-type OccSet = FastStringEnv (UniqSet NameSpace)
+newtype OccSet = OccSet (FastStringEnv (UniqSet NameSpace))
 
 emptyOccSet       :: OccSet
 unitOccSet        :: OccName -> OccSet
@@ -821,15 +821,15 @@ unionManyOccSets  :: [OccSet] -> OccSet
 elemOccSet        :: OccName -> OccSet -> Bool
 isEmptyOccSet     :: OccSet -> Bool
 
-emptyOccSet       = emptyFsEnv
-unitOccSet (OccName ns s) = unitFsEnv s (unitUniqSet ns)
+emptyOccSet       = OccSet emptyFsEnv
+unitOccSet (OccName ns s) = OccSet $ unitFsEnv s (unitUniqSet ns)
 mkOccSet          = extendOccSetList emptyOccSet
-extendOccSet      occs (OccName ns s) = extendFsEnv occs s (unitUniqSet ns)
-extendOccSetList  = foldl extendOccSet
-unionOccSets      = plusFsEnv_C unionUniqSets
+extendOccSet      (OccSet occs) (OccName ns s) = OccSet $ extendFsEnv occs s (unitUniqSet ns)
+extendOccSetList  = foldl' extendOccSet
+unionOccSets      (OccSet xs) (OccSet ys) = OccSet $ plusFsEnv_C unionUniqSets xs ys
 unionManyOccSets  = foldl' unionOccSets emptyOccSet
-elemOccSet (OccName ns s) occs = maybe False (elementOfUniqSet ns) $ lookupFsEnv occs s
-isEmptyOccSet     = isNullUFM
+elemOccSet (OccName ns s) (OccSet occs) = maybe False (elementOfUniqSet ns) $ lookupFsEnv occs s
+isEmptyOccSet     (OccSet occs) = isNullUFM occs
 
 {-
 ************************************************************************
