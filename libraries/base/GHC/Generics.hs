@@ -747,6 +747,7 @@ import GHC.Ix      ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
                    , Semigroup(..), Monoid(..), Void )
+import GHC.ByteOrder ( ByteOrder(..) )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
 import GHC.Read    ( Read(..) )
@@ -1636,6 +1637,9 @@ deriving instance Generic GeneralCategory
 
 -- | @since 4.15.0.0
 deriving instance Generic Fingerprint
+
+-- | @since 4.15.0.0
+deriving instance Generic ByteOrder
 
 -- | @since 4.6.0.0
 deriving instance Generic1 []

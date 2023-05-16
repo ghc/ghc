@@ -22,8 +22,8 @@ instance Show w => Show (Maybe w) -- Defined in ‘GHC.Show’
 instance Eq w => Eq (Maybe w) -- Defined in ‘GHC.Maybe’
 instance Monoid [w] -- Defined in ‘GHC.Base.Semigroup’
 instance Semigroup [w] -- Defined in ‘GHC.Base.Semigroup’
-instance Read w => Read [w] -- Defined in ‘GHC.Read’
 instance GHC.Generics.Generic [w] -- Defined in ‘GHC.Generics’
+instance Read w => Read [w] -- Defined in ‘GHC.Read’
 instance Eq w => Eq [w] -- Defined in ‘GHC.Classes’
 instance Ord w => Ord [w] -- Defined in ‘GHC.Classes’
 instance Show w => Show [w] -- Defined in ‘GHC.Show’

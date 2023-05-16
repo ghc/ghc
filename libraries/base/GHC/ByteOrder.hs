@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -18,10 +18,13 @@
 
 module GHC.ByteOrder where
 
+import GHC.Base
+import GHC.Enum
+import GHC.Read
+import GHC.Show
+
 -- Required for WORDS_BIGENDIAN
 #include <ghcautoconf.h>
-
-import GHC.Generics (Generic)
 
 -- | Byte ordering.
 data ByteOrder
@@ -33,7 +36,6 @@ data ByteOrder
              , Enum    -- ^ @since 4.11.0.0
              , Read    -- ^ @since 4.11.0.0
              , Show    -- ^ @since 4.11.0.0
-             , Generic -- ^ @since 4.15.0.0
              )
 
 -- | The byte ordering of the target machine.
