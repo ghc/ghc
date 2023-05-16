@@ -15,7 +15,7 @@ import GHC.Types.Hint
 import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Core.TyCon
 import GHC.Hs.Expr ()   -- instance Outputable
-import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
+import GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName,ImpDeclSpec (..), rdrNameOcc, rdrNameSpace)

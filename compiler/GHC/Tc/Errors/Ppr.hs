@@ -79,7 +79,7 @@ import GHC.Types.Name.Set
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing
-import {-# SOURCE #-} GHC.Types.TyThing.Ppr ( pprTyThingInContext )
+import GHC.Types.TyThing.Ppr ( pprTyThingInContext )
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
 import GHC.Types.Var
 import GHC.Types.Var.Set
