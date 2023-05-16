@@ -109,7 +109,7 @@ import qualified GHC.Types.FieldLabel as FieldLabel
 import qualified GHC.Utils.Ppr.Colour as Col
 import qualified GHC.Data.EnumSet as EnumSet
 
-import {-# SOURCE #-} GHC.Core.Opt.CallerCC
+import GHC.Core.Opt.CallerCC.Types
 
 import Control.Monad (msum, (<=<))
 import Control.Monad.Trans.Class (lift)
