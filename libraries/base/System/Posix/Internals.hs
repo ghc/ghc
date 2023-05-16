@@ -499,7 +499,7 @@ foreign import javascript interruptible "(($1,$2_1,$2_2,$c) => { return h$base_f
    c_ftruncate :: CInt -> FileOffset -> IO CInt
 foreign import javascript interruptible "(($1_1,$1_2,$c) => { return h$base_unlink($1_1,$1_2,$c); })"
    c_unlink :: CString -> IO CInt
-foreign import javascript unsafe "(() => { return h$base_getpid; })"
+foreign import javascript unsafe "h$base_getpid"
    c_getpid :: IO CPid
 -- foreign import ccall unsafe "HsBase.h fork"
 --   c_fork :: IO CPid
