@@ -69,6 +69,7 @@ import GHC.Real
 import GHC.Float
 import GHC.Num
 import GHC.Show
+import GHC.Show.Integer
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )
 import qualified Text.Read.Lex as L
 
@@ -146,20 +147,6 @@ readSigned readPos = readParen False read'
 
 -- -----------------------------------------------------------------------------
 -- Showing
-
--- | Show /non-negative/ 'Integral' numbers in base 10.
-showInt :: Integral a => a -> ShowS
-showInt n0 cs0
-    | n0 < 0    = errorWithoutStackTrace "Numeric.showInt: can't show negative numbers"
-    | otherwise = go n0 cs0
-    where
-    go n cs
-        | n < 10    = case unsafeChr (ord '0' + fromIntegral n) of
-            c@(C# _) -> c:cs
-        | otherwise = case unsafeChr (ord '0' + fromIntegral r) of
-            c@(C# _) -> go q (c:cs)
-        where
-        (q,r) = n `quotRem` 10
 
 -- Controlling the format and precision of floats. The code that
 -- implements the formatting itself is in @PrelNum@ to avoid
@@ -272,33 +259,3 @@ showHFloat = showString . fmt
               x : more -> x == 0 && allZ more
               []       -> True
 
--- ---------------------------------------------------------------------------
--- Integer printing functions
-
--- | Shows a /non-negative/ 'Integral' number using the base specified by the
--- first argument, and the character representation specified by the second.
-showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
-showIntAtBase base toChr n0 r0
-  | base <= 1 = errorWithoutStackTrace ("Numeric.showIntAtBase: applied to unsupported base " ++ show (toInteger base))
-  | n0 <  0   = errorWithoutStackTrace ("Numeric.showIntAtBase: applied to negative number " ++ show (toInteger n0))
-  | otherwise = showIt (quotRem n0 base) r0
-   where
-    showIt (n,d) r = seq c $ -- stricter than necessary
-      case n of
-        0 -> r'
-        _ -> showIt (quotRem n base) r'
-     where
-      c  = toChr (fromIntegral d)
-      r' = c : r
-
--- | Show /non-negative/ 'Integral' numbers in base 16.
-showHex :: Integral a => a -> ShowS
-showHex = showIntAtBase 16 intToDigit
-
--- | Show /non-negative/ 'Integral' numbers in base 8.
-showOct :: Integral a => a -> ShowS
-showOct = showIntAtBase 8  intToDigit
-
--- | Show /non-negative/ 'Integral' numbers in base 2.
-showBin :: Integral a => a -> ShowS
-showBin = showIntAtBase 2  intToDigit

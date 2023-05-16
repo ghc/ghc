@@ -346,6 +346,7 @@ Library
         Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
+        GHC.Show.Integer
         GHC.IO.Handle.Lock.Common
         GHC.IO.Handle.Lock.Flock
         GHC.IO.Handle.Lock.LinuxOFD

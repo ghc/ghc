@@ -29,9 +29,9 @@ module GHC.Ptr (
 
 import GHC.Base
 import GHC.Show
+import GHC.Show.Integer ( showHex )
 import GHC.Num
 import GHC.List ( length, replicate )
-import Numeric          ( showHex )
 
 #include "MachDeps.h"
 

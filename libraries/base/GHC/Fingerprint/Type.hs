@@ -16,8 +16,8 @@ import GHC.Base
 import GHC.List (length, replicate)
 import GHC.Num
 import GHC.Show
+import GHC.Show.Integer (showHex)
 import GHC.Word
-import Numeric (showHex)
 
 -- Using 128-bit MD5 fingerprints for now.
 
