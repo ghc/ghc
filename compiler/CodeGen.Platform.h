@@ -203,6 +203,39 @@ import GHC.Platform.Reg
 # define d29 61
 # define d30 62
 # define d31 63
+
+# define q0 32
+# define q1 33
+# define q2 34
+# define q3 35
+# define q4 36
+# define q5 37
+# define q6 38
+# define q7 39
+# define q8 40
+# define q9 41
+# define q10 42
+# define q11 43
+# define q12 44
+# define q13 45
+# define q14 46
+# define q15 47
+# define q16 48
+# define q17 49
+# define q18 50
+# define q19 51
+# define q20 52
+# define q21 53
+# define q22 54
+# define q23 55
+# define q24 56
+# define q25 57
+# define q26 58
+# define q27 59
+# define q28 60
+# define q29 61
+# define q30 62
+# define q31 63
 #endif
 
 # if defined(MACHREGS_darwin)

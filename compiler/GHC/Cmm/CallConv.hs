@@ -193,8 +193,10 @@ realLongRegs    platform = map LongReg    $ regList (pc_MAX_Real_Long_REG    (pl
 
 realXmmRegNos :: Platform -> [Int]
 realXmmRegNos platform
-    | isSse2Enabled platform = regList (pc_MAX_Real_XMM_REG (platformConstants platform))
-    | otherwise              = []
+    | isSse2Enabled platform || platformArch platform == ArchAArch64
+    = regList (pc_MAX_Real_XMM_REG (platformConstants platform))
+    | otherwise
+    = []
 
 regList :: Int -> [Int]
 regList n = [1 .. n]

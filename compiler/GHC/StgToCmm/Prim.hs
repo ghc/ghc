@@ -2299,7 +2299,7 @@ vecCmmCat FloatVec = cmmFloat
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Check to make sure that we can generate code for the specified vector type
 -- given the current set of dynamic flags.
--- Currently these checks are specific to x86 and x86_64 architecture.
+-- Currently these checks are specific to x86, x86_64 and AArch64 architectures.
 -- This should be fixed!
 -- In particular,
 -- 1) Add better support for other architectures! (this may require a redesign)
@@ -2330,27 +2330,38 @@ vecCmmCat FloatVec = cmmFloat
 checkVecCompatibility :: StgToCmmConfig -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility cfg vcat l w =
   case stgToCmmVecInstrsErr cfg of
-    Nothing  -> check vecWidth vcat l w  -- We are in a compatible backend
-    Just err -> sorry err                -- incompatible backend, do panic
+    Nothing | isX86 -> checkX86 vecWidth vcat l w
+            | platformArch platform == ArchAArch64 -> checkAArch64 vecWidth
+            | otherwise -> sorry "SIMD vector instructions are not supported on this architecture."
+    Just err -> sorry err  -- incompatible backend, do panic
   where
     platform = stgToCmmPlatform cfg
-    check :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
-    check W128 FloatVec 4 W32 | not (isSseEnabled platform) =
+    isX86 = case platformArch platform of
+      ArchX86_64 -> True
+      ArchX86 -> True
+      _ -> False
+    checkX86 :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
+    checkX86 W128 FloatVec 4 W32 | not (isSseEnabled platform) =
         sorry $ "128-bit wide single-precision floating point " ++
                 "SIMD vector instructions require at least -msse."
-    check W128 _ _ _ | not (isSse2Enabled platform) =
+    checkX86 W128 _ _ _ | not (isSse2Enabled platform) =
         sorry $ "128-bit wide integer and double precision " ++
                 "SIMD vector instructions require at least -msse2."
-    check W256 FloatVec _ _ | not (stgToCmmAvx cfg) =
+    checkX86 W256 FloatVec _ _ | not (stgToCmmAvx cfg) =
         sorry $ "256-bit wide floating point " ++
                 "SIMD vector instructions require at least -mavx."
-    check W256 _ _ _ | not (stgToCmmAvx2 cfg) =
+    checkX86 W256 _ _ _ | not (stgToCmmAvx2 cfg) =
         sorry $ "256-bit wide integer " ++
                 "SIMD vector instructions require at least -mavx2."
-    check W512 _ _ _ | not (stgToCmmAvx512f cfg) =
+    checkX86 W512 _ _ _ | not (stgToCmmAvx512f cfg) =
         sorry $ "512-bit wide " ++
                 "SIMD vector instructions require -mavx512f."
-    check _ _ _ _ = return ()
+    checkX86 _ _ _ _ = return ()
+
+    checkAArch64 :: Width -> FCode ()
+    checkAArch64 W256 = sorry $ "256-bit wide SIMD vector instructions are not supported."
+    checkAArch64 W512 = sorry $ "512-bit wide SIMD vector instructions are not supported."
+    checkAArch64 _ = return ()
 
     vecWidth = typeWidth (vecVmmType vcat l w)
 

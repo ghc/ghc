@@ -457,6 +457,12 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_D3          d14
 #define REG_D4          d15
 
+#define REG_XMM1        q4
+#define REG_XMM2        q5
+
+#define CALLER_SAVES_XMM1
+#define CALLER_SAVES_XMM2
+
 /* -----------------------------------------------------------------------------
    The s390x register mapping
 
