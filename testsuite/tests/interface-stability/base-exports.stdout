@@ -11619,13 +11619,6 @@ instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). GHC.Generics.Gene
 instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Generics.Generic (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Generics.Generic (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
 instance forall a b. GHC.Generics.Generic (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Generics.Generic (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Generics.Generic (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -11636,12 +11629,17 @@ instance [safe] GHC.Generics.Generic Data.Version.Version -- Defined in ‘Data.
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Generics.Generic ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Generics.Generic ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Generics.Generic ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
+instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘GHC.Generics’
+instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Types.Bool -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
 instance forall a. GHC.Generics.Generic (Data.Ord.Down a) -- Defined in ‘GHC.Generics’
+instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘GHC.Generics’
 instance forall a b. GHC.Generics.Generic (Data.Either.Either a b) -- Defined in ‘GHC.Generics’
+instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Generics’
@@ -11652,12 +11650,14 @@ instance forall a. GHC.Generics.Generic (GHC.Maybe.Maybe a) -- Defined in ‘GHC
 instance forall a. GHC.Generics.Generic (GHC.Base.NonEmpty.NonEmpty a) -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Types.Ordering -- Defined in ‘GHC.Generics’
 instance forall p. GHC.Generics.Generic (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
+instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘GHC.Generics’
 instance forall k (t :: k). GHC.Generics.Generic (Data.Proxy.Proxy t) -- Defined in ‘GHC.Generics’
 instance forall k (f :: k -> *) (p :: k). GHC.Generics.Generic (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
 instance forall a. GHC.Generics.Generic (Solo a) -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
 instance GHC.Generics.Generic GHC.Stack.Types.SrcLoc -- Defined in ‘GHC.Generics’
+instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘GHC.Generics’
 instance forall a b c d e f g h i j. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j) -- Defined in ‘GHC.Generics’
 instance forall a b c d e f g h i j k. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k) -- Defined in ‘GHC.Generics’
 instance forall a b c d e f g h i j k l. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k, l) -- Defined in ‘GHC.Generics’
@@ -11702,9 +11702,9 @@ instance forall k a. GHC.Generics.Generic1 (Data.Functor.Const.Const a) -- Defin
 instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
 instance forall k (f :: k -> *). GHC.Generics.Generic1 (Data.Monoid.Ap f) -- Defined in ‘Data.Monoid’
-instance forall k (f :: k -> *). GHC.Generics.Generic1 (base-4.18.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:*: g) -- Defined in ‘GHC.Generics’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:+: g) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *). GHC.Generics.Generic1 (base-4.18.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘GHC.Generics’
 instance forall k i c. GHC.Generics.Generic1 (GHC.Generics.K1 i c) -- Defined in ‘GHC.Generics’
 instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *). GHC.Generics.Generic1 (GHC.Generics.M1 i c f) -- Defined in ‘GHC.Generics’
 instance forall k. GHC.Generics.Generic1 Data.Proxy.Proxy -- Defined in ‘GHC.Generics’

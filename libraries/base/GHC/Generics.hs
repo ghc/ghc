@@ -740,9 +740,10 @@ import Data.Ord        ( Down(..) )
 import GHC.Num.Integer ( Integer, integerToInt )
 import GHC.Prim        ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr         ( Ptr )
-import GHC.Types
+import GHC.Types hiding ( Any)
 
 -- Needed for instances
+import Data.Semigroup.Internal ( All(..), Any(..), Alt(..), Dual(..), Sum(..), Product(..), Endo(..) )
 import GHC.Ix      ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
@@ -1638,6 +1639,27 @@ deriving instance Generic GeneralCategory
 -- | @since 4.15.0.0
 deriving instance Generic Fingerprint
 
+-- | @since 4.7.0.0
+deriving instance Generic (Dual a)
+
+-- | @since 4.7.0.0
+deriving instance Generic (Endo a)
+
+-- | @since 4.7.0.0
+deriving instance Generic All
+
+-- | @since 4.7.0.0
+deriving instance Generic Any
+
+-- | @since 4.7.0.0
+deriving instance Generic (Sum a)
+
+-- | @since 4.7.0.0
+deriving instance Generic (Product a)
+
+-- | @since 4.8.0.0
+deriving instance Generic (Alt f a)
+
 -- | @since 4.15.0.0
 deriving instance Generic ByteOrder
 
@@ -1703,6 +1725,19 @@ deriving instance Generic1 ((,,,,,,,,,,,,,,) a b c d e f g h i j k l m n)
 
 -- | @since 4.12.0.0
 deriving instance Generic1 Down
+
+-- | @since 4.7.0.0
+deriving instance Generic1 Dual
+
+-- | @since 4.7.0.0
+deriving instance Generic1 Sum
+
+-- | @since 4.7.0.0
+deriving instance Generic1 Product
+
+-- | @since 4.8.0.0
+deriving instance Generic1 (Alt f)
+
 
 --------------------------------------------------------------------------------
 -- Copied from the singletons package
