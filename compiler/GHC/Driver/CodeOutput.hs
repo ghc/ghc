@@ -105,7 +105,7 @@ codeOutput logger tmpfs llvm_config dflags unit_state this_mod filenm location g
                   (const ()) $ do
                 { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { logMsg logger
-                                                   MCDump
+                                                   MCInfo -- See Note [MCInfo for Lint] in "GHC.Core.Lint"
                                                    noSrcSpan
                                                    $ withPprStyle defaultDumpStyle err
                                        ; ghcExit logger 1
