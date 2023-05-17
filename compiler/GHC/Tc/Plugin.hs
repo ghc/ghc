@@ -156,10 +156,10 @@ isTouchableTcPluginM = unsafeTcPluginTcM . TcM.isTouchableTcM
 
 -- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
 zonkTcType :: TcType -> TcPluginM TcType
-zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
+zonkTcType = unsafeTcPluginTcM . TcM.liftZonkM . TcM.zonkTcType
 
 zonkCt :: Ct -> TcPluginM Ct
-zonkCt = unsafeTcPluginTcM . TcM.zonkCt
+zonkCt = unsafeTcPluginTcM . TcM.liftZonkM . TcM.zonkCt
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWanted :: CtLoc -> PredType -> TcPluginM CtEvidence

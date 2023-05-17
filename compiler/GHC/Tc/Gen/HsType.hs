@@ -95,6 +95,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBindersN,
                                   tcInstInvisibleTyBinder, tcSkolemiseInvisibleBndrs,
                                   tcInstTypeBndrs )
+import GHC.Tc.Zonk.Monad
 
 import GHC.Core.Type
 import GHC.Core.Predicate
@@ -443,7 +444,7 @@ tcHsSigType ctxt sig_ty
        ; traceTc "tcHsSigType 2" (ppr implic)
        ; simplifyAndEmitFlatConstraints (mkImplicWC (unitBag implic))
 
-       ; ty <- zonkTcType ty
+       ; ty <- liftZonkM $ zonkTcType ty
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
        ; return ty }
@@ -618,8 +619,8 @@ tc_top_lhs_type tyki ctxt (L loc sig_ty@(HsSig { sig_bndrs = hs_outer_bndrs
        ; kvs <- kindGeneralizeAll skol_info ty1  -- "All" because it's a top-level type
        ; reportUnsolvedEqualities skol_info kvs tclvl wanted
 
-       ; ze       <- mkEmptyZonkEnv NoFlexi
-       ; final_ty <- zonkTcTypeToTypeX ze (mkInfForAllTys kvs ty1)
+       ; final_ty <- initZonkEnv DefaultFlexi
+                   $ zonkTcTypeToTypeX (mkInfForAllTys kvs ty1)
        ; traceTc "tc_top_lhs_type }" (vcat [ppr sig_ty, ppr final_ty])
        ; return final_ty }
   where
@@ -702,7 +703,7 @@ tcHsTypeApp wc_ty kind
        -- We still must call kindGeneralizeNone, though, according
        -- to Note [Recipe for checking a signature]
        ; kindGeneralizeNone ty
-       ; ty <- zonkTcType ty
+       ; ty <- liftZonkM $ zonkTcType ty
        ; checkValidType TypeAppCtxt ty
        ; return ty }
 
@@ -756,7 +757,7 @@ tcFamTyPats fam_tc hs_pats
        ; (fam_app, res_kind) <- tcInferTyApps mode lhs_fun fun_ty hs_pats
 
        -- Hack alert: see Note [tcFamTyPats: zonking the result kind]
-       ; res_kind <- zonkTcType res_kind
+       ; res_kind <- liftZonkM $ zonkTcType res_kind
 
        ; traceTc "End tcFamTyPats }" $
          vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
@@ -1214,7 +1215,7 @@ tc_hs_type mode rn_ty@(HsTupleTy _ HsBoxedOrConstraintTuple hs_tys) exp_kind
   | otherwise
   = do { traceTc "tc_hs_type tuple 2" (ppr hs_tys)
        ; (tys, kinds) <- mapAndUnzipM (tc_infer_lhs_type mode) hs_tys
-       ; kinds <- mapM zonkTcType kinds
+       ; kinds <- liftZonkM $ mapM zonkTcType kinds
            -- Infer each arg type separately, because errors can be
            -- confusing if we give them a shared kind.  Eg #7410
            -- (Either Int, Int), we do not want to get an error saying
@@ -1668,7 +1669,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
            do { let arrows_needed = n_initial_val_args all_args
               ; co <- matchExpectedFunKind (HsTypeRnThing $ unLoc hs_ty) arrows_needed substed_fun_ki
 
-              ; fun' <- zonkTcType (fun `mkCastTy` co)
+              ; fun' <- liftZonkM $ zonkTcType (fun `mkCastTy` co)
                      -- This zonk is essential, to expose the fruits
                      -- of matchExpectedFunKind to the 'go' loop
 
@@ -1733,8 +1734,7 @@ mkAppTyM subst fun ki_binder arg
   , isTypeSynonymTyCon tc
   , args `lengthIs` (tyConArity tc - 1)
   , any isTrickyTvBinder (tyConTyVars tc) -- We could cache this in the synonym
-  = do { arg'  <- zonkTcType  arg
-       ; args' <- zonkTcTypes args
+  = do { (arg':args') <- liftZonkM $ zonkTcTypes (arg:args)
        ; let subst' = case ki_binder of
                         Anon {}           -> subst
                         Named (Bndr tv _) -> extendTvSubstAndInScope subst tv arg'
@@ -1747,7 +1747,7 @@ mkAppTyM subst fun (Anon {}) arg
 mkAppTyM subst fun (Named (Bndr tv _)) arg
   = do { arg' <- if isTrickyTvBinder tv
                  then -- See Note [mkAppTyM]: Nasty case 1
-                      zonkTcType arg
+                      liftZonkM $ zonkTcType arg
                  else return     arg
        ; return ( extendTvSubstAndInScope subst tv arg'
                 , mk_app_ty fun arg' ) }
@@ -2383,9 +2383,11 @@ kcCheckDeclHeader_cusk name flav
                      candidates `delCandidates` spec_req_tkvs
                      -- NB: 'inferred' comes back sorted in dependency order
 
-       ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs  -- scoped_kvs and tc_tvs are skolems,
-       ; tc_tvs     <- mapM zonkTyCoVarKind tc_tvs      -- so zonkTyCoVarKind suffices
-       ; res_kind   <- zonkTcType           res_kind
+       ; (scoped_kvs, tc_tvs, res_kind) <- liftZonkM $
+          do { scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs  -- scoped_kvs and tc_tvs are skolems,
+             ; tc_tvs     <- mapM zonkTyCoVarKind tc_tvs      -- so zonkTyCoVarKind suffices
+             ; res_kind   <- zonkTcType           res_kind
+             ; return (scoped_kvs, tc_tvs, res_kind) }
 
        ; let mentioned_kv_set = candidateKindVars candidates
              specified        = scopedSort scoped_kvs
@@ -2571,7 +2573,7 @@ kcCheckDeclHeader_sig sig_kind name flav
         -- Here p and q both map to the same kind variable k.  We don't allow this
         -- so we must check that they are distinct.  A similar thing happens
         -- in GHC.Tc.TyCl.swizzleTcTyConBinders during inference.
-        ; implicit_tvs <- zonkTcTyVarsToTcTyVars implicit_tvs
+        ; implicit_tvs <- liftZonkM $ zonkTcTyVarsToTcTyVars implicit_tvs
         ; let implicit_prs = implicit_nms `zip` implicit_tvs
         ; checkForDuplicateScopedTyVars implicit_prs
 
@@ -3494,9 +3496,10 @@ bindTyClTyVarsAndZonk :: Name -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
 -- here we do it right away because there are no more unifications to come
 bindTyClTyVarsAndZonk tycon_name thing_inside
   = bindTyClTyVars tycon_name $ \ tc_bndrs tc_kind ->
-    do { ze          <- mkEmptyZonkEnv NoFlexi
-       ; (ze, bndrs) <- zonkTyVarBindersX ze tc_bndrs
-       ; kind        <- zonkTcTypeToTypeX ze tc_kind
+    do { (bndrs, kind) <- initZonkEnv NoFlexi $
+          zonkBndr (zonkTyVarBindersX tc_bndrs) $ \ bndrs ->
+            do { kind <- zonkTcTypeToTypeX tc_kind
+               ; return (bndrs, kind) }
        ; thing_inside bndrs kind }
 
 
@@ -3508,7 +3511,7 @@ bindTyClTyVarsAndZonk tycon_name thing_inside
 
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
 zonkAndScopedSort spec_tkvs
-  = do { spec_tkvs <- zonkTcTyVarsToTcTyVars spec_tkvs
+  = do { spec_tkvs <- liftZonkM $ zonkTcTyVarsToTcTyVars spec_tkvs
          -- Zonk the kinds, to we can do the dependency analysis
 
        -- Do a stable topological sort, following
@@ -3567,7 +3570,7 @@ filterConstrainedCandidates wanted dvs
   | isEmptyWC wanted   -- Fast path for a common case
   = return dvs
   | otherwise
-  = do { wc_tvs <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
+  = do { wc_tvs <- liftZonkM $ zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
        ; let (to_promote, dvs') = partitionCandidates dvs (`elemVarSet` wc_tvs)
        ; _ <- promoteTyVarSet to_promote
        ; return dvs' }
@@ -4003,9 +4006,11 @@ tcHsPartialSigType ctxt sig_ty
        -- Zonk, so that any nested foralls can "see" their occurrences
        -- See Note [Checking partial type signatures], and in particular
        -- Note [Levels for wildcards]
-       ; tv_prs <- mapSndM zonkInvisTVBinder (tv_prs ++ tv_prs')
-       ; theta  <- mapM    zonkTcType        (theta ++ theta')
-       ; tau    <- zonkTcType                tau
+       ; (tv_prs, theta, tau) <- liftZonkM $
+         do { tv_prs <- mapSndM zonkInvisTVBinder (tv_prs ++ tv_prs')
+            ; theta  <- mapM    zonkTcType        (theta ++ theta')
+            ; tau    <- zonkTcType                tau
+            ; return (tv_prs, theta, tau) }
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it
@@ -4198,7 +4203,7 @@ tcHsPatSigType ctxt hole_mode
           -- to a's kind, which will be a metavariable.
           -- kindGeneralizeNone does this:
         ; kindGeneralizeNone sig_ty
-        ; sig_ty <- zonkTcType sig_ty
+        ; sig_ty <- liftZonkM $ zonkTcType sig_ty
         ; checkValidType ctxt sig_ty
 
         ; traceTc "tcHsPatSigType" (ppr sig_tkv_prs)
@@ -4303,7 +4308,7 @@ tc_lhs_kind_sig mode ctxt hs_kind
        ; traceTc "tcLHsKindSig" (ppr hs_kind $$ ppr kind)
        -- No generalization:
        ; kindGeneralizeNone kind
-       ; kind <- zonkTcType kind
+       ; kind <- liftZonkM $ zonkTcType kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. #13879    f :: forall (p :: forall z (y::z). <blah>).
          --                          <more blah>

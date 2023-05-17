@@ -194,7 +194,7 @@ import GHC.Parser.Lexer as Lexer
 
 import GHC.Tc.Module
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
+import GHC.Tc.Zonk.Monad ( ZonkFlexi (DefaultFlexi) )
 
 import GHC.Stg.Syntax
 import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )

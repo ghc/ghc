@@ -432,7 +432,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
                   ; return dont_default }
 
        -- Note [The SimplifyRule Plan] step 2
-       ; lhs_wanted <- zonkWC lhs_wanted
+       ; lhs_wanted <- liftZonkM $ zonkWC lhs_wanted
        ; let (quant_cts, residual_lhs_wanted) = getRuleQuantCts lhs_wanted
 
        -- Note [The SimplifyRule Plan] step 3

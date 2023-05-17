@@ -134,6 +134,9 @@ module GHC.Tc.Errors.Types (
   , BootDataConMismatch(..)
   , SynAbstractDataError(..)
   , BootListMismatch(..), BootListMismatches
+
+  -- * Zonker errors
+  , ZonkerMessage(..)
   ) where
 
 import GHC.Prelude
@@ -3535,15 +3538,13 @@ data TcRnMessage where
                        -> ![LIdP GhcRn] -- ^ The LHS args
                        -> !PatSynInvalidRhsReason -- ^ The number of equation arguments
                        -> TcRnMessage
-  {-| TcRnCannotDefaultConcrete is an error occurring when a concrete
-    type variable cannot be defaulted.
 
-    Test cases:
-      T23153
+  {-| TcRnZonkerMessage is collection of errors that occur when zonking,
+      i.e. filling in metavariables with their final values.
+
+      See 'ZonkerMessage'
   -}
-  TcRnCannotDefaultConcrete
-    :: !FixedRuntimeRepOrigin
-    -> TcRnMessage
+  TcRnZonkerMessage :: ZonkerMessage -> TcRnMessage
 
   {-| TcRnMultiAssocTyFamDefaults is an error indicating that multiple default
     declarations were specified for an associated type family.
@@ -4179,6 +4180,22 @@ data TcRnMessage where
 
   -}
   TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
+
+  deriving Generic
+
+
+----
+
+data ZonkerMessage where
+  {-| ZonkerCannotDefaultConcrete is an error occurring when a concrete
+    type variable cannot be defaulted.
+
+    Test cases:
+      T23153
+  -}
+  ZonkerCannotDefaultConcrete
+    :: !FixedRuntimeRepOrigin
+    -> ZonkerMessage
 
   deriving Generic
 

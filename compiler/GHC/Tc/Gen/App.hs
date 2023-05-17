@@ -32,6 +32,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
+import GHC.Tc.Zonk.Monad
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -370,7 +371,7 @@ tcApp rn_expr exp_res_ty
                  -- is on we must call tcSubType.
                  -- Zonk app_res_rho first, because QL may have instantiated some
                  -- delta variables to polytypes, and tcSubType doesn't expect that
-                 do { app_res_rho <- zonkQuickLook do_ql app_res_rho
+                 do { app_res_rho <- liftZonkM $ zonkQuickLook do_ql app_res_rho
                     ; tcSubTypeDS rn_expr app_res_rho exp_res_ty }
 
        -- Typecheck the value arguments
@@ -383,7 +384,7 @@ tcApp rn_expr exp_res_ty
           else do rebuildHsApps tc_fun fun_ctxt tc_args app_res_rho
 
        ; whenDOptM Opt_D_dump_tc_trace $
-         do { inst_args <- mapM zonkArg inst_args  -- Only when tracing
+         do { inst_args <- liftZonkM $ mapM zonkArg inst_args  -- Only when tracing
             ; traceTc "tcApp }" (vcat [ text "rn_fun:"      <+> ppr rn_fun
                                       , text "rn_args:"     <+> ppr rn_args
                                       , text "inst_args"    <+> brackets (pprWithCommas pprHsExprArgTc inst_args)
@@ -410,7 +411,7 @@ quickLookKeys :: [Unique]
 -- See Note [Quick Look for particular Ids]
 quickLookKeys = [dollarIdKey, leftSectionKey, rightSectionKey]
 
-zonkQuickLook :: Bool -> TcType -> TcM TcType
+zonkQuickLook :: Bool -> TcType -> ZonkM TcType
 -- After all Quick Look unifications are done, zonk to ensure that all
 -- instantiation variables are substituted away
 --
@@ -427,7 +428,7 @@ zonkQuickLook do_ql ty
 -- zonkArg is used *only* during debug-tracing, to make it easier to
 -- see what is going on.  For that reason, it is not a full zonk: add
 -- more if you need it.
-zonkArg :: HsExprArg 'TcpInst -> TcM (HsExprArg 'TcpInst)
+zonkArg :: HsExprArg 'TcpInst -> ZonkM (HsExprArg 'TcpInst)
 zonkArg eva@(EValArg { eva_arg_ty = Scaled m ty })
   = do { ty' <- zonkTcType ty
        ; return (eva { eva_arg_ty = Scaled m ty' }) }
@@ -459,7 +460,7 @@ tcValArgs do_ql args
              -- Then Theta = [p :-> forall a. a->a], and we want
              -- to check 'e' with expected type (forall a. a->a)
              -- See Note [Instantiation variables are short lived]
-             arg_ty <- zonkQuickLook do_ql arg_ty
+             arg_ty <- liftZonkM $ zonkQuickLook do_ql arg_ty
 
              -- Now check the argument
            ; arg' <- tcScalingUsage mult $
@@ -652,7 +653,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
                  -- Suppose kappa :: kk
                  -- Then fun_ty :: kk, fun_ty' :: Type, kind_co :: Type ~ kk
                  --      co_wrap :: (fun_ty' |> kind_co) ~ fun_ty'
-           ; writeMetaTyVar kappa (mkCastTy fun_ty' kind_co)
+           ; liftZonkM $ writeMetaTyVar kappa (mkCastTy fun_ty' kind_co)
                  -- kappa is uninstantiated ('go' already checked that)
            ; go delta' acc' so_far fun_ty' args }
 
@@ -719,7 +720,7 @@ tcVTA fun_ty hs_ty
              kind = tyVarKind tv
        ; ty_arg <- tcHsTypeApp hs_ty kind
 
-       ; inner_ty <- zonkTcType inner_ty
+       ; inner_ty <- liftZonkM $ zonkTcType inner_ty
              -- See Note [Visible type application zonk]
 
        ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
@@ -735,7 +736,7 @@ tcVTA fun_ty hs_ty
        ; return (ty_arg, insted_ty) }
 
   | otherwise
-  = do { (_, fun_ty) <- zonkTidyTcType emptyTidyEnv fun_ty
+  = do { (_, fun_ty) <- liftZonkM $ zonkTidyTcType emptyTidyEnv fun_ty
        ; failWith $ TcRnInvalidTypeApplication fun_ty hs_ty }
 
 {- Note [Required quantifiers in the type of a term]
@@ -949,7 +950,7 @@ quickLookResultType delta app_res_rho (Check exp_rho)
        ; return app_res_rho }
 
 quickLookResultType _ app_res_rho (Infer {})
-  = zonkTcType app_res_rho
+  = liftZonkM $ zonkTcType app_res_rho
     -- Zonk the result type, to ensure that we substitute out any
     -- filled-in instantiation variable before calling
     -- unifyExpectedType. In the Check case, this isn't necessary,
@@ -1033,7 +1034,7 @@ qlUnify delta ty1 ty2
         do { info <- readMetaTyVar kappa
            ; case info of
                Indirect ty1 -> go bvs ty1 ty2
-               Flexi        -> do { ty2 <- zonkTcType ty2
+               Flexi        -> do { ty2 <- liftZonkM $ zonkTcType ty2
                                   ; go_flexi bvs kappa ty2 } }
 
     ----------------
@@ -1053,7 +1054,7 @@ qlUnify delta ty1 ty2
              vcat [ hang (ppr kappa <+> dcolon <+> ppr kappa_kind)
                        2 (text ":=" <+> ppr ty2 <+> dcolon <+> ppr ty2_kind)
                  , text "co:" <+> ppr co ]
-           ; writeMetaTyVar kappa (mkCastTy ty2 co) }
+           ; liftZonkM $ writeMetaTyVar kappa (mkCastTy ty2 co) }
 
       | otherwise
       = return ()   -- Occurs-check or forall-bound variable
@@ -1192,7 +1193,7 @@ tcTagToEnum :: HsExpr GhcTc -> AppCtxt -> [HsExprArg 'TcpTc]
 -- See Note [tagToEnum#]   Urgh!
 tcTagToEnum tc_fun fun_ctxt tc_args res_ty
   | [val_arg] <- dropWhile (not . isHsValArg) tc_args
-  = do { res_ty <- zonkTcType res_ty
+  = do { res_ty <- liftZonkM $ zonkTcType res_ty
 
        -- Check that the type is algebraic
        ; case tcSplitTyConApp_maybe res_ty of {

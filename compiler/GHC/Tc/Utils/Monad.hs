@@ -144,6 +144,9 @@ module GHC.Tc.Utils.Monad(
   -- * Stuff for cost centres.
   getCCIndexM, getCCIndexTcM,
 
+  -- * Zonking
+  liftZonkM,
+
   -- * Types etc.
   module GHC.Tc.Types,
   module GHC.Data.IOEnv
@@ -218,6 +221,7 @@ import Control.Monad
 
 import GHC.Tc.Errors.Types
 import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
+import GHC.Tc.Zonk.Monad
 
 import qualified Data.Map as Map
 import GHC.Driver.Env.KnotVars
@@ -1238,7 +1242,7 @@ addErrCtxt :: SDoc -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
-addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (False, ctxt)
 
@@ -1252,7 +1256,7 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
 
@@ -1686,7 +1690,7 @@ mkErrInfo env ctxts
    go _ _ _   [] = return empty
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { (env', msg) <- ctxt env
+     = do { (env', msg) <- liftZonkM $ ctxt env
           ; let n' = if is_landmark then n else n+1
           ; rest <- go dbg n' env' ctxts
           ; return (msg $$ rest) }
@@ -2293,3 +2297,17 @@ getCCIndexM get_ccs nm = do
 -- | See 'getCCIndexM'.
 getCCIndexTcM :: FastString -> TcM CostCentreIndex
 getCCIndexTcM = getCCIndexM tcg_cc_st
+
+--------------------------------------------------------------------------------
+
+liftZonkM :: ZonkM a -> TcM a
+liftZonkM (ZonkM f) =
+  do { logger       <- getLogger
+     ; name_ppr_ctx <- getNamePprCtx
+     ; lvl          <- getTcLevel
+     ; src_span     <- getSrcSpanM
+     ; let zge = ZonkGblEnv { zge_logger = logger
+                            , zge_name_ppr_ctx = name_ppr_ctx
+                            , zge_src_span = src_span
+                            , zge_tc_level = lvl }
+     ; liftIO $ f zge }

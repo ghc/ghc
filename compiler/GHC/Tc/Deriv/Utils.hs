@@ -40,6 +40,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify (tcSubTypeSigma)
 import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Monad
 
 import GHC.Core.Class
 import GHC.Core.DataCon
@@ -235,17 +236,17 @@ setDerivSpecTheta theta ds = ds{ds_theta = theta}
 -- This is only used in the final zonking step when inferring
 -- the context for a derived instance.
 -- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
-zonkDerivSpec :: DerivSpec ThetaType -> TcM (DerivSpec ThetaType)
+zonkDerivSpec :: DerivSpec ThetaType -> ZonkT TcM (DerivSpec ThetaType)
 zonkDerivSpec ds@(DS { ds_tvs = tvs, ds_theta = theta
                      , ds_tys = tys, ds_mechanism = mechanism
-                     }) = do
-  (ze, tvs') <- zonkTyBndrs tvs
-  theta'     <- zonkTcTypesToTypesX ze theta
-  tys'       <- zonkTcTypesToTypesX ze tys
-  mechanism' <- zonkDerivSpecMechanism ze mechanism
-  pure ds{ ds_tvs = tvs', ds_theta = theta'
-         , ds_tys = tys', ds_mechanism = mechanism'
-         }
+                     }) =
+  zonkBndr (zonkTyBndrsX tvs) $ \ tvs' -> do
+    theta'     <- zonkTcTypesToTypesX theta
+    tys'       <- zonkTcTypesToTypesX tys
+    mechanism' <- zonkDerivSpecMechanism mechanism
+    pure ds{ ds_tvs = tvs', ds_theta = theta'
+           , ds_tys = tys', ds_mechanism = mechanism'
+           }
 
 -- | What action to take in order to derive a class instance.
 -- See @Note [DerivEnv and DerivSpecMechanism]@, as well as
@@ -312,21 +313,21 @@ isDerivSpecVia _                = False
 -- This is only used in the final zonking step when inferring
 -- the context for a derived instance.
 -- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
-zonkDerivSpecMechanism :: ZonkEnv -> DerivSpecMechanism -> TcM DerivSpecMechanism
-zonkDerivSpecMechanism ze mechanism =
+zonkDerivSpecMechanism :: DerivSpecMechanism -> ZonkT TcM DerivSpecMechanism
+zonkDerivSpecMechanism mechanism =
   case mechanism of
     DerivSpecStock { dsm_stock_dit     = dit
                    , dsm_stock_gen_fns = gen_fns
                    } -> do
-      dit' <- zonkDerivInstTys ze dit
+      dit' <- zonkDerivInstTys dit
       pure $ DerivSpecStock { dsm_stock_dit     = dit'
                             , dsm_stock_gen_fns = gen_fns
                             }
     DerivSpecNewtype { dsm_newtype_dit    = dit
                      , dsm_newtype_rep_ty = rep_ty
                      } -> do
-      dit'    <- zonkDerivInstTys ze dit
-      rep_ty' <- zonkTcTypeToTypeX ze rep_ty
+      dit'    <- zonkDerivInstTys dit
+      rep_ty' <- zonkTcTypeToTypeX rep_ty
       pure $ DerivSpecNewtype { dsm_newtype_dit    = dit'
                               , dsm_newtype_rep_ty = rep_ty'
                               }
@@ -336,9 +337,9 @@ zonkDerivSpecMechanism ze mechanism =
                  , dsm_via_inst_ty = inst_ty
                  , dsm_via_ty      = via_ty
                  } -> do
-      cls_tys' <- zonkTcTypesToTypesX ze cls_tys
-      inst_ty' <- zonkTcTypeToTypeX ze inst_ty
-      via_ty'  <- zonkTcTypeToTypeX ze via_ty
+      cls_tys' <- zonkTcTypesToTypesX cls_tys
+      inst_ty' <- zonkTcTypeToTypeX inst_ty
+      via_ty'  <- zonkTcTypeToTypeX via_ty
       pure $ DerivSpecVia { dsm_via_cls_tys = cls_tys'
                           , dsm_via_inst_ty = inst_ty'
                           , dsm_via_ty      = via_ty'

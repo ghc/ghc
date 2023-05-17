@@ -911,7 +911,7 @@ tcExprSig _ expr sig@(PartialSig { psig_name = name, sig_loc = loc })
            <- captureConstraints $ simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
        ; emitConstraints residual
 
-       ; tau <- zonkTcType tau
+       ; tau <- liftZonkM $ zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyCoVarsOfType tau
        ; (binders, my_theta) <- chooseInferredQuantifiers residual inferred_theta
@@ -1356,21 +1356,20 @@ addFunResCtxt :: HsExpr GhcRn -> [HsExprArg 'TcpRn]
 -- But not in generated code, where we don't want
 -- to mention internal (rebindable syntax) function names
 addFunResCtxt fun args fun_res_ty env_ty thing_inside
-  = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg) thing_inside
+  = do { env_tv  <- newFlexiTyVarTy liftedTypeKind
+       ; dumping <- doptM Opt_D_dump_tc_trace
+       ; addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg dumping env_tv) thing_inside }
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
   where
-    mk_msg
+    mk_msg dumping env_tv
       = do { mb_env_ty <- readExpType_maybe env_ty
                      -- by the time the message is rendered, the ExpType
                      -- will be filled in (except if we're debugging)
            ; fun_res' <- zonkTcType fun_res_ty
            ; env'     <- case mb_env_ty of
                            Just env_ty -> zonkTcType env_ty
-                           Nothing     ->
-                             do { dumping <- doptM Opt_D_dump_tc_trace
-                                ; massert dumping
-                                ; newFlexiTyVarTy liftedTypeKind }
+                           Nothing     -> do { massert dumping; return env_tv }
            ; let -- See Note [Splitting nested sigma types in mismatched
                  --           function types]
                  (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'

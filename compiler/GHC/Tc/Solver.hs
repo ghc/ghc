@@ -227,7 +227,7 @@ simplifyAndEmitFlatConstraints wanted
   = do { -- Solve and zonk to establish the
          -- preconditions for floatKindEqualities
          wanted <- runTcSEqualities (solveWanteds wanted)
-       ; wanted <- TcM.zonkWC wanted
+       ; wanted <- TcM.liftZonkM $ TcM.zonkWC wanted
 
        ; traceTc "emitFlatConstraints {" (ppr wanted)
        ; case floatKindEqualities wanted of
@@ -1344,7 +1344,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        --      the psig_theta; it's just the extra bit
        -- NB2: We do not do any defaulting when inferring a type, this can lead
        --      to less polymorphic types, see Note [Default while Inferring]
-       ; wanted_transformed <- TcM.zonkWC wanted_transformed
+       ; wanted_transformed <- TcM.liftZonkM $ TcM.zonkWC wanted_transformed
        ; let definite_error = insolubleWC wanted_transformed
                               -- See Note [Quantification with errors]
              quant_pred_candidates
@@ -1399,7 +1399,7 @@ emitResidualConstraints rhs_tclvl ev_binds_var
   = return ()
 
   | otherwise
-  = do { wanted_simple <- TcM.zonkSimples (wc_simple wanteds)
+  = do { wanted_simple <- TcM.liftZonkM $ TcM.zonkSimples (wc_simple wanteds)
        ; let (outer_simple, inner_simple) = partitionBag is_mono wanted_simple
              is_mono ct
                | Just ct_ev_id <- wantedEvId_maybe ct
@@ -1705,8 +1705,10 @@ decideQuantification skol_info infer_mode rhs_tclvl name_taus psigs candidates
        --         predicates to actually quantify over
        -- NB: decideQuantifiedTyVars turned some meta tyvars
        -- into quantified skolems, so we have to zonk again
-       ; candidates <- TcM.zonkTcTypes candidates
-       ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
+       ; (candidates, psig_theta) <- TcM.liftZonkM $
+          do { candidates <- TcM.zonkTcTypes candidates
+             ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
+             ; return (candidates, psig_theta) }
        ; min_theta  <- pickQuantifiablePreds (mkVarSet qtvs) mono_tvs0 candidates
 
        -- Take account of partial type signatures
@@ -1825,13 +1827,13 @@ decidePromotedTyVars infer_mode name_taus psigs candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
-       ; psig_qtvs <- zonkTcTyVarsToTcTyVars $ binderVars $
-                      concatMap (map snd . sig_inst_skols) psigs
-
-       ; psig_theta <- mapM TcM.zonkTcType $
-                       concatMap sig_inst_theta psigs
-
-       ; taus <- mapM (TcM.zonkTcType . snd) name_taus
+       ; (psig_qtvs, psig_theta, taus) <- TcM.liftZonkM $
+          do { psig_qtvs <- zonkTcTyVarsToTcTyVars $ binderVars $
+                            concatMap (map snd . sig_inst_skols) psigs
+             ; psig_theta <- mapM TcM.zonkTcType $
+                             concatMap sig_inst_theta psigs
+             ; taus <- mapM (TcM.zonkTcType . snd) name_taus
+             ; return (psig_qtvs, psig_theta, taus) }
 
        ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
 
@@ -1991,11 +1993,13 @@ decideQuantifiedTyVars skol_info name_taus psigs candidates
   = do {     -- Why psig_tys? We try to quantify over everything free in here
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
-       ; psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
-                                                  , (_,Bndr tv _) <- sig_inst_skols sig ]
-       ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
-                                                  , pred <- sig_inst_theta sig ]
-       ; tau_tys  <- mapM (TcM.zonkTcType . snd) name_taus
+       ; (psig_tv_tys, psig_theta, tau_tys) <- TcM.liftZonkM $
+         do { psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
+                                                       , (_,Bndr tv _) <- sig_inst_skols sig ]
+            ; psig_theta  <- mapM TcM.zonkTcType [ pred | sig <- psigs
+                                                        , pred <- sig_inst_theta sig ]
+            ; tau_tys     <- mapM (TcM.zonkTcType . snd) name_taus
+            ; return (psig_tv_tys, psig_theta, tau_tys) }
 
        ; let -- Try to quantify over variables free in these types
              psig_tys = psig_tv_tys ++ psig_theta
@@ -2571,7 +2575,7 @@ simplifyWantedsTcM :: [CtEvidence] -> TcM WantedConstraints
 simplifyWantedsTcM wanted
   = do { traceTc "simplifyWantedsTcM {" (ppr wanted)
        ; (result, _) <- runTcS (solveWanteds (mkSimpleWC wanted))
-       ; result <- TcM.zonkWC result
+       ; result <- TcM.liftZonkM $ TcM.zonkWC result
        ; traceTc "simplifyWantedsTcM }" (ppr result)
        ; return result }
 

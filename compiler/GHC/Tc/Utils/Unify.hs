@@ -55,7 +55,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
-import GHC.Types.Name( Name, isSystemName )
+import GHC.Tc.Zonk.Monad ( ZonkM )
 
 
 import GHC.Core.Type
@@ -70,6 +70,7 @@ import GHC.Core.Reduction
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Builtin.Types
+import GHC.Types.Name
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -183,7 +184,7 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
            ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------
-    mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt :: TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
     mk_ctxt res_ty env = mkFunTysMsg env herald (reverse arg_tys_so_far)
                                      res_ty n_val_args_in_call
     (n_val_args_in_call, arg_tys_so_far) = err_info
@@ -460,7 +461,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                  <*> newInferExpTypeFRR (FRRExpectedFunTy herald arg_pos)
 
     ------------
-    mk_ctxt :: [Scaled ExpSigmaTypeFRR] -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+    mk_ctxt :: [Scaled ExpSigmaTypeFRR] -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
     mk_ctxt arg_tys res_ty env
       = mkFunTysMsg env herald arg_tys' res_ty arity
       where
@@ -471,7 +472,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 mkFunTysMsg :: TidyEnv
             -> ExpectedFunTyOrigin
             -> [Scaled TcType] -> TcType -> Arity
-            -> TcM (TidyEnv, SDoc)
+            -> ZonkM (TidyEnv, SDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
   = do { (env', fun_rho) <- zonkTidyTcType env $
                             mkScaledFunTys arg_tys res_ty
@@ -2130,9 +2131,10 @@ uUnfilledVar, uUnfilledVar1
 --            It might be a skolem, or untouchable, or meta
 uUnfilledVar env swapped tv1 ty2
   | Nominal <- u_role env
-  = do { ty2 <- zonkTcType ty2    -- Zonk to expose things to the occurs check, and so
-                                  -- that if ty2 looks like a type variable then it
-                                  -- /is/ a type variable
+  = do { ty2 <- liftZonkM $ zonkTcType ty2
+                  -- Zonk to expose things to the occurs check, and so
+                  -- that if ty2 looks like a type variable then it
+                  -- /is/ a type variable
        ; uUnfilledVar1 env swapped tv1 ty2 }
 
   | otherwise  -- See Note [Do not unify representational equalities]
@@ -2158,7 +2160,7 @@ uUnfilledVar1 env       -- Precondition: u_role==Nominal
 
            | swapOverTyVars False tv1 tv2   -- Distinct type variables
                -- Swap meta tyvar to the left if poss
-           = do { tv1 <- zonkTyCoVarKind tv1
+           = do { tv1 <- liftZonkM $ zonkTyCoVarKind tv1
                      -- We must zonk tv1's kind because that might
                      -- not have happened yet, and it's an invariant of
                      -- uUnfilledTyVar2 that ty2 is fully zonked
@@ -2197,7 +2199,7 @@ uUnfilledVar2 env@(UE { u_defer = def_eq_ref }) swapped tv1 ty2
            -- Only proceed if the kinds match
            -- NB: tv1 should still be unfilled, despite the kind unification
            --     because tv1 is not free in ty2' (or, hence, in its kind)
-         then do { writeMetaTyVar tv1 ty2
+         then do { liftZonkM $ writeMetaTyVar tv1 ty2
                  ; case u_unified env of
                      Nothing -> return ()
                      Just uref -> updTcRef uref (tv1 :)
@@ -3262,7 +3264,7 @@ promote_meta_tyvar info dest_lvl occ_tv
 
     -- OK, not done already, so clone/promote it
     do { new_tv <- cloneMetaTyVarWithInfo info dest_lvl occ_tv
-       ; writeMetaTyVar occ_tv (mkTyVarTy new_tv)
+       ; liftZonkM $ writeMetaTyVar occ_tv (mkTyVarTy new_tv)
        ; traceTc "promoteTyVar" (ppr occ_tv <+> text "-->" <+> ppr new_tv)
        ; return (mkTyVarTy new_tv) } } }
 

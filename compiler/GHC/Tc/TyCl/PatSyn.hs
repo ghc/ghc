@@ -26,6 +26,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Zonk.Monad
 import GHC.Tc.Gen.Sig ( TcPragEnv, emptyPragEnv, completeSigFromId, lookupPragEnv
                       , addInlinePrags, addInlinePragArity )
 import GHC.Tc.Solver
@@ -175,7 +176,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
        ; top_ev_binds <- checkNoErrs (simplifyTop residual)
        ; addTopEvBinds top_ev_binds $
 
-    do { prov_dicts <- mapM zonkId prov_dicts
+    do { prov_dicts <- liftZonkM $ mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
              (prov_theta, prov_evs)
@@ -184,7 +185,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        -- Report coercions that escape
        -- See Note [Coercions that escape]
-       ; args <- mapM zonkId args
+       ; args <- liftZonkM $ mapM zonkId args
        ; let bad_arg arg = fmap (\bad_cos -> (arg, bad_cos)) $
                            nonEmpty $
                            dVarSetElems $
@@ -692,20 +693,24 @@ tc_patsyn_finish lname dir is_infix lpat' prag_fn
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
 
-       ; ze              <- mkEmptyZonkEnv NoFlexi
-       ; (ze, univ_tvs') <- zonkTyVarBindersX   ze univ_tvs
-       ; req_theta'      <- zonkTcTypesToTypesX ze req_theta
-       ; (ze, ex_tvs')   <- zonkTyVarBindersX   ze ex_tvs
-       ; prov_theta'     <- zonkTcTypesToTypesX ze prov_theta
-       ; pat_ty'         <- zonkTcTypeToTypeX   ze pat_ty
-       ; arg_tys'        <- zonkTcTypesToTypesX ze arg_tys
+       (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, pat_ty) <-
+         initZonkEnv NoFlexi $
+         zonkBndr (zonkTyVarBindersX   univ_tvs) $ \ univ_tvs' ->
+         do { req_theta'  <- zonkTcTypesToTypesX req_theta
+            ; zonkBndr (zonkTyVarBindersX ex_tvs) $ \ ex_tvs' ->
+         do { prov_theta' <- zonkTcTypesToTypesX prov_theta
+            ; pat_ty'     <- zonkTcTypeToTypeX   pat_ty
+            ; arg_tys'    <- zonkTcTypesToTypesX arg_tys
 
-       ; let (env1, univ_tvs) = tidyForAllTyBinders emptyTidyEnv univ_tvs'
-             (env2, ex_tvs)   = tidyForAllTyBinders env1 ex_tvs'
-             req_theta  = tidyTypes env2 req_theta'
-             prov_theta = tidyTypes env2 prov_theta'
-             arg_tys    = tidyTypes env2 arg_tys'
-             pat_ty     = tidyType  env2 pat_ty'
+            ; let (env1, univ_tvs) = tidyForAllTyBinders emptyTidyEnv univ_tvs'
+                  (env2, ex_tvs)   = tidyForAllTyBinders env1 ex_tvs'
+                  req_theta  = tidyTypes env2 req_theta'
+                  prov_theta = tidyTypes env2 prov_theta'
+                  arg_tys    = tidyTypes env2 arg_tys'
+                  pat_ty     = tidyType  env2 pat_ty'
+
+            ; return (univ_tvs, req_theta,
+                       ex_tvs, prov_theta, arg_tys, pat_ty) } }
 
        ; traceTc "tc_patsyn_finish {" $
            ppr (unLoc lname) $$ ppr (unLoc lpat') $$

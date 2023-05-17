@@ -18,7 +18,8 @@ module GHC.Tc.Types.Constraint (
         isWantedCt, isGivenCt,
         isTopLevelUserTypeError, containsUserTypeError, getUserTypeErrorMsg,
         isUnsatisfiableCt_maybe,
-        ctEvidence, ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
+        ctEvidence, modifyCtEvidence,
+        ctLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctRewriters,
         ctEvId, wantedEvId_maybe, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
@@ -81,7 +82,7 @@ module GHC.Tc.Types.Constraint (
         ctEvUnique, tcEvDestUnique,
 
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
-           -- exported concretely only for anyUnfilledCoercionHoles
+           -- exported concretely only for zonkRewriterSet
         addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
 
         wrapType,
@@ -703,6 +704,11 @@ ctEvidence :: Ct -> CtEvidence
 ctEvidence (CQuantCan (QCI { qci_ev = ev })) = ev
 ctEvidence (CEqCan (EqCt { eq_ev = ev }))    = ev
 ctEvidence ct                                = cc_ev ct
+
+modifyCtEvidence :: (CtEvidence -> CtEvidence) -> Ct -> Ct
+modifyCtEvidence f (CQuantCan qc@(QCI { qci_ev = ev })) = CQuantCan qc { qci_ev = f ev }
+modifyCtEvidence f (CEqCan ct@(EqCt { eq_ev = ev }))    = CEqCan ct { eq_ev = f ev }
+modifyCtEvidence f ct                                   = ct { cc_ev = f (cc_ev ct) }
 
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
@@ -2206,7 +2212,7 @@ inscrutable error messages. To solve this dilemma:
 
 * In error reporting, we simply suppress any errors that have been rewritten
   by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
-  which uses GHC.Tc.Utils.anyUnfilledCoercionHoles to look through any filled
+  which uses GHC.Tc.Utils.zonkRewriterSet to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
 

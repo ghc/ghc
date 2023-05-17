@@ -1531,14 +1531,14 @@ checkMissingFields con_like rbinds arg_tys
 
   | otherwise = do              -- A record
     unless (null missing_s_fields) $ do
-        fs <- zonk_fields missing_s_fields
+        fs <- liftZonkM $ zonk_fields missing_s_fields
         -- It is an error to omit a strict field, because
         -- we can't substitute it with (error "Missing field f")
         addErrTc (TcRnMissingStrictFields con_like fs)
 
     warn <- woptM Opt_WarnMissingFields
     when (warn && notNull missing_ns_fields) $ do
-        fs <- zonk_fields missing_ns_fields
+        fs <- liftZonkM $ zonk_fields missing_ns_fields
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.

@@ -12,6 +12,7 @@ import GHC.Utils.Outputable ( SDoc )
 import GHC.Types.Var.Env ( TidyEnv )
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFit, TypedHole, HoleFitCandidate )
 import GHC.Tc.Utils.TcType ( TcType, TcSigmaType, TcTyVar )
+import GHC.Tc.Zonk.Monad ( ZonkM )
 import GHC.Tc.Types.Evidence ( HsWrapper )
 import GHC.Utils.FV ( FV )
 import Data.Bool ( Bool )
@@ -37,6 +38,6 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 getHoleFitSortingAlg :: TcM HoleFitSortingAlg
 getHoleFitDispConfig :: TcM HoleFitDispConfig
 
-zonkSubs :: TidyEnv -> [HoleFit] -> TcM (TidyEnv, [HoleFit])
+zonkSubs :: TidyEnv -> [HoleFit] -> ZonkM (TidyEnv, [HoleFit])
 sortHoleFitsBySize :: [HoleFit] -> TcM [HoleFit]
 sortHoleFitsByGraph :: [HoleFit] -> TcM [HoleFit]

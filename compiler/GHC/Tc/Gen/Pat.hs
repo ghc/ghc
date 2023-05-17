@@ -31,7 +31,6 @@ import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
 import GHC.Tc.Errors.Types
-import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Sig( TcPragEnv, lookupPragEnv, addInlinePrags )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate

@@ -902,10 +902,10 @@ data TyCoMapper env m
 
 {-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
 mapTyCo :: Monad m => TyCoMapper () m
-         -> ( Type       -> m Type
-            , [Type]     -> m [Type]
-            , Coercion   -> m Coercion
-            , [Coercion] -> m[Coercion])
+        -> ( Type       -> m  Type
+           , [Type]     -> m  [Type]
+           , Coercion   -> m  Coercion
+           , [Coercion] -> m [Coercion] )
 mapTyCo mapper
   = case mapTyCoX mapper of
      (go_ty, go_tys, go_co, go_cos)
@@ -916,7 +916,7 @@ mapTyCoX :: Monad m => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
-            , env -> [Coercion] -> m[Coercion])
+            , env -> [Coercion] -> m [Coercion] )
 mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_tycobinder = tycobinder
                      , tcm_tycon = tycon

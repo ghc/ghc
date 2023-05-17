@@ -36,6 +36,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env  ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
+import GHC.Tc.Zonk.Monad ( ZonkM )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -1384,7 +1385,7 @@ Flexibility check:
   generalized actually.
 -}
 
-checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> TcM (TidyEnv, SDoc)
+checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
 checkThetaCtxt ctxt theta env
   = return ( env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)

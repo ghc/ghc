@@ -32,6 +32,7 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env( tcInitTidyEnv )
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Zonk.Monad ( ZonkM )
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
@@ -214,7 +215,7 @@ report_unsolved type_errors expr_holes
               , text "scope holes:" <+> ppr out_of_scope_holes ]
        ; traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
 
-       ; wanted <- zonkWC wanted   -- Zonk to reveal all information
+       ; wanted <- liftZonkM $ zonkWC wanted   -- Zonk to reveal all information
 
        ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
              free_tvs = filterOut isCoVar $
@@ -958,7 +959,8 @@ reportHoles tidy_items ctxt holes
           holes'   = filter (keepThisHole severity) holes
       -- Zonk and tidy all the TcLclEnvs before calling `mkHoleError`
       -- because otherwise types will be zonked and tidied many times over.
-      (tidy_env', lcl_name_cache) <- zonkTidyTcLclEnvs (cec_tidy ctxt) (map (ctl_env . hole_loc) holes')
+      (tidy_env', lcl_name_cache) <- liftZonkM $
+        zonkTidyTcLclEnvs (cec_tidy ctxt) (map (ctl_env . hole_loc) holes')
       let ctxt' = ctxt { cec_tidy = tidy_env' }
       forM_ holes' $ \hole -> do { msg <- mkHoleError lcl_name_cache tidy_items ctxt' hole
                                  ; reportDiagnostic msg }
@@ -980,14 +982,14 @@ keepThisHole sev hole
 -- type for each Id in any of the binder stacks in the  'TcLclEnv's.
 -- Since there is a huge overlap between these stacks, is is much,
 -- much faster to do them all at once, avoiding duplication.
-zonkTidyTcLclEnvs :: TidyEnv -> [TcLclEnv] -> TcM (TidyEnv, NameEnv Type)
+zonkTidyTcLclEnvs :: TidyEnv -> [TcLclEnv] -> ZonkM (TidyEnv, NameEnv Type)
 zonkTidyTcLclEnvs tidy_env lcls = foldM go (tidy_env, emptyNameEnv) (concatMap tcl_bndrs lcls)
   where
     go envs tc_bndr = case tc_bndr of
           TcTvBndr {} -> return envs
           TcIdBndr id _top_lvl -> go_one (idName id) (idType id) envs
           TcIdBndr_ExpType name et _top_lvl ->
-            do { mb_ty <- readExpType_maybe et
+            do { mb_ty <- liftIO $ readExpType_maybe et
                    -- et really should be filled in by now. But there's a chance
                    -- it hasn't, if, say, we're reporting a kind error en route to
                    -- checking a term. See test indexed-types/should_fail/T8129
@@ -1472,7 +1474,7 @@ mkHoleError lcl_name_cache tidy_simples ctxt
        ; (ctxt, hole_fits) <- if show_valid_hole_fits
                               then validHoleFits ctxt tidy_simples hole
                               else return (ctxt, noValidHoleFits)
-       ; (grouped_skvs, other_tvs) <- zonkAndGroupSkolTvs hole_ty
+       ; (grouped_skvs, other_tvs) <- liftZonkM $ zonkAndGroupSkolTvs hole_ty
        ; let reason | ExprHole _ <- sort = cec_expr_holes ctxt
                     | otherwise          = cec_type_holes ctxt
              err  = SolverReportWithCtxt ctxt $ ReportHoleError hole $ HoleError sort other_tvs grouped_skvs
@@ -1490,18 +1492,24 @@ mkHoleError lcl_name_cache tidy_simples ctxt
 
 -- | For all the skolem type variables in a type, zonk the skolem info and group together
 -- all the type variables with the same origin.
-zonkAndGroupSkolTvs :: Type -> TcM ([(SkolemInfoAnon, [TcTyVar])], [TcTyVar])
+zonkAndGroupSkolTvs :: Type -> ZonkM ([(SkolemInfoAnon, [TcTyVar])], [TcTyVar])
 zonkAndGroupSkolTvs hole_ty = do
-  zonked_info <- mapM (\(sk, tv) -> (,) <$> (zonkSkolemInfoAnon . getSkolemInfo $ sk) <*> pure (fst <$> tv)) skolem_list
+  zonked_info <- mapM zonk_skolem_info skolem_list
   return (zonked_info, other_tvs)
   where
+    zonk_skolem_info (sk, tv) =
+      do { sk <- zonkSkolemInfoAnon $ getSkolemInfo sk
+         ; return (sk, fst <$> tv) }
     tvs = tyCoVarsOfTypeList hole_ty
-    (skol_tvs, other_tvs) = partition (\tv -> isTcTyVar tv && isSkolemTyVar tv) tvs
+    (skol_tvs, other_tvs) = partition (isTcTyVar <&&> isSkolemTyVar) tvs
 
     group_skolems :: UM.UniqMap SkolemInfo ([(TcTyVar, Int)])
-    group_skolems = bagToList <$> UM.listToUniqMap_C unionBags [(skolemSkolInfo tv, unitBag (tv, n)) | tv <- skol_tvs | n <- [0..]]
+    group_skolems = bagToList <$>
+      UM.listToUniqMap_C unionBags
+        [(skolemSkolInfo tv, unitBag (tv, n)) | tv <- skol_tvs | n <- [0..]]
 
-    skolem_list = sortBy (comparing (sort . map snd . snd)) (UM.nonDetUniqMapToList group_skolems)
+    skolem_list = sortBy (comparing (sort . map snd . snd))
+                $ UM.nonDetUniqMapToList group_skolems
 
 {- Note [Adding deferred bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1586,7 +1594,7 @@ mkFRRErr :: HasDebugCallStack => SolverReportErrCtxt -> NonEmpty ErrorItem -> Tc
 mkFRRErr ctxt items
   = do { -- Process the error items.
        ; (_tidy_env, frr_infos) <-
-          zonkTidyFRRInfos (cec_tidy ctxt) $
+          liftZonkM $ zonkTidyFRRInfos (cec_tidy ctxt) $
             -- Zonk/tidy to show useful variable names.
           nubOrdBy (nonDetCmpType `on` (frr_type . frr_info_origin)) $
             -- Remove duplicates: only one representation-polymorphism error per type.
@@ -1783,7 +1791,7 @@ mkTyVarEqErr' ctxt item (tv1, co1) ty2
   -- alpha[conc] ~# rr[sk] ? If so, handle that first.
   | Just frr_info <- mb_concrete_reason
   = do
-      (_, infos) <- zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
+      (_, infos) <- liftZonkM $ zonkTidyFRRInfos (cec_tidy ctxt) [frr_info]
       return (FixedRuntimeRepError infos, [])
 
   -- Impredicativity is a simple error to understand;
@@ -2060,7 +2068,7 @@ extraTyVarInfo :: TcTyVar -> TcM TyVar
 extraTyVarInfo tv = assertPpr (isTyVar tv) (ppr tv) $
   case tcTyVarDetails tv of
     SkolemTv skol_info lvl overlaps -> do
-      new_skol_info <- zonkSkolemInfo skol_info
+      new_skol_info <- liftZonkM $ zonkSkolemInfo skol_info
       return $ mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv new_skol_info lvl overlaps)
     _ -> return tv
 
@@ -2448,7 +2456,7 @@ relevantBindings :: Bool  -- True <=> filter by tyvar; False <=> no filtering
 -- Also returns the zonked and tidied CtOrigin of the constraint
 relevantBindings want_filtering ctxt item
   = do { traceTc "relevantBindings" (ppr item)
-       ; (env1, tidy_orig) <- zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
+       ; (env1, tidy_orig) <- liftZonkM $ zonkTidyOrigin (cec_tidy ctxt) (ctLocOrigin loc)
 
              -- For *kind* errors, report the relevant bindings of the
              -- enclosing *type* equality, because that's more useful for the programmer
@@ -2461,7 +2469,7 @@ relevantBindings want_filtering ctxt item
              loc'   = setCtLocOrigin loc tidy_orig
              item'  = item { ei_loc = loc' }
 
-       ; (env2, lcl_name_cache) <- zonkTidyTcLclEnvs env1 [lcl_env]
+       ; (env2, lcl_name_cache) <- liftZonkM $ zonkTidyTcLclEnvs env1 [lcl_env]
 
        ; relev_bds <- relevant_bindings want_filtering lcl_env lcl_name_cache ct_fvs
        ; let ctxt'  = ctxt { cec_tidy = env2 }
@@ -2511,7 +2519,7 @@ relevant_bindings want_filtering lcl_env lcl_name_env ct_tvs
           TcTvBndr {} -> discard_it
           TcIdBndr id top_lvl -> go2 (idName id) top_lvl
           TcIdBndr_ExpType name et top_lvl ->
-            do { mb_ty <- readExpType_maybe et
+            do { mb_ty <- liftIO $ readExpType_maybe et
                    -- et really should be filled in by now. But there's a chance
                    -- it hasn't, if, say, we're reporting a kind error en route to
                    -- checking a term. See test indexed-types/should_fail/T8129

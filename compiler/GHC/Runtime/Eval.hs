@@ -117,11 +117,12 @@ import GHC.Unit.Module.ModSummary
 import GHC.Unit.Home.ModInfo
 
 import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
-import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
+import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Env (tcGetInstEnvs, lookupGlobal)
 import GHC.Tc.Utils.Instantiate (instDFunType)
-import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Zonk.Monad ( ZonkFlexi (SkolemiseFlexi) )
+
 import GHC.Unit.Env
 import GHC.IfaceToCore
 

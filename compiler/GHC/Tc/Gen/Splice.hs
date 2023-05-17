@@ -914,7 +914,7 @@ tcNestedSplice _ _ splice_name _ _
 runTopSplice :: DelayedSplice -> TcM (HsExpr GhcTc)
 runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
   = restoreLclEnv lcl_env $
-    do { zonked_ty <- zonkTcType res_ty
+    do { zonked_ty <- liftZonkM $ zonkTcType res_ty
        ; zonked_q_expr <- zonkTopLExpr q_expr
         -- See Note [Collecting modFinalizers in typed splices].
        ; modfinalizers_ref <- newTcRef []
@@ -2076,13 +2076,13 @@ reifyThing (AGlobal (AConLike (PatSynCon ps)))
        ; return (TH.PatSynI name ty) }
 
 reifyThing (ATcId {tct_id = id})
-  = do  { ty1 <- zonkTcType (idType id) -- Make use of all the info we have, even
+  = do  { ty1 <- liftZonkM $ zonkTcType (idType id) -- Make use of all the info we have, even
                                         -- though it may be incomplete
         ; ty2 <- reifyType ty1
         ; return (TH.VarI (reifyName id) ty2 Nothing) }
 
 reifyThing (ATyVar tv tv1)
-  = do { ty1 <- zonkTcTyVar tv1
+  = do { ty1 <- liftZonkM $ zonkTcTyVar tv1
        ; ty2 <- reifyType ty1
        ; return (TH.TyVarI (reifyName tv) ty2) }
 
@@ -2785,8 +2785,8 @@ reifyTypeOfThing th_name = do
       reifyType (idType (dataConWrapId dc))
     AGlobal (AConLike (PatSynCon ps)) ->
       reifyPatSynType (patSynSigBndr ps)
-    ATcId{tct_id = id} -> zonkTcType (idType id) >>= reifyType
-    ATyVar _ tctv -> zonkTcTyVar tctv >>= reifyType
+    ATcId{tct_id = id} -> liftZonkM (zonkTcType (idType id)) >>= reifyType
+    ATyVar _ tctv -> liftZonkM (zonkTcTyVar tctv) >>= reifyType
     -- Impossible cases, supposedly:
     AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
     ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"

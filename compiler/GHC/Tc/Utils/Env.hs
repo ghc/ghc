@@ -717,9 +717,9 @@ tcCheckUsage name id_mult thing_inside
     --
     -- We use a set to avoid calling promoteMetaTyVarTo twice on the same
     -- metavariable. This happened in #19400.
-    promote_mult m = do { fvs <- zonkTyCoVarsAndFV (tyCoVarsOfType m)
+    promote_mult m = do { fvs <- liftZonkM $ zonkTyCoVarsAndFV (tyCoVarsOfType m)
                         ; any_promoted <- promoteTyVarSet fvs
-                        ; if any_promoted then zonkTcType m else return m
+                        ; if any_promoted then liftZonkM $ zonkTcType m else return m
                         }
 
 {- *********************************************************************
@@ -749,7 +749,7 @@ tcInitTidyEnv
        = do { let (env', occ') = tidyOccName env (nameOccName name)
                   name'  = tidyNameOcc name occ'
                   tyvar1 = setTyVarName tyvar name'
-            ; tyvar2 <- zonkTcTyVarToTcTyVar tyvar1
+            ; tyvar2 <- liftZonkM $ zonkTcTyVarToTcTyVar tyvar1
               -- Be sure to zonk here!  Tidying applies to zonked
               -- types, so if we don't zonk we may create an
               -- ill-kinded type (#14175)

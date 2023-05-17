@@ -41,6 +41,7 @@ import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType ( checkTypeHasFixedRuntimeRep )
 import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Validity ( checkValidType )
@@ -442,14 +443,17 @@ tcPatSynSig name sig_ty@(L _ (HsSig{sig_bndrs = hs_outer_bndrs, sig_body = hs_ty
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralizeAll which may
        -- default kind variables to *.
-       ; ze                   <- mkEmptyZonkEnv NoFlexi
-       ; (ze, kv_bndrs)       <- zonkTyVarBindersX   ze (mkTyVarBinders InferredSpec kvs)
-       ; (ze, implicit_bndrs) <- zonkTyVarBindersX   ze implicit_bndrs
-       ; (ze, univ_bndrs)     <- zonkTyVarBindersX   ze univ_bndrs
-       ; (ze, ex_bndrs)       <- zonkTyVarBindersX   ze ex_bndrs
-       ; req                  <- zonkTcTypesToTypesX ze req
-       ; prov                 <- zonkTcTypesToTypesX ze prov
-       ; body_ty              <- zonkTcTypeToTypeX   ze body_ty
+       ; (kv_bndrs, implicit_bndrs, univ_bndrs, ex_bndrs, req, prov, body_ty) <-
+         initZonkEnv NoFlexi $
+         zonkBndr (zonkTyVarBindersX (mkTyVarBinders InferredSpec kvs)) $ \ kv_bndrs ->
+         zonkBndr (zonkTyVarBindersX implicit_bndrs) $ \ implicit_bndrs  ->
+         zonkBndr (zonkTyVarBindersX univ_bndrs) $ \ univ_bndrs ->
+           do { req            <- zonkTcTypesToTypesX req
+              ; zonkBndr (zonkTyVarBindersX ex_bndrs) $ \ ex_bndrs ->
+           do { prov           <- zonkTcTypesToTypesX prov
+              ; body_ty        <- zonkTcTypeToTypeX   body_ty
+              ; return (kv_bndrs, implicit_bndrs, univ_bndrs, ex_bndrs,
+                         req, prov, body_ty) } }
 
        -- Now do validity checking
        ; checkValidType ctxt $
