@@ -91,8 +91,13 @@ assignToTypedExprs tes es =
 
 assignTypedExprs :: [TypedExpr] -> [TypedExpr] -> JStat
 assignTypedExprs tes es =
-  -- TODO: check primRep (typex_typ) here?
-  assignToTypedExprs tes (concatMap typex_expr es)
+  let prim_tes = concatMap typex_expr tes
+      prim_es  = concatMap typex_expr es
+        -- extract the JExprs, effectively unarising a RuntimeRep thing to
+        -- multiple VarType-repped things (e.g., AddrRep takes two VarType-regs)
+  in assertPpr (equalLength prim_tes prim_es)
+               (ppr (map typex_typ tes) $$ ppr (map typex_typ es))
+               (assignAllEqual prim_tes prim_es)
 
 assignToExprCtx :: ExprCtx -> [JExpr] -> JStat
 assignToExprCtx ctx es = assignToTypedExprs (ctxTarget ctx) es
