@@ -7,7 +7,6 @@ import GHC.Prelude
 
 import Data.Maybe (catMaybes)
 
-import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.HsToCore.Ticks
 
@@ -20,7 +19,7 @@ initTicksConfig dflags = TicksConfig
 
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags = catMaybes
-  [ ifA Breakpoints $ backendWantsBreakpointTicks $ backend dflags
+  [ ifA Breakpoints $ gopt Opt_InsertBreakpoints dflags
   , ifA HpcTicks $ gopt Opt_Hpc dflags
   , ifA ProfNotes $ sccProfilingEnabled dflags && profAuto dflags /= NoProfAuto
   , ifA SourceNotes $ needSourceNotes dflags

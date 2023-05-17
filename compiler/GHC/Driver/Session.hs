@@ -1800,7 +1800,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fobject-code"     $ noArgM $ \dflags -> do
       setBackend $ platformDefaultBackend (targetPlatform dflags)
       dflags' <- liftEwM getCmdLineState
-      pure $ gopt_unset dflags' Opt_ByteCodeAndObjectCode
+      pure $ dflags' `gopt_unset` Opt_ByteCodeAndObjectCode
+                     `gopt_unset` Opt_InsertBreakpoints
 
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
@@ -2451,7 +2452,8 @@ fFlagsDeps = [
         return dflags)),
   flagSpec "show-error-context"               Opt_ShowErrorContext,
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
-  flagSpec "split-sections"                   Opt_SplitSections
+  flagSpec "split-sections"                   Opt_SplitSections,
+  flagSpec "break-points"                     Opt_InsertBreakpoints
   ]
   ++ fHoleFlags
 

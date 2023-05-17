@@ -541,7 +541,7 @@ including entities that are in scope in the current module context.
 
 .. warning::
     Temporary bindings introduced at the prompt only last until the
-    next :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` or 
+    next :ghci-cmd:`:load`, :ghci-cmd:`:reload`, :ghci-cmd:`:add` or
     :ghci-cmd:`:unadd` command, at which time they will be simply lost.
     However, they do survive a change of context with
     :ghci-cmd:`:module`: the temporary bindings just move to the new location.
@@ -1311,6 +1311,16 @@ often be enough to establish the context of an error. For instance, it
 is possible to break automatically when an exception is thrown, even if
 it is thrown from within compiled code (see
 :ref:`ghci-debugger-exceptions`).
+
+.. ghc-flag:: -fbreak-points
+    :shortdesc: :ref:`Insert breakpoints in the GHCi debugger <ghci-debugger>`
+    :type: dynamic
+    :reverse: -fno-break-points
+    :category: interactive
+    :default: enabled for GHCi
+
+    This flag's purpose is to allow disabling breakpoint insertion with
+    the reverse form.
 
 .. _breakpoints:
 
@@ -3185,7 +3195,7 @@ example, to turn on :ghc-flag:`-Wmissing-signatures`, you would say:
 
     ghci> :set -Wmissing-signatures
 
-GHCi will also accept any file-header pragmas it finds, such as 
+GHCi will also accept any file-header pragmas it finds, such as
 ``{-# OPTIONS_GHC ... #-}`` and ``{-# LANGUAGE ... #-}`` (see :ref:`pragmas`).  For example,
 instead of using :ghci-cmd:`:set` to enable :ghc-flag:`-Wmissing-signatures`,
 you could instead write:
