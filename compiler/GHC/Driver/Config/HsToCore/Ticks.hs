@@ -1,5 +1,6 @@
 module GHC.Driver.Config.HsToCore.Ticks
   ( initTicksConfig
+  , breakpointsAllowed
   )
 where
 
@@ -18,9 +19,14 @@ initTicksConfig dflags = TicksConfig
   , ticks_countEntries = gopt Opt_ProfCountEntries dflags
   }
 
+breakpointsAllowed :: DynFlags -> Bool
+breakpointsAllowed dflags =
+  gopt Opt_InsertBreakpoints dflags &&
+  backendSupportsBreakpoints (backend dflags)
+
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags = catMaybes
-  [ ifA Breakpoints $ backendWantsBreakpointTicks $ backend dflags
+  [ ifA Breakpoints $ breakpointsAllowed dflags
   , ifA HpcTicks $ gopt Opt_Hpc dflags
   , ifA ProfNotes $ sccProfilingEnabled dflags && profAuto dflags /= NoProfAuto
   , ifA SourceNotes $ needSourceNotes dflags

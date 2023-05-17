@@ -1,9 +1,9 @@
 Debugging compiled programs
 ===========================
 
-Since the 7.10 release GHC can emit a debugging information to help debugging
+Since the 7.10 release GHC can emit debugging information to help debugging
 tools understand the code that GHC produces. This debugging information is
-useable by most UNIX debugging tools.
+usable by most UNIX debugging tools.
 
 .. ghc-flag:: -g
               -g⟨n⟩

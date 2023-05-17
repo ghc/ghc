@@ -216,6 +216,8 @@ main' postLoadMode units dflags0 args flagWarnings = do
                                        -- object code but has little other effect unless you are also using
                                        -- fat interface files.
                                        `gopt_set` Opt_UseBytecodeRatherThanObjects
+                                       -- By default enable the debugger by inserting breakpoints
+                                       `gopt_set` Opt_InsertBreakpoints
 
   logger1 <- getLogger
   let logger2 = setLogFlags logger1 (initLogFlags dflags2)

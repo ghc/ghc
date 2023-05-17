@@ -13,6 +13,7 @@ other dynamic, non-language, flag settings:
   -fkeep-going
   -fshow-warning-groups
   -fprefer-byte-code
+  -fbreak-points
 warning settings:
   -Wsemigroup
   -Wcompat-unqualified-imports

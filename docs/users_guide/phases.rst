@@ -619,8 +619,8 @@ Options affecting code generation
     useful if you're only interested in type checking code.
 
     If a module contains a Template Haskell splice then in ``--make`` mode, code
-    generation will be automatically turned on for all dependencies. By default
-    object files are generated but if ghc-flag:`-fprefer-byte-code` is enable then
+    generation will be automatically turned on for all dependencies. By default,
+    object files are generated, but if ghc-flag:`-fprefer-byte-code` is enabled,
     byte-code will be generated instead.
 
 .. ghc-flag:: -fwrite-interface
@@ -777,7 +777,7 @@ Options affecting code generation
     :category: codegen
 
     If a home package module has byte-code available then use that instead of
-    and object file (if that's available) to evaluate and run TH splices.
+    an object file (if that's available) to evaluate and run TH splices.
 
     This is useful with flags such as :ghc-flag:`-fbyte-code-and-object-code`, which
     tells the compiler to generate byte-code, and :ghc-flag:`-fwrite-if-simplified-core` which

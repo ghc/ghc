@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiWayIf, LambdaCase #-}
 
 {-|
 Module      : GHC.Driver.Backend
@@ -85,7 +85,7 @@ module GHC.Driver.Backend
    , backendUnregisterisedAbiOnly
    , backendGeneratesHc
    , backendSptIsDynamic
-   , backendWantsBreakpointTicks
+   , backendSupportsBreakpoints
    , backendForcesOptimization0
    , backendNeedsFullWays
    , backendSpecialModuleSource
@@ -650,16 +650,16 @@ backendSptIsDynamic (Named JavaScript)  = False
 backendSptIsDynamic (Named Interpreter) = True
 backendSptIsDynamic (Named NoBackend)   = False
 
--- | If this flag is set, then "GHC.HsToCore.Ticks"
--- inserts `Breakpoint` ticks.  Used only for the
--- interpreter.
-backendWantsBreakpointTicks :: Backend -> Bool
-backendWantsBreakpointTicks (Named NCG)         = False
-backendWantsBreakpointTicks (Named LLVM)        = False
-backendWantsBreakpointTicks (Named ViaC)        = False
-backendWantsBreakpointTicks (Named JavaScript)  = False
-backendWantsBreakpointTicks (Named Interpreter) = True
-backendWantsBreakpointTicks (Named NoBackend)   = False
+-- | If this flag is unset, then the driver ignores the flag @-fbreak-points@,
+-- since backends other than the interpreter tend to panic on breakpoints.
+backendSupportsBreakpoints :: Backend -> Bool
+backendSupportsBreakpoints = \case
+  Named NCG         -> False
+  Named LLVM        -> False
+  Named ViaC        -> False
+  Named JavaScript  -> False
+  Named Interpreter -> True
+  Named NoBackend   -> False
 
 -- | If this flag is set, then the driver forces the
 -- optimization level to 0, issuing a warning message if
