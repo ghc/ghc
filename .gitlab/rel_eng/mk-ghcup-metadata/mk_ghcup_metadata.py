@@ -227,7 +227,13 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
     else:
         change_log =  "https://gitlab.haskell.org"
 
-    return { "viTags": ["Latest", "TODO_base_version"]
+    if release_mode:
+        tags =  ["Latest", "TODO_base_version"]
+    else:
+        tags = ["LatestNightly"]
+
+
+    return { "viTags": tags
         # Check that this link exists
         , "viChangeLog": change_log
         , "viSourceDL": source
@@ -237,6 +243,15 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
                     , "A_ARM64": arm64
                     }
         }
+
+
+def setNightlyTags(ghcup_metadata):
+    for version in ghcup_metadata['ghcupDownloads']['GHC']:
+        if "LatestNightly" in ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"]:
+            ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].remove("LatestNightly")
+        ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].append("Nightly")
+
+
 
 
 def main() -> None:
@@ -278,8 +293,10 @@ def main() -> None:
             ghcup_metadata = yaml.safe_load(file)
             if  args.version in ghcup_metadata['ghcupDownloads']['GHC']:
                 raise RuntimeError("Refusing to override existing version in metadata")
+            setNightlyTags(ghcup_metadata)
             ghcup_metadata['ghcupDownloads']['GHC'][args.version] = new_yaml
             print(yaml.dump(ghcup_metadata))
+
 
 
 if __name__ == '__main__':
