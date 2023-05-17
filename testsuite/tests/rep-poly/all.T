@@ -91,10 +91,17 @@ test('RepPolyUnliftedDatatype', normal, compile, [''])
 test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
 test('RepPolyUnliftedNewtype', normal, compile,
      ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
-test('RepPolyUnsafeCoerce1', normal, compile, [''])
+# js_skip: RepPolyUnsafeCoerce1 coerces from UnliftedRep to an unknown rep r
+# for which the JS backend can't compute a PrimRep.
+# Came up in https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10088#note_499218
+# (or, rather when submitting to CI)
+test('RepPolyUnsafeCoerce1', [js_skip], compile, [''])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
-test('RepPolyWrappedVar2', normal, compile, [''])
+# js_skip: RepPolyWrappedVar2 coerces from AddrRep to IntRep, which have
+# different PrimReps in JS.
+# Came up in https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10088#note_499218
+test('RepPolyWrappedVar2', [js_skip], compile, [''])
 test('UnliftedNewtypesCoerceFail', normal, compile_fail, [''])
 test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
 
