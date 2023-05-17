@@ -332,19 +332,79 @@ pprReg w r = case r of
 
   where
     ppr_reg_no :: Width -> Int -> doc
+    -- General Purpose Registers
     ppr_reg_no _ 0 = text "zero"
+    ppr_reg_no _ 1 = text "ra"
     ppr_reg_no _ 2 = text "sp"
+    ppr_reg_no _ 3 = text "gp"
+    ppr_reg_no _ 4 = text "tp"
+    ppr_reg_no _ 5 = text "t0"
+    ppr_reg_no _ 6 = text "t1"
+    ppr_reg_no _ 7 = text "t2"
+    ppr_reg_no _ 8 = text "s0"
+    ppr_reg_no _ 9 = text "s1"
+    ppr_reg_no _ 10 = text "a0"
+    ppr_reg_no _ 11 = text "a1"
+    ppr_reg_no _ 12 = text "a2"
+    ppr_reg_no _ 13 = text "a3"
+    ppr_reg_no _ 14 = text "a4"
+    ppr_reg_no _ 15 = text "a5"
+    ppr_reg_no _ 16 = text "a6"
+    ppr_reg_no _ 17 = text "a7"
+    ppr_reg_no _ 18 = text "s2"
+    ppr_reg_no _ 19 = text "s3"
+    ppr_reg_no _ 20 = text "s4"
+    ppr_reg_no _ 21 = text "s5"
+    ppr_reg_no _ 22 = text "s6"
+    ppr_reg_no _ 23 = text "s7"
+    ppr_reg_no _ 24 = text "s8"
+    ppr_reg_no _ 25 = text "s9"
+    ppr_reg_no _ 26 = text "s10"
+    ppr_reg_no _ 27 = text "s11"
+    ppr_reg_no _ 28 = text "t3"
+    ppr_reg_no _ 29 = text "t4"
+    ppr_reg_no _ 30 = text "t5"
+    ppr_reg_no _ 31 = text "t6"
+
+    -- Floating Point Registers
+    ppr_reg_no _ 32 = text "ft0"
+    ppr_reg_no _ 33 = text "ft1"
+    ppr_reg_no _ 34 = text "ft2"
+    ppr_reg_no _ 35 = text "ft3"
+    ppr_reg_no _ 36 = text "ft4"
+    ppr_reg_no _ 37 = text "ft5"
+    ppr_reg_no _ 38 = text "ft6"
+    ppr_reg_no _ 39 = text "ft7"
+    ppr_reg_no _ 40 = text "fs0"
+    ppr_reg_no _ 41 = text "fs1"
+    ppr_reg_no _ 42 = text "fa0"
+    ppr_reg_no _ 43 = text "fa1"
+    ppr_reg_no _ 44 = text "fa2"
+    ppr_reg_no _ 45 = text "fa3"
+    ppr_reg_no _ 46 = text "fa4"
+    ppr_reg_no _ 47 = text "fa5"
+    ppr_reg_no _ 48 = text "fa6"
+    ppr_reg_no _ 49 = text "fa7"
+    ppr_reg_no _ 50 = text "fs2"
+    ppr_reg_no _ 51 = text "fs3"
+    ppr_reg_no _ 52 = text "fs4"
+    ppr_reg_no _ 53 = text "fs5"
+    ppr_reg_no _ 54 = text "fs6"
+    ppr_reg_no _ 55 = text "fs7"
+    ppr_reg_no _ 56 = text "fs8"
+    ppr_reg_no _ 57 = text "fs9"
+    ppr_reg_no _ 58 = text "fs10"
+    ppr_reg_no _ 59 = text "fs11"
+    ppr_reg_no _ 60 = text "ft8"
+    ppr_reg_no _ 61 = text "ft9"
+    ppr_reg_no _ 62 = text "ft10"
+    ppr_reg_no _ 63 = text "ft11"
 
     ppr_reg_no w i
-         | i < 0, w == W32 = text "wzr"
-         | i < 0, w == W64 = text "xzr"
-         | i < 0 = pprPanic "Invalid Zero Reg" (ppr w <+> int i)
-         -- General Purpose Registers
-         | i <= 31 = text "x" <> int i
-         -- Floating Point Registers
-         | i <= 63 = text "f" <> int (i-32)
-         -- no support for 'q'uad in GHC's NCG yet.
-         | otherwise = text "very naughty powerpc register"
+         | i < 0 = pprPanic "Unexpected register number (min is 0)" (ppr w <+> int i)
+         | i > 63 = pprPanic "Unexpected register number (max is 63)" (ppr w <+> int i)
+         -- no support for widths > W64.
+         | otherwise = pprPanic "Unsupported width in register (max is 64)" (ppr w <+> int i)
 
 isFloatOp :: Operand -> Bool
 isFloatOp (OpReg _ (RegReal (RealRegSingle i))) | i > 31 = True
