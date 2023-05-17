@@ -158,7 +158,7 @@ def mk_from_platform(pipeline_type, platform):
     return Artifact(info['name'] , f"{info['jobInfo']['bindistName']}.tar.xz", platform.subdir)
 
 # Generate the new metadata for a specific GHC mode etc
-def mk_new_yaml(release_mode, version, pipeline_type, job_map):
+def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     def mk(platform):
         eprint("\n=== " + platform.name + " " + ('=' * (75 - len(platform.name))))
         return mk_one_metadata(release_mode, version, job_map, mk_from_platform(pipeline_type, platform))
@@ -234,6 +234,7 @@ def mk_new_yaml(release_mode, version, pipeline_type, job_map):
 
 
     return { "viTags": tags
+        , "viReleaseDay": date
         # Check that this link exists
         , "viChangeLog": change_log
         , "viSourceDL": source
@@ -264,6 +265,7 @@ def main() -> None:
     parser.add_argument('--fragment', action='store_true', help='Output the generated fragment rather than whole modified file')
     # TODO: We could work out the --version from the project-version CI job.
     parser.add_argument('--version', required=True, type=str, help='Version of the GHC compiler')
+    parser.add_argument('--date', required=True, type=str, help='Date of the compiler release')
     args = parser.parse_args()
 
     project = gl.projects.get(1, lazy=True)
@@ -284,7 +286,7 @@ def main() -> None:
     eprint(f"Pipeline Type: {pipeline_type}")
 
 
-    new_yaml = mk_new_yaml(args.release_mode, args.version, pipeline_type, job_map)
+    new_yaml = mk_new_yaml(args.release_mode, args.version, args.date, pipeline_type, job_map)
     if args.fragment:
         print(yaml.dump({ args.version : new_yaml }))
 

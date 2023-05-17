@@ -18,6 +18,7 @@ options:
   --release-mode        Generate metadata which points to downloads folder
   --fragment            Output the generated fragment rather than whole modified file
   --version VERSION     Version of the GHC compiler
+  --date DATE           Date of the compiler release
 ```
 
 The script also requires the `.gitlab/jobs-metadata.yaml` file which can be generated
