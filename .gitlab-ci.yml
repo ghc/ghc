@@ -998,8 +998,9 @@ project-version:
     # Calculate the project version
     - . ./version.sh
 
-    # Download existing ghcup metadata
-    - nix shell --extra-experimental-features nix-command --extra-experimental-features flakes nixpkgs#wget -c wget "https://gitlab.haskell.org/ghc/ghcup-metadata/-/raw/updates/ghcup-0.0.7.yaml"
+    # Download existing ghcup metadata for the correct year
+    - PipelineYear="$(date -d $CI_PIPELINE_CREATED_AT +%Y)"
+    - nix shell nixpkgs#wget -c wget "https://ghc.gitlab.haskell.org/ghcup-metadata/ghcup-nightlies-$PipelineYear-0.0.7.yaml" -O ghcup-0.0.7.yaml
 
     - .gitlab/generate_job_metadata
 
