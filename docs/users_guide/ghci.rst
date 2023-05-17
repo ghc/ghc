@@ -3546,41 +3546,19 @@ The interpreter can't load modules with foreign export declarations!
     Unfortunately not. We haven't implemented it yet. Please compile any
     offending modules by hand before loading them into GHCi.
 
-:ghc-flag:`-O` doesn't work with GHCi!
+:ghc-flag:`-O` is ineffective in GHCi!
 
     .. index::
        single: optimization; and GHCi
 
-    For technical reasons, the bytecode compiler doesn't interact well
-    with one of the optimisation passes, so we have disabled
-    optimisation when using the interpreter. This isn't a great loss:
-    you'll get a much bigger win by compiling the bits of your code that
-    need to go fast, rather than interpreting them with optimisation
-    turned on.
+    Before GHC 9.8, optimizations were considered too unstable to be used with
+    the bytecode interpreter.
+    This restriction has been lifted, but is still regarded as experimental and
+    guarded by :ghc-flag:`-funoptimized-core-for-interpreter`, which is enabled
+    by default.
+    In order to use optimizations, run: ::
 
-Modules using unboxed tuples or sums will automatically enable :ghc-flag:`-fobject-code`
-
-    .. index::
-       single: unboxed tuples, sums; and GHCi
-
-    The bytecode interpreter doesn't support most uses of unboxed tuples or
-    sums, so GHCi will automatically compile these modules, and all modules
-    they depend on, to object code instead of bytecode.
-
-    GHCi checks for the presence of unboxed tuples and sums in a somewhat
-    conservative fashion: it simply checks to see if a module enables the
-    :extension:`UnboxedTuples` or :extension:`UnboxedSums` language extensions.
-    It is not always the case that code which enables :extension:`UnboxedTuples`
-    or :extension:`UnboxedSums` requires :ghc-flag:`-fobject-code`, so if you
-    *really* want to compile
-    :extension:`UnboxedTuples`/:extension:`UnboxedSums`-using code to
-    bytecode, you can do so explicitly by enabling the :ghc-flag:`-fbyte-code`
-    flag. If you do this, do note that bytecode interpreter will throw an error
-    if it encounters unboxed tuple/sum–related code that it cannot handle.
-
-    Incidentally, the previous point, that :ghc-flag:`-O` is
-    incompatible with GHCi, is because the bytecode compiler can't
-    deal with unboxed tuples or sums.
+      ghci -fno-unoptimized-core-for-interpreter -O
 
 Concurrent threads don't carry on running when GHCi is waiting for input.
     This should work, as long as your GHCi was built with the
