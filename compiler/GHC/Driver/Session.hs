@@ -2484,7 +2484,8 @@ fFlagsDeps = [
         return dflags)),
   flagSpec "show-error-context"               Opt_ShowErrorContext,
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
-  flagSpec "split-sections"                   Opt_SplitSections
+  flagSpec "split-sections"                   Opt_SplitSections,
+  flagSpec "break-points"                     Opt_InsertBreakpoints
   ]
   ++ fHoleFlags
 

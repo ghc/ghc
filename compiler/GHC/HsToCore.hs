@@ -167,7 +167,7 @@ deSugar hsc_env
            [ (i, s)
            | i <- hsc_interp hsc_env
            , (_, s) <- m_tickInfo
-           , backendWantsBreakpointTicks (backend dflags)
+           , breakpointsAllowed dflags
            ]
            $ \(interp, specs) -> mkModBreaks interp mod specs
 
