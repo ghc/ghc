@@ -143,6 +143,7 @@ import Prelude
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Control.Monad as Monad
+import Control.Monad.Fix
 import Control.Monad.Reader
 import qualified Control.Monad.Reader as Reader
 import Data.Functor

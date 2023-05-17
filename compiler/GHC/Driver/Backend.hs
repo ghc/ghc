@@ -551,17 +551,14 @@ backendRespectsSpecialise (Named NoBackend)   = False
 
 -- | This back end wants the `mi_globals` field of a
 -- `ModIface` to be populated (with the top-level bindings
--- of the original source).  True for the interpreter, and
--- also true for "no backend", which is used by Haddock.
--- (After typechecking a module, Haddock wants access to
--- the module's `GlobalRdrEnv`.)
+-- of the original source).  Only true for the interpreter.
 backendWantsGlobalBindings :: Backend -> Bool
 backendWantsGlobalBindings (Named NCG)         = False
 backendWantsGlobalBindings (Named LLVM)        = False
 backendWantsGlobalBindings (Named ViaC)        = False
 backendWantsGlobalBindings (Named JavaScript)  = False
+backendWantsGlobalBindings (Named NoBackend)   = False
 backendWantsGlobalBindings (Named Interpreter) = True
-backendWantsGlobalBindings (Named NoBackend)   = True
 
 -- | The back end targets a technology that implements
 -- `switch` natively.  (For example, LLVM or C.) Therefore
