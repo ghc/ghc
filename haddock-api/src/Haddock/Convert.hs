@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, PatternGuards, TypeFamilies #-}
+{-# LANGUAGE CPP           #-}
+{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE TypeFamilies  #-}
+{-# LANGUAGE BangPatterns  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Convert
@@ -19,6 +23,7 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
+import Control.DeepSeq (force)
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), DefMethSpec(..), TopLevelFlag(..) )
 import GHC.Types.SourceText (SourceText(..))
@@ -73,7 +78,7 @@ data PrintRuntimeReps = ShowRuntimeRep | HideRuntimeRep deriving Show
 tyThingToLHsDecl
   :: PrintRuntimeReps
   -> TyThing
-  -> Either ErrMsg ([ErrMsg], (HsDecl GhcRn))
+  -> Either String ([String], (HsDecl GhcRn))
 tyThingToLHsDecl prr t = case t of
   -- ids (functions and zero-argument a.k.a. CAFs) get a type signature.
   -- Including built-in functions like seq.
@@ -89,7 +94,7 @@ tyThingToLHsDecl prr t = case t of
   -- later in the file (also it's used for class associated-types too.)
   ATyCon tc
     | Just cl <- tyConClass_maybe tc -- classes are just a little tedious
-    -> let extractFamilyDecl :: TyClDecl a -> Either ErrMsg (FamilyDecl a)
+    -> let extractFamilyDecl :: TyClDecl a -> Either String (FamilyDecl a)
            extractFamilyDecl (FamDecl _ d) = return d
            extractFamilyDecl _           =
              Left "tyThingToLHsDecl: impossible associated tycon"
@@ -117,7 +122,7 @@ tyThingToLHsDecl prr t = case t of
 
            extractAtItem
              :: ClassATItem
-             -> Either ErrMsg (LFamilyDecl GhcRn, Maybe (LTyFamDefltDecl GhcRn))
+             -> Either String (LFamilyDecl GhcRn, Maybe (LTyFamDefltDecl GhcRn))
            extractAtItem (ATI at_tc def) = do
              tyDecl <- synifyTyCon prr Nothing at_tc
              famDecl <- extractFamilyDecl tyDecl
@@ -182,7 +187,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
   where
     args_poly = tyConArgsPolyKinded tc
 
-synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
+synifyAxiom :: CoAxiom br -> Either String (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | isOpenTypeFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
@@ -202,7 +207,7 @@ synifyTyCon
   :: PrintRuntimeReps
   -> Maybe (CoAxiom br)  -- ^ RHS of type synonym
   -> TyCon               -- ^ type constructor to convert
-  -> Either ErrMsg (TyClDecl GhcRn)
+  -> Either String (TyClDecl GhcRn)
 synifyTyCon prr _coax tc
   | isPrimTyCon tc
   = return $
@@ -360,7 +365,7 @@ synifyFamilyResultSig (Just name) kind =
 -- result-type.
 -- But you might want pass False in simple enough cases,
 -- if you think it looks better.
-synifyDataCon :: Bool -> DataCon -> Either ErrMsg (LConDecl GhcRn)
+synifyDataCon :: Bool -> DataCon -> Either String (LConDecl GhcRn)
 synifyDataCon use_gadt_syntax dc =
  let
   -- dataConIsInfix allegedly tells us whether it was declared with
@@ -395,7 +400,7 @@ synifyDataCon use_gadt_syntax dc =
     ConDeclField noAnn [noLocA $ FieldOcc (flSelector fl) (noLocA $ mkVarUnqual $ field_label $ flLabel fl)] synTy
                  Nothing
 
-  mk_h98_arg_tys :: Either ErrMsg (HsConDeclH98Details GhcRn)
+  mk_h98_arg_tys :: Either String (HsConDeclH98Details GhcRn)
   mk_h98_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
     (True,True) -> Left "synifyDataCon: contradiction!"
     (True,False) -> return $ RecCon (noLocA field_tys)
@@ -452,8 +457,9 @@ synifyIdSig
   -> [TyVar]          -- ^ free variables in the type to convert
   -> Id               -- ^ the 'Id' from which to get the type signature
   -> Sig GhcRn
-synifyIdSig prr s vs i = TypeSig noAnn [synifyNameN i] (synifySigWcType s vs t)
+synifyIdSig prr s vs i = TypeSig noAnn [n] (synifySigWcType s vs t)
   where
+    !n = force $ synifyNameN i
     t = defaultType prr (varType i)
 
 -- | Turn a 'ClassOpItem' into a list of signatures. The list returned is going
@@ -640,7 +646,7 @@ synifyType _ vs (TyConApp tc tys)
       = mk_app_tys (HsTyVar noAnn prom $ noLocA (getName tc))
                    vis_tys
       where
-        prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
+        !prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
         mk_app_tys ty_app ty_args =
           foldl (\t1 t2 -> noLocA $ HsAppTy noExtField t1 t2)
                 (noLocA ty_app)
@@ -866,7 +872,7 @@ synifyInstHead (vs, preds, cls, types) = specializeInstHead $ InstHead
     synifyClsIdSig = synifyIdSig ShowRuntimeRep DeleteTopLevelQuantification vs
 
 -- Convert a family instance, this could be a type family or data family
-synifyFamInst :: FamInst -> Bool -> Either ErrMsg (InstHead GhcRn)
+synifyFamInst :: FamInst -> Bool -> Either String (InstHead GhcRn)
 synifyFamInst fi opaque = do
     ityp' <- ityp fam_flavor
     return InstHead

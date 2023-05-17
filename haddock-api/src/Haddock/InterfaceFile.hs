@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -75,7 +77,7 @@ mkPackageInterfaces :: Visibility -> InterfaceFile -> PackageInterfaces
 mkPackageInterfaces piVisibility
                     InterfaceFile { ifPackageInfo
                                   , ifInstalledIfaces
-                                  } = 
+                                  } =
   PackageInterfaces { piPackageInfo = ifPackageInfo
                     , piVisibility
                     , piInstalledInterfaces = ifInstalledIfaces

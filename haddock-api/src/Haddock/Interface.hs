@@ -1,4 +1,8 @@
-{-# LANGUAGE CPP, OverloadedStrings, BangPatterns, NamedFieldPuns #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE NamedFieldPuns    #-}
+{-# LANGUAGE TupleSections     #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -36,21 +40,20 @@ module Haddock.Interface (
 
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1, runIfM)
+import Haddock.Interface.Create (createInterface1)
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
-import Haddock.Types (DocOption (..), Documentation (..), ExportItem (..), IfaceMap, InstIfaceMap, Interface, LinkEnv,
-                      expItemDecl, expItemMbDoc, ifaceDoc, ifaceExportItems, ifaceExports, ifaceHaddockCoverage,
-                      ifaceInstances, ifaceMod, ifaceOptions, ifaceVisibleExports, instMod, runWriter, throwE)
+import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.Monad (unless, when)
-import Control.Monad.IO.Class (MonadIO)
-import Data.IORef (atomicModifyIORef', newIORef, readIORef)
-import Data.List (foldl', isPrefixOf, nub)
+import Data.IORef (atomicModifyIORef', newIORef, readIORef, IORef)
+import Data.List (foldl', isPrefixOf)
+import Data.Maybe (mapMaybe)
+import Data.Traversable (for)
 import Text.Printf (printf)
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 import GHC hiding (verbosity)
@@ -62,7 +65,7 @@ import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Plugins
 import GHC.Tc.Types (TcGblEnv (..), TcM)
 import GHC.Tc.Utils.Env (tcLookupGlobal)
-import GHC.Tc.Utils.Monad (getTopEnv, setGblEnv)
+import GHC.Tc.Utils.Monad (getTopEnv)
 import GHC.Unit.Module.Graph
 import GHC.Utils.Error (withTiming)
 
@@ -89,14 +92,18 @@ processModules verbosity modules flags extIfaces = do
   liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
 #endif
 
+  dflags <- getDynFlags
+
   out verbosity verbose "Creating interfaces..."
-  let
-    instIfaceMap :: InstIfaceMap
-    instIfaceMap = Map.fromList
-      [ (instMod iface, iface)
-      | ext <- extIfaces
-      , iface <- ifInstalledIfaces ext
-      ]
+
+
+  -- Map from a module to a corresponding installed interface
+  let instIfaceMap :: InstIfaceMap
+      instIfaceMap = Map.fromList
+        [ (instMod iface, iface)
+        | ext <- extIfaces
+        , iface <- ifInstalledIfaces ext
+        ]
 
   (interfaces, ms) <- createIfaces verbosity modules flags instIfaceMap
 
@@ -104,6 +111,7 @@ processModules verbosity modules flags extIfaces = do
         Set.unions $ map (Set.fromList . ifaceExports) $
         filter (\i -> not $ OptHide `elem` ifaceOptions i) interfaces
       mods = Set.fromList $ map ifaceMod interfaces
+
   out verbosity verbose "Attaching instances..."
   interfaces' <- {-# SCC attachInstances #-}
                  withTimingM "attachInstances" (const ()) $ do
@@ -117,26 +125,44 @@ processModules verbosity modules flags extIfaces = do
       links     = homeLinks `Map.union` extLinks
 
   out verbosity verbose "Renaming interfaces..."
+
   let warnings = Flag_NoWarnings `notElem` flags
-  dflags <- getDynFlags
-  let (interfaces'', msgs) =
-         runWriter $ mapM (renameInterface dflags (ignoredSymbols flags) links warnings) interfaces'
-  liftIO $ mapM_ putStrLn msgs
+      ignoredSymbolSet = ignoredSymbols flags
+
+  interfaces'' <-
+    withTimingM "renameAllInterfaces" (const ()) $
+      for interfaces' $ \i -> do
+        withTimingM ("renameInterface: " <+> pprModuleName (moduleName (ifaceMod i))) (const ()) $
+          renameInterface dflags ignoredSymbolSet links warnings (Flag_Hoogle `elem` flags) i
 
   return (interfaces'', homeLinks)
-
 
 --------------------------------------------------------------------------------
 -- * Module typechecking and Interface creation
 --------------------------------------------------------------------------------
 
-
-createIfaces :: Verbosity -> [String] -> [Flag] -> InstIfaceMap -> Ghc ([Interface], ModuleSet)
+createIfaces
+    :: Verbosity
+    -- ^ Verbosity requested by the caller
+    -> [String]
+    -- ^ List of modules provided as arguments to Haddock (still in FilePath
+    -- format)
+    -> [Flag]
+    -- ^ Command line flags which Hadddock was invoked with
+    -> InstIfaceMap
+    -- ^ Map from module to corresponding installed interface file
+    -> Ghc ([Interface], ModuleSet)
+    -- ^ Resulting interfaces
 createIfaces verbosity modules flags instIfaceMap = do
-  (haddockPlugin, getIfaces, getModules) <- liftIO $ plugin
-    verbosity flags instIfaceMap
+  -- Initialize the IORefs for the interface map and the module set
+  (ifaceMapRef, moduleSetRef) <- liftIO $ do
+    m <- newIORef Map.empty
+    s <- newIORef emptyModuleSet
+    return (m, s)
 
   let
+    haddockPlugin = plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef
+
     installHaddockPlugin :: HscEnv -> HscEnv
     installHaddockPlugin hsc_env =
       let
@@ -161,8 +187,11 @@ createIfaces verbosity modules flags instIfaceMap = do
       throwE "Cannot typecheck modules"
     Succeeded -> do
       modGraph <- GHC.getModuleGraph
-      ifaceMap  <- liftIO getIfaces
-      moduleSet <- liftIO getModules
+
+      (ifaceMap, moduleSet) <- liftIO $ do
+        m <- atomicModifyIORef' ifaceMapRef (Map.empty,)
+        s <- atomicModifyIORef' moduleSetRef (Set.empty,)
+        return (m, s)
 
       let
         -- We topologically sort the module graph including boot files,
@@ -205,19 +234,20 @@ createIfaces verbosity modules flags instIfaceMap = do
         -- i.e. if module A imports B, then B is preferred over A,
         -- but if module A {-# SOURCE #-} imports B, then we can't say the same.
         --
+        go :: SCC ModuleGraphNode -> Maybe Module
         go (AcyclicSCC (ModuleNode _ ms))
-          | NotBoot <- isBootSummary ms = [ms]
-          | otherwise = []
-        go (AcyclicSCC _) = []
+          | NotBoot <- isBootSummary ms = Just $ ms_mod ms
+          | otherwise = Nothing
+        go (AcyclicSCC _) = Nothing
         go (CyclicSCC _) = error "haddock: module graph cyclic even with boot files"
 
         ifaces :: [Interface]
         ifaces =
           [ Map.findWithDefault
               (error "haddock:iface")
-              (ms_mod ms)
+              m
               ifaceMap
-          | ms <- concatMap go $ topSortModuleGraph False modGraph Nothing
+          | m <- mapMaybe go $ topSortModuleGraph False modGraph Nothing
           ]
 
       return (ifaces, moduleSet)
@@ -227,20 +257,18 @@ createIfaces verbosity modules flags instIfaceMap = do
 -- interfaces. Due to the plugin nature we benefit from GHC's capabilities to
 -- parallelize the compilation process.
 plugin
-  :: MonadIO m
-  => Verbosity
+  :: Verbosity
+  -- ^ Verbosity requested by the Haddock caller
   -> [Flag]
+  -- ^ Command line flags which Hadddock was invoked with
   -> InstIfaceMap
-  -> m
-     (
-       StaticPlugin -- the plugin to install with GHC
-     , m IfaceMap  -- get the processed interfaces
-     , m ModuleSet -- get the loaded modules
-     )
-plugin verbosity flags instIfaceMap = liftIO $ do
-  ifaceMapRef  <- newIORef Map.empty
-  moduleSetRef <- newIORef emptyModuleSet
-
+  -- ^ Map from module to corresponding installed interface file
+  -> IORef IfaceMap
+  -- ^ The 'IORef' to write the interface map to
+  -> IORef ModuleSet
+  -- ^ The 'IORef' to write the module set to
+  -> StaticPlugin -- the plugin to install with GHC
+plugin verbosity flags instIfaceMap ifaceMapRef moduleSetRef =
   let
     processTypeCheckedResult :: ModSummary -> TcGblEnv -> TcM ()
     processTypeCheckedResult mod_summary tc_gbl_env
@@ -250,9 +278,10 @@ plugin verbosity flags instIfaceMap = liftIO $ do
       | otherwise = do
           hsc_env <- getTopEnv
           ifaces <- liftIO $ readIORef ifaceMapRef
-          (iface, modules) <- withTiming (hsc_logger hsc_env)
-                                "processModule" (const ()) $
-            processModule1 verbosity flags ifaces instIfaceMap hsc_env mod_summary tc_gbl_env
+
+          (iface, modules) <-
+            withTiming (hsc_logger hsc_env) "processModule1" (const ()) $
+              processModule1 verbosity flags ifaces instIfaceMap hsc_env mod_summary tc_gbl_env
 
           liftIO $ do
             atomicModifyIORef' ifaceMapRef $ \xs ->
@@ -260,36 +289,32 @@ plugin verbosity flags instIfaceMap = liftIO $ do
 
             atomicModifyIORef' moduleSetRef $ \xs ->
               (modules `unionModuleSet` xs, ())
-
-    staticPlugin :: StaticPlugin
-    staticPlugin = StaticPlugin
+  in
+    StaticPlugin
       {
         spPlugin = PluginWithArgs
         {
           paPlugin = defaultPlugin
           {
             renamedResultAction = keepRenamedSource
-          , typeCheckResultAction = \_ mod_summary tc_gbl_env -> setGblEnv tc_gbl_env $ do
+          , typeCheckResultAction = \_ mod_summary tc_gbl_env -> do
               processTypeCheckedResult mod_summary tc_gbl_env
               pure tc_gbl_env
-
           }
         , paArguments = []
         }
       }
 
-  pure
-    ( staticPlugin
-    , liftIO (readIORef ifaceMapRef)
-    , liftIO (readIORef moduleSetRef)
-    )
-
-
 processModule1
   :: Verbosity
+  -- ^ Verbosity requested by the Haddock caller
   -> [Flag]
+  -- ^ Command line flags which Hadddock was invoked with
   -> IfaceMap
+  -- ^ Map from module to corresponding interface, for the modules we have
+  -- already processed
   -> InstIfaceMap
+  -- ^ Map from module to corresponding installed interface file
   -> HscEnv
   -> ModSummary
   -> TcGblEnv
@@ -302,12 +327,12 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
 
     unit_state = hsc_units hsc_env
 
-  (!interface, messages) <- do
+  !interface <- do
     logger <- getLogger
     {-# SCC createInterface #-}
-     withTiming logger "createInterface" (const ()) $ runIfM (fmap Just . tcLookupGlobal) $
-      createInterface1 flags unit_state mod_summary tc_gbl_env
-        ifaces inst_ifaces
+      withTiming logger "createInterface" (const ()) $
+        runIfM (fmap Just . tcLookupGlobal) $
+          createInterface1 flags unit_state mod_summary tc_gbl_env ifaces inst_ifaces
 
   -- We need to keep track of which modules were somehow in scope so that when
   -- Haddock later looks for instances, it also looks in these modules too.
@@ -324,7 +349,6 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
       , unQualOK gre -- In scope unqualified
       ]
 
-  liftIO $ mapM_ putStrLn (nub messages)
   dflags <- getDynFlags
 
   let
@@ -349,9 +373,10 @@ processModule1 verbosity flags ifaces inst_ifaces hsc_env mod_summary tc_gbl_env
     undocumentedExports :: [String]
     undocumentedExports =
       [ formatName (locA s) n
-      | ExportDecl { expItemDecl = L s n
-                   , expItemMbDoc = (Documentation Nothing _, _)
-                   } <- ifaceExportItems interface
+      | ExportDecl ExportD
+          { expDDecl = L s n
+          , expDMbDoc = (Documentation Nothing _, _)
+          } <- ifaceExportItems interface
       ]
         where
           formatName :: SrcSpan -> HsDecl GhcRn -> String
@@ -396,12 +421,14 @@ buildHomeLinks :: [Interface] -> LinkEnv
 buildHomeLinks ifaces = foldl' upd Map.empty (reverse ifaces)
   where
     upd old_env iface
-      | OptHide    `elem` ifaceOptions iface = old_env
+      | OptHide `elem` ifaceOptions iface =
+          old_env
       | OptNotHome `elem` ifaceOptions iface =
-        foldl' keep_old old_env exported_names
-      | otherwise = foldl' keep_new old_env exported_names
+          foldl' keep_old old_env exported_names
+      | otherwise =
+          foldl' keep_new old_env exported_names
       where
-        exported_names = ifaceVisibleExports iface ++ map getName (ifaceInstances iface)
+        exported_names = ifaceVisibleExports iface ++ map haddockClsInstName (ifaceInstances iface)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env

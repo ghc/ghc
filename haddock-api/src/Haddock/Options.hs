@@ -45,6 +45,11 @@ module Haddock.Options (
 
 
 import qualified Data.Char as Char
+import           Data.List (dropWhileEnd)
+import           Data.Map (Map)
+import qualified Data.Map as Map
+import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Version
 import           Control.Applicative
 import           GHC.Data.FastString
@@ -353,8 +358,41 @@ verbosity flags =
       Left e -> throwE e
       Right v -> v
 
-ignoredSymbols :: [Flag] -> [String]
-ignoredSymbols flags = [ symbol | Flag_IgnoreLinkSymbol symbol <- flags ]
+-- | Get the ignored symbols from the given flags. These are the symbols for
+-- which no link warnings will be generated if their link destinations cannot be
+-- determined.
+--
+-- Symbols may be provided as qualified or unqualified names (e.g.
+-- 'Data.Map.dropWhileEnd' or 'dropWhileEnd', resp). If qualified, no link
+-- warnings will be produced for occurances of that name when it is imported
+-- from that module. If unqualified, no link warnings will be produced for any
+-- occurances of that name from any module.
+ignoredSymbols :: [Flag] -> Map (Maybe String) (Set String)
+ignoredSymbols flags =
+    foldr addToMap Map.empty [ splitSymbol symbol | Flag_IgnoreLinkSymbol symbol <- flags ]
+  where
+    -- Split a symbol into its module name and unqualified name, producing
+    -- 'Nothing' for the module name if the given symbol is already unqualified
+    splitSymbol :: String -> (Maybe String, String)
+    splitSymbol s =
+      -- Drop the longest suffix not containing a '.' character
+      case dropWhileEnd (/= '.') s of
+
+        -- If the longest suffix is empty, there was no '.'.
+        -- Assume it is an unqualified name (no module string).
+        "" -> (Nothing, s)
+
+        -- If the longest suffix is not empty, there was a '.'.
+        -- Assume it is a qualified name. `s'` will be the module string followed
+        -- by the last '.', e.g. "Data.List.", so take `init s'` as the module
+        -- string. Drop the length of `s'` from the original string `s` to
+        -- obtain to the unqualified name.
+        s' -> (Just $ init s', drop (length s') s)
+
+    -- Add a (module name, name) pair to the map from modules to their ignored
+    -- symbols
+    addToMap :: (Maybe String, String) -> Map (Maybe String) (Set String) -> Map (Maybe String) (Set String)
+    addToMap (m, name) symbs = Map.insertWith (Set.union) m (Set.singleton name) symbs
 
 ghcFlags :: [Flag] -> [String]
 ghcFlags flags = [ option | Flag_OptGhc option <- flags ]

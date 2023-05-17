@@ -1,7 +1,7 @@
-{-# OPTIONS_GHC -Wwarn #-}
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns     #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ViewPatterns     #-}
+{-# OPTIONS_GHC -Wwarn #-}
   -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
@@ -23,9 +23,11 @@ module Haddock.Interface.LexParseRn
 
 import Control.Arrow
 import Control.Monad
+import Control.Monad.State.Strict
 import Data.Functor
 import Data.List ((\\), maximumBy)
 import Data.Ord
+import qualified Data.Set as Set
 import Documentation.Haddock.Doc (metaDocConcat)
 import GHC.Driver.Session (languageExtensions)
 import qualified GHC.LanguageExtensions as LangExt
@@ -33,15 +35,21 @@ import GHC
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
+import GHC.Data.EnumSet as EnumSet
+import GHC.Driver.Ppr ( showPpr, showSDoc )
+import GHC.Parser.PostProcess
 import GHC.Types.Name
 import GHC.Types.Avail ( availName )
-import GHC.Parser.PostProcess
-import GHC.Driver.Ppr ( showPpr, showSDoc )
 import GHC.Types.Name.Reader
-import GHC.Data.EnumSet as EnumSet
+import GHC.Utils.Outputable (Outputable)
 
-processDocStrings :: DynFlags -> Maybe Package -> GlobalRdrEnv -> [HsDocString]
-                  -> ErrMsgM (Maybe (MDoc Name))
+processDocStrings
+  :: MonadIO m
+  => DynFlags
+  -> Maybe Package
+  -> GlobalRdrEnv
+  -> [HsDocString]
+  -> IfM m (Maybe (MDoc Name))
 processDocStrings dflags pkg gre strs = do
   mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags pkg gre) strs
   case mdoc of
@@ -51,20 +59,42 @@ processDocStrings dflags pkg gre strs = do
     MetaDoc { _meta = Meta Nothing Nothing, _doc = DocEmpty } -> pure Nothing
     x -> pure (Just x)
 
-processDocStringParas :: DynFlags -> Maybe Package -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
+processDocStringParas
+  :: MonadIO m
+  => DynFlags
+  -> Maybe Package
+  -> GlobalRdrEnv
+  -> HsDocString
+  -> IfM m (MDoc Name)
 processDocStringParas dflags pkg gre hds =
-  overDocF (rename dflags gre) $ parseParas dflags pkg (renderHsDocString hds)
+    overDocF (rename dflags gre) (parseParas dflags pkg (renderHsDocString hds))
 
-processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
+processDocString
+  :: MonadIO m
+  => DynFlags
+  -> GlobalRdrEnv
+  -> HsDocString
+  -> IfM m (Doc Name)
 processDocString dflags gre hds =
-  processDocStringFromString dflags gre (renderHsDocString hds)
+    processDocStringFromString dflags gre (renderHsDocString hds)
 
-processDocStringFromString :: DynFlags -> GlobalRdrEnv -> String -> ErrMsgM (Doc Name)
+processDocStringFromString
+  :: MonadIO m
+  => DynFlags
+  -> GlobalRdrEnv
+  -> String
+  -> IfM m (Doc Name)
 processDocStringFromString dflags gre hds =
-  rename dflags gre $ parseString dflags hds
+    rename dflags gre (parseString dflags hds)
 
-processModuleHeader :: DynFlags -> Maybe Package -> GlobalRdrEnv -> SafeHaskellMode -> Maybe HsDocString
-                    -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
+processModuleHeader
+  :: MonadIO m
+  => DynFlags
+  -> Maybe Package
+  -> GlobalRdrEnv
+  -> SafeHaskellMode
+  -> Maybe HsDocString
+  -> IfM m (HaddockModInfo Name, Maybe (MDoc Name))
 processModuleHeader dflags pkgName gre safety mayStr = do
   (hmi, doc) <-
     case mayStr of
@@ -82,10 +112,13 @@ processModuleHeader dflags pkgName gre safety mayStr = do
   let flags :: [LangExt.Extension]
       -- We remove the flags implied by the language setting and we display the language instead
       flags = EnumSet.toList (extensionFlags dflags) \\ languageExtensions (language dflags)
-  return (hmi { hmi_safety = Just $ showPpr dflags safety
-              , hmi_language = language dflags
-              , hmi_extensions = flags
-              } , doc)
+  return
+    (hmi { hmi_safety = Just $ showPpr dflags safety
+         , hmi_language = language dflags
+         , hmi_extensions = flags
+         }
+    , doc
+    )
   where
     failure = (emptyHaddockModInfo, Nothing)
 
@@ -100,12 +133,18 @@ traverseSnd f = traverse (\(x, a) ->
 -- fallbacks in case we can't locate the identifiers.
 --
 -- See the comments in the source for implementation commentary.
-rename :: DynFlags -> GlobalRdrEnv -> Doc NsRdrName -> ErrMsgM (Doc Name)
+rename
+  :: MonadIO m
+  => DynFlags
+  -> GlobalRdrEnv
+  -> Doc NsRdrName
+  -> IfM m (Doc Name)
 rename dflags gre = rn
   where
+    rn :: MonadIO m => Doc NsRdrName -> IfM m (Doc Name)
     rn d = case d of
       DocAppend a b -> DocAppend <$> rn a <*> rn b
-      DocParagraph doc -> DocParagraph <$> rn doc
+      DocParagraph p -> DocParagraph <$> rn p
       DocIdentifier i -> do
         let NsRdrName ns x = unwrap i
             occ = rdrNameOcc x
@@ -150,14 +189,14 @@ rename dflags gre = rn
           -- There are multiple names available.
           gres -> ambiguous dflags i gres
 
-      DocWarning doc -> DocWarning <$> rn doc
-      DocEmphasis doc -> DocEmphasis <$> rn doc
-      DocBold doc -> DocBold <$> rn doc
-      DocMonospaced doc -> DocMonospaced <$> rn doc
+      DocWarning dw -> DocWarning <$> rn dw
+      DocEmphasis de -> DocEmphasis <$> rn de
+      DocBold db -> DocBold <$> rn db
+      DocMonospaced dm -> DocMonospaced <$> rn dm
       DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
       DocOrderedList docs -> DocOrderedList <$> traverseSnd rn docs
       DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
-      DocCodeBlock doc -> DocCodeBlock <$> rn doc
+      DocCodeBlock dcb -> DocCodeBlock <$> rn dcb
       DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
       DocModule (ModLink m l) -> DocModule . ModLink m <$> traverse rn l
       DocHyperlink (Hyperlink u l) -> DocHyperlink . Hyperlink u <$> traverse rn l
@@ -180,23 +219,32 @@ rename dflags gre = rn
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.
-outOfScope :: DynFlags -> Namespace -> Wrap RdrName -> ErrMsgM (Doc a)
+outOfScope :: MonadIO m => DynFlags -> Namespace -> Wrap RdrName -> IfM m (Doc a)
 outOfScope dflags ns x =
-  case unwrap x of
-    Unqual occ -> warnAndMonospace (x $> occ)
-    Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
-    Orig _ occ -> warnAndMonospace (x $> occ)
-    Exact name -> warnAndMonospace (x $> name)  -- Shouldn't happen since x is out of scope
+    case unwrap x of
+      Unqual occ -> warnAndMonospace (x $> occ)
+      Qual mdl occ -> pure (DocIdentifierUnchecked (x $> (mdl, occ)))
+      Orig _ occ -> warnAndMonospace (x $> occ)
+      Exact name -> warnAndMonospace (x $> name)  -- Shouldn't happen since x is out of scope
   where
-    prefix = case ns of
-               Value -> "the value "
-               Type -> "the type "
-               None -> ""
+    prefix =
+      case ns of
+        Value -> "the value "
+        Type -> "the type "
+        None -> ""
 
+    warnAndMonospace :: (MonadIO m, Outputable a) => Wrap a -> IfM m (DocH mod id)
     warnAndMonospace a = do
       let a' = showWrapped (showPpr dflags) a
-      tell ["Warning: " ++ prefix ++ "'" ++ a' ++ "' is out of scope.\n" ++
-            "    If you qualify the identifier, haddock can try to link it anyway."]
+
+      -- If we have already warned for this identifier, don't warn again
+      firstWarn <- Set.notMember a' <$> gets ifeOutOfScopeNames
+      when firstWarn $ do
+        warn $
+          "Warning: " ++ prefix ++ "'" ++ a' ++ "' is out of scope.\n" ++
+          "    If you qualify the identifier, haddock can try to link it anyway."
+        modify' (\env -> env { ifeOutOfScopeNames = Set.insert a' (ifeOutOfScopeNames env) })
+
       pure (monospaced a')
     monospaced = DocMonospaced . DocString
 
@@ -205,25 +253,35 @@ outOfScope dflags ns x =
 -- Prefers local names primarily and type constructors or class names secondarily.
 --
 -- Emits a warning if the 'GlobalRdrElts's don't belong to the same type or class.
-ambiguous :: DynFlags
-          -> Wrap NsRdrName
-          -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
-          -> ErrMsgM (Doc Name)
+ambiguous
+  :: MonadIO m
+  => DynFlags
+  -> Wrap NsRdrName
+  -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
+  -> IfM m (Doc Name)
 ambiguous dflags x gres = do
-  let noChildren = map availName (gresToAvailInfo gres)
-      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
-      msg = "Warning: " ++ showNsRdrName dflags x ++ " is ambiguous. It is defined\n" ++
-            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greName gres) ++
-            "    You may be able to disambiguate the identifier by qualifying it or\n" ++
-            "    by specifying the type/value namespace explicitly.\n" ++
-            "    Defaulting to the one defined " ++ defnLoc dflt
-  -- TODO: Once we have a syntax for namespace qualification (#667) we may also
-  -- want to emit a warning when an identifier is a data constructor for a type
-  -- of the same name, but not the only constructor.
-  -- For example, for @data D = C | D@, someone may want to reference the @D@
-  -- constructor.
-  when (length noChildren > 1) $ tell [msg]
-  pure (DocIdentifier (x $> dflt))
+    let noChildren = map availName (gresToAvailInfo gres)
+        dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
+        nameStr = showNsRdrName dflags x
+        msg = "Warning: " ++ nameStr ++ " is ambiguous. It is defined\n" ++
+              concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map greName gres) ++
+              "    You may be able to disambiguate the identifier by qualifying it or\n" ++
+              "    by specifying the type/value namespace explicitly.\n" ++
+              "    Defaulting to the one defined " ++ defnLoc dflt
+
+    -- TODO: Once we have a syntax for namespace qualification (#667) we may also
+    -- want to emit a warning when an identifier is a data constructor for a type
+    -- of the same name, but not the only constructor.
+    -- For example, for @data D = C | D@, someone may want to reference the @D@
+    -- constructor.
+
+    -- If we have already warned for this name, do not warn again
+    firstWarn <- Set.notMember nameStr <$> gets ifeAmbiguousNames
+    when (length noChildren > 1 && firstWarn) $ do
+      warn msg
+      modify' (\env -> env { ifeAmbiguousNames = Set.insert nameStr (ifeAmbiguousNames env) })
+
+    pure (DocIdentifier (x $> dflt))
   where
     isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
     isLocalName _ = False
@@ -232,12 +290,19 @@ ambiguous dflags x gres = do
 -- | Handle value-namespaced names that cannot be for values.
 --
 -- Emits a warning that the value-namespace is invalid on a non-value identifier.
-invalidValue :: DynFlags -> Wrap NsRdrName -> ErrMsgM (Doc a)
+invalidValue :: MonadIO m => DynFlags -> Wrap NsRdrName -> IfM m (Doc a)
 invalidValue dflags x = do
-  tell ["Warning: " ++ showNsRdrName dflags x ++ " cannot be value, yet it is\n" ++
-            "    namespaced as such. Did you mean to specify a type namespace\n" ++
-            "    instead?"]
-  pure (DocMonospaced (DocString (showNsRdrName dflags x)))
+    let nameStr = showNsRdrName dflags x
+
+    -- If we have already warned for this name, do not warn again
+    firstWarn <- Set.notMember nameStr <$> gets ifeInvalidValues
+    when firstWarn $ do
+      warn $
+        "Warning: " ++ nameStr ++ " cannot be value, yet it is\n" ++
+        "    namespaced as such. Did you mean to specify a type namespace\n" ++
+        "    instead?"
+      modify' (\env -> env { ifeInvalidValues = Set.insert nameStr (ifeInvalidValues env) })
+    pure (DocMonospaced (DocString (showNsRdrName dflags x)))
 
 -- | Printable representation of a wrapped and namespaced name
 showNsRdrName :: DynFlags -> Wrap NsRdrName -> String
