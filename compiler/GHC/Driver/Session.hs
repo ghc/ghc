@@ -3658,9 +3658,10 @@ makeDynFlagsConsistent dflags
  , gopt Opt_UnoptimizedCoreForInterpreter dflags
  , let (dflags', changed) = updOptLevelChanged 0 dflags
  , changed
-    = loop dflags' ("Optimization flags are incompatible with the " ++
-                   backendDescription (backend dflags) ++
-                                          "; optimization flags ignored.")
+    = loop dflags' $
+      "Ignoring optimization flags since they are experimental for the " ++
+      backendDescription (backend dflags) ++
+      ". Pass -fno-unoptimized-core-for-interpreter to enable this feature."
 
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)

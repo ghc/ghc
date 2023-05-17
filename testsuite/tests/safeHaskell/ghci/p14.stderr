@@ -1,6 +1,6 @@
 
 when making flags consistent: warning:
-    Optimization flags are incompatible with the byte-code interpreter; optimization flags ignored.
+    Ignoring optimization flags since they are experimental for the byte-code interpreter. Pass -fno-unoptimized-core-for-interpreter to enable this feature.
 
 <interactive>:10:25: error: [GHC-39999]
     • No instance for ‘Num a’ arising from a use of ‘f’
