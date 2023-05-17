@@ -1072,7 +1072,7 @@ ghcup-metadata-nightly-push:
     - git remote add gitlab_origin https://oauth2:$PROJECT_PUSH_TOKEN@gitlab.haskell.org/ghc/ghcup-metadata.git
     - git add .
     - git commit -m "Update metadata"
-    - git push gitlab_origin HEAD:updates -o ci.skip
+    - git push gitlab_origin HEAD:updates
   rules:
     # Only run the update on scheduled nightly pipelines, ie once a day
     - if: $NIGHTLY && $CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == "master"
