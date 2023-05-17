@@ -205,15 +205,22 @@ can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
-can_eq_nc' _rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
+can_eq_nc' rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
-   -- we want to catch e.g. Maybe Int ~ (Int -> Int) here for better
-   -- error messages rather than decomposing into AppTys;
-   -- hence no direct match on TyConApp
-  , not (isTypeFamilyTyCon tc1)
-  , not (isTypeFamilyTyCon tc2)
-  = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
+   -- tcSplitTyConApp_maybe: we want to catch e.g. Maybe Int ~ (Int -> Int)
+   -- here for better error messages rather than decomposing into AppTys;
+   -- hence not using a direct match on TyConApp
+
+  , not (isTypeFamilyTyCon tc1 || isTypeFamilyTyCon tc2)
+    -- A type family at the top of LHS or RHS: we want to fall through
+    -- to the canonical-LHS cases (look for canEqLHS_maybe)
+
+  -- See (TC1) in Note [Canonicalising TyCon/TyCon equalities]
+  , let role            = eqRelRole eq_rel
+        both_generative = isGenerativeTyCon tc1 role && isGenerativeTyCon tc2 role
+  , rewritten || both_generative
+  = canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
 
 can_eq_nc' _rewritten _rdr_env _envs ev eq_rel
            s1@(ForAllTy (Bndr _ vis1) _) _
@@ -248,7 +255,7 @@ can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
 -- Only rewritten types end up below here.
 ----------------------------
 
--- NB: pattern match on True: we want only rewritten types sent to canEqLHS
+-- NB: pattern match on rewritten=True: we want only rewritten types sent to canEqLHS
 -- This means we've rewritten any variables and reduced any type family redexes
 -- See also Note [No top-level newtypes on RHS of representational equalities]
 can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
@@ -278,7 +285,7 @@ can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
        ; case eq_rel of -- See Note [Unsolved equalities]
             ReprEq -> solveIrredEquality ReprEqReason ev
             NomEq  -> solveIrredEquality ShapeMismatchReason ev }
-          -- No need to call canEqFailure/canEqHardFailure because they
+          -- No need to call canEqSoftFailure/canEqHardFailure because they
           -- rewrite, and the types involved here are already rewritten
 
 
@@ -720,33 +727,31 @@ canEqCast rewritten ev eq_rel swapped ty1 co1 ty2 ps_ty2
 
 ------------------------
 canTyConApp :: CtEvidence -> EqRel
+            -> Bool  -- Both TyCons are generative
             -> TyCon -> [TcType]
             -> TyCon -> [TcType]
             -> TcS (StopOrContinue Ct)
 -- See Note [Decomposing TyConApp equalities]
 -- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
 -- But they can be data families.
-canTyConApp ev eq_rel tc1 tys1 tc2 tys2
+canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
          then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
-         else canEqFailure ev eq_rel ty1 ty2 }
+         else canEqSoftFailure ev eq_rel ty1 ty2 }
 
   -- See Note [Skolem abstract data] in GHC.Core.Tycon
   | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
        ; solveIrredEquality AbstractTyConReason ev }
 
-  -- Fail straight away for better error messages
-  -- See Note [Use canEqFailure in canDecomposableTyConApp]
-  | eq_rel == ReprEq && not (isGenerativeTyCon tc1 Representational &&
-                             isGenerativeTyCon tc2 Representational)
-  = canEqFailure ev eq_rel ty1 ty2
-
-  | otherwise
-  = canEqHardFailure ev ty1 ty2
+  | otherwise  -- Different TyCons
+  = if both_generative -- See (TC2) and (TC3) in
+                       -- Note [Canonicalising TyCon/TyCon equalities]
+    then canEqHardFailure ev ty1 ty2
+    else canEqSoftFailure ev eq_rel ty1 ty2
   where
     -- Reconstruct the types for error messages. This would do
     -- the wrong thing (from a pretty printing point of view)
@@ -768,37 +773,42 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
           ctEvFlavour ev == Wanted && noGivenNewtypeReprEqs tc1 inerts)
              -- See Note [Decomposing newtype equalities] (EX2)
 
-{-
-Note [Use canEqFailure in canDecomposableTyConApp]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must use canEqFailure, not canEqHardFailure here, because there is
-the possibility of success if working with a representational equality.
-Here is one case:
+{- Note [Canonicalising TyCon/TyCon equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
 
   type family TF a where TF Char = Bool
   data family DF a
   newtype instance DF Bool = MkDF Int
 
-Suppose we are canonicalising (Int ~R DF (TF a)), where we don't yet
-know `a`. This is *not* a hard failure, because we might soon learn
-that `a` is, in fact, Char, and then the equality succeeds.
+Suppose we are canonicalising [W] Int ~R# DF (TF a).  Then
 
-Here is another case:
+(TC1) We might have an inert Given (a ~# Char), so if we rewrote the wanted
+      (i.e. went around again in `can_eq_nc` with `rewritten`=True, we'd get
+         [W] Int ~R# DF Bool
+      and then the `tcTopNormaliseNewTypeTF_maybe` call would fire and
+      we'd unwrap the newtype.  So we must do that "go round again" bit.
+      Hence the complicated guard (rewritten || both_generative) in `can_eq_nc`.
 
-  [G] Age ~R Int
+(TC2) If we can't rewrite `a` yet, we'll finish with an unsolved
+         [W] Int ~R# DF (TF a)
+      in the inert set. But we must use canEqSoftFailure, not canEqHardFailure,
+      because it might be solved "later" when we learn more about `a`.
+      Hence the use of `both_generative` in `canTyConApp`.
 
-where Age's constructor is not in scope. We don't want to report
-an "inaccessible code" error in the context of this Given!
+(TC3) Here's another example:
+         [G] Age ~R# Int
+      where Age's constructor is not in scope. We don't want to report
+      an "inaccessible code" error in the context of this Given!  So again
+      we want `canEqSoftFailure`.
 
-For example, see typecheck/should_compile/T10493, repeated here:
+      For example, see typecheck/should_compile/T10493, repeated here:
+        import Data.Ord (Down)  -- no constructor
+        foo :: Coercible (Down Int) Int => Down Int -> Int
+        foo = coerce
 
-  import Data.Ord (Down)  -- no constructor
-
-  foo :: Coercible (Down Int) Int => Down Int -> Int
-  foo = coerce
-
-That should compile, but only because we use canEqFailure and not
-canEqHardFailure.
+      That should compile, but only because we use canEqSoftFailure and
+      not canEqHardFailure.
 
 Note [Fast path when decomposing TyConApps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1289,20 +1299,19 @@ canDecomposableFunTy ev eq_rel af f1@(m1,a1,r1) f2@(m2,a2,r2)
     loc  = ctEvLoc ev
     role = eqRelRole eq_rel
 
--- | Call when canonicalizing an equality fails, but if the equality is
--- representational, there is some hope for the future.
--- Examples in Note [Use canEqFailure in canDecomposableTyConApp]
-canEqFailure :: CtEvidence -> EqRel
-             -> TcType -> TcType -> TcS (StopOrContinue Ct)
-canEqFailure ev NomEq ty1 ty2
+-- | Call canEqSoftFailure when canonicalizing an equality fails, but if the
+-- equality is representational, there is some hope for the future.
+canEqSoftFailure :: CtEvidence -> EqRel
+                 -> TcType -> TcType -> TcS (StopOrContinue Ct)
+canEqSoftFailure ev NomEq ty1 ty2
   = canEqHardFailure ev ty1 ty2
-canEqFailure ev ReprEq ty1 ty2
+canEqSoftFailure ev ReprEq ty1 ty2
   = do { (redn1, rewriters1) <- rewrite ev ty1
        ; (redn2, rewriters2) <- rewrite ev ty2
             -- We must rewrite the types before putting them in the
             -- inert set, so that we are sure to kick them out when
             -- new equalities become available
-       ; traceTcS "canEqFailure with ReprEq" $
+       ; traceTcS "canEqSoftFailure with ReprEq" $
          vcat [ ppr ev, ppr redn1, ppr redn2 ]
        ; new_ev <- rewriteEqEvidence (rewriters1 S.<> rewriters2) ev NotSwapped redn1 redn2
        ; continueWith (mkIrredCt ReprEqReason new_ev) }
