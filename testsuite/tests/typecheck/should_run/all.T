@@ -122,11 +122,9 @@ test('TypeRep', normal, compile_and_run, [''])
 test('T11120', normal, compile_and_run, [''])
 test('KindInvariant', normal, ghci_script, ['KindInvariant.script'])
 
-# We omit the ghci way in these 3 tests because they use
-# unboxed sums and ghci does not support those yet.
-test('StrictPats', omit_ways(['ghci']), compile_and_run, [''])
-test('T12809', omit_ways(['ghci']), compile_and_run, [''])
-test('EtaExpandLevPoly', [omit_ways(['ghci'])], compile_and_run, [''])
+test('StrictPats', normal, compile_and_run, [''])
+test('T12809', normal, compile_and_run, [''])
+test('EtaExpandLevPoly', normal, compile_and_run, [''])
 
 test('TestTypeableBinary', normal, compile_and_run, [''])
 test('Typeable1', normal, compile_fail, ['-Werror'])
