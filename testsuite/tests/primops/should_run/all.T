@@ -1,9 +1,8 @@
 test('T6135', normal, compile_and_run, [''])
 test('T7689', normal, compile_and_run, [''])
-# These tests are using unboxed tuples, so omit ghci
-test('T9430', omit_ways(['ghci']), compile_and_run, [''])
+test('T9430', normal, compile_and_run, [''])
 test('T4442',
-     [omit_ways(['ghci']), when(wordsize(32), expect_broken(15184))],
+     [when(wordsize(32), expect_broken(15184))],
      compile_and_run, [''])
 test('T10481', exit_code(1), compile_and_run, [''])
 test('T10678',
@@ -18,13 +17,12 @@ test('T16164', normal, compile_and_run, [''])
 test('ShowPrim', normal, compile_and_run, [''])
 test('T12492', normal, compile_and_run, [''])
 
-# These tests use unboxed tuples, which GHCi doesn't support
-test('ArithInt8', omit_ways(['ghci']), compile_and_run, [''])
-test('ArithWord8', omit_ways(['ghci']), compile_and_run, [''])
-test('ArithInt16', omit_ways(['ghci']), compile_and_run, [''])
-test('ArithWord16', omit_ways(['ghci']), compile_and_run, [''])
-test('ArithInt32', omit_ways(['ghci']), compile_and_run, [''])
-test('ArithWord32', omit_ways(['ghci']), compile_and_run, [''])
+test('ArithInt8', normal, compile_and_run, [''])
+test('ArithWord8', normal, compile_and_run, [''])
+test('ArithInt16', normal, compile_and_run, [''])
+test('ArithWord16', normal, compile_and_run, [''])
+test('ArithInt32', normal, compile_and_run, [''])
+test('ArithWord32', normal, compile_and_run, [''])
 
 test('CmpInt8', normal, compile_and_run, [''])
 test('CmpWord8', normal, compile_and_run, [''])
