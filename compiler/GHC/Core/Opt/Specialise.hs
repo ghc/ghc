@@ -1781,7 +1781,7 @@ specCalls spec_imp env existing_rules calls_for_me fn rhs
                  spec_fn_details
                    = case idDetails fn of
                        JoinId join_arity _ -> JoinId (join_arity - join_arity_decr) Nothing
-                       DFunId is_nt        -> DFunId is_nt
+                       DFunId unary        -> DFunId unary
                        _                   -> VanillaId
 
            ; spec_fn <- newSpecIdSM (idName fn) spec_fn_ty spec_fn_details spec_fn_info

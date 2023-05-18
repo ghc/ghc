@@ -333,7 +333,7 @@ buildClass tycon_name binders roles fds
               -- (We used to call them D_C, but now we can have two different
               --  superclasses both called C!)
 
-        ; let use_newtype = isSingleton (sc_theta ++ op_tys)
+        ; let unary_class = isSingleton (sc_theta ++ op_tys)
                 -- Use a newtype if the data constructor
                 --   (a) has exactly one value field
                 --       i.e. exactly one operation or superclass taken together
@@ -371,8 +371,8 @@ buildClass tycon_name binders roles fds
                                    (mkTyConTagMap rec_tycon)
 
         ; rhs <- case () of
-                  _ | use_newtype
-                    -> mkNewTyConRhs tycon_name rec_tycon dict_con
+                  _ | unary_class
+                    -> return (UnaryClass dict_con)
                     | isCTupleTyConName tycon_name
                     -> return (TupleTyCon { data_con = dict_con
                                           , tup_sort = ConstraintTuple })

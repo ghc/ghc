@@ -38,7 +38,9 @@ import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.Class( classTyCon )
 import GHC.Core.DataCon
+import GHC.Core.TyCo.Rep( scaledThing )
 import GHC.Core.Opt.OccurAnal
 
 import GHC.Data.Maybe
@@ -245,23 +247,22 @@ corePrepPgm :: Logger
             -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO CoreProgram
 corePrepPgm logger cp_cfg pgm_cfg
-            this_mod mod_loc binds data_tycons =
+            this_mod mod_loc binds tycons =
     withTiming logger
                (text "CorePrep"<+>brackets (ppr this_mod))
                (\a -> a `seqList` ()) $ do
     let initialCorePrepEnv = mkInitialCorePrepEnv cp_cfg
 
     us <- mkSplitUniqSupply 's'
-
-    let implicit_binds = mkDataConWorkers
-          (cpPgm_generateDebugInfo pgm_cfg)
-          mod_loc data_tycons
-            -- NB: we must feed mkImplicitBinds through corePrep too
-            -- so that they are suitably cloned and eta-expanded
+    let
+        gen_debug_info = cpPgm_generateDebugInfo pgm_cfg
+        implicit_binds = concatMap (mkDataConWorkers gen_debug_info mod_loc) tycons
 
         binds_out = initUs_ us $ do
                       floats1 <- corePrepTopBinds initialCorePrepEnv binds
                       floats2 <- corePrepTopBinds initialCorePrepEnv implicit_binds
+                                 -- NB: we must feed mkImplicitBinds through corePrep too
+                                 -- so that they are suitably cloned and eta-expanded
                       return (deFloatTop (floats1 `zipFloats` floats2))
 
     endPassIO logger (cpPgm_endPassConfig pgm_cfg)
@@ -291,16 +292,19 @@ corePrepTopBinds initialCorePrepEnv binds
                                floatss <- go env' binds
                                return (floats `zipFloats` floatss)
 
-mkDataConWorkers :: Bool -> ModLocation -> [TyCon] -> [CoreBind]
+mkDataConWorkers :: Bool -> ModLocation -> TyCon -> [CoreBind]
 -- See Note [Data constructor workers]
 -- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
-mkDataConWorkers generate_debug_info mod_loc data_tycons
+mkDataConWorkers generate_debug_info mod_loc tycon
+  | isBoxedDataTyCon tycon
   = [ NonRec id (tick_it (getName data_con) (Var id))
-                                -- The ice is thin here, but it works
-    | tycon <- data_tycons,     -- CorePrep will eta-expand it
-      data_con <- tyConDataCons tycon,
-      let id = dataConWorkId data_con
+      -- The ice is thin here, but it works: CorePrep will eta-expand it
+    | data_con <- tyConDataCons tycon
+    , let id = dataConWorkId data_con
     ]
+
+  | otherwise
+  = []  -- No worker for newtypes and family tycons
  where
    -- If we want to generate debug info, we put a source note on the
    -- worker. This is useful, especially for heap profiling.
@@ -1178,6 +1182,10 @@ cpeApp top_env expr
              ; return (floats1 `appFloats` floats2 `snocFloat` float, tup) }
 
     cpe_app env (Var v) args
+      | Just (payload, args') <- isUnaryClassApp v args
+      = cpe_app env payload args'
+
+    cpe_app env (Var v) args
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
                  hd = getIdFromTrivialExpr_maybe e2
@@ -1265,8 +1273,8 @@ cpeApp top_env expr
 
     rebuild_app'
         :: CorePrepEnv
-        -> [ArgInfo] -- The arguments (inner to outer)
-        -> CpeApp
+        -> [ArgInfo] -- The arguments (inner to outer); substitution not applied
+        -> CpeApp    -- Substitution already applied
         -> Floats
         -> [Demand]
         -> [CoreTickish]
@@ -1278,12 +1286,9 @@ cpeApp top_env expr
 
     rebuild_app' env (a : as) fun' floats ss rt_ticks req_depth = case a of
       -- See Note [Ticks and mandatory eta expansion]
-      _
-        | not (null rt_ticks)
-        , req_depth <= 0
-        ->
-            let tick_fun = foldr mkTick fun' rt_ticks
-            in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
+      _ | not (null rt_ticks), req_depth <= 0
+        -> let tick_fun = foldr mkTick fun' rt_ticks
+           in rebuild_app' env (a : as) tick_fun floats ss rt_ticks req_depth
 
       AIApp (Type arg_ty)
         -> rebuild_app' env as (App fun' (Type arg_ty')) floats ss rt_ticks req_depth
@@ -1301,7 +1306,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-        (fs, arg') <- cpeArg top_env ss1 arg
+        (fs, arg') <- cpeArg env ss1 arg
         rebuild_app' env as (App fun' arg') (fs `zipFloats` floats) ss_rest rt_ticks (req_depth-1)
 
       AICast co
@@ -1325,6 +1330,41 @@ isLazyExpr (Cast e _)              = isLazyExpr e
 isLazyExpr (Tick _ e)              = isLazyExpr e
 isLazyExpr (Var f `App` _ `App` _) = f `hasKey` lazyIdKey
 isLazyExpr _                       = False
+
+isUnaryClassApp :: Id -> [ArgInfo] -> Maybe (CoreExpr, [ArgInfo])
+-- If we have class C a b c where { op :: ty }
+-- Transform
+--    op  ta tb tc dict_arg  --> dict_arg |> co
+--    MkC ta tb tc meth_arg  --> meth_arg |> sym co
+-- where co :: C ta tb tc ~ ty[t1/a,tb/b,tc/c]
+isUnaryClassApp v args
+  | Just data_con <- isDataConWorkId_maybe v
+  , let tycon = dataConTyCon data_con
+  , Just (dict_arg, ty_args, rest) <- getUnaryClassPayload tycon args
+  = Just (mkCast dict_arg (mkSymCo (mk_co tycon ty_args)), rest)
+
+  | Just cls <- isClassOpId_maybe v
+  , let tycon = classTyCon cls
+  , Just (meth_arg, ty_args, rest) <- getUnaryClassPayload tycon args
+  = Just (mkCast meth_arg (mk_co tycon ty_args), rest)
+
+  | otherwise
+  = Nothing
+  where
+    -- mk_co makes a coercion of kind (C ta tb tc ~ ty[t1/a,tb/b,tc/c])
+    mk_co tycon ty_args
+      | [meth_ty] <- dataConInstArgTys (tyConSingleDataCon tycon) ty_args
+      = mkUnaryClassCo (mkTyConApp tycon ty_args) (scaledThing meth_ty)
+      | otherwise = pprPanic "isUnaryClassApp" (ppr args $$ ppr tycon $$ ppr ty_args)
+
+getUnaryClassPayload :: TyCon -> [ArgInfo] -> Maybe (CoreExpr, [Type], [ArgInfo])
+getUnaryClassPayload tc args
+  | isUnaryClassTyCon tc = go (tyConArity tc) [] args
+  | otherwise            = Nothing
+  where
+    go n rev_ty_args (AIApp (Type ty) : args) = go (n-1) (ty:rev_ty_args) args
+    go 0 rev_ty_args (AIApp payload : args)  = Just (payload, reverse rev_ty_args, args)
+    go _ _ _ = Nothing
 
 {- Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~~~~

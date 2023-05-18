@@ -648,15 +648,15 @@ getImplicitBinds tc = cls_binds ++ getTyConImplicitBinds tc
 
 getTyConImplicitBinds :: TyCon -> [CoreBind]
 getTyConImplicitBinds tc
-  | isDataTyCon tc = [ NonRec wrap_id rhs
-                     | dc <- tyConDataCons tc
-                     , let wrap_id = dataConWrapId dc
-                         -- For data cons with no wrapper, this wrap_id
-                         -- is in fact a DataConWorkId, and hence
-                         -- dataConWrapUnfolding_maybe returns Nothing
-                     , Just rhs <- [dataConWrapUnfolding_maybe wrap_id] ]
+  | isBoxedDataTyCon tc = [ NonRec wrap_id rhs
+                          | dc <- tyConDataCons tc
+                          , let wrap_id = dataConWrapId dc
+                              -- For data cons with no wrapper, this wrap_id
+                              -- is in fact a DataConWorkId, and hence
+                              -- dataConWrapUnfolding_maybe returns Nothing
+                          , Just rhs <- [dataConWrapUnfolding_maybe wrap_id] ]
 
-  | otherwise      = []
+  | otherwise           = []
     -- The 'otherwise' includes family TyCons of course, but also (less obviously)
     --  * Newtypes: see Note [Compulsory newtype unfolding] in GHC.Types.Id.Make
     --  * type data: we don't want any code for type-only stuff (#24620)
