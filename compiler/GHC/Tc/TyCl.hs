@@ -878,8 +878,13 @@ swizzleTcTyConBndrs tc_infos
     swizzle_tv _ tv = return (mkTyVarTy (swizzle_var tv))
     swizzle_cv _ cv = return (mkCoVarCo (swizzle_var cv))
 
-    swizzle_bndr _ tcv _
-      = return ((), swizzle_var tcv)
+    swizzle_bndr :: ()
+      -> TyCoVar
+      -> ForAllTyFlag
+      -> (() -> TyCoVar -> Identity r)
+      -> Identity r
+    swizzle_bndr _ tcv _ k
+      = k () (swizzle_var tcv)
 
     swizzle_var :: Var -> Var
     swizzle_var v
