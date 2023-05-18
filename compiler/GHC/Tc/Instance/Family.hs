@@ -189,9 +189,6 @@ For every other pair of family instance modules we import (directly or
 indirectly), we check that they are consistent now. (So that we can be
 certain that the modules in our `GHC.Driver.Env.dep_finsts' are consistent.)
 
-There is some fancy footwork regarding hs-boot module loops, see
-Note [Don't check hs-boot type family instances too early]
-
 Note [Checking family instance optimization]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As explained in Note [Checking family instance consistency]
@@ -245,9 +242,6 @@ a set of utility modules that every module imports directly or indirectly.
 This is basically the idea from #13092, comment:14.
 -}
 
--- This function doesn't check ALL instances for consistency,
--- only ones that aren't involved in recursive knot-tying
--- loops; see Note [Don't check hs-boot type family instances too early].
 -- We don't need to check the current module, this is done in
 -- tcExtendLocalFamInstEnv.
 -- See Note [The type family instance consistency story].
@@ -350,68 +344,7 @@ checkFamInstConsistency directlyImpMods
                  sizeE2 = famInstEnvSize env2'
                  (env1, env2) = if sizeE1 < sizeE2 then (env1', env2')
                                                    else (env2', env1')
-           -- Note [Don't check hs-boot type family instances too early]
-           -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-           -- Family instance consistency checking involves checking that
-           -- the family instances of our imported modules are consistent with
-           -- one another; this might lead you to think that this process
-           -- has nothing to do with the module we are about to typecheck.
-           -- Not so!  Consider the following case:
-           --
-           --   -- A.hs-boot
-           --   type family F a
-           --
-           --   -- B.hs
-           --   import {-# SOURCE #-} A
-           --   type instance F Int = Bool
-           --
-           --   -- A.hs
-           --   import B
-           --   type family F a
-           --
-           -- When typechecking A, we are NOT allowed to poke the TyThing
-           -- for F until we have typechecked the family.  Thus, we
-           -- can't do consistency checking for the instance in B
-           -- (checkFamInstConsistency is called during renaming).
-           -- Failing to defer the consistency check lead to #11062.
-           --
-           -- Additionally, we should also defer consistency checking when
-           -- type from the hs-boot file of the current module occurs on
-           -- the left hand side, as we will poke its TyThing when checking
-           -- for overlap.
-           --
-           --   -- F.hs
-           --   type family F a
-           --
-           --   -- A.hs-boot
-           --   import F
-           --   data T
-           --
-           --   -- B.hs
-           --   import {-# SOURCE #-} A
-           --   import F
-           --   type instance F T = Int
-           --
-           --   -- A.hs
-           --   import B
-           --   data T = MkT
-           --
-           -- In fact, it is even necessary to defer for occurrences in
-           -- the RHS, because we may test for *compatibility* in event
-           -- of an overlap.
-           --
-           -- Why don't we defer ALL of the checks to later?  Well, many
-           -- instances aren't involved in the recursive loop at all.  So
-           -- we might as well check them immediately; and there isn't
-           -- a good time to check them later in any case: every time
-           -- we finish kind-checking a type declaration and add it to
-           -- a context, we *then* consistency check all of the instances
-           -- which mentioned that type.  We DO want to check instances
-           -- as quickly as possible, so that we aren't typechecking
-           -- values with inconsistent axioms in scope.
-           --
-           -- See also Note [Tying the knot]
-           -- for why we are doing this at all.
+
            ; let check_now = famInstEnvElts env1
            ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
            ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
