@@ -1032,28 +1032,21 @@ truncateReg w w' r =
 --  The 'Amode' type: Memory addressing modes passed up the tree.
 data Amode = Amode AddrMode InstrBlock
 
+-- | Provide the value of a `CmmExpr` with an `Amode`
+--
+-- N.B. this function should be used to provide operands to load and store
+-- instructions with signed 12bit wide immediates (S & I types). For other
+-- immediate sizes and formats (e.g. B type uses multiples of 2) this function
+-- would need to be adjusted.
 getAmode :: Platform
          -> Width     -- ^ width of loaded value
          -> CmmExpr
          -> NatM Amode
 -- TODO: Specialize stuff we can destructure here.
 
--- OPTIMIZATION WARNING: Addressing modes.
--- Addressing options:
--- LDUR/STUR: imm9: -256 - 255
-getAmode platform _ (CmmRegOff reg off) | -256 <= off, off <= 255
-  = return $ Amode (AddrRegImm reg' off') nilOL
-    where reg' = getRegisterReg platform reg
-          off' = ImmInt off
--- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
-getAmode platform W32 (CmmRegOff reg off)
-  | 0 <= off, off <= 16380, off `mod` 4 == 0
-  = return $ Amode (AddrRegImm reg' off') nilOL
-    where reg' = getRegisterReg platform reg
-          off' = ImmInt off
--- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
-getAmode platform W64 (CmmRegOff reg off)
-  | 0 <= off, off <= 32760, off `mod` 8 == 0
+-- LDR/STR: Immediate can be represented with 12bits
+getAmode platform w (CmmRegOff reg off)
+  | w <= W64, fitsIn12bitImm off
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
@@ -1063,12 +1056,12 @@ getAmode platform W64 (CmmRegOff reg off)
 -- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
 -- for `n` in range.
 getAmode _platform _ (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
-  | -256 <= off, off <= 255
+  | fitsIn12bitImm off
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
 getAmode _platform _ (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
-  | -256 <= -off, -off <= 255
+  | fitsIn12bitImm (-off)
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
 
@@ -1076,6 +1069,12 @@ getAmode _platform _ (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
 getAmode _platform _ expr
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrReg reg) code
+
+fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
+fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
+  where
+    intMin12bit = -2048
+    intMax12bit = 2047
 
 -- -----------------------------------------------------------------------------
 -- Generating assignments
