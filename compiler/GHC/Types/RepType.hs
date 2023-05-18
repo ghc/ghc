@@ -698,7 +698,7 @@ mightBeFunTy ty
   = False
   | [BoxedRep _] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
-  , isDataTyCon tc
+  , isBoxedDataTyCon tc
   = False
   | otherwise
   = True

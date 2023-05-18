@@ -94,12 +94,11 @@ stgify summary guts = do
     let dflags = hsc_dflags hsc_env
     prepd_binds <- liftIO $ do
       cp_cfg <- initCorePrepConfig hsc_env
-      corePrepPgm (hsc_logger hsc_env) cp_cfg (initCorePrepPgmConfig dflags (interactiveInScope $ hsc_IC hsc_env)) this_mod location core_binds data_tycons
+      corePrepPgm (hsc_logger hsc_env) cp_cfg (initCorePrepPgmConfig dflags (interactiveInScope $ hsc_IC hsc_env)) this_mod location core_binds tycons
     return $ fstOf3 $ coreToStg (initCoreToStgOpts dflags) (ms_mod summary) (ms_location summary) prepd_binds
   where this_mod = mg_module guts
         location = ms_location summary
         core_binds = mg_binds guts
-        data_tycons = filter isDataTyCon tycons
         tycons = mg_tcs guts
 
 

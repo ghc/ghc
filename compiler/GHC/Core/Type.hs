@@ -2482,7 +2482,8 @@ isTerminatingType :: HasDebugCallStack => Type -> Bool
 -- NB: unlifted types are not terminating types!
 --     e.g. you can write a term (loop 1)::Int# that diverges.
 isTerminatingType ty = case tyConAppTyCon_maybe ty of
-    Just tc -> isClassTyCon tc && not (isNewTyCon tc)
+    Just tc -> isClassTyCon tc && not (isUnaryClassTyCon tc)
+               -- A non-unary class TyCon is terminating
     _       -> False
 
 isPrimitiveType :: Type -> Bool

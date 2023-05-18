@@ -330,16 +330,15 @@ tcExpr e@(HsIPVar _ x) res_ty
           -- Create a unification type variable of kind 'Type'.
           -- (The type of an implicit parameter must have kind 'Type'.)
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
-       ; ipClass <- tcLookupClass ipClassName
-       ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
+             origin  = IPOccOrigin x
+       ; ip_class <- tcLookupClass ipClassName
+       ; let ip_pred = mkClassPred ip_class [ip_name, ip_ty]
+       ; ip_dict <- emitWantedEvVar origin ip_pred
+       ; let (ip_op, _, _) = decomposeIP ip_pred
+             wrap = mkWpEvVarApps [ip_dict] <.> mkWpTyApps [ip_name, ip_ty]
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
-                   ip_ty res_ty }
-  where
-  -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = mkHsWrap $ mkWpCastR $
-                          unwrapIP $ mkClassPred ipClass [x,ty]
-  origin = IPOccOrigin x
+               (mkHsWrap wrap (HsVar noExtField (noLocA ip_op)))
+               ip_ty res_ty }
 
 tcExpr e@(HsLam x lam_variant matches) res_ty
   = do { (wrap, matches') <- tcLambdaMatches e lam_variant matches [] res_ty
