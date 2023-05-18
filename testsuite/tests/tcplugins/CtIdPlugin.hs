@@ -52,8 +52,7 @@ solver _args defs ev givens wanteds = do
       newGivens <- for (zip newGivenPredTypes givens) \case
         (Nothing, _) -> return Nothing
         (Just pred, ct) ->
-          let EvExpr expr =
-                evCast (ctEvExpr $ ctEvidence ct) $ pluginCo (ctPred ct) pred
+          let expr = evCastE (ctEvExpr $ ctEvidence ct) $ pluginCo (ctPred ct) pred
           in Just . mkNonCanonical <$> newGiven ev (ctLoc ct) pred expr
       let removedGivens =
             [ (substEvidence ct ct', ct)

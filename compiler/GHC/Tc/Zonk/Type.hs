@@ -76,8 +76,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Monad
 import GHC.Utils.Panic
 
-import GHC.Core.Multiplicity
 import GHC.Core
+import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 
 import GHC.Types.Name

@@ -1852,9 +1852,9 @@ app_ok fun_ok primop_ok fun args
 
   | otherwise
   = case idDetails fun of
-      DFunId new_type -> not new_type
+      DFunId unary_class -> not unary_class
          -- DFuns terminate, unless the dict is implemented
-         -- with a newtype in which case they may not
+         -- by a no-op in which case they may not
 
       DataConWorkId dc
         | isLazyDataConRep dc
@@ -2149,7 +2149,22 @@ exprIsHNF = exprIsHNFlike isDataConWorkId isEvaldUnfolding
 -- data constructors. Conlike arguments are considered interesting by the
 -- inliner.
 exprIsConLike :: CoreExpr -> Bool       -- True => lambda, conlike, PAP
-exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+-- exprIsConLike = exprIsHNFlike isConLikeId isConLikeUnfolding
+-- Trying: just a constructor application
+exprIsConLike (Var v)       = isConLikeId v
+exprIsConLike (Lit l)       = not (isLitRubbish l)
+exprIsConLike (App f a)     = exprIsTrivial a && exprIsConLike f
+exprIsConLike (Lam b e)
+  | isRuntimeVar b          = False
+  | otherwise               = exprIsConLike e
+exprIsConLike (Tick t e)
+  | tickishCounts t         = False
+  | otherwise               = exprIsConLike e
+exprIsConLike (Cast e _)    = exprIsConLike e
+exprIsConLike (Let {})      = False
+exprIsConLike (Case {})     = False
+exprIsConLike (Type {})     = False
+exprIsConLike (Coercion {}) = False
 
 -- | Returns true for values or value-like expressions. These are lambdas,
 -- constructors / CONLIKE functions (as determined by the function argument)
@@ -2696,6 +2711,7 @@ isEmptyTy ty
 -- | If @normSplitTyConApp_maybe _ ty = Just (tc, tys, co)@
 -- then @ty |> co = tc tys@. It's 'splitTyConApp_maybe', but looks through
 -- coercions via 'topNormaliseType_maybe'. Hence the \"norm\" prefix.
+-- Postcondition: tc is not a newtype (guaranteed by topNormaliseType_maybe)
 normSplitTyConApp_maybe :: FamInstEnvs -> Type -> Maybe (TyCon, [Type], Coercion)
 normSplitTyConApp_maybe fam_envs ty
   | let Reduction co ty1 = topNormaliseType_maybe fam_envs ty

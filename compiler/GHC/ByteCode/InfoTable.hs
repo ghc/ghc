@@ -21,7 +21,7 @@ import GHC.Types.Name.Env
 import GHC.Types.RepType
 
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
-import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isBoxedDataTyCon, tyConDataCons )
 import GHC.Core.Multiplicity     ( scaledThing )
 
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
@@ -38,7 +38,7 @@ import GHC.Utils.Panic
 mkITbls :: Interp -> Profile -> [TyCon] -> IO ItblEnv
 mkITbls interp profile tcs =
   foldr plusNameEnv emptyNameEnv <$>
-    mapM mkITbl (filter isDataTyCon tcs)
+    mapM mkITbl (filter isBoxedDataTyCon tcs)
  where
   mkITbl :: TyCon -> IO ItblEnv
   mkITbl tc

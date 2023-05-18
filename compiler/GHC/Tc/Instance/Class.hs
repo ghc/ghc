@@ -12,8 +12,6 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 
-import GHC.Core.TyCo.Rep
-
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
@@ -23,7 +21,8 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.CtLoc
 import GHC.Tc.Types.Origin ( InstanceWhat (..), SafeOverlapping, CtOrigin(GetFieldOrigin) )
-import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst, FamInstEnvs )
+import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcLookupDataFamInst, FamInstEnvs )
+
 import GHC.Rename.Env( addUsedGRE, addUsedDataCons, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
@@ -33,13 +32,15 @@ import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
 import GHC.Types.Name   ( Name )
+import GHC.Types.Name.Reader
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Var
 
+import GHC.Core.TyCo.Rep
 import GHC.Core.Predicate
 import GHC.Core.Coercion
 import GHC.Core.InstEnv
@@ -48,8 +49,7 @@ import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-
-import GHC.Core ( Expr(..) )
+import GHC.Core ( Expr(..), mkConApp )
 
 import GHC.StgToCmm.Closure ( isSmallFamily )
 
@@ -57,17 +57,14 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
-import GHC.Data.Maybe ( expectJust )
 
 import GHC.Unit.Module.Warnings
 
 import GHC.Hs.Extension
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
 
-import Data.Functor
 import Data.Maybe
 
 {- *******************************************************************
@@ -229,7 +226,6 @@ match_one so canonical dfun_id mb_inst_tys warn
                                                              , iw_safe_over = so
                                                              , iw_warn = warn } } }
 
-
 {- Note [Shortcut solving: overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have
@@ -260,13 +256,10 @@ was a puzzling example.
 matchCTuple :: Class -> [Type] -> TcM ClsInstResult
 matchCTuple clas tys   -- (isCTupleClass clas) holds
   = return (OneInst { cir_new_theta   = tys
-                    , cir_mk_ev       = tuple_ev
+                    , cir_mk_ev       = evDictApp clas tys
                     , cir_canonical   = EvCanonical
                     , cir_what        = BuiltinInstance })
             -- The dfun *is* the data constructor!
-  where
-     data_con = tyConSingleDataCon (classTyCon clas)
-     tuple_ev = evDFunApp (dataConWrapId data_con) tys
 
 {- ********************************************************************
 *                                                                     *
@@ -413,25 +406,25 @@ makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 --     The process is mirrored for Symbols:
 --     String    -> SSymbol n
 --     SSymbol n -> KnownSymbol n
-makeLitDict clas ty et
-    | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
-          -- co_dict :: KnownNat n ~ SNat n
-    , [ meth ]   <- classMethods clas
-    , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
-                    -- If the method type is forall n. KnownNat n => SNat n
-                    -- then tcRep is SNat
-    , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
-          -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
-    = return $ OneInst { cir_new_theta   = []
-                       , cir_mk_ev       = \_ -> ev_tm
-                       , cir_canonical   = EvCanonical
-                       , cir_what        = BuiltinInstance }
+makeLitDict clas lit_ty lit_expr
+  | [meth]      <- classMethods clas
+  , Just rep_tc <- tyConAppTyCon_maybe (classMethodTy meth)
+                  -- If the method type is forall n. KnownNat n => SNat n
+                  -- then rep_tc :: TyCon is SNat
+  , [rep_con]  <- tyConDataCons rep_tc
+  = do { let mk_ev _ = evDictApp clas [lit_ty] $
+                       [mkConApp rep_con [Type lit_ty, lit_expr]]
+       ; return $ OneInst { cir_new_theta   = []
+                          , cir_mk_ev       = mk_ev
+                          , cir_canonical   = EvCanonical
+                          , cir_what        = BuiltinInstance } }
 
-    | otherwise
-    = pprPanic "makeLitDict" $
-      text "Unexpected evidence for" <+> ppr (className clas)
-      $$ vcat (map (ppr . idType) (classMethods clas))
+  | otherwise
+  = pprPanic "makeLitDict" $
+    text "Unexpected evidence for" <+> ppr (className clas)
+    $$ vcat (map (ppr . idType) (classMethods clas))
+
+
 
 {- ********************************************************************
 *                                                                     *
@@ -447,32 +440,27 @@ matchWithDict [cls, mty]
   | Just (dict_tc, dict_args) <- tcSplitTyConApp_maybe cls
     -- Check that C is a class of the form
     -- `class C a_1 ... a_n where op :: meth_ty`
-    -- and in that case let
-    -- co :: C t1 ..tn ~R# inst_meth_ty
-  , Just (inst_meth_ty, co) <- tcInstNewTyCon_maybe dict_tc dict_args
+  , Just dict_dc <- isUnaryClassTyCon_maybe dict_tc
+  , [inst_meth_ty] <- dataConInstArgTys dict_dc dict_args
   = do { sv <- mkSysLocalM (fsLit "withDict_s") ManyTy mty
        ; k  <- mkSysLocalM (fsLit "withDict_k") ManyTy (mkInvisFunTy cls openAlphaTy)
+       ; wd_cls <- tcLookupClass withDictClassName
 
-       -- Given co2 : mty ~N# inst_meth_ty, construct the method of
+       -- Given ev_expr : mty ~N# inst_meth_ty, construct the method of
        -- the WithDict dictionary:
        --
        --   \@(r :: RuntimeRep) @(a :: TYPE r) (sv :: mty) (k :: cls => a) ->
-       --     k (sv |> (sub co ; sym co2))
-       ; let evWithDict co2 =
-               mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
-                 Var k
-                   `App`
-                 (Var sv `Cast` mkTransCo (mkSubCo co2) (mkSymCo co))
+       --     k (MkC tys (sv |> sub co2))
+       ; let evWithDict ev_expr
+               = mkCoreLams [ runtimeRep1TyVar, openAlphaTyVar, sv, k ] $
+                 Var k `App` (evWrapUnaryDict dict_tc dict_args meth_arg)
+               where
+                 meth_arg = Var sv `Cast` mkSubCo (evExprCoercion ev_expr)
 
-       ; tc <- tcLookupTyCon withDictClassName
-       ; let withdict_data_con = expectJust
-                 $ tyConSingleDataCon_maybe tc    -- "Data constructor"
-                                                  -- for WithDict
-             mk_ev [c] = evDataConApp withdict_data_con
-                            [cls, mty] [evWithDict (evTermCoercion (EvExpr c))]
+       ; let mk_ev [c] = evDictApp wd_cls [cls, mty] [evWithDict c]
              mk_ev e   = pprPanic "matchWithDict" (ppr e)
 
-       ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty inst_meth_ty]
+       ; return $ OneInst { cir_new_theta   = [mkNomEqPred mty (scaledThing inst_meth_ty)]
                           , cir_mk_ev       = mk_ev
                           , cir_canonical   = EvNonCanonical -- See (WD6) in Note [withDict]
                           , cir_what        = BuiltinInstance }
@@ -525,11 +513,11 @@ as if the following instance declaration existed:
 
 instance (mty ~# inst_meth_ty) => WithDict (C t1..tn) mty where
   withDict = \@{rr} @(r :: TYPE rr) (sv :: mty) (k :: C t1..tn => r) ->
-    k (sv |> (sub co2 ; sym co))
+    k (MkC (sv |> sub co)))
 
 That is, it matches on the first (constraint) argument of C; if C is
 a single-method class, the instance "fires" and emits an equality
-constraint `mty ~ inst_meth_ty`, where `inst_meth_ty` is `meth_ty[ti/ai]`.
+constraint `mty ~# inst_meth_ty`, where `inst_meth_ty` is `meth_ty[ti/ai]`.
 The coercion `co2` witnesses the equality `mty ~ inst_meth_ty`.
 
 The coercion `co` is a newtype coercion that coerces from `C t1 ... tn`
@@ -622,11 +610,64 @@ Some further observations about `withDict`:
       overloaded function `f` (e.g. with a type such as `f :: Eq a => ...`).
 
       See test-case T21575b.
+-}
 
 
+{- ********************************************************************
+*                                                                     *
+                   Class lookup for DataToTag
+*                                                                     *
+***********************************************************************-}
 
-Note [DataToTag overview]
-~~~~~~~~~~~~~~~~~~~~~~~~~
+matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
+-- See Note [DataToTag overview]
+matchDataToTag dataToTagClass [levity, dty] = do
+  famEnvs <- tcGetFamInstEnvs
+  (gbl_env, _lcl_env) <- getEnvs
+  platform <- getPlatform
+  if | isConcreteType levity -- condition C3
+     , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
+     , let (repTyCon, repArgs, repCo)
+             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
+
+     , not (isTypeDataTyCon repTyCon)
+     , Just constrs <- tyConDataCons_maybe repTyCon
+         -- condition C1
+
+     , let  rdr_env = tcg_rdr_env gbl_env
+            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
+     , all inScope constrs -- condition C2
+
+     , let  repTy = mkTyConApp repTyCon repArgs
+            numConstrs = tyConFamilySize repTyCon
+            !whichOp -- see wrinkle DTW4
+              | isSmallFamily platform numConstrs
+                = primOpId DataToTagSmallOp
+              | otherwise
+                = primOpId DataToTagLargeOp
+
+            -- See wrinkle DTW1; we must apply the underlying
+            -- operation at the representation type and cast it
+            methodRep = Var whichOp `App` Type levity `App` Type repTy
+            methodCo = mkFunCo Representational
+                               FTF_T_T
+                               (mkNomReflCo ManyTy)
+                               (mkSymCo repCo)
+                               (mkReflCo Representational intPrimTy)
+     -> do { addUsedDataCons rdr_env repTyCon   -- See wrinkles DTW2 and DTW3
+           ; let mk_ev _ = evDictApp dataToTagClass [levity, dty] $
+                           [methodRep `Cast` methodCo]
+           ; pure (OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
+                           , cir_mk_ev     = mk_ev
+                           , cir_canonical = EvCanonical
+                           , cir_what = BuiltinInstance })}
+     | otherwise -> pure NoInstance
+
+matchDataToTag _ _ = pure NoInstance
+
+
+{- Note [DataToTag overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Class `DataToTag` is defined like this, in GHC.Magic:
 
   type DataToTag :: forall {lev :: Levity}.
@@ -893,66 +934,7 @@ argument, unless tag inference determines the argument was already
 evaluated and correctly tagged.  Getting here was a long journey, with
 many similarities to the story behind Note [Evaluated and Properly Tagged] in
 GHC.Stg.EnforceEpt.  See also #15696.
-
 -}
-
-
-{- ********************************************************************
-*                                                                     *
-                   Class lookup for DataToTag
-*                                                                     *
-***********************************************************************-}
-
-matchDataToTag :: Class -> [Type] -> TcM ClsInstResult
--- See Note [DataToTag overview]
-matchDataToTag dataToTagClass [levity, dty] = do
-  famEnvs <- tcGetFamInstEnvs
-  (gbl_env, _lcl_env) <- getEnvs
-  platform <- getPlatform
-  if | isConcreteType levity -- condition C3
-     , Just (rawTyCon, rawTyConArgs) <- tcSplitTyConApp_maybe dty
-     , let (repTyCon, repArgs, repCo)
-             = tcLookupDataFamInst famEnvs rawTyCon rawTyConArgs
-
-     , not (isTypeDataTyCon repTyCon)
-     , Just constrs <- tyConAlgDataCons_maybe repTyCon
-         -- condition C1
-
-     , let  rdr_env = tcg_rdr_env gbl_env
-            inScope con = isJust $ lookupGRE_Name rdr_env $ dataConName con
-     , all inScope constrs -- condition C2
-
-     , let  repTy = mkTyConApp repTyCon repArgs
-            numConstrs = tyConFamilySize repTyCon
-            !whichOp -- see wrinkle DTW4
-              | isSmallFamily platform numConstrs
-                = primOpId DataToTagSmallOp
-              | otherwise
-                = primOpId DataToTagLargeOp
-
-            -- See wrinkle DTW1; we must apply the underlying
-            -- operation at the representation type and cast it
-            methodRep = Var whichOp `App` Type levity `App` Type repTy
-            methodCo = mkFunCo Representational
-                               FTF_T_T
-                               (mkNomReflCo ManyTy)
-                               (mkSymCo repCo)
-                               (mkReflCo Representational intPrimTy)
-            dataToTagDataCon = tyConSingleDataCon (classTyCon dataToTagClass)
-            mk_ev _ = evDataConApp dataToTagDataCon
-                                   [levity, dty]
-                                   [methodRep `Cast` methodCo]
-     -> addUsedDataCons rdr_env repTyCon -- See wrinkles DTW2 and DTW3
-          $> OneInst { cir_new_theta = [] -- (Ignore stupid theta.)
-                     , cir_mk_ev = mk_ev
-                     , cir_canonical = EvCanonical
-                     , cir_what = BuiltinInstance
-                     }
-     | otherwise -> pure NoInstance
-
-matchDataToTag _ _ = pure NoInstance
-
-
 
 {- ********************************************************************
 *                                                                     *
@@ -1000,8 +982,8 @@ doFunTy clas ty mult arg_ty ret_ty
                      , cir_what        = BuiltinInstance }
   where
     preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
-    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
-                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
+    mk_ev [mult_ev, arg_ev, ret_ev]
+       = evTypeable ty $ EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Instance.Class.doFunTy"
 
 
@@ -1153,21 +1135,21 @@ if you'd written
 ***********************************************************************-}
 
 -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
-matchEqualityInst :: Class -> [Type] -> (DataCon, Role, Type, Type)
+matchEqualityInst :: Class -> [Type] -> (Role, Type, Type)
 -- Precondition: `cls` satisfies GHC.Core.Predicate.isEqualityClass
 -- See Note [Solving equality classes] in GHC.Tc.Solver.Dict
 matchEqualityInst cls args
   | cls `hasKey` eqTyConKey  -- Solves (t1 ~ t2)
   , [_,t1,t2] <- args
-  = (eqDataCon, Nominal, t1, t2)
+  = (Nominal, t1, t2)
 
   | cls `hasKey` heqTyConKey -- Solves (t1 ~~ t2)
   , [_,_,t1,t2] <- args
-  = (heqDataCon,  Nominal, t1, t2)
+  = (Nominal, t1, t2)
 
   | cls `hasKey` coercibleTyConKey  -- Solves (Coercible t1 t2)
   , [_, t1, t2] <- args
-  = (coercibleDataCon, Representational, t1, t2)
+  = (Representational, t1, t2)
 
   | otherwise  -- Does not satisfy the precondition
   = pprPanic "matchEqualityInst" (ppr (mkClassPred cls args))
@@ -1271,16 +1253,13 @@ matchHasField dflags short_cut clas tys mb_ct_loc
                          theta = mkNomEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
-                         -- type (r -> a), then use the newtype coercion to cast
-                         -- it to a HasField dictionary.
-                         mk_ev (ev1:evs) = evSelector sel_id tvs evs `evCast` co
-                           where
-                             co = mkSubCo (evTermCoercion (EvExpr ev1))
-                                      `mkTransCo` mkSymCo co2
+                         -- type (r -> a), then use evWrapUnaryDict to turn it
+                         -- into a HasField dictionary.
+                         mk_ev (ev1:evs) = EvExpr                                $
+                                           evWrapUnaryDict (classTyCon clas) tys $
+                                           evCastExpr (evSelector sel_id tvs evs)
+                                                      (mkSubCo (evExprCoercion ev1))
                          mk_ev [] = panic "matchHasField.mk_ev"
-
-                         (_, co2) = expectJust $
-                             tcInstNewTyCon_maybe (classTyCon clas) tys
 
                      -- The selector must not be "naughty" (i.e. the field
                      -- cannot have an existentially quantified type),

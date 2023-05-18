@@ -41,7 +41,7 @@ module GHC.Tc.Utils.TcMType (
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
   newWantedWithLoc, newWanted, newWanteds, cloneWanted, cloneWC, cloneWantedCtEv,
-  emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
+  emitWanted, emitWantedEq, emitWantedEvVar,
   emitWantedEqs,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
   emitNewExprHole,
@@ -298,9 +298,6 @@ emitWantedEvVar origin ty
                              , ctev_rewriters = emptyRewriterSet }
        ; emitSimple $ mkNonCanonical ctev
        ; return new_cv }
-
-emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]
-emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 
 -- | Emit a new wanted expression hole
 emitNewExprHole :: RdrName         -- of the hole

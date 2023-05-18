@@ -530,10 +530,11 @@ coreToStgApp f args ticks = do
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
-                  | saturated    -> if isUnboxedSumDataCon dc then
-                                      StgConApp dc NoNumber args' (sumPrimReps args)
-                                    else
-                                      StgConApp dc NoNumber args' []
+                  | saturated
+                  -> if isUnboxedSumDataCon dc then
+                        StgConApp dc NoNumber args' (sumPrimReps args)
+                     else
+                        StgConApp dc NoNumber args' []
 
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps

@@ -590,9 +590,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
                                         ifSigs      = sigs,
                                         ifATs       = ats
                                      }})
-  = --   (possibly) newtype coercion
-    co_occs ++
-    --    data constructor (DataCon namespace)
+  = --    data constructor (DataCon namespace)
     --    data worker (Id namespace)
     --    no wrapper (class dictionaries never have a wrapper)
     [dc_occ, dcww_occ] ++
@@ -605,12 +603,8 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
   where
     cls_tc_occ = occName cls_tc_name
     n_ctxt = length sc_ctxt
-    n_sigs = length sigs
-    co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
-            | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
-    is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
 ifaceDeclImplicitBndrs _ = []
 

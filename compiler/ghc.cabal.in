@@ -852,7 +852,6 @@ Library
         GHC.Tc.Types
         GHC.Tc.Types.Constraint
         GHC.Tc.Types.Evidence
-        GHC.Tc.Types.EvTerm
         GHC.Tc.Types.Origin
         GHC.Tc.Types.Rank
         GHC.Tc.Types.CtLoc

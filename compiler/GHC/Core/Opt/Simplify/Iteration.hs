@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
+-- import GHC.Core.Class( Class, classArity )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
@@ -59,6 +60,7 @@ import GHC.Builtin.Names( runRWKey, seqHashKey )
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
+-- import GHC.Data.List.SetOps( getNth )
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -2247,16 +2249,20 @@ simplIdF env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId var1 ->
-        do { rule_base <- getSimplRules
-           ; let cont' = trimJoinCont var1 (idJoinPointHood var1) cont
-                 info  = mkArgInfo env rule_base var1 cont'
-           ; rebuildCall env info cont' }
+      DoneId var1 -> simplCall env var1 cont'
+        where
+          cont' = trimJoinCont var1 (idJoinPointHood var1) cont
 
       DoneEx e mb_join -> simplExprF env' e cont'
         where
           cont' = trimJoinCont var mb_join cont
           env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+
+simplCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplCall env var cont
+  = do { rule_base <- getSimplRules
+       ; let info  = mkArgInfo env rule_base var cont
+       ; rebuildCall env info cont }
 
 ---------------------------------------------------------
 --      Dealing with a call site
@@ -2497,7 +2503,7 @@ The simplifier arranges to do this, as follows. In effect, the ai_rewrite
 field of the ArgInfo record is the state of a little state-machine:
 
 * mkArgInfo sets the ai_rewrite field to TryRules if there are any rewrite
-  rules avaialable for that function.
+  rules available for that function.
 
 * rebuildCall simplifies arguments until enough are simplified to match the
   rule with greatest arity.  See Note [RULES apply to simplified arguments]
