@@ -897,3 +897,12 @@ opRegSExt W32 r = OpRegExt W32 r ESXTW 0
 opRegSExt W16 r = OpRegExt W16 r ESXTH 0
 opRegSExt W8  r = OpRegExt W8  r ESXTB 0
 opRegSExt w  _r = pprPanic "opRegSExt" (ppr w)
+
+fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
+fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
+  where
+    intMin12bit = -2048
+    intMax12bit = 2047
+
+fitsIn32bits  :: (Num a, Ord a, Bits a) => a -> Bool
+fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 -1)
