@@ -53,11 +53,12 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.Unify
 import GHC.Builtin.Names ( unsatisfiableIdName )
-import GHC.Core        ( Expr(..), mkApps, mkVarApps, mkLams )
+import GHC.Core        ( Expr(..), mkVarApps )
 import GHC.Core.Make   ( nO_METHOD_BINDING_ERROR_ID )
-import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+-- import GHC.Core.Unfold.Make ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
+import GHC.Core.Unfold.Make (mkDFunUnfolding )
 import GHC.Core.Type
-import GHC.Core.SimpleOpt
+-- import GHC.Core.SimpleOpt
 import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Tc.Types.Evidence
 import GHC.Core.TyCon
@@ -1379,10 +1380,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              inst_tv_tys = mkTyVarTys inst_tyvars
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
-             is_newtype = isNewTyCon class_tc
+--             is_newtype = isNewTyCon class_tc
              dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
              dfun_spec_prags
-                | is_newtype = SpecPrags []
+--                | is_newtype = SpecPrags []
                 | otherwise  = SpecPrags spec_inst_prags
                     -- Newtype dfuns just inline unconditionally,
                     -- so don't attempt to specialise them
@@ -1418,15 +1419,15 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- the DFunId rather than from the skolem pieces that the typechecker
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
- | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
- | otherwise
+-- xx | is_newtype
+--  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
+--            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+-- xx | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
  where
-   con_app    = mkLams dfun_bndrs $
-                mkApps (Var (dataConWrapId dict_con)) dict_args
+--   con_app    = mkLams dfun_bndrs $
+--                mkApps (Var (dataConWrapId dict_con)) dict_args
                 -- This application will satisfy the Core invariants
                 -- from Note [Representation polymorphism invariants] in GHC.Core,
                 -- because typeclass method types are never unlifted.
@@ -1438,7 +1439,7 @@ addDFunPrags dfun_id sc_meth_ids
    dfun_bndrs  = dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
    dict_con    = tyConSingleDataCon clas_tc
-   is_newtype  = isNewTyCon clas_tc
+--   is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> Id -> HsExpr GhcTc
 wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))

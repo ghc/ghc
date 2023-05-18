@@ -33,12 +33,15 @@ import GHC.Builtin.PrimOps ( PrimOp(..) )
 import GHC.Builtin.PrimOps.Ids ( primOpId )
 
 import GHC.Types.FieldLabel
-import GHC.Types.Name.Reader
 import GHC.Types.SafeHaskell
-import GHC.Types.Name   ( Name )
+import GHC.Types.Name   ( Name, getOccName )
+import GHC.Types.Name.Reader
+import GHC.Types.Name.Occurrence( occNameString, mkVarOcc )
 import GHC.Types.Var.Env ( VarEnv )
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Var
+import GHC.Types.Basic( dfunInlinePragma )
 
 import GHC.Core.Predicate
 import GHC.Core.Coercion
@@ -48,8 +51,8 @@ import GHC.Core.Make ( mkCharExpr, mkNaturalExpr, mkStringExprFS, mkCoreLams )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
-
-import GHC.Core ( Expr(..) )
+import GHC.Core.Unfold.Make( mkDFunUnfolding )
+import GHC.Core ( Expr(..), Bind(..), mkConApp )
 
 import GHC.StgToCmm.Closure ( isSmallFamily )
 
@@ -64,7 +67,6 @@ import GHC.Unit.Module.Warnings
 import GHC.Hs.Extension
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
-import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
 
 import Data.Functor
@@ -413,25 +415,41 @@ makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 --     The process is mirrored for Symbols:
 --     String    -> SSymbol n
 --     SSymbol n -> KnownSymbol n
-makeLitDict clas ty et
-    | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
-          -- co_dict :: KnownNat n ~ SNat n
-    , [ meth ]   <- classMethods clas
-    , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
-                    -- If the method type is forall n. KnownNat n => SNat n
-                    -- then tcRep is SNat
-    , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
-          -- SNat n ~ Integer
-    , let ev_tm = mkEvCast et (mkSymCo (mkTransCo co_dict co_rep))
-    = return $ OneInst { cir_new_theta   = []
-                       , cir_mk_ev       = \_ -> ev_tm
-                       , cir_canonical   = EvCanonical
-                       , cir_what        = BuiltinInstance }
+makeLitDict clas lit_ty lit_expr
+  | [meth]      <- classMethods clas
+  , Just rep_tc <- tyConAppTyCon_maybe (classMethodTy meth)
+                  -- If the method type is forall n. KnownNat n => SNat n
+                  -- then rep_tc :: TyCon is SNat
+  , [dict_con] <- tyConDataCons (classTyCon clas)
+  , [rep_con]  <- tyConDataCons rep_tc
+  , let pred_ty   = mkClassPred clas [lit_ty]
+        dict_args = [ Type lit_ty, mkConApp rep_con [Type lit_ty, lit_expr] ]
+        dfun_rhs  = mkConApp dict_con dict_args
+        dfun_info = vanillaIdInfo `setUnfoldingInfo`  mkDFunUnfolding [] dict_con dict_args
+                                  `setInlinePragInfo` dfunInlinePragma
+        dfun_occ_str :: String
+          = "$f" ++ occNameString (getOccName clas) ++
+            occNameString (getDFunTyKey lit_ty)
+
+  = do { df_name <- newName (mkVarOcc dfun_occ_str)
+       ; let dfun_id = mkLocalVar (DFunId True) df_name ManyTy pred_ty dfun_info
+             ev_tm   = EvExpr (Let (NonRec dfun_id dfun_rhs) (Var dfun_id))
+       ; return $ OneInst { cir_new_theta   = []
+                          , cir_mk_ev       = \_ -> ev_tm
+                          , cir_canonical   = EvCanonical
+                          , cir_what        = BuiltinInstance } }
 
     | otherwise
     = pprPanic "makeLitDict" $
       text "Unexpected evidence for" <+> ppr (className clas)
       $$ vcat (map (ppr . idType) (classMethods clas))
+
+{- Here is what we are making
+   let $dfKnownNat17 :: KnownNat 17
+       [Unfolding = DFun :DKnownNat @17 (UnsafeSNat @17 17)]
+       $dfKnownNat17 = :DKnownNat @17 (UnsafeSNat @17 17)
+   in $dfKnownNat17
+-}
 
 {- ********************************************************************
 *                                                                     *

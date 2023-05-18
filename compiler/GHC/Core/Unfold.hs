@@ -52,7 +52,9 @@ import GHC.Types.Tickish
 
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Names
+
 import GHC.Data.Bag
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 
@@ -597,11 +599,11 @@ sizeExpr opts !bOMB_OUT_SIZE top_args expr
     size_up_call :: Id -> [CoreExpr] -> Int -> ExprSize
     size_up_call fun val_args voids
        = case idDetails fun of
-           FCallId _        -> sizeN (callSize (length val_args) voids)
-           DataConWorkId dc -> conSize    dc (length val_args)
-           PrimOpId op _    -> primOpSize op (length val_args)
-           ClassOpId {}     -> classOpSize opts top_args val_args
-           _                -> funSize opts top_args fun (length val_args) voids
+           FCallId _         -> sizeN (callSize (length val_args) voids)
+           DataConWorkId dc  -> conSize    dc (length val_args)
+           PrimOpId op _     -> primOpSize op (length val_args)
+           ClassOpId cls _ _ -> classOpSize opts cls top_args val_args
+           _                 -> funSize opts top_args fun (length val_args) voids
 
     ------------
     size_up_alt (Alt _con _bndrs rhs) = size_up rhs `addSizeN` 10
@@ -666,21 +668,26 @@ litSize _other = 0    -- Must match size of nullary constructors
                       -- Key point: if  x |-> 4, then x must inline unconditionally
                       --            (eg via case binding)
 
-classOpSize :: UnfoldingOpts -> [Id] -> [CoreExpr] -> ExprSize
+classOpSize :: UnfoldingOpts -> Class -> [Id] -> [CoreExpr] -> ExprSize
 -- See Note [Conlike is interesting]
-classOpSize _ _ []
+
+classOpSize _ cls _ _
+  | isNewTyCon (classTyCon cls)
   = sizeZero
-classOpSize opts top_args (arg1 : other_args)
-  = SizeIs size arg_discount 0
+
+classOpSize opts _ top_args args
+  = case args of
+       []                -> sizeZero
+       (arg1:other_args) -> SizeIs (size other_args) (arg_discount arg1) 0
   where
-    size = 20 + (10 * length other_args)
+    size other_args = 20 + (10 * length other_args)
+
     -- If the class op is scrutinising a lambda bound dictionary then
     -- give it a discount, to encourage the inlining of this function
     -- The actual discount is rather arbitrarily chosen
-    arg_discount = case arg1 of
-                     Var dict | dict `elem` top_args
-                              -> unitBag (dict, unfoldingDictDiscount opts)
-                     _other   -> emptyBag
+    arg_discount (Var dict) | dict `elem` top_args
+                   = unitBag (dict, unfoldingDictDiscount opts)
+    arg_discount _ = emptyBag
 
 -- | The size of a function call
 callSize

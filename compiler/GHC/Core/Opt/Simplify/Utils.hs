@@ -217,8 +217,6 @@ data SimplCont
         CoreTickish     -- Tick tickish <hole>
         SimplCont
 
-type StaticEnv = SimplEnv       -- Just the static part is relevant
-
 data FromWhat = FromLet | FromBeta Levity
 
 -- See Note [DupFlag invariants]
@@ -741,7 +739,6 @@ it, but the simplest solution was to check sm_inline; if it is False,
 which it is on the LHS of a rule (see updModeForRules), then don't
 make use of the strictness info for the function.
 -}
-
 
 {-
 ************************************************************************
@@ -1468,6 +1465,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
   | isExitJoinId bndr                        = Nothing -- Note [Do not inline exit join points]
                                                        -- in module Exitify
   | not (one_occ (idOccInfo bndr))           = Nothing
+  | isDFunId bndr                            = Nothing
   | not (isStableUnfolding unf)              = Just $! (extend_subst_with rhs)
 
   -- See Note [Stable unfoldings and preInlineUnconditionally]

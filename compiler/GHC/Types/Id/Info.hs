@@ -168,6 +168,7 @@ data IdDetails
 
   | ClassOpId                   -- ^ The 'Id' is a superclass selector or class operation
       Class                     --    for this class
+      Int                       -- 0-indexed selector for which class method this is
       Bool                      --   True <=> given a non-bottom dictionary, the class op will
                                 --            definitely return a non-bottom result
                                 --   and Note [exprOkForSpeculation and type classes]

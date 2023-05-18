@@ -2410,20 +2410,25 @@ dmdTransformDataConSig str_marks sd = case viewProd arity body_sd of
 -- on the result into the indicated dictionary component (if saturated).
 -- See Note [Demand transformer for a dictionary selector].
 dmdTransformDictSelSig :: DmdSig -> DmdTransformer
--- NB: This currently doesn't handle newtype dictionaries.
--- It should simply apply call_sd directly to the dictionary, I suppose.
-dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* prod])) call_sd
+dmdTransformDictSelSig (DmdSig (DmdType _ [_ :* dict_dmd])) call_sd
+   -- NB: dict_dmd comes from the demand signature of the class-op
+   --     which is created in GHC.Types.Id.Make.mkDictSelId
    | (n, sd') <- peelCallDmd call_sd
-   , Prod _ sig_ds <- prod
    = multDmdType n $
-     DmdType nopDmdEnv [C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)]
-   | otherwise
-   = nopDmdType -- See Note [Demand transformer for a dictionary selector]
+     DmdType nopDmdEnv [enhance_dict_dmd sd' dict_dmd]
   where
-    enhance _  AbsDmd   = AbsDmd
-    enhance _  BotDmd   = BotDmd
-    enhance sd _dmd_var = C_11 :* sd  -- This is the one!
-                                      -- C_11, because we multiply with n above
+    enhance_dict_dmd sd' dict_dmd
+       | Prod _ sig_ds <- dict_dmd
+       = C_11 :* mkProd Unboxed (map (enhance sd') sig_ds)
+
+       | otherwise    -- Newtype dictionary
+       = C_11 :* sd'  -- Apply sd' to the dictionary
+
+    enhance _   AbsDmd   = AbsDmd
+    enhance _   BotDmd   = BotDmd
+    enhance sd' _dmd_var = C_11 :* sd'  -- This is the one!
+                           -- C_11, because we multiply with n above
+
 dmdTransformDictSelSig sig sd = pprPanic "dmdTransformDictSelSig: no args" (ppr sig $$ ppr sd)
 
 {-

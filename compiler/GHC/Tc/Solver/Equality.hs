@@ -969,8 +969,8 @@ This is the very /definition/ of injectivity: injectivity means result
 is the same => arguments are the same, modulo the role shift.
 See comments on GHC.Core.TyCon.isInjectiveTyCon.  This is also
 the CO_NTH rule in Fig 5 of the paper, except in the paper only
-newtypes are non-injective at representation role, so the rule says "H
-is not a newtype".
+newtypes are non-injective at representation role, so the rule says
+"H is not a newtype".
 
 Injectivity is a bit subtle:
                  Nominal   Representational

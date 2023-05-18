@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHC.Driver.Flags
 
 import GHC.Core
+import GHC.Core.Class( Class, classArity )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Opt.ConstantFold
 import GHC.Core.Type hiding ( substCo, substTy, substTyVar, extendTvSubst, extendCvSubst )
@@ -59,6 +60,7 @@ import GHC.Builtin.Names( runRWKey, seqHashKey )
 
 import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
+import GHC.Data.List.SetOps( getNth )
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -2247,16 +2249,53 @@ simplIdF env var cont
         where
           env' = setSubstEnv env tvs cvs ids
 
-      DoneId var1 ->
-        do { rule_base <- getSimplRules
-           ; let cont' = trimJoinCont var1 (idJoinPointHood var1) cont
-                 info  = mkArgInfo env rule_base var1 cont'
-           ; rebuildCall env info cont' }
+      DoneId var1 -> simplCall env var1 cont'
+        where
+          cont' = trimJoinCont var1 (idJoinPointHood var1) cont
 
       DoneEx e mb_join -> simplExprF env' e cont'
         where
           cont' = trimJoinCont var mb_join cont
           env'  = zapSubstEnv env  -- See Note [zapSubstEnv]
+
+simplCall :: SimplEnv -> OutId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplCall env var cont
+  | ClassOpId clas idx _     <- idDetails var
+  , Just (env', arg', cont') <- classOpDictApp_maybe env clas idx cont
+  = simplExprF env' arg' cont'
+
+  | otherwise
+  = do { rule_base <- getSimplRules
+       ; let info  = mkArgInfo env rule_base var cont
+       ; rebuildCall env info cont }
+
+classOpDictApp_maybe :: SimplEnv -> Class -> Int -> SimplCont
+                     -> Maybe (SimplEnv, InExpr, SimplCont)
+classOpDictApp_maybe env cls idx cont
+  = go cont
+  where
+    go (ApplyToTy { sc_cont = cont })
+      = go cont  -- Discard leading type args
+    go (ApplyToVal { sc_arg = dict_arg, sc_env = dict_se, sc_cont = cont })
+      | Just (dfun, dfun_args) <- splitInApp dict_se dict_arg [] -- dfun_args :: [InExpr]
+      , DFunUnfolding { df_bndrs = bndrs, df_args = dict_args } <- idUnfolding dfun
+      , bndrs `equalLength` dfun_args        -- See Note [DFun arity check]
+      , let arg_env = extendSubstForDFun (zapSubstEnv env) bndrs dfun_args
+            the_arg = getNth (drop (classArity cls) dict_args) idx   -- An OutExpr
+      = Just (arg_env, the_arg, cont)
+    go _ = Nothing
+
+    splitInApp :: StaticEnv -> InExpr -> [(InExpr,StaticEnv)]
+               -> Maybe (OutVar, [(InExpr,StaticEnv)])
+    splitInApp env (App fun arg) args
+      = splitInApp env fun ((arg,env):args)
+    splitInApp env (Var v) args
+      = case substId env v of
+          DoneId v'            -> Just (v', args)
+          ContEx tvs cvs ids e -> splitInApp (setSubstEnv env tvs cvs ids) e args
+          DoneEx e _           -> splitInApp (zapSubstEnv env)             e args
+    splitInApp _ _ _
+       = Nothing
 
 ---------------------------------------------------------
 --      Dealing with a call site
@@ -2497,7 +2536,7 @@ The simplifier arranges to do this, as follows. In effect, the ai_rewrite
 field of the ArgInfo record is the state of a little state-machine:
 
 * mkArgInfo sets the ai_rewrite field to TryRules if there are any rewrite
-  rules avaialable for that function.
+  rules available for that function.
 
 * rebuildCall simplifies arguments until enough are simplified to match the
   rule with greatest arity.  See Note [RULES apply to simplified arguments]

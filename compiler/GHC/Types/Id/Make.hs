@@ -476,7 +476,7 @@ mkDictSelId :: Name          -- Name of one of the *value* selectors
                              -- (dictionary superclass or method)
             -> Class -> Id
 mkDictSelId name clas
-  = mkGlobalId (ClassOpId clas terminating) name sel_ty info
+  = mkGlobalId (ClassOpId clas val_index terminating) name sel_ty info
   where
     tycon          = classTyCon clas
     sel_names      = map idName (classAllSelIds clas)
@@ -502,8 +502,9 @@ mkDictSelId name clas
                 `setDmdSigInfo` strict_sig
                 `setCprSigInfo` topCprSig
 
-    info | new_tycon
-         = base_info `setInlinePragInfo` alwaysInlinePragma
+    info | new_tycon  -- Same as non-new case; ToDo: explain
+         = base_info `setRuleInfo` mkRuleInfo [rule]
+                     `setInlinePragInfo` neverInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
                                            StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)

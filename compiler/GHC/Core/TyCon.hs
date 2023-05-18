@@ -68,7 +68,7 @@ module GHC.Core.TyCon(
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
         tyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
-        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
+        isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon,
         isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
@@ -2037,23 +2037,39 @@ isTypeDataTyCon (TyCon { tyConDetails = details })
 -- See also Note [Decomposing TyConApp equalities] in "GHC.Tc.Solver.Equality"
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon (TyCon { tyConDetails = details }) role
-  = go details role
+  = go details
   where
-    go _                             Phantom          = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
-    go (AlgTyCon {})                 Nominal          = True
-    go (AlgTyCon {algTcRhs = rhs})   Representational = isGenInjAlgRhs rhs
-    go (SynonymTyCon {})             _                = False
+    go _ | Phantom <- role = True -- Vacuously; (t1 ~P t2) holds for all t1, t2!
+
+    go (AlgTyCon {algTcRhs = rhs, algTcFlavour = flav})
+       | Nominal <- role                                = True
+       | Representational <- role                       = go_alg_rep rhs flav
+
     go (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
-                                                  Nominal = True
-    go (FamilyTyCon { famTcInj = Injective inj }) Nominal = and inj
-    go (FamilyTyCon {})              _                = False
-    go (PrimTyCon {})                _                = True
-    go (PromotedDataCon {})          _                = True
-    go (TcTyCon {})                  _                = True
+       | Nominal <- role                                = True
+    go (FamilyTyCon { famTcInj = Injective inj })
+       | Nominal <- role                                = and inj
+    go (FamilyTyCon {})                                 = False
 
-  -- Reply True for TcTyCon to minimise knock on type errors
-  -- See (W1) in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
+    go (SynonymTyCon {})    = False
+    go (PrimTyCon {})       = True
+    go (PromotedDataCon {}) = True
+    go (TcTyCon {})         = True
+       -- Reply True for TcTyCon to minimise knock on type errors
+       -- See (W1) in Note [TcTyCon, MonoTcTyCon, and PolyTcTyCon] in GHC.Tc.TyCl
 
+    -- go_alg_rep used only at Representational role
+    go_alg_rep (TupleTyCon {})    _               = True
+    go_alg_rep (SumTyCon {})      _               = True
+    go_alg_rep (DataTyCon {})     _               = True
+    go_alg_rep (AbstractTyCon {}) _               = False
+    go_alg_rep (NewTyCon {})      (ClassTyCon {}) = True -- See Note [Newtype classes]
+    go_alg_rep (NewTyCon {})      _               = False
+
+{- Note [Newtype classes]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+ToDo: write this up
+-}
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where r is the role passed in):
@@ -2073,14 +2089,6 @@ isGenerativeTyCon tc@(TyCon { tyConDetails = details }) role
     -- In all other cases, injectivity implies generativity
     go r _ = isInjectiveTyCon tc r
 
--- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective
--- with respect to representational equality?
-isGenInjAlgRhs :: AlgTyConRhs -> Bool
-isGenInjAlgRhs (TupleTyCon {})          = True
-isGenInjAlgRhs (SumTyCon {})            = True
-isGenInjAlgRhs (DataTyCon {})           = True
-isGenInjAlgRhs (AbstractTyCon {})       = False
-isGenInjAlgRhs (NewTyCon {})            = False
 
 -- | Is this 'TyCon' that for a @newtype@
 isNewTyCon :: TyCon -> Bool
