@@ -247,10 +247,10 @@ pprFamInst (FamInst { fi_flavor = flavor, fi_axiom = ax
     ppr_tc_sort = case flavor of
                      SynFamilyInst             -> text "type"
                      DataFamilyInst tycon
-                       | isDataTyCon     tycon -> text "data"
-                       | isNewTyCon      tycon -> text "newtype"
-                       | isAbstractTyCon tycon -> text "data"
-                       | otherwise             -> text "WEIRD" <+> ppr tycon
+                       | isBoxedDataTyCon tycon -> text "data"
+                       | isNewTyCon       tycon -> text "newtype"
+                       | isAbstractTyCon  tycon -> text "data"
+                       | otherwise              -> text "WEIRD" <+> ppr tycon
 
     debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax
                        , text "Tvs:" <+> ppr tvs

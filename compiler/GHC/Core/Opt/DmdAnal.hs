@@ -23,7 +23,6 @@ import GHC.Core.DataCon
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Predicate( isEqualityClass, isCTupleClass )
 import GHC.Core.FVs      ( rulesRhsFreeIds, bndrRuleAndUnfoldingIds )
 import GHC.Core.Coercion ( Coercion )
 import GHC.Core.TyCo.FVs     ( coVarsOfCos )
@@ -555,7 +554,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [Alt alt_con bndrs rhs])
     WithDmdType res_ty (Case scrut' case_bndr' ty [Alt alt_con bndrs' rhs'])
     where
       want_precise_field_dmds (DataAlt dc)
-        | Nothing <- tyConSingleAlgDataCon_maybe $ dataConTyCon dc
+        | Nothing <- tyConSingleDataCon_maybe $ dataConTyCon dc
         = False    -- Not a product type, even though this is the
                    -- only remaining possible data constructor
         | DefinitelyRecursive <- ae_rec_dc env dc
@@ -1166,7 +1165,7 @@ unboxedWhenSmall env rec_flag (Just ret_ty) sd = go 1 ret_ty sd
     go depth ty sd
       | depth <= max_depth
       , Just (tc, tc_args, _co) <- normSplitTyConApp_maybe (ae_fam_envs env) ty
-      , Just dc <- tyConSingleAlgDataCon_maybe tc
+      , Just [dc] <- canUnboxTyCon tc
       , null (dataConExTyCoVars dc) -- Can't unbox results with existentials
       , dataConRepArity dc <= dmd_unbox_width (ae_opts env)
       , Just (_, ds) <- viewProd (dataConRepArity dc) sd
@@ -2030,7 +2029,7 @@ finaliseArgBoxities env fn ww_arity arg_dmds div rhs
   -- The normal case
   | otherwise
   = -- pprTrace "finaliseArgBoxities" (
-    --   vcat [text "function:" <+> ppr fn
+    -- vcat [text "function:" <+> ppr fn
     --        , text "max" <+> ppr max_wkr_args
     --        , text "dmds before:" <+> ppr (map idDemandInfo (filter isId bndrs))
     --        , text "dmds after: " <+>  ppr arg_dmds' ]) $
@@ -2171,12 +2170,6 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
          -- isMarkedStrict: see Note [Unboxing evaluated arguments] in DmdAnal
        -> DontUnbox
 
-       | doNotUnbox ty
-       -> DontUnbox  -- See Note [Do not unbox class dictionaries]
-                     -- NB: 'ty' has not been normalised, so this will (rightly)
-                     --     catch newtype dictionaries too.
-                     -- NB: even for bottoming functions, don't unbox dictionaries
-
        | DefinitelyRecursive <- ae_rec_dc env dc
          -- See Note [Which types are unboxed?]
          -- and Note [Demand analysis for recursive data constructors]
@@ -2186,76 +2179,6 @@ wantToUnboxArg env ty str_mark dmd@(n :* _)
        -> DoUnbox (zip3 (dubiousDataConInstArgTys dc tc_args)
                         (dataConRepStrictness dc)
                         dmds)
-
-
-doNotUnbox :: Type -> Bool
--- Do not unbox class dictionaries, except equality classes and tuples
--- Note [Do not unbox class dictionaries]
-doNotUnbox arg_ty
-  = case tyConAppTyCon_maybe arg_ty of
-      Just tc | Just cls <- tyConClass_maybe tc
-              -> not (isEqualityClass cls || isCTupleClass cls)
-       -- See (DNB2) and (DNB1) in Note [Do not unbox class dictionaries]
-
-      _ -> False
-
-{- Note [Do not unbox class dictionaries]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We never unbox class dictionaries in worker/wrapper.
-
-1. INLINABLE functions
-   If we have
-      f :: Ord a => [a] -> Int -> a
-      {-# INLINABLE f #-}
-   and we worker/wrapper f, we'll get a worker with an INLINABLE pragma
-   (see Note [Worker/wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap),
-   which can still be specialised by the type-class specialiser, something like
-      fw :: Ord a => [a] -> Int# -> a
-
-   BUT if f is strict in the Ord dictionary, we might unpack it, to get
-      fw :: (a->a->Bool) -> [a] -> Int# -> a
-   and the type-class specialiser can't specialise that. An example is #6056.
-
-   Historical note: #14955 describes how I got this fix wrong the first time.
-   I got aware of the issue in T5075 by the change in boxity of loop between
-   demand analysis runs.
-
-2. -fspecialise-aggressively.  As #21286 shows, the same phenomenon can occur
-   occur without INLINABLE, when we use -fexpose-all-unfoldings and
-   -fspecialise-aggressively to do vigorous cross-module specialisation.
-
-3. #18421 found that unboxing a dictionary can also make the worker less likely
-   to inline; the inlining heuristics seem to prefer to inline a function
-   applied to a dictionary over a function applied to a bunch of functions.
-
-TL;DR we /never/ unbox class dictionaries. Unboxing the dictionary, and passing
-a raft of higher-order functions isn't a huge win anyway -- you really want to
-specialise the function.
-
-Wrinkle (DNB1): we /do/ want to unbox tuple dictionaries (#23398)
-     f :: (% Eq a, Show a %) => blah
-  with -fdicts-strict it is great to unbox to
-     $wf :: Eq a => Show a => blah
-  (where I have written out the currying explicitly).  Now we can specialise
-  $wf on the Eq or Show dictionary.  Nothing is lost.
-
-  And something is gained.  It is possible that `f` will look like this:
-     f = /\a. \d:(% Eq a, Show a %). ... f @a (% sel1 d, sel2 d %)...
-  where there is a recurive call to `f`, or to another function that takes the
-  same tuple dictionary, but where the tuple is built from the components of
-  `d`.  The Simplier does not fix this.  But if we unpacked the dictionary
-  we'd get
-     $wf = /\a. \(d1:Eq a) (d2:Show a). let d = (% d1, d2 %)
-             in ...f @a (% sel1 d, sel2 d %)
-  and all the tuple building and taking apart will disappear.
-
-Wrinkle (DNB2): we /do/ want to unbox equality dictionaries,
-  for (~), (~~), and Coercible (#23398).  Their payload is a single unboxed
-  coercion.  We never want to specialise on `(t1 ~ t2)`.  All that would do is
-  to make a copy of the function's RHS with a particular coercion.  Unlike
-  normal class methods, that does not unlock any new optimisation
-  opportunities in the specialised RHS.
--}
 
 {- *********************************************************************
 *                                                                      *
