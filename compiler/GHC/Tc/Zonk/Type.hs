@@ -237,7 +237,7 @@ zonkTcTypeMapper = TyCoMapper
   { tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
-  , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
+  , tcm_tycobinder = \ _env tcv _vis k -> zonkTyCoVarKind tcv >>= k ()
   , tcm_tycon      = zonkTcTyCon }
   where
     hole :: () -> CoercionHole -> ZonkM Coercion

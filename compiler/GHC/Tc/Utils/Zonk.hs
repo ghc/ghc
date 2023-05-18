@@ -397,7 +397,7 @@ zonk_tycomapper = TyCoMapper
   { tcm_tyvar      = \ env tv -> runZonkT (zonkTyVarOcc tv) env
   , tcm_covar      = \ env cv -> runZonkT (zonkCoVarOcc cv) env
   , tcm_hole       = \ env co -> runZonkT (zonkCoHole   co) env
-  , tcm_tycobinder = \ env tcv _vis -> runZonkBndrT (zonkTyBndrX tcv) env
+  , tcm_tycobinder = \ env tcv _vis k -> flip runZonkT env $ zonkBndr (zonkTyBndrX tcv) (\tcv' -> ZonkT $ \env' -> (k env' tcv'))
   , tcm_tycon      = \ tc -> zonkTcTyConToTyCon tc
   }
 

@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf, RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -889,7 +889,7 @@ data TyCoMapper env m
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
-      , tcm_tycobinder :: env -> TyCoVar -> ForAllTyFlag -> m (env, TyCoVar)
+      , tcm_tycobinder :: forall r . env -> TyCoVar -> ForAllTyFlag -> (env -> TyCoVar -> m r) ->  m r
           -- ^ The returned env is used in the extended scope
 
       , tcm_tycon :: TyCon -> m TyCon
@@ -950,7 +950,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
       = mkTyConApp tc <$> go_tys env tys
 
     go_ty env (ForAllTy (Bndr tv vis) inner)
-      = do { (env', tv') <- tycobinder env tv vis
+      = do { tycobinder env tv vis $ \env' tv' -> do
            ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
@@ -991,7 +991,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
       = mkTyConAppCo r tc <$> go_cos env cos
     go_co env (ForAllCo tv kind_co co)
       = do { kind_co' <- go_co env kind_co
-           ; (env', tv') <- tycobinder env tv Inferred
+           ; tycobinder env tv Inferred $ \env' tv' ->  do
            ; co' <- go_co env' co
            ; return $ mkForAllCo tv' kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
