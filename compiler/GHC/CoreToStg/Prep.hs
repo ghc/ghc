@@ -2109,8 +2109,8 @@ subst_tyco_mapper = TyCoMapper
   , tcm_covar      = \env cv -> return (lookup_tce_cv env cv)
   , tcm_hole       = \_ hole -> pprPanic "subst_co_mapper:hole" (ppr hole)
   , tcm_tycobinder = \env tcv _vis k -> if isTyVar tcv
-                                      then Identity (subst_tv_bndr env tcv) >>= \(env, v) -> k env v
-                                      else Identity (subst_cv_bndr env tcv) >>= \(env, v) -> k env v
+                                      then uncurry k (subst_tv_bndr env tcv)
+                                      else uncurry k (subst_cv_bndr env tcv)
   , tcm_tycon      = \tc -> return tc }
 
 subst_ty :: CpeTyCoEnv -> Type     -> Identity Type
