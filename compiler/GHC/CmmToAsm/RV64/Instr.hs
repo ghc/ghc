@@ -32,7 +32,7 @@ import Data.Maybe (fromMaybe)
 
 import GHC.Stack
 
--- | TODO: verify this!
+-- | TODO: Should be `2 * spillSlotSize = 16`
 stackFrameHeaderSize :: Platform -> Int
 stackFrameHeaderSize _ = 64
 
