@@ -1070,12 +1070,6 @@ getAmode _platform _ expr
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrReg reg) code
 
-fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
-fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
-  where
-    intMin12bit = -2048
-    intMax12bit = 2047
-
 -- -----------------------------------------------------------------------------
 -- Generating assignments
 

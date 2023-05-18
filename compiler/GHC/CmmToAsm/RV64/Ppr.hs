@@ -506,13 +506,16 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 || isFloatOp o2 -> op2 (text "\tfmov") o1 o2
     | isImmOp o2
     , (OpImm (ImmInteger i)) <- o2
-    , (-1 `shiftL` 11) <= i
-    , i <= (1 `shiftL` 11 - 1)     -> lines_ [ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2 ]
+    , fitsIn12bitImm i
+          -> lines_ [ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2 ]
     | isImmOp o2
     , (OpImm (ImmInteger i)) <- o2
-    , (-1 `shiftL` 31) <= i
-    , i <= (1 `shiftL` 31 -1)      -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
+    , fitsIn32bits i
+        -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
                                              , text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
+    | isImmOp o2
+        -- Surrender! Let the assembler figure out the right expressions with pseudo-op LI.
+        -> lines_ [ text "\tli" <+> pprOp platform o1 <> comma <+>  pprOp platform o2 ]
     | otherwise                    -> op3 (text "\taddi") o1 o2 (OpImm (ImmInt 0))
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
   MVN o1 o2     -> op2 (text "\tmvn") o1 o2
