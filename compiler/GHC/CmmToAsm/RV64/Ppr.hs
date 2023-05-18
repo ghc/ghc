@@ -493,6 +493,7 @@ pprInstr platform instr = case instr of
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3  -> op3 (text "\tand") o1 o2 o3
+  OR o1 o2 o3   -> op3 (text "\tor") o1 o2 o3
   -- ANDS o1 o2 o3 -> op3 (text "\tands") o1 o2 o3
   ASR o1 o2 o3  -> op3 (text "\tsra") o1 o2 o3
   BIC o1 o2 o3  -> op3 (text "\tbic") o1 o2 o3
@@ -516,7 +517,7 @@ pprInstr platform instr = case instr of
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
   MVN o1 o2     -> op2 (text "\tmvn") o1 o2
   ORN o1 o2 o3  -> op3 (text "\torn") o1 o2 o3
-  ORR o1 o2 o3  -> op3 (text "\torr") o1 o2 o3
+  ORI o1 o2 o3  -> op3 (text "\tori") o1 o2 o3
   ROR o1 o2 o3  -> op3 (text "\tror") o1 o2 o3
   TST o1 o2     -> op2 (text "\ttst") o1 o2
 

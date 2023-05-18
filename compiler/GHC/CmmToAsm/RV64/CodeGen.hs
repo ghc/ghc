@@ -762,8 +762,8 @@ getRegister' config plat expr
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | isBitMaskImmediate (fromIntegral n) ->
-      return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | fitsIn12bitImm n ->
+      return $ Any (intFormat w) (\d -> unitOL $ annExpr expr (ORI (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
@@ -932,7 +932,7 @@ getRegister' config plat expr
 
         -- Bitwise operations
         MO_And   w -> bitOp w (\d x y -> unitOL $ AND d x y)
-        MO_Or    w -> bitOp w (\d x y -> unitOL $ ORR d x y)
+        MO_Or    w -> bitOp w (\d x y -> unitOL $ OR d x y)
         MO_Xor   w -> bitOp w (\d x y -> unitOL $ EOR d x y)
         MO_Shl   w -> intOp False w (\d x y -> unitOL $ LSL d x y)
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
