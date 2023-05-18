@@ -491,8 +491,9 @@ mkDictSelId name clas
                 `setDmdSigInfo` strict_sig
                 `setCprSigInfo` topCprSig
 
-    info | new_tycon
-         = base_info `setInlinePragInfo` alwaysInlinePragma
+    info | new_tycon  -- Same as non-new case; ToDo: explain
+         = base_info `setRuleInfo` mkRuleInfo [rule]
+                     `setInlinePragInfo` neverInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity defaultSimpleOpts
                                            StableSystemSrc 1
                                            (mkDictSelRhs clas val_index)

@@ -1317,7 +1317,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              is_newtype = isNewTyCon class_tc
              dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
              dfun_spec_prags
-                | is_newtype = SpecPrags []
+--                | is_newtype = SpecPrags []
                 | otherwise  = SpecPrags spec_inst_prags
                     -- Newtype dfuns just inline unconditionally,
                     -- so don't attempt to specialise them
@@ -1354,10 +1354,10 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- the DFunId rather than from the skolem pieces that the typechecker
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
- | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
-            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
- | otherwise
+-- | is_newtype
+--  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity defaultSimpleOpts StableSystemSrc 0 con_app
+--            `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
+-- | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
  where
