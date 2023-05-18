@@ -102,6 +102,7 @@ regUsageOfInstr platform instr = case instr of
   UXTH dst src             -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -112,7 +113,8 @@ regUsageOfInstr platform instr = case instr of
   MOV dst src              -> usage (regOp src, regOp dst)
   MOVK dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
-  ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  -- ORI's third operand is always an immediate
+  ORI dst src1 _           -> usage (regOp src1, regOp dst)
   ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   TST src1 src2            -> usage (regOp src1 ++ regOp src2, [])
   -- 4. Branch Instructions ----------------------------------------------------
@@ -241,6 +243,7 @@ patchRegsOfInstr instr env = case instr of
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
+    OR o1 o2 o3    -> OR   (patchOp o1) (patchOp o2) (patchOp o3)
     -- ANDS o1 o2 o3  -> ANDS (patchOp o1) (patchOp o2) (patchOp o3)
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
     BIC o1 o2 o3   -> BIC  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -252,7 +255,8 @@ patchRegsOfInstr instr env = case instr of
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
     MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
     MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
-    ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
+    -- o3 cannot be a register for ORI (always an immediate)
+    ORI o1 o2 o3   -> ORI  (patchOp o1) (patchOp o2) (patchOp o3)
     ROR o1 o2 o3   -> ROR  (patchOp o1) (patchOp o2) (patchOp o3)
     TST o1 o2      -> TST  (patchOp o1) (patchOp o2)
 
@@ -647,7 +651,7 @@ data Instr
     -- | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
     | ORN Operand Operand Operand -- rd = rn | ~op2
-    | ORR Operand Operand Operand -- rd = rn | op2
+    | ORI Operand Operand Operand -- rd = rn | op2
     | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
     | TST Operand Operand -- rn & op2
     -- Load and stores.
@@ -700,6 +704,7 @@ instrCon i =
       PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
       ADD{} -> "ADD"
+      OR{} -> "OR"
       -- CMN{} -> "CMN"
       -- CMP{} -> "CMP"
       MSUB{} -> "MSUB"
@@ -727,7 +732,7 @@ instrCon i =
       MOVK{} -> "MOVK"
       MVN{} -> "MVN"
       ORN{} -> "ORN"
-      ORR{} -> "ORR"
+      ORI{} -> "ORI"
       ROR{} -> "ROR"
       TST{} -> "TST"
       STR{} -> "STR"
