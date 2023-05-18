@@ -12,8 +12,6 @@ Extracting imported and top-level names in scope
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE LambdaCase #-}
 
-{-# OPTIONS_GHC -ddump-to-file -ddump-simpl #-}
-
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordFieldLabel,
         extendGlobalRdrEnvRn,
