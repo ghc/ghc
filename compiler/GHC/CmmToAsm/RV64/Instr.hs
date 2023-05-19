@@ -783,6 +783,7 @@ data Operand
         | OpRegExt Width Reg ExtMode ExtShift -- rm, <ext>[, <shift left>]
         | OpRegShift Width Reg ShiftMode RegShift     -- rm, <shift>, <0-64>
         | OpImm Imm            -- immediate value
+        -- TODO: Does OpImmShift exist in RV64?
         | OpImmShift Imm ShiftMode RegShift
         | OpAddr AddrMode       -- memory reference
         deriving (Eq, Show)
