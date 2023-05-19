@@ -461,7 +461,6 @@ pprInstr platform instr = case instr of
   -- CMP  o1 o2
   --   | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
   --   | otherwise -> op2 (text "\tcmp") o1 o2
-  MSUB o1 o2 o3 o4 -> op4 (text "\tmsub") o1 o2 o3 o4
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
@@ -470,9 +469,13 @@ pprInstr platform instr = case instr of
   NEG  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfneg") o1 o2
     | otherwise -> op2 (text "\tneg") o1 o2
-  SDIV o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
+  DIV o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
+  -- TODO: This must (likely) be refined regarding width
     -> op3 (text "\tfdiv") o1 o2 o3
-  SDIV o1 o2 o3 -> op3 (text "\tsdiv") o1 o2 o3
+  DIV o1 o2 o3 -> op3 (text "\tdiv") o1 o2 o3
+  REM o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
+    -> panic $ "pprInstr - REM not implemented for floats (yet)"
+  REM o1 o2 o3 -> op3 (text "\trem") o1 o2 o3
 
   SUB  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub") o1 o2 o3

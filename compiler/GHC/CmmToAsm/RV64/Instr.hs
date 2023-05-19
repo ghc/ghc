@@ -82,12 +82,12 @@ regUsageOfInstr platform instr = case instr of
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   -- CMN l r                  -> usage (regOp l ++ regOp r, [])
   -- CMP l r                  -> usage (regOp l ++ regOp r, [])
-  MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
   SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
-  SDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  DIV dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  REM dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   UDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
 
@@ -222,12 +222,12 @@ patchRegsOfInstr instr env = case instr of
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
     -- CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     -- CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
-    MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
     SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
     SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
-    SDIV o1 o2 o3  -> SDIV (patchOp o1) (patchOp o2) (patchOp o3)
+    DIV o1 o2 o3   -> DIV (patchOp o1) (patchOp o2) (patchOp o3)
+    REM o1 o2 o3   -> REM (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
     UDIV o1 o2 o3  -> UDIV (patchOp o1) (patchOp o2) (patchOp o3)
 
@@ -607,7 +607,6 @@ data Instr
     -- | CMN Operand Operand -- rd + op2
     -- | CMP Operand Operand -- rd - op2
 
-    | MSUB Operand Operand Operand Operand -- rd = ra - rn × rm
     | MUL Operand Operand Operand -- rd = rn × rm
 
 
@@ -616,7 +615,8 @@ data Instr
     -- NOT = XOR -1, x
     | NEG Operand Operand -- rd = -op2
 
-    | SDIV Operand Operand Operand -- rd = rn ÷ rm
+    | DIV Operand Operand Operand -- rd = rn ÷ rm
+    | REM Operand Operand Operand -- rd = rn % rm
 
     | SMULH Operand Operand Operand
     | SMULL Operand Operand Operand
@@ -707,10 +707,10 @@ instrCon i =
       OR{} -> "OR"
       -- CMN{} -> "CMN"
       -- CMP{} -> "CMP"
-      MSUB{} -> "MSUB"
       MUL{} -> "MUL"
       NEG{} -> "NEG"
-      SDIV{} -> "SDIV"
+      DIV{} -> "DIV"
+      REM{} -> "REM"
       SMULH{} -> "SMULH"
       SMULL{} -> "SMULL"
       SUB{} -> "SUB"
