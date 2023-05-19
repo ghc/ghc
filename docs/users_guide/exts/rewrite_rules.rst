@@ -262,7 +262,7 @@ From a semantic point of view:
 
         {-# RULES forall @m (x :: KnownNat m => Proxy m).  g x = blah #-}
 
-   See `#21093 <https://gitlab.haskell.org/ghc/ghc/-/issues/21093>`_ for discussion.
+   See :ghc-ticket:`21093` for discussion.
 
 .. _rules-inline:
 

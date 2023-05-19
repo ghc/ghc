@@ -1691,7 +1691,7 @@ as such you shouldn't need to set any of them explicitly. A flag
     overhead for the check disappears completely.
 
     This can cause slight codesize increases. It will also cause many more functions
-    to get a worker/wrapper split which can play badly with rules (see Ticket #20364)
+    to get a worker/wrapper split which can play badly with rules (see :ghc-ticket:`20364`)
     which is why it's currently disabled by default.
     In particular if you depend on rules firing on functions marked as NOINLINE without
     marking use sites of these functions as INLINE or INLINEABLE then things will break
