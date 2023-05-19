@@ -877,7 +877,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             write_barrier(); // XXX: Necessary?
             SET_HDR(ap,&stg_AP_STACK_info,
                     ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
-            TICK_ALLOC_UP_THK(WDS(words+1),0);
+            TICK_ALLOC_UP_THK(AP_STACK_sizeW(words),0);
 
             //IF_DEBUG(scheduler,
             //       debugBelch("sched: Updating ");
@@ -927,7 +927,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             }
 
             SET_HDR(ap,&stg_AP_STACK_NOUPD_info,stack->header.prof.ccs);
-            TICK_ALLOC_SE_THK(WDS(words+1),0);
+            TICK_ALLOC_SE_THK(AP_STACK_sizeW(words),0);
 
             stack->sp = sp;
             threadStackUnderflow(cap,tso);
@@ -963,7 +963,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
             // handler in this frame.
             //
             raise = (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
-            TICK_ALLOC_SE_THK(WDS(1),0);
+            TICK_ALLOC_SE_THK(sizeofW(StgThunk)+1,0);
             SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
             raise->payload[0] = exception;
 
