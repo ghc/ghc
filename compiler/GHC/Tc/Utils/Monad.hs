@@ -158,6 +158,7 @@ import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
+import GHC.Tc.Types.TcRef
 import GHC.Tc.Utils.TcType
 
 import GHC.Hs hiding (LIE)
@@ -748,27 +749,6 @@ newSysLocalIds fs tys
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
         getUniqueSupplyM = newUniqueSupply
-
-{-
-************************************************************************
-*                                                                      *
-                Accessing input/output
-*                                                                      *
-************************************************************************
--}
-
-newTcRef :: a -> TcRnIf gbl lcl (TcRef a)
-newTcRef = newMutVar
-
-readTcRef :: TcRef a -> TcRnIf gbl lcl a
-readTcRef = readMutVar
-
-writeTcRef :: TcRef a -> a -> TcRnIf gbl lcl ()
-writeTcRef = writeMutVar
-
-updTcRef :: TcRef a -> (a -> a) -> TcRnIf gbl lcl ()
--- Returns ()
-updTcRef ref fn = liftIO $ modifyIORef' ref fn
 
 {-
 ************************************************************************

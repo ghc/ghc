@@ -11,6 +11,9 @@ import GHC.Utils.Outputable
 -- The TcBinderStack
 ---------------------------
 
+-- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
+type TcId        = Id
+
 type TcBinderStack = [TcBinder]
    -- This is a stack of locally-bound ids and tyvars,
    --   innermost on top

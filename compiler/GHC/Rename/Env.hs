@@ -1733,7 +1733,7 @@ data DeprecationWarnings
   = DisableDeprecationWarnings
   | EnableDeprecationWarnings
 
-addUsedGRE :: DeprecationWarnings -> GlobalRdrElt-> RnM ()
+addUsedGRE :: DeprecationWarnings -> GlobalRdrElt -> RnM ()
 -- Called for both local and imported things
 -- Add usage *and* warn if deprecated
 addUsedGRE warn_if_deprec gre
@@ -1744,7 +1744,7 @@ addUsedGRE warn_if_deprec gre
          do { env <- getGblEnv
              -- Do not report the GREInfo (#23424)
             ; traceRn "addUsedGRE" (ppr $ greName gre)
-            ; updMutVar (tcg_used_gres env) (gre :) } }
+            ; updTcRef (tcg_used_gres env) (gre :) } }
 
 addUsedGREs :: [GlobalRdrElt] -> RnM ()
 -- Record uses of any *imported* GREs
@@ -1756,7 +1756,7 @@ addUsedGREs gres
                         -- Do not report the GREInfo (#23424)
                        ; traceRn "addUsedGREs"
                              (ppr $ map greName imp_gres)
-                       ; updMutVar (tcg_used_gres env) (imp_gres ++) }
+                       ; updTcRef (tcg_used_gres env) (imp_gres ++) }
   where
     imp_gres = filterOut isLocalGRE gres
 

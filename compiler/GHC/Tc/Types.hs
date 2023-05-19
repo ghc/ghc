@@ -102,19 +102,23 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Driver.Env
+import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Core.Lint
 import GHC.Driver.DynFlags
 import {-# SOURCE #-} GHC.Driver.Hooks
 
+import GHC.Linker.Types
+
 import GHC.Hs
 
-import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.TcBinder
-import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
-import GHC.Tc.Types.Evidence
-import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
 import GHC.Tc.Errors.Types
+import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes ( HoleFitPlugin )
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Evidence
+import GHC.Tc.Types.Origin
+import GHC.Tc.Types.TcBinder
+import GHC.Tc.Types.TcRef
+import GHC.Tc.Utils.TcType
 
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Type
@@ -126,7 +130,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core.Predicate
 
-import GHC.Types.Id         ( idType, idName )
+import GHC.Types.Id         ( idType )
 import GHC.Types.Fixity.Env
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
@@ -165,18 +169,17 @@ import GHC.Utils.Logger
 
 import GHC.Builtin.Names ( isUnboundName )
 
+import GHCi.Message
+import GHCi.RemoteTypes
+
 import Data.Set      ( Set )
 import qualified Data.Set as S
 import Data.Dynamic  ( Dynamic )
 import Data.Map ( Map )
 import Data.Typeable ( TypeRep )
 import Data.Maybe    ( mapMaybe )
-import GHCi.Message
-import GHCi.RemoteTypes
 
 import qualified Language.Haskell.TH as TH
-import GHC.Driver.Env.KnotVars
-import GHC.Linker.Types
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
@@ -900,12 +903,6 @@ pass it inwards.
 
 -}
 
--- | Type alias for 'IORef'; the convention is we'll use this for mutable
--- bits of data in 'TcGblEnv' which are updated during typechecking and
--- returned at the end.
-type TcRef a     = IORef a
--- ToDo: when should I refer to it as a 'TcId' instead of an 'Id'?
-type TcId        = Id
 type TcIdSet     = IdSet
 
 -- fixes #12177

@@ -754,6 +754,7 @@ Library
         GHC.Tc.Types.Origin
         GHC.Tc.Types.Rank
         GHC.Tc.Types.TcBinder
+        GHC.Tc.Types.TcRef
         GHC.Tc.Utils.Backpack
         GHC.Tc.Utils.Concrete
         GHC.Tc.Utils.Env
