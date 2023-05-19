@@ -592,7 +592,7 @@ data Instr
 
     -- 2. Memory Load/Store Instructions ---------------------------------------
     -- Unlike arm, we don't have register shorthands for size.
-    -- We do hover have {L,S}{B,H,W,D}[U] instructions for Load/Store, Byte, Half, Word, Double, (Unsigned).
+    -- We do however have {L,S}{B,H,W,D}[U] instructions for Load/Store, Byte, Half, Word, Double, (Unsigned).
     -- Reusing the arm logic with the _format_ specifier will hopefully work.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
     | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
@@ -906,3 +906,4 @@ fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
 
 fitsIn32bits  :: (Num a, Ord a, Bits a) => a -> Bool
 fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 -1)
+
