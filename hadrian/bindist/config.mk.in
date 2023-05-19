@@ -257,6 +257,8 @@ TablesNextToCode = @TablesNextToCode@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@
 SettingsCxxCompilerCommand = @SettingsCxxCompilerCommand@
+SettingsCPPCommand = @SettingsCPPCommand@
+SettingsCPPFlags = @SettingsCPPFlags@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
 SettingsHaskellCPPFlags = @SettingsHaskellCPPFlags@
 SettingsCCompilerFlags = @SettingsCCompilerFlags@

@@ -97,6 +97,7 @@ module GHC.Driver.Session (
         sPgm_F,
         sPgm_c,
         sPgm_cxx,
+        sPgm_cpp,
         sPgm_a,
         sPgm_l,
         sPgm_lm,
@@ -135,8 +136,8 @@ module GHC.Driver.Session (
         ghcUsagePath, ghciUsagePath, topDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
-        pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
-        pgm_windres, pgm_ar,
+        pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
+        pgm_dll, pgm_T, pgm_windres, pgm_ar,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
@@ -395,6 +396,8 @@ pgm_c                 :: DynFlags -> String
 pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
 pgm_cxx               :: DynFlags -> String
 pgm_cxx dflags = toolSettings_pgm_cxx $ toolSettings dflags
+pgm_cpp               :: DynFlags -> (String,[Option])
+pgm_cpp dflags = toolSettings_pgm_cpp $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
 pgm_l                 :: DynFlags -> (String,[Option])

@@ -10,6 +10,7 @@ ar             = @ArCmd@
 autoreconf     = @AutoreconfCmd@
 cc             = @CC@
 happy          = @HappyCmd@
+cpp            = @CPPCmd@
 hs-cpp         = @HaskellCPPCmd@
 ld             = @LdCmd@
 make           = @MakeCmd@
@@ -21,6 +22,7 @@ ranlib         = @REAL_RANLIB_CMD@
 sphinx-build   = @SPHINXBUILD@
 system-ar      = @AR_STAGE0@
 system-cc      = @CC_STAGE0@
+system-cpp     = @CPPCmd_STAGE0@
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
 tar            = @TarCmd@
@@ -108,11 +110,6 @@ conf-cc-args-stage1         = @CONF_CC_OPTS_STAGE1@
 conf-cc-args-stage2         = @CONF_CC_OPTS_STAGE2@
 conf-cc-args-stage3         = @CONF_CC_OPTS_STAGE3@
 
-conf-cpp-args-stage0        = @CONF_CPP_OPTS_STAGE0@
-conf-cpp-args-stage1        = @CONF_CPP_OPTS_STAGE1@
-conf-cpp-args-stage2        = @CONF_CPP_OPTS_STAGE2@
-conf-cpp-args-stage3        = @CONF_CPP_OPTS_STAGE3@
-
 conf-gcc-linker-args-stage0 = @CONF_GCC_LINKER_OPTS_STAGE0@
 conf-gcc-linker-args-stage1 = @CONF_GCC_LINKER_OPTS_STAGE1@
 conf-gcc-linker-args-stage2 = @CONF_GCC_LINKER_OPTS_STAGE2@
@@ -145,6 +142,8 @@ ar-args = @ArArgs@
 
 settings-c-compiler-command = @SettingsCCompilerCommand@
 settings-cxx-compiler-command = @SettingsCxxCompilerCommand@
+settings-cpp-command = @SettingsCPPCommand@
+settings-cpp-flags = @SettingsCPPFlags@
 settings-haskell-cpp-command = @SettingsHaskellCPPCommand@
 settings-haskell-cpp-flags = @SettingsHaskellCPPFlags@
 settings-c-compiler-flags = @SettingsCCompilerFlags@
