@@ -707,30 +707,25 @@ getRegister' config plat expr
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
+    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | fitsIn12bitImm n -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
-    CmmMachOp (MO_S_Shr w) [x, y] | w == W8 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
-
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (SBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
-    CmmMachOp (MO_S_Shr w) [x, y] | w == W16 -> do
+      return $ Any (intFormat w) (\dst ->
+          code_x `appOL` toOL [ SUB sp sp (OpImm (ImmInt (widthInBits w)))
+                              , STR (intFormat w) (OpReg w reg_x) (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+                              , LDR (intFormat w)   (OpReg w reg_x)   (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+                              , ADD sp sp (OpImm (ImmInt (widthInBits w)))
+                              , ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))
+                              ])
+    CmmMachOp (MO_S_Shr w) [x, y] -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (SXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
-
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
-
-    CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
-
+      return $ Any (intFormat w) (\dst ->
+          code_x `appOL` code_y `appOL` toOL [ SUB sp sp (OpImm (ImmInt (widthInBits w)))
+                              , STR (intFormat w) (OpReg w reg_x) (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+                              , LDR (intFormat w)   (OpReg w reg_x)   (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+                              , ADD sp sp (OpImm (ImmInt (widthInBits w)))
+                              , ASR (OpReg w dst) (OpReg w reg_y) (OpImm (ImmInteger 0))
+                              ])
 
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
@@ -1010,15 +1005,14 @@ signExtendReg w w' r =
 -- | Instructions to truncate the value in the given register from width @w@
 -- down to width @w'@.
 truncateReg :: Width -> Width -> Reg -> OrdList Instr
+truncateReg w _w' _r | w == W64 = nilOL
+truncateReg w w' _r | w == w' = nilOL
 truncateReg w w' r =
-    case w of
-      W64 -> nilOL
-      W32
-        | w' == W32 -> nilOL
-      _   -> unitOL $ UBFM (OpReg w r)
-                           (OpReg w r)
-                           (OpImm (ImmInt 0))
-                           (OpImm $ ImmInt $ widthInBits w' - 1)
+  toOL [ SUB sp sp (OpImm (ImmInt (widthInBits w)))
+       , STR (intFormat w) (OpReg w r) (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+       , LDR (intFormat w') (OpReg w' r)   (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
+       , ADD sp sp (OpImm (ImmInt (widthInBits w)))
+       ]
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
