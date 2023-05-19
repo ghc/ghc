@@ -874,3 +874,4 @@ test('QualifiedRecordUpdate',
 test('T23171', normal, compile, [''])
 test('T23192', normal, compile, [''])
 test('T23199', normal, compile, [''])
+test('T23156', normal, compile, [''])
