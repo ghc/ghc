@@ -260,6 +260,12 @@ PrintTickyInfo(void)
   PR_CTR(ALLOC_PRIM_gds);
   PR_CTR(ALLOC_PRIM_slp);
 
+  PR_CTR(ALLOC_TSO_tot);
+  PR_CTR(ALLOC_TSO_ctr);
+
+  PR_CTR(ALLOC_STACK_ctr);
+  PR_CTR(ALLOC_STACK_tot);
+
   PR_CTR(ENT_VIA_NODE_ctr);
   PR_CTR(ENT_STATIC_CON_ctr);
   PR_CTR(ENT_DYN_CON_ctr);
