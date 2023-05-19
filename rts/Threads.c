@@ -89,7 +89,7 @@ createThread(Capability *cap, W_ size)
     stack->marking      = 0;
 
     tso = (StgTSO *)allocate(cap, sizeofW(StgTSO));
-    TICK_ALLOC_TSO();
+    TICK_ALLOC_TSO(sizeofW(StgTSO));
     SET_HDR(tso, &stg_TSO_info, CCS_SYSTEM);
 
     // Always start with the compiled code evaluator
@@ -873,7 +873,7 @@ StgMutArrPtrs *listThreads(Capability *cap)
     StgMutArrPtrs *arr =
         (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     SET_HDR(arr, &stg_MUT_ARR_PTRS_DIRTY_info, CCS_SYSTEM);
-    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), size, 0);
     arr->ptrs = n_threads;
     arr->size = size;
 
