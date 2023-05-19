@@ -108,7 +108,7 @@ import Data.Functor.Identity (Identity(..))
 -- import Fusion.Plugin.Types (Fuse(..))
 import GHC.Base (build)
 import GHC.Types (SPEC(..))
-import Prelude hiding (map, mapM, foldr, take, concatMap, takeWhile, replicate)
+import Prelude hiding (map, mapM, Foldable(..), take, concatMap, takeWhile, replicate)
 
 import Unfold (Unfold(..))
 import Fold (Fold(..))

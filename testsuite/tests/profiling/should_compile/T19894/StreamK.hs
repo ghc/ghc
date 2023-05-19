@@ -101,7 +101,7 @@ import Control.Monad.IO.Class (MonadIO(..))
 #if __GLASGOW_HASKELL__ < 808
 import Data.Semigroup (Semigroup(..))
 #endif
-import Prelude hiding (map, mapM, concatMap, foldr)
+import Prelude hiding (map, mapM, concatMap, Foldable(..))
 
 -- import Streamly.Internal.Data.SVar
 

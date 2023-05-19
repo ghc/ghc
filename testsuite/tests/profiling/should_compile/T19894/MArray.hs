@@ -45,7 +45,7 @@ import qualified GHC.ForeignPtr as GHC
 import qualified Fold as FL
 import qualified StreamD as D
 import qualified StreamK as K
-import Prelude hiding (length, read)
+import Prelude hiding (Foldable(..), read)
 
 data Array a =
     Array

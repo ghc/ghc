@@ -28,6 +28,10 @@ constraint_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
                          (b -> a -> b) -> b -> t a -> b
+        foldl' (_ :: a -> a -> a) (_ :: a)
+          where foldl' :: forall (t :: * -> *) b a.
+                          Foldable t =>
+                          (b -> a -> b) -> b -> t a -> b
         foldr (_ :: a -> a -> a) (_ :: a)
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>

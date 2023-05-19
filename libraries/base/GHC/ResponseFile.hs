@@ -23,9 +23,10 @@ module GHC.ResponseFile (
     expandResponse
   ) where
 
+import Prelude hiding (Foldable(..))
 import Control.Exception
 import Data.Char          (isSpace)
-import Data.Foldable      (foldl')
+import Data.Foldable      (Foldable(..))
 import System.Environment (getArgs)
 import System.Exit        (exitFailure)
 import System.IO

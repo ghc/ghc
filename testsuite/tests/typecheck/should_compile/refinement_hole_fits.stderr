@@ -53,6 +53,13 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           with foldl @[] @Integer @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘Data.Foldable’))
+        foldl' (_ :: Integer -> Integer -> Integer) (_ :: Integer)
+          where foldl' :: forall (t :: * -> *) b a.
+                          Foldable t =>
+                          (b -> a -> b) -> b -> t a -> b
+          with foldl' @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
         foldr (_ :: Integer -> Integer -> Integer) (_ :: Integer)
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
@@ -145,6 +152,13 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
                          Foldable t =>
                          (b -> a -> b) -> b -> t a -> b
           with foldl @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        foldl' (_ :: Integer -> Integer -> Integer)
+          where foldl' :: forall (t :: * -> *) b a.
+                          Foldable t =>
+                          (b -> a -> b) -> b -> t a -> b
+          with foldl' @[] @Integer @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘Data.Foldable’))
         foldr (_ :: Integer -> Integer -> Integer)

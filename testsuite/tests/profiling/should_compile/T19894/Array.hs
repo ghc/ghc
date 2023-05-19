@@ -25,7 +25,7 @@ import Unfold (Unfold(..))
 import Fold (Fold(..))
 import qualified MArray as MA
 import qualified Unfold as UF
-import Prelude hiding (length, read)
+import Prelude hiding (Foldable(..), read)
 
 data Array a =
     Array

@@ -55,9 +55,9 @@ NoImplicitPrelude. There are two motivations for this:
 -}
 
 import qualified Prelude
-import Prelude as X hiding ((<>), Applicative(..), head, tail)
+import Prelude as X hiding ((<>), Applicative(..), Foldable(..), head, tail)
 import Control.Applicative (Applicative(..))
-import Data.Foldable as X (foldl')
+import Data.Foldable as X (Foldable(elem, foldMap, foldr, foldl, foldl', foldr1, foldl1, maximum, minimum, product, sum, null, length))
 import GHC.Stack.Types (HasCallStack)
 
 #if MIN_VERSION_base(4,16,0)

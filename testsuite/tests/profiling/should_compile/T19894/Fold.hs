@@ -17,7 +17,7 @@ import Data.Bifunctor (Bifunctor(..))
 #if defined(FUSION_PLUGIN)
 import Fusion.Plugin.Types (Fuse(..))
 #endif
-import Prelude hiding (sum, take)
+import Prelude hiding (Foldable(..), take)
 
 ------------------------------------------------------------------------------
 -- Step of a fold

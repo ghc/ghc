@@ -56,7 +56,8 @@ import System.Directory ( getXdgDirectory, createDirectoryIfMissing, getAppUserD
                           getModificationTime, XdgDirectory ( XdgData ) )
 import Text.Printf
 
-import Prelude
+import Prelude hiding (Foldable(..))
+import Data.Foldable (Foldable(..))
 
 import System.Console.GetOpt
 import qualified Control.Exception as Exception
@@ -75,7 +76,7 @@ import System.IO.Error
 import GHC.IO           ( catchException )
 import GHC.IO.Exception (IOErrorType(InappropriateType))
 import Data.List ( group, sort, sortBy, nub, partition, find
-                 , intercalate, intersperse, foldl', unfoldr
+                 , intercalate, intersperse, unfoldr
                  , isInfixOf, isSuffixOf, isPrefixOf, stripPrefix )
 import Control.Concurrent
 import qualified Data.Foldable as F

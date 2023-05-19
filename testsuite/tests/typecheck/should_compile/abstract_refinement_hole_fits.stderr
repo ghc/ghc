@@ -27,6 +27,10 @@ abstract_refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
                          (b -> a -> b) -> b -> t a -> b
+        foldl' (_ :: Integer -> Integer -> Integer) (_ :: Integer)
+          where foldl' :: forall (t :: * -> *) b a.
+                          Foldable t =>
+                          (b -> a -> b) -> b -> t a -> b
         foldr (_ :: Integer -> Integer -> Integer) (_ :: Integer)
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
@@ -140,6 +144,10 @@ abstract_refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -W
           where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
                          (b -> a -> b) -> b -> t a -> b
+        foldl' (_ :: Integer -> Integer -> Integer)
+          where foldl' :: forall (t :: * -> *) b a.
+                          Foldable t =>
+                          (b -> a -> b) -> b -> t a -> b
         foldr (_ :: Integer -> Integer -> Integer)
           where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>

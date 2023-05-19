@@ -6,12 +6,9 @@ T11071a.hs:12:12: error: [GHC-88464]
       (at T11071a.hs:3:1-24).
 
 T11071a.hs:13:12: error: [GHC-88464]
-    Variable not in scope: foldl'
-    Suggested fixes:
-      • Perhaps use one of these:
-          ‘foldl’ (imported from Prelude), ‘foldl1’ (imported from Prelude),
-          ‘foldr’ (imported from Prelude)
-      • Add ‘foldl'’ to one of these import lists:
+    Variable not in scope: union
+    Suggested fix:
+      • Add ‘union’ to one of these import lists:
           ‘Data.List’ (at T11071a.hs:3:1-24)
           ‘Data.IntMap’ (at T11071a.hs:4:1-21)
 
