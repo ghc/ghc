@@ -9059,9 +9059,7 @@ module GHC.Real where
     floor :: forall b. Integral b => a -> b
   {-# MINIMAL properFraction #-}
   (^) :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a
-  (^%^) :: forall a. Integral a => Rational -> a -> Rational
   (^^) :: forall a b. (Fractional a, Integral b) => a -> b -> a
-  (^^%^^) :: forall a. Integral a => Rational -> a -> Rational
   denominator :: forall a. Ratio a -> a
   divZeroError :: forall a. a
   even :: forall a. Integral a => a -> GHC.Types.Bool
@@ -9084,8 +9082,6 @@ module GHC.Real where
   numericEnumFromTo :: forall a. (GHC.Classes.Ord a, Fractional a) => a -> a -> [a]
   odd :: forall a. Integral a => a -> GHC.Types.Bool
   overflowError :: forall a. a
-  powImpl :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a
-  powImplAcc :: forall a b. (GHC.Num.Num a, Integral b) => a -> b -> a -> a
   ratioPrec :: GHC.Types.Int
   ratioPrec1 :: GHC.Types.Int
   ratioZeroDenominatorError :: forall a. a
