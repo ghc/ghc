@@ -45,14 +45,109 @@
 
 
 module GHC.Float
-   ( module GHC.Float
-   , Float(..), Double(..), Float#, Double#
-   , double2Int, int2Double, float2Int, int2Float
+    ( -- * Classes
+      Floating(..)
+    , RealFloat(..)
 
-    -- * Monomorphic equality operators
-    -- | See GHC.Classes#matching_overloaded_methods_in_rules
-   , eqFloat, eqDouble
-   ) where
+      -- * 'Float'
+    , Float(..), Float#
+      -- ** Conversion
+    , float2Int
+    , int2Float
+    , word2Float
+    , integerToFloat#
+    , naturalToFloat#
+    , rationalToFloat
+    , castWord32ToFloat
+    , castFloatToWord32
+    , float2Double
+      -- ** Operations
+      -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    , floorFloat
+    , ceilingFloat
+    , truncateFloat
+    , roundFloat
+    , properFractionFloat
+      -- ** Predicate
+    , isFloatDenormalized
+    , isFloatFinite
+    , isFloatInfinite
+    , isFloatNaN
+    , isFloatNegativeZero
+      -- ** Comparison
+    , eqFloat, gtFloat, geFloat, leFloat, ltFloat
+      -- ** Arithmetic
+    , plusFloat, minusFloat, timesFloat, divideFloat
+    , negateFloat
+    , powerFloat
+    , expFloat, expm1Float
+    , logFloat, log1pFloat, sqrtFloat, fabsFloat
+    , sinFloat, cosFloat, tanFloat
+    , asinFloat, acosFloat, atanFloat
+    , sinhFloat, coshFloat, tanhFloat
+    , asinhFloat, acoshFloat, atanhFloat
+
+      -- * 'Double'
+    , Double(..)
+    , Double#
+      -- ** Conversion
+    , double2Int
+    , int2Double
+    , word2Double
+    , integerToDouble#
+    , naturalToDouble#
+    , rationalToDouble
+    , castWord64ToDouble
+    , castDoubleToWord64
+    , double2Float
+      -- ** Operations
+      -- | See GHC.Classes#matching_overloaded_methods_in_rules
+    , floorDouble
+    , ceilingDouble
+    , truncateDouble
+    , roundDouble
+    , properFractionDouble
+      -- ** Predicate
+    , isDoubleDenormalized
+    , isDoubleFinite
+    , isDoubleInfinite
+    , isDoubleNaN
+    , isDoubleNegativeZero
+      -- ** Comparison
+    , eqDouble, gtDouble, geDouble, leDouble, ltDouble
+      -- ** Arithmetic
+    , plusDouble, minusDouble, timesDouble, divideDouble
+    , negateDouble
+    , powerDouble
+    , expDouble, expm1Double
+    , logDouble, log1pDouble, sqrtDouble, fabsDouble
+    , sinDouble, cosDouble, tanDouble
+    , asinDouble, acosDouble, atanDouble
+    , sinhDouble, coshDouble, tanhDouble
+    , asinhDouble, acoshDouble, atanhDouble
+
+      -- * Formatting
+    , showFloat
+    , FFFormat(..)
+    , formatRealFloat
+    , formatRealFloatAlt
+    , showSignedFloat
+
+      -- * Operations
+    , log1mexpOrd
+    , roundTo
+    , floatToDigits
+    , integerToBinaryFloat'
+    , fromRat
+    , fromRat'
+    , roundingMode#
+
+      -- * Internal
+    , stgFloatToWord32
+    , stgWord32ToFloat
+    , stgDoubleToWord64
+    , stgWord64ToDouble
+    ) where
 
 import Data.Maybe
 

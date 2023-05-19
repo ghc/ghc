@@ -1600,22 +1600,22 @@ module Data.Semigroup where
 module Data.Show where
   -- Safety: Safe-Inferred
   type Show :: * -> Constraint
-  class Show a
-    ...
+  class Show a where
+    showsPrec :: GHC.Types.Int -> a -> ShowS
+    show :: a -> GHC.Base.String
+    showList :: [a] -> ShowS
+    {-# MINIMAL showsPrec | show #-}
   type ShowS :: *
   type ShowS = GHC.Base.String -> GHC.Base.String
-  show :: Show a => a -> GHC.Base.String
   showChar :: GHC.Types.Char -> ShowS
   showCommaSpace :: ShowS
-  showList :: Show a => [a] -> ShowS
   showLitChar :: GHC.Types.Char -> ShowS
   showLitString :: GHC.Base.String -> ShowS
   showMultiLineString :: GHC.Base.String -> [GHC.Base.String]
   showParen :: GHC.Types.Bool -> ShowS -> ShowS
   showSpace :: ShowS
   showString :: GHC.Base.String -> ShowS
-  shows :: Show a => a -> ShowS
-  showsPrec :: Show a => GHC.Types.Int -> a -> ShowS
+  shows :: forall a. Show a => a -> ShowS
 
 module Data.String where
   -- Safety: Trustworthy
@@ -7037,7 +7037,6 @@ module GHC.Float where
   castWord64ToDouble :: GHC.Word.Word64 -> Double
   ceilingDouble :: forall b. GHC.Real.Integral b => Double -> b
   ceilingFloat :: forall b. GHC.Real.Integral b => Float -> b
-  clamp :: GHC.Types.Int -> GHC.Types.Int -> GHC.Types.Int
   cosDouble :: Double -> Double
   cosFloat :: Float -> Float
   coshDouble :: Double -> Double
@@ -7052,9 +7051,6 @@ module GHC.Float where
   expFloat :: Float -> Float
   expm1Double :: Double -> Double
   expm1Float :: Float -> Float
-  expt :: GHC.Num.Integer.Integer -> GHC.Types.Int -> GHC.Num.Integer.Integer
-  expts :: GHC.Arr.Array GHC.Types.Int GHC.Num.Integer.Integer
-  expts10 :: GHC.Arr.Array GHC.Types.Int GHC.Num.Integer.Integer
   fabsDouble :: Double -> Double
   fabsFloat :: Float -> Float
   float2Double :: Float -> Double
@@ -7066,7 +7062,6 @@ module GHC.Float where
   formatRealFloatAlt :: forall a. RealFloat a => FFFormat -> GHC.Maybe.Maybe GHC.Types.Int -> GHC.Types.Bool -> a -> GHC.Base.String
   fromRat :: forall a. RealFloat a => GHC.Real.Rational -> a
   fromRat' :: forall a. RealFloat a => GHC.Real.Rational -> a
-  fromRat'' :: forall a. RealFloat a => GHC.Types.Int -> GHC.Types.Int -> GHC.Num.Integer.Integer -> GHC.Num.Integer.Integer -> a
   geDouble :: Double -> Double -> GHC.Types.Bool
   geFloat :: Float -> Float -> GHC.Types.Bool
   gtDouble :: Double -> Double -> GHC.Types.Bool
@@ -7095,9 +7090,6 @@ module GHC.Float where
   logFloat :: Float -> Float
   ltDouble :: Double -> Double -> GHC.Types.Bool
   ltFloat :: Float -> Float -> GHC.Types.Bool
-  maxExpt :: GHC.Types.Int
-  maxExpt10 :: GHC.Types.Int
-  minExpt :: GHC.Types.Int
   minusDouble :: Double -> Double -> Double
   minusFloat :: Float -> Float -> Float
   naturalToDouble# :: GHC.Num.Natural.Natural -> Double#
