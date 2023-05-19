@@ -3481,7 +3481,7 @@ cloneBndrSM env@(SE { se_subst = subst }) bndr
 
 cloneRecBndrsSM :: SpecEnv -> [Id] -> SpecM (SpecEnv, [Id])
 cloneRecBndrsSM env@(SE { se_subst = subst }) bndrs
-  = do { (subst', bndrs') <- Core.cloneRecIdBndrs subst bndrs
+  = do { (subst', bndrs') <- Core.cloneRecIdBndrsM subst bndrs
        ; let env' = env { se_subst = subst' }
        ; return (env', bndrs') }
 
