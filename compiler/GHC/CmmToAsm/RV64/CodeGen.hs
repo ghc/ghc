@@ -881,22 +881,14 @@ getRegister' config plat expr
         -- Signed multiply/divide
         MO_Mul w          -> intOp True w (\d x y -> unitOL $ MUL d x y)
         MO_S_MulMayOflo w -> do_mul_may_oflo w x y
-        MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ SDIV d x y)
+        MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ DIV d x y)
 
-        -- No native rem instruction. So we'll compute the following
-        -- Rd  <- Rx / Ry             | 2 <- 7 / 3      -- SDIV Rd Rx Ry
-        -- Rd' <- Rx - Rd * Ry        | 1 <- 7 - 2 * 3  -- MSUB Rd' Rd Ry Rx
-        --        |     '---|----------------|---'   |
-        --        |         '----------------|-------'
-        --        '--------------------------'
         -- Note the swap in Rx and Ry.
-        MO_S_Rem w -> withTempIntReg w $ \t ->
-                      intOp True w (\d x y -> toOL [ SDIV t x y, MSUB d t y x ])
+        MO_S_Rem w -> intOp True w (\d x y -> unitOL $ REM d x y)
 
         -- Unsigned multiply/divide
         MO_U_Quot w -> intOp False w (\d x y -> unitOL $ UDIV d x y)
-        MO_U_Rem w  -> withTempIntReg w $ \t ->
-                       intOp False w (\d x y -> toOL [ UDIV t x y, MSUB d t y x ])
+        MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ REM d x y)
 
         -- Signed comparisons -- see Note [CSET]
         MO_S_Ge w     -> intOp True  w (\d x y -> toOL [ CSET d x y SGE ])
@@ -914,7 +906,7 @@ getRegister' config plat expr
         MO_F_Add w   -> floatOp w (\d x y -> unitOL $ ADD d x y)
         MO_F_Sub w   -> floatOp w (\d x y -> unitOL $ SUB d x y)
         MO_F_Mul w   -> floatOp w (\d x y -> unitOL $ MUL d x y)
-        MO_F_Quot w  -> floatOp w (\d x y -> unitOL $ SDIV d x y)
+        MO_F_Quot w  -> floatOp w (\d x y -> unitOL $ DIV d x y)
 
         -- Floating point comparison
         MO_F_Eq w    -> floatCond w (\d x y -> toOL [ CSET d x y EQ ])
