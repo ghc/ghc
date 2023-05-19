@@ -102,9 +102,9 @@ import Data.Typeable.Internal (Typeable)
 import Data.Type.Equality
 
 import Data.Either
-import Data.Maybe
 import Data.Proxy
 import GHC.Fingerprint.Type
+import GHC.Maybe
 import GHC.Show
 import GHC.Base
 

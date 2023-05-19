@@ -43,7 +43,6 @@ module GHC.List (
 
  ) where
 
-import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Num.Integer (Integer)

@@ -10,8 +10,9 @@
 module Data.Functor.Utils where
 
 import Data.Coerce (Coercible, coerce)
-import GHC.Base ( Applicative(..), Functor(..), Maybe(..), Monad (..)
+import GHC.Base ( Applicative(..), Functor(..), Monad (..)
                 , Monoid(..), Ord(..), Semigroup(..), ($), liftM, otherwise )
+import GHC.Maybe (Maybe(..))
 import qualified GHC.List as List
 
 -- We don't expose Max and Min because, as Edward Kmett pointed out to me,

@@ -27,7 +27,6 @@ module GHC.Event.Thread
 import Control.Exception (finally, SomeException, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, atomicWriteIORef)
-import Data.Maybe (fromMaybe)
 import Data.Tuple (snd)
 import Foreign.C.Error (eBADF, errnoToIOError)
 import Foreign.C.Types (CInt(..), CUInt(..))

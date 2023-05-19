@@ -33,8 +33,8 @@ module Data.Type.Coercion
   ) where
 
 import qualified Data.Type.Equality as Eq
-import Data.Maybe
 import GHC.Enum
+import GHC.Maybe
 import GHC.Show
 import GHC.Read
 import GHC.Base

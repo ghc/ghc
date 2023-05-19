@@ -62,8 +62,6 @@ import qualified Text.Read.Lex as L
 
 import Text.ParserCombinators.ReadPrec
 
-import Data.Maybe
-
 import GHC.Unicode
 import GHC.Num
 import GHC.Real

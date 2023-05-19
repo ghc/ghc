@@ -38,7 +38,8 @@
 --
 module Control.Monad.Fail ( MonadFail(fail) ) where
 
-import GHC.Base (String, Monad(), Maybe(Nothing), IO(), failIO)
+import GHC.Base (String, Monad, IO, failIO)
+import GHC.Maybe (Maybe(Nothing))
 
 -- | When a value is bound in @do@-notation, the pattern on the left
 -- hand side of @<-@ might not match. In this case, this class

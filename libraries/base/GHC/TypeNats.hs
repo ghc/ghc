@@ -52,12 +52,12 @@ module GHC.TypeNats
 import GHC.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
                , Void, errorWithoutStackTrace, (++))
 import GHC.Types
+import GHC.Maybe(Maybe(..))
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..), appPrec, appPrec1, showParen, showString)
 import GHC.Read(Read(..))
 import GHC.Prim(Proxy#)
 import Data.Either(Either(..))
-import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Coercion (Coercion(..), TestCoercion(..))
 import Data.Type.Equality((:~:)(Refl), TestEquality(..))

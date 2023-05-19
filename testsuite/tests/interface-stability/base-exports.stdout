@@ -3697,6 +3697,7 @@ module GHC.Base where
   forkOn# :: forall {q :: RuntimeRep} (a :: TYPE q). Int# -> (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
   freezeArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MutableArray# d a -> Int# -> Int# -> State# d -> (# State# d, Array# a #)
   freezeSmallArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> Int# -> Int# -> State# d -> (# State# d, SmallArray# a #)
+  fromMaybe :: forall a. a -> Maybe a -> a
   geAddr# :: Addr# -> Addr# -> Int#
   geChar# :: Char# -> Char# -> Int#
   geFloat# :: Float# -> Float# -> Int#
@@ -3956,7 +3957,9 @@ module GHC.Base where
   isByteArrayPinned# :: ByteArray# -> Int#
   isCurrentThreadBound# :: State# RealWorld -> (# State# RealWorld, Int# #)
   isEmptyMVar# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). MVar# d a -> State# d -> (# State# d, Int# #)
+  isJust :: forall a. Maybe a -> Bool
   isMutableByteArrayPinned# :: forall d. MutableByteArray# d -> Int#
+  isNothing :: forall a. Maybe a -> Bool
   isTrue# :: Int# -> Bool
   join :: forall (m :: * -> *) a. Monad m => m (m a) -> m a
   keepAlive# :: forall {l :: Levity} {r :: RuntimeRep} (a :: TYPE (BoxedRep l)) d (b :: TYPE r). a -> State# d -> (State# d -> b) -> b
@@ -4012,6 +4015,7 @@ module GHC.Base where
   maskAsyncExceptions# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   maskUninterruptible# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   maxInt :: Int
+  maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
   minInt :: Int
   minusAddr# :: Addr# -> Addr# -> Int#
   minusDoubleX2# :: DoubleX2# -> DoubleX2# -> DoubleX2#
@@ -8290,6 +8294,10 @@ module GHC.Maybe where
   -- Safety: None
   type Maybe :: * -> *
   data Maybe a = Nothing | Just a
+  fromMaybe :: forall a. a -> Maybe a -> a
+  isJust :: forall a. Maybe a -> GHC.Types.Bool
+  isNothing :: forall a. Maybe a -> GHC.Types.Bool
+  maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
 
 module GHC.Natural where
   -- Safety: Trustworthy

@@ -305,9 +305,6 @@ alter f = \k t0 ->
     in case f mbX of
           (b, mbX') ->
             (b, maybe t (\(p, v) -> unsafeInsertNew k p v t) mbX')
-    where
-        maybe _ g (Just x)  = g x
-        maybe def _ Nothing = def
 
 -- | Smart constructor for a 'Bin' node whose left subtree could have become
 -- 'Nil'.

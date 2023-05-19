@@ -149,8 +149,6 @@ module GHC.Float
     , stgWord64ToDouble
     ) where
 
-import Data.Maybe
-
 import GHC.Base
 import GHC.Bits
 import GHC.List

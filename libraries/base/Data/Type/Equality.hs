@@ -46,8 +46,8 @@ module Data.Type.Equality (
   type (==)
   ) where
 
-import Data.Maybe
 import GHC.Enum
+import GHC.Maybe
 import GHC.Show
 import GHC.Read
 import GHC.Base

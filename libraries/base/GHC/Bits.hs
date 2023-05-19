@@ -62,7 +62,7 @@ module GHC.Bits (
 
 #include "MachDeps.h"
 
-import Data.Maybe
+import GHC.Maybe
 import GHC.Num
 import GHC.Base
 import GHC.Real

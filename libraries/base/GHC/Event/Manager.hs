@@ -66,7 +66,6 @@ import Data.Foldable (forM_)
 import Data.Functor (void)
 import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
                    writeIORef)
-import Data.Maybe (maybe)
 import Data.OldList (partition)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base

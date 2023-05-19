@@ -48,7 +48,6 @@ import GHC.Real( Rational, (%), fromIntegral, Integral,
                  toInteger, (^), quot, even )
 import GHC.List
 import GHC.Enum( minBound, maxBound )
-import Data.Maybe
 
 -- local copy to break import-cycle
 -- | @'guard' b@ is @'return' ()@ if @b@ is 'True',

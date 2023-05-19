@@ -25,7 +25,6 @@ module GHC.IO.Handle.FD (
 
 import GHC.Base
 import GHC.Show
-import Data.Maybe
 import Data.Typeable
 import Foreign.C.Types
 import GHC.MVar

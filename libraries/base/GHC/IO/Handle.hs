@@ -71,7 +71,6 @@ import GHC.IORef
 import GHC.Show
 import GHC.Num
 import GHC.Real
-import Data.Maybe
 import Data.Typeable
 
 -- ---------------------------------------------------------------------------

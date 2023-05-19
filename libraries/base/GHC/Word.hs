@@ -46,8 +46,6 @@ module GHC.Word (
     eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
     ) where
 
-import Data.Maybe
-
 import GHC.Prim
 import GHC.Base
 
