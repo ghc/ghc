@@ -135,7 +135,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    spliced expression must have type ``Code Q a``
 
    **NOTE**: Currently typed splices may inhibit the unused identifier warning for
-   identifiers in scope. See `#16524 <https://gitlab.haskell.org/ghc/ghc/-/issues/16524>`
+   identifiers in scope. See :ghc-ticket:`16524`.
 
 -  A *typed* expression quotation is written as ``[|| ... ||]``, or
    ``[e|| ... ||]``, where the "..." is an expression; if the "..."
