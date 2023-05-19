@@ -1742,7 +1742,8 @@ addUsedGRE warn_if_deprec gre
            DisableDeprecationWarnings -> return ()
        ; unless (isLocalGRE gre) $
          do { env <- getGblEnv
-            ; traceRn "addUsedGRE" (ppr gre)
+             -- Do not report the GREInfo (#23424)
+            ; traceRn "addUsedGRE" (ppr $ greName gre)
             ; updMutVar (tcg_used_gres env) (gre :) } }
 
 addUsedGREs :: [GlobalRdrElt] -> RnM ()
@@ -1752,7 +1753,9 @@ addUsedGREs :: [GlobalRdrElt] -> RnM ()
 addUsedGREs gres
   | null imp_gres = return ()
   | otherwise     = do { env <- getGblEnv
-                       ; traceRn "addUsedGREs" (ppr imp_gres)
+                        -- Do not report the GREInfo (#23424)
+                       ; traceRn "addUsedGREs"
+                             (ppr $ map greName imp_gres)
                        ; updMutVar (tcg_used_gres env) (imp_gres ++) }
   where
     imp_gres = filterOut isLocalGRE gres

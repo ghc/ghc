@@ -2201,6 +2201,11 @@ async def compare_outputs(way: WayName,
                     normaliser: OutputNormalizer,
                     expected_file, actual_file, diff_file=None,
                     whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
+    # Respect ignore_stdout and ignore_stderr options
+    if kind == 'stderr' and getTestOpts().ignore_stderr:
+        return True
+    if kind == 'stdout' and getTestOpts().ignore_stdout:
+        return True
 
     expected_path = in_srcdir(expected_file)
     actual_path = in_testdir(actual_file)
