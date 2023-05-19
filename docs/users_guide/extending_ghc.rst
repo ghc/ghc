@@ -287,7 +287,7 @@ would invoke GHC like this:
 
 
 Plugins can be also be loaded from libraries directly. It allows plugins to be
-loaded in cross-compilers (as a workaround for #14335).
+loaded in cross-compilers (as a workaround for :ghc-ticket:`14335`).
 
 .. ghc-flag:: -fplugin-library=⟨file-path⟩;⟨unit-id⟩;⟨module⟩;⟨args⟩
     :shortdesc: Load a pre-compiled static plugin from an external library

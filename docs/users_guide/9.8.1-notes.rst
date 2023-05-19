@@ -33,11 +33,10 @@ Compiler
 
 - Incoherent instance applications are no longer specialised. The previous implementation of
   specialisation resulted in nondeterministic instance resolution in certain cases, breaking
-  the specification described in the documentation of the `INCOHERENT` pragma. See GHC ticket
-  #22448 for further details.
+  the specification described in the documentation of the `INCOHERENT` pragma. See :ghc-ticket:`22448` for further details.
 
 - Fix a bug in TH causing excessive calls to ``setNumCapabilities`` when ``-j`` is greater than ``-N``.
-  See GHC ticket #23049.
+  See :ghc-ticket:`23049`.
 
 - The ``-Wno-⟨wflag⟩``, ``-Werror=⟨wflag⟩`` and ``-Wwarn=⟨wflag⟩`` options are
   now defined systematically for all warning groups (for example,
@@ -121,7 +120,7 @@ Runtime system
 ~~~~~~~~~~~~~~
 
 - On POSIX systems that support timerfd, RTS shutdown no longer has to wait for
-  the next RTS 'tick' to occur before continuing the shutdown process. See #22692.
+  the next RTS 'tick' to occur before continuing the shutdown process. See :ghc-ticket:`22692`.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
