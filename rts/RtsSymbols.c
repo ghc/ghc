@@ -402,9 +402,9 @@ extern char **environ;
       SymI_HasProto(ALLOC_PAP_gds)                      \
       SymI_HasProto(ALLOC_PAP_slp)                      \
       SymI_HasProto(ALLOC_TSO_ctr)                      \
-      SymI_HasProto(ALLOC_TSO_adm)                      \
-      SymI_HasProto(ALLOC_TSO_gds)                      \
-      SymI_HasProto(ALLOC_TSO_slp)                      \
+      SymI_HasProto(ALLOC_TSO_tot)                      \
+      SymI_HasProto(ALLOC_STACK_ctr)                    \
+      SymI_HasProto(ALLOC_STACK_tot)                    \
       SymI_HasProto(RET_NEW_ctr)                        \
       SymI_HasProto(RET_OLD_ctr)                        \
       SymI_HasProto(RET_UNBOXED_TUP_ctr)                \

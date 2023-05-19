@@ -170,9 +170,10 @@ EXTERN StgInt ALLOC_PAP_gds INIT(0);
 EXTERN StgInt ALLOC_PAP_slp INIT(0);
 
 EXTERN StgInt ALLOC_TSO_ctr INIT(0);
-EXTERN StgInt ALLOC_TSO_adm INIT(0);
-EXTERN StgInt ALLOC_TSO_gds INIT(0);
-EXTERN StgInt ALLOC_TSO_slp INIT(0);
+EXTERN StgInt ALLOC_TSO_tot INIT(0);
+
+EXTERN StgInt ALLOC_STACK_ctr INIT(0);
+EXTERN StgInt ALLOC_STACK_tot INIT(0);
 
 EXTERN StgInt RET_NEW_ctr INIT(0);
 EXTERN StgInt RET_OLD_ctr INIT(0);
@@ -215,15 +216,37 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
 
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 
-#define TICK_ALLOC_PRIM(x,y,z)        // FIXME: update counter
 #define TICK_UPD_OLD_IND()            TICK_BUMP(UPD_OLD_IND_ctr)
 #define TICK_UPD_NEW_IND()            TICK_BUMP(UPD_NEW_IND_ctr)
 #define TICK_UPD_SQUEEZED()           TICK_BUMP(UPD_SQUEEZED_ctr)
-#define TICK_ALLOC_HEAP_NOCTR(bytes)  // FIXME: update counter
-#define TICK_GC_FAILED_PROMOTION()    // FIXME: update counter
-#define TICK_ALLOC_TSO()              // FIXME: update counter
-#define TICK_ALLOC_STACK(g)           // FIXME: update counter
-#define TICK_ALLOC_UP_THK(g,s)        // FIXME: update counter
-#define TICK_ALLOC_SE_THK(g,s)        // FIXME: update counter
 
+#define TICK_ALLOC_PRIM(hdr,goods,slop)\
+  TICK_BUMP(ALLOC_PRIM_ctr);\
+  TICK_BUMP_BY(ALLOC_PRIM_adm,hdr);\
+  TICK_BUMP_BY(ALLOC_PRIM_gds,goods);\
+  TICK_BUMP_BY(ALLOC_PRIM_slp,slop);
+
+#define TICK_GC_FAILED_PROMOTION() TICK_BUMP(GC_FAILED_PROMOTION_ctr)
+
+#define TICK_ALLOC_TSO(n)\
+  TICK_BUMP(ALLOC_TSO_ctr);\
+  TICK_BUMP_BY(ALLOC_TSO_tot,n);
+
+#define TICK_ALLOC_STACK(n)\
+  TICK_BUMP(ALLOC_STACK_ctr);\
+  TICK_BUMP_BY(ALLOC_STACK_tot,n);
+
+#define TICK_ALLOC_UP_THK(g,s)\
+  TICK_BUMP(ALLOC_UP_THK_ctr);\
+  TICK_BUMP_BY(ALLOC_THK_gds,g);\
+  TICK_BUMP_BY(ALLOC_THK_slp,s);\
+
+#define TICK_ALLOC_SE_THK(g,s)\
+  TICK_BUMP(ALLOC_SE_THK_ctr);\
+  TICK_BUMP_BY(ALLOC_THK_gds,g);\
+  TICK_BUMP_BY(ALLOC_THK_slp,s);\
+
+#define TICK_ALLOC_HEAP_NOCTR(bytes)\
+  TICK_BUMP(ALLOC_RTS_ctr);\
+  TICK_BUMP_BY(ALLOC_RTS_tot,n);
 #endif
