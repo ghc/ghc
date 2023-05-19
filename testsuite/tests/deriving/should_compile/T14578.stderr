@@ -1,95 +1,98 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance (GHC.Base.Applicative f, GHC.Base.Applicative g,
-            GHC.Base.Semigroup a) =>
-           GHC.Base.Semigroup (T14578.Wat f g a) where
-    (GHC.Base.<>) ::
+  instance (GHC.Base.Functor.Applicative f,
+            GHC.Base.Functor.Applicative g, GHC.Base.Semigroup.Semigroup a) =>
+           GHC.Base.Semigroup.Semigroup (T14578.Wat f g a) where
+    (GHC.Base.Semigroup.<>) ::
       T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a
-    GHC.Base.sconcat ::
-      GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a
-    GHC.Base.stimes ::
+    GHC.Base.Semigroup.sconcat ::
+      GHC.Base.NonEmpty.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a
+    GHC.Base.Semigroup.stimes ::
       forall (b :: *). GHC.Real.Integral b =>
                        b -> T14578.Wat f g a -> T14578.Wat f g a
-    (GHC.Base.<>)
+    (GHC.Base.Semigroup.<>)
       = GHC.Prim.coerce
           @(T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
           @(T14578.Wat f g a -> T14578.Wat f g a -> T14578.Wat f g a)
-          ((GHC.Base.<>) @(T14578.App (Data.Functor.Compose.Compose f g) a))
-    GHC.Base.sconcat
+          ((GHC.Base.Semigroup.<>)
+             @(T14578.App (Data.Functor.Compose.Compose f g) a))
+    GHC.Base.Semigroup.sconcat
       = GHC.Prim.coerce
-          @(GHC.Base.NonEmpty
+          @(GHC.Base.NonEmpty.NonEmpty
               (T14578.App (Data.Functor.Compose.Compose f g) a)
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
-          @(GHC.Base.NonEmpty (T14578.Wat f g a) -> T14578.Wat f g a)
-          (GHC.Base.sconcat
+          @(GHC.Base.NonEmpty.NonEmpty (T14578.Wat f g a)
+            -> T14578.Wat f g a)
+          (GHC.Base.Semigroup.sconcat
              @(T14578.App (Data.Functor.Compose.Compose f g) a))
-    GHC.Base.stimes
+    GHC.Base.Semigroup.stimes
       = GHC.Prim.coerce
           @(b
             -> T14578.App (Data.Functor.Compose.Compose f g) a
             -> T14578.App (Data.Functor.Compose.Compose f g) a)
           @(b -> T14578.Wat f g a -> T14578.Wat f g a)
-          (GHC.Base.stimes
+          (GHC.Base.Semigroup.stimes
              @(T14578.App (Data.Functor.Compose.Compose f g) a))
   
-  instance GHC.Base.Functor f =>
-           GHC.Base.Functor (T14578.App f) where
-    GHC.Base.fmap ::
+  instance GHC.Base.Functor.Functor f =>
+           GHC.Base.Functor.Functor (T14578.App f) where
+    GHC.Base.Functor.fmap ::
       forall (a :: *) (b :: *). (a -> b)
                                 -> T14578.App f a -> T14578.App f b
-    (GHC.Base.<$) ::
+    (GHC.Base.Functor.<$) ::
       forall (a :: *) (b :: *). a -> T14578.App f b -> T14578.App f a
-    GHC.Base.fmap
+    GHC.Base.Functor.fmap
       = GHC.Prim.coerce
           @((a -> b) -> f a -> f b)
-          @((a -> b) -> T14578.App f a -> T14578.App f b) (GHC.Base.fmap @f)
-    (GHC.Base.<$)
+          @((a -> b) -> T14578.App f a -> T14578.App f b)
+          (GHC.Base.Functor.fmap @f)
+    (GHC.Base.Functor.<$)
       = GHC.Prim.coerce
           @(a -> f b -> f a) @(a -> T14578.App f b -> T14578.App f a)
-          ((GHC.Base.<$) @f)
+          ((GHC.Base.Functor.<$) @f)
   
-  instance GHC.Base.Applicative f =>
-           GHC.Base.Applicative (T14578.App f) where
-    GHC.Base.pure :: forall (a :: *). a -> T14578.App f a
-    (GHC.Base.<*>) ::
+  instance GHC.Base.Functor.Applicative f =>
+           GHC.Base.Functor.Applicative (T14578.App f) where
+    GHC.Base.Functor.pure :: forall (a :: *). a -> T14578.App f a
+    (GHC.Base.Functor.<*>) ::
       forall (a :: *) (b :: *). T14578.App f (a -> b)
                                 -> T14578.App f a -> T14578.App f b
-    GHC.Base.liftA2 ::
+    GHC.Base.Functor.liftA2 ::
       forall (a :: *) (b :: *) (c :: *). (a -> b -> c)
                                          -> T14578.App f a -> T14578.App f b -> T14578.App f c
-    (GHC.Base.*>) ::
+    (GHC.Base.Functor.*>) ::
       forall (a :: *) (b :: *). T14578.App f a
                                 -> T14578.App f b -> T14578.App f b
-    (GHC.Base.<*) ::
+    (GHC.Base.Functor.<*) ::
       forall (a :: *) (b :: *). T14578.App f a
                                 -> T14578.App f b -> T14578.App f a
-    GHC.Base.pure
+    GHC.Base.Functor.pure
       = GHC.Prim.coerce
-          @(a -> f a) @(a -> T14578.App f a) (GHC.Base.pure @f)
-    (GHC.Base.<*>)
+          @(a -> f a) @(a -> T14578.App f a) (GHC.Base.Functor.pure @f)
+    (GHC.Base.Functor.<*>)
       = GHC.Prim.coerce
           @(f (a -> b) -> f a -> f b)
           @(T14578.App f (a -> b) -> T14578.App f a -> T14578.App f b)
-          ((GHC.Base.<*>) @f)
-    GHC.Base.liftA2
+          ((GHC.Base.Functor.<*>) @f)
+    GHC.Base.Functor.liftA2
       = GHC.Prim.coerce
           @((a -> b -> c) -> f a -> f b -> f c)
           @((a -> b -> c)
             -> T14578.App f a -> T14578.App f b -> T14578.App f c)
-          (GHC.Base.liftA2 @f)
-    (GHC.Base.*>)
+          (GHC.Base.Functor.liftA2 @f)
+    (GHC.Base.Functor.*>)
       = GHC.Prim.coerce
           @(f a -> f b -> f b)
           @(T14578.App f a -> T14578.App f b -> T14578.App f b)
-          ((GHC.Base.*>) @f)
-    (GHC.Base.<*)
+          ((GHC.Base.Functor.*>) @f)
+    (GHC.Base.Functor.<*)
       = GHC.Prim.coerce
           @(f a -> f b -> f a)
           @(T14578.App f a -> T14578.App f b -> T14578.App f a)
-          ((GHC.Base.<*) @f)
+          ((GHC.Base.Functor.<*) @f)
   
 
 Derived type family instances:
@@ -97,13 +100,15 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
-GHC.Base.Semigroup [T14578.App f a]
-  GHC.Base.sconcat = GHC.Base.$dmsconcat @(T14578.App f a)
+GHC.Base.Semigroup.Semigroup [T14578.App f a]
+  GHC.Base.Semigroup.sconcat = GHC.Base.Semigroup.$dmsconcat
+                                 @(T14578.App f a)
 
 
 
 ==================== Filling in method body ====================
-GHC.Base.Semigroup [T14578.App f a]
-  GHC.Base.stimes = GHC.Base.$dmstimes @(T14578.App f a)
+GHC.Base.Semigroup.Semigroup [T14578.App f a]
+  GHC.Base.Semigroup.stimes = GHC.Base.Semigroup.$dmstimes
+                                @(T14578.App f a)
 
 

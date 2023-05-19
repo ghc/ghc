@@ -194,6 +194,13 @@ Library
         GHC.Arr
         GHC.ArrayArray
         GHC.Base
+        GHC.Base.FunOps
+        GHC.Base.Functor
+        GHC.Base.List
+        GHC.Base.NonEmpty
+        GHC.Base.Semigroup
+        GHC.Base.String
+        GHC.Base.Void
         GHC.Bits
         GHC.ByteOrder
         GHC.Char

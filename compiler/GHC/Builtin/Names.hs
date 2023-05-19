@@ -549,7 +549,10 @@ pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_PRIM_PANIC,
     gHC_TYPES, gHC_GENERICS, gHC_MAGIC, gHC_MAGIC_DICT,
-    gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
+    gHC_CLASSES, gHC_PRIMOPWRAPPERS,
+    gHC_BASE, gHC_BASE_FUNOPS, gHC_BASE_FUNCTOR, gHC_BASE_LIST, gHC_BASE_NONEMPTY,
+    gHC_BASE_SEMIGROUP, gHC_BASE_STRING, gHC_BASE_VOID,
+    gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
     gHC_NUM_INTEGER, gHC_NUM_NATURAL, gHC_NUM_BIGNAT,
@@ -574,7 +577,14 @@ gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
 gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
 gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
-gHC_BASE        = mkBaseModule (fsLit "GHC.Base")
+gHC_BASE           = mkBaseModule (fsLit "GHC.Base")
+gHC_BASE_FUNOPS    = mkBaseModule (fsLit "GHC.Base.FunOps")
+gHC_BASE_FUNCTOR   = mkBaseModule (fsLit "GHC.Base.Functor")
+gHC_BASE_LIST      = mkBaseModule (fsLit "GHC.Base.List")
+gHC_BASE_NONEMPTY  = mkBaseModule (fsLit "GHC.Base.NonEmpty")
+gHC_BASE_SEMIGROUP = mkBaseModule (fsLit "GHC.Base.Semigroup")
+gHC_BASE_STRING    = mkBaseModule (fsLit "GHC.Base.String")
+gHC_BASE_VOID      = mkBaseModule (fsLit "GHC.Base.Void")
 gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
 gHC_GHCI        = mkBaseModule (fsLit "GHC.GHCi")
 gHC_GHCI_HELPERS= mkBaseModule (fsLit "GHC.GHCi.Helpers")
@@ -786,7 +796,7 @@ fromListN_RDR = nameRdrName fromListNName
 toList_RDR = nameRdrName toListName
 
 compose_RDR :: RdrName
-compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")
+compose_RDR             = varQual_RDR gHC_BASE_FUNOPS (fsLit ".")
 
 not_RDR, dataToTag_RDR, succ_RDR, pred_RDR, minBound_RDR, maxBound_RDR,
     and_RDR, range_RDR, inRange_RDR, index_RDR,
@@ -915,10 +925,10 @@ fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
 fmap_RDR                = nameRdrName fmapName
-replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
+replace_RDR             = varQual_RDR gHC_BASE_FUNCTOR (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
-liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")
+liftA2_RDR              = varQual_RDR gHC_BASE_FUNCTOR (fsLit "liftA2")
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
@@ -972,7 +982,7 @@ leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
 
 voidTyConName :: Name
-voidTyConName = tcQual gHC_BASE (fsLit "Void") voidTyConKey
+voidTyConName = tcQual gHC_BASE_VOID (fsLit "Void") voidTyConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1054,7 +1064,7 @@ unpackCStringName, unpackCStringFoldrName,
     unpackCStringAppendName, unpackCStringAppendUtf8Name,
     eqStringName, cstringLengthName :: Name
 cstringLengthName       = varQual gHC_CSTRING (fsLit "cstringLength#") cstringLengthIdKey
-eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+eqStringName            = varQual gHC_BASE_STRING (fsLit "eqString")  eqStringIdKey
 
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringAppendName = varQual gHC_CSTRING (fsLit "unpackAppendCString#") unpackCStringAppendIdKey
@@ -1075,15 +1085,15 @@ eqClassName       = clsQual gHC_CLASSES (fsLit "Eq")      eqClassKey
 eqName            = varQual gHC_CLASSES (fsLit "==")      eqClassOpKey
 ordClassName      = clsQual gHC_CLASSES (fsLit "Ord")     ordClassKey
 geName            = varQual gHC_CLASSES (fsLit ">=")      geClassOpKey
-functorClassName  = clsQual gHC_BASE    (fsLit "Functor") functorClassKey
-fmapName          = varQual gHC_BASE    (fsLit "fmap")    fmapClassOpKey
+functorClassName  = clsQual gHC_BASE_FUNCTOR (fsLit "Functor") functorClassKey
+fmapName          = varQual gHC_BASE_FUNCTOR (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
 monadClassName, thenMName, bindMName, returnMName :: Name
-monadClassName     = clsQual gHC_BASE (fsLit "Monad")  monadClassKey
-thenMName          = varQual gHC_BASE (fsLit ">>")     thenMClassOpKey
-bindMName          = varQual gHC_BASE (fsLit ">>=")    bindMClassOpKey
-returnMName        = varQual gHC_BASE (fsLit "return") returnMClassOpKey
+monadClassName     = clsQual gHC_BASE_FUNCTOR (fsLit "Monad")  monadClassKey
+thenMName          = varQual gHC_BASE_FUNCTOR (fsLit ">>")     thenMClassOpKey
+bindMName          = varQual gHC_BASE_FUNCTOR (fsLit ">>=")    bindMClassOpKey
+returnMName        = varQual gHC_BASE_FUNCTOR (fsLit "return") returnMClassOpKey
 
 -- Class MonadFail
 monadFailClassName, failMName :: Name
@@ -1092,10 +1102,10 @@ failMName          = varQual mONAD_FAIL (fsLit "fail")      failMClassOpKey
 
 -- Class Applicative
 applicativeClassName, pureAName, apAName, thenAName :: Name
-applicativeClassName = clsQual gHC_BASE (fsLit "Applicative") applicativeClassKey
-apAName              = varQual gHC_BASE (fsLit "<*>")         apAClassOpKey
-pureAName            = varQual gHC_BASE (fsLit "pure")        pureAClassOpKey
-thenAName            = varQual gHC_BASE (fsLit "*>")          thenAClassOpKey
+applicativeClassName = clsQual gHC_BASE_FUNCTOR (fsLit "Applicative") applicativeClassKey
+apAName              = varQual gHC_BASE_FUNCTOR (fsLit "<*>")         apAClassOpKey
+pureAName            = varQual gHC_BASE_FUNCTOR (fsLit "pure")        pureAClassOpKey
+thenAName            = varQual gHC_BASE_FUNCTOR (fsLit "*>")          thenAClassOpKey
 
 -- Classes (Foldable, Traversable)
 foldableClassName, traversableClassName :: Name
@@ -1104,20 +1114,20 @@ traversableClassName  = clsQual  dATA_TRAVERSABLE    (fsLit "Traversable") trave
 
 -- Classes (Semigroup, Monoid)
 semigroupClassName, sappendName :: Name
-semigroupClassName = clsQual gHC_BASE       (fsLit "Semigroup") semigroupClassKey
-sappendName        = varQual gHC_BASE       (fsLit "<>")        sappendClassOpKey
+semigroupClassName = clsQual gHC_BASE_SEMIGROUP (fsLit "Semigroup") semigroupClassKey
+sappendName        = varQual gHC_BASE_SEMIGROUP (fsLit "<>")        sappendClassOpKey
 monoidClassName, memptyName, mappendName, mconcatName :: Name
-monoidClassName    = clsQual gHC_BASE       (fsLit "Monoid")    monoidClassKey
-memptyName         = varQual gHC_BASE       (fsLit "mempty")    memptyClassOpKey
-mappendName        = varQual gHC_BASE       (fsLit "mappend")   mappendClassOpKey
-mconcatName        = varQual gHC_BASE       (fsLit "mconcat")   mconcatClassOpKey
+monoidClassName    = clsQual gHC_BASE_SEMIGROUP (fsLit "Monoid")    monoidClassKey
+memptyName         = varQual gHC_BASE_SEMIGROUP (fsLit "mempty")    memptyClassOpKey
+mappendName        = varQual gHC_BASE_SEMIGROUP (fsLit "mappend")   mappendClassOpKey
+mconcatName        = varQual gHC_BASE_SEMIGROUP (fsLit "mconcat")   mconcatClassOpKey
 
 
 
 -- AMP additions
 
 joinMName, alternativeClassName :: Name
-joinMName            = varQual gHC_BASE (fsLit "join")        joinMIdKey
+joinMName            = varQual gHC_BASE_FUNCTOR (fsLit "join")        joinMIdKey
 alternativeClassName = clsQual mONAD (fsLit "Alternative") alternativeClassKey
 
 --
@@ -1138,13 +1148,13 @@ considerAccessibleName = varQual gHC_EXTS (fsLit "considerAccessible") considerA
 fromStringName, otherwiseIdName, foldrName, buildName, augmentName,
     mapName, appendName, assertName,
     dollarName :: Name
-dollarName        = varQual gHC_BASE (fsLit "$")          dollarIdKey
+dollarName        = varQual gHC_BASE_FUNOPS (fsLit "$")          dollarIdKey
 otherwiseIdName   = varQual gHC_BASE (fsLit "otherwise")  otherwiseIdKey
-foldrName         = varQual gHC_BASE (fsLit "foldr")      foldrIdKey
-buildName         = varQual gHC_BASE (fsLit "build")      buildIdKey
-augmentName       = varQual gHC_BASE (fsLit "augment")    augmentIdKey
-mapName           = varQual gHC_BASE (fsLit "map")        mapIdKey
-appendName        = varQual gHC_BASE (fsLit "++")         appendIdKey
+foldrName         = varQual gHC_BASE_LIST (fsLit "foldr")      foldrIdKey
+buildName         = varQual gHC_BASE_LIST (fsLit "build")      buildIdKey
+augmentName       = varQual gHC_BASE_LIST (fsLit "augment")    augmentIdKey
+mapName           = varQual gHC_BASE_LIST (fsLit "map")        mapIdKey
+appendName        = varQual gHC_BASE_LIST (fsLit "++")         appendIdKey
 assertName        = varQual gHC_BASE (fsLit "assert")     assertIdKey
 fromStringName = varQual dATA_STRING (fsLit "fromString") fromStringClassOpKey
 
@@ -1431,7 +1441,7 @@ withDictClassName :: Name
 withDictClassName = clsQual gHC_MAGIC_DICT (fsLit "WithDict") withDictClassKey
 
 nonEmptyTyConName :: Name
-nonEmptyTyConName = tcQual gHC_BASE (fsLit "NonEmpty") nonEmptyTyConKey
+nonEmptyTyConName = tcQual gHC_BASE_NONEMPTY (fsLit "NonEmpty") nonEmptyTyConKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -1546,10 +1556,10 @@ ioTyConName, ioDataConName,
   thenIOName, bindIOName, returnIOName, failIOName :: Name
 ioTyConName       = tcQual  gHC_TYPES (fsLit "IO")       ioTyConKey
 ioDataConName     = dcQual  gHC_TYPES (fsLit "IO")       ioDataConKey
-thenIOName        = varQual gHC_BASE  (fsLit "thenIO")   thenIOIdKey
-bindIOName        = varQual gHC_BASE  (fsLit "bindIO")   bindIOIdKey
-returnIOName      = varQual gHC_BASE  (fsLit "returnIO") returnIOIdKey
-failIOName        = varQual gHC_IO    (fsLit "failIO")   failIOIdKey
+thenIOName        = varQual gHC_BASE_FUNCTOR (fsLit "thenIO")   thenIOIdKey
+bindIOName        = varQual gHC_BASE_FUNCTOR (fsLit "bindIO")   bindIOIdKey
+returnIOName      = varQual gHC_BASE_FUNCTOR (fsLit "returnIO") returnIOIdKey
+failIOName        = varQual gHC_BASE_FUNCTOR (fsLit "failIO")   failIOIdKey
 
 -- IO things
 printName :: Name

@@ -1,2 +1,2 @@
-($!) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base’
+($!) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base.FunOps’
 infixr 0 $!

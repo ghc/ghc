@@ -3,4 +3,5 @@
 Ok, two modules loaded.
 [2 of 2] Compiling T8042A           ( T8042A.hs, interpreted )
 Ok, two modules loaded.
+-fghci-leak-check: ModIface:T8042B is still alive at 0x0000004200e53a90
 Breakpoint 0 activated at T8042A.hs:1:44-56

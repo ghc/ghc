@@ -1,5 +1,5 @@
 
 <interactive>:1:1: error: [GHC-88464]
-    Variable not in scope: abc :: IO String
+    Variable not in scope: abc :: IO GHC.Base.String
     Suggested fix: Perhaps use ‘abs’ (imported from Prelude)
 1

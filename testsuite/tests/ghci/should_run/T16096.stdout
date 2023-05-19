@@ -12,7 +12,7 @@ letrec {
         [LclId]
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x; } in
-GHC.Base.returnIO
+GHC.Base.Functor.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
      @GHC.Types.Any
@@ -39,7 +39,7 @@ letrec {
         [LclId]
         x = GHC.Enum.enumFrom @GHC.Types.Int $dEnum (GHC.Types.I# 1#); } in
       x; } in
-GHC.Base.returnIO
+GHC.Base.Functor.returnIO
   @[GHC.Types.Any]
   (GHC.Types.:
      @GHC.Types.Any

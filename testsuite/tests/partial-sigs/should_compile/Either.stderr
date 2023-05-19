@@ -1,4 +1,6 @@
 TYPE SIGNATURES
-  barry :: forall {w}. w -> (Either String w, Either String w)
+  barry ::
+    forall {w}.
+    w -> (Either GHC.Base.String w, Either GHC.Base.String w)
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.18.0.0]

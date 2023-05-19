@@ -1,6 +1,6 @@
 
 T14884.hs:4:5: error: [GHC-88464]
-    • Found hole: _ :: (a0 -> IO ()) -> String -> IO ()
+    • Found hole: _ :: (a0 -> IO ()) -> GHC.Base.String -> IO ()
       Where: ‘a0’ is an ambiguous type variable
     • In the expression: _ print "abc"
       In an equation for ‘x’: x = _ print "abc"
@@ -19,17 +19,20 @@ T14884.hs:4:5: error: [GHC-88464]
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘Data.Foldable’))
         id :: forall a. a -> a
-          with id @(String -> IO ())
+          with id @(GHC.Base.String -> IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Base.FunOps’))
         ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @GHC.Types.LiftedRep @GHC.Types.LiftedRep @String @(IO ())
+          with ($) @GHC.Types.LiftedRep
+                   @GHC.Types.LiftedRep
+                   @GHC.Base.String
+                   @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Base.FunOps’))
         ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @GHC.Types.LiftedRep @String @(IO ())
+          with ($!) @GHC.Types.LiftedRep @GHC.Base.String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Base.FunOps’))
 
 T14884.hs:4:7: error: [GHC-39999]
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’

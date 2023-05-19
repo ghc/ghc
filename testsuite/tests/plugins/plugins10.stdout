@@ -2,10 +2,13 @@ parsePlugin()
 interfacePlugin: Prelude
 interfacePlugin: Language.Haskell.TH
 interfacePlugin: Language.Haskell.TH.Quote
-interfacePlugin: GHC.Base
+interfacePlugin: GHC.Base.List
+interfacePlugin: GHC.Base.String
 interfacePlugin: GHC.Float
 interfacePlugin: GHC.Prim.Ext
+interfacePlugin: GHC.Base.Functor
 interfacePlugin: Language.Haskell.TH.Syntax
+interfacePlugin: GHC.Base.FunOps
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Num.BigNat

@@ -1,6 +1,7 @@
 parsePlugin(a,b)
 interfacePlugin: Prelude
-interfacePlugin: GHC.Base
+interfacePlugin: GHC.Base.List
+interfacePlugin: GHC.Base.String
 interfacePlugin: GHC.Float
 interfacePlugin: GHC.Prim.Ext
 typeCheckPlugin (rn)

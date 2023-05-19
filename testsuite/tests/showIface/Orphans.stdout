@@ -3,4 +3,4 @@ instance GHC.IsList.IsList [X] = $fIsListX
 family instance GHC.IsList.Item [X] = D:R:ItemX
 family instance [orphan] GHC.IsList.Item [GHC.Types.Bool]
 "myrule1" [orphan] forall @a.
-"myrule2" GHC.Base.id @(X -> X) f = f
+"myrule2" GHC.Base.FunOps.id @(X -> X) f = f

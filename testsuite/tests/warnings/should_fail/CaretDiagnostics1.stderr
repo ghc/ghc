@@ -14,7 +14,7 @@ CaretDiagnostics1.hs:7:8-15: error: [GHC-83865]
 CaretDiagnostics1.hs:8:9-27: error: [GHC-83865]
     • Couldn't match type ‘[Char]’ with ‘()’
       Expected: ()
-        Actual: String
+        Actual: GHC.Base.String
     • In the first argument of ‘(+)’, namely ‘"this is not an IO"’
       In the first argument of ‘pure’, namely
         ‘("this is not an IO" + ())’
@@ -27,7 +27,7 @@ CaretDiagnostics1.hs:13:7-11: error: [GHC-83865]
     • Couldn't match type: a1 -> a1
                      with: [Char]
       Expected: a1 -> a1
-        Actual: String
+        Actual: GHC.Base.String
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'
       In the expression: case id of "γηξ" -> () '0'

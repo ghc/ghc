@@ -3,7 +3,7 @@
 1
 ProjectionE ("foo" :| ["bar"])
 T20185a.x.foo.bar
-(GHC.Base.id T20185a.x).foo.bar
-(GHC.Base.id (GHC.Base.id T20185a.x).foo).bar
+(GHC.Base.FunOps.id T20185a.x).foo.bar
+(GHC.Base.FunOps.id (GHC.Base.FunOps.id T20185a.x).foo).bar
 (.foo.bar)
 (.foo.bar) T20185a.x

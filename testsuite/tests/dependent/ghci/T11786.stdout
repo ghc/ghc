@@ -1,6 +1,6 @@
 ($) :: (a -> b) -> a -> b
 (($)) :: (a -> b) -> a -> b
-($) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base’
+($) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base.FunOps’
 infixr 0 $
 ($)
   :: forall (repa :: GHC.Types.RuntimeRep)
@@ -14,5 +14,5 @@ infixr 0 $
   forall (repa :: GHC.Types.RuntimeRep)
          (repb :: GHC.Types.RuntimeRep) (a :: TYPE repa) (b :: TYPE repb).
   (a -> b) -> a -> b
-  	-- Defined in ‘GHC.Base’
+  	-- Defined in ‘GHC.Base.FunOps’
 infixr 0 $

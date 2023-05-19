@@ -7,6 +7,6 @@ BCO_toplevel :: GHC.Types.IO [GHC.Types.Any]
           sat :: [GHC.Types.Any]
           [LclId] =
               :! [GHC.Tuple.Prim.() GHC.Types.[]];
-        } in  GHC.Base.returnIO sat;
+        } in  GHC.Base.Functor.returnIO sat;
 
 

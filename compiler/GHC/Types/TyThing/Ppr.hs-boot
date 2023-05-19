@@ -3,7 +3,7 @@ module GHC.Types.TyThing.Ppr (
         pprTyThingInContext
   ) where
 
-import {-# SOURCE #-} GHC.Iface.Type ( ShowSub )
+import GHC.Iface.Type ( ShowSub )
 import GHC.Types.TyThing             ( TyThing )
 import GHC.Utils.Outputable          ( SDoc )
 

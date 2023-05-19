@@ -1,6 +1,6 @@
 test :: Int = 0
 test = 0
 test :: Int = 0
-test :: String = _
+test :: GHC.Base.String = _
 test = "test"
-test :: String = "test"
+test :: GHC.Base.String = "test"
