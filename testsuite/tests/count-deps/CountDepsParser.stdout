@@ -203,6 +203,7 @@ GHC.Tc.Types.Constraint
 GHC.Tc.Types.Evidence
 GHC.Tc.Types.Origin
 GHC.Tc.Types.Rank
+GHC.Tc.Types.TcBinder
 GHC.Tc.Utils.TcType
 GHC.Types.Annotations
 GHC.Types.Avail
