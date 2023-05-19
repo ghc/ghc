@@ -246,7 +246,7 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
   TICK_BUMP_BY(ALLOC_THK_gds,g);\
   TICK_BUMP_BY(ALLOC_THK_slp,s);\
 
-#define TICK_ALLOC_HEAP_NOCTR(bytes)\
+#define TICK_ALLOC_RTS(bytes)\
   TICK_BUMP(ALLOC_RTS_ctr);\
   TICK_BUMP_BY(ALLOC_RTS_tot,n);
 #endif

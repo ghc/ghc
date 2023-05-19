@@ -414,7 +414,7 @@
     TICK_BUMP(HEAP_CHK_ctr);                            \
     Hp = Hp + (bytes);                                  \
     if (Hp > HpLim) { HpAlloc = (bytes); failure; }     \
-    TICK_ALLOC_HEAP_NOCTR(bytes);
+    TICK_ALLOC_RTS(bytes);
 
 #define ALLOC_PRIM_WITH_CUSTOM_FAILURE(bytes,failure)           \
     HEAP_CHECK(bytes,failure)                                   \
@@ -435,7 +435,7 @@
 
 #define HP_CHK_GEN_TICKY(bytes)                 \
    HP_CHK_GEN(bytes);                           \
-   TICK_ALLOC_HEAP_NOCTR(bytes);
+   TICK_ALLOC_RTS(bytes);
 
 #define HP_CHK_P(bytes, fun, arg)               \
    HEAP_CHECK(bytes, GC_PRIM_P(fun,arg))
@@ -444,7 +444,7 @@
 //         -NSF March 2013
 #define ALLOC_P_TICKY(bytes, fun, arg)          \
    HP_CHK_P(bytes);                             \
-   TICK_ALLOC_HEAP_NOCTR(bytes);
+   TICK_ALLOC_RTS(bytes);
 
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
@@ -789,7 +789,7 @@
   TICK_BUMP(UPD_CON_IN_NEW_ctr);                \
   TICK_HISTO(UPD_CON_IN_NEW,n)
 
-#define TICK_ALLOC_HEAP_NOCTR(bytes)            \
+#define TICK_ALLOC_RTS(bytes)            \
     TICK_BUMP(ALLOC_RTS_ctr);                   \
     TICK_BUMP_BY(ALLOC_RTS_tot,bytes)
 
