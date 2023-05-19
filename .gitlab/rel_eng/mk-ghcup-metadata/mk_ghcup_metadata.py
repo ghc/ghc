@@ -63,7 +63,8 @@ eprint(f"Supported platforms: {job_mapping.keys()}")
 # Artifact precisely specifies a job what the bindist to download is called.
 class Artifact(NamedTuple):
     job_name: str
-    name: str
+    download_name: str
+    output_name: str
     subdir: str
 
 # Platform spec provides a specification which is agnostic to Job
@@ -72,8 +73,14 @@ class PlatformSpec(NamedTuple):
     name: str
     subdir: str
 
-source_artifact = Artifact('source-tarball', 'ghc-{version}-src.tar.xz', 'ghc-{version}' )
-test_artifact = Artifact('source-tarball', 'ghc-{version}-testsuite.tar.xz', 'ghc-{version}' )
+source_artifact = Artifact('source-tarball'
+                          , 'ghc-{version}-src.tar.xz'
+                          , 'ghc-{version}-src.tar.xz'
+                          , 'ghc-{version}' )
+test_artifact = Artifact('source-tarball'
+                        , 'ghc-{version}-testsuite.tar.xz'
+                        , 'ghc-{version}-testsuite.tar.xz'
+                        , 'ghc-{version}' )
 
 def debian(arch, n):
     return linux_platform(arch, "{arch}-linux-deb{n}".format(arch=arch, n=n))
@@ -129,7 +136,7 @@ def download_and_hash(url):
 def mk_one_metadata(release_mode, version, job_map, artifact):
     job_id = job_map[artifact.job_name].id
 
-    url = base_url.format(job_id=job_id, artifact_name=urllib.parse.quote_plus(artifact.name.format(version=version)))
+    url = base_url.format(job_id=job_id, artifact_name=urllib.parse.quote_plus(artifact.download_name.format(version=version)))
 
     # In --release-mode, the URL in the metadata needs to point into the downloads folder
     # rather then the pipeline.
@@ -149,10 +156,13 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
     eprint(f"Bindist URL: {url}")
     eprint(f"Download URL: {final_url}")
 
-    # Download and hash from the release pipeline, this must not change anyway during upload.
+    #Download and hash from the release pipeline, this must not change anyway during upload.
     h = download_and_hash(url)
 
-    res = { "dlUri": final_url, "dlSubdir": artifact.subdir.format(version=version), "dlHash" : h }
+    res = { "dlUri": final_url
+          , "dlSubdir": artifact.subdir.format(version=version)
+          , "dlOutput": artifact.output_name.format(version=version)
+          , "dlHash" : h }
     eprint(res)
     return res
 
@@ -161,7 +171,11 @@ def mk_one_metadata(release_mode, version, job_map, artifact):
 def mk_from_platform(pipeline_type, platform):
     info = job_mapping[platform.name][pipeline_type]
     eprint(f"From {platform.name} / {pipeline_type} selecting {info['name']}")
-    return Artifact(info['name'] , f"{info['jobInfo']['bindistName']}.tar.xz", platform.subdir)
+    return Artifact(info['name']
+                   , f"{info['jobInfo']['bindistName']}.tar.xz"
+                   , "ghc-{version}-{pn}.tar.xz".format(version="{version}", pn=platform.name)
+                   , platform.subdir)
+
 
 # Generate the new metadata for a specific GHC mode etc
 def mk_new_yaml(release_mode, version, pipeline_type, job_map):
