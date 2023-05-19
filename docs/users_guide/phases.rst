@@ -25,11 +25,11 @@ given compilation phase:
     Use ⟨cmd⟩ as the literate pre-processor.
 
 .. ghc-flag:: -pgmP ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the C pre-processor (with ``-cpp`` only)
+    :shortdesc: Use ⟨cmd⟩ as the C pre-processor (with :ghc-flag:`-cpp` only)
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the C pre-processor (with ``-cpp`` only).
+    Use ⟨cmd⟩ as the C pre-processor (with :ghc-flag:`-cpp` only).
 
 .. ghc-flag:: -pgmc ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the C compiler
@@ -159,11 +159,11 @@ the following flags:
     Pass ⟨option⟩ to the literate pre-processor
 
 .. ghc-flag:: -optP ⟨option⟩
-    :shortdesc: pass ⟨option⟩ to cpp (with ``-cpp`` only)
+    :shortdesc: pass ⟨option⟩ to cpp (with :ghc-flag:`-cpp` only)
     :type: dynamic
     :category: phase-options
 
-    Pass ⟨option⟩ to CPP (makes sense only if ``-cpp`` is also on).
+    Pass ⟨option⟩ to CPP (makes sense only if :ghc-flag:`-cpp` is also on).
 
 .. ghc-flag:: -optF ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the custom pre-processor
@@ -308,9 +308,9 @@ Options affecting the C pre-processor
     :category: cpp
 
     The C pre-processor :command:`cpp` is run over your Haskell code if
-    the ``-cpp`` option or ``-XCPP`` extension are given. Unless you are building a
-    large system with significant doses of conditional compilation, you
-    really shouldn't need it.
+    the :ghc-flag:`-cpp` option or :extension:`CPP` extension are given. Unless
+    you are building a large system with significant doses of conditional
+    compilation, you really shouldn't need it.
 
 .. ghc-flag:: -D⟨symbol⟩[=⟨value⟩]
     :shortdesc: Define a symbol in the C pre-processor
