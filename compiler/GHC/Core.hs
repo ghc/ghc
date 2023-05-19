@@ -165,99 +165,163 @@ These data types are the heart of the compiler
 --    optimization, analysis and code generation on.
 --
 -- The type parameter @b@ is for the type of binders in the expression tree.
---
--- The language consists of the following elements:
---
--- *  Variables
---    See Note [Variable occurrences in Core]
---
--- *  Primitive literals
---
--- *  Applications: note that the argument may be a 'Type'.
---    See Note [Representation polymorphism invariants]
---
--- *  Lambda abstraction
---    See Note [Representation polymorphism invariants]
---
--- *  Recursive and non recursive @let@s. Operationally
---    this corresponds to allocating a thunk for the things
---    bound and then executing the sub-expression.
---
---    See Note [Core letrec invariant]
---    See Note [Core let-can-float invariant]
---    See Note [Representation polymorphism invariants]
---    See Note [Core type and coercion invariant]
---
--- *  Case expression. Operationally this corresponds to evaluating
---    the scrutinee (expression examined) to weak head normal form
---    and then examining at most one level of resulting constructor (i.e. you
---    cannot do nested pattern matching directly with this).
---
---    The binder gets bound to the value of the scrutinee,
---    and the 'Type' must be that of all the case alternatives
---
---    IMPORTANT: see Note [Case expression invariants]
---
--- *  Cast an expression to a particular type.
---    This is used to implement @newtype@s (a @newtype@ constructor or
---    destructor just becomes a 'Cast' in Core) and GADTs.
---
--- *  Ticks. These are used to represent all the source annotation we
---    support: profiling SCCs, HPC ticks, and GHCi breakpoints.
---
--- *  A type: this should only show up at the top level of an Arg
---
--- *  A coercion
-
-{- Note [Why does Case have a 'Type' field?]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The obvious alternative is
-   exprType (Case scrut bndr alts)
-     | (_,_,rhs1):_ <- alts
-     = exprType rhs1
-
-But caching the type in the Case constructor
-  exprType (Case scrut bndr ty alts) = ty
-is better for at least three reasons:
-
-* It works when there are no alternatives (see case invariant 1 above)
-
-* It might be faster in deeply-nested situations.
-
-* It might not be quite the same as (exprType rhs) for one
-  of the RHSs in alts. Consider a phantom type synonym
-       type S a = Int
-   and we want to form the case expression
-        case x of { K (a::*) -> (e :: S a) }
-   Then exprType of the RHS is (S a), but we cannot make that be
-   the 'ty' in the Case constructor because 'a' is simply not in
-   scope there. Instead we must expand the synonym to Int before
-   putting it in the Case constructor.  See GHC.Core.Utils.mkSingleAltCase.
-
-   So we'd have to do synonym expansion in exprType which would
-   be inefficient.
-
-* The type stored in the case is checked with lintInTy. This checks
-  (among other things) that it does not mention any variables that are
-  not in scope. If we did not have the type there, it would be a bit
-  harder for Core Lint to reject case blah of Ex x -> x where
-      data Ex = forall a. Ex a.
--}
+-- It is usually instantiated to 'Var' (in 'CoreExpr', the commonly used type
+-- alias). To see why @b@ is useful, see 'TaggedExpr' and its use in
+-- "GHC.Core.Opt.SetLevels".
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Expr b
   = Var   Id
+  -- ^ A (term-level, hence 'Id') variable occurrence,
+  -- see Note [Variable occurrences in Core].
+  --
+  -- Refers to the 'Id' record of its binding site;
+  -- if you change its 'GHC.Types.Id.idInfo' you probably want to change the
+  -- 'GHC.Types.Id.idInfo' of the binding site as well.
+
   | Lit   Literal
+  -- ^ A primitive literal, always of unlifted kind.
+  --
+  -- Haskell's number literals such as `0 :: Int` (where `Int` is a lifted data type)
+  -- do /not/ have a representation as a Core 'Literal'; rather they get desugared
+  -- to `I# 0#`, where `0#` is a Literal of type `Int#` (which has unlifted kind
+  -- `TYPE IntRep`).
+  --
+  -- There are a few utility functions to create literals, for example
+  -- 'mkIntLit', 'mkDoubleLit', 'mkCharLit', 'mkStringLit'.
+
   | App   (Expr b) (Arg b)
+  -- ^ A unary application, often occuring in left-associated chains.
+  --
+  -- There are a few utility functions working on application chains;
+  -- see 'collectArgs' and friends.
+  --
+  -- Args have fixed runtime representation;
+  -- see Note [Representation polymorphism invariants].
+
   | Lam   b (Expr b)
+  -- ^ A lambda, binding term arguments ('Id'), type or kind arguments ('TyVar')
+  -- or coercion arguments ('CoVar').
+  --
+  -- Note that type and coercion binders are dependently quantified. E.g., in
+  -- pretty-printed Core,
+  --
+  -- > f = \(@a) (@co :: a ~# Int) -> <expr> :: (<ty> a |> (... co))
+  --
+  -- Where you can pick out dependent quantifiers by the leading `@`.
+  -- Here, `a` occurs in the kind of `co` (the next lambda binder) and in the
+  -- type of `<expr>`, so both the kind of `co` /and/ the type of `<expr>`
+  -- depend on `a`. Furthermore, the type of `<expr>` is casted via a
+  -- coercion mentioning `co`.
+  --
+  -- Subject to Note [Shadowing] for the lambda binder.
+  -- Lambda binders have fixed runtime representation;
+  -- see Note [Representation polymorphism invariants].
+  --
+  -- Use 'mkLams' to create multiple lambdas at once and 'wrapLamBody' to
+  -- map over the body of a lambda without touching its binders (beware of
+  -- name capture!).
+
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
-                                    -- and Note [Why does Case have a 'Type' field?]
-  | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
+  -- ^ A let binding. 'Bind' is either a single, 'NonRec'ursive binding or a
+  -- list of mutually 'Rec'ursive bindings.
+  -- Operationally, this corresponds to allocating a thunk for the things bound
+  -- and then executing the sub-expression.
+  --
+  -- Almost exclusively used for value bindings, e.g., 'Id's, in which case be
+  -- aware of the following invariants:
+  --
+  -- * Note [Core letrec invariant]
+  -- * Note [Core let-can-float invariant]
+  -- * Note [Shadowing] of the let binders
+  -- * Let binders have fixed runtime representation;
+  --   see Note [Representation polymorphism invariants].
+  --
+  -- A very special kind of let binding is a /join point/, which can be detected
+  -- with 'GHC.Types.Id.isJoinId_maybe' or 'GHC.Core.Utils.isJoinBind'.
+  -- Consult Note [Join points] for details.
+  --
+  -- In exception to \"exclusively\" above, we may bind a 'TyVar' or a 'CoVar'
+  -- in a non-recursive 'Bind', see Note [Core type and coercion invariant].
+  --
+  -- See also utility functions 'mkLet', 'mkLets', 'mkLetNonRec', 'mkLetRec'.
+
+  | Case  (Expr b) b Type [Alt b]
+  -- ^ Represents a Case expression, doing one level of pattern-matching.
+  -- Pretty-printed as
+  --
+  -- > case scrut of wild {
+  -- >   __DEFAULT -> rhs1;
+  -- >   (:) x xs  -> rhs2;
+  -- > }
+  --
+  -- Operationally, the /scrutinee/ expression `scrut` is evaluated to head
+  -- normal form. The value is bound to the /case binder/ `wild` and is then
+  -- examined to do a one-level switch on the data constructor tag/literal to
+  -- jump to one of the /alternatives/. (Nested matches in Haskell have been
+  -- desugared to multiple Case matches in Core.)
+  --
+  -- The type is the cached return type of the whole case
+  -- expression and hence matches that of the case alternatives,
+  -- see Note [Why does Case have a 'Type' field?].
+  -- The list of case alternatives is roughly represented as
+  --
+  -- > 'Alt' 'DefaultAlt' [] "rhs1", 'Alt' ('DataAlt' "(:)"), ["x","xs"], "rhs2"]
+  --
+  -- Note that there is at most one catch-all `__DEFAULT` case and no overlap
+  -- between other alternatives, so the order of alternatives is arbitrary
+  -- (e.g., /no/ first-match semantics).
+  --
+  -- See also
+  --
+  -- * Note [Case expression invariants]
+  -- * Note [Empty case alternatives]
+  -- * Note [Shadowing] of the case binder
+  -- * Case binders have fixed runtime representation;
+  --   see Note [Representation polymorphism invariants].
+  --
+  -- Utility functions: 'GHC.Core.Utils.mkAltExpr',
+  -- 'GHC.Core.Utils.mkDefaultCase', 'GHC.Core.Utils.mkSingleAltCase' and the
+  -- various helper functions around case alternatives in "GHC.Core.Utils".
+
+  | Cast  (Expr b) CoercionR
+  -- ^ Cast an expression's type via a 'CoercionR' (the R denotes that it has a
+  -- Representational role). Doing so has no effect at runtime, but it is
+  -- crucial for justifying term-level transformations in the type system.
+  --
+  -- This is used to implement `newtype`s (a `newtype` constructor or
+  -- destructor just becomes a 'Cast' in Core) and GADTs.
+
   | Tick  CoreTickish (Expr b)
+  -- ^ Wraps various sorts of debug information around an expression, such as
+  -- profiling SCCs, HPC ticks, and GHCi breakpoints.
+  --
+  -- We try to preserve meaning throughout transformations as best as possible.
+  --
+  -- There are quite a few utility functions that work on 'Ticks':
+  -- 'collectArgsTicks', 'GHC.Core.Utils.stripTicksTop' and friends in
+  -- "GHC.Core.Utils".
+
   | Type  Type
+  -- ^ Signals leaving of the \"term level\" and injects a type expression.
+  --
+  -- Occurs only in argument position of an 'App' such as `id @Int (I# 42#)`
+  -- (where there is a non-pretty-printed `Type ...` wrapped around the type
+  -- expression @Int@) or (rarely) in the RHS of a 'Let' that binds a type
+  -- variable, such as `let { a = @(Rep MyBigGenericRecord) } in ...`
+  -- as in Note [Core type and coercion invariant].
+  --
+  -- If you want to turn a 'Var' into an argument and don't know whether it's an
+  -- term level 'Id', a type-level 'TyVar' or a 'CoVar', use 'varToCoreExpr'.
+
   | Coercion Coercion
+  -- ^ Quite the same as the 'Type' constructor, but for introducing coercion
+  -- arguments (which encode equalities between types).
+  --
+  -- Coercion arguments are morally values and should be treated as such (e.g.,
+  -- somewhat close to tokens of type `()`) until they are erased in STG.
+
   deriving Data
 
 -- | Type synonym for expressions that occur in function argument positions.
@@ -584,6 +648,40 @@ checked by Core Lint.
 8. The multiplicity of the binders in constructor patterns must be the
    multiplicity of the corresponding field /scaled by the multiplicity of the
    case binder/. Checked in lintCoreAlt.
+
+Note [Why does Case have a 'Type' field?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The obvious alternative is
+   exprType (Case scrut bndr alts)
+     | (_,_,rhs1):_ <- alts
+     = exprType rhs1
+
+But caching the type in the Case constructor
+  exprType (Case scrut bndr ty alts) = ty
+is better for at least three reasons:
+
+* It works when there are no alternatives (see case invariant 1 above)
+
+* It might be faster in deeply-nested situations.
+
+* It might not be quite the same as (exprType rhs) for one
+  of the RHSs in alts. Consider a phantom type synonym
+       type S a = Int
+   and we want to form the case expression
+        case x of { K (a::*) -> (e :: S a) }
+   Then exprType of the RHS is (S a), but we cannot make that be
+   the 'ty' in the Case constructor because 'a' is simply not in
+   scope there. Instead we must expand the synonym to Int before
+   putting it in the Case constructor.  See GHC.Core.Utils.mkSingleAltCase.
+
+   So we'd have to do synonym expansion in exprType which would
+   be inefficient.
+
+* The type stored in the case is checked with lintInTy. This checks
+  (among other things) that it does not mention any variables that are
+  not in scope. If we did not have the type there, it would be a bit
+  harder for Core Lint to reject case blah of Ex x -> x where
+      data Ex = forall a. Ex a.
 
 Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
