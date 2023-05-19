@@ -596,6 +596,8 @@ pprInstr platform instr = case instr of
   STR II16 o1 o2 -> op2 (text "\tsh") o1 o2
   STR II32 o1 o2 -> op2 (text "\tsw") o1 o2
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
+  STR f o1 o2    -> pprPanic "RV64.pprInstr - STR not implemented for ... "
+                              (text "STR" <+> (text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
 
   LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     lines_ [ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
@@ -613,15 +615,17 @@ pprInstr platform instr = case instr of
     -- op_add o1 (text "%pcrel_lo(" <> pprAsmLabel platform lbl <> text ")")
     line $ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
 
-  LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tldrb") o1 o2
-  LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
-    op2 (text "\tldrh") o1 o2
+  LDR _f o1@(OpReg W8 reg) o2 | isIntRealReg reg ->
+    op2 (text "\tlb") o1 o2
+  LDR _f o1@(OpReg W16 reg) o2 | isIntRealReg reg ->
+    op2 (text "\tlh") o1 o2
 
   LDR II8  o1 o2 -> op2 (text "\tlb") o1 o2
   LDR II16 o1 o2 -> op2 (text "\tlh") o1 o2
   LDR II32 o1 o2 -> op2 (text "\tlw") o1 o2
   LDR II64 o1 o2 -> op2 (text "\tld") o1 o2
+  LDR f o1 o2    -> pprPanic "RV64.pprInstr - LDR not implemented for ... "
+                              (text "LDR" <+> (text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
   -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   -- STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
@@ -634,6 +638,7 @@ pprInstr platform instr = case instr of
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
   FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2
   FABS o1 o2 -> op2 (text "\tfabs") o1 o2
+  instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ (instrCon instr)
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
        op3 op o1 o2 o3     = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3
        op4 op o1 o2 o3 o4  = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2 <> comma <+> pprOp platform o3 <> comma <+> pprOp platform o4
