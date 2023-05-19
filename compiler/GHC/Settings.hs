@@ -29,6 +29,7 @@ module GHC.Settings
   , sPgm_F
   , sPgm_c
   , sPgm_cxx
+  , sPgm_cpp
   , sPgm_a
   , sPgm_l
   , sPgm_lm
@@ -96,10 +97,13 @@ data ToolSettings = ToolSettings
 
   -- commands for particular phases
   , toolSettings_pgm_L       :: String
-  , toolSettings_pgm_P       :: (String, [Option])
+  , -- | The Haskell C preprocessor and default options (not added by -optP)
+    toolSettings_pgm_P       :: (String, [Option])
   , toolSettings_pgm_F       :: String
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_cxx     :: String
+  , -- | The C preprocessor (distinct from the Haskell C preprocessor!)
+    toolSettings_pgm_cpp     :: (String, [Option])
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
   , toolSettings_pgm_lm      :: Maybe (String, [Option])
@@ -212,6 +216,8 @@ sPgm_c :: Settings -> String
 sPgm_c = toolSettings_pgm_c . sToolSettings
 sPgm_cxx :: Settings -> String
 sPgm_cxx = toolSettings_pgm_cxx . sToolSettings
+sPgm_cpp :: Settings -> (String, [Option])
+sPgm_cpp = toolSettings_pgm_cpp . sToolSettings
 sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings
 sPgm_l :: Settings -> (String, [Option])

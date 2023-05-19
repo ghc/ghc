@@ -466,7 +466,7 @@ dnl make extensions visible to allow feature-tests to detect them lateron
 AC_USE_SYSTEM_EXTENSIONS
 
 # --with-hs-cpp/--with-hs-cpp-flags
-FP_CPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
+FP_HSCPP_CMD_WITH_ARGS(HaskellCPPCmd, HaskellCPPArgs)
 AC_SUBST([HaskellCPPCmd])
 AC_SUBST([HaskellCPPArgs])
 
@@ -666,6 +666,16 @@ dnl TODO: Do we need -Qunused-arguments in CXX and GCC linker too?
 FP_CC_IGNORE_UNUSED_ARGS([$CC_STAGE0], [CONF_CC_OPTS_STAGE0])
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE1])
 FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE2])
+
+# CPP, CPPFLAGS
+# --with-cpp/-with-cpp-flags
+dnl Note that we must do this after setting and using the C99 CPPFLAGS, or
+dnl otherwise risk trying to configure the C99 and LD flags using -E as a CPPFLAG
+FP_CPP_CMD_WITH_ARGS([$CC_STAGE0],[CPPCmd_STAGE0],[CONF_CPP_OPTS_STAGE0])
+FP_CPP_CMD_WITH_ARGS([$CC],[CPPCmd],[CONF_CPP_OPTS_STAGE1])
+FP_CPP_CMD_WITH_ARGS([$CC],[CPPCmd],[CONF_CPP_OPTS_STAGE2])
+AC_SUBST([CPPCmd_STAGE0])
+AC_SUBST([CPPCmd])
 
 # See rules/distdir-way-opts.mk for details.
 # Flags passed to the C compiler
@@ -1241,6 +1251,8 @@ echo "\
    Unregisterised            : $Unregisterised
    TablesNextToCode          : $TablesNextToCode
    Build GMP in tree         : $GMP_FORCE_INTREE
+   cpp          : $CPPCmd
+   cpp-flags    : $CONF_CPP_OPTS_STAGE2
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd

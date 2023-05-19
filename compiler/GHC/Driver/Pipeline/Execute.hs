@@ -121,7 +121,7 @@ runPhase (T_CmmCpp pipe_env hsc_env input_fn) = do
         (hsc_dflags hsc_env)
         (hsc_unit_env hsc_env)
         (CppOpts
-          { cppUseCc       = True
+          { useHsCpp       = False
           , cppLinePragmas = True
           })
         input_fn output_fn
@@ -679,7 +679,7 @@ runCppPhase hsc_env input_fn output_fn = do
            (hsc_dflags hsc_env)
            (hsc_unit_env hsc_env)
            (CppOpts
-              { cppUseCc       = False
+              { useHsCpp       = True
               , cppLinePragmas = True
               })
            input_fn output_fn

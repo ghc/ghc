@@ -81,15 +81,18 @@ initSettings top_dir = do
   cc_args_str <- getToolSetting "C compiler flags"
   cxx_args_str <- getToolSetting "C++ compiler flags"
   gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
-  cpp_prog <- getToolSetting "Haskell CPP command"
-  cpp_args_str <- getToolSetting "Haskell CPP flags"
+  cpp_prog <- getToolSetting "CPP command"
+  cpp_args_str <- getToolSetting "CPP flags"
+  hs_cpp_prog <- getToolSetting "Haskell CPP command"
+  hs_cpp_args_str <- getToolSetting "Haskell CPP flags"
 
   platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
 
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
                       else []
-      cpp_args = map Option (words cpp_args_str)
+      cpp_args    = map Option (words cpp_args_str)
+      hs_cpp_args = map Option (words hs_cpp_args_str)
       cc_args  = words cc_args_str ++ unreg_cc_args
       cxx_args = words cxx_args_str
 
@@ -127,7 +130,6 @@ initSettings top_dir = do
   mkdll_prog <- getToolSetting "dllwrap command"
   let mkdll_args = []
 
-  -- cpp is derived from gcc on all platforms
   -- HACK, see setPgmP below. We keep 'words' here to remember to fix
   -- Config.hs one day.
 
@@ -180,10 +182,11 @@ initSettings top_dir = do
       , toolSettings_arSupportsDashL         = arSupportsDashL
 
       , toolSettings_pgm_L   = unlit_path
-      , toolSettings_pgm_P   = (cpp_prog, cpp_args)
+      , toolSettings_pgm_P   = (hs_cpp_prog, hs_cpp_args)
       , toolSettings_pgm_F   = ""
       , toolSettings_pgm_c   = cc_prog
       , toolSettings_pgm_cxx = cxx_prog
+      , toolSettings_pgm_cpp = (cpp_prog, cpp_args)
       , toolSettings_pgm_a   = (as_prog, as_args)
       , toolSettings_pgm_l   = (ld_prog, ld_args)
       , toolSettings_pgm_lm  = ld_r

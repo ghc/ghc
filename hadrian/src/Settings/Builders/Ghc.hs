@@ -37,7 +37,6 @@ toolArgs = do
               [ packageGhcArgs
               , includeGhcArgs
               , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
-              , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
               , map ("-optP" ++) <$> getContextData cppOpts
               , getContextData hcOpts
               ]
@@ -217,7 +216,6 @@ commonGhcArgs = do
             -- RTS package in the package database and failing.
             , package rts ? notStage0 ? arg "-ghcversion-file=rts/include/ghcversion.h"
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
-            , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getContextData cppOpts
             , arg "-outputdir", arg path
               -- we need to enable color explicitly because the output is

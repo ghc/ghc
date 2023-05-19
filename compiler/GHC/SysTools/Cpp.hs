@@ -5,7 +5,7 @@
 
 module GHC.SysTools.Cpp
   ( doCpp
-  , CppOpts (..)
+  , CppOpts(..)
   , getGhcVersionPathName
   , applyCDefs
   , offsetIncludePaths
@@ -40,11 +40,34 @@ import System.Directory
 import System.FilePath
 
 data CppOpts = CppOpts
-  { cppUseCc       :: !Bool -- ^ Use "cc -E" as preprocessor, otherwise use "cpp"
-  , cppLinePragmas :: !Bool -- ^ Enable generation of LINE pragmas
+  { useHsCpp       :: !Bool
+  -- ^ Use the Haskell C preprocessor, otherwise use the C preprocessor.
+  -- See the Note [Preprocessing invocations]
+  , cppLinePragmas :: !Bool
+  -- ^ Enable generation of LINE pragmas
   }
 
--- | Run CPP
+{-
+Note [Preprocessing invocations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must consider two distinct preprocessors when preprocessing Haskell.
+These are:
+
+(1) The Haskell C preprocessor (HsCpp), which preprocesses Haskell files that make use
+  of the CPP language extension
+
+(2) The C preprocessor (Cpp), which is used to preprocess C and Cmm files
+
+These preprocessors are indeed different. Despite often sharing the same
+underlying program (the C compiler), the set of flags passed determines the
+behaviour of the preprocessor, and Cpp and HsCpp behave differently.
+Specifically, we rely on "traditional" (pre-standard) preprocessing semantics
+(which most compilers expose via the `-traditional` flag) when preprocessing
+Haskell source. This avoids, e.g., the preprocessor removing C-style comments.
+-}
+
+-- | Run either the Haskell preprocessor or the C preprocessor, as per the
+-- 'CppOpts' passed. See Note [Preprocessing invocations].
 --
 -- UnitEnv is needed to compute MIN_VERSION macros
 doCpp :: Logger -> TmpFs -> DynFlags -> UnitEnv -> CppOpts -> FilePath -> FilePath -> IO ()
@@ -73,9 +96,8 @@ doCpp logger tmpfs dflags unit_env opts input_fn output_fn = do
     let verbFlags = getVerbFlags dflags
 
     let cpp_prog args
-          | cppUseCc opts = GHC.SysTools.runCc Nothing logger tmpfs dflags
-                                               (GHC.SysTools.Option "-E" : args)
-          | otherwise     = GHC.SysTools.runCpp logger dflags args
+          | useHsCpp opts = GHC.SysTools.runHsCpp logger dflags args
+          | otherwise     = GHC.SysTools.runCpp logger tmpfs dflags args
 
     let platform   = targetPlatform dflags
         targetArch = stringEncodeArch $ platformArch platform

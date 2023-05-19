@@ -50,7 +50,6 @@ getCFlags = do
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
     mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
-            , getStagedSettingList ConfCppArgs
             , cIncludeArgs
             , getContextData ccOpts
             -- we might be able to leave out cppOpts, to be investigated.

@@ -444,6 +444,8 @@ generateSettings = do
         , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
         , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
         , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
+        , ("CPP command", expr $ settingsFileSetting SettingsFileSetting_CPPCommand)
+        , ("CPP flags", expr $ settingsFileSetting SettingsFileSetting_CPPFlags)
         , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
         , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
         , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")

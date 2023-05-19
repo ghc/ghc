@@ -14,6 +14,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsCxxCompilerCommand="${mingw_bin_prefix}clang++.exe"
         SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2 -I\$\$tooldir/mingw/include"
         SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2 -L\$\$tooldir/mingw/lib -L\$\$tooldir/mingw/x86_64-w64-mingw32/lib"
+        SettingsCPPCommand="${mingw_bin_prefix}clang.exe"
+        SettingsCPPFlags="$CONF_CPP_OPTS_STAGE2 -I\$\$tooldir/mingw/include"
         SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs -I\$\$tooldir/mingw/include"
         # LLD does not support object merging (#21068)
@@ -33,6 +35,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
         SettingsCxxCompilerCommand="$CXX"
         SettingsCxxCompilerFlags="$CONF_CXX_OPTS_STAGE2"
+        SettingsCPPCommand="$CPPCmd"
+        SettingsCPPFlags="$CONF_CPP_OPTS_STAGE2"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
@@ -103,6 +107,8 @@ AC_DEFUN([FP_SETTINGS],
 
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsCxxCompilerCommand)
+    AC_SUBST(SettingsCPPCommand)
+    AC_SUBST(SettingsCPPFlags)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
     AC_SUBST(SettingsCCompilerFlags)

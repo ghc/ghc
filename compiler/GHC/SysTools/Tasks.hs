@@ -60,38 +60,9 @@ augmentImports _ [x] = [x]
 augmentImports dflags ("-include":fp:fps) = "-include" : augmentByWorkingDirectory dflags fp  : augmentImports dflags fps
 augmentImports dflags (fp1: fp2: fps) = fp1 : augmentImports dflags (fp2:fps)
 
-runCpp :: Logger -> DynFlags -> [Option] -> IO ()
-runCpp logger dflags args = traceSystoolCommand logger "cpp" $ do
-  let opts = getOpts dflags opt_P
-      modified_imports = augmentImports dflags opts
-  let (p,args0) = pgm_P dflags
-      args1 = map Option modified_imports
-      args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
-                ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
-  mb_env <- getGccEnv args2
-  runSomethingFiltered logger id  "C pre-processor" p
-                       (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
-
-runPp :: Logger -> DynFlags -> [Option] -> IO ()
-runPp logger dflags args = traceSystoolCommand logger "pp" $ do
-  let prog = pgm_F dflags
-      opts = map Option (getOpts dflags opt_F)
-  runSomething logger "Haskell pre-processor" prog (args ++ opts)
-
--- | Run compiler of C-like languages and raw objects (such as gcc or clang).
-runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
-runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
-  let args1 = map Option userOpts
-      args2 = languageOptions ++ args ++ args1
-      -- We take care to pass -optc flags in args1 last to ensure that the
-      -- user can override flags passed by GHC. See #14452.
-  mb_env <- getGccEnv args2
-  runSomethingResponseFile logger tmpfs dflags cc_filter dbgstring prog args2
-                           mb_env
- where
-  -- discard some harmless warnings from gcc that we can't turn off
-  cc_filter = unlines . doFilter . lines
-
+-- | Discard some harmless warnings from gcc that we can't turn off
+cc_filter :: String -> String
+cc_filter = unlines . doFilter . lines where
   {-
   gcc gives warnings in chunks like so:
       In file included from /foo/bar/baz.h:11,
@@ -139,6 +110,49 @@ runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
    | "warning: call-clobbered register used" `isContainedIn` w = False
    | otherwise = True
 
+-- | Run the C preprocessor, which is different from running the
+-- Haskell C preprocessor (they're configured separately!).
+-- See also Note [Preprocessing invocations] in GHC.SysTools.Cpp
+runCpp :: Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
+runCpp logger tmpfs dflags args = traceSystoolCommand logger "cpp" $ do
+  let (p,args0) = pgm_cpp dflags
+      userOpts_c = map Option $ getOpts dflags opt_c
+      args2 = args0 ++ args ++ userOpts_c
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile logger tmpfs dflags cc_filter "C pre-processor" p
+                           args2 mb_env
+
+-- | Run the Haskell C preprocessor.
+-- See also Note [Preprocessing invocations] in GHC.SysTools.Cpp
+runHsCpp :: Logger -> DynFlags -> [Option] -> IO ()
+runHsCpp logger dflags args = traceSystoolCommand logger "hs-cpp" $ do
+  let (p,args0) = pgm_P dflags
+      opts = getOpts dflags opt_P
+      modified_imports = augmentImports dflags opts
+      args1 = map Option modified_imports
+      args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
+                ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
+  mb_env <- getGccEnv args2 -- romes: what about args0 and args?
+  runSomethingFiltered logger id "Haskell C pre-processor" p
+                       (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
+
+runPp :: Logger -> DynFlags -> [Option] -> IO ()
+runPp logger dflags args = traceSystoolCommand logger "pp" $ do
+  let prog = pgm_F dflags
+      opts = map Option (getOpts dflags opt_F)
+  runSomething logger "Haskell pre-processor" prog (args ++ opts)
+
+-- | Run compiler of C-like languages and raw objects (such as gcc or clang).
+runCc :: Maybe ForeignSrcLang -> Logger -> TmpFs -> DynFlags -> [Option] -> IO ()
+runCc mLanguage logger tmpfs dflags args = traceSystoolCommand logger "cc" $ do
+  let args1 = map Option userOpts
+      args2 = languageOptions ++ args ++ args1
+      -- We take care to pass -optc flags in args1 last to ensure that the
+      -- user can override flags passed by GHC. See #14452.
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile logger tmpfs dflags cc_filter dbgstring prog args2
+                           mb_env
+ where
   -- force the C compiler to interpret this file as C when
   -- compiling .hc files, by adding the -x c option.
   -- Also useful for plain .c files, just in case GHC saw a
