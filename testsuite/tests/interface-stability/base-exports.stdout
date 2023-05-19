@@ -5047,7 +5047,7 @@ module GHC.Bits where
   toIntegralSized :: forall a b. (GHC.Real.Integral a, GHC.Real.Integral b, Bits a, Bits b) => a -> GHC.Maybe.Maybe b
 
 module GHC.ByteOrder where
-  -- Safety: None
+  -- Safety: Safe-Inferred
   type ByteOrder :: *
   data ByteOrder = BigEndian | LittleEndian
   targetByteOrder :: ByteOrder
@@ -11450,6 +11450,7 @@ instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Enum.Bounded (a Data.Type.Eq
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Enum.Bounded (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (t :: k). GHC.Enum.Bounded (Data.Proxy.Proxy t) -- Defined in ‘Data.Proxy’
 instance GHC.Enum.Bounded GHC.Types.Bool -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Bounded GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.Char -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.Int -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.Levity -- Defined in ‘GHC.Enum’
@@ -11497,7 +11498,6 @@ instance GHC.Enum.Bounded GHC.Word.Word64 -- Defined in ‘GHC.Word’
 instance GHC.Enum.Bounded GHC.Word.Word8 -- Defined in ‘GHC.Word’
 instance GHC.Enum.Bounded Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Enum.Bounded Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
-instance GHC.Enum.Bounded GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Enum.Bounded GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
 instance GHC.Enum.Bounded GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
 instance GHC.Enum.Bounded GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
@@ -11512,6 +11512,7 @@ instance forall k (a :: k) (b :: k). (a ~ b) => GHC.Enum.Enum (a Data.Type.Equal
 instance forall k1 k2 (a :: k1) (b :: k2). (a ~~ b) => GHC.Enum.Enum (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (s :: k). GHC.Enum.Enum (Data.Proxy.Proxy s) -- Defined in ‘Data.Proxy’
 instance GHC.Enum.Enum GHC.Types.Bool -- Defined in ‘GHC.Enum’
+instance GHC.Enum.Enum GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Types.Char -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Types.Int -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Num.Integer.Integer -- Defined in ‘GHC.Enum’
@@ -11546,7 +11547,6 @@ instance GHC.Enum.Enum GHC.Word.Word64 -- Defined in ‘GHC.Word’
 instance GHC.Enum.Enum GHC.Word.Word8 -- Defined in ‘GHC.Word’
 instance GHC.Enum.Enum Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Enum.Enum Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
-instance GHC.Enum.Enum GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Enum.Enum GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Enum.Enum GHC.Types.Float -- Defined in ‘GHC.Float’
 instance GHC.Enum.Enum GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
@@ -11837,6 +11837,7 @@ instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Bits.Ior a) -- Defined
 instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Bits.Xor a) -- Defined in ‘Data.Bits’
 instance forall a b. (GHC.Ix.Ix a, GHC.Read.Read a, GHC.Read.Read b) => GHC.Read.Read (GHC.Arr.Array a b) -- Defined in ‘GHC.Read’
 instance GHC.Read.Read GHC.Types.Bool -- Defined in ‘GHC.Read’
+instance GHC.Read.Read GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.Read’
 instance GHC.Read.Read GHC.Types.Char -- Defined in ‘GHC.Read’
 instance GHC.Read.Read GHC.Types.Double -- Defined in ‘GHC.Read’
 instance GHC.Read.Read GHC.Types.Float -- Defined in ‘GHC.Read’
@@ -11906,7 +11907,6 @@ instance forall k (a :: k) (b :: k). Coercible a b => GHC.Read.Read (Data.Type.C
 instance [safe] GHC.Read.Read Data.Version.Version -- Defined in ‘Data.Version’
 instance GHC.Read.Read Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Read.Read Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
-instance GHC.Read.Read GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Read.Read (f (g p)) => GHC.Read.Read ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
@@ -12025,6 +12025,7 @@ instance forall a. GHC.Show.Show a => GHC.Show.Show (Data.Bits.Ior a) -- Defined
 instance forall a. GHC.Show.Show a => GHC.Show.Show (Data.Bits.Xor a) -- Defined in ‘Data.Bits’
 instance GHC.Show.Show GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Unicode’
 instance GHC.Show.Show GHC.Types.Bool -- Defined in ‘GHC.Show’
+instance GHC.Show.Show GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.Show’
 instance GHC.Show.Show GHC.Stack.Types.CallStack -- Defined in ‘GHC.Show’
 instance GHC.Show.Show GHC.Types.Char -- Defined in ‘GHC.Show’
 instance GHC.Show.Show GHC.Types.Int -- Defined in ‘GHC.Show’
@@ -12116,7 +12117,6 @@ instance GHC.Show.Show Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Show.Show Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance forall a. GHC.Show.Show (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Foreign.C.ConstPtr’
 instance forall a b. (GHC.Ix.Ix a, GHC.Show.Show a, GHC.Show.Show b) => GHC.Show.Show (GHC.Arr.Array a b) -- Defined in ‘GHC.Arr’
-instance GHC.Show.Show GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
@@ -12320,7 +12320,7 @@ instance GHC.Classes.Eq Foreign.C.Error.Errno -- Defined in ‘Foreign.C.Error�
 instance forall a. GHC.Classes.Eq (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Foreign.C.ConstPtr’
 instance forall i e. (GHC.Ix.Ix i, GHC.Classes.Eq e) => GHC.Classes.Eq (GHC.Arr.Array i e) -- Defined in ‘GHC.Arr’
 instance forall s i e. GHC.Classes.Eq (GHC.Arr.STArray s i e) -- Defined in ‘GHC.Arr’
-instance GHC.Classes.Eq GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
+instance [safe] GHC.Classes.Eq GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
@@ -12466,7 +12466,7 @@ instance GHC.Classes.Ord Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Classes.Ord Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance forall a. GHC.Classes.Ord (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Foreign.C.ConstPtr’
 instance forall i e. (GHC.Ix.Ix i, GHC.Classes.Ord e) => GHC.Classes.Ord (GHC.Arr.Array i e) -- Defined in ‘GHC.Arr’
-instance GHC.Classes.Ord GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
+instance [safe] GHC.Classes.Ord GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Classes.Ord GHC.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Event.TimeOut’
 instance GHC.Classes.Ord GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
 instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’

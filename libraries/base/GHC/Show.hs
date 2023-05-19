@@ -53,6 +53,7 @@ import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
 import GHC.Stack.Types
+import GHC.ByteOrder
 import GHC.Tuple (Solo (..))
 
 
@@ -618,3 +619,5 @@ deriving instance Show VecElem
 -- | @since 4.11.0.0
 deriving instance Show TypeLitSort
 
+-- | @since 4.11.0.0
+deriving instance Show ByteOrder

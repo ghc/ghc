@@ -62,6 +62,7 @@ import qualified Text.Read.Lex as L
 
 import Text.ParserCombinators.ReadPrec
 
+import GHC.ByteOrder
 import GHC.Unicode
 import GHC.Num
 import GHC.Real
@@ -428,6 +429,9 @@ readSymField fieldName readVal = do
 
 -- | @since 2.01
 deriving instance Read GeneralCategory
+
+-- | @since 4.11.0.0
+deriving instance Read ByteOrder
 
 -- | @since 2.01
 instance Read Char where

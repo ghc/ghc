@@ -24,7 +24,7 @@ module GHC.Unicode.Internal.Bits
 
 import GHC.Base (Bool, Int(..), Word(..), Eq(..))
 import GHC.Bits (finiteBitSize, popCount)
-import {-# SOURCE #-} GHC.ByteOrder
+import GHC.ByteOrder
 import GHC.Prim
        (Addr#,
         indexWordOffAddr#, indexWord8OffAddr#,

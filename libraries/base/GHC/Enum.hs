@@ -32,6 +32,7 @@ module GHC.Enum(
    ) where
 
 import GHC.Base hiding ( many )
+import GHC.ByteOrder
 import GHC.Char
 import GHC.Num.Integer
 import GHC.Num
@@ -1092,3 +1093,11 @@ deriving instance Enum VecCount
 deriving instance Bounded VecElem
 -- | @since 4.10.0.0
 deriving instance Enum VecElem
+
+-- Instances from GHC.ByteOrder
+
+-- | @since 4.11.0.0
+deriving instance Bounded ByteOrder
+-- | @since 4.11.0.0
+deriving instance Enum ByteOrder
+
