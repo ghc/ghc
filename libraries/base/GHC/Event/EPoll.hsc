@@ -46,6 +46,7 @@ import Foreign.Marshal.Utils (with)
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
+import GHC.Maybe (Maybe(..))
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)

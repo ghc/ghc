@@ -110,7 +110,6 @@ module GHC.Base
     , module GHC.Prim.Ext    -- GHC.Prim.PtrEq and [boot] GHC.Err
     , module GHC.Prim.PtrEq  -- to avoid lots of people having to
     , module GHC.Err         -- import these modules explicitly
-    , module GHC.Maybe
     ) where
 
 import GHC.Types
@@ -122,7 +121,6 @@ import GHC.Prim
 import GHC.Prim.Ext
 import GHC.Prim.PtrEq
 import GHC.Err
-import GHC.Maybe
 
 import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 

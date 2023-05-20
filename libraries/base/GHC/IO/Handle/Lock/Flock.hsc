@@ -20,6 +20,7 @@ import Data.Function
 import Foreign.C.Error
 import Foreign.C.Types
 import GHC.Base
+import GHC.Maybe
 import GHC.IO.Exception
 import GHC.IO.FD
 import GHC.IO.Handle.FD

@@ -93,6 +93,7 @@ import Data.Either (Either (..))
 import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem, replicate )
 import GHC.Unicode (isDigit)
+import GHC.Maybe
 import GHC.Num ((-), (+), (*))
 import GHC.Word
 import GHC.Show

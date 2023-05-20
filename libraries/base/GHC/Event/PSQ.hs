@@ -42,9 +42,10 @@ module GHC.Event.PSQ
 
 import GHC.Base hiding (empty)
 import GHC.Event.Unique
-import GHC.Word (Word64)
+import GHC.Maybe
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
+import GHC.Word (Word64)
 
 #include "MachDeps.h"
 

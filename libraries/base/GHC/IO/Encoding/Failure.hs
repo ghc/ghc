@@ -31,6 +31,7 @@ import GHC.IO.Exception
 
 import GHC.Base
 import GHC.Char
+import GHC.Maybe
 import GHC.Word
 import GHC.Show
 import GHC.Num

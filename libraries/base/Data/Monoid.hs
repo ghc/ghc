@@ -82,6 +82,7 @@ module Data.Monoid (
 import GHC.Base hiding (Any)
 import GHC.Enum
 import GHC.Generics
+import GHC.Maybe
 import GHC.Num
 import GHC.Read
 import GHC.Show

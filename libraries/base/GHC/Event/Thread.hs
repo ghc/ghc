@@ -42,6 +42,7 @@ import GHC.IO (mask_, uninterruptibleMask_, onException)
 import GHC.IO.Exception (ioError)
 import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
                     boundsIOArray)
+import GHC.Maybe
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Control (controlWriteFd)
 import GHC.Event.Internal (eventIs, evtClose)

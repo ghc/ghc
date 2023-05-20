@@ -26,6 +26,7 @@ import Data.Int
 import Data.Word
 import GHC.Base
 import GHC.Generics (Generic)
+import GHC.Maybe ( Maybe(Nothing) )
 import GHC.Read ( Read )
 import GHC.Show ( Show )
 import GHC.IO.Exception

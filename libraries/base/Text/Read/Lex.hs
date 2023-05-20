@@ -40,6 +40,7 @@ import Text.ParserCombinators.ReadP
 
 import GHC.Base
 import GHC.Char
+import GHC.Maybe( Maybe(..), maybe )
 import GHC.Num( Num(..), Integer )
 import GHC.Show( Show(..) )
 import GHC.Unicode

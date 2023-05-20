@@ -48,6 +48,7 @@ import GHC.Base
 import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc.Signal (runHandlers)
 import GHC.Enum (maxBound)
+import GHC.Maybe (Maybe(..))
 import GHC.Num (Num(..))
 import GHC.Real (quot, fromIntegral)
 import GHC.Show (Show(..))

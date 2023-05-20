@@ -47,12 +47,12 @@ import Foreign.C
 import qualified Control.Exception as Exception
 import System.IO.Error
 import Data.Either (Either(..))
-import Data.Maybe
 
 import GHC.IORef
 import GHC.Base
-import GHC.Real
+import GHC.Maybe
 import GHC.Num
+import GHC.Real
 import GHC.Show
 import GHC.List
 

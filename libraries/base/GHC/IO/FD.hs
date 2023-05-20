@@ -30,6 +30,7 @@ module GHC.IO.FD (
     ) where
 
 import GHC.Base
+import GHC.Maybe
 import GHC.Num
 import GHC.Real
 import GHC.Show

@@ -33,6 +33,7 @@ import Foreign.Storable (Storable(..))
 import GHC.Base
 import GHC.Conc.Sync (withMVar)
 import GHC.Enum (maxBound)
+import GHC.Maybe (Maybe(..))
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)

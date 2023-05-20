@@ -22,6 +22,7 @@ module GHC.IO.BufferedIO (
     ) where
 
 import GHC.Base
+import GHC.Maybe
 import GHC.Ptr
 import Data.Word
 import GHC.Num

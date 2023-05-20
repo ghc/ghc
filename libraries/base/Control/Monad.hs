@@ -83,6 +83,7 @@ import Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
 
 import GHC.Base hiding ( mapM, sequence )
 import GHC.List ( zipWith, unzip )
+import GHC.Maybe ( Maybe )
 import GHC.Num  ( (-) )
 
 -- $setup

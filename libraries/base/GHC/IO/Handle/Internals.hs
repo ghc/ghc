@@ -73,12 +73,12 @@ import GHC.Conc.Sync
 import GHC.Real
 import GHC.Base
 import GHC.Exception
+import GHC.Maybe
 import GHC.Num          ( Num(..) )
 import GHC.Show
 import GHC.IORef
 import GHC.MVar
 import Data.Typeable
-import Data.Maybe
 import Foreign
 import System.Posix.Internals hiding (FD)
 

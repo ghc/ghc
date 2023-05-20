@@ -51,6 +51,7 @@ import GHC.Base
 
 import GHC.Bits
 import GHC.Enum
+import GHC.Maybe
 import GHC.Num
 import GHC.Real
 import GHC.Ix

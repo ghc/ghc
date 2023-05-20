@@ -50,6 +50,7 @@ import GHC.Base
 import GHC.Enum
 import GHC.Generics (Generic)
 import GHC.IO
+import GHC.Maybe
 import GHC.Real
 import GHC.Show
 

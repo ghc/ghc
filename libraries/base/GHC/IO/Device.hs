@@ -26,6 +26,7 @@ import GHC.Base
 import GHC.Word
 import GHC.Arr
 import GHC.Enum
+import GHC.Maybe
 import GHC.Read
 import GHC.Show
 import GHC.Ptr

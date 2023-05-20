@@ -48,8 +48,9 @@ module GHC.IO.Exception (
 
 import GHC.Base
 import GHC.Generics
-import GHC.List
 import GHC.IO
+import GHC.List
+import GHC.Maybe
 import GHC.Show
 import GHC.Read
 import GHC.Exception

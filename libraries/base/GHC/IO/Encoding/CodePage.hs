@@ -18,6 +18,7 @@ import GHC.Base () -- Build ordering
 #else
 import GHC.Base
 import GHC.Show
+import GHC.Maybe
 import GHC.Num
 import GHC.Enum
 import GHC.Word
@@ -26,7 +27,6 @@ import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.IO.Buffer
 import Data.Bits
-import Data.Maybe
 import Data.OldList (lookup)
 
 import qualified GHC.IO.Encoding.CodePage.API as API

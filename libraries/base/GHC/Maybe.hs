@@ -8,9 +8,15 @@ module GHC.Maybe
    , isJust
    , isNothing
    , fromMaybe
+   , maybeToList
+   , listToMaybe
+   , catMaybes
+   , mapMaybe
    )
 where
 
+import GHC.Base.FunOps
+import GHC.Base.List (foldr, build)
 import GHC.Num.Integer () -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 import GHC.Types
 import GHC.Classes
@@ -148,3 +154,132 @@ isNothing _       = False
 --
 fromMaybe     :: a -> Maybe a -> a
 fromMaybe d x = case x of {Nothing -> d;Just v  -> v}
+
+-- | The 'maybeToList' function returns an empty list when given
+-- 'Nothing' or a singleton list when given 'Just'.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> maybeToList (Just 7)
+-- [7]
+--
+-- >>> maybeToList Nothing
+-- []
+--
+-- One can use 'maybeToList' to avoid pattern matching when combined
+-- with a function that (safely) works on lists:
+--
+-- >>> import Text.Read ( readMaybe )
+-- >>> sum $ maybeToList (readMaybe "3")
+-- 3
+-- >>> sum $ maybeToList (readMaybe "")
+-- 0
+--
+maybeToList            :: Maybe a -> [a]
+maybeToList  Nothing   = []
+maybeToList  (Just x)  = [x]
+
+-- | The 'listToMaybe' function returns 'Nothing' on an empty list
+-- or @'Just' a@ where @a@ is the first element of the list.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> listToMaybe []
+-- Nothing
+--
+-- >>> listToMaybe [9]
+-- Just 9
+--
+-- >>> listToMaybe [1,2,3]
+-- Just 1
+--
+-- Composing 'maybeToList' with 'listToMaybe' should be the identity
+-- on singleton/empty lists:
+--
+-- >>> maybeToList $ listToMaybe [5]
+-- [5]
+-- >>> maybeToList $ listToMaybe []
+-- []
+--
+-- But not on lists with more than one element:
+--
+-- >>> maybeToList $ listToMaybe [1,2,3]
+-- [1]
+--
+listToMaybe :: [a] -> Maybe a
+listToMaybe = foldr (const . Just) Nothing
+{-# INLINE listToMaybe #-}
+-- We define listToMaybe using foldr so that it can fuse via the foldr/build
+-- rule. See #14387
+
+
+-- | The 'catMaybes' function takes a list of 'Maybe's and returns
+-- a list of all the 'Just' values.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> catMaybes [Just 1, Nothing, Just 3]
+-- [1,3]
+--
+-- When constructing a list of 'Maybe' values, 'catMaybes' can be used
+-- to return all of the \"success\" results (if the list is the result
+-- of a 'map', then 'mapMaybe' would be more appropriate):
+--
+-- >>> import Text.Read ( readMaybe )
+-- >>> [readMaybe x :: Maybe Int | x <- ["1", "Foo", "3"] ]
+-- [Just 1,Nothing,Just 3]
+-- >>> catMaybes $ [readMaybe x :: Maybe Int | x <- ["1", "Foo", "3"] ]
+-- [1,3]
+--
+catMaybes :: [Maybe a] -> [a]
+catMaybes = mapMaybe id -- use mapMaybe to allow fusion (#18574)
+
+-- | The 'mapMaybe' function is a version of 'map' which can throw
+-- out elements.  In particular, the functional argument returns
+-- something of type @'Maybe' b@.  If this is 'Nothing', no element
+-- is added on to the result list.  If it is @'Just' b@, then @b@ is
+-- included in the result list.
+--
+-- ==== __Examples__
+--
+-- Using @'mapMaybe' f x@ is a shortcut for @'catMaybes' $ 'map' f x@
+-- in most cases:
+--
+-- >>> import Text.Read ( readMaybe )
+-- >>> let readMaybeInt = readMaybe :: String -> Maybe Int
+-- >>> mapMaybe readMaybeInt ["1", "Foo", "3"]
+-- [1,3]
+-- >>> catMaybes $ map readMaybeInt ["1", "Foo", "3"]
+-- [1,3]
+--
+-- If we map the 'Just' constructor, the entire list should be returned:
+--
+-- >>> mapMaybe Just [1,2,3]
+-- [1,2,3]
+--
+mapMaybe          :: (a -> Maybe b) -> [a] -> [b]
+mapMaybe _ []     = []
+mapMaybe f (x:xs) =
+ let rs = mapMaybe f xs in
+ case f x of
+  Nothing -> rs
+  Just r  -> r:rs
+{-# NOINLINE [1] mapMaybe #-}
+
+{-# RULES
+"mapMaybe"     [~1] forall f xs. mapMaybe f xs
+                    = build (\c n -> foldr (mapMaybeFB c f) n xs)
+"mapMaybeList" [1]  forall f. foldr (mapMaybeFB (:) f) [] = mapMaybe f
+  #-}
+
+{-# INLINE [0] mapMaybeFB #-} -- See Note [Inline FB functions] in GHC.List
+mapMaybeFB :: (b -> r -> r) -> (a -> Maybe b) -> a -> r -> r
+mapMaybeFB cons f x next = case f x of
+  Nothing -> next
+  Just r -> cons r next

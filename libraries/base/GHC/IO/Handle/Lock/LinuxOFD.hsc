@@ -31,6 +31,7 @@ import GHC.IO.FD
 import GHC.IO.Handle.FD
 import GHC.IO.Handle.Lock.Common
 import GHC.IO.Handle.Types (Handle)
+import GHC.Maybe
 import GHC.Ptr
 import System.Posix.Types (COff, CPid)
 

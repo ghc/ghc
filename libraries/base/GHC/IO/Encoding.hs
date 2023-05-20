@@ -47,6 +47,7 @@ import qualified GHC.IO.Encoding.UTF8   as UTF8
 import qualified GHC.IO.Encoding.UTF16  as UTF16
 import qualified GHC.IO.Encoding.UTF32  as UTF32
 import GHC.List
+import GHC.Maybe
 import GHC.Word
 
 import Data.IORef

@@ -13,8 +13,8 @@ module GHC.Event.Windows.Clock (
 
 import qualified GHC.Event.Windows.FFI as FFI
 
-import Data.Maybe
 import GHC.Base
+import GHC.Maybe
 import GHC.Real
 
 -- | Monotonic clock

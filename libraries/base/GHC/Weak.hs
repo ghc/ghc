@@ -36,6 +36,7 @@ module GHC.Weak (
     ) where
 
 import GHC.Base
+import GHC.Maybe
 import GHC.Weak.Finalize
 
 {-|

@@ -16,11 +16,11 @@ module GHC.Event.IntTable
 
 import Data.Bits ((.&.), shiftL, shiftR)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Maybe (Maybe(..), isJust)
 import GHC.Base (Monad(..), (=<<), ($), ($!), const, liftM, otherwise, when)
 import GHC.Classes (Eq(..), Ord(..))
 import GHC.Event.Arr (Arr)
 import GHC.Event.IntVar
+import GHC.Maybe (Maybe(..), isJust)
 import GHC.Num (Num(..))
 import GHC.Prim (seq)
 import GHC.Types (Bool(..), IO(..), Int(..))

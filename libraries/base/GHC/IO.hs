@@ -43,10 +43,11 @@ module GHC.IO (
     ) where
 
 import GHC.Base
-import GHC.ST
 import GHC.Exception
-import GHC.Show
 import GHC.IO.Unsafe
+import GHC.Maybe
+import GHC.Show
+import GHC.ST
 import Unsafe.Coerce ( unsafeCoerce )
 
 import {-# SOURCE #-} GHC.IO.Exception ( userError, IOError )

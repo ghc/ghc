@@ -36,6 +36,7 @@ module GHC.IO.Handle.Types (
 #undef DEBUG
 
 import GHC.Base
+import GHC.Maybe
 import GHC.MVar
 import GHC.IO
 import GHC.IO.Buffer

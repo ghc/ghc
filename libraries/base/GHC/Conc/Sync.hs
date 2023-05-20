@@ -108,7 +108,6 @@ import Foreign
 import Foreign.C
 
 import Data.Typeable
-import Data.Maybe
 
 import GHC.Base
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
@@ -119,6 +118,7 @@ import GHC.IO
 import GHC.IO.Exception
 import GHC.Exception
 import GHC.IORef
+import GHC.Maybe
 import GHC.MVar
 import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )

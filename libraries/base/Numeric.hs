@@ -64,10 +64,11 @@ module Numeric (
         ) where
 
 import GHC.Base
+import GHC.Float
+import GHC.Maybe
+import GHC.Num
 import GHC.Read
 import GHC.Real
-import GHC.Float
-import GHC.Num
 import GHC.Show
 import GHC.Show.Integer
 import Text.ParserCombinators.ReadP( ReadP, readP_to_S, pfail )

@@ -32,17 +32,17 @@ module GHC.TopHandler (
 #include "HsBaseConfig.h"
 
 import Control.Exception
-import Data.Maybe
 
 import Foreign
 import Foreign.C
 import GHC.Base
 import GHC.Conc hiding (throwTo)
-import GHC.Real
+import GHC.Maybe
 import GHC.IO
 import GHC.IO.Handle
 import GHC.IO.StdHandles
 import GHC.IO.Exception
+import GHC.Real
 import GHC.Weak
 
 #if defined(mingw32_HOST_OS)

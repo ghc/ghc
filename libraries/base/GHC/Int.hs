@@ -40,7 +40,7 @@ module GHC.Int (
     ) where
 
 import Data.Bits
-import Data.Maybe
+import GHC.Maybe
 
 import GHC.Prim
 import GHC.Base

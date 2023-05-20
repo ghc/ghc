@@ -72,9 +72,9 @@ module GHC.Event.Windows.FFI (
 
 ##include "windows_cconv.h"
 
-import Data.Maybe
 import Foreign
 import GHC.Base
+import GHC.Maybe
 import GHC.Num ((*))
 import GHC.Real (fromIntegral)
 import GHC.Show

@@ -108,8 +108,9 @@ import Data.Ord ( Down(..) )
 import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
-import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
+import GHC.Base ( Applicative(..), Monad(..), Monoid, NonEmpty(..),
                   ($), (.), id, flip )
+import GHC.Maybe (Maybe(..))
 import GHC.Generics
 import qualified GHC.List as List ( foldr )
 import GHC.Tuple (Solo (..))

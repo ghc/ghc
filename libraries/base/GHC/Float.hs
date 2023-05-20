@@ -154,6 +154,7 @@ import GHC.Bits
 import GHC.List
 import GHC.Enum
 import GHC.Show
+import GHC.Maybe
 import GHC.Num
 import GHC.Real
 import GHC.Word

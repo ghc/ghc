@@ -136,6 +136,7 @@ module Control.Exception (
 import Control.Exception.Base
 
 import GHC.Base
+import GHC.Maybe
 import GHC.IO (interruptible)
 
 -- | You need this when using 'catches'.

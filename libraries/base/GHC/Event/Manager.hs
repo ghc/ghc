@@ -71,6 +71,7 @@ import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Sync (yield)
 import GHC.List (filter, replicate)
+import GHC.Maybe (Maybe(..), maybe)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))

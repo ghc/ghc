@@ -83,7 +83,6 @@ import Control.Concurrent.MVar (modifyMVar)
 import {-# SOURCE #-} Control.Concurrent (forkOS)
 import Data.Semigroup.Internal (stimesMonoid)
 import Data.Foldable (mapM_, length, forM_)
-import Data.Maybe (isJust, maybe)
 
 import GHC.Event.Windows.Clock   (Clock, Seconds, getClock, getTime)
 import GHC.Event.Windows.FFI     (LPOVERLAPPED, OVERLAPPED_ENTRY(..),

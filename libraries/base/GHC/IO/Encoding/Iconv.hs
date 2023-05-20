@@ -37,13 +37,13 @@ import GHC.Base () -- For build ordering
 
 import Foreign
 import Foreign.C hiding (charIsRepresentable)
-import Data.Maybe
 import GHC.Base
 import GHC.Foreign (charIsRepresentable)
 import GHC.IO.Buffer
 import GHC.IO.Encoding.Failure
 import GHC.IO.Encoding.Types
 import GHC.List (span)
+import GHC.Maybe
 import GHC.Num
 import GHC.Show
 import GHC.Real

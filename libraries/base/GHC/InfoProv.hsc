@@ -31,6 +31,7 @@ module GHC.InfoProv
 #include "Rts.h"
 
 import GHC.Base
+import GHC.Maybe
 import GHC.Show
 import GHC.Ptr (Ptr(..), plusPtr, nullPtr)
 import GHC.Foreign (CString, peekCString)

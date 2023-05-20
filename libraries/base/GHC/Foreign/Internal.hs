@@ -57,6 +57,7 @@ import Foreign.ForeignPtr
 
 import GHC.Debug
 import GHC.List
+import GHC.Maybe
 import GHC.Num
 import GHC.Base
 

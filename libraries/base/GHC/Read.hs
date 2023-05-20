@@ -64,6 +64,7 @@ import Text.ParserCombinators.ReadPrec
 
 import GHC.ByteOrder
 import GHC.Unicode
+import GHC.Maybe
 import GHC.Num
 import GHC.Real
 import GHC.Float

@@ -21,10 +21,10 @@ module GHC.IO.Handle.Windows (
   handleToHANDLE, mkHandleFromHANDLE
  ) where
 
-import Data.Maybe
 import Data.Typeable
 
 import GHC.Base
+import GHC.Maybe
 import GHC.MVar
 import GHC.IO
 import GHC.IO.BufferedIO hiding (flushWriteBuffer)

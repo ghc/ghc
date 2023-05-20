@@ -51,6 +51,7 @@ module GHC.Show
 
 import GHC.Base
 import GHC.List ((!!), foldr1, break)
+import GHC.Maybe
 import GHC.Num
 import GHC.Stack.Types
 import GHC.ByteOrder

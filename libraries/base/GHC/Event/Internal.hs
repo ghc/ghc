@@ -23,6 +23,7 @@ module GHC.Event.Internal
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 import System.Posix.Types (Fd)
 import GHC.Base
+import GHC.Maybe (Maybe)
 import GHC.Num (Num(..))
 import GHC.Event.Internal.Types
 
