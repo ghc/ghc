@@ -746,8 +746,9 @@ import GHC.Types hiding ( Any)
 import Data.Semigroup.Internal ( All(..), Any(..), Alt(..), Dual(..), Sum(..), Product(..), Endo(..) )
 import GHC.Ix      ( Ix )
 import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
-                   , Monad(..), MonadPlus(..), NonEmpty(..), String, coerce
+                   , Monad(..), MonadPlus(..), String, coerce
                    , Semigroup(..), Monoid(..), Void )
+import GHC.Base.NonEmpty ( NonEmpty(..) )
 import GHC.ByteOrder ( ByteOrder(..) )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )

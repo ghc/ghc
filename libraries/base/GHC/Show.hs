@@ -50,6 +50,7 @@ module GHC.Show
         where
 
 import GHC.Base
+import GHC.Base.NonEmpty
 import GHC.List ((!!), foldr1, break)
 import GHC.Maybe
 import GHC.Num

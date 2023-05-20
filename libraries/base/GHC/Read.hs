@@ -70,6 +70,7 @@ import GHC.Real
 import GHC.Float
 import GHC.Show
 import GHC.Base
+import GHC.Base.NonEmpty
 import GHC.Arr
 import GHC.Word
 import GHC.List (filter)

@@ -74,6 +74,7 @@ module Text.ParserCombinators.ReadP
 
 import GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
+import GHC.Base.NonEmpty ( NonEmpty(..) )
 import GHC.Base hiding ( many )
 
 import Control.Monad.Fail

@@ -119,6 +119,7 @@ import GHC.Arr  ( Array(..), elems, numElements,
                   foldl1Elems, foldr1Elems)
 import GHC.Maybe
 import GHC.Base hiding ( foldr )
+import GHC.Base.NonEmpty
 import GHC.Generics
 import GHC.Tuple (Solo (..))
 import GHC.Num  ( Num(..) )

@@ -98,7 +98,6 @@ module GHC.Base
     , module GHC.Base.FunOps
     , module GHC.Base.Functor
     , module GHC.Base.List
-    , module GHC.Base.NonEmpty
     , module GHC.Base.Semigroup
     , module GHC.Base.String
     , module GHC.Base.Void
@@ -127,7 +126,6 @@ import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 import GHC.Base.FunOps
 import GHC.Base.Functor
 import GHC.Base.List
-import GHC.Base.NonEmpty
 import GHC.Base.Semigroup
 import GHC.Base.String
 import GHC.Base.Void

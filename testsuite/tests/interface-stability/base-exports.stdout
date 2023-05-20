@@ -3329,8 +3329,6 @@ module GHC.Base where
   type role MutableByteArray# nominal
   type MutableByteArray# :: * -> UnliftedType
   data MutableByteArray# a
-  type NonEmpty :: * -> *
-  data NonEmpty a = a :| [a]
   type Opaque :: *
   data Opaque = forall a. O a
   type Ord :: * -> Constraint
@@ -3359,7 +3357,7 @@ module GHC.Base where
   type Semigroup :: * -> Constraint
   class Semigroup a where
     (<>) :: a -> a -> a
-    sconcat :: NonEmpty a -> a
+    sconcat :: GHC.Base.NonEmpty.NonEmpty a -> a
     stimes :: forall b. GHC.Real.Integral b => b -> a -> a
   {-# MINIMAL (<>) | sconcat #-}
   type SmallArray# :: forall {l :: Levity}. TYPE (BoxedRep l) -> UnliftedType

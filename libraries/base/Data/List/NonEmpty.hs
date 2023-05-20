@@ -111,7 +111,7 @@ import qualified Data.Foldable       as Foldable
 import           Data.Function       (on)
 import qualified Data.List           as List
 import           Data.Ord            (comparing)
-import           GHC.Base            (NonEmpty(..))
+import           GHC.Base.NonEmpty   (NonEmpty(..))
 import           GHC.Stack.Types     (HasCallStack)
 
 infixr 5 <|
