@@ -26,6 +26,7 @@ module GHC.Show.Integer
     ) where
 
 import GHC.Base
+import GHC.Err
 import GHC.Num
 import GHC.Real
 import GHC.Show

@@ -110,6 +110,7 @@ import Foreign.C
 import Data.Typeable
 
 import GHC.Base
+import GHC.Err
 import {-# SOURCE #-} GHC.IO.Handle ( hFlush )
 import {-# SOURCE #-} GHC.IO.StdHandles ( stdout )
 import GHC.Encoding.UTF8

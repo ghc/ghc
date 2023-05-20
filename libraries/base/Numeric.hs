@@ -64,6 +64,7 @@ module Numeric (
         ) where
 
 import GHC.Base
+import GHC.Err
 import GHC.Float
 import GHC.Maybe
 import GHC.Num

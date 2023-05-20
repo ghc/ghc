@@ -65,6 +65,7 @@ import GHC.IO.Handle.Text
 import qualified GHC.IO.BufferedIO as Buffered
 
 import GHC.Base
+import GHC.Err
 import GHC.Exception
 import GHC.Maybe
 import GHC.MVar

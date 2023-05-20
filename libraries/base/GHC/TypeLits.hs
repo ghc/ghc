@@ -69,8 +69,8 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base ( Bool(..), Eq(..), Functor(..), Ord(..), Ordering(..), String
-                , (.), otherwise, withDict, Void, (++)
-                , errorWithoutStackTrace)
+                , (.), otherwise, withDict, Void, (++) )
+import GHC.Err
 import GHC.Types(Symbol, Char, TYPE)
 import GHC.TypeError(ErrorMessage(..), TypeError)
 import GHC.Maybe (Maybe(..))

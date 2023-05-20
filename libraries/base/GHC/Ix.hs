@@ -21,9 +21,10 @@ module GHC.Ix (
         Ix(..), indexError
     ) where
 
-import GHC.Enum
-import GHC.Num
 import GHC.Base
+import GHC.Enum
+import GHC.Err
+import GHC.Num
 import GHC.Real( fromIntegral )
 import GHC.Show
 import GHC.Tuple (Solo (..))

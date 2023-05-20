@@ -102,6 +102,7 @@ module Control.Exception.Base (
   ) where
 
 import           GHC.Base
+import           GHC.Err
 import           GHC.Exception
 import           GHC.IO           hiding (bracket, finally, onException)
 import           GHC.IO.Exception

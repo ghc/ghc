@@ -34,6 +34,7 @@ module Data.Type.Coercion
 
 import qualified Data.Type.Equality as Eq
 import GHC.Enum
+import GHC.Err
 import GHC.Maybe
 import GHC.Show
 import GHC.Read

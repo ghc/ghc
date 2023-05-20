@@ -124,6 +124,7 @@ import Data.Typeable
 import Data.Version( Version(..) )
 import GHC.Base hiding (Any, IntRep, FloatRep)
 import GHC.Base.NonEmpty
+import GHC.Err
 import GHC.List
 import GHC.Num
 import GHC.Read

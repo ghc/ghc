@@ -72,6 +72,7 @@ import GHC.Show
 import GHC.Base
 import GHC.Base.NonEmpty
 import GHC.Arr
+import GHC.Err
 import GHC.Word
 import GHC.List (filter)
 import GHC.Tuple (Solo (..))

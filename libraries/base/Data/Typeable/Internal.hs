@@ -88,6 +88,7 @@ module Data.Typeable.Internal (
   ) where
 
 import GHC.Base
+import GHC.Err
 import qualified GHC.Arr as A
 import Data.Either (Either (..))
 import Data.Type.Equality

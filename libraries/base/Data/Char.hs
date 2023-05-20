@@ -54,6 +54,7 @@ module Data.Char
 
 import GHC.Base
 import GHC.Char
+import GHC.Err
 import GHC.Real (fromIntegral)
 import GHC.Show
 import GHC.Read (readLitChar, lexLitChar)

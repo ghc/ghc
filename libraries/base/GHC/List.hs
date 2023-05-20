@@ -44,6 +44,7 @@ module GHC.List (
  ) where
 
 import GHC.Base
+import GHC.Err
 import GHC.Maybe (Maybe(..))
 import GHC.Num (Num(..))
 import GHC.Num.Integer (Integer)

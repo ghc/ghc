@@ -47,6 +47,7 @@ module Data.Type.Equality (
   ) where
 
 import GHC.Enum
+import GHC.Err
 import GHC.Maybe
 import GHC.Show
 import GHC.Read

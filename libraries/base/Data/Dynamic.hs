@@ -50,6 +50,7 @@ import Type.Reflection
 import Data.Maybe
 
 import GHC.Base
+import GHC.Err
 import GHC.Show
 import GHC.Exception
 

@@ -39,8 +39,9 @@ module Foreign.Storable
 
 import GHC.Storable
 import GHC.Stable       ( StablePtr )
-import GHC.Num
+import GHC.Err
 import GHC.Int
+import GHC.Num
 import GHC.Word
 import GHC.Ptr
 import GHC.Base

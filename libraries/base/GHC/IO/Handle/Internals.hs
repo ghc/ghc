@@ -72,6 +72,7 @@ import qualified GHC.IO.BufferedIO as Buffered
 import GHC.Conc.Sync
 import GHC.Real
 import GHC.Base
+import GHC.Err
 import GHC.Exception
 import GHC.Maybe
 import GHC.Num          ( Num(..) )

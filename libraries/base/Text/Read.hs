@@ -45,6 +45,7 @@ module Text.Read (
  ) where
 
 import GHC.Base
+import GHC.Err
 import GHC.Maybe
 import GHC.Read
 import Data.Either

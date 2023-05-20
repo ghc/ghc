@@ -70,6 +70,7 @@ import Data.OldList (partition)
 import GHC.Arr (Array, (!), listArray)
 import GHC.Base
 import GHC.Conc.Sync (yield)
+import GHC.Err
 import GHC.List (filter, replicate)
 import GHC.Maybe (Maybe(..), maybe)
 import GHC.Num (Num(..))

@@ -41,12 +41,13 @@ module GHC.Arr (
         unsafeFreezeSTArray, unsafeThawSTArray,
     ) where
 
-import GHC.Num
-import GHC.ST
 import GHC.Base
+import GHC.Err
 import GHC.List
 import GHC.Ix
+import GHC.Num
 import GHC.Show
+import GHC.ST
 
 infixl 9  !, //
 

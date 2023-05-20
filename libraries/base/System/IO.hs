@@ -244,6 +244,7 @@ import System.Posix.Internals
 import System.Posix.Types
 
 import GHC.Base
+import GHC.Err
 import GHC.List
 #if !defined(mingw32_HOST_OS)
 import GHC.IORef

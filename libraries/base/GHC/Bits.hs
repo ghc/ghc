@@ -62,9 +62,10 @@ module GHC.Bits (
 
 #include "MachDeps.h"
 
+import GHC.Base
+import GHC.Err
 import GHC.Maybe
 import GHC.Num
-import GHC.Base
 import GHC.Real
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`

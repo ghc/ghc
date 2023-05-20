@@ -120,6 +120,7 @@ import GHC.Arr  ( Array(..), elems, numElements,
 import GHC.Maybe
 import GHC.Base hiding ( foldr )
 import GHC.Base.NonEmpty
+import GHC.Err
 import GHC.Generics
 import GHC.Tuple (Solo (..))
 import GHC.Num  ( Num(..) )

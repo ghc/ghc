@@ -50,7 +50,8 @@ module GHC.TypeNats
   ) where
 
 import GHC.Base( Eq(..), Functor(..), Ord(..), WithDict(..), (.), otherwise
-               , Void, errorWithoutStackTrace, (++))
+               , Void, (++))
+import GHC.Err
 import GHC.Types
 import GHC.Maybe(Maybe(..))
 import GHC.Num.Natural(Natural)

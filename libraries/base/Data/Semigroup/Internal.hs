@@ -22,6 +22,7 @@ module Data.Semigroup.Internal where
 
 import GHC.Base hiding (Any)
 import GHC.Enum
+import GHC.Err
 import qualified GHC.List as List
 import GHC.Maybe
 import GHC.Num

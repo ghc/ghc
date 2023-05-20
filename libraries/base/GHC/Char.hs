@@ -11,6 +11,7 @@ module GHC.Char
     ) where
 
 import GHC.Base
+import GHC.Err
 import GHC.Show
 
 -- | The 'Prelude.toEnum' method restricted to the type 'Data.Char.Char'.

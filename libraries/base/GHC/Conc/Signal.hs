@@ -20,6 +20,7 @@ import Foreign.Marshal.Alloc (finalizerFree)
 import GHC.Arr (inRange)
 import GHC.Base
 import GHC.Conc.Sync (forkIO)
+import GHC.Err
 import GHC.IO (mask_, unsafePerformIO)
 import GHC.IOArray (IOArray, boundsIOArray, newIOArray,
                     unsafeReadIOArray, unsafeWriteIOArray)

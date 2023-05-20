@@ -21,6 +21,7 @@ module GHC.IsList
 
 import GHC.Base
 import GHC.Base.NonEmpty
+import GHC.Err
 import GHC.Stack
 import Data.Version ( Version(..), makeVersion )
 import Control.Applicative (ZipList(..))

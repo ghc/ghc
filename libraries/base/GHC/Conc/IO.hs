@@ -56,6 +56,7 @@ module GHC.Conc.IO
 import Foreign
 import GHC.Base
 import GHC.Conc.Sync as Sync
+import GHC.Err
 import GHC.Real ( fromIntegral )
 import System.Posix.Types
 

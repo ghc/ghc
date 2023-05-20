@@ -34,6 +34,7 @@ module GHC.Enum(
 import GHC.Base hiding ( many )
 import GHC.ByteOrder
 import GHC.Char
+import GHC.Err
 import GHC.Num.Integer
 import GHC.Num
 import GHC.Show

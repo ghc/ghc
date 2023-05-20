@@ -59,6 +59,7 @@ import GHC.Debug
 import GHC.List
 import GHC.Maybe
 import GHC.Num
+import GHC.Err
 import GHC.Base
 
 import GHC.IO

@@ -70,6 +70,7 @@ import Data.Maybe
 import Foreign.C.Types          ( CSize(..) )
 import Foreign.Storable         ( Storable(sizeOf,alignment) )
 import Foreign.ForeignPtr       ( FinalizerPtr )
+import GHC.Err
 import GHC.IO.Exception
 import GHC.Num
 import GHC.Real

@@ -27,6 +27,7 @@ import GHC.Show
 import GHC.Read
 import GHC.Enum
 import GHC.Arr
+import GHC.Err
 
 -- $setup
 -- >>> import Data.Void

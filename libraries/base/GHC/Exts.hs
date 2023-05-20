@@ -140,6 +140,7 @@ import GHC.Types
 import qualified GHC.Prim.Ext
 import GHC.ArrayArray
 import GHC.Base hiding ( coerce )
+import GHC.Err
 import GHC.Ptr
 import GHC.Stack
 import GHC.IsList (IsList(..)) -- for re-export

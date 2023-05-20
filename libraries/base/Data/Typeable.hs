@@ -104,6 +104,7 @@ import Data.Type.Equality
 import Data.Either
 import Data.Proxy
 import GHC.Fingerprint.Type
+import GHC.Err
 import GHC.Maybe
 import GHC.Show
 import GHC.Base

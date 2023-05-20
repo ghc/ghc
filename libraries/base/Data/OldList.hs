@@ -221,6 +221,7 @@ import Data.Tuple       ( fst, snd )
 import GHC.Num
 import GHC.Real
 import GHC.List
+import GHC.Err
 import GHC.Base
 
 infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#cpp-and-string-gaps

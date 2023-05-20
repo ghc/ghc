@@ -33,8 +33,9 @@ import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
 import Data.Ord ( Down(..) )
-import GHC.Base ( Monad, errorWithoutStackTrace, (.) )
+import GHC.Base ( Monad, (.) )
 import GHC.Base.NonEmpty ( NonEmpty(..) )
+import GHC.Err
 import GHC.Generics
 import GHC.List ( head, drop )
 import GHC.Tuple (Solo (..))

@@ -30,6 +30,7 @@ module GHC.Event.Control
 #include "EventConfig.h"
 
 import GHC.Base
+import GHC.Err
 import GHC.IORef
 import GHC.Conc.Signal (Signal)
 import GHC.Real (fromIntegral)

@@ -21,6 +21,7 @@ module Unsafe.Coerce
 
 import GHC.Arr (amap) -- For amap/unsafeCoerce rule
 import GHC.Base
+import GHC.Err
 
 {- Note [Implementing unsafeCoerce]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

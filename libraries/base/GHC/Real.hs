@@ -84,9 +84,10 @@ module GHC.Real
 #include "MachDeps.h"
 
 import GHC.Base
-import GHC.Num
-import GHC.List
 import GHC.Enum
+import GHC.Err
+import GHC.List
+import GHC.Num
 import GHC.Show
 import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException
                                    , underflowException

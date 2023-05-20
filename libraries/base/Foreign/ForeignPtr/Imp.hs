@@ -52,8 +52,9 @@ import Foreign.Ptr
 import Foreign.Storable ( Storable(sizeOf) )
 
 import GHC.Base
-import GHC.Num
+import GHC.Err
 import GHC.ForeignPtr
+import GHC.Num
 
 newForeignPtr :: FinalizerPtr a -> Ptr a -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign pointer, and

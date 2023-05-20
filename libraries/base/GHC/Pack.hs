@@ -40,6 +40,7 @@ module GHC.Pack
         where
 
 import GHC.Base
+import GHC.Err
 import GHC.List ( length )
 import GHC.ST
 import GHC.Ptr

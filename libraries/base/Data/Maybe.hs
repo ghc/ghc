@@ -31,7 +31,7 @@ module Data.Maybe
    , mapMaybe
    ) where
 
-import GHC.Base
+import GHC.Err
 import GHC.Maybe
 import GHC.Stack.Types ( HasCallStack )
 

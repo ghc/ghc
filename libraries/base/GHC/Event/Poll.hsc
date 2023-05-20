@@ -14,6 +14,7 @@ module GHC.Event.Poll
 
 #if !defined(HAVE_POLL_H)
 import GHC.Base
+import GHC.Err
 import qualified GHC.Event.Internal as E
 
 new :: IO E.Backend
@@ -31,6 +32,7 @@ import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
 import GHC.Base
+import GHC.Err
 import GHC.Conc.Sync (withMVar)
 import GHC.Enum (maxBound)
 import GHC.Maybe (Maybe(..))

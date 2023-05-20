@@ -50,6 +50,7 @@ module GHC.Stack (
 
 import GHC.Stack.CCS
 import GHC.Stack.Types
+import GHC.Err
 import GHC.IO
 import GHC.Base
 import GHC.List

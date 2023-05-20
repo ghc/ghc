@@ -74,6 +74,7 @@ import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
 import GHC.Num
 import GHC.List
+import GHC.Err
 import GHC.Base
 
 {- Note [Specialising array operations]

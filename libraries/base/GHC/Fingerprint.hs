@@ -21,8 +21,9 @@ module GHC.Fingerprint (
 
 import GHC.IO
 import GHC.Base
-import GHC.Num
+import GHC.Err
 import GHC.List
+import GHC.Num
 import GHC.Real
 import GHC.Show
 import Foreign

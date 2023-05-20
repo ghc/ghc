@@ -48,6 +48,7 @@ import Foreign.C
 
 import GHC.Base
 import GHC.Enum
+import GHC.Err
 import GHC.Generics (Generic)
 import GHC.IO
 import GHC.Maybe

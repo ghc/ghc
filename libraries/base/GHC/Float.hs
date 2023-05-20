@@ -153,6 +153,7 @@ import GHC.Base
 import GHC.Bits
 import GHC.List
 import GHC.Enum
+import GHC.Err
 import GHC.Show
 import GHC.Maybe
 import GHC.Num

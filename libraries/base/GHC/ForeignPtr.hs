@@ -58,11 +58,12 @@ module GHC.ForeignPtr
 import Foreign.Storable
 import Data.Foldable    ( sequence_ )
 
-import GHC.Show
 import GHC.Base
+import GHC.Err
 import GHC.IORef
-import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
+import GHC.STRef        ( STRef(..) )
+import GHC.Show
 
 import Unsafe.Coerce    ( unsafeCoerce )
 

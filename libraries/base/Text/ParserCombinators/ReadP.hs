@@ -72,6 +72,7 @@ module Text.ParserCombinators.ReadP
   )
  where
 
+import GHC.Err
 import GHC.Unicode ( isSpace )
 import GHC.List ( replicate, null )
 import GHC.Base.NonEmpty ( NonEmpty(..) )

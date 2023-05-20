@@ -50,6 +50,7 @@ import Data.Either (Either(..))
 
 import GHC.IORef
 import GHC.Base
+import GHC.Err
 import GHC.Maybe
 import GHC.Num
 import GHC.Real

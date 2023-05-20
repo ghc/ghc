@@ -33,8 +33,9 @@ module Data.Either (
  ) where
 
 import GHC.Base
-import GHC.Show
+import GHC.Err
 import GHC.Read
+import GHC.Show
 
 -- $setup
 -- Allow the use of some Prelude functions in doctests.

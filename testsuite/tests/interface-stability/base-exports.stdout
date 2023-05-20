@@ -3455,7 +3455,6 @@ module GHC.Base where
   type ZeroBitRep = TupleRep '[] :: RuntimeRep
   type ZeroBitType :: *
   type ZeroBitType = TYPE ZeroBitRep
-  absentErr :: forall a. a
   absurd :: forall a. Void -> a
   acosDouble# :: Double# -> Double#
   acosFloat# :: Float# -> Float#
@@ -3655,8 +3654,6 @@ module GHC.Base where
   eqWord32# :: Word32# -> Word32# -> Int#
   eqWord64# :: Word64# -> Word64# -> Int#
   eqWord8# :: Word8# -> Word8# -> Int#
-  error :: forall (r :: RuntimeRep) (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
-  errorWithoutStackTrace :: forall (r :: RuntimeRep) (a :: TYPE r). [Char] -> a
   expDouble# :: Double# -> Double#
   expFloat# :: Float# -> Float#
   expm1Double# :: Double# -> Double#
@@ -4638,7 +4635,6 @@ module GHC.Base where
   uncheckedShiftRLWord16# :: Word16# -> Int# -> Word16#
   uncheckedShiftRLWord32# :: Word32# -> Int# -> Word32#
   uncheckedShiftRLWord8# :: Word8# -> Int# -> Word8#
-  undefined :: forall (r :: RuntimeRep) (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
   unmaskAsyncExceptions# :: forall {q :: RuntimeRep} (a :: TYPE q). (State# RealWorld -> (# State# RealWorld, a #)) -> State# RealWorld -> (# State# RealWorld, a #)
   unpackAppendCString# :: Addr# -> [Char] -> [Char]
   unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
