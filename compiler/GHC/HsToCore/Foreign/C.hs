@@ -42,7 +42,7 @@ import GHC.Types.Basic
 
 import GHC.Unit.Module
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 
 import GHC.Cmm.Expr

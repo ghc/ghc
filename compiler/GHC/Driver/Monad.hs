@@ -34,7 +34,7 @@ module GHC.Driver.Monad (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Errors ( printOrThrowDiagnostics, printMessages )
 import GHC.Driver.Errors.Types

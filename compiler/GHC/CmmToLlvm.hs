@@ -27,7 +27,7 @@ import GHC.Cmm
 import GHC.Cmm.Dataflow.Collections
 
 import GHC.Utils.BufHandle
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Platform ( platformArch, Arch(..) )
 import GHC.Utils.Error
 import GHC.Data.FastString

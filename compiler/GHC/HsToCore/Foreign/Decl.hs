@@ -33,7 +33,7 @@ import GHC.Cmm.CLabel
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Driver.Hooks

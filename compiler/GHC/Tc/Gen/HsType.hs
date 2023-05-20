@@ -124,7 +124,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Builtin.Names hiding ( wildCardName )
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString

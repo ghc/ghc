@@ -29,7 +29,7 @@ import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 
 import GHC.Types.Tickish (CoreTickish, GenTickish (..))
 import GHC.Types.CostCentre (mkUserCC, mkDeclCCFlavour)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Hs
 

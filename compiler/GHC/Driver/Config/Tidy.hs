@@ -12,7 +12,7 @@ import GHC.Prelude
 import GHC.Iface.Tidy
 import GHC.Iface.Tidy.StaticPtrTable
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Backend
 

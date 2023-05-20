@@ -55,7 +55,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
 import GHC.Utils.Panic

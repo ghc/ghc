@@ -10,7 +10,7 @@ module GHC.SysTools.Process where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Utils.Exception
 import GHC.Utils.Error

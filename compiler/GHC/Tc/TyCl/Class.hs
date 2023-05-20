@@ -51,7 +51,7 @@ import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Core.FamInstEnv
 import GHC.Core.TyCon
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Types.Error
 import GHC.Types.Id

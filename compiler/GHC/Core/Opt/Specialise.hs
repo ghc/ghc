@@ -10,7 +10,7 @@ module GHC.Core.Opt.Specialise ( specProgram, specUnfolding ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )

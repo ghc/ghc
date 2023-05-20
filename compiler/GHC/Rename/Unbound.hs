@@ -30,7 +30,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 
 import GHC.Tc.Errors.Types

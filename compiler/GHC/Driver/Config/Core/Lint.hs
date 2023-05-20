@@ -12,7 +12,7 @@ import GHC.Prelude
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Core

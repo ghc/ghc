@@ -35,7 +35,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Unit.Module
 import GHC.Hs
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type

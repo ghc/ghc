@@ -15,7 +15,7 @@ module GHC.HsToCore.Pmc.Utils (
 import GHC.Prelude
 
 import GHC.Types.Basic (Origin(..), isGenerated)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Core.Type
 import GHC.Data.FastString

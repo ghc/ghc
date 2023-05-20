@@ -4,7 +4,7 @@ module GHC.Driver.Config.Cmm
 
 import GHC.Cmm.Config
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Backend
 
 import GHC.Platform

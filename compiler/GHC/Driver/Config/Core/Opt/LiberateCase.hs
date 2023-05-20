@@ -2,7 +2,7 @@ module GHC.Driver.Config.Core.Opt.LiberateCase
   ( initLiberateCaseOpts
   ) where
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Core.Opt.LiberateCase ( LibCaseOpts(..) )
 

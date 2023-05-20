@@ -3562,11 +3562,6 @@ compilerInfo dflags
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir useInplaceMinGW mtoold . expandTopDir topd
 
-
--- | Get target profile
-targetProfile :: DynFlags -> Profile
-targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
-
 {- -----------------------------------------------------------------------------
 Note [DynFlags consistency]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

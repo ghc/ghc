@@ -35,7 +35,7 @@ import GHC.JS.Unsat.Syntax
 import qualified GHC.JS.Syntax as Sat
 import GHC.JS.Transform
 
-import GHC.Driver.Session (DynFlags(..))
+import GHC.Driver.DynFlags (DynFlags(..))
 import Language.Haskell.Syntax.Module.Name
 import GHC.SysTools.Cpp
 import GHC.SysTools

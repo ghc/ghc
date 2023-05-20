@@ -27,7 +27,7 @@ import GHC.Stg.InferTags.Types
 import GHC.Stg.InferTags.Rewrite (rewriteTopBinds)
 import Data.Maybe
 import GHC.Types.Name.Env (mkNameEnv, NameEnv)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Logger
 import qualified GHC.Unit.Types
 

@@ -59,7 +59,7 @@ import GHC.Core.PatSyn
 import GHC.Core.ConLike
 import GHC.Builtin.Names
 import GHC.Types.Basic hiding (SuccessFlag(..))
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Misc

@@ -5,7 +5,7 @@ module GHC.Driver.Config.Core.Lint.Interactive
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config.Core.Lint
 
 import GHC.Core

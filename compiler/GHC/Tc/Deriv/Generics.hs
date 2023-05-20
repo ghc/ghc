@@ -61,7 +61,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.Bag
 import GHC.Data.FastString
 

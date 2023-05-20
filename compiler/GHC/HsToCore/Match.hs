@@ -30,7 +30,7 @@ import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
 import GHC.Types.Basic ( Origin(..), isGenerated )
 import GHC.Types.SourceText
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Tc.Types.Evidence

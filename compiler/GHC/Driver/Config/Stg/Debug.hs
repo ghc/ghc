@@ -4,7 +4,7 @@ module GHC.Driver.Config.Stg.Debug
 
 import GHC.Stg.Debug
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 -- | Initialize STG pretty-printing options from DynFlags
 initStgDebugOpts :: DynFlags -> StgDebugOpts

@@ -20,7 +20,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Ppr
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Types.Basic (TypeOrKind(..))
 import GHC.Types.Fixity (defaultFixity)

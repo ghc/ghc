@@ -4,7 +4,7 @@ module GHC.Driver.Config.HsToCore
 where
 
 import GHC.Types.Id.Make
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 
 initBangOpts :: DynFlags -> BangOpts

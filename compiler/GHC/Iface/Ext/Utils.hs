@@ -9,7 +9,7 @@ module GHC.Iface.Ext.Utils where
 import GHC.Prelude
 
 import GHC.Core.Map.Type
-import GHC.Driver.Session    ( DynFlags )
+import GHC.Driver.DynFlags    ( DynFlags )
 import GHC.Driver.Ppr
 import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type

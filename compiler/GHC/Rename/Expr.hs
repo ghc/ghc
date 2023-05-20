@@ -52,7 +52,7 @@ import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Rename.Splice  ( rnTypedBracket, rnUntypedBracket, rnTypedSplice, rnUntypedSpliceExpr, checkThLocalName )
 import GHC.Rename.HsType
 import GHC.Rename.Pat
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( nilDataConName )
 

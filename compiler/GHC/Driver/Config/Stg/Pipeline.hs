@@ -11,7 +11,7 @@ import GHC.Stg.Pipeline
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Stg.Lift
 import GHC.Driver.Config.Stg.Ppr
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 -- | Initialize STG pretty-printing options from DynFlags
 initStgPipelineOpts :: DynFlags -> Bool -> StgPipelineOpts

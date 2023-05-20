@@ -44,7 +44,7 @@ import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 
 import GHC.Tc.Utils.Env     ( checkWellStaged, tcMetaTy )
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Utils.Logger
 import GHC.Utils.Panic

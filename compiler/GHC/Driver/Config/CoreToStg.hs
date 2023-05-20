@@ -1,7 +1,7 @@
 module GHC.Driver.Config.CoreToStg where
 
 import GHC.Driver.Config.Stg.Debug
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.CoreToStg
 

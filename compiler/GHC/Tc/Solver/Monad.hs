@@ -142,7 +142,7 @@ import qualified GHC.Tc.Utils.Env      as TcM
        , topIdLvl
        , tcInitTidyEnv )
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Tc.Instance.Class( safeOverlap, instanceReturnsDictCon )
 import GHC.Tc.Instance.FunDeps( FunDepEqn(..) )

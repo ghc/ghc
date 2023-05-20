@@ -4,7 +4,7 @@ module GHC.Driver.Config.Linker
 
 import GHC.Linker.Config
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 initFrameworkOpts :: DynFlags -> FrameworkOpts
 initFrameworkOpts dflags = FrameworkOpts

@@ -51,7 +51,7 @@ import GHC.Rename.Utils ( mapFvRn
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV
                         , addNoNestedForallsContextsErr, checkInferredVars )
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Unit.Module
 import GHC.Types.Error
 import GHC.Types.FieldLabel

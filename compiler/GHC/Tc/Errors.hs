@@ -18,7 +18,7 @@ module GHC.Tc.Errors(
 import GHC.Prelude
 
 import GHC.Driver.Env (hsc_units)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
 

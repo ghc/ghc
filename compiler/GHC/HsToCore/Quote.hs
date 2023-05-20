@@ -33,7 +33,7 @@ module GHC.HsToCore.Quote( dsBracket ) where
 import GHC.Prelude
 import GHC.Platform
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.HsToCore.Errors.Types
 import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr )

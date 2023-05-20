@@ -56,7 +56,7 @@ import GHC.Utils.Misc
 import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated), TypeOrKind )
 import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import Control.Monad
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )

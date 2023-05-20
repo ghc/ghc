@@ -29,7 +29,7 @@ import GHC.HsToCore.Monad ( DsM )
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils
 import GHC.HsToCore.Pmc.Solver
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Tc.Utils.TcType (evVarPred)
 import GHC.Data.OrdList

@@ -29,7 +29,7 @@ import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Data.FastString (fsLit)
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import qualified GHC.LanguageExtensions as LangExt
 

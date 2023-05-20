@@ -4,7 +4,7 @@ module GHC.Driver.Config.Stg.Lift
 
 import GHC.Stg.Lift.Config
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 initStgLiftConfig :: DynFlags -> StgLiftConfig
 initStgLiftConfig dflags = StgLiftConfig

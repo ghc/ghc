@@ -52,7 +52,7 @@ import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
 import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Types.Id
 import GHC.Types.SrcLoc

@@ -26,7 +26,7 @@ import GHC.Core
 import GHC.Core.Opt.Monad
 import GHC.Core.Utils (mkTick)
 import GHC.Types.Id
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Utils.Logger
 import GHC.Utils.Outputable

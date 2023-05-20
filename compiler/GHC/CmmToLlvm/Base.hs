@@ -44,7 +44,7 @@ import GHC.CmmToLlvm.Config
 
 import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Cmm              hiding ( succ )
 import GHC.Cmm.Utils (globalRegsOverlap)

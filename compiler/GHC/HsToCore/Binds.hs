@@ -23,7 +23,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Unit.Module

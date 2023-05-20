@@ -27,7 +27,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain

@@ -5,7 +5,7 @@ where
 
 import GHC.StgToJS.Types
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Platform.Ways
 import GHC.Utils.Outputable
 

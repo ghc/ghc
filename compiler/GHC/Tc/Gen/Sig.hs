@@ -28,7 +28,7 @@ module GHC.Tc.Gen.Sig(
 import GHC.Prelude
 import GHC.Data.FastString
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Backend
 
 import GHC.Hs

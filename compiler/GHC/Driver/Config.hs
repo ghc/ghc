@@ -8,7 +8,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Core.SimpleOpt
 import GHC.Core.Coercion.Opt
 import GHCi.Message (EvalOpts(..))

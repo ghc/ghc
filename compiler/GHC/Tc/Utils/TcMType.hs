@@ -109,7 +109,7 @@ module GHC.Tc.Utils.TcMType (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 
 import {-# SOURCE #-} GHC.Tc.Utils.Unify( unifyInvisibleType )

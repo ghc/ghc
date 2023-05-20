@@ -24,7 +24,7 @@ module GHC.Iface.Env (
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Tc.Utils.Monad
 import GHC.Core.Type

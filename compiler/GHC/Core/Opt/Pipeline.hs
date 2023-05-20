@@ -10,7 +10,7 @@ module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Plugins ( withPlugins, installCoreToDos )
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint ( endPass )

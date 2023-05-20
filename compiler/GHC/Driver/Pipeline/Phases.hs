@@ -6,7 +6,7 @@ module GHC.Driver.Pipeline.Phases (TPhase(..), PhaseHook(..)) where
 import GHC.Prelude
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Env.Types
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.SourceFile
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.Status
