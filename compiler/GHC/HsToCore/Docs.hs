@@ -44,7 +44,7 @@ import GHC.Unit.Module
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.Imported
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.TypeEnv
 import GHC.Types.Id
 import GHC.Types.Unique.Map

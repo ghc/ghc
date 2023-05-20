@@ -102,7 +102,6 @@ GHC.Data.TrieMap
 GHC.Data.Unboxed
 GHC.Driver.Backend
 GHC.Driver.Backend.Internal
-GHC.Driver.CmdLine
 GHC.Driver.Config.Core.Lint
 GHC.Driver.Config.Diagnostic
 GHC.Driver.Config.Logger
@@ -123,7 +122,6 @@ GHC.Driver.Pipeline.Phases
 GHC.Driver.Plugins
 GHC.Driver.Plugins.External
 GHC.Driver.Ppr
-GHC.Driver.Session
 GHC.Hs
 GHC.Hs.Binds
 GHC.Hs.Decls
@@ -187,7 +185,6 @@ GHC.Stg.Lift.Types
 GHC.Stg.Syntax
 GHC.StgToCmm.Config
 GHC.StgToCmm.Types
-GHC.SysTools.BaseDir
 GHC.SysTools.Terminal
 GHC.Tc.Errors.Hole.FitTypes
 GHC.Tc.Errors.Ppr

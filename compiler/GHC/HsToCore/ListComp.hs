@@ -23,7 +23,7 @@ import GHC.Core.Make
 import GHC.HsToCore.Monad          -- the monadery used in the desugarer
 import GHC.HsToCore.Utils
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type

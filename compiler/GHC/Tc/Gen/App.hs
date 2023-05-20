@@ -43,7 +43,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 import GHC.Data.Maybe

@@ -11,7 +11,7 @@ import GHC.Platform
 
 import GHC.Linker.Config
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Unit.Types
 import GHC.Unit.State

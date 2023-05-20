@@ -6,7 +6,7 @@ import GHC.Cmm.Parser.Config
 
 import GHC.Driver.Config.Parser
 import GHC.Driver.Config.StgToCmm
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Utils.Panic
 

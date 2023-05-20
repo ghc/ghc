@@ -13,7 +13,7 @@ module GHC.Tc.Instance.Family (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 
 import GHC.Core.FamInstEnv

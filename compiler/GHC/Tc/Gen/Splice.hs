@@ -34,7 +34,7 @@ import GHC.Prelude
 import GHC.Driver.Errors
 import GHC.Driver.Plugins
 import GHC.Driver.Main
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Hooks
 import GHC.Driver.Config.Diagnostic

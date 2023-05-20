@@ -31,7 +31,7 @@ module GHC.Core.Lint (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Tc.Utils.TcType ( isFloatingPrimTy, isTyFamFree )
 import GHC.Unit.Module.ModGuts

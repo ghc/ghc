@@ -63,7 +63,7 @@ import GHC.Rename.Env
 import GHC.Rename.Utils (wrapGenSpan)
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import GHC.Driver.Session ( getDynFlags, xopt_FieldSelectors )
+import GHC.Driver.DynFlags ( getDynFlags, xopt_FieldSelectors )
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition, mapAccumL )

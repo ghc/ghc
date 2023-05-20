@@ -48,7 +48,7 @@ import GHC.Core.RoughMap( RoughMatchTc(..) )
 import GHC.Driver.Config.HsToCore.Usage
 import GHC.Driver.Env
 import GHC.Driver.Backend
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Plugins
 
 import GHC.Types.Id

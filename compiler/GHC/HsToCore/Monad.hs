@@ -57,7 +57,7 @@ module GHC.HsToCore.Monad (
 import GHC.Prelude
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config.Diagnostic
 

@@ -24,7 +24,7 @@ import GHC.Data.FastString
 import GHC.Driver.Backend
 import GHC.Driver.Config.Finder
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Plugins
 

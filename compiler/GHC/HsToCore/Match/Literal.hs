@@ -58,7 +58,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.Id
 import GHC.Types.SourceText
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc

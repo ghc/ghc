@@ -79,7 +79,7 @@ import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
 import GHC.Utils.Misc
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 

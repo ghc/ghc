@@ -37,7 +37,7 @@ import GHC.Prelude
 import GHC.HsToCore.Pmc.Types
 import GHC.HsToCore.Pmc.Utils (tracePm, traceWhenFailPm, mkPmId)
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

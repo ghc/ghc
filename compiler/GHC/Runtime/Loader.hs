@@ -23,7 +23,7 @@ module GHC.Runtime.Loader (
 import GHC.Prelude
 import GHC.Data.FastString
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins

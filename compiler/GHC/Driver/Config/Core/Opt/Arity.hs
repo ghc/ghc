@@ -4,7 +4,7 @@ module GHC.Driver.Config.Core.Opt.Arity
 
 import GHC.Prelude ()
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Core.Opt.Arity
 

@@ -79,7 +79,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Builtin.Uniques ( mkBuiltinUnique )
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.Bag ( unitBag )

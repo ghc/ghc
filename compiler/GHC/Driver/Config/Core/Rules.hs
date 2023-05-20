@@ -5,7 +5,7 @@ module GHC.Driver.Config.Core.Rules
 import GHC.Prelude
 
 import GHC.Driver.Flags
-import GHC.Driver.Session ( DynFlags, gopt, targetPlatform, homeUnitId_ )
+import GHC.Driver.DynFlags ( DynFlags, gopt, targetPlatform, homeUnitId_ )
 
 import GHC.Core.Rules.Config
 

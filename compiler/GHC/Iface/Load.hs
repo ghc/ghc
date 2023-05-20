@@ -47,7 +47,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
 import GHC.Driver.Config.Finder
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Hooks
 import GHC.Driver.Plugins
 

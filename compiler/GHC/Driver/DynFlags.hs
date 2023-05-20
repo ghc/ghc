@@ -40,6 +40,8 @@ module GHC.Driver.DynFlags (
         positionIndependent,
         optimisationFlags,
 
+        targetProfile,
+
         -- ** Manipulating DynFlags
         defaultDynFlags,                -- Settings -> DynFlags
         initDynFlags,                   -- DynFlags -> IO DynFlags
@@ -75,6 +77,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Ways
+import GHC.Platform.Profile
 
 import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Unfold
@@ -1427,6 +1430,11 @@ ways :: DynFlags -> Ways
 ways dflags
    | dynamicNow dflags = addWay WayDyn (targetWays_ dflags)
    | otherwise         = targetWays_ dflags
+
+-- | Get target profile
+targetProfile :: DynFlags -> Profile
+targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
+
 --
 -- System tool settings and locations
 

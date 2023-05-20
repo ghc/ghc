@@ -18,7 +18,7 @@ module GHC.HsToCore (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 import GHC.Driver.Config.Core.Lint ( endPassHscEnvIO )
 import GHC.Driver.Config.HsToCore.Ticks

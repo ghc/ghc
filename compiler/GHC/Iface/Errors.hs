@@ -11,7 +11,7 @@ module GHC.Iface.Errors
 import GHC.Platform.Profile
 import GHC.Platform.Ways
 import GHC.Utils.Panic.Plain
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 import GHC.Driver.Errors.Types
 import GHC.Data.Maybe

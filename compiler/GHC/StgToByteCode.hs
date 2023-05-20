@@ -15,7 +15,7 @@ module GHC.StgToByteCode ( UnlinkedBCO, byteCodeGen) where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Env
 
 import GHC.ByteCode.Instr

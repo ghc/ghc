@@ -79,7 +79,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Names.TH( liftStringName, liftName )
 
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic

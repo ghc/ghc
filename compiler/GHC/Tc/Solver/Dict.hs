@@ -48,7 +48,7 @@ import GHC.Utils.Misc
 
 import GHC.Data.Bag
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import qualified GHC.LanguageExtensions as LangExt
 

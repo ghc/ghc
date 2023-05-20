@@ -56,7 +56,7 @@ import GHC.Data.Bag
 import GHC.Types.Basic  ( TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)

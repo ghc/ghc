@@ -50,7 +50,7 @@ import GHC.Driver.Monad
 import GHC.Driver.Main
 import GHC.Driver.Errors.Types ( hoistTcRnMessage )
 import GHC.Driver.Env
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Config
 

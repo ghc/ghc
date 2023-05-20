@@ -5,7 +5,7 @@ module GHC.Driver.Config.Core.Opt.WorkWrap
 import GHC.Prelude ()
 
 import GHC.Driver.Config (initSimpleOpts)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Core.FamInstEnv
 import GHC.Core.Opt.WorkWrap

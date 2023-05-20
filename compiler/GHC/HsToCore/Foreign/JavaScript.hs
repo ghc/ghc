@@ -50,7 +50,7 @@ import GHC.Cmm.Utils
 
 import GHC.JS.Ppr
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config
 
 import GHC.Builtin.Types

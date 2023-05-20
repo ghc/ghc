@@ -1842,7 +1842,7 @@ not happen.   Here's the one that bit me:
      data DynFlags = DF ... PackageState ...
 
    module Packages where
-     import GHC.Driver.Session
+     import GHC.Driver.DynFlags
      data PackageState = PS ...
      lookupModule (df :: DynFlags)
         = case df of

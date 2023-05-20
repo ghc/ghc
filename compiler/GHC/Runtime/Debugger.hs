@@ -16,7 +16,7 @@ import GHC.Prelude
 
 import GHC
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Driver.Monad
 import GHC.Driver.Env

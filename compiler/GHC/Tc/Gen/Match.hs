@@ -70,7 +70,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
-import GHC.Driver.Session ( getDynFlags )
+import GHC.Driver.DynFlags ( getDynFlags )
 
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name

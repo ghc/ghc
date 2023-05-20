@@ -119,7 +119,7 @@ import GHC.Cmm.CLabel
 
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Utils.Logger

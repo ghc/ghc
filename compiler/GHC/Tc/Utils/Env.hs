@@ -76,7 +76,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types

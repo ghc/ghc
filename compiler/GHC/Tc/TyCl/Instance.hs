@@ -71,7 +71,7 @@ import GHC.Types.Var.Set
 import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Types.Fixity
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Ppr
 import GHC.Utils.Logger
 import GHC.Data.FastString

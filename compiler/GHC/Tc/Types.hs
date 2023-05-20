@@ -103,7 +103,7 @@ import GHC.Platform
 
 import GHC.Driver.Env
 import GHC.Driver.Config.Core.Lint
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import {-# SOURCE #-} GHC.Driver.Hooks
 
 import GHC.Hs

@@ -52,7 +52,7 @@ import GHC.Prelude
 
 import GHC.Driver.Env
 import GHC.Driver.Plugins
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Driver.Config.Diagnostic
 
 import GHC.Tc.Errors.Hole.FitTypes ( HoleFitPluginR (..) )

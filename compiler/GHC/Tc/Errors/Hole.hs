@@ -58,7 +58,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Tc.Utils.Env (tcLookup)
 import GHC.Utils.Outputable
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.Maybe
 import GHC.Utils.FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
 

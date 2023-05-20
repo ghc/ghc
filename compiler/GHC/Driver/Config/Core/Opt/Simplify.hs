@@ -17,7 +17,7 @@ import GHC.Driver.Config ( initOptCoercionOpts )
 import GHC.Driver.Config.Core.Lint ( initLintPassResultConfig )
 import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 import GHC.Driver.Config.Core.Opt.Arity ( initArityOpts )
-import GHC.Driver.Session ( DynFlags(..), GeneralFlag(..), gopt )
+import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag(..), gopt )
 
 import GHC.Runtime.Context ( InteractiveContext(..) )
 

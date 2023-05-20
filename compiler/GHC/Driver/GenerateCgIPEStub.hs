@@ -18,7 +18,7 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
 import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
-import GHC.Driver.Session (gopt, targetPlatform)
+import GHC.Driver.DynFlags (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Config.Cmm
 import GHC.Prelude

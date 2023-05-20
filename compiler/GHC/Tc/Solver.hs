@@ -35,7 +35,7 @@ import GHC.Core
 import GHC.Core.DataCon
 import GHC.Core.InstEnv ( Coherence(IsCoherent) )
 import GHC.Core.Make
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Name

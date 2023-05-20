@@ -5,7 +5,7 @@ module GHC.Driver.Config.Finder (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Unit.Finder.Types
 import GHC.Data.FastString
 

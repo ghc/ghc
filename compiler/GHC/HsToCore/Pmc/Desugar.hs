@@ -21,7 +21,7 @@ import GHC.HsToCore.Pmc.Utils
 import GHC.Core (Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Data.Bag (bagToList)
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Tc.Utils.Zonk (shortCutLit)
 import GHC.Types.Id

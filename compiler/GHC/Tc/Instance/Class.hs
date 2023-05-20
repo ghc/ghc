@@ -10,7 +10,7 @@ module GHC.Tc.Instance.Class (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Driver.DynFlags
 
 import GHC.Core.TyCo.Rep
 

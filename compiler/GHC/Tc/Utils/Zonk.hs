@@ -85,7 +85,7 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM
 import GHC.Types.TyThing
-import GHC.Driver.Session( getDynFlags, targetPlatform )
+import GHC.Driver.DynFlags( getDynFlags, targetPlatform )
 
 import GHC.Data.Maybe
 import GHC.Data.Bag

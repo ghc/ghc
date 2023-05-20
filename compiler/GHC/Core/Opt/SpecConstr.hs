@@ -25,7 +25,7 @@ module GHC.Core.Opt.SpecConstr(
 
 import GHC.Prelude
 
-import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+import GHC.Driver.DynFlags ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
 
 import GHC.Core
