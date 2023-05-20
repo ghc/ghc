@@ -793,14 +793,14 @@ opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
 ra_reg, sp_reg :: Reg
+zero_reg = RegReal (RealRegSingle 0)
 ra_reg = RegReal (RealRegSingle 1)
 sp_reg = RegReal (RealRegSingle 2)
 
-xzr, wzr, sp, ip0 :: Operand
-xzr = OpReg W64 (RegReal (RealRegSingle 0))
-wzr = OpReg W32 (RegReal (RealRegSingle 0))
-ra  = OpReg W64 (RegReal (RealRegSingle 1))
-sp  = OpReg W64 (RegReal (RealRegSingle 2))
+zero, sp, ip0 :: Operand
+zero = OpReg W64 zero_reg
+ra  = OpReg W64 ra_reg
+sp  = OpReg W64 sp_reg
 gp  = OpReg W64 (RegReal (RealRegSingle 3))
 tp  = OpReg W64 (RegReal (RealRegSingle 4))
 fp  = OpReg W64 (RegReal (RealRegSingle 8))
