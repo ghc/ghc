@@ -499,7 +499,7 @@ getRegister' config plat expr
     CmmLit lit
       -> case lit of
 
-        -- TODO handle CmmInt 0 specially, use wzr or xzr.
+        CmmInt 0 w -> pure $ Fixed (intFormat w) zero_reg nilOL
 
         CmmInt i W8 | i >= 0 -> do
           return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowU W8 i))))))
