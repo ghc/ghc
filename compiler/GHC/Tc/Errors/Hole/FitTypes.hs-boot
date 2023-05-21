@@ -4,7 +4,7 @@
 -- + which needs 'GHC.Tc.Types'
 module GHC.Tc.Errors.Hole.FitTypes where
 
-import GHC.Base (Int, Maybe)
+import GHC.Prelude
 import GHC.Types.Var (Id)
 import GHC.Types.Name (Name)
 import GHC.Types.Name.Reader (GlobalRdrElt)
