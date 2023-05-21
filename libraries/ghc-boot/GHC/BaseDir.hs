@@ -24,7 +24,7 @@ import Data.List (stripPrefix)
 import Data.Maybe (listToMaybe)
 import System.FilePath
 
-#if MIN_VERSION_base(4,17,0)
+#if MIN_VERSION_base(4,17,0) && !defined(openbsd_HOST_OS)
 import System.Environment (executablePath)
 #else
 import System.Environment (getExecutablePath)
@@ -45,8 +45,10 @@ expandPathVar var value str
 expandPathVar var value (x:xs) = x : expandPathVar var value xs
 expandPathVar _ _ [] = []
 
-#if !MIN_VERSION_base(4,17,0)
--- Polyfill for base-4.17 executablePath
+#if !MIN_VERSION_base(4,17,0) || defined(openbsd_HOST_OS)
+-- Polyfill for base-4.17 executablePath and OpenBSD which doesn't
+-- have executablePath. The best it can do is use argv[0] which is
+-- good enough for most uses of getBaseDir.
 executablePath :: Maybe (IO (Maybe FilePath))
 executablePath = Just (Just <$> getExecutablePath)
 #elif !MIN_VERSION_base(4,18,0) && defined(js_HOST_ARCH)
