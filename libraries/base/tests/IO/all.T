@@ -155,6 +155,7 @@ test('T17414',
       # distributions. This test needs to create a large file which will exceed the
       # size of this filesystem consequently we must skip it (see #17459).
       when(opsys('linux'), skip),
+      when(opsys('openbsd'), skip),
       high_memory_usage],
      compile_and_run, [''])
 test('T17510', expect_broken(17510), compile_and_run, [''])
