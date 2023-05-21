@@ -1,0 +1,24 @@
+// RUN: "$HC" -debug -dppr-debug -cpp -dcmm-lint -keep-s-file -O0 -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-RV64
+// RUN: "$CC" "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe"
+
+#include "Cmm.h"
+#include "Types.h"
+
+main() {
+    I64 buffer;
+    I32 a, b, c, d;
+
+    I64 arr;
+    (arr) = foreign "C" malloc(1024);
+    bits64[arr] = 2;
+
+    a = I32[arr];
+    b = %mul(a, 32 :: I32);
+    c = %neg(b);
+    d = %shra(c, 4::I64);
+
+    foreign "C" printf("a: %hd b: %hd c: %hd d: %hd", a, b, c, d);
+
+    foreign "C" exit(d == -4 :: I32);
+}
