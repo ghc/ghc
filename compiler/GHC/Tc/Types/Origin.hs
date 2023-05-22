@@ -591,6 +591,7 @@ data CtOrigin
   | IfThenElseOrigin    -- An if-then-else expression
   | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
+  | ImpedanceMatching Id   -- See Note [Impedance matching] in GHC.Tc.Gen.Bind
   | Shouldn'tHappenOrigin String  -- The user should never see this one
 
   -- | Testing whether the constraint associated with an instance declaration
@@ -826,6 +827,10 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
          , ppr cls_inst
          , text "is provided by" <+> quotes (ppr mod)]
 
+pprCtOrigin (ImpedanceMatching x)
+  = vcat [ text "arising when matching required constraints"
+         , text "in a recursive group involving" <+> quotes (ppr x)]
+
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
 
@@ -921,6 +926,8 @@ pprCtO (FRROrigin {})               = text "a representation-polymorphism check"
 pprCtO (WantedSuperclassOrigin {})  = text "a superclass constraint"
 pprCtO (InstanceSigOrigin {})       = text "a type signature in an instance"
 pprCtO (AmbiguityCheckOrigin {})    = text "a type ambiguity check"
+pprCtO (ImpedanceMatching {})       = text "combining required constraints"
+
 
 {- *********************************************************************
 *                                                                      *
