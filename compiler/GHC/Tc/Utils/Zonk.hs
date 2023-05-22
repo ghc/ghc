@@ -93,7 +93,6 @@ import GHC.Data.Bag
 import Control.Monad
 import Data.List  ( partition )
 import Control.Arrow ( second )
-import Data.List.NonEmpty (NonEmpty(..))
 
 {- *********************************************************************
 *                                                                      *
@@ -1344,7 +1343,7 @@ zonk_pat env (TuplePat tys pats boxed)
         ; (env', pats') <- zonkPats env pats
         ; return (env', TuplePat tys' pats' boxed) }
 
-zonk_pat env p@(OrPat ty pats)
+zonk_pat env (OrPat ty pats)
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; (env', pats') <- zonkPats env pats
         ; return (env', OrPat ty' pats') }

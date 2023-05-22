@@ -44,7 +44,7 @@ import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
 import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
 import GHC.Hs
-import GHC.Hs.Pat ( patHasTyAppsL )
+-- import GHC.Hs.Pat ( patHasTyAppsL )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType ( hsOverLitName )
