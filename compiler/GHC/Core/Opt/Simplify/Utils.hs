@@ -2143,6 +2143,9 @@ abstractFloats uf_opts top_lvl main_tvs floats body
         get_tvs var free_tvs
            | isTyVar var      -- CoVars have been substituted away
            = extendVarSet free_tvs var
+           | isCoVar var  -- CoVars can be free in the RHS, but they are never let-bound;
+           = free_tvs     -- Do not call lookupIdSubst_maybe, though (#23426)
+                          --    because it has a non-CoVar precondition
            | Just poly_app <- GHC.Core.Subst.lookupIdSubst_maybe subst var
            = -- 'var' is like 'x' in (AB4)
              exprSomeFreeVars isTyVar poly_app `unionVarSet` free_tvs
