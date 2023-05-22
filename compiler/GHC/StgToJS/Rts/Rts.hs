@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
 
 {-# OPTIONS_GHC -O0 #-}
 
@@ -45,6 +46,7 @@ import GHC.StgToJS.Linker.Opt
 
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
+import GHC.JS.Ppr
 
 import Data.Array
 import Data.Monoid
@@ -314,12 +316,12 @@ rtsDecls = satJStat (Just "h$RTSD") $
           , declRets]
 
 -- | print the embedded RTS to a String
-rtsText :: StgToJSConfig -> String
-rtsText = show . pretty . jsOptimize . rts
+rtsText :: forall doc. JsRender doc => StgToJSConfig -> doc
+rtsText = pretty @doc . jsOptimize . rts
 
 -- | print the RTS declarations to a String.
-rtsDeclsText :: String
-rtsDeclsText = show . pretty . jsOptimize $ rtsDecls
+rtsDeclsText :: forall doc. JsRender doc => doc
+rtsDeclsText = pretty @doc . jsOptimize $ rtsDecls
 
 -- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
 rts :: StgToJSConfig -> Sat.JStat

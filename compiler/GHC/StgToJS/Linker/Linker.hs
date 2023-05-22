@@ -59,6 +59,7 @@ import GHC.Unit.Types
 import GHC.Unit.Module (moduleStableString)
 
 import GHC.Utils.Outputable hiding ((<>))
+import GHC.Utils.BufHandle
 import GHC.Utils.Panic
 import GHC.Utils.Error
 import GHC.Utils.Logger (Logger, logVerbAtLeast)
@@ -80,7 +81,6 @@ import Control.Monad
 import Data.Array
 import qualified Data.ByteString          as B
 import qualified Data.ByteString.Char8    as BC
-import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.ByteString.Lazy     as BL
 import qualified Data.ByteString          as BS
 import Data.Function            (on)
@@ -117,6 +117,9 @@ newtype ArchiveState = ArchiveState { loadedArchives :: IORef (Map FilePath Ar.A
 
 emptyArchiveState :: IO ArchiveState
 emptyArchiveState = ArchiveState <$> newIORef M.empty
+
+defaultJsContext :: SDocContext
+defaultJsContext = defaultSDocContext{sdocStyle = PprCode}
 
 jsLinkBinary
   :: JSLinkConfig
@@ -173,7 +176,7 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
 
       -- LTO + rendering of JS code
       link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h ->
-        renderLinker h mods jsFiles
+        renderLinker h (csPrettyRender cfg) mods jsFiles
 
       -------------------------------------------------------------
 
@@ -194,8 +197,13 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
 
       -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
-        BL.writeFile (out </> "rts.js") ( BLC.pack rtsDeclsText
-                                         <> BLC.pack (rtsText cfg))
+        withFile (out </> "rts.js") WriteMode $ \h -> do
+         if csPrettyRender cfg
+          then printSDoc defaultJsContext (Ppr.PageMode True) h (rtsDeclsText $$ rtsText cfg)
+          else do
+            bh <- newBufHandle h
+            bPutHDoc bh defaultJsContext (line rtsDeclsText $$ line (rtsText cfg))
+            bFlush bh
 
       -- link dependencies' JS files into lib.js
       withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
@@ -302,10 +310,11 @@ data CompactedModuleCode = CompactedModuleCode
 -- | Link modules and pretty-print them into the given Handle
 renderLinker
   :: Handle
+  -> Bool         -- ^ should we render readable JS for debugging?
   -> [ModuleCode] -- ^ linked code per module
   -> [FilePath]   -- ^ additional JS files
   -> IO LinkerStats
-renderLinker h mods jsFiles = do
+renderLinker h render_pretty mods jsFiles = do
 
   -- link modules
   let (compacted_mods, meta) = linkModules mods
@@ -314,8 +323,14 @@ renderLinker h mods jsFiles = do
     putBS   = B.hPut h
     putJS x = do
       before <- hTell h
-      Ppr.printLeftRender h (pretty x)
-      hPutChar h '\n'
+      if render_pretty
+        then do
+          printSDoc defaultJsContext (Ppr.PageMode True) h (pretty x)
+        else do
+          bh <- newBufHandle h
+          -- Append an empty line to correctly end the file in a newline
+          bPutHDoc bh defaultJsContext ((line $ pretty x) $$ empty)
+          bFlush bh
       after <- hTell h
       pure $! (after - before)
 

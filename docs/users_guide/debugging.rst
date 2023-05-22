@@ -723,6 +723,16 @@ assembler.
     Dump the final JavaScript code produced by the JavaScript code generator.
 
 
+JavaScript code generator
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -ddisable-js-minifier
+   :shortdesc: Generate pretty-printed JavaScript code instead of minified (compacted) code.
+   :type: dynamic
+
+   Include human-readable spacing and indentation when generating JavaScript.
+
+
 Miscellaneous backend dumps
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
