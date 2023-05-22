@@ -1593,6 +1593,14 @@ scavenge_one(StgPtr p)
 #endif
       break;
 
+    case BCO: {
+        StgBCO *bco = (StgBCO *)p;
+        evacuate((StgClosure **)&bco->instrs);
+        evacuate((StgClosure **)&bco->literals);
+        evacuate((StgClosure **)&bco->ptrs);
+        break;
+    }
+
     case COMPACT_NFDATA:
         scavenge_compact((StgCompactNFData*)p);
         break;
