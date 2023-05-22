@@ -91,7 +91,7 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
   -- Doc to dump when -ddump-js is enabled
   when (logHasDumpFlag logger Opt_D_dump_js) $ do
     putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
-      $ vcat (fmap (docToSDoc . jsToDoc . oiStat . luObjUnit) lus)
+      $ vcat (fmap (jsToDoc . oiStat . luObjUnit) lus)
 
   -- Write the object file
   bh <- openBinMem (4 * 1024 * 1000) -- a bit less than 4kB

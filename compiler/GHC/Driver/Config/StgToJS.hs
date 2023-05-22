@@ -20,6 +20,7 @@ initStgToJSConfig dflags = StgToJSConfig
   , csInlineLoadRegs  = False
   , csInlineEnter     = False
   , csInlineAlloc     = False
+  , csPrettyRender    = gopt Opt_DisableJsMinifier dflags
   , csTraceRts        = False
   , csAssertRts       = False
   , csBoundsCheck     = gopt Opt_DoBoundsChecking dflags

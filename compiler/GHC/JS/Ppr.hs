@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TypeApplications #-}
 
 -- For Outputable instances for JS syntax
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -55,12 +56,13 @@ module GHC.JS.Ppr
   , JsToDoc(..)
   , defaultRenderJs
   , RenderJs(..)
+  , JsRender(..)
   , jsToDoc
   , pprStringLit
-  , braceNest
-  , hangBrace
   , interSemi
   , addSemi
+  , braceNest
+  , hangBrace
   )
 where
 
@@ -75,16 +77,15 @@ import Data.List (sortOn)
 
 import Numeric(showHex)
 
-import GHC.Utils.Outputable (Outputable (..), docToSDoc)
-import GHC.Utils.Ppr as PP
+import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
 
 instance Outputable JExpr where
-  ppr = docToSDoc . renderJs
+  ppr = renderJs
 
 instance Outputable JVal where
-  ppr = docToSDoc . renderJs
+  ppr = renderJs
 
 --------------------------------------------------------------------------------
 --                            Top level API
@@ -93,87 +94,86 @@ instance Outputable JVal where
 -- | Render a syntax tree as a pretty-printable document
 -- (simply showing the resultant doc produces a nice,
 -- well formatted String).
-renderJs :: (JsToDoc a) => a -> Doc
+renderJs :: (JsToDoc a) => a -> SDoc
 renderJs = renderJs' defaultRenderJs
 
-renderJs' :: (JsToDoc a) => RenderJs -> a -> Doc
+{-# SPECIALISE renderJs' :: JsToDoc a => RenderJs HLine -> a -> HLine #-}
+{-# SPECIALISE renderJs' :: JsToDoc a => RenderJs SDoc  -> a -> SDoc  #-}
+renderJs' :: (JsToDoc a, JsRender doc) => RenderJs doc -> a -> doc
 renderJs' r = jsToDocR r
 
-data RenderJs = RenderJs
-  { renderJsS :: !(RenderJs -> JStat -> Doc)
-  , renderJsE :: !(RenderJs -> JExpr -> Doc)
-  , renderJsV :: !(RenderJs -> JVal  -> Doc)
-  , renderJsI :: !(RenderJs -> Ident -> Doc)
+data RenderJs doc = RenderJs
+  { renderJsS :: !(JsRender doc => RenderJs doc -> JStat -> doc)
+  , renderJsE :: !(JsRender doc => RenderJs doc -> JExpr -> doc)
+  , renderJsV :: !(JsRender doc => RenderJs doc -> JVal  -> doc)
+  , renderJsI :: !(JsRender doc => RenderJs doc -> Ident -> doc)
   }
 
-defaultRenderJs :: RenderJs
+defaultRenderJs :: RenderJs doc
 defaultRenderJs = RenderJs defRenderJsS defRenderJsE defRenderJsV defRenderJsI
 
-jsToDoc :: JsToDoc a => a -> Doc
+jsToDoc :: JsToDoc a => a -> SDoc
 jsToDoc = jsToDocR defaultRenderJs
 
 -- | Render a syntax tree as a pretty-printable document, using a given prefix
 -- to all generated names. Use this with distinct prefixes to ensure distinct
 -- generated names between independent calls to render(Prefix)Js.
-renderPrefixJs :: (JsToDoc a, JMacro a) => a -> Doc
+renderPrefixJs :: (JsToDoc a, JMacro a) => a -> SDoc
 renderPrefixJs = renderPrefixJs' defaultRenderJs
 
-renderPrefixJs' :: (JsToDoc a, JMacro a) => RenderJs -> a -> Doc
+renderPrefixJs' :: (JsToDoc a, JMacro a, JsRender doc) => RenderJs doc -> a -> doc
 renderPrefixJs' r = jsToDocR r
 
 --------------------------------------------------------------------------------
 --                            Code Generator
 --------------------------------------------------------------------------------
 
-class JsToDoc a where jsToDocR :: RenderJs -> a -> Doc
+class JsToDoc a where jsToDocR :: JsRender doc => RenderJs doc -> a -> doc
 instance JsToDoc JStat   where jsToDocR r = renderJsS r r
 instance JsToDoc JExpr   where jsToDocR r = renderJsE r r
 instance JsToDoc JVal    where jsToDocR r = renderJsV r r
 instance JsToDoc Ident   where jsToDocR r = renderJsI r r
-instance JsToDoc [JExpr] where jsToDocR r = vcat . map ((<> semi) . jsToDocR r)
-instance JsToDoc [JStat] where jsToDocR r = vcat . map ((<> semi) . jsToDocR r)
+instance JsToDoc [JExpr] where jsToDocR r = jcat . map (addSemi . jsToDocR r)
+instance JsToDoc [JStat] where jsToDocR r = jcat . map (addSemi . jsToDocR r)
 
-defRenderJsS :: RenderJs -> JStat -> Doc
+defRenderJsS :: JsRender doc => RenderJs doc -> JStat -> doc
 defRenderJsS r = \case
-  IfStat cond x y -> hangBrace (text "if" <> parens (jsToDocR r cond))
-                      (jsToDocR r x)
-                      $$ mbElse
-        where mbElse | y == BlockStat []  = PP.empty
-                     | otherwise = hangBrace (text "else") (jsToDocR r y)
+  IfStat cond x y -> hangBrace (text "if" <+?> parens (jsToDocR r cond))
+                      (jnest $ optBlock r x)
+                      <+?> mbElse
+        where mbElse | y == BlockStat []  = empty
+                     | otherwise = hangBrace (text "else") (jnest $ optBlock r y)
   DeclStat x Nothing  -> text "var" <+> jsToDocR r x
-  DeclStat x (Just e) -> text "var" <+> jsToDocR r x <+> char '=' <+> jsToDocR r e
-  WhileStat False p b -> hangBrace (text "while" <> parens (jsToDocR r p)) (jsToDocR r b)
-  WhileStat True  p b -> (hangBrace (text "do") (jsToDocR r b)) $+$ text "while" <+> parens (jsToDocR r p)
-  BreakStat l         -> maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
-  ContinueStat l      -> maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
-  LabelStat (LexicalFastString l) s -> ftext l <> char ':' $$ printBS s
+  DeclStat x (Just e) -> text "var" <+> jsToDocR r x <+?> char '=' <+?> jsToDocR r e
+  WhileStat False p b -> hangBrace (text "while" <+?> parens (jsToDocR r p)) (jnest $ optBlock r b)
+  WhileStat True  p b -> hangBrace (text "do") (jnest $ optBlock r b) <+?> text "while" <+?> parens (jsToDocR r p)
+  BreakStat l         -> addSemi $ maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
+  ContinueStat l      -> addSemi $ maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
+  LabelStat (LexicalFastString l) s -> ftext l <> char ':' $$$ printBS s
         where
-          printBS (BlockStat ss) = vcat $ interSemi $ map (jsToDocR r) ss
+          printBS (BlockStat ss) = interSemi $ map (jsToDocR r) ss
           printBS x = jsToDocR r x
 
-  ForStat init p s1 sb -> hangBrace (text "for" <> forCond) (jsToDocR r sb)
+  ForStat init p s1 sb -> hangBrace (text "for" <+?> parens forCond) (jnest $ optBlock r sb)
     where
-      forCond = parens $ hcat $ interSemi
-                            [ jsToDocR r init
-                            , jsToDocR r p
-                            , parens (jsToDocR r s1)
-                            ]
-  ForInStat each i e b -> hangBrace (text txt <> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e)) (jsToDocR r b)
+      forCond = jsToDocR r init <> semi <+?> jsToDocR r p <> semi <+?> parens (jsToDocR r s1)
+  ForInStat each i e b -> hangBrace (text txt <+?> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e)) (jnest $ optBlock r b)
         where txt | each = "for each"
                   | otherwise = "for"
-  SwitchStat e l d     -> hangBrace (text "switch" <+> parens (jsToDocR r e)) cases
-        where l' = map (\(c,s) -> (text "case" <+> parens (jsToDocR r c) <> char ':') $$$ (jsToDocR r s)) l ++ [text "default:" $$$ (jsToDocR r d)]
-              cases = vcat l'
+  SwitchStat e l d     -> hangBrace (text "switch" <+?> parens (jsToDocR r e)) cases
+        where l' = map (\(c,s) -> (text "case" <+?> parens (jsToDocR r c) <> colon) $$$ jnest (optBlock r s)) l
+                   ++ [(text "default:") $$$ jnest (optBlock r d)]
+              cases = foldl1 ($$$) l'
   ReturnStat e      -> text "return" <+> jsToDocR r e
-  ApplStat e es     -> jsToDocR r e <> (parens . hsep . punctuate comma $ map (jsToDocR r) es)
+  ApplStat e es     -> jsToDocR r e <> (parens . foldl' (<+?>) empty . punctuate comma $ map (jsToDocR r) es)
   FuncStat i is b   -> hangBrace (text "function" <+> jsToDocR r i
-                                  <> parens (fsep . punctuate comma . map (jsToDocR r) $ is))
-                             (jsToDocR r b)
-  TryStat s i s1 s2 -> hangBrace (text "try") (jsToDocR r s) $$ mbCatch $$ mbFinally
-        where mbCatch | s1 == BlockStat [] = PP.empty
-                      | otherwise = hangBrace (text "catch" <> parens (jsToDocR r i)) (jsToDocR r s1)
-              mbFinally | s2 == BlockStat [] = PP.empty
-                        | otherwise = hangBrace (text "finally") (jsToDocR r s2)
+                                  <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is))
+                             (jnest $ optBlock r b)
+  TryStat s i s1 s2 -> hangBrace (text "try") (jsToDocR r s) <+?> mbCatch <+?> mbFinally
+        where mbCatch | s1 == BlockStat [] = empty
+                      | otherwise = hangBrace (text "catch" <+?> parens (jsToDocR r i)) (jnest $ optBlock r s1)
+              mbFinally | s2 == BlockStat [] = empty
+                        | otherwise = hangBrace (text "finally") (jnest $ optBlock r s2)
   AssignStat i op x    -> case x of
     -- special treatment for functions, otherwise there is too much left padding
     -- (more than the length of the expression assigned to). E.g.
@@ -183,36 +183,41 @@ defRenderJsS r = \case
     --                               ...
     --                             });
     --
-    ValExpr (JFunc is b) -> sep [jsToDocR r i <+> ftext (aOpText op) <+> text " function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is) <> char '{', nest 2 (jsToDocR r b), text "}"]
-    _                      -> jsToDocR r i <+> ftext (aOpText op) <+> jsToDocR r x
+    ValExpr (JFunc is b) -> jsToDocR r i <> ftext (aOpText op) <> text " function" <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is) <> braceNest (jsToDocR r b)
+    _                      -> jsToDocR r i <+?> ftext (aOpText op) <+?> jsToDocR r x
   UOpStat op x
     | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
-    | isPre op                 -> ftext (uOpText op) <> optParens r x
-    | otherwise                -> optParens r x <> ftext (uOpText op)
+    | isPre op                 -> ftext (uOpText op) <+> optParens r x
+    | otherwise                -> optParens r x <+> ftext (uOpText op)
   BlockStat xs -> jsToDocR r xs
 
-optParens :: RenderJs -> JExpr -> Doc
+optBlock :: JsRender doc => RenderJs doc -> JStat -> doc
+optBlock r x = case x of
+  BlockStat{} -> jsToDocR r x
+  _           -> addSemi $ jsToDocR r x
+
+optParens :: JsRender doc => RenderJs doc -> JExpr -> doc
 optParens r x = case x of
   UOpExpr _ _ -> parens (jsToDocR r x)
   _           -> jsToDocR r x
 
-defRenderJsE :: RenderJs -> JExpr -> Doc
+defRenderJsE :: JsRender doc => RenderJs doc -> JExpr -> doc
 defRenderJsE r = \case
   ValExpr x         -> jsToDocR r x
   SelExpr x y       -> jsToDocR r x <> char '.' <> jsToDocR r y
   IdxExpr x y       -> jsToDocR r x <> brackets (jsToDocR r y)
-  IfExpr x y z      -> parens (jsToDocR r x <+> char '?' <+> jsToDocR r y <+> char ':' <+> jsToDocR r z)
-  InfixExpr op x y  -> parens $ hsep [jsToDocR r x, ftext (opText op), jsToDocR r y]
+  IfExpr x y z      -> parens (jsToDocR r x <+?> char '?' <+?> jsToDocR r y <+?> colon <+?> jsToDocR r z)
+  InfixExpr op x y  -> parens $ jsToDocR r x <+?> ftext (opText op) <+?> jsToDocR r y
   UOpExpr op x
     | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
-    | isPre op                 -> ftext (uOpText op) <> optParens r x
-    | otherwise                -> optParens r x <> ftext (uOpText op)
-  ApplExpr je xs -> jsToDocR r je <> (parens . hsep . punctuate comma $ map (jsToDocR r) xs)
+    | isPre op                 -> ftext (uOpText op) <+> optParens r x
+    | otherwise                -> optParens r x <+> ftext (uOpText op)
+  ApplExpr je xs -> jsToDocR r je <> (parens . foldl' (<+?>) empty . punctuate comma $ map (jsToDocR r) xs)
 
-defRenderJsV :: RenderJs -> JVal -> Doc
+defRenderJsV :: JsRender doc => RenderJs doc -> JVal -> doc
 defRenderJsV r = \case
   JVar i    -> jsToDocR r i
-  JList xs  -> brackets . hsep . punctuate comma $ map (jsToDocR r) xs
+  JList xs  -> brackets . foldl' (<+?>) empty . punctuate comma $ map (jsToDocR r) xs
   JDouble (SaneDouble d)
     | d < 0 || isNegativeZero d -> parens (double d)
     | otherwise                 -> double d
@@ -220,17 +225,17 @@ defRenderJsV r = \case
     | i < 0     -> parens (integer i)
     | otherwise -> integer i
   JStr   s -> pprStringLit s
-  JRegEx s -> hcat [char '/',ftext s, char '/']
+  JRegEx s -> char '/' <> ftext s <> char '/'
   JHash m
     | isNullUniqMap m  -> text "{}"
-    | otherwise -> braceNest . hsep . punctuate comma .
-                          map (\(x,y) -> squotes (ftext x) <> colon <+> jsToDocR r y)
+    | otherwise -> braceNest . foldl' (<+?>) empty . punctuate comma .
+                          map (\(x,y) -> char '\'' <> ftext x <> char '\'' <> colon <+?> jsToDocR r y)
                           -- nonDetKeysUniqMap doesn't introduce non-determinism here
                           -- because we sort the elements lexically
                           $ sortOn (LexicalFastString . fst) (nonDetUniqMapToList m)
-  JFunc is b -> parens $ hangBrace (text "function" <> parens (hsep . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
+  JFunc is b -> parens $ hangBrace (text "function" <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is)) (jsToDocR r b)
 
-defRenderJsI :: RenderJs -> Ident -> Doc
+defRenderJsI :: JsRender doc => RenderJs doc -> Ident -> doc
 defRenderJsI _ (TxtI t) = ftext t
 
 aOpText :: AOp -> FastString
@@ -298,17 +303,17 @@ isAlphaOp = \case
   VoidOp   -> True
   _        -> False
 
-pprStringLit :: FastString -> Doc
-pprStringLit s = hcat [char '\"',encodeJson s, char '\"']
+pprStringLit :: IsLine doc => FastString -> doc
+pprStringLit s = char '\"' <> encodeJson s <> char '\"'
 
 --------------------------------------------------------------------------------
 --                            Utilities
 --------------------------------------------------------------------------------
 
-encodeJson :: FastString -> Doc
+encodeJson :: IsLine doc => FastString -> doc
 encodeJson xs = hcat (map encodeJsonChar (unpackFS xs))
 
-encodeJsonChar :: Char -> Doc
+encodeJsonChar :: IsLine doc => Char -> doc
 encodeJsonChar = \case
   '/'  -> text "\\/"
   '\b' -> text "\\b"
@@ -329,24 +334,54 @@ encodeJsonChar = \case
             let h = showHex cp ""
             in  text (prefix ++ replicate (pad - length h) '0' ++ h)
 
-braceNest :: Doc -> Doc
-braceNest x = char '{' <+> nest 2 x $$ char '}'
 
-interSemi :: [Doc] -> [Doc]
-interSemi []     = []
-interSemi [s]    = [s]
-interSemi (x:xs) = x <> text ";" : interSemi xs
+interSemi :: JsRender doc => [doc] -> doc
+interSemi = foldl ($$$) empty . punctuateFinal semi semi
 
-addSemi :: Doc -> Doc
-addSemi x = x <> text ";"
+addSemi :: IsLine doc => doc -> doc
+addSemi x = x <> semi <> char '\n'
 
--- | Hang with braces:
---
---  hdr {
---    body
---  }
-hangBrace :: Doc -> Doc -> Doc
-hangBrace hdr body = sep [ hdr <> char ' ' <> char '{', nest 2 body, char '}' ]
+-- | The structure `{body}`, optionally indented over multiple lines
+{-# INLINE braceNest #-}
+braceNest :: JsRender doc => doc -> doc
+braceNest x = lbrace $$$ jnest x $$$ rbrace
 
-($$$) :: Doc -> Doc -> Doc
-x $$$ y = nest 2 $ x $+$ y
+-- | The structure `hdr {body}`, optionally indented over multiple lines
+{-# INLINE hangBrace #-}
+hangBrace :: JsRender doc => doc -> doc -> doc
+hangBrace hdr body = hdr <+?> braceNest body
+
+-- | JsRender controls the differences in whitespace between HLine and SDoc.
+-- Generally, this involves the indentation and newlines in the human-readable
+-- SDoc implementation being replaced in the HLine version by the minimal
+-- whitespace required for valid JavaScript syntax.
+class IsLine doc => JsRender doc where
+
+  -- | Concatenate with an optional single space
+  (<+?>)    :: doc -> doc -> doc
+  -- | Concatenate with an optional newline
+  ($$$)     :: doc -> doc -> doc
+  -- | Concatenate these `doc`s, either vertically (SDoc) or horizontally (HLine)
+  jcat      :: [doc] -> doc
+  -- | Optionally indent the following
+  jnest     :: doc -> doc
+
+instance JsRender SDoc where
+  (<+?>) = (<+>)
+  {-# INLINE (<+?>) #-}
+  ($$$)  = ($$)
+  {-# INLINE ($$$) #-}
+  jcat               = vcat
+  {-# INLINE jcat #-}
+  jnest              = nest 2
+  {-# INLINE jnest #-}
+
+instance JsRender HLine where
+  (<+?>) = (<>)
+  {-# INLINE (<+?>) #-}
+  ($$$)  = (<>)
+  {-# INLINE ($$$) #-}
+  jcat               = hcat
+  {-# INLINE jcat #-}
+  jnest              = id
+  {-# INLINE jnest #-}

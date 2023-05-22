@@ -31,7 +31,7 @@ import GHC.Exts
 import GHC.JS.Syntax
 import GHC.JS.Ppr
 
-import GHC.Utils.Ppr      as PP
+import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
 
@@ -39,10 +39,10 @@ import Data.List (sortOn)
 import Data.Char (isAlpha,isDigit,ord)
 import qualified Data.ByteString.Short as SBS
 
-pretty :: JStat -> Doc
+pretty :: JsRender doc => JStat -> doc
 pretty = jsToDocR ghcjsRenderJs
 
-ghcjsRenderJs :: RenderJs
+ghcjsRenderJs :: RenderJs doc
 ghcjsRenderJs = defaultRenderJs
   { renderJsV = ghcjsRenderJsV
   , renderJsS = ghcjsRenderJsS
@@ -52,7 +52,7 @@ ghcjsRenderJs = defaultRenderJs
 hdd :: SBS.ShortByteString
 hdd = SBS.pack (map (fromIntegral . ord) "h$$")
 
-ghcjsRenderJsI :: RenderJs -> Ident -> Doc
+ghcjsRenderJsI :: IsLine doc => RenderJs doc -> Ident -> doc
 ghcjsRenderJsI _ (TxtI fs)
   -- Fresh symbols are prefixed with "h$$". They aren't explicitly referred by
   -- name in user code, only in compiled code. Hence we can rename them if we do
@@ -75,7 +75,7 @@ ghcjsRenderJsI _ (TxtI fs)
 
 -- | Render as an hexadecimal number in reversed order (because it's faster and we
 -- don't care about the actual value).
-hexDoc :: Word -> Doc
+hexDoc :: IsLine doc => Word -> doc
 hexDoc 0 = char '0'
 hexDoc v = text $ go v
   where
@@ -91,23 +91,23 @@ hexDoc v = text $ go v
 
 
 -- attempt to resugar some of the common constructs
-ghcjsRenderJsS :: RenderJs -> JStat -> Doc
+ghcjsRenderJsS :: JsRender doc => RenderJs doc -> JStat -> doc
 ghcjsRenderJsS r s = renderJsS defaultRenderJs r s
 
 -- don't quote keys in our object literals, so closure compiler works
-ghcjsRenderJsV :: RenderJs -> JVal -> Doc
+ghcjsRenderJsV :: JsRender doc => RenderJs doc -> JVal -> doc
 ghcjsRenderJsV r (JHash m)
   | isNullUniqMap m = text "{}"
-  | otherwise       = braceNest . PP.fsep . punctuate comma .
-                          map (\(x,y) -> quoteIfRequired x <> PP.colon <+> jsToDocR r y)
+  | otherwise       = braceNest . fsep . punctuate comma .
+                          map (\(x,y) -> quoteIfRequired x <> colon <+> jsToDocR r y)
                           -- nonDetEltsUniqMap doesn't introduce non-determinism here because
                           -- we sort the elements lexically
                           . sortOn (LexicalFastString . fst) $ nonDetUniqMapToList m
   where
-    quoteIfRequired :: FastString -> Doc
+    quoteIfRequired :: IsLine doc => FastString -> doc
     quoteIfRequired x
       | isUnquotedKey x = ftext x
-      | otherwise       = PP.squotes (ftext x)
+      | otherwise       = char '\'' <> ftext x <> char '\''
 
     isUnquotedKey :: FastString -> Bool
     isUnquotedKey fs = case unpackFS fs of

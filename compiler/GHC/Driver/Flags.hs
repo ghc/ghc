@@ -314,6 +314,9 @@ data GeneralFlag
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
 
+   -- JavaScript opts
+   | Opt_DisableJsMinifier -- ^ render JavaScript pretty-printed instead of minified (compacted)
+
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries

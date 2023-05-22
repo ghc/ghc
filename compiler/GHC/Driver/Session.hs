@@ -1863,6 +1863,10 @@ dynamic_flags_deps = [
     , (Deprecated,    customOrUnrecognisedWarning "fno-warn-"  unSetCustomWarningFlag)
     ]
 
+     ------ JavaScript flags -----------------------------------------------
+ ++ [ make_ord_flag defFlag "ddisable-js-minifier" (NoArg (setGeneralFlag Opt_DisableJsMinifier))
+    ]
+
      ------ Language flags -------------------------------------------------
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps

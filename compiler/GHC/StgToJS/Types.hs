@@ -86,6 +86,7 @@ data StgToJSConfig = StgToJSConfig
   , csInlineLoadRegs  :: !Bool
   , csInlineEnter     :: !Bool
   , csInlineAlloc     :: !Bool
+  , csPrettyRender    :: !Bool
   , csTraceRts        :: !Bool
   , csAssertRts       :: !Bool
   , csBoundsCheck     :: !Bool

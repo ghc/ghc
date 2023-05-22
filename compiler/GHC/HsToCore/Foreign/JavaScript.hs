@@ -184,7 +184,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
                         ) <> semi
           _ -> empty
 
-  strlit xs = docToSDoc (pprStringLit xs)
+  strlit xs = pprStringLit xs
 
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun
