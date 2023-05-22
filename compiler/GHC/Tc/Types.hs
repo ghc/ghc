@@ -56,7 +56,7 @@ module GHC.Tc.Types(
         CompleteMatch, CompleteMatches,
 
         -- Template Haskell
-        ThStage(..), SpliceType(..), PendingStuff(..),
+        ThStage(..), SpliceType(..), SpliceOrBracket(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
         ForeignSrcLang(..), THDocs, DocLoc(..),
@@ -974,6 +974,7 @@ getPlatform = targetPlatform <$> getDynFlags
 ---------------------------
 
 data SpliceType = Typed | Untyped
+data SpliceOrBracket = IsSplice | IsBracket
 
 data ThStage    -- See Note [Template Haskell state diagram]
                 -- and Note [Template Haskell levels] in GHC.Tc.Gen.Splice

@@ -1,0 +1,5 @@
+
+TH_NestedSplicesFail3.hs:4:12: error: [GHC-45108]
+    • Untyped brackets may not appear in typed splices.
+    • In the Template Haskell quotation [| 'x' |]
+      In the typed splice: $$([| 'x' |])

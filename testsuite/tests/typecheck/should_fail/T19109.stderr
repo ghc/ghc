@@ -1,4 +1,4 @@
 
-T19109.hs:6:4: error:
-    Illegal visible type application in a pattern: ‘@Int’
-      Perhaps you intended to use TypeAbstractions
+T19109.hs:6:4: error: [GHC-17916]
+    Illegal visible type application in a pattern: @Int
+    Suggested fix: Perhaps you intended to use TypeAbstractions

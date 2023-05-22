@@ -57,7 +57,6 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 
-import GHC.Types.Error
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
@@ -77,7 +76,7 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard, unless )
+import Control.Monad       ( when, ap, guard )
 import Data.Foldable
 import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
@@ -642,15 +641,11 @@ rnConPatAndThen mk con (PrefixCon tyargs pats)
         }
   where
     check_lang_exts :: RnM ()
-    check_lang_exts = do
-      type_abs <- xoptM LangExt.TypeAbstractions
-      unless type_abs $
-        case listToMaybe tyargs of
-          Nothing -> pure ()
-          Just tyarg -> addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-            hang (text "Illegal visible type application in a pattern:"
-                    <+> quotes (ppr tyarg))
-               2 (text "Perhaps you intended to use TypeAbstractions")
+    check_lang_exts =
+      unlessXOptM LangExt.TypeAbstractions $
+        for_ (listToMaybe tyargs) $ \ arg ->
+          addErrTc $ TcRnTypeApplicationsDisabled (TypeApplicationInPattern arg)
+
     rnConPatTyArg (HsConPatTyArg at t) = do
       t' <- liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
       return (HsConPatTyArg at t')

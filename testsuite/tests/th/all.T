@@ -43,6 +43,14 @@ test('TH_spliceE6', normal, compile, ['-v0'])
 
 test('TH_NestedSplices', [], multimod_compile,
      ['TH_NestedSplices.hs', '-v0 ' + config.ghc_th_way_flags])
+test('TH_NestedSplicesFail1', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail2', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail3', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail4', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail5', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail6', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail7', normal, compile_fail, ['-v0'])
+test('TH_NestedSplicesFail8', normal, compile_fail, ['-v0'])
 
 # Testing profiling with TH is a bit tricky (when not using
 # -fexternal-interpreter); we've already disabled

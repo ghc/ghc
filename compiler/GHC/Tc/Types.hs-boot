@@ -15,6 +15,9 @@ instance Outputable TcIdSigInfo
 data TcTyThing
 instance Outputable TcTyThing
 
+data SpliceType = Typed | Untyped
+data SpliceOrBracket = IsSplice | IsBracket
+
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv
 getLclEnvTcLevel :: TcLclEnv -> TcLevel
 

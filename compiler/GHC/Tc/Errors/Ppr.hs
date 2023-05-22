@@ -58,7 +58,9 @@ import GHC.Hs
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.Constraint
-import {-# SOURCE #-} GHC.Tc.Types( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing, pprTcTyThingCategory )
+import {-# SOURCE #-} GHC.Tc.Types
+  ( getLclEnvLoc, lclEnvInGeneratedCode, TcTyThing, pprTcTyThingCategory
+  , SpliceType(..), SpliceOrBracket(..))
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Utils.TcType
@@ -1859,14 +1861,23 @@ instance Diagnostic TcRnMessage where
     TcRnQualifiedBinder rdr_name
       -> mkSimpleDecorated $
          text "Qualified name in binding position:" <+> ppr rdr_name
-    TcRnTypeApplicationsDisabled tok t
+    TcRnTypeApplicationsDisabled ty_app
       -> mkSimpleDecorated $
-         text "Illegal visible" <+> text what <+> text "application"
-         <+> quotes (char '@' <> ppr t)
+         text "Illegal visible" <+> what <+> text "application" <+> ctx <> colon
+           <+> ppr arg
          where
-           what = case tok of
-             TypeLevel -> "type"
-             KindLevel -> "kind"
+           arg = case ty_app of
+            TypeApplication ty _ -> char '@' <> ppr ty
+            TypeApplicationInPattern ty_app -> ppr ty_app
+           what = case ty_app of
+             TypeApplication _ ty_or_ki ->
+              case ty_or_ki of
+                TypeLevel -> text "type"
+                KindLevel -> text "kind"
+             TypeApplicationInPattern _ -> text "type"
+           ctx = case ty_app of
+            TypeApplicationInPattern _ -> text "in a pattern"
+            _                          -> empty
     TcRnInvalidRecordField con field
       -> mkSimpleDecorated $
          hsep [text "Constructor" <+> quotes (ppr con),
@@ -1939,6 +1950,30 @@ instance Diagnostic TcRnMessage where
         ambig_msg = case lookups of
           Just (_:_:_) -> text "The type is ambiguous."
           _            -> empty
+    TcRnIllegalQuasiQuotes -> mkSimpleDecorated $
+      text "Quasi-quotes are not permitted without QuasiQuotes"
+    TcRnIllegalTHQuotes expr -> mkSimpleDecorated $
+      text "Syntax error on" <+> ppr expr
+    TcRnIllegalTHSplice -> mkSimpleDecorated $
+      text "Top-level splices are not permitted without TemplateHaskell"
+    TcRnMismatchedSpliceType splice_type inner_splice_or_bracket ->
+      mkSimpleDecorated $
+        inner <+> text "may not appear in" <+> outer <> dot
+        where
+          (inner, outer) = case inner_splice_or_bracket of
+            IsSplice -> case splice_type of
+              Typed   -> (text "Typed splices"  , text "untyped brackets")
+              Untyped -> (text "Untyped splices", text "typed brackets")
+            IsBracket ->
+              case splice_type of
+              Typed   -> (text "Untyped brackets", text "typed splices")
+              Untyped -> (text "Typed brackets"  , text "untyped splices")
+    TcRnNestedTHBrackets -> mkSimpleDecorated $
+      text "Template Haskell brackets cannot be nested" <+>
+      text "(without intervening splices)"
+    TcRnQuotedNameWrongStage quote -> mkSimpleDecorated $
+      sep [ text "Stage error: the non-top-level quoted name" <+> ppr quote
+          , text "must be used at the same stage at which it is bound" ]
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2286,6 +2321,18 @@ instance Diagnostic TcRnMessage where
     TcRnNoExplicitAssocTypeOrDefaultDeclaration{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnIllegalTypeData
+      -> ErrorWithoutFlag
+    TcRnQuotedNameWrongStage {}
+      -> ErrorWithoutFlag
+    TcRnIllegalQuasiQuotes{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTHQuotes{}
+      -> ErrorWithoutFlag
+    TcRnIllegalTHSplice{}
+      -> ErrorWithoutFlag
+    TcRnNestedTHBrackets{}
+      -> ErrorWithoutFlag
+    TcRnMismatchedSpliceType{}
       -> ErrorWithoutFlag
     TcRnTypeDataForbids{}
       -> ErrorWithoutFlag
@@ -2931,6 +2978,18 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalHsigDefaultMethods{}
       -> noHints
+    TcRnQuotedNameWrongStage {}
+      -> noHints
+    TcRnIllegalQuasiQuotes{}
+      -> [suggestExtension LangExt.QuasiQuotes]
+    TcRnIllegalTHQuotes{}
+      -> [suggestAnyExtension [LangExt.TemplateHaskell, LangExt.TemplateHaskellQuotes]]
+    TcRnIllegalTHSplice{}
+      -> [suggestExtension LangExt.TemplateHaskell]
+    TcRnNestedTHBrackets{}
+      -> noHints
+    TcRnMismatchedSpliceType{}
+      -> noHints
     TcRnHsigFixityMismatch{}
       -> noHints
     TcRnHsigShapeMismatch{}
@@ -3243,8 +3302,12 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnQualifiedBinder{}
       -> noHints
-    TcRnTypeApplicationsDisabled{}
-      -> [suggestExtension LangExt.TypeApplications]
+    TcRnTypeApplicationsDisabled ty_app
+      -> case ty_app of
+          TypeApplication {}
+            -> [suggestExtension LangExt.TypeApplications]
+          TypeApplicationInPattern {}
+            -> [suggestExtension LangExt.TypeAbstractions]
     TcRnInvalidRecordField{}
       -> noHints
     TcRnTupleTooLarge{}

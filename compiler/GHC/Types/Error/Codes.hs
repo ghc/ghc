@@ -596,7 +596,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnusedRecordWildcard"                      = 83475
   GhcDiagnosticCode "TcRnUnusedName"                                = 40910
   GhcDiagnosticCode "TcRnQualifiedBinder"                           = 28329
-  GhcDiagnosticCode "TcRnTypeApplicationsDisabled"                  = 23482
   GhcDiagnosticCode "TcRnInvalidRecordField"                        = 53822
   GhcDiagnosticCode "TcRnTupleTooLarge"                             = 94803
   GhcDiagnosticCode "TcRnCTupleTooLarge"                            = 89347
@@ -612,6 +611,16 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnGhciMonadLookupFail"                       = 44990
   GhcDiagnosticCode "TcRnArityMismatch"                             = 27346
   GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
+  GhcDiagnosticCode "TcRnIllegalQuasiQuotes"                        = 77343
+  GhcDiagnosticCode "TcRnMismatchedSpliceType"                      = 45108
+  GhcDiagnosticCode "TcRnIllegalTHQuotes"                           = 62558
+  GhcDiagnosticCode "TcRnIllegalTHSplice"                           = 26759
+  GhcDiagnosticCode "TcRnNestedTHBrackets"                          = 59185
+  GhcDiagnosticCode "TcRnQuotedNameWrongStage"                      = 57695
+
+  -- TcRnTypeApplicationsDisabled
+  GhcDiagnosticCode "TypeApplication"                               = 23482
+  GhcDiagnosticCode "TypeApplicationInPattern"                      = 17916
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -895,6 +904,7 @@ type family ConRecursInto con where
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
   ConRecursInto "TcRnNonCanonicalDefinition" = 'Just NonCanonicalDefinition
   ConRecursInto "TcRnIllegalInstanceDecl"    = 'Just IllegalInstanceReason
+  ConRecursInto "TcRnTypeApplicationsDisabled" = 'Just TypeApplication
 
     -- Illegal instance reasons
 

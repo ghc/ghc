@@ -80,13 +80,8 @@ import qualified GHC.LanguageExtensions as LangExt
 -- Check that -XTemplateHaskellQuotes is enabled and available
 checkForTemplateHaskellQuotes :: HsExpr GhcPs ->  RnM ()
 checkForTemplateHaskellQuotes e =
-    do { thQuotesEnabled <- xoptM LangExt.TemplateHaskellQuotes
-       ; unless thQuotesEnabled $
-           failWith ( mkTcRnUnknownMessage $ mkPlainError noHints $ vcat
-                      [ text "Syntax error on" <+> ppr e
-                      , text ("Perhaps you intended to use TemplateHaskell"
-                              ++ " or TemplateHaskellQuotes") ] )
-       }
+  unlessXOptM LangExt.TemplateHaskellQuotes $
+    failWith $ TcRnIllegalTHQuotes e
 
 rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedBracket e br_body
@@ -97,13 +92,13 @@ rnTypedBracket e br_body
        ; cur_stage <- getStage
        ; case cur_stage of
            { Splice Typed   -> return ()
-           ; Splice Untyped -> failWithTc illegalTypedBracket
+           ; Splice Untyped -> failWithTc $ TcRnMismatchedSpliceType Untyped IsBracket
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnTypedBracket: Renaming typed bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> failWithTc illegalBracket
+           ; Brack {}       -> failWithTc TcRnNestedTHBrackets
            }
 
          -- Brackets are desugared to code that mentions the TH package
@@ -124,14 +119,14 @@ rnUntypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice Typed   -> failWithTc illegalUntypedBracket
+           { Splice Typed   -> failWithTc $ TcRnMismatchedSpliceType Typed IsBracket
            ; Splice Untyped -> return ()
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnUntypedBracket: Renaming untyped bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> failWithTc illegalBracket
+           ; Brack {}       -> failWithTc TcRnNestedTHBrackets
            }
 
          -- Brackets are desugared to code that mentions the TH package
@@ -170,7 +165,7 @@ rn_utbracket outer_stage br@(VarBr x flg rdr_name)
                                       (ppr name <+> ppr bind_lvl
                                                 <+> ppr outer_stage)
                                    ; checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                             (quotedNameStageErr br) }
+                                             (TcRnQuotedNameWrongStage br) }
                         }
                     }
        ; return (VarBr x flg (noLocA name), unitFV name) }
@@ -232,26 +227,6 @@ untypedQuotationCtxtDoc br_body
   = hang (text "In the Template Haskell quotation")
          2 (ppr br_body)
 
-illegalBracket :: TcRnMessage
-illegalBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
-    text "Template Haskell brackets cannot be nested" <+>
-    text "(without intervening splices)"
-
-illegalTypedBracket :: TcRnMessage
-illegalTypedBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
-    text "Typed brackets may only appear in typed splices."
-
-illegalUntypedBracket :: TcRnMessage
-illegalUntypedBracket = mkTcRnUnknownMessage $ mkPlainError noHints $
-    text "Untyped brackets may only appear in untyped splices."
-
-quotedNameStageErr :: HsQuote GhcPs -> TcRnMessage
-quotedNameStageErr br
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
-        , text "must be used at the same stage at which it is bound" ]
-
-
 {-
 *********************************************************
 *                                                      *
@@ -299,7 +274,7 @@ rnUntypedSpliceGen run_splice pend_splice splice
     { stage <- getStage
     ; case stage of
         Brack _ RnPendingTyped
-          -> failWithTc illegalUntypedSplice
+          -> failWithTc $ TcRnMismatchedSpliceType Untyped IsSplice
 
         Brack pop_stage (RnPendingUntyped ps_var)
           -> do { (splice', fvs) <- setStage pop_stage $
@@ -326,15 +301,12 @@ rnUntypedSpliceGen run_splice pend_splice splice
 -- are not executed until the top-level splice is run.
 checkTopSpliceAllowed :: HsUntypedSplice GhcPs -> RnM ()
 checkTopSpliceAllowed splice = do
-  let (herald, ext) = spliceExtension splice
-  extEnabled <- xoptM ext
-  unless extEnabled
-    (failWith $ mkTcRnUnknownMessage $ mkPlainError noHints $
-       text herald <+> text "are not permitted without" <+> ppr ext)
+  let (ext, err) = spliceExtension splice
+  unlessXOptM ext $ failWith err
   where
-     spliceExtension :: HsUntypedSplice GhcPs -> (String, LangExt.Extension)
-     spliceExtension (HsQuasiQuote {}) = ("Quasi-quotes", LangExt.QuasiQuotes)
-     spliceExtension (HsUntypedSpliceExpr {}) = ("Top-level splices", LangExt.TemplateHaskell)
+    spliceExtension :: HsUntypedSplice GhcPs -> (LangExt.Extension, TcRnMessage)
+    spliceExtension (HsQuasiQuote {}) = (LangExt.QuasiQuotes, TcRnIllegalQuasiQuotes)
+    spliceExtension (HsUntypedSpliceExpr {}) = (LangExt.TemplateHaskell, TcRnIllegalTHSplice)
 
 ------------------
 
@@ -456,13 +428,10 @@ rnTypedSplice expr
           -> setStage pop_stage rn_splice
 
         Brack _ (RnPendingUntyped _)
-          -> failWithTc illegalTypedSplice
+          -> failWithTc $ TcRnMismatchedSpliceType Typed IsSplice
 
-        _ -> do { extEnabled <- xoptM LangExt.TemplateHaskell
-                ; unless extEnabled
-                    (failWith $ mkTcRnUnknownMessage $ mkPlainError noHints $
-                       text "Top-level splices are not permitted without"
-                         <+> ppr LangExt.TemplateHaskell)
+        _ -> do { unlessXOptM LangExt.TemplateHaskell
+                    (failWith TcRnIllegalTHSplice)
 
                 ; (result, fvs1) <- checkNoErrs $ setStage (Splice Typed) rn_splice
                   -- checkNoErrs: don't attempt to run the splice if
@@ -895,14 +864,6 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
     spliceCodeDoc loc
       = vcat [ text "--" <+> ppr loc <> colon <+> text "Splicing" <+> text sd
              , gen ]
-
-illegalTypedSplice :: TcRnMessage
-illegalTypedSplice = mkTcRnUnknownMessage $ mkPlainError noHints $
-  text "Typed splices may not appear in untyped brackets"
-
-illegalUntypedSplice :: TcRnMessage
-illegalUntypedSplice = mkTcRnUnknownMessage $ mkPlainError noHints $
-  text "Untyped splices may not appear in typed brackets"
 
 checkThLocalName :: Name -> RnM ()
 checkThLocalName name

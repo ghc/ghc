@@ -106,6 +106,7 @@ module GHC.Tc.Errors.Types (
   , RoleValidationFailedReason(..)
   , DisabledClassExtension(..)
   , TyFamsDisabledReason(..)
+  , TypeApplication(..)
   , HsTypeOrSigType(..)
   , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
@@ -142,7 +143,8 @@ module GHC.Tc.Errors.Types (
 import GHC.Prelude
 
 import GHC.Hs
-import {-# SOURCE #-} GHC.Tc.Types (TcIdSigInfo, TcTyThing)
+import {-# SOURCE #-} GHC.Tc.Types ( TcIdSigInfo, TcTyThing
+                                   , SpliceType, SpliceOrBracket )
 import {-# SOURCE #-} GHC.Tc.Errors.Hole.FitTypes (HoleFit)
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence (EvBindsVar)
@@ -2528,7 +2530,6 @@ data TcRnMessage where
     pragma_warning_defined_mod :: ModuleName
   } -> TcRnMessage
 
-
   {-| TcRnIllegalHsigDefaultMethods is an error that occurs when a binding for
      a class default method is provided in a Backpack signature file.
 
@@ -2599,6 +2600,67 @@ data TcRnMessage where
        testsuite/tests/warnings/minimal/WarnMinimal.hs:
   -}
   TcRnWarningMinimalDefIncomplete :: ClassMinimalDef -> TcRnMessage
+
+  {-| TcRnIllegalQuasiQuotes is an error that occurs when a quasi-quote
+      is used without the QuasiQuotes extension.
+
+      Example:
+
+        foo = [myQuoter|x y z|]
+
+      Test cases: none; the parser fails to parse this if QuasiQuotes is off.
+  -}
+  TcRnIllegalQuasiQuotes :: TcRnMessage
+
+  {-| TcRnIllegalTHQuotes is an error that occurs when a Template Haskell
+     quote is used without the TemplateHaskell extension enabled.
+
+     Test case: T18251e
+  -}
+  TcRnIllegalTHQuotes :: !(HsExpr GhcPs) -> TcRnMessage
+
+  {-| TcRnIllegalTHSplice is an error that occurs when a Template Haskell
+      splice occurs without having enabled the TemplateHaskell extension.
+
+    Test cases:
+      bkpfail01, bkpfail05, bkpfail09, bkpfail16, bkpfail35, bkpcabal06
+  -}
+  TcRnIllegalTHSplice :: TcRnMessage
+
+  {-| TcRnNestedTHBrackets is an error that occurs when Template Haskell
+      brackets are nested without any intervening splices.
+
+      Example:
+
+        foo = [| [| 'x' |] |]
+
+      Test cases: TH_NestedSplicesFail{5,6,7,8}
+  -}
+  TcRnNestedTHBrackets :: TcRnMessage
+
+  {-| TcRnMismatchedSpliceType is an error that happens when a typed bracket
+      or splice is used inside a typed splice/bracket, or the other way around.
+
+      Examples:
+
+        f1 = [| $$x |]
+        f2 = [|| $y ||]
+        f3 = $$( [| 'x' |] )
+        f4 = $( [|| 'y' ||] )
+
+      Test cases: TH_NestedSplicesFail{1,2,3,4}
+  -}
+  TcRnMismatchedSpliceType :: SpliceType -- ^ type of the splice
+                           -> SpliceOrBracket -- ^ what's nested inside
+                           -> TcRnMessage
+
+  {-| TcRnQuotedNameWrongStage is an error that can happen when a
+      (non-top-level) Name is used at a different Template Haskell stage
+      than the stage at which it is bound.
+
+     Test cases: T16976z
+  -}
+  TcRnQuotedNameWrongStage :: !(HsQuote GhcPs) -> TcRnMessage
 
   {-| TcRnDefaultMethodForPragmaLacksBinding is an error that occurs when
       a default method pragma is missing an accompanying binding.
@@ -4080,8 +4142,7 @@ data TcRnMessage where
     Test cases:
       T12411, T12446, T15527, T16133, T18251c
   -}
-  TcRnTypeApplicationsDisabled :: !TypeOrKind -- ^ Type or kind application
-                               -> !(HsType GhcPs) -- ^ The type being applied
+  TcRnTypeApplicationsDisabled :: !TypeApplication -- ^ what kind of type application is it?
                                -> TcRnMessage
 
   {-| TcRnInvalidRecordField is an error indicating that a record field was
@@ -4226,7 +4287,7 @@ data TcRnMessage where
     -> Maybe [GlobalRdrElt] -- ^ lookup result
     -> TcRnMessage
 
-  {- TcRnMissingRoleAnnotation is a warning that occurs when type declaration
+  {-| TcRnMissingRoleAnnotation is a warning that occurs when type declaration
      doesn't have a role annotatiosn
 
      Controlled by flags:
@@ -5820,6 +5881,11 @@ data TyFamsDisabledReason
   = TyFamsDisabledFamily !Name
   | TyFamsDisabledInstance !TyCon
   deriving (Generic)
+
+data TypeApplication
+  = TypeApplication !(HsType GhcPs) !TypeOrKind
+  | TypeApplicationInPattern !(HsConPatTyArg GhcPs)
+  deriving Generic
 
 -- | Either `HsType p` or `HsSigType p`.
 --
