@@ -899,7 +899,7 @@ mkExport prag_fn residual insoluble qtvs theta
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
-                  else tcSubTypeSigma (Shouldn'tHappenOrigin "mkExport")
+                  else tcSubTypeSigma (ImpedanceMatching poly_id)
                                       sig_ctxt sel_poly_ty poly_ty
                        -- See Note [Impedance matching]
 
@@ -1254,11 +1254,9 @@ Then we want to check that
      forall qtvs. theta => f_mono_ty   is more polymorphic than   f's polytype
 and the proof is the impedance matcher.
 
-Notice that the impedance matcher may do defaulting.  See #7173.
-
-If we've gotten the constraints right during inference (and we assume we have),
-this sub-type check should never fail. It's not really a check -- it's more of
-a procedure to produce the right wrapper.
+The impedance matcher can do defaulting: in the above example, we default
+to Integer because of Num. See #7173. If we're dealing with a nondefaultable
+class, impedance matching can fail. See #23427.
 
 Note [SPECIALISE pragmas]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

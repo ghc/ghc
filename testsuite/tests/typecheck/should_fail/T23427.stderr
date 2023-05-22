@@ -1,0 +1,16 @@
+
+T23427.hs:9:7: error: [GHC-39999]
+    • Could not deduce ‘C a0’
+        arising when matching required constraints
+        in a recursive group involving ‘doTail’
+      from the context: C a
+        bound by the type signature for:
+                   indent :: forall a. C a => a -> a
+        at T23427.hs:6:1-23
+      The type variable ‘a0’ is ambiguous
+    • In an equation for ‘indent’:
+          indent n
+            = doText n
+            where
+                doText x = const (f x) doTail
+                doTail _ = const n doText
