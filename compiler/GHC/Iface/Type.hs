@@ -1937,15 +1937,13 @@ ppr_dco ctxt_prec (IfaceTransDCo co1 co2)
     in maybeParen ctxt_prec opPrec $
         vcat (ppr_dco topPrec co1 : ppr_trans co2)
 ppr_dco ctxt_prec (IfaceDehydrateCo co)
-  = maybeParen ctxt_prec funPrec
-  $ text "Dehydrate" <+> pprParendIfaceCoercion co
+  = ppr_special_co ctxt_prec (text "Dehydrate") [co]
 ppr_dco _ (IfaceUnivDCo prov rhs)
   = text "UnivDCo" <> (parens $
       sep [ pprIfaceUnivCoProv pprParendIfaceDCoercion prov
           , dcolon <+> text "_ ~>" <+> ppr_ty appPrec rhs ])
 ppr_dco ctxt_prec (IfaceSubDCo dco)
-  = maybeParen ctxt_prec appPrec $
-    text "Sub" <+> ppr_dco appPrec dco
+  = ppr_special_dco ctxt_prec (text "SubDCo") [dco]
 
 -- AMG TODO: deduplicate some of the pretty-printing code
 ppr_special_dco :: PprPrec -> SDoc -> [IfaceDCoercion] -> SDoc
