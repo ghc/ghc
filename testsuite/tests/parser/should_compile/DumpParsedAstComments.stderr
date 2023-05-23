@@ -34,23 +34,7 @@
        (EpaComment
         (EpaBlockComment
          "{-/n  Block comment at the beginning/n  -}")
-        { DumpParsedAstComments.hs:1:1-28 }))
-     ,(L
-       (Anchor
-        { DumpParsedAstComments.hs:7:1-20 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaLineComment
-         "-- comment 1 for bar")
-        { DumpParsedAstComments.hs:5:30-34 }))
-     ,(L
-       (Anchor
-        { DumpParsedAstComments.hs:8:1-20 }
-        (UnchangedAnchor))
-       (EpaComment
-        (EpaLineComment
-         "-- comment 2 for bar")
-        { DumpParsedAstComments.hs:7:1-20 }))]
+        { DumpParsedAstComments.hs:1:1-28 }))]
      []))
    (VirtualBraces
     (1))
@@ -70,7 +54,23 @@
                  (AnnListItem
                   [])
                  (EpaComments
-                  [])) { DumpParsedAstComments.hs:9:1-7 })
+                  [(L
+                    (Anchor
+                     { DumpParsedAstComments.hs:7:1-20 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment 1 for bar")
+                     { DumpParsedAstComments.hs:5:30-34 }))
+                  ,(L
+                    (Anchor
+                     { DumpParsedAstComments.hs:8:1-20 }
+                     (UnchangedAnchor))
+                    (EpaComment
+                     (EpaLineComment
+                      "-- comment 2 for bar")
+                     { DumpParsedAstComments.hs:7:1-20
+                        }))])) { DumpParsedAstComments.hs:9:1-7 })
     (ValD
      (NoExtField)
      (FunBind
