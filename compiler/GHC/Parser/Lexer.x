@@ -3816,14 +3816,19 @@ splitPriorComments
   -> ([LEpaComment], [LEpaComment])
 splitPriorComments ss prior_comments =
   let
-    -- True if there is only one line between the earlier and later span
-    cmp later earlier
-         = srcSpanStartLine later - srcSpanEndLine earlier == 1
+    -- True if there is only one line between the earlier and later span,
+    -- And the token preceding the comment is on a different line
+    cmp :: RealSrcSpan -> LEpaComment -> Bool
+    cmp later (L l c)
+         = srcSpanStartLine later - srcSpanEndLine (anchor l) == 1
+          && srcSpanEndLine (ac_prior_tok c) /= srcSpanStartLine (anchor l)
 
-    go decl _ [] = ([],decl)
-    go decl r (c@(L l _):cs) = if cmp r (anchor l)
-                              then go (c:decl) (anchor l) cs
-                              else (reverse (c:cs), decl)
+    go :: [LEpaComment] -> RealSrcSpan -> [LEpaComment]
+       -> ([LEpaComment], [LEpaComment])
+    go decl_comments _ [] = ([],decl_comments)
+    go decl_comments r (c@(L l _):cs) = if cmp r c
+                              then go (c:decl_comments) (anchor l) cs
+                              else (reverse (c:cs), decl_comments)
   in
     go [] ss prior_comments
 
@@ -3837,10 +3842,7 @@ allocatePriorComments ss comment_q mheader_comments =
     cmp (L l _) = anchor l <= ss
     (newAnns,after) = partition cmp comment_q
     comment_q'= after
-    (prior_comments, decl_comments)
-        = case mheader_comments of
-           Strict.Nothing -> (reverse newAnns, [])
-           _ -> splitPriorComments ss newAnns
+    (prior_comments, decl_comments) = splitPriorComments ss newAnns
   in
     case mheader_comments of
       Strict.Nothing -> (Strict.Just prior_comments, comment_q', decl_comments)
