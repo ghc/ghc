@@ -239,6 +239,7 @@ ghc.nix/
 
 # direnv
 .envrc
+.direnv
 
 # Visual Studio Code
 .vscode
