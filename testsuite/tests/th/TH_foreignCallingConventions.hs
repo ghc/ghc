@@ -1,6 +1,9 @@
 {-# LANGUAGE ForeignFunctionInterface, CApiFFI, GHCForeignImportPrim,
-             QuasiQuotes, TemplateHaskell, JavaScriptFFI, MagicHash,
-             UnliftedFFITypes #-}
+             QuasiQuotes, TemplateHaskell, MagicHash,
+             UnliftedFFITypes, CPP #-}
+#if defined(javascript_HOST_ARCH)
+{-# LANGUAGE JavaScriptFFI #-}
+#endif
 
 module TH_foreignCallingConventions where
 

@@ -2524,7 +2524,7 @@ supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
 supportedExtensions :: ArchOS -> [String]
-supportedExtensions (ArchOS _ os) = concatMap toFlagSpecNamePair xFlags
+supportedExtensions (ArchOS arch os) = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
@@ -2533,9 +2533,12 @@ supportedExtensions (ArchOS _ os) = concatMap toFlagSpecNamePair xFlags
       -- the rationale
       | isAIX, flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
       | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
+      -- "JavaScriptFFI" is only supported on the JavaScript backend
+      | notJS, flagSpecFlag flg == LangExt.JavaScriptFFI    = [noName]
       | otherwise = [name, noName]
       where
         isAIX = os == OSAIX
+        notJS = arch /= ArchJavaScript
         noName = "No" ++ name
         name = flagSpecName flg
 
