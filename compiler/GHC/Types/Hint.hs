@@ -41,7 +41,7 @@ import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Parser.Errors.Basic
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr
+import Language.Haskell.Syntax.Expr
 import GHC.Unit.Module.Imported (ImportedModsVal)
 import GHC.Data.FastString (fsLit)
 import Language.Haskell.Syntax (LPat, LIdP)

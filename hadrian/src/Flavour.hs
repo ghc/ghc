@@ -145,11 +145,11 @@ enableDebugInfo = addArgs $ notStage0 ? mconcat
 
 -- | Enable the ticky-ticky profiler in stage2 GHC
 enableTickyGhc :: Flavour -> Flavour
-enableTickyGhc =
-    addArgs $ orM [stage1, cross] ? mconcat
+enableTickyGhc f =
+    (addArgs (orM [stage1, cross] ? mconcat
       [ builder (Ghc CompileHs) ? tickyArgs
       , builder (Ghc LinkHs) ? tickyArgs
-      ]
+      ]) f) { ghcThreaded = const False }
 
 tickyArgs :: Args
 tickyArgs = mconcat
@@ -157,8 +157,8 @@ tickyArgs = mconcat
   , arg "-ticky-allocd"
   , arg "-ticky-dyn-thunk"
   -- You generally need STG dumps to interpret ticky profiles
-  , arg "-ddump-to-file"
-  , arg "-ddump-stg-final"
+--  , arg "-ddump-to-file"
+--  , arg "-ddump-stg-final"
   ]
 
 -- | Enable Core, STG, and (not C--) linting in all compilations with the stage1 compiler.
