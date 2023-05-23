@@ -1791,7 +1791,11 @@ async def simple_build(name: Union[TestName, str],
 
     stats_file = name + '.comp.stats'
     if isCompilerStatsTest():
-        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+        # Set a bigger chunk size to reduce variation due to additional under/overflowing
+        # The tests are attempting to test how much work the compiler is doing by proxy of
+        # bytes allocated. The additional allocations caused by stack overflow can cause
+        # spurious failures if you trip over the limit (see #23439)
+        extra_hc_opts += ' +RTS -kc128k -kb16k -V0 -t' + stats_file + ' --machine-readable -RTS'
     if backpack:
         extra_hc_opts += ' -outputdir ' + name + '.out'
 
