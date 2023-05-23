@@ -522,7 +522,9 @@ shutdown_handler(int sig STG_UNUSED)
     // extreme prejudice.  So the first ^C tries to exit the program
     // cleanly, and the second one just kills it.
     if (getSchedState() >= SCHED_INTERRUPTING) {
-        stg_exit(EXIT_INTERRUPTED);
+        // N.B. we cannot use stg_exit() here as it calls exit() which is not
+        // signal-safe. See #23417.
+        _exit(EXIT_INTERRUPTED);
     } else {
         interruptStgRts();
     }
