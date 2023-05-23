@@ -5,7 +5,7 @@ AC_DEFUN([FP_LD_SUPPORTS_RESPONSE_FILES], [
     AC_MSG_CHECKING([whether $LD supports response files])
     echo 'int main(void) {return 0;}' > conftest.c
     "$CC" -c -o conftest.o conftest.c > /dev/null 2>&1
-    printf "-o\nconftest\nconftest.o\n" > args.txt
+    printf -- "-o\nconftest\nconftest.o\n" > args.txt
     if "$LD" -shared @args.txt > /dev/null 2>&1 || "$LD" -dylib @args.txt > /dev/null 2>&1
     then
         LdSupportsResponseFiles=YES
