@@ -196,7 +196,12 @@ ppClass dflags decl subdocs =
 
         pprTyFam :: LFamilyDecl GhcRn -> SDoc
         pprTyFam (L _ at) = vcat' $ map text $
-            mkSubdocN dflags (fdLName at) subdocs (ppFam dflags at)
+            mkSubdocN dflags
+              (fdLName at)
+              subdocs
+              -- Associated type families should not be printed as top-level
+              -- (avoid printing the `family` keyword)
+              (ppFam dflags at{fdTopLevel = NotTopLevel})
 
         whereWrapper elems = vcat'
             [ text "where" <+> lbrace
