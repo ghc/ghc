@@ -201,9 +201,7 @@ toInstalledIface interface = InstalledInterface
   , instOptions          = interface.ifaceOptions
   , instFixMap           = interface.ifaceFixMap
   , instDefMeths         = interface.ifaceDefMeths
-
   }
-
 
 -- | A monad in which we create Haddock interfaces. Not to be confused with
 -- `GHC.Tc.Types.IfM` which is used to write GHC interfaces.
@@ -234,10 +232,6 @@ data IfEnv m = IfEnv
 
     -- | Names which we have warned about for being ambiguous
   , ifeAmbiguousNames  :: !(Set.Set String)
-
-    -- | Named which we have warned about for being inappropriately namespaced
-    -- as values
-  , ifeInvalidValues   :: !(Set.Set String)
   }
 
 -- | Run an `IfM` action.
@@ -257,7 +251,6 @@ runIfM lookup_name action = do
         ifeLookupName      = lookup_name
       , ifeOutOfScopeNames = Set.empty
       , ifeAmbiguousNames  = Set.empty
-      , ifeInvalidValues   = Set.empty
       }
   evalStateT (unIfM action) if_env
 

@@ -44,16 +44,15 @@ import Documentation.Haddock.Doc
 
 import Control.DeepSeq
 import Control.Monad.State.Strict
+import Data.Foldable
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
+import qualified Data.List.NonEmpty as NE
 import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, isJust, mapMaybe, maybeToList)
 import qualified Data.Set as Set
 import Data.Traversable (for)
-import qualified Data.List.NonEmpty as NE
-import Data.Foldable
-import qualified Data.Map as Map
 
 import GHC hiding (lookupName)
 import qualified GHC.Types.Unique.Map as UniqMap
@@ -183,7 +182,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   let local_instances = filter (nameIsLocalOrFrom sem_mdl)
                         $  map getName instances
                         ++ map getName fam_instances
-      instanceMap = M.fromList [(l, n) | n <- local_instances, RealSrcSpan l _ <- [getSrcSpan n] ]
+      instanceMap = Map.fromList [(l, n) | n <- local_instances, RealSrcSpan l _ <- [getSrcSpan n] ]
 
   -- See Note [Exporting built-in items]
   let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocString "Builtin syntax") [])
@@ -199,7 +198,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   let
     -- Warnings in this module and transitive warnings from dependend modules
     transitiveWarnings :: Map Name (Doc Name)
-    transitiveWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems ifaces))
+    transitiveWarnings = Map.unions (warningMap : map ifaceWarningMap (Map.elems ifaces))
 
   export_items <- mkExportItems
     prr
@@ -344,8 +343,8 @@ mkWarningMap dflags warnings exps =
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
           ws' = flip mapMaybe ws $ \(occ, w) ->
                   (,w) <$> lookupOccEnv expsOccEnv occ
-      in M.fromList <$> traverse (traverse (parseWarning dflags)) ws'
-    _ -> pure M.empty
+      in Map.fromList <$> traverse (traverse (parseWarning dflags)) ws'
+    _ -> pure Map.empty
 
 moduleWarning
   :: MonadIO m
@@ -407,7 +406,7 @@ parseOption other = warn ("Unrecognised option: " ++ other) >> return Nothing
 -- | Extract a map of fixity declarations only
 mkFixMap :: [Name] -> [(OccName, Fixity)] -> FixMap
 mkFixMap exps occFixs =
-    M.fromList $ flip mapMaybe occFixs $ \(occ, fix_) ->
+    Map.fromList $ flip mapMaybe occFixs $ \(occ, fix_) ->
       (,fix_) <$> lookupOccEnv expsOccEnv occ
     where
       expsOccEnv = mkOccEnv (map (nameOccName &&& id) exps)
@@ -449,7 +448,7 @@ mkExportItems
         doc <- processDocStringParas dflags pkgName hsDoc'
         pure [ExportDoc doc]
       DsiNamedChunkRef ref -> do
-        case M.lookup ref namedChunks of
+        case Map.lookup ref namedChunks of
           Nothing -> do
             warn $ "Cannot find documentation for: $" ++ ref
             pure []
@@ -488,11 +487,11 @@ unrestrictedModExports
 unrestrictedModExports dflags thisMod ifaceMap instIfaceMap avails mod_names = do
     mods_and_exports <- fmap catMaybes $ for mod_names $ \mod_name -> do
       let m_local = mkModule (moduleUnit thisMod) mod_name
-      case M.lookup m_local ifaceMap of
+      case Map.lookup m_local ifaceMap of
         -- First lookup locally
         Just iface -> pure $ Just (ifaceMod iface, mkNameSet (ifaceExports iface))
         Nothing ->
-          case M.lookup mod_name instIfaceMap' of
+          case Map.lookup mod_name instIfaceMap' of
             Just iface -> pure $ Just (instMod iface, mkNameSet (instExports iface))
             Nothing -> do
               warn $
@@ -504,15 +503,15 @@ unrestrictedModExports dflags thisMod ifaceMap instIfaceMap avails mod_names = d
         remaining = nubAvails (filterAvails (\n -> not (n `elemNameSet` mod_exps)) avails)
     pure (map fst unrestricted, remaining)
   where
-    instIfaceMap' = M.mapKeys moduleName instIfaceMap
+    instIfaceMap' = Map.mapKeys moduleName instIfaceMap
     all_names = availsToNameSet avails
 
     -- Is everything in this (supposedly re-exported) module visible?
     everythingVisible :: (Module, NameSet) -> Bool
     everythingVisible (mdl, exps)
       | not (exps `isSubsetOf` all_names) = False
-      | Just iface <- M.lookup mdl ifaceMap = OptHide `notElem` ifaceOptions iface
-      | Just iface <- M.lookup (moduleName mdl) instIfaceMap' = OptHide `notElem` instOptions iface
+      | Just iface <- Map.lookup mdl ifaceMap = OptHide `notElem` ifaceOptions iface
+      | Just iface <- Map.lookup (moduleName mdl) instIfaceMap' = OptHide `notElem` instOptions iface
       | otherwise = True
 
     -- TODO: Add a utility based on IntMap.isSubmapOfBy
@@ -548,7 +547,7 @@ availExportItem prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
             let tmod = nameModule t
             if tmod == thisMod
             then pure (lookupDocs avail warnings docMap argMap defMeths)
-            else case M.lookup tmod modMap of
+            else case Map.lookup tmod modMap of
               Just iface ->
                 pure (lookupDocs avail warnings (ifaceDocMap iface) (ifaceArgMap iface) (mkOccEnv (ifaceDefMeths iface)))
               Nothing ->
@@ -556,7 +555,7 @@ availExportItem prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
                 -- from the installed .haddock file for that package.
                 -- TODO: This needs to be more sophisticated to deal
                 -- with signature inheritance
-                case M.lookup (nameModule t) instIfaceMap of
+                case Map.lookup (nameModule t) instIfaceMap of
                   Nothing -> do
                     warn $
                       "Warning: " ++ pretty dflags thisMod ++
@@ -599,7 +598,7 @@ availExportItem prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
             !fixities = force
                 [ (n, f)
                 | n <- availName avail : fmap fst subs' ++ patSynNames
-                , Just f <- [M.lookup n fixMap]
+                , Just f <- [Map.lookup n fixMap]
                 ]
 
           return
@@ -618,7 +617,7 @@ availExportItem prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
           extractedDecl <- availDecl sub decl
 
           let
-            !fixities = force [ (sub, f) | Just f <- [M.lookup sub fixMap] ]
+            !fixities = force [ (sub, f) | Just f <- [Map.lookup sub fixMap] ]
             !subDoc   = force sub_doc
 
           return $
@@ -688,20 +687,22 @@ lookupDocs
   -> OccEnv Name
   -> (DocForDecl Name, [(Name, DocForDecl Name)])
 lookupDocs avail warningMap docMap argMap def_meths_env =
-  let n = availName avail in
-  let lookupArgDoc x = M.findWithDefault M.empty x argMap in
-  let doc = (lookupDoc n, lookupArgDoc n)
-      subs = availSubordinates avail
-      def_meths = [ (meth, (lookupDoc meth, lookupArgDoc meth))
+  let
+    n = availName avail
+    lookupArgDoc x = Map.findWithDefault Map.empty x argMap
+    doc = (lookupDoc n, lookupArgDoc n)
+    subs = availSubordinates avail
+    def_meths = [ (meth, (lookupDoc meth, lookupArgDoc meth))
                   | s <- subs
                   , let dmOcc = mkDefaultMethodOcc (nameOccName s)
-                  , Just meth <- [lookupOccEnv def_meths_env dmOcc]] in
-  let subDocs = [ (s, (lookupDoc s, lookupArgDoc s))
+                  , Just meth <- [lookupOccEnv def_meths_env dmOcc]]
+    subDocs = [ (s, (lookupDoc s, lookupArgDoc s))
                 | s <- subs
-                ] ++ def_meths in
-  (doc, subDocs)
+                ] ++ def_meths
+  in
+    (doc, subDocs)
   where
-    lookupDoc name = Documentation (M.lookup name docMap) (M.lookup name warningMap)
+    lookupDoc name = Documentation (Map.lookup name docMap) (Map.lookup name warningMap)
 
 
 -- Note [1]:
@@ -816,7 +817,8 @@ extractDecl prr dflags name decl
               _ -> pure $ Left "internal: extractDecl (ClsInstD)"
       _ -> pure $ Left ("extractDecl: Unhandled decl for " ++ getOccString name)
 
-extractPatternSyn :: Name -> Name
+extractPatternSyn :: Name
+                  -> Name
                   -> [LHsTypeArg GhcRn] -> [LConDecl GhcRn]
                   -> Either String (LSig GhcRn)
 extractPatternSyn nm t tvs cons =

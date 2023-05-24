@@ -47,10 +47,12 @@ import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
 import Control.DeepSeq (force)
+import Control.Monad
 import Data.List (foldl', isPrefixOf)
 import Data.Traversable (for)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Debug.Trace (traceMarkerIO)
 import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
 
@@ -70,8 +72,6 @@ import GHC.Unit.Module.ModDetails
 import GHC.Unit.Module.ModSummary (isBootSummary)
 import GHC.Utils.Outputable ((<+>), pprModuleName)
 import GHC.Utils.Error (withTiming)
-import Control.Monad
-import Debug.Trace (traceMarkerIO)
 import GHC.Unit.Home.ModInfo
 import GHC.Tc.Utils.Env (lookupGlobal_maybe)
 import GHC.Utils.Outputable (Outputable)
@@ -247,8 +247,15 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
       unit_state = hsc_units hsc_env
 
       do_hoogle = Flag_Hoogle `elem` flags
-      cls_insts = force . map (fromClsInst do_hoogle dflags unit_state)  . instEnvElts . md_insts $ hm_details hmi
+
+      -- We do not want to retain the ClsInsts, so force the creation of this
+      -- list
+      !cls_insts = force $
+          map (fromClsInst do_hoogle dflags unit_state)
+        . instEnvElts . md_insts $ hm_details hmi
+
       fam_insts = md_fam_insts $ hm_details hmi
+
       insts = (cls_insts, fam_insts)
 
   !interface <- do
