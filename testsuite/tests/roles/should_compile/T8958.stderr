@@ -96,7 +96,7 @@ AbsBinds [a] []
 
 
 
-T8958.hs:14:54: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘Representational v’ matches
         instance Representational a -- Defined at T8958.hs:11:10
       This makes type inference for inner bindings fragile;
@@ -104,7 +104,7 @@ T8958.hs:14:54: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
     • In the definition of data constructor ‘MkMap’
       In the newtype declaration for ‘Map’
 
-T8958.hs:14:54: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+T8958.hs:14:54: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘Nominal k’ matches
         instance Nominal a -- Defined at T8958.hs:8:10
       This makes type inference for inner bindings fragile;

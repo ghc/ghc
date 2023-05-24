@@ -610,6 +610,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMissingMain"                               = 67120
   GhcDiagnosticCode "TcRnGhciUnliftedBind"                          = 17999
   GhcDiagnosticCode "TcRnGhciMonadLookupFail"                       = 44990
+  GhcDiagnosticCode "TcRnArityMismatch"                             = 27346
+  GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
 
   -- PatSynInvalidRhsReason
   GhcDiagnosticCode "PatSynNotInvertible"                           = 69317
@@ -699,6 +701,18 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- TcRnUnusedImport/UnusedImportReason
   GhcDiagnosticCode "UnusedImportNone"                              = 66111
   GhcDiagnosticCode "UnusedImportSome"                              = 38856
+
+  -- TcRnIllegalInstanceDecl
+  GhcDiagnosticCode "IllegalInstanceHeadTypeSynonym"                = 93557
+  GhcDiagnosticCode "IllegalInstanceHeadNonTyVarArgs"               = 48406
+  GhcDiagnosticCode "IllegalMultiParamInstance"                     = 91901
+  GhcDiagnosticCode "IllegalInstanceFailsCoverageCondition"         = 21572
+
+  -- TcRnIllegalHasFieldInstance
+  GhcDiagnosticCode "IllegalHasFieldInstanceNotATyCon"              = 88994
+  GhcDiagnosticCode "IllegalHasFieldInstanceFamilyTyCon"            = 70743
+  GhcDiagnosticCode "IllegalHasFieldInstanceTyConHasFields"         = 43406
+  GhcDiagnosticCode "IllegalHasFieldInstanceTyConHasField"          = 30836
 
   -- Diagnostic codes for the foreign function interface
   GhcDiagnosticCode "NotADataType"                                  = 31136
@@ -880,6 +894,11 @@ type family ConRecursInto con where
   ConRecursInto "TcRnImportLookup"         = 'Just ImportLookupReason
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
   ConRecursInto "TcRnNonCanonicalDefinition" = 'Just NonCanonicalDefinition
+  ConRecursInto "TcRnIllegalInstanceDecl"    = 'Just IllegalInstanceReason
+
+    -- Illegal instance reasons
+
+  ConRecursInto "IllegalHasFieldInstance" = 'Just IllegalHasFieldInstance
 
     --
     -- TH errors

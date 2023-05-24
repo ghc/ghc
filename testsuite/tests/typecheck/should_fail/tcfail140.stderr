@@ -25,8 +25,8 @@ tcfail140.hs:15:15: error: [GHC-83865]
         xs :: [a] (bound at tcfail140.hs:15:5)
         bot :: [a] -> [b] (bound at tcfail140.hs:15:1)
 
-tcfail140.hs:17:8: error:
-    • The constructor ‘Just’ should have 1 argument, but has been given none
+tcfail140.hs:17:8: error: [GHC-27346]
+    • The data constructor ‘Just’ should have 1 argument, but has been given none
     • In the pattern: Just
       The lambda expression ‘\ Just x -> x’ has two value arguments,
         but its type ‘Maybe a -> a’ has only one

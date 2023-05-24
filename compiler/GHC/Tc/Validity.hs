@@ -15,7 +15,6 @@ module GHC.Tc.Validity (
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
-  arityErr,
   checkTyConTelescope,
   ) where
 
@@ -33,7 +32,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Env  ( tcInitTidyEnv, tcInitOpenTidyEnv )
+import GHC.Tc.Utils.Env  ( TyThing(..), tcInitTidyEnv, tcInitOpenTidyEnv )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
 
@@ -42,7 +41,7 @@ import GHC.Builtin.Names
 import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 
 import GHC.Core.Type
-import GHC.Core.Unify ( tcMatchTyX_BM, BindFlag(..) )
+import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
@@ -1281,22 +1280,10 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
   = do { result <- matchGlobalInst dflags False cls tys
        ; case result of
            OneInst { cir_what = what }
-              -> let dia = mkTcRnUnknownMessage $
-                       mkPlainDiagnostic (WarningWithFlag Opt_WarnSimplifiableClassConstraints)
-                                         noHints
-                                         (simplifiable_constraint_warn what)
-                 in addDiagnosticTc dia
-           _          -> return () }
+              -> addDiagnosticTc (TcRnSimplifiableConstraint pred what)
+           _  -> return () }
   where
-    pred = mkClassPred cls tys
-
-    simplifiable_constraint_warn :: InstanceWhat -> SDoc
-    simplifiable_constraint_warn what
-     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred))
-                    <+> text "matches")
-                 2 (ppr what)
-            , hang (text "This makes type inference for inner bindings fragile;")
-                 2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
+    pred = tidyType env (mkClassPred cls tys)
 
 {- Note [Simplifiable given constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1397,8 +1384,7 @@ tyConArityErr :: TyCon -> [TcType] -> TcRnMessage
 -- ignoring the /invisible/ arguments, which the user does not see.
 -- (e.g. #10516)
 tyConArityErr tc tks
-  = arityErr (ppr (tyConFlavour tc)) (tyConName tc)
-             tc_type_arity tc_type_args
+  = TcRnArityMismatch (ATyCon tc) tc_type_arity tc_type_args
   where
     vis_tks = filterOutInvisibleTypes tc tks
 
@@ -1406,17 +1392,6 @@ tyConArityErr tc tks
     -- tc_type_args  = number of *type* args encountered
     tc_type_arity = count isVisibleTyConBinder (tyConBinders tc)
     tc_type_args  = length vis_tks
-
-arityErr :: Outputable a => SDoc -> a -> Int -> Int -> TcRnMessage
-arityErr what name n m
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    hsep [ text "The" <+> what, quotes (ppr name), text "should have",
-           n_arguments <> comma, text "but has been given",
-           if m==0 then text "none" else int m]
-    where
-        n_arguments | n == 0 = text "no arguments"
-                    | n == 1 = text "1 argument"
-                    | True   = hsep [int n, text "arguments"]
 
 {-
 ************************************************************************
@@ -1528,8 +1503,8 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
 
   -- Check language restrictions on the args to the class
   | check_h98_arg_shape
-  , Just msg <- mb_ty_args_msg
-  = failWithTc (instTypeErr clas cls_args msg)
+  , Just illegalType <- mb_ty_args_type
+  = failWithTc (TcRnIllegalInstanceDecl clas cls_args illegalType)
 
   | otherwise
   = pure ()
@@ -1567,34 +1542,19 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
                               SigmaCtxt -> True
                               _         -> False
 
-    head_type_synonym_msg = parens (
-                text "All instance types must be of the form (T t1 ... tn)" $$
-                text "where T is not a synonym." $$
-                text "Use TypeSynonymInstances if you want to disable this.")
-
-    head_type_args_tyvars_msg = parens (vcat [
-                text "All instance types must be of the form (T a1 ... an)",
-                text "where a1 ... an are *distinct type variables*,",
-                text "and each type variable appears at most once in the instance head.",
-                text "Use FlexibleInstances if you want to disable this."])
-
-    head_one_type_msg = parens $
-                        text "Only one type can be given in an instance head." $$
-                        text "Use MultiParamTypeClasses if you want to allow more, or zero."
-
-    mb_ty_args_msg
+    mb_ty_args_type
       | not (xopt LangExt.TypeSynonymInstances dflags)
       , not (all tcInstHeadTyNotSynonym ty_args)
-      = Just head_type_synonym_msg
+      = Just IllegalInstanceHeadTypeSynonym
 
       | not (xopt LangExt.FlexibleInstances dflags)
       , not (all tcInstHeadTyAppAllTyVars ty_args)
-      = Just head_type_args_tyvars_msg
+      = Just IllegalInstanceHeadNonTyVarArgs
 
       | length ty_args /= 1
       , not (xopt LangExt.MultiParamTypeClasses dflags)
       , not (xopt LangExt.NullaryTypeClasses dflags && null ty_args)
-      = Just head_one_type_msg
+      = Just IllegalMultiParamInstance
 
       | otherwise
       = Nothing
@@ -1651,32 +1611,36 @@ dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
 dropCastsB :: TyVarBinder -> TyVarBinder
 dropCastsB b = b   -- Don't bother in the kind of a forall
 
-instTypeErr :: Class -> [Type] -> SDoc -> TcRnMessage
-instTypeErr cls tys msg
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    hang (hang (text "Illegal instance declaration for")
-             2 (quotes (pprClassPred cls tys)))
-       2 msg
-
 -- | See Note [Validity checking of HasField instances]
 checkHasFieldInst :: Class -> [Type] -> TcM ()
-checkHasFieldInst cls tys@[_k_ty, x_ty, r_ty, _a_ty] =
+checkHasFieldInst cls tys@[_k_ty, lbl_ty, r_ty, _a_ty] =
   case splitTyConApp_maybe r_ty of
-    Nothing -> whoops (text "Record data type must be specified")
+    Nothing -> add_err IllegalHasFieldInstanceNotATyCon
     Just (tc, _)
       | isFamilyTyCon tc
-                  -> whoops (text "Record data type may not be a data family")
-      | otherwise -> case isStrLitTy x_ty of
+                  -> add_err IllegalHasFieldInstanceFamilyTyCon
+      | otherwise -> case isStrLitTy lbl_ty of
        Just lbl
-         | isJust (lookupTyConFieldLabel (FieldLabelString lbl) tc)
-                     -> whoops (ppr tc <+> text "already has a field"
-                                       <+> quotes (ppr lbl))
-         | otherwise -> return ()
+         | let lbl_str = FieldLabelString lbl
+         , isJust (lookupTyConFieldLabel lbl_str tc)
+         -> add_err $ IllegalHasFieldInstanceTyConHasField tc lbl_str
+         | otherwise
+         -> return ()
        Nothing
-         | null (tyConFieldLabels tc) -> return ()
-         | otherwise -> whoops (ppr tc <+> text "has fields")
+         -- If the label is not a literal, we need to ensure it can't unify
+         -- with any of the field labels of the TyCon.
+         | null (tyConFieldLabels tc)
+           -- No field labels at all: nothing to check.
+         || typesAreApart (typeKind lbl_ty) typeSymbolKind
+           -- If the label has a type whose kind can't unify with Symbol,
+           -- then it definitely can't unify with any of the field labels.
+         -> return ()
+         | otherwise
+         -> add_err $ IllegalHasFieldInstanceTyConHasFields tc lbl_ty
   where
-    whoops = addErrTc . instTypeErr cls tys
+    add_err err = addErrTc $ TcRnIllegalInstanceDecl cls tys
+                           $ IllegalHasFieldInstance err
+
 checkHasFieldInst _ tys = pprPanic "checkHasFieldInst" (ppr tys)
 
 {- Note [Casts during validity checking]
@@ -2010,9 +1974,12 @@ checkValidInstance ctxt hs_type ty = case tau of
 
         ; traceTc "cvi 2" (ppr ty)
 
-        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
-            IsValid      -> return ()   -- Check succeeded
-            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
+        ; case checkInstCoverage undecidable_ok clas theta inst_tys of
+            IsValid
+              -> return ()   -- Check succeeded
+            NotValid coverageInstErr
+              -> addErrTc $ TcRnIllegalInstanceDecl clas inst_tys
+                          $ IllegalInstanceFailsCoverageCondition coverageInstErr
 
         ; traceTc "End checkValidInstance }" empty
 

@@ -44,7 +44,6 @@ import GHC.Core.Multiplicity
 import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Validity( arityErr )
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
@@ -1329,7 +1328,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
         -- NB: type_args already dealt with
         -- See Note [Type applications in patterns]
         { checkTc (con_arity == no_of_args)     -- Check correct arity
-                  (arityErr (text "constructor") con_like con_arity no_of_args)
+                  (TcRnArityMismatch (AConLike con_like) con_arity no_of_args)
 
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
@@ -1341,7 +1340,7 @@ tcConValArgs con_like arg_tys penv con_args thing_inside = case con_args of
 
   InfixCon p1 p2 -> do
         { checkTc (con_arity == 2)      -- Check correct arity
-                  (arityErr (text "constructor") con_like con_arity 2)
+                  (TcRnArityMismatch (AConLike con_like) con_arity 2)
         ; let [arg_ty1,arg_ty2] = arg_tys       -- This can't fail after the arity check
         ; ([p1',p2'], res) <- tcMultiple tcConArg penv [(p1,arg_ty1),(p2,arg_ty2)]
                                                   thing_inside

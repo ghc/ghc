@@ -1,5 +1,5 @@
 
-<interactive>:1:1: error:
+<interactive>:1:1: error: [GHC-27346]
     The type synonym ‘F1’ should have 1 argument, but has been given none
 
 <interactive>:1:4: error: [GHC-91028]
@@ -9,7 +9,7 @@
     • In the first argument of ‘T2’, namely ‘F2’
       In the type ‘T2 F2’
 
-<interactive>:1:1: error:
+<interactive>:1:1: error: [GHC-27346]
     The type synonym ‘F1’ should have 1 argument, but has been given none
 
 <interactive>:1:11: error: [GHC-91028]

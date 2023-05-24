@@ -94,6 +94,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.List.SetOps ( nubOrdBy )
 import GHC.Data.Maybe
+import GHC.Data.Pair
 import GHC.Settings.Constants (mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE)
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
@@ -105,6 +106,7 @@ import GHC.Data.BooleanFormula (pprBooleanFormulaNice)
 
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
+import Data.Foldable ( fold )
 import Data.Function (on)
 import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
@@ -408,6 +410,30 @@ instance Diagnostic TcRnMessage where
                 2 (text "type:" <+> quotes (ppr ty))
            , hang (text "where the body of the forall has this kind:")
                 2 (quotes (pprKind kind)) ]
+    TcRnSimplifiableConstraint pred what
+      -> mkSimpleDecorated $ vcat
+           [ hang (text "The constraint" <+> quotes (pprType pred) <+> text "matches")
+                2 (ppr what)
+           , hang (text "This makes type inference for inner bindings fragile;")
+                2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
+    TcRnArityMismatch thing thing_arity nb_args
+      -> mkSimpleDecorated $
+           hsep [ text "The" <+> what, quotes (ppr $ getName thing), text "should have"
+                , n_arguments <> comma, text "but has been given"
+                , if nb_args == 0 then text "none" else int nb_args
+                ]
+          where
+            what = case thing of
+              ATyCon tc -> ppr (tyConFlavour tc)
+              _         -> text (tyThingCategory thing)
+            n_arguments | thing_arity == 0 = text "no arguments"
+                        | thing_arity == 1 = text "1 argument"
+                        | True          = hsep [int thing_arity, text "arguments"]
+    TcRnIllegalInstanceDecl cls tys reason
+      -> mkSimpleDecorated $
+           hang (hang (text "Illegal instance declaration for")
+                    2 (quotes (pprClassPred cls tys)) <> colon)
+              2 (pprIllegalInstanceReason cls tys reason)
     TcRnVDQInTermType mb_ty
       -> mkSimpleDecorated $ vcat
            [ case mb_ty of
@@ -2024,6 +2050,12 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnForAllEscapeError{}
       -> ErrorWithoutFlag
+    TcRnSimplifiableConstraint{}
+      -> WarningWithFlag Opt_WarnSimplifiableClassConstraints
+    TcRnArityMismatch{}
+      -> ErrorWithoutFlag
+    TcRnIllegalInstanceDecl{}
+      -> ErrorWithoutFlag
     TcRnVDQInTermType{}
       -> ErrorWithoutFlag
     TcRnBadQuantPredHead{}
@@ -2697,6 +2729,12 @@ instance Diagnostic TcRnMessage where
            MonoTypeSynArg     -> [suggestExtension LangExt.LiberalTypeSynonyms]
            MonoTypeConstraint -> [suggestExtension LangExt.QuantifiedConstraints]
            _                  -> noHints
+    TcRnSimplifiableConstraint{}
+      -> noHints
+    TcRnArityMismatch{}
+      -> noHints
+    TcRnIllegalInstanceDecl _ _ reason
+      -> illegalInstanceHints reason
     TcRnMonomorphicBindings bindings
       -> case bindings of
           []     -> noHints
@@ -5887,5 +5925,103 @@ pprBootDataConMismatchErr dc1 dc2 = \case
      name2 = dataConName dc2
      pname1 = quotes (ppr name1)
      pname2 = quotes (ppr name2)
+
+--------------------------------------------------------------------------------
+-- Illegal instance errors
+
+pprIllegalInstanceReason :: Class -> [Type] -> IllegalInstanceReason -> SDoc
+pprIllegalInstanceReason cls tys = \case
+  IllegalInstanceHeadTypeSynonym ->
+    text "All instance types must be of the form (T t1 ... tn)" $$
+    text "where T is not a synonym."
+  IllegalInstanceHeadNonTyVarArgs -> vcat [
+    text "All instance types must be of the form (T a1 ... an)",
+    text "where a1 ... an are *distinct type variables*,",
+    text "and each type variable appears at most once in the instance head."]
+  IllegalMultiParamInstance -> parens $
+    text "Only one type can be given in an instance head."
+  IllegalHasFieldInstance has_field_err ->
+    pprIllegalHasFieldInstance has_field_err
+  IllegalInstanceFailsCoverageCondition coverage_failure ->
+    pprNotCovered cls tys coverage_failure
+
+pprIllegalHasFieldInstance :: IllegalHasFieldInstance -> SDoc
+pprIllegalHasFieldInstance = \case
+  IllegalHasFieldInstanceNotATyCon
+    -> text "Record data type must be specified."
+  IllegalHasFieldInstanceFamilyTyCon
+    -> text "Record data type may not be a data family."
+  IllegalHasFieldInstanceTyConHasField tc lbl
+    -> quotes (ppr tc) <+> text "already has a field" <+> quotes (ppr lbl) <> dot
+  IllegalHasFieldInstanceTyConHasFields tc lbl
+    -> sep [ ppr_tc <+> text "has fields, and the type" <+> quotes (ppr lbl)
+           , text "could unify with one of the field labels of" <+> ppr_tc <> dot ]
+    where ppr_tc = quotes (ppr tc)
+
+pprNotCovered :: Class -> [Type] -> CoverageProblem -> SDoc
+pprNotCovered clas _tys
+  CoverageProblem
+  { not_covered_fundep        = fd
+  , not_covered_fundep_inst   = (ls, rs)
+  , not_covered_invis_vis_tvs = undetermined_tvs
+  , not_covered_liberal       = which_cc_failed
+  } =
+  pprWithExplicitKindsWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
+    vcat [ sep [ text "The"
+                  <+> ppWhen liberal (text "liberal")
+                  <+> text "coverage condition fails in class"
+                  <+> quotes (ppr clas)
+                , nest 2 $ text "for functional dependency:"
+                  <+> quotes (pprFunDep fd) ]
+          , sep [ text "Reason: lhs type" <> plural ls <+> pprQuotedList ls
+                , nest 2 $
+                  (if isSingleton ls
+                  then text "does not"
+                  else text "do not jointly")
+                  <+> text "determine rhs type" <> plural rs
+                  <+> pprQuotedList rs ]
+          , text "Un-determined variable" <> pluralVarSet undet_set <> colon
+                  <+> pprVarSet undet_set (pprWithCommas ppr)
+          ]
+  where
+    liberal = case which_cc_failed of
+                   FailedLICC   -> True
+                   FailedICC {} -> False
+    undet_set = fold undetermined_tvs
+
+illegalInstanceHints :: IllegalInstanceReason -> [GhcHint]
+illegalInstanceHints = \case
+  IllegalInstanceHeadTypeSynonym ->
+    [suggestExtension LangExt.TypeSynonymInstances]
+  IllegalInstanceHeadNonTyVarArgs ->
+    [suggestExtension LangExt.FlexibleInstances]
+  IllegalMultiParamInstance ->
+    [suggestExtension LangExt.MultiParamTypeClasses]
+  IllegalHasFieldInstance has_field_err ->
+    illegalHasFieldInstanceHints has_field_err
+  IllegalInstanceFailsCoverageCondition coverage_failure ->
+    failedCoverageConditionHints coverage_failure
+
+illegalHasFieldInstanceHints :: IllegalHasFieldInstance -> [GhcHint]
+illegalHasFieldInstanceHints = \case
+  IllegalHasFieldInstanceNotATyCon
+    -> noHints
+  IllegalHasFieldInstanceFamilyTyCon
+    -> noHints
+  IllegalHasFieldInstanceTyConHasField {}
+    -> noHints
+  IllegalHasFieldInstanceTyConHasFields {}
+    -> noHints
+
+failedCoverageConditionHints :: CoverageProblem -> [GhcHint]
+failedCoverageConditionHints (CoverageProblem { not_covered_liberal = failed_cc })
+  = case failed_cc of
+      FailedLICC -> noHints
+      FailedICC { alsoFailedLICC = failed_licc } ->
+        -- Turning on UndecidableInstances makes the check liberal,
+        -- so if the liberal check passes, suggest enabling UndecidableInstances.
+        if failed_licc
+        then noHints
+        else [suggestExtension LangExt.UndecidableInstances]
 
 --------------------------------------------------------------------------------

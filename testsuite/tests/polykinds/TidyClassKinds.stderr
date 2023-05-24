@@ -1,8 +1,8 @@
 
-TidyClassKinds.hs:13:10: error:
+TidyClassKinds.hs:13:10: error: [GHC-93557]
     • Illegal instance declaration for
-        ‘Poly @{k -> *} @{k -> *} (ProxySyn @{k}) (ProxySyn @{k})’
-        (All instance types must be of the form (T t1 ... tn)
-         where T is not a synonym.
-         Use TypeSynonymInstances if you want to disable this.)
+        ‘Poly @{k -> *} @{k -> *} (ProxySyn @{k}) (ProxySyn @{k})’:
+        All instance types must be of the form (T t1 ... tn)
+        where T is not a synonym.
     • In the instance declaration for ‘Poly ProxySyn ProxySyn’
+    Suggested fix: Perhaps you intended to use TypeSynonymInstances

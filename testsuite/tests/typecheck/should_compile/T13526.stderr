@@ -1,5 +1,5 @@
 
-T13526.hs:21:8: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+T13526.hs:21:8: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘C (Maybe a)’ matches
         instance C a => C (Maybe a) -- Defined at T13526.hs:14:10
       This makes type inference for inner bindings fragile;

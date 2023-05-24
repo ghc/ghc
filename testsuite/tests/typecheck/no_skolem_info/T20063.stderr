@@ -21,7 +21,7 @@ T20063.hs:25:21: error: [GHC-25897]
         rnRename :: Rn ctx1 ctx2 -> Idx ctx3 -> Idx ctx4
           (bound at T20063.hs:25:1)
 
-T20063.hs:26:17: error:
-    • The constructor ‘T’ should have 1 argument, but has been given none
+T20063.hs:26:17: error: [GHC-27346]
+    • The data constructor ‘T’ should have 1 argument, but has been given none
     • In the pattern: T
       In an equation for ‘rnRename’: rnRename _ T = undefined

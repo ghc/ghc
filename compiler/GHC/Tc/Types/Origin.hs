@@ -25,11 +25,12 @@ module GHC.Tc.Types.Origin (
 
   -- * CtOrigin and CallStack
   isPushCallStackOrigin, callStackOriginFS,
+  ClsInstOrQC(..), NakedScFlag(..),
+
   -- * FixedRuntimeRep origin
   FixedRuntimeRepOrigin(..), FixedRuntimeRepContext(..),
   pprFixedRuntimeRepContext,
   StmtOrigin(..), RepPolyFun(..), ArgPos(..),
-  ClsInstOrQC(..), NakedScFlag(..),
 
   -- * Arrow command origin
   FRRArrowContext(..), pprFRRArrowContext,

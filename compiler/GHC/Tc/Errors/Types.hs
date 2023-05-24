@@ -134,6 +134,9 @@ module GHC.Tc.Errors.Types (
   , BootDataConMismatch(..)
   , SynAbstractDataError(..)
   , BootListMismatch(..), BootListMismatches
+  , IllegalInstanceReason(..)
+  , IllegalHasFieldInstance(..)
+  , CoverageProblem(..), FailedCoverageCondition(..)
   ) where
 
 import GHC.Prelude
@@ -181,6 +184,7 @@ import GHC.Unit.State (UnitState)
 import GHC.Utils.Misc (capitalise, filterOut)
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.FastString (FastString)
+import GHC.Data.Pair
 import GHC.Exception.Type (SomeException)
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
@@ -1222,8 +1226,62 @@ data TcRnMessage where
   -}
   TcRnForAllRankErr :: !Rank -> !Type -> TcRnMessage
 
+  {-| TcRnSimplifiableConstraint is a warning triggered by the occurrence of
+      a simplifiable constraint in a context, when MonoLocalBinds is not enabled.
+
+      Examples(s):
+        simplifiableEq :: Eq (a, a) => a -> a -> Bool
+        simplifiableEq = undefined
+
+      Test cases:
+        - indexed-types/should_compile/T15322
+        - partial-sigs/should_compile/SomethingShowable
+        - typecheck/should_compile/T13526
+  -}
+  TcRnSimplifiableConstraint :: !PredType -> !InstanceWhat -> TcRnMessage
+
+  {-| TcRnArityMismatch is an error that occurs when a type constructor is supplied with
+      fewer arguments than required.
+
+      Examples(s):
+        f Left = undefined
+
+      Test cases:
+        - backpack/should_fail/bkpfail25.bkp
+        - ghci/should_fail/T16013
+        - ghci/should_fail/T16287
+        - indexed-types/should_fail/BadSock
+        - indexed-types/should_fail/T9433
+        - module/mod60
+        - ndexed-types/should_fail/T2157
+        - parser/should_fail/ParserNoBinaryLiterals2
+        - parser/should_fail/ParserNoBinaryLiterals3
+        - patsyn/should_fail/T12819
+        - polykinds/T10516
+        - typecheck/should_fail/T12124
+        - typecheck/should_fail/T15954
+        - typecheck/should_fail/T16874
+        - typecheck/should_fail/tcfail100
+        - typecheck/should_fail/tcfail101
+        - typecheck/should_fail/tcfail107
+        - typecheck/should_fail/tcfail129
+        - typecheck/should_fail/tcfail187
+  -}
+  TcRnArityMismatch :: !TyThing
+                    -> !Arity -- ^ expected arity
+                    -> !Arity -- ^ actual arity
+                    -> TcRnMessage
+
+  {-| TcRnIllegalInstanceDecl is an error that arises from an invalid class
+      instance declaration.
+
+      See 'IllegalInstanceReason'.
+  -}
+  TcRnIllegalInstanceDecl :: !Class -> ![Type] -> IllegalInstanceReason
+                          -> TcRnMessage
+
   {-| TcRnMonomorphicBindings is a warning (controlled by -Wmonomorphism-restriction)
-      that arise when the monomorphism restriction applies to the given bindings.
+      that arises when the monomorphism restriction applies to the given bindings.
 
       Examples(s):
         {-# OPTIONS_GHC -Wmonomorphism-restriction #-}
@@ -5920,3 +5978,108 @@ data NonCanonical_Monad =
   |
   -- | @(>>)@ was defined as something other than @(*>)@.
   NonCanonical_ThenM
+
+-- | Why was an instance declaration rejected?
+data IllegalInstanceReason
+  -- | Instance head was headed by a type synonym.
+  --
+  -- Example:
+  --    type MyInt = Int
+  --    class C a where {..}
+  --    instance C MyInt where {..}
+  --
+  -- Test cases: drvfail015, mod42, TidyClassKinds, tcfail139
+  = IllegalInstanceHeadTypeSynonym
+  -- | Instance head was not of the form @T a1 ... an@,
+  -- where @a1, ..., an@ are all type variables or literals.
+  --
+  -- Example:
+  --
+  --    instance Num [Int] where {..}
+  --
+  -- Test cases: mod41, mod42, tcfail044, tcfail047.
+  | IllegalInstanceHeadNonTyVarArgs
+  -- | Multi-param instance without -XMultiParamTypeClasses.
+  --
+  -- Example:
+  --
+  --  instance C a b where {..}
+  --
+  -- Test case: IllegalMultiParamInstance
+  | IllegalMultiParamInstance
+  -- | An illegal HasField instance. See t'IllegalHasFieldInstance'.
+  | IllegalHasFieldInstance !IllegalHasFieldInstance
+  -- | The instance failed the coverage condition, i.e. the functional
+  -- dependencies were not respected.
+  --
+  -- Example:
+  --
+  --  class C a b | a -> b where {..}
+  --  instance C a b where {..}
+  --
+  -- Test cases: T9106, T10570, T2247, T12803, tcfail170.
+  | IllegalInstanceFailsCoverageCondition
+      !CoverageProblem
+  deriving Generic
+
+-- | Why was a HasField instance declaration rejected?
+data IllegalHasFieldInstance
+  -- | HasField instance for a type not headed by a TyCon.
+  --
+  -- Example:
+  --
+  --   instance HasField a where {..}
+  --
+  -- Test case: hasfieldfail03
+  = IllegalHasFieldInstanceNotATyCon
+  -- | HasField instance for a data family.
+  --
+  -- Example:
+  --
+  --  data family D a
+  --  data instance D Int = MkDInt Char
+  --
+  --  instance HasField "fld" (D Int) where {..}
+  --
+  -- Test case: hasfieldfail03
+  | IllegalHasFieldInstanceFamilyTyCon
+  -- | HasField instance for a type that already has that field.
+  --
+  -- Example
+  --
+  --  data T = MkT { quux :: Int }
+  --  instance HasField "quux" T Int where {..}
+  --
+  -- Test case: hasfieldfail03
+  | IllegalHasFieldInstanceTyConHasField !TyCon !FieldLabelString
+  -- | HasField instance for a type that already has fields, when the
+  -- field label could potentially unify with those fields.
+  --
+  -- Example:
+  --
+  --  data T = MkInt { quux :: Int }
+  --  instance forall (fld :: Symbol). HasField fld T Int where {..}
+  --
+  -- Test case: hasfieldfail03
+  | IllegalHasFieldInstanceTyConHasFields !TyCon !Type -- ^ the label type in the instance head
+  deriving Generic
+
+-- | Description of an instance coverage condition failure.
+data CoverageProblem =
+  CoverageProblem
+    { not_covered_fundep        :: ([TyVar], [TyVar])
+    , not_covered_fundep_inst   :: ([Type], [Type])
+    , not_covered_invis_vis_tvs :: Pair VarSet
+    , not_covered_liberal       :: FailedCoverageCondition
+    }
+
+-- | Which instance coverage condition failed? Was it the liberal
+-- coverage condition?
+data FailedCoverageCondition
+  -- | Failed the instance coverage condition (ICC)
+  = FailedICC
+    { alsoFailedLICC :: !Bool
+      -- ^ Whether the instance also failed the LICC
+    }
+  -- | Failed the liberal instance coverage condition (LICC)
+  | FailedLICC

@@ -35,8 +35,8 @@ import GHC.Core.Unify
 import GHC.Core.InstEnv
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Compare( eqTypes, eqType )
-import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
 
+import GHC.Tc.Errors.Types ( CoverageProblem(..), FailedCoverageCondition(..) )
 import GHC.Tc.Types.Constraint ( isUnsatisfiableCt_maybe )
 import GHC.Tc.Utils.TcType( transSuperClasses )
 
@@ -46,14 +46,13 @@ import GHC.Types.SrcLoc
 
 import GHC.Utils.Outputable
 import GHC.Utils.FV
-import GHC.Utils.Error( Validity'(..), Validity, allValid )
+import GHC.Utils.Error( Validity'(..), allValid )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 
-import GHC.Data.Pair             ( Pair(..) )
-import Data.List        ( nubBy )
-import Data.Maybe
-import Data.Foldable    ( fold )
+import GHC.Data.Pair ( Pair(..) )
+import Data.List     ( nubBy )
+import Data.Maybe    ( isJust, isNothing )
 
 {-
 ************************************************************************
@@ -393,7 +392,7 @@ makes instance inference go into a loop, because it requires the constraint
 
 checkInstCoverage :: Bool   -- Be liberal
                   -> Class -> [PredType] -> [Type]
-                  -> Validity
+                  -> Validity' CoverageProblem
 -- "be_liberal" flag says whether to use "liberal" coverage of
 --              See Note [Coverage condition] below
 --
@@ -415,8 +414,10 @@ checkInstCoverage be_liberal clas theta inst_taus
   where
     (tyvars, fds) = classTvsFds clas
     fundep_ok fd
-       | and (isEmptyVarSet <$> undetermined_tvs) = IsValid
-       | otherwise                                = NotValid msg
+       | all isEmptyVarSet undetermined_tvs
+       = IsValid
+       | otherwise
+       = NotValid not_covered_msg
        where
          (ls,rs) = instFD fd tyvars inst_taus
          ls_tvs = tyCoVarsOfTypes ls
@@ -429,33 +430,18 @@ checkInstCoverage be_liberal clas theta inst_taus
          liberal_undet_tvs = (`minusVarSet` closed_ls_tvs) <$> rs_tvs
          conserv_undet_tvs = (`minusVarSet` ls_tvs)        <$> rs_tvs
 
-         undet_set = fold undetermined_tvs
+         not_covered_msg =
+           CoverageProblem
+            { not_covered_fundep        = fd
+            , not_covered_fundep_inst   = (ls, rs)
+            , not_covered_invis_vis_tvs = undetermined_tvs
+            , not_covered_liberal       =
+                if be_liberal
+                then FailedLICC
+                else FailedICC
+                      { alsoFailedLICC = not $ all isEmptyVarSet liberal_undet_tvs }
+            }
 
-         msg = pprWithExplicitKindsWhen
-                 (isEmptyVarSet $ pSnd undetermined_tvs) $
-               vcat [ -- text "ls_tvs" <+> ppr ls_tvs
-                      -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
-                      -- , text "theta" <+> ppr theta
-                      -- , text "closeWrtFunDeps" <+> ppr (closeWrtFunDeps theta (closeOverKinds ls_tvs))
-                      -- , text "rs_tvs" <+> ppr rs_tvs
-                      sep [ text "The"
-                            <+> ppWhen be_liberal (text "liberal")
-                            <+> text "coverage condition fails in class"
-                            <+> quotes (ppr clas)
-                          , nest 2 $ text "for functional dependency:"
-                            <+> quotes (pprFunDep fd) ]
-                    , sep [ text "Reason: lhs type"<>plural ls <+> pprQuotedList ls
-                          , nest 2 $
-                            (if isSingleton ls
-                             then text "does not"
-                             else text "do not jointly")
-                            <+> text "determine rhs type"<>plural rs
-                            <+> pprQuotedList rs ]
-                    , text "Un-determined variable" <> pluralVarSet undet_set <> colon
-                            <+> pprVarSet undet_set (pprWithCommas ppr)
-                    , ppWhen (not be_liberal &&
-                              and (isEmptyVarSet <$> liberal_undet_tvs)) $
-                      text "Using UndecidableInstances might help" ]
 
 {- Note [Closing over kinds in coverage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

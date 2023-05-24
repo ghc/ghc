@@ -1,9 +1,9 @@
 TYPE SIGNATURES
   somethingShowable :: Show Bool => Bool -> String
 Dependent modules: []
-Dependent packages: [base-4.16.0.0]
+Dependent packages: [base-4.18.0.0]
 
-SomethingShowable.hs:5:1: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+SomethingShowable.hs:5:1: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
     • The constraint ‘Show Bool’ matches
         instance Show Bool -- Defined in ‘GHC.Show’
       This makes type inference for inner bindings fragile;

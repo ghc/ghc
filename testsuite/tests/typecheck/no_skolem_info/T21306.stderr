@@ -22,8 +22,8 @@ T21306.hs:23:15: error: [GHC-25897]
         xs :: HList xs (bound at T21306.hs:21:31)
         equal :: EqualLists xs1 ys (bound at T21306.hs:21:15)
 
-T21306.hs:25:5: error:
-    • The constructor ‘Foo’ should have 2 arguments, but has been given 1
+T21306.hs:25:5: error: [GHC-27346]
+    • The data constructor ‘Foo’ should have 2 arguments, but has been given 1
     • In the pattern: Foo bar
       In a case alternative: Foo bar -> Foo bar $ k foo
       In the expression: case f of Foo bar -> Foo bar $ k foo

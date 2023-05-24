@@ -4,8 +4,8 @@
 module GHC.Tc.Instance.Class (
      matchGlobalInst, matchEqualityInst,
      ClsInstResult(..),
-     safeOverlap, instanceReturnsDictCon,
-     AssocInstInfo(..), isNotAssociated,
+     InstanceWhat(..), safeOverlap, instanceReturnsDictCon,
+     AssocInstInfo(..), isNotAssociated
   ) where
 
 import GHC.Prelude
