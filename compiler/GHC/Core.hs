@@ -251,7 +251,7 @@ data Expr b
   = Var   Id
   | Lit   Literal
   | App   (Expr b) (Arg b)
-  | Lam   b (Expr b)
+  | HasCallStack => Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
@@ -259,7 +259,7 @@ data Expr b
   | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
-  deriving Data
+deriving instance Data b => Data (Expr b)
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -1930,7 +1930,7 @@ mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
-mkLams        :: [b] -> Expr b -> Expr b
+mkLams        :: HasCallStack => [b] -> Expr b -> Expr b
 
 mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr mkLet body binds

@@ -328,6 +328,7 @@ top level -- but then they must be applied to a constant dictionary and
 will almost certainly be optimised away anyway.
 -}
 
+-- ROMES:TODO: Short comment with examples of what it does
 lvlExpr :: LevelEnv             -- Context
         -> CoreExprWithFVs      -- Input expression
         -> LvlM LevelledExpr    -- Result expression
@@ -1261,6 +1262,7 @@ profitableFloat env dest_lvl
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
 
+-- ROMES:TODO: What does this do? Why does it start with lvl?
 lvlRhs :: LevelEnv
        -> RecFlag
        -> Bool               -- Is this a bottoming function
@@ -1271,6 +1273,7 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
   = lvlFloatRhs [] (le_ctxt_lvl env) env
                 rec_flag is_bot mb_join_arity expr
 
+-- ROMES:TODO: Document this function, what does it do?
 lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> Maybe JoinArity

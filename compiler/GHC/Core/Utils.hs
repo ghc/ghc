@@ -122,7 +122,7 @@ import GHC.Types.RepType (isZeroBitTy)
 ************************************************************************
 -}
 
-exprType :: HasDebugCallStack => CoreExpr -> Type
+exprType :: HasCallStack => HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
