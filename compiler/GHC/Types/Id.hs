@@ -216,7 +216,7 @@ idMult x = case Var.varMultMaybe x of
              Nothing   -> pprPanic "idMult" (ppr x <+> ppr (Var.idDetails x) <+> Var.ppr_id_scope (Var.idScope x) <+> ppr (Var.idBinding x))
              Just mult -> mult
 
-idUsageEnv :: Id -> UsageEnv
+idUsageEnv :: HasCallStack => Id -> UsageEnv
 idUsageEnv x = case Var.idBinding x of
              LambdaBound _ -> pprPanic "idUsageEnv" (ppr x)
              LetBound ue -> ue

@@ -133,6 +133,8 @@ import GHC.LanguageExtensions (Extension)
 import GHC.Utils.GlobalVars( unsafeHasPprDebug )
 import GHC.Utils.Misc (lastMaybe)
 
+import Data.Typeable
+
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
@@ -1229,7 +1231,9 @@ data BindingSite
     deriving (Eq, Show)
 -- | When we print a binder, we often want to print its type too.
 -- The @OutputableBndr@ class encapsulates this idea.
-class Outputable a => OutputableBndr a where
+class ( Outputable a
+      , Typeable a ) -- ROMES:TODO: Temporary!! Debugging...
+      => OutputableBndr a where
    pprBndr :: BindingSite -> a -> SDoc
    pprBndr _b x = ppr x
 

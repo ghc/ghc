@@ -5,6 +5,7 @@
 
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE GADTs, StandaloneDeriving #-}
 
@@ -1927,19 +1928,29 @@ mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
 -- that the rhs satisfies the let-can-float invariant.  Prefer to use
 -- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
-mkLets        :: [Bind b] -> Expr b -> Expr b
+mkLets        :: Typeable b => [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
-mkLams        :: HasCallStack => [b] -> Expr b -> Expr b
+mkLams        :: forall b. HasCallStack => Typeable b => [b] -> Expr b -> Expr b
 
-mkLams binders body = foldr Lam body binders
+mkLams binders body = case eqT @b @Id of Just Refl -> assertPpr (all isLambdaBinding binders) (text "mkLams: A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") $ foldr Lam body binders
+                                         Nothing -> foldr Lam body binders
 mkLets binds body   = foldr mkLet body binds
 
-mkLet :: Bind b -> Expr b -> Expr b
+-- ROMES:TODO: temporary assertions, this is validated in the linter...
+
+mkLet :: forall b. Typeable b
+      => Bind b -> Expr b -> Expr b
 -- The desugarer sometimes generates an empty Rec group
 -- which Lint rejects, so we kill it off right away
 mkLet (Rec []) body = body
-mkLet bind     body = Let bind body
+mkLet bind     body = case (eqT @b @Id) of Just Refl -> assertPpr (isLetBinder bind) (text "mkLet: A lambda-bound var [" <+> pprLetBinderId bind <+> text "] was used to construct a let binder!") $ Let bind body
+                                           Nothing   -> Let bind body
+  where
+    isLetBinder (NonRec b _) = isLetBinding b
+    isLetBinder (Rec ls) = all (isLetBinding . fst) ls
+    pprLetBinderId (NonRec b _) = pprIdWithBinding b
+    pprLetBinderId (Rec ls)     = hsep $ map (pprIdWithBinding . fst) ls
 
 -- | @mkLetNonRec bndr rhs body@ wraps @body@ in a @let@ binding @bndr@.
 mkLetNonRec :: b -> Expr b -> Expr b -> Expr b

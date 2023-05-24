@@ -28,6 +28,7 @@ module GHC.Core.Ppr (
     ) where
 
 import GHC.Prelude
+import Data.Typeable
 
 import GHC.Core
 import GHC.Core.Stats (exprStats)
@@ -384,7 +385,8 @@ instance OutputableBndr Var where
   pprPrefixOcc = pprPrefixName . varName
   bndrIsJoin_maybe = isJoinId_maybe
 
-instance Outputable b => OutputableBndr (TaggedBndr b) where
+-- ROMES:TODO: Temporary TYepable !
+instance (Typeable b, Outputable b) => OutputableBndr (TaggedBndr b) where
   pprBndr _    b = ppr b   -- Simple
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b

@@ -1105,7 +1105,8 @@ call of 'f'.  Hence the (not float_is_lam) in float_me.
 The binding stuff works for top level too.
 -}
 
-lvlBind :: LevelEnv
+lvlBind :: HasCallStack
+        => LevelEnv
         -> CoreBindWithFVs
         -> LvlM (LevelledBind, LevelEnv)
 
@@ -1263,7 +1264,7 @@ profitableFloat env dest_lvl
 -- Three help functions for the type-abstraction case
 
 -- ROMES:TODO: What does this do? Why does it start with lvl?
-lvlRhs :: LevelEnv
+lvlRhs :: HasCallStack => LevelEnv
        -> RecFlag
        -> Bool               -- Is this a bottoming function
        -> Maybe JoinArity
@@ -1274,7 +1275,7 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
                 rec_flag is_bot mb_join_arity expr
 
 -- ROMES:TODO: Document this function, what does it do?
-lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
+lvlFloatRhs :: HasCallStack => [OutVar] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> Maybe JoinArity
             -> CoreExprWithFVs
@@ -1292,7 +1293,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                       | otherwise
                       = collectAnnBndrs rhs
     (env1, bndrs1)    = substBndrsSL NonRecursive env bndrs
-    all_bndrs         = abs_vars ++ bndrs1
+    all_bndrs         = pprTrace "lvlFloatRhs" (text "abs_vars:" <+> ppr abs_vars $$ text "bndrs1:" <+> ppr bndrs1) $ abs_vars ++ bndrs1
     (body_env, bndrs') | Just _ <- mb_join_arity
                       = lvlJoinBndrs env1 dest_lvl rec all_bndrs
                       | otherwise

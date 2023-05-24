@@ -66,6 +66,7 @@ module GHC.Types.Var (
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
+        isLetBinding, isLambdaBinding,
 
         -- * ForAllTyFlags
         ForAllTyFlag(Invisible,Required,Specified,Inferred),
@@ -278,7 +279,7 @@ data Var
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
 
 data IdBinding where
-  LambdaBound :: !Mult -> IdBinding -- ^ includes lambda-bound and constructor fields---pattern bound
+  LambdaBound :: HasCallStack => !Mult -> IdBinding -- ^ includes lambda-bound and constructor fields---pattern bound
   LetBound    :: HasCallStack => UsageEnv -> IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
   -- ROMES:TODO: What about type variables? LambdaBound too? Do type variables have a multiplicity?
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
@@ -286,6 +287,16 @@ data IdBinding where
 
 pprIdWithBinding :: Id -> SDoc
 pprIdWithBinding x = ppr x <> text "[" <> ppr (idBinding x) <> text "]"
+
+isLetBinding :: Id -> Bool
+isLetBinding x = case idBinding x of
+                   LetBound _ -> True
+                   LambdaBound _ -> False
+
+isLambdaBinding :: Id -> Bool
+isLambdaBinding x = case idBinding x of
+                     LetBound _ -> False
+                     LambdaBound _ -> True
 
 {-
 Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)

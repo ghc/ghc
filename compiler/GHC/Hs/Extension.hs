@@ -110,7 +110,8 @@ type instance Anno Id      = SrcSpanAnnN
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (EpAnn a),
                           IsPass p)
 
-instance UnXRec (GhcPass p) where
+-- ROMES:TODO:::::
+instance Typeable p => UnXRec (GhcPass p) where
   unXRec = unLoc
 instance MapXRec (GhcPass p) where
   mapXRec = fmap
@@ -183,6 +184,7 @@ type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 -- See Note [IsPass].
 class ( NoGhcTcPass (NoGhcTcPass p) ~ NoGhcTcPass p
       , IsPass (NoGhcTcPass p)
+      , Typeable p -- ROMES:TODO: Temp
       ) => IsPass p where
   ghcPass :: GhcPass p
 
@@ -221,6 +223,9 @@ type OutputableBndrId pass =
   , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
   , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
+  , Typeable pass -- ROMES:TODO: Temporary!!
+  , Typeable (NoGhcTcPass pass) -- ROMES:TODO: Temporary!!
+  , Typeable (IdGhcP pass) -- ROMES:TODO: Temporary!!
   )
 
 -- useful helper functions:
