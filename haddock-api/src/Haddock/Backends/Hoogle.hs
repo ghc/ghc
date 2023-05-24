@@ -107,11 +107,17 @@ outHsSigType :: DynFlags -> HsSigType GhcRn -> String
 outHsSigType dflags = out dflags . reparenSigType . dropHsDocTy
 
 outWith :: Outputable a => (SDoc -> String) -> a -> [Char]
-outWith p = f . unwords . map (dropWhile isSpace) . lines . p . ppr
-    where
-        f xs | " <document comment>" `isPrefixOf` xs = f $ drop 19 xs
-        f (x:xs) = x : f xs
-        f [] = []
+outWith p =
+      f
+    . unwords
+    . map (dropWhile isSpace)
+    . lines
+    . p
+    . ppr
+  where
+      f xs | " <document comment>" `isPrefixOf` xs = f $ drop 19 xs
+      f (x:xs) = x : f xs
+      f [] = []
 
 out :: Outputable a => DynFlags -> a -> String
 out dflags = outWith $ showSDoc dflags
@@ -135,27 +141,27 @@ ppExportD dflags
       , expDSubDocs  = subdocs
       , expDFixities = fixities
       }
-  = let
-      -- Since Hoogle is line based, we want to avoid breaking long lines.
-      dflags' = dflags{ pprCols = maxBound }
-    in
-      concat
-        [ ppDocumentation dflags' dc ++ f d
-        | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
-        ] ++ ppFixities
+  = concat
+      [ ppDocumentation dflags' dc ++ f d
+      | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
+      ] ++ ppFixities
   where
+    -- Since Hoogle is line based, we want to avoid breaking long lines.
+    dflags' :: DynFlags
+    dflags' = dflags{ pprCols = maxBound }
+
     f :: HsDecl GhcRn -> [String]
-    f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
-    f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
-    f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
-    f (TyClD _ (FamDecl _ d)) = ppFam dflags d
-    f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] typ]
-    f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] typ]
-    f (SigD _ sig) = ppSig dflags sig
+    f (TyClD _ d@DataDecl{})  = ppData dflags' d subdocs
+    f (TyClD _ d@SynDecl{})   = ppSynonym dflags' d
+    f (TyClD _ d@ClassDecl{}) = ppClass dflags' d subdocs
+    f (TyClD _ (FamDecl _ d)) = ppFam dflags' d
+    f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags' [name] typ]
+    f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags' [name] typ]
+    f (SigD _ sig) = ppSig dflags' sig
     f _ = []
 
     ppFixities :: [String]
-    ppFixities = concatMap (ppFixity dflags) fixities
+    ppFixities = concatMap (ppFixity dflags') fixities
 
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
@@ -176,38 +182,53 @@ pp_sig dflags names (L _ typ)  =
     where
       prettyNames = intercalate ", " $ map (out dflags) names
 
+
+
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppClass dflags decl subdocs =
-  (out dflags decl{tcdSigs=[], tcdATs=[], tcdATDefs=[], tcdMeths=emptyLHsBinds}
-    ++ ppTyFams) :  ppMethods
-    where
-        ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
-        ppSig' = flip (ppSigWithDoc dflags) subdocs
+    (ppDecl ++ ppTyFams) : ppMethods
+  where
+    ppDecl :: String
+    ppDecl =
+      out dflags
+        decl
+          { tcdSigs = []
+          , tcdATs = []
+          , tcdATDefs = []
+          , tcdMeths = emptyLHsBinds
+          }
 
-        add_ctxt = addClassContext (tcdName decl) (tyClDeclTyVars decl)
+    ppMethods :: [String]
+    ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
 
-        ppTyFams
-            | null $ tcdATs decl = ""
-            | otherwise = (" " ++) . showSDoc dflags . whereWrapper $ concat
-                [ map pprTyFam (tcdATs decl)
-                , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
-                ]
+    ppSig' = flip (ppSigWithDoc dflags) subdocs
 
-        pprTyFam :: LFamilyDecl GhcRn -> SDoc
-        pprTyFam (L _ at) = vcat' $ map text $
-            mkSubdocN dflags
-              (fdLName at)
-              subdocs
-              -- Associated type families should not be printed as top-level
-              -- (avoid printing the `family` keyword)
-              (ppFam dflags at{fdTopLevel = NotTopLevel})
+    add_ctxt = addClassContext (tcdName decl) (tyClDeclTyVars decl)
 
-        whereWrapper elems = vcat'
-            [ text "where" <+> lbrace
-            , nest 4 . vcat . map (Outputable.<> semi) $ elems
-            , rbrace
+    ppTyFams :: String
+    ppTyFams
+        | null $ tcdATs decl = ""
+        | otherwise = (" " ++) . showSDoc dflags . whereWrapper $ concat
+            [ map pprTyFam (tcdATs decl)
+            , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
             ]
+
+    pprTyFam :: LFamilyDecl GhcRn -> SDoc
+    pprTyFam (L _ at) = vcat' $ map text $
+        mkSubdocN dflags
+          (fdLName at)
+          subdocs
+          -- Associated type families should not be printed as top-level
+          -- (avoid printing the `family` keyword)
+          (ppFam dflags at{fdTopLevel = NotTopLevel})
+
+    whereWrapper elems = vcat'
+        [ text "where" <+> lbrace
+        , nest 4 . vcat . map (Outputable.<> semi) $ elems
+        , rbrace
+        ]
+
 
 ppFam :: DynFlags -> FamilyDecl GhcRn -> [String]
 ppFam dflags decl@(FamilyDecl { fdInfo = info })

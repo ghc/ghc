@@ -532,8 +532,11 @@ availExportItem
   -> AvailInfo
   -> OccEnv Name       -- Default methods
   -> IfM m [ExportItem GhcRn]
-availExportItem prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
-  dflags availInfo defMeths = declWith availInfo
+availExportItem
+    prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
+    dflags availInfo defMeths
+  =
+    declWith availInfo
   where
     declWith :: AvailInfo -> IfM m [ ExportItem GhcRn ]
     declWith avail = do

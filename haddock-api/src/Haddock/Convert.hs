@@ -507,9 +507,10 @@ synifyTyVarBndr' no_kinds (Bndr tv spec) = synify_ty_var no_kinds spec tv
 -- signatures (even if they don't have the lifted type kind).
 synify_ty_var :: VarSet -> flag -> TyVar -> LHsTyVarBndr flag GhcRn
 synify_ty_var no_kinds flag tv
-  | isLiftedTypeKind kind || tv `elemVarSet` no_kinds
-  = noLocA (UserTyVar noAnn flag (noLocA name))
-  | otherwise = noLocA (KindedTyVar noAnn flag (noLocA name) (synifyKindSig kind))
+    | isLiftedTypeKind kind || tv `elemVarSet` no_kinds
+    = noLocA (UserTyVar noAnn flag (noLocA name))
+    | otherwise
+    = noLocA (KindedTyVar noAnn flag (noLocA name) (synifyKindSig kind))
   where
     kind = tyVarKind tv
     name = getName tv
