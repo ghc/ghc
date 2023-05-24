@@ -11,3 +11,4 @@ Release notes
    9.2.5-notes
    9.2.6-notes
    9.2.7-notes
+   9.2.8-notes
