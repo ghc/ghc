@@ -1,5 +1,6 @@
 
-T18251e.hs:3:5: error:
+T18251e.hs:3:5: error: [GHC-62558]
     • Syntax error on [| id |]
-      Perhaps you intended to use TemplateHaskell or TemplateHaskellQuotes
     • In the Template Haskell quotation [| id |]
+    Suggested fix:
+      Enable any of the following extensions: TemplateHaskell, TemplateHaskellQuotes

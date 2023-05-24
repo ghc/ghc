@@ -974,9 +974,6 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
            text "non-bidirectional pattern synonym"
            <+> quotes (ppr name) <+> text "used in an expression"
-    TcRnSplicePolymorphicLocalVar ident
-      -> mkSimpleDecorated $
-           text "Can't splice the polymorphic local variable" <+> quotes (ppr ident)
     TcRnIllegalDerivingItem hs_ty
       -> mkSimpleDecorated $
            text "Illegal deriving item" <+> quotes (ppr hs_ty)
@@ -992,9 +989,6 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalRecordSyntax either_ty_ty
       -> mkSimpleDecorated $
            text "Record syntax is illegal here:" <+> either ppr ppr either_ty_ty
-    TcRnUnexpectedTypeSplice ty
-      -> mkSimpleDecorated $
-           text "Unexpected type splice:" <+> ppr ty
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
            text "Cannot apply function of kind" <+> quotes (ppr ty)
@@ -1200,108 +1194,6 @@ instance Diagnostic TcRnMessage where
           -- Is the data con a "covert" GADT?  See Note [isCovertGadtDataCon]
           -- in GHC.Core.DataCon
           sneaky_eq_spec = isCovertGadtDataCon con
-
-    TcRnTypedTHWithPolyType ty
-      -> mkSimpleDecorated $
-        vcat [ text "Illegal polytype:" <+> ppr ty
-             , text "The type of a Typed Template Haskell expression must" <+>
-               text "not have any quantification." ]
-    TcRnSpliceThrewException phase _exn exn_msg expr show_code
-      -> mkSimpleDecorated $
-           vcat [ text "Exception when trying to" <+> text phaseStr <+> text "compile-time code:"
-                , nest 2 (text exn_msg)
-                , if show_code then text "Code:" <+> ppr expr else empty]
-         where phaseStr =
-                 case phase of
-                   SplicePhase_Run -> "run"
-                   SplicePhase_CompileAndLink -> "compile and link"
-    TcRnInvalidTopDecl _decl
-      -> mkSimpleDecorated $
-         text "Only function, value, annotation, and foreign import declarations may be added with addTopDecls"
-    TcRnNonExactName name
-      -> mkSimpleDecorated $
-         hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
-            2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
-    TcRnAddInvalidCorePlugin plugin
-      -> mkSimpleDecorated $
-         hang
-           (text "addCorePlugin: invalid plugin module "
-              <+> text (show plugin)
-           )
-           2
-           (text "Plugins in the current package can't be specified.")
-    TcRnAddDocToNonLocalDefn doc_loc
-      -> mkSimpleDecorated $
-         text "Can't add documentation to" <+> ppr_loc doc_loc <+>
-         text "as it isn't inside the current module"
-      where
-        ppr_loc (TH.DeclDoc n) = text $ TH.pprint n
-        ppr_loc (TH.ArgDoc n _) = text $ TH.pprint n
-        ppr_loc (TH.InstDoc t) = text $ TH.pprint t
-        ppr_loc TH.ModuleDoc = text "the module header"
-
-    TcRnFailedToLookupThInstName th_type reason
-      -> mkSimpleDecorated $
-         case reason of
-           NoMatchesFound ->
-             text "Couldn't find any instances of"
-               <+> text (TH.pprint th_type)
-               <+> text "to add documentation to"
-           CouldNotDetermineInstance ->
-             text "Couldn't work out what instance"
-               <+> text (TH.pprint th_type)
-               <+> text "is supposed to be"
-    TcRnCannotReifyInstance ty
-      -> mkSimpleDecorated $
-         hang (text "reifyInstances:" <+> quotes (ppr ty))
-            2 (text "is not a class constraint or type family application")
-    TcRnCannotReifyOutOfScopeThing th_name
-      -> mkSimpleDecorated $
-         quotes (text (TH.pprint th_name)) <+>
-                 text "is not in scope at a reify"
-               -- Ugh! Rather an indirect way to display the name
-    TcRnCannotReifyThingNotInTypeEnv name
-      -> mkSimpleDecorated $
-         quotes (ppr name) <+> text "is not in the type environment at a reify"
-    TcRnNoRolesAssociatedWithThing thing
-      -> mkSimpleDecorated $
-         text "No roles associated with" <+> (ppr thing)
-    TcRnCannotRepresentType sort ty
-      -> mkSimpleDecorated $
-         hsep [text "Can't represent" <+> sort_doc <+>
-               text "in Template Haskell:",
-                 nest 2 (ppr ty)]
-       where
-         sort_doc = text $
-           case sort of
-             LinearInvisibleArgument -> "linear invisible argument"
-             CoercionsInTypes -> "coercions in types"
-    TcRnRunSpliceFailure mCallingFnName (ConversionFail what reason)
-      -> mkSimpleDecorated
-           . addCallingFn
-           . addSpliceInfo
-           $ pprConversionFailReason reason
-      where
-        addCallingFn rest =
-          case mCallingFnName of
-            Nothing -> rest
-            Just callingFn ->
-              hang (text ("Error in a declaration passed to " ++ callingFn ++ ":"))
-                 2 rest
-        addSpliceInfo = case what of
-          ConvDec d -> addSliceInfo' "declaration" d
-          ConvExp e -> addSliceInfo' "expression" e
-          ConvPat p -> addSliceInfo' "pattern" p
-          ConvType t -> addSliceInfo' "type" t
-        addSliceInfo' what item reasonErr = reasonErr $$ descr
-          where
-                -- Show the item in pretty syntax normally,
-                -- but with all its constructors if you say -dppr-debug
-            descr = hang (text "When splicing a TH" <+> text what <> colon)
-                       2 (getPprDebug $ \case
-                           True  -> text (show item)
-                           False -> text (TH.pprint item))
-    TcRnReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
     TcRnUnsatisfiedMinimalDef mindef
       -> mkSimpleDecorated $
         vcat [text "No explicit implementation for"
@@ -1330,10 +1222,6 @@ instance Diagnostic TcRnMessage where
       text "For this to work enable NamedFieldPuns"
     TcRnIllegalStaticExpression e -> mkSimpleDecorated $
         text "Illegal static expression:" <+> ppr e
-    TcRnIllegalStaticFormInSplice e -> mkSimpleDecorated $
-      sep [ text "static forms cannot be used in splices:"
-          , nest 2 $ ppr e
-          ]
     TcRnListComprehensionDuplicateBinding n -> mkSimpleDecorated $
         (text "Duplicate binding in parallel list comprehension for:"
           <+> quotes (ppr n))
@@ -1522,9 +1410,6 @@ instance Diagnostic TcRnMessage where
     TcRnStupidThetaInGadt{} -> mkSimpleDecorated $
       vcat [text "No context is allowed on a GADT-style data declaration",
             text "(You can put a context on each constructor, though.)"]
-    TcRnBadImplicitSplice -> mkSimpleDecorated $
-         text "Parse error: module header, import declaration"
-      $$ text "or top-level declaration expected."
     TcRnShadowedTyVarNameInFamResult resName -> mkSimpleDecorated $
        hsep [ text "Type variable", quotes (ppr resName) <> comma
             , text "naming a type family result,"
@@ -1919,11 +1804,6 @@ instance Diagnostic TcRnMessage where
     TcRnNonCanonicalDefinition reason inst_ty
       -> mkSimpleDecorated $
          pprNonCanonicalDefinition inst_ty reason
-    TcRnUnexpectedDeclarationSplice {}
-      -> mkSimpleDecorated $
-         text "Declaration splices are not permitted" <+>
-         text "inside top-level declarations added with" <+>
-         quotes (text "addTopDecls") <> dot
     TcRnImplicitImportOfPrelude
       -> mkSimpleDecorated $
          text "Module" <+> quotes (text "Prelude") <+> text "implicitly imported."
@@ -1952,28 +1832,7 @@ instance Diagnostic TcRnMessage where
           _            -> empty
     TcRnIllegalQuasiQuotes -> mkSimpleDecorated $
       text "Quasi-quotes are not permitted without QuasiQuotes"
-    TcRnIllegalTHQuotes expr -> mkSimpleDecorated $
-      text "Syntax error on" <+> ppr expr
-    TcRnIllegalTHSplice -> mkSimpleDecorated $
-      text "Top-level splices are not permitted without TemplateHaskell"
-    TcRnMismatchedSpliceType splice_type inner_splice_or_bracket ->
-      mkSimpleDecorated $
-        inner <+> text "may not appear in" <+> outer <> dot
-        where
-          (inner, outer) = case inner_splice_or_bracket of
-            IsSplice -> case splice_type of
-              Typed   -> (text "Typed splices"  , text "untyped brackets")
-              Untyped -> (text "Untyped splices", text "typed brackets")
-            IsBracket ->
-              case splice_type of
-              Typed   -> (text "Untyped brackets", text "typed splices")
-              Untyped -> (text "Typed brackets"  , text "untyped splices")
-    TcRnNestedTHBrackets -> mkSimpleDecorated $
-      text "Template Haskell brackets cannot be nested" <+>
-      text "(without intervening splices)"
-    TcRnQuotedNameWrongStage quote -> mkSimpleDecorated $
-      sep [ text "Stage error: the non-top-level quoted name" <+> ppr quote
-          , text "must be used at the same stage at which it is bound" ]
+    TcRnTHError err -> pprTHError err
 
   diagnosticReason = \case
     TcRnUnknownMessage m
@@ -2165,6 +2024,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnBadRecordUpdate{}
       -> ErrorWithoutFlag
+    TcRnIllegalStaticExpression {}
+      -> ErrorWithoutFlag
     TcRnStaticFormNotClosed{}
       -> ErrorWithoutFlag
     TcRnUselessTypeable
@@ -2260,15 +2121,11 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPatSynNotBidirectional{}
       -> ErrorWithoutFlag
-    TcRnSplicePolymorphicLocalVar{}
-      -> ErrorWithoutFlag
     TcRnIllegalDerivingItem{}
       -> ErrorWithoutFlag
     TcRnUnexpectedAnnotation{}
       -> ErrorWithoutFlag
     TcRnIllegalRecordSyntax{}
-      -> ErrorWithoutFlag
-    TcRnUnexpectedTypeSplice{}
       -> ErrorWithoutFlag
     TcRnInvalidVisibleKindArgument{}
       -> ErrorWithoutFlag
@@ -2322,50 +2179,14 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnIllegalTypeData
       -> ErrorWithoutFlag
-    TcRnQuotedNameWrongStage {}
-      -> ErrorWithoutFlag
     TcRnIllegalQuasiQuotes{}
       -> ErrorWithoutFlag
-    TcRnIllegalTHQuotes{}
-      -> ErrorWithoutFlag
-    TcRnIllegalTHSplice{}
-      -> ErrorWithoutFlag
-    TcRnNestedTHBrackets{}
-      -> ErrorWithoutFlag
-    TcRnMismatchedSpliceType{}
-      -> ErrorWithoutFlag
+    TcRnTHError err
+      -> thErrorReason err
     TcRnTypeDataForbids{}
       -> ErrorWithoutFlag
     TcRnIllegalNewtype{}
       -> ErrorWithoutFlag
-    TcRnTypedTHWithPolyType{}
-      -> ErrorWithoutFlag
-    TcRnSpliceThrewException{}
-      -> ErrorWithoutFlag
-    TcRnInvalidTopDecl{}
-      -> ErrorWithoutFlag
-    TcRnNonExactName{}
-      -> ErrorWithoutFlag
-    TcRnAddInvalidCorePlugin{}
-      -> ErrorWithoutFlag
-    TcRnAddDocToNonLocalDefn{}
-      -> ErrorWithoutFlag
-    TcRnFailedToLookupThInstName{}
-      -> ErrorWithoutFlag
-    TcRnCannotReifyInstance{}
-      -> ErrorWithoutFlag
-    TcRnCannotReifyOutOfScopeThing{}
-      -> ErrorWithoutFlag
-    TcRnCannotReifyThingNotInTypeEnv{}
-      -> ErrorWithoutFlag
-    TcRnNoRolesAssociatedWithThing{}
-      -> ErrorWithoutFlag
-    TcRnCannotRepresentType{}
-      -> ErrorWithoutFlag
-    TcRnRunSpliceFailure{}
-      -> ErrorWithoutFlag
-    TcRnReportCustomQuasiError isError _
-      -> if isError then ErrorWithoutFlag else WarningWithoutFlag
     TcRnUnsatisfiedMinimalDef{}
       -> WarningWithFlag (Opt_WarnMissingMethods)
     TcRnMisplacedInstSig{}
@@ -2379,10 +2200,6 @@ instance Diagnostic TcRnMessage where
     TcRnNoRebindableSyntaxRecordDot{}
       -> ErrorWithoutFlag
     TcRnNoFieldPunsRecordDot{}
-      -> ErrorWithoutFlag
-    TcRnIllegalStaticExpression{}
-      -> ErrorWithoutFlag
-    TcRnIllegalStaticFormInSplice{}
       -> ErrorWithoutFlag
     TcRnListComprehensionDuplicateBinding{}
       -> ErrorWithoutFlag
@@ -2447,8 +2264,6 @@ instance Diagnostic TcRnMessage where
     TcRnNoDerivStratSpecified{}
       -> WarningWithFlag Opt_WarnMissingDerivingStrategies
     TcRnStupidThetaInGadt{}
-      -> ErrorWithoutFlag
-    TcRnBadImplicitSplice{}
       -> ErrorWithoutFlag
     TcRnShadowedTyVarNameInFamResult{}
       -> ErrorWithoutFlag
@@ -2619,8 +2434,6 @@ instance Diagnostic TcRnMessage where
       -> WarningWithFlag Opt_WarnNonCanonicalMonoidInstances
     TcRnNonCanonicalDefinition (NonCanonicalMonad _) _
       -> WarningWithFlag Opt_WarnNonCanonicalMonadInstances
-    TcRnUnexpectedDeclarationSplice {}
-      -> ErrorWithoutFlag
     TcRnImplicitImportOfPrelude {}
       -> WarningWithFlag Opt_WarnImplicitPrelude
     TcRnMissingMain {}
@@ -2850,6 +2663,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnBadRecordUpdate{}
       -> noHints
+    TcRnIllegalStaticExpression {}
+      -> [suggestExtension LangExt.StaticPointers]
     TcRnStaticFormNotClosed{}
       -> noHints
     TcRnUselessTypeable
@@ -2933,15 +2748,11 @@ instance Diagnostic TcRnMessage where
       -> [SuggestPatternMatchingSyntax]
     TcRnPatSynNotBidirectional{}
       -> noHints
-    TcRnSplicePolymorphicLocalVar{}
-      -> noHints
     TcRnIllegalDerivingItem{}
       -> noHints
     TcRnUnexpectedAnnotation{}
       -> noHints
     TcRnIllegalRecordSyntax{}
-      -> noHints
-    TcRnUnexpectedTypeSplice{}
       -> noHints
     TcRnInvalidVisibleKindArgument{}
       -> noHints
@@ -2978,18 +2789,10 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalHsigDefaultMethods{}
       -> noHints
-    TcRnQuotedNameWrongStage {}
-      -> noHints
     TcRnIllegalQuasiQuotes{}
       -> [suggestExtension LangExt.QuasiQuotes]
-    TcRnIllegalTHQuotes{}
-      -> [suggestAnyExtension [LangExt.TemplateHaskell, LangExt.TemplateHaskellQuotes]]
-    TcRnIllegalTHSplice{}
-      -> [suggestExtension LangExt.TemplateHaskell]
-    TcRnNestedTHBrackets{}
-      -> noHints
-    TcRnMismatchedSpliceType{}
-      -> noHints
+    TcRnTHError err
+      -> thErrorHints err
     TcRnHsigFixityMismatch{}
       -> noHints
     TcRnHsigShapeMismatch{}
@@ -3014,34 +2817,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnIllegalNewtype{}
       -> noHints
-    TcRnTypedTHWithPolyType{}
-      -> noHints
-    TcRnSpliceThrewException{}
-      -> noHints
-    TcRnInvalidTopDecl{}
-      -> noHints
-    TcRnNonExactName{}
-      -> noHints
-    TcRnAddInvalidCorePlugin{}
-      -> noHints
-    TcRnAddDocToNonLocalDefn{}
-      -> noHints
-    TcRnFailedToLookupThInstName{}
-      -> noHints
-    TcRnCannotReifyInstance{}
-      -> noHints
-    TcRnCannotReifyOutOfScopeThing{}
-      -> noHints
-    TcRnCannotReifyThingNotInTypeEnv{}
-      -> noHints
-    TcRnNoRolesAssociatedWithThing{}
-      -> noHints
-    TcRnCannotRepresentType{}
-      -> noHints
-    TcRnRunSpliceFailure{}
-      -> noHints
-    TcRnReportCustomQuasiError{}
-      -> noHints
     TcRnUnsatisfiedMinimalDef{}
       -> noHints
     TcRnMisplacedInstSig{}
@@ -3055,10 +2830,6 @@ instance Diagnostic TcRnMessage where
     TcRnNoRebindableSyntaxRecordDot{}
       -> noHints
     TcRnNoFieldPunsRecordDot{}
-      -> noHints
-    TcRnIllegalStaticExpression{}
-      -> [suggestExtension LangExt.StaticPointers]
-    TcRnIllegalStaticFormInSplice{}
       -> noHints
     TcRnListComprehensionDuplicateBinding{}
       -> noHints
@@ -3135,8 +2906,6 @@ instance Diagnostic TcRnMessage where
       then noHints
       else [suggestExtension LangExt.DerivingStrategies]
     TcRnStupidThetaInGadt{}
-      -> noHints
-    TcRnBadImplicitSplice{}
       -> noHints
     TcRnShadowedTyVarNameInFamResult{}
       -> noHints
@@ -3322,8 +3091,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnNonCanonicalDefinition reason _
       -> suggestNonCanonicalDefinition reason
-    TcRnUnexpectedDeclarationSplice {}
-      -> noHints
     TcRnImplicitImportOfPrelude {}
       -> noHints
     TcRnMissingMain {}
@@ -6086,5 +5853,311 @@ failedCoverageConditionHints (CoverageProblem { not_covered_liberal = failed_cc 
         if failed_licc
         then noHints
         else [suggestExtension LangExt.UndecidableInstances]
+
+--------------------------------------------------------------------------------
+-- Template Haskell quotes and splices
+
+pprTHError :: THError -> DecoratedSDoc
+pprTHError = \case
+  THSyntaxError err -> pprTHSyntaxError err
+  THNameError   err -> pprTHNameError   err
+  THReifyError  err -> pprTHReifyError  err
+  TypedTHError  err -> pprTypedTHError  err
+  THSpliceFailed rea -> pprSpliceFailReason rea
+  AddTopDeclsError err -> pprAddTopDeclsError err
+
+  IllegalStaticFormInSplice e ->
+    mkSimpleDecorated $
+      sep [ text "static forms cannot be used in splices:"
+          , nest 2 $ ppr e
+          ]
+
+  FailedToLookupThInstName th_type reason ->
+    mkSimpleDecorated $
+    case reason of
+      NoMatchesFound ->
+        text "Couldn't find any instances of"
+          <+> text (TH.pprint th_type)
+          <+> text "to add documentation to"
+      CouldNotDetermineInstance ->
+        text "Couldn't work out what instance"
+          <+> text (TH.pprint th_type)
+          <+> text "is supposed to be"
+
+  AddInvalidCorePlugin plugin ->
+    mkSimpleDecorated $
+      hang (text "addCorePlugin: invalid plugin module" <+> quotes (text plugin) )
+         2 (text "Plugins in the current package can't be specified.")
+
+  AddDocToNonLocalDefn doc_loc ->
+    mkSimpleDecorated $
+      text "Can't add documentation to" <+> ppr_loc doc_loc <> comma <+>
+      text "as it isn't inside the current module."
+      where
+        ppr_loc (TH.DeclDoc n) = text $ TH.pprint n
+        ppr_loc (TH.ArgDoc n _) = text $ TH.pprint n
+        ppr_loc (TH.InstDoc t) = text $ TH.pprint t
+        ppr_loc TH.ModuleDoc = text "the module header"
+
+  ReportCustomQuasiError _ msg -> mkSimpleDecorated $ text msg
+
+pprTHSyntaxError :: THSyntaxError -> DecoratedSDoc
+pprTHSyntaxError = mkSimpleDecorated . \case
+  IllegalTHQuotes expr ->
+    text "Syntax error on" <+> ppr expr
+      -- The error message context will say
+      -- "In the Template Haskell quotation", so no need to repeat that here.
+  BadImplicitSplice ->
+    sep [ text "Parse error: module header, import declaration"
+        , text "or top-level declaration expected." ]
+    -- The compiler should not mention TemplateHaskell, as the common case
+    -- is that this is a simple beginner error, for example:
+    --
+    -- module M where
+    --   f :: Int -> Int; f x = x
+    --   xyzzy
+    --   g y = f y + 1
+    --
+    -- It's unlikely that 'xyzzy' above was intended to be a Template Haskell
+    -- splice; instead it's probably something mistakenly left in the code.
+    -- See #12146 for discussion.
+
+  IllegalTHSplice ->
+    text "Unexpected top-level splice."
+  MismatchedSpliceType splice_type inner_splice_or_bracket ->
+    inner <+> text "may not appear in" <+> outer <> dot
+      where
+        (inner, outer) = case inner_splice_or_bracket of
+          IsSplice -> case splice_type of
+            Typed   -> (text "Typed splices"  , text "untyped brackets")
+            Untyped -> (text "Untyped splices", text "typed brackets")
+          IsBracket ->
+            case splice_type of
+            Typed   -> (text "Untyped brackets", text "typed splices")
+            Untyped -> (text "Typed brackets"  , text "untyped splices")
+  NestedTHBrackets ->
+    text "Template Haskell brackets cannot be nested" <+>
+    text "(without intervening splices)"
+
+pprTHNameError :: THNameError -> DecoratedSDoc
+pprTHNameError = \case
+  NonExactName name ->
+    mkSimpleDecorated $
+      hang (text "The binder" <+> quotes (ppr name) <+> text "is not a NameU.")
+         2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
+  QuotedNameWrongStage quote ->
+    mkSimpleDecorated $
+      sep [ text "Stage error: the non-top-level quoted name" <+> ppr quote
+          , text "must be used at the same stage at which it is bound." ]
+
+pprTHReifyError :: THReifyError -> DecoratedSDoc
+pprTHReifyError = \case
+  CannotReifyInstance ty
+    -> mkSimpleDecorated $
+       hang (text "reifyInstances:" <+> quotes (ppr ty))
+          2 (text "is not a class constraint or type family application")
+  CannotReifyOutOfScopeThing th_name
+    -> mkSimpleDecorated $
+       quotes (text (TH.pprint th_name)) <+>
+               text "is not in scope at a reify"
+             -- Ugh! Rather an indirect way to display the name
+  CannotReifyThingNotInTypeEnv name
+    -> mkSimpleDecorated $
+       quotes (ppr name) <+> text "is not in the type environment at a reify"
+  NoRolesAssociatedWithThing thing
+    -> mkSimpleDecorated $
+       text "No roles associated with" <+> (ppr thing)
+  CannotRepresentType sort ty
+    -> mkSimpleDecorated $
+       hsep [text "Can't represent" <+> sort_doc <+>
+             text "in Template Haskell:",
+               nest 2 (ppr ty)]
+     where
+       sort_doc = text $
+         case sort of
+           LinearInvisibleArgument -> "linear invisible argument"
+           CoercionsInTypes -> "coercions in types"
+
+pprTypedTHError :: TypedTHError -> DecoratedSDoc
+pprTypedTHError = \case
+  SplicePolymorphicLocalVar ident
+    -> mkSimpleDecorated $
+         text "Can't splice the polymorphic local variable" <+> quotes (ppr ident)
+  TypedTHWithPolyType ty
+    -> mkSimpleDecorated $
+      vcat [ text "Illegal polytype:" <+> ppr ty
+           , text "The type of a Typed Template Haskell expression must" <+>
+             text "not have any quantification." ]
+
+pprSpliceFailReason :: SpliceFailReason -> DecoratedSDoc
+pprSpliceFailReason = \case
+  SpliceThrewException phase _exn exn_msg expr show_code ->
+    mkSimpleDecorated $
+      vcat [ text "Exception when trying to" <+> text phaseStr <+> text "compile-time code:"
+           , nest 2 (text exn_msg)
+           , if show_code then text "Code:" <+> ppr expr else empty]
+    where phaseStr =
+            case phase of
+              SplicePhase_Run -> "run"
+              SplicePhase_CompileAndLink -> "compile and link"
+  RunSpliceFailure err -> pprRunSpliceFailure Nothing err
+
+pprAddTopDeclsError :: AddTopDeclsError -> DecoratedSDoc
+pprAddTopDeclsError = \case
+  InvalidTopDecl _decl ->
+    mkSimpleDecorated $
+      sep [ text "Only function, value, annotation, and foreign import declarations"
+          , text "may be added with" <+> quotes (text "addTopDecls") <> dot ]
+  AddTopDeclsUnexpectedDeclarationSplice {} ->
+    mkSimpleDecorated $
+      text "Declaration splices are not permitted" <+>
+      text "inside top-level declarations added with" <+>
+      quotes (text "addTopDecls") <> dot
+  AddTopDeclsRunSpliceFailure err ->
+    pprRunSpliceFailure (Just "addTopDecls") err
+
+pprRunSpliceFailure :: Maybe String -> RunSpliceFailReason -> DecoratedSDoc
+pprRunSpliceFailure mb_calling_fn (ConversionFail what reason) =
+  mkSimpleDecorated . add_calling_fn . addSpliceInfo $
+    pprConversionFailReason reason
+  where
+    add_calling_fn rest =
+      case mb_calling_fn of
+        Just calling_fn ->
+          hang (text "Error in a declaration passed to" <+> quotes (text calling_fn) <> colon)
+             2 rest
+        Nothing -> rest
+    addSpliceInfo = case what of
+      ConvDec  d -> addSliceInfo' "declaration" d
+      ConvExp  e -> addSliceInfo' "expression" e
+      ConvPat  p -> addSliceInfo' "pattern" p
+      ConvType t -> addSliceInfo' "type" t
+    addSliceInfo' what item reasonErr = reasonErr $$ descr
+      where
+            -- Show the item in pretty syntax normally,
+            -- but with all its constructors if you say -dppr-debug
+        descr = hang (text "When splicing a TH" <+> text what <> colon)
+                   2 (getPprDebug $ \case
+                       True  -> text (show item)
+                       False -> text (TH.pprint item))
+
+thErrorReason :: THError -> DiagnosticReason
+thErrorReason = \case
+  THSyntaxError err -> thSyntaxErrorReason err
+  THNameError   err -> thNameErrorReason   err
+  THReifyError  err -> thReifyErrorReason  err
+  TypedTHError  err -> typedTHErrorReason  err
+  THSpliceFailed rea -> spliceFailedReason rea
+  AddTopDeclsError err -> addTopDeclsErrorReason err
+
+  IllegalStaticFormInSplice {} -> ErrorWithoutFlag
+  FailedToLookupThInstName {}  -> ErrorWithoutFlag
+  AddInvalidCorePlugin {}      -> ErrorWithoutFlag
+  AddDocToNonLocalDefn {}      -> ErrorWithoutFlag
+  ReportCustomQuasiError is_error _ ->
+    if is_error
+    then ErrorWithoutFlag
+    else WarningWithoutFlag
+
+thSyntaxErrorReason :: THSyntaxError -> DiagnosticReason
+thSyntaxErrorReason = \case
+  IllegalTHQuotes{}      -> ErrorWithoutFlag
+  BadImplicitSplice      -> ErrorWithoutFlag
+  IllegalTHSplice{}      -> ErrorWithoutFlag
+  NestedTHBrackets{}     -> ErrorWithoutFlag
+  MismatchedSpliceType{} -> ErrorWithoutFlag
+
+thNameErrorReason :: THNameError -> DiagnosticReason
+thNameErrorReason = \case
+  NonExactName {}         -> ErrorWithoutFlag
+  QuotedNameWrongStage {} -> ErrorWithoutFlag
+
+thReifyErrorReason :: THReifyError -> DiagnosticReason
+thReifyErrorReason = \case
+  CannotReifyInstance {}          -> ErrorWithoutFlag
+  CannotReifyOutOfScopeThing {}   -> ErrorWithoutFlag
+  CannotReifyThingNotInTypeEnv {} -> ErrorWithoutFlag
+  NoRolesAssociatedWithThing {}   -> ErrorWithoutFlag
+  CannotRepresentType {}          -> ErrorWithoutFlag
+
+typedTHErrorReason :: TypedTHError -> DiagnosticReason
+typedTHErrorReason = \case
+  SplicePolymorphicLocalVar {} -> ErrorWithoutFlag
+  TypedTHWithPolyType {}       -> ErrorWithoutFlag
+
+spliceFailedReason :: SpliceFailReason -> DiagnosticReason
+spliceFailedReason = \case
+  SpliceThrewException {} -> ErrorWithoutFlag
+  RunSpliceFailure {}     -> ErrorWithoutFlag
+
+addTopDeclsErrorReason :: AddTopDeclsError -> DiagnosticReason
+addTopDeclsErrorReason = \case
+  InvalidTopDecl {}
+    -> ErrorWithoutFlag
+  AddTopDeclsUnexpectedDeclarationSplice {}
+    -> ErrorWithoutFlag
+  AddTopDeclsRunSpliceFailure {}
+    -> ErrorWithoutFlag
+
+thErrorHints :: THError -> [GhcHint]
+thErrorHints = \case
+  THSyntaxError err -> thSyntaxErrorHints err
+  THNameError   err -> thNameErrorHints   err
+  THReifyError  err -> thReifyErrorHints  err
+  TypedTHError  err -> typedTHErrorHints  err
+  THSpliceFailed rea -> spliceFailedHints rea
+  AddTopDeclsError err -> addTopDeclsErrorHints err
+
+  IllegalStaticFormInSplice {} -> noHints
+  FailedToLookupThInstName {}  -> noHints
+  AddInvalidCorePlugin {}      -> noHints
+  AddDocToNonLocalDefn {}      -> noHints
+  ReportCustomQuasiError {}    -> noHints
+
+thSyntaxErrorHints :: THSyntaxError -> [GhcHint]
+thSyntaxErrorHints = \case
+  IllegalTHQuotes{}
+    -> [suggestAnyExtension [LangExt.TemplateHaskell, LangExt.TemplateHaskellQuotes]]
+  BadImplicitSplice {}
+    -> noHints -- NB: don't suggest TemplateHaskell
+               -- see comments on BadImplicitSplice in pprTHSyntaxError
+  IllegalTHSplice{}
+    -> [suggestExtension LangExt.TemplateHaskell]
+  NestedTHBrackets{}
+    -> noHints
+  MismatchedSpliceType{}
+    -> noHints
+
+thNameErrorHints :: THNameError -> [GhcHint]
+thNameErrorHints = \case
+  NonExactName {}         -> noHints
+  QuotedNameWrongStage {} -> noHints
+
+thReifyErrorHints :: THReifyError -> [GhcHint]
+thReifyErrorHints = \case
+  CannotReifyInstance {}          -> noHints
+  CannotReifyOutOfScopeThing {}   -> noHints
+  CannotReifyThingNotInTypeEnv {} -> noHints
+  NoRolesAssociatedWithThing {}   -> noHints
+  CannotRepresentType {}          -> noHints
+
+typedTHErrorHints :: TypedTHError -> [GhcHint]
+typedTHErrorHints = \case
+  SplicePolymorphicLocalVar {} -> noHints
+  TypedTHWithPolyType {}       -> noHints
+
+spliceFailedHints :: SpliceFailReason -> [GhcHint]
+spliceFailedHints = \case
+  SpliceThrewException {} -> noHints
+  RunSpliceFailure {}     -> noHints
+
+addTopDeclsErrorHints :: AddTopDeclsError -> [GhcHint]
+addTopDeclsErrorHints = \case
+  InvalidTopDecl {}
+    -> noHints
+  AddTopDeclsUnexpectedDeclarationSplice {}
+    -> noHints
+  AddTopDeclsRunSpliceFailure {}
+    -> noHints
 
 --------------------------------------------------------------------------------

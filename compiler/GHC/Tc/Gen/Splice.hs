@@ -790,7 +790,8 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 -- Takes a m and tau and returns the type m (TExp tau)
 tcTExpTy :: TcType -> TcType -> TcM TcType
 tcTExpTy m_ty exp_ty
-  = do { unless (isTauTy exp_ty) $ addErr (TcRnTypedTHWithPolyType exp_ty)
+  = do { unless (isTauTy exp_ty) $ addErr $
+          TcRnTHError $ TypedTHError $ TypedTHWithPolyType exp_ty
        ; codeCon <- tcLookupTyCon codeTyConName
        ; let rep = getRuntimeRep exp_ty
        ; return (mkTyConApp codeCon [rep, m_ty, exp_ty]) }
@@ -1247,7 +1248,8 @@ runMeta' show_code ppr_hs run_and_convert expr
                                                 -- see where this splice is
              do { mb_result <- run_and_convert expr_span hval
                 ; case mb_result of
-                    Left err     -> failWithTc (TcRnRunSpliceFailure Nothing err)
+                    Left err     -> failWithTc $
+                      TcRnTHError $ THSpliceFailed $ RunSpliceFailure err
                     Right result -> do { traceTc "Got HsSyn result:" (ppr_hs result)
                                        ; return $! result } }
 
@@ -1262,8 +1264,8 @@ runMeta' show_code ppr_hs run_and_convert expr
     fail_with_exn :: Exception e => SplicePhase -> e -> TcM a
     fail_with_exn phase exn = do
         exn_msg <- liftIO $ Panic.safeShowException exn
-        failWithTc
-          $ TcRnSpliceThrewException phase (SomeException exn) exn_msg expr show_code
+        failWithTc $ TcRnTHError $ THSpliceFailed $
+          SpliceThrewException phase (SomeException exn) exn_msg expr show_code
 
 {-
 Note [Running typed splices in the zonker]
@@ -1379,8 +1381,8 @@ instance TH.Quasi TcM where
 
   -- 'msg' is forced to ensure exceptions don't escape,
   -- see Note [Exceptions in TH]
-  qReport True msg  = seqList msg $ addErr $ TcRnReportCustomQuasiError True msg
-  qReport False msg = seqList msg $ addDiagnostic $ TcRnReportCustomQuasiError False msg
+  qReport True msg  = seqList msg $ addErr        $ TcRnTHError $ ReportCustomQuasiError True  msg
+  qReport False msg = seqList msg $ addDiagnostic $ TcRnTHError $ ReportCustomQuasiError False msg
 
   qLocation :: TcM TH.Loc
   qLocation = do { m <- getModule
@@ -1433,8 +1435,8 @@ instance TH.Quasi TcM where
       th_origin <- getThSpliceOrigin
       let either_hval = convertToHsDecls th_origin l thds
       ds <- case either_hval of
-              Left exn -> failWithTc
-                            $ TcRnRunSpliceFailure (Just "addTopDecls") exn
+              Left exn -> failWithTc $ TcRnTHError $ AddTopDeclsError $
+                AddTopDeclsRunSpliceFailure exn
               Right ds -> return ds
       mapM_ (checkTopDecl . unLoc) ds
       th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
@@ -1450,7 +1452,7 @@ instance TH.Quasi TcM where
       checkTopDecl (ForD _ (ForeignImport { fd_name = L _ name }))
         = bindName name
       checkTopDecl d
-        = addErr $ TcRnInvalidTopDecl d
+        = addErr $ TcRnTHError $ AddTopDeclsError $ InvalidTopDecl d
 
       bindName :: RdrName -> TcM ()
       bindName (Exact n)
@@ -1458,7 +1460,7 @@ instance TH.Quasi TcM where
              ; updTcRef th_topnames_var (\ns -> extendNameSet ns n)
              }
 
-      bindName name = addErr $ TcRnNonExactName name
+      bindName name = addErr $ TcRnTHError $ THNameError $ NonExactName name
 
   qAddForeignFilePath lang fp = do
     var <- fmap tcg_th_foreign_files getGblEnv
@@ -1476,7 +1478,7 @@ instance TH.Quasi TcM where
       let dflags    = hsc_dflags hsc_env
       let fopts     = initFinderOpts dflags
       r <- liftIO $ findHomeModule fc fopts home_unit (mkModuleName plugin)
-      let err = TcRnAddInvalidCorePlugin plugin
+      let err = TcRnTHError $ AddInvalidCorePlugin plugin
       case r of
         Found {} -> addErr err
         FoundMultiple {} -> addErr err
@@ -1504,7 +1506,7 @@ instance TH.Quasi TcM where
     th_doc_var <- tcg_th_docs <$> getGblEnv
     resolved_doc_loc <- resolve_loc doc_loc
     is_local <- checkLocalName resolved_doc_loc
-    unless is_local $ failWithTc $ TcRnAddDocToNonLocalDefn doc_loc
+    unless is_local $ failWithTc $ TcRnTHError $ AddDocToNonLocalDefn doc_loc
     let ds = mkGeneratedHsDocString s
         hd = lexHsDoc parseIdentifier ds
     hd' <- rnHsDoc hd
@@ -1588,7 +1590,7 @@ lookupThInstName th_type = do
     Right (_, [])       -> noMatches
   where
     noMatches = failWithTc $
-      TcRnFailedToLookupThInstName th_type NoMatchesFound
+      TcRnTHError $ FailedToLookupThInstName th_type NoMatchesFound
 
     -- Get the name of the class for the instance we are documenting
     -- > inst_cls_name (Monad Maybe) == Monad
@@ -1625,7 +1627,7 @@ lookupThInstName th_type = do
     inst_cls_name (TH.ImplicitParamT _ _)    = inst_cls_name_err
 
     inst_cls_name_err = failWithTc $
-      TcRnFailedToLookupThInstName th_type CouldNotDetermineInstance
+      TcRnTHError $ FailedToLookupThInstName th_type CouldNotDetermineInstance
 
     -- Basically does the opposite of 'mkThAppTs'
     -- > inst_arg_types (Monad Maybe) == [Maybe]
@@ -1913,14 +1915,14 @@ reifyInstances' th_nm th_tys
                      ; let matches = lookupFamInstEnv inst_envs tc tys
                      ; traceTc "reifyInstances'2" (ppr matches)
                      ; return $ Right (tc, map fim_instance matches) }
-            _  -> bale_out $ TcRnCannotReifyInstance ty }
+            _  -> bale_out $ TcRnTHError $ THReifyError $ CannotReifyInstance ty }
   where
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
     cvt :: Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
     cvt origin loc th_ty = case convertToHsType origin loc th_ty of
-      Left msg -> failWithTc (TcRnRunSpliceFailure Nothing msg)
+      Left msg -> failWithTc (TcRnTHError $ THSpliceFailed $ RunSpliceFailure msg)
       Right ty -> return ty
 
 {-
@@ -2034,10 +2036,10 @@ tcLookupTh name
 
 notInScope :: TH.Name -> TcRnMessage
 notInScope th_name =
-  TcRnCannotReifyOutOfScopeThing th_name
+  TcRnTHError $ THReifyError $ CannotReifyOutOfScopeThing th_name
 
 notInEnv :: Name -> TcRnMessage
-notInEnv name = TcRnCannotReifyThingNotInTypeEnv name
+notInEnv name = TcRnTHError $ THReifyError $ CannotReifyThingNotInTypeEnv name
 
 ------------------------------
 reifyRoles :: TH.Name -> TcM [TH.Role]
@@ -2045,7 +2047,8 @@ reifyRoles th_name
   = do { thing <- getThing th_name
        ; case thing of
            AGlobal (ATyCon tc) -> return (map reify_role (tyConRoles tc))
-           _ -> failWithTc (TcRnNoRolesAssociatedWithThing thing)
+           _ -> failWithTc $ TcRnTHError $ THReifyError $
+                  NoRolesAssociatedWithThing thing
        }
   where
     reify_role Nominal          = TH.NominalR
@@ -2842,7 +2845,7 @@ mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
 mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
 noTH :: UnrepresentableTypeDescr -> Type -> TcM a
-noTH s d = failWithTc $ TcRnCannotRepresentType s d
+noTH s d = failWithTc $ TcRnTHError $ THReifyError $ CannotRepresentType s d
 
 ppr_th :: TH.Ppr a => a -> SDoc
 ppr_th x = text (TH.pprint x)

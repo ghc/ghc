@@ -2616,21 +2616,18 @@ add gp _ (SpliceD _ (SpliceDecl _ (L _ qq@HsQuasiQuote{}) _)) ds
 
 add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
   = do { -- We've found a top-level splice.  If it is an *implicit* one
-         -- (i.e. a naked top level expression)
+         -- (i.e. a naked top level expression), throw an error if
+         -- TemplateHaskell is not enabled.
          case flag of
            DollarSplice -> return ()
-           BareSplice -> do { th_on <- xoptM LangExt.TemplateHaskell
-                                ; unless th_on $ setSrcSpan (locA loc) $
-                                  failWith badImplicitSplice }
+           BareSplice -> do { unlessXOptM LangExt.TemplateHaskell
+                            $ setSrcSpan (locA loc)
+                            $ failWith badImplicitSplice }
 
        ; return (gp, Just (splice, ds)) }
   where
     badImplicitSplice :: TcRnMessage
-    badImplicitSplice = TcRnBadImplicitSplice
-                     -- The compiler should suggest the above, and not using
-                     -- TemplateHaskell since the former suggestion is more
-                     -- relevant to the larger base of users.
-                     -- See #12146 for discussion.
+    badImplicitSplice = TcRnTHError (THSyntaxError BadImplicitSplice)
 
 -- Class declarations: added to the TyClGroup
 add gp@(HsGroup {hs_tyclds = ts}) l (TyClD _ d) ds

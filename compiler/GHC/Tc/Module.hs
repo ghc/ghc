@@ -627,7 +627,8 @@ tc_rn_src_decls ds
                         { Nothing -> return ()
                         ; Just (SpliceDecl _ (L loc _) _, _) ->
                             setSrcSpanA loc $ addErr $
-                            TcRnUnexpectedDeclarationSplice
+                            TcRnTHError $ AddTopDeclsError
+                              AddTopDeclsUnexpectedDeclarationSplice
                         }
                       -- Rename TH-generated top-level declarations
                     ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env

@@ -1,4 +1,5 @@
 
-TH_top_splice.hs:6:7: error:
-    • Top-level splices are not permitted without TemplateHaskell
+TH_top_splice.hs:6:7: error: [GHC-26759]
+    • Unexpected top-level splice.
     • In the untyped splice: $([| 1 |])
+    Suggested fix: Perhaps you intended to use TemplateHaskell

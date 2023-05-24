@@ -1287,7 +1287,8 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         -- bindings of the same splice proxy, but that doesn't
         -- matter, although it's a mite untidy.
     do  { let id_ty = idType id
-        ; checkTc (isTauTy id_ty) (TcRnSplicePolymorphicLocalVar id)
+        ; checkTc (isTauTy id_ty) $
+          TcRnTHError $ TypedTHError $ SplicePolymorphicLocalVar id
                -- If x is polymorphic, its occurrence sites might
                -- have different instantiations, so we can't use plain
                -- 'x' as the splice proxy name.  I don't know how to

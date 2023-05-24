@@ -417,6 +417,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnFieldUpdateInvalidType"                    = 63055
   GhcDiagnosticCode "TcRnMissingStrictFields"                       = 95909
   GhcDiagnosticCode "TcRnStaticFormNotClosed"                       = 88431
+  GhcDiagnosticCode "TcRnIllegalStaticExpression"                   = 23800
   GhcDiagnosticCode "TcRnUselessTypeable"                           = 90584
   GhcDiagnosticCode "TcRnDerivingDefaults"                          = 20042
   GhcDiagnosticCode "TcRnNonUnaryTypeclassConstraint"               = 73993
@@ -432,8 +433,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIncorrectNameSpace"                        = 31891
   GhcDiagnosticCode "TcRnNoRebindableSyntaxRecordDot"               = 65945
   GhcDiagnosticCode "TcRnNoFieldPunsRecordDot"                      = 57365
-  GhcDiagnosticCode "TcRnIllegalStaticExpression"                   = 23800
-  GhcDiagnosticCode "TcRnIllegalStaticFormInSplice"                 = 12219
   GhcDiagnosticCode "TcRnListComprehensionDuplicateBinding"         = 81232
   GhcDiagnosticCode "TcRnLastStmtNotExpr"                           = 55814
   GhcDiagnosticCode "TcRnUnexpectedStatementInContext"              = 42026
@@ -459,11 +458,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnExpectedValueId"                           = 01570
   GhcDiagnosticCode "TcRnRecSelectorEscapedTyVar"                   = 55876
   GhcDiagnosticCode "TcRnPatSynNotBidirectional"                    = 16444
-  GhcDiagnosticCode "TcRnSplicePolymorphicLocalVar"                 = 06568
   GhcDiagnosticCode "TcRnIllegalDerivingItem"                       = 11913
   GhcDiagnosticCode "TcRnUnexpectedAnnotation"                      = 18932
   GhcDiagnosticCode "TcRnIllegalRecordSyntax"                       = 89246
-  GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = 39180
   GhcDiagnosticCode "TcRnInvalidVisibleKindArgument"                = 20967
   GhcDiagnosticCode "TcRnTooManyBinders"                            = 05989
   GhcDiagnosticCode "TcRnDifferentNamesForTyVar"                    = 17370
@@ -498,19 +495,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNoExplicitAssocTypeOrDefaultDeclaration"   = 08585
   GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
   GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
-  GhcDiagnosticCode "TcRnTypedTHWithPolyType"                       = 94642
-  GhcDiagnosticCode "TcRnSpliceThrewException"                      = 87897
-  GhcDiagnosticCode "TcRnInvalidTopDecl"                            = 52886
-  GhcDiagnosticCode "TcRnNonExactName"                              = 77923
-  GhcDiagnosticCode "TcRnAddInvalidCorePlugin"                      = 86463
-  GhcDiagnosticCode "TcRnAddDocToNonLocalDefn"                      = 67760
-  GhcDiagnosticCode "TcRnFailedToLookupThInstName"                  = 49530
-  GhcDiagnosticCode "TcRnCannotReifyInstance"                       = 30384
-  GhcDiagnosticCode "TcRnCannotReifyOutOfScopeThing"                = 24922
-  GhcDiagnosticCode "TcRnCannotReifyThingNotInTypeEnv"              = 79890
-  GhcDiagnosticCode "TcRnNoRolesAssociatedWithThing"                = 65923
-  GhcDiagnosticCode "TcRnCannotRepresentType"                       = 75721
-  GhcDiagnosticCode "TcRnReportCustomQuasiError"                    = 39584
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
   GhcDiagnosticCode "TcRnUnsatisfiedMinimalDef"                     = 06201
   GhcDiagnosticCode "TcRnMisplacedInstSig"                          = 06202
@@ -542,7 +526,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIllegalMultipleDerivClauses"               = 30281
   GhcDiagnosticCode "TcRnNoDerivStratSpecified"                     = 55631
   GhcDiagnosticCode "TcRnStupidThetaInGadt"                         = 18403
-  GhcDiagnosticCode "TcRnBadImplicitSplice"                         = 25277
   GhcDiagnosticCode "TcRnShadowedTyVarNameInFamResult"              = 99412
   GhcDiagnosticCode "TcRnIncorrectTyVarOnLhsOfInjCond"              = 88333
   GhcDiagnosticCode "TcRnUnknownTyVarsOnRhsOfInjCond"               = 48254
@@ -604,7 +587,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindingNameConflict"                       = 10498
   GhcDiagnosticCode "NonCanonicalMonoid"                            = 50928
   GhcDiagnosticCode "NonCanonicalMonad"                             = 22705
-  GhcDiagnosticCode "TcRnUnexpectedDeclarationSplice"               = 17599
   GhcDiagnosticCode "TcRnImplicitImportOfPrelude"                   = 20540
   GhcDiagnosticCode "TcRnMissingMain"                               = 67120
   GhcDiagnosticCode "TcRnGhciUnliftedBind"                          = 17999
@@ -612,11 +594,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnArityMismatch"                             = 27346
   GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
   GhcDiagnosticCode "TcRnIllegalQuasiQuotes"                        = 77343
-  GhcDiagnosticCode "TcRnMismatchedSpliceType"                      = 45108
-  GhcDiagnosticCode "TcRnIllegalTHQuotes"                           = 62558
-  GhcDiagnosticCode "TcRnIllegalTHSplice"                           = 26759
-  GhcDiagnosticCode "TcRnNestedTHBrackets"                          = 59185
-  GhcDiagnosticCode "TcRnQuotedNameWrongStage"                      = 57695
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482
@@ -814,6 +791,30 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "BootMismatchedIdTypes"                         = 11890
   GhcDiagnosticCode "BootMismatchedTyCons"                          = 15843
 
+  -- TH errors
+  GhcDiagnosticCode "TypedTHWithPolyType"                           = 94642
+  GhcDiagnosticCode "SplicePolymorphicLocalVar"                     = 06568
+  GhcDiagnosticCode "SpliceThrewException"                          = 87897
+  GhcDiagnosticCode "InvalidTopDecl"                                = 52886
+  GhcDiagnosticCode "NonExactName"                                  = 77923
+  GhcDiagnosticCode "AddInvalidCorePlugin"                          = 86463
+  GhcDiagnosticCode "AddDocToNonLocalDefn"                          = 67760
+  GhcDiagnosticCode "FailedToLookupThInstName"                      = 49530
+  GhcDiagnosticCode "CannotReifyInstance"                           = 30384
+  GhcDiagnosticCode "CannotReifyOutOfScopeThing"                    = 24922
+  GhcDiagnosticCode "CannotReifyThingNotInTypeEnv"                  = 79890
+  GhcDiagnosticCode "NoRolesAssociatedWithThing"                    = 65923
+  GhcDiagnosticCode "CannotRepresentType"                           = 75721
+  GhcDiagnosticCode "ReportCustomQuasiError"                        = 39584
+  GhcDiagnosticCode "MismatchedSpliceType"                          = 45108
+  GhcDiagnosticCode "IllegalTHQuotes"                               = 62558
+  GhcDiagnosticCode "IllegalTHSplice"                               = 26759
+  GhcDiagnosticCode "NestedTHBrackets"                              = 59185
+  GhcDiagnosticCode "AddTopDeclsUnexpectedDeclarationSplice"        = 17599
+  GhcDiagnosticCode "BadImplicitSplice"                             = 25277
+  GhcDiagnosticCode "QuotedNameWrongStage"                          = 57695
+  GhcDiagnosticCode "IllegalStaticFormInSplice"                     = 12219
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
@@ -827,6 +828,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
   GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
   GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
+  GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = 39180
 
 {- *********************************************************************
 *                                                                      *
@@ -912,9 +914,16 @@ type family ConRecursInto con where
 
     --
     -- TH errors
-
-  ConRecursInto "TcRnRunSpliceFailure"     = 'Just RunSpliceFailReason
-  ConRecursInto "ConversionFail"           = 'Just ConversionFailReason
+  ConRecursInto "TcRnTHError"                 = 'Just THError
+  ConRecursInto "THSyntaxError"               = 'Just THSyntaxError
+  ConRecursInto "THNameError"                 = 'Just THNameError
+  ConRecursInto "THReifyError"                = 'Just THReifyError
+  ConRecursInto "TypedTHError"                = 'Just TypedTHError
+  ConRecursInto "THSpliceFailed"              = 'Just SpliceFailReason
+  ConRecursInto "RunSpliceFailure"            = 'Just RunSpliceFailReason
+  ConRecursInto "ConversionFail"              = 'Just ConversionFailReason
+  ConRecursInto "AddTopDeclsError"            = 'Just AddTopDeclsError
+  ConRecursInto "AddTopDeclsRunSpliceFailure" = 'Just RunSpliceFailReason
 
     -- Interface file errors
 

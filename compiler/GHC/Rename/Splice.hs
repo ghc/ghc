@@ -78,10 +78,10 @@ import qualified GHC.LanguageExtensions as LangExt
 -}
 
 -- Check that -XTemplateHaskellQuotes is enabled and available
-checkForTemplateHaskellQuotes :: HsExpr GhcPs ->  RnM ()
+checkForTemplateHaskellQuotes :: HsExpr GhcPs -> RnM ()
 checkForTemplateHaskellQuotes e =
   unlessXOptM LangExt.TemplateHaskellQuotes $
-    failWith $ TcRnIllegalTHQuotes e
+    failWith $ thSyntaxError $ IllegalTHQuotes e
 
 rnTypedBracket :: HsExpr GhcPs -> LHsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 rnTypedBracket e br_body
@@ -92,13 +92,15 @@ rnTypedBracket e br_body
        ; cur_stage <- getStage
        ; case cur_stage of
            { Splice Typed   -> return ()
-           ; Splice Untyped -> failWithTc $ TcRnMismatchedSpliceType Untyped IsBracket
+           ; Splice Untyped -> failWithTc $ thSyntaxError
+                                          $ MismatchedSpliceType Untyped IsBracket
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnTypedBracket: Renaming typed bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> failWithTc TcRnNestedTHBrackets
+           ; Brack {}       -> failWithTc $ thSyntaxError
+                                          $ NestedTHBrackets
            }
 
          -- Brackets are desugared to code that mentions the TH package
@@ -119,14 +121,16 @@ rnUntypedBracket e br_body
          -- Check for nested brackets
        ; cur_stage <- getStage
        ; case cur_stage of
-           { Splice Typed   -> failWithTc $ TcRnMismatchedSpliceType Typed IsBracket
+           { Splice Typed   -> failWithTc $ thSyntaxError
+                                          $ MismatchedSpliceType Typed IsBracket
            ; Splice Untyped -> return ()
            ; RunSplice _    ->
                -- See Note [RunSplice ThLevel] in GHC.Tc.Types.
                pprPanic "rnUntypedBracket: Renaming untyped bracket when running a splice"
                         (ppr e)
            ; Comp           -> return ()
-           ; Brack {}       -> failWithTc TcRnNestedTHBrackets
+           ; Brack {}       -> failWithTc $ thSyntaxError
+                                          $ NestedTHBrackets
            }
 
          -- Brackets are desugared to code that mentions the TH package
@@ -164,8 +168,8 @@ rn_utbracket outer_stage br@(VarBr x flg rdr_name)
                              -> do { traceRn "rn_utbracket VarBr"
                                       (ppr name <+> ppr bind_lvl
                                                 <+> ppr outer_stage)
-                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl)
-                                             (TcRnQuotedNameWrongStage br) }
+                                   ; checkTc (thLevel outer_stage + 1 == bind_lvl) $
+                                      TcRnTHError $ THNameError $ QuotedNameWrongStage br }
                         }
                     }
        ; return (VarBr x flg (noLocA name), unitFV name) }
@@ -274,7 +278,8 @@ rnUntypedSpliceGen run_splice pend_splice splice
     { stage <- getStage
     ; case stage of
         Brack _ RnPendingTyped
-          -> failWithTc $ TcRnMismatchedSpliceType Untyped IsSplice
+          -> failWithTc $ thSyntaxError
+                        $ MismatchedSpliceType Untyped IsSplice
 
         Brack pop_stage (RnPendingUntyped ps_var)
           -> do { (splice', fvs) <- setStage pop_stage $
@@ -305,8 +310,10 @@ checkTopSpliceAllowed splice = do
   unlessXOptM ext $ failWith err
   where
     spliceExtension :: HsUntypedSplice GhcPs -> (LangExt.Extension, TcRnMessage)
-    spliceExtension (HsQuasiQuote {}) = (LangExt.QuasiQuotes, TcRnIllegalQuasiQuotes)
-    spliceExtension (HsUntypedSpliceExpr {}) = (LangExt.TemplateHaskell, TcRnIllegalTHSplice)
+    spliceExtension (HsQuasiQuote {}) =
+      (LangExt.QuasiQuotes, TcRnIllegalQuasiQuotes)
+    spliceExtension (HsUntypedSpliceExpr {}) =
+      (LangExt.TemplateHaskell, thSyntaxError $ IllegalTHSplice)
 
 ------------------
 
@@ -428,10 +435,10 @@ rnTypedSplice expr
           -> setStage pop_stage rn_splice
 
         Brack _ (RnPendingUntyped _)
-          -> failWithTc $ TcRnMismatchedSpliceType Typed IsSplice
+          -> failWithTc $ thSyntaxError $ MismatchedSpliceType Typed IsSplice
 
         _ -> do { unlessXOptM LangExt.TemplateHaskell
-                    (failWith TcRnIllegalTHSplice)
+                    (failWith $ thSyntaxError IllegalTHSplice)
 
                 ; (result, fvs1) <- checkNoErrs $ setStage (Splice Typed) rn_splice
                   -- checkNoErrs: don't attempt to run the splice if
@@ -481,6 +488,9 @@ rnUntypedSpliceExpr splice
                         <$> lexpr3
            ; return (gHsPar e, fvs)
            }
+
+thSyntaxError :: THSyntaxError -> TcRnMessage
+thSyntaxError err = TcRnTHError $ THSyntaxError err
 
 {- Note [Running splices in the Renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

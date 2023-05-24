@@ -82,14 +82,6 @@ module GHC.Tc.Errors.Types (
   , ExpectedBackends
   , ArgOrResult(..)
   , MatchArgsContext(..), MatchArgBadMatches(..)
-  , ConversionFailReason(..)
-  , UnrepresentableTypeDescr(..)
-  , LookupTHInstNameErrReason(..)
-  , SplicePhase(..)
-  , THDeclDescriptor(..)
-  , RunSpliceFailReason(..)
-  , ThingBeingConverted(..)
-  , IllegalDecls(..)
   , EmptyStatementGroupErrReason(..)
   , UnexpectedStatement(..)
   , DeclSort(..)
@@ -135,9 +127,24 @@ module GHC.Tc.Errors.Types (
   , BootDataConMismatch(..)
   , SynAbstractDataError(..)
   , BootListMismatch(..), BootListMismatches
+
+    -- * Instance errors
   , IllegalInstanceReason(..)
   , IllegalHasFieldInstance(..)
   , CoverageProblem(..), FailedCoverageCondition(..)
+
+    -- * Template Haskell errors
+  , THError(..), THSyntaxError(..), THNameError(..)
+  , THReifyError(..), TypedTHError(..)
+  , SpliceFailReason(..), RunSpliceFailReason(..)
+  , AddTopDeclsError(..)
+  , ConversionFailReason(..)
+  , UnrepresentableTypeDescr(..)
+  , LookupTHInstNameErrReason(..)
+  , SplicePhase(..)
+  , THDeclDescriptor(..)
+  , ThingBeingConverted(..)
+  , IllegalDecls(..)
   ) where
 
 import GHC.Prelude
@@ -2175,16 +2182,6 @@ data TcRnMessage where
   -}
   TcRnPatSynNotBidirectional :: !Name -> TcRnMessage
 
-  {-| TcRnSplicePolymorphicLocalVar is the error that occurs when the expression
-     inside typed template haskell brackets is a polymorphic local variable.
-
-     Example(s):
-     x = \(y :: forall a. a -> a) -> [|| y ||]
-
-    Test cases: quotes/T10384
-  -}
-  TcRnSplicePolymorphicLocalVar :: !Id -> TcRnMessage
-
   {-| TcRnIllegalDerivingItem is an error for when something other than a type class
      appears in a deriving statement.
 
@@ -2216,24 +2213,6 @@ data TcRnMessage where
                 rename/should_fail/T9077
   -}
   TcRnIllegalRecordSyntax :: Either (HsType GhcPs) (HsType GhcRn) -> TcRnMessage
-
-  {-| TcRnUnexpectedTypeSplice is an error for a typed Template Haskell splice
-     appearing unexpectedly.
-
-     Example(s): none
-
-    Test cases: none
-  -}
-  TcRnUnexpectedTypeSplice :: !(HsType GhcRn) -> TcRnMessage
-
-  {-| TcRnUnexpectedDeclarationSplice is an error that occurs when a Template Haskell
-      splice appears inside top-level declarations added with 'addTopDecls'.
-
-      Example(s): none
-
-      Test cases: none
-  -}
-  TcRnUnexpectedDeclarationSplice :: TcRnMessage
 
   {-| TcRnInvalidVisibleKindArgument is an error for a kind application on a
      target type that cannot accept it.
@@ -2612,55 +2591,10 @@ data TcRnMessage where
   -}
   TcRnIllegalQuasiQuotes :: TcRnMessage
 
-  {-| TcRnIllegalTHQuotes is an error that occurs when a Template Haskell
-     quote is used without the TemplateHaskell extension enabled.
-
-     Test case: T18251e
+  {-| TcRnTHError is a family of errors involving Template Haskell.
+      See 'THError'.
   -}
-  TcRnIllegalTHQuotes :: !(HsExpr GhcPs) -> TcRnMessage
-
-  {-| TcRnIllegalTHSplice is an error that occurs when a Template Haskell
-      splice occurs without having enabled the TemplateHaskell extension.
-
-    Test cases:
-      bkpfail01, bkpfail05, bkpfail09, bkpfail16, bkpfail35, bkpcabal06
-  -}
-  TcRnIllegalTHSplice :: TcRnMessage
-
-  {-| TcRnNestedTHBrackets is an error that occurs when Template Haskell
-      brackets are nested without any intervening splices.
-
-      Example:
-
-        foo = [| [| 'x' |] |]
-
-      Test cases: TH_NestedSplicesFail{5,6,7,8}
-  -}
-  TcRnNestedTHBrackets :: TcRnMessage
-
-  {-| TcRnMismatchedSpliceType is an error that happens when a typed bracket
-      or splice is used inside a typed splice/bracket, or the other way around.
-
-      Examples:
-
-        f1 = [| $$x |]
-        f2 = [|| $y ||]
-        f3 = $$( [| 'x' |] )
-        f4 = $( [|| 'y' ||] )
-
-      Test cases: TH_NestedSplicesFail{1,2,3,4}
-  -}
-  TcRnMismatchedSpliceType :: SpliceType -- ^ type of the splice
-                           -> SpliceOrBracket -- ^ what's nested inside
-                           -> TcRnMessage
-
-  {-| TcRnQuotedNameWrongStage is an error that can happen when a
-      (non-top-level) Name is used at a different Template Haskell stage
-      than the stage at which it is bound.
-
-     Test cases: T16976z
-  -}
-  TcRnQuotedNameWrongStage :: !(HsQuote GhcPs) -> TcRnMessage
+  TcRnTHError :: THError -> TcRnMessage
 
   {-| TcRnDefaultMethodForPragmaLacksBinding is an error that occurs when
       a default method pragma is missing an accompanying binding.
@@ -2756,180 +2690,6 @@ data TcRnMessage where
        testsuite/tests/type-data/should_fail/TDStrictnessH98
   -}
   TcRnTypeDataForbids :: !TypeDataForbids -> TcRnMessage
-
-  {-| TcRnTypedTHWithPolyType is an error that signifies the illegal use
-      of a polytype in a typed template haskell expression.
-
-      Example(s):
-      bad :: (forall a. a -> a) -> ()
-      bad = $$( [|| \_ -> () ||] )
-
-     Test cases: th/T11452
-  -}
-  TcRnTypedTHWithPolyType :: !TcType -> TcRnMessage
-
-  {-| TcRnSpliceThrewException is an error that occurrs when running a template
-      haskell splice throws an exception.
-
-      Example(s):
-
-     Test cases: annotations/should_fail/annfail12
-                 perf/compiler/MultiLayerModulesTH_Make
-                 perf/compiler/MultiLayerModulesTH_OneShot
-                 th/T10796b
-                 th/T19470
-                 th/T19709d
-                 th/T5358
-                 th/T5976
-                 th/T7276a
-                 th/T8987
-                 th/TH_exn1
-                 th/TH_exn2
-                 th/TH_runIO
-  -}
-  TcRnSpliceThrewException
-    :: !SplicePhase
-    -> !SomeException
-    -> !String -- ^ Result of showing the exception (cannot be done safely outside IO)
-    -> !(LHsExpr GhcTc)
-    -> !Bool -- True <=> Print the expression
-    -> TcRnMessage
-
-  {-| TcRnInvalidTopDecl is a template haskell error occurring when one of the 'Dec's passed to
-      'addTopDecls' is not a function, value, annotation, or foreign import declaration.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnInvalidTopDecl :: !(HsDecl GhcPs) -> TcRnMessage
-
-  {-| TcRnNonExactName is a template haskell error for when a declaration being
-      added is bound to a name that is not fully known.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnNonExactName :: !RdrName -> TcRnMessage
-
-  {-| TcRnAddInvalidCorePlugin is a template haskell error indicating that a
-      core plugin being added has an invalid module due to being in the current package.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnAddInvalidCorePlugin
-    :: !String -- ^ Module name
-    -> TcRnMessage
-
-  {-| TcRnAddDocToNonLocalDefn is a template haskell error for documentation being added to a
-      definition which is not in the current module.
-
-      Example(s):
-
-     Test cases: showIface/should_fail/THPutDocExternal
-  -}
-  TcRnAddDocToNonLocalDefn :: !TH.DocLoc -> TcRnMessage
-
-  {-| TcRnFailedToLookupThInstName is a template haskell error that occurrs when looking up an
-      instance fails.
-
-      Example(s):
-
-     Test cases: showIface/should_fail/THPutDocNonExistent
-  -}
-  TcRnFailedToLookupThInstName :: !TH.Type -> !LookupTHInstNameErrReason -> TcRnMessage
-
-  {-| TcRnCannotReifyInstance is a template haskell error for when an instance being reified
-      via `reifyInstances` is not a class constraint or type family application.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnCannotReifyInstance :: !Type -> TcRnMessage
-
-  {-| TcRnCannotReifyOutOfScopeThing is a template haskell error indicating
-      that the given name is not in scope and therefore cannot be reified.
-
-      Example(s):
-
-     Test cases: th/T16976f
-  -}
-  TcRnCannotReifyOutOfScopeThing :: !TH.Name -> TcRnMessage
-
-  {-| TcRnCannotReifyThingNotInTypeEnv is a template haskell error occurring
-      when the given name is not in the type environment and therefore cannot be reified.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnCannotReifyThingNotInTypeEnv :: !Name -> TcRnMessage
-
-  {-| TcRnNoRolesAssociatedWithName is a template haskell error for when the user
-      tries to reify the roles of a given name but it is not something that has
-      roles associated with it.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnNoRolesAssociatedWithThing :: !TcTyThing -> TcRnMessage
-
-  {-| TcRnCannotRepresentThing is a template haskell error indicating that a
-      type cannot be reified because it does not have a representation in template haskell.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnCannotRepresentType :: !UnrepresentableTypeDescr -> !Type -> TcRnMessage
-
-  {-| TcRnRunSpliceFailure is an error indicating that a Template Haskell splice
-      failed to be converted into a valid expression.
-
-      Example(s):
-
-     Test cases: th/T10828a
-                 th/T10828b
-                 th/T12478_4
-                 th/T15270A
-                 th/T15270B
-                 th/T16895a
-                 th/T16895b
-                 th/T16895c
-                 th/T16895d
-                 th/T16895e
-                 th/T18740d
-                 th/T2597b
-                 th/T2674
-                 th/T3395
-                 th/T7484
-                 th/T7667a
-                 th/TH_implicitParamsErr1
-                 th/TH_implicitParamsErr2
-                 th/TH_implicitParamsErr3
-                 th/TH_invalid_add_top_decl
-  -}
-  TcRnRunSpliceFailure
-    :: !(Maybe String) -- ^ Name of the function used to run the splice
-    -> !RunSpliceFailReason
-    -> TcRnMessage
-
-  {-| TcRnUserErrReported is an error or warning thrown using 'qReport' from
-      the 'Quasi' instance of 'TcM'.
-
-      Example(s):
-
-     Test cases:
-  -}
-  TcRnReportCustomQuasiError
-    :: !Bool -- True => Error, False => Warning
-    -> !String -- Error body
-    -> TcRnMessage
 
   {-| TcRnUnsatisfiedMinimalDef is a warning that occurs when a class instance
        is missing methods that are required by the minimal definition.
@@ -3030,15 +2790,6 @@ data TcRnMessage where
      Test cases: th/T14204
   -}
   TcRnIllegalStaticExpression :: HsExpr GhcPs -> TcRnMessage
-
-  {-| TcRnIllegalStaticFormInSplice is an error when a user attempts to define
-      a static pointer in a Template Haskell splice.
-
-      Example(s):
-
-     Test cases: th/TH_StaticPointers02
-  -}
-  TcRnIllegalStaticFormInSplice :: HsExpr GhcPs -> TcRnMessage
 
   {-| TcRnListComprehensionDuplicateBinding is an error triggered by duplicate
       let-bindings in a list comprehension.
@@ -3473,21 +3224,6 @@ data TcRnMessage where
       Test cases: rename/should_fail/RnStupidThetaInGadt
   -}
   TcRnStupidThetaInGadt :: HsDocContext -> TcRnMessage
-
-  {-| TcRnBadImplicitSplice is an error thrown when a user uses top-level implicit
-      TH-splice without enabling the TemplateHaskell extension.
-
-      Example:
-
-        pure [] -- on top-level
-
-      Test cases: ghci/prog019/prog019
-                  ghci/scripts/T1914
-                  ghci/scripts/T6106
-                  rename/should_fail/T4042
-                  rename/should_fail/T12146
-  -}
-  TcRnBadImplicitSplice :: TcRnMessage
 
   {-| TcRnShadowedTyVarNameInFamResult is an error triggered by type variable in
       type family result that shadows type variable from left hand side
@@ -4315,55 +4051,6 @@ instance Outputable TypeDataForbids where
   ppr TypeDataForbidsLabelledFields        = text "Labelled fields"
   ppr TypeDataForbidsStrictnessAnnotations = text "Strictness flags"
   ppr TypeDataForbidsDerivingClauses       = text "Deriving clauses"
-
-data RunSpliceFailReason
-  = ConversionFail !ThingBeingConverted !ConversionFailReason
-  deriving Generic
-
--- | Identifies the TH splice attempting to be converted
-data ThingBeingConverted
-  = ConvDec !TH.Dec
-  | ConvExp !TH.Exp
-  | ConvPat !TH.Pat
-  | ConvType !TH.Type
-
--- | The reason a TH splice could not be converted to a Haskell expression
-data ConversionFailReason
-  = IllegalOccName !OccName.NameSpace !String
-  | SumAltArityExceeded !TH.SumAlt !TH.SumArity
-  | IllegalSumAlt !TH.SumAlt
-  | IllegalSumArity !TH.SumArity
-  | MalformedType !TypeOrKind !TH.Type
-  | IllegalLastStatement !HsDoFlavour !(LStmt GhcPs (LHsExpr GhcPs))
-  | KindSigsOnlyAllowedOnGADTs
-  | IllegalDeclaration !THDeclDescriptor !IllegalDecls
-  | CannotMixGADTConsWith98Cons
-  | EmptyStmtListInDoBlock
-  | NonVarInInfixExpr
-  | MultiWayIfWithoutAlts
-  | CasesExprWithoutAlts
-  | ImplicitParamsWithOtherBinds
-  | InvalidCCallImpent !String -- ^ Source
-  | RecGadtNoCons
-  | GadtNoCons
-  | InvalidTypeInstanceHeader !TH.Type
-  | InvalidTyFamInstLHS !TH.Type
-  | InvalidImplicitParamBinding
-  | DefaultDataInstDecl ![LDataFamInstDecl GhcPs]
-  | FunBindLacksEquations !TH.Name
-  deriving Generic
-
-data IllegalDecls
-  = IllegalDecls    !(NE.NonEmpty (LHsDecl GhcPs))
-  | IllegalFamDecls !(NE.NonEmpty (LFamilyDecl GhcPs))
-
--- | Label for a TH declaration
-data THDeclDescriptor
-  = InstanceDecl
-  | WhereClause
-  | LetBinding
-  | LetExpression
-  | ClssDecl
 
 -- | Specifies which back ends can handle a requested foreign import or export
 type ExpectedBackends = [Backend]
@@ -5714,19 +5401,6 @@ data MatchArgBadMatches where
         , matchArgBadMatches :: NE.NonEmpty (LocatedA (Match GhcRn body)) }
     -> MatchArgBadMatches
 
--- | The phase in which an exception was encountered when dealing with a TH splice
-data SplicePhase
-  = SplicePhase_Run
-  | SplicePhase_CompileAndLink
-
-data LookupTHInstNameErrReason
-  = NoMatchesFound
-  | CouldNotDetermineInstance
-
-data UnrepresentableTypeDescr
-  = LinearInvisibleArgument
-  | CoercionsInTypes
-
 -- | The context for an "empty statement group" error.
 data EmptyStatementGroupErrReason
   = EmptyStmtsGroupInParallelComp
@@ -6149,3 +5823,362 @@ data FailedCoverageCondition
     }
   -- | Failed the liberal instance coverage condition (LICC)
   | FailedLICC
+
+--------------------------------------------------------------------------------
+-- Template Haskell errors
+
+data THError
+  -- | A syntax error with Template Haskel quotes & splices.
+  -- See t'THSyntaxError'.
+  = THSyntaxError !THSyntaxError
+  -- | An error in Template Haskell involving 'Name's.
+  -- See t'THNameError'.
+  | THNameError !THNameError
+  -- | An error in Template Haskell reification. See t'THReifyError'.
+  | THReifyError !THReifyError
+  -- | An error due to typing restrictions in Typed Template Haskell.
+  -- See t'TypedTHError'.
+  | TypedTHError !TypedTHError
+  -- | An error occurred when trying to run a splice in Template Haskell.
+  -- See 'SpliceFailReason'.
+  | THSpliceFailed !SpliceFailReason
+  -- | An error involving the 'addTopDecls' functionality. See t'AddTopDeclsError'.
+  | AddTopDeclsError !AddTopDeclsError
+
+  {-| IllegalStaticFormInSplice is an error when a user attempts to define
+      a static pointer in a Template Haskell splice.
+
+      Example(s):
+
+     Test cases: th/TH_StaticPointers02
+  -}
+  | IllegalStaticFormInSplice !(HsExpr GhcPs)
+
+  {-| FailedToLookupThInstName is a Template Haskell error that occurrs when looking up an
+      instance fails.
+
+      Example(s):
+
+      Test cases: showIface/should_fail/THPutDocNonExistent
+  -}
+  | FailedToLookupThInstName !TH.Type !LookupTHInstNameErrReason
+
+  {-| AddInvalidCorePlugin is a Template Haskell error indicating that a
+      Core plugin being added has an invalid module due to being
+      in the current package.
+
+      Example(s):
+
+      Test cases:
+  -}
+  | AddInvalidCorePlugin !String -- ^ Module name
+
+  {-| AddDocToNonLocalDefn is a Template Haskell error for documentation being added to a
+      definition which is not in the current module.
+
+      Example(s):
+
+      Test cases: showIface/should_fail/THPutDocExternal
+  -}
+  | AddDocToNonLocalDefn !TH.DocLoc
+
+  {-| ReportCustomQuasiError is an error or warning thrown using 'qReport' from
+      the 'Quasi' instance of 'TcM'.
+
+      Example(s):
+
+      Test cases:
+  -}
+  | ReportCustomQuasiError
+    !Bool -- ^ True => Error, False => Warning
+    !String -- ^ Error body
+  deriving Generic
+
+-- | An error involving Template Haskell quotes or splices, e.g. nested
+-- quotation brackets or the use of an untyped bracket inside a typed splice.
+data THSyntaxError
+  = {-| IllegalTHQuotes is an error that occurs when a Template Haskell
+        quote is used without the TemplateHaskell extension enabled.
+
+        Test case: T18251e
+    -}
+    IllegalTHQuotes !(HsExpr GhcPs)
+
+    {-| IllegalTHSplice is an error that occurs when a Template Haskell
+        splice occurs without having enabled the TemplateHaskell extension.
+
+        Test cases:
+          bkpfail01, bkpfail05, bkpfail09, bkpfail16, bkpfail35, bkpcabal06
+    -}
+  | IllegalTHSplice
+
+    {-| NestedTHBrackets is an error that occurs when Template Haskell
+        brackets are nested without any intervening splices.
+
+        Example:
+
+          foo = [| [| 'x' |] |]
+
+        Test cases: TH_NestedSplicesFail{5,6,7,8}
+    -}
+  | NestedTHBrackets
+
+  {-| MismatchedSpliceType is an error that happens when a typed bracket
+      or splice is used inside a typed splice/bracket, or the other way around.
+
+      Examples:
+
+        f1 = [| $$x |]
+        f2 = [|| $y ||]
+        f3 = $$( [| 'x' |] )
+        f4 = $( [|| 'y' ||] )
+
+      Test cases: TH_NestedSplicesFail{1,2,3,4}
+  -}
+  | MismatchedSpliceType
+      SpliceType -- ^ type of the splice
+      SpliceOrBracket -- ^ what's nested inside
+  {-| BadImplicitSplice is an error thrown when a user uses top-level implicit
+      TH-splice without enabling the TemplateHaskell extension.
+
+      Example:
+
+        pure [] -- on top-level
+
+      Test cases: ghci/prog019/prog019
+                  ghci/scripts/T1914
+                  ghci/scripts/T6106
+                  rename/should_fail/T4042
+                  rename/should_fail/T12146
+  -}
+  | BadImplicitSplice
+  deriving Generic
+
+data THNameError
+  {-| NonExactName is a Template Haskell error that occurs when the user
+      attempts to define a binder with a 'RdrName' that is not an exact 'Name'.
+
+      Example(s):
+
+      Test cases:
+  -}
+  = NonExactName !RdrName
+
+  {-| QuotedNameWrongStage is an error that can happen when a
+      (non-top-level) Name is used at a different Template Haskell stage
+      than the stage at which it is bound.
+
+     Test cases: T16976z
+  -}
+  | QuotedNameWrongStage !(HsQuote GhcPs)
+  deriving Generic
+
+data THReifyError
+  = {-| CannotReifyInstance is a Template Haskell error for when an instance being reified
+        via `reifyInstances` is not a class constraint or type family application.
+
+        Example(s):
+
+       Test cases:
+    -}
+    CannotReifyInstance !Type
+
+  {-| CannotReifyOutOfScopeThing is a Template Haskell error indicating
+      that the given name is not in scope and therefore cannot be reified.
+
+      Example(s):
+
+     Test cases: th/T16976f
+  -}
+ | CannotReifyOutOfScopeThing !TH.Name
+
+  {-| CannotReifyThingNotInTypeEnv is a Template Haskell error occurring
+      when the given name is not in the type environment and therefore cannot be reified.
+
+      Example(s):
+
+     Test cases:
+  -}
+  | CannotReifyThingNotInTypeEnv !Name
+
+  {-| NoRolesAssociatedWithName is a Template Haskell error for when the user
+      tries to reify the roles of a given name but it is not something that has
+      roles associated with it.
+
+      Example(s):
+
+     Test cases:
+  -}
+  | NoRolesAssociatedWithThing !TcTyThing
+
+  {-| CannotRepresentThing is a Template Haskell error indicating that a
+      type cannot be reified because it does not have a representation in Template Haskell.
+
+      Example(s):
+
+     Test cases:
+  -}
+  | CannotRepresentType !UnrepresentableTypeDescr !Type
+  deriving Generic
+
+data AddTopDeclsError
+  = {-| InvalidTopDecl is a Template Haskell error occurring when one of the 'Dec's passed to
+      'addTopDecls' is not a function, value, annotation, or foreign import declaration.
+
+       Example(s):
+
+       Test cases:
+    -}
+    InvalidTopDecl !(HsDecl GhcPs)
+    {-| UnexpectedDeclarationSplice is an error that occurs when a Template Haskell
+        splice appears inside top-level declarations added with 'addTopDecls'.
+
+        Example(s): none
+
+        Test cases: none
+  -}
+  | AddTopDeclsUnexpectedDeclarationSplice
+
+  | AddTopDeclsRunSpliceFailure !RunSpliceFailReason
+  deriving Generic
+
+data TypedTHError
+  = {-| SplicePolymorphicLocalVar is the error that occurs when the expression
+        inside typed Template Haskell brackets is a polymorphic local variable.
+
+        Example(s):
+        x = \(y :: forall a. a -> a) -> [|| y ||]
+
+       Test cases: quotes/T10384
+    -}
+    SplicePolymorphicLocalVar !Id
+
+    {-| TypedTHWithPolyType is an error that signifies the illegal use
+        of a polytype in a typed Template Haskell expression.
+
+        Example(s):
+        bad :: (forall a. a -> a) -> ()
+        bad = $$( [|| \_ -> () ||] )
+
+       Test cases: th/T11452
+    -}
+  | TypedTHWithPolyType !TcType
+  deriving Generic
+
+data SpliceFailReason
+  = {-| SpliceThrewException is an error that occurs when running a Template
+        Haskell splice throws an exception.
+
+        Example(s):
+
+       Test cases: annotations/should_fail/annfail12
+                   perf/compiler/MultiLayerModulesTH_Make
+                   perf/compiler/MultiLayerModulesTH_OneShot
+                   th/T10796b
+                   th/T19470
+                   th/T19709d
+                   th/T5358
+                   th/T5976
+                   th/T7276a
+                   th/T8987
+                   th/TH_exn1
+                   th/TH_exn2
+                   th/TH_runIO
+  -}
+  SpliceThrewException
+    !SplicePhase
+    !SomeException
+    !String -- ^ Result of showing the exception (cannot be done safely outside IO)
+    !(LHsExpr GhcTc)
+    !Bool -- True <=> Print the expression
+
+  {-| RunSpliceFailure is an error indicating that a Template Haskell splice
+      failed to be converted into a valid expression.
+
+      Example(s):
+
+     Test cases: th/T10828a
+                 th/T10828b
+                 th/T12478_4
+                 th/T15270A
+                 th/T15270B
+                 th/T16895a
+                 th/T16895b
+                 th/T16895c
+                 th/T16895d
+                 th/T16895e
+                 th/T18740d
+                 th/T2597b
+                 th/T2674
+                 th/T3395
+                 th/T7484
+                 th/T7667a
+                 th/TH_implicitParamsErr1
+                 th/TH_implicitParamsErr2
+                 th/TH_implicitParamsErr3
+                 th/TH_invalid_add_top_decl
+  -}
+  | RunSpliceFailure !RunSpliceFailReason
+  deriving Generic
+
+data RunSpliceFailReason
+  = ConversionFail !ThingBeingConverted !ConversionFailReason
+  deriving Generic
+
+-- | Identifies the TH splice attempting to be converted
+data ThingBeingConverted
+  = ConvDec !TH.Dec
+  | ConvExp !TH.Exp
+  | ConvPat !TH.Pat
+  | ConvType !TH.Type
+
+-- | The reason a TH splice could not be converted to a Haskell expression
+data ConversionFailReason
+  = IllegalOccName !OccName.NameSpace !String
+  | SumAltArityExceeded !TH.SumAlt !TH.SumArity
+  | IllegalSumAlt !TH.SumAlt
+  | IllegalSumArity !TH.SumArity
+  | MalformedType !TypeOrKind !TH.Type
+  | IllegalLastStatement !HsDoFlavour !(LStmt GhcPs (LHsExpr GhcPs))
+  | KindSigsOnlyAllowedOnGADTs
+  | IllegalDeclaration !THDeclDescriptor !IllegalDecls
+  | CannotMixGADTConsWith98Cons
+  | EmptyStmtListInDoBlock
+  | NonVarInInfixExpr
+  | MultiWayIfWithoutAlts
+  | CasesExprWithoutAlts
+  | ImplicitParamsWithOtherBinds
+  | InvalidCCallImpent !String -- ^ Source
+  | RecGadtNoCons
+  | GadtNoCons
+  | InvalidTypeInstanceHeader !TH.Type
+  | InvalidTyFamInstLHS !TH.Type
+  | InvalidImplicitParamBinding
+  | DefaultDataInstDecl ![LDataFamInstDecl GhcPs]
+  | FunBindLacksEquations !TH.Name
+  deriving Generic
+
+data IllegalDecls
+  = IllegalDecls    !(NE.NonEmpty (LHsDecl GhcPs))
+  | IllegalFamDecls !(NE.NonEmpty (LFamilyDecl GhcPs))
+
+-- | Label for a TH declaration
+data THDeclDescriptor
+  = InstanceDecl
+  | WhereClause
+  | LetBinding
+  | LetExpression
+  | ClssDecl
+
+-- | The phase in which an exception was encountered when dealing with a TH splice
+data SplicePhase
+  = SplicePhase_Run
+  | SplicePhase_CompileAndLink
+
+data LookupTHInstNameErrReason
+  = NoMatchesFound
+  | CouldNotDetermineInstance
+
+data UnrepresentableTypeDescr
+  = LinearInvisibleArgument
+  | CoercionsInTypes
