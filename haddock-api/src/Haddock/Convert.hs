@@ -133,24 +133,31 @@ tyThingToLHsDecl prr t = case t of
            vs = tyConVisibleTyVars (classTyCon cl)
 
        in withErrs (lefts atTyClDecls) . TyClD noExtField $ ClassDecl
-         { tcdCtxt = Just $ synifyCtx (classSCTheta cl)
-         , tcdLayout = NoLayoutInfo
-         , tcdLName = synifyNameN cl
-         , tcdTyVars = synifyTyVars vs
-         , tcdFixity = synifyFixity cl
-         , tcdFDs = map (\ (l,r) -> noLocA
-                        (FunDep noAnn (map (noLocA . getName) l) (map (noLocA . getName) r)) ) $
-                         snd $ classTvsFds cl
-         , tcdSigs = noLocA (MinimalSig (noAnn, NoSourceText) . noLocA . fmap noLocA $ classMinimalDef cl) :
-                      [ noLocA tcdSig
-                      | clsOp <- classOpItems cl
-                      , tcdSig <- synifyTcIdSig vs clsOp ]
-         , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
-         -- class associated-types are a subset of TyCon:
-         , tcdATs = atFamDecls
-         , tcdATDefs = catMaybes atDefFamDecls
-         , tcdDocs = [] --we don't have any docs at this point
-         , tcdCExt = emptyNameSet }
+          { -- This should not always be `Just`, since `Just` of an empty
+            -- context causes pretty printing to print `()` for the
+            -- context
+            tcdCtxt =
+              case classSCTheta cl of
+                [] -> Nothing
+                th -> Just $ synifyCtx th
+
+          , tcdLayout = NoLayoutInfo
+          , tcdLName = synifyNameN cl
+          , tcdTyVars = synifyTyVars vs
+          , tcdFixity = synifyFixity cl
+          , tcdFDs = map (\ (l,r) -> noLocA
+                          (FunDep noAnn (map (noLocA . getName) l) (map (noLocA . getName) r)) ) $
+                          snd $ classTvsFds cl
+          , tcdSigs = noLocA (MinimalSig (noAnn, NoSourceText) . noLocA . fmap noLocA $ classMinimalDef cl) :
+                        [ noLocA tcdSig
+                        | clsOp <- classOpItems cl
+                        , tcdSig <- synifyTcIdSig vs clsOp ]
+          , tcdMeths = emptyBag --ignore default method definitions, they don't affect signature
+          -- class associated-types are a subset of TyCon:
+          , tcdATs = atFamDecls
+          , tcdATDefs = catMaybes atDefFamDecls
+          , tcdDocs = [] --we don't have any docs at this point
+          , tcdCExt = emptyNameSet }
     | otherwise
     -> synifyTyCon prr Nothing tc >>= allOK . TyClD noExtField
 
@@ -279,7 +286,13 @@ synifyTyCon _prr coax tc
                      , tcdRhs = synifyType WithinType [] ty }
   | otherwise = do
   -- (closed) newtype and data
-  let alg_ctx = synifyCtx (tyConStupidTheta tc)
+  let -- This should not always be `Just`, since `Just` of an empty
+      -- context causes pretty printing to print `()` for the context
+      alg_ctx =
+        case tyConStupidTheta tc of
+          [] -> Nothing
+          th -> Just $ synifyCtx th
+
       name = case coax of
         Just a -> synifyNameN a -- Data families are named according to their
                            -- CoAxioms, not their TyCons
@@ -314,7 +327,7 @@ synifyTyCon _prr coax tc
   let -- "deriving" doesn't affect the signature, no need to specify any.
       alg_deriv = []
       defn = HsDataDefn { dd_ext     = noExtField
-                    , dd_ctxt    = Just alg_ctx
+                    , dd_ctxt    = alg_ctx
                     , dd_cType   = Nothing
                     , dd_kindSig = kindSig
                     , dd_cons    = cons
@@ -474,7 +487,7 @@ synifyTcIdSig vs (i, dm) =
     defSig t = synifySigType ImplicitizeForAll vs t
 
 synifyCtx :: [PredType] -> LHsContext GhcRn
-synifyCtx ts = noLocA ( map (synifyType WithinType []) ts)
+synifyCtx ts = noLocA (map (synifyType WithinType []) ts)
 
 
 synifyTyVars :: [TyVar] -> LHsQTyVars GhcRn

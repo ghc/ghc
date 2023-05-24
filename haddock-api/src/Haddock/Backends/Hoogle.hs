@@ -182,7 +182,6 @@ ppClass dflags decl subdocs =
   (out dflags decl{tcdSigs=[], tcdATs=[], tcdATDefs=[], tcdMeths=emptyLHsBinds}
     ++ ppTyFams) :  ppMethods
     where
-
         ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
         ppSig' = flip (ppSigWithDoc dflags) subdocs
 
