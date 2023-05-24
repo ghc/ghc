@@ -415,9 +415,8 @@ mkWarningMap
   -> [Name]
   -> IfM m WarningMap
 mkWarningMap dflags warnings gre exps = case warnings of
-  NoWarnings  -> pure M.empty
-  WarnAll _   -> pure M.empty
-  WarnSome ws ->
+  WarnAll _     -> pure M.empty
+  WarnSome ws _ ->
     let ws' = [ (n, w)
               | (occ, w) <- ws
               , elt <- lookupGRE_OccName (IncludeFields WantNormal) gre occ
@@ -431,8 +430,7 @@ moduleWarning
   -> GlobalRdrEnv
   -> Warnings a
   -> IfM m (Maybe (Doc Name))
-moduleWarning _ _ NoWarnings = pure Nothing
-moduleWarning _ _ (WarnSome _) = pure Nothing
+moduleWarning _ _ (WarnSome _ _) = pure Nothing
 moduleWarning dflags gre (WarnAll w) = Just <$> parseWarning dflags gre w
 
 parseWarning
