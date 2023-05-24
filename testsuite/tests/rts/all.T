@@ -491,3 +491,4 @@ test('decodeMyStack_underflowFrames', [extra_run_opts('+RTS -kc8K -RTS')], compi
 test('decodeMyStack_emptyListForMissingFlag', [ignore_stdout, ignore_stderr], compile_and_run, [''])
 
 test('T17574', [], compile_and_run, ['-with-rtsopts -T'])
+test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
