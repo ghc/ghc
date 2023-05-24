@@ -1204,6 +1204,74 @@ allocateMightFail (Capability *cap, W_ n)
  */
 #define MEMSET_SLOP_W(p, val, len_w) memset(p, val, (len_w) * sizeof(W_))
 
+/**
+ * Finish the capability's current pinned object accumulator block
+ * (cap->pinned_object_block), if any, and start a new one.
+ */
+static bdescr *
+start_new_pinned_block(Capability *cap)
+{
+    bdescr *bd = cap->pinned_object_block;
+
+    // stash the old block on cap->pinned_object_blocks.  On the
+    // next GC cycle these objects will be moved to
+    // g0->large_objects.
+    if (bd != NULL) {
+        // add it to the allocation stats when the block is full
+        finishedNurseryBlock(cap, bd);
+        dbl_link_onto(bd, &cap->pinned_object_blocks);
+    }
+
+    // We need to find another block.  We could just allocate one,
+    // but that means taking a global lock and we really want to
+    // avoid that (benchmarks that allocate a lot of pinned
+    // objects scale really badly if we do this).
+    //
+    // See Note [Sources of Block Level Fragmentation]
+    // for a more complete history of this section.
+    bd = cap->pinned_object_empty;
+    if (bd == NULL) {
+        // The pinned block list is empty: allocate a fresh block (we can't fail
+        // here).
+        ACQUIRE_SM_LOCK;
+        bd = allocNursery(cap->node, NULL, PINNED_EMPTY_SIZE);
+        RELEASE_SM_LOCK;
+    }
+
+    // Bump up the nursery pointer to avoid the pathological situation
+    // where a program is *only* allocating pinned objects.
+    // T4018 fails without this safety.
+    // This has the effect of counting a full pinned block in the same way
+    // as a full nursery block, so GCs will be triggered at the same interval
+    // if you are only allocating pinned data compared to normal allocations
+    // via allocate().
+    bdescr *nbd = cap->r.rCurrentNursery->link;
+    if (nbd != NULL){
+      newNurseryBlock(nbd);
+      cap->r.rCurrentNursery->link = nbd->link;
+      if (nbd->link != NULL) {
+          nbd->link->u.back = cap->r.rCurrentNursery;
+        }
+      dbl_link_onto(nbd, &cap->r.rNursery->blocks);
+      // Important for accounting purposes
+      if (cap->r.rCurrentAlloc){
+        finishedNurseryBlock(cap, cap->r.rCurrentAlloc);
+      }
+      cap->r.rCurrentAlloc = nbd;
+    }
+
+    cap->pinned_object_empty = bd->link;
+    newNurseryBlock(bd);
+    if (bd->link != NULL) {
+      bd->link->u.back = cap->pinned_object_empty;
+    }
+    initBdescr(bd, g0, g0);
+
+    cap->pinned_object_block = bd;
+    bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
+    return bd;
+}
+
 /* ---------------------------------------------------------------------------
    Allocate a fixed/pinned object.
 
@@ -1231,135 +1299,76 @@ allocateMightFail (Capability *cap, W_ n)
 StgPtr
 allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ align_off /*bytes*/)
 {
-    StgPtr p;
-    bdescr *bd;
-
     // Alignment and offset have to be a power of two
-    ASSERT(alignment && !(alignment & (alignment - 1)));
-    ASSERT(alignment >= sizeof(W_));
+    CHECK(alignment && !(alignment & (alignment - 1)));
+    CHECK(!(align_off & (align_off - 1)));
+    // We don't support sub-word alignments
+    CHECK(alignment >= sizeof(W_));
 
-    ASSERT(!(align_off & (align_off - 1)));
+    bdescr *bd = cap->pinned_object_block;
+    if (bd == NULL) {
+        bd = start_new_pinned_block(cap);
+    }
 
     const StgWord alignment_w = alignment / sizeof(W_);
+    W_ off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
 
-    // If the request is for a large object, then allocate()
-    // will give us a pinned object anyway.
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-        // For large objects we don't bother optimizing the number of words
-        // allocated for alignment reasons. Here we just allocate the maximum
-        // number of extra words we could possibly need to satisfy the alignment
-        // constraint.
-        p = allocateMightFail(cap, n + alignment_w - 1);
-        if (p == NULL) {
-            return NULL;
-        } else {
-            Bdescr(p)->flags |= BF_PINNED;
-            W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
+    // If the request is is smaller than LARGE_OBJECT_THRESHOLD then
+    // allocate into the pinned object accumulator.
+    if (n + off_w < LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+        // If the current pinned object block isn't large enough to hold the new
+        // object, get a new one.
+        if ((bd->free + off_w + n) > (bd->start + BLOCK_SIZE_W)) {
+            bd = start_new_pinned_block(cap);
+
+            // The pinned_object_block remains attached to the capability
+            // until it is full, even if a GC occurs.  We want this
+            // behaviour because otherwise the unallocated portion of the
+            // block would be forever slop, and under certain workloads
+            // (allocating a few ByteStrings per GC) we accumulate a lot
+            // of slop.
+            //
+            // So, the pinned_object_block is initially marked
+            // BF_EVACUATED so the GC won't touch it.  When it is full,
+            // we place it on the large_objects list, and at the start of
+            // the next GC the BF_EVACUATED flag will be cleared, and the
+            // block will be promoted as usual (if anything in it is
+            // live).
+
+            off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+        }
+
+        // N.B. it is important that we account for the alignment padding
+        // when determining large-object-ness, lest we may over-fill the
+        // block. See #23400.
+        if (n + off_w < LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+            StgPtr p = bd->free;
             MEMSET_SLOP_W(p, 0, off_w);
+            n += off_w;
             p += off_w;
-            MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
+            bd->free += n;
+            ASSERT(bd->free <= bd->start + bd->blocks * BLOCK_SIZE_W);
+            accountAllocation(cap, n);
             return p;
         }
     }
 
-    bd = cap->pinned_object_block;
-
-    W_ off_w = 0;
-
-    if(bd)
-        off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
-
-    // If we don't have a block of pinned objects yet, or the current
-    // one isn't large enough to hold the new object, get a new one.
-    if (bd == NULL || (bd->free + off_w + n) > (bd->start + BLOCK_SIZE_W)) {
-
-        // stash the old block on cap->pinned_object_blocks.  On the
-        // next GC cycle these objects will be moved to
-        // g0->large_objects.
-        if (bd != NULL) {
-            // add it to the allocation stats when the block is full
-            finishedNurseryBlock(cap, bd);
-            dbl_link_onto(bd, &cap->pinned_object_blocks);
-        }
-
-        // We need to find another block.  We could just allocate one,
-        // but that means taking a global lock and we really want to
-        // avoid that (benchmarks that allocate a lot of pinned
-        // objects scale really badly if we do this).
-        //
-        // See Note [Sources of Block Level Fragmentation]
-        // for a more complete history of this section.
-        bd = cap->pinned_object_empty;
-        if (bd == NULL) {
-            // The pinned block list is empty: allocate a fresh block (we can't fail
-            // here).
-            ACQUIRE_SM_LOCK;
-            bd = allocNursery(cap->node, NULL, PINNED_EMPTY_SIZE);
-            RELEASE_SM_LOCK;
-        }
-
-        // Bump up the nursery pointer to avoid the pathological situation
-        // where a program is *only* allocating pinned objects.
-        // T4018 fails without this safety.
-        // This has the effect of counting a full pinned block in the same way
-        // as a full nursery block, so GCs will be triggered at the same interval
-        // if you are only allocating pinned data compared to normal allocations
-        // via allocate().
-        bdescr * nbd;
-        nbd = cap->r.rCurrentNursery->link;
-        if (nbd != NULL){
-          newNurseryBlock(nbd);
-          cap->r.rCurrentNursery->link = nbd->link;
-          if (nbd->link != NULL) {
-              nbd->link->u.back = cap->r.rCurrentNursery;
-            }
-          dbl_link_onto(nbd, &cap->r.rNursery->blocks);
-          // Important for accounting purposes
-          if (cap->r.rCurrentAlloc){
-            finishedNurseryBlock(cap, cap->r.rCurrentAlloc);
-          }
-          cap->r.rCurrentAlloc = nbd;
-        }
-
-
-        cap->pinned_object_empty = bd->link;
-        newNurseryBlock(bd);
-        if (bd->link != NULL) {
-          bd->link->u.back = cap->pinned_object_empty;
-        }
-        initBdescr(bd, g0, g0);
-
-        cap->pinned_object_block = bd;
-        bd->flags  = BF_PINNED | BF_LARGE | BF_EVACUATED;
-
-        // The pinned_object_block remains attached to the capability
-        // until it is full, even if a GC occurs.  We want this
-        // behaviour because otherwise the unallocated portion of the
-        // block would be forever slop, and under certain workloads
-        // (allocating a few ByteStrings per GC) we accumulate a lot
-        // of slop.
-        //
-        // So, the pinned_object_block is initially marked
-        // BF_EVACUATED so the GC won't touch it.  When it is full,
-        // we place it on the large_objects list, and at the start of
-        // the next GC the BF_EVACUATED flag will be cleared, and the
-        // block will be promoted as usual (if anything in it is
-        // live).
-
-        off_w = ALIGN_WITH_OFF_W(bd->free, alignment, align_off);
+    // Otherwise handle the request as a large object
+    // For large objects we don't bother optimizing the number of words
+    // allocated for alignment reasons. Here we just allocate the maximum
+    // number of extra words we could possibly need to satisfy the alignment
+    // constraint.
+    StgPtr p = allocateMightFail(cap, n + alignment_w - 1);
+    if (p == NULL) {
+        return NULL;
+    } else {
+        Bdescr(p)->flags |= BF_PINNED;
+        off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
+        MEMSET_SLOP_W(p, 0, off_w);
+        p += off_w;
+        MEMSET_SLOP_W(p + n, 0, alignment_w - off_w - 1);
+        return p;
     }
-
-    p = bd->free;
-
-    MEMSET_SLOP_W(p, 0, off_w);
-
-    n += off_w;
-    p += off_w;
-    bd->free += n;
-
-    accountAllocation(cap, n);
-
-    return p;
 }
 
 /* -----------------------------------------------------------------------------
