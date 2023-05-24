@@ -16,7 +16,8 @@ match   :: HasCallStack => [Id]
         -> DsM (MatchResult CoreExpr)
 
 matchWrapper
-        :: HsMatchContext GhcRn
+        :: HasCallStack
+        => HsMatchContext GhcRn
         -> Maybe [LHsExpr GhcTc]
         -> MatchGroup GhcTc (LHsExpr GhcTc)
         -> DsM ([Id], CoreExpr)

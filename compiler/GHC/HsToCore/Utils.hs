@@ -92,6 +92,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe (maybeToList)
 import qualified Data.List.NonEmpty as NEL
 
+import GHC.Core.UsageEnv (zeroUE)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -378,7 +380,7 @@ mkDataConCase var ty alts@(alt1 :| _)
                      , alt_result = match_result } =
       flip adjustMatchResultDs match_result $ \body -> do
         case dataConBoxer con of
-          Nothing -> pprTrace "mk_alt" (ppr (map (\x -> (idBinding x, x)) args)) $ return (Alt (DataAlt con) args body)
+          Nothing -> pprTrace "mk_alt" (hsep (map pprIdWithBinding args)) $ return (Alt (DataAlt con) args body)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
@@ -923,7 +925,7 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs (LambdaBound ManyTy) (unboxedUnitTy `mkVisFunTyMany` ty) -- ROMES:TODO: Failure pair LambdaBound?
+  = do { fail_fun_var <- newFailLocalDs (LetBound zeroUE) (unboxedUnitTy `mkVisFunTyMany` ty)
        ; fail_fun_arg <- newSysLocalDs  (LambdaBound ManyTy) unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),

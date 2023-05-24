@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns, GADTs #-}
+             PatternSynonyms, BangPatterns, GADTs, RankNTypes #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |
@@ -129,6 +129,8 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+
+import {-# SOURCE #-} GHC.Core.UsageEnv (zeroUE)
 
 import Data.Data
 
@@ -273,7 +275,7 @@ data Var
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
         -- ROMES:TODO: merge binding and scope?
-        idBinding  :: IdBinding,        -- See Note [Multiplicity of let binders]
+        idBinding  :: HasCallStack => IdBinding,        -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -286,17 +288,29 @@ data IdBinding where
   -- Might no longer make sense to merge with IdScope at all
 
 pprIdWithBinding :: Id -> SDoc
-pprIdWithBinding x = ppr x <> text "[" <> ppr (idBinding x) <> text "]"
+pprIdWithBinding x
+  | isId x
+  = ppr x <> text "[" <> ppr (idBinding x) <> text "]"
+  | otherwise
+  = ppr x <+> text "is not an Id"
 
 isLetBinding :: Id -> Bool
-isLetBinding x = case idBinding x of
+isLetBinding x
+  | isId x
+  = case idBinding x of
                    LetBound _ -> True
                    LambdaBound _ -> False
+  | otherwise
+  = True -- ROMES:TODO: ouch
 
 isLambdaBinding :: Id -> Bool
-isLambdaBinding x = case idBinding x of
+isLambdaBinding x
+  | isId x
+  = case idBinding x of
                      LetBound _ -> False
                      LambdaBound _ -> True
+  | otherwise
+  = True -- ROMES:TODO: ouch
 
 {-
 Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)
@@ -1177,8 +1191,8 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  -- ROMES: This doesn't really classify as LambdaBound, but has the semantics we want...
-  = mk_id name (LambdaBound manyDataConTy) ty GlobalId details info
+  -- ROMES: A global variable is let-bound with a closed linear environment
+  = mk_id name (LetBound zeroUE) ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
@@ -1194,8 +1208,8 @@ mkCoVar name ty = mk_id name (LambdaBound manyDataConTy) ty (LocalId NotExported
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  -- ROMES:TODO: As in mkGlobalVar, this isn't really LambdaBound I figure
-  = mk_id name (LambdaBound manyDataConTy) ty (LocalId Exported) details info
+  -- ROMES: Exported variables are as global bound, let-bound with a closed usage env
+  = mk_id name (LetBound zeroUE) ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
 mk_id :: Name -> IdBinding -> Type -> IdScope -> IdDetails -> IdInfo -> Id

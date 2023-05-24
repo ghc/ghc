@@ -6,6 +6,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep (Mult)
 data Usage -- = Zero | Bottom | MUsage Mult
 data UsageEnv -- = UsageEnv !(NameEnv Mult) Bool
 
+zeroUE :: UsageEnv
 nonDetMults :: UsageEnv -> [Mult]
 mapUE :: (Mult -> Mult) -> UsageEnv -> UsageEnv
 mapUEM :: Applicative m => (Mult -> m Mult) -> UsageEnv -> m UsageEnv

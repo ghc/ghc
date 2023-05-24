@@ -76,7 +76,7 @@ import Control.Monad
 ************************************************************************
 -}
 
-dsLocalBinds :: HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsLocalBinds :: HasCallStack => HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsLocalBinds (EmptyLocalBinds _)  body = return body
 dsLocalBinds b@(HsValBinds _ binds) body = putSrcSpanDs (spanHsLocaLBinds b) $
                                            dsValBinds binds body
@@ -84,7 +84,7 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 
 -------------------------
 -- caller sets location
-dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsValBinds :: HasCallStack => HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsValBinds (XValBindsLR (NValBinds binds _)) body
   = foldrM ds_val_bind body binds
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
@@ -105,7 +105,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: HasCallStack => (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.

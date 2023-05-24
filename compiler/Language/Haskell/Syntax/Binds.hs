@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ExistentialQuantification #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -41,6 +42,8 @@ import GHC.Types.SourceText (StringLiteral)
 import Data.Void
 import Data.Bool
 import Data.Maybe
+
+import GHC.Stack (HasCallStack)
 
 {-
 ************************************************************************
@@ -193,11 +196,11 @@ data HsBindLR idL idR
     --    'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-    FunBind {
+    HasCallStack => FunBind {
 
         fun_ext :: XFunBind idL idR,
 
-        fun_id :: LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: HasCallStack => LIdP idL, -- Note [fun_id in Match] in GHC.Hs.Expr ROMES:TODO: Revive note
 
         fun_matches :: MatchGroup idR (LHsExpr idR)  -- ^ The payload
 
@@ -226,9 +229,9 @@ data HsBindLR idL idR
   --
   -- Dictionary binding and suchlike.
   -- All VarBinds are introduced by the type checker
-  | VarBind {
+  | HasCallStack => VarBind {
         var_ext    :: XVarBind idL idR,
-        var_id     :: IdP idL,
+        var_id     :: HasCallStack => IdP idL,
         var_rhs    :: LHsExpr idR    -- ^ Located only for consistency
     }
 

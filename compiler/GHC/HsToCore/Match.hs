@@ -738,7 +738,8 @@ Call @match@ with all of this information!
 --                         p2 q2 -> ...
 
 matchWrapper
-  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
+  :: HasCallStack
+  => HsMatchContext GhcRn              -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared

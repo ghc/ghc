@@ -602,10 +602,11 @@ lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
 lvlNonTailMFE env strict_ctxt ann_expr
   = lvlMFE (placeJoinCeiling env) strict_ctxt ann_expr
 
-lvlMFE ::  LevelEnv             -- Level of in-scope names/tyvars
-        -> Bool                 -- True <=> strict context [body of case or let]
-        -> CoreExprWithFVs      -- input expression
-        -> LvlM LevelledExpr    -- Result expression
+lvlMFE ::  HasCallStack
+       => LevelEnv             -- Level of in-scope names/tyvars
+       -> Bool                 -- True <=> strict context [body of case or let]
+       -> CoreExprWithFVs      -- input expression
+       -> LvlM LevelledExpr    -- Result expression
 -- lvlMFE is just like lvlExpr, except that it might let-bind
 -- the expression, so that it can itself be floated.
 
@@ -1274,7 +1275,7 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
   = lvlFloatRhs [] (le_ctxt_lvl env) env
                 rec_flag is_bot mb_join_arity expr
 
--- ROMES:TODO: Document this function, what does it do?
+-- ROMES:TODO: Document this function, what does it do? With some examples.
 lvlFloatRhs :: HasCallStack => [OutVar] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> Maybe JoinArity
@@ -1293,7 +1294,7 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                       | otherwise
                       = collectAnnBndrs rhs
     (env1, bndrs1)    = substBndrsSL NonRecursive env bndrs
-    all_bndrs         = pprTrace "lvlFloatRhs" (text "abs_vars:" <+> ppr abs_vars $$ text "bndrs1:" <+> ppr bndrs1) $ abs_vars ++ bndrs1
+    all_bndrs         = abs_vars ++ bndrs1
     (body_env, bndrs') | Just _ <- mb_join_arity
                       = lvlJoinBndrs env1 dest_lvl rec all_bndrs
                       | otherwise

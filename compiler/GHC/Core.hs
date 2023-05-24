@@ -253,7 +253,7 @@ data Expr b
   | Lit   Literal
   | App   (Expr b) (Arg b)
   | HasCallStack => Lam   b (Expr b)
-  | Let   (Bind b) (Expr b)
+  | HasCallStack => Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
@@ -313,9 +313,10 @@ instance Ord AltCon where
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data Bind b = NonRec b (Expr b)
-            | Rec [(b, (Expr b))]
-  deriving Data
+data Bind b = HasCallStack => NonRec b (Expr b)
+            | HasCallStack => Rec [(b, (Expr b))]
+
+deriving instance Data b => Data (Bind b)
 
 {-
 Note [Shadowing]
@@ -1928,23 +1929,23 @@ mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
 -- that the rhs satisfies the let-can-float invariant.  Prefer to use
 -- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
-mkLets        :: Typeable b => [Bind b] -> Expr b -> Expr b
+mkLets        :: HasCallStack => Typeable b => [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
 mkLams        :: forall b. HasCallStack => Typeable b => [b] -> Expr b -> Expr b
 
-mkLams binders body = case eqT @b @Id of Just Refl -> assertPpr (all isLambdaBinding binders) (text "mkLams: A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") $ foldr Lam body binders
+mkLams binders body = case eqT @b @Id of Just Refl -> if not (all isLambdaBinding binders) then pprPanic "mkLams" (text "A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") else foldr Lam body binders
                                          Nothing -> foldr Lam body binders
 mkLets binds body   = foldr mkLet body binds
 
 -- ROMES:TODO: temporary assertions, this is validated in the linter...
 
-mkLet :: forall b. Typeable b
+mkLet :: forall b. HasCallStack => Typeable b
       => Bind b -> Expr b -> Expr b
 -- The desugarer sometimes generates an empty Rec group
 -- which Lint rejects, so we kill it off right away
 mkLet (Rec []) body = body
-mkLet bind     body = case (eqT @b @Id) of Just Refl -> assertPpr (isLetBinder bind) (text "mkLet: A lambda-bound var [" <+> pprLetBinderId bind <+> text "] was used to construct a let binder!") $ Let bind body
+mkLet bind     body = case (eqT @b @Id) of Just Refl -> if not (isLetBinder bind) then pprPanic "mkLet" (text "A lambda-bound var [" <+> pprLetBinderId bind <+> text "] was used to construct a let binder!") else Let bind body
                                            Nothing   -> Let bind body
   where
     isLetBinder (NonRec b _) = isLetBinding b

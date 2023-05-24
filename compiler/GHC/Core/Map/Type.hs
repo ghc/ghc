@@ -549,6 +549,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- only exist for Ids, not TyVars and such
 -- The impl for varMultMaybe will surely chnge
 data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
+-- ROMES:TODO: AGAIN; FIX THIS.
 
 -- TODO(22292): derive
 instance Functor BndrMap where

@@ -2360,6 +2360,10 @@ occAnal env (Case scrut bndr ty alts)
         (alt_usg, Alt con tagged_bndrs rhs1)
 
 occAnal env (Let bind body)
+  | NonRec b _ <- bind
+  , isLambdaBinding b
+  = pprPanic "occAnal" (pprIdWithBinding b)
+  | otherwise
   = let
       body_env = env { occ_encl = OccVanilla } `addInScope` bindersOf bind
       (WithUsageDetails body_usage  body')  = occAnal body_env body

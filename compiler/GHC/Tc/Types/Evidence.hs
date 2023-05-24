@@ -2,6 +2,8 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Tc.Types.Evidence (
 
@@ -169,13 +171,13 @@ data HsWrapper
   | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
 
 
-  | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
+  | HasCallStack => WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
 
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
                                 -- Note [Wrapper returned from tcSubMult]
-  deriving Data.Data
+deriving instance Data.Data HsWrapper
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
 -- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
@@ -261,10 +263,15 @@ mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
 
-mkWpLet :: TcEvBinds -> HsWrapper
+mkWpLet :: HasCallStack => TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case
 mkWpLet (EvBinds b) | isEmptyBag b = WpHole
-mkWpLet ev_binds                   = WpLet ev_binds
+mkWpLet ev_binds
+  | EvBinds bs <- ev_binds
+  , anyBag (isLambdaBinding . evBindVar) bs
+  = pprPanic "mkWpEvLams" (ppr $ mapBag (pprIdWithBinding . evBindVar) bs)
+  | otherwise
+  = WpLet ev_binds
 
 mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
 mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as

@@ -113,6 +113,7 @@ import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
 import GHC.Types.RepType (isZeroBitTy)
+import GHC.Core.UsageEnv (zeroUE)
 
 {-
 ************************************************************************
@@ -492,7 +493,7 @@ stripTicksT p expr = fromOL $ go expr
 ************************************************************************
 -}
 
-bindNonRec :: HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
+bindNonRec :: HasCallStack => HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- ^ @bindNonRec x r b@ produces either:
 --
 -- > let x = r in b
@@ -519,8 +520,10 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = pprTrace "bindNonRec:needsCaseBinding:" (ppr bndr <+> ppr (idBinding bndr)) case_bind
   | otherwise                          = let_bind
   where
-    case_bind = mkDefaultCase rhs (setIdBinding bndr (maybe (LambdaBound ManyTy) LambdaBound (varMultMaybe bndr))) body -- ROMES:TODO: Explain
-    let_bind  = Let (NonRec bndr rhs) body
+    lambda_bndr = setIdBinding bndr (maybe (LambdaBound ManyTy) LambdaBound (varMultMaybe bndr)) -- ROMES:TODO: Explain, is this the best place to do this?
+    case_bind = mkDefaultCase rhs lambda_bndr body
+    -- ROMES:TODO: I couldn't find the root cause, for now we simply override the idBinding here
+    let_bind  = Let (NonRec (bndr `setIdBinding` LetBound zeroUE) rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this
 -- expression as per the invariants of 'CoreExpr': see "GHC.Core#let_can_float_invariant"

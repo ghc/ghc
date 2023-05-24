@@ -37,7 +37,7 @@ import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.DynFlags
 import GHC.Data.Bag
-import GHC.Types.Var ( VarBndr(..) )
+import GHC.Types.Var ( VarBndr(..), pprIdWithBinding )
 import GHC.Core.Map.Type
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
@@ -48,6 +48,9 @@ import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe ( isJust )
+
+import GHC.Core.UsageEnv (zeroUE)
+import GHC.Stack ( HasCallStack )
 
 {- Note [Grand plan for Typeable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -273,7 +276,7 @@ todoForExportedKindReps kinds = do
     return $ ExportedKindRepsTodo $ map mkId kinds
 
 -- | Generate TyCon bindings for a set of type constructors
-mkTypeRepTodoBinds :: [TypeRepTodo] -> TcM TcGblEnv
+mkTypeRepTodoBinds :: HasCallStack => [TypeRepTodo] -> TcM TcGblEnv
 mkTypeRepTodoBinds [] = getGblEnv
 mkTypeRepTodoBinds todos
   = do { stuff <- collect_stuff
@@ -417,7 +420,7 @@ mkTrNameLit = do
     return trNameLit
 
 -- | Make Typeable bindings for the given 'TyCon'.
-mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
+mkTyConRepBinds :: HasCallStack => TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
 mkTyConRepBinds stuff todo (TypeableTyCon {..})
   = do -- Make a KindRep
@@ -523,7 +526,7 @@ addKindRepBind in_scope k bndr rhs =
 
 -- | Run a 'KindRepM' and add the produced 'KindRep's to the typechecking
 -- environment.
-runKindRepM :: KindRepM a -> TcRn (TcGblEnv, a)
+runKindRepM :: HasCallStack => KindRepM a -> TcRn (TcGblEnv, a)
 runKindRepM (KindRepM action) = do
     kindRepEnv <- initialKindRepEnv
     (res, reps_env) <- runStateT action kindRepEnv
@@ -552,11 +555,13 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = return (nlHsVar id, env)
 
         -- We need to construct a new KindRep binding
+        -- (Romes: This will be a top level binding, so the binding is
+        -- let-bound with a closed usage env)
       | otherwise
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") (LambdaBound ManyTy) (mkTyConTy kindRepTyCon) -- ROMES:TODO: Are these type variables? What provenance should we give them
+                   <$> newSysLocalId (fsLit "$krep") (LetBound zeroUE) (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do

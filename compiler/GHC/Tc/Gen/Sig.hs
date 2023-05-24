@@ -75,6 +75,7 @@ import GHC.Data.Maybe( orElse, whenIsJust )
 import Data.Maybe( mapMaybe )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad( unless )
+import GHC.Core.UsageEnv (zeroUE)
 
 
 {- -------------------------------------------------------------
@@ -231,7 +232,10 @@ tcUserTypeSig loc hs_sig_ty mb_name
   = do { sigma_ty <- tcHsSigWcType ctxt_no_rrc hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name (LambdaBound ManyTy) sigma_ty -- ROMES:TODO: LambdaBound?
+                                   -- Romes: If this identifier gets bound, it is a
+                                   -- top-level let binder with a closed usage
+                                   -- env.
+         CompleteSig { sig_bndr  = mkLocalId name (LetBound zeroUE) sigma_ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level
