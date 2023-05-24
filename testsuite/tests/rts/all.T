@@ -570,3 +570,4 @@ test('decodeMyStack_emptyListForMissingFlag',
   ], compile_and_run, [''])
 
 test('T17574', [js_skip], compile_and_run, ['-with-rtsopts -T'])
+test('T23400', [], compile_and_run, ['-with-rtsopts -A8k'])
