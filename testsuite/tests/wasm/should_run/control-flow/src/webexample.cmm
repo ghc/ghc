@@ -1,0 +1,19 @@
+section "comment" {
+  mycomment:
+  bits8 [] "see https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-and-for-all-5123117b1ee2";
+}
+
+hardswitch(bits32 n) {
+
+  foreign "C" A();
+  if (n > 1) {
+    header:
+      foreign "C" B();
+      foreign "C" D();
+      if (n > 4) goto header;
+  } else {
+    foreign "C" C();
+  }
+  foreign "C" E();
+  return();
+}

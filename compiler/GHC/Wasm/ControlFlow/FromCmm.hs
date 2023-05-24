@@ -79,7 +79,7 @@ flowLeaving platform b =
               scrutinee = smartExtend platform $ smartPlus platform e offset
               range = inclusiveInterval (lo+toInteger offset) (hi+toInteger offset)
           in  Switch scrutinee range target_labels default_label
-      CmmCall { cml_cont = Nothing, cml_target = e } -> TailCall e
+      CmmCall { cml_target = e } -> TailCall e
       _ -> panic "flowLeaving: unreachable"
 
 ----------------------- Evaluation contexts ------------------------------
