@@ -203,7 +203,7 @@ class TestConfig:
         self.baseline_commit = None # type: Optional[GitRef]
 
         # Additional package dbs to inspect for test dependencies.
-        self.test_package_db = [] # type: [PathToPackageDb]
+        self.test_package_db = [] # type: List[PathToPackageDb]
 
         # Should we skip performance tests
         self.skip_perf_tests = False
@@ -224,6 +224,10 @@ class TestConfig:
         # the haddock perf tests in testsuite/tests/perf/haddock/.
         # See Note [Haddock runtime stats files] at the bottom of this file.
         self.stats_files_dir = Path('/please_set_stats_files_dir')
+
+        # Where to place observed output files on when unexpected output
+        # is observed.
+        self.unexpected_output_dir = None # type: Optional[Path]
 
         # Should we cleanup after test runs?
         self.cleanup = True

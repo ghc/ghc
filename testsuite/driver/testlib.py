@@ -2262,11 +2262,15 @@ async def check_prof_ok(name: TestName, way: WayName) -> bool:
 # new output. Returns true if output matched or was accepted, false
 # otherwise. See Note [Output comparison] for the meaning of the
 # normaliser and whitespace_normaliser parameters.
-async def compare_outputs(way: WayName,
-                    kind: str,
-                    normaliser: OutputNormalizer,
-                    expected_file, actual_file, diff_file=None,
-                    whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
+async def compare_outputs(
+        way: WayName,
+        kind: str,
+        normaliser: OutputNormalizer,
+        expected_file: Path,
+        actual_file: Path,
+        diff_file: Optional[Path]=None,
+        whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
+
     # Respect ignore_stdout and ignore_stderr options
     if kind == 'stderr' and getTestOpts().ignore_stderr:
         return True
@@ -2343,6 +2347,12 @@ async def compare_outputs(way: WayName,
             expected_path.unlink()
             return True
         else:
+            if config.unexpected_output_dir is not None:
+                ghc_root = expected_path.relative_to(config.top.parent)
+                out = config.unexpected_output_dir / ghc_root
+                out.parent.mkdir(exist_ok=True, parents=True)
+                write_file(out, actual_raw)
+
             return False
 
 # Checks that each line from pattern_file is present in actual_file as
@@ -2397,6 +2407,15 @@ def grep_output(normaliser: OutputNormalizer, pattern_file, actual_file, is_subs
 #    squash all whitespace, making the diff unreadable. Instead we rely
 #    on the `diff` program to ignore whitespace changes as much as
 #    possible (#10152).
+#
+# In addition, to aid CI users we will optionally collect all
+# of the unexpected output that we encountered in the
+# directory at config.unexpected_output_dir. The intent here is for this
+# directory to be preserved as a CI artifact which can then
+# be downloaded by the user and committed to their branch
+# to address CI failures on platforms which they cannot
+# test locally.
+
 
 # Note [Null device handling]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
