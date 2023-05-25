@@ -856,8 +856,8 @@ commentsOrigDeltasDecl (L an d) = L (addCommentOrigDeltasEpAnnS an) d
 
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
 -- given @DeltaPos@.
-noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> (EpAnnS ann)
-noAnnSrcSpanDP _ dp
+noAnnSrcSpanDP :: (Monoid ann) => DeltaPos -> (EpAnnS ann)
+noAnnSrcSpanDP dp
   = EpAnnS (EpaDelta dp []) mempty emptyComments
 
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
@@ -869,9 +869,8 @@ noAnnSrcSpanDPI l dp
 noAnnSrcSpanDP0I :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP0I l = noAnnSrcSpanDPI l (SameLine 0)
 
-noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> (EpAnnS ann)
--- noAnnSrcSpanDP0 :: SrcSpan -> SrcSpanAnnA
-noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (SameLine 0)
+noAnnSrcSpanDP0 :: (Monoid ann) => (EpAnnS ann)
+noAnnSrcSpanDP0 = noAnnSrcSpanDP (SameLine 0)
 
 noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP1 l = noAnnSrcSpanDPI l (SameLine 1)
