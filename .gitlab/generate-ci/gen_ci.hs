@@ -680,10 +680,12 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
     jobAfterScript
       | Windows <- opsys =
       [ "bash .gitlab/ci.sh save_cache"
+      , "bash .gitlab/ci.sh save_test_output"
       , "bash .gitlab/ci.sh clean"
       ]
       | otherwise =
       [ ".gitlab/ci.sh save_cache"
+      , ".gitlab/ci.sh save_test_output"
       , ".gitlab/ci.sh clean"
       , "cat ci_timings" ]
 
@@ -706,16 +708,19 @@ job arch opsys buildConfig = NamedJob { name = jobName, jobInfo = Job {..} }
           Emulator s       -> "CROSS_EMULATOR" =: s
           NoEmulatorNeeded -> mempty
       , if withNuma buildConfig then "ENABLE_NUMA" =: "1" else mempty
-      , if validateNonmovingGc buildConfig
-           then "RUNTEST_ARGS" =: "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"
-           else mempty
+      , let runtestArgs =
+                [ "--way=nonmoving --way=nonmoving_thr --way=nonmoving_thr_sanity"
+                | validateNonmovingGc buildConfig
+                ]
+        in "RUNTEST_ARGS" =: unwords runtestArgs
       ]
 
     jobArtifacts = Artifacts
       { junitReport = "junit.xml"
       , expireIn = "2 weeks"
       , artifactPaths = [binDistName arch opsys buildConfig ++ ".tar.xz"
-                        ,"junit.xml"]
+                        ,"junit.xml"
+                        ,"unexpected-test-output.tar.gz"]
       , artifactsWhen = ArtifactsAlways
       }
 

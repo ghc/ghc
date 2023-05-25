@@ -43,12 +43,13 @@ $0 - GHC continuous integration driver
 
 Common Modes:
 
-  usage         Show this usage message.
-  setup         Prepare environment for a build.
-  configure     Run ./configure.
-  clean         Clean the tree
-  shell         Run an interactive shell with a configured build environment.
-  save_cache    Preserve the cabal cache
+  usage             Show this usage message.
+  setup             Prepare environment for a build.
+  configure         Run ./configure.
+  clean             Clean the tree
+  shell             Run an interactive shell with a configured build environment.
+  save_test_output  Generate unexpected-test-output.tar.gz
+  save_cache        Preserve the cabal cache
 
 Hadrian build system
   build_hadrian Build GHC via the Hadrian build system
@@ -614,12 +615,16 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files    \
       --docs=none                 \
-      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "cross-compiled hadrian main testsuite"
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "cross-compiled hadrian main testsuite"
   elif [[ -n "${CROSS_TARGET:-}" ]] && [[ "${CROSS_TARGET:-}" == *"wasm"* ]]; then
     run_hadrian \
       test \
       --summary-junit=./junit.xml \
-      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian main testsuite targetting $CROSS_TARGET"
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "hadrian main testsuite targetting $CROSS_TARGET"
   elif [ -n "${CROSS_TARGET:-}" ]; then
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
@@ -635,7 +640,9 @@ function test_hadrian() {
       --test-compiler=stage-cabal \
       --test-root-dirs=testsuite/tests/perf \
       --test-root-dirs=testsuite/tests/typecheck \
-      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian cabal-install test"
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "hadrian cabal-install test"
   else
     local instdir="$TOP/_build/install"
     local test_compiler="$instdir/bin/${cross_prefix}ghc$exe"
@@ -673,12 +680,13 @@ function test_hadrian() {
       --summary-junit=./junit.xml \
       --test-have-intree-files \
       --test-compiler="${test_compiler}" \
-      "runtest.opts+=${RUNTEST_ARGS:-}" || fail "hadrian main testsuite"
+      "runtest.opts+=${RUNTEST_ARGS:-}" \
+      "runtest.opts+=--unexpected-output-dir=$TOP/unexpected-test-output" \
+      || fail "hadrian main testsuite"
 
     info "STAGE2_TEST=$?"
 
-    fi
-
+  fi
 }
 
 function summarise_hi_files() {
@@ -768,6 +776,10 @@ function run_abi_test() {
   OUT="$PWD/out/run2" DIR=$(mktemp -d XXXX-short) cabal_abi_test -O0
   check_interfaces out/run1 out/run2 abis "Mismatched ABI hash"
   check_interfaces out/run1 out/run2 interfaces "Mismatched interface hashes"
+}
+
+function save_test_output() {
+    tar -czf unexpected-test-output.tar.gz unexpected-test-output
 }
 
 function save_cache () {
@@ -935,6 +947,7 @@ case ${1:-help} in
   lint_author) shift; lint_author "$@" ;;
   compare_interfaces_of) shift; compare_interfaces_of "$@" ;;
   clean) clean ;;
+  save_test_output) save_test_output ;;
   save_cache) save_cache ;;
   shell) shift; shell "$@" ;;
   *) fail "unknown mode $1" ;;
