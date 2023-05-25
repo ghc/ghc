@@ -1125,9 +1125,6 @@ dynamic_flags_deps = [
       $ hasArg $ \f ->
         alterToolSettings $ \s -> s { toolSettings_opt_windres = f : toolSettings_opt_windres s }
 
-  , make_ord_flag defGhcFlag "split-objs"
-      (NoArg $ addWarn "ignoring -split-objs")
-
     -- N.B. We may someday deprecate this in favor of -fsplit-sections,
     -- which has the benefit of also having a negating -fno-split-sections.
   , make_ord_flag defGhcFlag "split-sections"

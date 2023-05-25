@@ -576,11 +576,8 @@ The available mode flags are:
     :type: mode
     :category: modes
 
-    Print ``YES`` if GHC was compiled with support for splitting generated
-    object files into smaller objects, ``NO`` otherwise.
-    This feature uses platform specific techniques and may not be available on
-    all platforms.
-    See :ghc-flag:`-split-objs` for details.
+    Prints ``NO`` as object splitting is no longer supported. See
+    :ghc-flag:`-split-sections` for a more portable and reliable alternative.
 
 .. ghc-flag:: --print-project-git-commit-id
     :shortdesc: display Git commit id GHC is built from
