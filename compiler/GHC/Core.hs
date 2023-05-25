@@ -7,12 +7,12 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GADTs, StandaloneDeriving #-}
+{-# LANGUAGE GADTs, StandaloneDeriving, PatternSynonyms #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types
-        Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
+        Expr(..,Let,Lam), Alt(..), Bind(..), AltCon(..), Arg,
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -252,8 +252,8 @@ data Expr b
   = Var   Id
   | Lit   Literal
   | App   (Expr b) (Arg b)
-  | HasCallStack => Lam   b (Expr b)
-  | HasCallStack => Let   (Bind b) (Expr b)
+  | HasCallStack => Lam'   b (Expr b)
+  | HasCallStack => Let'   (Bind b) (Expr b)
   | HasCallStack => Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
@@ -261,6 +261,31 @@ data Expr b
   | Type  Type
   | Coercion Coercion
 deriving instance Data b => Data (Expr b)
+
+{-# COMPLETE Var, Lit, App, Lam, Let, Case, Cast, Tick, Type, Coercion #-}
+
+pattern Lam :: forall b. (HasCallStack, Typeable b) => b -> Expr b -> Expr b
+pattern Lam x y <- Lam' x y where
+  Lam x y
+    | Just Refl <- eqT @b @Id
+    , not (isLambdaBinding x)
+    = pprPanic "pattern Lam!" (pprIdWithBinding x)
+    | otherwise
+    = Lam' x y
+
+pattern Let :: forall b. (HasCallStack, Typeable b) => Bind b -> Expr b -> Expr b
+pattern Let x y <- Let' x y where
+  Let x y
+    | Just Refl <- eqT @b @Id
+    , NonRec z _ <- x
+    , not (isLetBinding z)
+    = pprPanic "pattern Let 1!" (pprIdWithBinding z)
+    | Just Refl <- eqT @b @Id
+    , Rec zs <- x
+    , any (not . isLetBinding . fst) zs
+    = pprPanic "pattern Let 2!" (ppr zs)
+    | otherwise
+    = Let' x y
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -1808,7 +1833,7 @@ type TaggedAlt  t = Alt  (TaggedBndr t)
 instance Outputable b => Outputable (TaggedBndr b) where
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
-deTagExpr :: TaggedExpr t -> CoreExpr
+deTagExpr :: Typeable t => TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
 deTagExpr (Lit l)                   = Lit l
 deTagExpr (Type ty)                 = Type ty
@@ -1820,11 +1845,11 @@ deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts
 deTagExpr (Tick t e)                = Tick t (deTagExpr e)
 deTagExpr (Cast e co)               = Cast (deTagExpr e) co
 
-deTagBind :: TaggedBind t -> CoreBind
+deTagBind :: Typeable t => TaggedBind t -> CoreBind
 deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
 deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs]
 
-deTagAlt :: TaggedAlt t -> CoreAlt
+deTagAlt :: Typeable t => TaggedAlt t -> CoreAlt
 deTagAlt (Alt con bndrs rhs) = Alt con [b | TB b _ <- bndrs] (deTagExpr rhs)
 
 {-
@@ -1954,12 +1979,12 @@ mkLet bind     body = case (eqT @b @Id) of Just Refl -> if not (isLetBinder bind
     pprLetBinderId (Rec ls)     = hsep $ map (pprIdWithBinding . fst) ls
 
 -- | @mkLetNonRec bndr rhs body@ wraps @body@ in a @let@ binding @bndr@.
-mkLetNonRec :: b -> Expr b -> Expr b -> Expr b
+mkLetNonRec :: Typeable b => b -> Expr b -> Expr b -> Expr b
 mkLetNonRec b rhs body = Let (NonRec b rhs) body
 
 -- | @mkLetRec binds body@ wraps @body@ in a @let rec@ with the given set of
 -- @binds@ if binds is non-empty.
-mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
+mkLetRec :: Typeable b => [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
@@ -2056,7 +2081,7 @@ flattenBinds []                   = []
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',
 -- and 'collectTyAndValBinders'
-collectBinders         :: Expr b   -> ([b],     Expr b)
+collectBinders         :: Typeable b => Expr b   -> ([b],     Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar], CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],    CoreExpr)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
@@ -2064,7 +2089,7 @@ collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
 -- | Strip off exactly N leading lambdas (type or value).
 -- Good for use with join points.
 -- Panic if there aren't enough
-collectNBinders :: JoinArity -> Expr b -> ([b], Expr b)
+collectNBinders :: Typeable b => JoinArity -> Expr b -> ([b], Expr b)
 
 collectBinders expr
   = go [] expr
@@ -2111,7 +2136,7 @@ collectNValBinders_maybe orig_n orig_expr
 
 -- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied
-collectArgs :: Expr b -> (Expr b, [Arg b])
+collectArgs :: Typeable b => Expr b -> (Expr b, [Arg b])
 collectArgs expr
   = go expr []
   where
@@ -2120,7 +2145,7 @@ collectArgs expr
 
 -- | Takes a nested application expression and returns the function
 -- being applied. Looking through casts and ticks to find it.
-collectFunSimple :: Expr b -> Expr b
+collectFunSimple :: Typeable b => Expr b -> Expr b
 collectFunSimple expr
   = go expr
   where
@@ -2268,10 +2293,10 @@ collectAnnArgsTicks tickishOk expr
                               = go e as (t:ts)
     go e                as ts = (e, as, reverse ts)
 
-deAnnotate :: AnnExpr bndr annot -> Expr bndr
+deAnnotate :: Typeable bndr => AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
-deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
+deAnnotate' :: Typeable bndr => AnnExpr' bndr annot -> Expr bndr
 deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
@@ -2286,15 +2311,15 @@ deAnnotate' (AnnLet bind body)
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
-deAnnAlt :: AnnAlt bndr annot -> Alt bndr
+deAnnAlt :: Typeable bndr => AnnAlt bndr annot -> Alt bndr
 deAnnAlt (AnnAlt con args rhs) = Alt con args (deAnnotate rhs)
 
-deAnnBind  :: AnnBind b annot -> Bind b
+deAnnBind  :: Typeable b => AnnBind b annot -> Bind b
 deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
 deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'
-collectAnnBndrs :: AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
+collectAnnBndrs :: Typeable bndr => AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
 collectAnnBndrs e
   = collect [] e
   where

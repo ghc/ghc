@@ -65,6 +65,7 @@ module GHC.Core.Utils (
         dumpIdInfoOfProgram
     ) where
 
+import Data.Typeable (Typeable)
 import GHC.Prelude
 import GHC.Platform
 
@@ -453,7 +454,7 @@ stripTicksTopT p = go []
 
 -- | Completely strip ticks satisfying a predicate from an
 -- expression. Note this is O(n) in the size of the expression!
-stripTicksE :: (CoreTickish -> Bool) -> Expr b -> Expr b
+stripTicksE :: Typeable b => (CoreTickish -> Bool) -> Expr b -> Expr b
 stripTicksE p expr = go expr
   where go (App e a)        = App (go e) (go a)
         go (Lam b e)        = Lam b (go e)
@@ -469,7 +470,7 @@ stripTicksE p expr = go expr
         go_b (b, e)         = (b, go e)
         go_a (Alt c bs e)   = Alt c bs (go e)
 
-stripTicksT :: (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
+stripTicksT :: Typeable b => (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
 stripTicksT p expr = fromOL $ go expr
   where go (App e a)        = go e `appOL` go a
         go (Lam _ e)        = go e
