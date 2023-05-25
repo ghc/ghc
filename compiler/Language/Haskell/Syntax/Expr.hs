@@ -45,6 +45,8 @@ import Data.Maybe
 import Data.List.NonEmpty ( NonEmpty )
 import GHC.Types.Name.Reader
 
+import GHC.Stack (HasCallStack)
+
 {- Note [RecordDotSyntax field updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The extensions @OverloadedRecordDot@ @OverloadedRecordUpdate@ together
@@ -427,7 +429,7 @@ data HsExpr p
   --       'GHC.Parser.Annotation.AnnClose' @'}'@,'GHC.Parser.Annotation.AnnIn'
 
   -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-  | HsLet       (XLet p)
+  | HasCallStack => HsLet       (XLet p)
                !(LHsToken "let" p)
                 (HsLocalBinds p)
                !(LHsToken "in" p)

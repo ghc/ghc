@@ -153,7 +153,8 @@ selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWit
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return ((unLoc var) `setIdBinding` (LambdaBound ManyTy))) -- ROMES:TODO: Are match variables always put in cases? If yes, then this could be a way to guarantee match variables are lambda bound/case bound
+selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return ((unLoc var) `setIdBinding` (LambdaBound ManyTy)))
+                                     -- ROMES:TODO: Are match variables always put in cases? If yes, then this could be a way to guarantee match variables are lambda bound/case bound
 -- selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
 selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: Can match variables end up in lets and cases?, I think yes.
 
@@ -251,17 +252,22 @@ adjustMatchResultDs encl_fn = \case
   MR_Fallible body_fn -> MR_Fallible $ \fail ->
     encl_fn =<< body_fn fail
 
-wrapBinds :: [(Var,Var)] -> CoreExpr -> CoreExpr
+wrapBinds :: HasCallStack => [(Var,Var)] -> CoreExpr -> CoreExpr
 wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
-wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
+wrapBind :: HasCallStack => Var -> Var -> CoreExpr -> CoreExpr
 wrapBind new old body   -- NB: this function must deal with term
   | new==old    = body  -- variables, type variables or coercion variables
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
-seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = mkDefaultCase (Var var) var body
+-- | 'seqVar' produces a 'CoreExpr' in which the evaluation of 'Var' is forced
+-- by means of scrutinizing it in a case expression with a single DEFAULT alternative.
+seqVar :: HasCallStack => Var -> CoreExpr -> CoreExpr
+-- romes:TODO: it's not evident how to consider the case of a variable that was
+-- let bound being used for the case scrutinee. Now I'm making them ManyTy to
+-- move forward
+seqVar var body = mkDefaultCase (Var var) (var `setIdBinding` LambdaBound ManyTy) body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)
@@ -734,8 +740,8 @@ work out well:
      ; y = case v of K x y -> y }
   which is better.
 -}
--- Remark: pattern selectors only occur in unrestricted patterns so we are free
--- to select Many as the multiplicity of every let-expression introduced.
+
+-- | See Note [mkSelectorBinds]
 mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
                 -> LPat GhcTc      -- ^ The pattern
                 -> CoreExpr        -- ^ Expression to which the pattern is bound
@@ -744,13 +750,17 @@ mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
                 -- binds (see Note [Desugar Strict binds] in "GHC.HsToCore.Binds")
                 -- and all the desugared binds
 
+-- ROMES:TODO: Update remark, and what's a pattern selector?
+-- Remark: pattern selectors only occur in unrestricted patterns so we are free
+-- to select Many as the multiplicity of every let-expression introduced.
+-- See also Note [Keeping the IdBinding up to date]
 mkSelectorBinds ticks pat val_expr
   | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs (LambdaBound ManyTy) pat_ty -- ROMES:TODO: selector binders are lambda bound?
+       ; val_var <- newSysLocalDs (LetBound zeroUE) pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -768,7 +778,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs (LambdaBound ManyTy) tuple_ty -- ROMES:TODO: selector binders are lambda bound? yes since they're used ahead in mkBigTupleSelectorSolo?
+  = do { tuple_var  <- newSysLocalDs (LetBound zeroUE) tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -73,6 +74,8 @@ import GHC.Types.Unique.Supply
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad
+
+import GHC.Core.UsageEnv (zeroUE)
 
 {-
 Note [CorePrep Overview]
@@ -1722,7 +1725,7 @@ data FloatingBind
                          -- They are always of lifted type;
                          -- unlifted ones are done with FloatCase
 
- | FloatCase
+ | HasCallStack => FloatCase
       CpeBody         -- Always ok-for-speculation
       Id              -- Case binder
       AltCon [Var]    -- Single alternative
@@ -1761,14 +1764,15 @@ data OkToSpec
                         -- ok-to-speculate unlifted bindings
    | NotOkToSpec        -- Some not-ok-to-speculate unlifted bindings
 
-mkFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
+mkFloat :: HasCallStack => CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
+-- romes:TODO: See Note [Keeping the IdBinding up to date]
 mkFloat env dmd is_unlifted bndr rhs
   | is_strict || ok_for_spec -- See Note [Speculative evaluation]
-  , not is_hnf  = FloatCase rhs bndr DEFAULT [] ok_for_spec
+  , not is_hnf  = FloatCase rhs (bndr `setIdBinding` LambdaBound ManyTy) DEFAULT [] ok_for_spec
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
-  | is_unlifted = FloatCase rhs bndr DEFAULT [] True
+  | is_unlifted = FloatCase rhs (bndr `setIdBinding` LambdaBound ManyTy) DEFAULT [] True
       -- we used to assertPpr ok_for_spec (ppr rhs) here, but it is now disabled
       -- because exprOkForSpeculation isn't stable under ANF-ing. See for
       -- example #19489 where the following unlifted expression:
@@ -2223,7 +2227,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") (LambdaBound ManyTy) ty -- ROMES:TODO: What kind of binders?! I guess up until now it didn't really matter, but now it does
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") (LetBound zeroUE) ty
 
 
 ------------------------------------------------------------------------------

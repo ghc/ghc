@@ -40,7 +40,7 @@ module GHC.Core (
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
-        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        bindersOf, bindersOfBinds, rhssOfBind, bindersOfAlts, rhssOfAlts,
         foldBindersOfBindStrict, foldBindersOfBindsStrict,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
@@ -254,7 +254,7 @@ data Expr b
   | App   (Expr b) (Arg b)
   | HasCallStack => Lam   b (Expr b)
   | HasCallStack => Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+  | HasCallStack => Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
   | Tick  CoreTickish (Expr b)
@@ -1934,7 +1934,7 @@ mkLets        :: HasCallStack => Typeable b => [Bind b] -> Expr b -> Expr b
 -- use 'GHC.Core.Make.mkCoreLams' if possible
 mkLams        :: forall b. HasCallStack => Typeable b => [b] -> Expr b -> Expr b
 
-mkLams binders body = case eqT @b @Id of Just Refl -> if not (all isLambdaBinding binders) then pprPanic "mkLams" (text "A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") else foldr Lam body binders
+mkLams binders body = case eqT @b @Id of Just Refl -> if any (not . isLambdaBinding) binders then pprPanic "mkLams" (text "A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") else foldr Lam body binders
                                          Nothing -> foldr Lam body binders
 mkLets binds body   = foldr mkLet body binds
 
@@ -2038,6 +2038,10 @@ foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
+
+-- | Concat together all the binders in each alternative
+bindersOfAlts :: [Alt b] -> [b]
+bindersOfAlts = concatMap (\(Alt _ ids _) -> ids)
 
 rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | Alt _ _ e <- alts]

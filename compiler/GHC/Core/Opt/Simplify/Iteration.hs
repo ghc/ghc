@@ -60,7 +60,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar )
+import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, isLetBinding, isLambdaBinding )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
@@ -587,7 +587,7 @@ unless the kind of the type of rhs is concrete, in the sense of
 Note [Concrete types] in GHC.Tc.Utils.Concrete.
 -}
 
-tryCastWorkerWrapper :: SimplEnv -> BindContext
+tryCastWorkerWrapper :: HasCallStack => SimplEnv -> BindContext
                      -> InId -> OccInfo
                      -> OutId -> OutExpr
                      -> SimplM (SimplFloats, SimplEnv)
@@ -918,7 +918,7 @@ It does *not* attempt to do let-to-case.  Why?  Because it is used for
 Nor does it do the atomic-argument thing
 -}
 
-completeBind :: SimplEnv
+completeBind :: HasCallStack => SimplEnv
              -> BindContext
              -> InId           -- Old binder
              -> OutId          -- New binder; can be a JoinId
@@ -973,6 +973,7 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
+             `setIdBinding` LetBound zeroUE -- See Note [Keeping the IdBinding up to date]
   where
     new_arity = arityTypeArity new_arity_type
     info1 = idInfo new_bndr `setArityInfo` new_arity
@@ -1213,6 +1214,9 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env (Case scrut bndr _ alts) cont
+  | isLetBinding bndr || any isLetBinding (bindersOfAlts alts)
+  = pprPanic "simplExprF1:ouch!" (pprIdWithBinding bndr <+> ppr alts)
+  | otherwise
   = {-#SCC "simplExprF1-Case" #-}
     pprTrace "simplExprF1:Case:" (ppr bndr <+> ppr (idBinding bndr)) $
     simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
@@ -2933,6 +2937,9 @@ rebuildCase, reallyRebuildCase
 --------------------------------------------------
 
 rebuildCase env scrut case_bndr alts cont
+  | isLetBinding case_bndr || any isLetBinding (bindersOfAlts alts)
+  = pprPanic "reallyRebuildCase:ouch!" (pprIdWithBinding case_bndr <+> ppr alts)
+
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
@@ -3831,6 +3838,8 @@ mkDupableAlt :: HasCallStack => Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
 mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
+  | any (not . isLambdaBinding) alt_bndrs
+  = pprPanic "mkDupableAlt: Alt has let binders" (ppr $ map pprIdWithBinding alt_bndrs)
   | exprIsTrivial alt_rhs_in   -- See point (2) of Note [Duplicating join points]
   = return (jfloats, Alt con alt_bndrs alt_rhs_in)
 
@@ -3879,7 +3888,8 @@ mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
               -- so we must zap them here.
               join_rhs   = mkLams (map zapIdUnfolding final_bndrs) rhs_with_seqs
 
-        ; pprTraceM "mkDupableAlt:filtered_binders" (ppr $ map (\x -> ppr x <+> ppr (idBinding x)) filtered_binders)
+        ; pprTraceM "mkDupableAlt:final_bndrs" (ppr $ map pprIdWithBinding final_bndrs)
+        ; pprTraceM "mkDupableAlt:filtered_binders" (ppr $ map pprIdWithBinding filtered_binders)
         ; join_bndr <- newJoinId filtered_binders rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args

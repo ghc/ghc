@@ -51,6 +51,7 @@ import GHC.Core.Make
 import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
+import GHC.Types.Var (pprIdWithBinding)
 import GHC.Types.Id.Make
 import GHC.Unit.Module
 import GHC.Core.ConLike
@@ -155,6 +156,8 @@ ds_val_bind (is_rec, binds) body
                -- we should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
+        ; pprTraceM "ds_val_bind:binds" (ppr binds)
+        ; pprTraceM "ds_val_bind:prs" (ppr $ map (pprIdWithBinding . fst) prs)
         ; let body' = foldr seqVar body force_vars
         ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
           -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType

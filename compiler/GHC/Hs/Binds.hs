@@ -10,6 +10,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
 
@@ -50,6 +52,7 @@ import GHC.Data.Bag
 import GHC.Data.BooleanFormula (LBooleanFormula)
 import GHC.Types.Name.Reader
 import GHC.Types.Name
+import GHC.Stack
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -697,8 +700,8 @@ type instance XXFixitySig (GhcPass p) = DataConCantHappen
 -- generated for record selectors. We simply record the desired Id
 -- itself, replete with its name, type and IdDetails. Otherwise it's
 -- just like a type signature: there should be an accompanying binding
-newtype IdSig = IdSig { unIdSig :: Id }
-    deriving Data
+data IdSig = HasCallStack => IdSig { unIdSig :: Id }
+deriving instance Data IdSig
 
 data AnnSig
   = AnnSig {

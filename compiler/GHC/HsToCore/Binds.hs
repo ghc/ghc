@@ -321,7 +321,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs (LambdaBound ManyTy) tup_ty -- ROMES:TODO?
+                = do { tup_id  <- newSysLocalDs (LetBound zeroUE) tup_ty -- ROMES:TODO?
                      ; dsHsWrapper wrap $ \core_wrap -> do
                      { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $

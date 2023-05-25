@@ -523,7 +523,11 @@ bindNonRec bndr rhs body
     lambda_bndr = setIdBinding bndr (maybe (LambdaBound ManyTy) LambdaBound (varMultMaybe bndr)) -- ROMES:TODO: Explain, is this the best place to do this?
     case_bind = mkDefaultCase rhs lambda_bndr body
     -- ROMES:TODO: I couldn't find the root cause, for now we simply override the idBinding here
-    let_bind  = Let (NonRec (bndr `setIdBinding` LetBound zeroUE) rhs) body
+    let_bind 
+      | isId bndr
+      = Let (NonRec (bndr `setIdBinding` LetBound zeroUE) rhs) body
+      | otherwise
+      = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this
 -- expression as per the invariants of 'CoreExpr': see "GHC.Core#let_can_float_invariant"
@@ -547,7 +551,7 @@ mkAltExpr (LitAlt lit) [] []
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 
-mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
+mkDefaultCase :: HasCallStack => CoreExpr -> Id -> CoreExpr -> CoreExpr
 -- Make (case x of y { DEFAULT -> e }
 mkDefaultCase scrut case_bndr body
   = assertPpr (isJust (varMultMaybe case_bndr)) (text "mkDefaultCase:Case binder is marked LetBound!") $
@@ -606,7 +610,7 @@ findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
 findDefault alts                          =                    (alts, Nothing)
 
-addDefault :: [Alt b] -> Maybe (Expr b) -> [Alt b]
+addDefault :: HasCallStack => [Alt b] -> Maybe (Expr b) -> [Alt b]
 addDefault alts Nothing    = alts
 addDefault alts (Just rhs) = Alt DEFAULT [] rhs : alts
 
@@ -688,7 +692,8 @@ trimConArgs DEFAULT      args = assert (null args) []
 trimConArgs (LitAlt _)   args = assert (null args) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
-filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
+filterAlts :: HasCallStack
+           => TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
            -> [Type]               -- ^ And its type arguments
            -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
            -> [Alt b] -- ^ Alternatives

@@ -4,7 +4,7 @@
 The simplifier utilities
 -}
 
-
+{-# LANGUAGE ExistentialQuantification #-}
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
@@ -50,6 +50,7 @@ import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Stats ( Tick(..) )
+import GHC.Core.UsageEnv (zeroUE)
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -179,7 +180,7 @@ data SimplCont
                                   -- See Note [The hole type in ApplyToTy]
       , sc_cont    :: SimplCont }
 
-  | Select             -- (Select alts K)[e] = K[ case e of alts ]
+  | HasCallStack => Select             -- (Select alts K)[e] = K[ case e of alts ]
       { sc_dup  :: DupFlag        -- See Note [DupFlag invariants]
       , sc_bndr :: InId           -- case binder
       , sc_alts :: [InAlt]        -- Alternatives
@@ -2289,7 +2290,7 @@ OutId.  Test simplCore/should_compile/simpl013 apparently shows this
 up, although I'm not sure exactly how..
 -}
 
-prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: HasCallStack => OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 --
 -- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
@@ -2538,7 +2539,9 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                                             (Alt con args (wrap_rhs rhs))
                 -- Simplifier's no-shadowing invariant should ensure
                 -- that outer_bndr is not shadowed by the inner patterns
-              wrap_rhs rhs = Let (NonRec inner_bndr (Var outer_bndr)) rhs
+              wrap_rhs rhs = Let (NonRec (inner_bndr `setIdBinding` LetBound zeroUE) (Var outer_bndr)) rhs
+                -- IdBinding: See Note [Keeping the IdBinding up to date]
+                -- 
                 -- The let is OK even for unboxed binders,
 
               wrapped_alts | isDeadBinder inner_bndr = inner_alts

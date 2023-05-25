@@ -556,7 +556,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name (LambdaBound ManyTy) forall_a_a -- ROMES:TODO: Does it matter?
+      = mkLocalId name (LetBound zeroUE) forall_a_a -- ROMES:TODO: Does it matter?
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -610,11 +610,12 @@ tcPolyCheck :: TcPragEnv
 --   it is a FunBind
 --   it has a complete type signature,
 tcPolyCheck prag_fn
-            (CompleteSig { sig_bndr  = poly_id
-                         , sig_ctxt  = ctxt
-                         , sig_loc   = sig_loc })
+            cs
             (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
+  | (CompleteSig { sig_bndr  = poly_id
+                 , sig_ctxt  = ctxt
+                 , sig_loc   = sig_loc }) <- cs
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
        ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
@@ -967,7 +968,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- (#14000) we may report an ambiguity error for a rather
          -- bogus type.
 
-       ; return (mkLocalId poly_name (LambdaBound ManyTy) inferred_poly_ty) } -- ROMES:TODO: Inferred poly id is prob forall bound, consider lambda bound (its lambda alright, a big one) ?
+       ; return (mkLocalId poly_name (LetBound zeroUE) inferred_poly_ty) } -- ROMES:TODO: Inferred poly id is prob forall bound, consider lambda bound (its lambda alright, a big one) ?
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints

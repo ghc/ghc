@@ -1302,7 +1302,7 @@ checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
       | Infix <- is_infix = ParseContext (Just $ unLoc fun) NoIncompleteDoBlock
       | otherwise         = noParseContext
 
-makeFunBind :: LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
+makeFunBind :: HasCallStack => LocatedN RdrName -> LocatedL [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
 -- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms

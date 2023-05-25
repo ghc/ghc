@@ -1343,7 +1343,7 @@ updateIdTypeAndMultsM f id@(Id { varType = ty
        ; return (id { varType = ty', idBinding = binding' }) }
 updateIdTypeAndMultsM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 
-setIdBinding :: Id -> IdBinding -> Id
+setIdBinding :: HasCallStack => Id -> IdBinding -> Id
 setIdBinding id !r | isId id = id { idBinding = r }
                    | otherwise = pprPanic "setIdBinding" (ppr id <+> ppr r)
 

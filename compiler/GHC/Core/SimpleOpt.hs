@@ -35,6 +35,7 @@ import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, Id
 import GHC.Types.Var      ( isNonCoVarId )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
+import GHC.Core.UsageEnv
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish
@@ -768,9 +769,11 @@ add_info env old_bndr top_level new_rhs new_bndr
                                     False -- may be bottom or not
                                     new_rhs Nothing
 
-wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
+wrapLet :: HasCallStack => Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
-wrapLet (Just (b,r)) body = Let (NonRec b r) body
+wrapLet (Just (b,r)) body = Let (NonRec (b `setIdBinding` LetBound zeroUE) r) body
+                            -- See Note [Keeping the IdBinding up to date]
+                            -- wrapLet is called always on binders lambda bound
 
 {-
 Note [Inline prag in simplOpt]

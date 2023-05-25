@@ -28,6 +28,7 @@ import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
+import GHC.Core.UsageEnv (zeroUE)
 import GHC.Types.Basic ( Origin(..), isGenerated )
 import GHC.Types.SourceText
 import GHC.Driver.DynFlags
@@ -371,7 +372,6 @@ Among other things in the resulting Pattern:
 The bindings created by the above patterns are put into the returned wrapper
 instead.
 
--- ROMES:TODO: Do something about this, lambda bound can become let bound for irrefutable patterns
 This means a definition of the form:
   f x = rhs
 when called with v get's desugared to the equivalent of:
@@ -396,12 +396,14 @@ only these which can be assigned a PatternGroup (see patGroup).
 
 -}
 
+-- | See 'Tidiying Patterns' above
+--
+-- Wraps a call to 'tidy1' which does the interesting stuff, looking at one
+-- pattern and fiddling the list of bindings
 tidyEqnInfo :: Id -> EquationInfo
             -> DsM (DsWrapper, EquationInfo)
         -- DsM'd because of internal call to dsLHsBinds
         --      and mkSelectorBinds.
-        -- "tidy1" does the interesting stuff, looking at
-        -- one pattern and fiddling the list of bindings.
         --
         -- POST CONDITION: head pattern in the EqnInfo is
         --      one of these for which patGroup is defined.
@@ -413,12 +415,13 @@ tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
   = do { (wrap, pat') <- tidy1 v orig pat
        ; return (wrap, eqn { eqn_pats = pat' : pats }) }
 
+-- | See also 'Tidiying Patterns' above
 tidy1 :: Id                  -- The Id being scrutinised
       -> Origin              -- Was this a pattern the user wrote?
       -> Pat GhcTc           -- The pattern against which it is to be matched
       -> DsM (DsWrapper,     -- Extra bindings to do before the match
               Pat GhcTc)     -- Equivalent pattern
-
+-- ^
 -------------------------------------------------------
 --      (pat', mr') = tidy1 v pat mr
 -- tidies the *outer level only* of pat, giving pat'
@@ -433,13 +436,15 @@ tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
 tidy1 v _ (VarPat _ (L _ var))
-  = return (wrapBind var v, WildPat (idType var))
+  = return (wrapBind (var `setIdBinding` LetBound zeroUE) v, WildPat (idType var))
+                      -- See Note [Keeping the IdBinding up to date]
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
 tidy1 v o (AsPat _ (L _ var) _ pat)
   = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
-        ; return (wrapBind var v . wrap, pat') }
+        ; return (wrapBind (var `setIdBinding` LetBound zeroUE) v . wrap, pat') }
+                 -- See Note [Keeping the IdBinding up to date]
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :

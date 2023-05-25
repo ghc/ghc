@@ -45,7 +45,7 @@ import GHC.Tc.TyCl.Build( TcMethInfo )
 
 import GHC.Core.Type     ( extendTvSubstWithClone, piResultTys )
 import GHC.Core.Predicate
-import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.Class
 import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Core.FamInstEnv
@@ -295,7 +295,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; let local_dm_id = mkLocalId local_dm_name (LambdaBound ManyTy) local_dm_ty -- ROMES:TODO:
+       ; let local_dm_id = mkLocalId local_dm_name (LetBound zeroUE) local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
                                         , sig_loc   = getLocA hs_ty }

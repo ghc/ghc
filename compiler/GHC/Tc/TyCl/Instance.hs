@@ -60,6 +60,7 @@ import GHC.Core.Type
 import GHC.Core.SimpleOpt
 import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Tc.Types.Evidence
+import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
@@ -2024,7 +2025,7 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
       | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
-tcMethodBodyHelp :: HsSigFun -> Id -> TcId
+tcMethodBodyHelp :: HasCallStack => HsSigFun -> Id -> TcId
                  -> LHsBind GhcRn -> TcM (LHsBinds GhcTc)
 tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
   | Just hs_sig_ty <- hs_sig_fn sel_name
@@ -2090,6 +2091,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- they are all for meth_id
 
 ------------------------
+-- | Romes:TODO: What is a MethId?
 mkMethIds :: Class -> [TcTyVar] -> [EvVar]
           -> [TcType] -> Id -> TcM (TcId, TcId)
              -- returns (poly_id, local_id), but ignoring any instance signature
@@ -2099,8 +2101,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  (LambdaBound ManyTy) poly_meth_ty -- ROMES:TODO:
-              local_meth_id = mkLocalId local_meth_name (LambdaBound ManyTy) local_meth_ty -- ROMES:TODO:
+        ; let poly_meth_id  = mkLocalId poly_meth_name  (LetBound zeroUE) poly_meth_ty -- ROMES:TODO: methIds
+              local_meth_id = mkLocalId local_meth_name (LetBound zeroUE) local_meth_ty -- ROMES:TODO:
 
         ; return (poly_meth_id, local_meth_id) }
   where

@@ -154,6 +154,7 @@ import Data.IORef
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
 import GHC.Types.Name.Reader
+import GHC.Core.UsageEnv (zeroUE)
 
 {-
 ************************************************************************
@@ -320,7 +321,7 @@ emitNewExprHole occ ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (LambdaBound ManyTy) (mkClassPred cls tys)) } -- Dicts are lambda bound with Many
+       ; return (mkLocalId name (LetBound zeroUE) (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of

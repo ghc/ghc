@@ -37,6 +37,7 @@ import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
 
 import GHC.Types.Id
+import GHC.Types.Var (pprIdWithBinding, isLambdaBinding)
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -277,7 +278,11 @@ mkWwBodies opts fun_id arg_vars res_ty demands res_cpr
 mkAppsBeta :: CoreExpr -> [CoreArg] -> CoreExpr
 -- The precondition holds for our call site in mkWwBodies, because all the FVs
 -- of as are either cloned_arg_vars (and thus fresh) or fresh worker args.
-mkAppsBeta (Lam b body) (a:as) = bindNonRec b a $! mkAppsBeta body as
+mkAppsBeta (Lam b body) (a:as)
+  | not (isLambdaBinding b)
+  = pprPanic "mkAppsBeta" (pprIdWithBinding b)
+  | otherwise
+  = bindNonRec b a $! mkAppsBeta body as
 mkAppsBeta f            as     = mkApps f as
 
 -- See Note [Limit w/w arity]
