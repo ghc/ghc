@@ -47,6 +47,7 @@ import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
+import GHC.Types.Var (pprIdWithBinding, isLetBinding, isLambdaBinding, zeroUE)
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -1484,11 +1485,22 @@ scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
-scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
-                              (usg, e') <- scExpr env' e
-                              return (usg, Lam b' e')
+scExpr' env (Lam b e)
+  | not (isLambdaBinding b)
+  = pprPanic "scExpr':Lam" (pprIdWithBinding b)
+  | otherwise
+  = do let (env', b') = extendBndr env b
+       (usg, e') <- scExpr env' e
+       return (usg, Lam b' e')
 
 scExpr' env (Let bind body)
+  | NonRec b _ <- bind
+  , not (isLetBinding b)
+  = pprPanic "scExpr':Let:NonRec" (pprIdWithBinding b)
+  | Rec bs <- bind
+  , any (not . isLetBinding . fst) bs
+  = pprPanic "scExpr':Let:Rec" (ppr bs)
+  | otherwise
   = do { (final_usage, binds', body') <- scBind NotTopLevel env bind $
                                          (\env -> scExpr env body)
        ; return (final_usage, mkLets binds' body') }
@@ -1606,6 +1618,8 @@ scApp env (Var fn, args)        -- Function is a variable
   where
     doBeta :: OutExpr -> [OutExpr] -> OutExpr
     doBeta (Lam bndr body) (arg : args) = Let (NonRec bndr arg) (doBeta body args)
+      where bndr' | isId bndr = bndr `setIdBinding` LetBound zeroUE
+                  | otherwise = bndr
     doBeta fn              args         = mkApps fn args
 
 -- The function is almost always a variable, but not always.

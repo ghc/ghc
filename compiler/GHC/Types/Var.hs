@@ -59,7 +59,7 @@ module GHC.Types.Var (
         setIdExported, setIdNotExported, setIdBinding,
         updateIdTypeButNotMults,
         updateIdTypeAndMults, updateIdTypeAndMultsM,
-        IdBinding(..), idBinding, pprIdWithBinding,
+        IdBinding(..), idBinding, pprIdWithBinding, zeroUE,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,

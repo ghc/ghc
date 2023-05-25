@@ -45,7 +45,6 @@ import GHC.Tc.TyCl.Build( TcMethInfo )
 
 import GHC.Core.Type     ( extendTvSubstWithClone, piResultTys )
 import GHC.Core.Predicate
-import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.Class
 import GHC.Core.Coercion ( pprCoAxiom )
 import GHC.Core.FamInstEnv

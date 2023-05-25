@@ -1751,7 +1751,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq (LambdaBound ManyTy) rhs_ty -- ROMES:TODO: What's the IdBinding
+      = mkSysLocal (mkFastString "lvl") uniq (LetBound zeroUE) rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

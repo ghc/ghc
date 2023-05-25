@@ -4,7 +4,7 @@
 \section[GHC.Core.Opt.Simplify.Monad]{The simplifier Monad}
 -}
 
-
+{-# LANGUAGE ExistentialQuantification #-}
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
@@ -812,7 +812,7 @@ addJoinFloats floats join_floats
            , sfInScope    = foldlOL extendInScopeSetBind
                                     (sfInScope floats) join_floats }
 
-addFloats :: SimplFloats -> SimplFloats -> SimplFloats
+addFloats :: HasCallStack => SimplFloats -> SimplFloats -> SimplFloats
 -- Add both let-floats and join-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
@@ -849,7 +849,7 @@ mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs _ff
     !jfloats' | isNilOL jbs = emptyJoinFloats
               | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
 
-wrapFloats :: SimplFloats -> OutExpr -> OutExpr
+wrapFloats :: HasCallStack => SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression
 wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs flag
                         , sfJoinFloats = jbs }) body
@@ -867,7 +867,7 @@ wrapJoinFloatsX floats body
   = ( floats { sfJoinFloats = emptyJoinFloats }
     , wrapJoinFloats (sfJoinFloats floats) body )
 
-wrapJoinFloats :: JoinFloats -> OutExpr -> OutExpr
+wrapJoinFloats :: HasCallStack => JoinFloats -> OutExpr -> OutExpr
 -- Wrap the sfJoinFloats of the env around the expression,
 -- and take them out of the SimplEnv
 wrapJoinFloats join_floats body

@@ -44,7 +44,6 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
-import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
@@ -60,7 +59,6 @@ import GHC.Core.Type
 import GHC.Core.SimpleOpt
 import GHC.Core.Predicate( classMethodInstTy )
 import GHC.Tc.Types.Evidence
-import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.DataCon
@@ -1485,7 +1483,7 @@ tcSuperClasses skol_info dfun_id cls tyvars dfun_evs dfun_ev_binds sc_theta
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id IsCoherent sc_ev_tm
            ; let sc_top_ty = tcMkDFunSigmaTy tyvars (map idType dfun_evs) sc_pred
-                 sc_top_id = mkLocalId sc_top_name (LambdaBound ManyTy) sc_top_ty -- ROMES:TODO:
+                 sc_top_id = mkLocalId sc_top_name (LetBound zeroUE) sc_top_ty
                  export = ABE { abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
                               , abe_mono = sc_ev_id
@@ -2051,7 +2049,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; let ctxt = FunSigCtxt sel_name (lhsSigTypeContextSpan hs_sig_ty)
                     -- WantRCC <=> check for redundant constraints in the
                     --          user-specified instance signature
-             inner_meth_id  = mkLocalId inner_meth_name (LambdaBound ManyTy) sig_ty -- ROMES:TODO:
+             inner_meth_id  = mkLocalId inner_meth_name (LetBound zeroUE) sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
                                           , sig_loc  = getLocA hs_sig_ty }

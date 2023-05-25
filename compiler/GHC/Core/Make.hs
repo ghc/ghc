@@ -531,7 +531,7 @@ unwrapBox us var body
       BI_Box { bi_data_con = box_con, bi_boxed_type = box_ty }
          -> (us', var', body')
          where
-           var'  = mkSysLocal (fsLit "uc") uniq (LambdaBound ManyTy) box_ty -- ROMES:TODO: LambdaBound here?
+           var'  = mkSysLocal (fsLit "uc") uniq (LambdaBound ManyTy) box_ty -- ROMES:TODO: LambdaBound since its put in case binder
            body' = Case (Var var') var' (exprType body)
                         [Alt (DataAlt box_con) [var] body]
   where

@@ -1747,7 +1747,8 @@ lintIdBndr top_lvl bind_site id thing_inside
     matchesBindingSite :: IdBinding -> BindingSite -> Bool
     matchesBindingSite (LetBound _) LetBind = True
     matchesBindingSite (LambdaBound _) LambdaBind = True
-    -- ROMES:TODO: Other binding sites!
+    matchesBindingSite (LambdaBound _) CaseBind = True
+    matchesBindingSite (LambdaBound _) CasePatBind = True
     matchesBindingSite _ _ = False
 
 {-
