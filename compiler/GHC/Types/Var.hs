@@ -287,6 +287,73 @@ data IdBinding where
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
   -- Might no longer make sense to merge with IdScope at all
 
+{-
+Note [The IdBinding of an Id]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The IdBinding of an Id indicates the binding site of the Id (is it lambda, let,
+or case bound?) together with the linearity information associated to the binder.
+
+For example, in
+
+  module A where
+
+  f :: a ⊸ b -> c
+  f x y = let z = (x,y) in <expr>
+
+- `f` is a (top-level) let bound Id, with a closed (empty) usage environment
+(there are no linear free variables in the body of `f`)
+- `x` is a lambda-bound Id with multiplicity `One`
+- `y` is a lambda-bound Id with multiplicity `Many`
+- `z` is a let-bound Id with usage environment `{x}`, since `x` is the only
+linear variable free in the body of the let binder.
+
+As another example, in (TODO)
+
+  module B where
+
+  f :: Maybe a ⊸ Maybe b -> (a, b)
+  f x y = case x of z
+            Nothing -> ...
+            Just x' -> -- x' is as if it were lambda bound, I'm not sure if we ought to call it something else.
+
+In the first iteration of IdBindings, let binders will always have an empty
+usage environment, for in this first pass we don't do anything regarding
+linearity, but simply add a provenence (let-bound vs lambda-bound) to all Ids.
+
+Ids can only be case-bound in the Core representation, since there are no case
+binders before it.
+
+See Note [Keeping the IdBinding up to date] for details on how it is kept in
+face of the transformations a Haskell program undergoes.
+
+Note [Keeping the IdBinding up to date]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How is the IdBinding of an Id kept up to in face of desugaring and the multiple
+transformations a Core program undergoes?
+
+Indeed, multiple transformations will move a lambda-bound Id into a let-bound
+position, or vice-versa. In these situations we must update its IdBinding, or
+otherwise risk it becoming incorrect very fast.
+
+It is likely that most of these occurrences will have a pointer to this note.
+Nonetheless, consider as an example tidying a variable pattern (in 'tidy1'):
+
+        case v of { x -> mr[] }
+        ==>
+        case v of { _ -> let x=v in mr[] }
+
+When tidying a variable binder, we turn it into a wildcard pattern and let-bind
+the variable in the alternative body. In this situation, we have moved an
+lambda-bound Id into a let-bound position, so we must update the IdBinding.
+
+But how do we make sure the IdBindings are correct?
+
+Luckily, as with most important things in Core, in the Core Linter we can
+continuously validate the IdBinding is correct wrt to the place where it is
+currently bound. Specifically, in `lintIdBndr` we lint that the `IdBinding`
+matches with the current `BindingSite`!
+-}
+
 pprIdWithBinding :: Id -> SDoc
 pprIdWithBinding x
   | isId x
