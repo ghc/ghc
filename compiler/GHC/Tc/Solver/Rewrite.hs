@@ -56,7 +56,6 @@ import qualified GHC.Data.List.Infinite as Inf
 -- | The 'RewriteM' monad is a wrapper around 'TcS' with a 'RewriteEnv'
 newtype RewriteM a
   = RewriteM { runRewriteM :: RewriteEnv -> TcS a }
-  deriving (Functor)
 
 -- | Smart constructor for 'RewriteM', as describe in Note [The one-shot state
 -- monad trick] in "GHC.Utils.Monad".
@@ -72,6 +71,9 @@ instance Monad RewriteM where
 instance Applicative RewriteM where
   pure x = mkRewriteM $ \_ -> pure x
   (<*>) = ap
+
+instance Functor RewriteM where
+  fmap f (RewriteM x) = mkRewriteM $ \env -> fmap f (x env)
 
 instance HasDynFlags RewriteM where
   getDynFlags = liftTcS getDynFlags
