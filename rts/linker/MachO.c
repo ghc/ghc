@@ -11,6 +11,7 @@
 #include "linker/MachO.h"
 #include "linker/CacheFlush.h"
 #include "linker/SymbolExtras.h"
+#include "linker/MMap.h"
 
 #include <string.h>
 #include <regex.h>
