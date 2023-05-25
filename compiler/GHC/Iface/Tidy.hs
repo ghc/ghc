@@ -1080,11 +1080,9 @@ tidyTopName mod name_cache maybe_ref occ_env id
                             -- See #19619
                             let new_local_name = occ' `seq` mkInternalName uniq occ' loc
                             return (occ_env', new_local_name)
-        -- Even local, internal names must get a unique occurrence, because
-        -- if we do -split-objs we externalise the name later, in the code generator
-        --
-        -- Similarly, we must make sure it has a system-wide Unique, because
-        -- the byte-code generator builds a system-wide Name->BCO symbol table
+        -- Even local, internal names must get a unique occurrence.
+        -- This is necessary because the byte-code generator the byte-code
+        -- generator builds a system-wide Name->BCO symbol table.
 
   | local  && external = do new_external_name <- allocateGlobalBinder name_cache mod occ' loc
                             return (occ_env', new_external_name)

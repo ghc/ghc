@@ -103,10 +103,6 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
                 yield cmm
                 return a
 
-               -- Note [codegen-split-init] the cmm_init block must come
-               -- FIRST.  This is because when -split-objs is on we need to
-               -- combine this block with its initialisation routines; see
-               -- Note [pipeline-split-init].
         ; cg (mkModuleInit cost_centre_info (stgToCmmThisModule cfg) hpc_info)
 
         ; mapM_ (cg . cgTopBinding logger tmpfs cfg) stg_binds
