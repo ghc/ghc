@@ -3,6 +3,7 @@
   "aarch64-darwin-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -11,7 +12,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-aarch64-darwin-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -59,12 +61,14 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-darwin-validate"
     }
   },
   "aarch64-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -73,7 +77,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -117,12 +122,14 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate"
     }
   },
   "i386-linux-deb9-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -131,7 +138,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-i386-linux-deb9-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -175,12 +183,14 @@
       "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb9-validate"
     }
   },
   "nightly-aarch64-darwin-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -189,7 +199,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-darwin-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -237,6 +248,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-darwin-validate",
       "XZ_OPT": "-9"
     }
@@ -244,6 +256,7 @@
   "nightly-aarch64-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -252,7 +265,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -296,6 +310,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -303,6 +318,7 @@
   "nightly-aarch64-linux-deb10-validate+llvm": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -311,7 +327,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-aarch64-linux-deb10-validate+llvm.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -355,6 +372,7 @@
       "BIN_DIST_NAME": "ghc-aarch64-linux-deb10-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-validate+llvm",
       "XZ_OPT": "-9"
     }
@@ -362,6 +380,7 @@
   "nightly-i386-linux-deb9-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -370,7 +389,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-i386-linux-deb9-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -414,6 +434,7 @@
       "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb9-validate",
       "XZ_OPT": "-9"
     }
@@ -421,6 +442,7 @@
   "nightly-x86_64-darwin-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -429,7 +451,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-darwin-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -477,6 +500,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
@@ -487,6 +511,7 @@
   "nightly-x86_64-freebsd13-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -495,7 +520,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-freebsd13-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -541,6 +567,7 @@
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-freebsd13-validate",
       "XZ_OPT": "-9"
     }
@@ -548,6 +575,7 @@
   "nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -556,7 +584,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -603,6 +632,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-validate+fully_static",
       "XZ_OPT": "-9"
     }
@@ -610,6 +640,7 @@
   "nightly-x86_64-linux-alpine3_12-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -618,7 +649,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -665,6 +697,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate",
       "XZ_OPT": "-9"
     }
@@ -672,6 +705,7 @@
   "nightly-x86_64-linux-alpine3_12-validate+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -680,7 +714,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -727,6 +762,7 @@
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static",
       "XZ_OPT": "-9"
     }
@@ -734,6 +770,7 @@
   "nightly-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -742,7 +779,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -788,6 +826,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
     }
@@ -795,6 +834,7 @@
   "nightly-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -803,7 +843,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -849,6 +890,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
     }
@@ -856,6 +898,7 @@
   "nightly-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -864,7 +907,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -910,6 +954,7 @@
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static",
       "XZ_OPT": "-9"
     }
@@ -917,6 +962,7 @@
   "nightly-x86_64-linux-centos7-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -925,7 +971,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-centos7-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -970,6 +1017,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-validate",
       "XZ_OPT": "-9"
     }
@@ -977,6 +1025,7 @@
   "nightly-x86_64-linux-deb10-int_native-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -985,7 +1034,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1029,6 +1079,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-int_native-validate",
       "XZ_OPT": "-9"
     }
@@ -1036,6 +1087,7 @@
   "nightly-x86_64-linux-deb10-no_tntc-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1044,7 +1096,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1088,6 +1141,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate",
       "XZ_OPT": "-9"
     }
@@ -1095,6 +1149,7 @@
   "nightly-x86_64-linux-deb10-numa-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1103,7 +1158,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1148,6 +1204,7 @@
       "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate",
       "XZ_OPT": "-9"
     }
@@ -1155,6 +1212,7 @@
   "nightly-x86_64-linux-deb10-unreg-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1163,7 +1221,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1207,6 +1266,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate",
       "XZ_OPT": "-9"
     }
@@ -1214,6 +1274,7 @@
   "nightly-x86_64-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1222,7 +1283,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1266,6 +1328,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -1273,6 +1336,7 @@
   "nightly-x86_64-linux-deb10-validate+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1281,7 +1345,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1325,6 +1390,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
       "XZ_OPT": "-9"
     }
@@ -1332,6 +1398,7 @@
   "nightly-x86_64-linux-deb10-validate+llvm": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1340,7 +1407,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1384,6 +1452,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+llvm",
       "XZ_OPT": "-9"
     }
@@ -1391,6 +1460,7 @@
   "nightly-x86_64-linux-deb10-validate+thread_sanitizer": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1399,7 +1469,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1444,6 +1515,7 @@
       "BUILD_FLAVOUR": "validate+thread_sanitizer",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
       "XZ_OPT": "-9"
@@ -1452,6 +1524,7 @@
   "nightly-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1460,7 +1533,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1506,6 +1580,7 @@
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate",
       "XZ_OPT": "-9"
     }
@@ -1513,6 +1588,7 @@
   "nightly-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1521,7 +1597,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1568,6 +1645,7 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate",
       "XZ_OPT": "-9"
     }
@@ -1575,6 +1653,7 @@
   "nightly-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1583,7 +1662,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1630,6 +1710,7 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate",
       "XZ_OPT": "-9"
     }
@@ -1637,6 +1718,7 @@
   "nightly-x86_64-linux-deb11-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1645,7 +1727,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1689,6 +1772,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb11-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-validate",
       "XZ_OPT": "-9"
     }
@@ -1696,6 +1780,7 @@
   "nightly-x86_64-linux-deb11-validate+boot_nonmoving_gc": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1704,7 +1789,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-validate+boot_nonmoving_gc.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1756,6 +1842,7 @@
   "nightly-x86_64-linux-deb9-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1764,7 +1851,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-deb9-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1808,6 +1896,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb9-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-validate",
       "XZ_OPT": "-9"
     }
@@ -1815,6 +1904,7 @@
   "nightly-x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1823,7 +1913,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1869,6 +1960,7 @@
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
@@ -1876,6 +1968,7 @@
   "nightly-x86_64-linux-fedora33-release-hackage": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1884,7 +1977,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1931,6 +2025,7 @@
       "HADRIAN_ARGS": "--haddock-base-url",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
@@ -1938,6 +2033,7 @@
   "nightly-x86_64-linux-fedora33-validate+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -1946,7 +2042,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-validate+debug_info.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -1992,6 +2089,7 @@
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-validate+debug_info",
       "XZ_OPT": "-9"
     }
@@ -1999,6 +2097,7 @@
   "nightly-x86_64-linux-rocky8-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2007,7 +2106,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-rocky8-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2052,6 +2152,7 @@
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=no-sphinx",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-validate",
       "XZ_OPT": "-9"
     }
@@ -2059,6 +2160,7 @@
   "nightly-x86_64-linux-ubuntu18_04-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2067,7 +2169,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-ubuntu18_04-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2111,6 +2214,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu18_04-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-validate",
       "XZ_OPT": "-9"
     }
@@ -2118,6 +2222,7 @@
   "nightly-x86_64-linux-ubuntu20_04-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2126,7 +2231,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-linux-ubuntu20_04-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2170,6 +2276,7 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-ubuntu20_04-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-validate",
       "XZ_OPT": "-9"
     }
@@ -2177,6 +2284,7 @@
   "nightly-x86_64-windows-int_native-validate": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
@@ -2184,7 +2292,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-windows-int_native-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2229,6 +2338,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-int_native-validate",
       "XZ_OPT": "-9"
     }
@@ -2236,6 +2346,7 @@
   "nightly-x86_64-windows-validate": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
@@ -2243,7 +2354,8 @@
       "expire_in": "8 weeks",
       "paths": [
         "ghc-x86_64-windows-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2288,6 +2400,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-validate",
       "XZ_OPT": "-9"
     }
@@ -2295,6 +2408,7 @@
   "release-aarch64-darwin-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2303,7 +2417,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-aarch64-darwin-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2352,6 +2467,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "11.0",
       "NIX_SYSTEM": "aarch64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-darwin-release",
       "XZ_OPT": "-9"
     }
@@ -2359,6 +2475,7 @@
   "release-aarch64-linux-deb10-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2367,7 +2484,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-aarch64-linux-deb10-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2413,6 +2531,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "aarch64-linux-deb10-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -2420,6 +2539,7 @@
   "release-i386-linux-deb9-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2428,7 +2548,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-i386-linux-deb9-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2474,6 +2595,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "i386-linux-deb9-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -2481,6 +2603,7 @@
   "release-x86_64-darwin-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2489,7 +2612,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-darwin-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2538,6 +2662,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-release",
       "XZ_OPT": "-9",
       "ac_cv_func_clock_gettime": "no",
@@ -2548,6 +2673,7 @@
   "release-x86_64-linux-alpine3_12-int_native-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2556,7 +2682,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2604,6 +2731,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-int_native-release+fully_static",
       "XZ_OPT": "-9"
     }
@@ -2611,6 +2739,7 @@
   "release-x86_64-linux-alpine3_12-release+fully_static+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2619,7 +2748,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2667,6 +2797,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -2674,6 +2805,7 @@
   "release-x86_64-linux-alpine3_12-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2682,7 +2814,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2730,6 +2863,7 @@
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -2737,6 +2871,7 @@
   "release-x86_64-linux-centos7-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2745,7 +2880,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-centos7-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2791,6 +2927,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-centos7-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -2798,6 +2935,7 @@
   "release-x86_64-linux-deb10-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2806,7 +2944,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb10-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2852,6 +2991,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release",
       "XZ_OPT": "-9"
     }
@@ -2859,6 +2999,7 @@
   "release-x86_64-linux-deb10-release+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2867,7 +3008,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb10-release+debug_info.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2913,6 +3055,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-release+debug_info",
       "XZ_OPT": "-9"
     }
@@ -2920,6 +3063,7 @@
   "release-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2928,7 +3072,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -2977,6 +3122,7 @@
       "CROSS_TARGET": "javascript-unknown-ghcjs",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-release",
       "XZ_OPT": "-9"
     }
@@ -2984,6 +3130,7 @@
   "release-x86_64-linux-deb11-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -2992,7 +3139,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb11-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3038,6 +3186,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-release",
       "XZ_OPT": "-9"
     }
@@ -3045,6 +3194,7 @@
   "release-x86_64-linux-deb11-release+boot_nonmoving_gc": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3053,7 +3203,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb11-release+boot_nonmoving_gc.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3107,6 +3258,7 @@
   "release-x86_64-linux-deb9-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3115,7 +3267,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-deb9-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3161,6 +3314,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb9-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -3168,6 +3322,7 @@
   "release-x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3176,7 +3331,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3224,6 +3380,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
@@ -3231,6 +3388,7 @@
   "release-x86_64-linux-fedora33-release+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3239,7 +3397,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release+debug_info.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3287,6 +3446,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release+debug_info",
       "XZ_OPT": "-9"
     }
@@ -3294,6 +3454,7 @@
   "release-x86_64-linux-fedora33-release-hackage": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3302,7 +3463,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3350,6 +3512,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release",
       "XZ_OPT": "-9"
     }
@@ -3357,6 +3520,7 @@
   "release-x86_64-linux-rocky8-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3365,7 +3529,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-rocky8-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3411,6 +3576,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-rocky8-release",
       "XZ_OPT": "-9"
     }
@@ -3418,6 +3584,7 @@
   "release-x86_64-linux-ubuntu18_04-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3426,7 +3593,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-ubuntu18_04-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3472,6 +3640,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu18_04-release",
       "XZ_OPT": "-9"
     }
@@ -3479,6 +3648,7 @@
   "release-x86_64-linux-ubuntu20_04-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3487,7 +3657,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-linux-ubuntu20_04-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3533,6 +3704,7 @@
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-ubuntu20_04-release",
       "XZ_OPT": "-9"
     }
@@ -3540,6 +3712,7 @@
   "release-x86_64-windows-int_native-release+no_split_sections": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
@@ -3547,7 +3720,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-windows-int_native-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3593,6 +3767,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-int_native-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -3600,6 +3775,7 @@
   "release-x86_64-windows-release+no_split_sections": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
@@ -3607,7 +3783,8 @@
       "expire_in": "1 year",
       "paths": [
         "ghc-x86_64-windows-release+no_split_sections.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3653,6 +3830,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-release+no_split_sections",
       "XZ_OPT": "-9"
     }
@@ -3660,6 +3838,7 @@
   "x86_64-darwin-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3668,7 +3847,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-darwin-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3716,6 +3896,7 @@
       "LANG": "en_US.UTF-8",
       "MACOSX_DEPLOYMENT_TARGET": "10.10",
       "NIX_SYSTEM": "x86_64-darwin",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-darwin-validate",
       "ac_cv_func_clock_gettime": "no",
       "ac_cv_func_futimens": "no",
@@ -3725,6 +3906,7 @@
   "x86_64-freebsd13-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3733,7 +3915,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-freebsd13-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3779,12 +3962,14 @@
       "CONFIGURE_ARGS": "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib ",
       "GHC_VERSION": "9.4.3",
       "HADRIAN_ARGS": "--docs=no-sphinx",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-freebsd13-validate"
     }
   },
   "x86_64-linux-alpine3_12-validate+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3793,7 +3978,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_12-validate+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3840,12 +4026,14 @@
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "INSTALL_CONFIGURE_ARGS": "--disable-ld-override",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_12-validate+fully_static"
     }
   },
   "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3854,7 +4042,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3900,12 +4089,14 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
     }
   },
   "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3914,7 +4105,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -3961,12 +4153,14 @@
       "CONFIGURE_ARGS": "--with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-int_native-cross_wasm32-wasi-release+fully_static"
     }
   },
   "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -3975,7 +4169,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4022,12 +4217,14 @@
       "CONFIGURE_ARGS": "--enable-unregisterised --with-intree-gmp --with-system-libffi",
       "CROSS_TARGET": "wasm32-wasi",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-alpine3_17-wasm-unreg-cross_wasm32-wasi-release+fully_static"
     }
   },
   "x86_64-linux-deb10-int_native-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4036,7 +4233,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-int_native-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4080,12 +4278,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-int_native-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-int_native-validate"
     }
   },
   "x86_64-linux-deb10-no_tntc-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4094,7 +4294,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-no_tntc-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4139,12 +4340,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-no_tntc-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-tables-next-to-code",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-no_tntc-validate"
     }
   },
   "x86_64-linux-deb10-numa-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4153,7 +4356,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-numa-slow-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4198,12 +4402,14 @@
       "BUILD_FLAVOUR": "slow-validate",
       "CONFIGURE_ARGS": "",
       "ENABLE_NUMA": "1",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-numa-slow-validate"
     }
   },
   "x86_64-linux-deb10-unreg-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4212,7 +4418,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-unreg-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4256,12 +4463,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-unreg-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-unregisterised",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate"
     }
   },
   "x86_64-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4270,7 +4479,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4314,12 +4524,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--enable-ipe-data-compression",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate"
     }
   },
   "x86_64-linux-deb10-validate+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4328,7 +4540,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+debug_info.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4372,12 +4585,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+debug_info",
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
     }
   },
   "x86_64-linux-deb10-validate+llvm": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4386,7 +4601,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+llvm.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4430,12 +4646,14 @@
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+llvm",
       "BUILD_FLAVOUR": "validate+llvm",
       "CONFIGURE_ARGS": "",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+llvm"
     }
   },
   "x86_64-linux-deb10-validate+thread_sanitizer": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4444,7 +4662,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb10-validate+thread_sanitizer.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4490,6 +4709,7 @@
       "BUILD_FLAVOUR": "validate+thread_sanitizer",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--docs=none",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions"
     }
@@ -4497,6 +4717,7 @@
   "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4505,7 +4726,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-cross_aarch64-linux-gnu-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4551,12 +4773,14 @@
       "CONFIGURE_ARGS": "--with-intree-gmp",
       "CROSS_EMULATOR": "qemu-aarch64 -L /usr/aarch64-linux-gnu",
       "CROSS_TARGET": "aarch64-linux-gnu",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
     }
   },
   "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4565,7 +4789,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4612,12 +4837,14 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-slow-validate"
     }
   },
   "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4626,7 +4853,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4673,12 +4901,14 @@
       "CONFIGURE_WRAPPER": "emconfigure",
       "CROSS_EMULATOR": "js-emulator",
       "CROSS_TARGET": "javascript-unknown-ghcjs",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb11-int_native-cross_javascript-unknown-ghcjs-validate"
     }
   },
   "x86_64-linux-deb11-validate+boot_nonmoving_gc": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4687,7 +4917,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-deb11-validate+boot_nonmoving_gc.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4738,6 +4969,7 @@
   "x86_64-linux-fedora33-release": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
       ".gitlab/ci.sh clean",
       "cat ci_timings"
     ],
@@ -4746,7 +4978,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-linux-fedora33-release.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4792,12 +5025,14 @@
       "CONFIGURE_ARGS": "",
       "LLC": "/bin/false",
       "OPT": "/bin/false",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-fedora33-release"
     }
   },
   "x86_64-windows-validate": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
+      "bash .gitlab/ci.sh save_test_output",
       "bash .gitlab/ci.sh clean"
     ],
     "allow_failure": false,
@@ -4805,7 +5040,8 @@
       "expire_in": "2 weeks",
       "paths": [
         "ghc-x86_64-windows-validate.tar.xz",
-        "junit.xml"
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
       ],
       "reports": {
         "junit": "junit.xml"
@@ -4850,6 +5086,7 @@
       "HADRIAN_ARGS": "--docs=no-sphinx",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "CLANG64",
+      "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-windows-validate"
     }
   }
