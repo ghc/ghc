@@ -1430,13 +1430,16 @@ data UMState = UMState
 newtype UM a
   = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
     -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
-  deriving (Functor)
 
 pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern UM m <- UM' m
   where
     UM m = UM' (oneShot m)
+{-# COMPLETE UM #-}
+
+instance Functor UM where
+  fmap f (UM m) = UM (\s -> fmap (\(s', v) -> (s', f v)) (m s))
 
 instance Applicative UM where
       pure a = UM (\s -> pure (s, a))
