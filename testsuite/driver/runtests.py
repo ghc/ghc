@@ -71,6 +71,7 @@ parser.add_argument("--config", action='append', help="config field")
 parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
 parser.add_argument("--metrics-file", help="file in which to save (append) the performance test metrics. If omitted, git notes will be used.")
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
+parser.add_argument("--unexpected-output-dir", help="directory in which to place unexpected output")
 parser.add_argument("--target-wrapper", help="wrapper executable to use when executing binaries compiled for the target")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
@@ -127,6 +128,9 @@ if args.top:
 
 if args.test_package_db:
     config.test_package_db = args.test_package_db
+
+if args.unexpected_output_dir:
+    config.unexpected_output_dir = Path(args.unexpected_output_dir)
 
 if args.only:
     config.only = args.only
