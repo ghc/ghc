@@ -909,14 +909,12 @@ addHiding1 :: Changer
 addHiding1 _libdir (L l p) = do
   let doTransform = do
         l0 <- uniqueSrcSpanT
-        l1 <- uniqueSrcSpanT
-        l2 <- uniqueSrcSpanT
         let
           [L li imp1,imp2] = hsmodImports p
-          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1")) :: LIdP GhcPs
-          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2")) :: LIdP GhcPs
-          v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar Nothing (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1))) :: LIE GhcPs
-          v2 = L (           noAnnSrcSpanDP0 l2) (IEVar Nothing (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2))) :: LIE GhcPs
+          n1 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n1")) :: LIdP GhcPs
+          n2 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n2")) :: LIdP GhcPs
+          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1))) :: LIE GhcPs
+          v2 = L             noAnnSrcSpanDP0  (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2))) :: LIE GhcPs
           impHiding = L (SrcSpanAnn (EpAnn (EpaDelta m0 [])
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
@@ -940,8 +938,6 @@ addHiding2 _libdir top = do
   let doTransform = do
         -- let (L l p) = makeDeltaAst top
         let (L l p) = top
-        l1 <- uniqueSrcSpanT
-        l2 <- uniqueSrcSpanT
         let
           [L li imp1] = hsmodImports p
           Just (_,L lh ns) = ideclImportList imp1
@@ -952,10 +948,10 @@ addHiding2 _libdir top = do
                                               [(AddEpAnn AnnHiding d1)]
                                               [])
                                        emptyComments) (locI lh))
-          n1 = L (noAnnSrcSpanDP0 l1) (mkVarUnqual (mkFastString "n1")) :: LIdP GhcPs
-          n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2")) :: LIdP GhcPs
-          v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar Nothing (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1))) :: LIE GhcPs
-          v2 = L (           noAnnSrcSpanDP0 l2) (IEVar Nothing (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2))) :: LIE GhcPs
+          n1 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n1")) :: LIdP GhcPs
+          n2 = L noAnnSrcSpanDP0 (mkVarUnqual (mkFastString "n2")) :: LIdP GhcPs
+          v1 = L (addComma $ noAnnSrcSpanDP0) (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n1))) :: LIE GhcPs
+          v2 = L             noAnnSrcSpanDP0  (IEVar Nothing (L noAnnSrcSpanDP0 (IEName noExtField n2))) :: LIE GhcPs
           L ln n = last ns
           n' = L (addComma ln) n
           imp1' = imp1 { ideclImportList = Just (EverythingBut, L lh' (init ns ++ [n',v1,v2]))}
