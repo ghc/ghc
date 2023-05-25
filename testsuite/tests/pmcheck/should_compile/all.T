@@ -112,6 +112,10 @@ test('CaseOfKnownCon', [], compile, [overlapping_incomplete])
 test('TooManyDeltas', [], compile, [overlapping_incomplete+'-fmax-pmcheck-models=0'])
 test('LongDistanceInfo', [], compile, [overlapping_incomplete])
 test('T21662', [],  compile, [overlapping_incomplete])
+test('T19271', [],  compile, [overlapping_incomplete])
+test('T21761', [],  compile, [overlapping_incomplete])
+test('T22964', [], compile, [overlapping_incomplete])
+test('T23445', [], compile, [overlapping_incomplete])
 
 # Series (inspired) by Luke Maranget
 
@@ -156,6 +160,4 @@ test('EmptyCase007', [],  compile, [overlapping_incomplete])
 test('EmptyCase008', [],  compile, [overlapping_incomplete])
 test('EmptyCase009', [],  compile, [overlapping_incomplete])
 test('EmptyCase010', [],  compile, [overlapping_incomplete])
-test('T19271', [],  compile, [overlapping_incomplete])
-test('T21761', [],  compile, [overlapping_incomplete])
-test('T22964', [], compile, [overlapping_incomplete])
+

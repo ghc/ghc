@@ -209,7 +209,7 @@ mkMatchGroup :: AnnoBody p body
              -> LocatedL [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
              -> MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))
 mkMatchGroup origin matches = MG { mg_ext = origin
-                                 , mg_alts = matches }
+                                 , mg_alts = matches }
 
 mkLamCaseMatchGroup :: AnnoBody p body
                     => Origin

@@ -1157,7 +1157,7 @@ Wrinkle [GADT result type in tcRecordUpd]
 
 -}
 
--- | Desugars a record update @record_expr { fld1 = e1, fld2 = e2}@ into a case expression
+-- | Desugars a record update @record_expr { fld1 = e1, fld2 = e2 }@ into a case expression
 -- that matches on the constructors of the record @r@, as described in
 -- Note [Record Updates].
 --
