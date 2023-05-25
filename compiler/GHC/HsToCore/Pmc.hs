@@ -39,7 +39,7 @@ module GHC.HsToCore.Pmc (
         isMatchContextPmChecked,
 
         -- See Note [Long-distance information]
-        addTyCs, addCoreScrutTmCs, addHsScrutTmCs
+        addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas
     ) where
 
 import GHC.Prelude
@@ -142,8 +142,8 @@ pmcGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
 -- Returns one non-empty 'Nablas' for 1.) each pattern of a 'Match' and 2.)
 -- each of a 'Match'es 'GRHS' for Note [Long-distance information].
 --
--- Special case: When there are /no matches/, then the functionassumes it
--- checks and @-XEmptyCase@ with only a single match variable.
+-- Special case: When there are /no matches/, then the function assumes it
+-- checks an @-XEmptyCase@ with only a single match variable.
 -- See Note [Checking EmptyCase].
 pmcMatches
   :: DsMatchContext                  -- ^ Match context, for warnings messages
