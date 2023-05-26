@@ -3228,39 +3228,54 @@ others).
 
 ----- How tracking works
 
-* When two Givens are the same, we drop the evidence for the one
+(RC1) When two Givens are the same, we drop the evidence for the one
   that requires more superclass selectors. This is done
-  according to Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
+  according to 2(c) of Note [Replacement vs keeping] in GHC.Tc.Solver.InertSet.
 
-* The ic_need fields of an Implic records in-scope (given) evidence
+(RC2) The ic_need fields of an Implic records in-scope (given) evidence
   variables bound by the context, that were needed to solve this
   implication (so far).  See the declaration of Implication.
 
-* When the constraint solver finishes solving all the wanteds in
+(RC3) setImplicationStatus:
+  When the constraint solver finishes solving all the wanteds in
   an implication, it sets its status to IC_Solved
 
   - The ics_dead field, of IC_Solved, records the subset of this
     implication's ic_given that are redundant (not needed).
 
-* We compute which evidence variables are needed by an implication
-  in setImplicationStatus.  A variable is needed if
+  - We compute which evidence variables are needed by an implication
+    in setImplicationStatus.  A variable is needed if
     a) it is free in the RHS of a Wanted EvBind,
     b) it is free in the RHS of an EvBind whose LHS is needed, or
     c) it is in the ics_need of a nested implication.
 
-* After computing which variables are needed, we then look at the
-  remaining variables for internal redundancies. This is case (b)
-  from above. This is also done in setImplicationStatus.
-  Note that we only look for case (b) if case (a) shows up empty,
-  as exemplified below.
+  - After computing which variables are needed, we then look at the
+    remaining variables for internal redundancies. This is case (b)
+    from above. This is also done in setImplicationStatus.
+    Note that we only look for case (b) if case (a) shows up empty,
+    as exemplified below.
 
-* We need to be careful not to discard an implication
-  prematurely, even one that is fully solved, because we might
-  thereby forget which variables it needs, and hence wrongly
-  report a constraint as redundant.  But we can discard it once
-  its free vars have been incorporated into its parent; or if it
-  simply has no free vars. This careful discarding is also
-  handled in setImplicationStatus.
+  - We need to be careful not to discard an implication
+    prematurely, even one that is fully solved, because we might
+    thereby forget which variables it needs, and hence wrongly
+    report a constraint as redundant.  But we can discard it once
+    its free vars have been incorporated into its parent; or if it
+    simply has no free vars. This careful discarding is also
+    handled in setImplicationStatus.
+
+(RC4) We do not want to report redundant constraints for implications
+  that come from quantified constraints.  Example #23323:
+     data T a
+     instance Show (T a) where ...  -- No context!
+     foo :: forall f c. (forall a. c a => Show (f a)) => Proxy c -> f Int -> Int
+     bar = foo @T @Eq
+
+  The call to `foo` gives us
+    [W] d : (forall a. Eq a => Show (T a))
+  To solve this, GHC.Tc.Solver.Solve.solveForAll makes an implication constraint:
+    forall a. Eq a =>  [W] ds : Show (T a)
+  and because of the degnerate instance for `Show (T a)`, we don't need the `Eq a`
+  constraint.  But we don't want to report it as redundant!
 
 * Examples:
 

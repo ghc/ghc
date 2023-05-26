@@ -1479,6 +1479,7 @@ data Implication
       -- NB: including stuff used by nested implications that have since
       --     been discarded
       -- See Note [Needed evidence variables]
+      -- and (RC2) in Note [Tracking redundant constraints]a
       ic_need_inner :: VarSet,    -- Includes all used Given evidence
       ic_need_outer :: VarSet,    -- Includes only the free Given evidence
                                   --  i.e. ic_need_inner after deleting

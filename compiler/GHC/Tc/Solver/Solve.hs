@@ -425,8 +425,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
                    ; return ( ctEvEvId wanted_ev
                             , unitBag (mkNonCanonical wanted_ev)) }
 
-      ; ev_binds <- emitImplicationTcS lvl (getSkolemInfo skol_info) skol_tvs
-                                       given_ev_vars wanteds
+      ; ev_binds <- emitImplicationTcS lvl skol_info_anon skol_tvs given_ev_vars wanteds
 
       ; setWantedEvTerm dest IsCoherent $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars

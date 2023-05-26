@@ -352,8 +352,9 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
                -- Do /not/ use the tidied tvs because then are in the
                -- wrong order, so tidying will rename things wrongly
        ; reportWanteds ctxt' tc_lvl wanted
-       ; when (cec_warn_redundant ctxt) $
-         warnRedundantConstraints ctxt' ct_loc_env info' dead_givens }
+
+       -- Report redundant (unused) constraints
+       ; warnRedundantConstraints ctxt' ct_loc_env info' dead_givens }
   where
     insoluble    = isInsolubleStatus status
     (env1, tvs') = tidyVarBndrs (cec_tidy ctxt) $
@@ -390,7 +391,17 @@ reportImplic ctxt implic@(Implic { ic_skols  = tvs
 warnRedundantConstraints :: SolverReportErrCtxt -> CtLocEnv -> SkolemInfoAnon -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
 warnRedundantConstraints ctxt env info redundant_evs
+ | not (cec_warn_redundant ctxt)
+ = return ()
+
  | null redundant_evs
+ = return ()
+
+ -- Do not report redundant constraints for quantified constraints
+ -- See (RC4) in Note [Tracking redundant constraints]
+ -- Fortunately it is easy to spot implications constraints that arise
+ -- from quantified constraints, from their SkolInfo
+ | InstSkol (IsQC {}) _ <- info
  = return ()
 
  | SigSkol user_ctxt _ _ <- info
@@ -404,7 +415,7 @@ warnRedundantConstraints ctxt env info redundant_evs
  -- "In the instance declaration for Eq [a]" context
  -- and we don't want to say it twice. Seems a bit ad-hoc
  = report_redundant_msg False env
-                 --   ^^^^^ don't add "In the type signature..."
+                   --   ^^^^^ don't add "In the type signature..."
  where
    report_redundant_msg :: Bool -- whether to add "In the type signature..." to the diagnostic
                         -> CtLocEnv
