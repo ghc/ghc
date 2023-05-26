@@ -641,7 +641,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1264,7 +1264,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
       "TEST_ENV": "x86_64-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -1325,65 +1325,6 @@
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info",
-      "XZ_OPT": "-9"
-    }
-  },
-  "nightly-x86_64-linux-deb10-validate+ipe": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "8 weeks",
-      "paths": [
-        "ghc-x86_64-linux-deb10-validate+ipe.tar.xz",
-        "junit.xml"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb10-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+ipe",
-      "BUILD_FLAVOUR": "validate+ipe",
-      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
-      "TEST_ENV": "x86_64-linux-deb10-validate+ipe",
       "XZ_OPT": "-9"
     }
   },
@@ -2701,7 +2642,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3869,7 +3810,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "manual"
       }
     ],
@@ -3930,7 +3871,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "manual"
       }
     ],
@@ -4189,6 +4130,64 @@
       "TEST_ENV": "x86_64-linux-deb10-unreg-validate"
     }
   },
+  "x86_64-linux-deb10-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "2 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-validate.tar.xz",
+        "junit.xml"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/) && (\"true\" == \"true\")",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
+      "TEST_ENV": "x86_64-linux-deb10-validate"
+    }
+  },
   "x86_64-linux-deb10-validate+debug_info": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
@@ -4245,64 +4244,6 @@
       "BUILD_FLAVOUR": "validate+debug_info",
       "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+debug_info"
-    }
-  },
-  "x86_64-linux-deb10-validate+ipe": {
-    "after_script": [
-      ".gitlab/ci.sh save_cache",
-      ".gitlab/ci.sh clean",
-      "cat ci_timings"
-    ],
-    "allow_failure": false,
-    "artifacts": {
-      "expire_in": "2 weeks",
-      "paths": [
-        "ghc-x86_64-linux-deb10-validate+ipe.tar.xz",
-        "junit.xml"
-      ],
-      "reports": {
-        "junit": "junit.xml"
-      },
-      "when": "always"
-    },
-    "cache": {
-      "key": "x86_64-linux-deb10-$CACHE_REV",
-      "paths": [
-        "cabal-cache",
-        "toolchain"
-      ]
-    },
-    "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
-    "needs": [
-      {
-        "artifacts": false,
-        "job": "hadrian-ghc-in-ghci"
-      }
-    ],
-    "rules": [
-      {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/) && (\"true\" == \"true\")",
-        "when": "on_success"
-      }
-    ],
-    "script": [
-      "sudo chown ghc:ghc -R .",
-      ".gitlab/ci.sh setup",
-      ".gitlab/ci.sh configure",
-      ".gitlab/ci.sh build_hadrian",
-      ".gitlab/ci.sh test_hadrian"
-    ],
-    "stage": "full-build",
-    "tags": [
-      "x86_64-linux"
-    ],
-    "variables": {
-      "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate+ipe",
-      "BUILD_FLAVOUR": "validate+ipe",
-      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
-      "TEST_ENV": "x86_64-linux-deb10-validate+ipe"
     }
   },
   "x86_64-linux-deb10-validate+llvm": {
