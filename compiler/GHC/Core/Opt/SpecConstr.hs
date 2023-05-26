@@ -1876,19 +1876,10 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
       Nothing      -> return (nullUsage, spec_info)
 
 
----------------------
-spec_one :: ScEnv
-         -> OutId       -- Function
-         -> [InVar]     -- Lambda-binders of RHS; should match patterns
-         -> InExpr      -- Body of the original function
-         -> (CallPat, Int)
-         -> UniqSM (ScUsage, OneSpec)   -- Rule and binding
+{- | @'spec_one'@ creates a specialised copy of the function,
+    together with a rule for using it. I'm very proud of how short this
+    function is, considering what it does :-).
 
--- spec_one creates a specialised copy of the function, together
--- with a rule for using it.  I'm very proud of how short this
--- function is, considering what it does :-).
-
-{-
   Example
 
      In-scope: a, x::a
@@ -1905,12 +1896,16 @@ spec_one :: ScEnv
 
             f (b,c) ((:) (a,(b,c)) (x,v) hw) = f_spec b c v hw
 -}
-
+spec_one :: ScEnv
+         -> OutId          -- ^ Function
+         -> [InVar]        -- ^ Lambda-binders of RHS; should match patterns
+         -> InExpr         -- ^ Body of the original function
+         -> (CallPat, Int)
+         -> UniqSM (ScUsage, OneSpec) -- ^ Rule and binding
 spec_one env fn arg_bndrs body (call_pat, rule_number)
   | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
-  = do  { -- pprTraceM "spec_one {" (ppr fn <+> ppr pats)
-
-        ; spec_uniq <- getUniqueM
+  = do  {
+          spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
                                        (arg_bndrs `zip` pats)
               (body_env, extra_bndrs) = extendBndrs env1 (dropList pats arg_bndrs)
@@ -1933,10 +1928,9 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_name  = mkInternalName spec_uniq spec_occ fn_loc
 
         -- Specialise the body
-        -- ; pprTraceM "body_subst_for" $ ppr (spec_occ) $$ ppr (sc_subst body_env)
         ; (spec_usg, spec_body) <- scExpr body_env body
 
-                -- And build the results
+        -- And build the results
         ; (qvars', pats') <- generaliseDictPats qvars pats
         ; let spec_body_ty = exprType spec_body
               (spec_lam_args, spec_call_args, spec_sig)
@@ -1946,7 +1940,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_join_arity | isJoinId fn = Just (length spec_call_args)
                               | otherwise   = Nothing
               spec_id    = asWorkerLikeId $
-                           mkLocalId spec_name (LambdaBound ManyTy)
+                           mkLocalId spec_name (LetBound zeroUE) -- Specialized bindings are let-bound
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`    spec_sig
@@ -1984,7 +1978,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
                                , os_id = spec_id
                                , os_rhs = spec_rhs }) }
 
-generaliseDictPats :: [Var] -> [CoreExpr]  -- Quantified vars and pats
+generaliseDictPats :: [Var] -> [CoreExpr] -- Quantified vars and pats
                    -> UniqSM ([Var], [CoreExpr]) -- New quantified vars and pats
 -- See Note [generaliseDictPats]
 generaliseDictPats qvars pats
