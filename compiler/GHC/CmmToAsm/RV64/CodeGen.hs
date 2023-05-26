@@ -413,11 +413,11 @@ opRegWidth W16 = W32  -- w
 opRegWidth W8  = W32  -- w
 opRegWidth w   = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 
--- Note [Signed arithmetic on AArch64]
+-- Note [Signed arithmetic on RISCV64]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Handling signed arithmetic on sub-word-size values on AArch64 is a bit
+-- Handling signed arithmetic on sub-word-size values on RISCV64 is a bit
 -- tricky as Cmm's type system does not capture signedness. While 32-bit values
--- are fairly easy to handle due to AArch64's 32-bit instruction variants
+-- are fairly easy to handle due to RISCV64's 32-bit instruction variants
 -- (denoted by use of %wN registers), 16- and 8-bit values require quite some
 -- care.
 --
@@ -446,6 +446,10 @@ opRegWidth w   = pprPanic "opRegWidth" (text "Unsupported width" <+> ppr w)
 -- we must still truncate the result back down to 8-bits. Finally the `%shrl`
 -- requires no extension and no truncate since we can assume that
 -- `c` is zero-extended.
+--
+-- The "RISC-V Sign Extension Optimizations" LLVM tech talk presentation by
+-- Craig Topper covers possible future improvements
+-- (https://llvm.org/devmtg/2022-11/slides/TechTalk21-RISC-VSignExtensionOptimizations.pdf)
 --
 -- TODO:
 --   Don't use Width in Operands
@@ -655,14 +659,28 @@ getRegister' config plat expr
                 NEG (OpReg w' dst) (OpReg w' reg') `appOL`
                 truncateReg w' w dst
 
-        ss_conv from to reg code =
-            let w' = opRegWidth (max from to)
-            in return $ Any (intFormat to) $ \dst ->
-                code `snocOL`
-                SBFM (OpReg w' dst) (OpReg w' reg) (OpImm (ImmInt 0)) (toImm (min from to)) `appOL`
-                -- At this point an 8- or 16-bit value would be sign-extended
-                -- to 32-bits. Truncate back down the final width.
-                truncateReg w' to dst
+        ss_conv from to reg code | from == to =
+          pure $ Any (intFormat from) $ \dst ->
+            code `snocOL` (MOV (OpReg from dst) (OpReg from reg))
+        ss_conv from to reg code | from < to = do
+          pure $ Any (intFormat to) $ \dst ->
+            code
+            `appOL` signExtend from to reg dst
+            `appOL` truncateReg from to dst
+        ss_conv from to reg code | from > to =
+          pure $ Any (intFormat to) $ \dst ->
+            code
+              `appOL` toOL
+                [ ann
+                    (text "narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
+                    (LSL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
+                  -- signed right shift
+                  ASR (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
+                ]
+              `appOL` truncateReg from to dst
+                  where
+                    -- Why -1? We need to shift out one more bit for the sign.
+                    shift = 64 - (widthInBits from - widthInBits to - 1)
 
     -- Dyadic machops:
     --
@@ -944,57 +962,61 @@ getRegister' config plat expr
             SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
             CSET (OpReg w dst) (OpReg w hi) (OpRegShift w lo SASR 63) NE)
     do_mul_may_oflo w x y = do
-        (reg_x, _format_x, code_x) <- getSomeReg x
-        (reg_y, _format_y, code_y) <- getSomeReg y
-        let tmp_w = case w of
-                      W32 -> W64
-                      W16 -> W32
-                      W8  -> W32
-                      _   -> panic "do_mul_may_oflo: impossible"
-        -- This will hold the product
-        tmp <- getNewRegNat (intFormat tmp_w)
-        let ext_mode = case w of
-                         W32 -> ESXTW
-                         W16 -> ESXTH
-                         W8  -> ESXTB
-                         _   -> panic "do_mul_may_oflo: impossible"
-            mul = case w of
+        (reg_x, format_x, code_x) <- getSomeReg x
+        (reg_y, format_y, code_y) <- getSomeReg y
+        let mul = case w of
                     W32 -> SMULL
                     W16 -> MUL
                     W8  -> MUL
                     _   -> panic "do_mul_may_oflo: impossible"
+            wx' = max (formatToWidth format_x) w
+            wy' = max (formatToWidth format_y) w
         return $ Any (intFormat w) (\dst ->
             code_x `appOL`
-            code_y `snocOL`
-            mul (OpReg tmp_w tmp) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
-            CSET (OpReg w dst) (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) NE)
+            signExtend (formatToWidth format_x) wx' reg_x reg_x `appOL`
+            code_y `appOL`
+            signExtend (formatToWidth format_y) wy' reg_y reg_y `snocOL`
+            mul (OpReg w dst) (OpReg wx' reg_x) (OpReg wy' reg_y)
+                                   )
+            -- TODO: Handle overflow
+            -- `snocOL`
+            -- CSET (OpReg w dst) (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) NE)
 
--- TODO: Some cases can surely be implemented with shifts and SEXT.W. This would
--- save 2 (expensive) memory accesses!
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.
 signExtendReg :: Width -> Width -> Reg -> NatM (Reg, OrdList Instr)
 signExtendReg w _w' r | w == W64 = pure (r, nilOL)
-signExtendReg _w w' _r | w' > W64 = pprPanic "Cannot sign extend to width bigger than register size:" (ppr w')
-signExtendReg w _w' r | w > W64 = pprPanic "Unexpected register size (max is 64bit):" $ text (show r) <> char ':' <+> ppr w
-signExtendReg w w' r | w == W32 && w' == W64 =
-                       -- `ADDIW r r 0` is the pseudo-op SEXT.W
-                       pure (r, unitOL $
-                              ann (text "sign-extend register" <+> ppr r <+> ppr w <> text "->" <> ppr w')
-                                  (ADD (OpReg w' r) (OpReg w r) (OpImm (ImmInt 0)))
-                            )
 signExtendReg w w' r = do
   r' <- getNewRegNat (intFormat w')
-  let instrs = toOL [ann (text "sign-extend register" <+> ppr r <+> ppr w <> text "->" <> ppr w')
-                          (SUB sp sp (OpImm (ImmInt (widthInBits w))))
-                    -- loading (LW, LH, LB) sign extends to 64bit
-                    , STR (intFormat w) (OpReg w r) (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
-                    , LDR (intFormat w) (OpReg w r)   (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
-                    , ADD sp sp (OpImm (ImmInt (widthInBits w)))
-                    -- ADD to move the result to r', which has the correct width / format
-                    , ADD (OpReg w' r') (OpReg w r) zero
-                    ]
+  let instrs = signExtend w w' r r'
   pure (r', instrs)
+
+-- | Sign extends to 64bit, if needed
+--
+-- Source `Reg` @r@ stays untouched, while the conversion happens on destination
+-- `Reg` @r'@.
+signExtend :: Width -> Width -> Reg -> Reg -> OrdList Instr
+signExtend w w' _r _r' | w > w' = pprPanic "This is not a sign extension, but a truncation." $ ppr w <> text "->" <+> ppr w'
+signExtend w w' _r _r' | w > W64 || w' > W64 = pprPanic "Unexpected width (max is 64bit):" $ ppr w <> text "->" <+> ppr w'
+signExtend w w' r r' | w == W64 && w' == W64 && r == r' = nilOL
+signExtend w w' r r' | w == W64 && w' == W64 = unitOL $ MOV (OpReg w' r') (OpReg w r)
+signExtend w w' r r'
+  | w == W32 && w' == W64 =
+      unitOL $
+        ann
+          (text "sign-extend register (SEXT.W)" <+> ppr r <+> ppr w <> text "->" <> ppr w')
+          -- `ADDIW r r 0` is the pseudo-op SEXT.W
+          (ADD (OpReg w' r') (OpReg w r) (OpImm (ImmInt 0)))
+signExtend w w' r r' =
+  toOL
+    [ ann
+        (text "narrow register signed" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
+        (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+      -- signed (arithmetic) right shift
+      ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+    ]
+  where
+    shift = 64 - widthInBits w
 
 -- | Instructions to truncate the value in the given register from width @w@
 -- down to width @w'@.
@@ -1155,15 +1177,25 @@ genCondJump bid expr = do
                   _   -> code_x `appOL` code_y `appOL` toOL [                         (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
 
             sbcond w cmp = do
-                -- compute both sides.
-                (reg_x, _format_x, code_x) <- getSomeReg x
-                (reg_y, _format_y, code_y) <- getSomeReg y
-                let x' = OpReg w reg_x
-                    y' = OpReg w reg_y
-                return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ SXTB x' x', SXTB y' y', (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ SXTH x' x', SXTH y' y', (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
+              -- compute both sides.
+              (reg_x, format_x, code_x) <- getSomeReg x
+              (reg_y, format_y, code_y) <- getSomeReg y
+              let x' = OpReg w reg_x
+                  y' = OpReg w reg_y
+              return $ case w of
+                W8 ->
+                  code_x
+                    `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
+                    `appOL` code_y
+                    `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
+                    `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
+                W16 ->
+                  code_x
+                    `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
+                    `appOL` code_y
+                    `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
+                    `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
+                _ -> code_x `appOL` code_y `appOL` unitOL (annExpr expr (BCOND cmp x' y' (TBlock bid)))
 
             fbcond w cmp = do
               -- ensure we get float regs
@@ -1595,25 +1627,15 @@ genCCall target dest_regs arg_regs bid = do
       --
     -- Still have GP regs, and we want to pass an GP argument.
 
-
     passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
       platform <- getPlatform
+    -- RISCV64 Integer Calling Convention: "When passed in registers or on the
+    -- stack, integer scalars narrower than XLEN bits are widened according to
+    -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
       let w = formatToWidth format
-          mov
-            -- Specifically, Darwin/AArch64's ABI requires that the caller
-            -- sign-extend arguments which are smaller than 32-bits.
-            | w < W32
-            , platformCConvNeedsExtension platform
-            , SignedHint <- hint
-            = case w of
-                W8  -> SXTB (OpReg W64 gpReg) (OpReg w r)
-                W16 -> SXTH (OpReg W64 gpReg) (OpReg w r)
-                _   -> panic "impossible"
-            | otherwise
-            = MOV (OpReg w gpReg) (OpReg w r)
           accumCode' = accumCode `appOL`
-                       code_r `snocOL`
-                       ann (text "Pass gp argument: " <> ppr r) mov
+                       code_r `appOL`
+                       signExtend w W64 r gpReg
       passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
 
     -- Still have FP regs, and we want to pass an FP argument.

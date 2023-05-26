@@ -456,8 +456,8 @@ pprInstr platform instr = case instr of
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd") o1 o2 o3
-    -- This case is used for sign extension.
-    | OpReg W64 _ <- o1 , OpReg w _ <- o2, w < W64, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
+    -- This case is used for sign extension: SEXT.W op
+    | OpReg W64 _ <- o1 , OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
   -- CMN  o1 o2    -> op2 (text "\tcmn") o1 o2
   -- CMP  o1 o2
@@ -490,9 +490,7 @@ pprInstr platform instr = case instr of
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
   -- signed and unsigned bitfield extract
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
-  SXTB o1 o2       -> op2 (text "\tsxtb") o1 o2
   UXTB o1 o2       -> op2 (text "\tuxtb") o1 o2
-  SXTH o1 o2       -> op2 (text "\tsxth") o1 o2
   UXTH o1 o2       -> op2 (text "\tuxth") o1 o2
 
   -- 3. Logical and Move Instructions ------------------------------------------
