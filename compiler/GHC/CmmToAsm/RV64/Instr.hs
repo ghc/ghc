@@ -95,9 +95,7 @@ regUsageOfInstr platform instr = case instr of
   SBFM dst src _ _         -> usage (regOp src, regOp dst)
   UBFM dst src _ _         -> usage (regOp src, regOp dst)
   UBFX dst src _ _         -> usage (regOp src, regOp dst)
-  SXTB dst src             -> usage (regOp src, regOp dst)
   UXTB dst src             -> usage (regOp src, regOp dst)
-  SXTH dst src             -> usage (regOp src, regOp dst)
   UXTH dst src             -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -234,9 +232,7 @@ patchRegsOfInstr instr env = case instr of
     SBFM o1 o2 o3 o4 -> SBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     UBFM o1 o2 o3 o4 -> UBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     UBFX o1 o2 o3 o4 -> UBFX (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-    SXTB o1 o2       -> SXTB (patchOp o1) (patchOp o2)
     UXTB o1 o2       -> UXTB (patchOp o1) (patchOp o2)
-    SXTH o1 o2       -> SXTH (patchOp o1) (patchOp o2)
     UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
 
     -- 3. Logical and Move Instructions ----------------------------------------
@@ -562,9 +558,7 @@ data Instr
     | DELTA   Int
 
     -- 0. Pseudo Instructions --------------------------------------------------
-    | SXTB Operand Operand
     | UXTB Operand Operand
-    | SXTH Operand Operand
     | UXTH Operand Operand
     -- | SXTW Operand Operand
     -- | SXTX Operand Operand
@@ -694,9 +688,7 @@ instrCon i =
       LDATA{} -> "LDATA"
       NEWBLOCK{} -> "NEWBLOCK"
       DELTA{} -> "DELTA"
-      SXTB{} -> "SXTB"
       UXTB{} -> "UXTB"
-      SXTH{} -> "SXTH"
       UXTH{} -> "UXTH"
       PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
@@ -880,13 +872,6 @@ d28 = OpReg W64 (RegReal (RealRegSingle 60))
 d29 = OpReg W64 (RegReal (RealRegSingle 61))
 d30 = OpReg W64 (RegReal (RealRegSingle 62))
 d31 = OpReg W64 (RegReal (RealRegSingle 63))
-
-opRegUExt :: Width -> Reg -> Operand
-opRegUExt W64 r = OpRegExt W64 r EUXTX 0
-opRegUExt W32 r = OpRegExt W32 r EUXTW 0
-opRegUExt W16 r = OpRegExt W16 r EUXTH 0
-opRegUExt W8  r = OpRegExt W8  r EUXTB 0
-opRegUExt w  _r = pprPanic "opRegUExt" (ppr w)
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
