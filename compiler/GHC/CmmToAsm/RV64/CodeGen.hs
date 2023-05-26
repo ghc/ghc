@@ -1019,21 +1019,24 @@ signExtend w w' r r' =
     shift = 64 - widthInBits w
 
 -- | Instructions to truncate the value in the given register from width @w@
--- down to width @w'@.
--- N.B.: This ignores signedness!
+-- to width @w'@.
+--
+-- In other words, it just cuts the width out of the register. N.B.: This
+-- ignores signedness (no sign extension takes place)!
 truncateReg :: Width -> Width -> Reg -> OrdList Instr
 truncateReg _w w' _r | w' == W64 = nilOL
 truncateReg _w w' r | w' > W64 = pprPanic "Cannot truncate to width bigger than register size (max is 64bit):" $ text (show r) <> char ':' <+> ppr w'
 truncateReg w _w' r | w > W64 = pprPanic "Unexpected register size (max is 64bit):" $ text (show r) <> char ':' <+> ppr w
-truncateReg w w' _r | w < w' = pprPanic "This is not a truncation." $ ppr w <+> char '<' <+> ppr w'
-truncateReg w w' _r | w == w' = nilOL
-truncateReg w w' r = toOL [ann (text "truncate register" <+> ppr r <+> ppr w <> text "->" <> ppr w')
-                               (LSL (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift)))
-                          -- SHL ignores signedness!
-                          , LSR (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))
-                          ]
+truncateReg w w' r =
+  toOL
+    [ ann
+        (text "truncate register" <+> ppr r <+> ppr w <> text "->" <> ppr w')
+        (LSL (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))),
+      -- SHL ignores signedness!
+      LSR (OpReg w' r) (OpReg w r) (OpImm (ImmInt shift))
+    ]
   where
-    shift = 64 - (widthInBits w - widthInBits w')
+    shift = 64 - widthInBits w'
 
 -- -----------------------------------------------------------------------------
 --  The 'Amode' type: Memory addressing modes passed up the tree.
