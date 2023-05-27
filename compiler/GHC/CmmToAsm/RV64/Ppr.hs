@@ -483,15 +483,13 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub") o1 o2 o3
     | isImmOp o3 -> op3 (text "\taddi") o1 o2 (negOp o3)
     | otherwise -> op3 (text "\tsub")  o1 o2 o3
-  UDIV o1 o2 o3 -> op3 (text "\tudiv") o1 o2 o3
+  UDIV o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
   SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
   UBFM o1 o2 o3 o4 -> op4 (text "\tubfm") o1 o2 o3 o4
   -- signed and unsigned bitfield extract
   UBFX o1 o2 o3 o4 -> op4 (text "\tubfx") o1 o2 o3 o4
-  UXTB o1 o2       -> op2 (text "\tuxtb") o1 o2
-  UXTH o1 o2       -> op2 (text "\tuxth") o1 o2
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND o1 o2 o3  -> op3 (text "\tand") o1 o2 o3
