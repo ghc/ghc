@@ -521,9 +521,9 @@ pprInstr platform instr = case instr of
         -> lines_ [ text "\tli" <+> pprOp platform o1 <> comma <+>  pprOp platform o2 ]
     | otherwise                    -> op3 (text "\taddi") o1 o2 (OpImm (ImmInt 0))
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
-  MVN o1 o2     -> op2 (text "\tmvn") o1 o2
   ORN o1 o2 o3  -> op3 (text "\torn") o1 o2 o3
   ORI o1 o2 o3  -> op3 (text "\tori") o1 o2 o3
+  XORI o1 o2 o3 -> op3 (text "\txori") o1 o2 o3
   ROR o1 o2 o3  -> op3 (text "\tror") o1 o2 o3
   TST o1 o2     -> op2 (text "\ttst") o1 o2
 
