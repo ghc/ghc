@@ -109,9 +109,9 @@ regUsageOfInstr platform instr = case instr of
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
   MOVK dst src             -> usage (regOp src, regOp dst)
-  MVN dst src              -> usage (regOp src, regOp dst)
   -- ORI's third operand is always an immediate
   ORI dst src1 _           -> usage (regOp src1, regOp dst)
+  XORI dst src1 _          -> usage (regOp src1, regOp dst)
   ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   TST src1 src2            -> usage (regOp src1 ++ regOp src2, [])
   -- 4. Branch Instructions ----------------------------------------------------
@@ -248,9 +248,9 @@ patchRegsOfInstr instr env = case instr of
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
     MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
-    MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
     -- o3 cannot be a register for ORI (always an immediate)
     ORI o1 o2 o3   -> ORI  (patchOp o1) (patchOp o2) (patchOp o3)
+    XORI o1 o2 o3  -> XORI  (patchOp o1) (patchOp o2) (patchOp o3)
     ROR o1 o2 o3   -> ROR  (patchOp o1) (patchOp o2) (patchOp o3)
     TST o1 o2      -> TST  (patchOp o1) (patchOp o2)
 
@@ -640,9 +640,9 @@ data Instr
     | MOVK Operand Operand
     -- | MOVN Operand Operand
     -- | MOVZ Operand Operand
-    | MVN Operand Operand -- rd = ~rn
     | ORN Operand Operand Operand -- rd = rn | ~op2
     | ORI Operand Operand Operand -- rd = rn | op2
+    | XORI Operand Operand Operand -- rd = rn `xor` imm
     | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
     | TST Operand Operand -- rn & op2
     -- Load and stores.
@@ -718,9 +718,9 @@ instrCon i =
       LSR{} -> "LSR"
       MOV{} -> "MOV"
       MOVK{} -> "MOVK"
-      MVN{} -> "MVN"
       ORN{} -> "ORN"
       ORI{} -> "ORI"
+      XORI{} -> "ORI"
       ROR{} -> "ROR"
       TST{} -> "TST"
       STR{} -> "STR"

@@ -614,8 +614,9 @@ getRegister' config plat expr
         MO_Not w -> return $ Any (intFormat w) $ \dst ->
             let w' = opRegWidth w
              in code `snocOL`
-                MVN (OpReg w' dst) (OpReg w' reg) `appOL`
-                truncateReg w' w dst -- See Note [Signed arithmetic on AArch64]
+                -- pseudo instruction `not` is `xori rd, rs, -1`
+                ann (text "not") (XORI (OpReg w' dst) (OpReg w' reg) (OpImm (ImmInt (-1)))) `appOL`
+                truncateReg w' w dst -- See Note [Signed arithmetic on RISCV64]
 
         MO_S_Neg w -> negate code w reg
         MO_F_Neg w -> return $ Any (floatFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
