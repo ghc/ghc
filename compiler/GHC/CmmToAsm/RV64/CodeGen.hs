@@ -931,7 +931,7 @@ getRegister' config plat expr
         -- Bitwise operations
         MO_And   w -> bitOp w (\d x y -> unitOL $ AND d x y)
         MO_Or    w -> bitOp w (\d x y -> unitOL $ OR d x y)
-        MO_Xor   w -> bitOp w (\d x y -> unitOL $ EOR d x y)
+        MO_Xor   w -> bitOp w (\d x y -> unitOL $ XOR d x y)
         MO_Shl   w -> intOp False w (\d x y -> unitOL $ LSL d x y)
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ ASR d x y)
