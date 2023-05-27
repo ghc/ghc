@@ -101,8 +101,6 @@ regUsageOfInstr platform instr = case instr of
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
-  -- TODO: Unused and does not exist in RISCV64
-  EON dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   XOR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -239,7 +237,6 @@ patchRegsOfInstr instr env = case instr of
     ASR o1 o2 o3   -> ASR  (patchOp o1) (patchOp o2) (patchOp o3)
     BIC o1 o2 o3   -> BIC  (patchOp o1) (patchOp o2) (patchOp o3)
     BICS o1 o2 o3  -> BICS (patchOp o1) (patchOp o2) (patchOp o3)
-    EON o1 o2 o3   -> EON  (patchOp o1) (patchOp o2) (patchOp o3)
     XOR o1 o2 o3   -> XOR  (patchOp o1) (patchOp o2) (patchOp o3)
     LSL o1 o2 o3   -> LSL  (patchOp o1) (patchOp o2) (patchOp o3)
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -622,7 +619,6 @@ data Instr
     -- | ASR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits
     | BIC Operand Operand Operand -- rd = rn & ~op2
     | BICS Operand Operand Operand -- rd = rn & ~op2
-    | EON Operand Operand Operand -- rd = rn ⊕ ~op2
     | XOR Operand Operand Operand -- rd = rn ⊕ op2
     -- | LSL Operand Operand Operand -- rd = rn ≪ rm  or rd = rn ≪ #i, i is 6 bits
     -- | LSR Operand Operand Operand -- rd = rn ≫ rm  or rd = rn ≫ #i, i is 6 bits
@@ -700,7 +696,6 @@ instrCon i =
       ASR{} -> "ASR"
       BIC{} -> "BIC"
       BICS{} -> "BICS"
-      EON{} -> "EON"
       XOR{} -> "XOR"
       LSL{} -> "LSL"
       LSR{} -> "LSR"
