@@ -52,6 +52,7 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Type
 import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk
@@ -267,7 +268,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
              -- for overloaded functions, but doesn't seem worth it
              (arg_tys, res_ty) = splitFunTys (dropForAlls norm_sig_ty)
 
-             id = mkLocalId nm (LambdaBound ManyTy) sig_ty -- ROMES:TODO: how bound?
+             id = mkLocalId nm (LetBound zeroUE) sig_ty -- Let bound top-level foreign import
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Zonk.Type.zonkForeignExports ignores it).

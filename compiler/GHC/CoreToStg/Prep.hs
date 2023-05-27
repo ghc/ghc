@@ -1847,7 +1847,8 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b)               bs = get_bind b                 : bs
-    get (FloatCase body var _ _ _) bs = get_bind (NonRec var body) : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec (var `setIdBinding` LetBound zeroUE) body) : bs
+                                                 -- See Note [Keeping the IdBinding up to date]
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]

@@ -12,7 +12,7 @@
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types
-        Expr(..,Let,Lam), Alt(..), Bind(..), AltCon(..), Arg,
+        Expr(..,Let,Lam), Alt(..), Bind(..,Rec,NonRec), AltCon(..), Arg,
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -338,8 +338,28 @@ instance Ord AltCon where
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data Bind b = HasCallStack => NonRec b (Expr b)
-            | HasCallStack => Rec [(b, (Expr b))]
+data Bind b = HasCallStack => NonRec' b (Expr b)
+            | HasCallStack => Rec' [(b, (Expr b))]
+
+{-# COMPLETE NonRec, Rec #-}
+
+pattern NonRec :: forall b. (HasCallStack, Typeable b) => b -> Expr b -> Bind b
+pattern NonRec b e <- NonRec' b e where
+  NonRec b e
+    | Just Refl <- eqT @b @Id
+    , not (isLetBinding b)
+    = pprPanic "NonRec" (pprIdWithBinding b)
+    | otherwise
+    = NonRec' b e
+
+pattern Rec :: forall b. (HasCallStack, Typeable b) => [(b, Expr b)] -> Bind b
+pattern Rec bs <- Rec' bs where
+  Rec bs
+    | Just Refl <- eqT @b @Id
+    , any (not . isLetBinding . fst) bs
+    = pprPanic "Rec" (ppr bs)
+    | otherwise
+    = Rec' bs
 
 deriving instance Data b => Data (Bind b)
 
@@ -2035,32 +2055,32 @@ exprToType _bad          = pprPanic "exprToType" empty
 -}
 
 -- | Extract every variable by this group
-bindersOf  :: Bind b -> [b]
+bindersOf  :: Typeable b => Bind b -> [b]
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
 -- | 'bindersOf' applied to a list of binding groups
-bindersOfBinds :: [Bind b] -> [b]
+bindersOfBinds :: Typeable b => [Bind b] -> [b]
 bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
 
 -- We inline this to avoid unknown function calls.
 {-# INLINE foldBindersOfBindStrict #-}
-foldBindersOfBindStrict :: (a -> b -> a) -> a -> Bind b -> a
+foldBindersOfBindStrict :: Typeable b => (a -> b -> a) -> a -> Bind b -> a
 foldBindersOfBindStrict f
   = \z bind -> case bind of
       NonRec b _rhs -> f z b
       Rec pairs -> foldl' f z $ map fst pairs
 
 {-# INLINE foldBindersOfBindsStrict #-}
-foldBindersOfBindsStrict :: (a -> b -> a) -> a -> [Bind b] -> a
+foldBindersOfBindsStrict :: Typeable b => (a -> b -> a) -> a -> [Bind b] -> a
 foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
   where
     fold_bind = (foldBindersOfBindStrict f)
 
 
-rhssOfBind :: Bind b -> [Expr b]
+rhssOfBind :: Typeable b => Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
@@ -2073,7 +2093,7 @@ rhssOfAlts alts = [e | Alt _ _ e <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single
 -- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
-flattenBinds :: [Bind b] -> [(b, Expr b)]
+flattenBinds :: Typeable b => [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []

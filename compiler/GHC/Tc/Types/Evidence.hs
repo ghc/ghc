@@ -2,13 +2,13 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE ExistentialQuantification, PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Tc.Types.Evidence (
 
   -- * HsWrapper
-  HsWrapper(..),
+  HsWrapper(.., WpLet),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
@@ -171,13 +171,25 @@ data HsWrapper
   | WpTyApp KindOrType  -- [] t    the 't' is a type (not coercion)
 
 
-  | HasCallStack => WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
+  | HasCallStack => WpLet' TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
 
   | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
                                 -- error in the desugarer. See GHC.Tc.Utils.Unify
                                 -- Note [Wrapper returned from tcSubMult]
+
+{-# COMPLETE WpHole, WpCompose, WpFun, WpCast, WpEvLam, WpEvApp, WpTyLam, WpTyApp, WpLet, WpMultCoercion #-}
+
 deriving instance Data.Data HsWrapper
+
+pattern WpLet :: HasCallStack => TcEvBinds -> HsWrapper
+pattern WpLet x <- WpLet' x where
+  WpLet x
+    | EvBinds zs <- x
+    , anyBag (not . isLetBinding . evBindVar) zs
+    = pprPanic "pattern WpLet!" (ppr zs)
+    | otherwise
+    = WpLet' x
 
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
 -- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
@@ -464,7 +476,7 @@ data EvBindInfo
 -----------------
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
-  = EvBind { eb_lhs  :: EvVar
+  = HasCallStack => EvBind { eb_lhs  :: EvVar
            , eb_rhs  :: EvTerm
            , eb_info :: EvBindInfo
     }

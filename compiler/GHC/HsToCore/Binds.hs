@@ -896,7 +896,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
                 extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) (LambdaBound ManyTy) (idType d) -- ROMES:TODO: Dicts lambda bound here?
+                  [ mkLocalId (localiseName (idName d)) (LetBound zeroUE) (idType d)
                   | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v
