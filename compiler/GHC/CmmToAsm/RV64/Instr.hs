@@ -89,8 +89,7 @@ regUsageOfInstr platform instr = case instr of
   DIV dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   REM dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  -- TODO: It's named DIVU in RISCV64 -> rename
-  UDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
+  DIVU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
   SBFM dst src _ _         -> usage (regOp src, regOp dst)
@@ -226,7 +225,7 @@ patchRegsOfInstr instr env = case instr of
     DIV o1 o2 o3   -> DIV (patchOp o1) (patchOp o2) (patchOp o3)
     REM o1 o2 o3   -> REM (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
-    UDIV o1 o2 o3  -> UDIV (patchOp o1) (patchOp o2) (patchOp o3)
+    DIVU o1 o2 o3  -> DIVU (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
     SBFM o1 o2 o3 o4 -> SBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
@@ -609,7 +608,7 @@ data Instr
     | SMULH Operand Operand Operand
     | SMULL Operand Operand Operand
 
-    | UDIV Operand Operand Operand -- rd = rn ÷ rm
+    | DIVU Operand Operand Operand -- rd = rn ÷ rm
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
     | SBFM Operand Operand Operand Operand -- rd = rn[i,j]
@@ -692,7 +691,7 @@ instrCon i =
       SMULH{} -> "SMULH"
       SMULL{} -> "SMULL"
       SUB{} -> "SUB"
-      UDIV{} -> "UDIV"
+      DIVU{} -> "DIVU"
       SBFM{} -> "SBFM"
       UBFM{} -> "UBFM"
       UBFX{} -> "UBFX"

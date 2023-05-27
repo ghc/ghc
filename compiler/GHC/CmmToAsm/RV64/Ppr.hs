@@ -483,7 +483,7 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub") o1 o2 o3
     | isImmOp o3 -> op3 (text "\taddi") o1 o2 (negOp o3)
     | otherwise -> op3 (text "\tsub")  o1 o2 o3
-  UDIV o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
+  DIVU o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
 
   -- 2. Bit Manipulation Instructions ------------------------------------------
   SBFM o1 o2 o3 o4 -> op4 (text "\tsbfm") o1 o2 o3 o4
