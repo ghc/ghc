@@ -142,7 +142,7 @@ fvVarSet = snd . fvVarAcc
 
 -- | Add a variable - when free, to the returned free variables.
 -- Ignores duplicates and respects the filtering function.
-unitFV :: Id -> FV
+unitFV :: Var -> FV
 unitFV var fv_cand in_scope acc@(have, haveSet)
   | var `elemVarSet` in_scope = acc
   | var `elemVarSet` haveSet = acc

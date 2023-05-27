@@ -462,16 +462,14 @@ instance Outputable TyConBndrVis where
 
 mkAnonTyConBinder :: TyVar -> TyConBinder
 -- Make a visible anonymous TyCon binder
-mkAnonTyConBinder tv = assert (isTyVar tv) $
-                       Bndr tv AnonTCB
+mkAnonTyConBinder tv = Bndr tv AnonTCB
 
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
 
 mkNamedTyConBinder :: ForAllTyFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
-mkNamedTyConBinder vis tv = assert (isTyVar tv) $
-                            Bndr tv (NamedTCB vis)
+mkNamedTyConBinder vis tv = Bndr tv (NamedTCB vis)
 
 mkNamedTyConBinders :: ForAllTyFlag -> [TyVar] -> [TyConBinder]
 -- The odd argument order supports currying
@@ -483,8 +481,8 @@ mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
                       -> TyVar
                       -> TyConBinder
 mkRequiredTyConBinder dep_set tv
-  | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
-  | otherwise               = mkAnonTyConBinder tv
+  | Left tv `elementOfUniqSet` dep_set = mkNamedTyConBinder Required tv
+  | otherwise                    = mkAnonTyConBinder tv
 
 tyConBinderForAllTyFlag :: TyConBinder -> ForAllTyFlag
 tyConBinderForAllTyFlag (Bndr _ vis) = tyConBndrVisForAllTyFlag vis
@@ -518,8 +516,8 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr tv vis) k
-    mk (Bndr tv AnonTCB)        k = mkNakedFunTy FTF_T_T (varType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllTy (Bndr (Left tv) vis) k
+    mk (Bndr tv AnonTCB)        k = mkNakedFunTy FTF_T_T (varTypeTyVar tv) k
     -- mkNakedFunTy: see Note [Naked FunTy] in GHC.Builtin.Types
 
 -- | (mkTyConTy tc) returns (TyConApp tc [])

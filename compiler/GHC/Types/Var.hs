@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns #-}
+             PatternSynonyms, BangPatterns, RecordWildCards, LambdaCase, NamedFieldPuns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |
@@ -36,8 +36,8 @@
 
 module GHC.Types.Var (
         -- * The main data type and synonyms
-        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
-        TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
+        Var(..), CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
+        TyVar, TcTyVar, TypeVar, KindVar, TyCoVar,
 
         -- * In and Out variants
         InVar,  InCoVar,  InId,  InTyVar,
@@ -46,6 +46,8 @@ module GHC.Types.Var (
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
         varMult, varMultMaybe,
+        varNameTyVar, varNameTcTyVar, varNameId,
+        varTypeTyVar, varTypeTcTyVar, varTypeId,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
@@ -137,10 +139,6 @@ import Data.Data
 -- large number of SOURCE imports of "GHC.Types.Id" :-(
 -}
 
--- | Identifier
-type Id    = Var       -- A term-level identifier
-                       --  predicate: isId
-
 -- | Coercion Variable
 type CoVar = Id        -- See Note [Evidence: EvIds and CoVars]
                        --   predicate: isCoVar
@@ -149,15 +147,6 @@ type CoVar = Id        -- See Note [Evidence: EvIds and CoVars]
 type NcId  = Id        -- A term-level (value) variable that is
                        -- /not/ an (unlifted) coercion
                        --    predicate: isNonCoVarId
-
--- | Type or kind Variable
-type TyVar   = Var     -- Type *or* kind variable (historical)
-
--- | Type or Kind Variable
-type TKVar   = Var     -- Type *or* kind variable (historical)
-
--- | Type variable that might be a metavariable
-type TcTyVar = Var
 
 -- | Type Variable
 type TypeVar = Var     -- Definitely a type variable
@@ -187,8 +176,8 @@ type EqVar  = EvId      -- Boxed equality evidence
 type JoinId = Id        -- A join variable
 
 -- | Type or Coercion Variable
-type TyCoVar = Id       -- Type, *or* coercion variable
-                        --   predicate: isTyCoVar
+type TyCoVar = Either TyVar CoVar -- Type, *or* coercion variable
+                                  --   predicate: isTyCoVar
 
 
 {- Many passes apply a substitution, and it's very handy to have type
@@ -244,33 +233,61 @@ in its @VarDetails@.
 -- Essentially a typed 'Name', that may also contain some additional information
 -- about the 'Var' and its use sites.
 data Var
+  = TV TyVar
+  | TTV TcTyVar
+  | I Id
+
+-- | Type or kind Variable
+data TyVar
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
-        varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Int,
+        varNameTyVar :: !Name,
+        realUniqueTyVar :: {-# UNPACK #-} !Int,
                                      -- ^ Key for fast comparison
                                      -- Identical to the Unique in the name,
                                      -- cached here for speed
-        varType    :: Kind           -- ^ The type or kind of the 'Var' in question
+        varTypeTyVar :: Kind           -- ^ The type or kind of the 'Var' in question
  }
 
-  | TcTyVar {                           -- Used only during type inference
+-- | Type variable that might be a metavariable
+data TcTyVar
+  = TcTyVar {                           -- Used only during type inference
                                         -- Used for kind variables during
                                         -- inference, as well
-        varName        :: !Name,
-        realUnique     :: {-# UNPACK #-} !Int,
-        varType        :: Kind,
+        varNameTcTyVar :: !Name,
+        realUniqueTcTyVar :: {-# UNPACK #-} !Int,
+        varTypeTcTyVar :: Kind,
         tc_tv_details  :: TcTyVarDetails
   }
 
-  | Id {
-        varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Int,
-        varType    :: Type,
+-- | Identifier
+--
+-- A term level identifier.
+data Id
+  = Id {
+        varNameId  :: !Name,
+        realUniqueId :: {-# UNPACK #-} !Int,
+        varTypeId  :: Type,
         varMult    :: Mult,             -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
+
+varName :: Var -> Name
+varName = \case
+  TV TyVar{varNameTyVar} -> varNameTyVar
+  TTV TcTyVar{varNameTcTyVar} -> varNameTcTyVar
+  I Id{varNameId} -> varNameId
+varType :: Var -> Type
+varType = \case
+  TV TyVar{varTypeTyVar} -> varTypeTyVar
+  TTV TcTyVar{varTypeTcTyVar} -> varTypeTcTyVar
+  I Id{varTypeId} -> varTypeId
+realUnique :: Var -> Int
+realUnique = \case
+  TV TyVar{realUniqueTyVar} -> realUniqueTyVar
+  TTV TcTyVar{realUniqueTcTyVar} -> realUniqueTcTyVar
+  I Id{realUniqueId} -> realUniqueId
 
 -- | Identifier Scope
 data IdScope    -- See Note [GlobalId/LocalId]
@@ -338,15 +355,15 @@ instance Outputable Var where
             getPprStyle $ \sty ->
             let
               ppr_var = case var of
-                  (TyVar {})
+                  (TV TyVar {})
                      | debug
                      -> brackets (text "tv")
 
-                  (TcTyVar {tc_tv_details = d})
+                  (TTV TcTyVar {tc_tv_details = d})
                      | dumpStyle sty || debug
                      -> brackets (pprTcTyVarDetails d)
 
-                  (Id { idScope = s, id_details = d })
+                  (I Id { idScope = s, id_details = d })
                      | debug
                      -> brackets (ppr_id_scope s <> pprIdDetails d)
 
@@ -355,9 +372,19 @@ instance Outputable Var where
                |  debug && (not supp_var_kinds)
                  -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
                                               <+> ppr_var <+>
-                          dcolon <+> pprKind (tyVarKind var))
+                          -- ROMES:TODO: dcolon <+> pprKind (tyVarKind var))
+                          dcolon)
                |  otherwise
                  -> ppr (varName var) <> ppr_var
+
+instance Outputable Id where
+  ppr id = text "ROMES:TODO: ppr Id"
+
+instance Outputable TyVar where
+  ppr v = text "ROMES:TODO: ppr TyVar"
+
+instance Outputable TcTyVar where
+  ppr v = text "ROMES:TODO: ppr TcTyVar"
 
 ppr_id_scope :: IdScope -> SDoc
 ppr_id_scope GlobalId              = text "gid"
@@ -380,6 +407,45 @@ instance Ord Var where
     a >  b = realUnique a >  realUnique b
     a `compare` b = a `nonDetCmpVar` b
 
+-- romes:TODO: These could likely be derived...
+
+instance NamedThing Id where
+  getName = varNameId
+instance Uniquable Id where
+  getUnique = mkUniqueGrimily . realUniqueId
+instance Eq Id where
+    a == b = realUniqueId a == realUniqueId b
+instance Ord Id where
+    a <= b = realUniqueId a <= realUniqueId b
+    a <  b = realUniqueId a <  realUniqueId b
+    a >= b = realUniqueId a >= realUniqueId b
+    a >  b = realUniqueId a >  realUniqueId b
+    a `compare` b = (I a) `nonDetCmpVar` (I b)
+instance NamedThing TyVar where
+  getName = varNameTyVar
+instance Uniquable TyVar where
+  getUnique = mkUniqueGrimily . realUniqueTyVar
+instance Eq TyVar where
+    a == b = realUniqueTyVar a == realUniqueTyVar b
+instance Ord TyVar where
+    a <= b = realUniqueTyVar a <= realUniqueTyVar b
+    a <  b = realUniqueTyVar a <  realUniqueTyVar b
+    a >= b = realUniqueTyVar a >= realUniqueTyVar b
+    a >  b = realUniqueTyVar a >  realUniqueTyVar b
+    a `compare` b = (TV a) `nonDetCmpVar` (TV b)
+instance NamedThing TcTyVar where
+  getName = varNameTcTyVar
+instance Uniquable TcTyVar where
+  getUnique = mkUniqueGrimily . realUniqueTcTyVar
+instance Eq TcTyVar where
+    a == b = realUniqueTcTyVar a == realUniqueTcTyVar b
+instance Ord TcTyVar where
+    a <= b = realUniqueTcTyVar a <= realUniqueTcTyVar b
+    a <  b = realUniqueTcTyVar a <  realUniqueTcTyVar b
+    a >= b = realUniqueTcTyVar a >= realUniqueTcTyVar b
+    a >  b = realUniqueTcTyVar a >  realUniqueTcTyVar b
+    a `compare` b = (TTV a) `nonDetCmpVar` (TTV b)
+
 -- | Compare Vars by their Uniques.
 -- This is what Ord Var does, provided here to make it explicit at the
 -- call-site that it can introduce non-determinism.
@@ -393,28 +459,56 @@ instance Data Var where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = mkNoRepType "Var"
 
+instance Data Id where
+  -- don't traverse?
+  toConstr _   = abstractConstr "Id"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "Id"
+
+instance Data TyVar where
+  -- don't traverse?
+  toConstr _   = abstractConstr "TyVar"
+  gunfold _ _  = error "gunfold"
+  dataTypeOf _ = mkNoRepType "TyVar"
+
 instance HasOccName Var where
   occName = nameOccName . varName
 
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 
-varMultMaybe :: Id -> Maybe Mult
-varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe :: Var -> Maybe Mult
+varMultMaybe (I Id { varMult = mult }) = Just mult
 varMultMaybe _ = Nothing
 
 setVarUnique :: Var -> Unique -> Var
-setVarUnique var uniq
-  = var { realUnique = getKey uniq,
-          varName = setNameUnique (varName var) uniq }
+setVarUnique var uniq = case var of
+  I id -> I id { realUniqueId = newUnique
+               , varNameId    = newVarName }
+  TV tv -> TV tv { realUniqueTyVar = newUnique
+                 , varNameTyVar    = newVarName }
+  TTV ttv -> TTV ttv { realUniqueTcTyVar = newUnique
+                     , varNameTcTyVar    = newVarName }
+  where
+    newVarName = setNameUnique (varName var) uniq
+    newUnique  = getKey uniq
 
 setVarName :: Var -> Name -> Var
-setVarName var new_name
-  = var { realUnique = getKey (getUnique new_name),
-          varName = new_name }
+setVarName var new_name = case var of
+  I id -> I id { realUniqueId = newUnique
+               , varNameId    = new_name }
+  TV tv -> TV tv { realUniqueTyVar = newUnique
+                 , varNameTyVar    = new_name }
+  TTV ttv -> TTV ttv { realUniqueTcTyVar = newUnique
+                     , varNameTcTyVar    = new_name }
+  where
+    newUnique  = getKey (getUnique new_name)
 
 setVarType :: Var -> Type -> Var
-setVarType id ty = id { varType = ty }
+setVarType var ty = case var of
+  I id -> I id { varTypeId = ty }
+  TV tv -> TV tv { varTypeTyVar = ty }
+  TTV ttv -> TTV ttv { varTypeTcTyVar = ty }
 
 -- | Update a 'Var's type. Does not update the /multiplicity/
 -- stored in an 'Id', if any. Because of the possibility for
@@ -422,24 +516,25 @@ setVarType id ty = id { varType = ty }
 updateVarType :: (Type -> Type) -> Var -> Var
 updateVarType upd var
   = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
+      I id@Id { id_details = details } -> assert (isCoVarDetails details) $
+                                          I id {varTypeId = newVarType}
+      TV tv   -> TV tv {varTypeTyVar = newVarType}
+      TTV ttv -> TTV ttv {varTypeTcTyVar = newVarType}
   where
-    result = var { varType = upd (varType var) }
+    newVarType = upd (varType var)
 
 -- | Update a 'Var's type monadically. Does not update the /multiplicity/
 -- stored in an 'Id', if any. Because of the possibility for
 -- abuse, ASSERTs that there is no multiplicity to update.
 updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
 updateVarTypeM upd var
-  = case var of
-      Id { id_details = details } -> assert (isCoVarDetails details) $
-                                     result
-      _ -> result
-  where
-    result = do { ty' <- upd (varType var)
-                ; return (var { varType = ty' }) }
+  = do
+    ty' <- upd (varType var)
+    case var of
+      I id@Id { id_details = details } -> assert (isCoVarDetails details) $
+                                          return (I id {varTypeId = ty'})
+      TV tv   -> return (TV tv {varTypeTyVar = ty'})
+      TTV ttv -> return (TTV ttv {varTypeTcTyVar = ty'})
 
 {- *********************************************************************
 *                                                                      *
@@ -730,10 +825,12 @@ binderFlags :: [VarBndr tv argf] -> [argf]
 binderFlags tvbs = map binderFlag tvbs
 
 binderType :: VarBndr TyCoVar argf -> Type
-binderType (Bndr tv _) = varType tv
+binderType (Bndr (Left tv) _)  = varTypeTyVar tv
+binderType (Bndr (Right id) _) = varTypeId id
 
 isTyVarBinder :: VarBndr TyCoVar vis -> Bool
-isTyVarBinder (Bndr tcv _) = isTyVar tcv
+isTyVarBinder (Bndr (Left _) _) = True
+isTyVarBinder _ = False
 
 -- | Make a named binder
 mkForAllTyBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
@@ -742,9 +839,7 @@ mkForAllTyBinder vis var = Bndr var vis
 -- | Make a named binder
 -- 'var' should be a type variable
 mkTyVarBinder :: vis -> TyVar -> VarBndr TyVar vis
-mkTyVarBinder vis var
-  = assert (isTyVar var) $
-    Bndr var vis
+mkTyVarBinder vis var = Bndr var vis
 
 -- | Make many named binders
 mkForAllTyBinders :: vis -> [TyCoVar] -> [VarBndr TyCoVar vis]
@@ -842,8 +937,9 @@ isTyBinder (Named bnd) = isTyVarBinder bnd
 isTyBinder _ = True
 
 piTyBinderType :: PiTyBinder -> Type
-piTyBinderType (Named (Bndr tv _)) = varType tv
-piTyBinderType (Anon ty _)         = scaledThing ty
+piTyBinderType (Named (Bndr (Left tv) _))  = varTypeTyVar tv
+piTyBinderType (Named (Bndr (Right id) _)) = varTypeId id
+piTyBinderType (Anon ty _) = scaledThing ty
 
 {- Note [PiTyBinders]
 ~~~~~~~~~~~~~~~~~~~
@@ -1050,51 +1146,52 @@ see Note [Required quantifiers in the type of a term] in GHC.Tc.Gen.Expr.
 -}
 
 tyVarName :: TyVar -> Name
-tyVarName = varName
+tyVarName = varNameTyVar
 
 tyVarKind :: TyVar -> Kind
-tyVarKind = varType
+tyVarKind = varTypeTyVar
 
 setTyVarUnique :: TyVar -> Unique -> TyVar
-setTyVarUnique = setVarUnique
+setTyVarUnique tv uq = case setVarUnique (TV tv) uq of
+                         TV tv -> tv
+                         _ -> panic "Romes:Todo: This is impossible, but I don't like this approach..."
 
 setTyVarName :: TyVar -> Name -> TyVar
-setTyVarName   = setVarName
+setTyVarName tv n = case setVarName (TV tv) n of
+                      TV tv -> tv
+                      _ -> panic "Romes:Todo: This is impossible, but I don't like this approach..."
 
 setTyVarKind :: TyVar -> Kind -> TyVar
-setTyVarKind tv k = tv {varType = k}
+setTyVarKind tv k = tv {varTypeTyVar = k}
 
 updateTyVarKind :: (Kind -> Kind) -> TyVar -> TyVar
-updateTyVarKind update tv = tv {varType = update (tyVarKind tv)}
+updateTyVarKind update tv = tv {varTypeTyVar = update (tyVarKind tv)}
 
 updateTyVarKindM :: (Monad m) => (Kind -> m Kind) -> TyVar -> m TyVar
 updateTyVarKindM update tv
   = do { k' <- update (tyVarKind tv)
-       ; return $ tv {varType = k'} }
+       ; return $ tv {varTypeTyVar = k'} }
 
 mkTyVar :: Name -> Kind -> TyVar
-mkTyVar name kind = TyVar { varName    = name
-                          , realUnique = getKey (nameUnique name)
-                          , varType  = kind
+mkTyVar name kind = TyVar { varNameTyVar = name
+                          , realUniqueTyVar = getKey (nameUnique name)
+                          , varTypeTyVar = kind
                           }
 
-mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
+mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TcTyVar
 mkTcTyVar name kind details
   = -- NB: 'kind' may be a coercion kind; cf, 'GHC.Tc.Utils.TcMType.newMetaCoVar'
-    TcTyVar {   varName    = name,
-                realUnique = getKey (nameUnique name),
-                varType  = kind,
+    TcTyVar {   varNameTcTyVar    = name,
+                realUniqueTcTyVar = getKey (nameUnique name),
+                varTypeTcTyVar  = kind,
                 tc_tv_details = details
         }
 
-tcTyVarDetails :: TyVar -> TcTyVarDetails
+tcTyVarDetails :: TcTyVar -> TcTyVarDetails
 -- See Note [TcTyVars and TyVars in the typechecker] in GHC.Tc.Utils.TcType
 tcTyVarDetails (TcTyVar { tc_tv_details = details }) = details
--- MP: This should never happen, but it does. Future work is to turn this into a panic.
-tcTyVarDetails (TyVar {})                            = vanillaSkolemTvUnk
-tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (tyVarKind var))
 
-setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
+setTcTyVarDetails :: TcTyVar -> TcTyVarDetails -> TcTyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }
 
 {-
@@ -1105,13 +1202,11 @@ setTcTyVarDetails tv details = tv { tc_tv_details = details }
 ************************************************************************
 -}
 
-idInfo :: HasDebugCallStack => Id -> IdInfo
+idInfo :: Id -> IdInfo
 idInfo (Id { id_info = info }) = info
-idInfo other                   = pprPanic "idInfo" (ppr other)
 
 idDetails :: Id -> IdDetails
 idDetails (Id { id_details = details }) = details
-idDetails other                         = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
 -- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
@@ -1137,16 +1232,16 @@ mkExportedLocalVar details name ty info
 
 mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name !w ty scope details info
-  = Id { varName    = name,
-         realUnique = getKey (nameUnique name),
+  = Id { varNameId  = name,
+         realUniqueId = getKey (nameUnique name),
          varMult    = w,
-         varType    = ty,
+         varTypeId  = ty,
          idScope    = scope,
          id_details = details,
          id_info    = info }
 
 -------------------
-lazySetIdInfo :: Id -> IdInfo -> Var
+lazySetIdInfo :: Id -> IdInfo -> Id
 lazySetIdInfo id info = id { id_info = info }
 
 setIdDetails :: Id -> IdDetails -> Id
@@ -1161,7 +1256,6 @@ setIdExported :: Id -> Id
 -- and class operations, which are born as global 'Id's and automatically exported
 setIdExported id@(Id { idScope = LocalId {} }) = id { idScope = LocalId Exported }
 setIdExported id@(Id { idScope = GlobalId })   = id
-setIdExported tv                               = pprPanic "setIdExported" (ppr tv)
 
 setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
@@ -1170,30 +1264,27 @@ setIdNotExported id = assert (isLocalId id) $
 
 -----------------------
 updateIdTypeButNotMult :: (Type -> Type) -> Id -> Id
-updateIdTypeButNotMult f id = id { varType = f (varType id) }
+updateIdTypeButNotMult f id = id { varTypeId = f (varTypeId id) }
 
 
 updateIdTypeAndMult :: (Type -> Type) -> Id -> Id
-updateIdTypeAndMult f id@(Id { varType = ty
+updateIdTypeAndMult f id@(Id { varTypeId = ty
                              , varMult = mult })
-  = id { varType = ty'
+  = id { varTypeId = ty'
        , varMult = mult' }
   where
     !ty'   = f ty
     !mult' = f mult
-updateIdTypeAndMult _ other = pprPanic "updateIdTypeAndMult" (ppr other)
 
 updateIdTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateIdTypeAndMultM f id@(Id { varType = ty
+updateIdTypeAndMultM f id@(Id { varTypeId = ty
                               , varMult = mult })
   = do { !ty' <- f ty
        ; !mult' <- f mult
-       ; return (id { varType = ty', varMult = mult' }) }
-updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
+       ; return (id { varTypeId = ty', varMult = mult' }) }
 
 setIdMult :: Id -> Mult -> Id
-setIdMult id !r | isId id = id { varMult = r }
-                | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
+setIdMult id !r = id { varMult = r }
 
 {-
 ************************************************************************
@@ -1206,13 +1297,13 @@ setIdMult id !r | isId id = id { varMult = r }
 -- | Is this a type-level (i.e., computationally irrelevant, thus erasable)
 -- variable? Satisfies @isTyVar = not . isId@.
 isTyVar :: Var -> Bool        -- True of both TyVar and TcTyVar
-isTyVar (TyVar {})   = True
-isTyVar (TcTyVar {}) = True
-isTyVar _            = False
+isTyVar (TV _)  = True
+isTyVar (TTV _) = True
+isTyVar _       = False
 
 isTcTyVar :: Var -> Bool      -- True of TcTyVar only
-isTcTyVar (TcTyVar {}) = True
-isTcTyVar _            = False
+isTcTyVar (TTV _) = True
+isTcTyVar _       = False
 
 isTyCoVar :: Var -> Bool
 isTyCoVar v = isTyVar v || isCoVar v
@@ -1220,24 +1311,24 @@ isTyCoVar v = isTyVar v || isCoVar v
 -- | Is this a value-level (i.e., computationally relevant) 'Id'entifier?
 -- Satisfies @isId = not . isTyVar@.
 isId :: Var -> Bool
-isId (Id {}) = True
-isId _       = False
+isId (I _) = True
+isId _     = False
 
 -- | Is this a coercion variable?
 -- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
 isCoVar :: Var -> Bool
-isCoVar (Id { id_details = details }) = isCoVarDetails details
-isCoVar _                             = False
+isCoVar (I Id { id_details = details }) = isCoVarDetails details
+isCoVar _                               = False
 
 -- | Is this a term variable ('Id') that is /not/ a coercion variable?
 -- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
 isNonCoVarId :: Var -> Bool
-isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
-isNonCoVarId _                             = False
+isNonCoVarId (I Id { id_details = details }) = not (isCoVarDetails details)
+isNonCoVarId _                               = False
 
-isLocalId :: Var -> Bool
+isLocalId :: Id -> Bool
 isLocalId (Id { idScope = LocalId _ }) = True
-isLocalId _                            = False
+isLocalId (Id { idScope = GlobalId }) = False
 
 -- | 'isLocalVar' returns @True@ for type variables as well as local 'Id's
 -- These are the variables that we need to pay attention to when finding free
@@ -1246,8 +1337,8 @@ isLocalVar :: Var -> Bool
 isLocalVar v = not (isGlobalId v)
 
 isGlobalId :: Var -> Bool
-isGlobalId (Id { idScope = GlobalId }) = True
-isGlobalId _                           = False
+isGlobalId (I Id { idScope = GlobalId }) = True
+isGlobalId _                             = False
 
 -- | 'mustHaveLocalBinding' returns @True@ of 'Id's and 'TyVar's
 -- that must have a binding in this module.  The converse
@@ -1259,6 +1350,6 @@ mustHaveLocalBinding var = isLocalVar var
 
 -- | 'isExportedIdVar' means \"don't throw this away\"
 isExportedId :: Var -> Bool
-isExportedId (Id { idScope = GlobalId })        = True
-isExportedId (Id { idScope = LocalId Exported}) = True
+isExportedId (I Id { idScope = GlobalId })        = True
+isExportedId (I Id { idScope = LocalId Exported}) = True
 isExportedId _ = False

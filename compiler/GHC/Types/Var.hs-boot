@@ -1,7 +1,7 @@
 {-# LANGUAGE NoPolyKinds #-}
 module GHC.Types.Var where
 
-import GHC.Prelude ()
+import GHC.Prelude (Either)
 import {-# SOURCE #-} GHC.Types.Name
   -- We compile this GHC with -XNoImplicitPrelude, so if there are no imports
   -- it does not seem to depend on anything. But it does! We must, for
@@ -13,10 +13,13 @@ data ForAllTyFlag
 data FunTyFlag
 data Var
 instance NamedThing Var
+instance NamedThing Id
+instance NamedThing TyVar
+instance NamedThing TcTyVar
 data VarBndr var argf
 data Specificity
-type TyVar = Var
-type Id    = Var
-type TyCoVar = Id
-type TcTyVar = Var
+data TyVar
+data Id
+type TyCoVar = Either TyVar Id
+data TcTyVar
 type InvisTVBinder = VarBndr TyVar Specificity

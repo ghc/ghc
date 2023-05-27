@@ -40,6 +40,7 @@ import Language.Haskell.Syntax.Basic (Role(..))
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprType, pprTyVar )
+import {-# SOURCE #-} GHC.Core.Ppr ( pprId )
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -496,7 +497,7 @@ instance Outputable CoAxBranch where
                   , cab_lhs = lhs_tys, cab_rhs = rhs, cab_incomps = incomps })
     = text "CoAxBranch" <+> braces payload
     where
-      payload = hang (text "forall" <+> pprWithCommas pprTyVar (tvs ++ cvs) <> dot)
+      payload = hang (text "forall" <+> pprWithCommas pprTyVar tvs <+> pprWithCommas pprId cvs <> dot)
                    2 (vcat [ text "<tycon>" <+> sep (map pprType lhs_tys)
                            , nest 2 (text "=" <+> ppr rhs)
                            , ppUnless (null incomps) $
