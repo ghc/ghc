@@ -716,7 +716,7 @@ getRegister' config plat expr
                                           truncateReg (formatToWidth format_x) w reg_x `appOL`
                                           code_y `appOL`
                                           truncateReg (formatToWidth format_y) w reg_y `snocOL`
-                                          annExpr expr (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+                                          annExpr expr (DIVU (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
@@ -893,7 +893,7 @@ getRegister' config plat expr
         MO_S_Rem w -> intOp True w (\d x y -> unitOL $ REM d x y)
 
         -- Unsigned multiply/divide
-        MO_U_Quot w -> intOp False w (\d x y -> unitOL $ UDIV d x y)
+        MO_U_Quot w -> intOp False w (\d x y -> unitOL $ DIVU d x y)
         MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ REM d x y)
 
         -- Signed comparisons -- see Note [CSET]
