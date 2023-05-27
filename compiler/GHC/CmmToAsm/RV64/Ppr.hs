@@ -500,7 +500,7 @@ pprInstr platform instr = case instr of
   BIC o1 o2 o3  -> op3 (text "\tbic") o1 o2 o3
   BICS o1 o2 o3 -> op3 (text "\tbics") o1 o2 o3
   EON o1 o2 o3  -> op3 (text "\teon") o1 o2 o3
-  EOR o1 o2 o3  -> op3 (text "\teor") o1 o2 o3
+  XOR o1 o2 o3  -> op3 (text "\txor") o1 o2 o3
   LSL o1 o2 o3  -> op3 (text "\tsll") o1 o2 o3
   LSR o1 o2 o3  -> op3 (text "\tsrl") o1 o2 o3
   MOV o1 o2
