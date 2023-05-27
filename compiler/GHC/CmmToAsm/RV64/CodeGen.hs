@@ -709,14 +709,14 @@ getRegister' config plat expr
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_U_Quot w) [x, y] | w == W8 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (UXTB (OpReg w reg_y) (OpReg w reg_y)) `snocOL` (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
-    CmmMachOp (MO_U_Quot w) [x, y] | w == W16 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (UXTH (OpReg w reg_y) (OpReg w reg_y)) `snocOL` (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+    CmmMachOp (MO_U_Quot w) [x, y] | w == W8 || w == W16  -> do
+      (reg_x, format_x, code_x) <- getSomeReg x
+      (reg_y, format_y, code_y) <- getSomeReg y
+      return $ Any (intFormat w) (\dst -> code_x `appOL`
+                                          truncateReg (formatToWidth format_x) w reg_x `appOL`
+                                          code_y `appOL`
+                                          truncateReg (formatToWidth format_y) w reg_y `snocOL`
+                                          annExpr expr (UDIV (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
@@ -745,18 +745,14 @@ getRegister' config plat expr
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W8, 0 <= n, n < 8 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (8-n)))))
-    CmmMachOp (MO_U_Shr w) [x, y] | w == W8 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
+    CmmMachOp (MO_U_Shr w) [x, y] | w == W8 || w == W16 -> do
+      (reg_x, format_x, code_x) <- getSomeReg x
       (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTB (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
+      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `appOL` truncateReg (formatToWidth format_x) w reg_x `snocOL` annExpr expr (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W16, 0 <= n, n < 16 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (UBFX (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n)) (OpImm (ImmInteger (16-n)))))
-    CmmMachOp (MO_U_Shr w) [x, y] | w == W16 -> do
-      (reg_x, _format_x, code_x) <- getSomeReg x
-      (reg_y, _format_y, code_y) <- getSomeReg y
-      return $ Any (intFormat w) (\dst -> code_x `appOL` code_y `snocOL` annExpr expr (UXTH (OpReg w reg_x) (OpReg w reg_x)) `snocOL` (ASR (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y)))
 
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
@@ -1171,14 +1167,18 @@ genCondJump bid expr = do
 
         let ubcond w cmp = do
                 -- compute both sides.
-                (reg_x, _format_x, code_x) <- getSomeReg x
-                (reg_y, _format_y, code_y) <- getSomeReg y
+                (reg_x, format_x, code_x) <- getSomeReg x
+                (reg_y, format_y, code_y) <- getSomeReg y
                 let x' = OpReg w reg_x
                     y' = OpReg w reg_y
                 return $ case w of
-                  W8  -> code_x `appOL` code_y `appOL` toOL [ UXTB x' x', UXTB y' y', (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
-                  W16 -> code_x `appOL` code_y `appOL` toOL [ UXTH x' x', UXTH y' y', (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
-                  _   -> code_x `appOL` code_y `appOL` toOL [                         (annExpr expr (BCOND cmp x' y' (TBlock bid))) ]
+                  w | w == W8 || w == W16 -> code_x `appOL`
+                      truncateReg (formatToWidth format_x) w reg_x  `appOL`
+                      code_y `appOL`
+                      truncateReg (formatToWidth format_y) w reg_y  `appOL`
+                      code_y `snocOL`
+                      annExpr expr (BCOND cmp x' y' (TBlock bid))
+                  _   -> code_x `appOL` code_y `snocOL` annExpr expr (BCOND cmp x' y' (TBlock bid))
 
             sbcond w cmp = do
               -- compute both sides.

@@ -95,8 +95,6 @@ regUsageOfInstr platform instr = case instr of
   SBFM dst src _ _         -> usage (regOp src, regOp dst)
   UBFM dst src _ _         -> usage (regOp src, regOp dst)
   UBFX dst src _ _         -> usage (regOp src, regOp dst)
-  UXTB dst src             -> usage (regOp src, regOp dst)
-  UXTH dst src             -> usage (regOp src, regOp dst)
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   OR dst src1 src2         -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -232,8 +230,6 @@ patchRegsOfInstr instr env = case instr of
     SBFM o1 o2 o3 o4 -> SBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     UBFM o1 o2 o3 o4 -> UBFM (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     UBFX o1 o2 o3 o4 -> UBFX (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
-    UXTB o1 o2       -> UXTB (patchOp o1) (patchOp o2)
-    UXTH o1 o2       -> UXTH (patchOp o1) (patchOp o2)
 
     -- 3. Logical and Move Instructions ----------------------------------------
     AND o1 o2 o3   -> AND  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -558,8 +554,6 @@ data Instr
     | DELTA   Int
 
     -- 0. Pseudo Instructions --------------------------------------------------
-    | UXTB Operand Operand
-    | UXTH Operand Operand
     -- | SXTW Operand Operand
     -- | SXTX Operand Operand
     | PUSH_STACK_FRAME
@@ -617,12 +611,7 @@ data Instr
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
     | SBFM Operand Operand Operand Operand -- rd = rn[i,j]
-    -- SXTB = SBFM <Wd>, <Wn>, #0, #7
-    -- SXTH = SBFM <Wd>, <Wn>, #0, #15
-    -- SXTW = SBFM <Wd>, <Wn>, #0, #31
     | UBFM Operand Operand Operand Operand -- rd = rn[i,j]
-    -- UXTB = UBFM <Wd>, <Wn>, #0, #7
-    -- UXTH = UBFM <Wd>, <Wn>, #0, #15
     -- Signed/Unsigned bitfield extract
     | UBFX Operand Operand Operand Operand -- rd = rn[i,j]
 
@@ -688,8 +677,6 @@ instrCon i =
       LDATA{} -> "LDATA"
       NEWBLOCK{} -> "NEWBLOCK"
       DELTA{} -> "DELTA"
-      UXTB{} -> "UXTB"
-      UXTH{} -> "UXTH"
       PUSH_STACK_FRAME{} -> "PUSH_STACK_FRAME"
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
       ADD{} -> "ADD"
