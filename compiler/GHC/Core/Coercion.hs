@@ -591,11 +591,6 @@ coVarKindsTypesRole cv
  = pprPanic "coVarKindsTypesRole, non coercion variable"
             (ppr cv $$ ppr (varType cv))
 
-coVarKind :: CoVar -> Type
-coVarKind cv
-  = assert (isCoVar cv )
-    varType cv
-
 coVarRole :: CoVar -> Role
 coVarRole cv
   = eqTyConRole (case tyConAppTyCon_maybe (varType cv) of

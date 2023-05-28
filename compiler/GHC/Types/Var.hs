@@ -48,9 +48,13 @@ module GHC.Types.Var (
         varMult, varMultMaybe,
         varNameTyVar, varNameTcTyVar, varNameId,
         varTypeTyVar, varTypeTcTyVar, varTypeId,
+        
+        varTypeTyCoVar, tyCoVarToVar,
+        coVarKind, tyCoVarKind,
+
 
         -- ** Modifying 'Var's
-        setVarName, setVarUnique, setVarType,
+        setVarName, setVarUnique, setVarType, setTyCoVarType,
         updateVarType, updateVarTypeM,
 
         -- ** Constructing, taking apart, modifying 'Id's
@@ -272,6 +276,16 @@ data Id
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
+
+varTypeTyCoVar :: TyCoVar -> Type
+varTypeTyCoVar = \case
+  Left  v -> varTypeTyVar v
+  Right v -> varTypeId v
+
+tyCoVarToVar :: TyCoVar -> Var
+tyCoVarToVar = \case
+  Left x  -> TV x
+  Right x -> I x
 
 varName :: Var -> Name
 varName = \case
@@ -509,6 +523,11 @@ setVarType var ty = case var of
   I id -> I id { varTypeId = ty }
   TV tv -> TV tv { varTypeTyVar = ty }
   TTV ttv -> TTV ttv { varTypeTcTyVar = ty }
+
+setTyCoVarType :: TyCoVar -> Type -> TyCoVar
+setTyCoVarType var ty = case var of
+  Left tv -> Left tv { varTypeTyVar = ty }
+  Right id -> Right id { varTypeId = ty }
 
 -- | Update a 'Var's type. Does not update the /multiplicity/
 -- stored in an 'Id', if any. Because of the possibility for
@@ -1150,6 +1169,14 @@ tyVarName = varNameTyVar
 
 tyVarKind :: TyVar -> Kind
 tyVarKind = varTypeTyVar
+
+coVarKind :: CoVar -> Type
+coVarKind cv = varTypeId cv
+
+tyCoVarKind :: TyCoVar -> Kind
+tyCoVarKind = \case
+  Left tv -> tyVarKind tv
+  Right cv -> coVarKind cv
 
 setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique tv uq = case setVarUnique (TV tv) uq of

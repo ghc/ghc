@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Var.Set (
         -- * Var, Id and TyVar set types
@@ -44,9 +44,12 @@ module GHC.Types.Var.Set (
         sizeDVarSet, seqDVarSet,
         partitionDVarSet,
         dVarSetToVarSet,
+        leftsVarSet, rightsVarSet
     ) where
 
+import Data.Either
 import GHC.Prelude
+import GHC.Utils.Panic
 
 import GHC.Types.Var      ( Var, TyVar, CoVar, TyCoVar, Id )
 import GHC.Types.Unique
@@ -78,30 +81,39 @@ type CoVarSet     = UniqSet CoVar
 -- | Type or Coercion Variable Set
 type TyCoVarSet   = UniqSet TyCoVar
 
-emptyVarSet     :: VarSet
-intersectVarSet :: VarSet -> VarSet -> VarSet
-unionVarSet     :: VarSet -> VarSet -> VarSet
+emptyVarSet     :: UniqSet a
+intersectVarSet :: UniqSet a -> UniqSet a -> UniqSet a
+{-# SPECIALISE intersectVarSet :: VarSet -> VarSet -> VarSet #-}
+unionVarSet     :: UniqSet a -> UniqSet a -> UniqSet a
+{-# SPECIALISE unionVarSet     :: VarSet -> VarSet -> VarSet #-}
 unionVarSets    :: [VarSet] -> VarSet
 
 mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
 -- ^ map the function over the list, and union the results
 
-unitVarSet      :: Var -> VarSet
-extendVarSet    :: VarSet -> Var -> VarSet
+unitVarSet      :: Uniquable a => a -> UniqSet a
+{-# SPECIALIZE unitVarSet      :: Var -> VarSet #-}
+extendVarSet    :: Uniquable a => UniqSet a -> a -> UniqSet a
+{-# SPECIALISE extendVarSet :: VarSet -> Var -> VarSet #-}
 extendVarSetList:: VarSet -> [Var] -> VarSet
-elemVarSet      :: Var -> VarSet -> Bool
-delVarSet       :: VarSet -> Var -> VarSet
+elemVarSet      :: Uniquable a => a -> UniqSet a -> Bool
+{-# SPECIALISE elemVarSet :: Var -> VarSet -> Bool #-}
+delVarSet       :: Uniquable a => UniqSet a -> a -> UniqSet a
+{-# SPECIALISE delVarSet :: VarSet -> Var -> VarSet #-}
 delVarSetList   :: VarSet -> [Var] -> VarSet
-minusVarSet     :: VarSet -> VarSet -> VarSet
+minusVarSet     :: Uniquable a => UniqSet a -> UniqSet a -> UniqSet a
+{-# SPECIALISE minusVarSet     :: VarSet -> VarSet -> VarSet #-}
 isEmptyVarSet   :: VarSet -> Bool
-mkVarSet        :: [Var] -> VarSet
+mkVarSet        :: Uniquable a => [a] -> UniqSet a
+{-# SPECIALISE mkVarSet :: [Var] -> VarSet #-}
 lookupVarSet_Directly :: VarSet -> Unique -> Maybe Var
 lookupVarSet    :: VarSet -> Var -> Maybe Var
                         -- Returns the set element, which may be
                         -- (==) to the argument, but not the same as
 lookupVarSetByName :: VarSet -> Name -> Maybe Var
 sizeVarSet      :: VarSet -> Int
-filterVarSet    :: (Var -> Bool) -> VarSet -> VarSet
+filterVarSet    :: Uniquable a => (a -> Bool) -> UniqSet a -> UniqSet a
+{-# SPECIALISE filterVarSet :: (Var -> Bool) -> VarSet -> VarSet #-}
 
 delVarSetByKey  :: VarSet -> Unique -> VarSet
 elemVarSetByKey :: Unique -> VarSet -> Bool
@@ -113,7 +125,8 @@ extendVarSet    = addOneToUniqSet
 extendVarSetList= addListToUniqSet
 intersectVarSet = intersectUniqSets
 
-intersectsVarSet:: VarSet -> VarSet -> Bool     -- True if non-empty intersection
+intersectsVarSet:: UniqSet a -> UniqSet a -> Bool     -- True if non-empty intersection
+{-# SPECIALISE intersectsVarSet :: VarSet -> VarSet -> Bool #-}
 disjointVarSet  :: VarSet -> VarSet -> Bool     -- True if empty intersection
 subVarSet       :: VarSet -> VarSet -> Bool     -- True if first arg is subset of second
         -- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty;
@@ -155,7 +168,8 @@ mapVarSet = mapUniqSet
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
-nonDetStrictFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
+nonDetStrictFoldVarSet :: (b -> a -> a) -> a -> UniqSet b -> a
+{-# SPECIALISE nonDetStrictFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a #-}
 nonDetStrictFoldVarSet = nonDetStrictFoldUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
@@ -251,7 +265,7 @@ extendDVarSet = addOneToUniqDSet
 elemDVarSet :: Var -> DVarSet -> Bool
 elemDVarSet = elementOfUniqDSet
 
-dVarSetElems :: DVarSet -> [Var]
+dVarSetElems :: UniqDSet a -> [a]
 dVarSetElems = uniqDSetToList
 
 subDVarSet :: DVarSet -> DVarSet -> Bool
@@ -358,3 +372,10 @@ transCloDVarSet fn seeds
        | otherwise            = go (acc `unionDVarSet` new_vs) new_vs
        where
          new_vs = fn candidates `minusDVarSet` acc
+
+leftsVarSet :: (Uniquable a, Uniquable b) => UniqSet (Either a b) -> UniqSet a
+leftsVarSet = mapVarSet (\case Left x -> x; Right _ -> panic "leftsVarSet") . filterVarSet isLeft
+
+rightsVarSet :: (Uniquable a, Uniquable b) => UniqSet (Either a b) -> UniqSet b
+rightsVarSet = mapVarSet (\case Right x -> x; Left _ -> panic "rightsVarSet") . filterVarSet isRight
+

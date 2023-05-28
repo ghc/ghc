@@ -192,6 +192,9 @@ instance Uniquable Int where
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
 
+instance (Uniquable a, Uniquable b) => Uniquable (Either a b) where
+  getUnique (Left x)  = getUnique x
+  getUnique (Right x) = getUnique x
 
 {-
 ************************************************************************
@@ -323,3 +326,4 @@ iToBase62 n_
     {-# INLINE chooseChar62 #-}
     chooseChar62 (I# n) = C# (indexCharOffAddr# chars62 n)
     chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+

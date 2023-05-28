@@ -1,5 +1,6 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -122,7 +123,7 @@ type FRRType = Type
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Type
   -- See Note [Non-trivial definitional equality]
-  = TyVarTy Var -- ^ Vanilla type or kind variable (*never* a coercion variable)
+  = TyVarTy TyVar -- ^ Vanilla type or kind variable (*never* a coercion variable)
 
   | AppTy
         Type
@@ -674,18 +675,15 @@ which in turn is imported by Type
 -}
 
 mkTyVarTy  :: TyVar   -> Type
-mkTyVarTy v = assertPpr (isTyVar v) (ppr v <+> dcolon <+> ppr (tyVarKind v)) $
-              TyVarTy v
+mkTyVarTy v = TyVarTy v
 
 mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 mkTyCoVarTy :: TyCoVar -> Type
-mkTyCoVarTy v
-  | isTyVar v
-  = TyVarTy v
-  | otherwise
-  = CoercionTy (CoVarCo v)
+mkTyCoVarTy = \case
+  Left v  -> TyVarTy v
+  Right v -> CoercionTy (CoVarCo v)
 
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
@@ -783,7 +781,7 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
-mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
+mkInvisForAllTys tyvars = mkForAllTys $ mapVarBndrs Left (tyVarSpecToBinders tyvars)
 
 mkPiTy :: PiTyBinder -> Type -> Type
 mkPiTy (Anon ty1 af) ty2  = mkScaledFunTy af ty1 ty2
@@ -1727,7 +1725,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
-        in go_ty env (varType tv) `mappend` go_ty env' inner
+        in go_ty env (varTypeTyCoVar tv) `mappend` go_ty env' inner
 
     -- Explicit recursion because using foldr builds a local
     -- loop (with env free) and I'm not confident it'll be
@@ -1761,7 +1759,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
        = go_co env cw `mappend` go_co env c1 `mappend` go_co env c2
 
     go_co env (ForAllCo tv kind_co co)
-      = go_co env kind_co `mappend` go_ty env (varType tv)
+      = go_co env kind_co `mappend` go_ty env (varTypeTyCoVar tv)
                           `mappend` go_co env' co
       where
         env' = tycobinder env tv Inferred
@@ -1801,7 +1799,7 @@ typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
-typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varTypeTyCoVar tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co

@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
@@ -51,6 +52,7 @@ module GHC.Core.TyCo.FVs
         Endo(..), runTyCoVars
   ) where
 
+import Data.Either
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type( partitionInvisibleTypes, coreView, rewriterView )
@@ -102,7 +104,7 @@ Examples:
   Type                     Shallow     Deep
   ---------------------------------
   (a : (k:Type))           {a}        {a,k}
-  forall (a:(k:Type)). a   {k}        {k}
+  forall (a:(k:Type)). a   { }        {k}
   (a:k->Type) (b:k)        {a,b}      {a,b,k}
 -}
 
@@ -317,18 +319,27 @@ deep_cos :: [Coercion] -> Endo TyCoVarSet
 
 deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
 deepTcvFolder = TyCoFolder { tcf_view = noView
-                           , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                           , tcf_tyvar = do_tv, tcf_covar = do_cv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
+    do_tv :: TyCoVarSet -> TyVar -> Endo TyCoVarSet
+    do_tv is v = Endo do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_ty (varType v)) $
-                                         acc `extendVarSet` v
+        do_it acc | Left v `elemVarSet` is  = acc
+                  | Left v `elemVarSet` acc = acc
+                  | otherwise = appEndo (deep_ty (varTypeTyVar v)) $
+                                acc `extendVarSet` Left v
+
+    do_cv :: TyCoVarSet -> CoVar -> Endo TyCoVarSet
+    do_cv is v = Endo do_it
+      where
+        do_it acc | Right v `elemVarSet` is  = acc
+                  | Right v `elemVarSet` acc = acc
+                  | otherwise = appEndo (deep_ty (varTypeId v)) $
+                                acc `extendVarSet` Right v
 
     do_bndr is tcv _ = extendVarSet is tcv
-    do_hole is hole  = do_tcv is (coHoleCoVar hole)
+    do_hole is hole  = do_cv is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
@@ -375,14 +386,22 @@ shallow_cos :: [Coercion] -> Endo TyCoVarSet
 
 shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
 shallowTcvFolder = TyCoFolder { tcf_view = noView
-                              , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                              , tcf_tyvar = do_tv, tcf_covar = do_cv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
+    do_tv :: TyCoVarSet -> TyVar -> Endo TyCoVarSet
+    do_tv is v = Endo do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = acc `extendVarSet` v
+        do_it acc | Left v `elemVarSet` is  = acc
+                  | Left v `elemVarSet` acc = acc
+                  | otherwise = acc `extendVarSet` Left v
+
+    do_cv :: TyCoVarSet -> CoVar -> Endo TyCoVarSet
+    do_cv is v = Endo do_it
+      where
+        do_it acc | Right v `elemVarSet` is  = acc
+                  | Right v `elemVarSet` acc = acc
+                  | otherwise = acc `extendVarSet` Right v
 
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole _ _  = mempty   -- Ignore coercion holes
@@ -411,10 +430,10 @@ coVarsOfTypes :: [Type]     -> CoVarSet
 coVarsOfCo    :: Coercion   -> CoVarSet
 coVarsOfCos   :: [Coercion] -> CoVarSet
 
-coVarsOfType  ty  = runTyCoVars (deep_cv_ty ty)
-coVarsOfTypes tys = runTyCoVars (deep_cv_tys tys)
-coVarsOfCo    co  = runTyCoVars (deep_cv_co co)
-coVarsOfCos   cos = runTyCoVars (deep_cv_cos cos)
+coVarsOfType  ty  = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_ty ty)
+coVarsOfTypes tys = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_tys tys)
+coVarsOfCo    co  = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_co co)
+coVarsOfCos   cos = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_cos cos)
 
 deep_cv_ty  :: Type       -> Endo CoVarSet
 deep_cv_tys :: [Type]     -> Endo CoVarSet
@@ -436,9 +455,9 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
 
     do_covar is v = Endo do_it
       where
-        do_it acc | v `elemVarSet` is  = acc
+        do_it acc | Right v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_cv_ty (varType v)) $
+                  | otherwise          = appEndo (deep_cv_ty (varTypeId v)) $
                                          acc `extendVarSet` v
 
     do_bndr is tcv _ = extendVarSet is tcv
@@ -459,7 +478,7 @@ closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- add the deep free variables of its kind
 closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
-    do_one v acc = appEndo (deep_ty (varType v)) acc
+    do_one v acc = appEndo (deep_ty (varTypeTyCoVar v)) acc
 
 {- --------------- Alternative version 1 (using FV) ------------
 closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
@@ -520,50 +539,60 @@ close_over_kinds wl acc
 *                                                                      *
 ********************************************************************* -}
 
+-- ROMES:TODO: In the following functions, the right thing to do is parametrize FV rather than converting to and from Var (the last being unsafe...)
+unsafeVarToTyVar :: [Var] -> [TyVar]
+unsafeVarToTyVar = map (\case TV v -> v; _ -> panic "unsafeVarToTyVar")
+unsafeVarToTyCoVar :: [Var] -> [TyCoVar]
+unsafeVarToTyCoVar = map (\case TV v -> Left v; I i -> Right i; _ -> panic "unsafeVarToTyCoVar")
+unsafeVarSetToTyVarSet :: DVarSet -> DTyVarSet
+unsafeVarSetToTyVarSet = mapDVarSet (\case TV v -> v; _ -> panic "unsafeVarSetToTyVarSet")
+unsafeVarSetToTyCoVarSet :: DVarSet -> DTyCoVarSet
+unsafeVarSetToTyCoVarSet = mapDVarSet (\case TV v -> Left v; I i -> Right i; _ -> panic "unsafeVarSetToTyCoVarSet")
+
 -- | Given a list of tyvars returns a deterministic FV computation that
 -- returns the given tyvars with the kind variables free in the kinds of the
 -- given tyvars.
 closeOverKindsFV :: [TyVar] -> FV
 closeOverKindsFV tvs =
-  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
+  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs (map TV tvs)
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministically ordered list.
 closeOverKindsList :: [TyVar] -> [TyVar]
-closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+closeOverKindsList tvs = unsafeVarToTyVar $ fvVarList $ closeOverKindsFV tvs
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
-closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
+closeOverKindsDSet = unsafeVarSetToTyVarSet . fvDVarSet . closeOverKindsFV . dVarSetElems
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
 -- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
+tyCoVarsOfTypeDSet ty = unsafeVarSetToTyCoVarSet $ fvDVarSet $ tyCoFVsOfType ty
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
 -- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
-tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
+tyCoVarsOfTypeList ty = unsafeVarToTyCoVar $ fvVarList $ tyCoFVsOfType ty
 
 -- | Returns free variables of types, including kind variables as
 -- a deterministic set. For type synonyms it does /not/ expand the
 -- synonym.
 tyCoVarsOfTypesDSet :: [Type] -> DTyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfTypesDSet tys = fvDVarSet $ tyCoFVsOfTypes tys
+tyCoVarsOfTypesDSet tys = unsafeVarSetToTyCoVarSet $ fvDVarSet $ tyCoFVsOfTypes tys
 
 -- | Returns free variables of types, including kind variables as
 -- a deterministically ordered list. For type synonyms it does /not/ expand the
 -- synonym.
 tyCoVarsOfTypesList :: [Type] -> [TyCoVar]
 -- See Note [Free variables of types]
-tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
+tyCoVarsOfTypesList tys = unsafeVarToTyCoVar $ fvVarList $ tyCoFVsOfTypes tys
 
 -- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
@@ -577,12 +606,12 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
-  | not (f v) = (acc_list, acc_set)
-  | v `elemVarSet` bound_vars = (acc_list, acc_set)
-  | v `elemVarSet` acc_set = (acc_list, acc_set)
+  | not (f (TV v)) = (acc_list, acc_set)
+  | TV v `elemVarSet` bound_vars = (acc_list, acc_set)
+  | TV v `elemVarSet` acc_set = (acc_list, acc_set)
   | otherwise = tyCoFVsOfType (tyVarKind v) f
                                emptyVarSet   -- See Note [Closing over free variable kinds]
-                               (v:acc_list, extendVarSet acc_set v)
+                               (TV v:acc_list, extendVarSet acc_set (TV v))
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
@@ -595,13 +624,13 @@ tyCoFVsBndr :: ForAllTyBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
 tyCoFVsBndr (Bndr tv _) fvs = tyCoFVsVarBndr tv fvs
 
-tyCoFVsVarBndrs :: [Var] -> FV -> FV
+tyCoFVsVarBndrs :: [TyCoVar] -> FV -> FV
 tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
 
-tyCoFVsVarBndr :: Var -> FV -> FV
-tyCoFVsVarBndr var fvs
-  = tyCoFVsOfType (varType var)   -- Free vars of its type/kind
-    `unionFV` delFV var fvs       -- Delete it from the thing-inside
+tyCoFVsVarBndr :: TyCoVar -> FV -> FV
+tyCoFVsVarBndr tycov fvs
+  = tyCoFVsOfType (varTypeTyCoVar tycov)   -- Free vars of its type/kind
+    `unionFV` delFV (tyCoVarToVar tycov) fvs       -- Delete it from the thing-inside
 
 tyCoFVsOfTypes :: [Type] -> FV
 -- See Note [Free variables of types]
@@ -611,11 +640,11 @@ tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 -- | Get a deterministic set of the vars free in a coercion
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfCoDSet co = fvDVarSet $ tyCoFVsOfCo co
+tyCoVarsOfCoDSet co = unsafeVarSetToTyCoVarSet $ fvDVarSet $ tyCoFVsOfCo co
 
 tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Free variables of types]
-tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
+tyCoVarsOfCoList co = unsafeVarToTyCoVar $ fvVarList $ tyCoFVsOfCo co
 
 tyCoFVsOfMCo :: MCoercion -> FV
 tyCoFVsOfMCo MRefl    = emptyFV
@@ -655,7 +684,7 @@ tyCoFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoFVsOfCos cs fv_cand i
 
 tyCoFVsOfCoVar :: CoVar -> FV
 tyCoFVsOfCoVar v fv_cand in_scope acc
-  = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
+  = (unitFV (I v) `unionFV` tyCoFVsOfType (varTypeId v)) fv_cand in_scope acc
 
 tyCoFVsOfProv :: UnivCoProvenance -> FV
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
@@ -688,7 +717,7 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
   && almost_devoid_co_var_of_co arg cv
 almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
   = almost_devoid_co_var_of_co kind_co cv
-  && (v == cv || almost_devoid_co_var_of_co co cv)
+  && (v == Right cv || almost_devoid_co_var_of_co co cv)
 almost_devoid_co_var_of_co (FunCo { fco_mult = w, fco_arg = co1, fco_res = co2 }) cv
   =  almost_devoid_co_var_of_co w   cv
   && almost_devoid_co_var_of_co co1 cv
@@ -747,8 +776,8 @@ almost_devoid_co_var_of_type (FunTy _ w arg res) cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
-  = almost_devoid_co_var_of_type (varType v) cv
-  && (v == cv || almost_devoid_co_var_of_type ty cv)
+  = almost_devoid_co_var_of_type (varTypeTyCoVar v) cv
+  && (v == (Right cv) || almost_devoid_co_var_of_type ty cv)
 almost_devoid_co_var_of_type (CastTy ty co) cv
   = almost_devoid_co_var_of_type ty cv
   && almost_devoid_co_var_of_co co cv
@@ -780,13 +809,13 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     Pair invis_vars1 vis_vars = go orig_ty
     invis_vars = invis_vars1 `minusVarSet` vis_vars
 
-    go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet tv)
+    go (TyVarTy tv)      = Pair (tyCoVarsOfType $ tyVarKind tv) (unitVarSet (Left tv))
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
     go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
     go (ForAllTy (Bndr tv _) ty)
       = ((`delVarSet` tv) <$> go ty) `mappend`
-        (invisible (tyCoVarsOfType $ varType tv))
+        invisible (tyCoVarsOfType $ varTypeTyCoVar tv)
     go (LitTy {}) = mempty
     go (CastTy ty co) = go ty `mappend` invisible (tyCoVarsOfCo co)
     go (CoercionTy co) = invisible $ tyCoVarsOfCo co
@@ -819,8 +848,10 @@ isInjectiveInType tv ty
     go (AppTy f a)                      = go f || go a
     go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
-                                          || (tv /= tv' && go ty)
+    go (ForAllTy (Bndr (Left tv') _) ty) = go (tyVarKind tv')
+                                           || (tv /= tv' && go ty)
+    go (ForAllTy (Bndr (Right cv') _) ty) = go (coVarKind cv')
+                                          --  || (tv /= cv' && go ty) ROMES:TODO: Can never happen, right? How can a tyVar be == to a coVar
     go LitTy{}                          = False
     go (CastTy ty _)                    = go ty
     go CoercionTy{}                     = False
@@ -859,11 +890,12 @@ injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
 injectiveVarsOfType look_under_tfs = go
   where
     go ty | Just ty' <- rewriterView ty = go ty'
-    go (TyVarTy v)                      = unitFV v `unionFV` go (tyVarKind v)
+    go (TyVarTy v)                      = unitFV (TV v) `unionFV` go (tyVarKind v)
     go (AppTy f a)                      = go f `unionFV` go a
     go (FunTy _ w ty1 ty2)              = go w `unionFV` go ty1 `unionFV` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `unionFV` delFV tv (go ty)
+    go (ForAllTy (Bndr (Left tv) _) ty) = go (tyVarKind tv) `unionFV` delFV (TV tv) (go ty)
+    go (ForAllTy (Bndr (Right tv) _) ty) = go (coVarKind tv) `unionFV` delFV (I tv) (go ty)
     go LitTy{}                          = emptyFV
     go (CastTy ty _)                    = go ty
     go CoercionTy{}                     = emptyFV
@@ -944,10 +976,11 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 {-# INLINE afvFolder #-}   -- so that specialization to (const True) works
 afvFolder :: (TyCoVar -> Bool) -> TyCoFolder TyCoVarSet DM.Any
 afvFolder check_fv = TyCoFolder { tcf_view = noView
-                                , tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                                , tcf_tyvar = do_tv, tcf_covar = do_cv
                                 , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is tv = Any (not (tv `elemVarSet` is) && check_fv tv)
+    do_tv is tv = Any (not (Left tv `elemVarSet` is) && check_fv (Left tv))
+    do_cv is cv = Any (not (Right cv `elemVarSet` is) && check_fv (Right cv))
     do_hole _ _  = Any False    -- I'm unsure; probably never happens
     do_bndr is tv _ = is `extendVarSet` tv
 
@@ -1055,7 +1088,7 @@ scopedSort = go [] []
            -> [TyCoVar]     -- sorted list, in reverse order
            -> [TyCoVarSet]  -- list of fvs, as above
            -> ([TyCoVar], [TyCoVarSet])   -- augmented lists
-    insert tv []     []         = ([tv], [tyCoVarsOfType (tyVarKind tv)])
+    insert tv []     []         = ([tv], [tyCoVarsOfType (tyCoVarKind tv)])
     insert tv (a:as) (fvs:fvss)
       | tv `elemVarSet` fvs
       , (as', fvss') <- insert tv as fvss
@@ -1064,18 +1097,18 @@ scopedSort = go [] []
       | otherwise
       = (tv:a:as, fvs `unionVarSet` fv_tv : fvs : fvss)
       where
-        fv_tv = tyCoVarsOfType (tyVarKind tv)
+        fv_tv = tyCoVarsOfType (tyCoVarKind tv)
 
        -- lists not in correspondence
     insert _ _ _ = panic "scopedSort"
 
 -- | Get the free vars of a type in scoped order
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
-tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
+tyCoVarsOfTypeWellScoped = lefts . scopedSort . tyCoVarsOfTypeList
 
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+tyCoVarsOfTypesWellScoped = lefts . scopedSort . tyCoVarsOfTypesList
 
 {-
 ************************************************************************
@@ -1101,7 +1134,7 @@ tyConsOfType ty
      go (FunTy af w a b)            = go w `unionUniqSets`
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
-     go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
+     go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varTypeTyCoVar tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
@@ -1212,7 +1245,7 @@ of occurrences.  See bad_var_occ in occCheckExpand.  And
 see #18451 for more debate.
 -}
 
-occCheckExpand :: [Var] -> Type -> Maybe Type
+occCheckExpand :: [TyCoVar] -> Type -> Maybe Type
 -- See Note [Occurs check expansion]
 -- We may have needed to do some type synonym unfolding in order to
 -- get rid of the variable (or forall), so we also return the unfolded
@@ -1226,14 +1259,14 @@ occCheckExpand vs_to_avoid ty
   | otherwise
   = go (mkVarSet vs_to_avoid, emptyVarEnv) ty
   where
-    go :: (VarSet, VarEnv TyCoVar) -> Type -> Maybe Type
+    go :: (TyCoVarSet, TyCoVarEnv TyCoVar) -> Type -> Maybe Type
           -- The VarSet is the set of variables we are trying to avoid
           -- The VarEnv carries mappings necessary
           -- because of kind expansion
     go (as, env) ty@(TyVarTy tv)
-      | Just tv' <- lookupVarEnv env tv = return (mkTyVarTy tv')
-      | bad_var_occ as tv               = Nothing
-      | otherwise                       = return ty
+      | Just (Left tv') <- lookupVarEnv env (Left tv) = return (mkTyVarTy tv')
+      | bad_var_occ as (Left tv) = Nothing
+      | otherwise                = return ty
 
     go _   ty@(LitTy {}) = return ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
@@ -1245,8 +1278,8 @@ occCheckExpand vs_to_avoid ty
             ; ty2' <- go cxt ty2
             ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
-       = do { ki' <- go cxt (varType tv)
-            ; let tv'  = setVarType tv ki'
+       = do { ki' <- go cxt (varTypeTyCoVar tv)
+            ; let tv'  = setTyCoVarType tv ki'
                   env' = extendVarEnv env tv tv'
                   as'  = as `delVarSet` tv
             ; body' <- go (as', env') body_ty
@@ -1270,12 +1303,12 @@ occCheckExpand vs_to_avoid ty
                                 ; return (CoercionTy co') }
 
     ------------------
-    bad_var_occ :: VarSet -> Var -> Bool
+    bad_var_occ :: TyCoVarSet -> TyCoVar -> Bool
     -- Works for TyVar and CoVar
     -- See Note [Occurrence checking: look inside kinds]
     bad_var_occ vs_to_avoid v
        =  v                          `elemVarSet`       vs_to_avoid
-       || tyCoVarsOfType (varType v) `intersectsVarSet` vs_to_avoid
+       || tyCoVarsOfType (varTypeTyCoVar v) `intersectsVarSet` vs_to_avoid
 
     ------------------
     go_mco _   MRefl = return MRefl
@@ -1295,7 +1328,7 @@ occCheckExpand vs_to_avoid ty
                                              ; return (AppCo co' arg') }
     go_co cxt@(as, env) (ForAllCo tv kind_co body_co)
       = do { kind_co' <- go_co cxt kind_co
-           ; let tv' = setVarType tv $
+           ; let tv' = setTyCoVarType tv $
                        coercionLKind kind_co'
                  env' = extendVarEnv env tv tv'
                  as'  = as `delVarSet` tv
@@ -1308,13 +1341,13 @@ occCheckExpand vs_to_avoid ty
            ; return (co { fco_mult = w', fco_arg = co1', fco_res = co2' })}
 
     go_co (as,env) co@(CoVarCo c)
-      | Just c' <- lookupVarEnv env c   = return (CoVarCo c')
-      | bad_var_occ as c                = Nothing
-      | otherwise                       = return co
+      | Just (Right c') <- lookupVarEnv env (Right c) = return (CoVarCo c')
+      | bad_var_occ as (Right c) = Nothing
+      | otherwise                = return co
 
     go_co (as,_) co@(HoleCo h)
-      | bad_var_occ as (ch_co_var h)    = Nothing
-      | otherwise                       = return co
+      | bad_var_occ as (Right (ch_co_var h)) = Nothing
+      | otherwise                            = return co
 
     go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
                                              ; return (AxiomInstCo ax ind args') }

@@ -500,13 +500,14 @@ type TyCoVarEnv elt = UniqFM TyCoVar elt
 -- | Coercion Variable Environment
 type CoVarEnv elt   = UniqFM CoVar elt
 
-emptyVarEnv       :: VarEnv a
+emptyVarEnv       :: UniqFM var a
 mkVarEnv          :: [(Var, a)] -> VarEnv a
 mkVarEnv_Directly :: [(Unique, a)] -> VarEnv a
 zipVarEnv         :: [Var] -> [a] -> VarEnv a
 unitVarEnv        :: Var -> a -> VarEnv a
 alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
-extendVarEnv      :: VarEnv a -> Var -> a -> VarEnv a
+extendVarEnv      :: UniqFM var a -> var -> a -> UniqFM var a
+{-# SPECIALISE extendVarEnv :: VarEnv a -> Var -> a -> VarEnv a #-}
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
 plusVarEnv        :: VarEnv a -> VarEnv a -> VarEnv a
@@ -527,7 +528,8 @@ mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv      :: (a -> a) -> VarEnv a -> Var -> VarEnv a
 
 isEmptyVarEnv     :: VarEnv a -> Bool
-lookupVarEnv      :: VarEnv a -> Var -> Maybe a
+lookupVarEnv      :: UniqFM var a -> var -> Maybe a
+{-# SPECIALISE lookupVarEnv :: VarEnv a -> Var -> Maybe a #-}
 lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
 filterVarEnv      :: (a -> Bool) -> VarEnv a -> VarEnv a
 anyVarEnv         :: (elt -> Bool) -> UniqFM key elt -> Bool
