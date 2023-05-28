@@ -1862,7 +1862,7 @@
                          (GRHS
                           (EpAnn
                            (Anchor
-                            { DumpSemis.hs:39:8-9 }
+                            { DumpSemis.hs:39:8-13 }
                             (UnchangedAnchor))
                            (GrhsAnn
                             (Nothing)
@@ -1931,7 +1931,7 @@
                          (GRHS
                           (EpAnn
                            (Anchor
-                            { DumpSemis.hs:40:8-9 }
+                            { DumpSemis.hs:40:8-13 }
                             (UnchangedAnchor))
                            (GrhsAnn
                             (Nothing)
@@ -2002,7 +2002,7 @@
                          (GRHS
                           (EpAnn
                            (Anchor
-                            { DumpSemis.hs:41:8-9 }
+                            { DumpSemis.hs:41:8-13 }
                             (UnchangedAnchor))
                            (GrhsAnn
                             (Nothing)
@@ -2075,7 +2075,7 @@
                          (GRHS
                           (EpAnn
                            (Anchor
-                            { DumpSemis.hs:42:8-9 }
+                            { DumpSemis.hs:42:8-13 }
                             (UnchangedAnchor))
                            (GrhsAnn
                             (Nothing)
@@ -2100,3 +2100,5 @@
                         (NoExtField)))))]))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

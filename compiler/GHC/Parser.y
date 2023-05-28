@@ -2588,8 +2588,9 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
                                   do { let L l (bs, csw) = adaptWhereBinds $3
                                      ; let loc = (comb3 $1 $2 (L l bs))
+                                     ; let locg = (comb2 $1 $2)
                                      ; acs (\cs ->
-                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
+                                       sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs locg) (GrhsAnn Nothing (mj AnnEqual $1)) cs) locg $2)
                                                       bs)) } }
         | gdrhs wherebinds      {% do { let {L l (bs, csw) = adaptWhereBinds $2}
                                       ; acs (\cs -> sL (comb2 $1 (L l bs))
@@ -3336,7 +3337,7 @@ alt_rhs :: { forall b. DisambECP b => PV (Located (GRHSs GhcPs (LocatedA b))) }
 
 ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : '->' exp            { unECP $2 >>= \ $2 ->
-                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (glR $1) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 $2) $2)) }
+                                acs (\cs -> sLL $1 $> (unguardedRHS (EpAnn (spanAsAnchor $ comb2 $1 (reLoc $2)) (GrhsAnn Nothing (mu AnnRarrow $1)) cs) (comb2 $1 (reLoc $2)) $2)) }
         | gdpats              { $1 >>= \gdpats ->
                                 return $ sL1 gdpats (reverse (unLoc gdpats)) }
 

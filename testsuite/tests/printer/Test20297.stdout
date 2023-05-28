@@ -82,11 +82,11 @@
             [(L
               (SrcSpanAnn
                (EpAnnNotUsed)
-               { Test20297.hs:(5,5)-(7,7) })
+               { Test20297.hs:5:5-7 })
               (GRHS
                (EpAnn
                 (Anchor
-                 { Test20297.hs:(5,5)-(7,7) }
+                 { Test20297.hs:5:5-7 }
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
@@ -182,11 +182,11 @@
             [(L
               (SrcSpanAnn
                (EpAnnNotUsed)
-               { Test20297.hs:(9,5)-(11,26) })
+               { Test20297.hs:9:5-7 })
               (GRHS
                (EpAnn
                 (Anchor
-                 { Test20297.hs:(9,5)-(11,26) }
+                 { Test20297.hs:9:5-7 }
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
@@ -422,11 +422,11 @@
             [(L
               (SrcSpanAnn
                (EpAnnNotUsed)
-               { Test20297.ppr.hs:(4,3)-(5,7) })
+               { Test20297.ppr.hs:4:3-5 })
               (GRHS
                (EpAnn
                 (Anchor
-                 { Test20297.ppr.hs:(4,3)-(5,7) }
+                 { Test20297.ppr.hs:4:3-5 }
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
@@ -508,11 +508,11 @@
             [(L
               (SrcSpanAnn
                (EpAnnNotUsed)
-               { Test20297.ppr.hs:(7,3)-(9,24) })
+               { Test20297.ppr.hs:7:3-5 })
               (GRHS
                (EpAnn
                 (Anchor
-                 { Test20297.ppr.hs:(7,3)-(9,24) }
+                 { Test20297.ppr.hs:7:3-5 }
                  (UnchangedAnchor))
                 (GrhsAnn
                  (Nothing)
@@ -655,4 +655,5 @@
                         (EmptyLocalBinds
                          (NoExtField)))))]))))]}
               [])))))])))))]))
+
 
