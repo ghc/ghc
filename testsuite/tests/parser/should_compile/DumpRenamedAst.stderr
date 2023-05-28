@@ -1466,7 +1466,7 @@
      (XImportDeclPass
       (EpAnn
        (Anchor
-        { DumpRenamedAst.hs:5:1-6 }
+        { DumpRenamedAst.hs:5:1-16 }
         (UnchangedAnchor))
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:5:1-6 })
@@ -1494,7 +1494,7 @@
      (XImportDeclPass
       (EpAnn
        (Anchor
-        { DumpRenamedAst.hs:7:1-6 }
+        { DumpRenamedAst.hs:7:1-23 }
         (UnchangedAnchor))
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:7:1-6 })

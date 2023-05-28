@@ -35,7 +35,7 @@
      (XImportDeclPass
       (EpAnn
        (Anchor
-        { KindSigs.hs:8:1-6 }
+        { KindSigs.hs:8:1-16 }
         (UnchangedAnchor))
        (EpAnnImportDecl
         (EpaSpan { KindSigs.hs:8:1-6 })
