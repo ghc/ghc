@@ -35,7 +35,7 @@
      (XImportDeclPass
       (EpAnn
        (Anchor
-        { DumpParsedAst.hs:5:1-6 }
+        { DumpParsedAst.hs:5:1-16 }
         (UnchangedAnchor))
        (EpAnnImportDecl
         (EpaSpan { DumpParsedAst.hs:5:1-6 })
