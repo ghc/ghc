@@ -506,7 +506,7 @@ mkVarEnv_Directly :: [(Unique, a)] -> VarEnv a
 zipVarEnv         :: [Var] -> [a] -> VarEnv a
 unitVarEnv        :: Var -> a -> VarEnv a
 alterVarEnv       :: (Maybe a -> Maybe a) -> VarEnv a -> Var -> VarEnv a
-extendVarEnv      :: UniqFM var a -> var -> a -> UniqFM var a
+extendVarEnv      :: Uniquable var => UniqFM var a -> var -> a -> UniqFM var a
 {-# SPECIALISE extendVarEnv :: VarEnv a -> Var -> a -> VarEnv a #-}
 extendVarEnv_C    :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 extendVarEnv_Acc  :: (a->b->b) -> (a->b) -> VarEnv b -> Var -> a -> VarEnv b
@@ -528,7 +528,7 @@ mapVarEnv         :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv      :: (a -> a) -> VarEnv a -> Var -> VarEnv a
 
 isEmptyVarEnv     :: VarEnv a -> Bool
-lookupVarEnv      :: UniqFM var a -> var -> Maybe a
+lookupVarEnv      :: Uniquable var => UniqFM var a -> var -> Maybe a
 {-# SPECIALISE lookupVarEnv :: VarEnv a -> Var -> Maybe a #-}
 lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
 filterVarEnv      :: (a -> Bool) -> VarEnv a -> VarEnv a

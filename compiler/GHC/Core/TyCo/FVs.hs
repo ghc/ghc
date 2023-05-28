@@ -283,6 +283,11 @@ runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
 runTyCoVars f = appEndo f emptyVarSet
 
+runCoVars :: Endo CoVarSet -> CoVarSet
+{-# INLINE runCoVars #-}
+runCoVars f = appEndo f emptyVarSet
+
+
 {- *********************************************************************
 *                                                                      *
           Deep free variables
@@ -430,10 +435,10 @@ coVarsOfTypes :: [Type]     -> CoVarSet
 coVarsOfCo    :: Coercion   -> CoVarSet
 coVarsOfCos   :: [Coercion] -> CoVarSet
 
-coVarsOfType  ty  = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_ty ty)
-coVarsOfTypes tys = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_tys tys)
-coVarsOfCo    co  = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_co co)
-coVarsOfCos   cos = rightsVarSet $ runTyCoVars (mapVarSet Right <$> deep_cv_cos cos)
+coVarsOfType  ty  = runCoVars (deep_cv_ty ty)
+coVarsOfTypes tys = runCoVars (deep_cv_tys tys)
+coVarsOfCo    co  = runCoVars (deep_cv_co co)
+coVarsOfCos   cos = runCoVars (deep_cv_cos cos)
 
 deep_cv_ty  :: Type       -> Endo CoVarSet
 deep_cv_tys :: [Type]     -> Endo CoVarSet

@@ -6,7 +6,7 @@
 -}
 
 {-# LANGUAGE FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable,
-             PatternSynonyms, BangPatterns, RecordWildCards, LambdaCase, NamedFieldPuns #-}
+             PatternSynonyms, BangPatterns, LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |
@@ -153,10 +153,10 @@ type NcId  = Id        -- A term-level (value) variable that is
                        --    predicate: isNonCoVarId
 
 -- | Type Variable
-type TypeVar = Var     -- Definitely a type variable
+type TypeVar = TyVar   -- Definitely a type variable
 
 -- | Kind Variable
-type KindVar = Var     -- Definitely a kind variable
+type KindVar = TyVar   -- Definitely a kind variable
                        -- See Note [Kind and type variables]
 
 -- See Note [Evidence: EvIds and CoVars]
@@ -277,6 +277,48 @@ data Id
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
 
+class VarLike var where
+  varName :: var -> Name
+  realUnique :: var -> Int
+  varType :: var -> Type
+
+instance VarLike Var where
+  varName = \case
+    TV TyVar{varNameTyVar=name} -> name
+    TTV TcTyVar{varNameTcTyVar=name} -> name
+    I Id{varNameId=name} -> name
+  varType = \case
+    TV TyVar{varTypeTyVar=ty} -> ty
+    TTV TcTyVar{varTypeTcTyVar=ty} -> ty
+    I Id{varTypeId=ty} -> ty
+  realUnique = \case
+    TV TyVar{realUniqueTyVar=uq} -> uq
+    TTV TcTyVar{realUniqueTcTyVar=uq} -> uq
+    I Id{realUniqueId=uq} -> uq
+
+instance VarLike Id where
+  varName = varNameId
+  varType = varTypeId
+  realUnique = realUniqueId
+
+instance VarLike TyVar where
+  varName = varNameTyVar
+  varType = varTypeTyVar
+  realUnique = realUniqueTyVar
+
+instance VarLike TcTyVar where
+  varName = varNameTcTyVar
+  varType = varTypeTcTyVar
+  realUnique = realUniqueTcTyVar
+
+instance VarLike TyCoVar where
+  varName (Left v)  = varNameTyVar v
+  varName (Right v) = varNameId v
+  varType (Left v)  = varTypeTyVar v
+  varType (Right v) = varTypeId v
+  realUnique (Left v)  = realUniqueTyVar v
+  realUnique (Right v) = realUniqueId v
+
 varTypeTyCoVar :: TyCoVar -> Type
 varTypeTyCoVar = \case
   Left  v -> varTypeTyVar v
@@ -287,21 +329,6 @@ tyCoVarToVar = \case
   Left x  -> TV x
   Right x -> I x
 
-varName :: Var -> Name
-varName = \case
-  TV TyVar{varNameTyVar} -> varNameTyVar
-  TTV TcTyVar{varNameTcTyVar} -> varNameTcTyVar
-  I Id{varNameId} -> varNameId
-varType :: Var -> Type
-varType = \case
-  TV TyVar{varTypeTyVar} -> varTypeTyVar
-  TTV TcTyVar{varTypeTcTyVar} -> varTypeTcTyVar
-  I Id{varTypeId} -> varTypeId
-realUnique :: Var -> Int
-realUnique = \case
-  TV TyVar{realUniqueTyVar} -> realUniqueTyVar
-  TTV TcTyVar{realUniqueTcTyVar} -> realUniqueTcTyVar
-  I Id{realUniqueId} -> realUniqueId
 
 -- | Identifier Scope
 data IdScope    -- See Note [GlobalId/LocalId]
@@ -488,7 +515,7 @@ instance Data TyVar where
 instance HasOccName Var where
   occName = nameOccName . varName
 
-varUnique :: Var -> Unique
+varUnique :: VarLike var => var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 
 varMultMaybe :: Var -> Maybe Mult

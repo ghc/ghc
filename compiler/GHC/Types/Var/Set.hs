@@ -43,8 +43,7 @@ module GHC.Types.Var.Set (
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
         partitionDVarSet,
-        dVarSetToVarSet,
-        leftsVarSet, rightsVarSet
+        dVarSetToVarSet
     ) where
 
 import Data.Either
@@ -125,9 +124,8 @@ extendVarSet    = addOneToUniqSet
 extendVarSetList= addListToUniqSet
 intersectVarSet = intersectUniqSets
 
-intersectsVarSet:: UniqSet a -> UniqSet a -> Bool     -- True if non-empty intersection
-{-# SPECIALISE intersectsVarSet :: VarSet -> VarSet -> Bool #-}
-disjointVarSet  :: VarSet -> VarSet -> Bool     -- True if empty intersection
+intersectsVarSet:: UniqSet a -> UniqSet a -> Bool -- True if non-empty intersection
+disjointVarSet  :: UniqSet a -> UniqSet a -> Bool -- True if empty intersection
 subVarSet       :: VarSet -> VarSet -> Bool     -- True if first arg is subset of second
         -- (s1 `intersectsVarSet` s2) doesn't compute s2 if s1 is empty;
         -- ditto disjointVarSet, subVarSet
@@ -372,10 +370,4 @@ transCloDVarSet fn seeds
        | otherwise            = go (acc `unionDVarSet` new_vs) new_vs
        where
          new_vs = fn candidates `minusDVarSet` acc
-
-leftsVarSet :: (Uniquable a, Uniquable b) => UniqSet (Either a b) -> UniqSet a
-leftsVarSet = mapVarSet (\case Left x -> x; Right _ -> panic "leftsVarSet") . filterVarSet isLeft
-
-rightsVarSet :: (Uniquable a, Uniquable b) => UniqSet (Either a b) -> UniqSet b
-rightsVarSet = mapVarSet (\case Right x -> x; Left _ -> panic "rightsVarSet") . filterVarSet isRight
 
