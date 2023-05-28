@@ -31,7 +31,7 @@
      (XImportDeclPass
       (EpAnn
        (Anchor
-        { mod185.hs:3:1-6 }
+        { mod185.hs:3:1-24 }
         (UnchangedAnchor))
        (EpAnnImportDecl
         (EpaSpan { mod185.hs:3:1-6 })

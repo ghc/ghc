@@ -1134,8 +1134,9 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnPackage   = fst $5
                              , importDeclAnnAs        = fst $8
                              }
-                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 $6 $7 (snd $8) $9) $
-                      ImportDecl { ideclExt = XImportDeclPass (EpAnn (glR $1) anns cs) (snd $ fst $2) False
+                  ; let loc = (comb5 $1 $6 $7 (snd $8) $9);
+                  ; fmap reLocA $ acs (\cs -> L loc $
+                      ImportDecl { ideclExt = XImportDeclPass (EpAnn (spanAsAnchor loc) anns cs) (snd $ fst $2) False
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
                                   , ideclQualified = snd $ importDeclQualifiedStyle mPreQual mPostQual
