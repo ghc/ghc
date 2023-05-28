@@ -574,22 +574,36 @@ renderCreateFileLink linkTarget link' = do
     where
         link = unifyPath link'
 
+-- | Render a multiline string, prefixing the first line with a header.
+renderMultiLineString :: String -> String -> [String]
+renderMultiLineString header string =
+    [ linePrefix index ++ line | (index, line) <- zip [0..] (lines string) ]
+  where
+    linePrefix :: Int -> String
+    linePrefix index
+        | index == 0 = header
+        | otherwise  = replicate (length header) ' '
+
+-- | Render a (possibly multiline) synopsis, making sure it ends with a dot.
+renderSynopsis :: String -> String -> [String]
+renderSynopsis header synopsis
+    | null synopsis = []
+    | otherwise = renderMultiLineString header (endWithADot synopsis)
+  where
+    endWithADot :: String -> String
+    endWithADot s = dropWhileEnd isPunctuation s ++ "."
+
 -- | Render the successful build of a program.
 renderProgram :: String -> String -> String -> String
 renderProgram name bin synopsis = renderBox $
-    [ "Successfully built program " ++ name
-    , "Executable: " ++ bin ] ++
-    [ "Program synopsis: " ++ endWithADot synopsis | not (null synopsis) ]
+    [ "Successfully built program " ++ name, "Executable: " ++ bin ] ++
+    renderSynopsis "Program synopsis: " synopsis
 
 -- | Render the successful build of a library.
 renderLibrary :: String -> String -> String -> String
 renderLibrary name lib synopsis = renderBox $
-    [ "Successfully built library " ++ name
-    , "Library: " ++ lib ] ++
-    [ "Library synopsis: " ++ endWithADot synopsis | not (null synopsis) ]
-
-endWithADot :: String -> String
-endWithADot s = dropWhileEnd isPunctuation s ++ "."
+    [ "Successfully built library " ++ name, "Library: " ++ lib ] ++
+    renderSynopsis "Library synopsis: " synopsis
 
 -- | Render the given set of lines in an ASCII box. The minimum width and
 -- whether to use Unicode symbols are hardcoded in the function's body.
