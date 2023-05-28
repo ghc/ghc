@@ -42,7 +42,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaSpan { DumpParsedAst.hs:6:1-6 })
+       (EpaSpan { DumpParsedAst.hs:6:1-16 })
        (EpAnnImportDecl
         (EpaSpan { DumpParsedAst.hs:5:1-6 })
         (Nothing)

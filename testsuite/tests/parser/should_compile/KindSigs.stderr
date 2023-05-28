@@ -42,7 +42,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaSpan { KindSigs.hs:8:1-6 })
+       (EpaSpan { KindSigs.hs:8:1-16 })
        (EpAnnImportDecl
         (EpaSpan { KindSigs.hs:8:1-6 })
         (Nothing)

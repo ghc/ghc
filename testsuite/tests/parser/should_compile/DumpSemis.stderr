@@ -58,7 +58,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaSpan { DumpSemis.hs:5:1-6 })
+       (EpaSpan { DumpSemis.hs:5:1-19 })
        (EpAnnImportDecl
         (EpaSpan { DumpSemis.hs:5:1-6 })
         (Nothing)
@@ -115,7 +115,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaSpan { DumpSemis.hs:7:1-6 })
+       (EpaSpan { DumpSemis.hs:7:1-16 })
        (EpAnnImportDecl
         (EpaSpan { DumpSemis.hs:7:1-6 })
         (Nothing)

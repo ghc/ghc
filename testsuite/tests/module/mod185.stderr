@@ -33,7 +33,7 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
-       (EpaSpan { mod185.hs:3:1-6 })
+       (EpaSpan { mod185.hs:3:1-24 })
        (EpAnnImportDecl
         (EpaSpan { mod185.hs:3:1-6 })
         (Nothing)

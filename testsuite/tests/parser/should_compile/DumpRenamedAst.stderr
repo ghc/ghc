@@ -2743,8 +2743,12 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
+<<<<<<< HEAD
        (EpaSpan { DumpRenamedAst.hs:6:1-6 })
 >>>>>>> fd352736b6 (Put BufSpan into RealSrcSpan)
+=======
+       (EpaSpan { DumpRenamedAst.hs:6:1-16 })
+>>>>>>> 0b38b82052 (EPA: Provide correct annotation span for ImportDecl)
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:5:1-6 })
         (Nothing)
@@ -2793,8 +2797,12 @@
     (ImportDecl
      (XImportDeclPass
       (EpAnn
+<<<<<<< HEAD
        (EpaSpan { DumpRenamedAst.hs:8:1-6 })
 >>>>>>> fd352736b6 (Put BufSpan into RealSrcSpan)
+=======
+       (EpaSpan { DumpRenamedAst.hs:8:1-23 })
+>>>>>>> 0b38b82052 (EPA: Provide correct annotation span for ImportDecl)
        (EpAnnImportDecl
         (EpaSpan { DumpRenamedAst.hs:7:1-6 })
         (Nothing)
