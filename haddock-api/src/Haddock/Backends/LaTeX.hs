@@ -685,7 +685,7 @@ ppClassDecl instances doc subdocs
       , '$':'d':'m':occStr <- getOccString n
       = setName (tidyNameOcc (getName n) (mkOccName varName occStr)) n
       | otherwise = n
-            
+
 
     instancesBit = ppDocInstances unicode instances
 
