@@ -482,9 +482,7 @@ FIND_LD([$target],[GccUseLdOpt])
 FIND_MERGE_OBJECTS()
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
-LdCmd="$LD"
 CFLAGS="$CFLAGS $GccUseLdOpt"
-AC_SUBST([LdCmd])
 
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_NO_COMPACT_UNWIND
@@ -1246,7 +1244,6 @@ echo "\
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd
-   ld           : $LdCmd
    nm           : $NmCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd

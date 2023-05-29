@@ -115,8 +115,6 @@ data SettingsFileSetting
     | SettingsFileSetting_CxxCompilerFlags
     | SettingsFileSetting_CCompilerLinkFlags
     | SettingsFileSetting_CCompilerSupportsNoPie
-    | SettingsFileSetting_LdCommand
-    | SettingsFileSetting_LdFlags
     | SettingsFileSetting_MergeObjectsCommand
     | SettingsFileSetting_MergeObjectsFlags
     | SettingsFileSetting_ArCommand
@@ -214,8 +212,6 @@ settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_CxxCompilerFlags -> "settings-cxx-compiler-flags"
     SettingsFileSetting_CCompilerLinkFlags -> "settings-c-compiler-link-flags"
     SettingsFileSetting_CCompilerSupportsNoPie -> "settings-c-compiler-supports-no-pie"
-    SettingsFileSetting_LdCommand -> "settings-ld-command"
-    SettingsFileSetting_LdFlags -> "settings-ld-flags"
     SettingsFileSetting_MergeObjectsCommand -> "settings-merge-objects-command"
     SettingsFileSetting_MergeObjectsFlags -> "settings-merge-objects-flags"
     SettingsFileSetting_ArCommand -> "settings-ar-command"

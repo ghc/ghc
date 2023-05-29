@@ -16,8 +16,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2 -L\$\$tooldir/mingw/lib -L\$\$tooldir/mingw/x86_64-w64-mingw32/lib"
         SettingsHaskellCPPCommand="${mingw_bin_prefix}clang.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs -I\$\$tooldir/mingw/include"
-        SettingsLdCommand="${mingw_bin_prefix}ld.lld.exe"
-        SettingsLdFlags=""
         # LLD does not support object merging (#21068)
         SettingsMergeObjectsCommand=""
         SettingsMergeObjectsFlags=""
@@ -38,8 +36,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
-        SettingsLdCommand="$LdCmd"
-        SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
         SettingsArCommand="$ArCmd"
         SettingsRanlibCommand="$RanlibCmd"
         SettingsMergeObjectsCommand="$MergeObjsCmd"
@@ -113,8 +109,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCxxCompilerFlags)
     AC_SUBST(SettingsCCompilerLinkFlags)
     AC_SUBST(SettingsCCompilerSupportsNoPie)
-    AC_SUBST(SettingsLdCommand)
-    AC_SUBST(SettingsLdFlags)
     AC_SUBST(SettingsMergeObjectsCommand)
     AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)

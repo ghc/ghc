@@ -446,8 +446,6 @@ generateSettings = do
         , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
         , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
         , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
-        , ("ld command", expr $ settingsFileSetting SettingsFileSetting_LdCommand)
-        , ("ld flags", expr $ settingsFileSetting SettingsFileSetting_LdFlags)
         , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")
         , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
         , ("ld supports response files", expr $ lookupSystemConfig "ld-supports-response-files")
