@@ -1113,10 +1113,9 @@ addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
 addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
 addAnns EpAnnNotUsed as cs = EpAnn (widenAnchor noSpanAnchor as) as cs
 
--- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
 addAnnsA (EpAnnS l as1 cs) as2 cs2
-  = (EpAnnS l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2))
+  = (EpAnnS (widenAnchorTAs l as2) (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2))
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.
@@ -1136,6 +1135,15 @@ widenRealSpan s as = foldl combineRealSrcSpans s (go as)
     go (AddEpAnn _ (EpaSpan (RealSrcSpan s _)):rest) = s : go rest
     go (AddEpAnn _ _                          :rest) =     go rest
 
+widenRealSpanTAs :: RealSrcSpan -> [TrailingAnn] -> RealSrcSpan
+widenRealSpanTAs s tas = foldl combineRealSrcSpans s (go tas)
+  where
+    go [] = []
+    go (h:rest) =
+      case ta_location h of
+        EpaSpan (RealSrcSpan r _b) -> r : go rest
+        _                          -> go rest
+
 widenRealSpanTA :: RealSrcSpan -> TrailingAnn -> RealSrcSpan
 widenRealSpanTA l ta =
   case ta_location ta of
@@ -1152,6 +1160,19 @@ realSpanFromAnns as = go Strict.Nothing as
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan s _b)):rest) = go (combine acc s) rest
     go acc (AddEpAnn _ _                           :rest) = go acc rest
 
+realSpanFromTAs :: [TrailingAnn] -> Strict.Maybe RealSrcSpan
+realSpanFromTAs tas = go Strict.Nothing tas
+  where
+    combine Strict.Nothing r  = Strict.Just r
+    combine (Strict.Just l) r = Strict.Just $ combineRealSrcSpans l r
+
+    go acc [] = acc
+    go acc (h:rest) =
+      case ta_location h of
+        (EpaSpan (RealSrcSpan s _b)) -> go (combine acc s) rest
+        _ -> go acc rest
+
+-- TODO: get rid of in favour of realSpanFromTAs
 realSpanFromTA :: TrailingAnn -> Strict.Maybe RealSrcSpan
 realSpanFromTA ta =
   case ta_location ta of
@@ -1168,6 +1189,19 @@ bufSpanFromAnns as =  go Strict.Nothing as
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
     go acc (AddEpAnn _ _:rest) = go acc rest
 
+bufSpanFromTAs :: [TrailingAnn] -> Strict.Maybe BufSpan
+bufSpanFromTAs tas =  go Strict.Nothing tas
+  where
+    combine Strict.Nothing r  = Strict.Just r
+    combine (Strict.Just l) r = Strict.Just $ combineBufSpans l r
+
+    go acc [] = acc
+    go acc (h:rest) =
+      case ta_location h of
+        (EpaSpan (RealSrcSpan _ (Strict.Just mb))) -> go (combine acc mb) rest
+        _ -> go acc rest
+
+-- TODO: replace with bufSpanFromTAs
 bufSpanFromTA :: TrailingAnn -> Strict.Maybe BufSpan
 bufSpanFromTA ta =
   case ta_location ta of
@@ -1189,6 +1223,14 @@ widenAnchorTA (EpaSpan us) _ = EpaSpan us
 widenAnchorTA a@(EpaDelta _ _) ta = case (realSpanFromTA ta) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
+
+widenAnchorTAs :: Anchor -> [TrailingAnn] -> Anchor
+widenAnchorTAs (EpaSpan (RealSrcSpan s mb)) tas
+  = EpaSpan (RealSrcSpan (widenRealSpanTAs s tas) (liftA2 combineBufSpans mb  (bufSpanFromTAs tas)))
+widenAnchorTAs (EpaSpan us) _ = EpaSpan us
+widenAnchorTAs a@(EpaDelta _ _) tas = case (realSpanFromTAs tas) of
+                                      Strict.Nothing -> a
+                                      Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
 widenAnchorS :: Anchor -> SrcSpan -> Anchor
 widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
