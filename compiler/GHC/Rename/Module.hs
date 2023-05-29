@@ -1717,8 +1717,10 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 
 -- "data", "newtype" declarations
 rnTyClDecl (DataDecl
-    { tcdLName = tycon, tcdTyVars = tyvars,
+    { tcdTkNewOrData = tkNewOrData,
+      tcdLName = tycon, tcdTyVars = tyvars,
       tcdFixity = fixity,
+      tcdTkWhere = tkWhere,
       tcdDataDefn = defn@HsDataDefn{ dd_cons = cons, dd_kindSig = kind_sig} })
   = do { tycon' <- lookupLocatedTopConstructorRnN tycon
        ; let kvs = extractDataDefnKindVars defn
@@ -1731,16 +1733,21 @@ rnTyClDecl (DataDecl
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
-       ; return (DataDecl { tcdLName    = tycon'
-                          , tcdTyVars   = tyvars'
-                          , tcdFixity   = fixity
-                          , tcdDataDefn = defn'
-                          , tcdDExt     = rn_info }, fvs) } }
+       ; return (DataDecl { tcdTkNewOrData = rnNewOrDataToken tkNewOrData
+                          , tcdLName       = tycon'
+                          , tcdTyVars      = tyvars'
+                          , tcdFixity      = fixity
+                          , tcdTkWhere     = tkWhere
+                          , tcdDataDefn    = defn'
+                          , tcdDExt        = rn_info }, fvs) } }
 
 rnTyClDecl (ClassDecl { tcdLayout = layout,
+                        tcdTkClass = tkClass,
                         tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
-                        tcdFDs = fds, tcdSigs = sigs,
+                        tcdFDs = fds,
+                        tcdTkWhere = tkWhere,
+                        tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                         tcdDocs = docs})
   = do  { lcls' <- lookupLocatedTopConstructorRnN lcls
@@ -1793,9 +1800,12 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
         ; return (ClassDecl { tcdLayout = rnLayoutInfo layout,
+                              tcdTkClass = tkClass,
                               tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
-                              tcdFDs = fds', tcdSigs = sigs',
+                              tcdFDs = fds',
+                              tcdTkWhere = tkWhere,
+                              tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
                               tcdDocs = docs', tcdCExt = all_fvs },
                   all_fvs ) }
@@ -1806,6 +1816,10 @@ rnLayoutInfo :: LayoutInfo GhcPs -> LayoutInfo GhcRn
 rnLayoutInfo (ExplicitBraces ob cb) = ExplicitBraces ob cb
 rnLayoutInfo (VirtualBraces n) = VirtualBraces n
 rnLayoutInfo NoLayoutInfo = NoLayoutInfo
+
+rnNewOrDataToken :: NewOrDataToken GhcPs -> NewOrDataToken GhcRn
+rnNewOrDataToken (NewTypeToken a) = NewTypeToken a
+rnNewOrDataToken (DataTypeToken a) = DataTypeToken a
 
 -- Does the data type declaration include a CUSK?
 data_decl_has_cusk :: LHsQTyVars (GhcPass p) -> NewOrData -> Bool -> Maybe (LHsKind (GhcPass p')) -> RnM Bool

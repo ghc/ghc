@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
                                       -- in module Language.Haskell.Syntax.Extension
 
@@ -24,7 +25,7 @@ module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
-  NewOrData, newOrDataToFlavour, anyLConIsGadt,
+  NewOrData, NewOrDataToken(..), newOrDataToFlavour, anyLConIsGadt,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -111,6 +112,7 @@ import GHC.Hs.Doc
 import GHC.Types.Basic
 import GHC.Core.Coercion
 import Language.Haskell.Syntax.Extension
+import Language.Haskell.Syntax.Concrete (LHsToken)
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
 import GHC.Types.Name
@@ -131,6 +133,7 @@ import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data (Data)
 import Data.Foldable (toList)
+import qualified GHC.Data.Strict as Strict
 
 {-
 ************************************************************************
@@ -439,16 +442,17 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
               pp_vanilla_decl_head ltycon tyvars fixity Nothing <+> equals)
           4 (ppr rhs)
 
-    ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
+    ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdTkWhere = tkWhere, tcdFixity = fixity
                   , tcdDataDefn = defn })
-      = pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
+      = pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn tkWhere
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
+                    tcdTkWhere = tkWhere,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs})
-      | null sigs && isEmptyBag methods && null ats && null at_defs -- No "where" part
+      | null sigs && isEmptyBag methods && null ats && null at_defs && Strict.isNothing tkWhere -- No "where" part
       = top_matter
 
       | otherwise       -- Laid out
@@ -712,12 +716,16 @@ ppDataDefnHeader pp_hdr HsDataDefn
 pp_data_defn :: (OutputableBndrId p)
                   => (Maybe (LHsContext (GhcPass p)) -> SDoc)   -- Printing the header
                   -> HsDataDefn (GhcPass p)
+                  -> Strict.Maybe (LHsToken "where" (GhcPass p))
                   -> SDoc
 pp_data_defn pp_hdr defn@HsDataDefn
   { dd_cons = condecls
-  , dd_derivs = derivings }
+  , dd_derivs = derivings } mtkWhere
   | null condecls
-  = ppDataDefnHeader pp_hdr defn <+> pp_derivings derivings
+  , let whereTok = case mtkWhere of
+          Strict.Nothing -> empty
+          Strict.Just{} -> text "where"
+  = ppDataDefnHeader pp_hdr defn <+> whereTok <+> pp_derivings derivings
 
   | otherwise
   = hang (ppDataDefnHeader pp_hdr defn) 2 (pp_condecls (toList condecls) $$ pp_derivings derivings)
@@ -726,7 +734,7 @@ pp_data_defn pp_hdr defn@HsDataDefn
 
 instance OutputableBndrId p
        => Outputable (HsDataDefn (GhcPass p)) where
-   ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
+   ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d Strict.Nothing
 
 instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
@@ -853,7 +861,7 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn =
                                     , feqn_pats   = pats
                                     , feqn_fixity = fixity
                                     , feqn_rhs    = defn })})
-  = pp_data_defn pp_hdr defn
+  = pp_data_defn pp_hdr defn Strict.Nothing
   where
     pp_hdr mctxt = ppr_instance_keyword top_lvl
               <+> pprHsFamInstLHS tycon bndrs pats fixity mctxt
@@ -941,6 +949,9 @@ newOrDataToFlavour DataType = DataTypeFlavour
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
+
+instance Outputable (NewOrDataToken a) where
+  ppr = ppr . tokenNewOrData
 
 -- At the moment we only call this with @f = '[]'@ and @f = 'DataDefnCons'@.
 anyLConIsGadt :: Foldable f => f (GenLocated l (ConDecl pass)) -> Bool

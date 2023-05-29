@@ -55,6 +55,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { T20718b.hs:4:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { T20718b.hs:4:16-20 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T20718b.hs:4:8-14 })

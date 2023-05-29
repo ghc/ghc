@@ -131,6 +131,11 @@ deriving instance Data (TyClDecl GhcPs)
 deriving instance Data (TyClDecl GhcRn)
 deriving instance Data (TyClDecl GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (NewOrDataToken p)
+deriving instance Data (NewOrDataToken GhcPs)
+deriving instance Data (NewOrDataToken GhcRn)
+deriving instance Data (NewOrDataToken GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (FunDep p)
 deriving instance Data (FunDep GhcPs)
 deriving instance Data (FunDep GhcRn)

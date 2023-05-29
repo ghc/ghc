@@ -9,6 +9,7 @@
 module GHC.Data.Strict (
     Maybe(Nothing, Just),
     fromMaybe,
+    isNothing,
     Pair(And),
 
     -- Not used at the moment:
@@ -28,6 +29,10 @@ data Maybe a = Nothing | Just !a
 fromMaybe :: a -> Maybe a -> a
 fromMaybe d Nothing = d
 fromMaybe _ (Just x) = x
+
+isNothing :: Maybe a -> Bool
+isNothing Nothing = True
+isNothing _ = False
 
 apMaybe :: Maybe (a -> b) -> Maybe a -> Maybe b
 apMaybe (Just f) (Just x) = Just (f x)

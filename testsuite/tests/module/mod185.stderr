@@ -23,6 +23,7 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsNoModTk)
   (Nothing)
   (Nothing)
   [(L
@@ -122,3 +123,5 @@
                    {OccName: undefined}))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

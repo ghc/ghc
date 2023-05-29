@@ -26,6 +26,11 @@
          (True)
          {NameSet:
           [{Name: GHC.Types.Int}]})
+        (DataTypeToken
+         (L
+          (TokenLoc
+           (EpaSpan { T14189.hs:6:1-4 }))
+          (HsTok)))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:6:6-11 })
          {Name: T14189.MyType})
@@ -33,6 +38,7 @@
          []
          [])
         (Prefix)
+        (Nothing)
         (HsDataDefn
          (NoExtField)
          (Nothing)

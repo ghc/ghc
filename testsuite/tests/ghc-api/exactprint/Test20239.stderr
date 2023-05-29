@@ -31,6 +31,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { Test20239.hs:1:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { Test20239.hs:1:18-22 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:1:8-16 })
@@ -326,5 +335,5 @@
 
 
 
-Test20239.hs:5:15: [GHC-76037]
+Test20239.hs:5:15: error: [GHC-76037]
     Not in scope: type constructor or class ‘Method’

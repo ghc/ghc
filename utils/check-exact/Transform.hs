@@ -744,7 +744,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
 -- ---------------------------------------------------------------------
 
 anchorEof :: ParsedSource -> ParsedSource
-anchorEof (L l m@(HsModule (XModulePs an _lo _ _) _mn _exps _imps _decls)) = L l (m { hsmodExt = (hsmodExt m){ hsmodAnn = an' } })
+anchorEof (L l m@(HsModule (XModulePs an _lo _ _) _ht _mn _exps _imps _decls)) = L l (m { hsmodExt = (hsmodExt m){ hsmodAnn = an' } })
   where
     an' = addCommentOrigDeltasAnn an
 
@@ -884,12 +884,12 @@ class (Data t) => HasDecls t where
 -- ---------------------------------------------------------------------
 
 instance HasDecls ParsedSource where
-  hsDecls (L _ (HsModule (XModulePs _ _lo _ _) _mn _exps _imps decls)) = return decls
-  replaceDecls (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps _decls)) decls
+  hsDecls (L _ (HsModule (XModulePs _ _lo _ _)  _ht _mn _exps _imps decls)) = return decls
+  replaceDecls (L l (HsModule (XModulePs a lo deps haddocks) headertoks mname exps imps _decls)) decls
     = do
         logTr "replaceDecls LHsModule"
         -- modifyAnnsT (captureOrder m decls)
-        return (L l (HsModule (XModulePs a lo deps haddocks) mname exps imps decls))
+        return (L l (HsModule (XModulePs a lo deps haddocks) headertoks mname exps imps decls))
 
 -- ---------------------------------------------------------------------
 

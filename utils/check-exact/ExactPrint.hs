@@ -1350,7 +1350,7 @@ instance ExactPrint (HsModule GhcPs) where
                    `debug` ("setAnnotationAnchor hsmod called" ++ showAst (anc,cs))
 
   exact hsmod@(HsModule {hsmodExt = XModulePs { hsmodAnn = EpAnnNotUsed }}) = withPpr hsmod >> return hsmod
-  exact (HsModule (XModulePs an lo mdeprec mbDoc) mmn mexports imports decls) = do
+  exact (HsModule (XModulePs an lo mdeprec mbDoc) headertoks mmn mexports imports decls) = do
 
     mbDoc' <- markAnnotated mbDoc
 
@@ -1395,7 +1395,7 @@ instance ExactPrint (HsModule GhcPs) where
     let anf = an0 { anns = (anns an0) { am_decls = am_decls' }}
     debugM $ "HsModule, anf=" ++ showAst anf
 
-    return (HsModule (XModulePs anf lo1 mdeprec' mbDoc') mmn' mexports' imports' decls')
+    return (HsModule (XModulePs anf lo1 mdeprec' mbDoc') headertoks mmn' mexports' imports' decls')
 
 -- ---------------------------------------------------------------------
 
@@ -3454,20 +3454,22 @@ instance ExactPrint (TyClDecl GhcPs) where
                     , tcdRhs = rhs' })
 
   -- TODO: add a workaround for https://gitlab.haskell.org/ghc/ghc/-/issues/20452
-  exact (DataDecl { tcdDExt = an, tcdLName = ltycon, tcdTyVars = tyvars
-                  , tcdFixity = fixity, tcdDataDefn = defn }) = do
+  exact (DataDecl { tcdDExt = an, tcdTkNewOrData = tknd, tcdLName = ltycon, tcdTyVars = tyvars
+                  , tcdFixity = fixity, tcdTkWhere = tkWhere, tcdDataDefn = defn }) = do
     (_, an', ltycon', tyvars', _, _mctxt', defn') <-
       exactDataDefn an (exactVanillaDeclHead ltycon tyvars fixity) defn
-    return (DataDecl { tcdDExt = an', tcdLName = ltycon', tcdTyVars = tyvars'
-                     , tcdFixity = fixity, tcdDataDefn = defn' })
+    return (DataDecl { tcdDExt = an', tcdTkNewOrData = tknd, tcdLName = ltycon', tcdTyVars = tyvars'
+                     , tcdFixity = fixity, tcdTkWhere = tkWhere, tcdDataDefn = defn' })
 
   -- -----------------------------------
 
   exact (ClassDecl {tcdCExt = (an, sortKey),
                     tcdLayout = lo,
+                    tcdTkClass = tkClass,
                     tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
                     tcdFixity = fixity,
                     tcdFDs  = fds,
+                    tcdTkWhere = tkWhere,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs,
                     tcdDocs = _docs})
@@ -3479,9 +3481,11 @@ instance ExactPrint (TyClDecl GhcPs) where
           an2 <- markEpAnnL an1 lidl AnnCloseC
           return (ClassDecl {tcdCExt = (an2, sortKey),
                              tcdLayout = lo,
+                             tcdTkClass = tkClass,
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
+                             tcdTkWhere = tkWhere,
                              tcdSigs = sigs, tcdMeths = methods,
                              tcdATs = ats, tcdATDefs = at_defs,
                              tcdDocs = _docs})
@@ -3506,9 +3510,11 @@ instance ExactPrint (TyClDecl GhcPs) where
             at_defs' = undynamic ds
           return (ClassDecl {tcdCExt = (an3, sortKey),
                              tcdLayout = lo,
+                             tcdTkClass = tkClass,
                              tcdCtxt = context', tcdLName = lclas', tcdTyVars = tyvars',
                              tcdFixity = fixity,
                              tcdFDs  = fds',
+                             tcdTkWhere = tkWhere,
                              tcdSigs = sigs', tcdMeths = methods',
                              tcdATs = ats', tcdATDefs = at_defs',
                              tcdDocs = _docs})

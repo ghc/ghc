@@ -22,8 +22,8 @@ module GHC.Parser.PostProcess (
         mkHsIntegral, mkHsFractional, mkHsIsString,
         mkHsDo, mkSpliceDecl,
         mkRoleAnnotDecl,
-        mkClassDecl,
-        mkTyData, mkDataFamInst,
+        PsClassWhereClause(..), mkClassDecl,
+        PsDataWhereClause(..), mkTyData, mkDataFamInst,
         mkTySynonym, mkTyFamInstEqn,
         mkStandaloneKindSig,
         mkTyFamInst,
@@ -188,44 +188,62 @@ mkTyClD (L loc d) = L loc (TyClD noExtField d)
 mkInstD :: LInstDecl (GhcPass p) -> LHsDecl (GhcPass p)
 mkInstD (L loc d) = L loc (InstD noExtField d)
 
+data PsClassWhereClause =
+  PsClassWhereClause {
+    pcwcLayoutInfo :: !(LayoutInfo GhcPs),
+    pcwcTkWhere    :: !(Strict.Maybe (LHsToken "where" GhcPs)),
+    pcwcDecls      :: !(OrdList (LHsDecl GhcPs))    -- Reversed
+  }
+
 mkClassDecl :: SrcSpan
+            -> LHsToken "class" GhcPs
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
-            -> OrdList (LHsDecl GhcPs)
-            -> LayoutInfo GhcPs
+            -> PsClassWhereClause
             -> [AddEpAnn]
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc' (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo annsIn
+mkClassDecl loc' tkClass (L _ (mcxt, tycl_hdr)) fds
+            PsClassWhereClause
+              {pcwcLayoutInfo = layoutInfo, pcwcTkWhere = tkWhere, pcwcDecls = decls}
+             annsIn
   = do { let loc = noAnnSrcSpan loc'
-       ; (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
+       ; (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs decls
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; tyvars <- checkTyVars (text "class") whereDots cls tparams
        ; cs <- getCommentsFor (locA loc) -- Get any remaining comments
        ; let anns' = addAnns (EpAnn (spanAsAnchor $ locA loc) annsIn emptyComments) ann cs
        ; return (L loc (ClassDecl { tcdCExt = (anns', NoAnnSortKey)
                                   , tcdLayout = layoutInfo
+                                  , tcdTkClass = tkClass
                                   , tcdCtxt = mcxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
+                                  , tcdTkWhere = tkWhere
                                   , tcdSigs = mkClassOpSigs sigs
                                   , tcdMeths = binds
                                   , tcdATs = ats, tcdATDefs = at_defs
                                   , tcdDocs  = docs })) }
 
+data PsDataWhereClause =
+  PsDataWhereClause {
+    pdwcTkWhere :: !(Strict.Maybe (LHsToken "where" GhcPs)),
+    pdkwDecls   :: ![LConDecl GhcPs] -- Returned in order
+  }
+
 mkTyData :: SrcSpan
          -> Bool
-         -> NewOrData
+         -> NewOrDataToken GhcPs
          -> Maybe (LocatedP CType)
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
          -> Maybe (LHsKind GhcPs)
-         -> [LConDecl GhcPs]
+         -> PsDataWhereClause
          -> Located (HsDeriving GhcPs)
          -> [AddEpAnn]
          -> P (LTyClDecl GhcPs)
 mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
-         ksig data_cons (L _ maybe_deriv) annsIn
+         ksig (PsDataWhereClause tkWhere data_cons) (L _ maybe_deriv) annsIn
   = do { let loc = noAnnSrcSpan loc'
        ; (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; tyvars <- checkTyVars (ppr new_or_data) equalsDots tc tparams
@@ -234,8 +252,10 @@ mkTyData loc' is_type_data new_or_data cType (L _ (mcxt, tycl_hdr))
        ; data_cons <- checkNewOrData (locA loc) (unLoc tc) is_type_data new_or_data data_cons
        ; defn <- mkDataDefn cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = anns',
+                                   tcdTkNewOrData = new_or_data,
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
+                                   tcdTkWhere = tkWhere,
                                    tcdDataDefn = defn })) }
 
 mkDataDefn :: Maybe (LocatedP CType)
@@ -313,17 +333,17 @@ mkTyFamInstEqn loc bndrs lhs rhs anns
                         , feqn_rhs    = rhs })}
 
 mkDataFamInst :: SrcSpan
-              -> NewOrData
+              -> NewOrDataToken GhcPs
               -> Maybe (LocatedP CType)
               -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
-              -> [LConDecl GhcPs]
+              -> PsDataWhereClause
               -> Located (HsDeriving GhcPs)
               -> [AddEpAnn]
               -> P (LInstDecl GhcPs)
 mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
-              ksig data_cons (L _ maybe_deriv) anns
+              ksig (PsDataWhereClause _ data_cons) (L _ maybe_deriv) anns
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; cs <- getCommentsFor loc -- Add any API Annotations to the top SrcSpan
        ; let fam_eqn_ans = addAnns (EpAnn (spanAsAnchor loc) ann cs) anns emptyComments
@@ -977,9 +997,9 @@ checkRecordSyntax lr@(L loc r)
 
 -- | Check if the gadt_constrlist is empty. Only raise parse error for
 -- `data T where` to avoid affecting existing error message, see #8258.
-checkEmptyGADTs :: Located ([AddEpAnn], [LConDecl GhcPs])
-                -> P (Located ([AddEpAnn], [LConDecl GhcPs]))
-checkEmptyGADTs gadts@(L span (_, []))           -- Empty GADT declaration.
+checkEmptyGADTs :: Located ([AddEpAnn], PsDataWhereClause)
+                -> P (Located ([AddEpAnn], PsDataWhereClause))
+checkEmptyGADTs gadts@(L span (_, PsDataWhereClause _ []))  -- Empty GADT declaration.
     = do gadtSyntax <- getBit GadtSyntaxBit   -- GADTs implies GADTSyntax
          unless gadtSyntax $ addError $ mkPlainErrorMsgEnvelope span $
                                           PsErrIllegalWhereInDataDecl
@@ -2621,12 +2641,12 @@ mkOpaquePragma src
                  , inl_rule   = FunLike
                  }
 
-checkNewOrData :: SrcSpan -> RdrName -> Bool -> NewOrData -> [LConDecl GhcPs]
+checkNewOrData :: SrcSpan -> RdrName -> Bool -> NewOrDataToken GhcPs -> [LConDecl GhcPs]
                -> P (DataDefnCons (LConDecl GhcPs))
 checkNewOrData span name is_type_data = curry $ \ case
-    (NewType, [a]) -> pure $ NewTypeCon a
-    (DataType, as) -> pure $ DataTypeCons is_type_data (handle_type_data as)
-    (NewType, as) -> addFatalError $ mkPlainErrorMsgEnvelope span $ PsErrMultipleConForNewtype name (length as)
+    (NewTypeToken{}, [a]) -> pure $ NewTypeCon a
+    (DataTypeToken{}, as) -> pure $ DataTypeCons is_type_data (handle_type_data as)
+    (NewTypeToken{}, as) -> addFatalError $ mkPlainErrorMsgEnvelope span $ PsErrMultipleConForNewtype name (length as)
   where
     -- In a "type data" declaration, the constructors are in the type/class
     -- namespace rather than the data constructor namespace.

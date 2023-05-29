@@ -29,6 +29,7 @@ module Language.Haskell.Syntax.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
+  NewOrDataToken(..), tokenNewOrData,
   NewOrData(..), DataDefnCons(..), dataDefnConsNewOrData,
   isTypeDataDefnCons,
   StandaloneKindSig(..), LStandaloneKindSig,
@@ -124,6 +125,7 @@ import qualified Data.List
 import Data.Foldable
 import Data.Traversable
 import Data.List.NonEmpty (NonEmpty (..))
+import qualified GHC.Data.Strict as Strict
 
 {-
 ************************************************************************
@@ -442,12 +444,14 @@ data TyClDecl pass
     --              'GHC.Parser.Annotation.AnnWhere',
 
     -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
-    DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
-             , tcdLName    :: LIdP pass             -- ^ Type constructor
-             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
-                              -- See Note [TyVar binders for associated decls]
-             , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
-             , tcdDataDefn :: HsDataDefn pass }
+    DataDecl { tcdDExt        :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
+             , tcdTkNewOrData :: !(NewOrDataToken pass) -- ^ "newtype" or "data" token
+             , tcdLName       :: LIdP pass             -- ^ Type constructor
+             , tcdTyVars      :: LHsQTyVars pass      -- ^ Type variables
+                                 -- See Note [TyVar binders for associated decls]
+             , tcdFixity      :: LexicalFixity        -- ^ Fixity used in the declaration
+             , tcdTkWhere     :: !(Strict.Maybe (LHsToken "where" pass)) -- ^ The "where" token
+             , tcdDataDefn    :: HsDataDefn pass }
 
     -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnClass',
     --           'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen',
@@ -459,11 +463,13 @@ data TyClDecl pass
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdLayout  :: !(LayoutInfo pass),      -- ^ Explicit or virtual braces
                               -- See Note [Class LayoutInfo]
+                tcdTkClass :: !(LHsToken "class" pass), -- ^ The "class" token
                 tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
                 tcdLName   :: LIdP pass,               -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
+                tcdTkWhere :: !(Strict.Maybe (LHsToken "where" pass)), -- ^ The "where" token
                 tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
@@ -1016,6 +1022,18 @@ data NewOrData
   = NewType                     -- ^ @newtype Blah ...@
   | DataType                    -- ^ @data Blah ...@
   deriving ( Eq, Data )                -- Needed because Demand derives Eq
+
+-- type role NewOrDataToken representational
+--  | Same as `NewOrData`, but with additional location info
+data NewOrDataToken pass
+  = NewTypeToken  !(LHsToken "newtype" pass)  -- ^ @newtype Blah ...@
+  | DataTypeToken !(LHsToken "data" pass)     -- ^ @data Blah ...@
+
+tokenNewOrData :: NewOrDataToken pass -> NewOrData
+tokenNewOrData NewTypeToken{} = NewType
+tokenNewOrData DataTypeToken{} = DataType
+
+
 
 -- | Whether a data-type declaration is @data@ or @newtype@, and its constructors.
 data DataDefnCons a

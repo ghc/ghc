@@ -479,14 +479,14 @@ instance HasHaddock (HsDecl GhcPs) where
   --     deriving newtype (Ord {- ^ Comment on Ord N -})
   --
   addHaddock (TyClD x decl)
-    | DataDecl { tcdDExt, tcdLName, tcdTyVars, tcdFixity, tcdDataDefn = defn } <- decl
+    | DataDecl { tcdDExt, tcdTkNewOrData, tcdLName, tcdTyVars, tcdTkWhere, tcdFixity, tcdDataDefn = defn } <- decl
     = do
         registerHdkA tcdLName
         defn' <- addHaddock defn
         pure $
           TyClD x (DataDecl {
-            tcdDExt,
-            tcdLName, tcdTyVars, tcdFixity,
+            tcdDExt, tcdTkNewOrData,
+            tcdLName, tcdTyVars, tcdTkWhere, tcdFixity,
             tcdDataDefn = defn' })
 
   -- Class declarations:
@@ -498,9 +498,9 @@ instance HasHaddock (HsDecl GhcPs) where
   --      -- ^ Comment on the second method
   --
   addHaddock (TyClD _ decl)
-    | ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout,
+    | ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdTkClass, tcdLayout,
                   tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs,
-                  tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
+                  tcdTkWhere, tcdSigs, tcdMeths, tcdATs, tcdATDefs } <- decl
     = do
         registerHdkA tcdLName
         -- todo: register keyword location of 'where', see Note [Register keyword location]
@@ -509,8 +509,8 @@ instance HasHaddock (HsDecl GhcPs) where
           flattenBindsAndSigs (tcdMeths, tcdSigs, tcdATs, tcdATDefs, [], [])
         pure $
           let (tcdMeths', tcdSigs', tcdATs', tcdATDefs', _, tcdDocs) = partitionBindsAndSigs where_cls'
-              decl' = ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdLayout
-                                , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs
+              decl' = ClassDecl { tcdCExt = (x, NoAnnSortKey), tcdTkClass, tcdLayout
+                                , tcdCtxt, tcdLName, tcdTyVars, tcdFixity, tcdFDs, tcdTkWhere
                                 , tcdSigs = tcdSigs'
                                 , tcdMeths = tcdMeths'
                                 , tcdATs = tcdATs'

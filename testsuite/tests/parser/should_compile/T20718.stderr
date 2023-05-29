@@ -70,6 +70,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { T20718.hs:3:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { T20718.hs:3:15-19 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:3:8-13 })
@@ -152,3 +161,5 @@
                     (1))))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

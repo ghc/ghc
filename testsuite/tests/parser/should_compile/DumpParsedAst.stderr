@@ -24,6 +24,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { DumpParsedAst.hs:5:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { DumpParsedAst.hs:5:22-26 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:5:8-20 })
@@ -77,6 +86,11 @@
        ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:8:12 }))]
        (EpaComments
         []))
+      (DataTypeToken
+       (L
+        (TokenLoc
+         (EpaSpan { DumpParsedAst.hs:8:1-4 }))
+        (HsTok)))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:8:6-10 })
        (Unqual
@@ -85,6 +99,7 @@
        (NoExtField)
        [])
       (Prefix)
+      (Nothing)
       (HsDataDefn
        (NoExtField)
        (Nothing)
@@ -470,6 +485,11 @@
        ,(AddEpAnn AnnEqual (EpaSpan { DumpParsedAst.hs:15:19 }))]
        (EpaComments
         []))
+      (DataTypeToken
+       (L
+        (TokenLoc
+         (EpaSpan { DumpParsedAst.hs:15:1-4 }))
+        (HsTok)))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { DumpParsedAst.hs:15:6 })
        (Unqual
@@ -524,6 +544,7 @@
              (Unqual
               {OccName: k}))))))])
       (Prefix)
+      (Nothing)
       (HsDataDefn
        (NoExtField)
        (Nothing)

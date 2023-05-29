@@ -24,6 +24,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { T18791.hs:2:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { T18791.hs:2:15-19 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:2:8-13 })
@@ -50,6 +59,11 @@
        ,(AddEpAnn AnnWhere (EpaSpan { T18791.hs:4:8-12 }))]
        (EpaComments
         []))
+      (DataTypeToken
+       (L
+        (TokenLoc
+         (EpaSpan { T18791.hs:4:1-4 }))
+        (HsTok)))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:4:6 })
        (Unqual
@@ -58,6 +72,11 @@
        (NoExtField)
        [])
       (Prefix)
+      (Just
+       (L
+        (TokenLoc
+         (EpaSpan { T18791.hs:4:8-12 }))
+        (HsTok)))
       (HsDataDefn
        (NoExtField)
        (Nothing)

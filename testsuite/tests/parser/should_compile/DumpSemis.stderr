@@ -35,6 +35,15 @@
     (1))
    (Nothing)
    (Nothing))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { DumpSemis.hs:1:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { DumpSemis.hs:1:18-22 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:1:8-16 })
@@ -1053,6 +1062,10 @@
        (NoAnnSortKey))
       (VirtualBraces
        (3))
+      (L
+       (TokenLoc
+        (EpaSpan { DumpSemis.hs:28:1-5 }))
+       (HsTok))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:28:7-19 })
@@ -1096,6 +1109,11 @@
               {OccName: Type}))))))])
       (Prefix)
       []
+      (Just
+       (L
+        (TokenLoc
+         (EpaSpan { DumpSemis.hs:28:40-44 }))
+        (HsTok)))
       [(L
         (SrcSpanAnn (EpAnnNotUsed) { DumpSemis.hs:29:3-23 })
         (ClassOpSig

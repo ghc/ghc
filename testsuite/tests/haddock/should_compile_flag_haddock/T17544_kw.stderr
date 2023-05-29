@@ -12,7 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
-      []
+     []
      (Just
       ((,)
        { T17544_kw.hs:25:1 }
@@ -36,6 +36,15 @@
           " Bad comment for the module"))
         []))
       []))))
+  (HsModTk
+   (L
+    (TokenLoc
+     (EpaSpan { T17544_kw.hs:11:1-6 }))
+    (HsTok))
+   (L
+    (TokenLoc
+     (EpaSpan { T17544_kw.hs:13:13-17 }))
+    (HsTok)))
   (Just
    (L
     (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:13:3-11 })
@@ -62,6 +71,11 @@
        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
        (EpaComments
         []))
+      (DataTypeToken
+       (L
+        (TokenLoc
+         (EpaSpan { T17544_kw.hs:15:1-4 }))
+        (HsTok)))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:15:6-8 })
        (Unqual
@@ -70,6 +84,11 @@
        (NoExtField)
        [])
       (Prefix)
+      (Just
+       (L
+        (TokenLoc
+         (EpaSpan { T17544_kw.hs:16:3-7 }))
+        (HsTok)))
       (HsDataDefn
        (NoExtField)
        (Nothing)
@@ -153,6 +172,11 @@
        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
        (EpaComments
         []))
+      (NewTypeToken
+       (L
+        (TokenLoc
+         (EpaSpan { T17544_kw.hs:18:1-7 }))
+        (HsTok)))
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:18:9-11 })
        (Unqual
@@ -161,6 +185,11 @@
        (NoExtField)
        [])
       (Prefix)
+      (Just
+       (L
+        (TokenLoc
+         (EpaSpan { T17544_kw.hs:19:3-7 }))
+        (HsTok)))
       (HsDataDefn
        (NoExtField)
        (Nothing)
@@ -274,6 +303,10 @@
        (NoAnnSortKey))
       (VirtualBraces
        (5))
+      (L
+       (TokenLoc
+        (EpaSpan { T17544_kw.hs:21:1-5 }))
+       (HsTok))
       (Nothing)
       (L
        (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:21:7-9 })
@@ -298,6 +331,11 @@
             {OccName: a}))))])
       (Prefix)
       []
+      (Just
+       (L
+        (TokenLoc
+         (EpaSpan { T17544_kw.hs:23:3-7 }))
+        (HsTok)))
       [(L
         (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:24:5-18 })
         (ClassOpSig

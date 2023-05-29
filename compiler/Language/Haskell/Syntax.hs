@@ -10,6 +10,7 @@ therefore, is almost nothing but re-exporting.
 -}
 
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
 {-# LANGUAGE TypeFamilies #-}
@@ -27,7 +28,7 @@ module Language.Haskell.Syntax (
         module Language.Haskell.Syntax.Type,
         module Language.Haskell.Syntax.Concrete,
         module Language.Haskell.Syntax.Extension,
-        ModuleName(..), HsModule(..)
+        ModuleName(..), HsModuleHeaderTokens(..), HsModule(..)
 ) where
 
 import Language.Haskell.Syntax.Decls
@@ -64,6 +65,12 @@ For more details, see
 https://gitlab.haskell.org/ghc/ghc/-/wikis/implementing-trees-that-grow
 -}
 
+data HsModuleHeaderTokens p
+  = HsSigTk !(LHsToken "signature" p) !(LHsToken "where" p)
+  | HsModTk !(LHsToken "module" p) !(LHsToken "where" p)
+  | HsNoModTk
+
+
 -- | Haskell Module
 --
 -- All we actually declare here is the top-level structure for a module.
@@ -80,6 +87,8 @@ data HsModule p
     HsModule {
       hsmodExt :: XCModule p,
         -- ^ HsModule extension point
+      hsmodHeaderTokens :: HsModuleHeaderTokens p,
+        -- ^ Module tokens: @module@, @signature@, @where@
       hsmodName :: Maybe (XRec p ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
@@ -102,4 +111,3 @@ data HsModule p
         -- ^ Type, class, value, and interface signature decls
    }
   | XModule !(XXModule p)
-

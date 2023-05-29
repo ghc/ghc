@@ -866,12 +866,16 @@ unitdecl :: { LHsUnitDecl PackageName }
                    NotBoot -> HsSrcFile
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing)
+                                   (HsModTk (hsTok $1) (hsTok $6))
+                                   (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
         | 'signature' modid maybemodwarning maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
-                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing) (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
+                 (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $6) $3 Nothing)
+                                   (HsSigTk (hsTok $1) (hsTok $5))
+                                   (Just $2) $4 (fst $ sndOf3 $6) (snd $ sndOf3 $6))) }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -897,6 +901,7 @@ signature :: { Located (HsModule GhcPs) }
                 acs (\cs-> (L loc (HsModule (XModulePs
                                                (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) Nothing) cs)
                                                (thdOf3 $6) $3 Nothing)
+                                            (HsSigTk (hsTok $1) (hsTok $5))
                                             (Just $2) $4 (fst $ sndOf3 $6)
                                             (snd $ sndOf3 $6)))
                     ) }
@@ -907,6 +912,7 @@ module :: { Located (HsModule GhcPs) }
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
                                                      (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) eof) cs)
                                                      (thdOf3 $6) $3 Nothing)
+                                                  (HsModTk (hsTok $1) (hsTok $5))
                                                   (Just $2) $4 (fst $ sndOf3 $6)
                                                   (snd $ sndOf3 $6))
                     )) }
@@ -915,6 +921,7 @@ module :: { Located (HsModule GhcPs) }
                    acsFinal (\cs eof -> (L loc (HsModule (XModulePs
                                                         (EpAnn (spanAsAnchor loc) (AnnsModule [] (fstOf3 $1) eof) cs)
                                                         (thdOf3 $1) Nothing Nothing)
+                                                     HsNoModTk
                                                      Nothing Nothing
                                                      (fst $ sndOf3 $1) (snd $ sndOf3 $1)))) }
 
@@ -964,6 +971,7 @@ header  :: { Located (HsModule GhcPs) }
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
+                                                (HsModTk (hsTok $1) (hsTok $5))
                                                 (Just $2) $4 $6 []
                           ))) }
         | 'signature' modid maybemodwarning maybeexports 'where' header_body
@@ -971,11 +979,12 @@ header  :: { Located (HsModule GhcPs) }
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
+                                                (HsSigTk (hsTok $1) (hsTok $5))
                                                 (Just $2) $4 $6 []
                           ))) }
         | header_body2
                 {% fileSrcSpan >>= \ loc ->
-                   return (L loc (HsModule (XModulePs noAnn NoLayoutInfo Nothing Nothing) Nothing Nothing $1 [])) }
+                   return (L loc (HsModule (XModulePs noAnn NoLayoutInfo Nothing Nothing) HsNoModTk Nothing Nothing $1 [])) }
 
 header_body :: { [LImportDecl GhcPs] }
         :  '{'            header_top            { $2 }
@@ -1252,8 +1261,8 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
-                        (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
+                {% (mkClassDecl (comb4 $1 $2 $3 $4) (hsTok $1) $2 $3 (snd $ unLoc $4))
+                        (mj AnnClass $1:(fst $ unLoc $3)++(fst $ unLoc $4)) }
 
 -- Type declarations (toplevel)
 --
@@ -1282,7 +1291,7 @@ ty_decl :: { LTyClDecl GhcPs }
           -- ordinary data type or newtype declaration
         | type_data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                 {% mkTyData (comb4 $1 $3 $4 $5) (sndOf3 $ unLoc $1) (thdOf3 $ unLoc $1) $2 $3
-                           Nothing (reverse (snd $ unLoc $4))
+                           Nothing (snd $ unLoc $4)
                                    (fmap reverse $5)
                            ((fstOf3 $ unLoc $1)++(fst $ unLoc $4)) }
                                    -- We need the location on tycl_hdr in case
@@ -1344,7 +1353,7 @@ inst_decl :: { LInstDecl GhcPs }
         | data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
                           maybe_derivings
             {% mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
-                                      Nothing (reverse (snd  $ unLoc $5))
+                                      Nothing (snd $ unLoc $5)
                                               (fmap reverse $6)
                       ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $5)) }
 
@@ -1506,7 +1515,7 @@ at_decl_inst :: { LInstDecl GhcPs }
         -- data/newtype instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype datafam_inst_hdr constrs maybe_derivings
                {% mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (unLoc $4)
-                                    Nothing (reverse (snd $ unLoc $5))
+                                    Nothing (snd $ unLoc $5)
                                             (fmap reverse $6)
                         ((fst $ unLoc $1):$2++(fst $ unLoc $5)) }
 
@@ -1519,14 +1528,14 @@ at_decl_inst :: { LInstDecl GhcPs }
                                 (fmap reverse $7)
                         ((fst $ unLoc $1):$2++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
-type_data_or_newtype :: { Located ([AddEpAnn], Bool, NewOrData) }
-        : 'data'        { sL1 $1 ([mj AnnData    $1],            False,DataType) }
-        | 'newtype'     { sL1 $1 ([mj AnnNewtype $1],            False,NewType) }
-        | 'type' 'data' { sL1 $1 ([mj AnnType $1, mj AnnData $2],True ,DataType) }
+type_data_or_newtype :: { Located ([AddEpAnn], Bool, NewOrDataToken GhcPs) }
+        : 'data'        { sL1 $1 ([mj AnnData    $1],            False,DataTypeToken (hsTok $1)) }
+        | 'newtype'     { sL1 $1 ([mj AnnNewtype $1],            False,NewTypeToken  (hsTok $1)) }
+        | 'type' 'data' { sL1 $1 ([mj AnnType $1, mj AnnData $2],True ,DataTypeToken (hsTok $2)) }
 
-data_or_newtype :: { Located (AddEpAnn, NewOrData) }
-        : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
-        | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewType) }
+data_or_newtype :: { Located (AddEpAnn, NewOrDataToken GhcPs) }
+        : 'data'        { sL1 $1 (mj AnnData    $1,DataTypeToken (hsTok $1)) }
+        | 'newtype'     { sL1 $1 (mj AnnNewtype $1,NewTypeToken  (hsTok $1)) }
 
 -- Family result/return kind signatures
 
@@ -1729,14 +1738,14 @@ decllist_cls
 
 -- Class body
 --
-where_cls :: { Located ([AddEpAnn]
-                       ,(OrdList (LHsDecl GhcPs))    -- Reversed
-                       ,LayoutInfo GhcPs) }
+where_cls :: { Located ([AddEpAnn], PsClassWhereClause) }
                                 -- No implicit parameters
                                 -- May have type declarations
         : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
-                                             ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],nilOL,NoLayoutInfo) }
+                                             ,PsClassWhereClause (thdOf3 $ unLoc $2)
+                                                                 (Strict.Just (hsTok $1))
+                                                                 (sndOf3 $ unLoc $2)) }
+        | {- empty -}                   { noLoc ([],PsClassWhereClause NoLayoutInfo Strict.Nothing nilOL) }
 
 -- Declarations in instance bodies
 --
@@ -2371,19 +2380,23 @@ And both become a HsTyVar ("Zero", DataName) after the renamer.
 -- Datatype declarations
 
 gadt_constrlist :: { Located ([AddEpAnn]
-                          ,[LConDecl GhcPs]) } -- Returned in order
+                          , PsDataWhereClause) }
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
                                                         ([mj AnnWhere $1
                                                          ,moc $2
                                                          ,mcc $4]
-                                                        , unLoc $3) }
+                                                        , PsDataWhereClause
+                                                            (Strict.Just (hsTok $1))
+                                                            (unLoc $3)) }
         | 'where' vocurly    gadt_constrs close  {% checkEmptyGADTs $
                                                       L (comb2 $1 $3)
                                                         ([mj AnnWhere $1]
-                                                        , unLoc $3) }
-        | {- empty -}                            { noLoc ([],[]) }
+                                                        , PsDataWhereClause
+                                                            (Strict.Just (hsTok $1))
+                                                            (unLoc $3)) }
+        | {- empty -}                            { noLoc ([],PsDataWhereClause Strict.Nothing []) }
 
 gadt_constrs :: { Located [LConDecl GhcPs] }
         : gadt_constr ';' gadt_constrs
@@ -2417,8 +2430,8 @@ consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 
-constrs :: { Located ([AddEpAnn],[LConDecl GhcPs]) }
-        : '=' constrs1    { sLL $1 $2 ([mj AnnEqual $1],unLoc $2)}
+constrs :: { Located ([AddEpAnn],PsDataWhereClause) }
+        : '=' constrs1    { sLL $1 $2 ([mj AnnEqual $1],PsDataWhereClause Strict.Nothing (reverse $ unLoc $2))}
 
 constrs1 :: { Located [LConDecl GhcPs] }
         : constrs1 '|' constr

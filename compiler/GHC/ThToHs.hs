@@ -69,6 +69,7 @@ import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
+import qualified GHC.Data.Strict as Strict
 
 
 -------------------------------------------------------------------
@@ -291,7 +292,9 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noAnn
+                   , tcdTkNewOrData = NewTypeToken noHsTok
                    , tcdLName = tc', tcdTyVars = tvs'
+                   , tcdTkWhere = Strict.Nothing
                    , tcdFixity = Prefix
                    , tcdDataDefn = defn } }
 
@@ -306,9 +309,12 @@ cvtDec (ClassD ctxt cl tvs fds decs)
             (failWith $ DefaultDataInstDecl adts')
         ; returnJustLA $ TyClD noExtField $
           ClassDecl { tcdCExt = (noAnn, NoAnnSortKey), tcdLayout = NoLayoutInfo
+                    , tcdTkClass = noHsTok
                     , tcdCtxt = mkHsContextMaybe cxt', tcdLName = tc', tcdTyVars = tvs'
                     , tcdFixity = Prefix
-                    , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
+                    , tcdFDs = fds'
+                    , tcdTkWhere = Strict.Nothing
+                    , tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
                     , tcdATs = fams', tcdATDefs = at_defs', tcdDocs = [] }
                               -- no docs in TH ^^
@@ -533,7 +539,9 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noAnn
+                   , tcdTkNewOrData = DataTypeToken noHsTok
                    , tcdLName = tc', tcdTyVars = tvs'
+                   , tcdTkWhere = Strict.Nothing
                    , tcdFixity = Prefix
                    , tcdDataDefn = defn } }
 

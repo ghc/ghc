@@ -96,6 +96,7 @@ type instance XXModule p = DataConCantHappen
 
 type instance Anno ModuleName = SrcSpanAnnA
 
+deriving instance Data (HsModuleHeaderTokens GhcPs)
 deriving instance Data (HsModule GhcPs)
 
 data AnnsModule

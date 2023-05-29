@@ -100,6 +100,11 @@
          (True)
          {NameSet:
           [{Name: DumpRenamedAst.Peano}]})
+        (DataTypeToken
+         (L
+          (TokenLoc
+           (EpaSpan { DumpRenamedAst.hs:10:1-4 }))
+          (HsTok)))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:10:6-10 })
          {Name: DumpRenamedAst.Peano})
@@ -107,6 +112,7 @@
          []
          [])
         (Prefix)
+        (Nothing)
         (HsDataDefn
          (NoExtField)
          (Nothing)
@@ -739,6 +745,11 @@
          {NameSet:
           [{Name: a}
           ,{Name: f}]})
+        (DataTypeToken
+         (L
+          (TokenLoc
+           (EpaSpan { DumpRenamedAst.hs:22:1-4 }))
+          (HsTok)))
         (L
          (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:6 })
          {Name: DumpRenamedAst.T})
@@ -783,6 +794,7 @@
                (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:16 })
                {Name: k})))))])
         (Prefix)
+        (Nothing)
         (HsDataDefn
          (NoExtField)
          (Nothing)
@@ -1059,6 +1071,10 @@
          []}
         (VirtualBraces
          (3))
+        (L
+         (TokenLoc
+          (EpaSpan { DumpRenamedAst.hs:27:1-5 }))
+         (HsTok))
         (Nothing)
         (L
          (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:27:7 })
@@ -1081,6 +1097,11 @@
              {Name: a})))])
         (Prefix)
         []
+        (Just
+         (L
+          (TokenLoc
+           (EpaSpan { DumpRenamedAst.hs:27:11-15 }))
+          (HsTok)))
         []
         {Bag(LocatedA (HsBind Name)):
          []}
