@@ -3328,7 +3328,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
                          acsA (\cs -> sLLAsl $1 $>
-                                         (Match { m_ext = EpAnn (listAsAnchor $1) [] cs
+                                         (Match { m_ext = EpAnn (listAsAnchor $1 $>) [] cs
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
                                                 , m_pats = $1
                                                 , m_grhss = unLoc $2 }))}
@@ -4485,9 +4485,9 @@ hsDoAnn (L l _) (L ll _) kw
       RealSrcSpan lll _ -> AnnList (Just$ realSpanAsAnchor lll) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
       _                 -> AnnList Nothing                      Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAnS t a] -> Anchor
-listAsAnchor [] = spanAsAnchor noSrcSpan
-listAsAnchor (L l _:_) = spanAsAnchor (locA l)
+listAsAnchor :: [LocatedAnS t a] -> Located b -> Anchor
+listAsAnchor [] (L l _) = spanAsAnchor l
+listAsAnchor (h:_) s = spanAsAnchor (comb2 (reLoc h) s)
 
 listAsAnchorM :: [LocatedAnS t a] -> Maybe Anchor
 listAsAnchorM [] = Nothing
