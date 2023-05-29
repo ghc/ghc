@@ -12,7 +12,7 @@ AC_CACHE_CHECK([whether ld understands -filelist], [fp_cv_ld_has_filelist],
     ${CC-cc} -c conftest2.c
     echo conftest1.o  > conftest.o-files
     echo conftest2.o >> conftest.o-files
-    if ${LdCmd} -r -filelist conftest.o-files -o conftest.o > /dev/null 2>&1
+    if $LD -r -filelist conftest.o-files -o conftest.o > /dev/null 2>&1
     then
         fp_cv_ld_has_filelist=yes
     else

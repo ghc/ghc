@@ -87,8 +87,6 @@ lib/settings : config.mk
 	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
 	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
 	@echo ',("Haskell CPP flags", "$(SettingsHaskellCPPFlags)")' >> $@
-	@echo ',("ld command", "$(SettingsLdCommand)")' >> $@
-	@echo ',("ld flags", "$(SettingsLdFlags)")' >> $@
 	@echo ',("ld supports compact unwind", "$(LdHasNoCompactUnwind)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld supports response files", "$(LdSupportsResponseFiles)")' >> $@
