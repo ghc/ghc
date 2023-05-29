@@ -1829,7 +1829,7 @@
                      (Match
                       (EpAnn
                        (Anchor
-                        { DumpSemis.hs:39:6 }
+                        { DumpSemis.hs:39:6-13 }
                         (UnchangedAnchor))
                        []
                        (EpaComments
@@ -1898,7 +1898,7 @@
                      (Match
                       (EpAnn
                        (Anchor
-                        { DumpSemis.hs:40:6 }
+                        { DumpSemis.hs:40:6-13 }
                         (UnchangedAnchor))
                        []
                        (EpaComments
@@ -1969,7 +1969,7 @@
                      (Match
                       (EpAnn
                        (Anchor
-                        { DumpSemis.hs:41:6 }
+                        { DumpSemis.hs:41:6-13 }
                         (UnchangedAnchor))
                        []
                        (EpaComments
@@ -2042,7 +2042,7 @@
                      (Match
                       (EpAnn
                        (Anchor
-                        { DumpSemis.hs:42:6 }
+                        { DumpSemis.hs:42:6-13 }
                         (UnchangedAnchor))
                        []
                        (EpaComments
