@@ -2277,7 +2277,7 @@ atype :: { LHsType GhcPs }
         | PREFIX_TILDE atype             {% acsA (\cs -> sLL $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnTilde $1] cs) SrcLazy $2)) }
         | PREFIX_BANG  atype             {% acsA (\cs -> sLL $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnBang $1] cs) SrcStrict $2)) }
 
-        | '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (Just $ listAsAnchor $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
+        | '{' fielddecls '}'             {% do { decls <- acsA (\cs -> (sLL $1 $> $ HsRecTy (EpAnn (glR $1) (AnnList (listAsAnchorM $2) (Just $ moc $1) (Just $ mcc $3) [] []) cs) $2))
                                                ; checkRecordSyntax decls }}
                                                         -- Constructor sigs only
         | '(' ')'                        {% acsA (\cs -> sLL $1 $> $ HsTupleTy (EpAnn (glR $1) (AnnParen AnnParens (glAA $1) (glAA $2)) cs)
@@ -3328,7 +3328,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
                          acsA (\cs -> sLLAsl $1 $>
-                                         (Match { m_ext = EpAnn (listAsAnchor $1) [] cs
+                                         (Match { m_ext = EpAnn (listAsAnchor $1 $>) [] cs
                                                 , m_ctxt = CaseAlt -- for \case and \cases, this will be changed during post-processing
                                                 , m_pats = $1
                                                 , m_grhss = unLoc $2 }))}
@@ -4449,9 +4449,16 @@ hsDoAnn :: Located a -> LocatedAn t b -> AnnKeywordId -> AnnList
 hsDoAnn (L l _) (L ll _) kw
   = AnnList (Just $ spanAsAnchor (locA ll)) Nothing Nothing [AddEpAnn kw (srcSpan2e l)] []
 
-listAsAnchor :: [LocatedAn t a] -> Anchor
-listAsAnchor [] = spanAsAnchor noSrcSpan
-listAsAnchor (L l _:_) = spanAsAnchor (locA l)
+listAsAnchor :: [LocatedAn t a] -> Located b -> Anchor
+listAsAnchor [] (L l _) = spanAsAnchor l
+listAsAnchor (h:_) s = spanAsAnchor (comb2 (reLoc h) s)
+
+listAsAnchorM :: [LocatedAn t a] -> Maybe Anchor
+listAsAnchorM [] = Nothing
+listAsAnchorM (L l _:_) =
+  case locA l of
+    RealSrcSpan ll _ -> Just $ realSpanAsAnchor ll
+    _                -> Nothing
 
 hsTok :: Located Token -> LHsToken tok GhcPs
 hsTok (L l _) = L (mkTokenLocation l) HsTok
