@@ -66,7 +66,7 @@ module GHC.Parser.Annotation (
   -- ** Building up annotations
   extraToAnnList, reAnn,
   reAnnL, reAnnC,
-  addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorS, widenLocatedAn,
+  addAnns, addAnnsA, widenSpan, widenAnchor, widenAnchorTA, widenAnchorS, widenLocatedAn,
   widenEpAnnS,
 
   -- ** Querying annotations
@@ -686,9 +686,9 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn EpaLocation    -- ^ Trailing ';'
-  | AddCommaAnn EpaLocation   -- ^ Trailing ','
-  | AddVbarAnn EpaLocation    -- ^ Trailing '|'
+  = AddSemiAnn { ta_location :: EpaLocation }    -- ^ Trailing ';'
+  | AddCommaAnn { ta_location :: EpaLocation }   -- ^ Trailing ','
+  | AddVbarAnn { ta_location :: EpaLocation }    -- ^ Trailing '|'
   deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
@@ -883,8 +883,9 @@ trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
 addTrailingAnnToL :: SrcSpan -> TrailingAnn -> EpAnnComments
                   -> EpAnn AnnList -> EpAnn AnnList
 addTrailingAnnToL s t cs EpAnnNotUsed
-  = EpAnn (spanAsAnchor s) (AnnList (Just $ spanAsAnchor s) Nothing Nothing [] [t]) cs
-addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
+  = EpAnn (spanAsAnchor s) (AnnList (Just $ (widenAnchorTA (spanAsAnchor s) t)) Nothing Nothing [] [t]) cs
+addTrailingAnnToL _ t cs n = n { entry = widenAnchorTA (entry n) t
+                               , anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
     -- See Note [list append in addTrailing*]
@@ -895,13 +896,14 @@ addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
 addTrailingAnnToA :: TrailingAnn -> EpAnnComments
                   -> EpAnnS AnnListItem -> EpAnnS AnnListItem
 addTrailingAnnToA t cs (EpAnnS anc (AnnListItem ts) csa) =
-  EpAnnS anc (AnnListItem (ts ++ [t])) (csa <> cs)
+  EpAnnS (widenAnchorTA anc t) (AnnListItem (ts ++ [t])) (csa <> cs)
     -- See Note [list append in addTrailing*]
 
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
 addTrailingCommaToN :: SrcSpan -> EpAnnS NameAnn -> EpaLocation -> EpAnnS NameAnn
-addTrailingCommaToN _ n l = n { s_anns = addTrailing (s_anns n) l }
+addTrailingCommaToN _ n l = n { s_entry = widenAnchorTA (s_entry n) (AddCommaAnn l)
+                               , s_anns = addTrailing (s_anns n) l }
   where
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
@@ -1134,6 +1136,12 @@ widenRealSpan s as = foldl combineRealSrcSpans s (go as)
     go (AddEpAnn _ (EpaSpan (RealSrcSpan s _)):rest) = s : go rest
     go (AddEpAnn _ _                          :rest) =     go rest
 
+widenRealSpanTA :: RealSrcSpan -> TrailingAnn -> RealSrcSpan
+widenRealSpanTA l ta =
+  case ta_location ta of
+    EpaSpan (RealSrcSpan r _b) -> combineRealSrcSpans l r
+    _                          -> l
+
 realSpanFromAnns :: [AddEpAnn] -> Strict.Maybe RealSrcSpan
 realSpanFromAnns as = go Strict.Nothing as
   where
@@ -1143,6 +1151,12 @@ realSpanFromAnns as = go Strict.Nothing as
     go acc [] = acc
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan s _b)):rest) = go (combine acc s) rest
     go acc (AddEpAnn _ _                           :rest) = go acc rest
+
+realSpanFromTA :: TrailingAnn -> Strict.Maybe RealSrcSpan
+realSpanFromTA ta =
+  case ta_location ta of
+    EpaSpan (RealSrcSpan s _b) -> Strict.Just s
+    _                          -> Strict.Nothing
 
 bufSpanFromAnns :: [AddEpAnn] -> Strict.Maybe BufSpan
 bufSpanFromAnns as =  go Strict.Nothing as
@@ -1154,12 +1168,25 @@ bufSpanFromAnns as =  go Strict.Nothing as
     go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
     go acc (AddEpAnn _ _:rest) = go acc rest
 
+bufSpanFromTA :: TrailingAnn -> Strict.Maybe BufSpan
+bufSpanFromTA ta =
+  case ta_location ta of
+    EpaSpan (RealSrcSpan _s b) -> b
+    _                          -> Strict.Nothing
 
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
 widenAnchor (EpaSpan (RealSrcSpan s mb)) as
   = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
 widenAnchor (EpaSpan us) _ = EpaSpan us
 widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
+                                    Strict.Nothing -> a
+                                    Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
+
+widenAnchorTA :: Anchor -> TrailingAnn -> Anchor
+widenAnchorTA (EpaSpan (RealSrcSpan s mb)) ta
+  = EpaSpan (RealSrcSpan (widenRealSpanTA s ta) (liftA2 combineBufSpans mb  (bufSpanFromTA ta)))
+widenAnchorTA (EpaSpan us) _ = EpaSpan us
+widenAnchorTA a@(EpaDelta _ _) ta = case (realSpanFromTA ta) of
                                     Strict.Nothing -> a
                                     Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
