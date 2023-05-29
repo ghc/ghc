@@ -386,7 +386,6 @@ rnImplicitTvOccs :: Maybe assoc
                  -> RnM (a, FreeVars)
 rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
   = do { let implicit_vs = nubN implicit_vs_with_dups
-       ; mapM_ warn_term_var_capture implicit_vs
 
        ; traceRn "rnImplicitTvOccs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
@@ -395,7 +394,7 @@ rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
          -- See Note [Source locations for implicitly bound type variables].
        ; loc <- getSrcSpanM
        ; let loc' = noAnnSrcSpan loc
-       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc' . unLoc) implicit_vs
+       ; vars <- mapM (newTyVarNameRnImplicit mb_assoc . L loc' . unLoc) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -1136,6 +1135,7 @@ bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
         thing_inside $ HsOuterExplicit { hso_xexplicit = noExtField
                                        , hso_bndrs     = exp_bndrs' }
 
+-- See Note [Term variable capture and implicit quantification]
 warn_term_var_capture :: LocatedN RdrName -> RnM ()
 warn_term_var_capture lVar = do
     gbl_env <- getGlobalRdrEnv
@@ -1242,15 +1242,68 @@ rnHsBndrVis :: HsBndrVis GhcPs -> HsBndrVis GhcRn
 rnHsBndrVis HsBndrRequired = HsBndrRequired
 rnHsBndrVis (HsBndrInvisible at) = HsBndrInvisible at
 
-newTyVarNameRn :: Maybe a -- associated class
-               -> LocatedN RdrName -> RnM Name
-newTyVarNameRn mb_assoc lrdr@(L _ rdr)
-  = do { rdr_env <- getLocalRdrEnv
-       ; case (mb_assoc, lookupLocalRdrEnv rdr_env rdr) of
-           (Just _, Just n) -> return n
-              -- Use the same Name as the parent class decl
+newTyVarNameRn, newTyVarNameRnImplicit
+  :: Maybe a -- associated class
+  -> LocatedN RdrName -> RnM Name
+newTyVarNameRn         mb_assoc = new_tv_name_rn mb_assoc newLocalBndrRn
+newTyVarNameRnImplicit mb_assoc = new_tv_name_rn mb_assoc $ \lrdr ->
+  do { warn_term_var_capture lrdr
+     ; newLocalBndrRn lrdr }
 
-           _                -> newLocalBndrRn lrdr }
+new_tv_name_rn :: Maybe a -- associated class
+               -> (LocatedN RdrName -> RnM Name) -- how to create a new name
+               -> (LocatedN RdrName -> RnM Name)
+new_tv_name_rn Nothing  cont lrdr = cont lrdr
+new_tv_name_rn (Just _) cont lrdr@(L _ rdr)
+  = do { rdr_env <- getLocalRdrEnv
+       ; case lookupLocalRdrEnv rdr_env rdr of
+           Just n -> return n -- Use the same Name as the parent class decl
+           _      -> cont lrdr }
+
+{- Note [Term variable capture and implicit quantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Wterm-variable-capture is a warning introduced in GHC Proposal #281 "Visible forall in types of terms",
+Section 7.3: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst#73implicit-quantification
+
+Its purpose is to notify users when implicit quantification occurs that would
+stop working under RequiredTypeArguments (a future GHC extension). Example:
+
+   a = 42
+   id :: a -> a
+
+As it stands, the `a` in the signature `id :: a -> a` is considered free and
+leads to implicit quantification, as if the user wrote `id :: forall a. a -> a`.
+Under RequiredTypeArguments it will capture the term-level variable `a` (bound by `a = 42`),
+leading to a type error.
+
+`warn_term_var_capture` detects this by demoting the namespace of the
+implicitly quantified type variable (`TvName` becomes `VarName`) and looking it up
+in the environment. But when do we call `warn_term_var_capture`? It's tempting
+to do so at the start of `rnImplicitTvOccs`, as soon as we know our implicit
+variables:
+
+  rnImplicitTvOccs mb_assoc implicit_vs_with_dups thing_inside
+    = do { let implicit_vs = nubN implicit_vs_with_dups
+         ; mapM_ warn_term_var_capture implicit_vs
+         ... }
+
+This approach generates false positives (#23434) because it misses a corner
+case: class variables in associated types. Consider the following example:
+
+  k = 12
+  class C k a where
+    type AT a :: k -> Type
+
+If we look at the signature for `AT` in isolation, the `k` looks like a free
+variable, so it's passed to `rnImplicitTvOccs`. And if we passed it to
+`warn_term_var_capture`, we would find the `k` bound by `k = 12` and report a warning.
+But we don't want that: `k` is actually bound in the declaration header of the
+parent class.
+
+The solution is to check if it's a class variable (this is done in `new_tv_name_rn`)
+before we check for term variable capture.
+-}
+
 {-
 *********************************************************
 *                                                       *
