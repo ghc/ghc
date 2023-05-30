@@ -52,7 +52,6 @@ import Data.Array
 import Data.Monoid
 import Data.Char (toLower, toUpper)
 import qualified Data.Bits          as Bits
-import qualified Data.ByteString.Lazy.Char8 as BLC
 
 -- | The garbageCollector resets registers and result variables.
 garbageCollector :: JStat
