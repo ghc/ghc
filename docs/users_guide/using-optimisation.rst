@@ -993,8 +993,8 @@ as such you shouldn't need to set any of them explicitly. A flag
               last' x (y : ys) = last' y ys
 
     As well avoid unnecessary pattern matching it also helps avoid
-    unnecessary allocation. This applies when a argument is strict in
-    the recursive call to itself but not on the initial entry. As strict
+    unnecessary allocation. This applies when an argument is strict in
+    the recursive call to itself but not on the initial entry. A strict
     recursive branch of the function is created similar to the above
     example.
 

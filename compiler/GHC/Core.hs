@@ -2129,7 +2129,7 @@ stripNArgs 0 e = Just e
 stripNArgs n (App f _) = stripNArgs (n - 1) f
 stripNArgs _ _ = Nothing
 
--- | Like @collectArgs@, but also collects looks through floatable
+-- | Like @collectArgs@, but also looks through floatable
 -- ticks if it means that we can find more arguments.
 collectArgsTicks :: (CoreTickish -> Bool) -> Expr b
                  -> (Expr b, [Arg b], [CoreTickish])

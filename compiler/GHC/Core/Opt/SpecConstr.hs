@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, LambdaCase #-}
 #if __GLASGOW_HASKELL__ < 905
 {-# LANGUAGE PatternSynonyms #-}
 #endif
@@ -1478,7 +1478,8 @@ scExpr' env (Type t)     =
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})   = return (nullUsage, e)
 scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
-                              return (usg, Tick t e')
+                              (usg_t, t') <- scTickish env t
+                              return (combineUsage usg usg_t, Tick t' e')
 scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               return (usg, mkCast e' (scSubstCo env co))
                               -- Important to use mkCast here
@@ -1537,6 +1538,17 @@ scExpr' env (Case scrut b ty alts)
           ; return (usg', b_occ `combineOcc` scrut_occ, Alt con bs2 rhs') }
 
 
+-- | Substitute the free variables captured by a breakpoint.
+-- Variables are dropped if they have a non-variable substitution, like in
+-- 'GHC.Opt.Specialise.specTickish'.
+scTickish :: ScEnv -> CoreTickish -> UniqSM (ScUsage, CoreTickish)
+scTickish env = \case
+  Breakpoint ext i fv modl -> do
+    (usg, fv') <- unzip <$> mapM (\ v -> scExpr env (Var v)) fv
+    pure (combineUsages usg, Breakpoint ext i [v | Var v <- fv'] modl)
+  t@ProfNote {} -> pure (nullUsage, t)
+  t@HpcTick {} -> pure (nullUsage, t)
+  t@SourceNote {} -> pure (nullUsage, t)
 
 {- Note [Do not specialise evals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
