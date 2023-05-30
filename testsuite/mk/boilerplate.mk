@@ -265,7 +265,7 @@ ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
 endif
 
 # Note [WayFlags]
-#
+# ~~~~~~~~~~~~~~~
 # Code that uses TemplateHaskell should either use -fexternal-interpreter, or
 # be built in the same way as the compiler (-prof, -dynamic or -static).
 #

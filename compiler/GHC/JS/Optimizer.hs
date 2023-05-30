@@ -47,9 +47,8 @@ import GHC.JS.Syntax
 import Control.Arrow
 
 {-
-Note [ Unsafe JavaScript Optimizations ]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Unsafe JavaScript optimizations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a number of optimizations that the JavaScript Backend performs that
 are not sound with respect to arbritrary JavaScript. We still perform these
 optimizations because we are not optimizing arbritrary javascript and under the
