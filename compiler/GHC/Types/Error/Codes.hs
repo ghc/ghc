@@ -538,7 +538,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
   GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
   GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
-  GhcDiagnosticCode "TcRnCannotDefaultConcrete"                     = 52083
   GhcDiagnosticCode "TcRnMultiAssocTyFamDefaults"                   = 59128
   GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
   GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
@@ -815,6 +814,9 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "QuotedNameWrongStage"                          = 57695
   GhcDiagnosticCode "IllegalStaticFormInSplice"                     = 12219
 
+  -- Zonker messages
+  GhcDiagnosticCode "ZonkerCannotDefaultConcrete"                   = 52083
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
@@ -934,6 +936,9 @@ type family ConRecursInto con where
   ConRecursInto "TcRnBootMismatch"         = 'Just BootMismatch
   ConRecursInto "MissingBootThing"         = 'Just MissingBootThing
   ConRecursInto "BootMismatch"             = 'Just BootMismatchWhat
+
+    -- Zonker errors
+  ConRecursInto "TcRnZonkerMessage"        = 'Just ZonkerMessage
 
     ------------------
     -- FFI errors

@@ -61,7 +61,6 @@ import GHC.Core.Coercion.Axiom
 
 import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType )
-import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
@@ -72,6 +71,7 @@ import GHC.Tc.Utils.Concrete ( hasFixedRuntimeRep_syntactic )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Errors.Types
+import GHC.Tc.Zonk.Monad ( ZonkM )
 
 import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Types.Basic ( TypeOrKind(..), Arity )
@@ -762,7 +762,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> SrcSpan -> TidyEnv
-               -> TcRn (TidyEnv, SDoc)
+               -> ZonkM (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty loc tidy_env = return (tidy_env, msg)
   where
     msg = vcat [ text "When checking that" <+> quotes (ppr name)

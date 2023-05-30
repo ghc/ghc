@@ -21,14 +21,16 @@ module GHC.Types.Hint (
   , noStarIsTypeHints
   ) where
 
+import Language.Haskell.Syntax.Expr (LHsExpr)
+import Language.Haskell.Syntax (LPat, LIdP)
+
 import GHC.Prelude
 
 import qualified Data.List.NonEmpty as NE
 
-import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Typeable (Typeable)
 import GHC.Unit.Module (ModuleName, Module)
+import GHC.Unit.Module.Imported (ImportedModsVal)
 import GHC.Hs.Extension (GhcTc, GhcRn)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
@@ -41,12 +43,10 @@ import GHC.Types.SrcLoc (SrcSpan)
 import GHC.Types.Basic (Activation, RuleName)
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Parser.Errors.Basic
-import {-# SOURCE #-} Language.Haskell.Syntax.Expr
-import GHC.Unit.Module.Imported (ImportedModsVal)
+import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit)
-import Language.Haskell.Syntax (LPat, LIdP)
-  -- This {-# SOURCE #-} import should be removable once
-  -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
+
+import Data.Typeable ( Typeable )
 
 -- | The bindings we have available in scope when
 -- suggesting an explicit type signature.

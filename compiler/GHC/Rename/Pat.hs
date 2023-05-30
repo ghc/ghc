@@ -46,7 +46,7 @@ import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Zonk   ( hsOverLitName )
+import GHC.Tc.Utils.TcMType ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames

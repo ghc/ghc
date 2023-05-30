@@ -139,8 +139,10 @@ import qualified GHC.Tc.Instance.Class as TcM( matchGlobalInst, ClsInstResult(..
 import qualified GHC.Tc.Utils.Env      as TcM
        ( checkWellStaged, tcGetDefaultTys
        , tcLookupClass, tcLookupId, tcLookupTyCon
-       , topIdLvl
-       , tcInitTidyEnv )
+       , topIdLvl )
+import GHC.Tc.Zonk.Monad ( ZonkM )
+import qualified GHC.Tc.Zonk.TcType  as TcM
+import qualified GHC.Tc.Zonk.Type as TcM
 
 import GHC.Driver.DynFlags
 
@@ -878,6 +880,9 @@ wrapTcS :: TcM a -> TcS a
 -- and TcS is supposed to have limited functionality
 wrapTcS action = mkTcS $ \_env -> action -- a TcM action will not use the TcEvBinds
 
+liftZonkTcS :: ZonkM a -> TcS a
+liftZonkTcS = wrapTcS . TcM.liftZonkM
+
 wrap2TcS :: (TcM a -> TcM a) -> TcS a -> TcS a
 wrap2TcS fn (TcS thing) = mkTcS $ \env -> fn (thing env)
 
@@ -1298,7 +1303,7 @@ unifyTyVar tv ty
   = assertPpr (isMetaTyVar tv) (ppr tv) $
     TcS $ \ env ->
     do { TcM.traceTc "unifyTyVar" (ppr tv <+> text ":=" <+> ppr ty)
-       ; TcM.writeMetaTyVar tv ty
+       ; TcM.liftZonkM $ TcM.writeMetaTyVar tv ty
        ; TcM.updTcRef (tcs_unified env) (+1) }
 
 reportUnifications :: TcS a -> TcS (Int, a)
@@ -1474,31 +1479,31 @@ isFilledMetaTyVar :: TcTyVar -> TcS Bool
 isFilledMetaTyVar tv = wrapTcS (TcM.isFilledMetaTyVar tv)
 
 zonkTyCoVarsAndFV :: TcTyCoVarSet -> TcS TcTyCoVarSet
-zonkTyCoVarsAndFV tvs = wrapTcS (TcM.zonkTyCoVarsAndFV tvs)
+zonkTyCoVarsAndFV tvs = liftZonkTcS (TcM.zonkTyCoVarsAndFV tvs)
 
 zonkTyCoVarsAndFVList :: [TcTyCoVar] -> TcS [TcTyCoVar]
-zonkTyCoVarsAndFVList tvs = wrapTcS (TcM.zonkTyCoVarsAndFVList tvs)
+zonkTyCoVarsAndFVList tvs = liftZonkTcS (TcM.zonkTyCoVarsAndFVList tvs)
 
 zonkCo :: Coercion -> TcS Coercion
-zonkCo = wrapTcS . TcM.zonkCo
+zonkCo = wrapTcS . fmap TcM.liftZonkM TcM.zonkCo
 
 zonkTcType :: TcType -> TcS TcType
-zonkTcType ty = wrapTcS (TcM.zonkTcType ty)
+zonkTcType ty = liftZonkTcS (TcM.zonkTcType ty)
 
 zonkTcTypes :: [TcType] -> TcS [TcType]
-zonkTcTypes tys = wrapTcS (TcM.zonkTcTypes tys)
+zonkTcTypes tys = liftZonkTcS (TcM.zonkTcTypes tys)
 
 zonkTcTyVar :: TcTyVar -> TcS TcType
-zonkTcTyVar tv = wrapTcS (TcM.zonkTcTyVar tv)
+zonkTcTyVar tv = liftZonkTcS (TcM.zonkTcTyVar tv)
 
 zonkSimples :: Cts -> TcS Cts
-zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
+zonkSimples cts = liftZonkTcS (TcM.zonkSimples cts)
 
 zonkWC :: WantedConstraints -> TcS WantedConstraints
-zonkWC wc = wrapTcS (TcM.zonkWC wc)
+zonkWC wc = liftZonkTcS (TcM.zonkWC wc)
 
 zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
-zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
+zonkTyCoVarKind tv = liftZonkTcS (TcM.zonkTyCoVarKind tv)
 
 ----------------------------
 pprKicked :: Int -> SDoc
@@ -1874,8 +1879,10 @@ matchFamTcM tycon args
 solverDepthError :: CtLoc -> TcType -> TcM a
 solverDepthError loc ty
   = TcM.setCtLocM loc $
-    do { ty <- TcM.zonkTcType ty
-       ; env0 <- TcM.tcInitTidyEnv
+    do { (ty, env0) <- TcM.liftZonkM $
+           do { ty   <- TcM.zonkTcType ty
+              ; env0 <- TcM.tcInitTidyEnv
+              ; return (ty, env0) }
        ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
              msg = mkTcRnUnknownMessage $ mkPlainError noHints $
@@ -2215,9 +2222,10 @@ mkTEFA_Break ev eq_rel breaker
 -- See Note [Type equality cycles] in GHC.Tc.Solver.Equality
 restoreTyVarCycles :: InertSet -> TcM ()
 restoreTyVarCycles is
-  = forAllCycleBreakerBindings_ (inert_cycle_breakers is) TcM.writeMetaTyVar
+  = TcM.liftZonkM
+  $ forAllCycleBreakerBindings_ (inert_cycle_breakers is) TcM.writeMetaTyVar
 {-# SPECIALISE forAllCycleBreakerBindings_ ::
-      CycleBreakerVarStack -> (TcTyVar -> TcType -> TcM ()) -> TcM () #-}
+      CycleBreakerVarStack -> (TcTyVar -> TcType -> ZonkM ()) -> ZonkM () #-}
 
 
 {- Note [Occurs check and representational equality]

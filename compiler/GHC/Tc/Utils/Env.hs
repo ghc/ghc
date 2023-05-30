@@ -35,7 +35,6 @@ module GHC.Tc.Utils.Env(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
-        tcCheckUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
@@ -47,9 +46,6 @@ module GHC.Tc.Utils.Env(
         tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
         getTypeSigNames,
         tcExtendRecEnv,         -- For knot-tying
-
-        -- Tidying
-        tcInitTidyEnv, tcInitOpenTidyEnv,
 
         -- Instances
         tcLookupInstance, tcGetInstEnvs,
@@ -90,13 +86,9 @@ import GHC.Iface.Load
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.TcMType
+--import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper)
-import {-# SOURCE #-} GHC.Tc.Utils.Unify ( tcSubMult )
-import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
 
-import GHC.Core.UsageEnv
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
 import GHC.Core.PatSyn  ( PatSyn )
@@ -130,8 +122,6 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
-import GHC.Types.Var
-import GHC.Types.Var.Env
 import GHC.Types.Name.Reader
 import GHC.Types.TyThing
 import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
@@ -669,59 +659,6 @@ tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
   = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
 
--- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
--- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
--- usage environment. See also Note [Wrapper returned from tcSubMult] in
--- GHC.Tc.Utils.Unify, which applies to the wrapper returned from this function.
-tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
-tcCheckUsage name id_mult thing_inside
-  = do { (local_usage, result) <- tcCollectingUsage thing_inside
-       ; wrapper <- check_then_add_usage local_usage
-       ; return (result, wrapper) }
-    where
-    check_then_add_usage :: UsageEnv -> TcM HsWrapper
-    -- Checks that the usage of the newly introduced binder is compatible with
-    -- its multiplicity, and combines the usage of non-new binders to |uenv|
-    check_then_add_usage uenv
-      = do { let actual_u = lookupUE uenv name
-           ; traceTc "check_then_add_usage" (ppr id_mult $$ ppr actual_u)
-           ; wrapper <- case actual_u of
-               Bottom -> return idHsWrapper
-               Zero     -> tcSubMult (UsageEnvironmentOf name) ManyTy id_mult
-               MUsage m -> do { m <- promote_mult m
-                              ; tcSubMult (UsageEnvironmentOf name) m id_mult }
-           ; tcEmitBindingUsage (deleteUE uenv name)
-           ; return wrapper }
-
-    -- This is gross. The problem is in test case typecheck/should_compile/T18998:
-    --   f :: a %1-> Id n a -> Id n a
-    --   f x (MkId _) = MkId x
-    -- where MkId is a GADT constructor. Multiplicity polymorphism of constructors
-    -- invents a new multiplicity variable p[2] for the application MkId x. This
-    -- variable is at level 2, bumped because of the GADT pattern-match (MkId _).
-    -- We eventually unify the variable with One, due to the call to tcSubMult in
-    -- tcCheckUsage. But by then, we're at TcLevel 1, and so the level-check
-    -- fails.
-    --
-    -- What to do? If we did inference "for real", the sub-multiplicity constraint
-    -- would end up in the implication of the GADT pattern-match, and all would
-    -- be well. But we don't have a real sub-multiplicity constraint to put in
-    -- the implication. (Multiplicity inference works outside the usual generate-
-    -- constraints-and-solve scheme.) Here, where the multiplicity arrives, we
-    -- must promote all multiplicity variables to reflect this outer TcLevel.
-    -- It's reminiscent of floating a constraint, really, so promotion is
-    -- appropriate. The promoteTcType function works only on types of kind TYPE rr,
-    -- so we can't use it here. Thus, this dirtiness.
-    --
-    -- It works nicely in practice.
-    --
-    -- We use a set to avoid calling promoteMetaTyVarTo twice on the same
-    -- metavariable. This happened in #19400.
-    promote_mult m = do { fvs <- zonkTyCoVarsAndFV (tyCoVarsOfType m)
-                        ; any_promoted <- promoteTyVarSet fvs
-                        ; if any_promoted then zonkTcType m else return m
-                        }
-
 {- *********************************************************************
 *                                                                      *
              The TcBinderStack
@@ -733,39 +670,6 @@ tcExtendBinderStack bndrs thing_inside
   = do { traceTc "tcExtendBinderStack" (ppr bndrs)
        ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
-
-tcInitTidyEnv :: TcM TidyEnv
--- We initialise the "tidy-env", used for tidying types before printing,
--- by building a reverse map from the in-scope type variables to the
--- OccName that the programmer originally used for them
-tcInitTidyEnv
-  = do  { lcl_env <- getLclEnv
-        ; go emptyTidyEnv (tcl_bndrs lcl_env) }
-  where
-    go (env, subst) []
-      = return (env, subst)
-    go (env, subst) (b : bs)
-      | TcTvBndr name tyvar <- b
-       = do { let (env', occ') = tidyOccName env (nameOccName name)
-                  name'  = tidyNameOcc name occ'
-                  tyvar1 = setTyVarName tyvar name'
-            ; tyvar2 <- zonkTcTyVarToTcTyVar tyvar1
-              -- Be sure to zonk here!  Tidying applies to zonked
-              -- types, so if we don't zonk we may create an
-              -- ill-kinded type (#14175)
-            ; go (env', extendVarEnv subst tyvar tyvar2) bs }
-      | otherwise
-      = go (env, subst) bs
-
--- | Get a 'TidyEnv' that includes mappings for all vars free in the given
--- type. Useful when tidying open types.
-tcInitOpenTidyEnv :: [TyCoVar] -> TcM TidyEnv
-tcInitOpenTidyEnv tvs
-  = do { env1 <- tcInitTidyEnv
-       ; let env2 = tidyFreeTyCoVars env1 tvs
-       ; return env2 }
-
-
 
 {- *********************************************************************
 *                                                                      *

@@ -51,7 +51,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Instantiate( newFamInst )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Type
 import GHC.Tc.Validity ( checkValidCoAxBranch )
 
 import GHC.Core.DataCon
@@ -2783,19 +2783,19 @@ substDerivInstTys subst
     rep_tc_args' = substTys subst rep_tc_args
 
 -- | Zonk the 'TcTyVar's in a 'DerivInstTys' value to 'TyVar's.
--- See @Note [What is zonking?]@ in "GHC.Tc.Utils.TcMType".
+-- See @Note [What is zonking?]@ in "GHC.Tc.Zonk.Type".
 --
 -- This is only used in the final zonking step when inferring
 -- the context for a derived instance.
 -- See @Note [Overlap and deriving]@ in "GHC.Tc.Deriv.Infer".
-zonkDerivInstTys :: ZonkEnv -> DerivInstTys -> TcM DerivInstTys
-zonkDerivInstTys ze dit@(DerivInstTys { dit_cls_tys = cls_tys
-                                      , dit_tc_args = tc_args
-                                      , dit_rep_tc = rep_tc
-                                      , dit_rep_tc_args = rep_tc_args }) = do
-  cls_tys'     <- zonkTcTypesToTypesX ze cls_tys
-  tc_args'     <- zonkTcTypesToTypesX ze tc_args
-  rep_tc_args' <- zonkTcTypesToTypesX ze rep_tc_args
+zonkDerivInstTys :: DerivInstTys -> ZonkT TcM DerivInstTys
+zonkDerivInstTys dit@(DerivInstTys { dit_cls_tys = cls_tys
+                                   , dit_tc_args = tc_args
+                                   , dit_rep_tc = rep_tc
+                                   , dit_rep_tc_args = rep_tc_args }) = do
+  cls_tys'     <- zonkTcTypesToTypesX cls_tys
+  tc_args'     <- zonkTcTypesToTypesX tc_args
+  rep_tc_args' <- zonkTcTypesToTypesX rep_tc_args
   pure dit{ dit_cls_tys         = cls_tys'
           , dit_tc_args         = tc_args'
           , dit_rep_tc_args     = rep_tc_args'

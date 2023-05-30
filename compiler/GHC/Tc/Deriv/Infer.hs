@@ -30,6 +30,8 @@ import GHC.Tc.Solver
 import GHC.Tc.Solver.Monad ( runTcS )
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor)
+import GHC.Tc.Zonk.TcType ( zonkWC )
+import GHC.Tc.Zonk.Env ( ZonkFlexi(..), initZonkEnv )
 
 import GHC.Core.Class
 import GHC.Core.DataCon
@@ -672,7 +674,7 @@ simplifyInstanceContexts infer_specs
         ; final_specs <- iterate_deriv 1 initial_solutions
           -- After simplification finishes, zonk the TcTyVars as described
           -- in Note [Overlap and deriving].
-        ; traverse zonkDerivSpec final_specs }
+        ; initZonkEnv DefaultFlexi $ traverse zonkDerivSpec final_specs }
   where
     ------------------------------------------------------------------
         -- The initial solutions for the equations claim that each
@@ -756,7 +758,7 @@ simplifyDeriv (DS { ds_loc = loc, ds_tvs = tvs
                                 solveWanteds wanteds
 
        -- It's not yet zonked!  Obviously zonk it before peering at it
-       ; solved_wanteds <- zonkWC solved_wanteds
+       ; solved_wanteds <- liftZonkM $ zonkWC solved_wanteds
 
        -- See [STEP DAC HOIST]
        -- From the simplified constraints extract a subset 'good' that will

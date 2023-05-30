@@ -31,6 +31,7 @@ module GHC.Tc.Utils.TcType (
   ExpTypeFRR, ExpSigmaType, ExpSigmaTypeFRR,
   ExpRhoType,
   mkCheckExpType,
+  checkingExpType_maybe, checkingExpType,
 
   SyntaxOpType(..), synKnownType, mkSynFunTys,
 
@@ -509,6 +510,16 @@ instance Outputable InferResult where
 mkCheckExpType :: TcType -> ExpType
 mkCheckExpType = Check
 
+-- | Returns the expected type when in checking mode.
+checkingExpType_maybe :: ExpType -> Maybe TcType
+checkingExpType_maybe (Check ty) = Just ty
+checkingExpType_maybe (Infer {}) = Nothing
+
+-- | Returns the expected type when in checking mode. Panics if in inference
+-- mode.
+checkingExpType :: String -> ExpType -> TcType
+checkingExpType _   (Check ty) = ty
+checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 
 {- *********************************************************************
 *                                                                      *

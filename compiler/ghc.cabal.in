@@ -763,8 +763,11 @@ Library
         GHC.Tc.Utils.TcMType
         GHC.Tc.Utils.TcType
         GHC.Tc.Utils.Unify
-        GHC.Tc.Utils.Zonk
         GHC.Tc.Validity
+        GHC.Tc.Zonk.Env
+        GHC.Tc.Zonk.Monad
+        GHC.Tc.Zonk.TcType
+        GHC.Tc.Zonk.Type
         GHC.ThToHs
         GHC.Types.Annotations
         GHC.Types.Avail

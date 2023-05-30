@@ -1664,12 +1664,8 @@ instance Diagnostic TcRnMessage where
             let n = tyConName tc
             in ppr (getSrcSpan n) <> colon <+> ppr (tyConName tc)
                    <+> text "from external module"
-
-    TcRnCannotDefaultConcrete frr
-      -> mkSimpleDecorated $
-         ppr (frr_context frr) $$
-         text "cannot be assigned a fixed runtime representation," <+>
-         text "not even by defaulting."
+    TcRnZonkerMessage err
+      -> mkSimpleDecorated $ pprZonkerMessage err
     TcRnInterfaceError reason
       -> diagnosticMessage (tcOptsIfaceOpts opts) reason
     TcRnSelfImport imp_mod_name
@@ -2373,8 +2369,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTypeSynonymCycle{}
       -> ErrorWithoutFlag
-    TcRnCannotDefaultConcrete{}
-      -> ErrorWithoutFlag
+    TcRnZonkerMessage msg
+      -> zonkerMessageReason msg
     TcRnInterfaceError err
       -> interfaceErrorReason err
     TcRnSelfImport{}
@@ -3024,8 +3020,8 @@ instance Diagnostic TcRnMessage where
       -> [suggestExtension LangExt.DataKinds]
     TcRnTypeSynonymCycle{}
       -> noHints
-    TcRnCannotDefaultConcrete{}
-      -> [SuggestAddTypeSignatures UnnamedBinding]
+    TcRnZonkerMessage msg
+      -> zonkerMessageHints msg
     TcRnInterfaceError reason
       -> interfaceErrorHints reason
     TcRnSelfImport{}
@@ -6165,5 +6161,22 @@ addTopDeclsErrorHints = \case
     -> noHints
   AddTopDeclsRunSpliceFailure {}
     -> noHints
+
+--------------------------------------------------------------------------------
+
+pprZonkerMessage :: ZonkerMessage -> SDoc
+pprZonkerMessage = \case
+  ZonkerCannotDefaultConcrete frr ->
+    ppr (frr_context frr) $$
+    text "cannot be assigned a fixed runtime representation," <+>
+    text "not even by defaulting."
+
+zonkerMessageHints :: ZonkerMessage -> [GhcHint]
+zonkerMessageHints = \case
+  ZonkerCannotDefaultConcrete {} -> [SuggestAddTypeSignatures UnnamedBinding]
+
+zonkerMessageReason :: ZonkerMessage -> DiagnosticReason
+zonkerMessageReason = \case
+  ZonkerCannotDefaultConcrete {} -> ErrorWithoutFlag
 
 --------------------------------------------------------------------------------

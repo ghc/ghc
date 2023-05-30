@@ -1,6 +1,7 @@
 
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
@@ -119,6 +120,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcBinder
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Zonk.Monad ( ZonkM )
 
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Type
@@ -858,7 +860,7 @@ getLclEnvLoc = tcl_loc
 lclEnvInGeneratedCode :: TcLclEnv -> Bool
 lclEnvInGeneratedCode = tcl_in_gen_code
 
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, SDoc))
+type ErrCtxt = (Bool, TidyEnv -> ZonkM (TidyEnv, SDoc))
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction

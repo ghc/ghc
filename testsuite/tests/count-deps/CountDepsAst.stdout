@@ -199,6 +199,7 @@ GHC.Tc.Types.Rank
 GHC.Tc.Types.TcBinder
 GHC.Tc.Types.TcRef
 GHC.Tc.Utils.TcType
+GHC.Tc.Zonk.Monad
 GHC.Types.Annotations
 GHC.Types.Avail
 GHC.Types.Basic
@@ -296,7 +297,6 @@ GHC.Utils.Lexeme
 GHC.Utils.Logger
 GHC.Utils.Misc
 GHC.Utils.Monad
-GHC.Utils.Monad.Codensity
 GHC.Utils.Monad.State.Strict
 GHC.Utils.Outputable
 GHC.Utils.Panic

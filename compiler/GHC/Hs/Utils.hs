@@ -14,7 +14,7 @@ which deal with the instantiated versions are located elsewhere:
    ----------------          -------------
    GhcPs/RdrName             GHC.Parser.PostProcess
    GhcRn/Name                GHC.Rename.*
-   GhcTc/Id                  GHC.Tc.Utils.Zonk
+   GhcTc/Id                  GHC.Tc.Zonk.Type
 
 The @mk*@ functions attempt to construct a not-completely-useless SrcSpan
 from their components, compared with the @nl*@ functions which
@@ -1271,7 +1271,7 @@ instance IsPass p => CollectPass (GhcPass p) where
         AbsBinds { abs_exports = dbinds } -> (map abe_poly dbinds ++)
         -- I don't think we want the binders from the abe_binds
 
-        -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
+        -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Zonk.Type
 
   collectXSplicePat flag ext =
       case ghcPass @p of

@@ -36,7 +36,7 @@
 
 module GHC.Types.Var (
         -- * The main data type and synonyms
-        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
+        Var, CoVar, Id, TcId, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
         TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- * In and Out variants
@@ -149,6 +149,9 @@ type CoVar = Id        -- See Note [Evidence: EvIds and CoVars]
 type NcId  = Id        -- A term-level (value) variable that is
                        -- /not/ an (unlifted) coercion
                        --    predicate: isNonCoVarId
+
+-- | An 'Id' whose type may contain metavariables ('TcType')
+type TcId = Id
 
 -- | Type or kind Variable
 type TyVar   = Var     -- Type *or* kind variable (historical)

@@ -26,7 +26,8 @@ import GHC.Tc.Types            ( TcM, ThStage(..), PendingStuff(..) )
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
 import GHC.Tc.Types.Origin     ( CtOrigin(..), FixedRuntimeRepContext, FixedRuntimeRepOrigin(..) )
-import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc )
+import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc
+                               , liftZonkM )
 import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTypeFRR
                                , MetaInfo(..), ConcreteTvOrigin(..)
                                , isMetaTyVar, metaTyVarInfo, tcTyVarLevel )
@@ -654,7 +655,7 @@ makeTypeConcrete conc_orig ty =
                     do { conc_tv <- setTcLevel (tcTyVarLevel tv) $
                                     newConcreteTyVar conc_orig occ_fs kind
                        ; let conc_ty = mkTyVarTy conc_tv
-                       ; writeMetaTyVar tv conc_ty
+                       ; liftZonkM $ writeMetaTyVar tv conc_ty
                        ; return conc_ty } }
                | otherwise
                -- Don't attempt to make other type variables concrete

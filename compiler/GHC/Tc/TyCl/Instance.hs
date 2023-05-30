@@ -35,7 +35,8 @@ import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Validity
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Type
+import GHC.Tc.Zonk.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Types.Constraint
@@ -750,17 +751,21 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               , text "eta_tcbs" <+> ppr eta_tcbs ]
 
        -- Zonk the patterns etc into the Type world
-       ; ze                <- mkEmptyZonkEnv NoFlexi
-       ; (ze, ty_binders)  <- zonkTyVarBindersX   ze tc_ty_binders
-       ; res_kind          <- zonkTcTypeToTypeX   ze tc_res_kind
-       ; all_pats          <- zonkTcTypesToTypesX ze all_pats
-       ; eta_pats          <- zonkTcTypesToTypesX ze eta_pats
-       ; stupid_theta      <- zonkTcTypesToTypesX ze stupid_theta
-       ; let zonked_post_eta_qtvs = map (lookupTyVarX ze) post_eta_qtvs
-             zonked_eta_tvs       = map (lookupTyVarX ze) eta_tvs
-             -- All these qtvs are in ty_binders, and hence will be in
-             -- the ZonkEnv, ze.  We need the zonked (TyVar) versions to
-             -- put in the CoAxiom that we are about to build.
+       ; (ty_binders, res_kind, all_pats, eta_pats, stupid_theta,
+           zonked_post_eta_qtvs, zonked_eta_tvs) <-
+         initZonkEnv NoFlexi $
+         runZonkBndrT (zonkTyVarBindersX tc_ty_binders) $ \ ty_binders ->
+           do { res_kind             <- zonkTcTypeToTypeX   tc_res_kind
+              ; all_pats             <- zonkTcTypesToTypesX all_pats
+              ; eta_pats             <- zonkTcTypesToTypesX eta_pats
+              ; stupid_theta         <- zonkTcTypesToTypesX stupid_theta
+              ; zonked_post_eta_qtvs <- mapM lookupTyVarX   post_eta_qtvs
+              ; zonked_eta_tvs       <- mapM lookupTyVarX   eta_tvs
+                    -- All these qtvs are in ty_binders, and hence will be in
+                    -- the ZonkEnv, ze.  We need the zonked (TyVar) versions to
+                    -- put in the CoAxiom that we are about to build.
+              ; return (ty_binders, res_kind, all_pats, eta_pats, stupid_theta,
+                         zonked_post_eta_qtvs, zonked_eta_tvs) }
 
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
@@ -959,11 +964,14 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
 
-       ; final_tvs         <- zonkTcTyVarsToTcTyVars final_tvs
-       ; lhs_ty            <- zonkTcType  lhs_ty
-       ; master_res_kind   <- zonkTcType  master_res_kind
-       ; instance_res_kind <- zonkTcType  instance_res_kind
-       ; stupid_theta      <- zonkTcTypes stupid_theta
+       ; (final_tvs,lhs_ty,master_res_kind,instance_res_kind,stupid_theta) <-
+          liftZonkM $ do
+            { final_tvs         <- zonkTcTyVarsToTcTyVars final_tvs
+            ; lhs_ty            <- zonkTcType             lhs_ty
+            ; master_res_kind   <- zonkTcType             master_res_kind
+            ; instance_res_kind <- zonkTcType             instance_res_kind
+            ; stupid_theta      <- zonkTcTypes            stupid_theta
+            ; return (final_tvs,lhs_ty,master_res_kind,instance_res_kind,stupid_theta) }
 
        -- Check that res_kind is OK with checkDataKindSig.  We need to
        -- check that it's ok because res_kind can come from a user-written
@@ -2103,7 +2111,7 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
     poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
     theta         = map idType dfun_ev_vars
 
-methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
 methSigCtxt sel_name sig_ty meth_ty env0
   = do { (env1, sig_ty)  <- zonkTidyTcType env0 sig_ty
        ; (env2, meth_ty) <- zonkTidyTcType env1 meth_ty

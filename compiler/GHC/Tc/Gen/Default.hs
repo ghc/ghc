@@ -19,7 +19,7 @@ import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.HsType
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Type
 import GHC.Tc.Solver
 import GHC.Tc.Validity
 import GHC.Tc.Utils.TcType

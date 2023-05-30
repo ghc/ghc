@@ -62,7 +62,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Validity( checkValidType )
 import GHC.Tc.Gen.Match
 import GHC.Tc.Utils.Unify( checkConstraints, tcSubTypeSigma )
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Type
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
@@ -84,6 +84,7 @@ import GHC.Tc.Solver
 import GHC.Tc.TyCl
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
 import GHC.Tc.Utils.Backpack
+import GHC.Tc.Zonk.TcType
 
 import GHC.Rename.Bind ( rejectBootDecls )
 import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
@@ -2228,7 +2229,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               it_plans =
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
-                       ; it_ty <- zonkTcType (idType it_id)
+                       ; it_ty <- liftZonkM $ zonkTcType (idType it_id)
                        ; when (isUnitTy it_ty) failM
                        ; return stuff } :|
 
@@ -2352,7 +2353,7 @@ tcUserStmt rdr_stmt@(L loc _)
   where
     mk_print_result_plan stmt v
       = do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
-           ; v_ty <- zonkTcType (idType v_id)
+           ; v_ty <- liftZonkM $ zonkTcType (idType v_id)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
@@ -2519,7 +2520,7 @@ tcRnExpr hsc_env mode rdr_expr
 
     let { all_expr_ty = mkInfForAllTys qtvs $
                         mkPhiTy (map idType dicts) res_ty } ;
-    ty <- zonkTcType all_expr_ty ;
+    ty <- liftZonkM $ zonkTcType all_expr_ty ;
 
     -- See Note [Normalising the type in :type]
     fam_envs <- tcGetFamInstEnvs ;
@@ -2634,8 +2635,7 @@ tcRnType hsc_env flexi normalise rdr_type
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll unkSkol kind
 
-       ; e <- mkEmptyZonkEnv flexi
-       ; ty  <- zonkTcTypeToTypeX e ty
+       ; ty  <- initZonkEnv flexi $ zonkTcTypeToTypeX ty
 
        -- Do validity checking on type
        ; checkValidType (GhciCtxt True) ty

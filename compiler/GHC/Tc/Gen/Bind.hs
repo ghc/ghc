@@ -52,8 +52,9 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Validity (checkValidType, checkEscapingKind)
+import GHC.Tc.Zonk.TcType
 
-import GHC.Core.Predicate
+import GHC.Core.Predicate ( getEqPredTys_maybe )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
@@ -876,7 +877,7 @@ mkExport prag_fn residual insoluble qtvs theta
          (MBI { mbi_poly_name = poly_name
               , mbi_sig       = mb_sig
               , mbi_mono_id   = mono_id })
-  = do  { mono_ty <- zonkTcType (idType mono_id)
+  = do  { mono_ty <- liftZonkM $ zonkTcType (idType mono_id)
         ; poly_id <- mkInferredPolyId residual insoluble qtvs theta poly_name mb_sig mono_ty
 
         -- NB: poly_id has a zonked type
@@ -987,7 +988,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
               , sig_inst_skols = annotated_tvs }))
   = -- Choose quantifiers for a partial type signature
     do { let (psig_qtv_nms, psig_qtv_bndrs) = unzip annotated_tvs
-       ; psig_qtv_bndrs <- mapM zonkInvisTVBinder psig_qtv_bndrs
+       ; psig_qtv_bndrs <- liftZonkM $ mapM zonkInvisTVBinder psig_qtv_bndrs
        ; let psig_qtvs    = map binderVar psig_qtv_bndrs
              psig_qtv_set = mkVarSet psig_qtvs
              psig_qtv_prs = psig_qtv_nms `zip` psig_qtvs
@@ -1006,7 +1007,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
        ; mapM_ report_mono_sig_tv_err [ pr | pr@(_,tv) <- psig_qtv_prs
                                            , not (tv `elem` qtvs) ]
 
-       ; annotated_theta      <- zonkTcTypes annotated_theta
+       ; annotated_theta      <- liftZonkM $ zonkTcTypes annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtv_set annotated_theta wcx
                                  -- NB: free_tvs includes tau_tvs
 
@@ -1066,7 +1067,8 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
                -- comes from the checkExpectedKind in GHC.Tc.Gen.HsType.tcAnonWildCardOcc.
                -- So, to make the kinds work out, we reverse the cast here.
-               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
+               Just (wc_var, wc_co) -> liftZonkM $
+                                       writeMetaTyVar wc_var (mkConstraintTupleTy diff_theta
                                                               `mkCastTy` mkSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
@@ -1099,7 +1101,7 @@ chooseInferredQuantifiers residual inferred_theta tau_tvs qtvs
 chooseInferredQuantifiers _ _ _ _ (Just (TISI { sig_inst_sig = sig@(CompleteSig {}) }))
   = pprPanic "chooseInferredQuantifiers" (ppr sig)
 
-mk_inf_msg :: Name -> TcType -> TidyEnv -> TcM (TidyEnv, SDoc)
+mk_inf_msg :: Name -> TcType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
 mk_inf_msg poly_name poly_ty tidy_env
  = do { (tidy_env1, poly_ty) <- zonkTidyTcType tidy_env poly_ty
       ; let msg = vcat [ text "When checking the inferred type"
@@ -1115,7 +1117,7 @@ localSigWarn id mb_sig
 
 warnMissingSignatures :: Id -> TcM ()
 warnMissingSignatures id
-  = do  { env0 <- tcInitTidyEnv
+  = do  { env0 <- liftZonkM $ tcInitTidyEnv
         ; let (env1, tidy_ty) = tidyOpenType env0 (idType id)
         ; let dia = TcRnPolymorphicBinderMissingSig (idName id) tidy_ty
         ; addDiagnosticTcM (env1, dia) }

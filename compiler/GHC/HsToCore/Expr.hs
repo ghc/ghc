@@ -225,7 +225,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
 
 -- | Replace the body of the function with this block to test the hsExprType
--- function in GHC.Tc.Utils.Zonk:
+-- function in GHC.Tc.Zonk.Type:
 -- putSrcSpanDs loc $ do
 --   { core_expr <- dsExpr e
 --   ; massertPpr (exprType core_expr `eqType` hsExprType e)

@@ -23,7 +23,7 @@ import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Data.Bag (bagToList)
 import GHC.Driver.DynFlags
 import GHC.Hs
-import GHC.Tc.Utils.Zonk (shortCutLit)
+import GHC.Tc.Utils.TcMType (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name

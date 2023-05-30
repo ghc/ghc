@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf #-}
+{-# LANGUAGE FlexibleContexts, PatternSynonyms, ViewPatterns, MultiWayIf, RankNTypes #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -889,7 +889,8 @@ data TyCoMapper env m
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
-      , tcm_tycobinder :: env -> TyCoVar -> ForAllTyFlag -> m (env, TyCoVar)
+      , tcm_tycobinder :: forall r. env -> TyCoVar -> ForAllTyFlag
+                       -> (env -> TyCoVar -> m r) -> m r
           -- ^ The returned env is used in the extended scope
 
       , tcm_tycon :: TyCon -> m TyCon
@@ -902,10 +903,10 @@ data TyCoMapper env m
 
 {-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
 mapTyCo :: Monad m => TyCoMapper () m
-         -> ( Type       -> m Type
-            , [Type]     -> m [Type]
-            , Coercion   -> m Coercion
-            , [Coercion] -> m[Coercion])
+        -> ( Type       -> m  Type
+           , [Type]     -> m  [Type]
+           , Coercion   -> m  Coercion
+           , [Coercion] -> m [Coercion] )
 mapTyCo mapper
   = case mapTyCoX mapper of
      (go_ty, go_tys, go_co, go_cos)
@@ -916,7 +917,7 @@ mapTyCoX :: Monad m => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
-            , env -> [Coercion] -> m[Coercion])
+            , env -> [Coercion] -> m [Coercion] )
 mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_tycobinder = tycobinder
                      , tcm_tycon = tycon
@@ -924,20 +925,20 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_hole = cohole })
   = (go_ty, go_tys, go_co, go_cos)
   where
-    go_tys _   []       = return []
-    go_tys env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
+    go_tys !_   []       = return []
+    go_tys !env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
 
-    go_ty env (TyVarTy tv)    = tyvar env tv
-    go_ty env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
-    go_ty _   ty@(LitTy {})   = return ty
-    go_ty env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
-    go_ty env (CoercionTy co) = CoercionTy <$> go_co env co
+    go_ty !env (TyVarTy tv)    = tyvar env tv
+    go_ty !env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
+    go_ty !_   ty@(LitTy {})   = return ty
+    go_ty !env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
+    go_ty !env (CoercionTy co) = CoercionTy <$> go_co env co
 
-    go_ty env ty@(FunTy _ w arg res)
+    go_ty !env ty@(FunTy _ w arg res)
       = do { w' <- go_ty env w; arg' <- go_ty env arg; res' <- go_ty env res
            ; return (ty { ft_mult = w', ft_arg = arg', ft_res = res' }) }
 
-    go_ty env ty@(TyConApp tc tys)
+    go_ty !env ty@(TyConApp tc tys)
       | isTcTyCon tc
       = do { tc' <- tycon tc
            ; mkTyConApp tc' <$> go_tys env tys }
@@ -949,36 +950,36 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
       | otherwise
       = mkTyConApp tc <$> go_tys env tys
 
-    go_ty env (ForAllTy (Bndr tv vis) inner)
-      = do { (env', tv') <- tycobinder env tv vis
+    go_ty !env (ForAllTy (Bndr tv vis) inner)
+      = do { tycobinder env tv vis $ \env' tv' -> do
            ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
-    go_cos _   []       = return []
-    go_cos env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
+    go_cos !_   []       = return []
+    go_cos !env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
 
-    go_mco _   MRefl    = return MRefl
-    go_mco env (MCo co) = MCo <$> (go_co env co)
+    go_mco !_   MRefl    = return MRefl
+    go_mco !env (MCo co) = MCo <$> (go_co env co)
 
-    go_co env (Refl ty)                  = Refl <$> go_ty env ty
-    go_co env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
-    go_co env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
-    go_co env (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co env cw
+    go_co !env (Refl ty)                  = Refl <$> go_ty env ty
+    go_co !env (GRefl r ty mco)           = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
+    go_co !env (AppCo c1 c2)              = mkAppCo <$> go_co env c1 <*> go_co env c2
+    go_co !env (FunCo r afl afr cw c1 c2) = mkFunCo2 r afl afr <$> go_co env cw
                                            <*> go_co env c1 <*> go_co env c2
-    go_co env (CoVarCo cv)               = covar env cv
-    go_co env (HoleCo hole)              = cohole env hole
-    go_co env (UnivCo p r t1 t2)         = mkUnivCo <$> go_prov env p <*> pure r
+    go_co !env (CoVarCo cv)               = covar env cv
+    go_co !env (HoleCo hole)              = cohole env hole
+    go_co !env (UnivCo p r t1 t2)         = mkUnivCo <$> go_prov env p <*> pure r
                                            <*> go_ty env t1 <*> go_ty env t2
-    go_co env (SymCo co)                 = mkSymCo <$> go_co env co
-    go_co env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
-    go_co env (AxiomRuleCo r cos)        = AxiomRuleCo r <$> go_cos env cos
-    go_co env (SelCo i co)               = mkSelCo i <$> go_co env co
-    go_co env (LRCo lr co)               = mkLRCo lr <$> go_co env co
-    go_co env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
-    go_co env (KindCo co)                = mkKindCo <$> go_co env co
-    go_co env (SubCo co)                 = mkSubCo <$> go_co env co
-    go_co env (AxiomInstCo ax i cos)     = mkAxiomInstCo ax i <$> go_cos env cos
-    go_co env co@(TyConAppCo r tc cos)
+    go_co !env (SymCo co)                 = mkSymCo <$> go_co env co
+    go_co !env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2
+    go_co !env (AxiomRuleCo r cos)        = AxiomRuleCo r <$> go_cos env cos
+    go_co !env (SelCo i co)               = mkSelCo i <$> go_co env co
+    go_co !env (LRCo lr co)               = mkLRCo lr <$> go_co env co
+    go_co !env (InstCo co arg)            = mkInstCo <$> go_co env co <*> go_co env arg
+    go_co !env (KindCo co)                = mkKindCo <$> go_co env co
+    go_co !env (SubCo co)                 = mkSubCo <$> go_co env co
+    go_co !env (AxiomInstCo ax i cos)     = mkAxiomInstCo ax i <$> go_cos env cos
+    go_co !env co@(TyConAppCo r tc cos)
       | isTcTyCon tc
       = do { tc' <- tycon tc
            ; mkTyConAppCo r tc' <$> go_cos env cos }
@@ -989,17 +990,17 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
 
       | otherwise
       = mkTyConAppCo r tc <$> go_cos env cos
-    go_co env (ForAllCo tv kind_co co)
+    go_co !env (ForAllCo tv kind_co co)
       = do { kind_co' <- go_co env kind_co
-           ; (env', tv') <- tycobinder env tv Inferred
+           ; tycobinder env tv Inferred $ \env' tv' ->  do
            ; co' <- go_co env' co
            ; return $ mkForAllCo tv' kind_co' co' }
         -- See Note [Efficiency for ForAllCo case of mapTyCoX]
 
-    go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
-    go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
-    go_prov _   p@(PluginProv _)    = return p
-    go_prov _   p@(CorePrepProv _)  = return p
+    go_prov !env (PhantomProv co)    = PhantomProv <$> go_co env co
+    go_prov !env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
+    go_prov !_   p@(PluginProv _)    = return p
+    go_prov !_   p@(CorePrepProv _)  = return p
 
 
 {- *********************************************************************

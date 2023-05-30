@@ -24,6 +24,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Expr
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify( buildImplicationFor )
+import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Type
 import GHC.Core.Coercion( mkCoVarCo )
@@ -147,7 +148,7 @@ tcRule (HsRule { rd_ext  = ext
        --
        -- We also need to get the completely-unconstrained tyvars of
        -- the LHS, lest they otherwise get defaulted to Any; but we do that
-       -- during zonking (see GHC.Tc.Utils.Zonk.zonkRule)
+       -- during zonking (see GHC.Tc.Zonk.Type.zonkRule)
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
 
@@ -432,7 +433,7 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
                   ; return dont_default }
 
        -- Note [The SimplifyRule Plan] step 2
-       ; lhs_wanted <- zonkWC lhs_wanted
+       ; lhs_wanted <- liftZonkM $ zonkWC lhs_wanted
        ; let (quant_cts, residual_lhs_wanted) = getRuleQuantCts lhs_wanted
 
        -- Note [The SimplifyRule Plan] step 3

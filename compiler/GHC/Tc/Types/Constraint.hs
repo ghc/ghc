@@ -85,7 +85,7 @@ module GHC.Tc.Types.Constraint (
 
         -- RewriterSet
         RewriterSet(..), emptyRewriterSet, isEmptyRewriterSet,
-           -- exported concretely only for anyUnfilledCoercionHoles
+           -- exported concretely only for zonkRewriterSet
         addRewriter, unitRewriterSet, unionRewriterSet, rewriterSetFromCts,
 
         wrapType,
@@ -732,7 +732,7 @@ updCtEvidence upd ct
      CEqCan eq@(EqCt { eq_ev = ev })       -> CEqCan    (eq { eq_ev = upd ev })
      CIrredCan ir@(IrredCt { ir_ev = ev }) -> CIrredCan (ir { ir_ev = upd ev })
      CNonCanonical ev                      -> CNonCanonical (upd ev)
-     CDictCan di@(DictCt { di_ev = ev })      -> CDictCan (di { di_ev = upd ev })
+     CDictCan di@(DictCt { di_ev = ev })   -> CDictCan (di { di_ev = upd ev })
 
 ctLoc :: Ct -> CtLoc
 ctLoc = ctEvLoc . ctEvidence
@@ -2236,7 +2236,7 @@ inscrutable error messages. To solve this dilemma:
 
 * In error reporting, we simply suppress any errors that have been rewritten
   by /unsolved/ wanteds. This suppression happens in GHC.Tc.Errors.mkErrorItem,
-  which uses GHC.Tc.Utils.anyUnfilledCoercionHoles to look through any filled
+  which uses GHC.Tc.Zonk.Type.zonkRewriterSet to look through any filled
   coercion holes. The idea is that we wish to report the "root cause" -- the
   error that rewrote all the others.
 

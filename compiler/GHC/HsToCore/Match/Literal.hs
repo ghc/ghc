@@ -36,7 +36,7 @@ import GHC.HsToCore.Utils
 
 import GHC.Hs
 
-import GHC.Tc.Utils.Zonk ( shortCutLit )
+import GHC.Tc.Utils.TcMType ( shortCutLit )
 import GHC.Tc.Utils.TcType
 
 import GHC.Core

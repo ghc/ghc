@@ -35,7 +35,6 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
 import GHC.Hs
 import GHC.Hs.Syn.Type
 import GHC.Rename.Utils
-import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Unify
 import GHC.Types.Basic
@@ -61,6 +60,7 @@ import GHC.Tc.Gen.Arrow
 import GHC.Tc.Gen.Match
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Zonk.TcType
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Types.Id
@@ -211,7 +211,7 @@ tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
-         -- See Note [Short cut for overloaded literals] in GHC.Tc.Utils.Zonk
+         -- See Note [Short cut for overloaded literals] in GHC.Tc.Zonk.Type
        ; case mb_res of
            Just lit' -> return (HsOverLit noAnn lit')
            Nothing   -> tcApp e res_ty }
@@ -1537,14 +1537,14 @@ checkMissingFields con_like rbinds arg_tys
 
   | otherwise = do              -- A record
     unless (null missing_s_fields) $ do
-        fs <- zonk_fields missing_s_fields
+        fs <- liftZonkM $ zonk_fields missing_s_fields
         -- It is an error to omit a strict field, because
         -- we can't substitute it with (error "Missing field f")
         addErrTc (TcRnMissingStrictFields con_like fs)
 
     warn <- woptM Opt_WarnMissingFields
     when (warn && notNull missing_ns_fields) $ do
-        fs <- zonk_fields missing_ns_fields
+        fs <- liftZonkM $ zonk_fields missing_ns_fields
         -- It is not an error (though we may want) to omit a
         -- lazy field, because we can always use
         -- (error "Missing field f") instead.

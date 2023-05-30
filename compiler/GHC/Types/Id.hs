@@ -27,7 +27,7 @@
 
 module GHC.Types.Id (
         -- * The main types
-        Var, Id, isId,
+        Var, Id, Var.TcId, isId,
 
         -- * In and Out variants
         InVar,  InId,

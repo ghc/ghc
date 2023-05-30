@@ -62,7 +62,7 @@ import {-# SOURCE #-} GHC.Tc.Gen.Splice
     , tcTopSpliceExpr
     )
 
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Type
 
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)

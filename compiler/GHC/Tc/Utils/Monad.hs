@@ -42,7 +42,7 @@ module GHC.Tc.Utils.Monad(
   newSysName, newSysLocalId, newSysLocalIds,
 
   -- * Accessing input/output
-  newTcRef, readTcRef, writeTcRef, updTcRef,
+  newTcRef, readTcRef, writeTcRef, updTcRef, updTcRefM,
 
   -- * Debugging
   traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
@@ -144,6 +144,9 @@ module GHC.Tc.Utils.Monad(
   -- * Stuff for cost centres.
   getCCIndexM, getCCIndexTcM,
 
+  -- * Zonking
+  liftZonkM,
+
   -- * Types etc.
   module GHC.Tc.Types,
   module GHC.Data.IOEnv
@@ -154,12 +157,14 @@ import GHC.Prelude
 
 import GHC.Builtin.Names
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Types     -- Re-export all
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Zonk.TcType
 
 import GHC.Hs hiding (LIE)
 
@@ -216,9 +221,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
-
-import GHC.Tc.Errors.Types
-import {-# SOURCE #-} GHC.Tc.Utils.Env    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
 import GHC.Driver.Env.KnotVars
@@ -1058,7 +1060,7 @@ addErrAt :: SrcSpan -> TcRnMessage -> TcRn ()
 -- tidying is not an issue, but it's all lazy so the extra
 -- work doesn't matter
 addErrAt loc msg = do { ctxt <- getErrCtxt
-                      ; tidy_env <- tcInitTidyEnv
+                      ; tidy_env <- liftZonkM $ tcInitTidyEnv
                       ; err_info <- mkErrInfo tidy_env ctxt
                       ; let detailed_msg = mkDetailedMessage (ErrInfo err_info Outputable.empty) msg
                       ; add_long_err_at loc detailed_msg }
@@ -1218,7 +1220,7 @@ addErrCtxt :: SDoc -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
-addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addErrCtxtM ctxt = pushCtxt (False, ctxt)
 
@@ -1232,7 +1234,7 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
-addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, SDoc)) -> TcM a -> TcM a
+addLandmarkErrCtxtM :: (TidyEnv -> ZonkM (TidyEnv, SDoc)) -> TcM a -> TcM a
 {-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxtM ctxt = pushCtxt (True, ctxt)
 
@@ -1527,7 +1529,7 @@ tryTcDiscardingErrs recover thing_inside
 -}
 
 addErrTc :: TcRnMessage -> TcM ()
-addErrTc err_msg = do { env0 <- tcInitTidyEnv
+addErrTc err_msg = do { env0 <- liftZonkM tcInitTidyEnv
                       ; addErrTcM (env0, err_msg) }
 
 addErrTcM :: (TidyEnv, TcRnMessage) -> TcM ()
@@ -1589,8 +1591,8 @@ diagnosticTcM should_report warn_msg
 -- | Display a diagnostic in the current context.
 addDiagnosticTc :: TcRnMessage -> TcM ()
 addDiagnosticTc msg
- = do { env0 <- tcInitTidyEnv ;
-      addDiagnosticTcM (env0, msg) }
+ = do { env0 <- liftZonkM tcInitTidyEnv
+      ; addDiagnosticTcM (env0, msg) }
 
 -- | Display a diagnostic in a given context.
 addDiagnosticTcM :: (TidyEnv, TcRnMessage) -> TcM ()
@@ -1608,7 +1610,7 @@ addDetailedDiagnostic mkMsg = do
   loc <- getSrcSpanM
   name_ppr_ctx <- getNamePprCtx
   !diag_opts  <- initDiagOpts <$> getDynFlags
-  env0 <- tcInitTidyEnv
+  env0 <- liftZonkM tcInitTidyEnv
   ctxt <- getErrCtxt
   err_info <- mkErrInfo env0 ctxt
   reportDiagnostic (mkMsgEnvelope diag_opts loc name_ppr_ctx (mkMsg (ErrInfo err_info empty)))
@@ -1666,7 +1668,7 @@ mkErrInfo env ctxts
    go _ _ _   [] = return empty
    go dbg n env ((is_landmark, ctxt) : ctxts)
      | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
-     = do { (env', msg) <- ctxt env
+     = do { (env', msg) <- liftZonkM $ ctxt env
           ; let n' = if is_landmark then n else n+1
           ; rest <- go dbg n' env' ctxts
           ; return (msg $$ rest) }
@@ -2267,3 +2269,22 @@ getCCIndexM get_ccs nm = do
 -- | See 'getCCIndexM'.
 getCCIndexTcM :: FastString -> TcM CostCentreIndex
 getCCIndexTcM = getCCIndexM tcg_cc_st
+
+--------------------------------------------------------------------------------
+
+-- | Lift a computation from the dedicated zonking monad 'ZonkM' to the
+-- full-fledged 'TcM' monad.
+liftZonkM :: ZonkM a -> TcM a
+liftZonkM (ZonkM f) =
+  do { logger       <- getLogger
+     ; name_ppr_ctx <- getNamePprCtx
+     ; lvl          <- getTcLevel
+     ; src_span     <- getSrcSpanM
+     ; bndrs        <- tcl_bndrs <$> getLclEnv
+     ; let zge = ZonkGblEnv { zge_logger = logger
+                            , zge_name_ppr_ctx = name_ppr_ctx
+                            , zge_src_span = src_span
+                            , zge_tc_level = lvl
+                            , zge_binder_stack = bndrs }
+     ; liftIO $ f zge }
+{-# INLINE liftZonkM #-}

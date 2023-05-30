@@ -41,9 +41,10 @@ import GHC.Core.TyCon
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
-import GHC.Tc.Utils.Zonk ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
+import GHC.Tc.Zonk.Type
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Env
+import GHC.Tc.Zonk.TcType
 
 import GHC.Types.Var
 import GHC.Types.Name
@@ -656,7 +657,7 @@ applyRevSubst :: RttiInstantiation -> TR ()
 -- Apply the *reverse* substitution in-place to any un-filled-in
 -- meta tyvars.  This recovers the original debugger-world variable
 -- unless it has been refined by new information from the heap
-applyRevSubst pairs = liftTcM (mapM_ do_pair pairs)
+applyRevSubst pairs = liftTcM (liftZonkM $ mapM_ do_pair pairs)
   where
     do_pair (tc_tv, rtti_tv)
       = do { tc_ty <- zonkTcTyVar tc_tv
@@ -719,7 +720,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
               when (check1 old_tvs) (traceTR (text "check1 passed") >>
                                           addConstraint my_ty old_ty')
               term  <- go max_depth my_ty old_ty hval
-              new_ty <- zonkTcType (termType term)
+              new_ty <- liftTcM $ liftZonkM $ zonkTcType (termType term)
               if isMonomorphic new_ty || check2 new_ty old_ty
                  then do
                       traceTR (text "check2 passed")
@@ -996,11 +997,11 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
           my_ty <- newOpenVar
           when (check1 old_tvs) (traceTR (text "check1 passed") >>
                                       addConstraint my_ty old_ty')
-          search (isMonomorphic `fmap` zonkTcType my_ty)
+          search (isMonomorphic `fmap` liftZonkM (zonkTcType my_ty))
                  (\(ty,a) -> go ty a)
                  (Seq.singleton (my_ty, hval))
                  max_depth
-          new_ty <- zonkTcType my_ty
+          new_ty <- liftZonkM $ zonkTcType my_ty
           if isMonomorphic new_ty || check2 new_ty old_ty
             then do
                  traceTR (text "check2 passed" <+> ppr old_ty $$ ppr new_ty)
@@ -1381,8 +1382,8 @@ zonkTerm = foldTermM (TermFoldM
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars
 -- by RuntimeUnk skolems, safely out of Meta-tyvar-land
-zonkRttiType ty= do { ze <- mkEmptyZonkEnv RuntimeUnkFlexi
-                    ; zonkTcTypeToTypeX ze ty }
+zonkRttiType ty
+  = initZonkEnv RuntimeUnkFlexi $ zonkTcTypeToTypeX ty
 
 --------------------------------------------------------------------------------
 -- Restore Class predicates out of a representation type

@@ -42,6 +42,7 @@ import GHC.Rename.Utils ( warnUnusedTopBinds )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Zonk.TcType
 
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
@@ -1647,7 +1648,7 @@ warnMissingSignatures gbl_env
              add_binding_warn :: Id -> RnM ()
              add_binding_warn id =
                when (not_ghc_generated name) $
-               do { env <- tcInitTidyEnv -- Why not use emptyTidyEnv?
+               do { env <- liftZonkM $ tcInitTidyEnv -- Why not use emptyTidyEnv?
                   ; let (_, ty) = tidyOpenType env (idType id)
                         missing = MissingTopLevelBindingSig name ty
                         diag = TcRnMissingSignature missing exported warn_binds

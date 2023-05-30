@@ -982,9 +982,9 @@ Consider
   {-# RULES "myrule"  foo C = 1 #-}
 
 After type checking the LHS becomes (foo alpha (C alpha)), where alpha
-is an unbound meta-tyvar.  The zonker in GHC.Tc.Utils.Zonk is careful not to
+is an unbound meta-tyvar.  The zonker in GHC.Tc.Zonk.Type is careful not to
 turn the free alpha into Any (as it usually does).  Instead it turns it
-into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in "GHC.Tc.Utils.Zonk".
+into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in "GHC.Tc.Zonk.Type".
 
 Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
 in the zonker, because the HsExpr data type is very large.  But it's /easy/

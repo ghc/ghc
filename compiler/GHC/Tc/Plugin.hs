@@ -57,6 +57,7 @@ import qualified GHC.Tc.Utils.Monad     as TcM
 import qualified GHC.Tc.Solver.Monad    as TcS
 import qualified GHC.Tc.Utils.Env       as TcM
 import qualified GHC.Tc.Utils.TcMType   as TcM
+import qualified GHC.Tc.Zonk.TcType       as TcM
 import qualified GHC.Tc.Instance.Family as TcM
 import qualified GHC.Iface.Env          as IfaceEnv
 import qualified GHC.Unit.Finder        as Finder
@@ -154,12 +155,12 @@ newFlexiTyVar = unsafeTcPluginTcM . TcM.newFlexiTyVar
 isTouchableTcPluginM :: TcTyVar -> TcPluginM Bool
 isTouchableTcPluginM = unsafeTcPluginTcM . TcM.isTouchableTcM
 
--- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
+-- | Confused by zonking? See Note [What is zonking?] in "GHC.Tc.Zonk.Type".
 zonkTcType :: TcType -> TcPluginM TcType
-zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
+zonkTcType = unsafeTcPluginTcM . TcM.liftZonkM . TcM.zonkTcType
 
 zonkCt :: Ct -> TcPluginM Ct
-zonkCt = unsafeTcPluginTcM . TcM.zonkCt
+zonkCt = unsafeTcPluginTcM . TcM.liftZonkM . TcM.zonkCt
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWanted :: CtLoc -> PredType -> TcPluginM CtEvidence

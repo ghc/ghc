@@ -32,9 +32,9 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Utils.Env  ( TyThing(..), tcInitTidyEnv, tcInitOpenTidyEnv )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Instance.Family
+import GHC.Tc.Zonk.TcType
 
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -67,6 +67,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
+import GHC.Types.TyThing ( TyThing(..) )
 import GHC.Types.Unique.Set( isEmptyUniqSet )
 
 import GHC.Utils.FV
@@ -297,7 +298,7 @@ checkUserTypeError ctxt ty
     -- inside type family arguments (see #20241).
 
   fail_with :: Type -> TcM ()
-  fail_with msg = do { env0 <- tcInitTidyEnv
+  fail_with msg = do { env0 <- liftZonkM tcInitTidyEnv
                      ; let (env1, tidy_msg) = tidyOpenType env0 msg
                      ; failWithTcM (env1, TcRnUserTypeError tidy_msg)
                      }
@@ -420,7 +421,7 @@ checkValidType ctxt ty
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
-       ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
+       ; env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                              , ve_rank = rank, ve_expand = expand }
@@ -443,7 +444,7 @@ checkValidType ctxt ty
 checkValidMonoType :: Type -> TcM ()
 -- Assumes argument is fully zonked
 checkValidMonoType ty
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
+  = do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
        ; expand <- initialExpandMode
        ; let ve = ValidityEnv{ ve_tidy_env = env, ve_ctxt = SigmaCtxt
                              , ve_rank = MustBeMonoType, ve_expand = expand }
@@ -1097,7 +1098,7 @@ checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
   = addErrCtxtM (checkThetaCtxt ctxt theta) $
-    do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
+    do { env <- liftZonkM $ tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; expand <- initialExpandMode
        ; check_valid_theta env ctxt expand theta }
 
@@ -1372,7 +1373,7 @@ Flexibility check:
   generalized actually.
 -}
 
-checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> TcM (TidyEnv, SDoc)
+checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> ZonkM (TidyEnv, SDoc)
 checkThetaCtxt ctxt theta env
   = return ( env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
@@ -1953,7 +1954,7 @@ checkValidInstance ctxt hs_type ty = case tau of
 
         ; traceTc "checkValidInstance {" (ppr ty)
 
-        ; env0 <- tcInitTidyEnv
+        ; env0 <- liftZonkM $ tcInitTidyEnv
         ; expand <- initialExpandMode
         ; check_valid_theta env0 ctxt expand theta
 
