@@ -234,7 +234,7 @@ test('MulMayOflo_full',
      [ extra_files(['MulMayOflo.hs']),
        when(unregisterised(), skip),
        unless(
-         arch('aarch64') or arch('x86_64') or arch('i386'),
+         arch('aarch64') or arch('x86_64') or arch('i386') or arch('riscv64'),
          expect_broken(23742)
        ),
         ignore_stdout],
