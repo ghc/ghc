@@ -248,7 +248,6 @@ import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 import GHC.Types.Unique.Supply (uniqFromMask)
-import GHC.Types.Unique (getKey)
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
@@ -2588,7 +2587,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   -- guaranteed.
   --
   -- We reuse the unique we obtained for the binding, but any unique would do.
-  let this_mod = mkInteractiveModule (getKey u)
+  let this_mod = mkInteractiveModule (show u)
   let for_bytecode = True
 
   (stg_binds, _prov_map, _collected_ccs, _stg_cg_infos) <-

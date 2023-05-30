@@ -330,7 +330,7 @@ icReaderEnv = igre_env . ic_gre_cache
 
 icInteractiveModule :: InteractiveContext -> Module
 icInteractiveModule (InteractiveContext { ic_mod_index = index })
-  = mkInteractiveModule index
+  = mkInteractiveModule (show index)
 
 -- | This function returns the list of visible TyThings (useful for
 -- e.g. showBindings).
