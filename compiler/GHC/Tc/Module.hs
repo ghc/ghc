@@ -699,9 +699,6 @@ tcRnHsBootDecls boot_or_sig decls
                             , hs_valds  = XValBindsLR (NValBinds val_binds val_sigs) })
               <- rnTopSrcDecls first_group
 
-        -- The empty list is for extra dependencies coming from .hs-boot files
-        -- See Note [Extra dependencies from .hs-boot files] in GHC.Rename.Module
-
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
               -- NB: setGblEnv **before** captureTopConstraints so that
               -- if the latter reports errors, it knows what's in scope

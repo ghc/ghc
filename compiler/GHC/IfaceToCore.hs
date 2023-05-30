@@ -114,7 +114,6 @@ import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Env
-import GHC.Types.Name.Set
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
@@ -568,7 +567,7 @@ tcHiBootIface hsc_src mod
           then do { (_, hug) <- getEpsAndHug
                  ; case lookupHugByModule mod hug  of
                       Just info | mi_boot (hm_iface info) == IsBoot
-                                -> mkSelfBootInfo (hm_iface info) (hm_details info)
+                                -> return $ SelfBoot { sb_mds = hm_details info }
                       _ -> return NoSelfBoot }
           else do
 
@@ -584,7 +583,7 @@ tcHiBootIface hsc_src mod
         ; case read_result of {
             Succeeded (iface, _path) ->
               do { tc_iface <- initIfaceTcRn $ typecheckIface iface
-                 ; mkSelfBootInfo iface tc_iface } ;
+                 ; return $ SelfBoot { sb_mds = tc_iface } } ;
             Failed err               ->
 
         -- There was no hi-boot file. But if there is circularity in
@@ -612,29 +611,6 @@ tcHiBootIface hsc_src mod
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
                  <+> text "to compare against the Real Thing"
-
-mkSelfBootInfo :: ModIface -> ModDetails -> TcRn SelfBootInfo
-mkSelfBootInfo iface mds
-  = do -- NB: This is computed DIRECTLY from the ModIface rather
-       -- than from the ModDetails, so that we can query 'sb_tcs'
-       -- WITHOUT forcing the contents of the interface.
-       let tcs = map ifName
-                 . filter isIfaceTyCon
-                 . map snd
-                 $ mi_decls iface
-       return $ SelfBoot { sb_mds = mds
-                         , sb_tcs = mkNameSet tcs }
-  where
-    -- Returns @True@ if, when you call 'tcIfaceDecl' on
-    -- this 'IfaceDecl', an ATyCon would be returned.
-    -- NB: This code assumes that a TyCon cannot be implicit.
-    isIfaceTyCon IfaceId{}      = False
-    isIfaceTyCon IfaceData{}    = True
-    isIfaceTyCon IfaceSynonym{} = True
-    isIfaceTyCon IfaceFamily{}  = True
-    isIfaceTyCon IfaceClass{}   = True
-    isIfaceTyCon IfaceAxiom{}   = False
-    isIfaceTyCon IfacePatSyn{}  = False
 
 {-
 ************************************************************************

@@ -5021,7 +5021,7 @@ checkValidRoleAnnots role_annots tc
       = whenIsJust role_annot_decl_maybe illegalRoleAnnotDecl
 
 -- Note [Missing role annotations warning]
---
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- We warn about missing role annotations for tycons
 -- 1. not type-classes:
 --    type classes are nominal by default, which is most conservative

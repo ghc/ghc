@@ -167,7 +167,7 @@ def stage1(name, opts):
                    'add your test to testsuite/tests/stage1 instead')
 
 # Note [Why is there no stage1 setup function?]
-#
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Presumably a stage1 setup function would signal that the stage1
 # compiler should be used to compile a test.
 #
