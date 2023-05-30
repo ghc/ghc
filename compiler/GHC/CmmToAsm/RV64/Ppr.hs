@@ -466,7 +466,7 @@ pprInstr platform instr = case instr of
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
-  SMULH o1 o2 o3 -> op3 (text "\tsmulh") o1 o2 o3
+  SMULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
   SMULL o1 o2 o3 -> op3 (text "\tsmull") o1 o2 o3
   NEG  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfneg") o1 o2

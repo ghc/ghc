@@ -229,3 +229,8 @@ test('T20640b', normal, compile_and_run, [''])
 test('T22296',[only_ways(llvm_ways)
               ,unless(arch('x86_64'), skip)],compile_and_run,[''])
 test('T22798', normal, compile_and_run, ['-fregs-graph'])
+
+test('MulMayOflo',
+     [ omit_ways(['ghci']), js_skip],
+     multi_compile_and_run,
+     ['MulMayOflo', [('MulMayOflo_cmm.cmm', '')], ''])

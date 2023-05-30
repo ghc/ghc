@@ -946,38 +946,110 @@ getRegister' config plat expr
     isNbitEncodeable :: Int -> Integer -> Bool
     isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
     -- N.B. MUL does not set the overflow flag.
+    -- Return 0 when the operation cannot overflow, /= 0 otherwise
     do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
+    do_mul_may_oflo w _x _y | w > W64 = pprPanic "Cannot multiply larger than 64bit" (ppr w)
     do_mul_may_oflo w@W64 x y = do
-        (reg_x, _format_x, code_x) <- getSomeReg x
-        (reg_y, _format_y, code_y) <- getSomeReg y
-        lo <- getNewRegNat II64
-        hi <- getNewRegNat II64
-        return $ Any (intFormat w) (\dst ->
-            code_x `appOL`
-            code_y `snocOL`
-            MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
-            SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
-            CSET (OpReg w dst) (OpReg w hi) (OpRegShift w lo SASR 63) NE)
+      (reg_x, format_x, code_x) <- getSomeReg x
+      (reg_y, format_y, code_y) <- getSomeReg y
+      -- TODO: Can't we clobber reg_x and reg_y to save registers?
+      lo <- getNewRegNat II64
+      hi <- getNewRegNat II64
+      -- TODO: Overhaul CSET: 3rd operand isn't needed for SNEZ
+      let nonSense = OpImm (ImmInt 0)
+      pure $
+        Any
+          (intFormat w)
+          ( \dst ->
+              code_x
+                `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
+                `appOL` code_y
+                `appOL` signExtend (formatToWidth format_y) W64 reg_x reg_y
+                `appOL` toOL
+                  [ annExpr expr (SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
+                    MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
+                    ASR (OpReg w lo) (OpReg w reg_x) (OpImm (ImmInt (widthInBits W64 - 1))),
+                    ann
+                      (text "Set flag if result of MULH contains more than sign bits.")
+                      (SUB (OpReg w hi) (OpReg w hi) (OpReg w lo)),
+                    CSET (OpReg w dst) (OpReg w hi) nonSense NE
+                  ]
+          )
     do_mul_may_oflo w x y = do
-        (reg_x, format_x, code_x) <- getSomeReg x
-        (reg_y, format_y, code_y) <- getSomeReg y
-        let mul = case w of
-                    W32 -> SMULL
-                    W16 -> MUL
-                    W8  -> MUL
-                    _   -> panic "do_mul_may_oflo: impossible"
-            wx' = max (formatToWidth format_x) w
-            wy' = max (formatToWidth format_y) w
-        return $ Any (intFormat w) (\dst ->
-            code_x `appOL`
-            signExtend (formatToWidth format_x) wx' reg_x reg_x `appOL`
-            code_y `appOL`
-            signExtend (formatToWidth format_y) wy' reg_y reg_y `snocOL`
-            mul (OpReg w dst) (OpReg wx' reg_x) (OpReg wy' reg_y)
-                                   )
-            -- TODO: Handle overflow
-            -- `snocOL`
-            -- CSET (OpReg w dst) (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) NE)
+      (reg_x, format_x, code_x) <- getSomeReg x
+      (reg_y, format_y, code_y) <- getSomeReg y
+      let width_x = formatToWidth format_x
+          width_y = formatToWidth format_y
+      if w > width_x && w > width_y
+        then
+          pure $
+            Any
+              (intFormat w)
+              ( \dst ->
+                  -- 8bit * 8bit cannot overflow 16bit
+                  -- 16bit * 16bit cannot overflow 32bit
+                  -- 32bit * 32bit cannot overflow 64bit
+                  unitOL $ annExpr expr (ADD (OpReg w dst) zero (OpImm (ImmInt 0)))
+              )
+        else do
+          let use32BitMul = width_x <= W32 && width_y <= W32
+              nonSense = OpImm (ImmInt 0)
+          if use32BitMul
+            then do
+              narrowedReg <- getNewRegNat II64
+              pure $
+                Any
+                  (intFormat w)
+                  ( \dst ->
+                      code_x
+                        `appOL` signExtend (formatToWidth format_x) W32 reg_x reg_x
+                        `appOL` code_y
+                        `appOL` signExtend (formatToWidth format_y) W32 reg_y reg_y
+                        `snocOL` annExpr expr (MUL (OpReg W32 dst) (OpReg W32 reg_x) (OpReg W32 reg_y))
+                        `appOL` signExtend W32 w dst narrowedReg
+                        `appOL` toOL
+                          [ ann
+                              (text "Check if the multiplied value fits in the narrowed register")
+                              (SUB (OpReg w dst) (OpReg w dst) (OpReg w narrowedReg)),
+                            CSET (OpReg w dst) (OpReg w dst) nonSense NE
+                          ]
+                  )
+            else do
+              -- TODO: Can't we clobber reg_x and reg_y to save registers?
+              lo <- getNewRegNat II64
+              hi <- getNewRegNat II64
+              narrowedLo <- getNewRegNat II64
+
+              -- TODO: Overhaul CSET: 3rd operand isn't needed for SNEZ
+              let nonSense = OpImm (ImmInt 0)
+              pure $
+                Any
+                  (intFormat w)
+                  ( \dst ->
+                      code_x
+                        `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
+                        `appOL` code_y
+                        `appOL` signExtend (formatToWidth format_y) W64 reg_x reg_y
+                        `appOL` toOL
+                          [ annExpr expr (SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
+                            MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
+                            ASR (OpReg w lo) (OpReg w reg_x) (OpImm (ImmInt (widthInBits W64 - 1))),
+                            ann
+                              (text "Set flag if result of MULH contains more than sign bits.")
+                              (SUB (OpReg w hi) (OpReg w hi) (OpReg w lo)),
+                            CSET (OpReg w hi) (OpReg w hi) nonSense NE
+                          ]
+                        `appOL` signExtend W64 w lo narrowedLo
+                        `appOL` toOL
+                          [ ann
+                              (text "Check if the multiplied value fits in the narrowed register")
+                              (SUB (OpReg w narrowedLo) (OpReg w lo) (OpReg w narrowedLo)),
+                            CSET (OpReg w narrowedLo) (OpReg w narrowedLo) nonSense NE,
+                            ann
+                              (text "Combine both overflow flags")
+                              (OR (OpReg w dst) (OpReg w narrowedLo) (OpReg w hi))
+                          ]
+                )
 
 -- | Instructions to sign-extend the value in the given register from width @w@
 -- up to width @w'@.

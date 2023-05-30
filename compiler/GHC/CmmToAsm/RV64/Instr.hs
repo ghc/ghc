@@ -602,6 +602,7 @@ data Instr
     | DIV Operand Operand Operand -- rd = rn ÷ rm
     | REM Operand Operand Operand -- rd = rn % rm
 
+    -- TODO: Rename: MULH
     | SMULH Operand Operand Operand
     | SMULL Operand Operand Operand
 
