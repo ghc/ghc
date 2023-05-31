@@ -152,6 +152,10 @@ instance Diagnostic TcRnMessage where
          hang (text "Inaccessible code in")
            2 (ppr (ic_info implic))
          $$ pprSolverReportWithCtxt contra
+    TcRnInaccessibleCoAxBranch fam_tc cur_branch
+      -> mkSimpleDecorated $
+          text "Type family instance equation is overlapped:" $$
+          nest 2 (pprCoAxBranchUser fam_tc cur_branch)
     TcRnTypeDoesNotHaveFixedRuntimeRep ty prov (ErrInfo extra supplementary)
       -> mkDecorated [pprTypeDoesNotHaveFixedRuntimeRep ty prov, extra, supplementary]
     TcRnImplicitLift id_or_name ErrInfo{..}
@@ -1833,7 +1837,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalQuasiQuotes -> mkSimpleDecorated $
       text "Quasi-quotes are not permitted without QuasiQuotes"
     TcRnTHError err -> pprTHError err
-
+    TcRnPatersonCondFailure reason ctxt lhs rhs ->
+      mkSimpleDecorated $ pprPatersonCondFailure reason ctxt lhs rhs
     TcRnIllegalInvisTyVarBndr bndr ->
       mkSimpleDecorated $
         hang (text "Illegal invisible type variable binder:")
@@ -1876,6 +1881,8 @@ instance Diagnostic TcRnMessage where
     TcRnRedundantConstraints {}
       -> WarningWithFlag Opt_WarnRedundantConstraints
     TcRnInaccessibleCode {}
+      -> WarningWithFlag Opt_WarnInaccessibleCode
+    TcRnInaccessibleCoAxBranch {}
       -> WarningWithFlag Opt_WarnInaccessibleCode
     TcRnTypeDoesNotHaveFixedRuntimeRep{}
       -> ErrorWithoutFlag
@@ -2485,6 +2492,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnImplicitRhsQuantification{}
       -> WarningWithFlag Opt_WarnImplicitRhsQuantification
+    TcRnPatersonCondFailure{}
+      -> ErrorWithoutFlag
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -2499,6 +2508,8 @@ instance Diagnostic TcRnMessage where
     TcRnRedundantConstraints{}
       -> noHints
     TcRnInaccessibleCode{}
+      -> noHints
+    TcRnInaccessibleCoAxBranch{}
       -> noHints
     TcRnTypeDoesNotHaveFixedRuntimeRep{}
       -> noHints
@@ -3154,6 +3165,8 @@ instance Diagnostic TcRnMessage where
       -> [SuggestAddStandaloneKindSignature name]
     TcRnImplicitRhsQuantification kv
       -> [SuggestBindTyVarOnLhs (unLoc kv)]
+    TcRnPatersonCondFailure{}
+      -> [suggestExtension LangExt.UndecidableInstances]
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
@@ -6217,6 +6230,45 @@ addTopDeclsErrorHints = \case
     -> noHints
   AddTopDeclsRunSpliceFailure {}
     -> noHints
+
+--------------------------------------------------------------------------------
+
+pprPatersonCondFailure ::
+  PatersonCondFailure -> PatersonCondFailureContext -> Type -> Type -> SDoc
+pprPatersonCondFailure (PCF_TyVar tvs) InInstanceDecl lhs rhs =
+  hang (occMsg tvs)
+    2 (sep [ text "in the constraint" <+> quotes (ppr lhs)
+         , text "than in the instance head" <+> quotes (ppr rhs) ])
+  where
+    occMsg tvs = text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+                 <+> pp_occurs <+> text "more often"
+    pp_occurs | isSingleton tvs = text "occurs"
+              | otherwise       = text "occur"
+pprPatersonCondFailure (PCF_TyVar tvs) InTyFamEquation lhs rhs =
+  hang (occMsg tvs)
+    2 (sep [ text "in the type-family application" <+> quotes (ppr rhs)
+         , text "than in the LHS of the family instance" <+> quotes (ppr lhs) ])
+  where
+    occMsg tvs = text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+                 <+> pp_occurs <+> text "more often"
+    pp_occurs | isSingleton tvs = text "occurs"
+              | otherwise       = text "occur"
+pprPatersonCondFailure PCF_Size InInstanceDecl lhs rhs =
+  hang (text "The constraint" <+> quotes (ppr lhs))
+    2 (sep [ text "is no smaller than", pp_rhs ])
+  where pp_rhs = text "the instance head" <+> quotes (ppr rhs)
+pprPatersonCondFailure PCF_Size InTyFamEquation lhs rhs =
+  hang (text "The type-family application" <+> quotes (ppr rhs))
+    2 (sep [ text "is no smaller than", pp_lhs ])
+  where pp_lhs = text "the LHS of the family instance" <+> quotes (ppr lhs)
+pprPatersonCondFailure  (PCF_TyFam tc) InInstanceDecl lhs _rhs =
+  hang (text "Illegal use of type family" <+> quotes (ppr tc))
+    2 (text "in the constraint" <+> quotes (ppr lhs))
+pprPatersonCondFailure  (PCF_TyFam tc) InTyFamEquation _lhs rhs =
+  hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
+    2 (text "in the arguments of the type-family application" <+> quotes (ppr rhs))
+
+
 
 --------------------------------------------------------------------------------
 

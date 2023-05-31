@@ -117,7 +117,8 @@ module GHC.Tc.Utils.TcType (
 
   ---------------------------------
   -- Patersons sizes
-  PatersonSize(..), PatersonSizeFailure(..),
+  PatersonSize(..), PatersonCondFailure(..),
+  PatersonCondFailureContext(..),
   ltPatersonSize,
   pSizeZero, pSizeOne,
   pSizeType, pSizeTypeX, pSizeTypes,
@@ -2097,17 +2098,28 @@ The type-family termination test, in GHC.Tc.Validity.checkFamInstRhs, already
 has a separate call to isStuckTypeFamily, so the `F` above will still be accepted.
 -}
 
-
--- | Why was the LHS 'PatersonSize' not strictly smaller than the RHS 'PatersonSize'?
+-- | Why did the Paterson conditions fail; that is, why
+-- was the context P not Paterson-smaller than the head H?
 --
 -- See Note [Paterson conditions] in GHC.Tc.Validity.
-data PatersonSizeFailure
-  -- | Either side contains a type family.
-  = PSF_TyFam TyCon
-  -- | The size of the LHS is not strictly less than the size of the RHS.
-  | PSF_Size
-  -- | These type variables appear more often in the LHS than in the RHS.
-  | PSF_TyVar [TyVar] -- ^  no duplicates in this list
+data PatersonCondFailure
+  -- | Some type variables occur more often in P than in H.
+  -- See (PC1) in Note [Paterson conditions] in GHC.Tc.Validity.
+  = PCF_TyVar
+    [TyVar]  -- ^ the type variables which appear more often in the context
+  -- | P is not smaller in size than H.
+  -- See (PC2) in Note [Paterson conditions] in GHC.Tc.Validity.
+  | PCF_Size
+  -- | P contains a type family.
+  -- See (PC3) in Note [Paterson conditions] in GHC.Tc.Validity.
+  | PCF_TyFam
+    TyCon  -- ^ the type constructor of the type family
+
+-- | Indicates whether a Paterson condition failure occurred in an instance declaration or a type family equation.
+-- Useful for differentiating context in error messages.
+data PatersonCondFailureContext
+  = InInstanceDecl
+  | InTyFamEquation
 
 --------------------------------------
 
@@ -2119,7 +2131,6 @@ data PatersonSizeFailure
 data PatersonSize
   -- | The type mentions a type family, so the size could be anything.
   = PS_TyFam TyCon
-
   -- | The type does not mention a type family.
   | PS_Vanilla { ps_tvs :: [TyVar]  -- ^ free tyvars, including repetitions;
                , ps_size :: Int     -- ^ number of type constructors and variables
@@ -2142,14 +2153,14 @@ pSizeOne  = PS_Vanilla { ps_tvs = [], ps_size = 1 }
 --  - @Just ps_fail@ otherwise; @ps_fail@ says what went wrong.
 ltPatersonSize :: PatersonSize
                -> PatersonSize
-               -> Maybe PatersonSizeFailure
+               -> Maybe PatersonCondFailure
 ltPatersonSize (PS_Vanilla { ps_tvs = tvs1, ps_size = s1 })
                (PS_Vanilla { ps_tvs = tvs2, ps_size = s2 })
-  | s1 >= s2                                = Just PSF_Size
-  | bad_tvs@(_:_) <- noMoreTyVars tvs1 tvs2 = Just (PSF_TyVar bad_tvs)
+  | s1 >= s2                                = Just PCF_Size
+  | bad_tvs@(_:_) <- noMoreTyVars tvs1 tvs2 = Just (PCF_TyVar bad_tvs)
   | otherwise                               = Nothing -- OK!
-ltPatersonSize (PS_TyFam tc) _ = Just (PSF_TyFam tc)
-ltPatersonSize _ (PS_TyFam tc) = Just (PSF_TyFam tc)
+ltPatersonSize (PS_TyFam tc) _ = Just (PCF_TyFam tc)
+ltPatersonSize _ (PS_TyFam tc) = Just (PCF_TyFam tc)
   -- NB: this last equation is never taken when checking instances, because
   -- type families are disallowed in instance heads.
   --

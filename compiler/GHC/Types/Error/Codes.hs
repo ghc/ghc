@@ -332,6 +332,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- Typechecker/renamer diagnostic codes
   GhcDiagnosticCode "TcRnRedundantConstraints"                      = 30606
   GhcDiagnosticCode "TcRnInaccessibleCode"                          = 40564
+  GhcDiagnosticCode "TcRnInaccessibleCoAxBranch"                    = 28129
   GhcDiagnosticCode "TcRnTypeDoesNotHaveFixedRuntimeRep"            = 18478
   GhcDiagnosticCode "TcRnImplicitLift"                              = 00846
   GhcDiagnosticCode "TcRnUnusedPatternBinds"                        = 61367
@@ -593,6 +594,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
   GhcDiagnosticCode "TcRnIllegalQuasiQuotes"                        = 77343
   GhcDiagnosticCode "TcRnImplicitRhsQuantification"                 = 16382
+  GhcDiagnosticCode "TcRnPatersonCondFailure"                       = 22979
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482
