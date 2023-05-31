@@ -293,6 +293,7 @@ pprAlignForSection platform seg = line $
           RelocatableReadOnlyData
                             -> naturalAlignment
           UninitialisedData -> naturalAlignment
+          InfoProvData      -> naturalAlignment
           -- TODO: This is copied from the ReadOnlyData case, but it can likely be
           -- made more efficient.
           InitArray         -> 3

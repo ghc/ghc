@@ -140,22 +140,22 @@ emitIpeBufferListNode this_mod ents = do
 
     -- Emit the list of info table pointers
     emitDecl $ CmmData
-      (Section Data tables_lbl)
+      (Section InfoProvData tables_lbl)
       (CmmStaticsRaw tables_lbl tables)
 
     -- Emit the strings table
     emitDecl $ CmmData
-      (Section Data strings_lbl)
+      (Section InfoProvData strings_lbl)
       (CmmStaticsRaw strings_lbl strings)
 
     -- Emit the list of IPE buffer entries
     emitDecl $ CmmData
-      (Section Data entries_lbl)
+      (Section InfoProvData entries_lbl)
       (CmmStaticsRaw entries_lbl entries)
 
     -- Emit the IPE buffer list node
     emitDecl $ CmmData
-      (Section Data ipe_buffer_lbl)
+      (Section InfoProvData ipe_buffer_lbl)
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
 
 -- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.

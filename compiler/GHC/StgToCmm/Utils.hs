@@ -10,6 +10,7 @@
 
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
+        emitInfoProvDataLits,
         emitDataCon,
         emitRtsCall, emitRtsCallWithResult, emitRtsCallGen,
         emitBarf,
@@ -261,6 +262,9 @@ callerRestoreGlobalReg platform reg
 -- | Emit a data-segment data block
 emitDataLits :: CLabel -> [CmmLit] -> FCode ()
 emitDataLits lbl lits = emitDecl (mkDataLits (Section Data lbl) lbl lits)
+
+emitInfoProvDataLits :: CLabel -> [CmmLit] -> FCode ()
+emitInfoProvDataLits lbl lits = emitDecl (mkDataLits (Section InfoProvData lbl) lbl lits)
 
 -- | Emit a read-only data block
 emitRODataLits :: CLabel -> [CmmLit] -> FCode ()

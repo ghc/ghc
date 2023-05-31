@@ -249,6 +249,7 @@ data SectionType
   | ReadOnlyData
   | RelocatableReadOnlyData
   | UninitialisedData
+  | InfoProvData
     -- See Note [Initializers and finalizers in Cmm] in GHC.Cmm.InitFini
   | InitArray           -- .init_array on ELF, .ctor on Windows
   | FiniArray           -- .fini_array on ELF, .dtor on Windows
@@ -268,6 +269,7 @@ sectionProtection (Section t _) = case t of
     Text                    -> ReadOnlySection
     ReadOnlyData            -> ReadOnlySection
     RelocatableReadOnlyData -> WriteProtectedSection
+    InfoProvData            -> ReadWriteSection
     InitArray               -> ReadOnlySection
     FiniArray               -> ReadOnlySection
     CString                 -> ReadOnlySection
@@ -474,6 +476,7 @@ pprSectionType s = doubleQuotes $ case s of
   ReadOnlyData            -> text "readonly"
   RelocatableReadOnlyData -> text "relreadonly"
   UninitialisedData       -> text "uninitialised"
+  InfoProvData            -> text "infoprovdata"
   InitArray               -> text "initarray"
   FiniArray               -> text "finiarray"
   CString                 -> text "cstring"

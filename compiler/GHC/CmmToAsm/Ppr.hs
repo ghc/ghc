@@ -230,6 +230,7 @@ pprGNUSectionHeader config t suffix =
                                           -> text ".rdata$rel.ro"
                               | otherwise -> text ".data.rel.ro"
       UninitialisedData -> text ".bss"
+      InfoProvData  -> text ".data$ipe"
       InitArray
         | OSMinGW32 <- platformOS platform
                     -> text ".ctors"
@@ -276,6 +277,7 @@ pprDarwinSectionHeader t = case t of
   Text                    -> text ".text"
   Data                    -> text ".data"
   ReadOnlyData            -> text ".const"
+  InfoProvData            -> text ".data"
   RelocatableReadOnlyData -> text ".const_data"
   UninitialisedData       -> text ".data"
   InitArray               -> text ".section\t__DATA,__mod_init_func,mod_init_funcs"

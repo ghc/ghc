@@ -140,6 +140,7 @@ llvmSectionType p t = case t of
                                  _         -> fsLit ".data.rel.ro"
     Data                    -> fsLit ".data"
     UninitialisedData       -> fsLit ".bss"
+    InfoProvData            -> fsLit ".data$ipe"
     CString                 -> case platformOS p of
                                  OSMinGW32 -> fsLit ".rdata$str"
                                  _         -> fsLit ".rodata.str"
