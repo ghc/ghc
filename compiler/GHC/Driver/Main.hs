@@ -234,6 +234,7 @@ import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
 import GHC.Types.Name.Env      ( mkNameEnv )
 import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
+import GHC.Types.Var.Set
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
@@ -248,6 +249,7 @@ import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 import GHC.Types.Unique.Supply (uniqFromMask)
+import GHC.Types.Unique.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
@@ -278,7 +280,7 @@ import System.FilePath as FilePath
 import System.Directory
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.Functor
+import Data.Functor ((<&>))
 import Control.DeepSeq (force)
 import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty ((:|)))
@@ -1847,7 +1849,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             this_mod location late_cc_binds data_tycons
 
         -----------------  Convert to STG ------------------
-        (stg_binds, denv, (caf_ccs, caf_cc_stacks), stg_cg_infos)
+        (stg_binds_with_deps, denv, (caf_ccs, caf_cc_stacks), stg_cg_infos)
             <- {-# SCC "CoreToStg" #-}
                withTiming logger
                    (text "CoreToStg"<+>brackets (ppr this_mod))
@@ -1858,6 +1860,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                         d `seqList`
                         (seqEltsUFM (seqTagSig) tag_env))
                    (myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) False this_mod location prepd_binds)
+
+        let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
         let cost_centre_info =
               (late_local_ccs ++ caf_ccs, caf_cc_stacks)
@@ -1977,9 +1981,12 @@ hscInteractive hsc_env cgguts location = do
 
     -- The stg cg info only provides a runtime benfit, but is not requires so we just
     -- omit it here
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
+    (stg_binds_with_deps, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
       <- {-# SCC "CoreToStg" #-}
           myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod location prepd_binds
+
+    let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
+
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
@@ -2157,7 +2164,7 @@ doCodeGen hsc_env this_mod denv data_tycons
 myCoreToStg :: Logger -> DynFlags -> [Var]
             -> Bool
             -> Module -> ModLocation -> CoreProgram
-            -> IO ( [CgStgTopBinding] -- output program
+            -> IO ( [(CgStgTopBinding,IdSet)] -- output program and its dependencies
                   , InfoTableProvMap
                   , CollectedCCs -- CAF cost centre info (declared and used)
                   , StgCgInfos )
@@ -2172,7 +2179,7 @@ myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
                    this_mod stg_binds
 
     putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
-        (pprGenStgTopBindings (initStgPprOpts dflags) stg_binds_with_fvs)
+        (pprGenStgTopBindings (initStgPprOpts dflags) (fmap fst stg_binds_with_fvs))
 
     return (stg_binds_with_fvs, denv, cost_centre_info, stg_cg_info)
 
@@ -2325,7 +2332,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
         (initCorePrepPgmConfig (hsc_dflags hsc_env) (interactiveInScope $ hsc_IC hsc_env))
         this_mod iNTERACTIVELoc core_binds data_tycons
 
-    (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _stg_cg_info)
+    (stg_binds_with_deps, _infotable_prov, _caf_ccs__caf_cc_stacks, _stg_cg_info)
         <- {-# SCC "CoreToStg" #-}
            liftIO $ myCoreToStg (hsc_logger hsc_env)
                                 (hsc_dflags hsc_env)
@@ -2334,6 +2341,8 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                                 this_mod
                                 iNTERACTIVELoc
                                 prepd_binds
+
+    let (stg_binds,_stg_deps) = unzip stg_binds_with_deps
 
     {- Generate byte code -}
     cbc <- liftIO $ byteCodeGen hsc_env this_mod
@@ -2590,7 +2599,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let this_mod = mkInteractiveModule (show u)
   let for_bytecode = True
 
-  (stg_binds, _prov_map, _collected_ccs, _stg_cg_infos) <-
+  (stg_binds_with_deps, _prov_map, _collected_ccs, _stg_cg_infos) <-
        myCoreToStg logger
                    dflags
                    (interactiveInScope (hsc_IC hsc_env))
@@ -2598,6 +2607,8 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
                    this_mod
                    this_loc
                    [NonRec binding_id prepd_expr]
+
+  let (stg_binds, _stg_deps) = unzip stg_binds_with_deps
 
   let interp = hscInterp hsc_env
   let tmpfs = hsc_tmpfs hsc_env

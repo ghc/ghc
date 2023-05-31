@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
@@ -84,26 +85,31 @@ But isn't it in correct dependency order already?  No:
 --     with the free variables needed in the closure
 --   * Each StgCase is correctly annotated (in its extension field) with
 --     the variables that must be saved across the case
-depSortWithAnnotStgPgm :: Module -> [StgTopBinding] -> [CgStgTopBinding]
+depSortWithAnnotStgPgm :: Module -> [StgTopBinding] -> [(CgStgTopBinding,ImpFVs)]
 depSortWithAnnotStgPgm this_mod binds
   = {-# SCC "STG.depSortWithAnnotStgPgm" #-}
-    lit_binds ++ map from_scc sccs
+    zip lit_binds (repeat emptyVarSet) ++ map from_scc sccs
   where
     lit_binds :: [CgStgTopBinding]
     pairs     :: [(Id, StgRhs)]
     (lit_binds, pairs) = flattenTopStgBindings binds
 
-    nodes :: [Node Name (Id, CgStgRhs)]
+    nodes :: [Node Name (Id, CgStgRhs, ImpFVs)]
     nodes = map (annotateTopPair env0) pairs
     env0 = Env { locals = emptyVarSet, mod = this_mod }
 
     -- Do strongly connected component analysis.  Why?
     -- See Note [Why do we need dependency analysis?]
-    sccs :: [SCC (Id,CgStgRhs)]
+    sccs :: [SCC (Id,CgStgRhs,ImpFVs)]
     sccs  = stronglyConnCompFromEdgedVerticesUniq nodes
 
-    from_scc (CyclicSCC pairs)       = StgTopLifted (StgRec pairs)
-    from_scc (AcyclicSCC (bndr,rhs)) = StgTopLifted (StgNonRec bndr rhs)
+    from_scc = \case
+      AcyclicSCC (bndr,rhs,imp_fvs) -> (StgTopLifted (StgNonRec bndr rhs), imp_fvs)
+      CyclicSCC triples             -> (StgTopLifted (StgRec pairs), imp_fvs)
+        where
+          (ids,rhss,imp_fvss) = unzip3 triples
+          pairs = zip ids rhss
+          imp_fvs = unionVarSets imp_fvss
 
 
 flattenTopStgBindings :: [StgTopBinding] -> ([CgStgTopBinding], [(Id,StgRhs)])
@@ -119,13 +125,13 @@ flattenTopStgBindings binds
     flatten_one (StgNonRec b r) = [(b,r)]
     flatten_one (StgRec pairs)  = pairs
 
-annotateTopPair :: Env -> (Id, StgRhs) -> Node Name (Id, CgStgRhs)
+annotateTopPair :: Env -> (Id, StgRhs) -> Node Name (Id, CgStgRhs, ImpFVs)
 annotateTopPair env0 (bndr, rhs)
   = DigraphNode { node_key          = idName bndr
-                , node_payload      = (bndr, rhs')
+                , node_payload      = (bndr, rhs', imp_fvs)
                 , node_dependencies = map idName (nonDetEltsUniqSet top_fvs) }
   where
-    (rhs', top_fvs, _) = rhsFVs env0 rhs
+    (rhs', imp_fvs, top_fvs, _) = rhsFVs env0 rhs
 
 --------------------------------------------------------------------------------
 -- * Non-global free variable analysis
@@ -158,6 +164,12 @@ addLocals bndrs env
 -- analysis on the top-level bindings.
 type TopFVs   = IdSet
 
+-- | ImpFVs: set of variables that are imported
+--
+-- It is a /non-deterministic/ set because we use it only to perform module
+-- dependency analysis.
+type ImpFVs   = IdSet
+
 -- | LocalFVs: set of variable that are:
 --     (a) bound locally (by a lambda, non-top-level let, or case); that is,
 --         it appears in the 'locals' field of 'Env'
@@ -181,97 +193,100 @@ type LocalFVs = DIdSet
 --
 
 annBindingFreeVars :: Module -> StgBinding -> CgStgBinding
-annBindingFreeVars this_mod = fstOf3 . bindingFVs (Env emptyVarSet this_mod) emptyDVarSet
+annBindingFreeVars this_mod = fstOf4 . bindingFVs (Env emptyVarSet this_mod) emptyDVarSet
 
-bindingFVs :: Env -> LocalFVs -> StgBinding -> (CgStgBinding, TopFVs, LocalFVs)
+bindingFVs :: Env -> LocalFVs -> StgBinding -> (CgStgBinding, ImpFVs, TopFVs, LocalFVs)
 bindingFVs env body_fv b =
   case b of
-    StgNonRec bndr r -> (StgNonRec bndr r', fvs, lcl_fvs)
+    StgNonRec bndr r -> (StgNonRec bndr r', imp_fvs, top_fvs, lcl_fvs)
       where
-        (r', fvs, rhs_lcl_fvs) = rhsFVs env r
+        (r', imp_fvs, top_fvs, rhs_lcl_fvs) = rhsFVs env r
         lcl_fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_lcl_fvs
 
-    StgRec pairs -> (StgRec pairs', fvs, lcl_fvss)
+    StgRec pairs -> (StgRec pairs', imp_fvs, top_fvs, lcl_fvss)
       where
         bndrs = map fst pairs
         env' = addLocals bndrs env
-        (rhss, rhs_fvss, rhs_lcl_fvss) = mapAndUnzip3 (rhsFVs env' . snd) pairs
-        fvs = unionVarSets rhs_fvss
+        (rhss, rhs_imp_fvss, rhs_top_fvss, rhs_lcl_fvss) = mapAndUnzip4 (rhsFVs env' . snd) pairs
+        top_fvs = unionVarSets rhs_top_fvss
+        imp_fvs = unionVarSets rhs_imp_fvss
         pairs' = zip bndrs rhss
         lcl_fvss = delDVarSetList (unionDVarSets (body_fv:rhs_lcl_fvss)) bndrs
 
-varFVs :: Env -> Id -> (TopFVs, LocalFVs) -> (TopFVs, LocalFVs)
-varFVs env v (top_fvs, lcl_fvs)
+varFVs :: Env -> Id -> (ImpFVs, TopFVs, LocalFVs) -> (ImpFVs, TopFVs, LocalFVs)
+varFVs env v (imp_fvs, top_fvs, lcl_fvs)
   | v `elemVarSet` locals env                -- v is locally bound
-  = (top_fvs, lcl_fvs `extendDVarSet` v)
+  = (imp_fvs, top_fvs, lcl_fvs `extendDVarSet` v)
   | nameIsLocalOrFrom (mod env) (idName v)   -- v is bound at top level
-  = (top_fvs `extendVarSet` v, lcl_fvs)
+  = (imp_fvs, top_fvs `extendVarSet` v, lcl_fvs)
   | otherwise                                -- v is imported
-  = (top_fvs, lcl_fvs)
+  = (imp_fvs `extendVarSet` v, top_fvs, lcl_fvs)
 
-exprFVs :: Env -> StgExpr -> (CgStgExpr, TopFVs, LocalFVs)
+exprFVs :: Env -> StgExpr -> (CgStgExpr, ImpFVs, TopFVs, LocalFVs)
 exprFVs env = go
   where
     go (StgApp f as)
-      | (top_fvs, lcl_fvs) <- varFVs env f (argsFVs env as)
-      = (StgApp f as, top_fvs, lcl_fvs)
+      | (imp_fvs, top_fvs, lcl_fvs) <- varFVs env f (argsFVs env as)
+      = (StgApp f as, imp_fvs, top_fvs, lcl_fvs)
 
-    go (StgLit lit) = (StgLit lit, emptyVarSet, emptyDVarSet)
+    go (StgLit lit) = (StgLit lit, emptyVarSet, emptyVarSet, emptyDVarSet)
 
     go (StgConApp dc n as tys)
-      | (top_fvs, lcl_fvs) <- argsFVs env as
-      = (StgConApp dc n as tys, top_fvs, lcl_fvs)
+      | (imp_fvs, top_fvs, lcl_fvs) <- argsFVs env as
+      = (StgConApp dc n as tys, imp_fvs, top_fvs, lcl_fvs)
 
     go (StgOpApp op as ty)
-      | (top_fvs, lcl_fvs) <- argsFVs env as
-      = (StgOpApp op as ty, top_fvs, lcl_fvs)
+      | (imp_fvs, top_fvs, lcl_fvs) <- argsFVs env as
+      = (StgOpApp op as ty, imp_fvs, top_fvs, lcl_fvs)
 
     go (StgCase scrut bndr ty alts)
-      | (scrut',scrut_top_fvs,scrut_lcl_fvs) <- exprFVs env scrut
-      , (alts',alts_top_fvss,alts_lcl_fvss)
-          <- mapAndUnzip3 (altFVs (addLocals [bndr] env)) alts
+      | (scrut',scrut_imp_fvs,scrut_top_fvs,scrut_lcl_fvs) <- exprFVs env scrut
+      , (alts',alts_imp_fvss,alts_top_fvss,alts_lcl_fvss)
+          <- mapAndUnzip4 (altFVs (addLocals [bndr] env)) alts
       , let top_fvs = scrut_top_fvs `unionVarSet` unionVarSets alts_top_fvss
+            imp_fvs = scrut_imp_fvs `unionVarSet` unionVarSets alts_imp_fvss
             alts_lcl_fvs = unionDVarSets alts_lcl_fvss
             lcl_fvs = delDVarSet (unionDVarSet scrut_lcl_fvs alts_lcl_fvs) bndr
-      = (StgCase scrut' bndr ty alts', top_fvs,lcl_fvs)
+      = (StgCase scrut' bndr ty alts', imp_fvs, top_fvs, lcl_fvs)
 
     go (StgLet ext         bind body) = go_bind (StgLet ext) bind body
     go (StgLetNoEscape ext bind body) = go_bind (StgLetNoEscape ext) bind body
 
     go (StgTick tick e)
-      | (e', top_fvs, lcl_fvs) <- exprFVs env e
+      | (e', imp_fvs, top_fvs, lcl_fvs) <- exprFVs env e
       , let lcl_fvs' = unionDVarSet (tickish tick) lcl_fvs
-      = (StgTick tick e', top_fvs, lcl_fvs')
+      = (StgTick tick e', imp_fvs, top_fvs, lcl_fvs')
         where
           tickish (Breakpoint _ _ ids) = mkDVarSet ids
           tickish _                    = emptyDVarSet
 
-    go_bind dc bind body = (dc bind' body', top_fvs, lcl_fvs)
+    go_bind dc bind body = (dc bind' body', imp_fvs, top_fvs, lcl_fvs)
       where
         env' = addLocals (bindersOf bind) env
-        (body', body_top_fvs, body_lcl_fvs) = exprFVs env' body
-        (bind', bind_top_fvs, lcl_fvs)      = bindingFVs env' body_lcl_fvs bind
+        (body', body_imp_fvs, body_top_fvs, body_lcl_fvs) = exprFVs env' body
+        (bind', bind_imp_fvs, bind_top_fvs, lcl_fvs)      = bindingFVs env' body_lcl_fvs bind
         top_fvs = bind_top_fvs `unionVarSet` body_top_fvs
+        imp_fvs = bind_imp_fvs `unionVarSet` body_imp_fvs
 
 
-rhsFVs :: Env -> StgRhs -> (CgStgRhs, TopFVs, LocalFVs)
+rhsFVs :: Env -> StgRhs -> (CgStgRhs, ImpFVs, TopFVs, LocalFVs)
 rhsFVs env (StgRhsClosure _ ccs uf bs body typ)
-  | (body', top_fvs, lcl_fvs) <- exprFVs (addLocals bs env) body
+  | (body', imp_fvs, top_fvs, lcl_fvs) <- exprFVs (addLocals bs env) body
   , let lcl_fvs' = delDVarSetList lcl_fvs bs
-  = (StgRhsClosure lcl_fvs' ccs uf bs body' typ, top_fvs, lcl_fvs')
+  = (StgRhsClosure lcl_fvs' ccs uf bs body' typ, imp_fvs, top_fvs, lcl_fvs')
 rhsFVs env (StgRhsCon ccs dc mu ts bs typ)
-  | (top_fvs, lcl_fvs) <- argsFVs env bs
-  = (StgRhsCon ccs dc mu ts bs typ, top_fvs, lcl_fvs)
+  | (imp_fvs, top_fvs, lcl_fvs) <- argsFVs env bs
+  = (StgRhsCon ccs dc mu ts bs typ, imp_fvs, top_fvs, lcl_fvs)
 
-argsFVs :: Env -> [StgArg] -> (TopFVs, LocalFVs)
-argsFVs env = foldl' f (emptyVarSet, emptyDVarSet)
+argsFVs :: Env -> [StgArg] -> (ImpFVs, TopFVs, LocalFVs)
+argsFVs env = foldl' f (emptyVarSet, emptyVarSet, emptyDVarSet)
   where
-    f (fvs,ids) StgLitArg{}   = (fvs, ids)
-    f (fvs,ids) (StgVarArg v) = varFVs env v (fvs, ids)
+    f (imp_fvs,fvs,ids) StgLitArg{}   = (imp_fvs, fvs, ids)
+    f (imp_fvs,fvs,ids) (StgVarArg v) = varFVs env v (imp_fvs, fvs, ids)
 
-altFVs :: Env -> StgAlt -> (CgStgAlt, TopFVs, LocalFVs)
+altFVs :: Env -> StgAlt -> (CgStgAlt, ImpFVs, TopFVs, LocalFVs)
 altFVs env GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=e}
-  | (e', top_fvs, lcl_fvs) <- exprFVs (addLocals bndrs env) e
+  | (e', imp_fvs, top_fvs, lcl_fvs) <- exprFVs (addLocals bndrs env) e
   , let lcl_fvs' = delDVarSetList lcl_fvs bndrs
   , let newAlt   = GenStgAlt{alt_con=con, alt_bndrs=bndrs, alt_rhs=e'}
-  = (newAlt, top_fvs, lcl_fvs')
+  = (newAlt, imp_fvs, top_fvs, lcl_fvs')
