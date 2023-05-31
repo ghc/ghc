@@ -29,6 +29,11 @@ module GHC.Linker.Loader
    , withExtendedLoadedEnv
    , extendLoadedEnv
    , deleteFromLoadedEnv
+   -- * Internals
+   , rmDupLinkables
+   , modifyLoaderState
+   , initLinkDepsOpts
+   , partitionLinkable
    )
 where
 
@@ -282,15 +287,22 @@ reallyInitLoaderState interp hsc_env = do
   -- Initialise the linker state
   let pls0 = emptyLoaderState
 
-  -- (a) initialise the C dynamic linker
-  initObjLinker interp
+  case platformArch (targetPlatform (hsc_dflags hsc_env)) of
+    -- FIXME: we don't initialize anything with the JS interpreter.
+    -- Perhaps we should load preload packages. We'll load them on demand
+    -- anyway.
+    ArchJavaScript -> return pls0
+
+    _ -> do
+      -- (a) initialise the C dynamic linker
+      initObjLinker interp
 
 
-  -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
+      -- (b) Load packages from the command-line (Note [preload packages])
+      pls <- unitEnv_foldWithKey (\k u env -> k >>= \pls' -> loadPackages' interp (hscSetActiveUnitId u hsc_env) (preloadUnits (homeUnitEnv_units env)) pls') (return pls0) (hsc_HUG hsc_env)
 
-  -- steps (c), (d) and (e)
-  loadCmdLineLibs' interp hsc_env pls
+      -- steps (c), (d) and (e)
+      loadCmdLineLibs' interp hsc_env pls
 
 
 loadCmdLineLibs :: Interp -> HscEnv -> IO ()
