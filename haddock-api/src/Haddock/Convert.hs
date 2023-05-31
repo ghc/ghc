@@ -280,14 +280,17 @@ synifyTyCon _prr _coax tc
         }
 
 synifyTyCon _prr coax tc
+  -- type synonyms
   | Just ty <- synTyConRhs_maybe tc
   = return $ SynDecl { tcdSExt   = emptyNameSet
                      , tcdLName  = synifyNameN tc
                      , tcdTyVars = synifyTyVars (tyConVisibleTyVars tc)
                      , tcdFixity = synifyFixity tc
-                     , tcdRhs = synifyType WithinType [] ty }
-  | otherwise = do
+                     , tcdRhs = synifyType WithinType [] ty
+                     }
+
   -- (closed) newtype and data
+  | otherwise = do
   let -- This should not always be `Just`, since `Just` of an empty
       -- context causes pretty printing to print `()` for the context
       alg_ctx =
@@ -295,12 +298,22 @@ synifyTyCon _prr coax tc
           [] -> Nothing
           th -> Just $ synifyCtx th
 
+      -- Data families are named according to their CoAxioms, not their TyCons
       name = case coax of
-        Just a -> synifyNameN a -- Data families are named according to their
-                                -- CoAxioms, not their TyCons
+        Just a -> synifyNameN a
         _ -> synifyNameN tc
+
+      -- For a data declaration:
+      --   data Vec :: Nat -> Type -> Type where
+      -- GHC will still report visible tyvars with default names 'a' and 'b'.
+      -- Since 'Nat' is not inhabited by lifted types, 'a' will be given a kind
+      -- signature (due to the logic in 'synify_ty_var'). Similarly, 'Vec'
+      -- constructs lifted types and will therefore not be given a result kind
+      -- signature. Thus, the generated documentation for 'Vec' will look like:
+      -- data Vec (a :: Nat) b where
       tyvars = synifyTyVars (tyConVisibleTyVars tc)
       kindSig = synifyDataTyConReturnKind tc
+
       -- The data constructors.
       --
       -- Any data-constructors not exported from the module that *defines* the
@@ -318,9 +331,15 @@ synifyTyCon _prr coax tc
       -- in prefix position), since, otherwise, the logic (at best) gets much more
       -- complicated. (would use dataConIsInfix.)
       use_gadt_syntax = isGadtSyntaxTyCon tc
-  consRaw <- case partitionEithers $ synifyDataCon use_gadt_syntax <$> tyConDataCons tc of
-      ([], consRaw) -> Right consRaw
+
+  consRaw <-
+    case     partitionEithers
+         $   synifyDataCon use_gadt_syntax
+         <$> tyConDataCons tc
+    of
+      ([], cs) -> Right cs
       (errs, _) -> Left (unlines errs)
+
   cons <- case (isNewTyCon tc, consRaw) of
       (False, cons) -> Right (DataTypeCons False cons)
       (True, [con]) -> Right (NewTypeCon con)
@@ -375,11 +394,9 @@ synifyFamilyResultSig Nothing kind
 synifyFamilyResultSig (Just name) kind =
     noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
 
--- User beware: it is your responsibility to pass True (use_gadt_syntax)
--- for any constructor that would be misrepresented by omitting its
--- result-type.
--- But you might want pass False in simple enough cases,
--- if you think it looks better.
+-- User beware: it is your responsibility to pass True (use_gadt_syntax) for any
+-- constructor that would be misrepresented by omitting its result-type. But you
+-- might want pass False in simple enough cases, if you think it looks better.
 synifyDataCon :: Bool -> DataCon -> Either String (LConDecl GhcRn)
 synifyDataCon use_gadt_syntax dc =
  let
