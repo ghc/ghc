@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 
 {-
 (c) The University of Glasgow 2006
