@@ -342,11 +342,9 @@ mkWarningMap dflags warnings exps =
     WarnSome ws ->
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
           ws' = flip mapMaybe ws $ \(occ, w) ->
-            -- Ensure we also look in the record field namespace. If the OccName
-            -- resolves to multiple GREs, take the first.
-            case lookupOccEnv_WithFields expsOccEnv occ of
-              (n : _) -> Just (n, w)
-              []      -> Nothing
+            case lookupOccEnv expsOccEnv occ of
+              Just n -> Just (n, w)
+              Nothing -> Nothing
       in Map.fromList <$> traverse (traverse (parseWarning dflags)) ws'
     _ -> pure Map.empty
 
