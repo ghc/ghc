@@ -393,10 +393,11 @@ opt_co4 opts env@(LC _ _lift_co_env) sym rep r (HydrateDCo _r lhs_ty dco rhs_ty)
         = assert (r == _r) $
              wrapSym sym $
 --             (\ (lhs', dco') -> mkHydrateDCo r' lhs' dco' rhs') $
-             opt_dco4_wrap "HydrateDCo" opts env rep r lhs_ty dco
-  where
-    rhs' = substTyUnchecked (lcSubstRight env) rhs_ty
-    r'   = chooseRole rep r
+--             opt_dco4_wrap "HydrateDCo" opts env rep r lhs_ty dco
+             opt_dco4_to_co opts env rep r lhs_ty dco
+--  where
+--    rhs' = substTyUnchecked (lcSubstRight env) rhs_ty
+--    r'   = chooseRole rep r
 
 opt_co4 opts env sym rep r (UnivCo prov _r t1 t2)
   = assert (r == _r) $
@@ -612,29 +613,31 @@ type family OptRes co_or_dco where
 type Optimiser in_co out_co =
       OptCoParams -> LiftingContext -> SymFlag -> ReprFlag -> Role -> in_co -> out_co
 
-opt_co_or_dco :: CoOrDCo co_or_dco -> Type -> Optimiser co_or_dco Coercion
+opt_co_or_dco :: CoOrDCo co_or_dco -> Type -> Optimiser co_or_dco co_or_dco
 opt_co_or_dco Co  _    = opt_co4
 opt_co_or_dco DCo l_ty = \ opts lc sym repr r dco ->
   assert (sym == False) $
+  snd $
   opt_dco4 opts lc repr r l_ty dco
 
 opt_univ :: forall co_or_dco
          .  Outputable co_or_dco
          => CoOrDCo co_or_dco
          -> OptCoParams
-         -> LiftingContext -> SymFlag -> UnivCoProvenance Coercion -> Role
-         -> Type -> Type -> Coercion
+         -> LiftingContext -> SymFlag -> UnivCoProvenance co_or_dco -> Role
+         -> Type -> Type -> OptRes co_or_dco
 opt_univ co_or_dco opts env sym (PhantomProv h) _r ty1 ty2
   | sym       = mk_phantom h' ty2' ty1'
   | otherwise = mk_phantom h' ty1' ty2'
   where
-    h' = wrap "opt_univ PhantomProv" (opt_co_or_dco Co ty1) opts env sym False Nominal h
+    h' = wrap "opt_univ PhantomProv" (opt_co_or_dco co_or_dco ty1) opts env sym False Nominal h
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
-    mk_phantom :: Coercion -> Type -> Type -> Coercion
-    mk_phantom = mkPhantomCo
-
+    mk_phantom :: co_or_dco -> Type -> Type -> OptRes co_or_dco
+    mk_phantom = case co_or_dco of
+      Co  -> mkPhantomCo
+      DCo -> \ h t1 t2 -> (t1, mkUnivDCo (PhantomProv h) t2)
 
 opt_univ co_or_dco opts env sym prov role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
@@ -645,10 +648,19 @@ opt_univ co_or_dco opts env sym prov role oty1 oty2
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
   = let roles    = tyConRoleListX role tc1
-        arg_cos  = zipWith3 mk_univ roles tys1 tys2
-        arg_cos' = zipWith (opt_co4 opts env sym False) roles arg_cos
-    in
-    mkTyConAppCo role tc1 arg_cos'
+    in case co_or_dco of
+          Co ->
+            let
+              arg_cos  = zipWith3 mk_univ roles tys1 tys2
+              arg_cos' = zipWith (opt_co4 opts env sym False) roles arg_cos
+            in
+              mkTyConAppCo role tc1 arg_cos'
+          DCo ->
+            let
+              arg_cos  = zipWith3 (\ r x y -> snd $ mk_univ r x y) roles tys1 tys2
+              (arg_lhs', arg_dcos') = unzip $ zipWith3 (opt_dco4 opts env False) roles tys1 arg_cos
+            in
+              (mkTyConApp tc1 arg_lhs', mkTyConAppDCo arg_dcos')
 
   -- can't optimize the AppTy case because we can't build the kind coercions.
 
@@ -657,7 +669,9 @@ opt_univ co_or_dco opts env sym prov role oty1 oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
-        eta  = mk_univ Nominal k1 k2
+        eta  = case co_or_dco of
+                 Co  -> mk_univ Nominal k1 k2
+                 DCo -> snd $ mk_univ Nominal k1 k2
         tv1' = mk_castTy (TyVarTy tv1) k1 eta k2
           -- eta gets opt'ed soon, but not yet.
         ty2' = substTyWith [tv2] [tv1'] ty2
@@ -672,9 +686,13 @@ opt_univ co_or_dco opts env sym prov role oty1 oty2
   = let k1    = varType cv1
         k2    = varType cv2
         r'    = coVarRole cv1
-        eta   = mk_univ Nominal k1 k2
+        eta   = case co_or_dco of
+                  Co  -> mk_univ Nominal k1 k2
+                  DCo -> snd $ mk_univ Nominal k1 k2
         eta_d = downgradeRole r' Nominal $
-                eta
+                case co_or_dco of
+                  Co  -> eta
+                  DCo -> mkHydrateDCo Nominal k1 eta k2
           -- eta gets opt'ed soon, but not yet.
         n_co  = (mkSymCo $ mkSelCo (SelTyCon 2 r') eta_d) `mkTransCo`
                 (mkCoVarCo cv1) `mkTransCo`
@@ -694,24 +712,32 @@ opt_univ co_or_dco opts env sym prov role oty1 oty2
     mk_univ role a b
 
   where
-    mk_castTy :: Type -> Type -> Coercion -> Type -> Type
-    mk_castTy = \ ty _ co  _ -> CastTy ty co
-    mk_univ :: Role -> Type -> Type -> Coercion
-    mk_univ = mkUnivCo prov'
-    mk_forall :: TyCoVar -> Coercion -> Coercion -> Coercion
-    mk_forall cv eta = mkForAllCo cv eta
-    opt_forall :: TyCoVar -> Coercion -> (LiftingContext,TyCoVar,Coercion)
-    opt_forall tv co = optForAllCoBndr  opts env sym tv co
-    prov' :: UnivCoProvenance KindCoercion
+    mk_castTy :: Type -> Type -> co_or_dco -> Type -> Type
+    mk_castTy = case co_or_dco of
+      Co  -> \ ty _ co  _ -> CastTy ty co
+      DCo -> \ ty l dco r -> CastTy ty (mkHydrateDCo Nominal l dco r)
+    mk_univ :: Role -> Type -> Type -> OptRes co_or_dco
+    mk_univ = case co_or_dco of
+      Co  -> mkUnivCo  prov'
+      DCo -> \ _ l_ty r_ty -> (l_ty, mkUnivDCo prov' r_ty)
+    mk_forall :: TyCoVar -> co_or_dco -> OptRes co_or_dco -> OptRes co_or_dco
+    mk_forall cv eta = case co_or_dco of
+      Co  -> mkForAllCo cv eta
+      DCo -> \ (_,body) -> (mkTyVarTy cv, mkForAllDCo cv eta body)
+    opt_forall :: TyCoVar -> co_or_dco -> (LiftingContext,TyCoVar,co_or_dco)
+    opt_forall tv co = case co_or_dco of
+      Co  -> optForAllCoBndr  opts env sym tv co
+      DCo -> optForAllDCoBndr opts env sym tv co
+    prov' :: UnivCoProvenance co_or_dco
     prov' = case prov of
 #if __GLASGOW_HASKELL__ < 901
 -- This alt is redundant with the first match of the FunDef
       PhantomProv kco    -> PhantomProv
-                          $ wrap "univ_co phantom" (opt_co_or_dco Co oty1)
+                          $ wrap "univ_co phantom" (opt_co_or_dco co_or_dco oty1)
                               opts env sym False Nominal kco
 #endif
       ProofIrrelProv kco -> ProofIrrelProv
-                          $ wrap "univ_co proof_irrel" (opt_co_or_dco Co oty1)
+                          $ wrap "univ_co proof_irrel" (opt_co_or_dco co_or_dco oty1)
                               opts env sym False Nominal kco
       PluginProv str     -> PluginProv str
       CorePrepProv homo  -> CorePrepProv homo
@@ -1034,14 +1060,14 @@ fireTransRule _rule _co1 _co2 res
 -- N.B.: The reason we return (Type, DCoercion) and not just DCoercion is that we
 -- sometimes need the substituted LHS type (see opt_trans_dco).
 
-opt_phantom_dco :: OptCoParams -> LiftingContext -> Role -> Type -> DCoercion -> NormalCo
+opt_phantom_dco :: OptCoParams -> LiftingContext -> Role -> Type -> DCoercion -> (Type, NormalDCo)
 opt_phantom_dco opts env r l_ty dco = opt_univ DCo opts env False (PhantomProv kco) Phantom l_ty r_ty
   where
-    kco = mkKindCo $ mkHydrateDCo r l_ty dco r_ty
+    kco = DehydrateCo (mkKindCo $ mkHydrateDCo r l_ty dco r_ty)
     r_ty = followDCo r l_ty dco
     -- A naive attempt at removing this entirely causes issues in test "type_in_type_hole_fits".
 
-opt_dco4_wrap :: String -> OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> NormalCo
+opt_dco4_wrap :: String -> OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> (Type, NormalDCo)
 opt_dco4_wrap str opts lc rep r l_ty dco = wrap ("opt_dco4 " ++ str) go opts lc False rep r dco
   where
     go opts lc _sym repr r dco = opt_dco4 opts lc repr r l_ty dco
@@ -1050,11 +1076,11 @@ opt_dco2 :: OptCoParams
          -> LiftingContext
          -> Role   -- ^ The role of the input coercion
          -> Type
-         -> DCoercion -> NormalCo
+         -> DCoercion -> (Type, NormalDCo)
 opt_dco2 opts env Phantom ty dco = opt_phantom_dco opts env Phantom ty dco
 opt_dco2 opts env r       ty dco = opt_dco3 opts env Nothing r ty dco
 
-opt_dco3 :: OptCoParams -> LiftingContext -> Maybe Role -> Role -> Type -> DCoercion -> NormalCo
+opt_dco3 :: OptCoParams -> LiftingContext -> Maybe Role -> Role -> Type -> DCoercion -> (Type, NormalDCo)
 opt_dco3 opts env (Just Phantom)          r ty dco = opt_phantom_dco opts env r ty dco
 opt_dco3 opts env (Just Representational) r ty dco = opt_dco4_wrap "opt_dco3 R" opts env True  r ty dco
 opt_dco3 opts env _                       r ty dco = opt_dco4_wrap "opt_dco3 _" opts env False r ty dco
@@ -1069,85 +1095,70 @@ which is where we have a long transitive chain of type family reduction steps.
 
 -}
 
-opt_dco4 :: OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> NormalCo
-opt_dco4 opts env@(LC _ lift_co_env) rep r l_ty dco = case dco of
+opt_dco4_to_co :: OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> NormalCo
+opt_dco4_to_co opts env rep r l_ty dco = case dco of
   TransDCo dco1 dco2
-    -> case opt_dco4 opts env rep r l_ty dco1 of
-         HydrateDCo r' l_ty' dco1' r_ty
-           | isEmptyVarEnv lift_co_env ->
-               let dco2' = substDCo (lcSubst env) dco2
-               in HydrateDCo r' l_ty' (dco1' `mkTransDCo` dco2') (followDCo r' r_ty dco2')
-         co1@(AxiomInstCo coax br cos)
-           | not (isNewTyCon (coAxiomTyCon coax))
-           , isEmptyVarEnv lift_co_env ->
-               let dco2' = substDCo (lcSubst env) dco2
+    -> case opt_dco4_to_co opts env rep r l_ty dco1 of
+         HydrateDCo r' l_ty' dco1' r_ty ->
+               let (r_ty', dco2') = opt_dco4 opts env rep r r_ty dco2
+               in mkHydrateDCo r' l_ty' (dco1' `mkTransDCo` dco2') (followDCo r' r_ty' dco2')
+         co1@(AxiomInstCo coax _br _cos)
+           | not (isNewTyCon (coAxiomTyCon coax)) ->
+               let (r_ty', dco2') = opt_dco4 opts env rep r r_ty dco2
                    Pair l_ty' r_ty = coercionKind co1
                    dco1' = mkDehydrateCo co1 -- TODO: inline; use assumption cos are refls?
-               in HydrateDCo r l_ty' (dco1' `mkTransDCo` dco2') (followDCo r r_ty dco2')
+               in mkHydrateDCo r l_ty' (dco1' `mkTransDCo` dco2') (followDCo r r_ty' dco2')
          -- TODO: AxiomRuleCo?
-         co1 -> opt_trans opts (lcInScopeSet env) co1 (opt_dco4 opts env rep r (coercionRKind co1) dco2)
+         co1 -> opt_trans opts (lcInScopeSet env) co1 (opt_dco4_to_co opts env rep r (coercionRKind co1) dco2)
+  StepsDCo n | n > 1 -> let (lhs', dco') = opt_dco4 opts env rep r l_ty dco
+                        in mkHydrateDCo r lhs' dco' (followDCo r lhs' dco')
   _ -> opt_co4 opts env False rep r (hydrateOneLayerDCo r l_ty dco)
 
 
-_opt_dco4 :: OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> NormalCo
-_opt_dco4 opts env rep r l_ty dco = case dco of
+opt_dco4 :: OptCoParams -> LiftingContext -> ReprFlag -> Role -> Type -> DCoercion -> (Type, NormalDCo)
+opt_dco4 opts env rep r l_ty dco = case dco of
 
     ReflDCo
-      -> lifted_co
+      -> lifted_dco
     GReflRightDCo kco
       | isGReflCo kco || isGReflCo kco'
-      -> lifted_co
+      -> lifted_dco
       | otherwise
-      -> mkGReflRightCo r l_ty' kco'
+      -> (l_ty', mkGReflRightDCo kco')
       where
         kco' = opt_co4 opts env False False Nominal kco
     GReflLeftDCo kco
       | isGReflCo kco || isGReflCo kco'
-      -> lifted_co
+      -> lifted_dco
       | otherwise
-      -> mkGReflLeftCo r l_ty' kco'
+      -> (l_ty', mkGReflLeftDCo kco')
       where
         kco' = opt_co4 opts env False False Nominal kco
 
     TyConAppDCo dcos
       | Just (tc, l_tys) <- splitTyConApp_maybe l_ty
       -> let
-            arg_cos =
+            (arg_ltys, arg_dcos) =
               case (rep, r) of
                 (True, Nominal) ->
+                  unzip $
                   zipWith3
                     (\ mb_r' -> opt_dco3 opts env mb_r' Nominal)
                     (map Just (tyConRoleListRepresentational tc))
                     l_tys
                     dcos
                 (False, Nominal) ->
+                  unzip $
                   zipWith (opt_dco4 opts env False Nominal) l_tys dcos
                 (_, Representational) ->
+                  unzip $
                   zipWith3
                     (opt_dco2 opts env)
                     (tyConRoleListRepresentational tc)
                     l_tys
                     dcos
                 (_, Phantom) -> pprPanic "opt_dco4 sees a phantom!" (ppr dco)
-         in mkTyConAppCo r tc arg_cos
-
--- AMG TODO: experimenting with changing dco opt to return a Coercion.
---
--- Key question: do we want to push Hydrate up or down?
--- If we have TyConApp for a non-family, it will never reduce, so might want to be a Coercion?
--- But then perhaps that is included in a larger context which wants a DCoercion?
---
--- Idea: we only benefit from DCoercion when we have a long chain of
--- Steps/AxiomInstDCo.  For coercion optimisation purposes, a Coercion is
--- better.  Thus dcoercion optimisation produces Coercions.  Then in
--- opt_trans_rule we need to handle the cases intelligently.
---
--- Idea: look out for
---    Hydrate ty1 dco ; Sym (Hydrate ty2 dco)
--- and handle it by converting to coercions and optimising their transitive composition?
-
---    Sym (Hydrate ty dco1) ; Hydrate ty dco2
--- should be easy as we can follow common prefix of both dco1 and dco2
+         in (mkTyConApp tc arg_ltys, mkTyConAppDCo arg_dcos)
 
       | otherwise
       -> pprPanic "opt_dco4: TyConAppDCo where ty is not a TyConApp" $
@@ -1157,17 +1168,14 @@ _opt_dco4 opts env rep r l_ty dco = case dco of
     AppDCo dco1 dco2
       | Just (l_ty1, l_ty2) <- splitAppTy_maybe l_ty
       , let
-          l_co1 = opt_dco4 opts env rep   r       l_ty1 dco1
-          l_co2 = opt_dco4 opts env False Nominal l_ty2 dco2
-      -> mkAppCo l_co1 l_co2
+          (l_ty1', l_dco1) = opt_dco4 opts env rep   r       l_ty1 dco1
+          (l_ty2', l_dco2) = opt_dco4 opts env False Nominal l_ty2 dco2
+      -> (mkAppTy l_ty1' l_ty2', mkAppDCo l_dco1 l_dco2)
       | otherwise
       -> pprPanic "opt_dco4: AppDCo where ty is not an AppTy" $
            vcat [ text "dco =" <+> ppr dco
                 , text "l_ty =" <+> ppr l_ty ]
 
-    ForAllDCo{} -- AMG TODO
-       -> rep_dco
-{-
     ForAllDCo dco_tcv k_dco body_dco
       | ForAllTy (Bndr ty_tv af) body_ty <- coreFullView l_ty
       ->  case optForAllDCoBndr opts env False dco_tcv k_dco of
@@ -1183,45 +1191,44 @@ _opt_dco4 opts env rep r l_ty dco = case dco of
       -> pprPanic "opt_dco4: ForAllDCo where ty is not a ForAllTy" $
            vcat [ text "dco =" <+> ppr dco
                 , text "l_ty =" <+> ppr l_ty ]
--}
 
     CoVarDCo cv
-      -> opt_co4 opts env False rep r (CoVarCo cv)
+      -> let co' = opt_co4 opts env False rep r (CoVarCo cv)
+         in (coercionLKind co', mkDehydrateCo co')
 
     AxiomInstDCo {}
-      -> rep_dco
+      -> (l_ty', rep_dco)
     StepsDCo {}
-      -> rep_dco
+      -> (l_ty', rep_dco)
 
-    UnivDCo{} -> rep_dco -- TODO
-{-
     UnivDCo prov rhs_ty
       -> opt_univ DCo opts env False prov r' l_ty rhs_ty
--}
 
     TransDCo dco1 dco2 ->
       let
-        co1' = opt_dco4 opts env rep r l_ty dco1
+        (l_ty', dco1') = opt_dco4 opts env rep r l_ty dco1
 
         -- Follow the original directed coercion,
         -- to avoid applying the substitution twice.
-        Pair l_ty' mid_ty' = coercionKind co1'
-        co2' = opt_dco4 opts env rep r mid_ty' dco2
+        mid_ty = followDCo r l_ty dco1
+        (mid_ty', dco2') = opt_dco4 opts env rep r mid_ty dco2
       in
-        opt_trans opts (lcInScopeSet env) co1' co2'
+        (l_ty', opt_trans_dco opts (lcInScopeSet env) r' l_ty' dco1' mid_ty' dco2')
 
     SubDCo dco ->
       assert (r == Representational) $
         opt_dco4_wrap "SubDCo" opts env True Nominal l_ty dco
 
     DehydrateCo co ->
-      opt_co4_wrap "DehydrateCo" opts env False rep r co
+      let co' = opt_co4_wrap "DehydrateCo" opts env False rep r co
+      in (coercionLKind co', mkDehydrateCo co')
 
   where
-    lifted_co = liftCoSubst r' env l_ty
+    lifted_dco = let lifted_co = liftCoSubst r' env l_ty
+                 in ( coercionLKind lifted_co, mkDehydrateCo lifted_co )
     l_ty'      = substTyUnchecked (lcSubstLeft env) l_ty
     r'         = chooseRole rep r
-    rep_dco    = wrapRole rep r $ mkHydrateDCo r l_ty' dco (followDCo r l_ty' dco)
+    rep_dco    = wrapRole_dco rep r l_ty' dco (followDCo r l_ty' dco)
 
 ---------------------------------------------------------
 -- Transitivity for directed coercions.
@@ -1691,5 +1698,5 @@ optForAllDCoBndr :: OptCoParams
 optForAllDCoBndr opts env sym tv
   = substForAllDCoBndrUsingLC sym
       (substTyUnchecked (lcSubstLeft env))
-      (mkDehydrateCo . opt_dco4_wrap "optForAllDCoBndr" opts env False Nominal (tyVarKind tv)) env
+      (snd . opt_dco4_wrap "optForAllDCoBndr" opts env False Nominal (tyVarKind tv)) env
       tv
