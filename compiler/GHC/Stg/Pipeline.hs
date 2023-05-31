@@ -33,6 +33,7 @@ import GHC.Unit.Module ( Module )
 
 import GHC.Utils.Error
 import GHC.Types.Var
+import GHC.Types.Var.Set
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
@@ -70,7 +71,7 @@ stg2stg :: Logger
         -> StgPipelineOpts
         -> Module                    -- ^ module being compiled
         -> [StgTopBinding]           -- ^ input program
-        -> IO ([CgStgTopBinding], StgCgInfos) -- output program
+        -> IO ([(CgStgTopBinding,IdSet)], StgCgInfos) -- output program
 stg2stg logger extra_vars opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
         ; showPass logger "Stg2Stg"
@@ -88,9 +89,10 @@ stg2stg logger extra_vars opts this_mod binds
           -- sorting pass is necessary.
           -- This pass will also augment each closure with non-global free variables
           -- annotations (which is used by code generator to compute offsets into closures)
-        ; let binds_sorted_with_fvs = depSortWithAnnotStgPgm this_mod binds'
+        ; let (binds_sorted_with_fvs, imp_fvs) = unzip (depSortWithAnnotStgPgm this_mod binds')
         -- See Note [Tag inference for interactive contexts]
-        ; inferTags (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
+        ; (cg_binds, cg_infos) <- inferTags (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
+        ; pure (zip cg_binds imp_fvs, cg_infos)
    }
 
   where

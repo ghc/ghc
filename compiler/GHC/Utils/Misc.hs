@@ -22,7 +22,7 @@ module GHC.Utils.Misc (
         unzipWith,
 
         mapFst, mapSnd, chkAppend,
-        mapAndUnzip, mapAndUnzip3,
+        mapAndUnzip, mapAndUnzip3, mapAndUnzip4,
         filterOut, partitionWith,
 
         dropWhileEndLE, spanEnd, last2, lastMaybe, onJust,
@@ -55,6 +55,7 @@ module GHC.Utils.Misc (
 
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
+        fstOf4, sndOf4,
         fst3, snd3, third3,
         uncurry3,
 
@@ -182,6 +183,11 @@ thdOf3   :: (a,b,c) -> c
 fstOf3      (a,_,_) =  a
 sndOf3      (_,b,_) =  b
 thdOf3      (_,_,c) =  c
+
+fstOf4   :: (a,b,c,d) -> a
+sndOf4   :: (a,b,c,d) -> b
+fstOf4      (a,_,_,_) =  a
+sndOf4      (_,b,_,_) =  b
 
 fst3 :: (a -> d) -> (a, b, c) -> (d, b, c)
 fst3 f (a, b, c) = (f a, b, c)
@@ -324,13 +330,20 @@ mapAndUnzip f (x:xs)
     (r1:rs1, r2:rs2)
 
 mapAndUnzip3 :: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
-
 mapAndUnzip3 _ [] = ([], [], [])
 mapAndUnzip3 f (x:xs)
   = let (r1,  r2,  r3)  = f x
         (rs1, rs2, rs3) = mapAndUnzip3 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3)
+
+mapAndUnzip4 :: (a -> (b, c, d, e)) -> [a] -> ([b], [c], [d], [e])
+mapAndUnzip4 _ [] = ([], [], [], [])
+mapAndUnzip4 f (x:xs)
+  = let (r1,  r2,  r3, r4)  = f x
+        (rs1, rs2, rs3, rs4) = mapAndUnzip4 f xs
+    in
+    (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
 
 zipWithAndUnzip :: (a -> b -> (c,d)) -> [a] -> [b] -> ([c],[d])
 zipWithAndUnzip f (a:as) (b:bs)
