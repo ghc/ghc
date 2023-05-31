@@ -196,7 +196,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
         | otherwise         = mods
 
   let
-    -- Warnings in this module and transitive warnings from dependend modules
+    -- Warnings in this module and transitive warnings from dependent modules
     transitiveWarnings :: Map Name (Doc Name)
     transitiveWarnings = Map.unions (warningMap : map ifaceWarningMap (Map.elems ifaces))
 
@@ -342,7 +342,11 @@ mkWarningMap dflags warnings exps =
     WarnSome ws ->
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
           ws' = flip mapMaybe ws $ \(occ, w) ->
-                  (,w) <$> lookupOccEnv expsOccEnv occ
+            -- Ensure we also look in the record field namespace. If the OccName
+            -- resolves to multiple GREs, take the first.
+            case lookupOccEnv_WithFields expsOccEnv occ of
+              (n : _) -> Just (n, w)
+              []      -> Nothing
       in Map.fromList <$> traverse (traverse (parseWarning dflags)) ws'
     _ -> pure Map.empty
 
