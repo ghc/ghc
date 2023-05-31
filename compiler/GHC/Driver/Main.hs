@@ -148,6 +148,7 @@ import GHC.ByteCode.Types
 
 import GHC.Linker.Loader
 import GHC.Linker.Types
+import GHC.Linker.Deps
 
 import GHC.Hs
 import GHC.Hs.Dump
@@ -2578,7 +2579,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
    tidy_expr
 
   {- Lint if necessary -}
-  lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
+  lintInteractiveExpr (text "hscCompileCoreExpr") hsc_env prepd_expr
   let this_loc = ModLocation{ ml_hs_file   = Nothing,
                               ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
                               ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
@@ -2592,7 +2593,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   -- files for the same module and the JS linker doesn't support this.
   --
   -- Note that we can't use icInteractiveModule because the ic_mod_index value
-  -- isn't bumped between invocations of hscCompileExpr, so uniqueness isn't
+  -- isn't bumped between invocations of hscCompileCoreExpr, so uniqueness isn't
   -- guaranteed.
   --
   -- We reuse the unique we obtained for the binding, but any unique would do.
@@ -2611,14 +2612,11 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   let (stg_binds, _stg_deps) = unzip stg_binds_with_deps
 
   let interp = hscInterp hsc_env
-  let tmpfs = hsc_tmpfs hsc_env
-  let tmp_dir = tmpDir dflags
 
   case interp of
     -- always generate JS code for the JS interpreter (no bytecode!)
     Interp (ExternalInterp (ExtJS i)) _ ->
-      jsCodeGen logger tmpfs tmp_dir unit_env (initStgToJSConfig dflags) interp i
-                this_mod stg_binds binding_id
+      jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id
 
     _ -> do
       {- Convert to BCOs -}
@@ -2637,18 +2635,70 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
 
 -- | Generate JS code for the given bindings and return the HValue for the given id
 jsCodeGen
-  :: Logger
-  -> TmpFs
-  -> TempDir
-  -> UnitEnv
-  -> StgToJSConfig
-  -> Interp
+  :: HscEnv
+  -> SrcSpan
   -> JSInterp
   -> Module
-  -> [CgStgTopBinding]
+  -> [(CgStgTopBinding,IdSet)]
   -> Id
   -> IO (ForeignHValue, [Linkable], PkgsLoaded)
-jsCodeGen logger tmpfs tmp_dir unit_env js_config interp i this_mod stg_binds binding_id = do
+jsCodeGen hsc_env srcspan i this_mod stg_binds_with_deps binding_id = do
+  let logger           = hsc_logger hsc_env
+      tmpfs            = hsc_tmpfs hsc_env
+      dflags           = hsc_dflags hsc_env
+      interp           = hscInterp hsc_env
+      tmp_dir          = tmpDir dflags
+      unit_env         = hsc_unit_env hsc_env
+      js_config        = initStgToJSConfig dflags
+
+  -- We need to load all the dependencies first.
+  --
+  -- We get all the imported names from the Stg bindings and load their modules.
+  --
+  -- (logic adapted from GHC.Linker.Loader.loadDecls for the JS linker)
+  let
+    (stg_binds, stg_deps) = unzip stg_binds_with_deps
+    imported_ids   = nonDetEltsUniqSet (unionVarSets stg_deps)
+    imported_names = map idName imported_ids
+
+    needed_mods :: [Module]
+    needed_mods = [ nameModule n | n <- imported_names,
+                    isExternalName n,       -- Names from other modules
+                    not (isWiredInName n)   -- Exclude wired-in names
+                  ]                         -- (see note below)
+    -- Exclude wired-in names because we may not have read
+    -- their interface files, so getLinkDeps will fail
+    -- All wired-in names are in the base package, which we link
+    -- by default, so we can safely ignore them here.
+
+  -- Initialise the linker (if it's not been done already)
+  initLoaderState interp hsc_env
+
+  -- Take lock for the actual work.
+  (dep_linkables, dep_units) <- modifyLoaderState interp $ \pls -> do
+    let link_opts = initLinkDepsOpts hsc_env
+
+    -- Find what packages and linkables are required
+    deps <- getLinkDeps link_opts interp pls srcspan needed_mods
+    -- We update the LinkerState even if the JS interpreter maintains its linker
+    -- state independently to load new objects here.
+    let (objs, _bcos) = partition isObjectLinkable
+                          (concatMap partitionLinkable (ldNeededLinkables deps))
+
+    let (objs_loaded', _new_objs) = rmDupLinkables (objs_loaded pls) objs
+
+    -- FIXME: we should make the JS linker load new_objs here, instead of
+    -- on-demand.
+
+    -- FIXME: we don't report needed units because we would have to find a way
+    -- to build a meaningful LoadedPkgInfo (see the mess in
+    -- GHC.Linker.Loader.{loadPackage,loadPackages'}). Detecting what to load
+    -- and actually loading (using the native interpreter) are intermingled, so
+    -- we can't directly reuse this code.
+    let pls' = pls { objs_loaded = objs_loaded' }
+    pure (pls', (ldAllLinkables deps, emptyUDFM {- ldNeededUnits deps -}) )
+
+
   let foreign_stubs    = NoStubs
       spt_entries      = mempty
       cost_centre_info = mempty
@@ -2671,12 +2721,7 @@ jsCodeGen logger tmpfs tmp_dir unit_env js_config interp i this_mod stg_binds bi
   binding_fref <- withJSInterp i $ \inst ->
                     mkForeignRef href (freeReallyRemoteRef inst href)
 
-  -- FIXME (#23013): the JS linker doesn't use the LoaderState.
-  -- The state is only maintained in the interpreter instance (jsLinkState field) for now.
-  let linkables   = mempty
-  let loaded_pkgs = emptyUDFM
-
-  return (castForeignRef binding_fref, linkables, loaded_pkgs)
+  return (castForeignRef binding_fref, dep_linkables, dep_units)
 
 
 {- **********************************************************************
