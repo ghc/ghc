@@ -2049,39 +2049,8 @@ checkInstTermination theta head_pred
       where
         check2 pred_size
           = case pred_size `ltPatersonSize` head_size of
-              Just ps_failure -> failWithTc $ mkInstSizeError ps_failure head_pred pred
+              Just pc_failure -> failWithTc $ TcRnPatersonCondFailure pc_failure InInstanceDecl pred head_pred
               Nothing         -> return ()
-
-
-mkInstSizeError :: PatersonSizeFailure -> TcPredType -> TcPredType -> TcRnMessage
-mkInstSizeError ps_failure head_pred pred
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ main_msg
-         , parens undecidableMsg ]
-  where
-    pp_head = text "instance head" <+> quotes (ppr head_pred)
-    pp_pred = text "constraint" <+> quotes (ppr pred)
-
-    main_msg = case ps_failure of
-      PSF_TyFam tc -> -- See (PC3) of Note [Paterson conditions]
-                      hang (text "Illegal use of type family" <+> quotes (ppr tc))
-                         2 (text "in the" <+> pp_pred)
-      PSF_TyVar tvs -> hang (occMsg tvs)
-                          2 (sep [ text "in the" <+> pp_pred
-                                 , text "than in the" <+> pp_head ])
-      PSF_Size -> hang (text "The" <+> pp_pred)
-                     2 (sep [ text "is no smaller than", text "the" <+> pp_head ])
-
-occMsg :: [TyVar] -> SDoc
-occMsg tvs = text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
-                             <+> pp_occurs <+> text "more often"
-           where
-             pp_occurs | isSingleton tvs = text "occurs"
-                       | otherwise       = text "occur"
-
-undecidableMsg :: SDoc
-undecidableMsg = text "Use UndecidableInstances to permit this"
-
 
 {- Note [Instances and constraint synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2137,8 +2106,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     --   (b) failure of injectivity
     check_branch_compat prev_branches cur_branch
       | cur_branch `isDominatedBy` prev_branches
-      = do { let dia = mkTcRnUnknownMessage $
-                   mkPlainDiagnostic WarningWithoutFlag noHints (inaccessibleCoAxBranch fam_tc cur_branch)
+      = do { let dia = TcRnInaccessibleCoAxBranch fam_tc cur_branch
            ; addDiagnosticAt (coAxBranchSpan cur_branch) dia
            ; return prev_branches }
       | otherwise
@@ -2272,7 +2240,7 @@ checkValidAssocTyFamDeflt fam_tc pats =
       let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
         (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
-              mkTcRnUnknownMessage $ mkPlainError noHints $
+               mkTcRnUnknownMessage $ mkPlainError noHints $
                pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
                hang (text "Illegal duplicate variable"
                        <+> quotes (ppr pat_tv) <+> text "in:")
@@ -2305,29 +2273,10 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
    lhs_size = pSizeTypes lhs_tys
    check (tc, tys)
       | not (isStuckTypeFamily tc)                                   -- (TF1)
-      , Just ps_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
-      = Just $ mkFamSizeError ps_failure (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)
+      , Just pc_failure <- pSizeTypes tys `ltPatersonSize` lhs_size  -- (TF2)
+      = Just $ TcRnPatersonCondFailure pc_failure InTyFamEquation (TyConApp lhs_tc lhs_tys) (TyConApp tc tys)
       | otherwise
       = Nothing
-
-mkFamSizeError :: PatersonSizeFailure -> Type -> Type -> TcRnMessage
-mkFamSizeError ps_failure lhs fam_call
-  = mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ main_msg
-         , parens undecidableMsg ]
-  where
-    pp_lhs  = text "LHS of the family instance" <+> quotes (ppr lhs)
-    pp_call = text "type-family application" <+> quotes (ppr fam_call)
-
-    main_msg = case ps_failure of
-      PSF_TyFam tc -> -- See (PC3) of Note [Paterson conditions]
-                      hang (text "Illegal nested use of type family" <+> quotes (ppr tc))
-                         2 (text "in the arguments of the" <+> pp_call)
-      PSF_TyVar tvs -> hang (occMsg tvs)
-                          2 (sep [ text "in the" <+> pp_call
-                                 , text "than in the" <+> pp_lhs ])
-      PSF_Size -> hang (text "The" <+> pp_call)
-                     2 (sep [ text "is no smaller than", text "the" <+> pp_lhs ])
 
 -----------------
 checkFamPatBinders :: TyCon
@@ -2424,13 +2373,6 @@ checkValidTypePats tc pat_ty_args
         hang (text "Illegal type synonym family application"
                 <+> quotes (ppr ty) <+> text "in instance" <> colon)
            2 (ppr inst_ty)
-
--- Error messages
-
-inaccessibleCoAxBranch :: TyCon -> CoAxBranch -> SDoc
-inaccessibleCoAxBranch fam_tc cur_branch
-  = text "Type family instance equation is overlapped:" $$
-    nest 2 (pprCoAxBranchUser fam_tc cur_branch)
 
 -------------------------
 checkConsistentFamInst :: AssocInstInfo

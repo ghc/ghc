@@ -167,7 +167,8 @@ import GHC.Tc.Types.Origin ( CtOrigin (ProvCtxtOrigin), SkolemInfoAnon (SigSkol)
                            , UserTypeCtxt (PatSynCtxt), TyVarBndrs, TypedThing
                            , FixedRuntimeRepOrigin(..), InstanceWhat )
 import GHC.Tc.Types.Rank (Rank)
-import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType)
+import GHC.Tc.Utils.TcType (TcType, TcSigmaType, TcPredType,
+                            PatersonCondFailure, PatersonCondFailureContext)
 import GHC.Types.Basic
 import GHC.Types.Error
 import GHC.Types.Avail
@@ -364,7 +365,19 @@ data TcRnMessage where
   TcRnInaccessibleCode :: Implication          -- ^ The implication containing a contradiction.
                        -> SolverReportWithCtxt -- ^ The contradiction.
                        -> TcRnMessage
+  {-| TcRnInaccessibleCoAxBranch is a warning that is emitted when a closed type family has a
+      branch which is inaccessible due to a more general, prior branch.
 
+      Example:
+        type family F a where
+          F a = Int
+          F Bool = Bool
+      Test cases: T9085, T14066a, T9085, T6018, tc265,
+
+  -}
+  TcRnInaccessibleCoAxBranch :: TyCon      -- ^ The type family's constructor
+                             -> CoAxBranch -- ^ The inaccessible branch
+                             -> TcRnMessage
   {-| A type which was expected to have a fixed runtime representation
       does not have a fixed runtime representation.
 
@@ -4120,6 +4133,21 @@ data TcRnMessage where
 
   -}
   TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
+  {-| TcRnPatersonCondFailure is an error that occurs when an instance
+      declaration fails to conform to the Paterson conditions. Which particular condition
+      fails depends on the constructor of PatersonCondFailure
+      See Note [Paterson conditions].
+
+      Test cases:
+        T15231, tcfail157, T15316, T19187a, fd-loop, tcfail108, tcfail154,
+        T15172, tcfail214
+  -}
+  TcRnPatersonCondFailure
+    :: PatersonCondFailure -- ^ the failed Paterson Condition
+    -> PatersonCondFailureContext
+    -> Type                -- ^ the LHS
+    -> Type                -- ^ the RHS
+    -> TcRnMessage
 
   {-| TcRnImplicitRhsQuantification is a warning that occurs when GHC implicitly
       quantifies over a type variable that occurs free on the RHS of the type declaration
