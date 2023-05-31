@@ -151,7 +151,7 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   mod_iface_docs <- case mi_docs mod_iface of
     Just docs -> pure docs
     Nothing -> do
-      warn $ showPpr dflags mdl ++ " has no docs in its .hi-file"
+      warn $ showPpr dflags mdl ++ " has no docs in its .hi file"
       pure emptyDocs
   -- Derive final options to use for haddocking this module
   doc_opts <- mkDocOpts (docs_haddock_opts mod_iface_docs) flags mdl
@@ -477,8 +477,8 @@ unrestrictedModExports
   -> Module           -- ^ Current Module
   -> IfaceMap         -- ^ Already created interfaces
   -> InstIfaceMap     -- ^ Interfaces in other packages
-  -> Avails           -- ^ Modules to be exporte
-  -> [ModuleName]
+  -> Avails
+  -> [ModuleName]     -- ^ Modules to be exported
   -> IfM m ([Module], Avails)
      -- ^ ( modules exported without restriction
      --   , remaining exports not included in any
@@ -533,8 +533,8 @@ availExportItem
   -> OccEnv Name       -- Default methods
   -> IfM m [ExportItem GhcRn]
 availExportItem
-    prr modMap thisMod warnings docMap argMap fixMap instIfaceMap
-    dflags availInfo defMeths
+    prr modMap thisMod warnings docMap argMap fixMap instIfaceMap dflags
+    availInfo defMeths
   =
     declWith availInfo
   where

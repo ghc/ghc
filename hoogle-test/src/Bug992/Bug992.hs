@@ -3,4 +3,6 @@
 
 module Bug992 where
 
-data K (m :: * -> *) = K
+import Data.Kind (Type)
+
+data K (m :: Type -> Type) = K

@@ -264,18 +264,20 @@ synifyTyCon _prr _coax tc
   where
     resultVar = tyConFamilyResVar_maybe tc
     mkFamDecl i = return $ FamDecl noExtField $
-      FamilyDecl { fdExt = noAnn
-                 , fdInfo = i
-                 , fdTopLevel = TopLevel
-                 , fdLName = synifyNameN tc
-                 , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
-                 , fdFixity = synifyFixity tc
-                 , fdResultSig =
-                       synifyFamilyResultSig resultVar (tyConResKind tc)
-                 , fdInjectivityAnn =
-                       synifyInjectivityAnn  resultVar (tyConTyVars tc)
-                                       (tyConInjectivityInfo tc)
-                 }
+      FamilyDecl
+        { fdExt = noAnn
+        , fdInfo = i
+        , fdTopLevel = TopLevel
+        , fdLName = synifyNameN tc
+        , fdTyVars = synifyTyVars (tyConVisibleTyVars tc)
+        , fdFixity = synifyFixity tc
+        , fdResultSig = synifyFamilyResultSig resultVar (tyConResKind tc)
+        , fdInjectivityAnn =
+            synifyInjectivityAnn
+              resultVar
+              (tyConTyVars tc)
+              (tyConInjectivityInfo tc)
+        }
 
 synifyTyCon _prr coax tc
   | Just ty <- synTyConRhs_maybe tc
@@ -295,7 +297,7 @@ synifyTyCon _prr coax tc
 
       name = case coax of
         Just a -> synifyNameN a -- Data families are named according to their
-                           -- CoAxioms, not their TyCons
+                                -- CoAxioms, not their TyCons
         _ -> synifyNameN tc
       tyvars = synifyTyVars (tyConVisibleTyVars tc)
       kindSig = synifyDataTyConReturnKind tc
@@ -359,18 +361,19 @@ synifyDataTyConReturnKind tc
 
 synifyInjectivityAnn :: Maybe Name -> [TyVar] -> Injectivity
                      -> Maybe (LInjectivityAnn GhcRn)
-synifyInjectivityAnn Nothing _ _            = Nothing
-synifyInjectivityAnn _       _ NotInjective = Nothing
 synifyInjectivityAnn (Just lhs) tvs (Injective inj) =
     let rhs = map (noLocA . tyVarName) (filterByList inj tvs)
     in Just $ noLocA $ InjectivityAnn noAnn (noLocA lhs) rhs
+synifyInjectivityAnn _ _ _ = Nothing
 
 synifyFamilyResultSig :: Maybe Name -> Kind -> LFamilyResultSig GhcRn
-synifyFamilyResultSig  Nothing    kind
-   | isLiftedTypeKind kind = noLocA $ NoSig noExtField
-   | otherwise = noLocA $ KindSig  noExtField (synifyKindSig kind)
+synifyFamilyResultSig Nothing kind
+    | isLiftedTypeKind kind
+    = noLocA $ NoSig noExtField
+    | otherwise
+    = noLocA $ KindSig noExtField (synifyKindSig kind)
 synifyFamilyResultSig (Just name) kind =
-   noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
+    noLocA $ TyVarSig noExtField (noLocA $ KindedTyVar noAnn () (noLocA name) (synifyKindSig kind))
 
 -- User beware: it is your responsibility to pass True (use_gadt_syntax)
 -- for any constructor that would be misrepresented by omitting its
@@ -605,6 +608,7 @@ synifyType _ vs (TyConApp tc tys)
       , rep `hasKey` boxedRepDataConKey
       , lev `hasKey` liftedDataConKey
       = noLocA (HsTyVar noAnn NotPromoted (noLocA liftedTypeKindTyConName))
+
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
       , tyConArity tc == tys_len
@@ -614,16 +618,22 @@ synifyType _ vs (TyConApp tc tys)
                               ConstraintTuple -> HsBoxedOrConstraintTuple
                               UnboxedTuple    -> HsUnboxedTuple)
                            (map (synifyType WithinType vs) vis_tys)
-      | isUnboxedSumTyCon tc = noLocA $ HsSumTy noAnn (map (synifyType WithinType vs) vis_tys)
+
+      | isUnboxedSumTyCon tc
+      = noLocA $ HsSumTy noAnn (map (synifyType WithinType vs) vis_tys)
+
       | Just dc <- isPromotedDataCon_maybe tc
       , isTupleDataCon dc
       , dataConSourceArity dc == length vis_tys
       = noLocA $ HsExplicitTupleTy noExtField (map (synifyType WithinType vs) vis_tys)
+
       -- ditto for lists
-      | getName tc == listTyConName, [ty] <- vis_tys =
-         noLocA $ HsListTy noAnn (synifyType WithinType vs ty)
+      | getName tc == listTyConName, [ty] <- vis_tys
+      = noLocA $ HsListTy noAnn (synifyType WithinType vs ty)
+
       | tc == promotedNilDataCon, [] <- vis_tys
       = noLocA $ HsExplicitListTy noExtField IsPromoted []
+
       | tc == promotedConsDataCon
       , [ty1, ty2] <- vis_tys
       = let hTy = synifyType WithinType vs ty1
@@ -632,11 +642,13 @@ synifyType _ vs (TyConApp tc tys)
                  -> noLocA $ HsExplicitListTy noExtField IsPromoted (hTy : tTy')
                  | otherwise
                  -> noLocA $ HsOpTy noAnn IsPromoted hTy (noLocA $ getName tc) tTy
+
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
       , Just x <- isStrLitTy name
       = noLocA $ HsIParamTy noAnn (noLocA $ HsIPName x) (synifyType WithinType vs ty)
+
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys
@@ -645,6 +657,7 @@ synifyType _ vs (TyConApp tc tys)
                        (synifyType WithinType vs ty1)
                        (noLocA eqTyConName)
                        (synifyType WithinType vs ty2)
+
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
       , ty1:ty2:tys_rest <- vis_tys
@@ -654,6 +667,7 @@ synifyType _ vs (TyConApp tc tys)
                            (noLocA $ getName tc)
                            (synifyType WithinType vs ty2))
                    tys_rest
+
       -- Most TyCons:
       | otherwise
       = mk_app_tys (HsTyVar noAnn prom $ noLocA (getName tc))

@@ -247,7 +247,6 @@ ppData :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppData dflags decl@DataDecl { tcdLName = name, tcdTyVars = tvs, tcdFixity = fixity, tcdDataDefn = defn } subdocs
     = out dflags (ppDataDefnHeader (pp_vanilla_decl_head name tvs fixity) defn) :
       concatMap (ppCtor dflags decl subdocs . unLoc) (dd_cons defn)
-    where
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
