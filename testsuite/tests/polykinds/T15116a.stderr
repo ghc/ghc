@@ -1,5 +1,5 @@
 
-T15116a.hs:6:21: error: [GHC-88634]
+T15116a.hs:6:21: error: [GHC-56753]
     • Data constructor ‘MkB’ cannot be used here
         (it is defined and used in the same recursive group)
     • In the first argument of ‘Proxy’, namely ‘'MkB’

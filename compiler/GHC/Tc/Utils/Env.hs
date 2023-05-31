@@ -43,7 +43,7 @@ module GHC.Tc.Utils.Env(
         getInLocalScope,
         wrongThingErr, pprBinders,
 
-        tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
+        tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders, tcAddKindSigPlaceholders,
         getTypeSigNames,
         tcExtendRecEnv,         -- For knot-tying
 
@@ -703,6 +703,12 @@ tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
 tcAddPatSynPlaceholders pat_syns thing_inside
   = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
                         | PSB{ psb_id = L _ name } <- pat_syns ]
+       thing_inside
+
+tcAddKindSigPlaceholders :: LHsKind GhcRn -> TcM a -> TcM a
+tcAddKindSigPlaceholders kind_sig thing_inside
+  = tcExtendKindEnvList [ (name, APromotionErr TypeVariablePE)
+                        | name <- hsScopedKvs kind_sig ]
        thing_inside
 
 getTypeSigNames :: [LSig GhcRn] -> NameSet

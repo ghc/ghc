@@ -464,7 +464,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDifferentNamesForTyVar"                    = 17370
   GhcDiagnosticCode "TcRnInvalidReturnKind"                         = 55233
   GhcDiagnosticCode "TcRnClassKindNotConstraint"                    = 80768
-  GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634
   GhcDiagnosticCode "TcRnMatchesHaveDiffNumArgs"                    = 91938
   GhcDiagnosticCode "TcRnCannotBindScopedTyVarInPatSig"             = 46131
   GhcDiagnosticCode "TcRnCannotBindTyVarsInPatBind"                 = 48361
@@ -821,6 +820,17 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- Zonker messages
   GhcDiagnosticCode "ZonkerCannotDefaultConcrete"                   = 52083
 
+  -- Promotion errors
+  GhcDiagnosticCode "ClassPE"                                       = 86934
+  GhcDiagnosticCode "TyConPE"                                       = 85413
+  GhcDiagnosticCode "PatSynPE"                                      = 70349
+  GhcDiagnosticCode "FamDataConPE"                                  = 64578
+  GhcDiagnosticCode "ConstrainedDataConPE"                          = 28374
+  GhcDiagnosticCode "RecDataConPE"                                  = 56753
+  GhcDiagnosticCode "NoDataKindsDC"                                 = 71015
+  GhcDiagnosticCode "TermVariablePE"                                = 45510
+  GhcDiagnosticCode "TypeVariablePE"                                = 47557
+
   -- To generate new random numbers:
   --  https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
   --
@@ -836,6 +846,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
   GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = 39180
   GhcDiagnosticCode "PsErrUnexpectedTypeAppInDecl"                  = 45054
+  GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634
 
 {- *********************************************************************
 *                                                                      *
@@ -977,6 +988,7 @@ type family ConRecursInto con where
   -- Constructors of ImportLookupBad
   ConRecursInto "ImportLookupBad"          = 'Just BadImportKind
 
+  ConRecursInto "TcRnUnpromotableThing"    = 'Just PromotionErr
   ----------------------------------
   -- Any other constructors: don't recur, instead directly
   -- use the constructor name for the error code.

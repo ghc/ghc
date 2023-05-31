@@ -1,5 +1,5 @@
 
-T15116.hs:7:12: error: [GHC-88634]
+T15116.hs:7:12: error: [GHC-56753]
     • Data constructor ‘MkA’ cannot be used here
         (it is defined and used in the same recursive group)
     • In the first argument of ‘A’, namely ‘MkA’

@@ -1,5 +1,5 @@
 
-PolyKinds07.hs:10:11: error: [GHC-88634]
+PolyKinds07.hs:10:11: error: [GHC-56753]
     • Data constructor ‘A1’ cannot be used here
         (it is defined and used in the same recursive group)
     • In the first argument of ‘B’, namely ‘'A1’

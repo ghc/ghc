@@ -1,5 +1,5 @@
 
-PromotedClass.hs:10:15: error: [GHC-88634]
+PromotedClass.hs:10:15: error: [GHC-28374]
     • Data constructor ‘MkX’ cannot be used here
         (it has an unpromotable context ‘Show a’)
     • In the first argument of ‘Proxy’, namely ‘('MkX 'True)’

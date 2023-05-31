@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module GHC.Tc.Errors.Types.PromotionErr ( PromotionErr(..)
                                         , pprPECategory
                                         , peCategory
@@ -7,6 +8,7 @@ import GHC.Prelude
 import GHC.Core.Type (ThetaType)
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Generics (Generic)
 
 data PromotionErr
   = TyConPE          -- TyCon used in a kind before we are ready
@@ -25,6 +27,8 @@ data PromotionErr
                      -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
   | TermVariablePE   -- See Note [Promoted variables in types]
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
+  | TypeVariablePE   -- See Note [Type variable scoping errors during typechecking]
+  deriving (Generic)
 
 instance Outputable PromotionErr where
   ppr ClassPE              = text "ClassPE"
@@ -35,6 +39,7 @@ instance Outputable PromotionErr where
   ppr RecDataConPE         = text "RecDataConPE"
   ppr NoDataKindsDC        = text "NoDataKindsDC"
   ppr TermVariablePE       = text "TermVariablePE"
+  ppr TypeVariablePE       = text "TypeVariablePE"
 
 pprPECategory :: PromotionErr -> SDoc
 pprPECategory = text . capitalise . peCategory
@@ -48,3 +53,45 @@ peCategory ConstrainedDataConPE{} = "data constructor"
 peCategory RecDataConPE         = "data constructor"
 peCategory NoDataKindsDC        = "data constructor"
 peCategory TermVariablePE       = "term variable"
+peCategory TypeVariablePE       = "type variable"
+
+
+{- Note [Type variable scoping errors during typechecking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the scoping of the type variable `a` in the following
+term-level example:
+
+  -- f :: [forall b . Either b ()]
+  f = [Right @a @() () :: forall a. Either a ()]
+
+Here `@a` in the type application and `a` in the type signature refer to
+the same type variable. Indeed, this term elaborates to the following Core:
+
+  f = [(\@a -> Right @a @() ()) :: forall a . Either a ()]
+
+But how does this work with types? Suppose we have:
+
+  type F = '[Right @a @() () :: forall a. Either a ()]
+
+To be consistent with the term-level language, we would have to elaborate
+this using a big lambda:
+
+  type F = '[(/\ a . Right @a @() ()) :: forall a. Either a ()]
+
+Core has no such construct, so this is not a valid type.
+
+Conclusion: Even with -XExtendedForAllScope, the forall'd variables of a
+kind signature on a type cannot scope over the type.
+
+In implementation terms, to get a helpful error message we do this:
+
+* The renamer treats the type variable as bound by the forall
+  (so it doesn't just say "out of scope"); see the `HsKindSig` case of GHC.Rename.HsType.rnHsTyKi.
+
+* The typechecker adds the forall-bound type variables to the type environent,
+  but bound to `APromotionErr TypeVariablePE`; see the call to `tcAddKindSigPlaceholders`
+  in the `HsKindSig` case of `GHC.Tc.Gen.HsType.tc_infer_hs_type`.
+
+* The occurrence site of a type variable then complains when it finds `APromotionErr`;
+  see `GHC.Tc.Gen.HsType.tcTyVar`.
+-}

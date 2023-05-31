@@ -2371,6 +2371,9 @@ data TcRnMessage where
                 saks/should_fail/T16727a
                 saks/should_fail/T16727b
                 rename/should_fail/T12686
+                rename/should_fail/T16635a
+                rename/should_fail/T16635b
+                rename/should_fail/T16635c
   -}
   TcRnUnpromotableThing :: !Name -> !PromotionErr -> TcRnMessage
 

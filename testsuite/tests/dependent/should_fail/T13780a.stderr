@@ -1,5 +1,5 @@
 
-T13780a.hs:9:40: error: [GHC-88634]
+T13780a.hs:9:40: error: [GHC-28374]
     • Data constructor ‘MkFoo’ cannot be used here
         (it has an unpromotable context ‘a ~ Bool’)
     • In the second argument of ‘(~)’, namely ‘MkFoo’

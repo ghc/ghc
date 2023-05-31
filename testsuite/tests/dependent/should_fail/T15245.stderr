@@ -1,5 +1,5 @@
 
-T15245.hs:10:24: error: [GHC-88634]
+T15245.hs:10:24: error: [GHC-64578]
     • Data constructor ‘MkK’ cannot be used here
         (it comes from a data family instance)
     • In the type ‘'MkK’

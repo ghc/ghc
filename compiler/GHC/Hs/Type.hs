@@ -73,7 +73,7 @@ module GHC.Hs.Type (
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded,
-        hsScopedTvs, hsWcScopedTvs, dropWildCards,
+        hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
@@ -430,6 +430,13 @@ hsScopedTvs :: LHsSigType GhcRn -> [Name]
 hsScopedTvs (L _ (HsSig{sig_bndrs = outer_bndrs}))
   = hsLTyVarNames (hsOuterExplicitBndrs outer_bndrs)
     -- See Note [hsScopedTvs and visible foralls]
+
+hsScopedKvs :: LHsKind GhcRn -> [Name]
+-- Same as hsScopedTvs, but for a LHsKind
+hsScopedKvs  (L _ HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }})
+  = hsLTyVarNames bndrs
+    -- See Note [hsScopedTvs and visible foralls]
+hsScopedKvs _ = []
 
 ---------------------
 hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)

@@ -1,5 +1,5 @@
 
-SelfDep.hs:5:11: error: [GHC-88634]
+SelfDep.hs:5:11: error: [GHC-85413]
     • Type constructor ‘T’ cannot be used here
         (it is defined and used in the same recursive group)
     • In the kind ‘T -> *’

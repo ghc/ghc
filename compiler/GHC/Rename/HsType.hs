@@ -646,8 +646,9 @@ rnHsTyKi env listTy@(HsListTy x ty)
 rnHsTyKi env (HsKindSig x ty k)
   = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
        ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
-       ; (ty', lhs_fvs) <- rnLHsTyKi env ty
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
+       ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
+                           rnLHsTyKi env ty
        ; return (HsKindSig x ty' k', lhs_fvs `plusFV` sig_fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
@@ -1992,8 +1993,7 @@ extract_lty (L _ ty) acc
       HsExplicitTupleTy _ tys     -> extract_ltys tys acc
       HsTyLit _ _                 -> acc
       HsStarTy _ _                -> acc
-      HsKindSig _ ty ki           -> extract_lty ty $
-                                     extract_lty ki acc
+      HsKindSig _ ty ki           -> extract_kind_sig ty ki acc
       HsForAllTy { hst_tele = tele, hst_body = ty }
                                   -> extract_hs_for_all_telescope tele acc $
                                      extract_lty ty []
@@ -2003,6 +2003,19 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
+
+extract_kind_sig :: LHsType GhcPs -- type
+                 -> LHsType GhcPs -- kind
+                 -> FreeKiTyVars -> FreeKiTyVars
+extract_kind_sig ty ki acc
+  | (L _ HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
+                    , hst_body = ki_body }) <- ki
+  = extract_hs_tv_bndrs bndrs acc $
+    extract_lty ty $
+    extract_lty ki_body []
+extract_kind_sig ty ki acc
+  = extract_lty ty $
+    extract_lty ki acc
 
 extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
 extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =

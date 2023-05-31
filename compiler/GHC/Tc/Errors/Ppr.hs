@@ -1046,6 +1046,7 @@ instance Diagnostic TcRnMessage where
                      ClassPE        -> same_rec_group_msg
                      TyConPE        -> same_rec_group_msg
                      TermVariablePE -> text "term variables cannot be promoted"
+                     TypeVariablePE -> text "type variables bound in a kind signature cannot be used in the type"
           same_rec_group_msg = text "it is defined and used in the same recursive group"
     TcRnMatchesHaveDiffNumArgs argsContext (MatchArgMatches match1 bad_matches)
       -> mkSimpleDecorated $

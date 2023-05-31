@@ -1,5 +1,5 @@
 
-T5716.hs:14:39: error: [GHC-88634]
+T5716.hs:14:39: error: [GHC-64578]
     • Data constructor ‘DFInt’ cannot be used here
         (it comes from a data family instance)
     • In the first argument of ‘U1’, namely ‘DFInt’
