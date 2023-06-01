@@ -1559,7 +1559,7 @@ data TcRnMessage where
   -}
   TcRnExportedParentChildMismatch :: Name -- ^ parent
                                   -> TyThing
-                                  -> GlobalRdrElt -- ^ child
+                                  -> Name -- ^ child
                                   -> [Name] -> TcRnMessage
 
   {-| TcRnConflictingExports is an error that occurs when different identifiers that

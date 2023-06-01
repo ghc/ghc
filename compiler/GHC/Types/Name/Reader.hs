@@ -68,13 +68,13 @@ module GHC.Types.Name.Reader (
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrEltX(..), GlobalRdrElt, IfGlobalRdrElt, FieldGlobalRdrElt,
         greName, forceGlobalRdrEnv, hydrateGlobalRdrEnv,
-        isLocalGRE, isRecFldGRE,
+        isLocalGRE, isImportedGRE, isRecFldGRE,
         fieldGREInfo,
         isDuplicateRecFldGRE, isNoFieldSelectorGRE, isFieldSelectorGRE,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
-        vanillaGRE, localVanillaGRE, localTyConGRE,
-        localConLikeGRE, localFieldGREs,
+        mkGRE, mkExactGRE, mkLocalGRE, mkLocalVanillaGRE, mkLocalTyConGRE,
+        mkLocalConLikeGRE, mkLocalFieldGREs,
         gresToNameSet,
 
         -- ** Shadowing
@@ -526,7 +526,8 @@ type GlobalRdrEnvX info = OccEnv [GlobalRdrEltX info]
 
 -- | Global Reader Element
 --
--- An element of the 'GlobalRdrEnv'.
+-- Something in scope in the renamer; usually a member of the 'GlobalRdrEnv'.
+-- See Note [GlobalRdrElt provenance].
 
 type GlobalRdrElt   = GlobalRdrEltX GREInfo
 
@@ -538,7 +539,8 @@ type IfGlobalRdrElt = GlobalRdrEltX ()
 
 -- | Global Reader Element
 --
--- An element of the 'GlobalRdrEnv'.
+-- Something in scope in the renamer; usually a member of the 'GlobalRdrEnv'.
+-- See Note [GlobalRdrElt provenance].
 --
 -- Why do we parametrise over the 'gre_info' field? See Note [IfGlobalRdrEnv].
 data GlobalRdrEltX info
@@ -546,6 +548,8 @@ data GlobalRdrEltX info
         , gre_par  :: !Parent            -- ^ See Note [Parents]
         , gre_lcl  :: !Bool              -- ^ True <=> the thing was defined locally
         , gre_imp  :: !(Bag ImportSpec)  -- ^ In scope through these imports
+  -- See Note [GlobalRdrElt provenance] for the relation between gre_lcl and gre_imp.
+
         , gre_info :: info
             -- ^ Information the renamer knows about this particular 'Name'.
             --
@@ -554,8 +558,7 @@ data GlobalRdrEltX info
             --
             -- Note [Retrieving the GREInfo from interfaces] in GHC.Types.GREInfo.
     } deriving (Data)
-         -- INVARIANT: either gre_lcl = True or gre_imp is non-empty
-         -- See Note [GlobalRdrElt provenance]
+
 
 {- Note [IfGlobalRdrEnv]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -623,16 +626,32 @@ hasParent p _  = p
 {- Note [GlobalRdrElt provenance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The gre_lcl and gre_imp fields of a GlobalRdrElt describe its "provenance",
-i.e. how the Name came to be in scope.  It can be in scope two ways:
-  - gre_lcl = True: it is bound in this module
-  - gre_imp: a list of all the imports that brought it into scope
+i.e. how the Name came to be in scope.  It can be in scope in one of the following
+three ways:
 
-It's an INVARIANT that you have one or the other; that is, either
-gre_lcl is True, or gre_imp is non-empty.
+  A. The Name was locally bound, in the current module.
+     gre_lcl = True
 
-It is just possible to have *both* if there is a module loop: a Name
-is defined locally in A, and also brought into scope by importing a
-module that SOURCE-imported A.  Example (#7672):
+     The renamer adds this Name to the GlobalRdrEnv after renaming the binding.
+     See the calls to "extendGlobalRdrEnvRn" in GHC.Rename.Module.rnSrcDecls.
+
+  B. The Name was imported
+     gre_imp = Just imps <=> brought into scope by the imports "imps"
+
+     The renamer adds this Name to the GlobalRdrEnv after processing the imports.
+     See GHC.Rename.Names.filterImports and GHC.Tc.Module.tcRnImports.
+
+  C. We followed an exact reference (i.e. an Exact or Orig RdrName)
+     gre_lcl = False, gre_imp = Nothing
+
+     In this case, we directly fetch a Name and its GREInfo from direct reference.
+     We don't add it to the GlobalRdrEnv. See "GHC.Rename.Env.lookupExactOrOrig".
+
+It is just about possible to have *both* gre_lcl = True and gre_imp = Just imps.
+This can happen with module loops: a Name is defined locally in A, and also
+brought into scope by importing a module that SOURCE-imported A.
+
+Example (#7672):
 
  A.hs-boot   module A where
                data T
@@ -710,42 +729,47 @@ those.  For T that will mean we have
 That's why plusParent picks the "best" case.
 -}
 
-vanillaGRE :: (Name -> Maybe ImportSpec) -> Parent -> Name -> GlobalRdrElt
-vanillaGRE prov_fn par n =
+mkGRE :: (Name -> Maybe ImportSpec) -> GREInfo -> Parent -> Name -> GlobalRdrElt
+mkGRE prov_fn info par n =
   case prov_fn n of
       -- Nothing => bound locally
       -- Just is => imported from 'is'
     Nothing -> GRE { gre_name = n, gre_par = par
                    , gre_lcl = True, gre_imp = emptyBag
-                   , gre_info = Vanilla }
+                   , gre_info = info }
     Just is -> GRE { gre_name = n, gre_par = par
                    , gre_lcl = False, gre_imp = unitBag is
-                   , gre_info = Vanilla }
+                   , gre_info = info }
 
-localVanillaGRE :: Parent -> Name -> GlobalRdrElt
-localVanillaGRE = vanillaGRE (const Nothing)
+mkExactGRE :: Name -> GREInfo -> GlobalRdrElt
+mkExactGRE nm info =
+  GRE { gre_name = nm, gre_par = NoParent
+      , gre_lcl = False, gre_imp = emptyBag
+      , gre_info = info }
+
+mkLocalGRE :: GREInfo -> Parent -> Name -> GlobalRdrElt
+mkLocalGRE = mkGRE (const Nothing)
+
+mkLocalVanillaGRE :: Parent -> Name -> GlobalRdrElt
+mkLocalVanillaGRE = mkLocalGRE Vanilla
 
 -- | Create a local 'GlobalRdrElt' for a 'TyCon'.
-localTyConGRE :: TyConFlavour Name
+mkLocalTyConGRE :: TyConFlavour Name
               -> Name
               -> GlobalRdrElt
-localTyConGRE flav nm =
-  ( localVanillaGRE par nm )
-    { gre_info = IAmTyCon flav }
+mkLocalTyConGRE flav nm = mkLocalGRE (IAmTyCon flav) par nm
   where
     par = case tyConFlavourAssoc_maybe flav of
       Nothing -> NoParent
       Just p  -> ParentIs p
 
-localConLikeGRE :: Parent -> (ConLikeName, ConInfo) -> GlobalRdrElt
-localConLikeGRE p (con_nm, con_info) =
-  ( localVanillaGRE p $ conLikeName_Name con_nm )
-    { gre_info = IAmConLike con_info }
+mkLocalConLikeGRE :: Parent -> (ConLikeName, ConInfo) -> GlobalRdrElt
+mkLocalConLikeGRE p (con_nm, con_info) =
+  mkLocalGRE (IAmConLike con_info) p (conLikeName_Name con_nm )
 
-localFieldGREs :: Parent -> [(ConLikeName, ConInfo)] -> [GlobalRdrElt]
-localFieldGREs p cons =
-  [ ( localVanillaGRE p fld_nm )
-      { gre_info = IAmRecField fld_info }
+mkLocalFieldGREs :: Parent -> [(ConLikeName, ConInfo)] -> [GlobalRdrElt]
+mkLocalFieldGREs p cons =
+  [ mkLocalGRE (IAmRecField fld_info) p fld_nm
   | (S.Arg fld_nm fl, fl_cons) <- flds
   , let fld_info = RecFieldInfo { recFieldLabel = fl
                                 , recFieldCons  = fl_cons } ]
@@ -1147,8 +1171,16 @@ getGRE_NameQualifier_maybes env name
       | lcl       = Nothing
       | otherwise = Just $ map (is_as . is_decl) (bagToList iss)
 
+-- | Is this 'GlobalRdrElt' defined locally?
 isLocalGRE :: GlobalRdrEltX info -> Bool
 isLocalGRE (GRE { gre_lcl = lcl }) = lcl
+
+-- | Is this 'GlobalRdrElt' imported?
+--
+-- Not just the negation of 'isLocalGRE', because it might be an Exact or
+-- Orig name reference. See Note [GlobalRdrElt provenance].
+isImportedGRE :: GlobalRdrEltX info -> Bool
+isImportedGRE (GRE { gre_imp = imps }) = not $ isEmptyBag imps
 
 -- | Is this a record field GRE?
 --

@@ -1938,8 +1938,8 @@ lookupName :: Bool      -- True  <=> type namespace
                         -- False <=> value namespace
            -> String -> TcM (Maybe TH.Name)
 lookupName is_type_name s
-  = do { mb_gre <- lookupSameOccRn_maybe rdr_name
-       ; return (fmap (reifyName . greName) mb_gre) }
+  = do { mb_nm <- lookupSameOccRn_maybe rdr_name
+       ; return (fmap reifyName mb_nm) }
   where
     th_name = TH.mkName s       -- Parses M.x into a base of 'x' and a module of 'M'
 
@@ -1999,15 +1999,12 @@ lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 lookupThName_maybe th_name
   =  do { let guesses = thRdrNameGuesses th_name
         ; case guesses of
-        { [for_sure] -> get_name $ lookupSameOccRn_maybe for_sure
+        { [for_sure] -> lookupSameOccRn_maybe for_sure
         ; _ ->
-     do { names <- mapMaybeM (get_name . lookupOccRn_maybe) guesses
+     do { gres <- mapMaybeM lookupOccRn_maybe guesses
           -- Pick the first that works
           -- E.g. reify (mkName "A") will pick the class A in preference to the data constructor A
-        ; return (listToMaybe names) } } }
-  where
-    get_name :: TcM (Maybe GlobalRdrElt) -> TcM (Maybe Name)
-    get_name = fmap (fmap greName)
+        ; return (fmap greName $ listToMaybe gres) } } }
 
 tcLookupTh :: Name -> TcM TcTyThing
 -- This is a specialised version of GHC.Tc.Utils.Env.tcLookup; specialised mainly in that

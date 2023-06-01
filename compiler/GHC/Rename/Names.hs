@@ -858,7 +858,7 @@ getLocalNonValBinders fixity_env
       -- declaration, not just the name
     new_simple :: LocatedN RdrName -> RnM GlobalRdrElt
     new_simple rdr_name = do { nm <- newTopSrcBinder rdr_name
-                             ; return (localVanillaGRE NoParent nm) }
+                             ; return (mkLocalVanillaGRE NoParent nm) }
 
     new_tc :: DuplicateRecordFields -> FieldSelectors -> LTyClDecl GhcPs
            -> RnM [GlobalRdrElt]
@@ -871,13 +871,13 @@ getLocalNonValBinders fixity_env
              ; con_names_with_flds <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (l2n con)) cons_with_flds
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst con_names_with_flds) flds
              ; mapM_ (add_dup_fld_errs flds') con_names_with_flds
-             ; let tc_gre = localTyConGRE (fmap (const tycon_name) tc_flav) tycon_name
+             ; let tc_gre = mkLocalTyConGRE (fmap (const tycon_name) tc_flav) tycon_name
                    fld_env = mk_fld_env con_names_with_flds flds'
-                   at_gres = zipWith (\ (_, at_flav) at_nm -> localTyConGRE (fmap (const tycon_name) at_flav) at_nm)
+                   at_gres = zipWith (\ (_, at_flav) at_nm -> mkLocalTyConGRE (fmap (const tycon_name) at_flav) at_nm)
                                at_bndrs at_names
-                   sig_gres = map (localVanillaGRE (ParentIs tycon_name)) sig_names
-                   con_gres = map (localConLikeGRE (ParentIs tycon_name)) fld_env
-                   fld_gres = localFieldGREs (ParentIs tycon_name) fld_env
+                   sig_gres = map (mkLocalVanillaGRE (ParentIs tycon_name)) sig_names
+                   con_gres = map (mkLocalConLikeGRE (ParentIs tycon_name)) fld_env
+                   fld_gres = mkLocalFieldGREs (ParentIs tycon_name) fld_env
                    sub_gres = at_gres ++ sig_gres ++ con_gres ++ fld_gres
              ; traceRn "getLocalNonValBinders new_tc" $
                  vcat [ text "tycon:" <+> ppr tycon_name
@@ -947,8 +947,8 @@ getLocalNonValBinders fixity_env
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst sub_names) flds
              ; mapM_ (add_dup_fld_errs flds') sub_names
              ; let fld_env  = mk_fld_env sub_names flds'
-                   con_gres = map (localConLikeGRE (ParentIs main_name)) fld_env
-                   field_gres = localFieldGREs (ParentIs main_name) fld_env
+                   con_gres = map (mkLocalConLikeGRE (ParentIs main_name)) fld_env
+                   field_gres = mkLocalFieldGREs (ParentIs main_name) fld_env
                -- NB: the data family name is not bound here,
                -- so we don't return a GlobalRdrElt for it here!
              ; return $ con_gres ++ field_gres }

@@ -520,14 +520,13 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
             NameNotFound ->
               do { ub <- reportUnboundName unboundName
                  ; let l = getLoc n
-                       gre = localVanillaGRE NoParent ub
+                       gre = mkLocalVanillaGRE NoParent ub
                  ; return (L l (IEName noExtField (L (la2na l) ub)), gre)}
-            FoundChild child@(GRE { gre_par = par }) ->
-              do { checkPatSynParent spec_parent par child
-                 ; let child_nm = greName child
+            FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
+              do { checkPatSynParent spec_parent par child_nm
                  ; return (replaceLWrappedName n child_nm, child)
                  }
-            IncorrectParent p c gs -> failWithDcErr p c gs
+            IncorrectParent p c gs -> failWithDcErr p (greName c) gs
 
 
 -- Note [Typing Pattern Synonym Exports]
@@ -590,7 +589,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
 checkPatSynParent :: Name    -- ^ Alleged parent type constructor
                              -- User wrote T( P, Q )
                   -> Parent  -- The parent of P we discovered
-                  -> GlobalRdrElt
+                  -> Name
                        -- ^ Either a
                        --   a) Pattern Synonym Constructor
                        --   b) A pattern synonym selector
@@ -598,13 +597,12 @@ checkPatSynParent :: Name    -- ^ Alleged parent type constructor
 checkPatSynParent _ (ParentIs {}) _
   = return ()
 
-checkPatSynParent parent NoParent gre
+checkPatSynParent parent NoParent nm
   | isUnboundName parent -- Avoid an error cascade
   = return ()
 
   | otherwise
   = do { parent_ty_con  <- tcLookupTyCon  parent
-       ; let nm = greName gre
        ; mpat_syn_thing <- tcLookupGlobal nm
 
         -- 1. Check that the Id was actually from a thing associated with patsyns
@@ -615,7 +613,7 @@ checkPatSynParent parent NoParent gre
 
             AConLike (PatSynCon p) -> handle_pat_syn (psErr p) parent_ty_con p
 
-            _ -> failWithDcErr parent gre [] }
+            _ -> failWithDcErr parent nm [] }
   where
     psErr  = exportErrCtxt "pattern synonym"
     selErr = exportErrCtxt "pattern synonym record selector"
@@ -736,9 +734,9 @@ addExportErrCtxt ie = addErrCtxt exportCtxt
     exportCtxt = text "In the export:" <+> ppr ie
 
 
-failWithDcErr :: Name -> GlobalRdrElt -> [Name] -> TcM a
+failWithDcErr :: Name -> Name -> [Name] -> TcM a
 failWithDcErr parent child parents = do
-  ty_thing <- tcLookupGlobal (greName child)
+  ty_thing <- tcLookupGlobal child
   failWithTc $ TcRnExportedParentChildMismatch parent ty_thing child parents
 
 

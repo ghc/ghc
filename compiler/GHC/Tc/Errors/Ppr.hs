@@ -611,7 +611,7 @@ instance Diagnostic TcRnMessage where
           | isRecordSelector i = "record selector"
         pp_category i = tyThingCategory i
         what_is = pp_category ty_thing
-        thing = ppr $ greOccName child
+        thing = ppr $ nameOccName child
         parents = map ppr parent_names
     TcRnConflictingExports occ child_gre1 ie1 child_gre2 ie2
       -> mkSimpleDecorated $

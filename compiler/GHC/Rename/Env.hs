@@ -331,26 +331,26 @@ lookupExactOcc_either name
                -- 'RuntimeRep's (#17837)
                UnboxedTuple -> tyConArity tycon `div` 2
                _ -> tyConArity tycon
+       ; let info = case thing of
+               ATyCon {} -> IAmTyCon $ TupleFlavour $ tupleSortBoxity tupleSort
+               _         -> IAmConLike $ mkConInfo tupArity []
        ; checkTupSize tupArity
-       ; let gre = (localTyConGRE (TupleFlavour $ tupleSortBoxity tupleSort) name)
-                     { gre_lcl = False }
-       ; return (Right gre) }
+       ; return $ Right $ mkExactGRE name info }
 
   | isExternalName name
-  = Right <$> lookupExternalExactGRE name
+  = do { info <- lookupExternalExactName name
+       ; return $ Right $ mkExactGRE name info }
 
   | otherwise
   = lookupLocalExactGRE name
 
-lookupExternalExactGRE :: Name -> RnM GlobalRdrElt
-lookupExternalExactGRE name
+lookupExternalExactName :: Name -> RnM GREInfo
+lookupExternalExactName name
   = do { thing <-
            case wiredInNameTyThing_maybe name of
              Just thing -> return thing
              _          -> tcLookupGlobal name
-       ; return $
-           (localVanillaGRE NoParent name)
-             { gre_lcl = False, gre_info = tyThingGREInfo thing } }
+       ; return $ tyThingGREInfo thing }
 
 lookupLocalExactGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
 lookupLocalExactGRE name
@@ -370,7 +370,7 @@ lookupLocalExactGRE name
 
            []    -> -- See Note [Splicing Exact names]
                     do { lcl_env <- getLocalRdrEnv
-                       ; let gre = localVanillaGRE NoParent name -- LocalRdrEnv only contains Vanilla things
+                       ; let gre = mkLocalVanillaGRE NoParent name -- LocalRdrEnv only contains Vanilla things
                        ; if name `inLocalRdrEnvScope` lcl_env
                          then return (Right gre)
                          else
@@ -451,7 +451,7 @@ lookupExactOrOrig :: RdrName -> (GlobalRdrElt -> r) -> RnM r -> RnM r
 lookupExactOrOrig rdr_name res k
   = do { men <- lookupExactOrOrig_base rdr_name
        ; case men of
-          FoundExactOrOrig n -> return $ res n
+          FoundExactOrOrig gre -> return $ res gre
           ExactOrOrigError e ->
             do { addErr (mkTcRnNotInScope rdr_name e)
                ; return $ res (mkUnboundGRERdr rdr_name) }
@@ -464,9 +464,9 @@ lookupExactOrOrig_maybe :: RdrName -> (Maybe GlobalRdrElt -> r) -> RnM r -> RnM 
 lookupExactOrOrig_maybe rdr_name res k
   = do { men <- lookupExactOrOrig_base rdr_name
        ; case men of
-           FoundExactOrOrig n -> return (res (Just n))
-           ExactOrOrigError _ -> return (res Nothing)
-           NotExactOrOrig     -> k }
+           FoundExactOrOrig gre -> return (res (Just gre))
+           ExactOrOrigError _   -> return (res Nothing)
+           NotExactOrOrig       -> k }
 
 data ExactOrOrigResult
   = FoundExactOrOrig GlobalRdrElt
@@ -490,15 +490,15 @@ lookupExactOrOrig_base rdr_name
        ; mb_gre <-
          if nameIsLocalOrFrom this_mod nm
          then lookupLocalExactGRE nm
-         else Right <$> lookupExternalExactGRE nm
+         else do { info <- lookupExternalExactName nm
+                 ; return $ Right $ mkExactGRE nm info }
        ; return $ case mb_gre of
           Left  err -> ExactOrOrigError err
           Right gre -> FoundExactOrOrig gre }
   | otherwise = return NotExactOrOrig
   where
-    cvtEither (Left e)  = ExactOrOrigError e
-    cvtEither (Right n) = FoundExactOrOrig n
-
+    cvtEither (Left e)    = ExactOrOrigError e
+    cvtEither (Right gre) = FoundExactOrOrig gre
 
 {- Note [Errors in lookup functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -561,7 +561,7 @@ lookupRecFieldOcc mb_con rdr_name
           ; Just nm -> return nm } }
 
   | otherwise  -- Can't use the data constructor to disambiguate
-  = greName <$> lookupGlobalOccRn' (IncludeFields WantField) rdr_name
+  = lookupGlobalOccRn' (IncludeFields WantField) rdr_name
     -- This use of Global is right as we are looking up a selector,
     -- which can only be defined at the top level.
 
@@ -851,18 +851,16 @@ lookupSubBndrOcc :: DeprecationWarnings
                  -> RnM (Either NotInScopeError Name)
 -- Find all the things the rdr-name maps to
 -- and pick the one with the right parent name
-lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
-  res <-
-    lookupExactOrOrig rdr_name FoundChild $
-      -- This happens for built-in classes, see mod052 for example
-      lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name
-  case res of
-    NameNotFound -> return (Left (UnknownSubordinate doc))
-    FoundChild child -> return (Right $ greName child)
-    IncorrectParent {}
-         -- See [Mismatched class methods and associated type families]
-         -- in TcInstDecls.
-      -> return $ Left (UnknownSubordinate doc)
+lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
+  lookupExactOrOrig rdr_name (Right . greName) $
+    -- This happens for built-in classes, see mod052 for example
+    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name
+       ; return $ case child of
+           FoundChild g       -> Right (greName g)
+           NameNotFound       -> Left (UnknownSubordinate doc)
+           IncorrectParent {} -> Left (UnknownSubordinate doc) }
+       -- See [Mismatched class methods and associated type families]
+       -- in TcInstDecls.
 
 {-
 Note [Family instance binders]
@@ -1107,10 +1105,10 @@ lookup_demoted rdr_name
        ; let is_star_type = if star_is_type then StarIsType else StarIsNotType
              star_is_type_hints = noStarIsTypeHints is_star_type rdr_name
        ; if data_kinds
-            then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
-                    ; case mb_demoted_name of
+            then do { mb_demoted_gre <- lookupOccRn_maybe demoted_rdr
+                    ; case mb_demoted_gre of
                         Nothing -> unboundNameX looking_for rdr_name star_is_type_hints
-                        Just demoted_name -> return $ greName demoted_name }
+                        Just demoted_gre -> return $ greName demoted_gre}
             else do { -- We need to check if a data constructor of this name is
                       -- in scope to give good error messages. However, we do
                       -- not want to give an additional error if the data
@@ -1242,18 +1240,26 @@ lookupOccRnX_maybe globalLookup wrapper rdr_name
            ; case res of
            { Nothing -> return Nothing
            ; Just nm ->
-        do { let gre = localVanillaGRE NoParent nm
+           -- Elements in the LocalRdrEnv are always Vanilla GREs
+        do { let gre = mkLocalVanillaGRE NoParent nm
            ; Just <$> wrapper gre } } }
       , globalLookup rdr_name ]
 
 lookupOccRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 lookupOccRn_maybe =
-  lookupOccRnX_maybe (lookupGlobalOccRn_maybe $ IncludeFields WantNormal) return
+  lookupOccRnX_maybe
+    (lookupGlobalOccRn_maybe $ IncludeFields WantNormal)
+    return
 
 -- Used outside this module only by TH name reification (lookupName, lookupThName_maybe)
-lookupSameOccRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
+lookupSameOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupSameOccRn_maybe =
-  lookupOccRnX_maybe (lookupGlobalOccRn_maybe SameOccName) return
+  lookupOccRnX_maybe
+    (get_name <$> lookupGlobalOccRn_maybe SameOccName)
+    (return . greName)
+  where
+    get_name :: RnM (Maybe GlobalRdrElt) -> RnM (Maybe Name)
+    get_name = fmap (fmap greName)
 
 -- | Look up a 'RdrName' used as a variable in an expression.
 --
@@ -1292,7 +1298,7 @@ lookupGlobalOccRn_maybe which_gres rdr_name =
   lookupExactOrOrig_maybe rdr_name id $
     lookupGlobalOccRn_base which_gres rdr_name
 
-lookupGlobalOccRn :: RdrName -> RnM GlobalRdrElt
+lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
 -- environment.  Adds an error message if the RdrName is not in scope.
 -- You usually want to use "lookupOccRn" which also looks in the local
@@ -1301,15 +1307,14 @@ lookupGlobalOccRn :: RdrName -> RnM GlobalRdrElt
 -- Used by exports_from_avail
 lookupGlobalOccRn = lookupGlobalOccRn' (IncludeFields WantNormal)
 
-lookupGlobalOccRn' :: WhichGREs GREInfo -> RdrName -> RnM GlobalRdrElt
+lookupGlobalOccRn' :: WhichGREs GREInfo -> RdrName -> RnM Name
 lookupGlobalOccRn' which_gres rdr_name =
-  lookupExactOrOrig rdr_name id $ do
-    mn <- lookupGlobalOccRn_base which_gres rdr_name
-    case mn of
-      Just n -> return n
+  lookupExactOrOrig rdr_name greName $ do
+    mb_gre <- lookupGlobalOccRn_base which_gres rdr_name
+    case mb_gre of
+      Just gre -> return (greName gre)
       Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                    ; nm <- unboundName (LF which_suggest WL_Global) rdr_name
-                    ; return $ localVanillaGRE NoParent nm }
+                    ; unboundName (LF which_suggest WL_Global) rdr_name }
         where which_suggest = case which_gres of
                 IncludeFields WantBoth  -> WL_RecField
                 IncludeFields WantField -> WL_RecField
@@ -1333,7 +1338,7 @@ lookupGlobalOccRn_base which_gres rdr_name =
 
 -- | Lookup a 'Name' in the 'GlobalRdrEnv', falling back to looking up
 -- in the type environment it if fails.
-lookupGREInfo_GRE ::  Name -> RnM GREInfo
+lookupGREInfo_GRE :: Name -> RnM GREInfo
 lookupGREInfo_GRE name
   = do { rdr_env <- getGlobalRdrEnv
        ; case lookupGRE_Name rdr_env name of
@@ -1740,7 +1745,7 @@ addUsedGRE warn_if_deprec gre
   = do { case warn_if_deprec of
            EnableDeprecationWarnings  -> warnIfDeprecated gre
            DisableDeprecationWarnings -> return ()
-       ; unless (isLocalGRE gre) $
+       ; when (isImportedGRE gre) $ -- See Note [Using isImportedGRE in addUsedGRE]
          do { env <- getGblEnv
              -- Do not report the GREInfo (#23424)
             ; traceRn "addUsedGRE" (ppr $ greName gre)
@@ -1758,7 +1763,22 @@ addUsedGREs gres
                              (ppr $ map greName imp_gres)
                        ; updTcRef (tcg_used_gres env) (imp_gres ++) }
   where
-    imp_gres = filterOut isLocalGRE gres
+    imp_gres = filter isImportedGRE gres
+    -- See Note [Using isImportedGRE in addUsedGRE]
+
+{- Note [Using isImportedGRE in addUsedGRE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In addUsedGRE, we want to add any used imported GREs to the tcg_used_gres field,
+so that we can emit appropriate warnings (see GHC.Rename.Names.warnUnusedImportDecls).
+
+We want to do this for GREs that were brought into scope through imports. As per
+Note [GlobalRdrElt provenance] in GHC.Types.Name.Reader, this means we should
+check that gre_imp is non-empty. Checking that gre_lcl is False is INCORRECT,
+because we might have obtained the GRE by an Exact or Orig direct reference,
+in which case we have both gre_lcl = False and gre_imp = emptyBag.
+
+Geting this wrong can lead to panics in e.g. bestImport, see #23240.
+-}
 
 warnIfDeprecated :: GlobalRdrElt -> RnM ()
 warnIfDeprecated gre@(GRE { gre_imp = iss })

@@ -152,7 +152,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                     -- Excludes pattern-synonym binders
                     -- They are already in scope
    traceRn "rnSrcDecls" (ppr id_bndrs) ;
-   tc_envs <- extendGlobalRdrEnvRn (map (localVanillaGRE NoParent) id_bndrs) local_fix_env ;
+   tc_envs <- extendGlobalRdrEnvRn (map (mkLocalVanillaGRE NoParent) id_bndrs) local_fix_env ;
    restoreEnvs tc_envs $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
@@ -2520,8 +2520,8 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
    ; let pat_syn_bndrs = concat [ conLikeName_Name name : map flSelector flds
                                 | (name, con_info) <- names_with_fls
                                 , let flds = conInfoFields con_info ]
-   ; let gres =  map (localConLikeGRE NoParent) names_with_fls
-              ++ localFieldGREs NoParent names_with_fls
+   ; let gres =  map (mkLocalConLikeGRE NoParent) names_with_fls
+              ++ mkLocalFieldGREs NoParent names_with_fls
       -- Recall Note [Parents] in GHC.Types.Name.Reader:
       --
       -- pattern synonym constructors and their record fields have no parent

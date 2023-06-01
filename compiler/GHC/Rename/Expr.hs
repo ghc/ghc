@@ -260,18 +260,20 @@ rnExpr (HsVar _ (L l v))
        ; case mb_gre of {
            Nothing -> rnUnboundVar v ;
            Just gre ->
-    do { if | Just fl <- recFieldLabel <$> recFieldInfo_maybe gre
+    do { let nm   = greName gre
+             info = gre_info gre
+       ; if | IAmRecField fld_info <- info
             -- Since GHC 9.4, such occurrences of record fields must be
             -- unambiguous. For ambiguous occurrences, we arbitrarily pick one
             -- matching GRE and add a name clash error
             -- (see lookupGlobalOccRn_overloaded, called by lookupExprOccRn).
-            -> do { let sel_name = flSelector fl
+            -> do { let sel_name = flSelector $ recFieldLabel fld_info
                   ; this_mod <- getModule
                   ; when (nameIsLocalOrFrom this_mod sel_name) $
                       checkThLocalName sel_name
                   ; return (HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
                   }
-            | greName gre == nilDataConName
+            | nm == nilDataConName
               -- Treat [] as an ExplicitList, so that
               -- OverloadedLists works correctly
               -- Note [Empty lists] in GHC.Hs.Expr
@@ -279,7 +281,7 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> finishHsVar (L (na2la l) $ greName gre)
+            -> finishHsVar (L (na2la l) nm)
         }}}
 
 rnExpr (HsIPVar x v)

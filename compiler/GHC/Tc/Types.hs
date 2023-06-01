@@ -512,6 +512,8 @@ data TcGblEnv
           -- See Note [Tracking unused binding and imports]
         tcg_dus       :: DefUses,
         tcg_used_gres :: TcRef [GlobalRdrElt],
+          -- ^ INVARIANT: all these GREs were imported; that is,
+          -- they all have a non-empty gre_imp field.
         tcg_keep      :: TcRef NameSet,
 
         tcg_th_used :: TcRef Bool,

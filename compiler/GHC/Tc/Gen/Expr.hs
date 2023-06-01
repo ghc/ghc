@@ -1413,20 +1413,18 @@ disambiguateRecordBinds record_expr record_rho possible_parents rbnds res_ty
     lookupField :: FieldGlobalRdrElt
                 -> LHsRecUpdField GhcRn GhcRn
                 -> TcM (LHsRecUpdField GhcTc GhcRn)
-    lookupField fl (L l upd)
+    lookupField fld_gre (L l upd)
       = do { let L loc af = hfbLHS upd
-                 rdr      = ambiguousFieldOccRdrName af
-                 mb_gre   = pickGREs rdr [fl]
-                   -- NB: this GRE can be 'Nothing' when in GHCi.
-                   -- See test T10439.
+                 lbl      = ambiguousFieldOccRdrName af
+                 mb_gre   = pickGREs lbl [fld_gre]
+                      -- NB: this GRE can be 'Nothing' when in GHCi.
+                      -- See test T10439.
 
              -- Mark the record fields as used, now that we have disambiguated.
              -- There is no risk of duplicate deprecation warnings, as we have
              -- not marked the GREs as used previously.
            ; setSrcSpanA loc $ mapM_ (addUsedGRE EnableDeprecationWarnings) mb_gre
-           ; sel <- tcLookupId $ flSelector $ fieldGRELabel fl
-           ; let L loc af = hfbLHS upd
-                 lbl      = ambiguousFieldOccRdrName af
+           ; sel <- tcLookupId (greName fld_gre)
            ; return $ L l HsFieldBind
                { hfbAnn = hfbAnn upd
                , hfbLHS = L (l2l loc) $ Unambiguous sel (L (l2l loc) lbl)

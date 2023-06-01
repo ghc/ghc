@@ -287,7 +287,7 @@ tyThingLocalGREs ty_thing =
     ATyCon t
       | Just c <- tyConClass_maybe t
       -> myself NoParent
-       : (  map (localVanillaGRE (ParentIs $ className c) . getName) (classMethods c)
+       : (  map (mkLocalVanillaGRE (ParentIs $ className c) . getName) (classMethods c)
          ++ map tc_GRE (classATs c) )
       | otherwise
       -> let dcs = tyConDataCons t
@@ -296,7 +296,7 @@ tyThingLocalGREs ty_thing =
          in myself NoParent
           : map (dc_GRE par) dcs
             ++
-            localFieldGREs par
+            mkLocalFieldGREs par
                [ (mk_nm dc, con_info)
                | dc <- dcs
                , let con_info = conLikeConInfo (RealDataCon dc) ]
@@ -308,7 +308,7 @@ tyThingLocalGREs ty_thing =
                   RealDataCon dc -> ParentIs $ tyConName $ dataConTyCon dc
       in
         myself par :
-          localFieldGREs par
+          mkLocalFieldGREs par
             [(conLikeConLikeName con, conLikeConInfo con)]
     AnId id
       | RecSelId { sel_tycon = RecSelData tc } <- idDetails id
@@ -318,17 +318,15 @@ tyThingLocalGREs ty_thing =
     _ -> [ myself NoParent ]
   where
     tc_GRE :: TyCon -> GlobalRdrElt
-    tc_GRE at = localTyConGRE
+    tc_GRE at = mkLocalTyConGRE
                      (fmap tyConName $ tyConFlavour at)
                      (tyConName at)
     dc_GRE :: Parent -> DataCon -> GlobalRdrElt
     dc_GRE par dc =
       let con_info = conLikeConInfo (RealDataCon dc)
-      in localConLikeGRE par (DataConName $ dataConName dc, con_info)
+      in mkLocalConLikeGRE par (DataConName $ dataConName dc, con_info)
     myself :: Parent -> GlobalRdrElt
-    myself p =
-      (localVanillaGRE p (getName ty_thing))
-        { gre_info = tyThingGREInfo ty_thing }
+    myself p = mkLocalGRE (tyThingGREInfo ty_thing) p (getName ty_thing)
 
 -- | Obtain information pertinent to the renamer about a particular 'TyThing'.
 --
