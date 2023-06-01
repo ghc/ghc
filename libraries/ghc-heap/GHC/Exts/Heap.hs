@@ -317,8 +317,9 @@ getClosureDataFromHeapRepPrim getConDesc decodeCCS itbl heapRep pts = do
             _ -> fail $ "Expected at least 3 ptrs to MVAR, found "
                         ++ show (length pts)
 
-        BLOCKING_QUEUE ->
-            pure $ OtherClosure itbl pts rawHeapWords
+        BLOCKING_QUEUE
+          | [_link, bh, _owner, msg] <- pts ->
+            pure $ BlockingQueueClosure itbl _link bh _owner msg
 
         WEAK -> case pts of
             pts0 : pts1 : pts2 : pts3 : rest -> pure $ WeakClosure
