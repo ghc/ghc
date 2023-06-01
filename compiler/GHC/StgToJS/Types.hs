@@ -47,6 +47,7 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.ByteString as BS
 import           Data.Monoid
+import           Data.Word
 
 -- | A State monad over IO holding the generator state.
 type G = StateT GenState IO
@@ -190,7 +191,7 @@ data IdType
 
 -- | Keys to differentiate Ident's in the ID Cache
 data IdKey
-  = IdKey !Int !Int !IdType
+  = IdKey !Word64 !Int !IdType
   deriving (Eq, Ord)
 
 -- | Some other symbol

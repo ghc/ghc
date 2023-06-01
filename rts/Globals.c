@@ -108,5 +108,5 @@ mkStoreAccessor(LibHSghcGlobalHasPprDebug)
 mkStoreAccessor(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessor(LibHSghcGlobalHasNoStateHack)
 
-HsInt ghc_unique_counter = 0;
+HsWord64 ghc_unique_counter64 = 0;
 HsInt ghc_unique_inc     = 1;

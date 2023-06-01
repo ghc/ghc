@@ -64,6 +64,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
+import GHC.Utils.Unique (sameUnique)
 
 import GHC.Data.FastString
 
@@ -319,29 +320,29 @@ warnAboutOverflowedLiterals dflags lit
  , Just (i, tc) <- lit
  = if
     -- These only show up via the 'HsOverLit' route
-    | tc == intTyConName        -> check i tc minInt         maxInt
-    | tc == wordTyConName       -> check i tc minWord        maxWord
-    | tc == int8TyConName       -> check i tc (min' @Int8)   (max' @Int8)
-    | tc == int16TyConName      -> check i tc (min' @Int16)  (max' @Int16)
-    | tc == int32TyConName      -> check i tc (min' @Int32)  (max' @Int32)
-    | tc == int64TyConName      -> check i tc (min' @Int64)  (max' @Int64)
-    | tc == word8TyConName      -> check i tc (min' @Word8)  (max' @Word8)
-    | tc == word16TyConName     -> check i tc (min' @Word16) (max' @Word16)
-    | tc == word32TyConName     -> check i tc (min' @Word32) (max' @Word32)
-    | tc == word64TyConName     -> check i tc (min' @Word64) (max' @Word64)
-    | tc == naturalTyConName    -> checkPositive i tc
+    | sameUnique tc intTyConName        -> check i tc minInt         maxInt
+    | sameUnique tc wordTyConName       -> check i tc minWord        maxWord
+    | sameUnique tc int8TyConName       -> check i tc (min' @Int8)   (max' @Int8)
+    | sameUnique tc int16TyConName      -> check i tc (min' @Int16)  (max' @Int16)
+    | sameUnique tc int32TyConName      -> check i tc (min' @Int32)  (max' @Int32)
+    | sameUnique tc int64TyConName      -> check i tc (min' @Int64)  (max' @Int64)
+    | sameUnique tc word8TyConName      -> check i tc (min' @Word8)  (max' @Word8)
+    | sameUnique tc word16TyConName     -> check i tc (min' @Word16) (max' @Word16)
+    | sameUnique tc word32TyConName     -> check i tc (min' @Word32) (max' @Word32)
+    | sameUnique tc word64TyConName     -> check i tc (min' @Word64) (max' @Word64)
+    | sameUnique tc naturalTyConName    -> checkPositive i tc
 
     -- These only show up via the 'HsLit' route
-    | tc == intPrimTyConName    -> check i tc minInt         maxInt
-    | tc == wordPrimTyConName   -> check i tc minWord        maxWord
-    | tc == int8PrimTyConName   -> check i tc (min' @Int8)   (max' @Int8)
-    | tc == int16PrimTyConName  -> check i tc (min' @Int16)  (max' @Int16)
-    | tc == int32PrimTyConName  -> check i tc (min' @Int32)  (max' @Int32)
-    | tc == int64PrimTyConName  -> check i tc (min' @Int64)  (max' @Int64)
-    | tc == word8PrimTyConName  -> check i tc (min' @Word8)  (max' @Word8)
-    | tc == word16PrimTyConName -> check i tc (min' @Word16) (max' @Word16)
-    | tc == word32PrimTyConName -> check i tc (min' @Word32) (max' @Word32)
-    | tc == word64PrimTyConName -> check i tc (min' @Word64) (max' @Word64)
+    | sameUnique tc intPrimTyConName    -> check i tc minInt         maxInt
+    | sameUnique tc wordPrimTyConName   -> check i tc minWord        maxWord
+    | sameUnique tc int8PrimTyConName   -> check i tc (min' @Int8)   (max' @Int8)
+    | sameUnique tc int16PrimTyConName  -> check i tc (min' @Int16)  (max' @Int16)
+    | sameUnique tc int32PrimTyConName  -> check i tc (min' @Int32)  (max' @Int32)
+    | sameUnique tc int64PrimTyConName  -> check i tc (min' @Int64)  (max' @Int64)
+    | sameUnique tc word8PrimTyConName  -> check i tc (min' @Word8)  (max' @Word8)
+    | sameUnique tc word16PrimTyConName -> check i tc (min' @Word16) (max' @Word16)
+    | sameUnique tc word32PrimTyConName -> check i tc (min' @Word32) (max' @Word32)
+    | sameUnique tc word64PrimTyConName -> check i tc (min' @Word64) (max' @Word64)
 
     | otherwise -> return ()
 
@@ -398,22 +399,22 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
 
       platform <- targetPlatform <$> getDynFlags
          -- Be careful to use target Int/Word sizes! cf #17336
-      if | tc == intTyConName     -> case platformWordSize platform of
-                                      PW4 -> check @Int32
-                                      PW8 -> check @Int64
-         | tc == wordTyConName    -> case platformWordSize platform of
-                                      PW4 -> check @Word32
-                                      PW8 -> check @Word64
-         | tc == int8TyConName    -> check @Int8
-         | tc == int16TyConName   -> check @Int16
-         | tc == int32TyConName   -> check @Int32
-         | tc == int64TyConName   -> check @Int64
-         | tc == word8TyConName   -> check @Word8
-         | tc == word16TyConName  -> check @Word16
-         | tc == word32TyConName  -> check @Word32
-         | tc == word64TyConName  -> check @Word64
-         | tc == integerTyConName -> check @Integer
-         | tc == naturalTyConName -> check @Integer
+      if | sameUnique tc intTyConName     -> case platformWordSize platform of
+                                               PW4 -> check @Int32
+                                               PW8 -> check @Int64
+         | sameUnique tc wordTyConName    -> case platformWordSize platform of
+                                               PW4 -> check @Word32
+                                               PW8 -> check @Word64
+         | sameUnique tc int8TyConName    -> check @Int8
+         | sameUnique tc int16TyConName   -> check @Int16
+         | sameUnique tc int32TyConName   -> check @Int32
+         | sameUnique tc int64TyConName   -> check @Int64
+         | sameUnique tc word8TyConName   -> check @Word8
+         | sameUnique tc word16TyConName  -> check @Word16
+         | sameUnique tc word32TyConName  -> check @Word32
+         | sameUnique tc word64TyConName  -> check @Word64
+         | sameUnique tc integerTyConName -> check @Integer
+         | sameUnique tc naturalTyConName -> check @Integer
             -- We use 'Integer' because otherwise a negative 'Natural' literal
             -- could cause a compile time crash (instead of a runtime one).
             -- See the T10930b test case for an example of where this matters.

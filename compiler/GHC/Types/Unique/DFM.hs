@@ -71,18 +71,18 @@ module GHC.Types.Unique.DFM (
 
 import GHC.Prelude
 
-import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
+import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
 
-import qualified Data.IntMap.Strict as MS
-import qualified Data.IntMap as M
+import qualified GHC.Data.Word64Map.Strict as MS
+import qualified GHC.Data.Word64Map as M
 import Data.Data
 import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
 import Unsafe.Coerce
-import qualified Data.IntSet as I
+import qualified GHC.Data.Word64Set as W
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,7 +147,7 @@ instance Eq val => Eq (TaggedVal val) where
 -- very much discouraged.
 data UniqDFM key ele =
   UDFM
-    !(M.IntMap (TaggedVal ele)) -- A map where keys are Unique's values and
+    !(M.Word64Map (TaggedVal ele)) -- A map where keys are Unique's values and
                                 -- values are tagged with insertion time.
                                 -- The invariant is that all the tags will
                                 -- be distinct within a single map
@@ -290,6 +290,8 @@ elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
 -- | Performs a deterministic fold over the UniqDFM.
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
 foldUDFM :: (elt -> a -> a) -> a -> UniqDFM key elt -> a
+{-# INLINE foldUDFM #-}
+-- This INLINE prevents a regression in !10568
 foldUDFM k z m = foldr k z (eltsUDFM m)
 
 -- | Performs a nondeterministic strict fold over the UniqDFM.
@@ -306,7 +308,7 @@ eltsUDFM :: UniqDFM key elt -> [elt]
 -- The INLINE makes it a good producer (from the map)
 eltsUDFM (UDFM m _i) = map taggedFst (sort_it m)
 
-sort_it :: M.IntMap (TaggedVal elt) -> [TaggedVal elt]
+sort_it :: M.Word64Map (TaggedVal elt) -> [TaggedVal elt]
 sort_it m = sortBy (compare `on` taggedSnd) (M.elems m)
 
 filterUDFM :: (elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
@@ -315,12 +317,12 @@ filterUDFM p (UDFM m i) = UDFM (M.filter (\(TaggedVal v _) -> p v) m) i
 filterUDFM_Directly :: (Unique -> elt -> Bool) -> UniqDFM key elt -> UniqDFM key elt
 filterUDFM_Directly p (UDFM m i) = UDFM (M.filterWithKey p' m) i
   where
-  p' k (TaggedVal v _) = p (getUnique k) v
+  p' k (TaggedVal v _) = p (mkUniqueGrimily k) v
 
 udfmRestrictKeys :: UniqDFM key elt -> UniqDFM key elt2 -> UniqDFM key elt
 udfmRestrictKeys (UDFM a i) (UDFM b _) = UDFM (M.restrictKeys a (M.keysSet b)) i
 
-udfmRestrictKeysSet :: UniqDFM key elt -> I.IntSet -> UniqDFM key elt
+udfmRestrictKeysSet :: UniqDFM key elt -> W.Word64Set -> UniqDFM key elt
 udfmRestrictKeysSet (UDFM val_set i) set =
   let key_set = set
   in UDFM (M.restrictKeys val_set key_set) i
@@ -329,7 +331,7 @@ udfmRestrictKeysSet (UDFM val_set i) set =
 -- It's O(n log n) while the corresponding function on `UniqFM` is O(n).
 udfmToList :: UniqDFM key elt -> [(Unique, elt)]
 udfmToList (UDFM m _i) =
-  [ (getUnique k, taggedFst v)
+  [ (mkUniqueGrimily k, taggedFst v)
   | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
 
 -- Determines whether two 'UniqDFM's contain the same keys.

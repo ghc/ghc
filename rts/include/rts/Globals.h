@@ -32,5 +32,5 @@ mkStoreAccessorPrototype(LibHSghcFastStringTable)
 mkStoreAccessorPrototype(LibHSghcGlobalHasPprDebug)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoDebugOutput)
 mkStoreAccessorPrototype(LibHSghcGlobalHasNoStateHack)
-extern HsInt ghc_unique_counter;
+extern HsWord64 ghc_unique_counter64;
 extern HsInt ghc_unique_inc;

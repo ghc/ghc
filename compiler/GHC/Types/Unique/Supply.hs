@@ -15,7 +15,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply, uniqFromMask,
+        takeUniqFromSupply, uniqFromTag,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -39,12 +39,19 @@ import GHC.IO
 
 import GHC.Utils.Monad
 import Control.Monad
-import Data.Char
+import Data.Word
 import GHC.Exts( Ptr(..), noDuplicate#, oneShot )
-#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
-import GHC.Exts( Int(..), word2Int#, fetchAddWordAddr#, plusWord#, readWordOffAddr# )
-#endif
 import Foreign.Storable
+
+#include "MachDeps.h"
+
+#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0) && WORD_SIZE_IN_BITS == 64
+import GHC.Word( Word64(..) )
+import GHC.Exts( fetchAddWordAddr#, plusWord#, readWordOffAddr# )
+#if MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
+import GHC.Exts( wordToWord64# )
+#endif
+#endif
 
 #include "Unique.h"
 
@@ -61,17 +68,17 @@ import Foreign.Storable
 The basic idea (due to Lennart Augustsson) is that a UniqSupply is
 lazily-evaluated infinite tree.
 
-* At each MkSplitUniqSupply node is a unique Int, and two
+* At each MkSplitUniqSupply node is a unique Word64, and two
   sub-trees (see data UniqSupply)
 
 * takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
-  returns the unique Int and one of the sub-trees
+  returns the unique Word64 and one of the sub-trees
 
 * splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
   returns the two sub-trees
 
 * When you poke on one of the thunks, it does a foreign call
-  to get a fresh Int from a thread-safe counter, and returns
+  to get a fresh Word64 from a thread-safe counter, and returns
   a fresh MkSplitUniqSupply node.  This has to be as efficient
   as possible: it should allocate only
      * The fresh node
@@ -83,25 +90,25 @@ The general design (used throughout GHC) is to:
 
 * For creating new uniques either a UniqSupply is used and threaded through
   or for monadic code a MonadUnique instance might conjure up uniques using
-  `uniqFromMask`.
+  `uniqFromTag`.
 * Different parts of the compiler will use a UniqSupply or MonadUnique instance
-  with a specific mask. This way the different parts of the compiler will
-  generate uniques with different masks.
+  with a specific tag. This way the different parts of the compiler will
+  generate uniques with different tags.
 
-If different code shares the same mask then care has to be taken that all uniques
+If different code shares the same tag then care has to be taken that all uniques
 still get distinct numbers. Usually this is done by relying on genSym which
 has *one* counter per GHC invocation that is relied on by all calls to it.
 But using something like the address for pinned objects works as well and in fact is done
 for fast strings.
 
 This is important for example in the simplifier. Most passes of the simplifier use
-the same mask 's'. However in some places we create a unique supply using `mkSplitUniqSupply`
+the same tag 's'. However in some places we create a unique supply using `mkSplitUniqSupply`
 and thread it through the code, while in GHC.Core.Opt.Simplify.Monad  we use the
 `instance MonadUnique SimplM`, which uses `mkSplitUniqSupply` in getUniqueSupplyM
-and `uniqFromMask` in getUniqueM.
+and `uniqFromTag` in getUniqueM.
 
-Ultimately all these boil down to each new unique consisting of the mask and the result from
-a call to `genSym`. The later producing a distinct number for each invocation ensuring
+Ultimately all these boil down to each new unique consisting of the tag and the result from
+a call to `genSym`. The latter producing a distinct number for each invocation ensuring
 uniques are distinct.
 
 Note [Optimising the unique supply]
@@ -113,7 +120,7 @@ The inner loop of mkSplitUniqSupply is a function closure
         case unIO genSym s1 of { (# s2, u #) ->
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
-        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        (# s4, MkSplitUniqSupply (tag .|. u) x y #)
         }}}}
 
 It's a classic example of an IO action that is captured and then called
@@ -127,7 +134,7 @@ We used to write it as:
                  genSym      >>= \ u ->
                  mk_supply   >>= \ s1 ->
                  mk_supply   >>= \ s2 ->
-                 return (MkSplitUniqSupply (mask .|. u) s1 s2)
+                 return (MkSplitUniqSupply (tag .|. u) s1 s2)
 
 and to rely on -fno-state-hack, full laziness and inlining to get the same
 result. It was very brittle and required enabling -fno-state-hack globally. So
@@ -146,29 +153,29 @@ The code for this is about as optimized as it gets, but we can't
 get around the need to allocate one `UniqSupply` for each Unique
 we need.
 
-For code in IO we can improve on this by threading only the *mask*
-we are going to use for Uniques. Using `uniqFromMask` to
+For code in IO we can improve on this by threading only the *tag*
+we are going to use for Uniques. Using `uniqFromTag` to
 generate uniques as needed. This gets rid of the overhead of
 allocating a new UniqSupply for each unique generated. It also avoids
-frequent state updates when the Unique/Mask is part of the state in a
+frequent state updates when the Unique/Tag is part of the state in a
 state monad.
 
-For monadic code in IO which always uses the same mask we can go further
-and hardcode the mask into the MonadUnique instance. On top of all the
-benefits of threading the mask this *also* has the benefit of avoiding
-the mask getting captured in thunks, or being passed around at runtime.
-It does however come at the cost of having to use a fixed Mask for all
-code run in this Monad. But remember, the Mask is purely cosmetic:
-See Note [Uniques and masks].
+For monadic code in IO which always uses the same tag we can go further
+and hardcode the tag into the MonadUnique instance. On top of all the
+benefits of threading the tag this *also* has the benefit of avoiding
+the tag getting captured in thunks, or being passed around at runtime.
+It does however come at the cost of having to use a fixed tag for all
+code run in this Monad. But remember, the tag is purely cosmetic:
+See Note [Uniques and tags].
 
 NB: It's *not* an optimization to pass around the UniqSupply inside an
-IORef instead of the mask. While this would avoid frequent state updates
+IORef instead of the tag. While this would avoid frequent state updates
 it still requires allocating one UniqSupply per Unique. On top of some
 overhead for reading/writing to/from the IORef.
 
 All of this hinges on the assumption that UniqSupply and
-uniqFromMask use the same source of distinct numbers (`genSym`) which
-allows both to be used at the same time, with the same mask, while still
+uniqFromTag use the same source of distinct numbers (`genSym`) which
+allows both to be used at the same time, with the same tag, while still
 ensuring distinct uniques.
 One might consider this fact to be an "accident". But GHC worked like this
 as far back as source control history goes. It also allows the later two
@@ -184,18 +191,18 @@ optimizations to be used. So it seems safe to depend on this fact.
 -- also manufacture an arbitrary number of further 'UniqueSupply' values,
 -- which will be distinct from the first and from all others.
 data UniqSupply
-  = MkSplitUniqSupply {-# UNPACK #-} !Int -- make the Unique with this
+  = MkSplitUniqSupply {-# UNPACK #-} !Word64 -- make the Unique with this
                    UniqSupply UniqSupply
                                 -- when split => these two supplies
 
 mkSplitUniqSupply :: Char -> IO UniqSupply
 -- ^ Create a unique supply out of thin air.
--- The "mask" (Char) supplied is purely cosmetic, making it easier
+-- The "tag" (Char) supplied is purely cosmetic, making it easier
 -- to figure out where a Unique was born. See
--- Note [Uniques and masks].
+-- Note [Uniques and tags].
 --
 -- The payload part of the Uniques allocated from this UniqSupply are
--- guaranteed distinct wrt all other supplies, regardless of their "mask".
+-- guaranteed distinct wrt all other supplies, regardless of their "tag".
 -- This is achieved by allocating the payload part from
 -- a single source of Uniques, namely `genSym`, shared across
 -- all UniqSupply's.
@@ -206,7 +213,7 @@ mkSplitUniqSupply c
   = unsafeDupableInterleaveIO (IO mk_supply)
 
   where
-     !mask = ord c `unsafeShiftL` uNIQUE_BITS
+     !tag = mkTag c
 
         -- Here comes THE MAGIC: see Note [How the unique supply works]
         -- This is one of the most hammered bits in the whole compiler
@@ -218,21 +225,28 @@ mkSplitUniqSupply c
         -- deferred IO computations
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s2 of { (# s3, x #) ->
         case unIO (unsafeDupableInterleaveIO (IO mk_supply)) s3 of { (# s4, y #) ->
-        (# s4, MkSplitUniqSupply (mask .|. u) x y #)
+        (# s4, MkSplitUniqSupply (tag .|. u) x y #)
         }}}}
 
-#if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
-foreign import ccall unsafe "genSym" genSym :: IO Int
+-- If a word is not 64 bits then we would need a fetchAddWord64Addr# primitive,
+-- which does not exist. So we fall back on the C implementation in that case.
+
+#if !MIN_VERSION_GLASGOW_HASKELL(9,1,0,0) || WORD_SIZE_IN_BITS != 64
+foreign import ccall unsafe "genSym" genSym :: IO Word64
 #else
-genSym :: IO Int
+genSym :: IO Word64
 genSym = do
     let !mask = (1 `unsafeShiftL` uNIQUE_BITS) - 1
-    let !(Ptr counter) = ghc_unique_counter
+    let !(Ptr counter) = ghc_unique_counter64
     let !(Ptr inc_ptr) = ghc_unique_inc
     u <- IO $ \s0 -> case readWordOffAddr# inc_ptr 0# s0 of
         (# s1, inc #) -> case fetchAddWordAddr# counter inc s1 of
             (# s2, val #) ->
-                let !u = I# (word2Int# (val `plusWord#` inc)) .&. mask
+#if !MIN_VERSION_GLASGOW_HASKELL(9,3,0,0)
+                let !u = W64# (val `plusWord#` inc) .&. mask
+#else
+                let !u = W64# (wordToWord64# (val `plusWord#` inc)) .&. mask
+#endif
                 in (# s2, u #)
 #if defined(DEBUG)
     -- Uh oh! We will overflow next time a unique is requested.
@@ -242,19 +256,19 @@ genSym = do
     return u
 #endif
 
-foreign import ccall unsafe "&ghc_unique_counter" ghc_unique_counter :: Ptr Word
-foreign import ccall unsafe "&ghc_unique_inc"     ghc_unique_inc     :: Ptr Int
+foreign import ccall unsafe "&ghc_unique_counter64" ghc_unique_counter64 :: Ptr Word64
+foreign import ccall unsafe "&ghc_unique_inc"       ghc_unique_inc       :: Ptr Int
 
-initUniqSupply :: Word -> Int -> IO ()
+initUniqSupply :: Word64 -> Int -> IO ()
 initUniqSupply counter inc = do
-    poke ghc_unique_counter counter
-    poke ghc_unique_inc     inc
+    poke ghc_unique_counter64 counter
+    poke ghc_unique_inc       inc
 
-uniqFromMask :: Char -> IO Unique
-uniqFromMask !mask
+uniqFromTag :: Char -> IO Unique
+uniqFromTag !tag
   = do { uqNum <- genSym
-       ; return $! mkUnique mask uqNum }
-{-# NOINLINE uniqFromMask #-} -- We'll unbox everything, but we don't want to inline it
+       ; return $! mkUnique tag uqNum }
+{-# NOINLINE uniqFromTag #-} -- We'll unbox everything, but we don't want to inline it
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
 -- ^ Build two 'UniqSupply' from a single one, each of which

@@ -20,25 +20,26 @@ import GHC.Utils.Outputable
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
 import GHC.Cmm.Dataflow.Collections
 
-import GHC.Types.Unique (Uniquable(..))
+import GHC.Types.Unique (Uniquable(..), mkUniqueGrimily)
 import GHC.Data.TrieMap
+import Data.Word (Word64)
 
 
 -----------------------------------------------------------------------------
 --              Label
 -----------------------------------------------------------------------------
 
-newtype Label = Label { lblToUnique :: Int }
+newtype Label = Label { lblToUnique :: Word64 }
   deriving (Eq, Ord)
 
-mkHooplLabel :: Int -> Label
+mkHooplLabel :: Word64 -> Label
 mkHooplLabel = Label
 
 instance Show Label where
   show (Label n) = "L" ++ show n
 
 instance Uniquable Label where
-  getUnique label = getUnique (lblToUnique label)
+  getUnique label = mkUniqueGrimily (lblToUnique label)
 
 instance Outputable Label where
   ppr label = ppr (getUnique label)

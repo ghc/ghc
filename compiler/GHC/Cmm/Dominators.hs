@@ -26,8 +26,7 @@ import Data.Array.IArray
 import Data.Foldable()
 import qualified Data.Tree as Tree
 
-import qualified Data.IntMap.Strict as IM
-import qualified Data.IntSet as IS
+import Data.Word
 
 import qualified GHC.CmmToAsm.CFG.Dominators as LT
 
@@ -41,6 +40,9 @@ import GHC.Cmm
 import GHC.Utils.Outputable( Outputable(..), text, int, hcat, (<+>))
 import GHC.Utils.Misc
 import GHC.Utils.Panic
+import GHC.Utils.Word64 (intToWord64)
+import qualified GHC.Data.Word64Map as WM
+import qualified GHC.Data.Word64Set as WS
 
 
 -- | =Dominator sets
@@ -129,33 +131,37 @@ graphWithDominators :: forall node .
 -- The implementation uses the Lengauer-Tarjan algorithm from the x86
 -- back end.
 
+-- Technically, we do not need Word64 here, however the dominators code
+-- has to accomodate Word64 for other uses.
+
 graphWithDominators g = GraphWithDominators (reachable rpblocks g) dmap rpmap
       where rpblocks = revPostorderFrom (graphMap g) (g_entry g)
             rplabels' = map entryLabel rpblocks
-            rplabels :: Array Int Label
+            rplabels :: Array Word64 Label
             rplabels = listArray bounds rplabels'
 
             rpmap :: LabelMap RPNum
             rpmap = mapFromList $ zipWith kvpair rpblocks [0..]
               where kvpair block i = (entryLabel block, RPNum i)
 
-            labelIndex :: Label -> Int
+            labelIndex :: Label -> Word64
             labelIndex = flip findLabelIn imap
-              where imap :: LabelMap Int
+              where imap :: LabelMap Word64
                     imap = mapFromList $ zip rplabels' [0..]
             blockIndex = labelIndex . entryLabel
 
-            bounds = (0, length rpblocks - 1)
+            bounds :: (Word64, Word64)
+            bounds = (0, intToWord64 (length rpblocks - 1))
 
             ltGraph :: [Block node C C] -> LT.Graph
-            ltGraph [] = IM.empty
+            ltGraph [] = WM.empty
             ltGraph (block:blocks) =
-                IM.insert
+                WM.insert
                       (blockIndex block)
-                      (IS.fromList $ map labelIndex $ successors block)
+                      (WS.fromList $ map labelIndex $ successors block)
                       (ltGraph blocks)
 
-            idom_array :: Array Int LT.Node
+            idom_array :: Array Word64 LT.Node
             idom_array = array bounds $ LT.idom (0, ltGraph rpblocks)
 
             domSet 0 = EntryNode

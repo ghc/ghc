@@ -8,23 +8,32 @@ module GHC.StgToJS.Symbols
   , mkFreshJsSymbol
   , mkRawSymbol
   , intBS
+  , word64BS
   ) where
 
 import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Unit.Module
+import GHC.Utils.Word64 (intToWord64)
 import Data.ByteString (ByteString)
+import Data.Word (Word64)
 import qualified Data.ByteString.Char8   as BSC
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy    as BSL
 
 -- | Hexadecimal representation of an int
 --
+-- Used for the sub indices.
+intBS :: Int -> ByteString
+intBS = word64BS . intToWord64
+
+-- | Hexadecimal representation of a 64-bit word
+--
 -- Used for uniques. We could use base-62 as GHC usually does but this is likely
 -- faster.
-intBS :: Int -> ByteString
-intBS = BSL.toStrict . BSB.toLazyByteString . BSB.wordHex . fromIntegral
+word64BS :: Word64 -> ByteString
+word64BS = BSL.toStrict . BSB.toLazyByteString . BSB.word64Hex
 
 -- | Return z-encoded unit:module
 unitModuleStringZ :: Module -> ByteString

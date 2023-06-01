@@ -17,8 +17,3 @@ GVAR(h$getOrSetLibHSghcGlobalHasPprDebug, has_ppr_debug)
 GVAR(h$getOrSetLibHSghcGlobalHasNoDebugOutput, has_no_debug_output)
 GVAR(h$getOrSetLibHSghcGlobalHasNoStateHack, has_no_state_hack)
 GVAR(h$getOrSetLibHSghcFastStringTable, faststring_table)
-
-var h$ghc_unique_inc       = h$newByteArray(4);
-h$ghc_unique_inc.i3[0]     = 1;
-var h$ghc_unique_counter   = h$newByteArray(4);
-h$ghc_unique_counter.i3[0] = 0;

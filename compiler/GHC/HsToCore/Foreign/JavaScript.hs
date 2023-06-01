@@ -156,7 +156,7 @@ mkFExportJSBits platform c_nm maybe_target arg_htys res_hty is_IO_res_ty _cconv
 
   header_bits = maybe mempty idTag maybe_target
   idTag i = let (tag, u) = unpkUnique (getUnique i)
-            in  CHeader (char tag <> int u)
+            in  CHeader (char tag <> word64 u)
 
   fun_args
     | null arg_info = empty -- text "void"

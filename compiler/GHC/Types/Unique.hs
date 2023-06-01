@@ -30,9 +30,12 @@ module GHC.Types.Unique (
 
         pprUniqueAlways,
 
+        mkTag,
         mkUniqueGrimily,
+        mkUniqueIntGrimily,
         getKey,
         mkUnique, unpkUnique,
+        mkUniqueInt,
         eqUnique, ltUnique,
         incrUnique, stepUnique,
 
@@ -52,11 +55,12 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Utils.Panic.Plain
+import GHC.Utils.Word64 (intToWord64, word64ToInt)
 
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
 
+import GHC.Word         ( Word64 )
 import Data.Char        ( chr, ord )
 
 import Language.Haskell.Syntax.Module.Name
@@ -68,19 +72,19 @@ import Language.Haskell.Syntax.Module.Name
 *                                                                      *
 ************************************************************************
 
-Note [Uniques and masks]
+Note [Uniques and tags]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-A `Unique` in GHC is a Word-sized value composed of two pieces:
-* A "mask", of width `UNIQUE_TAG_BITS`, in the high order bits
-* A number, of width `uNIQUE_BITS`, which fills up the remainder of the Word
+A `Unique` in GHC is a 64 bit value composed of two pieces:
+* A "tag", of width `UNIQUE_TAG_BITS`, in the high order bits
+* A number, of width `uNIQUE_BITS`, which fills up the remainder of the Word64
 
-The mask is typically an ASCII character.  It is typically used to make it easier
+The tag is typically an ASCII character.  It is typically used to make it easier
 to distinguish uniques constructed by different parts of the compiler.
-There is a (potentially incomplete) list of unique masks used given in
-GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known masks]
+There is a (potentially incomplete) list of unique tags used given in
+GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known tags]
 
 `mkUnique` constructs a `Unique` from its pieces
-  mkUnique :: Char -> Int -> Unique
+  mkUnique :: Char -> Word64 -> Unique
 
 -}
 
@@ -91,24 +95,24 @@ GHC.Builtin.Uniques. See Note [Uniques for wired-in prelude things and known mas
 -- the functions from the 'UniqSupply' module
 --
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
-newtype Unique = MkUnique Int
+newtype Unique = MkUnique Word64
 
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int
-uNIQUE_BITS = finiteBitSize (0 :: Int) - UNIQUE_TAG_BITS
+uNIQUE_BITS = 64 - UNIQUE_TAG_BITS
 
 {-
 Now come the functions which construct uniques from their pieces, and vice versa.
 The stuff about unique *supplies* is handled further down this module.
 -}
 
-unpkUnique      :: Unique -> (Char, Int)        -- The reverse
+unpkUnique      :: Unique -> (Char, Word64)        -- The reverse
 
-mkUniqueGrimily :: Int -> Unique                -- A trap-door for UniqSupply
-getKey          :: Unique -> Int                -- for Var
+mkUniqueGrimily :: Word64 -> Unique                -- A trap-door for UniqSupply
+getKey          :: Unique -> Word64                -- for Var
 
 incrUnique   :: Unique -> Unique
-stepUnique   :: Unique -> Int -> Unique
+stepUnique   :: Unique -> Word64 -> Unique
 newTagUnique :: Unique -> Char -> Unique
 
 mkUniqueGrimily = MkUnique
@@ -119,7 +123,7 @@ getKey (MkUnique x) = x
 incrUnique (MkUnique i) = MkUnique (i + 1)
 stepUnique (MkUnique i) n = MkUnique (i + n)
 
-mkLocalUnique :: Int -> Unique
+mkLocalUnique :: Word64 -> Unique
 mkLocalUnique i = mkUnique 'X' i
 
 minLocalUnique :: Unique
@@ -131,10 +135,16 @@ maxLocalUnique = mkLocalUnique uniqueMask
 -- newTagUnique changes the "domain" of a unique to a different char
 newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
--- | How many bits are devoted to the unique index (as opposed to the class
--- character).
-uniqueMask :: Int
+-- | Bitmask that has zeros for the tag bits and ones for the rest.
+uniqueMask :: Word64
 uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
+
+-- | Put the character in the highest bits of the Word64.
+-- This may truncate the character to UNIQUE_TAG_BITS.
+-- This function is used in @`mkSplitUniqSupply`@ so that it can
+-- precompute and share the tag part of the uniques it generates.
+mkTag :: Char -> Word64
+mkTag c = intToWord64 (ord c) `shiftL` uNIQUE_BITS
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -142,19 +152,25 @@ uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
 
 -- and as long as the Char fits in 8 bits, which we assume anyway!
 
-mkUnique :: Char -> Int -> Unique       -- Builds a unique from pieces
+mkUnique :: Char -> Word64 -> Unique       -- Builds a unique from pieces
 -- EXPORTED and used only in GHC.Builtin.Uniques
 mkUnique c i
   = MkUnique (tag .|. bits)
   where
-    tag  = ord c `shiftL` uNIQUE_BITS
+    tag  = mkTag c
     bits = i .&. uniqueMask
+
+mkUniqueInt :: Char -> Int -> Unique
+mkUniqueInt c i = mkUnique c (intToWord64 i)
+
+mkUniqueIntGrimily :: Int -> Unique
+mkUniqueIntGrimily = MkUnique . intToWord64
 
 unpkUnique (MkUnique u)
   = let
-        -- as long as the Char may have its eighth bit set, we
-        -- really do need the logical right-shift here!
-        tag = chr (u `shiftR` uNIQUE_BITS)
+        -- The potentially truncating use of fromIntegral here is safe
+        -- because the argument is just the tag bits after shifting.
+        tag = chr (word64ToInt (u `shiftR` uNIQUE_BITS))
         i   = u .&. uniqueMask
     in
     (tag, i)
@@ -184,10 +200,10 @@ hasKey          :: Uniquable a => a -> Unique -> Bool
 x `hasKey` k    = getUnique x == k
 
 instance Uniquable FastString where
- getUnique fs = mkUniqueGrimily (uniqueOfFS fs)
+ getUnique fs = mkUniqueIntGrimily (uniqueOfFS fs)
 
 instance Uniquable Int where
- getUnique i = mkUniqueGrimily i
+  getUnique i = mkUniqueIntGrimily i
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm
@@ -261,7 +277,7 @@ The alternatives are:
 
   1) Use UniqFM or UniqDFM, see Note [Deterministic UniqFM] to decide which
   2) Create a newtype wrapper based on Unique ordering where nondeterminism
-     is controlled. See Module.ModuleEnv
+     is controlled. See GHC.Unit.Module.Env.ModuleEnv
   3) Change the algorithm to use nonDetCmpUnique and document why it's still
      deterministic
   4) Use TrieMap as done in GHC.Cmm.CommonBlockElim.groupByLabel
@@ -279,7 +295,7 @@ instance Uniquable Unique where
 showUnique :: Unique -> String
 showUnique uniq
   = case unpkUnique uniq of
-      (tag, u) -> tag : iToBase62 u
+      (tag, u) -> tag : w64ToBase62 u
 
 pprUniqueAlways :: IsLine doc => Unique -> doc
 -- The "always" means regardless of -dsuppress-uniques
@@ -305,19 +321,20 @@ instance Show Unique where
 ************************************************************************
 
 A character-stingy way to read/write numbers (notably Uniques).
-The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
+The ``62-its'' are \tr{[0-9a-zA-Z]}.
 Code stolen from Lennart.
 -}
 
-iToBase62 :: Int -> String
-iToBase62 n_
-  = assert (n_ >= 0) $ go n_ ""
+w64ToBase62 :: Word64 -> String
+w64ToBase62 n_ = go n_ ""
   where
+    -- The potentially truncating uses of fromIntegral here are safe
+    -- because the argument is guaranteed to be less than 62 in both cases.
     go n cs | n < 62
-            = let !c = chooseChar62 n in c : cs
+            = let !c = chooseChar62 (word64ToInt n) in c : cs
             | otherwise
             = go q (c : cs) where (!q, r) = quotRem n 62
-                                  !c = chooseChar62 r
+                                  !c = chooseChar62 (word64ToInt r)
 
     chooseChar62 :: Int -> Char
     {-# INLINE chooseChar62 #-}

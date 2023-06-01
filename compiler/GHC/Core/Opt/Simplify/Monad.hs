@@ -180,13 +180,13 @@ traceSmpl herald doc
 ************************************************************************
 -}
 
--- See Note [Uniques for wired-in prelude things and known masks] in GHC.Builtin.Uniques
-simplMask :: Char
-simplMask = 's'
+-- See Note [Uniques for wired-in prelude things and known tags] in GHC.Builtin.Uniques
+simplTag :: Char
+simplTag = 's'
 
 instance MonadUnique SimplM where
-    getUniqueSupplyM = liftIO $ mkSplitUniqSupply simplMask
-    getUniqueM = liftIO $ uniqFromMask simplMask
+    getUniqueSupplyM = liftIO $ mkSplitUniqSupply simplTag
+    getUniqueM = liftIO $ uniqFromTag simplTag
 
 instance HasLogger SimplM where
     getLogger = gets st_logger
