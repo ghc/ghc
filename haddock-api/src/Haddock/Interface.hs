@@ -66,7 +66,6 @@ import GHC.Driver.Monad
 import GHC.Driver.Make
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
-import GHC.Types.Error (mkUnknownDiagnostic)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
 import GHC.Unit.Module.Graph (ModuleGraphNode (..))
 import GHC.Unit.Module.ModDetails
@@ -162,7 +161,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   liftIO $ traceMarkerIO "Load started"
   -- Create (if necessary) and load .hi-files.
   success <- withTimingM "load'" (const ()) $
-               load' noIfaceCache LoadAllTargets mkUnknownDiagnostic Nothing modGraph
+               load' noIfaceCache LoadAllTargets Nothing modGraph
   when (failed success) $ do
     out verbosity normal "load' failed"
     liftIO exitFailure
