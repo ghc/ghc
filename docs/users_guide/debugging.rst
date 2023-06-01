@@ -1203,3 +1203,9 @@ Other
     This option can be used to override this check, e.g.
     ``ghci -O2 -fno-unoptimized-core-for-interpreter``.
     It is not recommended for normal use and can cause a compiler panic.
+
+    Note that this has an effect on the debugger interface: With optimizations
+    in play, free variables in breakpoints may now be substituted with complex
+    expressions.
+    Those cannot be stored in breakpoints, so any free variable that refers to
+    optimized code will not be inspectable when this flag is enabled.

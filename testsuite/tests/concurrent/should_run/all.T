@@ -81,7 +81,7 @@ test('T5611a', fragile(12751), compile_and_run, [''])
 test('T5238', normal, compile_and_run, [''])
 test('T5866', exit_code(1), compile_and_run, [''])
 
-test('readMVar1', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
+test('readMVar1', normal, compile_and_run, [''])
 test('readMVar2', normal, compile_and_run, [''])
 test('readMVar3', normal, compile_and_run, [''])
 test('tryReadMVar1', normal, compile_and_run, [''])
@@ -149,7 +149,7 @@ test('conc016', [omit_ways(concurrent_ways)  # see comment in conc016.hs
 test('conc017', normal, compile_and_run, [''])
 test('conc017a', normal, compile_and_run, [''])
 test('conc018', normal, compile_and_run, [''])
-test('conc019', [extra_run_opts('+RTS -K16m -RTS'), expect_broken_for(23272, ['ghci-opt'])], compile_and_run, [''])
+test('conc019', [extra_run_opts('+RTS -K16m -RTS')], compile_and_run, [''])
 test('conc020', normal, compile_and_run, [''])
 test('conc021',
   [ omit_ghci, exit_code(1)

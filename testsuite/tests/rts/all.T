@@ -143,7 +143,6 @@ test('stack003', [ omit_ghci, # parameter 50000 is not passed
 # Test that +RTS -K0 (e.g. no stack limit) parses correctly
 test('stack004', [ extra_run_opts('+RTS -K0 -RTS')
                  , js_broken(22374)
-                 , expect_broken_for(23272, ['ghci-opt'])
                  , expect_broken_for(14913, ['ghci'])
                  ], compile_and_run, [''])
 
@@ -265,7 +264,6 @@ test('T7037', req_c, makefile_test, ['T7037'])
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', [ # finalization order is different in the nonmoving
                 omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc', 'nonmoving_thr_sanity'])
-              , expect_broken_for(23272, ['ghci-opt'])
               , js_broken(22261)
               ], compile_and_run, [''])
 
@@ -285,7 +283,7 @@ test('T7227', [extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS')],
 
 test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )
 
-test('stablename001', [expect_fail_for(['hpc']), expect_broken_for(23272, ['ghci-opt'])], compile_and_run, [''])
+test('stablename001', [expect_fail_for(['hpc'])], compile_and_run, [''])
 # hpc should fail this, because it tags every variable occurrence with
 # a different tick.  It's probably a bug if it works, hence expect_fail.
 

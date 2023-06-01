@@ -96,7 +96,6 @@ test('hGetBuf001',
      [ when(fast(), skip)
      , expect_fail_if_windows
      , js_broken(22374)
-     , expect_broken_for(23272, ['ghci-opt'])
      , req_process
      ],
      compile_and_run, ['-package unix'])
