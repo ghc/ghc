@@ -248,7 +248,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
-import GHC.Types.Unique.Supply (uniqFromMask)
+import GHC.Types.Unique.Supply (uniqFromTag)
 import GHC.Types.Unique.Set
 
 import GHC.Utils.Fingerprint ( Fingerprint )
@@ -2595,7 +2595,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr = do
   --
   -- The id has to be exported for the JS backend. This isn't required for the
   -- byte-code interpreter but it does no harm to always do it.
-  u <- uniqFromMask 'I'
+  u <- uniqFromTag 'I'
   let binding_name = mkSystemVarName u (fsLit ("BCO_toplevel"))
   let binding_id   = mkExportedVanillaId binding_name (exprType simpl_expr)
 

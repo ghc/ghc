@@ -117,7 +117,7 @@ import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCo
 import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
-                        , mkUniqueGrimily, nonDetCmpUnique )
+                        , nonDetCmpUnique )
 import GHC.Types.Basic( TypeOrConstraint(..) )
 import GHC.Utils.Misc
 import GHC.Utils.Binary
@@ -247,7 +247,7 @@ data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
         varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Int,
+        realUnique :: {-# UNPACK #-} !Unique,
                                      -- ^ Key for fast comparison
                                      -- Identical to the Unique in the name,
                                      -- cached here for speed
@@ -258,14 +258,14 @@ data Var
                                         -- Used for kind variables during
                                         -- inference, as well
         varName        :: !Name,
-        realUnique     :: {-# UNPACK #-} !Int,
+        realUnique     :: {-# UNPACK #-} !Unique,
         varType        :: Kind,
         tc_tv_details  :: TcTyVarDetails
   }
 
   | Id {
         varName    :: !Name,
-        realUnique :: {-# UNPACK #-} !Int,
+        realUnique :: {-# UNPACK #-} !Unique,
         varType    :: Type,
         varMult    :: Mult,             -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
@@ -374,10 +374,10 @@ instance Eq Var where
     a == b = realUnique a == realUnique b
 
 instance Ord Var where
-    a <= b = realUnique a <= realUnique b
-    a <  b = realUnique a <  realUnique b
-    a >= b = realUnique a >= realUnique b
-    a >  b = realUnique a >  realUnique b
+    a <= b = getKey (realUnique a) <= getKey (realUnique b)
+    a <  b = getKey (realUnique a) <  getKey (realUnique b)
+    a >= b = getKey (realUnique a) >= getKey (realUnique b)
+    a >  b = getKey (realUnique a) >  getKey (realUnique b)
     a `compare` b = a `nonDetCmpVar` b
 
 -- | Compare Vars by their Uniques.
@@ -397,7 +397,7 @@ instance HasOccName Var where
   occName = nameOccName . varName
 
 varUnique :: Var -> Unique
-varUnique var = mkUniqueGrimily (realUnique var)
+varUnique var = realUnique var
 
 varMultMaybe :: Id -> Maybe Mult
 varMultMaybe (Id { varMult = mult }) = Just mult
@@ -405,12 +405,12 @@ varMultMaybe _ = Nothing
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
-  = var { realUnique = getKey uniq,
+  = var { realUnique = uniq,
           varName = setNameUnique (varName var) uniq }
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKey (getUnique new_name),
+  = var { realUnique = getUnique new_name,
           varName = new_name }
 
 setVarType :: Var -> Type -> Var
@@ -1080,7 +1080,7 @@ updateTyVarKindM update tv
 
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
-                          , realUnique = getKey (nameUnique name)
+                          , realUnique = nameUnique name
                           , varType  = kind
                           }
 
@@ -1088,7 +1088,7 @@ mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
   = -- NB: 'kind' may be a coercion kind; cf, 'GHC.Tc.Utils.TcMType.newMetaCoVar'
     TcTyVar {   varName    = name,
-                realUnique = getKey (nameUnique name),
+                realUnique = nameUnique name,
                 varType  = kind,
                 tc_tv_details = details
         }
@@ -1144,7 +1144,7 @@ mkExportedLocalVar details name ty info
 mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name !w ty scope details info
   = Id { varName    = name,
-         realUnique = getKey (nameUnique name),
+         realUnique = nameUnique name,
          varMult    = w,
          varType    = ty,
          idScope    = scope,

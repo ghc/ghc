@@ -75,6 +75,13 @@ GHC.Data.Pair
 GHC.Data.Strict
 GHC.Data.StringBuffer
 GHC.Data.TrieMap
+GHC.Data.Word64Map
+GHC.Data.Word64Map.Internal
+GHC.Data.Word64Map.Lazy
+GHC.Data.Word64Map.Strict
+GHC.Data.Word64Map.Strict.Internal
+GHC.Data.Word64Set
+GHC.Data.Word64Set.Internal
 GHC.Driver.Backend
 GHC.Driver.Backend.Internal
 GHC.Driver.Backpack.Syntax
@@ -212,6 +219,8 @@ GHC.Utils.Binary.Typeable
 GHC.Utils.BufHandle
 GHC.Utils.CliOption
 GHC.Utils.Constants
+GHC.Utils.Containers.Internal.BitUtil
+GHC.Utils.Containers.Internal.StrictPair
 GHC.Utils.Error
 GHC.Utils.Exception
 GHC.Utils.FV
@@ -230,6 +239,7 @@ GHC.Utils.Ppr
 GHC.Utils.Ppr.Colour
 GHC.Utils.TmpFs
 GHC.Utils.Trace
+GHC.Utils.Word64
 Language.Haskell.Syntax
 Language.Haskell.Syntax.Basic
 Language.Haskell.Syntax.Binds

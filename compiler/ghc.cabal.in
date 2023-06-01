@@ -165,7 +165,11 @@ Library
         -- as it's magic.
         GHC-Options: -this-unit-id ghc
 
-    c-sources:
+    if arch(javascript)
+      js-sources:
+        jsbits/genSym.js
+    else
+      c-sources:
         cbits/cutils.c
         cbits/genSym.c
         cbits/keepCAFsForGHCi.c
@@ -417,6 +421,13 @@ Library
         GHC.Data.TrieMap
         GHC.Data.Unboxed
         GHC.Data.UnionFind
+        GHC.Data.Word64Set
+        GHC.Data.Word64Set.Internal
+        GHC.Data.Word64Map
+        GHC.Data.Word64Map.Internal
+        GHC.Data.Word64Map.Lazy
+        GHC.Data.Word64Map.Strict
+        GHC.Data.Word64Map.Strict.Internal
         GHC.Driver.Backend
         GHC.Driver.Backend.Internal
         GHC.Driver.Backpack
@@ -884,6 +895,8 @@ Library
         GHC.Utils.BufHandle
         GHC.Utils.CliOption
         GHC.Utils.Constants
+        GHC.Utils.Containers.Internal.BitUtil
+        GHC.Utils.Containers.Internal.StrictPair
         GHC.Utils.Error
         GHC.Utils.Exception
         GHC.Utils.Fingerprint
@@ -904,6 +917,8 @@ Library
         GHC.Utils.Ppr.Colour
         GHC.Utils.TmpFs
         GHC.Utils.Trace
+        GHC.Utils.Unique
+        GHC.Utils.Word64
         GHC.Wasm.ControlFlow
         GHC.Wasm.ControlFlow.FromCmm
         GHC.CmmToAsm.Wasm

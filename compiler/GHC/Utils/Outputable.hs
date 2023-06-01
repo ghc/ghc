@@ -37,7 +37,7 @@ module GHC.Utils.Outputable (
         spaceIfSingleQuote,
         isEmpty, nest,
         ptext,
-        int, intWithCommas, integer, word, float, double, rational, doublePrec,
+        int, intWithCommas, integer, word64, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
@@ -142,7 +142,7 @@ import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
-import qualified Data.IntSet as IntSet
+import qualified GHC.Data.Word64Set as Word64Set
 import Data.String
 import Data.Word
 import System.IO        ( Handle )
@@ -682,6 +682,7 @@ ptext    ::               PtrString  -> SDoc
 int      :: IsLine doc => Int        -> doc
 integer  :: IsLine doc => Integer    -> doc
 word     ::               Integer    -> SDoc
+word64   :: IsLine doc => Word64     -> doc
 float    :: IsLine doc => Float      -> doc
 double   :: IsLine doc => Double     -> doc
 rational ::               Rational   -> SDoc
@@ -699,6 +700,8 @@ double n    = text $ show n
 {-# INLINE CONLIKE rational #-}
 rational n  = text $ show n
               -- See Note [Print Hexadecimal Literals] in GHC.Utils.Ppr
+{-# INLINE CONLIKE word64 #-}
+word64 n    = text $ show n
 {-# INLINE CONLIKE word #-}
 word n      = sdocOption sdocHexWordLiterals $ \case
                True  -> docToSDoc $ Pretty.hex n
@@ -976,8 +979,8 @@ instance (Outputable a, Outputable b) => Outputable (Arg a b) where
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (pprWithCommas ppr (Set.toList s))
 
-instance Outputable IntSet.IntSet where
-    ppr s = braces (pprWithCommas ppr (IntSet.toList s))
+instance Outputable Word64Set.Word64Set where
+    ppr s = braces (pprWithCommas ppr (Word64Set.toList s))
 
 instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])

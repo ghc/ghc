@@ -71,6 +71,7 @@ import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
+import GHC.Utils.Unique
 import GHC.Platform
 
 import GHC.Data.Bag
@@ -741,16 +742,16 @@ marshalableTyCon dflags tc
 
 boxedMarshalableTyCon :: TyCon -> Validity' TypeCannotBeMarshaledReason
 boxedMarshalableTyCon tc
-   | getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
-                         , int32TyConKey, int64TyConKey
-                         , wordTyConKey, word8TyConKey, word16TyConKey
-                         , word32TyConKey, word64TyConKey
-                         , floatTyConKey, doubleTyConKey
-                         , ptrTyConKey, funPtrTyConKey
-                         , charTyConKey
-                         , stablePtrTyConKey
-                         , boolTyConKey
-                         ]
+   | anyOfUnique tc [ intTyConKey, int8TyConKey, int16TyConKey
+                    , int32TyConKey, int64TyConKey
+                    , wordTyConKey, word8TyConKey, word16TyConKey
+                    , word32TyConKey, word64TyConKey
+                    , floatTyConKey, doubleTyConKey
+                    , ptrTyConKey, funPtrTyConKey
+                    , charTyConKey
+                    , stablePtrTyConKey
+                    , boolTyConKey
+                    ]
   = IsValid
 
   | otherwise = NotValid NotABoxedMarshalableTyCon

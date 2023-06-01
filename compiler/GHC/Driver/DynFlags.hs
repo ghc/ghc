@@ -117,6 +117,7 @@ import Control.Monad.Trans.Except (ExceptT)
 import Control.Monad.Trans.Reader (ReaderT)
 import Control.Monad.Trans.Writer (WriterT)
 import Data.IORef
+import Data.Word
 import System.IO
 import System.IO.Error (catchIOError)
 import System.Environment (lookupEnv)
@@ -449,7 +450,7 @@ data DynFlags = DynFlags {
   maxErrors             :: Maybe Int,
 
   -- | Unique supply configuration for testing build determinism
-  initialUnique         :: Word,
+  initialUnique         :: Word64,
   uniqueIncrement       :: Int,
     -- 'Int' because it can be used to test uniques in decreasing order.
 

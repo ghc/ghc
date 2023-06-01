@@ -90,6 +90,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Outputable
+import GHC.Utils.Unique (sameUnique)
 
 import GHC.Unit.State
 import GHC.Unit.External
@@ -792,17 +793,17 @@ hasFixedRuntimeRepRes std_nm user_expr ty = mapM_ do_check mb_arity
      in hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowFun user_expr) res_ty
    mb_arity :: Maybe Arity
    mb_arity -- arity of the arrow operation, counting type-level arguments
-     | std_nm == arrAName     -- result used as an argument in, e.g., do_premap
+     | sameUnique std_nm arrAName     -- result used as an argument in, e.g., do_premap
      = Just 3
-     | std_nm == composeAName -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     | sameUnique std_nm composeAName -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
      = Just 5
-     | std_nm == firstAName   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
+     | sameUnique std_nm firstAName   -- result used as an argument in, e.g., dsCmdStmt/BodyStmt
      = Just 4
-     | std_nm == appAName     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
+     | sameUnique std_nm appAName     -- result used as an argument in, e.g., dsCmd/HsCmdArrApp/HsHigherOrderApp
      = Just 2
-     | std_nm == choiceAName  -- result used as an argument in, e.g., HsCmdIf
+     | sameUnique std_nm choiceAName  -- result used as an argument in, e.g., HsCmdIf
      = Just 5
-     | std_nm == loopAName    -- result used as an argument in, e.g., HsCmdIf
+     | sameUnique std_nm loopAName    -- result used as an argument in, e.g., HsCmdIf
      = Just 4
      | otherwise
      = Nothing

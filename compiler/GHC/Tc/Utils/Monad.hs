@@ -454,14 +454,14 @@ an actual crash (attempting to look up the Integer type).
 ************************************************************************
 -}
 
-initTcRnIf :: Char              -- ^ Mask for unique supply
+initTcRnIf :: Char              -- ^ Tag for unique supply
            -> HscEnv
            -> gbl -> lcl
            -> TcRnIf gbl lcl a
            -> IO a
-initTcRnIf uniq_mask hsc_env gbl_env lcl_env thing_inside
+initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
    = do { let { env = Env { env_top = hsc_env,
-                            env_um  = uniq_mask,
+                            env_ut  = uniq_tag,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
 
@@ -717,14 +717,14 @@ escapeArrowScope
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
  = do { env <- getEnv
-      ; let mask = env_um env
-      ; liftIO $! uniqFromMask mask }
+      ; let tag = env_ut env
+      ; liftIO $! uniqFromTag tag }
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
  = do { env <- getEnv
-      ; let mask = env_um env
-      ; liftIO $! mkSplitUniqSupply mask }
+      ; let tag = env_ut env
+      ; liftIO $! mkSplitUniqSupply tag }
 
 cloneLocalName :: Name -> TcM Name
 -- Make a fresh Internal name with the same OccName and SrcSpan

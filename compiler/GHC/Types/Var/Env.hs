@@ -78,7 +78,7 @@ module GHC.Types.Var.Env (
     ) where
 
 import GHC.Prelude
-import qualified Data.IntMap.Strict as IntMap -- TODO: Move this to UniqFM
+import qualified GHC.Data.Word64Map.Strict as Word64Map -- TODO: Move this to UniqFM
 
 import GHC.Types.Name.Occurrence
 import GHC.Types.Name
@@ -228,7 +228,7 @@ uniqAway' in_scope var
 -- introduce non-unique 'Unique's this way. See Note [Local uniques].
 unsafeGetFreshLocalUnique :: InScopeSet -> Unique
 unsafeGetFreshLocalUnique (InScope set)
-  | Just (uniq,_) <- IntMap.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
+  | Just (uniq,_) <- Word64Map.lookupLT (getKey maxLocalUnique) (ufmToIntMap $ getUniqSet set)
   , let uniq' = mkLocalUnique uniq
   , not $ uniq' `ltUnique` minLocalUnique
   = incrUnique uniq'

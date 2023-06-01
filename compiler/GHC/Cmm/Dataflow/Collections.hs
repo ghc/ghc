@@ -12,10 +12,11 @@ module GHC.Cmm.Dataflow.Collections
 
 import GHC.Prelude
 
-import qualified Data.IntMap.Strict as M
-import qualified Data.IntSet as S
+import qualified GHC.Data.Word64Map.Strict as M
+import qualified GHC.Data.Word64Set as S
 
 import Data.List (foldl1')
+import Data.Word (Word64)
 
 class IsSet set where
   type ElemOf set
@@ -107,10 +108,10 @@ mapUnions maps = foldl1' mapUnion maps
 -- Basic instances
 -----------------------------------------------------------------------------
 
-newtype UniqueSet = US S.IntSet deriving (Eq, Ord, Show, Semigroup, Monoid)
+newtype UniqueSet = US S.Word64Set deriving (Eq, Ord, Show, Semigroup, Monoid)
 
 instance IsSet UniqueSet where
-  type ElemOf UniqueSet = Int
+  type ElemOf UniqueSet = Word64
 
   setNull (US s) = S.null s
   setSize (US s) = S.size s
@@ -133,11 +134,11 @@ instance IsSet UniqueSet where
   setElems (US s) = S.elems s
   setFromList ks = US (S.fromList ks)
 
-newtype UniqueMap v = UM (M.IntMap v)
+newtype UniqueMap v = UM (M.Word64Map v)
   deriving (Eq, Ord, Show, Functor, Foldable, Traversable)
 
 instance IsMap UniqueMap where
-  type KeyOf UniqueMap = Int
+  type KeyOf UniqueMap = Word64
 
   mapNull (UM m) = M.null m
   mapSize (UM m) = M.size m

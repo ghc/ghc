@@ -45,18 +45,19 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.IntSet as IS
-import qualified Data.IntMap as IM
-import Data.IntMap (IntMap)
+import qualified GHC.Data.Word64Map as WM
+import GHC.Data.Word64Map (Word64Map)
 import Data.Array
 import Data.Either
+import Data.Word
 import Control.Monad
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 
 data DependencyDataCache = DDC
-  { ddcModule :: !(IntMap Unit)        -- ^ Unique Module -> Unit
-  , ddcId     :: !(IntMap ExportedFun) -- ^ Unique Id     -> ExportedFun (only to other modules)
+  { ddcModule :: !(Word64Map Unit)               -- ^ Unique Module -> Unit
+  , ddcId     :: !(Word64Map ExportedFun)        -- ^ Unique Id     -> ExportedFun (only to other modules)
   , ddcOther  :: !(Map OtherSymb ExportedFun)
   }
 
@@ -71,7 +72,7 @@ genDependencyData
   -> G BlockInfo
 genDependencyData mod units = do
     ds <- evalStateT (mapM (uncurry oneDep) blocks)
-                     (DDC IM.empty IM.empty M.empty)
+                     (DDC WM.empty WM.empty M.empty)
     return $ BlockInfo
       { bi_module     = mod
       , bi_must_link  = IS.fromList [ n | (n, _, True, _) <- ds ]
@@ -144,7 +145,7 @@ genDependencyData mod units = do
             in  if m == mod
                    then pprPanic "local id not found" (ppr m)
                     else Left <$> do
-                            mr <- gets (IM.lookup k . ddcId)
+                            mr <- gets (WM.lookup k . ddcId)
                             maybe addEntry return mr
 
       -- get the function for an OtherSymb from the cache, add it if necessary
@@ -167,7 +168,7 @@ genDependencyData mod units = do
 
       -- lookup a dependency to another module, add to the id cache if there's
       -- an id key, otherwise add to other cache
-      lookupExternalFun :: Maybe Int
+      lookupExternalFun :: Maybe Word64
                         -> OtherSymb -> StateT DependencyDataCache G ExportedFun
       lookupExternalFun mbIdKey od@(OtherSymb m idTxt) = do
         let mk        = getKey . getUnique $ m
@@ -175,17 +176,17 @@ genDependencyData mod units = do
             exp_fun   = ExportedFun m (LexicalFastString idTxt)
             addCache  = do
               ms <- gets ddcModule
-              let !cache' = IM.insert mk mpk ms
+              let !cache' = WM.insert mk mpk ms
               modify (\s -> s { ddcModule = cache'})
               pure exp_fun
         f <- do
-          mbm <- gets (IM.member mk . ddcModule)
+          mbm <- gets (WM.member mk . ddcModule)
           case mbm of
             False -> addCache
             True  -> pure exp_fun
 
         case mbIdKey of
           Nothing -> modify (\s -> s { ddcOther = M.insert od f (ddcOther s) })
-          Just k  -> modify (\s -> s { ddcId    = IM.insert k f (ddcId s) })
+          Just k  -> modify (\s -> s { ddcId    = WM.insert k f (ddcId s) })
 
         return f

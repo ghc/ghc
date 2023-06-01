@@ -86,12 +86,12 @@ module GHC.Types.Unique.FM (
 
 import GHC.Prelude
 
-import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
+import GHC.Types.Unique ( Uniquable(..), Unique, getKey, mkUniqueGrimily )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
-import qualified Data.IntMap as M
-import qualified Data.IntMap.Strict as MS
-import qualified Data.IntSet as S
+import qualified GHC.Data.Word64Map as M
+import qualified GHC.Data.Word64Map.Strict as MS
+import qualified GHC.Data.Word64Set as S
 import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
@@ -105,7 +105,7 @@ import Data.Coerce
 -- If two types don't overlap in their uniques it's also safe
 -- to index the same map at multiple key types. But this is
 -- very much discouraged.
-newtype UniqFM key ele = UFM (M.IntMap ele)
+newtype UniqFM key ele = UFM (M.Word64Map ele)
   deriving (Data, Eq, Functor)
   -- Nondeterministic Foldable and Traversable instances are accessible through
   -- use of the 'NonDetUniqFM' wrapper.
@@ -379,7 +379,7 @@ nonDetFoldUFM f z (UFM m) = M.foldr f z m
 nonDetFoldWithKeyUFM :: (Unique -> elt -> a -> a) -> a -> UniqFM key elt -> a
 nonDetFoldWithKeyUFM f z (UFM m) = M.foldrWithKey f' z m
   where
-    f' k e a = f (getUnique k) e a
+    f' k e a = f (mkUniqueGrimily k) e a
 
 mapUFM :: (elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapUFM f (UFM m) = UFM (M.map f m)
@@ -388,10 +388,10 @@ mapMaybeUFM :: (elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
 mapMaybeUFM f (UFM m) = UFM (M.mapMaybe f m)
 
 mapMaybeWithKeyUFM :: (Unique -> elt1 -> Maybe elt2) -> UniqFM key elt1 -> UniqFM key elt2
-mapMaybeWithKeyUFM f (UFM m) = UFM (M.mapMaybeWithKey (f . getUnique) m)
+mapMaybeWithKeyUFM f (UFM m) = UFM (M.mapMaybeWithKey (f . mkUniqueGrimily) m)
 
 mapUFM_Directly :: (Unique -> elt1 -> elt2) -> UniqFM key elt1 -> UniqFM key elt2
-mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . getUnique) m)
+mapUFM_Directly f (UFM m) = UFM (M.mapWithKey (f . mkUniqueGrimily) m)
 
 strictMapUFM :: (a -> b) -> UniqFM k a -> UniqFM k b
 strictMapUFM f (UFM a) = UFM $ MS.map f a
@@ -400,7 +400,7 @@ filterUFM :: (elt -> Bool) -> UniqFM key elt -> UniqFM key elt
 filterUFM p (UFM m) = UFM (M.filter p m)
 
 filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM key elt -> UniqFM key elt
-filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . getUnique) m)
+filterUFM_Directly p (UFM m) = UFM (M.filterWithKey (p . mkUniqueGrimily) m)
 
 partitionUFM :: (elt -> Bool) -> UniqFM key elt -> (UniqFM key elt, UniqFM key elt)
 partitionUFM p (UFM m) =
@@ -429,7 +429,7 @@ lookupWithDefaultUFM (UFM m) v k = M.findWithDefault v (getKey $ getUnique k) m
 lookupWithDefaultUFM_Directly :: UniqFM key elt -> elt -> Unique -> elt
 lookupWithDefaultUFM_Directly (UFM m) v u = M.findWithDefault v (getKey u) m
 
-ufmToSet_Directly :: UniqFM key elt -> S.IntSet
+ufmToSet_Directly :: UniqFM key elt -> S.Word64Set
 ufmToSet_Directly (UFM m) = M.keysSet m
 
 anyUFM :: (elt -> Bool) -> UniqFM key elt -> Bool
@@ -451,7 +451,7 @@ nonDetEltsUFM (UFM m) = M.elems m
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetKeysUFM :: UniqFM key elt -> [Unique]
-nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
+nonDetKeysUFM (UFM m) = map mkUniqueGrimily $ M.keys m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
@@ -468,18 +468,18 @@ nonDetStrictFoldUFM k z (UFM m) = M.foldl' (flip k) z m
 nonDetStrictFoldUFM_DirectlyM :: (Monad m) => (Unique -> b -> elt -> m b) -> b -> UniqFM key elt -> m b
 nonDetStrictFoldUFM_DirectlyM f z0 (UFM xs) = M.foldrWithKey c return xs z0
   -- See Note [List fusion and continuations in 'c']
-  where c u x k z = f (getUnique u) z x >>= k
+  where c u x k z = f (mkUniqueGrimily u) z x >>= k
         {-# INLINE c #-}
 
 nonDetStrictFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM key elt -> a
-nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (getUnique i) x z') z m
+nonDetStrictFoldUFM_Directly k z (UFM m) = M.foldlWithKey' (\z' i x -> k (mkUniqueGrimily i) x z') z m
 {-# INLINE nonDetStrictFoldUFM_Directly #-}
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetUFMToList :: UniqFM key elt -> [(Unique, elt)]
-nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+nonDetUFMToList (UFM m) = map (\(k, v) -> (mkUniqueGrimily k, v)) $ M.toList m
 
 -- | A wrapper around 'UniqFM' with the sole purpose of informing call sites
 -- that the provided 'Foldable' and 'Traversable' instances are
@@ -504,10 +504,10 @@ instance forall key. Foldable (NonDetUniqFM key) where
 instance forall key. Traversable (NonDetUniqFM key) where
   traverse f (NonDetUniqFM (UFM m)) = NonDetUniqFM . UFM <$> traverse f m
 
-ufmToIntMap :: UniqFM key elt -> M.IntMap elt
+ufmToIntMap :: UniqFM key elt -> M.Word64Map elt
 ufmToIntMap (UFM m) = m
 
-unsafeIntMapToUFM :: M.IntMap elt -> UniqFM key elt
+unsafeIntMapToUFM :: M.Word64Map elt -> UniqFM key elt
 unsafeIntMapToUFM = UFM
 
 -- | Cast the key domain of a UniqFM.

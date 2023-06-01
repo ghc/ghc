@@ -77,9 +77,9 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_rdr_env = rdr_env })
   = do { let builtin_passes = getCoreToDo dflags hpt_rule_base extra_vars
-             uniq_mask = 's'
+             uniq_tag = 's'
 
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_tag mod
                                     name_ppr_ctx loc $
                            do { hsc_env' <- getHscEnv
                               ; all_passes <- withPlugins (hsc_plugins hsc_env')

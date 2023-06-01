@@ -155,7 +155,7 @@ import GHC.Types.Unique.DFM (udfmRestrictKeysSet)
 import GHC.Types.Unique
 import GHC.Iface.Errors.Types
 
-import qualified Data.IntSet as I
+import qualified GHC.Data.Word64Set as W
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
@@ -2836,12 +2836,12 @@ See test "jspace" for an example which used to trigger this problem.
 -}
 
 -- See Note [ModuleNameSet, efficiency and space leaks]
-type ModuleNameSet = M.Map UnitId I.IntSet
+type ModuleNameSet = M.Map UnitId W.Word64Set
 
 addToModuleNameSet :: UnitId -> ModuleName -> ModuleNameSet -> ModuleNameSet
 addToModuleNameSet uid mn s =
   let k = (getKey $ getUnique $ mn)
-  in M.insertWith (I.union) uid (I.singleton k) s
+  in M.insertWith (W.union) uid (W.singleton k) s
 
 -- | Wait for some dependencies to finish and then read from the given MVar.
 wait_deps_hug :: MVar HomeUnitGraph -> [BuildResult] -> ReaderT MakeEnv (MaybeT IO) (HomeUnitGraph, ModuleNameSet)
@@ -2852,7 +2852,7 @@ wait_deps_hug hug_var deps = do
         let -- Restrict to things which are in the transitive closure to avoid retaining
             -- reference to loop modules which have already been compiled by other threads.
             -- See Note [ModuleNameSet, efficiency and space leaks]
-            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe I.empty $ M.lookup  uid module_deps)
+            !new = udfmRestrictKeysSet (homeUnitEnv_hpt hme) (fromMaybe W.empty $ M.lookup  uid module_deps)
         in hme { homeUnitEnv_hpt = new }
   return (unitEnv_mapWithKey pruneHomeUnitEnv hug, module_deps)
 
@@ -2867,7 +2867,7 @@ wait_deps (x:xs) = do
     Nothing -> return (hmis, new_deps)
     Just hmi -> return (hmi:hmis, new_deps)
   where
-    unionModuleNameSet = M.unionWith I.union
+    unionModuleNameSet = M.unionWith W.union
 
 
 -- Executing the pipelines

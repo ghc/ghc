@@ -1,3 +1,8 @@
+-- The transition from Int to Word64 for uniques makes functions slightly larger
+-- without this GHC option some optimizations fail to fire.
+-- See https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10568#note_505751
+{-# OPTIONS_GHC -fspec-constr-threshold=10000 #-}
+
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
