@@ -64,7 +64,7 @@ import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
 
-import GHC.Data.Maybe   ( isNothing, orElse )
+import GHC.Data.Maybe   ( isNothing, orElse, mapMaybe )
 import GHC.Data.FastString
 import GHC.Unit.Module ( moduleName )
 import GHC.Utils.Outputable
@@ -1436,7 +1436,7 @@ simplTick env tickish expr cont
 
   simplTickish env tickish
     | Breakpoint ext n ids modl <- tickish
-          = Breakpoint ext n (map (getDoneId . substId env) ids) modl
+          = Breakpoint ext n (mapMaybe (getDoneId . substId env) ids) modl
     | otherwise = tickish
 
   -- Push type application and coercion inside a tick
@@ -1447,8 +1447,9 @@ simplTick env tickish expr cont
     where (inc,outc) = splitCont c
   splitCont other = (mkBoringStop (contHoleType other), other)
 
-  getDoneId (DoneId id)  = id
-  getDoneId (DoneEx e _) = getIdFromTrivialExpr e -- Note [substTickish] in GHC.Core.Subst
+  getDoneId (DoneId id)  = Just id
+  getDoneId (DoneEx (Var id) _) = Just id
+  getDoneId (DoneEx e _) = getIdFromTrivialExpr_maybe e -- Note [substTickish] in GHC.Core.Subst
   getDoneId other = pprPanic "getDoneId" (ppr other)
 
 -- Note [case-of-scc-of-case]

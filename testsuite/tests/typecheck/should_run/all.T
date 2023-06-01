@@ -76,10 +76,10 @@ test('IPRun', normal, compile_and_run, [''])
 test('IPLocation', normal, compile_and_run, [''])
 test('T10845', normal, compile_and_run, [''])
 test('T10846', normal, compile_and_run, [''])
-test('T16646', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
+test('T16646', normal, compile_and_run, [''])
 
 # Support files for T1735 are in directory T1735_Help/
-test('T1735', expect_broken_for(23272, ['ghci-opt']), multimod_compile_and_run, ['T1735',''])
+test('T1735', normal, multimod_compile_and_run, ['T1735',''])
 
 # The following two tests no longer compile
 # See Note [Inferring principal types] in Ghc.Tc.Solver

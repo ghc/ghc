@@ -592,9 +592,9 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
 ------------------
 substTickish :: Subst -> CoreTickish -> CoreTickish
 substTickish subst (Breakpoint ext n ids modl)
-   = Breakpoint ext n (map do_one ids) modl
+   = Breakpoint ext n (mapMaybe do_one ids) modl
  where
-    do_one = getIdFromTrivialExpr . lookupIdSubst subst
+    do_one = getIdFromTrivialExpr_maybe . lookupIdSubst subst
 substTickish _subst other = other
 
 {- Note [Substitute lazily]
@@ -649,6 +649,13 @@ Second, we have to ensure that we never try to substitute a literal
 for an Id in a breakpoint.  We ensure this by never storing an Id with
 an unlifted type in a Breakpoint - see GHC.HsToCore.Ticks.mkTickish.
 Breakpoints can't handle free variables with unlifted types anyway.
+
+These measures are only reliable with unoptimized code.
+Since we can now enable optimizations for GHCi with
+@-fno-unoptimized-core-for-interpreter -O@, nontrivial expressions can be
+substituted, e.g. by specializations.
+Therefore we resort to discarding free variables from breakpoints when this
+situation occurs.
 -}
 
 {-

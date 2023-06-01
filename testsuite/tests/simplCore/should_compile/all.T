@@ -489,3 +489,4 @@ test('T23491b', [extra_files(['T23491.hs']), grep_errmsg(r'Float inwards')], mul
 test('T23491c', [extra_files(['T23491.hs']), grep_errmsg(r'Liberate case')], multimod_compile, ['T23491', '-fliberate-case -ddump-liberate-case'])
 test('T23491d', [extra_files(['T23491.hs']), grep_errmsg(r'Static argument')], multimod_compile, ['T23491', '-fstatic-argument-transformation -ddump-static-argument-transformation'])
 test('T23074', normal, compile, ['-O -ddump-rules'])
+test('T23272', [only_ways(['ghci']), extra_hc_opts('-fno-unoptimized-core-for-interpreter -O')], ghci_script, ['T23272.script'])
