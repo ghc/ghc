@@ -2300,7 +2300,7 @@ prepareAlts scrut case_bndr alts
                -- The multiplicity on case_bndr's is the multiplicity of the
                -- case expression The newly introduced patterns in
                -- refineDefaultAlt must be scaled by this multiplicity
-             (yes3, idcs3, alts3) = combineIdenticalAlts idcs1 alts2
+             (yes3, idcs3, alts3) = combineIdenticalAlts scrut case_bndr idcs1 alts2
              -- "idcs" stands for "impossible default data constructors"
              -- i.e. the constructors that can't match the default case
        ; when yes2 $ tick (FillInCaseDefault case_bndr)

@@ -109,7 +109,7 @@ import GHC.Utils.Misc
 
 import Data.ByteString     ( ByteString )
 import Data.Function       ( on )
-import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
+import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL, (\\) )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
 import GHC.Types.RepType (isZeroBitTy)
@@ -909,6 +909,50 @@ Note [Combine identical alternatives: wrinkles]
   here.
   See Note [Combine case alts: awkward corner] in GHC.Core.Opt.CSE).
 
+Note [Combine identical alternatives: Unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data Int = I# Int#
+  g :: Int -> Int
+  g n = case n of
+    2 -> 2
+    n -> n
+
+This is just the identity function in disguise. We encountered this artificial
+example in #20138. The Simplifier sees
+
+  T20138.g
+    = \ (n_awv [Occ=Once1!] :: GHC.Types.Int) ->
+        case n_awv of wild_X1 [Occ=Once1]
+        { GHC.Types.I# ds_dSv [Occ=Once1!] ->
+        case ds_dSv of {
+          __DEFAULT -> wild_X1;
+          2# -> GHC.Types.I# 2#
+        }
+        }
+
+and we would really like to combine the alts, yielding the underlying identity
+function.
+For that we need a special kind of 'cheapEqExpr', called 'cheapEqAlts', that
+
+  1. Looks through the unfolding of wild_X1, so that the first Alt reads
+     `I# ds_dSv`
+  2. Knows and unfolds the local equality `ds_dSv ~ 2#` from the 2# branch of
+     the inner Alt.
+
+(This is often called equality modulo δ, that is, equality modulo replacing
+occurrences with their definition, as in
+https://coq.inria.fr/refman/language/core/conversion.html#delta-reduction-sect.)
+
+'cheapEqAlts' accomplishes (1) by simply expanding unfoldings such that of
+wild_X1 and (2) by applying a poor-man's substitution
+`[ds_dSv :-> 2#] :: VarEnv CoreExpr` to variables in the supposed
+DEFAULT alt that encodes the local equality..
+It does *not* need to take an in-scope set because it will give up on the first
+binding construct. The caller must be sure not to pass on equalities that had
+already been shadowed.
+
 Note [Care with impossible-constructors when combining alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have (#10538)
@@ -952,14 +996,16 @@ missed the first one.)
 
 -}
 
-combineIdenticalAlts :: [AltCon]    -- Constructors that cannot match DEFAULT
+combineIdenticalAlts :: CoreExpr    -- Scrutinee
+                     -> Id          -- Case binder
+                     -> [AltCon]    -- Constructors that cannot match DEFAULT
                      -> [CoreAlt]
                      -> (Bool,      -- True <=> something happened
                          [AltCon],  -- New constructors that cannot match DEFAULT
                          [CoreAlt]) -- New alternatives
 -- See Note [Combine identical alternatives]
 -- True <=> we did some combining, result is a single DEFAULT alternative
-combineIdenticalAlts imposs_deflt_cons (Alt con1 bndrs1 rhs1 : rest_alts)
+combineIdenticalAlts scrut case_bndr imposs_deflt_cons (Alt con1 bndrs1 rhs1 : rest_alts)
   | all isDeadBinder bndrs1    -- Remember the default
   , not (null elim_rest) -- alternative comes first
   = (True, imposs_deflt_cons', deflt_alt : filtered_rest)
@@ -974,12 +1020,18 @@ combineIdenticalAlts imposs_deflt_cons (Alt con1 bndrs1 rhs1 : rest_alts)
                   DEFAULT -> []
                   _       -> [con1]
 
-    cheapEqTicked e1 e2 = cheapEqExpr' tickishFloatable e1 e2
-    identical_to_alt1 (Alt _con bndrs rhs)
-      = all isDeadBinder bndrs && rhs `cheapEqTicked` rhs1
+
+    identical_to_alt1 (Alt con bndrs rhs)
+      = all isDeadBinder bndrs && cheapEqAlts unfs rhs rhs1
+      where
+        unfs
+          | DEFAULT <- con = emptyVarEnv
+          | otherwise      = mkVarEnv [ (v,mkAltExpr con bndrs arg_tys) | v <- subst_bndrs ]
+    subst_bndrs = (case_bndr : [ scrut_var | Var scrut_var <- [scrut] ]) Data.List.\\ bndrs1
+    arg_tys = tyConAppArgs (idType case_bndr)
     tickss = map (\(Alt _ _ rhs) -> stripTicksT tickishFloatable rhs) elim_rest
 
-combineIdenticalAlts imposs_cons alts
+combineIdenticalAlts _ _ imposs_cons alts
   = (False, imposs_cons, alts)
 
 -- Scales the multiplicity of the binders of a list of case alternatives. That
@@ -993,6 +1045,39 @@ scaleAltsBy w alts = map scaleAlt alts
     scaleBndr :: CoreBndr -> CoreBndr
     scaleBndr b = scaleVarBy w b
 
+-- | Cheap expression equality test comparing to the (soon to be) DEFAULT RHS.
+-- The IdEnv encodes local equalities to be applied in the DEFAULT RHS that hold
+-- in the RHS we try to equate to.
+--
+-- This is a close sibling of 'cheapEqExpr' to accommodate
+-- Note [Combine identical alternatives: Unfoldings]
+cheapEqAlts :: IdEnv CoreExpr -> CoreExpr -> CoreExpr -> Bool
+cheapEqAlts unf_env rhs default_rhs
+  = go rhs default_rhs
+  where
+    go e1         (Var v2)
+      | Just unf <- lookupVarEnv unf_env v2 -- only need to expand the case binder in the DEFAULT alt
+                                   = go e1 unf
+      | Just unf <- get_unf v2     = go e1 unf
+    go (Var v1)   e2
+      | Just unf <- get_unf v1     = go unf e2
+
+    go (Var v1)   (Var v2)         = v1 == v2
+    go (Lit lit1) (Lit lit2)       = lit1 == lit2
+    go (Type t1)  (Type t2)        = t1 `eqType` t2
+    go (Coercion c1) (Coercion c2) = c1 `eqCoercion` c2
+    go (App f1 a1) (App f2 a2)     = f1 `go` f2 && a1 `go` a2
+    go (Cast e1 t1) (Cast e2 t2)   = e1 `go` e2 && t1 `eqCoercion` t2
+
+    go (Tick t1 e1) e2 | tickishFloatable t1 = go e1 e2
+    go e1 (Tick t2 e2) | tickishFloatable t2 = go e1 e2
+    go (Tick t1 e1) (Tick t2 e2) = t1 == t2 && e1 `go` e2
+
+    go _ _ = False
+
+    get_unf :: Var -> Maybe CoreExpr
+    get_unf v | isId v    = expandUnfolding_maybe (idUnfolding v)
+              | otherwise = Nothing
 
 {- *********************************************************************
 *                                                                      *

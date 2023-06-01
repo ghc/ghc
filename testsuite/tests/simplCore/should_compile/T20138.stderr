@@ -1,0 +1,110 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 78, types: 34, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 6, types: 2, coercions: 0, joins: 0/0}
+T20138.$WO :: Ordering %1 -> O
+T20138.$WO
+  = \ (conrep :: Ordering) ->
+      case conrep of conrep1 { __DEFAULT -> T20138.O conrep1 }
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+f :: Int -> Int
+f = \ (n :: Int) -> n
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+g :: Int -> Int
+g = f
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+k :: O -> O
+k = \ (ds :: O) -> ds
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20138.$trModule4 :: GHC.Prim.Addr#
+T20138.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20138.$trModule3 :: GHC.Types.TrName
+T20138.$trModule3 = GHC.Types.TrNameS T20138.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20138.$trModule2 :: GHC.Prim.Addr#
+T20138.$trModule2 = "T20138"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20138.$trModule1 :: GHC.Types.TrName
+T20138.$trModule1 = GHC.Types.TrNameS T20138.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T20138.$trModule :: GHC.Types.Module
+T20138.$trModule
+  = GHC.Types.Module T20138.$trModule3 T20138.$trModule1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+$krep
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcOrdering (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20138.$tcO2 :: GHC.Prim.Addr#
+T20138.$tcO2 = "O"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20138.$tcO1 :: GHC.Types.TrName
+T20138.$tcO1 = GHC.Types.TrNameS T20138.$tcO2
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T20138.$tcO :: GHC.Types.TyCon
+T20138.$tcO
+  = GHC.Types.TyCon
+      1145581556550476387#Word64
+      1434093014026668163#Word64
+      T20138.$trModule
+      T20138.$tcO1
+      0#
+      GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep1 :: GHC.Types.KindRep
+$krep1
+  = GHC.Types.KindRepTyConApp
+      T20138.$tcO (GHC.Types.[] @GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T20138.$tc'O1 :: GHC.Types.KindRep
+T20138.$tc'O1 = GHC.Types.KindRepFun $krep $krep1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T20138.$tc'O3 :: GHC.Prim.Addr#
+T20138.$tc'O3 = "'O"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T20138.$tc'O2 :: GHC.Types.TrName
+T20138.$tc'O2 = GHC.Types.TrNameS T20138.$tc'O3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T20138.$tc'O :: GHC.Types.TyCon
+T20138.$tc'O
+  = GHC.Types.TyCon
+      12109796057866694799#Word64
+      5332816606609293872#Word64
+      T20138.$trModule
+      T20138.$tc'O2
+      0#
+      T20138.$tc'O1
+
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
+h :: Int -> Int
+h = \ (n :: Int) ->
+      case n of wild { GHC.Types.I# ds ->
+      case ds of {
+        __DEFAULT -> wild;
+        2# -> GHC.Base.maxInt
+      }
+      }
+
+
+
