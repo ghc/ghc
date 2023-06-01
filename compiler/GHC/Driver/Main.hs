@@ -261,6 +261,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Logger
 import GHC.Utils.TmpFs
 
+import qualified GHC.LanguageExtensions as LangExt
+
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.StringBuffer
@@ -871,6 +873,15 @@ hscRecompStatus
            , IsBoot <- isBootSummary mod_summary -> do
                msg UpToDate
                return $ HscUpToDate checked_iface emptyHomeModInfoLinkable
+
+           -- Always recompile with the JS backend when TH is enabled until
+           -- #23013 is fixed.
+           | ArchJavaScript <- platformArch (targetPlatform lcl_dflags)
+           , xopt LangExt.TemplateHaskell lcl_dflags
+           -> do
+              msg $ needsRecompileBecause THWithJS
+              return $ HscRecompNeeded $ Just $ mi_iface_hash $ mi_final_exts $ checked_iface
+
            | otherwise -> do
                -- Do need linkable
                -- 1. Just check whether we have bytecode/object linkables and then

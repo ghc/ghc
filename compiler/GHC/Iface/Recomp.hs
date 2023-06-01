@@ -197,6 +197,7 @@ data RecompReason
   | MismatchedDynHiFile
   | ObjectsChanged
   | LibraryChanged
+  | THWithJS
   deriving (Eq)
 
 instance Outputable RecompReason where
@@ -229,6 +230,7 @@ instance Outputable RecompReason where
     MismatchedDynHiFile     -> text "Mismatched dynamic interface file"
     ObjectsChanged          -> text "Objects changed"
     LibraryChanged          -> text "Library changed"
+    THWithJS                -> text "JS backend always recompiles modules using Template Haskell for now (#23013)"
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False
