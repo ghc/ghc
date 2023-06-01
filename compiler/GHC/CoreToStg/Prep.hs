@@ -836,7 +836,7 @@ cpeRhsE env (Case scrut _ ty [])
   = do { (floats, scrut') <- cpeRhsE env scrut
        ; let ty'       = cpSubstTy env ty
              scrut_ty' = exprType scrut'
-             co'       = mkUnivCo prov Representational scrut_ty' ty'
+             co'       = mkUnivCo [] prov Representational scrut_ty' ty'
              prov      = CorePrepProv False
                -- False says that the kinds of two types may differ
                -- E.g. we might cast Int to Int#.  This is fine
@@ -855,7 +855,7 @@ cpeRhsE env (Case scrut bndr _ alts)
                       -- is dead.  It usually is, but see #18227
   , [Alt _ [co_var] rhs] <- alts
   , let Pair ty1 ty2 = coVarTypes co_var
-        the_co = mkUnivCo prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
+        the_co = mkUnivCo [] prov Nominal (cpSubstTy env ty1) (cpSubstTy env ty2)
         prov   = CorePrepProv True  -- True <=> kind homogeneous
         env'   = extendCoVarEnv env co_var the_co
   = cpeRhsE env' rhs

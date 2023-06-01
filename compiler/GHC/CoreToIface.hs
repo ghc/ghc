@@ -300,7 +300,7 @@ toIfaceCoercionX fr co
     go (SubCo co)           = IfaceSubCo (go co)
     go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
     go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
-    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
+    go (UnivCo cvs p r t1 t2)  = IfaceUnivCo (map toIfaceCoVar cvs) (go_prov p) r
                                           (toIfaceTypeX fr t1)
                                           (toIfaceTypeX fr t2)
     go co@(TyConAppCo r tc cos)

@@ -641,8 +641,9 @@ tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
   = tyCoFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
     -- See Note [CoercionHoles and coercion free variables]
 tyCoFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
-tyCoFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
-  = (tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
+tyCoFVsOfCo (UnivCo cvs p _ t1 t2) fv_cand in_scope acc
+  = (mapUnionFV tyCoFVsOfCoVar cvs `unionFV`
+    tyCoFVsOfProv p `unionFV` tyCoFVsOfType t1
                      `unionFV` tyCoFVsOfType t2) fv_cand in_scope acc
 tyCoFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
@@ -697,8 +698,8 @@ almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
 almost_devoid_co_var_of_co (AxiomInstCo _ _ cos) cv
   = almost_devoid_co_var_of_cos cos cv
-almost_devoid_co_var_of_co (UnivCo p _ t1 t2) cv
-  = almost_devoid_co_var_of_prov p cv
+almost_devoid_co_var_of_co (UnivCo cvs p _ t1 t2) cv
+  = all (cv /=) cvs && almost_devoid_co_var_of_prov p cv
   && almost_devoid_co_var_of_type t1 cv
   && almost_devoid_co_var_of_type t2 cv
 almost_devoid_co_var_of_co (SymCo co) cv
@@ -1086,7 +1087,7 @@ tyConsOfType ty
      go_co (FunCo { fco_mult = m, fco_arg = a, fco_res = r })
                                    = go_co m `unionUniqSets` go_co a `unionUniqSets` go_co r
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
-     go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
+     go_co (UnivCo _ p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet
      go_co (HoleCo {})             = emptyUniqSet
      go_co (SymCo co)              = go_co co
@@ -1280,21 +1281,16 @@ occCheckExpand vs_to_avoid ty
            ; w' <- go_co cxt w
            ; return (co { fco_mult = w', fco_arg = co1', fco_res = co2' })}
 
-    go_co (as,env) co@(CoVarCo c)
-      | Just c' <- lookupVarEnv env c   = return (CoVarCo c')
-      | bad_var_occ as c                = Nothing
-      | otherwise                       = return co
+    go_co (as,env) co@(CoVarCo c) = CoVarCo <$> covar (as, env) c
 
-    go_co (as,_) co@(HoleCo h)
-      | bad_var_occ as (ch_co_var h)    = Nothing
-      | otherwise                       = return co
 
     go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
                                              ; return (AxiomInstCo ax ind args') }
-    go_co cxt (UnivCo p r ty1 ty2)      = do { p' <- go_prov cxt p
+    go_co cxt (UnivCo cvs p r ty1 ty2)      = do { cvs' <- mapM (covar cxt) cvs
+                                             ; p' <- go_prov cxt p
                                              ; ty1' <- go cxt ty1
                                              ; ty2' <- go cxt ty2
-                                             ; return (UnivCo p' r ty1' ty2') }
+                                             ; return (UnivCo cvs' p' r ty1' ty2') }
     go_co cxt (SymCo co)                = do { co' <- go_co cxt co
                                              ; return (SymCo co') }
     go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1
@@ -1313,6 +1309,16 @@ occCheckExpand vs_to_avoid ty
                                              ; return (SubCo co') }
     go_co cxt (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co cxt) cs
                                              ; return (AxiomRuleCo ax cs') }
+
+
+    go_co (as,_) co@(HoleCo h)
+      | bad_var_occ as (ch_co_var h)    = Nothing
+      | otherwise                       = return co
+
+    covar (as, env) c
+      | Just c' <- lookupVarEnv env c   = return c'
+      | bad_var_occ as c                = Nothing
+      | otherwise                       = return c
 
     ------------------
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co

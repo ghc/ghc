@@ -989,7 +989,7 @@ data Coercion
     -- The number coercions should match exactly the expectations
     -- of the CoAxiomRule (i.e., the rule is fully saturated).
 
-  | UnivCo UnivCoProvenance Role Type Type
+  | UnivCo [CoVar] UnivCoProvenance Role Type Type
       -- :: _ -> "e" -> _ -> _ -> e
 
   | SymCo Coercion             -- :: e -> e
@@ -1836,6 +1836,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_cos _   []     = mempty
     go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
 
+    go_cvs _ [] = mempty
+    go_cvs env (v:vs) = covar env v `mappend` go_cvs env vs
+
     go_co env (Refl ty)                = go_ty env ty
     go_co env (GRefl _ ty MRefl)       = go_ty env ty
     go_co env (GRefl _ ty (MCo co))    = go_ty env ty `mappend` go_co env co
@@ -1844,7 +1847,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (CoVarCo cv)             = covar env cv
     go_co env (AxiomInstCo _ _ args)   = go_cos env args
     go_co env (HoleCo hole)            = cohole env hole
-    go_co env (UnivCo p _ t1 t2)       = go_prov env p `mappend` go_ty env t1
+    go_co env (UnivCo cvs p _ t1 t2)   = go_cvs env cvs `mappend`
+                                         go_prov env p `mappend` go_ty env t1
                                                        `mappend` go_ty env t2
     go_co env (SymCo co)               = go_co env co
     go_co env (TransCo c1 c2)          = go_co env c1 `mappend` go_co env c2
@@ -1914,7 +1918,7 @@ coercionSize (FunCo _ _ _ w c1 c2) = 1 + coercionSize c1 + coercionSize c2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
+coercionSize (UnivCo _ p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
 coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (SelCo _ co)        = 1 + coercionSize co

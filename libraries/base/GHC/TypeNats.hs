@@ -16,6 +16,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 {-| This module is an internal GHC module.  It declares the constants used
 in the implementation of type-level natural numbers.  The programmer interface
@@ -34,7 +35,7 @@ module GHC.TypeNats
   , someNatVal
   , sameNat
     -- ** Singleton values
-  , SNat
+  , SNat(..)
   , pattern SNat
   , fromSNat
   , withSomeSNat
@@ -274,6 +275,7 @@ cmpNat x y = case compare (natVal x) (natVal y) of
 --
 -- @since 4.18.0.0
 newtype SNat (n :: Nat) = UnsafeSNat Natural
+type role SNat nominal
 
 -- | A explicitly bidirectional pattern synonym relating an 'SNat' to a
 -- 'KnownNat' constraint.

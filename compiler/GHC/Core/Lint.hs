@@ -2133,25 +2133,8 @@ lintCoercion :: InCoercion -> LintM LintedCoercion
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 
-lintCoercion (CoVarCo cv)
-  | not (isCoVar cv)
-  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
-                  2 (text "With offending type:" <+> ppr (varType cv)))
+lintCoercion (CoVarCo cv) = lintCoVar cv
 
-  | otherwise
-  = do { subst <- getSubst
-       ; case lookupCoVar subst cv of
-           Just linted_co -> return linted_co ;
-           Nothing
-              | cv `isInScope` subst
-                   -> return (CoVarCo cv)
-              | otherwise
-                   ->
-                      -- lintCoBndr always extends the substitution
-                      failWithL $
-                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
-                         2 (text "is out of scope")
-     }
 
 
 lintCoercion (Refl ty)
@@ -2271,8 +2254,9 @@ lintCoercion co@(FunCo { fco_role = r, fco_afl = afl, fco_afr = afr
                               , text "res_co:" <+> ppr co2 ])
 
 -- See Note [Bad unsafe coercion]
-lintCoercion co@(UnivCo prov r ty1 ty2)
-  = do { ty1' <- lintType ty1
+lintCoercion co@(UnivCo cvs prov r ty1 ty2)
+  = do { cvs' <- concatMapM (fmap tyCoVarsOfCoList . lintCoVar) cvs
+       ; ty1' <- lintType ty1
        ; ty2' <- lintType ty2
        ; let k1 = typeKind ty1'
              k2 = typeKind ty2'
@@ -2282,7 +2266,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                             && isTYPEorCONSTRAINT k2)
               (checkTypes ty1 ty2)
 
-       ; return (UnivCo prov' r ty1' ty2') }
+       ; return (UnivCo cvs' prov' r ty1' ty2') }
    where
      report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
@@ -2521,6 +2505,26 @@ lintCoercion this@(AxiomRuleCo ax cos)
 lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
+
+lintCoVar cv
+  | not (isCoVar cv)
+  = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
+                  2 (text "With offending type:" <+> ppr (varType cv)))
+
+  | otherwise
+  = do { subst <- getSubst
+       ; case lookupCoVar subst cv of
+           Just linted_co -> return linted_co ;
+           Nothing
+              | cv `isInScope` subst
+                   -> return (CoVarCo cv)
+              | otherwise
+                   ->
+                      -- lintCoBndr always extends the substitution
+                      failWithL $
+                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
+                         2 (text "is out of scope")
+     }
 
 {-
 ************************************************************************

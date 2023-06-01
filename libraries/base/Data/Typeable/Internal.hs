@@ -1061,6 +1061,7 @@ mkTypeLitTyCon name kind_tycon
 -- | Used to make `'Typeable' instance for things of kind Nat
 typeNatTypeRep :: forall a. KnownNat a => TypeRep a
 typeNatTypeRep = typeLitTypeRep (show (natVal' (proxy# @a))) tcNat
+{-# INLINABLE typeNatTypeRep #-}
 
 -- | Used to make `'Typeable' instance for things of kind Symbol
 typeSymbolTypeRep :: forall a. KnownSymbol a => TypeRep a

@@ -349,9 +349,9 @@ opt_co4 env sym rep r (AxiomInstCo con ind cos)
                                  cos)
       -- Note that the_co does *not* have sym pushed into it
 
-opt_co4 env sym rep r (UnivCo prov _r t1 t2)
+opt_co4 env sym rep r (UnivCo cvs prov _r t1 t2)
   = assert (r == _r )
-    opt_univ env sym prov (chooseRole rep r) t1 t2
+    opt_univ env sym prov cvs (chooseRole rep r) t1 t2
 
 opt_co4 env sym rep r (TransCo co1 co2)
                       -- sym (g `o` h) = sym h `o` sym g
@@ -514,7 +514,7 @@ in GHC.Core.Coercion.
 -- be a phantom, but the output sure will be.
 opt_phantom :: LiftingContext -> SymFlag -> Coercion -> NormalCo
 opt_phantom env sym co
-  = opt_univ env sym (PhantomProv (mkKindCo co)) Phantom ty1 ty2
+  = opt_univ env sym (PhantomProv (mkKindCo co)) [] Phantom ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
 
@@ -549,9 +549,9 @@ See #19509.
 
  -}
 
-opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
+opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> [CoVar] -> Role
          -> Type -> Type -> Coercion
-opt_univ env sym (PhantomProv h) _r ty1 ty2
+opt_univ env sym (PhantomProv h) [] _r ty1 ty2
   | sym       = mkPhantomCo h' ty2' ty1'
   | otherwise = mkPhantomCo h' ty1' ty2'
   where
@@ -559,8 +559,9 @@ opt_univ env sym (PhantomProv h) _r ty1 ty2
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
-opt_univ env sym prov role oty1 oty2
-  | Just (tc1, tys1) <- splitTyConApp_maybe oty1
+opt_univ env sym prov cvs role oty1 oty2
+  | [] <- cvs
+  , Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
   , isInjectiveTyCon tc1 role  -- see Note [opt_univ needs injectivity]
@@ -568,33 +569,35 @@ opt_univ env sym prov role oty1 oty2
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
   = let roles    = tyConRoleListX role tc1
-        arg_cos  = zipWith3 (mkUnivCo prov') roles tys1 tys2
+        arg_cos  = zipWith3 (mkUnivCo [] prov') roles tys1 tys2
         arg_cos' = zipWith (opt_co4 env sym False) roles arg_cos
     in
     mkTyConAppCo role tc1 arg_cos'
 
   -- can't optimize the AppTy case because we can't build the kind coercions.
 
-  | Just (tv1, ty1) <- splitForAllTyVar_maybe oty1
+  | [] <- cvs
+  , Just (tv1, ty1) <- splitForAllTyVar_maybe oty1
   , Just (tv2, ty2) <- splitForAllTyVar_maybe oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
-        eta  = mkUnivCo prov' Nominal k1 k2
+        eta  = mkUnivCo [] prov' Nominal k1 k2
           -- eta gets opt'ed soon, but not yet.
         ty2' = substTyWith [tv2] [TyVarTy tv1 `mkCastTy` eta] ty2
 
         (env', tv1', eta') = optForAllCoBndr env sym tv1 eta
     in
-    mkForAllCo tv1' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo tv1' eta' (opt_univ env' sym prov' [] role ty1 ty2')
 
-  | Just (cv1, ty1) <- splitForAllCoVar_maybe oty1
+  | [] <- cvs
+  , Just (cv1, ty1) <- splitForAllCoVar_maybe oty1
   , Just (cv2, ty2) <- splitForAllCoVar_maybe oty2
       -- NB: prov isn't interesting here either
   = let k1    = varType cv1
         k2    = varType cv2
         r'    = coVarRole cv1
-        eta   = mkUnivCo prov' Nominal k1 k2
+        eta   = mkUnivCo [] prov' Nominal k1 k2
         eta_d = downgradeRole r' Nominal eta
           -- eta gets opt'ed soon, but not yet.
         n_co  = (mkSymCo $ mkSelCo (SelTyCon 2 r') eta_d) `mkTransCo`
@@ -604,7 +607,7 @@ opt_univ env sym prov role oty1 oty2
 
         (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
     in
-    mkForAllCo cv1' eta' (opt_univ env' sym prov' role ty1 ty2')
+    mkForAllCo cv1' eta' (opt_univ env' sym prov' [] role ty1 ty2')
 
   | otherwise
   = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
@@ -612,7 +615,7 @@ opt_univ env sym prov role oty1 oty2
         (a, b) | sym       = (ty2, ty1)
                | otherwise = (ty1, ty2)
     in
-    mkUnivCo prov' role a b
+    mkUnivCo cvs prov' role a b
 
   where
     prov' = case prov of
@@ -691,12 +694,12 @@ opt_trans_rule is in_co1@(InstCo co1 ty1) in_co2@(InstCo co2 ty2)
   = fireTransRule "TrPushInst" in_co1 in_co2 $
     mkInstCo (opt_trans is co1 co2) ty1
 
-opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
-                  in_co2@(UnivCo p2 r2 _tyl2 tyr2)
+opt_trans_rule is in_co1@(UnivCo cvs1 p1 r1 tyl1 _tyr1)
+                  in_co2@(UnivCo cvs2 p2 r2 _tyl2 tyr2)
   | Just prov' <- opt_trans_prov p1 p2
   = assert (r1 == r2) $
     fireTransRule "UnivCo" in_co1 in_co2 $
-    mkUnivCo prov' r1 tyl1 tyr2
+    mkUnivCo (cvs1 ++ cvs2) prov' r1 tyl1 tyr2
   where
     -- if the provenances are different, opt'ing will be very confusing
     opt_trans_prov (PhantomProv kco1)    (PhantomProv kco2)

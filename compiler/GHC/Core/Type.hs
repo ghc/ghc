@@ -255,6 +255,7 @@ import GHC.Types.Unique.Set
 
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
+import GHC.Utils.Monad
 
 import {-# SOURCE #-} GHC.Builtin.Types
    ( charTy, naturalTy
@@ -538,8 +539,8 @@ expandTypeSynonyms ty
       = substCoVar subst cv
     go_co subst (AxiomInstCo ax ind args)
       = mkAxiomInstCo ax ind (map (go_co subst) args)
-    go_co subst (UnivCo p r t1 t2)
-      = mkUnivCo (go_prov subst p) r (go subst t1) (go subst t2)
+    go_co subst (UnivCo cvs p r t1 t2)
+      = mkUnivCo (concatMap (tyCoVarsOfCoList . substCoVar subst) cvs) (go_prov subst p) r (go subst t1) (go subst t2)
     go_co subst (SymCo co)
       = mkSymCo (go_co subst co)
     go_co subst (TransCo co1 co2)
@@ -945,7 +946,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                                            <*> go_co env c1 <*> go_co env c2
     go_co env (CoVarCo cv)               = covar env cv
     go_co env (HoleCo hole)              = cohole env hole
-    go_co env (UnivCo p r t1 t2)         = mkUnivCo <$> go_prov env p <*> pure r
+    go_co env (UnivCo cvs p r t1 t2)     = mkUnivCo <$> concatMapM (fmap tyCoVarsOfCoList . covar env) cvs <*> go_prov env p <*> pure r
                                            <*> go_ty env t1 <*> go_ty env t2
     go_co env (SymCo co)                 = mkSymCo <$> go_co env co
     go_co env (TransCo c1 c2)            = mkTransCo <$> go_co env c1 <*> go_co env c2

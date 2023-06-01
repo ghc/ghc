@@ -23,7 +23,7 @@ mkFunCo2 :: HasDebugCallStack => Role -> FunTyFlag -> FunTyFlag -> CoercionN -> 
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
-mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
+mkUnivCo :: [CoVar] -> UnivCoProvenance -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
 mkSelCo :: HasDebugCallStack => CoSel -> Coercion -> Coercion

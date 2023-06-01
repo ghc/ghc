@@ -93,6 +93,7 @@ module Data.Typeable
     , typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7
       -- Jank
     , I.trLiftedRep
+    , I.typeNatTypeRep
     ) where
 
 import qualified Data.Typeable.Internal as I

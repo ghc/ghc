@@ -1508,7 +1508,9 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_co dv (FunCo _ _ _ w co1 co2) = foldlM go_co dv [w, co1, co2]
     go_co dv (AxiomInstCo _ _ cos)   = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)     = foldlM go_co dv cos
-    go_co dv (UnivCo prov _ t1 t2)   = do dv1 <- go_prov dv prov
+    go_co dv (UnivCo cvs prov _ t1 t2) = do
+                                          dv' <- foldM go_cv dv cvs
+                                          dv1 <- go_prov dv' prov
                                           dv2 <- collect_cand_qtvs orig_ty True bound dv1 t1
                                           collect_cand_qtvs orig_ty True bound dv2 t2
     go_co dv (SymCo co)              = go_co dv co

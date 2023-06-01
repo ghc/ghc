@@ -224,6 +224,11 @@ tidyCo env@(_, subst) co
     go_mco MRefl    = MRefl
     go_mco (MCo co) = MCo $! go co
 
+    covar cv =
+      case lookupVarEnv subst cv of
+                                 Nothing  -> cv
+                                 Just cv' -> cv'
+
     go (Refl ty)             = Refl $! tidyType env ty
     go (GRefl r ty mco)      = (GRefl r $! tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = TyConAppCo r tc $! strictMap go cos
@@ -233,12 +238,11 @@ tidyCo env@(_, subst) co
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r afl afr w co1 co2) = ((FunCo r afl afr $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
+    go (CoVarCo cv)          = CoVarCo (covar cv)
+
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = AxiomInstCo con ind $! strictMap go cos
-    go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
+    go (UnivCo cvs p r t1 t2)    = ((((UnivCo $! strictMap covar cvs) $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
     go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2

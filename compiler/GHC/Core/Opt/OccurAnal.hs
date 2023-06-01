@@ -2840,6 +2840,7 @@ addBndrSwap scrut case_bndr
                  -- See Note [Zap case binders in proxy bindings]
 
 scrutBinderSwap_maybe :: OutExpr -> Maybe (OutVar, MCoercion)
+scrutBinderSwap_maybe _ = Nothing
 -- If (scrutBinderSwap_maybe e = Just (v, mco), then
 --    v = e |> mco
 -- See Note [Case of cast]
