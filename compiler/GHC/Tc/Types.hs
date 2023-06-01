@@ -245,7 +245,7 @@ data Env gbl lcl
                              -- Includes all info about imported things
                              -- BangPattern is to fix leak, see #15111
 
-        env_um   :: {-# UNPACK #-} !Char,   -- Mask for Uniques
+        env_ut   :: {-# UNPACK #-} !Char,   -- Tag for Uniques
 
         env_gbl  :: gbl,     -- Info about things defined at the top level
                              -- of the module being compiled

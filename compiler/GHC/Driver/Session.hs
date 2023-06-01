@@ -279,6 +279,7 @@ import Data.List (intercalate, sortBy)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Word
 import System.FilePath
 import System.Directory
 import System.Environment (lookupEnv)
@@ -732,7 +733,7 @@ data DynFlags = DynFlags {
   maxErrors             :: Maybe Int,
 
   -- | Unique supply configuration for testing build determinism
-  initialUnique         :: Word,
+  initialUnique         :: Word64,
   uniqueIncrement       :: Int,
     -- 'Int' because it can be used to test uniques in decreasing order.
 
@@ -2028,8 +2029,8 @@ add_dep_message (OptIntSuffix f) message =
                                OptIntSuffix $ \oi -> f oi >> deprecate message
 add_dep_message (IntSuffix f) message =
                                   IntSuffix $ \i -> f i >> deprecate message
-add_dep_message (WordSuffix f) message =
-                                  WordSuffix $ \i -> f i >> deprecate message
+add_dep_message (Word64Suffix f) message =
+                                  Word64Suffix $ \i -> f i >> deprecate message
 add_dep_message (FloatSuffix f) message =
                                 FloatSuffix $ \fl -> f fl >> deprecate message
 add_dep_message (PassFlag f) message =
@@ -2842,7 +2843,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "fmax-inline-memset-insns"
       (intSuffix (\n d -> d { maxInlineMemsetInsns = n }))
   , make_ord_flag defGhcFlag "dinitial-unique"
-      (wordSuffix (\n d -> d { initialUnique = n }))
+      (word64Suffix (\n d -> d { initialUnique = n }))
   , make_ord_flag defGhcFlag "dunique-increment"
       (intSuffix (\n d -> d { uniqueIncrement = n }))
 
@@ -4183,8 +4184,8 @@ intSuffix fn = IntSuffix (\n -> upd (fn n))
 intSuffixM :: (Int -> DynFlags -> DynP DynFlags) -> OptKind (CmdLineP DynFlags)
 intSuffixM fn = IntSuffix (\n -> updM (fn n))
 
-wordSuffix :: (Word -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
-wordSuffix fn = WordSuffix (\n -> upd (fn n))
+word64Suffix :: (Word64 -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
+word64Suffix fn = Word64Suffix (\n -> upd (fn n))
 
 floatSuffix :: (Float -> DynFlags -> DynFlags) -> OptKind (CmdLineP DynFlags)
 floatSuffix fn = FloatSuffix (\n -> upd (fn n))

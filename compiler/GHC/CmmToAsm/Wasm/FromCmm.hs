@@ -26,7 +26,7 @@ import Control.Monad
 import qualified Data.ByteString as BS
 import Data.Foldable
 import Data.Functor
-import qualified Data.IntSet as IS
+import qualified GHC.Data.Word64Set as WS
 import Data.Semigroup
 import Data.String
 import Data.Traversable
@@ -1551,7 +1551,7 @@ onTopSym lbl = case sym_vis of
   SymDefault -> wasmModifyM $ \s ->
     s
       { defaultSyms =
-          IS.insert
+          WS.insert
             (getKey $ getUnique sym)
             $ defaultSyms s
       }

@@ -53,7 +53,7 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.Coerce
 import Data.Functor
-import qualified Data.IntSet as IS
+import qualified GHC.Data.Word64Set as WS
 import Data.Kind
 import Data.String
 import Data.Type.Equality
@@ -198,7 +198,7 @@ data DataSection = DataSection
 type SymMap = UniqMap SymName
 
 -- | No need to remember the symbols.
-type SymSet = IS.IntSet
+type SymSet = WS.Word64Set
 
 type GlobalInfo = (SymName, SomeWasmType)
 
@@ -428,7 +428,7 @@ initialWasmCodeGenState platform us =
   WasmCodeGenState
     { wasmPlatform =
         platform,
-      defaultSyms = IS.empty,
+      defaultSyms = WS.empty,
       funcTypes = emptyUniqMap,
       funcBodies =
         emptyUniqMap,

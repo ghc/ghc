@@ -571,7 +571,7 @@ extern char **environ;
       SymI_HasProto(getOrSetLibHSghcGlobalHasPprDebug)                  \
       SymI_HasProto(getOrSetLibHSghcGlobalHasNoDebugOutput)             \
       SymI_HasProto(getOrSetLibHSghcGlobalHasNoStateHack)               \
-      SymI_HasProto(ghc_unique_counter)                                 \
+      SymI_HasProto(ghc_unique_counter64)                               \
       SymI_HasProto(ghc_unique_inc)                                     \
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
@@ -923,6 +923,7 @@ extern char **environ;
       SymI_HasProto(stopHeapProfTimer)                                  \
       SymI_HasProto(requestHeapCensus)                                  \
       SymI_HasProto(atomic_inc)                                         \
+      SymI_HasProto(atomic_inc64)                                       \
       SymI_HasProto(atomic_dec)                                         \
       SymI_HasProto(hs_spt_lookup)                                      \
       SymI_HasProto(hs_spt_insert)                                      \

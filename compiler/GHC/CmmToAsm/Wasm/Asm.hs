@@ -14,7 +14,7 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Builder
 import Data.Coerce
 import Data.Foldable
-import qualified Data.IntSet as IS
+import qualified GHC.Data.Word64Set as WS
 import Data.Maybe
 import Data.Semigroup
 import GHC.Cmm
@@ -181,9 +181,9 @@ asmTellSectionHeader :: Builder -> WasmAsmM ()
 asmTellSectionHeader k = asmTellTabLine $ ".section " <> k <> ",\"\",@"
 
 asmTellDataSection ::
-  WasmTypeTag w -> IS.IntSet -> SymName -> DataSection -> WasmAsmM ()
+  WasmTypeTag w -> WS.Word64Set -> SymName -> DataSection -> WasmAsmM ()
 asmTellDataSection ty_word def_syms sym DataSection {..} = do
-  when (getKey (getUnique sym) `IS.member` def_syms) $ asmTellDefSym sym
+  when (getKey (getUnique sym) `WS.member` def_syms) $ asmTellDefSym sym
   asmTellSectionHeader sec_name
   asmTellAlign dataSectionAlignment
   asmTellTabLine asm_size
@@ -420,12 +420,12 @@ asmTellWasmControl ty_word c = case c of
 
 asmTellFunc ::
   WasmTypeTag w ->
-  IS.IntSet ->
+  WS.Word64Set ->
   SymName ->
   (([SomeWasmType], [SomeWasmType]), FuncBody w) ->
   WasmAsmM ()
 asmTellFunc ty_word def_syms sym (func_ty, FuncBody {..}) = do
-  when (getKey (getUnique sym) `IS.member` def_syms) $ asmTellDefSym sym
+  when (getKey (getUnique sym) `WS.member` def_syms) $ asmTellDefSym sym
   asmTellSectionHeader $ ".text." <> asm_sym
   asmTellLine $ asm_sym <> ":"
   asmTellFuncType sym func_ty

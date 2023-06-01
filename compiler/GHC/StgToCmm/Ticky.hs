@@ -157,6 +157,7 @@ import GHC.Types.Id.Info
 import GHC.StgToCmm.Env (getCgInfo_maybe)
 import Data.Coerce (coerce)
 import GHC.Utils.Json
+import GHC.Utils.Unique (anyOfUnique)
 
 -----------------------------------------------------------------------------
 --
@@ -884,20 +885,19 @@ showTypeCategory ty
   | otherwise = case tcSplitTyConApp_maybe ty of
   Nothing -> '.'
   Just (tycon, _) ->
-    let anyOf us = getUnique tycon `elem` us in
     case () of
-      _ | anyOf [fUNTyConKey] -> '>'
-        | anyOf [charTyConKey] -> 'C'
-        | anyOf [charPrimTyConKey] -> 'c'
-        | anyOf [doubleTyConKey] -> 'D'
-        | anyOf [doublePrimTyConKey] -> 'd'
-        | anyOf [floatTyConKey] -> 'F'
-        | anyOf [floatPrimTyConKey] -> 'f'
-        | anyOf [intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey] -> 'I'
-        | anyOf [intPrimTyConKey, int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int64PrimTyConKey] -> 'i'
-        | anyOf [wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey] -> 'W'
-        | anyOf [wordPrimTyConKey, word8PrimTyConKey, word16PrimTyConKey, word32PrimTyConKey, word64PrimTyConKey] -> 'w'
-        | anyOf [listTyConKey] -> 'L'
+      _ | anyOfUnique tycon [fUNTyConKey] -> '>'
+        | anyOfUnique tycon [charTyConKey] -> 'C'
+        | anyOfUnique tycon [charPrimTyConKey] -> 'c'
+        | anyOfUnique tycon [doubleTyConKey] -> 'D'
+        | anyOfUnique tycon [doublePrimTyConKey] -> 'd'
+        | anyOfUnique tycon [floatTyConKey] -> 'F'
+        | anyOfUnique tycon [floatPrimTyConKey] -> 'f'
+        | anyOfUnique tycon [intTyConKey, int8TyConKey, int16TyConKey, int32TyConKey, int64TyConKey] -> 'I'
+        | anyOfUnique tycon [intPrimTyConKey, int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int64PrimTyConKey] -> 'i'
+        | anyOfUnique tycon [wordTyConKey, word8TyConKey, word16TyConKey, word32TyConKey, word64TyConKey] -> 'W'
+        | anyOfUnique tycon [wordPrimTyConKey, word8PrimTyConKey, word16PrimTyConKey, word32PrimTyConKey, word64PrimTyConKey] -> 'w'
+        | anyOfUnique tycon [listTyConKey] -> 'L'
         | isUnboxedTupleTyCon tycon -> 't'
         | isTupleTyCon tycon       -> 'T'
         | isPrimTyCon tycon        -> 'P'

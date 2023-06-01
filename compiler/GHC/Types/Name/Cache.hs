@@ -98,7 +98,7 @@ data NameCache = NameCache
 type OrigNameCache   = ModuleEnv (OccEnv Name)
 
 takeUniqFromNameCache :: NameCache -> IO Unique
-takeUniqFromNameCache (NameCache c _) = uniqFromMask c
+takeUniqFromNameCache (NameCache c _) = uniqFromTag c
 
 lookupOrigNameCache :: OrigNameCache -> Module -> OccName -> Maybe Name
 lookupOrigNameCache nc mod occ

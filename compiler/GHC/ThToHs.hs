@@ -63,6 +63,7 @@ import Data.Foldable (for_)
 import Data.List.NonEmpty( NonEmpty (..), nonEmpty )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe( catMaybes, isNothing )
+import Data.Word (Word64)
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
 import Foreign.ForeignPtr
@@ -2150,7 +2151,7 @@ mk_mod mod = mkModuleName (TH.modString mod)
 mk_pkg :: TH.PkgName -> Unit
 mk_pkg pkg = stringToUnit (TH.pkgString pkg)
 
-mk_uniq :: Int -> Unique
+mk_uniq :: Word64 -> Unique
 mk_uniq u = mkUniqueGrimily u
 
 {-

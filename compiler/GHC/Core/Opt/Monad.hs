@@ -20,7 +20,7 @@ module GHC.Core.Opt.Monad (
     initRuleEnv, getExternalRuleBase,
     getDynFlags, getPackageFamInstEnv,
     getInteractiveContext,
-    getUniqMask,
+    getUniqTag,
     getNamePprCtx, getSrcSpanM,
 
     -- ** Writing to the monad
@@ -117,7 +117,7 @@ data CoreReader = CoreReader {
         cr_name_ppr_ctx        :: NamePprCtx,
         cr_loc                 :: SrcSpan,   -- Use this for log/error messages so they
                                              -- are at least tagged with the right source file
-        cr_uniq_mask           :: !Char      -- Mask for creating unique values
+        cr_uniq_tag            :: !Char      -- Tag for creating unique values
 }
 
 -- Note: CoreWriter used to be defined with data, rather than newtype.  If it
@@ -167,12 +167,12 @@ instance MonadPlus CoreM
 
 instance MonadUnique CoreM where
     getUniqueSupplyM = do
-        mask <- read cr_uniq_mask
-        liftIO $! mkSplitUniqSupply mask
+        tag <- read cr_uniq_tag
+        liftIO $! mkSplitUniqSupply tag
 
     getUniqueM = do
-        mask <- read cr_uniq_mask
-        liftIO $! uniqFromMask mask
+        tag <- read cr_uniq_tag
+        liftIO $! uniqFromTag tag
 
 runCoreM :: HscEnv
          -> RuleBase
@@ -182,7 +182,7 @@ runCoreM :: HscEnv
          -> SrcSpan
          -> CoreM a
          -> IO (a, SimplCount)
-runCoreM hsc_env rule_base mask mod name_ppr_ctx loc m
+runCoreM hsc_env rule_base tag mod name_ppr_ctx loc m
   = liftM extract $ runIOEnv reader $ unCoreM m
   where
     reader = CoreReader {
@@ -191,7 +191,7 @@ runCoreM hsc_env rule_base mask mod name_ppr_ctx loc m
             cr_module = mod,
             cr_name_ppr_ctx = name_ppr_ctx,
             cr_loc = loc,
-            cr_uniq_mask = mask
+            cr_uniq_tag = tag
         }
 
     extract :: (a, CoreWriter) -> (a, SimplCount)
@@ -261,8 +261,8 @@ getSrcSpanM = read cr_loc
 addSimplCount :: SimplCount -> CoreM ()
 addSimplCount count = write (CoreWriter { cw_simpl_count = count })
 
-getUniqMask :: CoreM Char
-getUniqMask = read cr_uniq_mask
+getUniqTag :: CoreM Char
+getUniqTag = read cr_uniq_tag
 
 -- Convenience accessors for useful fields of HscEnv
 

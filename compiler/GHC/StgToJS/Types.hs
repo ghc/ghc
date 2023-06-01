@@ -50,6 +50,7 @@ import           Data.Monoid
 import           Data.Typeable (Typeable)
 import           GHC.Generics (Generic)
 import           Control.DeepSeq
+import           Data.Word
 
 -- | A State monad over IO holding the generator state.
 type G = StateT GenState IO
@@ -200,7 +201,7 @@ data IdType
 
 -- | Keys to differentiate Ident's in the ID Cache
 data IdKey
-  = IdKey !Int !Int !IdType
+  = IdKey !Word64 !Int !IdType
   deriving (Eq, Ord)
 
 -- | Some other symbol

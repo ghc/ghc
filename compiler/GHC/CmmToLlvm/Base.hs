@@ -260,7 +260,7 @@ data LlvmEnv = LlvmEnv
   , envConfig    :: !LlvmCgConfig    -- ^ Configuration for LLVM code gen
   , envLogger    :: !Logger          -- ^ Logger
   , envOutput    :: BufHandle        -- ^ Output buffer
-  , envMask      :: !Char            -- ^ Mask for creating unique values
+  , envTag       :: !Char            -- ^ Tag for creating unique values
   , envFreshMeta :: MetaId           -- ^ Supply of fresh metadata IDs
   , envUniqMeta  :: UniqFM Unique MetaId   -- ^ Global metadata nodes
   , envFunMap    :: LlvmEnvMap       -- ^ Global functions so far, with type
@@ -292,12 +292,12 @@ getConfig = LlvmM $ \env -> return (envConfig env, env)
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
-        mask <- getEnv envMask
-        liftIO $! mkSplitUniqSupply mask
+        tag <- getEnv envTag
+        liftIO $! mkSplitUniqSupply tag
 
     getUniqueM = do
-        mask <- getEnv envMask
-        liftIO $! uniqFromMask mask
+        tag <- getEnv envTag
+        liftIO $! uniqFromTag tag
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
@@ -318,7 +318,7 @@ runLlvm logger cfg ver out m = do
                       , envConfig    = cfg
                       , envLogger    = logger
                       , envOutput    = out
-                      , envMask      = 'n'
+                      , envTag       = 'n'
                       , envFreshMeta = MetaId 0
                       , envUniqMeta  = emptyUFM
                       }

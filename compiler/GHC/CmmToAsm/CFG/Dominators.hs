@@ -21,8 +21,8 @@
       /Advanced Compiler Design and Implementation/, 1997.
 
     \[3\] Brisk, Sarrafzadeh,
-      /Interference Graphs for Procedures in Static Single/
-      /Information Form are Interval Graphs/, 2007.
+      /Interference CGraphs for Procedures in Static Single/
+      /Information Form are Interval CGraphs/, 2007.
 
  * Strictness
 
@@ -40,7 +40,7 @@ module GHC.CmmToAsm.CFG.Dominators (
   ,pddfs,rpddfs
   ,fromAdj,fromEdges
   ,toAdj,toEdges
-  ,asTree,asGraph
+  ,asTree,asCGraph
   ,parents,ancestors
 ) where
 
@@ -61,14 +61,23 @@ import Data.Array.ST
 import Data.Array.Base
   (unsafeNewArray_
   ,unsafeWrite,unsafeRead)
+import GHC.Data.Word64Set (Word64Set)
+import qualified GHC.Data.Word64Set as WS
+import GHC.Data.Word64Map (Word64Map)
+import qualified GHC.Data.Word64Map as WM
+import Data.Word
 
 -----------------------------------------------------------------------------
 
-type Node       = Int
-type Path       = [Node]
-type Edge       = (Node,Node)
-type Graph      = IntMap IntSet
-type Rooted     = (Node, Graph)
+-- Compacted nodes; these can be stored in contiguous arrays
+type CNode       = Int
+type CGraph      = IntMap IntSet
+
+type Node     = Word64
+type Path     = [Node]
+type Edge     = (Node, Node)
+type Graph    = Word64Map Word64Set
+type Rooted   = (Node, Graph)
 
 -----------------------------------------------------------------------------
 
@@ -111,7 +120,7 @@ idom rg = runST (evalS idomM =<< initEnv (pruneReach rg))
 -- | /Immediate post-dominators/.
 -- Complexity as for @idom@.
 ipdom :: Rooted -> [(Node,Node)]
-ipdom rg = runST (evalS idomM =<< initEnv (pruneReach (second predG rg)))
+ipdom rg = runST (evalS idomM =<< initEnv (pruneReach (second predGW rg)))
 
 -----------------------------------------------------------------------------
 
@@ -126,24 +135,24 @@ rpddfs = concat . levels . pdomTree
 -----------------------------------------------------------------------------
 
 type Dom s a = S s (Env s) a
-type NodeSet    = IntSet
-type NodeMap a  = IntMap a
+type NodeSet    = Word64Set
+type NodeMap a  = Word64Map a
 data Env s = Env
-  {succE      :: !Graph
-  ,predE      :: !Graph
-  ,bucketE    :: !Graph
+  {succE      :: !CGraph
+  ,predE      :: !CGraph
+  ,bucketE    :: !CGraph
   ,dfsE       :: {-# UNPACK #-}!Int
-  ,zeroE      :: {-# UNPACK #-}!Node
-  ,rootE      :: {-# UNPACK #-}!Node
-  ,labelE     :: {-# UNPACK #-}!(Arr s Node)
-  ,parentE    :: {-# UNPACK #-}!(Arr s Node)
-  ,ancestorE  :: {-# UNPACK #-}!(Arr s Node)
-  ,childE     :: {-# UNPACK #-}!(Arr s Node)
-  ,ndfsE      :: {-# UNPACK #-}!(Arr s Node)
+  ,zeroE      :: {-# UNPACK #-}!CNode
+  ,rootE      :: {-# UNPACK #-}!CNode
+  ,labelE     :: {-# UNPACK #-}!(Arr s CNode)
+  ,parentE    :: {-# UNPACK #-}!(Arr s CNode)
+  ,ancestorE  :: {-# UNPACK #-}!(Arr s CNode)
+  ,childE     :: {-# UNPACK #-}!(Arr s CNode)
+  ,ndfsE      :: {-# UNPACK #-}!(Arr s CNode)
   ,dfnE       :: {-# UNPACK #-}!(Arr s Int)
   ,sdnoE      :: {-# UNPACK #-}!(Arr s Int)
   ,sizeE      :: {-# UNPACK #-}!(Arr s Int)
-  ,domE       :: {-# UNPACK #-}!(Arr s Node)
+  ,domE       :: {-# UNPACK #-}!(Arr s CNode)
   ,rnE        :: {-# UNPACK #-}!(Arr s Node)}
 
 -----------------------------------------------------------------------------
@@ -188,7 +197,7 @@ idomM = do
 
 -----------------------------------------------------------------------------
 
-eval :: Node -> Dom s Node
+eval :: CNode -> Dom s CNode
 eval v = do
   n0 <- zeroM
   a  <- ancestorM v
@@ -205,7 +214,7 @@ eval v = do
         True-> return l
         False-> return la
 
-compress :: Node -> Dom s ()
+compress :: CNode -> Dom s ()
 compress v = do
   n0  <- zeroM
   a   <- ancestorM v
@@ -224,7 +233,7 @@ compress v = do
 
 -----------------------------------------------------------------------------
 
-link :: Node -> Node -> Dom s ()
+link :: CNode -> CNode -> Dom s ()
 link v w = do
   n0  <- zeroM
   lw  <- labelM w
@@ -268,7 +277,7 @@ link v w = do
 
 -----------------------------------------------------------------------------
 
-dfsDom :: Node -> Dom s ()
+dfsDom :: CNode -> Dom s ()
 dfsDom i = do
   _   <- go i
   n0  <- zeroM
@@ -293,10 +302,10 @@ dfsDom i = do
 
 initEnv :: Rooted -> ST s (Env s)
 initEnv (r0,g0) = do
-  -- Graph renumbered to indices from 1 to |V|
+  -- CGraph renumbered to indices from 1 to |V|
   let (g,rnmap) = renum 1 g0
       pred      = predG g -- reverse graph
-      root      = rnmap IM.! r0 -- renamed root
+      root      = rnmap WM.! r0 -- renamed root
       n         = IM.size g
       ns        = [0..n]
       m         = n+1
@@ -304,9 +313,9 @@ initEnv (r0,g0) = do
   let bucket = IM.fromList
         (zip ns (repeat mempty))
 
-  rna <- newI m
+  rna <- newW m
   writes rna (fmap swap
-        (IM.toList rnmap))
+        (WM.toList rnmap))
 
   doms      <- newI m
   sdno      <- newI m
@@ -361,33 +370,33 @@ fromEnv = do
 
 -----------------------------------------------------------------------------
 
-zeroM :: Dom s Node
+zeroM :: Dom s CNode
 zeroM = gets zeroE
-domM :: Node -> Dom s Node
+domM :: CNode -> Dom s CNode
 domM = fetch domE
-rootM :: Dom s Node
+rootM :: Dom s CNode
 rootM = gets rootE
-succsM :: Node -> Dom s [Node]
+succsM :: CNode -> Dom s [CNode]
 succsM i = gets (IS.toList . (! i) . succE)
-predsM :: Node -> Dom s [Node]
+predsM :: CNode -> Dom s [CNode]
 predsM i = gets (IS.toList . (! i) . predE)
-bucketM :: Node -> Dom s [Node]
+bucketM :: CNode -> Dom s [CNode]
 bucketM i = gets (IS.toList . (! i) . bucketE)
-sizeM :: Node -> Dom s Int
+sizeM :: CNode -> Dom s Int
 sizeM = fetch sizeE
-sdnoM :: Node -> Dom s Int
+sdnoM :: CNode -> Dom s Int
 sdnoM = fetch sdnoE
--- dfnM :: Node -> Dom s Int
+-- dfnM :: CNode -> Dom s Int
 -- dfnM = fetch dfnE
-ndfsM :: Int -> Dom s Node
+ndfsM :: Int -> Dom s CNode
 ndfsM = fetch ndfsE
-childM :: Node -> Dom s Node
+childM :: CNode -> Dom s CNode
 childM = fetch childE
-ancestorM :: Node -> Dom s Node
+ancestorM :: CNode -> Dom s CNode
 ancestorM = fetch ancestorE
-parentM :: Node -> Dom s Node
+parentM :: CNode -> Dom s CNode
 parentM = fetch parentE
-labelM :: Node -> Dom s Node
+labelM :: CNode -> Dom s CNode
 labelM = fetch labelE
 nextM :: Dom s Int
 nextM = do
@@ -422,6 +431,9 @@ new n = unsafeNewArray_ (0,n-1)
 newI :: Int -> ST s (Arr s Int)
 newI = new
 
+newW :: Int -> ST s (Arr s Node)
+newW = new
+
 writes :: (MArray (A s) a (ST s))
      => Arr s a -> [(Int,a)] -> ST s ()
 writes a xs = forM_ xs (\(i,x) -> (a.=x) i)
@@ -431,18 +443,18 @@ writes a xs = forM_ xs (\(i,x) -> (a.=x) i)
 (!) g n = maybe mempty id (IM.lookup n g)
 
 fromAdj :: [(Node, [Node])] -> Graph
-fromAdj = IM.fromList . fmap (second IS.fromList)
+fromAdj = WM.fromList . fmap (second WS.fromList)
 
 fromEdges :: [Edge] -> Graph
-fromEdges = collectI IS.union fst (IS.singleton . snd)
+fromEdges = collectW WS.union fst (WS.singleton . snd)
 
 toAdj :: Graph -> [(Node, [Node])]
-toAdj = fmap (second IS.toList) . IM.toList
+toAdj = fmap (second WS.toList) . WM.toList
 
 toEdges :: Graph -> [Edge]
 toEdges = concatMap (uncurry (fmap . (,))) . toAdj
 
-predG :: Graph -> Graph
+predG :: CGraph -> CGraph
 predG g = IM.unionWith IS.union (go g) g0
   where g0 = fmap (const mempty) g
         go = flip IM.foldrWithKey mempty (\i a m ->
@@ -451,15 +463,24 @@ predG g = IM.unionWith IS.union (go g) g0
                         m
                        (IS.toList a))
 
+predGW :: Graph -> Graph
+predGW g = WM.unionWith WS.union (go g) g0
+  where g0 = fmap (const mempty) g
+        go = flip WM.foldrWithKey mempty (\i a m ->
+                foldl' (\m p -> WM.insertWith mappend p
+                                      (WS.singleton i) m)
+                        m
+                       (WS.toList a))
+
 pruneReach :: Rooted -> Rooted
 pruneReach (r,g) = (r,g2)
   where is = reachable
               (maybe mempty id
-                . flip IM.lookup g) $ r
-        g2 = IM.fromList
-            . fmap (second (IS.filter (`IS.member`is)))
-            . filter ((`IS.member`is) . fst)
-            . IM.toList $ g
+                . flip WM.lookup g) $ r
+        g2 = WM.fromList
+            . fmap (second (WS.filter (`WS.member`is)))
+            . filter ((`WS.member`is) . fst)
+            . WM.toList $ g
 
 tip :: Tree a -> (a, [Tree a])
 tip (Node a ts) = (a, ts)
@@ -476,26 +497,28 @@ ancestors = go []
             in p acc' xs ++ concatMap (go acc') xs
         p is = fmap (flip (,) is . rootLabel)
 
-asGraph :: Tree Node -> Rooted
-asGraph t@(Node a _) = let g = go t in (a, fromAdj g)
+asCGraph :: Tree Node -> Rooted
+asCGraph t@(Node a _) = let g = go t in (a, fromAdj g)
   where go (Node a ts) = let as = (fst . unzip . fmap tip) ts
                           in (a, as) : concatMap go ts
 
 asTree :: Rooted -> Tree Node
-asTree (r,g) = let go a = Node a (fmap go ((IS.toList . f) a))
+asTree (r,g) = let go a = Node a (fmap go ((WS.toList . f) a))
                    f = (g !)
             in go r
+  where (!) g n = maybe mempty id (WM.lookup n g)
+
 
 reachable :: (Node -> NodeSet) -> (Node -> NodeSet)
-reachable f a = go (IS.singleton a) a
+reachable f a = go (WS.singleton a) a
   where go seen a = let s = f a
-                        as = IS.toList (s `IS.difference` seen)
-                    in foldl' go (s `IS.union` seen) as
+                        as = WS.toList (s `WS.difference` seen)
+                    in foldl' go (s `WS.union` seen) as
 
-collectI :: (c -> c -> c)
-        -> (a -> Int) -> (a -> c) -> [a] -> IntMap c
-collectI (<>) f g
-  = foldl' (\m a -> IM.insertWith (<>)
+collectW :: (c -> c -> c)
+        -> (a -> Node) -> (a -> c) -> [a] -> Word64Map c
+collectW (<>) f g
+  = foldl' (\m a -> WM.insertWith (<>)
                                   (f a)
                                   (g a) m) mempty
 
@@ -504,12 +527,12 @@ collectI (<>) f g
 -- Gives nodes sequential names starting at n.
 -- Returns the new graph and a mapping.
 -- (renamed, old -> new)
-renum :: Int -> Graph -> (Graph, NodeMap Node)
+renum :: Int -> Graph -> (CGraph, NodeMap CNode)
 renum from = (\(_,m,g)->(g,m))
-  . IM.foldrWithKey
+  . WM.foldrWithKey
       (\i ss (!n,!env,!new)->
           let (j,n2,env2) = go n env i
-              (n3,env3,ss2) = IS.fold
+              (n3,env3,ss2) = WS.fold
                 (\k (!n,!env,!new)->
                     case go n env k of
                       (l,n2,env2)-> (n2,env2,l `IS.insert` new))
@@ -517,13 +540,13 @@ renum from = (\(_,m,g)->(g,m))
               new2 = IM.insertWith IS.union j ss2 new
           in (n3,env3,new2)) (from,mempty,mempty)
   where go :: Int
-           -> NodeMap Node
+           -> NodeMap CNode
            -> Node
-           -> (Node,Int,NodeMap Node)
+           -> (CNode,Int,NodeMap CNode)
         go !n !env i =
-          case IM.lookup i env of
+          case WM.lookup i env of
             Just j -> (j,n,env)
-            Nothing -> (n,n+1,IM.insert i n env)
+            Nothing -> (n,n+1,WM.insert i n env)
 
 -----------------------------------------------------------------------------
 

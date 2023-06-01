@@ -251,6 +251,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Error( Validity'(..) )
+import GHC.Utils.Unique (anyOfUnique)
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -2098,7 +2099,7 @@ isFFIDynTy expected ty
     -- In the example below, expected would be 'CInt -> IO ()', while ty would
     -- be 'FunPtr (CDouble -> IO ())'.
     | Just (tc, [ty']) <- splitTyConApp_maybe ty
-    , tyConUnique tc `elem` [ptrTyConKey, funPtrTyConKey]
+    , anyOfUnique tc [ptrTyConKey, funPtrTyConKey]
     , eqType ty' expected
     = IsValid
     | otherwise
@@ -2239,7 +2240,7 @@ marshalableTyCon dflags tc
 
 boxedMarshalableTyCon :: TyCon -> Validity' TypeCannotBeMarshaledReason
 boxedMarshalableTyCon tc
-   | getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
+   | anyOfUnique tc      [ intTyConKey, int8TyConKey, int16TyConKey
                          , int32TyConKey, int64TyConKey
                          , wordTyConKey, word8TyConKey, word16TyConKey
                          , word32TyConKey, word64TyConKey

@@ -36,6 +36,7 @@ import GHC.Types.Error ( DiagnosticReason(..) )
 
 import Data.Function
 import Data.List (sortBy, intercalate, stripPrefix)
+import Data.Word
 
 import GHC.ResponseFile
 import Control.Exception (IOException, catch)
@@ -74,7 +75,7 @@ hoistFlag f (Flag a b c) = Flag a (go b) c
       go (OptPrefix k) = OptPrefix (\s -> go2 (k s))
       go (OptIntSuffix k) = OptIntSuffix (\n -> go2 (k n))
       go (IntSuffix k) = IntSuffix (\n -> go2 (k n))
-      go (WordSuffix k) = WordSuffix (\s -> go2 (k s))
+      go (Word64Suffix k) = Word64Suffix (\s -> go2 (k s))
       go (FloatSuffix k) = FloatSuffix (\s -> go2 (k s))
       go (PassFlag k) = PassFlag (\s -> go2 (k s))
       go (AnySuffix k) = AnySuffix (\s -> go2 (k s))
@@ -97,7 +98,7 @@ data OptKind m                             -- Suppose the flag is -f
     | OptPrefix (String -> EwM m ())       -- -f or -farg (i.e. the arg is optional)
     | OptIntSuffix (Maybe Int -> EwM m ()) -- -f or -f=n; pass n to fn
     | IntSuffix (Int -> EwM m ())          -- -f or -f=n; pass n to fn
-    | WordSuffix (Word -> EwM m ())        -- -f or -f=n; pass n to fn
+    | Word64Suffix (Word64 -> EwM m ())    -- -f or -f=n; pass n to fn
     | FloatSuffix (Float -> EwM m ())      -- -f or -f=n; pass n to fn
     | PassFlag  (String -> EwM m ())       -- -f; pass "-f" fn
     | AnySuffix (String -> EwM m ())       -- -f or -farg; pass entire "-farg" to fn
@@ -250,7 +251,7 @@ processOneArg opt_kind rest arg args
         IntSuffix f | Just n <- parseInt rest_no_eq -> Right (f n, args)
                     | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
-        WordSuffix f | Just n <- parseWord rest_no_eq -> Right (f n, args)
+        Word64Suffix f | Just n <- parseWord64 rest_no_eq -> Right (f n, args)
                      | otherwise -> Left ("malformed natural argument in " ++ dash_arg)
 
         FloatSuffix f | Just n <- parseFloat rest_no_eq -> Right (f n, args)
@@ -279,7 +280,7 @@ arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in p
                                             -- to improve error message (#12625)
 arg_ok (OptIntSuffix    _)  _    _   = True
 arg_ok (IntSuffix       _)  _    _   = True
-arg_ok (WordSuffix      _)  _    _   = True
+arg_ok (Word64Suffix    _)  _    _   = True
 arg_ok (FloatSuffix     _)  _    _   = True
 arg_ok (OptPrefix       _)  _    _   = True
 arg_ok (PassFlag        _)  rest _   = null rest
@@ -295,8 +296,8 @@ parseInt s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
 
-parseWord :: String -> Maybe Word
-parseWord s = case reads s of
+parseWord64 :: String -> Maybe Word64
+parseWord64 s = case reads s of
                  ((n,""):_) -> Just n
                  _          -> Nothing
 

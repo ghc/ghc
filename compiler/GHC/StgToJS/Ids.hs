@@ -131,7 +131,7 @@ makeIdentForId i num id_type current_module = TxtI ident
       , if exported
           then mempty
           else let (c,u) = unpkUnique (getUnique i)
-               in mconcat [BSC.pack ['_',c,'_'], intBS u]
+               in mconcat [BSC.pack ['_',c,'_'], word64BS u]
       ]
 
 -- | Retrieve the cached Ident for the given Id if there is one. Otherwise make

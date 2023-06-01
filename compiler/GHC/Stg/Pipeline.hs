@@ -62,10 +62,10 @@ newtype StgM a = StgM { _unStgM :: ReaderT Char IO a }
 type StgCgInfos = NameEnv TagSig
 
 instance MonadUnique StgM where
-  getUniqueSupplyM = StgM $ do { mask <- ask
-                               ; liftIO $! mkSplitUniqSupply mask}
-  getUniqueM = StgM $ do { mask <- ask
-                         ; liftIO $! uniqFromMask mask}
+  getUniqueSupplyM = StgM $ do { tag <- ask
+                               ; liftIO $! mkSplitUniqSupply tag}
+  getUniqueM = StgM $ do { tag <- ask
+                         ; liftIO $! uniqFromTag tag}
 
 runStgM :: Char -> StgM a -> IO a
 runStgM mask (StgM m) = runReaderT m mask
