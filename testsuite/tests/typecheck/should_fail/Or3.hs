@@ -16,12 +16,12 @@ data GADT a where
     IsInt2 :: GADT Int
 
 foo :: a -> GADT a -> a
-foo x (one of IsInt1 {}, IsInt2 {}) = x + 1
+foo x (one of IsInt1 {}; IsInt2 {}) = x + 1
 
 f x = case x of
-  (one of Left a, Right a) -> a
+  (one of Left a; Right a) -> a
 
 g x = case x of
-  (one of _, (one of _, x)) -> x
+  (one of _; (one of _; x)) -> x
 
 main = print $ foo 3 IsInt1

@@ -19,20 +19,20 @@ main = do
 f1 x = case x of
   3 -> 1
   4 -> 2
-  (one of 3,4,5) -> 3
+  (one of 3;4;5) -> 3
 
 f2 y = case y of
-  (one of _:2:_, 1:_) | length y /= 2 -> 1
-  (one of [1,2], 1:3:_)-> 2
-  (one of _, _) -> 3
+  (one of _:2:_; 1:_) | length y /= 2 -> 1
+  (one of [1,2]; 1:3:_)-> 2
+  (one of _; _) -> 3
 
 f3 :: (Eq a, Show a) => a -> a -> Bool
-f3 a (one of (== a) -> True, show -> "8") = True
+f3 a (one of (== a) -> True; show -> "8") = True
 f3 _ _ = False
 
-a3 = (\(one of 1, 2) -> 3) 1
-a4 = (\(one of Left 0, Right 1) -> True) (Right 1)
-a5 = (\(one of (one of [1], [2, _]), (one of [3, _, _], [4, _, _, _])) -> True) [4, undefined, undefined, undefined]
+a3 = (\(one of 1; 2) -> 3) 1
+a4 = (\(one of Left 0; Right 1) -> True) (Right 1)
+a5 = (\(one of (one of [1]; [2, _]); (one of [3, _, _]; [4, _, _, _])) -> True) [4, undefined, undefined, undefined]
 a6 = (\(one of 1, 2, 3) -> False) 3
 
 backtrack :: String
