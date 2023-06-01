@@ -49,7 +49,7 @@ test('isValidNatural', normal, compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',
-     [when(fast(), skip),extra_run_opts('+RTS -K64m -RTS'), expect_broken_for(23272, ['ghci-opt'])],
+     [when(fast(), skip),extra_run_opts('+RTS -K64m -RTS')],
      compile_and_run,
      ['+RTS -K64m -RTS'])
 
@@ -250,7 +250,7 @@ test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
 test('T12494', normal, compile_and_run, [''])
 test('T12852', [when(opsys('mingw32'), skip), js_broken(22374), req_process], compile_and_run, [''])
-test('lazySTexamples', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
+test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', [req_ghc_smp,
                req_target_smp,
                only_ways(['threaded1', 'threaded2', 'nonmoving_thr'])],
@@ -304,7 +304,7 @@ test('T19719', normal, compile_and_run, [''])
 test('T20107', extra_run_opts('+RTS -M50M'), compile_and_run, ['-package bytestring'])
 test('T22816', normal, compile_and_run, [''])
 test('trace', normal, compile_and_run, [''])
-test('listThreads', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''])
+test('listThreads', normal, compile_and_run, [''])
 test('listThreads1', omit_ghci, compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
 test('CLC149', normal, compile, [''])

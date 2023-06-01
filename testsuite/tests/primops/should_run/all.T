@@ -60,7 +60,6 @@ test('UnliftedWeakPtr', normal, compile_and_run, [''])
 test('FMA_Primops'
     , [ when(have_cpu_feature('fma'), extra_hc_opts('-mfma'))
       , js_skip # JS backend doesn't have an FMA implementation
-      , expect_broken_for(23272, ['ghci-opt'])
       ]
      , compile_and_run, [''])
 test('FMA_ConstantFold'
