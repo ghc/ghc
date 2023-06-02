@@ -83,7 +83,7 @@ module GHC.JS.Make
   -- $intro_funcs
   , var
   , jString
-  , jLam, jFunction, jVar, jFor, jForNoDecl, jForIn, jForEachIn, jTryCatchFinally
+  , jLam, jFun, jFunction, jVar, jFor, jForNoDecl, jForIn, jForEachIn, jTryCatchFinally
   -- * Combinators
   -- $combinators
   , (||=), (|=), (.==.), (.===.), (.!=.), (.!==.), (.!)
@@ -248,6 +248,15 @@ jLam :: ToSat a => a -> JExpr
 jLam f = ValExpr . UnsatVal . IS $ do
            (block,is) <- runIdentSupply $ toSat_ f []
            return $ JFunc is block
+
+-- | Create a new function. The result is a 'GHC.JS.Syntax.JStat'.
+-- Usage:
+--
+-- > jFun fun_name $ \x -> ...
+jFun :: ToSat a => Ident -> a -> JStat
+jFun n f = UnsatBlock . IS $ do
+           (block,is) <- runIdentSupply $ toSat_ f []
+           return $ FuncStat n is block
 
 -- | Introduce a new variable into scope for the duration
 -- of the enclosed expression. The result is a block statement.

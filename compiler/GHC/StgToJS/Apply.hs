@@ -590,7 +590,7 @@ genericStackApply cfg = closure info body
 --
 genericFastApply :: StgToJSConfig -> JStat
 genericFastApply s =
-   TxtI "h$ap_gen_fast" ||= jLam \tag -> jVar \c ->
+   jFun (TxtI "h$ap_gen_fast") \tag -> jVar \c ->
       [traceRts s (jString "h$ap_gen_fast: " + tag)
       , c |= closureEntry r1
       , SwitchStat (entryClosureType c)
@@ -802,12 +802,12 @@ stackApply s fun_name nargs nvars =
 -- h$ap_n_r_fast is entered if a function of unknown arity is called, n
 -- arguments are already in r registers
 fastApply :: StgToJSConfig -> FastString -> Int -> Int -> JStat
-fastApply s fun_name nargs nvars = func ||= body0
+fastApply s fun_name nargs nvars = body0
   where
       -- special case for h$ap_0_0_fast
       body0 = if nargs == 0 && nvars == 0
-        then jLam (enter s r1)
-        else toJExpr (JFunc myFunArgs body)
+        then jFun func (enter s r1)
+        else FuncStat func myFunArgs body
 
       func    = TxtI fun_name
 
@@ -875,7 +875,7 @@ fastApply s fun_name nargs nvars = func ||= body0
 
 zeroApply :: StgToJSConfig -> JStat
 zeroApply s = mconcat
-  [ TxtI "h$e" ||= jLam (\c -> (r1 |= c) <> enter s c)
+  [ jFun (TxtI "h$e") (\c -> (r1 |= c) <> enter s c)
   ]
 
 -- carefully enter a closure that might be a thunk or a function
@@ -973,13 +973,13 @@ selectors s =
 
     mkSel :: FastString -> (JExpr -> JExpr) -> JStat
     mkSel name sel = mconcat
-      [TxtI createName ||= jLam \r -> mconcat
+      [jFun (TxtI createName) \r -> mconcat
           [ traceRts s (toJExpr ("selector create: " <> name <> " for ") + (r .^ "alloc"))
           , ifS (isThunk r .||. isBlackhole r)
               (returnS (app "h$mkSelThunk" [r, toJExpr (v entryName), toJExpr (v resName)]))
               (returnS (sel r))
           ]
-      , TxtI resName ||= jLam \r -> mconcat
+      , jFun (TxtI resName) \r -> mconcat
           [ traceRts s (toJExpr ("selector result: " <> name <> " for ") + (r .^ "alloc"))
           , returnS (sel r)
           ]
@@ -1106,7 +1106,7 @@ papGen cfg =
 -- general utilities
 -- move the first n registers, starting at R2, m places up (do not use with negative m)
 moveRegs2 :: JStat
-moveRegs2 = TxtI "h$moveRegs2" ||= jLam moveSwitch
+moveRegs2 = jFun (TxtI "h$moveRegs2") moveSwitch
   where
     moveSwitch n m = SwitchStat ((n .<<. 8) .|. m) switchCases (defaultCase n m)
     -- fast cases

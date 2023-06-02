@@ -20,7 +20,7 @@
 -----------------------------------------------------------------------------
 module GHC.StgToJS.Linker.Opt
   ( pretty
-  , ghcjsRenderJs
+  , optRenderJs
   )
 where
 
@@ -39,11 +39,17 @@ import Data.List (sortOn)
 import Data.Char (isAlpha,isDigit,ord)
 import qualified Data.ByteString.Short as SBS
 
-pretty :: JsRender doc => JStat -> doc
-pretty = jsToDocR ghcjsRenderJs
+pretty :: JsRender doc => Bool -> JStat -> doc
+pretty render_pretty = \case
+  BlockStat []      -> empty
+  s | render_pretty -> jsToDocR defaultRenderJs [s]
+    | otherwise     -> jsToDocR optRenderJs [s]
+                        -- render as a list of statements to ensure that
+                        -- semicolons are added.
 
-ghcjsRenderJs :: RenderJs doc
-ghcjsRenderJs = defaultRenderJs
+-- | Render JS with code size minimization enabled
+optRenderJs :: RenderJs doc
+optRenderJs = defaultRenderJs
   { renderJsV = ghcjsRenderJsV
   , renderJsS = ghcjsRenderJsS
   , renderJsI = ghcjsRenderJsI

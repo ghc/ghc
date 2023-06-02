@@ -366,4 +366,4 @@ genToplevelRhs i rhs = case rhs of
                                  sr)
     ccId <- costCentreStackLbl cc
     emitStatic idt static ccId
-    return $ (eid ||= toJExpr (JFunc [] (ll <> upd <> setcc <> body)))
+    return $ (FuncStat eid [] (ll <> upd <> setcc <> body))

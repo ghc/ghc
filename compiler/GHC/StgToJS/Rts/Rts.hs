@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications  #-}
-
-{-# OPTIONS_GHC -O0 #-}
+{-# LANGUAGE BlockArguments    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +23,11 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.StgToJS.Rts.Rts where
+module GHC.StgToJS.Rts.Rts
+  ( rts
+  , assignRegs
+  )
+where
 
 import GHC.Prelude
 
@@ -42,11 +45,8 @@ import GHC.StgToJS.Regs
 import GHC.StgToJS.Types
 import GHC.StgToJS.Stack
 
-import GHC.StgToJS.Linker.Opt
-
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
-import GHC.JS.Ppr
 
 import Data.Array
 import Data.Monoid
@@ -56,8 +56,8 @@ import qualified Data.Bits          as Bits
 -- | The garbageCollector resets registers and result variables.
 garbageCollector :: JStat
 garbageCollector =
-  mconcat [ TxtI "h$resetRegisters"  ||= jLam (mconcat $ map resetRegister [minBound..maxBound])
-          , TxtI "h$resetResultVars" ||= jLam (mconcat $ map resetResultVar [minBound..maxBound])
+  mconcat [ jFun (TxtI "h$resetRegisters")  (mconcat $ map resetRegister [minBound..maxBound])
+          , jFun (TxtI "h$resetResultVars") (mconcat $ map resetResultVar [minBound..maxBound])
           ]
 
 -- | Reset the register 'r' in JS Land. Note that this "resets" by setting the
@@ -233,8 +233,8 @@ declRegs =
 -- | JS payload to define getters and setters on the registers.
 regGettersSetters :: JStat
 regGettersSetters =
-  mconcat [ TxtI "h$getReg" ||= jLam (\n   -> SwitchStat n getRegCases mempty)
-          , TxtI "h$setReg" ||= jLam (\n v -> SwitchStat n (setRegCases v) mempty)
+  mconcat [ jFun (TxtI "h$getReg") (\n   -> SwitchStat n getRegCases mempty)
+          , jFun (TxtI "h$setReg") (\n v -> SwitchStat n (setRegCases v) mempty)
           ]
   where
     getRegCases =
@@ -292,17 +292,16 @@ closureTypes = mconcat (map mkClosureType (enumFromTo minBound maxBound)) <> clo
     mkClosureType c = let s = TxtI . mkFastString $ "h$" ++ map toUpper (show c) ++ "_CLOSURE"
                       in  s ||= toJExpr c
     closureTypeName :: JStat
-    closureTypeName =
-      TxtI "h$closureTypeName" ||= jLam (\c ->
-                                           mconcat (map (ifCT c) [minBound..maxBound])
-                                          <> returnS (jString "InvalidClosureType"))
+    closureTypeName = jFun (TxtI "h$closureTypeName") \c ->
+                        mconcat (map (ifCT c) [minBound..maxBound])
+                        <> returnS (jString "InvalidClosureType")
 
     ifCT :: JExpr -> ClosureType -> JStat
     ifCT arg ct = jwhenS (arg .===. toJExpr ct) (returnS (toJExpr (show ct)))
 
 -- | JS payload declaring the RTS functions.
-rtsDecls :: Sat.JStat
-rtsDecls = satJStat (Just "h$RTSD") $
+rtsDecls :: JStat
+rtsDecls =
   mconcat [ TxtI "h$currentThread"   ||= null_                   -- thread state object for current thread
           , TxtI "h$stack"           ||= null_                   -- stack for the current thread
           , TxtI "h$sp"              ||= 0                       -- stack pointer for the current thread
@@ -315,17 +314,12 @@ rtsDecls = satJStat (Just "h$RTSD") $
           , declRegs
           , declRets]
 
--- | print the embedded RTS to a String
-rtsText :: forall doc. JsRender doc => StgToJSConfig -> doc
-rtsText = pretty @doc . jsOptimize . rts
-
--- | print the RTS declarations to a String.
-rtsDeclsText :: forall doc. JsRender doc => doc
-rtsDeclsText = pretty @doc . jsOptimize $ rtsDecls
-
--- | Wrapper over the RTS to guarentee saturation, see 'GHC.JS.Transform'
+-- | Generated RTS code
 rts :: StgToJSConfig -> Sat.JStat
-rts = satJStat (Just "h$RTS") . rts'
+rts cfg = jsOptimize $ satJStat (Just "h$RTS") $ mconcat
+  [ rtsDecls
+  , rts' cfg
+  ]
 
 -- | JS Payload which defines the embedded RTS.
 rts' :: StgToJSConfig -> JStat
@@ -349,8 +343,8 @@ rts' s =
           , TxtI "h$vt_rtsobj" ||= toJExpr RtsObjV
           , TxtI "h$vt_obj"    ||= toJExpr ObjV
           , TxtI "h$vt_arr"    ||= toJExpr ArrV
-          , TxtI "h$bh"        ||= jLam (bhStats s True)
-          , TxtI "h$bh_lne"    ||= jLam (\x frameSize -> bhLneStats s x frameSize)
+          , jFun (TxtI "h$bh")     (bhStats s True)
+          , jFun (TxtI "h$bh_lne") (\x frameSize -> bhLneStats s x frameSize)
           , closure (ClosureInfo (TxtI "h$blackhole") (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIBlackhole mempty)
                (appS "throw" [jString "oops: entered black hole"])
           , closure (ClosureInfo (TxtI "h$blackholeTrap") (CIRegs 0 []) "blackhole" (CILayoutUnknown 2) CIThunk mempty)

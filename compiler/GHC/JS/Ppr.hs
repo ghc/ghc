@@ -60,7 +60,6 @@ module GHC.JS.Ppr
   , jsToDoc
   , pprStringLit
   , interSemi
-  , addSemi
   , braceNest
   , hangBrace
   )
@@ -138,15 +137,25 @@ instance JsToDoc [JStat] where jsToDocR r = jcat . map (addSemi . jsToDocR r)
 
 defRenderJsS :: JsRender doc => RenderJs doc -> JStat -> doc
 defRenderJsS r = \case
-  IfStat cond x y -> hangBrace (text "if" <+?> parens (jsToDocR r cond))
-                      (jnest $ optBlock r x)
-                      <+?> mbElse
+  IfStat cond x y -> jcat
+                        [ hangBrace (text "if" <+?> parens (jsToDocR r cond)) (optBlock r x)
+                        , mbElse
+                        ]
         where mbElse | y == BlockStat []  = empty
-                     | otherwise = hangBrace (text "else") (jnest $ optBlock r y)
+                     | otherwise = hangBrace (text "else") (optBlock r y)
   DeclStat x Nothing  -> text "var" <+> jsToDocR r x
+    -- special treatment for functions, otherwise there is too much left padding
+    -- (more than the length of the expression assigned to). E.g.
+    --
+    --    var long_variable_name = (function()
+    --                               {
+    --                               ...
+    --                             });
+    --
+  DeclStat x (Just (ValExpr f@(JFunc {}))) -> jhang (text "var" <+> jsToDocR r x <+?> char '=') (jsToDocR r f)
   DeclStat x (Just e) -> text "var" <+> jsToDocR r x <+?> char '=' <+?> jsToDocR r e
-  WhileStat False p b -> hangBrace (text "while" <+?> parens (jsToDocR r p)) (jnest $ optBlock r b)
-  WhileStat True  p b -> hangBrace (text "do") (jnest $ optBlock r b) <+?> text "while" <+?> parens (jsToDocR r p)
+  WhileStat False p b -> hangBrace (text "while" <+?> parens (jsToDocR r p)) (optBlock r b)
+  WhileStat True  p b -> hangBrace (text "do") (optBlock r b) <+?> text "while" <+?> parens (jsToDocR r p)
   BreakStat l         -> addSemi $ maybe (text "break")    (\(LexicalFastString s) -> (text "break"    <+> ftext s)) l
   ContinueStat l      -> addSemi $ maybe (text "continue") (\(LexicalFastString s) -> (text "continue" <+> ftext s)) l
   LabelStat (LexicalFastString l) s -> ftext l <> char ':' $$$ printBS s
@@ -154,10 +163,10 @@ defRenderJsS r = \case
           printBS (BlockStat ss) = interSemi $ map (jsToDocR r) ss
           printBS x = jsToDocR r x
 
-  ForStat init p s1 sb -> hangBrace (text "for" <+?> parens forCond) (jnest $ optBlock r sb)
+  ForStat init p s1 sb -> hangBrace (text "for" <+?> parens forCond) (optBlock r sb)
     where
       forCond = jsToDocR r init <> semi <+?> jsToDocR r p <> semi <+?> parens (jsToDocR r s1)
-  ForInStat each i e b -> hangBrace (text txt <+?> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e)) (jnest $ optBlock r b)
+  ForInStat each i e b -> hangBrace (text txt <+?> parens (jsToDocR r i <+> text "in" <+> jsToDocR r e)) (optBlock r b)
         where txt | each = "for each"
                   | otherwise = "for"
   SwitchStat e l d     -> hangBrace (text "switch" <+?> parens (jsToDocR r e)) cases
@@ -168,33 +177,35 @@ defRenderJsS r = \case
   ApplStat e es     -> jsToDocR r e <> (parens . foldl' (<+?>) empty . punctuate comma $ map (jsToDocR r) es)
   FuncStat i is b   -> hangBrace (text "function" <+> jsToDocR r i
                                   <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is))
-                             (jnest $ optBlock r b)
+                             (optBlock r b)
   TryStat s i s1 s2 -> hangBrace (text "try") (jsToDocR r s) <+?> mbCatch <+?> mbFinally
         where mbCatch | s1 == BlockStat [] = empty
-                      | otherwise = hangBrace (text "catch" <+?> parens (jsToDocR r i)) (jnest $ optBlock r s1)
+                      | otherwise = hangBrace (text "catch" <+?> parens (jsToDocR r i)) (optBlock r s1)
               mbFinally | s2 == BlockStat [] = empty
-                        | otherwise = hangBrace (text "finally") (jnest $ optBlock r s2)
+                        | otherwise = hangBrace (text "finally") (optBlock r s2)
   AssignStat i op x    -> case x of
     -- special treatment for functions, otherwise there is too much left padding
     -- (more than the length of the expression assigned to). E.g.
     --
-    --    var long_variable_name = (function()
+    --    long_variable_name = (function()
     --                               {
     --                               ...
     --                             });
     --
-    ValExpr (JFunc is b) -> jsToDocR r i <> ftext (aOpText op) <> text " function" <> parens (foldl' (<+?>) empty . punctuate comma . map (jsToDocR r) $ is) <> braceNest (jsToDocR r b)
-    _                      -> jsToDocR r i <+?> ftext (aOpText op) <+?> jsToDocR r x
+    ValExpr f@(JFunc {}) -> jhang (jsToDocR r i <> ftext (aOpText op)) (jsToDocR r f)
+    _                    -> jsToDocR r i <+?> ftext (aOpText op) <+?> jsToDocR r x
   UOpStat op x
     | isPre op && isAlphaOp op -> ftext (uOpText op) <+> optParens r x
     | isPre op                 -> ftext (uOpText op) <+> optParens r x
     | otherwise                -> optParens r x <+> ftext (uOpText op)
   BlockStat xs -> jsToDocR r xs
 
+-- | Remove one Block layering if we know we already have braces around the
+-- statement
 optBlock :: JsRender doc => RenderJs doc -> JStat -> doc
 optBlock r x = case x of
   BlockStat{} -> jsToDocR r x
-  _           -> addSemi $ jsToDocR r x
+  _           -> addSemi (jsToDocR r x)
 
 optParens :: JsRender doc => RenderJs doc -> JExpr -> doc
 optParens r x = case x of
@@ -338,9 +349,6 @@ encodeJsonChar = \case
 interSemi :: JsRender doc => [doc] -> doc
 interSemi = foldl ($$$) empty . punctuateFinal semi semi
 
-addSemi :: IsLine doc => doc -> doc
-addSemi x = x <> semi <> char '\n'
-
 -- | The structure `{body}`, optionally indented over multiple lines
 {-# INLINE braceNest #-}
 braceNest :: JsRender doc => doc -> doc
@@ -349,7 +357,11 @@ braceNest x = lbrace $$$ jnest x $$$ rbrace
 -- | The structure `hdr {body}`, optionally indented over multiple lines
 {-# INLINE hangBrace #-}
 hangBrace :: JsRender doc => doc -> doc -> doc
-hangBrace hdr body = hdr <+?> braceNest body
+hangBrace hdr body = jcat [ hdr <> char ' ' <> char '{', jnest body, char '}' ]
+
+{-# INLINE jhang #-}
+jhang :: JsRender doc => doc -> doc -> doc
+jhang hdr body = jcat [ hdr, jnest body]
 
 -- | JsRender controls the differences in whitespace between HLine and SDoc.
 -- Generally, this involves the indentation and newlines in the human-readable
@@ -365,16 +377,21 @@ class IsLine doc => JsRender doc where
   jcat      :: [doc] -> doc
   -- | Optionally indent the following
   jnest     :: doc -> doc
+  -- | Append semi-colon (and line-break in HLine mode)
+  addSemi   :: doc -> doc
 
 instance JsRender SDoc where
   (<+?>) = (<+>)
   {-# INLINE (<+?>) #-}
-  ($$$)  = ($$)
+  ($$$)  = ($+$)
   {-# INLINE ($$$) #-}
   jcat               = vcat
   {-# INLINE jcat #-}
   jnest              = nest 2
   {-# INLINE jnest #-}
+  addSemi x = x <> semi
+  {-# INLINE addSemi #-}
+
 
 instance JsRender HLine where
   (<+?>) = (<>)
@@ -385,3 +402,6 @@ instance JsRender HLine where
   {-# INLINE jcat #-}
   jnest              = id
   {-# INLINE jnest #-}
+  addSemi x = x <> semi <> char '\n'
+  -- we add a line-break to avoid issues with lines too long in minified outputs
+  {-# INLINE addSemi #-}

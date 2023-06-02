@@ -198,12 +198,7 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
       -- link generated RTS parts into rts.js
       unless (lcNoRts lc_cfg) $ do
         withFile (out </> "rts.js") WriteMode $ \h -> do
-         if csPrettyRender cfg
-          then printSDoc defaultJsContext (Ppr.PageMode True) h (rtsDeclsText $$ rtsText cfg)
-          else do
-            bh <- newBufHandle h
-            bPutHDoc bh defaultJsContext (line rtsDeclsText $$ line (rtsText cfg))
-            bFlush bh
+          void $ hPutJS (csPrettyRender cfg) h (rts cfg)
 
       -- link dependencies' JS files into lib.js
       withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
@@ -307,6 +302,24 @@ data CompactedModuleCode = CompactedModuleCode
   , cmc_exports :: !B.ByteString        -- ^ rendered exports
   }
 
+-- | Output JS statements and return the output size in bytes.
+hPutJS :: Bool -> Handle -> Sat.JStat -> IO Integer
+hPutJS render_pretty h = \case
+  Sat.BlockStat [] -> pure 0
+  x                -> do
+    before <- hTell h
+    if render_pretty
+      then do
+        printSDoc defaultJsContext (Ppr.PageMode True) h (pretty render_pretty x)
+      else do
+        bh <- newBufHandle h
+        bPutHDoc bh defaultJsContext (line $ pretty render_pretty x)
+        bFlush bh
+    -- Append an empty line to correctly end the file in a newline
+    hPutChar h '\n'
+    after <- hTell h
+    pure $! (after - before)
+
 -- | Link modules and pretty-print them into the given Handle
 renderLinker
   :: Handle
@@ -321,18 +334,7 @@ renderLinker h render_pretty mods jsFiles = do
 
   let
     putBS   = B.hPut h
-    putJS x = do
-      before <- hTell h
-      if render_pretty
-        then do
-          printSDoc defaultJsContext (Ppr.PageMode True) h (pretty x)
-        else do
-          bh <- newBufHandle h
-          -- Append an empty line to correctly end the file in a newline
-          bPutHDoc bh defaultJsContext ((line $ pretty x) $$ empty)
-          bFlush bh
-      after <- hTell h
-      pure $! (after - before)
+    putJS   = hPutJS render_pretty h
 
   ---------------------------------------------------------
   -- Pretty-print JavaScript code for all the dependencies.

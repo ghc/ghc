@@ -116,7 +116,7 @@ setObjInfo debug obj t name fields a size regs static
 closure :: ClosureInfo -- ^ object being info'd see @ciVar@ in @ClosureInfo@
         -> JStat       -- ^ rhs
         -> JStat
-closure ci body = (ciVar ci ||= jLam body) `mappend` closureInfoStat False ci
+closure ci body = (jFun (ciVar ci) body) `mappend` closureInfoStat False ci
 
 conClosure :: Ident -> FastString -> CILayout -> Int -> JStat
 conClosure symbol name layout constr =
