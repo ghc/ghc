@@ -1461,8 +1461,13 @@ The rules for map work like this.
 --
 -- If the first list is not finite, the result is the first list.
 --
--- WARNING: This function takes linear time in the number of elements of the
--- first list.
+-- This function takes linear time in the number of elements of the
+-- __first__ list. Thus it is better to associate repeated
+-- applications of '(++)' to the right (which is the default behaviour):
+-- @xs ++ (ys ++ zs)@ or simply @xs ++ ys ++ zs@, but not @(xs ++ ys) ++ zs@.
+-- For the same reason 'Data.List.concat' @=@ 'Data.List.foldr' '(++)' @[]@
+-- has linear performance, while 'Data.List.foldl' '(++)' @[]@ is prone
+-- to quadratic slowdown.
 
 (++) :: [a] -> [a] -> [a]
 {-# NOINLINE [2] (++) #-}
