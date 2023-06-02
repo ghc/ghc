@@ -204,9 +204,7 @@ dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
        ; let upat = unLoc pat
-             eqn = EqnInfo { eqn_pats = [upat],
-                             eqn_orig = FromSource,
-                             eqn_rhs = cantFailMatchResult body }
+             eqn = EqnMatch upat FromSource (EqnDone $ cantFailMatchResult body)
        ; var    <- selectMatchVar ManyTy upat
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.

@@ -21,13 +21,15 @@ module GHC.HsToCore.Match
    )
 where
 
+import GHC.Stack
 import GHC.Prelude
 import GHC.Platform
 
 import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
-
+import Data.List (intercalate)
+import Debug.Trace
 import GHC.Types.Basic ( Origin(..), isGenerated )
 import GHC.Types.SourceText
 import GHC.Driver.DynFlags
@@ -178,9 +180,20 @@ with External names (#13043).
 See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 -}
 
+-- input: equationInfo
+-- output: do call to `match` (recursing into matchNew) but group the first var beforehand
+-- for the call to match, construct a EqnInfo with only a single pattern and put the recursive call into the eqn_rhs.
+
+--matchNew :: [MatchId]
+--         -> Type
+--         -> [EquationInfo]
+--         -> Dsm (MatchResult CoreExpr)
+
+
+
 type MatchId = Id   -- See Note [Match Ids]
 
-match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
+match :: HasCallStack => [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
                           -- ^ See Note [Match Ids]
                           --
                           -- ^ Note that the Match Ids carry not only a name, but
@@ -192,11 +205,7 @@ match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
 
 match [] ty eqns
   = assertPpr (not (null eqns)) (ppr ty) $
-    return (foldr1 combineMatchResults match_results)
-  where
-    match_results = [ assert (null (eqn_pats eqn)) $
-                      eqn_rhs eqn
-                    | eqn <- eqns ]
+    combineRHSs (NEL.fromList eqns)
 
 match (v:vs) ty eqns    -- Eqns *can* be empty
   = assertPpr (all (isInternalName . idName) vars) (ppr vars) $
@@ -207,11 +216,19 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
         ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
                 -- Group the equations and match each group in turn
         ; let grouped = groupEquations platform tidy_eqns
+        -- ; grouped' <- mapM (moveGroupVarsIntoRhs vs ty) grouped
+        ; let grouped' = grouped
+
+       -- ; traceM ("Before moving: " ++ show (length grouped) ++ " groups:")
+       -- ; testPrint grouped
+       -- ; traceM ("After moving: " ++ show (length grouped') ++ " groups:")
+       -- ; testPrint grouped'
+       -- ; traceM ""
 
          -- print the view patterns that are commoned up to help debug
-        ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped)
+        ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped')
 
-        ; match_results <- match_groups grouped
+        ; match_results <- match_groups grouped'
         ; return $ foldr (.) id aux_binds <$>
             foldr1 combineMatchResults match_results
         }
@@ -239,6 +256,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
+            PgDistinct-> combineRHSs             (dropGroup eqns)
             PgOr      -> matchOr         vars ty eq -- every or-pattern makes up a single PgOr group
       where eqns' = NEL.toList eqns
             ne l = case NEL.nonEmpty l of
@@ -247,7 +265,19 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
 
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
-
+{-
+    testPrint :: Applicative f => [NonEmpty (PatGroup, EquationInfo)] -> f ()
+    testPrint groups =
+      traceM $ intercalate "\n" $ map
+          (\group -> intercalate " ; " $ map
+            (\(pg, eqn) -> (show pg ++ " " ++ (intercalate " " $ map (showSDocUnsafe . pprLPat . mklpat) (pats eqn))))
+            (NEL.toList group))
+            groups
+        where
+          pats (EqnMatch pat _ rest) = pat : pats rest
+          pats (EqnDone _) = []
+          mklpat pat = L noSrcSpanA pat
+-}
     -- print some stuff to see what's getting grouped
     -- use -dppr-debug to see the resolution of overloaded literals
     debug eqns =
@@ -266,6 +296,10 @@ matchEmpty var res_ty
   where
     mk_seq fail = return $ mkWildCase (Var var) (idScaledType var) res_ty
                                       [Alt DEFAULT [] fail]
+
+
+combineRHSs :: NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
+combineRHSs eqns = return $ foldr1 combineMatchResults $ map (\(EqnDone rhs) -> rhs) (NEL.toList eqns)
 
 matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -319,12 +353,11 @@ matchOr (var :| vars) ty eqn = do {
     ; match [var] ty or_eqns -- todo: not if pats is empty
     })
   } where
-    singleEqn expr (L _ pat) = EqnInfo { eqn_pats = [pat], eqn_orig = FromSource, eqn_rhs = pure expr }
+    singleEqn expr (L _ pat) = EqnMatch pat FromSource (EqnDone $ pure expr)
 
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
-decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
-        = eqn { eqn_pats = extractpat pat : pats}
+decomposeFirstPat extract (EqnMatch pat orig rest) = EqnMatch (extract pat) orig rest
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
 getCoPat, getBangPat, getViewPat :: Pat GhcTc -> Pat GhcTc
@@ -408,7 +441,19 @@ only these which can be assigned a PatternGroup (see patGroup).
 
 -}
 
-tidyEqnInfo :: Id -> EquationInfo
+{-
+moveGroupVarsIntoRhs :: HasCallStack => [Id] -> Type -> NonEmpty (PatGroup, EquationInfo) -> DsM (NonEmpty (PatGroup, EquationInfo))
+moveGroupVarsIntoRhs vs ty group = do
+  let (gp, eq) = NEL.head group
+  case eq of
+    EqnDone _ -> return group
+    EqnMatch pat orig _ -> do
+      let rest = NEL.map (\(_, EqnMatch _ _ rest) -> rest) group
+      rhs <- match vs ty (NEL.toList rest)
+      return $ NEL.singleton (gp, EqnMatch pat orig (EqnDone rhs))
+-}
+
+tidyEqnInfo :: HasCallStack => Id -> EquationInfo
             -> DsM (DsWrapper, EquationInfo)
         -- DsM'd because of internal call to dsLHsBinds
         --      and mkSelectorBinds.
@@ -418,12 +463,11 @@ tidyEqnInfo :: Id -> EquationInfo
         -- POST CONDITION: head pattern in the EqnInfo is
         --      one of these for which patGroup is defined.
 
-tidyEqnInfo _ (EqnInfo { eqn_pats = [] })
-  = panic "tidyEqnInfo"
+tidyEqnInfo _ (EqnDone r) = return (idDsWrapper, EqnDone r)
 
-tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_orig = orig })
-  = do { (wrap, pat') <- tidy1 v orig pat
-       ; return (wrap, eqn { eqn_pats = pat' : pats }) }
+tidyEqnInfo v (EqnMatch pat orig rest) = do
+  (wrap, pat') <- tidy1 v orig pat
+  return (wrap, EqnMatch pat' orig rest)
 
 tidy1 :: Id                  -- The Id being scrutinised
       -> Origin              -- Was this a pattern the user wrote?
@@ -833,9 +877,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
            -- from that knowledge (#18533)
            ; match_result <- updPmNablas pat_nablas $
                              dsGRHSs ctxt grhss rhs_ty rhss_nablas
-           ; return EqnInfo { eqn_pats = upats
-                            , eqn_orig = FromSource
-                            , eqn_rhs  = match_result } }
+           ; return $ mkEqnInfo upats FromSource match_result }
 
     discard_warnings_if_generated orig =
       if isGenerated orig
@@ -972,9 +1014,9 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
            addCoreScrutTmCs (maybeToList mb_scrut) [var] $
            pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
-       ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
-                                , eqn_orig = FromSource
-                                , eqn_rhs  = match_result }
+       ; let eqn_info = EqnMatch (unLoc (decideBangHood dflags pat))
+                                 FromSource
+                                 (EqnDone match_result)
        ; match [var] ty [eqn_info] }
 
 
@@ -1002,7 +1044,17 @@ data PatGroup
   | PgView (LHsExpr GhcTc) -- view pattern (e -> p):
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
+  | PgDistinct          -- Group equations which are Done: no further grouping can be done with them
   | PgOr                -- Or pattern
+
+instance Show PatGroup where
+  show PgAny = "PgAny"
+  show (PgCon _) = "PgCon"
+  show (PgLit _) = "PgLit"
+  show (PgView _ _) = "PgView"
+  show PgOr = "PgOr"
+  show PgDistinct = "PgDistinct"
+  show _ = "PgOther"
 
 {- Note [Don't use Literal for PgN]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1030,7 +1082,7 @@ groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInf
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
+  = NEL.groupBy same_gp $ [(patGroup platform (maybeFirstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
@@ -1120,6 +1172,7 @@ sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
 sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2)
        -- ViewPats are in the same group iff the expressions
        -- are "equal"---conservatively, we use syntactic equality
+sameGroup PgDistinct    PgDistinct    = True
 sameGroup _          _          = False
 
 -- An approximation of syntactic equality used for determining when view
@@ -1246,15 +1299,19 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list _  (_:_)  []     = False
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
-patGroup :: Platform -> Pat GhcTc -> PatGroup
-patGroup _ (ConPat { pat_con = L _ con
+patGroup :: Platform -> Maybe (Pat GhcTc) -> PatGroup
+patGroup _ Nothing = PgDistinct
+patGroup p (Just pat) = patGroup' p pat
+
+patGroup' :: Platform -> Pat GhcTc -> PatGroup
+patGroup' _ (ConPat { pat_con = L _ con
                    , pat_con_ext = ConPatTc { cpt_arg_tys = tys }
                    })
- | RealDataCon dcon <- con              = PgCon dcon
- | PatSynCon psyn <- con                = PgSyn psyn tys
-patGroup _ (WildPat {})                 = PgAny
-patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
+ | RealDataCon dcon <- con               = PgCon dcon
+ | PatSynCon psyn <- con                 = PgSyn psyn tys
+patGroup' _ (WildPat {})                 = PgAny
+patGroup' _ (BangPat {})                 = PgBang
+patGroup' _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
     (HsIntegral   i, is_neg) -> PgN (integralFractionalLit is_neg (if is_neg
                                                                     then negate (il_value i)
@@ -1264,17 +1321,17 @@ patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
       | otherwise -> PgN f
     (HsIsString _ s, _) -> assert (isNothing mb_neg) $
                             PgOverS s
-patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
+patGroup' _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
-patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
-patGroup platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
-patGroup platform (XPat ext) = case ext of
+patGroup' _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
+patGroup' platform (LitPat _ lit)        = PgLit (hsLitKey platform lit)
+patGroup' platform (XPat ext) = case ext of
   CoPat _ p _      -> PgCo (hsPatType p) -- Type of innelexp pattern
-  ExpansionPat _ p -> patGroup platform p
-patGroup _ (OrPat {}) = PgOr
-patGroup _ pat                          = pprPanic "patGroup" (ppr pat)
+  ExpansionPat _ p -> patGroup' platform p
+patGroup' _ (OrPat {}) = PgOr
+patGroup' _ pat                          = pprPanic "patGroup" (ppr pat)
 
 {-
 Note [Grouping overloaded literal patterns]

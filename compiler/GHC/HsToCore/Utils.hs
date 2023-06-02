@@ -15,7 +15,7 @@ This module exports some utility functions of no great interest.
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module GHC.HsToCore.Utils (
         EquationInfo(..),
-        firstPat, shiftEqns,
+        firstPat, maybeFirstPat, shiftEqns,
 
         MatchResult (..), CaseAlt(..),
         cantFailMatchResult, alwaysFailMatchResult,
@@ -196,11 +196,16 @@ worthy of a type synonym and a few handy functions.
 -}
 
 firstPat :: EquationInfo -> Pat GhcTc
-firstPat eqn = assert (notNull (eqn_pats eqn)) $ head (eqn_pats eqn)
+firstPat (EqnMatch pat _ _) = pat
+firstPat (EqnDone _) = error "firstPat: no patterns"
+
+maybeFirstPat :: EquationInfo -> Maybe (Pat GhcTc)
+maybeFirstPat (EqnMatch pat _ _) = Just pat
+maybeFirstPat (EqnDone _) = Nothing
 
 shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
-shiftEqns = fmap $ \eqn -> eqn { eqn_pats = tail (eqn_pats eqn) }
+shiftEqns = fmap $ \(EqnMatch _ _ rest) -> rest
 
 -- Functions on MatchResult CoreExprs
 
@@ -221,8 +226,8 @@ extractMatchResult match_result failure_expr =
     (shareFailureHandler match_result)
 
 combineMatchResults :: MatchResult CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
-combineMatchResults match_result1@(MR_Infallible _) _
-  = match_result1
+-- combineMatchResults match_result1@(MR_Infallible _) _
+--   = match_result1
 combineMatchResults match_result1 match_result2 =
   -- if the first pattern needs a failure handler (i.e. if it is fallible),
   -- make it let-bind it bind it with `shareFailureHandler`.

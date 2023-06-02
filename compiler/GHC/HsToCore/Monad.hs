@@ -48,7 +48,8 @@ module GHC.HsToCore.Monad (
 
         -- Data types
         DsMatchContext(..),
-        EquationInfo(..), MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
+        EquationInfo(..), mkEqnInfo, eqn_rhs, eqn_pats,
+        MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
         -- Trace injection
         pprRuntimeTrace
@@ -130,7 +131,7 @@ data DsMatchContext
 instance Outputable DsMatchContext where
   ppr (DsMatchContext hs_match ss) = ppr ss <+> pprMatchContext hs_match
 
-data EquationInfo
+{-data EquationInfo
   = EqnInfo { eqn_pats :: [Pat GhcTc]
               -- ^ The patterns for an equation
               --
@@ -149,9 +150,22 @@ data EquationInfo
             , eqn_rhs  :: MatchResult CoreExpr
               -- ^ What to do after match
             }
+-}
 
+data EquationInfo = EqnMatch (Pat GhcTc) Origin EquationInfo | EqnDone (MatchResult CoreExpr)
+
+mkEqnInfo [] _ rhs = EqnDone rhs
+mkEqnInfo (pat:pats) orig rhs = EqnMatch pat orig (mkEqnInfo pats orig rhs)
+
+eqn_pats :: EquationInfo -> [Pat GhcTc]
+eqn_pats (EqnDone _) = []
+eqn_pats (EqnMatch pat _ rest) = pat : eqn_pats rest
+
+eqn_rhs :: EquationInfo -> MatchResult CoreExpr
+eqn_rhs (EqnDone rhs) = rhs
+eqn_rhs (EqnMatch _ _ rest) = eqn_rhs rest
 instance Outputable EquationInfo where
-    ppr (EqnInfo pats _ _) = ppr pats
+    ppr = ppr . eqn_pats
 
 type DsWrapper = CoreExpr -> CoreExpr
 idDsWrapper :: DsWrapper

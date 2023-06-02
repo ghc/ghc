@@ -625,10 +625,10 @@ matchLiterals (var :| vars) ty sub_groups
         }
   where
     match_group :: NonEmpty EquationInfo -> DsM (Literal, MatchResult CoreExpr)
-    match_group eqns@(firstEqn :| _)
+    match_group eqns
         = do { dflags <- getDynFlags
              ; let platform = targetPlatform dflags
-             ; let LitPat _ hs_lit = firstPat firstEqn
+             ; let (EqnMatch (LitPat _ hs_lit) _ _) = NEL.head eqns
              ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
              ; return (hsLitKey platform hs_lit, match_result) }
 
@@ -726,7 +726,7 @@ matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
                    fmap (foldr1 (.) wraps)                      $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
-        = (wrapBind n n1, eqn { eqn_pats = pats })
+    shift n1 eqn@(EqnMatch (NPlusKPat _ (L _ n) _ _ _ _) _ rest)
+        = (wrapBind n n1, rest)
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)

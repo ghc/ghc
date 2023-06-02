@@ -1,5 +1,6 @@
 module GHC.HsToCore.Match where
 
+import GHC.Stack (HasCallStack)
 import GHC.Prelude
 import GHC.Types.Var ( Id )
 import GHC.Tc.Utils.TcType  ( Type )
@@ -8,7 +9,7 @@ import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import GHC.Hs.Extension ( GhcTc, GhcRn )
 
-match   :: [Id]
+match   :: HasCallStack => [Id]
         -> Type
         -> [EquationInfo]
         -> DsM (MatchResult CoreExpr)
