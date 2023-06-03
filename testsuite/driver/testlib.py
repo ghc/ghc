@@ -327,12 +327,13 @@ def req_process( name, opts ):
 
 def req_host_target_ghc( name, opts ):
     """
-    When testing a cross GHC, some test cases require a host GHC as
-    well (e.g. for compiling custom Setup.hs). This is not supported
-    yet (#23236), so for the time being we skip them when testing
-    cross GHCs.
+    When testing a cross GHC, some test cases require a host GHC as well (e.g.
+    for compiling custom Setup.hs). This is not supported yet (#23236), so for
+    the time being we skip them when testing cross GHCs. However, this is not
+    the case for the JS backend. The JS backend is a cross-compiler that
+    produces code that the host can run.
     """
-    if isCross():
+    if isCross() and not js_arch():
         opts.skip = True
 
 def ignore_stdout(name, opts):
