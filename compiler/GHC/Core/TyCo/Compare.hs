@@ -66,9 +66,7 @@ to refer to, so searching for references to this Note will find every place
 that needs to be updated.
 
 * See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
-
-* See Historical Note [Typechecker equality vs definitional equality]
-  below
+* See Note [Typechecker equality vs definitional equality]
 
 Note [Type comparisons using object pointer comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -249,14 +247,141 @@ cmpForAllVis (Invisible _) (Invisible _)  = EQ
 
 {- Note [ForAllTy and type equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we compare (ForAllTy (Bndr tv1 vis1) ty1)
-         and    (ForAllTy (Bndr tv2 vis2) ty2)
-what should we do about `vis1` vs `vis2`.
+Forall-bound type variables can be either visible or invisible,
+and invisible variables are further subdivided into specified and inferred:
+  * Visible:              forall a -> t
+  * Invisible Specified:  forall a. t
+  * Invisible Inferred:   forall {a}. t
+We call those properties *visibility* and *specificity* respectively.
 
-First, we always compare with `eqForAllVis` and `cmpForAllVis`.
-But what decision do we make?
+Visibility and specificity are jointly represented by the `ForallTyFlag` data
+type. The interaction between this flag and type equality is tricky:
+  * Definitional equality (eqType) completly ignores the flag
+  * Typechecker equality (tcEqType, can_eq_nc) respects visibility but ignores specificity
 
-Should GHC type-check the following program (adapted from #15740)?
+This is not the only possible design, so we describe the design space below.
+Since visibility and specificity are different properties, we cover them
+separately.
+
+Visibility
+==========
+Visible forall in types of terms (GHC Proposal #281, implementation in progress)
+allows us to define functions that require explicitly passed type arguments:
+
+  idv :: forall a -> a -> a
+  idv = \a -> \x -> (x :: a)    -- Usage example: idv Int 42
+
+Desugared:
+  (idv :: forall a -> a -> a) =
+    /\(a :: Type) -> \(x :: a) -> x
+
+Compare that to the desugaring of the ordinary `id` function that uses
+an invisible forall:
+  (id :: forall a. a -> a) =
+    /\(a :: Type) -> \(x :: a) -> x
+
+The Core terms for `idv` and `id` are identical, while the types are different.
+That's not possible because we should be able to determine the type from the term:
+    exprType :: CoreExpr -> Type
+
+So the question becomes: which forall visibility should `exprType` return
+when faced with (/\a -> e), is it (forall a. t) or (forall a -> t)?
+The term alone doesn't contain enough information to make this choice.
+
+There are two ways we could address this:
+  a) Declare `forall a -> t` and `forall a. t` nominally distinct and record the difference
+     between visible/invisible foralls right in the Core terms, so that we would have
+        idv = /\[vis](a :: Type)   -> \(x :: a) -> a
+        id =  /\[invis](a :: Type) -> \(x :: a) -> a
+     This way `exprType` could consult the visibility flag stored in the term
+     and use it in the returned type. The downsides of this approach are that
+        1. it pollutes the syntax of Core terms with visibility flags
+        2. it requires coercions to cast between (forall a. t) and (forall a -> t)
+  b) Declare `forall a -> t` and `forall a. t` nominally equal and
+     ignore the visibility flag in `eqType`
+        eqType :: Type -> Type -> Bool
+     This way `exprType` can always generate invisible foralls because it won't matter.
+     This begs the question: why not remove visibilities from Core syntax
+     altogether? The answer is that it's not possible because Core types are
+     also used in parts of the compiler we the distinction does matter:
+        tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)   -- Type checker
+        reifyType :: TyCoRep.Type -> TcM TH.Type                     -- Template Haskell
+        toIfaceType :: Type -> IfaceType                             -- .hi files
+     So we want to carry the visibility flag for the sake of those parts of the
+     compiler where the distinction does matter, but ignore it in `eqType`.
+
+We prefer option (b) for its simplicity. That is, we record the visibility flag
+in the Core syntax for types, but we ignore it in `eqType`, meaning that Core
+lint will accept the following:
+
+  (idv :: forall a -> a -> a) = id
+  (id  :: forall a. a -> a)   = /\(a :: Type) -> \(x :: a) -> x
+
+We are able to assign `idv = id` despite the difference in visibilities.
+There are no casts involved.
+
+At the same time, we want to reject such programs in surface Haskell,
+where users care about the distinction between visible and invisible forall.
+That is, the following code is ill-typed:
+
+  idv :: forall a -> a -> a
+  idv = id
+
+If we accepted it, we would lose referential transparency:
+
+  x = idv Int 42  -- by referential transparency and the definition idv = id,
+                  -- we should be able to substitute `id` for `idv`
+  x = id Int 42   -- but this is ill-typed
+
+(In Core we don't have this problem because all type applications and
+ type abstractions are visible regardless of the visibility flag)
+
+This wouldn't be the first case where Haskell is referentially opaque,
+but it would be nice not to introduce another one.
+See https://github.com/ghc-proposals/ghc-proposals/issues/558#issuecomment-1328106754.
+
+We also care about this distinction at the kind level. See the following test cases:
+  T18863a VisFlag1 VisFlag1_ql VisFlag2 VisFlag3 VisFlag4 VisFlag5
+
+So we want `forall a. t` and `forall a -> t` to be equal in Core but different in Haskell.
+However, this means that we can't use `eqType` in the type checker. We need to use a
+more restrictive equality check `tcEqType` that takes visibility into account.
+
+This is not the first time we wanted something like this. For a long time, this was exactly
+how GHC handled Constraint vs Type: equal in Core, different in Haskell. Unfortunately, it
+led to an inconsistency if the user wrote a type family that distinguished between those two:
+  type family F a where
+    F Type       = Int
+    F Constraint = Bool
+
+Or if they used Typeable with constraints (#11715):
+  import Data.Typeable
+  main = print $ typeOf (Proxy :: Proxy Eq)
+
+Fortunately, we get to avoid this issue because both type families and Typeable
+are limited to monotypes, so a forall will never occur there.
+
+Still, it is a bit unsatisfying that we have two distinct type equality
+relations in Core and Haskell. It is tempting to make `eqType` and `tcEqType`
+behave identically. To that end, a hybrid approach was proposed:
+
+  Declare `forall a -> t` and `forall a. t` nominally equal and ignore the
+  visibility flag in `eqType`, `tcEqType`, `can_eq_nc`, etc;
+  At the same time, introduce a separate check `checkEqForallVis` to reject
+  unwanted programs and find strategic spots in the type checker to call it.
+
+This was implemented in !9912, but we quickly found out that it was hard to
+find those strategic spots to call `checkEqForallVis` and all too easy to
+forget to call it at all. Checking visibility in `tcEqType` and `can_eq_nc`
+is more robust.
+
+Specificity
+===========
+Specificity (unlike visibility) is ignored in all equality checks.
+Neither definitional equality (eqType) nor typechecker equality (tcEqType, can_eq_nc)
+look at specificity.
+
+This is motivated by the followng program (adapted from #15740):
 
   {-# LANGUAGE PolyKinds, ... #-}
   data D a
@@ -280,64 +405,44 @@ programs like the one above. Whether a kind variable binder ends up being
 specified or inferred can be somewhat subtle, however, especially for kinds
 that aren't explicitly written out in the source code (like in D above).
 
-For now, we decide
+For now, we decide to ignore specificity. That is, we have the following:
 
-    the specified/inferred status of an invisible type variable binder
-    does not affect GHC's notion of equality.
+  eqForAllVis Required      Required      = True
+  eqForAllVis (Invisible _) (Invisible _) = True
+  eqForAllVis _             _             = False
 
-That is, we have the following:
+One unfortunate consequence of this setup is that it can be exploited
+to observe the order of inferred quantification (#22648). However, fixing this
+would be a breaking change, so we choose not to (at least for now).
 
-  --------------------------------------------------
-  | Type 1            | Type 2            | Equal? |
-  --------------------|-----------------------------
-  | forall k. <...>   | forall k. <...>   | Yes    |
-  |                   | forall {k}. <...> | Yes    |
-  |                   | forall k -> <...> | No     |
-  --------------------------------------------------
-  | forall {k}. <...> | forall k. <...>   | Yes    |
-  |                   | forall {k}. <...> | Yes    |
-  |                   | forall k -> <...> | No     |
-  --------------------------------------------------
-  | forall k -> <...> | forall k. <...>   | No     |
-  |                   | forall {k}. <...> | No     |
-  |                   | forall k -> <...> | Yes    |
-  --------------------------------------------------
-
-IMPORTANT NOTE: if we want to change this decision, ForAllCo will need to carry
+If we want to change this decision, ForAllCo will need to carry
 visiblity (by taking a ForAllTyBinder rathre than a TyCoVar), so that
 coercionLKind/RKind build forall types that match (are equal to) the desired
 ones.  Otherwise we get an infinite loop in the solver via canEqCanLHSHetero.
 Examples: T16946, T15079.
 
-Historical Note [Typechecker equality vs definitional equality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This Note describes some history, in case there are vesitges of this
-history lying around in the code.
-
-Summary: prior to summer 2022, GHC had have two notions of equality
-over Core types.  But now there is only one: definitional equality,
-or just equality for short.
-
-The old setup was:
+Note [Typechecker equality vs definitional equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC has two notions of equality over Core types:
 
 * Definitional equality, as implemented by GHC.Core.Type.eqType.
   See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+* Typechecker equality, as implemented by tcEqType (in GHC.Tc.Utils.TcType).
+  GHC.Tc.Solver.Canonical.canEqNC also respects typechecker equality.
 
-* Typechecker equality, as implemented by tcEqType.
-  GHC.Tc.Solver.Equality.canonicaliseEquality also respects typechecker equality.
-
-Typechecker equality implied definitional equality: if two types are equal
+Typechecker equality implies definitional equality: if two types are equal
 according to typechecker equality, then they are also equal according to
 definitional equality. The converse is not always true, as typechecker equality
-is more finer-grained than definitional equality in two places:
-
-* Constraint vs Type.  Definitional equality equated Type and
-  Constraint, but typechecker treats them as distinct types.
+is more finer-grained than definitional equality:
 
 * Unlike definitional equality, which does not care about the ForAllTyFlag of a
   ForAllTy, typechecker equality treats Required type variable binders as
   distinct from Invisible type variable binders.
   See Note [ForAllTy and type equality]
+
+* (Historical, no longer the case) Constraint vs Type.
+  Definitional equality used to equate Type and Constraint, but typechecker
+  treated them as distinct types.
 
 
 ************************************************************************
@@ -513,9 +618,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
-    go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
-      = liftOrdering (vis1 `cmpForAllVis` vis2)
-        `thenCmpTy` go env (varType tv1) (varType tv2)
+    go env (ForAllTy (Bndr tv1 _) t1) (ForAllTy (Bndr tv2 _) t2)
+      = go env (varType tv1) (varType tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 
         -- See Note [Equality on AppTys]
