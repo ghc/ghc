@@ -1372,7 +1372,7 @@ languageExtensions (Just Haskell2010)
        LangExt.DoAndIfThenElse,
        LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec,
-       LangExt.DeepSubsumption ]
+       LangExt.DeepSubsumption]
 
 languageExtensions (Just GHC2021)
     = [LangExt.ImplicitPrelude,
@@ -1428,8 +1428,7 @@ languageExtensions (Just GHC2021)
        LangExt.StandaloneKindSignatures,
        LangExt.TupleSections,
        LangExt.TypeApplications,
-       LangExt.TypeOperators,
-       LangExt.TypeSynonymInstances]
+       LangExt.TypeOperators]
 
 
 ways :: DynFlags -> Ways
