@@ -1417,7 +1417,13 @@ languageExtensions (Just GHC2021)
        LangExt.PostfixOperators,
        LangExt.RankNTypes,
        LangExt.ScopedTypeVariables,
-       LangExt.TypeAbstractions,     -- implied by ScopedTypeVariables according to GHC Proposal #448 "Modern Scoped Type Variables"
+
+       -- implied by ScopedTypeVariables according to GHC Proposal #448 "Modern Scoped Type Variables"
+       LangExt.TypeAbstractions,
+       LangExt.PatternSignatures,
+       LangExt.MethodTypeVariables,
+       LangExt.ExtendedForAllScope,
+
        LangExt.StandaloneDeriving,
        LangExt.StandaloneKindSignatures,
        LangExt.TupleSections,

@@ -114,7 +114,7 @@ The ``forall``-or-nothing rule takes effect in the following places:
 
 Notes:
 
-- :ref:`pattern-type-sigs` are a notable example of a place where
+- :extension:`ScopedTypeVariables` are a notable example of a place where
   types do *not* obey the ``forall``-or-nothing rule. For example, GHC will
   accept the following: ::
 

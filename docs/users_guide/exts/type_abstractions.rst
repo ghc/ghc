@@ -6,6 +6,8 @@ Type abstractions
 
     :since: 9.8.1
 
+    :implied by: :extension:`ScopedTypeVariables`
+
     :status: Partially implemented
 
     Allow the use of type abstraction syntax.

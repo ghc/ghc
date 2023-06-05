@@ -194,7 +194,7 @@ also sets :extension:`GADTSyntax` and :extension:`MonoLocalBinds`.
 
    In the function clause for ``g``, GHC first checks ``MkF``, the outermost
    pattern, followed by the inner ``Nothing`` pattern. This outside-in order
-   can interact somewhat counterintuitively with :ref:`pattern-type-sigs`.
+   can interact somewhat counterintuitively with :extension:`ScopedTypeVariables`.
    Consider the following variation of ``g``: ::
 
        g2 :: F a a -> a

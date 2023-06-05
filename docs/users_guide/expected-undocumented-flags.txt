@@ -14,7 +14,6 @@
 -XMonomorphismRestriction
 -XParallelArrays
 -XPatternGuards
--XPatternSignatures
 -XPolymorphicComponents
 -XRecordPuns
 -XRelaxedLayout

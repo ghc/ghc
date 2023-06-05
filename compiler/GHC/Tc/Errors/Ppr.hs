@@ -1637,9 +1637,7 @@ instance Diagnostic TcRnMessage where
              nest 4 (text "in the section:" <+> quotes (ppr section))]
 
     TcRnUnexpectedPatSigType ty
-      -> mkSimpleDecorated $
-           hang (text "Illegal type signature:" <+> quotes (ppr ty))
-              2 (text "Type signatures are only allowed in patterns with ScopedTypeVariables")
+      -> mkSimpleDecorated $ text "Illegal type signature:" <+> quotes (ppr ty)
 
     TcRnIllegalKindSignature ty
       -> mkSimpleDecorated $ text "Illegal kind signature:" <+> quotes (ppr ty)
@@ -3048,7 +3046,7 @@ instance Diagnostic TcRnMessage where
     TcRnSectionPrecedenceError{}
       -> noHints
     TcRnUnexpectedPatSigType{}
-      -> [suggestExtension LangExt.ScopedTypeVariables]
+      -> [suggestExtension LangExt.PatternSignatures]
     TcRnIllegalKindSignature{}
       -> [suggestExtension LangExt.KindSignatures]
     TcRnUnusedQuantifiedTypeVar{}

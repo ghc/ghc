@@ -198,7 +198,8 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
    -- (H) Rename Everything else
 
-   (rn_rule_decls,    src_fvs2) <- setXOptM LangExt.ScopedTypeVariables $
+   (rn_rule_decls,    src_fvs2) <- setXOptM LangExt.PatternSignatures $
+                                   setXOptM LangExt.ScopedTypeVariables $
                                    rnList rnHsRuleDecls rule_decls ;
                            -- Inside RULES, scoped type variables are on
    (rn_foreign_decls, src_fvs3) <- rnList rnHsForeignDecl foreign_decls ;

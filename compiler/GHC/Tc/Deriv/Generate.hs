@@ -1875,9 +1875,9 @@ of the method. For example, recall:
                   join
 
 In the example above, it is imperative that the `a` in the instance signature
-for `join` scope over the body of `join` by way of ScopedTypeVariables.
-This might sound obvious, but note that in gen_Newtype_binds, which is
-responsible for generating the code above, the type in `join`'s instance
+for `join` scope over the body of `join` by way of ExtendedForallScope (implied
+by ScopedTypeVariables). This might sound obvious, but note that in gen_Newtype_binds,
+which is responsible for generating the code above, the type in `join`'s instance
 signature is given as a Core type, whereas gen_Newtype_binds will eventually
 produce HsBinds (i.e., source Haskell) that is renamed and typechecked. We
 must ensure that `a` is in scope over the body of `join` during renaming

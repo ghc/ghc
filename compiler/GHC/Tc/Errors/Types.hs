@@ -2393,7 +2393,7 @@ data TcRnMessage where
     -> TcRnMessage
 
   {-| TcRnUnexpectedPatSigType is an error occurring when there is
-      a type signature in a pattern without -XScopedTypeVariables extension
+      a type signature in a pattern without -XPatternSignatures extension
 
       Examples:
         f (a :: Bool) = ...
