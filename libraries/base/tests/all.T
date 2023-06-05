@@ -293,3 +293,9 @@ test('trace', normal, compile_and_run, [''])
 test('listThreads', normal, compile_and_run, [''])
 test('listThreads1', normal, compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
+<<<<<<< HEAD
+=======
+test('CLC149', normal, compile, [''])
+test('AtomicSwapIORef', normal, compile_and_run, [''])
+test('T23454', normal, compile_fail, [''])
+>>>>>>> 4639100b5dd (Add role annotations to SNat, SSymbol and SChar)

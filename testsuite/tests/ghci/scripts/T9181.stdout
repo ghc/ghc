@@ -18,12 +18,12 @@ type GHC.TypeLits.NatToChar :: GHC.Num.Natural.Natural -> Char
 type family GHC.TypeLits.NatToChar a
 pattern GHC.TypeLits.SChar
   :: () => GHC.TypeLits.KnownChar c => GHC.TypeLits.SChar c
-type role GHC.TypeLits.SChar phantom
+type role GHC.TypeLits.SChar nominal
 type GHC.TypeLits.SChar :: Char -> *
 newtype GHC.TypeLits.SChar s = GHC.TypeLits.UnsafeSChar Char
 pattern GHC.TypeLits.SSymbol
   :: () => GHC.TypeLits.KnownSymbol s => GHC.TypeLits.SSymbol s
-type role GHC.TypeLits.SSymbol phantom
+type role GHC.TypeLits.SSymbol nominal
 type GHC.TypeLits.SSymbol :: GHC.Types.Symbol -> *
 newtype GHC.TypeLits.SSymbol s = GHC.TypeLits.UnsafeSSymbol String
 type GHC.TypeLits.SomeChar :: *
@@ -152,7 +152,7 @@ data Data.Type.Ord.OrderingI a b where
                        Data.Type.Ord.OrderingI a b
 pattern GHC.TypeNats.SNat
   :: () => GHC.TypeNats.KnownNat n => GHC.TypeNats.SNat n
-type role GHC.TypeNats.SNat phantom
+type role GHC.TypeNats.SNat nominal
 type GHC.TypeNats.SNat :: GHC.TypeNats.Nat -> *
 newtype GHC.TypeNats.SNat n
   = GHC.TypeNats.UnsafeSNat GHC.Num.Natural.Natural
