@@ -1,0 +1,21 @@
+
+T23454.hs:12:38: error: [GHC-25897]
+    • Couldn't match type ‘a’ with ‘b’ arising from a use of ‘coerce’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          bogus :: forall (a :: Nat) (b :: Nat). KnownNat a => a :~: b
+        at T23454.hs:11:1-43
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          bogus :: forall (a :: Nat) (b :: Nat). KnownNat a => a :~: b
+        at T23454.hs:11:1-43
+    • In the second argument of ‘testEquality’, namely
+        ‘(coerce (SNat @a) :: SNat b)’
+      In the expression:
+        testEquality (SNat @a) (coerce (SNat @a) :: SNat b)
+      In the expression:
+        case testEquality (SNat @a) (coerce (SNat @a) :: SNat b) of
+          Just r -> r
+          Nothing -> error "bug fixed"
+    • Relevant bindings include
+        bogus :: a :~: b (bound at T23454.hs:12:1)
