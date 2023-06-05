@@ -173,6 +173,10 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
                   then tv_rdrs
                   else []
                NeverBind  -> []
+       ; let i_bndrs = nubN implicit_bndrs in
+          unless (null i_bndrs) $
+          forM_ i_bndrs $ \i_bndr ->
+            addDiagnosticAt (locA $ getLoc i_bndr) (TcRnPatternSignatureBinds i_bndr)
        ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }

@@ -1849,6 +1849,11 @@ instance Diagnostic TcRnMessage where
              , text "or a complete user-supplied kind (CUSK, legacy feature)"
              , text "is required to use invisible binders." ]
 
+    TcRnPatternSignatureBinds fvar -> mkSimpleDecorated $
+      sep  [text "Type variable binding"
+           , text "in pattern signature:" <+> quotes (ppr fvar)
+           ]
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2465,6 +2470,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInvisBndrWithoutSig{}
       -> ErrorWithoutFlag
+    TcRnPatternSignatureBinds{}
+      -> WarningWithFlag Opt_WarnPatternSignatureBinds
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3128,6 +3135,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnInvisBndrWithoutSig name _
       -> [SuggestAddStandaloneKindSignature name]
+    TcRnPatternSignatureBinds{}
+      -> noHints
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode

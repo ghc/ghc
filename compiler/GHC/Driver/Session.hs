@@ -2257,7 +2257,8 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnTypeEqualityOutOfScope,
   warnSpec    Opt_WarnTypeEqualityRequiresOperators,
   warnSpec    Opt_WarnTermVariableCapture,
-  warnSpec    Opt_WarnMissingRoleAnnotations
+  warnSpec    Opt_WarnMissingRoleAnnotations,
+  warnSpec    Opt_WarnPatternSignatureBinds
  ]
 
 warningGroupsDeps :: [(Deprecation, FlagSpec WarningGroup)]

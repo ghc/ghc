@@ -30,6 +30,9 @@ Compiler
 - Added a new warning :ghc-flag:`-Wterm-variable-capture` that helps to make code compatible with
   the future extension ``RequiredTypeArguments``.
 
+- Added a new warning :ghc-flag:`-Wpattern-signature-binds` which alerts the user when they bind
+  a new type variable in a pattern signature.
+
 - Rewrite rules now support a limited form of higher order matching when a
   pattern variable is applied to distinct locally bound variables. For example: ::
 

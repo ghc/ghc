@@ -4094,6 +4094,18 @@ data TcRnMessage where
   -}
   TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
 
+  {-| TcRnPatternSignatureBinds is a warning thrown when a user binds
+      type variables in a pattern signature. This is only performed with
+      -Wpattern-signature-binds
+
+     Example(s):
+
+       id (x :: b) = x
+
+     Test case: rename/should_fail/WPatternSigBinds
+  -}
+  TcRnPatternSignatureBinds :: LocatedN RdrName -> TcRnMessage
+
   deriving Generic
 
 

@@ -591,6 +591,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnArityMismatch"                             = 27346
   GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
   GhcDiagnosticCode "TcRnIllegalQuasiQuotes"                        = 77343
+  GhcDiagnosticCode "TcRnPatternSignatureBinds"                     = 65467
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

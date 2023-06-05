@@ -523,7 +523,7 @@ rnExpr (HsRecSel x _) = dataConCantHappen x
 
 rnExpr (ExprWithTySig _ expr pty)
   = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
-        ; (expr', fvExpr) <- bindSigTyVarsFVExtended (hsWcScopedTvs pty') $
+        ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
 

@@ -1,0 +1,27 @@
+
+WPatternSigBinds.hs:4:9: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘a’
+
+WPatternSigBinds.hs:6:9: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘a’
+
+WPatternSigBinds.hs:6:18: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘b’
+
+WPatternSigBinds.hs:8:9: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘a’
+
+WPatternSigBinds.hs:8:18: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘b’
+
+WPatternSigBinds.hs:8:20: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘c’
+
+WPatternSigBinds.hs:8:22: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘d’
+
+WPatternSigBinds.hs:11:9: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘b’
+
+WPatternSigBinds.hs:11:11: error: [GHC-65467] [-Wpattern-signature-binds, Werror=pattern-signature-binds]
+    Type variable binding in pattern signature: ‘c’

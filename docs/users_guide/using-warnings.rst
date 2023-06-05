@@ -2415,6 +2415,28 @@ of ``-W(no-)*``.
     In other words the type-class role cannot be accidentally left
     representational or phantom, which could affected the code correctness.
 
+.. ghc-flag:: -Wpattern-signature-binds
+    :shortdesc: warn when a pattern signature binds new type variables
+    :type: dynamic
+
+    :since: 9.8.1
+
+    Added in accordance with `GHC Proposal #448
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0448-type-variable-scoping.rst>`__.
+
+    Type variable bindings in pattern signatures violate the Lexical Scoping Principle: depending
+    on the context, type variables in pattern signatures can be either occurrences or bindings.
+
+    For example: ::
+
+       f (x :: a) = ... -- binding of ‘a’
+
+       g :: forall a . ...
+       g (x :: a) = ... -- occurrence of ‘a’
+
+    When :ghc-flag:`-Wpattern-signature-binds` is enabled, GHC warns about type variable bindings
+    in pattern signatures.
+
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

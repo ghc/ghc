@@ -519,7 +519,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
        -- invariant: no free vars here when it's a FunBind
   = do  { let plain_name = unLoc name
 
-        ; (matches', rhs_fvs) <- bindSigTyVarsFVExtended (sig_fn plain_name) $
+        ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
                                  rnMatchGroup (mkPrefixFunRhs name)
                                               rnLExpr matches
@@ -726,7 +726,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
         ; unless pattern_synonym_ok (addErr TcRnIllegalPatternSynonymDecl)
         ; let scoped_tvs = sig_fn name
 
-        ; ((pat', details'), fvs1) <- bindSigTyVarsFVExtended scoped_tvs $
+        ; ((pat', details'), fvs1) <- bindSigTyVarsFV scoped_tvs $
                                       rnPat PatSyn pat $ \pat' ->
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
@@ -763,7 +763,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
-                do { (mg', fvs) <- bindSigTyVarsFVExtended scoped_tvs $
+                do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
                                    rnMatchGroup (mkPrefixFunRhs (L l name))
                                                 rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
