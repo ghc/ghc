@@ -273,7 +273,9 @@ renameDeriv inst_infos bagBinds
     setXOptM LangExt.EmptyCase $
     -- Derived decls (for empty types) can have
     --    case x of {}
-    setXOptM LangExt.ScopedTypeVariables $
+    setXOptM LangExt.MethodTypeVariables $
+    setXOptM LangExt.PatternSignatures $
+    setXOptM LangExt.ExtendedForAllScope $
     setXOptM LangExt.KindSignatures $
     -- Derived decls (for newtype-deriving) can use ScopedTypeVariables &
     -- KindSignatures

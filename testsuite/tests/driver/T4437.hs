@@ -38,7 +38,9 @@ check title expected got
 expectedGhcOnlyExtensions :: [String]
 expectedGhcOnlyExtensions =
     [ "TypeAbstractions",
-      "ExtendedLiterals"
+      "ExtendedLiterals",
+      "MethodTypeVariables",
+      "ExtendedForAllScope"
     ]
 
 expectedCabalOnlyExtensions :: [String]

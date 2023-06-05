@@ -6,9 +6,13 @@ Lexically scoped type variables
 ===============================
 
 .. extension:: ScopedTypeVariables
-    :shortdesc: Enable lexically-scoped type variables.
+    :shortdesc: Enable lexically-scoped type variables everywhere.
 
-    :implies: :extension:`ExplicitForAll`
+    :implies: :extension:`ExplicitForAll`,
+      :extension:`PatternSignatures`,
+      :extension:`ExtendedForAllScope`,
+      :extension:`MethodTypeVariables`,
+      :extension:`TypeAbstractions`
 
     :since: 6.8.1
 
@@ -26,7 +30,7 @@ Lexically scoped type variables
     To trigger those forms of :extension:`ScopedTypeVariables`, the ``forall`` must appear against the top-level signature (or outer expression)
     but *not* against nested signatures referring to the same type variables.
 
-    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent <pattern-equiv-form>` for the example in this section, or :ref:`pattern-type-sigs`.
+    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent <pattern-equiv-form>` for the example in this section, or :extension:`PatternSignatures`.
 
 GHC supports *lexically scoped type variables*, without which some type
 signatures are simply impossible to write. For example: ::
@@ -48,7 +52,7 @@ possible to do so.
 
 .. _pattern-equiv-form:
 
-An equivalent form for that example, avoiding explicit ``forall`` uses :ref:`pattern-type-sigs`: ::
+An equivalent form for that example, avoiding explicit ``forall`` uses :extension:`PatternSignatures`: ::
 
     f :: [a] -> [a]
     f (xs :: [aa]) = xs ++ ys
@@ -84,9 +88,9 @@ A *lexically scoped type variable* can be bound by:
 
 -  An expression type signature (:ref:`exp-type-sigs`)
 
--  A pattern type signature (:ref:`pattern-type-sigs`)
+-  A pattern type signature (:extension:`PatternSignatures`)
 
--  Class and instance declarations (:ref:`cls-inst-scoped-tyvars`)
+-  Class and instance declarations (:extension:`MethodTypeVariables`)
 
 In Haskell, a programmer-written type signature is implicitly quantified
 over its free type variables (`Section
@@ -100,14 +104,31 @@ scope is *not* universally quantified. For example, if type variable
       (e :: b -> b)     means     (e :: forall b. b->b)
       (e :: a -> b)     means     (e :: forall b. a->b)
 
+Extended ForAll Scope
+=====================
+
+.. extension:: ExtendedForAllScope
+    :shortdesc: Enable lexically-scoped type variables in function bindings,
+                pattern synonyms and expression type signatures.
+
+    :since: 9.8.1
+
+    :implied by: :extension:`ScopedTypeVariables`
+
+    :status: Included in :extension:`GHC2021`
+
+    Enable lexical scoping of type variables explicitly introduced with
+    a ``forall`` in function bindings, pattern synonyms and expression type signatures.
+
 .. _decl-type-sigs:
 
 Declaration type signatures
 ---------------------------
 
-A declaration type signature that has *explicit* quantification (using
-``forall``) brings into scope the explicitly-quantified type variables,
-in the definition of the named function. For example: ::
+When :extension:`ExtendedForAllScope` is enabled, a declaration type signature
+that has *explicit* quantification (using ``forall``) brings into scope the
+explicitly-quantified type variables, in the definition of the named function.
+For example: ::
 
       f :: forall a. [a] -> [a]
       f (x:xs) = xs ++ [ x :: a ]
@@ -171,9 +192,9 @@ This only happens if:
 Expression type signatures
 --------------------------
 
-An expression type signature that has *explicit* quantification (using
-``forall``) brings into scope the explicitly-quantified type variables,
-in the annotated expression. For example: ::
+When :extension:`ExtendedForAllScope` is enabled, an expression type signature
+that has *explicit* quantification (using ``forall``) brings into scope the
+explicitly-quantified type variables, in the annotated expression. For example: ::
 
     f = runST ( (op >>= \(x :: STRef s Int) -> g x) :: forall s. ST s Bool )
 
@@ -181,13 +202,22 @@ Here, the type signature ``forall s. ST s Bool`` brings the type
 variable ``s`` into scope, in the annotated expression
 ``(op >>= \(x :: STRef s Int) -> g x)``.
 
-.. _pattern-type-sigs:
+Pattern Signatures
+==================
 
-Pattern type signatures
------------------------
+.. extension:: PatternSignatures
+    :shortdesc: Allow type signatures in patterns.
 
-A type signature may occur in any pattern; this is a *pattern type
-signature*. For example: ::
+    :since: 9.8.1
+
+    :implied by: :extension:`ScopedTypeVariables`
+
+    :status: Included in :extension:`GHC2021`
+
+    Allow type signatures and type variable bindings in patterns.
+
+When :extension:`PatternSignatures` is enabled, a type signature may occur
+in any pattern; this is a *pattern type signature*. For example: ::
 
     -- f and g assume that 'a' is already in scope
     f = \(x::Int, y::a) -> x
@@ -259,12 +289,21 @@ they are both legal whether or not ``a`` is already in scope.
 They differ in that *if* ``a`` is already in scope, the signature constrains
 the pattern, rather than the pattern binding the variable.
 
-.. _cls-inst-scoped-tyvars:
+Method Type Variables
+=====================
 
-Class and instance declarations
--------------------------------
+.. extension:: MethodTypeVariables
+    :shortdesc: Enable lexically-scoped type variables in class and instance declarations.
 
-:extension:`ScopedTypeVariables` allow the type variables bound by the top of a
+    :since: 9.8.1
+
+    :implied by: :extension:`ScopedTypeVariables`
+
+    :status: Included in :extension:`GHC2021`
+
+    Enable lexical scoping of type variables explicitly introduced by class and instance heads.
+
+:extension:`MethodTypeVariables` allow the type variables bound by the top of a
 ``class`` or ``instance`` declaration to scope over the methods defined in the
 ``where`` part. Unlike :ref:`decl-type-sigs`, type variables from class and
 instance declarations can be lexically scoped without an explicit ``forall``
@@ -286,11 +325,11 @@ declaration; see :ref:`explicit-foralls`). For example: ::
       instance forall b. C b => C [b] where
         op xs = reverse (head (xs :: [[b]]))
 
-While :extension:`ScopedTypeVariables` is required for type variables from the
+While :extension:`MethodTypeVariables` is required for type variables from the
 top of a class or instance declaration to scope over the /bodies/ of the
 methods, it is not required for the type variables to scope over the /type
 signatures/ of the methods. For example, the following will be accepted without
-explicitly enabling :extension:`ScopedTypeVariables`: ::
+explicitly enabling :extension:`MethodTypeVariables`: ::
 
       class D a where
         m :: [a] -> a
@@ -302,11 +341,11 @@ explicitly enabling :extension:`ScopedTypeVariables`: ::
 Note that writing ``m :: [a] -> [a]`` requires the use of the
 :extension:`InstanceSigs` extension.
 
-Similarly, :extension:`ScopedTypeVariables` is not required for type variables
+Similarly, :extension:`MethodTypeVariables` is not required for type variables
 from the top of the class or instance declaration to scope over associated type
 families, which only requires the :extension:`TypeFamilies` extension. For
 instance, the following will be accepted without explicitly enabling
-:extension:`ScopedTypeVariables`: ::
+:extension:`MethodTypeVariables`: ::
 
       class E a where
         type T a

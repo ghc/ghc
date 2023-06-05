@@ -31,7 +31,8 @@ module GHC.Rename.HsType (
         -- Binding related stuff
         bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
-        rnImplicitTvOccs, bindSigTyVarsFV, bindHsQTyVars,
+        rnImplicitTvOccs, bindSigTyVarsFV, bindClassInstanceHeadTyVarsFV ,
+        bindHsQTyVars,
         FreeKiTyVars, filterInScopeM,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars,
@@ -150,20 +151,27 @@ rnHsPatSigType :: HsPatSigTypeScoping
                -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
                -> RnM (a, FreeVars)
 -- Used for
---   - Pattern type signatures, which are only allowed with ScopedTypeVariables
+--   - Pattern type signatures, which are only allowed with PatternSignatures
 --   - Signatures on binders in a RULE, which are allowed even if
---     ScopedTypeVariables isn't enabled
+--     PatternSignatures isn't enabled
 -- Wildcards are allowed
 --
 -- See Note [Pattern signature binders and scoping] in GHC.Hs.Type
 rnHsPatSigType scoping ctx sig_ty thing_inside
-  = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
+  = do { ty_sig_okay <- xoptM LangExt.PatternSignatures
+       ; free_var_should_bind <- xoptM LangExt.ExtendedForAllScope
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
        ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubN nwc_rdrs'
              implicit_bndrs = case scoping of
-               AlwaysBind -> tv_rdrs
+               AlwaysBind ->
+                -- `PatternSignatures` doesn't enable binding of
+                -- free type variables in pattern signatures.
+                -- That does `ExtendedForAllScope`.
+                if free_var_should_bind
+                  then tv_rdrs
+                  else []
                NeverBind  -> []
        ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
     do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
@@ -900,18 +908,25 @@ notInKinds _ _ = return ()
 *                                                      *
 ***************************************************** -}
 
-bindSigTyVarsFV :: [Name]
-                -> RnM (a, FreeVars)
-                -> RnM (a, FreeVars)
 -- Used just before renaming the defn of a function
 -- with a separate type signature, to bring its tyvars into scope
--- With no -XScopedTypeVariables, this is a no-op
+-- With no -XExtendedForAllScope/-XMethodTypeVariables, this is a no-op
+bindSigTyVarsFV, bindClassInstanceHeadTyVarsFV :: [Name]
+                                               -> RnM (a, FreeVars)
+                                               -> RnM (a, FreeVars)
+
 bindSigTyVarsFV tvs thing_inside
-  = do  { scoped_tyvars <- xoptM LangExt.ScopedTypeVariables
-        ; if not scoped_tyvars then
-                thing_inside
-          else
-                bindLocalNamesFV tvs thing_inside }
+  = do { extended_for_all_scope <- xoptM LangExt.ExtendedForAllScope
+       ; if extended_for_all_scope
+           then bindLocalNamesFV tvs thing_inside
+           else thing_inside }
+
+bindClassInstanceHeadTyVarsFV tvs thing_inside
+  = do { method_type_variables <- xoptM LangExt.MethodTypeVariables
+       ; if method_type_variables
+           then bindLocalNamesFV tvs thing_inside
+           else thing_inside }
+
 
 ---------------
 bindHsQTyVars :: forall a b.

@@ -18,6 +18,11 @@ Language
     data T @k (a :: k) @(j :: Type) (b :: j)
 
   This feature is guarded behind :extension:`TypeAbstractions`.
+  
+- :extension:`ScopedTypeVariables` was split into several new extensions:
+  :extension:`PatternSignatures`, :extension:`ExtendedForAllScope`, :extension:`MethodTypeVariables`.
+  You can set :extension:`ScopedTypeVariables` to enable them all or enable them individually
+  for more fine-grained control of features that you want to have.
 
 Compiler
 ~~~~~~~~

@@ -95,5 +95,7 @@ docs:
          StandaloneKindSignatures
          FieldSelectors
          TypeAbstractions
+         PatternSignatures
+         ExtendedForAllScope
+         MethodTypeVariables
 extensible fields:
-

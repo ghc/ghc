@@ -2673,8 +2673,9 @@ xFlagsDeps = [
   flagSpec "ParallelListComp"                 LangExt.ParallelListComp,
   flagSpec "PartialTypeSignatures"            LangExt.PartialTypeSignatures,
   flagSpec "PatternGuards"                    LangExt.PatternGuards,
-  depFlagSpec' "PatternSignatures"            LangExt.ScopedTypeVariables
-    (deprecatedForExtension "ScopedTypeVariables"),
+  flagSpec "PatternSignatures"                LangExt.PatternSignatures,
+  flagSpec "MethodTypeVariables"              LangExt.MethodTypeVariables,
+  flagSpec "ExtendedForAllScope"              LangExt.ExtendedForAllScope,
   flagSpec "PatternSynonyms"                  LangExt.PatternSynonyms,
   flagSpec "PolyKinds"                        LangExt.PolyKinds,
   flagSpec "PolymorphicComponents"            LangExt.RankNTypes,
@@ -2767,6 +2768,9 @@ impliedXFlags
 
     -- In accordance with GHC Proposal #448 "Modern Scoped Type Variables"
     , (LangExt.ScopedTypeVariables,       turnOn, LangExt.TypeAbstractions)
+    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.PatternSignatures)
+    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.MethodTypeVariables)
+    , (LangExt.ScopedTypeVariables,       turnOn, LangExt.ExtendedForAllScope)
 
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
 
