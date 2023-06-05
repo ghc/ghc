@@ -33,6 +33,8 @@
 struct NonmovingHeap nonmovingHeap;
 
 uint8_t nonmovingMarkEpoch = 1;
+uint8_t nonmoving_alloca_dense_cnt;
+uint8_t nonmoving_alloca_cnt;
 
 static void nonmovingBumpEpoch(void) {
     nonmovingMarkEpoch = nonmovingMarkEpoch == 1 ? 2 : 1;
@@ -255,6 +257,8 @@ Mutex concurrent_coll_finished_lock;
  *
  *  - Note [Sync phase marking budget] describes how we avoid long mutator
  *    pauses during the sync phase
+ *
+ *  - Note [Allocator sizes] goes into detail about our choice of allocator sizes.
  *
  * [ueno 2016]:
  *   Katsuhiro Ueno and Atsushi Ohori. 2016. A fully concurrent garbage
@@ -539,6 +543,35 @@ Mutex concurrent_coll_finished_lock;
  * TODO: Perhaps sync_phase_marking_budget should be controllable via a
  * command-line argument?
  *
+ *
+ * Note [Allocator sizes]
+ * ~~~~~~~~~~~~~~~~~~~~~~
+ * Our choice of allocator sizes has to balance several considerations:
+ * - Allocator sizes should be available for the most commonly request block sizes,
+ *   in order to avoid excessive waste from rounding up to the next size (internal fragmentation).
+ * - It should be possible to efficiently determine which allocator services
+ *   a certain block size.
+ * - The amount of allocators should be kept down to avoid overheads
+ *   (eg, each capability must have an allocator of each size)
+ *   and the risk of fragmentation.
+ * - It should be possible to efficiently divide by the allocator size.
+ *   This is necessary to implement marking efficiently. It's trivial
+ *   to efficiently divide by powers of 2. But to do so efficiently with
+ *   arbitrary allocator sizes, we need to do some precomputation and make
+ *   use of the integer division by constants optimisation.
+ *
+ * We currenlty try to balance these considerations by adopting the following scheme.
+ * We have nonmoving_alloca_dense_cnt "dense" allocators starting with size
+ * NONMOVING_ALLOCA0, and incrementing by NONMOVING_ALLOCA_DENSE_INCREMENT.
+ * These service the vast majority of allocations.
+ * In practice, Haskell programs tend to allocate a lot of small objects.
+ *
+ * Other allocations are handled by a family of "sparse" allocators, each providing
+ * blocks up to a power of 2. This places an upper bound on the waste at half the
+ * required block size.
+ *
+ * See #23340
+ *
  */
 
 memcount nonmoving_segment_live_words = 0;
@@ -550,6 +583,8 @@ MarkBudget sync_phase_marking_budget = 200000;
 static void* nonmovingConcurrentMark(void *mark_queue);
 #endif
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent);
+static void nonmovingInitAllocator(struct NonmovingAllocator* alloc, uint16_t block_size);
+static void nonmovingInitAllocators(void);
 
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
@@ -577,23 +612,42 @@ void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
     __sync_add_and_fetch(&nonmovingHeap.n_free, 1);
 }
 
-unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
+void nonmovingInitAllocator(struct NonmovingAllocator* alloc, uint16_t block_size)
 {
-  // We compute the overwhelmingly common size cases directly to avoid a very
-  // expensive integer division.
-  switch (log_block_size) {
-    case 3:  return nonmovingBlockCount(3);
-    case 4:  return nonmovingBlockCount(4);
-    case 5:  return nonmovingBlockCount(5);
-    case 6:  return nonmovingBlockCount(6);
-    case 7:  return nonmovingBlockCount(7);
-    default: return nonmovingBlockCount(log_block_size);
-  }
+  *alloc = (struct NonmovingAllocator)
+    { .filled = NULL,
+      .saved_filled = NULL,
+      .active = NULL,
+      .block_size = block_size,
+      .block_count = nonmovingBlockCount(block_size),
+      .block_division_constant = ((uint32_t) -1) / block_size + 1
+    };
 }
+
+void nonmovingInitAllocators(void)
+{
+    nonmoving_alloca_dense_cnt = RtsFlags.GcFlags.nonmovingDenseAllocatorCount;
+    uint16_t first_sparse_allocator = nonmoving_first_sparse_allocator_size();
+    uint16_t nonmoving_alloca_sparse_cnt = log2_ceil(NONMOVING_SEGMENT_SIZE) - first_sparse_allocator;
+    nonmoving_alloca_cnt = nonmoving_alloca_dense_cnt + nonmoving_alloca_sparse_cnt;
+
+    nonmovingHeap.allocators = stgMallocBytes(sizeof(struct NonmovingAllocator) * nonmoving_alloca_cnt, "allocators array");
+
+    // Initialise allocator sizes
+    for (unsigned int i = 0; i < nonmoving_alloca_dense_cnt; i++) {
+      nonmovingInitAllocator(&nonmovingHeap.allocators[i], NONMOVING_ALLOCA0 + i * sizeof(StgWord));
+    }
+    for (unsigned int i = nonmoving_alloca_dense_cnt; i < nonmoving_alloca_cnt; i++) {
+      uint16_t block_size = 1 << (i + first_sparse_allocator - nonmoving_alloca_dense_cnt);
+      nonmovingInitAllocator(&nonmovingHeap.allocators[i], block_size);
+    }
+}
+
 
 void nonmovingInit(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;
+    nonmovingInitAllocators();
 #if defined(THREADED_RTS)
     initMutex(&nonmoving_collection_mutex);
     initCondition(&concurrent_coll_finished);
@@ -647,7 +701,7 @@ static void nonmovingPrepareMark(void)
 
     nonmovingHeap.n_caps = n_capabilities;
     nonmovingBumpEpoch();
-    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+    for (int alloca_idx = 0; alloca_idx < nonmoving_alloca_cnt; ++alloca_idx) {
         struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
 
         // Update current segments' snapshot pointers
@@ -899,7 +953,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 
     // Walk the list of filled segments that we collected during preparation,
     // updated their snapshot pointers and move them to the sweep list.
-    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+    for (int alloca_idx = 0; alloca_idx < nonmoving_alloca_cnt; ++alloca_idx) {
         struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx].saved_filled;
         if (filled) {
             struct NonmovingSegment *seg = filled;
@@ -1147,7 +1201,7 @@ void assert_in_nonmoving_heap(StgPtr p)
         }
     }
 
-    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+    for (int alloca_idx = 0; alloca_idx < nonmoving_alloca_cnt; ++alloca_idx) {
         struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
 
         // Search current segments
@@ -1186,13 +1240,12 @@ void assert_in_nonmoving_heap(StgPtr p)
 void nonmovingPrintSegment(struct NonmovingSegment *seg)
 {
     int num_blocks = nonmovingSegmentBlockCount(seg);
-    uint8_t log_block_size = nonmovingSegmentLogBlockSize(seg);
+    uint16_t block_size = nonmovingSegmentBlockSize(seg);
 
-    debugBelch("Segment with %d blocks of size 2^%d (%d bytes, %u words, scan: %p)\n",
+    debugBelch("Segment with %d blocks of size: %d bytes, %u words, scan: %p\n",
                num_blocks,
-               log_block_size,
-               1 << log_block_size,
-               (unsigned int) ROUNDUP_BYTES_TO_WDS(1 << log_block_size),
+               block_size,
+               (unsigned int) ROUNDUP_BYTES_TO_WDS(block_size),
                (void*)Bdescr((P_)seg)->u.scan);
 
     for (nonmoving_block_idx p_idx = 0; p_idx < seg->next_free; ++p_idx) {
@@ -1211,7 +1264,7 @@ void nonmovingPrintSegment(struct NonmovingSegment *seg)
 void locate_object(P_ obj)
 {
     // Search allocators
-    for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
+    for (int alloca_idx = 0; alloca_idx < nonmoving_alloca_cnt; ++alloca_idx) {
         struct NonmovingAllocator *alloca = &nonmovingHeap.allocators[alloca_idx];
         for (uint32_t cap_n = 0; cap_n < getNumCapabilities(); ++cap_n) {
             Capability *cap = getCapability(cap_n);

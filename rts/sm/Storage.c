@@ -401,7 +401,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 
       // list capabilities' current segments
       if(RtsFlags.GcFlags.useNonmoving) {
-        for (s = 0; s < NONMOVING_ALLOCA_CNT; s++) {
+        for (s = 0; s < nonmoving_alloca_cnt; s++) {
           listSegmentBlocks(cb, user, getCapability(i)->current_segments[s]);
         }
       }
@@ -409,7 +409,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 
   // list blocks on the nonmoving heap
   if(RtsFlags.GcFlags.useNonmoving) {
-    for(s = 0; s < NONMOVING_ALLOCA_CNT; s++) {
+    for(s = 0; s < nonmoving_alloca_cnt; s++) {
       listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].filled);
       listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].saved_filled);
       listSegmentBlocks(cb, user, nonmovingHeap.allocators[s].active);
@@ -2005,7 +2005,7 @@ void rts_clearMemory(void) {
             nonmovingClearSegment(seg);
         }
 
-        for (int i = 0; i < NONMOVING_ALLOCA_CNT; ++i) {
+        for (int i = 0; i < nonmoving_alloca_cnt; ++i) {
             struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[i];
 
             for (struct NonmovingSegment *seg = alloc->active; seg; seg = seg->link) {

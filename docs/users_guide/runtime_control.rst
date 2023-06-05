@@ -418,6 +418,22 @@ performance.
 
     An alias for :rts-flag:`--nonmoving-gc`
 
+.. rts-flag:: --nonmoving-dense-allocator-count=⟨count⟩
+
+    :default: 16
+    :since: 9.10.1
+    :reverse: none
+
+    Specify the amount of dense allocators used by the non-moving garbage collector.
+
+    Increasing this value is likely to decrease the amount of memory lost to
+    internal fragmentation while marginally increasing the baseline memory requirements
+    and potentially regressing other metrics.
+
+    Large values are likely to lead to diminishing returns as
+    , in practice, the Haskell heap tends to be dominated by small objects.
+
+
 .. rts-flag:: -w
 
     :default: off

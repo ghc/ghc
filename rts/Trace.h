@@ -329,7 +329,7 @@ void traceConcSyncEnd(void);
 void traceConcSweepBegin(void);
 void traceConcSweepEnd(void);
 void traceConcUpdRemSetFlush(Capability *cap);
-void traceNonmovingHeapCensus(uint32_t log_blk_size,
+void traceNonmovingHeapCensus(uint16_t blk_size,
                               const struct NonmovingAllocCensus *census);
 
 void traceIPE(const InfoProvEnt *ipe);

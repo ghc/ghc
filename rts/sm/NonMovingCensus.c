@@ -133,7 +133,7 @@ void nonmovingPrintAllocatorCensus(bool collect_live_words)
     if (!RtsFlags.GcFlags.useNonmoving)
         return;
 
-    for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
+    for (int i=0; i < nonmoving_alloca_cnt; i++) {
         struct NonmovingAllocCensus census =
             nonmovingAllocatorCensus_(i, collect_live_words);
 
@@ -147,10 +147,10 @@ void nonmovingTraceAllocatorCensus(void)
     if (!RtsFlags.GcFlags.useNonmoving && !TRACE_nonmoving_gc)
         return;
 
-    for (int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
+    for (int i=0; i < nonmoving_alloca_cnt; i++) {
         const struct NonmovingAllocCensus census = nonmovingAllocatorCensus(i);
-        const uint32_t log_blk_size = i + NONMOVING_ALLOCA0;
-        traceNonmovingHeapCensus(log_blk_size, &census);
+        const uint32_t blk_size = nonmovingHeap.allocators[i].block_size;
+        traceNonmovingHeapCensus(blk_size, &census);
     }
 #endif
 }

@@ -70,9 +70,10 @@ struct NonmovingSegment {
     // N.B. There are also bits of information which are stored in the
     // NonmovingBlockInfo stored in the segment's block descriptor. Namely:
     //
-    //  * the block size can be found in nonmovingBlockInfo(seg)->log_block_size.
     //  * the next_free snapshot can be found in
     //    nonmovingBlockInfo(seg)->next_free_snap.
+    //
+    // Some other information about the block size is stored on NonmovingAllocator.
     //
     // This allows us to mark a nonmoving closure without bringing the
     // NonmovingSegment header into cache.
@@ -88,20 +89,41 @@ struct NonmovingAllocator {
     struct NonmovingSegment *saved_filled;
     struct NonmovingSegment *active;
     // N.B. Per-capabilty "current" segment lives in Capability
+
+    // The size of each block for this allocator.
+    StgWord16 block_size;
+    // The amount of blocks for a segment of this allocator.
+    // See nonmovingBlockCount for how this is calculated.
+    StgWord16 block_count;
+    // A constant for implementing the "division by a constant" optimisation.
+    // Invariant:
+    // (x * block_division_constant >> NONMOVING_ALLOCA_DIVIDE_SHIFT)
+    // = x / block_size
+    StgWord32 block_division_constant;
 };
 
-// first allocator is of size 2^NONMOVING_ALLOCA0 (in bytes)
-#define NONMOVING_ALLOCA0 3
+// first allocator is of size NONMOVING_ALLOCA0 (in bytes)
+#define NONMOVING_ALLOCA0 8
 
-// allocators cover block sizes of 2^NONMOVING_ALLOCA0 to
-// 2^(NONMOVING_ALLOCA0 + NONMOVING_ALLOCA_CNT) (in bytes)
-#define NONMOVING_ALLOCA_CNT 12
+// used in conjuction with NonmovingAllocator.block_division_constant
+// to implement the "division by a constant" optimisation
+#define NONMOVING_ALLOCA_DIVIDE_SHIFT 32
+
+// amount of dense allocators.
+// These cover block sizes starting with NONMOVING_ALLOCA0
+// and increase in increments of NONMOVING_ALLOCA_INCREMENT
+extern uint8_t nonmoving_alloca_dense_cnt;
+
+// total amount of allocators (dense and sparse).
+// allocators cover block sizes of NONMOVING_ALLOCA0 to
+// NONMOVING_SEGMENT_SIZE (in bytes)
+extern uint8_t nonmoving_alloca_cnt;
 
 // maximum number of free segments to hold on to
 #define NONMOVING_MAX_FREE 16
 
 struct NonmovingHeap {
-    struct NonmovingAllocator allocators[NONMOVING_ALLOCA_CNT];
+    struct NonmovingAllocator *allocators;
     // free segment list. This is a cache where we keep up to
     // NONMOVING_MAX_FREE segments to avoid thrashing the block allocator.
     // Note that segments in this list are still counted towards
@@ -154,19 +176,44 @@ void nonmovingCollect(StgWeak **dead_weaks,
 
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
 
+INLINE_HEADER unsigned long log2_ceil(unsigned long x)
+{
+    return (sizeof(unsigned long)*8) - __builtin_clzl(x-1);
+}
+
 INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {
     return &Bdescr((StgPtr) seg)->nonmoving_segment;
 }
 
-INLINE_HEADER uint8_t nonmovingSegmentLogBlockSize(struct NonmovingSegment *seg) {
-    return nonmovingSegmentInfo(seg)->log_block_size;
+// Find the allocator a segement belongs to
+INLINE_HEADER struct NonmovingAllocator nonmovingSegmentAllocator(struct NonmovingSegment *seg) {
+    return nonmovingHeap.allocators[nonmovingSegmentInfo(seg)->allocator_idx];
+}
+
+// Determine the index of the allocator for blocks of a certain size
+INLINE_HEADER uint8_t nonmovingAllocatorForSize(uint16_t block_size){
+   if (block_size - NONMOVING_ALLOCA0 < nonmoving_alloca_dense_cnt * (uint16_t) sizeof(StgWord)) {
+       // dense case
+       return (block_size  - NONMOVING_ALLOCA0) / sizeof(StgWord);
+   }
+   else {
+       // sparse case
+       return log2_ceil(block_size)
+              - log2_ceil(NONMOVING_ALLOCA0 + sizeof(StgWord) * nonmoving_alloca_dense_cnt)
+              + nonmoving_alloca_dense_cnt;
+    }
+}
+
+// The block size of a given segment in bytes.
+INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *seg)
+{
+    return nonmovingSegmentAllocator(seg).block_size;
 }
 
 // Add a segment to the appropriate active list.
 INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 {
-    struct NonmovingAllocator *alloc =
-        &nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+    struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[nonmovingAllocatorForSize(nonmovingSegmentBlockSize(seg))];
     SET_SEGMENT_STATE(seg, ACTIVE);
     while (true) {
         struct NonmovingSegment *current_active = RELAXED_LOAD(&alloc->active);
@@ -180,8 +227,7 @@ INLINE_HEADER void nonmovingPushActiveSegment(struct NonmovingSegment *seg)
 // Add a segment to the appropriate filled list.
 INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 {
-    struct NonmovingAllocator *alloc =
-        &nonmovingHeap.allocators[nonmovingSegmentLogBlockSize(seg) - NONMOVING_ALLOCA0];
+    struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[nonmovingAllocatorForSize(nonmovingSegmentBlockSize(seg))];
     SET_SEGMENT_STATE(seg, FILLED);
     while (true) {
         struct NonmovingSegment *current_filled = (struct NonmovingSegment*) RELAXED_LOAD(&alloc->filled);
@@ -200,52 +246,43 @@ INLINE_HEADER void nonmovingPushFilledSegment(struct NonmovingSegment *seg)
 //
 void assert_in_nonmoving_heap(StgPtr p);
 
-// The block size of a given segment in bytes.
-INLINE_HEADER unsigned int nonmovingSegmentBlockSize(struct NonmovingSegment *seg)
-{
-    return 1 << nonmovingSegmentLogBlockSize(seg);
-}
-
 // How many blocks does a segment with the given block size have?
-INLINE_HEADER unsigned int nonmovingBlockCount(uint8_t log_block_size)
+INLINE_HEADER unsigned int nonmovingBlockCount(uint16_t block_size)
 {
   unsigned int segment_data_size = NONMOVING_SEGMENT_SIZE - sizeof(struct NonmovingSegment);
   segment_data_size -= segment_data_size % SIZEOF_VOID_P;
-  unsigned int blk_size = 1 << log_block_size;
   // N.B. +1 accounts for the byte in the mark bitmap.
-  return segment_data_size / (blk_size + 1);
+  unsigned int block_count = segment_data_size / (block_size + 1);
+  ASSERT(block_count < 0xfff); // must fit into StgWord16
+  return block_count;
 }
-
-unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size);
 
 // How many blocks does the given segment contain? Also the size of the bitmap.
 INLINE_HEADER unsigned int nonmovingSegmentBlockCount(struct NonmovingSegment *seg)
 {
-  return nonmovingBlockCountFromSize(nonmovingSegmentLogBlockSize(seg));
+  return nonmovingSegmentAllocator(seg).block_count;
 }
 
 // Get a pointer to the given block index assuming that the block size is as
 // given (avoiding a potential cache miss when this information is already
 // available). The log_block_size argument must be equal to seg->block_size.
-INLINE_HEADER void *nonmovingSegmentGetBlock_(struct NonmovingSegment *seg, uint8_t log_block_size, nonmoving_block_idx i)
+INLINE_HEADER void *nonmovingSegmentGetBlock_(struct NonmovingSegment *seg, uint16_t block_size, uint16_t block_count, nonmoving_block_idx i)
 {
-  ASSERT(log_block_size == nonmovingSegmentLogBlockSize(seg));
-  // Block size in bytes
-  unsigned int blk_size = 1 << log_block_size;
+  ASSERT(block_size == nonmovingSegmentBlockSize(seg));
   // Bitmap size in bytes
-  W_ bitmap_size = nonmovingBlockCountFromSize(log_block_size) * sizeof(uint8_t);
+  W_ bitmap_size = block_count * sizeof(uint8_t);
   // Where the actual data starts (address of the first block).
   // Use ROUNDUP_BYTES_TO_WDS to align to word size. Note that
   // ROUNDUP_BYTES_TO_WDS returns in _words_, not in _bytes_, so convert it back
   // back to bytes by multiplying with word size.
   W_ data = ROUNDUP_BYTES_TO_WDS(((W_)seg) + sizeof(struct NonmovingSegment) + bitmap_size) * sizeof(W_);
-  return (void*)(data + i*blk_size);
+  return (void*)(data + i*block_size);
 }
 
 // Get a pointer to the given block index.
 INLINE_HEADER void *nonmovingSegmentGetBlock(struct NonmovingSegment *seg, nonmoving_block_idx i)
 {
-  return nonmovingSegmentGetBlock_(seg, nonmovingSegmentLogBlockSize(seg), i);
+  return nonmovingSegmentGetBlock_(seg, nonmovingSegmentBlockSize(seg), nonmovingSegmentBlockCount(seg), i);
 }
 
 // Get the segment which a closure resides in. Assumes that pointer points into
@@ -270,12 +307,23 @@ INLINE_HEADER struct NonmovingSegment *nonmovingGetSegment(StgPtr p)
     return nonmovingGetSegment_unchecked(p);
 }
 
+// Divide x by the block size of the segment.
+INLINE_HEADER uint16_t nonmovingSegmentDivideBySize(struct NonmovingSegment *seg, uint16_t x)
+{
+    return ((StgWord64) x * nonmovingSegmentAllocator(seg).block_division_constant) >> NONMOVING_ALLOCA_DIVIDE_SHIFT;
+}
+
 INLINE_HEADER nonmoving_block_idx nonmovingGetBlockIdx(StgPtr p)
 {
     struct NonmovingSegment *seg = nonmovingGetSegment(p);
     ptrdiff_t blk0 = (ptrdiff_t)nonmovingSegmentGetBlock(seg, 0);
     ptrdiff_t offset = (ptrdiff_t)p - blk0;
-    return (nonmoving_block_idx) (offset >> nonmovingSegmentLogBlockSize(seg));
+    return (nonmoving_block_idx) nonmovingSegmentDivideBySize(seg, offset);
+}
+
+INLINE_HEADER uint16_t nonmoving_first_sparse_allocator_size (void)
+{
+    return log2_ceil(NONMOVING_ALLOCA0 + (nonmoving_alloca_dense_cnt - 1) * sizeof(StgWord) + 1);
 }
 
 // TODO: Eliminate this
@@ -314,7 +362,7 @@ INLINE_HEADER bool nonmovingClosureMarkedThisCycle(StgPtr p)
 INLINE_HEADER bool nonmovingSegmentBeingSwept(struct NonmovingSegment *seg)
 {
     struct NonmovingSegmentInfo *seginfo = nonmovingSegmentInfo(seg);
-    unsigned int n = nonmovingBlockCountFromSize(seginfo->log_block_size);
+    unsigned int n = nonmovingSegmentBlockCount(seg);
     return seginfo->next_free_snap >= n;
 }
 

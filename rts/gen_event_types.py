@@ -131,7 +131,7 @@ event_types = [
     EventType(204, 'CONC_SWEEP_BEGIN',             [],                    'Begin concurrent sweep phase'),
     EventType(205, 'CONC_SWEEP_END',               [],                    'End concurrent sweep phase'),
     EventType(206, 'CONC_UPD_REM_SET_FLUSH',       [CapNo],               'Update remembered set flushed'),
-    EventType(207, 'NONMOVING_HEAP_CENSUS',        [Word8, Word32, Word32, Word32], 'Nonmoving heap census'),
+    EventType(207, 'NONMOVING_HEAP_CENSUS',        [Word16, Word32, Word32, Word32], 'Nonmoving heap census'),
 
     # Ticky-ticky profiling
     EventType(210, 'TICKY_COUNTER_DEF',            VariableLength,        'Ticky-ticky entry counter definition'),

@@ -642,7 +642,7 @@ void checkNonmovingHeap (const struct NonmovingHeap *heap)
     checkLargeObjects(nonmoving_large_objects);
     checkLargeObjects(nonmoving_marked_large_objects);
     checkCompactObjects(nonmoving_compact_objects);
-    for (unsigned int i=0; i < NONMOVING_ALLOCA_CNT; i++) {
+    for (unsigned int i=0; i < nonmoving_alloca_cnt; i++) {
         const struct NonmovingAllocator *alloc = &heap->allocators[i];
         checkNonmovingSegments(alloc->filled);
         checkNonmovingSegments(alloc->saved_filled);
@@ -1115,7 +1115,7 @@ findMemoryLeak (void)
         markBlocks(nonmoving_marked_large_objects);
         markBlocks(nonmoving_compact_objects);
         markBlocks(nonmoving_marked_compact_objects);
-        for (i = 0; i < NONMOVING_ALLOCA_CNT; i++) {
+        for (i = 0; i < nonmoving_alloca_cnt; i++) {
             struct NonmovingAllocator *alloc = &nonmovingHeap.allocators[i];
             markNonMovingSegments(alloc->filled);
             markNonMovingSegments(alloc->saved_filled);
@@ -1231,7 +1231,7 @@ static W_
 countNonMovingHeap(struct NonmovingHeap *heap)
 {
     W_ ret = 0;
-    for (int alloc_idx = 0; alloc_idx < NONMOVING_ALLOCA_CNT; alloc_idx++) {
+    for (int alloc_idx = 0; alloc_idx < nonmoving_alloca_cnt; alloc_idx++) {
         struct NonmovingAllocator *alloc = &heap->allocators[alloc_idx];
         ret += countNonMovingSegments(alloc->filled);
         ret += countNonMovingSegments(alloc->saved_filled);

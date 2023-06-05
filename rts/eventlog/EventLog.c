@@ -1142,12 +1142,12 @@ void postConcMarkEnd(StgWord32 marked_obj_count)
     RELEASE_LOCK(&eventBufMutex);
 }
 
-void postNonmovingHeapCensus(int log_blk_size,
+void postNonmovingHeapCensus(uint16_t blk_size,
                              const struct NonmovingAllocCensus *census)
 {
     ACQUIRE_LOCK(&eventBufMutex);
     postEventHeader(&eventBuf, EVENT_NONMOVING_HEAP_CENSUS);
-    postWord8(&eventBuf, log_blk_size);
+    postWord16(&eventBuf, blk_size);
     postWord32(&eventBuf, census->n_active_segs);
     postWord32(&eventBuf, census->n_filled_segs);
     postWord32(&eventBuf, census->n_live_blocks);
