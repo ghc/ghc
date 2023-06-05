@@ -15,6 +15,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE RoleAnnotations #-}
 
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
@@ -340,6 +341,7 @@ withSomeSNat n k
 --
 -- @since 4.18.0.0
 newtype SSymbol (s :: Symbol) = UnsafeSSymbol String
+type role SSymbol nominal
 
 -- | A explicitly bidirectional pattern synonym relating an 'SSymbol' to a
 -- 'KnownSymbol' constraint.
@@ -442,6 +444,7 @@ withSomeSSymbol s k = k (UnsafeSSymbol s)
 --
 -- @since 4.18.0.0
 newtype SChar (s :: Char) = UnsafeSChar Char
+type role SChar nominal
 
 -- | A explicitly bidirectional pattern synonym relating an 'SChar' to a
 -- 'KnownChar' constraint.
