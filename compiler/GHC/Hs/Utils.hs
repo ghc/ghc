@@ -819,7 +819,7 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
 mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
 
-mkVarBind :: IdP (GhcPass p) -> LHsExpr (GhcPass p) -> LHsBind (GhcPass p)
+mkVarBind :: IdP GhcTc -> LHsExpr GhcTc -> LHsBind GhcTc
 mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
                               var_id = var, var_rhs = rhs }

@@ -1931,15 +1931,6 @@ rep_bind (L loc (PatBind { pat_lhs = pat
         ; ans' <- wrapGenSyms ss ans
         ; return (locA loc, ans') }
 
-rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
- =   do { v' <- lookupBinder v
-        ; e2 <- repLE e
-        ; x <- repNormal e2
-        ; patcore <- repPvar v'
-        ; empty_decls <- coreListM decTyConName []
-        ; ans <- repVal patcore x empty_decls
-        ; return (srcLocSpan (getSrcLoc v), ans) }
-
 rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
                                    , psb_args = args
                                    , psb_def  = pat
@@ -1977,6 +1968,8 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
+
+rep_bind (L _ (VarBind { var_ext = x })) = dataConCantHappen x
 
 repPatSynD :: Core TH.Name
            -> Core (M TH.PatSynArgs)

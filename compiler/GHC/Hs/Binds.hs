@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -120,7 +121,11 @@ type instance XPatBind    GhcTc (GhcPass pR) =
     , ( [CoreTickish]       -- Ticks to put on the rhs, if any
       , [[CoreTickish]] ) ) -- and ticks to put on the bound variables.
 
-type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XVarBind (GhcPass pL) (GhcPass pR) = XVarBindGhc pL pR
+type family XVarBindGhc pL pR where
+  XVarBindGhc 'Typechecked 'Typechecked = NoExtField
+  XVarBindGhc _     _                   = DataConCantHappen
+
 type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExtField
 
 type instance XXHsBindsLR GhcPs pR = DataConCantHappen

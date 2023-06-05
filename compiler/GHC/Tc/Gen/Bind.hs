@@ -780,11 +780,12 @@ checkMonomorphismRestriction mbis lbinds
     no_mr_name _ = Nothing
 
     -- The Haskell 98 monomorphism restriction
+    restricted :: HsBindLR GhcRn GhcRn -> Bool
     restricted (PatBind {})                              = True
-    restricted (VarBind { var_id = v })                  = mr_needed_for v
     restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
                                                            && mr_needed_for (unLoc v)
-    restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
+    restricted (VarBind { var_ext = x })                 = dataConCantHappen x
+    restricted b@(PatSynBind {}) = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
 
     restricted_match mg = matchGroupArity mg == 0
         -- No args => like a pattern binding
@@ -1518,8 +1519,10 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                       Just (TcIdSig sig) -> Right (name, sig)
                       _                  -> Left name
 
-tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
-        -- AbsBind, VarBind impossible
+tcLhs _ _ b@(PatSynBind {}) = pprPanic "tcLhs: PatSynBind" (ppr b)
+  -- pattern synonyms are handled separately; see tc_single
+
+tcLhs _ _ (VarBind { var_ext = x }) = dataConCantHappen x
 
 lookupMBI :: Name -> TcM MonoBindInfo
 -- After typechecking the pattern, look up the binder
