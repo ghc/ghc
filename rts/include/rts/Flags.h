@@ -54,6 +54,7 @@ typedef struct _GC_FLAGS {
     double  pcFreeHeap;
 
     bool         useNonmoving; // default = false
+    uint16_t     nonmovingDenseAllocatorCount; // Amount of dense nonmoving allocators. See Note [Allocator sizes]
     uint32_t     generations;
     bool squeezeUpdFrames;
 

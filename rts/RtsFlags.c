@@ -166,6 +166,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.returnDecayFactor  = 4;
     RtsFlags.GcFlags.useNonmoving       = false;
+    RtsFlags.GcFlags.nonmovingDenseAllocatorCount = 16;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
     RtsFlags.GcFlags.compact            = false;
@@ -1027,6 +1028,17 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
                       RtsFlags.GcFlags.useNonmoving = true;
+                  }
+                  else if (!strncmp("nonmoving-dense-allocator-count=",
+                               &rts_argv[arg][2], 32)) {
+                      OPTION_SAFE;
+                      int32_t threshold = strtol(rts_argv[arg]+34, (char **) NULL, 10);
+                      if (threshold < 1 || threshold > (uint16_t)-1) {
+                        errorBelch("bad value for --nonmoving-dense-allocator-count");
+                        error = true;
+                      } else {
+                        RtsFlags.GcFlags.nonmovingDenseAllocatorCount = threshold;
+                      }
                   }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)

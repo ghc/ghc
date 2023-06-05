@@ -87,7 +87,8 @@
 
 
 struct NonmovingSegmentInfo {
-  StgWord8 log_block_size;
+  StgWord16 allocator_idx; // nonmovingHeap.allocators[allocators_idx] is
+                           // this segment's allocator.
   StgWord16 next_free_snap;
 };
 

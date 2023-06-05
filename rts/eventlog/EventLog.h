@@ -194,7 +194,7 @@ void postIPE(const InfoProvEnt *ipe);
 
 void postConcUpdRemSetFlush(Capability *cap);
 void postConcMarkEnd(StgWord32 marked_obj_count);
-void postNonmovingHeapCensus(int log_blk_size,
+void postNonmovingHeapCensus(uint16_t blk_size,
                              const struct NonmovingAllocCensus *census);
 
 #if defined(TICKY_TICKY)

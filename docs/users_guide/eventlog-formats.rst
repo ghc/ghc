@@ -922,7 +922,7 @@ heap.
 
    :tag: 207
    :length: fixed
-   :field Word8: base-2 logarithm of *blk_sz*.
+   :field Word16: *blk_sz* in bytes.
    :field Word32: number of active segments.
    :field Word32: number of filled segments.
    :field Word32: number of live blocks.
