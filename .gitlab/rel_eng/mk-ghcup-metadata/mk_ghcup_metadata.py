@@ -264,7 +264,7 @@ def setNightlyTags(ghcup_metadata):
     for version in ghcup_metadata['ghcupDownloads']['GHC']:
         if "LatestNightly" in ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"]:
             ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].remove("LatestNightly")
-        ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].append("Nightly")
+            ghcup_metadata['ghcupDownloads']['GHC'][version]["viTags"].append("Nightly")
 
 
 
