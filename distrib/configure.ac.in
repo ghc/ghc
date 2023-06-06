@@ -223,6 +223,10 @@ dnl CONF_CC_OPTS_STAGE[12] accordingly.
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE1], [CONF_CXX_OPTS_STAGE1], [CONF_GCC_LINK_OPTS_STAGE1])
 FP_CC_SUPPORTS_TARGET([$CC], [CONF_CC_OPTS_STAGE2], [CONF_CXX_OPTS_STAGE2], [CONF_GCC_LINK_OPTS_STAGE2])
 
+dnl Pass -Qunused-arguments or otherwise GHC will have very noisy invocations of Clang
+FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE1])
+FP_CC_IGNORE_UNUSED_ARGS([$CC], [CONF_CC_OPTS_STAGE2])
+
 dnl TargetWordSize for settings file
 AC_CHECK_SIZEOF(void *, 4)
 if test "x$ac_cv_sizeof_void_p" = "x0"; then

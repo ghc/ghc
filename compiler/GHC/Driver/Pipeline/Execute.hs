@@ -292,11 +292,7 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
 
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let (as_prog, get_asm_info) =
-                ( applyAssemblerProg $ backendAssemblerProg (backend dflags)
-                , applyAssemblerInfoGetter $ backendAssemblerInfoGetter (backend dflags)
-                )
-        asmInfo <- get_asm_info logger dflags platform
+        let as_prog = applyAssemblerProg $ backendAssemblerProg (backend dflags)
 
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
@@ -330,9 +326,6 @@ runAsPhase with_cpp pipe_env hsc_env location input_fn = do
                        ++ [ GHC.SysTools.Option "-Wa,--no-type-check"
                           | platformArch (targetPlatform dflags) == ArchWasm32]
 
-                       ++ (if any (asmInfo ==) [Clang, AppleClang, AppleClang51]
-                            then [GHC.SysTools.Option "-Qunused-arguments"]
-                            else [])
                        ++ [ GHC.SysTools.Option "-x"
                           , if with_cpp
                               then GHC.SysTools.Option "assembler-with-cpp"
@@ -399,19 +392,6 @@ runForeignJsPhase pipe_env hsc_env _location input_fn = do
   embedJsFile logger dflags tmpfs unit_env input_fn output_fn
   return output_fn
 
-
-applyAssemblerInfoGetter
-    :: DefunctionalizedAssemblerInfoGetter
-    -> Logger -> DynFlags -> Platform -> IO CompilerInfo
-applyAssemblerInfoGetter StandardAssemblerInfoGetter logger dflags _platform =
-    getAssemblerInfo logger dflags
-applyAssemblerInfoGetter JSAssemblerInfoGetter _ _ _ =
-    pure Emscripten
-applyAssemblerInfoGetter DarwinClangAssemblerInfoGetter logger dflags platform =
-    if platformOS platform == OSDarwin then
-        pure Clang
-    else
-        getAssemblerInfo logger dflags
 
 applyAssemblerProg
     :: DefunctionalizedAssemblerProg
