@@ -157,6 +157,12 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- or which exits with an error or help message.
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
+
+  -- If argument tracing is enabled, print the arguments we were given
+  when (Flag_TraceArgs `elem` flags) $ do
+    putStrLn $ "haddock received arguments:"
+    mapM_ (putStrLn . ("  " ++)) args
+
   qual <- rightOrThrowE (qualification flags)
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
@@ -562,7 +568,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
     logger <- getLogger
     dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
 
-    -- We disable pattern match warnings because than can be very
+    -- We disable pattern match warnings because they can be very
     -- expensive to check
     let dynflags'' = unsetPatternMatchWarnings $ updOptLevel 0 dynflags'
 
@@ -587,12 +593,14 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
       -- TODO: handle warnings?
 
       let extra_opts =
-            [ Opt_Haddock
-              -- Include docstrings in .hi-files.
+            [ -- Include docstrings in .hi files.
+              Opt_Haddock
 
-            -- , Opt_WriteInterface
-              -- If we can't use an old .hi-file, save the new one.
-            ] ++ if needHieFiles
+              -- Do not recompile because of changes to optimization flags
+            , Opt_IgnoreOptimChanges
+            ]
+              -- Write .hie files if we need them for hyperlinked src
+              ++ if needHieFiles
                     then [Opt_WriteHie] -- Generate .hie-files
                     else []
           dynflags' = (foldl' gopt_set dynflags extra_opts)

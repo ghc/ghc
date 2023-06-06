@@ -179,7 +179,7 @@ The following options are available:
       * Every entity should span exactly one line. ::
 
             newtype ReaderT r (m :: * -> *) a :: * -> (* -> *) -> * -> *
-          
+
         The one exception to this rule is classes. The body of a class
         is split up with one class member per line, an opening brace on
         the line of the header, and a closing brace on a new line after
@@ -190,7 +190,7 @@ The following options are available:
                 type family Baz a;
                 type Baz a = [(a, a)];
             }
-      
+
       * Entites that are exported only indirectly (for instance data
         constructors visible via a ``ReaderT(..)`` export) have their names
         wrapped in square brackets. ::
@@ -534,6 +534,13 @@ The following options are available:
 .. option:: --print-missing-docs
 
     Print extra information about any undocumented entities.
+
+.. option:: --trace-args
+
+    Make Haddock print the arguments it receives to standard output. This is
+    useful for examining arguments when invoking through `cabal haddock`, as
+    `cabal` uses temporary `response files
+    <https://gcc.gnu.org/wiki/Response_Files>`_ to pass arguments to Haddock.
 
 Using literate or pre-processed source
 --------------------------------------
