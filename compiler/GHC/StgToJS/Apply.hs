@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -49,6 +51,10 @@ import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
+import GHC.Types.Name
+
+import Language.Haskell.Syntax.Module.Name
+import GHC.Unit.Types
 
 import GHC.Stg.Syntax
 
@@ -68,6 +74,7 @@ import GHC.Data.FastString
 import qualified Data.Bits as Bits
 import Data.Monoid
 import Data.Array
+import qualified Data.List as L
 
 -- | Pre-generated functions for fast Apply.
 -- These are bundled with the RTS.
@@ -85,6 +92,13 @@ rtsApply cfg = BlockStat $
      , selectors cfg
      ]
 
+matchVarName :: String -> FastString -> FastString -> Id -> Bool
+matchVarName pkg modu occ (idName -> n)
+  | Just m <- nameModule_maybe n =
+    occ  == occNameFS (nameOccName n) &&
+    modu == moduleNameFS (moduleName m) &&
+    pkg `L.isPrefixOf` (unitIdString (moduleUnitId m))
+  | otherwise = False
 
 -- | Generate an application of some args to an Id.
 --
@@ -97,6 +111,13 @@ genApp
   -> [StgArg]
   -> G (JStat, ExprResult)
 genApp ctx i args
+    -- JSString literals
+    | [StgVarArg v] <- args
+    , matchVarName "base" "GHC.JS.Prim" "unsafeUnpackJSStringUtf8##" i
+    -- `typex_expr` can throw an error for certain bindings so it's important
+    -- that this condition comes after matching on the function name
+    , [top] <- concatMap typex_expr (ctxTarget ctx)
+    = (,ExprInline Nothing) . (top |=) . app "h$decodeUtf8z" <$> varsForId v
 
     -- Case: unpackCStringAppend# "some string"# str
     --
