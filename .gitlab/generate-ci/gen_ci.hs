@@ -114,7 +114,8 @@ data LinuxDistro
   | Ubuntu2004
   | Ubuntu1804
   | Centos7
-  | Alpine
+  | Alpine312
+  | Alpine318
   | AlpineWasm
   | Rocky8
   deriving (Eq)
@@ -293,7 +294,8 @@ distroName Fedora38  = "fedora38"
 distroName Ubuntu1804 = "ubuntu18_04"
 distroName Ubuntu2004 = "ubuntu20_04"
 distroName Centos7    = "centos7"
-distroName Alpine     = "alpine3_12"
+distroName Alpine312  = "alpine3_12"
+distroName Alpine318  = "alpine3_18"
 distroName AlpineWasm = "alpine3_17-wasm"
 distroName Rocky8     = "rocky8"
 
@@ -430,9 +432,7 @@ opsysVariables _ (Windows {}) =
           , "GHC_VERSION" =: "9.4.3" ]
 opsysVariables _ _ = mempty
 
-
-distroVariables :: LinuxDistro -> Variables
-distroVariables Alpine = mconcat
+alpineVariables = mconcat
   [ -- Due to #20266
     "CONFIGURE_ARGS" =: "--disable-ld-override"
   , "INSTALL_CONFIGURE_ARGS" =: "--disable-ld-override"
@@ -441,6 +441,11 @@ distroVariables Alpine = mconcat
     -- T10458, ghcilink002: due to #17869
   , "BROKEN_TESTS" =: "encoding004 T10458"
   ]
+
+
+distroVariables :: LinuxDistro -> Variables
+distroVariables Alpine312 = alpineVariables
+distroVariables Alpine318 = alpineVariables
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
   ]
@@ -997,10 +1002,11 @@ job_groups =
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
      , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.
-     , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static))
+     , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken static))
      -- Dynamically linked build, suitable for building your own static executables on alpine
-     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken vanilla))
-     , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt)))
+     , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine312) (splitSectionsBroken vanilla))
+     , disableValidate (standardBuildsWithConfig AArch64 (Linux Alpine318) (splitSectionsBroken vanilla))
+     , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine312) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
         )
