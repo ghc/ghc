@@ -115,14 +115,15 @@ type (Data.Type.Ord.<=?) :: forall k. k -> k -> Bool
 type (Data.Type.Ord.<=?) m n =
   Data.Type.Ord.OrdCond (Data.Type.Ord.Compare m n) True True False
   :: Bool
-type GHC.TypeLits.Internal.CmpChar :: Char -> Char -> Ordering
-type family GHC.TypeLits.Internal.CmpChar a b
-type GHC.TypeNats.Internal.CmpNat :: GHC.Num.Natural.Natural
-                                     -> GHC.Num.Natural.Natural -> Ordering
-type family GHC.TypeNats.Internal.CmpNat a b
-type GHC.TypeLits.Internal.CmpSymbol :: GHC.Types.Symbol
-                                        -> GHC.Types.Symbol -> Ordering
-type family GHC.TypeLits.Internal.CmpSymbol a b
+type base-4.18.0.0:GHC.TypeLits.Internal.CmpChar :: Char
+                                                    -> Char -> Ordering
+type family base-4.18.0.0:GHC.TypeLits.Internal.CmpChar a b
+type base-4.18.0.0:GHC.TypeNats.Internal.CmpNat :: GHC.Num.Natural.Natural
+                                                   -> GHC.Num.Natural.Natural -> Ordering
+type family base-4.18.0.0:GHC.TypeNats.Internal.CmpNat a b
+type base-4.18.0.0:GHC.TypeLits.Internal.CmpSymbol :: GHC.Types.Symbol
+                                                      -> GHC.Types.Symbol -> Ordering
+type family base-4.18.0.0:GHC.TypeLits.Internal.CmpSymbol a b
 type GHC.TypeNats.Div :: GHC.Num.Natural.Natural
                          -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family GHC.TypeNats.Div a b
