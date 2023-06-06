@@ -222,10 +222,13 @@ deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
 instance Outputable (WarningTxt pass) where
-    ppr (WarningTxt _ lsrc ws)
+    ppr (WarningTxt mcat lsrc ws)
       = case unLoc lsrc of
-          NoSourceText   -> pp_ws ws
-          SourceText src -> ftext src <+> pp_ws ws <+> text "#-}"
+            NoSourceText   -> pp_ws ws
+            SourceText src -> ftext src <+> ctg_doc <+> pp_ws ws <+> text "#-}"
+        where
+          ctg_doc = maybe empty (\ctg -> text "in" <+> doubleQuotes (ppr ctg)) mcat
+
 
     ppr (DeprecatedTxt lsrc  ds)
       = case unLoc lsrc of

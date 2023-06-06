@@ -1234,7 +1234,7 @@ instance OutputableBndrId p
               <+> ppr txt
       where
         ppr_category = case txt of
-                         WarningTxt (Just cat) _ _ -> text "[" <> ppr (unLoc cat) <> text "]"
+                         WarningTxt (Just cat) _ _ -> text "in" <+> doubleQuotes (ppr cat)
                          _ -> empty
 
 {-
