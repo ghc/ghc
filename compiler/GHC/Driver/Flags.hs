@@ -568,6 +568,7 @@ codeGenFlags = EnumSet.fromList
      -- Flags that affect generated code
    , Opt_ExposeAllUnfoldings
    , Opt_NoTypeableBinds
+   , Opt_Haddock
 
      -- Flags that affect catching of runtime errors
    , Opt_CatchNonexhaustiveCases
