@@ -4,8 +4,8 @@ T21115b.hs:9:1: warning:
     scrut ds
     In the RHS of foo :: Double# -> Int#
     In the body of lambda with binder ds :: Double#
-    In the body of letrec with binders fail :: (# #) -> Int#
-    In the body of letrec with binders fail :: (# #) -> Int#
+    In the body of a let with binder fail :: (# #) -> Int#
+    In the body of a let with binder fail :: (# #) -> Int#
     Substitution: <InScope = {}
                    IdSubst   = []
                    TvSubst   = []

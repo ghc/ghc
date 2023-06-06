@@ -565,9 +565,9 @@ lintRecBindings top_lvl pairs thing_inside
            ; lintLetBind top_lvl Recursive bndr' rhs rhs_ty
            ; return ue }
 
-lintLetBody :: [LintedId] -> CoreExpr -> LintM (LintedType, UsageEnv)
-lintLetBody bndrs body
-  = do { (body_ty, body_ue) <- addLoc (BodyOfLetRec bndrs) (lintCoreExpr body)
+lintLetBody :: LintLocInfo -> [LintedId] -> CoreExpr -> LintM (LintedType, UsageEnv)
+lintLetBody loc bndrs body
+  = do { (body_ty, body_ue) <- addLoc loc (lintCoreExpr body)
        ; mapM_ (lintJoinBndrType body_ty) bndrs
        ; return (body_ty, body_ue) }
 
@@ -900,7 +900,7 @@ lintCoreExpr (Let (NonRec tv (Type ty)) body)
                 -- Now extend the substitution so we
                 -- take advantage of it in the body
         ; extendTvSubstL tv ty'        $
-          addLoc (BodyOfLetRec [tv]) $
+          addLoc (BodyOfLet tv) $
           lintCoreExpr body } }
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
@@ -912,7 +912,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
          -- Now lint the binder
        ; lintBinder LetBind bndr $ \bndr' ->
     do { lintLetBind NotTopLevel NonRecursive bndr' rhs rhs_ty
-       ; addAliasUE bndr let_ue (lintLetBody [bndr'] body) } }
+       ; addAliasUE bndr let_ue (lintLetBody (BodyOfLet bndr') [bndr'] body) } }
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
@@ -932,7 +932,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
           -- See Note [Multiplicity of let binders] in Var
         ; ((body_type, body_ue), ues) <-
             lintRecBindings NotTopLevel pairs $ \ bndrs' ->
-            lintLetBody bndrs' body
+            lintLetBody (BodyOfLetRec bndrs') bndrs' body
         ; return (body_type, body_ue  `addUE` scaleUE ManyTy (foldr1 addUE ues)) }
   where
     bndrs = map fst pairs
@@ -3177,7 +3177,8 @@ data LintLocInfo
   | LambdaBodyOf Id     -- The lambda-binder
   | RuleOf Id           -- Rules attached to a binder
   | UnfoldingOf Id      -- Unfolding of a binder
-  | BodyOfLetRec [Id]   -- One of the binders
+  | BodyOfLet Id        -- The let-bound variable
+  | BodyOfLetRec [Id]   -- The binders of the let
   | CaseAlt CoreAlt     -- Case alternative
   | CasePat CoreAlt     -- The *pattern* of the case alternative
   | CaseTy CoreExpr     -- The type field of a case expression
@@ -3467,11 +3468,14 @@ dumpLoc (RuleOf b)
 dumpLoc (UnfoldingOf b)
   = (getSrcLoc b, text "In the unfolding of" <+> pp_binder b)
 
+dumpLoc (BodyOfLet b)
+  = (noSrcLoc, text "In the body of a let with binder" <+> pp_binder b)
+
 dumpLoc (BodyOfLetRec [])
   = (noSrcLoc, text "In body of a letrec with no binders")
 
 dumpLoc (BodyOfLetRec bs@(b:_))
-  = ( getSrcLoc b, text "In the body of letrec with binders" <+> pp_binders bs)
+  = ( getSrcLoc b, text "In the body of a letrec with binders" <+> pp_binders bs)
 
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
