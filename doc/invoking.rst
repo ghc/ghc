@@ -538,8 +538,8 @@ The following options are available:
 .. option:: --trace-args
 
     Make Haddock print the arguments it receives to standard output. This is
-    useful for examining arguments when invoking through `cabal haddock`, as
-    `cabal` uses temporary `response files
+    useful for examining arguments when invoking through ``cabal haddock``, as
+    ``cabal`` uses temporary `response files
     <https://gcc.gnu.org/wiki/Response_Files>`_ to pass arguments to Haddock.
 
 Using literate or pre-processed source
@@ -549,3 +549,51 @@ Since Haddock uses GHC internally, both plain and literate Haskell
 sources are accepted without the need for the user to do anything. To
 use the C pre-processor, however, the user must pass the ``-cpp``
 option to GHC using :option:`--optghc`.
+
+Avoiding recompilation
+----------------------
+
+With the advent of "hi-haddock", Haddock now produces documentation from ``.hi``
+(Haskell interface) files and ``.hie`` (``.hi`` extended) files [#]_, rather
+than typechecked module results. This means that as long as the necessary
+``.hi`` and ``.hie`` files are available (i.e. produced by your build process),
+recompilation can be avoided during documentation generation.
+
+.. [#] Note that ``.hie`` files are only necessary to build documentation which
+       includes hyperlinked source files `like this one
+       <https://hackage.haskell.org/package/base-4.18.0.0/docs/src/GHC.Base.html>`_,
+       while ``.hi`` files are required for all Haddock documentation flavors.
+
+The first step is to ensure that your build process is producing ``.hi`` files
+that contain Haddock docstrings. This requires that you somehow provide the
+``-fwrite-interface`` and ``-haddock`` flags to GHC. If you intend to generate
+documentation that includes hyperlinked source files, you should also provide
+the ``-fwrite-ide-info`` flag to GHC. You may specify the directory in which GHC
+should write the ``.hi`` and ``.hie`` files by providing the
+``-hidir=/path/to/hidir`` and ``-hiedir=/path/to/hiedir`` flags to GHC. If you
+are building your application with ``cabal build``, the default location is in
+``dist-newstyle/build/<arch>-<os>/ghc-<ghc-version>/<component>-0.1.0/build``.
+
+The next step is to ensure that the flags which Haddock passes to GHC will not
+trigger recompilation. Unfortunately, this is not very easy to do if you are
+invoking Haddock through ``cabal haddock``. Upon ``cabal haddock``, Cabal passes
+a ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` (where ``NNNN`` is the Haddock
+version number) flag to Haddock, which forwards the ``-optP=...`` flag to GHC
+and triggers a recompilation (unless the existing build results were also
+created by a ``cabal haddock``). To avoid such a recompilation, one must
+manually extract the arguments passed to Haddock by Cabal and remove the
+``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` flag. This can be achieved using
+the :option:`--trace-args` flag by invoking ``cabal haddock`` with
+``--haddock-option="--trace-args"`` and copying the traced arguments to a script
+which makes an equivalent call to Haddock without the aformentioned flag.
+
+In addition to the above, Cabal passes a temporary directory as ``-hidir`` to
+Haddock by default. Obviously, this also triggers a recompilation for every
+invocation of ``cabal haddock``. To remedy this, pass a
+``--optghc="-hidir=/path/to/hidir"`` flag to Haddock, where ``/path/to/hidir``
+is the path to the directory in which your build process is writing ``.hi``
+files.
+
+Following the steps above will allow you to take full advantage of "hi-haddock"
+and generate Haddock documentation from existing build results without requiring
+any further compilation.
