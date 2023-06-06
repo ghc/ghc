@@ -283,13 +283,13 @@ lintStgExpr (StgOpApp _ args _) =
 
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
-    addLoc (BodyOfLetRec binders) $
+    addLoc (BodyOfLet binders) $
       addInScopeVars binders $
         lintStgExpr body
 
 lintStgExpr (StgLetNoEscape _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
-    addLoc (BodyOfLetRec binders) $
+    addLoc (BodyOfLet binders) $
       addInScopeVars binders $
         lintStgExpr body
 
@@ -446,7 +446,7 @@ data LintFlags = LintFlags { lf_unarised :: !Bool
 data LintLocInfo
   = RhsOf Id            -- The variable bound
   | LambdaBodyOf [Id]   -- The lambda-binder
-  | BodyOfLetRec [Id]   -- One of the binders
+  | BodyOfLet [Id]      -- The binders of the let
 
 dumpLoc :: LintLocInfo -> (SrcSpan, SDoc)
 dumpLoc (RhsOf v) =
@@ -454,8 +454,8 @@ dumpLoc (RhsOf v) =
 dumpLoc (LambdaBodyOf bs) =
   (srcLocSpan (getSrcLoc (head bs)), text " [in body of lambda with binders " <> pp_binders bs <> char ']' )
 
-dumpLoc (BodyOfLetRec bs) =
-  (srcLocSpan (getSrcLoc (head bs)), text " [in body of letrec with binders " <> pp_binders bs <> char ']' )
+dumpLoc (BodyOfLet bs) =
+  (srcLocSpan (getSrcLoc (head bs)), text " [in body of let with binders " <> pp_binders bs <> char ']' )
 
 
 pp_binders :: [Id] -> SDoc
