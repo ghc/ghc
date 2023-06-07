@@ -238,12 +238,8 @@ pprImm p (ImmIndex l i) = pprAsmLabel p l <> char '+' <> int i
 pprImm _ (ImmLit s)     = ftext s
 
 -- TODO: See pprIm below for why this is a bad idea!
-pprImm _ (ImmFloat f)
-  | f == 0 = text "wzr"
-  | otherwise = float (fromRational f)
-pprImm _ (ImmDouble d)
-  | d == 0 = text "xzr"
-  | otherwise = double (fromRational d)
+pprImm _ (ImmFloat f) = float (fromRational f)
+pprImm _ (ImmDouble d) = double (fromRational d)
 
 pprImm p (ImmConstantSum a b) = pprImm p a <> char '+' <> pprImm p b
 pprImm p (ImmConstantDiff a b) = pprImm p a <> char '-'
@@ -278,9 +274,9 @@ pprIm platform im = case im of
   --
   -- We could also just turn them into statics :-/ Which is what the
   -- PowerPC backend does.
-  ImmFloat f | f == 0 -> text "wzr"
+  ImmFloat f | f == 0 -> text "zero"
   ImmFloat f -> char '#' <> float (fromRational f)
-  ImmDouble d | d == 0 -> text "xzr"
+  ImmDouble d | d == 0 -> text "zero"
   ImmDouble d -> char '#' <> double (fromRational d)
   -- =<lbl> pseudo instruction!
   ImmCLbl l    -> char '=' <> pprAsmLabel platform l
@@ -412,9 +408,24 @@ isFloatOp (OpReg _ (RegVirtual (VirtualRegF _))) = True
 isFloatOp (OpReg _ (RegVirtual (VirtualRegD _))) = True
 isFloatOp _ = False
 
+isSingleOp :: Operand -> Bool
+isSingleOp (OpReg W32 _) = True
+isSingleOp _ = False
+
+isDoubleOp :: Operand -> Bool
+isDoubleOp (OpReg W64 _) = True
+isDoubleOp _ = False
+
 isImmOp :: Operand -> Bool
 isImmOp (OpImm _) = True
 isImmOp _ = False
+
+isImmZero :: Operand -> Bool
+isImmZero (OpImm (ImmFloat 0)) = True
+isImmZero (OpImm (ImmDouble 0)) = True
+isImmZero (OpImm (ImmInt 0)) = True
+isImmZero _ = False
+
 
 isLabel :: Target -> Bool
 isLabel (TBlock _) = True
@@ -455,7 +466,7 @@ pprInstr platform instr = case instr of
   -- AArch64 Instruction Set
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd") o1 o2 o3
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfadd." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     -- This case is used for sign extension: SEXT.W op
     | OpReg W64 _ <- o1 , OpReg W32 _ <- o2, isImmOp o3 -> op3 (text "\taddiw") o1 o2 o3
     | otherwise -> op3 (text "\tadd") o1 o2 o3
@@ -464,7 +475,7 @@ pprInstr platform instr = case instr of
   --   | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
   --   | otherwise -> op2 (text "\tcmp") o1 o2
   MUL  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul") o1 o2 o3
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
   SMULH o1 o2 o3 -> op3 (text "\tmulh") o1 o2 o3
   SMULL o1 o2 o3 -> op3 (text "\tsmull") o1 o2 o3
@@ -473,14 +484,14 @@ pprInstr platform instr = case instr of
     | otherwise -> op2 (text "\tneg") o1 o2
   DIV o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
   -- TODO: This must (likely) be refined regarding width
-    -> op3 (text "\tfdiv") o1 o2 o3
+    -> op3 (text "\tfdiv." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
   DIV o1 o2 o3 -> op3 (text "\tdiv") o1 o2 o3
   REM o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
     -> panic $ "pprInstr - REM not implemented for floats (yet)"
   REM o1 o2 o3 -> op3 (text "\trem") o1 o2 o3
 
   SUB  o1 o2 o3
-    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub") o1 o2 o3
+    | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3
     | isImmOp o3 -> op3 (text "\taddi") o1 o2 (negOp o3)
     | otherwise -> op3 (text "\tsub")  o1 o2 o3
   DIVU o1 o2 o3 -> op3 (text "\tdivu") o1 o2 o3
@@ -503,7 +514,14 @@ pprInstr platform instr = case instr of
   LSL o1 o2 o3  -> op3 (text "\tsll") o1 o2 o3
   LSR o1 o2 o3  -> op3 (text "\tsrl") o1 o2 o3
   MOV o1 o2
-    | isFloatOp o1 || isFloatOp o2 -> op2 (text "\tfmov") o1 o2
+    | isFloatOp o1 && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.d") o1 o2 -- fmv.d rd, rs is pseudo op fsgnj.d rd, rs, rs
+    | isFloatOp o1 && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.s") o1 o2 -- fmv.s rd, rs is pseudo op fsgnj.s rd, rs, rs
+    | isFloatOp o1 && isImmZero o2 && isDoubleOp o1 -> op2 (text "\tfcvt.d.w") o1 zero
+    | isFloatOp o1 && isImmZero o2 && isSingleOp o1 -> op2 (text "\tfcvt.s.w") o1 zero
+    | isFloatOp o1 && not (isFloatOp o2) && isSingleOp o1 -> op2 (text "\tfmv.w.x") o1 o2
+    | isFloatOp o1 && not (isFloatOp o2) && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
+    | not (isFloatOp o1) && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
+    | not (isFloatOp o1) && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
     | isImmOp o2
     , (OpImm (ImmInteger i)) <- o2
     , fitsIn12bitImm i
@@ -593,6 +611,8 @@ pprInstr platform instr = case instr of
   STR II16 o1 o2 -> op2 (text "\tsh") o1 o2
   STR II32 o1 o2 -> op2 (text "\tsw") o1 o2
   STR II64 o1 o2 -> op2 (text "\tsd") o1 o2
+  STR FF32 o1 o2 -> op2 (text "\tfsw") o1 o2
+  STR FF64 o1 o2 -> op2 (text "\tfsd") o1 o2
   STR f o1 o2    -> pprPanic "RV64.pprInstr - STR not implemented for ... "
                               (text "STR" <+> (text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
 
@@ -621,8 +641,8 @@ pprInstr platform instr = case instr of
   LDR II16 o1 o2 -> op2 (text "\tlh") o1 o2
   LDR II32 o1 o2 -> op2 (text "\tlw") o1 o2
   LDR II64 o1 o2 -> op2 (text "\tld") o1 o2
-  LDR f o1 o2    -> pprPanic "RV64.pprInstr - LDR not implemented for ... "
-                              (text "LDR" <+> (text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
+  LDR FF32 o1 o2 -> op2 (text "\tflw") o1 o2
+  LDR FF64 o1 o2 -> op2 (text "\tfld") o1 o2
   -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   -- STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3
