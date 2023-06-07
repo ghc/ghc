@@ -141,8 +141,6 @@ data BuildConfig
                 , llvmBootstrap  :: Bool
                 , withAssertions :: Bool
                 , withNuma       :: Bool
-                , withZstd       :: Bool
-                , withIpe        :: Bool
                 , crossTarget    :: Maybe String
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
@@ -156,11 +154,10 @@ data BuildConfig
 -- Extra arguments to pass to ./configure due to the BuildConfig
 configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = unwords $
-     ["--enable-unregisterised"| unregisterised bc ]
+  ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
   ++ ["--with-intree-gmp" | Just _ <- pure (crossTarget bc) ]
   ++ ["--with-system-libffi" | crossTarget bc == Just "wasm32-wasi" ]
-  ++ ["--enable-ipe-data-compression" | withZstd bc ]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
@@ -171,19 +168,13 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [FullyStatic | fullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
-           [BootNonmovingGc | validateNonmovingGc ] ++
-           [Ipe | withIpe]
+           [BootNonmovingGc | validateNonmovingGc ]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
-data FlavourTrans =
-      Llvm
-    | Dwarf
-    | FullyStatic
-    | ThreadSanitiser
-    | NoSplitSections
+data FlavourTrans
+    = Llvm | Dwarf | FullyStatic | ThreadSanitiser | NoSplitSections
     | BootNonmovingGc
-    | Ipe
 
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
@@ -201,8 +192,6 @@ vanilla = BuildConfig
   , llvmBootstrap  = False
   , withAssertions = False
   , withNuma = False
-  , withZstd = False
-  , withIpe  = False
   , crossTarget = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
@@ -233,16 +222,7 @@ debug = vanilla { buildFlavour = SlowValidate
                 , withAssertions = True
                 -- WithNuma so at least one job tests Numa
                 , withNuma = True
-
-                -- Build with IPE in debug so at least one job tests
-                -- uncompressed IPE data
-                , withIpe = True
                 }
-
-ipe :: BuildConfig
-ipe = vanilla { withIpe = True
-              , withZstd = True
-              }
 
 static :: BuildConfig
 static = vanilla { fullyStatic = True }
@@ -333,19 +313,18 @@ testEnv arch opsys bc = intercalate "-" $
 
 -- | The hadrian flavour string we are going to use for this build
 flavourString :: Flavour -> String
-flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . flavour_string) trans
+flavourString (Flavour base trans) = baseString base ++ concatMap (("+" ++) . flavourString) trans
   where
-    base_string Release = "release"
-    base_string Validate = "validate"
-    base_string SlowValidate = "slow-validate"
+    baseString Release = "release"
+    baseString Validate = "validate"
+    baseString SlowValidate = "slow-validate"
 
-    flavour_string Llvm = "llvm"
-    flavour_string Dwarf = "debug_info"
-    flavour_string FullyStatic = "fully_static"
-    flavour_string ThreadSanitiser = "thread_sanitizer"
-    flavour_string NoSplitSections = "no_split_sections"
-    flavour_string BootNonmovingGc = "boot_nonmoving_gc"
-    flavour_string Ipe = "ipe"
+    flavourString Llvm = "llvm"
+    flavourString Dwarf = "debug_info"
+    flavourString FullyStatic = "fully_static"
+    flavourString ThreadSanitiser = "thread_sanitizer"
+    flavourString NoSplitSections = "no_split_sections"
+    flavourString BootNonmovingGc = "boot_nonmoving_gc"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -538,7 +517,7 @@ manualRule rules = rules { when = Manual }
 -- For example, even if you don't explicitly disable a rule it will end up in the
 -- rule list with the OFF state.
 enumRules :: OnOffRules -> [OnOffRule]
-enumRules o = map lkup rulesList
+enumRules o = map lkup rules
   where
     enabled_rules = rule_set o
     lkup r = OnOffRule (if S.member r enabled_rules then On else Off) r
@@ -574,7 +553,6 @@ data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
           | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
           | NonmovingGc  -- ^ Only run this job when the "non-moving GC" label is set.
-          | IpeData      -- ^ Only run this job when the "IPE" label is set
           | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
@@ -601,14 +579,12 @@ ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
 ruleString Off Nightly = "$NIGHTLY == null"
-ruleString On IpeData = "$CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/"
-ruleString Off IpeData = true
 ruleString On Disable = false
 ruleString Off Disable = true
 
 -- Enumeration of all the rules
-rulesList :: [Rule]
-rulesList = [minBound .. maxBound]
+rules :: [Rule]
+rules = [minBound .. maxBound]
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -897,7 +873,6 @@ job_groups =
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , disableValidate (validateBuilds Amd64 (Linux Debian10) ipe)
      , -- Nightly allowed to fail: #22520
        modifyNightlyJobs allowFailure
          (modifyValidateJobs manual tsan_jobs)
@@ -905,7 +880,7 @@ job_groups =
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
-     , addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) ipe)
+
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
