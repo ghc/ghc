@@ -20,6 +20,10 @@
 #include <fs_rts.h>
 #include <string.h>
 
+#if HAVE_LIBZSTD == 1
+#include <zstd.h>
+#endif
+
 #if defined(TRACING)
 #include "Trace.h"
 #endif
@@ -36,8 +40,9 @@ collecting IPE lists on registration.
 
 It's a singly linked list of IPE list buffers (IpeBufferListNode). These are
 emitted by the code generator, with generally one produced per module. Each
-contains an array of IPE entries and a link field (which is used to link
-buffers onto the pending list.
+contains a pointer to a list of IPE entries, a pointer to a list of info
+table pointers, and a link field (which is used to link buffers onto the
+pending list.
 
 For reasons of space efficiency, IPE entries are represented slightly
 differently in the object file than the InfoProvEnt which we ultimately expose
@@ -77,22 +82,22 @@ void exitIpe(void) { }
 
 #endif // THREADED_RTS
 
-static InfoProvEnt ipeBufferEntryToIpe(const IpeBufferListNode *node, const IpeBufferEntry *ent)
+static InfoProvEnt ipeBufferEntryToIpe(const char *strings, const StgInfoTable *tbl, const IpeBufferEntry ent)
 {
-    const char *strings = node->string_table;
     return (InfoProvEnt) {
-            .info = ent->info,
+            .info = tbl,
             .prov = {
-                .table_name = &strings[ent->table_name],
-                .closure_desc = &strings[ent->closure_desc],
-                .ty_desc = &strings[ent->ty_desc],
-                .label = &strings[ent->label],
-                .module = &strings[ent->module_name],
-                .src_file = &strings[ent->src_file],
-                .src_span = &strings[ent->src_span]
+                .table_name = &strings[ent.table_name],
+                .closure_desc = &strings[ent.closure_desc],
+                .ty_desc = &strings[ent.ty_desc],
+                .label = &strings[ent.label],
+                .module = &strings[ent.module_name],
+                .src_file = &strings[ent.src_file],
+                .src_span = &strings[ent.src_span]
             }
     };
 }
+
 
 #if defined(TRACING)
 static void traceIPEFromHashTable(void *data STG_UNUSED, StgWord key STG_UNUSED,
@@ -105,8 +110,18 @@ void dumpIPEToEventLog(void) {
     // Dump pending entries
     IpeBufferListNode *cursor = RELAXED_LOAD(&ipeBufferList);
     while (cursor != NULL) {
+        IpeBufferEntry *entries;
+        char *strings;
+
+        // Decompress if compressed
+        decompressIPEBufferListNodeIfCompressed(cursor, &entries, &strings);
+
         for (uint32_t i = 0; i < cursor->count; i++) {
-            const InfoProvEnt ent = ipeBufferEntryToIpe(cursor, &cursor->entries[i]);
+            const InfoProvEnt ent = ipeBufferEntryToIpe(
+                strings,
+                cursor->tables[i],
+                entries[i]
+            );
             traceIPE(&ent);
         }
         cursor = cursor->next;
@@ -119,6 +134,7 @@ void dumpIPEToEventLog(void) {
     }
     RELEASE_LOCK(&ipeMapLock);
 }
+
 
 #else
 
@@ -169,16 +185,85 @@ void updateIpeMap() {
     }
 
     while (pending != NULL) {
-        IpeBufferListNode *currentNode = pending;
-        InfoProvEnt *ip_ents = stgMallocBytes(sizeof(InfoProvEnt) * currentNode->count, "updateIpeMap");
-        for (uint32_t i = 0; i < currentNode->count; i++) {
-            const IpeBufferEntry *ent = &currentNode->entries[i];
-            ip_ents[i] = ipeBufferEntryToIpe(currentNode, ent);
-            insertHashTable(ipeMap, (StgWord) ent->info, &ip_ents[i]);
+        IpeBufferListNode *current_node = pending;
+        IpeBufferEntry *entries;
+        char *strings;
+
+        // Decompress if compressed
+        decompressIPEBufferListNodeIfCompressed(current_node, &entries, &strings);
+
+        // Convert the on-disk IPE buffer entry representation (IpeBufferEntry)
+        // into the runtime representation (InfoProvEnt)
+        InfoProvEnt *ip_ents = stgMallocBytes(
+            sizeof(InfoProvEnt) * current_node->count,
+            "updateIpeMap: ip_ents"
+        );
+        for (uint32_t i = 0; i < current_node->count; i++) {
+            const IpeBufferEntry ent = entries[i];
+            const StgInfoTable *tbl = current_node->tables[i];
+            ip_ents[i] = ipeBufferEntryToIpe(strings, tbl, ent);
+            insertHashTable(ipeMap, (StgWord) tbl, &ip_ents[i]);
         }
 
-        pending = currentNode->next;
+        pending = current_node->next;
     }
 
     RELEASE_LOCK(&ipeMapLock);
+}
+
+/* Decompress the IPE data and strings table referenced by an IPE buffer list
+node if it is compressed. No matter whether the data is compressed, the pointers
+referenced by the 'entries_dst' and 'string_table_dst' parameters will point at
+the decompressed IPE data and string table for the given node, respectively,
+upon return from this function.
+*/
+void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node, IpeBufferEntry **entries_dst, char **string_table_dst) {
+    if (node->compressed == 1) {
+        // The IPE list buffer node indicates that the strings table and
+        // entries list has been compressed. If zstd is not available, fail.
+        // If zstd is available, decompress.
+#if HAVE_LIBZSTD == 0
+        barf("An IPE buffer list node has been compressed, but the "
+             "decompression library (zstd) is not available."
+);
+#else
+        size_t compressed_sz = ZSTD_findFrameCompressedSize(
+            node->string_table,
+            node->string_table_size
+        );
+        char *decompressed_strings = stgMallocBytes(
+            node->string_table_size,
+            "updateIpeMap: decompressed_strings"
+        );
+        ZSTD_decompress(
+            decompressed_strings,
+            node->string_table_size,
+            node->string_table,
+            compressed_sz
+        );
+        *string_table_dst = decompressed_strings;
+
+        // Decompress the IPE data
+        compressed_sz = ZSTD_findFrameCompressedSize(
+            node->entries,
+            node->entries_size
+        );
+        void *decompressed_entries = stgMallocBytes(
+            node->entries_size,
+            "updateIpeMap: decompressed_entries"
+        );
+        ZSTD_decompress(
+            decompressed_entries,
+            node->entries_size,
+            node->entries,
+            compressed_sz
+        );
+        *entries_dst = decompressed_entries;
+#endif // HAVE_LIBZSTD == 0
+
+    } else {
+        // Not compressed, no need to decompress
+        *entries_dst = node->entries;
+        *string_table_dst = node->string_table;
+    }
 }

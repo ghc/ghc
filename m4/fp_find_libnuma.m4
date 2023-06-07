@@ -30,7 +30,7 @@ AC_DEFUN([FP_FIND_LIBNUMA],
           [Enable NUMA memory policy and thread affinity support in the
            runtime system via numactl's libnuma [default=auto]])])
 
-  if test "$enable_numa" != "no" ; then
+  if test "$enable_numa" = "yes" ; then
     CFLAGS2="$CFLAGS"
     CFLAGS="$LIBNUMA_CFLAGS $CFLAGS"
     LDFLAGS2="$LDFLAGS"
@@ -41,7 +41,7 @@ AC_DEFUN([FP_FIND_LIBNUMA],
     if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
       AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
     fi
-    if test "$enable_numa:$HaveLibNuma" = "yes:0" ; then
+    if test "$HaveLibNuma" = "0" ; then
         AC_MSG_ERROR([Cannot find system libnuma (required by --enable-numa)])
     fi
 

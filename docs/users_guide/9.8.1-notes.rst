@@ -148,6 +148,20 @@ Compiler
   `-ddump-spec-constr`, allowing only output from the typeclass specialiser or
   `SpecConstr` to be seen if desired.
 
+- The compiler may now be configured to compress the debugging information
+  included in :ghc-flag:`-finfo-table-map` enabled binaries. To do so, one must
+  build GHC from source (see
+  `here<https://gitlab.haskell.org/ghc/ghc/-/wikis/building>` for directions)
+  and supply the ``--enable-ipe-data-compression`` flag to the ``configure``
+  script. **Note**: This feature requires that the machine building GHC has
+  `libzstd <https://github.com/facebook/zstd/>`_ version 1.4.0 or greater
+  installed. The compression library `libzstd` may optionally be statically
+  linked in the resulting compiler (on non-darwin machines) using the
+  `--enable-static-libzstd` configure flag.
+
+  In a test compiling GHC itself, the size of the :ghc-flag:`-finfo-table-map`
+  enabled build results was reduced by over 20% when compression was enabled.
+
 GHCi
 ~~~~
 

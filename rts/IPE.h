@@ -17,5 +17,6 @@ void dumpIPEToEventLog(void);
 void updateIpeMap(void);
 void initIpe(void);
 void exitIpe(void);
+void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode*, IpeBufferEntry**, char**);
 
 #include "EndPrivate.h"
