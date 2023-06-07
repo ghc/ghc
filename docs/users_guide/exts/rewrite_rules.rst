@@ -204,7 +204,7 @@ From a semantic point of view:
    (b) large or a redex, then it would not be substituted, and the rule
    would not fire.
 
--  GHC will never match a forall'd variable in a template with an expression
+-  GHC will never match a pattern variable in a template with an expression
    which contains locally bound variables. For example, it is permitted to write
    a rule which contains a case expression::
 
@@ -254,13 +254,13 @@ From a semantic point of view:
 
         prog x = case x of (m, n) -> test ((\p q -> p) m n) 0
 
--  A rule that has a forall binder with a polymorphic type, is likely to fail to fire. E. g., ::
+-  A rule that has a pattern variable with a polymorphic type, is likely to fail to fire. E. g., ::
 
-        {-# RULES forall (x :: forall a. Num a => a -> a).  f x = blah #-}
+        {-# RULES "f" forall (x :: forall a. Num a => a -> a).  f x = blah #-}
 
-   Here ``x`` has a polymorphic type.  This applies to a forall'd binder with a type class constraint, such as::
+   Here ``x`` has a polymorphic type.  The same holds for pattern variables with a type class constraint, such as::
 
-        {-# RULES forall @m (x :: KnownNat m => Proxy m).  g x = blah #-}
+        {-# RULES "g" forall m. forall (x :: KnownNat m => Proxy m).  g x = blah #-}
 
    See :ghc-ticket:`21093` for discussion.
 
