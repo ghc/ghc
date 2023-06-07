@@ -10,11 +10,13 @@ import qualified Data.ByteString.Internal as BSI
 import GHC.IO (unsafePerformIO)
 #endif
 
+import GHC.Data.FastString (fastStringToShortText)
 import GHC.Prelude
 import GHC.Platform
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
 import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
 
 import GHC.Cmm

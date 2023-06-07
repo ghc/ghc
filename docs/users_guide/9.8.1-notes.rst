@@ -128,17 +128,6 @@ Compiler
 
   GHC used to accept the contradictory ``Int~Bool`` in the type signature, but reject the ``Int~Bool`` constraint that arises from typechecking the definition itself.  Now it accepts both.  More details in `GHC ticket #23413 <https://gitlab.haskell.org/ghc/ghc/-/issues/23413>`_, which gives examples of the previous inconsistency.  GHC now implements the "PermissivePlan" described in that ticket.
 
-- The compiler may now be configured to compress the debugging information
-  included in :ghc-flag:`-finfo-table-map` enabled binaries. To do so, one must
-  build GHC from source (see
-  `here<https://gitlab.haskell.org/ghc/ghc/-/wikis/building>` for directions)
-  and supply the ``--enable-ipe-data-compression`` flag to the ``configure``
-  script. **Note**: This feature requires that the machine building GHC has
-  `libzstd <https://github.com/facebook/zstd/>`_ installed.
-
-  In a test compiling GHC itself, the size of the :ghc-flag:`-finfo-table-map`
-  enabled build results was reduced by over 20% when compression was enabled.
-
 GHCi
 ~~~~
 
