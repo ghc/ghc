@@ -2,14 +2,8 @@
 
 module GHC.StgToCmm.InfoTableProv (emitIpeBufferListNode) where
 
-import Foreign
-import Foreign.C.Types
-
-import GHC.Data.FastString (fastStringToShortText)
-import GHC.IO (unsafePerformIO)
 import GHC.Prelude
 import GHC.Platform
-import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
@@ -25,13 +19,20 @@ import GHC.StgToCmm.Monad
 import GHC.Data.ShortText (ShortText)
 import qualified GHC.Data.ShortText as ST
 
-import Control.Monad.Trans.State.Strict
+import Data.Word (Word32)
 
+import qualified Data.Map.Strict as M
+import Control.Monad.Trans.State.Strict
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
-import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Map.Strict as M
+
+do_compress :: Int
+#if defined(HAVE_LIBZSTD)
+do_compress = 1
+#else
+do_compress = 0
+#endif
 
 emitIpeBufferListNode ::
      Module
@@ -56,15 +57,8 @@ emitIpeBufferListNode this_mod ents = do
         tables :: [CmmStatic]
         tables = map (CmmStaticLit . CmmLabel . ipeInfoTablePtr) cg_ipes
 
-        uncompressed_strings :: BS.ByteString
-        uncompressed_strings = getStringTableStrings strtab
-
         strings_bytes :: BS.ByteString
-        strings_bytes =
-          if do_compress == 1 then
-            compress defaultCompressionLevel uncompressed_strings
-          else
-            uncompressed_strings
+        strings_bytes = getStringTableStrings strtab
 
         strings :: [CmmStatic]
         strings = [CmmString strings_bytes]
@@ -122,22 +116,13 @@ emitIpeBufferListNode this_mod ents = do
       (Section Data ipe_buffer_lbl)
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
 
--- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.
--- If compression is enabled, the fields are converted to a bytestring,
--- compressed, and then emitted as a string. If compression is not enabled, the
--- fields are emitted as a list of 32 bit words.
+-- | Emit the fields of an @IpeBufferEntry@ as a list of 'Word32's for each
+-- 'CgInfoProvEnt' in the given list
 toIpeBufferEntries ::
-     [CgInfoProvEnt] -- ^ List of IPE buffer entries
+     [CgInfoProvEnt] -- ^ List of buffer entries to emit
   -> [CmmStatic]
 toIpeBufferEntries cg_ipes =
-    if do_compress == 1 then
-      [ CmmString
-      . compress defaultCompressionLevel
-      . BSL.toStrict . BSB.toLazyByteString . mconcat
-      $ map (mconcat . map (BSB.word32BE) . to_ipe_buf_ent) cg_ipes
-      ]
-    else
-      concatMap (map int32 . to_ipe_buf_ent) cg_ipes
+    concatMap (map int32 . to_ipe_buf_ent) cg_ipes
   where
     int32 n = CmmStaticLit $ CmmInt (fromIntegral n) W32
 
@@ -222,47 +207,6 @@ lookupStringTable str = state $ \st ->
                         }
               res = fromIntegral (stLength st)
           in (res, st')
-
-do_compress :: Int
-compress    :: Int -> BS.ByteString -> BS.ByteString
-#if !defined(HAVE_LIBZSTD)
-do_compress   = 0
-compress _ bs = bs
-#else
-do_compress = 1
-
-compress clvl (BSI.PS srcForeignPtr off len) = unsafePerformIO $
-    withForeignPtr srcForeignPtr $ \srcPtr -> do
-      maxCompressedSize <- zstd_compress_bound $ fromIntegral len
-      dstForeignPtr <- BSI.mallocByteString (fromIntegral maxCompressedSize)
-      withForeignPtr dstForeignPtr $ \dstPtr -> do
-        compressedSize <- fromIntegral <$>
-          zstd_compress
-            dstPtr
-            maxCompressedSize
-            (srcPtr `plusPtr` off)
-            (fromIntegral len)
-            (fromIntegral clvl)
-        BSI.create compressedSize $ \p -> BSI.memcpy p dstPtr compressedSize
-
-foreign import ccall unsafe "ZSTD_compress"
-    zstd_compress ::
-         Ptr dst -- ^ Destination buffer
-      -> CSize   -- ^ Capacity of destination buffer
-      -> Ptr src -- ^ Source buffer
-      -> CSize   -- ^ Size of source buffer
-      -> CInt    -- ^ Compression level
-      -> IO CSize
-
--- | Compute the maximum compressed size for a given source buffer size
-foreign import ccall unsafe "ZSTD_compressBound"
-    zstd_compress_bound ::
-         CSize -- ^ Size of source buffer
-      -> IO CSize
-#endif
-
-defaultCompressionLevel :: Int
-defaultCompressionLevel = 3
 
 newtype DList a = DList ([a] -> [a])
 
