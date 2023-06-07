@@ -57,6 +57,20 @@ Flag build-tool-depends
     Description: Use build-tool-depends
     Default: True
 
+Flag with-libzstd
+    Default: False
+    Manual: True
+
+Flag static-libzstd
+    Default: False
+    Manual: True
+
+-- While the boot compiler fixes ghc's unit-id to `ghc`, the stage0 compiler must still be compiled with `-this-unit-id ghc`
+Flag hadrian-stage0
+    Description: Enable if compiling the stage0 compiler with hadrian
+    Default: False
+    Manual: True
+
 Library
     Default-Language: Haskell2010
     Exposed: False
@@ -70,6 +84,16 @@ Library
 
     if flag(build-tool-depends)
       build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0, genprimopcode:genprimopcode, deriveConstants:deriveConstants
+
+    if flag(with-libzstd)
+      if flag(static-libzstd)
+        if os(darwin)
+          buildable: False
+        else
+          extra-libraries: :libzstd.a
+      else
+        extra-libraries: zstd
+      CPP-Options: -DHAVE_LIBZSTD
 
     Build-Depends: base       >= 4.11 && < 4.19,
                    deepseq    >= 1.4 && < 1.5,
@@ -672,6 +696,7 @@ Library
         GHC.StgToJS.Linker.Linker
         GHC.StgToJS.Linker.Types
         GHC.StgToJS.Linker.Utils
+        GHC.StgToJS.Linker.Opt
         GHC.Stg.Unarise
         GHC.SysTools
         GHC.SysTools.Ar
@@ -691,8 +716,10 @@ Library
         GHC.Tc.Errors
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
+        GHC.Tc.Errors.Hole.Plugin
         GHC.Tc.Errors.Ppr
         GHC.Tc.Errors.Types
+        GHC.Tc.Errors.Types.PromotionErr
         GHC.Tc.Gen.Annotation
         GHC.Tc.Gen.App
         GHC.Tc.Gen.Arrow
