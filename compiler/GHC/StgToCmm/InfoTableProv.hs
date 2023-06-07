@@ -33,39 +33,6 @@ import qualified Data.ByteString.Internal as BSI
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map.Strict as M
 
-{-
-Note [Compression and Decompression of IPE data]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Compiling with `-finfo-table-map` causes build results to include a map from
-info tables to source positions called the info table provenance entry (IPE)
-map. See Note [Mapping Info Tables to Source Positions]. The IPE information
-can grow the size of build results significantly. At the time of writing, a
-default build of GHC results in a total of 109M of libHSghc-*.so build results.
-A default+ipe build of GHC (see ./hadrian/doc/flavours.md) results in 262M of
-libHSghc-*.so build results without compression.
-
-We reduce the impact of IPE data on the size of build results by compressing
-the data before it is emitted using the zstd compression library. See
-Note [The Info Table Provenance Entry (IPE) Map] for information on the layout
-of IPE data on disk and in the RTS. We cannot simply compress all data held in
-the IPE entry buffer, as the pointers to info tables must be converted to
-memory addresses during linking. Therefore, we can only compress the strings
-table and the IPE entries themselves (which essentially only consist of indices
-into the strings table).
-
-With compression, a default+ipe build of GHC results in a total of 205M of
-libHSghc-*.so build results. This is over a 20% reduction from the uncompressed
-case.
-
-Decompression happens lazily, as it only occurs when the IPE map is
-constructed (which is also done lazily on first lookup or traversal). During
-construction, the 'compressed' field of each IPE buffer list node is examined.
-If the field indicates that the data has been compressed, the entry data and
-strings table are decompressed before continuing with the normal IPE map
-construction.
--}
-
 emitIpeBufferListNode ::
      Module
   -> [InfoProvEnt]
@@ -156,18 +123,21 @@ emitIpeBufferListNode this_mod ents = do
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
 
 -- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.
--- The fields are converted to a bytestring, compressed, and then emitted as a
--- string. If compression is not enabled, the compression step is simply
--- @id@.
+-- If compression is enabled, the fields are converted to a bytestring,
+-- compressed, and then emitted as a string. If compression is not enabled, the
+-- fields are emitted as a list of 32 bit words.
 toIpeBufferEntries ::
      [CgInfoProvEnt] -- ^ List of IPE buffer entries
   -> [CmmStatic]
 toIpeBufferEntries cg_ipes =
-    [ CmmString
-    . compress defaultCompressionLevel
-    . BSL.toStrict . BSB.toLazyByteString . mconcat
-    $ map (mconcat . map (BSB.word32BE) . to_ipe_buf_ent) cg_ipes
-    ]
+    if do_compress == 1 then
+      [ CmmString
+      . compress defaultCompressionLevel
+      . BSL.toStrict . BSB.toLazyByteString . mconcat
+      $ map (mconcat . map (BSB.word32BE) . to_ipe_buf_ent) cg_ipes
+      ]
+    else
+      concatMap (map int32 . to_ipe_buf_ent) cg_ipes
   where
     int32 n = CmmStaticLit $ CmmInt (fromIntegral n) W32
 
