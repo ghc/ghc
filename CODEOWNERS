@@ -36,6 +36,7 @@
 /compiler/GHC/Rename/              @simonpj @rae
 /compiler/GHC/Types/               @simonpj @rae
 /compiler/GHC/HsToCore/            @simonpj @rae
+/compiler/GHC/HsToCore/Pmc*        @sgraf
 /compiler/GHC/Tc/Deriv/            @RyanGlScott
 /compiler/GHC/CmmToAsm/            @simonmar @bgamari @AndreasK
 /compiler/GHC/CmmToAsm/Wasm/       @TerrorJack
@@ -43,13 +44,12 @@
 /compiler/GHC/StgToCmm/            @simonmar @osa1
 /compiler/GHC/Cmm/                 @simonmar @osa1
 /compiler/ghci/                    @simonmar
-/compiler/GHC/Core/Op/CallArity.hs @nomeata
-/compiler/utils/UnVarGraph.hs      @nomeata
-/compiler/GHC/Core/Op/Exitify.hs   @nomeata
+/compiler/GHC/Core/Opt/CallArity.hs @nomeata
+/compiler/GHC/Core/Opt/Exitify.hs   @nomeata
 /compiler/GHC/Stg/CSE.hs           @nomeata
-/compiler/GHC/Stg/Lift.hs          @sgraf
+/compiler/GHC/Stg/Lift*            @sgraf
 /compiler/GHC/Cmm/Switch.hs        @nomeata
-/compiler/GHC/Core/Op/DmdAnal.hs   @simonpj @sgraf
+/compiler/GHC/Core/Opt/            @simonpj @sgraf
 /compiler/GHC/ThToHs.hs            @rae
 /compiler/GHC/Wasm/                @nrnrnr
 
