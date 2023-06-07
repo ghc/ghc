@@ -7,17 +7,17 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (pprUserRealSpan, srcSpanFile)
 import GHC.Data.FastString (fastStringToShortText, unpackFS, LexicalFastString(..))
 
-import GHC.Cmm
 import GHC.Cmm.CLabel
+import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 
 import GHC.StgToCmm.Config
+import GHC.StgToCmm.Lit (newByteStringCLit)
 import GHC.StgToCmm.Monad
+import GHC.StgToCmm.Utils
 
 import GHC.Data.ShortText (ShortText)
 import qualified GHC.Data.ShortText as ST
-
-import Data.Word (Word32)
 
 import qualified Data.Map.Strict as M
 import Control.Monad.Trans.State.Strict
@@ -25,109 +25,43 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as BSL
 
-emitIpeBufferListNode ::
-     Module
-  -> [InfoProvEnt]
-  -> FCode ()
+emitIpeBufferListNode :: Module
+                      -> [InfoProvEnt]
+                      -> FCode ()
 emitIpeBufferListNode _ [] = return ()
 emitIpeBufferListNode this_mod ents = do
     cfg <- getStgToCmmConfig
-
-    tables_lbl  <- mkStringLitLabel <$> newUnique
-    strings_lbl <- mkStringLitLabel <$> newUnique
-    entries_lbl <- mkStringLitLabel <$> newUnique
-
-    let ctx      = stgToCmmContext cfg
+    let ctx      = stgToCmmContext  cfg
         platform = stgToCmmPlatform cfg
-        int n    = mkIntCLit platform n
 
-        (cg_ipes, strtab) = flip runState emptyStringTable $ do
-          module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)
-          mapM (toCgIPE platform ctx module_name) ents
+    let (cg_ipes, strtab) = flip runState emptyStringTable $ do
+            module_name <- lookupStringTable $ ST.pack $ renderWithContext ctx (ppr this_mod)
+            mapM (toCgIPE platform ctx module_name) ents
 
-        tables :: [CmmStatic]
-        tables = map (CmmStaticLit . CmmLabel . ipeInfoTablePtr) cg_ipes
+    let -- Emit the fields of an IpeBufferEntry struct.
+        toIpeBufferEntry :: CgInfoProvEnt -> [CmmLit]
+        toIpeBufferEntry cg_ipe =
+            [ CmmLabel (ipeInfoTablePtr cg_ipe)
+            , strtab_offset (ipeTableName cg_ipe)
+            , strtab_offset (ipeClosureDesc cg_ipe)
+            , strtab_offset (ipeTypeDesc cg_ipe)
+            , strtab_offset (ipeLabel cg_ipe)
+            , strtab_offset (ipeModuleName cg_ipe)
+            , strtab_offset (ipeSrcFile cg_ipe)
+            , strtab_offset (ipeSrcSpan cg_ipe)
+            , int32 0
+            ]
 
-        strings_bytes :: BS.ByteString
-        strings_bytes = getStringTableStrings strtab
+        int n = mkIntCLit platform n
+        int32 n = CmmInt n W32
+        strtab_offset (StrTabOffset n) = int32 (fromIntegral n)
 
-        strings :: [CmmStatic]
-        strings = [CmmString strings_bytes]
-
-        entries :: [CmmStatic]
-        entries = toIpeBufferEntries cg_ipes
-
-        ipe_buffer_lbl :: CLabel
-        ipe_buffer_lbl = mkIPELabel this_mod
-
-        ipe_buffer_node :: [CmmStatic]
-        ipe_buffer_node = map CmmStaticLit
-          [ -- 'next' field
-            zeroCLit platform
-
-            -- 'compressed' field
-          , int $ 0 -- hardcoded to 0 for now
-
-            -- 'count' field
-          , int $ length cg_ipes
-
-            -- 'tables' field
-          , CmmLabel tables_lbl
-
-            -- 'entries' field
-          , CmmLabel entries_lbl
-
-            -- 'entries_size' field
-          , int (length cg_ipes * 8 * 32)
-
-            -- 'string_table' field
-          , CmmLabel strings_lbl
-
-            -- 'string_table_size' field
-          , int (BS.length strings_bytes)
-          ]
-
-    -- Emit the list of info table pointers
-    emitDecl $ CmmData
-      (Section Data tables_lbl)
-      (CmmStaticsRaw tables_lbl tables)
-
-    -- Emit the strings table
-    emitDecl $ CmmData
-      (Section Data strings_lbl)
-      (CmmStaticsRaw strings_lbl strings)
-
-    -- Emit the list of IPE buffer entries
-    emitDecl $ CmmData
-      (Section Data entries_lbl)
-      (CmmStaticsRaw entries_lbl entries)
-
-    -- Emit the IPE buffer list node
-    emitDecl $ CmmData
-      (Section Data ipe_buffer_lbl)
-      (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
-
--- | Emit the fields of an @IpeBufferEntry@ as a list of 'Word32's for each
--- 'CgInfoProvEnt' in the given list
-toIpeBufferEntries ::
-     [CgInfoProvEnt] -- ^ List of buffer entries to emit
-  -> [CmmStatic]
-toIpeBufferEntries cg_ipes =
-    concatMap (map int32 . to_ipe_buf_ent) cg_ipes
-  where
-    int32 n = CmmStaticLit $ CmmInt (fromIntegral n) W32
-
-    to_ipe_buf_ent :: CgInfoProvEnt -> [Word32]
-    to_ipe_buf_ent cg_ipe =
-      [ ipeTableName cg_ipe
-      , ipeClosureDesc cg_ipe
-      , ipeTypeDesc cg_ipe
-      , ipeLabel cg_ipe
-      , ipeModuleName cg_ipe
-      , ipeSrcFile cg_ipe
-      , ipeSrcSpan cg_ipe
-      , 0 -- padding
-      ]
+    strings <- newByteStringCLit (getStringTableStrings strtab)
+    let lits = [ zeroCLit platform     -- 'next' field
+               , strings               -- 'strings' field
+               , int $ length cg_ipes  -- 'count' field
+               ] ++ concatMap toIpeBufferEntry cg_ipes
+    emitDataLits (mkIPELabel this_mod) lits
 
 toCgIPE :: Platform -> SDocContext -> StrTabOffset -> InfoProvEnt -> State StringTable CgInfoProvEnt
 toCgIPE platform ctx module_name ipe = do
@@ -171,7 +105,7 @@ data StringTable = StringTable { stStrings :: DList ShortText
                                , stLookup :: !(M.Map ShortText StrTabOffset)
                                }
 
-type StrTabOffset = Word32
+newtype StrTabOffset = StrTabOffset Int
 
 emptyStringTable :: StringTable
 emptyStringTable =
@@ -196,7 +130,7 @@ lookupStringTable str = state $ \st ->
                         , stLength  = stLength st + ST.byteLength str + 1
                         , stLookup  = M.insert str res (stLookup st)
                         }
-              res = fromIntegral (stLength st)
+              res = StrTabOffset (stLength st)
           in (res, st')
 
 newtype DList a = DList ([a] -> [a])
