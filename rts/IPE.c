@@ -186,8 +186,8 @@ void updateIpeMap() {
 
     while (pending != NULL) {
         IpeBufferListNode *current_node = pending;
-        const IpeBufferEntry *entries;
-        const char *strings;
+        IpeBufferEntry *entries;
+        char *strings;
 
         // Decompress if compressed
         decompressIPEBufferListNodeIfCompressed(current_node, &entries, &strings);
