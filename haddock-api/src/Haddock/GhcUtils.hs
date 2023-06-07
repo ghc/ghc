@@ -27,10 +27,9 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char ( isSpace )
-import Data.Foldable ( toList, foldl' )
+import Data.Foldable ( toList )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( mapMaybe, fromMaybe )
-import qualified Data.Set as Set
 
 import Haddock.Types( DocName, DocNameI, XRecCond )
 
@@ -48,7 +47,7 @@ import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
 import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Core.Type     ( isRuntimeRepVar, binderVar )
+import GHC.Core.Type     ( isRuntimeRepVar )
 import GHC.Builtin.Types( liftedRepTy )
 
 import           GHC.Data.StringBuffer ( StringBuffer )
@@ -340,7 +339,7 @@ reparenTypePrec = go
   where
 
   -- Shorter name for 'reparenType'
-  go :: Precedence -> HsType a -> HsType a
+  go :: XParTy a ~ EpAnn AnnParen => Precedence -> HsType a -> HsType a
   go _ (HsBangTy x b ty)     = HsBangTy x b (reparenLType ty)
   go _ (HsTupleTy x con tys) = HsTupleTy x con (map reparenLType tys)
   go _ (HsSumTy x tys)       = HsSumTy x (map reparenLType tys)
@@ -360,6 +359,7 @@ reparenTypePrec = go
           p' _   = PREC_TOP -- parens will get added anyways later...
           ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
       in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
+    -- = paren p PREC_FUN $ HsQualTy x (fmap (mapXRec @a (map reparenLType)) ctxt) (reparenLType ty)
   go p (HsFunTy x w ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
@@ -377,11 +377,12 @@ reparenTypePrec = go
   go _ t@XHsType{} = t
 
   -- Located variant of 'go'
-  goL :: Precedence -> LHsType a -> LHsType a
+  goL :: XParTy a ~ EpAnn AnnParen => Precedence -> LHsType a -> LHsType a
   goL ctxt_prec = mapXRec @a (go ctxt_prec)
 
   -- Optionally wrap a type in parens
-  paren :: Precedence            -- Precedence of context
+  paren :: XParTy a ~ EpAnn AnnParen
+        => Precedence            -- Precedence of context
         -> Precedence            -- Precedence of top-level operator
         -> HsType a -> HsType a  -- Wrap in parens if (ctxt >= op)
   paren ctxt_prec op_prec | ctxt_prec >= op_prec = HsParTy noAnn . wrapXRec @a
@@ -648,27 +649,6 @@ tryCppLine !loc !buf = spanSpace (S.prevChar buf '\n' == '\n') loc buf
         ('\n', b') -> (splitStringBuffer buf b', advanceSrcLoc l '\n', b')
 
         (c   , b') -> spanCppLine (advanceSrcLoc l c) b'
-
--------------------------------------------------------------------------------
--- * Names in a 'Type'
--------------------------------------------------------------------------------
-
--- | Given a 'Type', return a set of 'Name's coming from the 'TyCon's within
--- the type.
-typeNames :: Type -> Set.Set Name
-typeNames ty = go ty Set.empty
-  where
-    go :: Type -> Set.Set Name -> Set.Set Name
-    go t acc =
-      case t of
-        TyVarTy {} -> acc
-        AppTy t1 t2 ->  go t2 $ go t1 acc
-        FunTy _ _ t1 t2 -> go t2 $ go t1 acc
-        TyConApp tcon args -> foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
-        ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
-        LitTy _ -> acc
-        CastTy t' _ -> go t' acc
-        CoercionTy {} -> acc
 
 -------------------------------------------------------------------------------
 -- * Free variables of a 'Type'

@@ -10,14 +10,14 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==9.6.*
+tested-with:          GHC==9.4.*
 stability:            experimental
 
 library
   default-language: Haskell2010
   ghc-options: -Wall
   hs-source-dirs:   src
-  build-depends:    base >= 4.3 && < 4.19, bytestring, directory, process, filepath, Cabal
+  build-depends:    base >= 4.3 && < 4.17, bytestring, directory, process, filepath, Cabal
 
   exposed-modules:
     Test.Haddock

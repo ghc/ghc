@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -----------------------------------------------------------------------------
@@ -14,25 +13,23 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-module Haddock.Interface.AttachInstances (attachInstances, instHead) where
+module Haddock.Interface.AttachInstances (attachInstances) where
 
 
-import Haddock.Convert
-import Haddock.GhcUtils (typeNames)
 import Haddock.Types
+import Haddock.Convert
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
-import Control.DeepSeq (force)
-import Data.Foldable (foldl')
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
-import qualified Data.Map.Strict as Map
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import GHC.Data.FastString (unpackFS)
 import GHC.Core.Class
+import GHC.Core (isOrphan)
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
@@ -77,21 +74,13 @@ attachInstances expInfo ifaces instIfaceMap mods = do
 attachOrphanInstances
   :: ExportInfo
   -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
-  -> [HaddockClsInst]                 -- ^ a list of instances
+  -> [ClsInst]                        -- ^ a list of orphan instances
   -> [DocInstance GhcRn]
 attachOrphanInstances expInfo getInstDoc cls_instances =
-  [ (synified, getInstDoc instName, (L (getSrcSpan instName) instName), Nothing)
-  | let is =
-          [ ( haddockClsInstHead i
-            , haddockClsInstSynified i
-            , haddockClsInstName i
-            , haddockClsInstClsName i
-            , haddockClsInstTyNames i
-            )
-          | i <- cls_instances, haddockClsInstIsOrphan i
-          ]
-  , (_, synified, instName, cls, tyNames) <- sortBy (comparing $ (\(ih,_,_,_,_) -> ih)) is
-  , not $ isInstanceHidden expInfo cls tyNames
+  [ (synifyInstHead i, getInstDoc n, (L (getSrcSpan n) n), Nothing)
+  | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
+  , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
+  , not $ isInstanceHidden expInfo cls tys
   ]
 
 
@@ -104,7 +93,7 @@ attachToExportItem
   -> Ghc (ExportItem GhcRn)
 attachToExportItem index expInfo getInstDoc getFixity export =
   case attachFixities export of
-    ExportDecl e@(ExportD { expDDecl = L eSpan (TyClD _ d) }) -> do
+    e@ExportDecl { expItemDecl = L eSpan (TyClD _ d) } -> do
       insts <-
         let mb_instances  = lookupNameEnv index (tcdName d)
             cls_instances = maybeToList mb_instances >>= fst
@@ -112,7 +101,7 @@ attachToExportItem index expInfo getInstDoc getFixity export =
             fam_insts = [ ( synFamInst
                           , getInstDoc n
                           , spanNameE n synFamInst (L (locA eSpan) (tcdName d))
-                          , mb_mdl
+                          , nameModule_maybe n
                           )
                         | i <- sortBy (comparing instFam) fam_instances
                         , let n = getName i
@@ -120,21 +109,16 @@ attachToExportItem index expInfo getInstDoc getFixity export =
                         , not $ any (isTypeHidden expInfo) (fi_tys i)
                         , let opaque = isTypeHidden expInfo (fi_rhs i)
                         , let synFamInst = synifyFamInst i opaque
-                        , let !mb_mdl = force $ nameModule_maybe n
                         ]
             cls_insts = [ ( synClsInst
                           , getInstDoc n
                           , spanName n synClsInst (L (locA eSpan) (tcdName d))
-                          , mb_mdl
+                          , nameModule_maybe n
                           )
                         | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                         , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
-                        , not $ isInstanceHidden
-                                  expInfo
-                                  (getName cls)
-                                  (foldl' (\acc t -> acc `Set.union` typeNames t) Set.empty tys)
+                        , not $ isInstanceHidden expInfo cls tys
                         , let synClsInst = synifyInstHead i
-                        , let !mb_mdl = force $ nameModule_maybe n
                         ]
               -- fam_insts but with failing type fams filtered out
             cleanFamInsts = [ (fi, n, L l r, m) | (Right fi, n, L l (Right r), m) <- fam_insts ]
@@ -143,39 +127,22 @@ attachToExportItem index expInfo getInstDoc getFixity export =
           let mkBug = (text "haddock-bug:" <+>) . text
           putMsgM (sep $ map mkBug famInstErrs)
           return $ cls_insts ++ cleanFamInsts
-      return $ ExportDecl e { expDInstances = insts }
+      return $ e { expItemInstances = insts }
     e -> return e
   where
-    attachFixities
-        ( ExportDecl
-          ( e@ExportD
-              { expDDecl = L _ d
-              , expDPats = patsyns
-              , expDSubDocs = subDocs
-              }
-          )
-        )
-      = ExportDecl e
-          { expDFixities = fixities
-          }
+    attachFixities e@ExportDecl{ expItemDecl = L _ d
+                               , expItemPats = patsyns
+                               , expItemSubDocs = subDocs
+                               } = e { expItemFixities =
+      nubByName fst $ expItemFixities e ++
+      [ (n',f) | n <- getMainDeclBinder emptyOccEnv d
+               , n' <- n : (map fst subDocs ++ patsyn_names)
+               , f <- maybeToList (getFixity n')
+      ] }
       where
-        fixities :: [(Name, Fixity)]
-        !fixities = force . Map.toList $ foldl' f Map.empty all_names
-
-        f :: Map.Map Name Fixity -> Name -> Map.Map Name Fixity
-        f !fs n = Map.alter (<|> getFixity n) n fs
-
-        patsyn_names :: [Name]
         patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
 
-        all_names :: [Name]
-        all_names =
-             getMainDeclBinder emptyOccEnv d
-          ++ map fst subDocs
-          ++ patsyn_names
-
     attachFixities e = e
-
     -- spanName: attach the location to the name that is the same file as the instance location
     spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
         let s1 = getSrcSpan s
@@ -207,6 +174,27 @@ findFixity iface ifaceMap instIfaceMap = \name ->
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances
 --------------------------------------------------------------------------------
+
+-- | Stable name for stable comparisons. GHC's `Name` uses unstable
+-- ordering based on their `Unique`'s.
+newtype SName = SName Name
+
+instance Eq SName where
+  SName n1 == SName n2 = n1 `stableNameCmp` n2 == EQ
+
+instance Ord SName where
+  SName n1 `compare` SName n2 = n1 `stableNameCmp` n2
+
+-- | Simplified type for sorting types, ignoring qualification (not visible
+-- in Haddock output) and unifying special tycons with normal ones.
+-- For the benefit of the user (looks nice and predictable) and the
+-- tests (which prefer output to be deterministic).
+data SimpleType = SimpleType SName [SimpleType]
+                | SimpleIntTyLit Integer
+                | SimpleStringTyLit String
+                | SimpleCharTyLit Char
+                  deriving (Eq,Ord)
+
 
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], SName, [SimpleType])
 instHead (_, _, cls, args)
@@ -260,21 +248,30 @@ isNameHidden (names, modules) name =
 
 -- | We say that an instance is «hidden» iff its class or any (part)
 -- of its type(s) is hidden.
-isInstanceHidden :: ExportInfo -> Name -> Set.Set Name -> Bool
-isInstanceHidden expInfo cls tyNames =
+isInstanceHidden :: ExportInfo -> Class -> [Type] -> Bool
+isInstanceHidden expInfo cls tys =
     instClassHidden || instTypeHidden
   where
     instClassHidden :: Bool
-    instClassHidden = isNameHidden expInfo cls
+    instClassHidden = isNameHidden expInfo $ getName cls
 
     instTypeHidden :: Bool
-    instTypeHidden = any (isNameHidden expInfo) tyNames
+    instTypeHidden = any (isTypeHidden expInfo) tys
 
 isTypeHidden :: ExportInfo -> Type -> Bool
 isTypeHidden expInfo = typeHidden
   where
     typeHidden :: Type -> Bool
-    typeHidden t = any nameHidden $ typeNames t
+    typeHidden t =
+      case t of
+        TyVarTy {} -> False
+        AppTy t1 t2 -> typeHidden t1 || typeHidden t2
+        FunTy _ _ t1 t2 -> typeHidden t1 || typeHidden t2
+        TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
+        ForAllTy bndr ty -> typeHidden (tyVarKind (binderVar bndr)) || typeHidden ty
+        LitTy _ -> False
+        CastTy ty _ -> typeHidden ty
+        CoercionTy {} -> False
 
     nameHidden :: Name -> Bool
     nameHidden = isNameHidden expInfo
