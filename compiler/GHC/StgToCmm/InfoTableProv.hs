@@ -101,11 +101,8 @@ emitIpeBufferListNode this_mod ents = do
         strings :: [CmmStatic]
         strings = [CmmString strings_bytes]
 
-        uncompressed_entries :: BS.ByteString
-        uncompressed_entries = toIpeBufferEntries (platformByteOrder platform) cg_ipes
-
         entries_bytes :: BS.ByteString
-        entries_bytes = compress defaultCompressionLevel uncompressed_entries
+        entries_bytes = toIpeBufferEntries (platformByteOrder platform) cg_ipes
 
         entries :: [CmmStatic]
         entries = [CmmString entries_bytes]
@@ -130,14 +127,14 @@ emitIpeBufferListNode this_mod ents = do
             -- 'entries' field
           , CmmLabel entries_lbl
 
-            -- 'entries_size' field (decompressed size)
-          , int $ BS.length uncompressed_entries
+            -- 'entries_size' field
+          , int $ BS.length entries_bytes
 
             -- 'string_table' field
           , CmmLabel strings_lbl
 
-            -- 'string_table_size' field (decompressed size)
-          , int $ BS.length uncompressed_strings
+            -- 'string_table_size' field
+          , int $ BS.length strings_bytes
           ]
 
     -- Emit the list of info table pointers
@@ -161,12 +158,15 @@ emitIpeBufferListNode this_mod ents = do
       (CmmStaticsRaw ipe_buffer_lbl ipe_buffer_node)
 
 -- | Emit the fields of an IpeBufferEntry struct for each entry in a given list.
+-- The fields are converted to a bytestring and compressed. If compression is
+-- not enabled, the compression step is simply @id@.
 toIpeBufferEntries ::
      ByteOrder       -- ^ Byte order to write the data in
   -> [CgInfoProvEnt] -- ^ List of IPE buffer entries
   -> BS.ByteString
 toIpeBufferEntries byte_order cg_ipes =
-      BSL.toStrict . BSB.toLazyByteString . mconcat
+      compress defaultCompressionLevel
+    . BSL.toStrict . BSB.toLazyByteString . mconcat
     $ map (mconcat . map word32Builder . to_ipe_buf_ent) cg_ipes
   where
     to_ipe_buf_ent :: CgInfoProvEnt -> [Word32]
