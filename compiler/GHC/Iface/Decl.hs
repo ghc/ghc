@@ -1,5 +1,6 @@
 
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006-2008
@@ -12,6 +13,7 @@
 module GHC.Iface.Decl
    ( coAxiomToIfaceDecl
    , tyThingToIfaceDecl -- Converting things to their Iface equivalents
+   , toIfaceBooleanFormula
    )
 where
 
@@ -38,12 +40,14 @@ import GHC.Types.Var
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Types.TyThing
+import GHC.Types.SrcLoc
 
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 
 import GHC.Data.FastString
 import GHC.Data.Maybe
+import GHC.Data.BooleanFormula
 
 import Data.List ( findIndex, mapAccumL )
 
@@ -284,7 +288,7 @@ classToIfaceDecl env clas
                 ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
-                ifMinDef = fmap getOccFS (classMinimalDef clas)
+                ifMinDef = toIfaceBooleanFormula $ fmap getOccFS (classMinimalDef clas)
             }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
@@ -332,3 +336,10 @@ tidyTyConBinders = mapAccumL tidyTyConBinder
 
 tidyTyVar :: TidyEnv -> TyVar -> FastString
 tidyTyVar (_, subst) tv = toIfaceTyVar (lookupVarEnv subst tv `orElse` tv)
+
+toIfaceBooleanFormula :: BooleanFormula IfLclName -> IfaceBooleanFormula
+toIfaceBooleanFormula = \case
+    Var nm    -> IfVar    nm
+    And bfs   -> IfAnd    (map (toIfaceBooleanFormula . unLoc) bfs)
+    Or bfs    -> IfOr     (map (toIfaceBooleanFormula . unLoc) bfs)
+    Parens bf -> IfParens (toIfaceBooleanFormula . unLoc $ bf)

@@ -17,7 +17,7 @@ module GHC.Iface.Syntax (
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
-        IfaceClassBody(..),
+        IfaceClassBody(..), IfaceBooleanFormula(..),
         IfaceBang(..),
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
         IfaceAxBranch(..),
@@ -32,6 +32,7 @@ module GHC.Iface.Syntax (
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceDeclFingerprints,
+        fromIfaceBooleanFormula,
 
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
@@ -66,12 +67,13 @@ import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
-import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
+import GHC.Data.BooleanFormula ( BooleanFormula(..), pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
+import GHC.Parser.Annotation (noLocA)
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -191,8 +193,21 @@ data IfaceClassBody
      ifClassCtxt :: IfaceContext,             -- Super classes
      ifATs       :: [IfaceAT],                -- Associated type families
      ifSigs      :: [IfaceClassOp],           -- Method signatures
-     ifMinDef    :: BooleanFormula IfLclName  -- Minimal complete definition
+     ifMinDef    :: IfaceBooleanFormula       -- Minimal complete definition
     }
+
+data IfaceBooleanFormula
+  = IfVar IfLclName
+  | IfAnd [IfaceBooleanFormula]
+  | IfOr [IfaceBooleanFormula]
+  | IfParens IfaceBooleanFormula
+
+fromIfaceBooleanFormula :: IfaceBooleanFormula -> BooleanFormula IfLclName
+fromIfaceBooleanFormula = \case
+    IfVar nm     -> Var    nm
+    IfAnd ibfs   -> And    (map (noLocA . fromIfaceBooleanFormula) ibfs)
+    IfOr ibfs    -> Or     (map (noLocA . fromIfaceBooleanFormula) ibfs)
+    IfParens ibf -> Parens (noLocA . fromIfaceBooleanFormula $ ibf)
 
 data IfaceTyConParent
   = IfNoParent
@@ -930,7 +945,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
-                        , ppShowAllSubs ss (pprMinDef minDef)])]
+                        , ppShowAllSubs ss (pprMinDef $ fromIfaceBooleanFormula minDef)])]
     where
       pp_where = ppShowRhs ss $ ppUnless (null sigs && null ats) (text "where")
 
@@ -2038,6 +2053,20 @@ instance Binary IfaceDecl where
                         ifBody = IfAbstractClass })
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
+instance Binary IfaceBooleanFormula where
+    put_ bh = \case
+        IfVar a1    -> putByte bh 0 >> put_ bh a1
+        IfAnd a1    -> putByte bh 1 >> put_ bh a1
+        IfOr a1     -> putByte bh 2 >> put_ bh a1
+        IfParens a1 -> putByte bh 3 >> put_ bh a1
+
+    get bh = do
+        getByte bh >>= \case
+            0 -> IfVar    <$> get bh
+            1 -> IfAnd    <$> get bh
+            2 -> IfOr     <$> get bh
+            _ -> IfParens <$> get bh
+
 {- Note [Lazy deserialization of IfaceId]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The use of lazyPut and lazyGet in the IfaceId Binary instance is
@@ -2650,7 +2679,14 @@ instance NFData IfaceAxBranch where
 instance NFData IfaceClassBody where
   rnf = \case
     IfAbstractClass -> ()
-    IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+    IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` ()
+
+instance NFData IfaceBooleanFormula where
+  rnf = \case
+      IfVar f1    -> rnf f1
+      IfAnd f1    -> rnf f1
+      IfOr f1     -> rnf f1
+      IfParens f1 -> rnf f1
 
 instance NFData IfaceAT where
   rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2

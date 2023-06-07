@@ -44,6 +44,7 @@ import GHC.Driver.Config.Core.Lint ( initLintConfig )
 import GHC.Builtin.Types.Literals(typeNatCoAxiomRules)
 import GHC.Builtin.Types
 
+import GHC.Iface.Decl (toIfaceBooleanFormula)
 import GHC.Iface.Syntax
 import GHC.Iface.Load
 import GHC.Iface.Env
@@ -290,7 +291,7 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = BF.mkOr [noLocA bf1, noLocA bf2]
+                ifMinDef = toIfaceBooleanFormula . BF.mkOr . map (noLocA . fromIfaceBooleanFormula) $ [bf1, bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
@@ -773,7 +774,7 @@ tc_iface_decl _parent ignore_prags
                          ifBody = IfConcreteClass {
                              ifClassCtxt = rdr_ctxt,
                              ifATs = rdr_ats, ifSigs = rdr_sigs,
-                             ifMinDef = mindef_occ
+                             ifMinDef = if_mindef
                          }})
   = bindIfaceTyConBinders binders $ \ binders' -> do
     { traceIf (text "tc-iface-class1" <+> ppr tc_name)
@@ -782,6 +783,7 @@ tc_iface_decl _parent ignore_prags
     ; sigs <- mapM tc_sig rdr_sigs
     ; fds  <- mapM tc_fd rdr_fds
     ; traceIf (text "tc-iface-class3" <+> ppr tc_name)
+    ; let mindef_occ = fromIfaceBooleanFormula if_mindef
     ; mindef <- traverse (lookupIfaceTop . mkVarOccFS) mindef_occ
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
