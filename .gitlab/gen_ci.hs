@@ -233,6 +233,10 @@ debug = vanilla { buildFlavour = SlowValidate
                 , withAssertions = True
                 -- WithNuma so at least one job tests Numa
                 , withNuma = True
+
+                -- Build with IPE in debug so at least one job tests
+                -- uncompressed IPE data
+                , withIpe = True
                 }
 
 ipe :: BuildConfig
