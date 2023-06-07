@@ -886,7 +886,6 @@ job_groups =
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , disableValidate (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      , -- Nightly allowed to fail: #22520
        modifyNightlyJobs allowFailure
          (modifyValidateJobs manual tsan_jobs)
@@ -894,7 +893,6 @@ job_groups =
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
-     , addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
@@ -933,6 +931,8 @@ job_groups =
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {unregisterised = True}
      , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+     , modifyNightlyJobs (addJobRule Disable) $
+         addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      ]
 
   where

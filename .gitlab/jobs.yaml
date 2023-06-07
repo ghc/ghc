@@ -1264,7 +1264,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
+      "CONFIGURE_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
