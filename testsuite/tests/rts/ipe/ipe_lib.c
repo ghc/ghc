@@ -25,8 +25,9 @@ uint32_t add_string(StringTable *st, const char *s) {
     return n;
 }
 
-IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, int i) {
+IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, HaskellObj closure, int i) {
     IpeBufferEntry provEnt;
+    provEnt.info = get_itbl(closure);
 
     unsigned int tableNameLength = strlen("table_name_") + 3 /* digits */ + 1 /* null character */;
     char *tableName = malloc(sizeof(char) * tableNameLength);
@@ -68,27 +69,15 @@ IpeBufferEntry makeAnyProvEntry(Capability *cap, StringTable *st, int i) {
 
 IpeBufferListNode *makeAnyProvEntries(Capability *cap, int start, int end) {
     const int n = end - start;
-
-    // Allocate buffers for IpeBufferListNode
-    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode));
-    node->tables = malloc(sizeof(StgInfoTable *) * n);
-    node->entries = malloc(sizeof(IpeBufferEntry) * n);
-
+    IpeBufferListNode *node = malloc(sizeof(IpeBufferListNode) + n * sizeof(IpeBufferEntry));
     StringTable st;
     init_string_table(&st);
-
-    // Make the entries and fill the buffers
     for (int i=start; i < end; i++) {
         HaskellObj closure = rts_mkInt(cap, 42);
-        node->tables[i]  = get_itbl(closure);
-        node->entries[i] = makeAnyProvEntry(cap, &st, i);
+        node->entries[i] = makeAnyProvEntry(cap, &st, closure, i);
     }
-
-    // Set the rest of the fields
     node->next = NULL;
-    node->compressed = 0;
     node->count = n;
     node->string_table = st.buffer;
-
     return node;
 }
