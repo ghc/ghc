@@ -20,10 +20,6 @@
 #include <fs_rts.h>
 #include <string.h>
 
-#if HAVE_LIBZSTD == 1
-#include <zstd.h>
-#endif
-
 #if defined(TRACING)
 #include "Trace.h"
 #endif

@@ -57,10 +57,6 @@ Flag build-tool-depends
     Description: Use build-tool-depends
     Default: True
 
-Flag with-libzstd
-    Default: False
-    Manual: True
-
 -- While the boot compiler fixes ghc's unit-id to `ghc`, the stage0 compiler must still be compiled with `-this-unit-id ghc`
 Flag hadrian-stage0
     Description: Enable if compiling the stage0 compiler with hadrian
@@ -80,10 +76,6 @@ Library
 
     if flag(build-tool-depends)
       build-tool-depends: alex:alex >= 3.2.6, happy:happy >= 1.20.0, genprimopcode:genprimopcode, deriveConstants:deriveConstants
-
-    if flag(with-libzstd)
-      extra-libraries: zstd
-      CPP-Options: -DHAVE_LIBZSTD
 
     Build-Depends: base       >= 4.11 && < 4.19,
                    deepseq    >= 1.4 && < 1.5,

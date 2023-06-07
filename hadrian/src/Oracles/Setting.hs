@@ -60,8 +60,6 @@ data Setting = BuildArch
              | LibdwLibDir
              | LibnumaIncludeDir
              | LibnumaLibDir
-             | LibZstdIncludeDir
-             | LibZstdLibDir
              | LlvmTarget
              | ProjectGitCommitId
              | ProjectName
@@ -163,8 +161,6 @@ setting key = lookupSystemConfig $ case key of
     LibdwLibDir        -> "libdw-lib-dir"
     LibnumaIncludeDir  -> "libnuma-include-dir"
     LibnumaLibDir      -> "libnuma-lib-dir"
-    LibZstdIncludeDir  -> "libzstd-include-dir"
-    LibZstdLibDir      -> "libzstd-lib-dir"
     LlvmTarget         -> "llvm-target"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
