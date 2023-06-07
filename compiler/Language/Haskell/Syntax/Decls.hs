@@ -30,7 +30,7 @@ module Language.Haskell.Syntax.Decls (
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep, FunDep(..),
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
   NewOrData(..), DataDefnCons(..), dataDefnConsNewOrData,
-  isTypeDataDefnCons,
+  isTypeDataDefnCons, firstDataDefnCon,
   StandaloneKindSig(..), LStandaloneKindSig,
 
   -- ** Class or type declarations
@@ -1039,6 +1039,11 @@ dataDefnConsNewOrData = \ case
 isTypeDataDefnCons :: DataDefnCons a -> Bool
 isTypeDataDefnCons (NewTypeCon _) = False
 isTypeDataDefnCons (DataTypeCons is_type_data _) = is_type_data
+
+-- | Retrieve the first data constructor in a 'DataDefnCons' (if one exists).
+firstDataDefnCon :: DataDefnCons a -> Maybe a
+firstDataDefnCon (NewTypeCon con) = Just con
+firstDataDefnCon (DataTypeCons _ cons) = listToMaybe cons
 
 -- | Located data Constructor Declaration
 type LConDecl pass = XRec pass (ConDecl pass)
