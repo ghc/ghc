@@ -258,6 +258,15 @@ buildPackageDocumentation = do
         need [ takeDirectory file  -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
 
+        -- Build Haddock documentation
+        -- TODO: Pass the correct way from Rules via Context.
+        dynamicPrograms <- dynamicGhcPrograms =<< flavour
+        let haddockWay = if dynamicPrograms then dynamic else vanilla
+
+        -- Build the dependencies of the package we are going to build documentation for
+        dep_pkgs <- sequence [pkgConfFile (context { way = haddockWay, Context.package = p})
+                             | (p, _) <- haddocks]
+
         -- `ghc-prim` has a source file for 'GHC.Prim' which is generated just
         -- for Haddock. We need to 'union' (instead of '++') to avoid passing
         -- 'GHC.PrimopWrappers' (which unfortunately shows up in both
@@ -266,12 +275,8 @@ buildPackageDocumentation = do
         vanillaSrcs <- hsSources context
         let srcs = vanillaSrcs `union` generatedSrcs
 
-        need $ srcs ++ (map snd haddocks)
+        need $ srcs ++ (map snd haddocks) ++ dep_pkgs
 
-        -- Build Haddock documentation
-        -- TODO: Pass the correct way from Rules via Context.
-        dynamicPrograms <- dynamicGhcPrograms =<< flavour
-        let haddockWay = if dynamicPrograms then dynamic else vanilla
         statsFilesDir <- haddockStatsFilesDir
         createDirectory statsFilesDir
         build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
