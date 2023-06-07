@@ -52,6 +52,9 @@ module GHC.Data.FastString
         fastStringToShortByteString,
         mkFastStringShortByteString,
 
+        -- * ShortText
+        fastStringToShortText,
+
         -- * FastZString
         FastZString,
         hPutFZS,
@@ -118,6 +121,7 @@ import GHC.Utils.IO.Unsafe
 import GHC.Utils.Panic.Plain
 import GHC.Utils.Misc
 import GHC.Data.FastMutInt
+import GHC.Data.ShortText (ShortText(..))
 
 import Control.Concurrent.MVar
 import Control.DeepSeq
@@ -525,6 +529,9 @@ mkFastStringByteString bs =
 mkFastStringShortByteString :: ShortByteString -> FastString
 mkFastStringShortByteString sbs =
   inlinePerformIO $ mkFastStringWith (mkNewFastStringShortByteString sbs) sbs
+
+fastStringToShortText :: FastString -> ShortText
+fastStringToShortText = ShortText . fs_sbs
 
 -- | Creates a UTF-8 encoded 'FastString' from a 'String'
 mkFastString :: String -> FastString

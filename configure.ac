@@ -1148,6 +1148,10 @@ AS_IF([test x"${UseLibffiForAdjustors}" = x"YES"],
 )
 AC_SUBST([CabalLibffiAdjustors])
 
+dnl ** IPE data compression
+dnl --------------------------------------------------------------
+FP_FIND_LIBZSTD
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
@@ -1318,6 +1322,19 @@ echo "\
    makeinfo     : $MAKEINFO
    git          : $GIT
    cabal-install : $CABAL
+"
+
+USING_LIBNUMA=$(if [ "$HaveLibNuma" = "1" ]; then echo "YES"; else echo "NO"; fi;)
+USING_LIBZSTD=$(if [ "$HaveLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
+STATIC_LIBZSTD=$(if [ "$StaticLibZstd" = "1" ]; then echo "YES"; else echo "NO"; fi;)
+USING_LIBDW=$(if [ "$USE_LIBDW" = "1" ]; then echo "YES"; else echo "NO"; fi;)
+
+echo "\
+   Using optional dependencies:
+      libnuma : $USING_LIBNUMA
+      libzstd : $USING_LIBZSTD
+         statically linked? : $STATIC_LIBZSTD
+      libdw   : $USING_LIBDW
 
    Using LLVM tools
       clang : $ClangCmd

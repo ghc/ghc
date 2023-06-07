@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 58d08589371e78829a3279c6f8b1241e155d7f70
+  DOCKER_REV: 243a00f06550e6b9a00fa0f1530d1bb761e8b7cc
 
   # Sequential version number of all cached things.
   # Bump to invalidate GitLab CI cache.

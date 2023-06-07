@@ -34,6 +34,8 @@ data Flag = ArSupportsAtFile
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
           | UseLibffiForAdjustors
+          | UseLibzstd
+          | StaticLibzstd
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
@@ -58,6 +60,8 @@ flag f = do
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
             UseLibffiForAdjustors -> "use-libffi-for-adjustors"
+            UseLibzstd           -> "use-lib-zstd"
+            StaticLibzstd        -> "static-lib-zstd"
     value <- lookupSystemConfig key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."

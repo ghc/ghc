@@ -116,6 +116,7 @@ data BuildConfig
                 , llvmBootstrap  :: Bool
                 , withAssertions :: Bool
                 , withNuma       :: Bool
+                , withZstd       :: Bool
                 , fullyStatic    :: Bool
                 , tablesNextToCode :: Bool
                 , threadSanitiser :: Bool
@@ -126,6 +127,7 @@ configureArgsStr :: BuildConfig -> String
 configureArgsStr bc = intercalate " " $
   ["--enable-unregisterised"| unregisterised bc ]
   ++ ["--disable-tables-next-to-code" | not (tablesNextToCode bc) ]
+  ++ ["--enable-ipe-data-compression" | withZstd bc ]
 
 -- Compute the hadrian flavour from the BuildConfig
 mkJobFlavour :: BuildConfig -> Flavour
@@ -156,6 +158,7 @@ vanilla = BuildConfig
   , llvmBootstrap  = False
   , withAssertions = False
   , withNuma = False
+  , withZstd = False
   , fullyStatic = False
   , tablesNextToCode = True
   , threadSanitiser = False
@@ -179,6 +182,9 @@ debug = vanilla { buildFlavour = SlowValidate
                 -- WithNuma so at least one job tests Numa
                 , withNuma = True
                 }
+
+zstdIpe :: BuildConfig
+zstdIpe = vanilla { withZstd = True }
 
 static :: BuildConfig
 static = vanilla { fullyStatic = True }
@@ -494,7 +500,8 @@ data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
           | Nightly      -- ^ Only run this job in the nightly pipeline
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
           | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
-          | ARMLabel    -- ^ Only run this job when the "ARM" label is set.
+          | ARMLabel     -- ^ Only run this job when the "ARM" label is set.
+          | IpeData      -- ^ Only run this job when the "IPE" label is set.
           | Disable      -- ^ Don't run this job.
           deriving (Bounded, Enum, Ord, Eq)
 
@@ -521,6 +528,8 @@ ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
 ruleString Off Nightly = "$NIGHTLY == null"
+ruleString On IpeData = "$CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/"
+ruleString Off IpeData = true
 ruleString On Disable = false
 ruleString Off Disable = true
 
@@ -791,6 +800,7 @@ jobs = M.fromList $ concatMap flattenJobGroup $
      , standardBuilds I386 (Linux Debian9)
      , allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) static)
      , disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt))
+     , addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      ]
 
   where

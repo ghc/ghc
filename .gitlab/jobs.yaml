@@ -35,7 +35,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -97,7 +97,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -155,7 +155,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*ARM.*/) && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*ARM.*/) && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -216,7 +216,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -274,7 +274,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -337,7 +337,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -396,7 +396,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -458,7 +458,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -517,7 +517,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -582,7 +582,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -643,7 +643,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -705,7 +705,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -767,7 +767,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -827,7 +827,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -886,7 +886,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -945,7 +945,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1005,7 +1005,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1064,7 +1064,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1083,7 +1083,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
       "TEST_ENV": "x86_64-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
@@ -1123,7 +1123,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1182,7 +1182,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1241,7 +1241,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1302,7 +1302,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1361,7 +1361,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1420,7 +1420,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1482,7 +1482,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1543,7 +1543,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1605,7 +1605,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1666,7 +1666,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1721,7 +1721,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1780,7 +1780,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1843,7 +1843,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1907,7 +1907,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -1967,7 +1967,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2030,7 +2030,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2090,7 +2090,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2156,7 +2156,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2218,7 +2218,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2281,7 +2281,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2344,7 +2344,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2405,7 +2405,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2465,7 +2465,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2525,7 +2525,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2585,7 +2585,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2645,7 +2645,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2708,7 +2708,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2770,7 +2770,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2832,7 +2832,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2895,7 +2895,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -2951,7 +2951,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3011,7 +3011,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3075,7 +3075,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3139,7 +3139,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/) && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3199,7 +3199,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -3260,7 +3260,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3321,7 +3321,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -3380,7 +3380,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3439,7 +3439,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "manual"
       }
     ],
@@ -3497,7 +3497,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3556,7 +3556,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3614,7 +3614,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/) && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3633,7 +3633,7 @@
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
-      "CONFIGURE_ARGS": "",
+      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
       "TEST_ENV": "x86_64-linux-deb10-validate"
     }
   },
@@ -3672,7 +3672,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3730,7 +3730,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -3789,7 +3789,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "manual"
       }
     ],
@@ -3849,7 +3849,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -3907,7 +3907,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -3965,7 +3965,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -4026,7 +4026,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
@@ -4086,7 +4086,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -4147,7 +4147,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -4207,7 +4207,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -4261,7 +4261,7 @@
     ],
     "rules": [
       {
-        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
+        "if": "($CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"disabled\" != \"disabled\")",
         "when": "on_success"
       }
     ],
@@ -4319,7 +4319,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
         "when": "on_success"
       }
     ],
