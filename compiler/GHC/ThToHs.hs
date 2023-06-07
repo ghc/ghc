@@ -277,17 +277,13 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
         ; ksig' <- cvtKind `traverse` ksig
-        ; let first_datacon =
-                case get_cons_names constr of
-                  []  -> panic "cvtDec: empty list of constructors"
-                  c:_ -> c
-        ; con' <- cvtConstr first_datacon cNameN constr
+        ; con' <- cvtDataDefnCons False ksig $ NewTypeCon constr
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
                                 , dd_cType = Nothing
                                 , dd_ctxt = mkHsContextMaybe ctxt'
                                 , dd_kindSig = ksig'
-                                , dd_cons = NewTypeCon con'
+                                , dd_cons = con'
                                 , dd_derivs = derivs' }
         ; returnJustLA $ TyClD noExtField $
           DataDecl { tcdDExt = noAnn
@@ -353,17 +349,13 @@ cvtDec (DataFamilyD tc tvs kind)
 cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-       ; let first_datacon =
-                case get_cons_names $ head constrs of
-                  []  -> panic "cvtDec: empty list of constructors"
-                  c:_ -> c
-       ; cons' <- mapM (cvtConstr first_datacon cNameN) constrs
+       ; cons' <- cvtDataDefnCons False ksig $ DataTypeCons False constrs
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = DataTypeCons False cons'
+                               , dd_cons = cons'
                                , dd_derivs = derivs' }
 
        ; returnJustLA $ InstD noExtField $ DataFamInstD
@@ -379,17 +371,14 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
 cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
        ; ksig' <- cvtKind `traverse` ksig
-       ; let first_datacon =
-                case get_cons_names constr of
-                  []  -> panic "cvtDec: empty list of constructors"
-                  c:_ -> c
-       ; con' <- cvtConstr first_datacon cNameN constr
+       ; con' <- cvtDataDefnCons False ksig $ NewTypeCon constr
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
                                , dd_cType = Nothing
                                , dd_ctxt = mkHsContextMaybe ctxt'
                                , dd_kindSig = ksig'
-                               , dd_cons = NewTypeCon con', dd_derivs = derivs' }
+                               , dd_cons = con'
+                               , dd_derivs = derivs' }
        ; returnJustLA $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
            , dfid_inst = DataFamInstDecl { dfid_eqn =
@@ -498,6 +487,28 @@ cvtGenDataDec :: Bool -> TH.Cxt -> TH.Name -> [TH.TyVarBndr TH.BndrVis]
     -> Maybe TH.Kind -> [TH.Con] -> [TH.DerivClause]
     -> CvtM (Maybe (LHsDecl GhcPs))
 cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
+  = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
+        ; ksig' <- cvtKind `traverse` ksig
+        ; cons' <- cvtDataDefnCons type_data ksig $
+                   DataTypeCons type_data constrs
+        ; derivs' <- cvtDerivs derivs
+        ; let defn = HsDataDefn { dd_ext = noExtField
+                                , dd_cType = Nothing
+                                , dd_ctxt = mkHsContextMaybe ctxt'
+                                , dd_kindSig = ksig'
+                                , dd_cons = cons'
+                                , dd_derivs = derivs' }
+        ; returnJustLA $ TyClD noExtField $
+          DataDecl { tcdDExt = noAnn
+                   , tcdLName = tc', tcdTyVars = tvs'
+                   , tcdFixity = Prefix
+                   , tcdDataDefn = defn } }
+
+-- Convert a set of data constructors.
+cvtDataDefnCons ::
+  Bool -> Maybe TH.Kind ->
+  DataDefnCons TH.Con -> CvtM (DataDefnCons (LConDecl GhcPs))
+cvtDataDefnCons type_data ksig constrs
   = do  { let isGadtCon (GadtC    _ _ _) = True
               isGadtCon (RecGadtC _ _ _) = True
               isGadtCon (ForallC  _ _ c) = isGadtCon c
@@ -515,27 +526,16 @@ cvtGenDataDec type_data ctxt tc tvs ksig constrs derivs
                  (failWith CannotMixGADTConsWith98Cons)
         ; unless (isNothing ksig || isGadtDecl)
                  (failWith KindSigsOnlyAllowedOnGADTs)
-        ; (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
-        ; ksig' <- cvtKind `traverse` ksig
 
         ; let first_datacon =
-                case get_cons_names $ head constrs of
-                  []  -> panic "cvtGenDataDec: empty list of constructors"
+                case firstDataDefnCon constrs of
+                  Nothing -> panic "cvtDataDefnCons: empty list of constructors"
+                  Just con -> con
+              first_datacon_name =
+                case get_cons_names first_datacon of
+                  []  -> panic "cvtDataDefnCons: data constructor with no names"
                   c:_ -> c
-        ; cons' <- mapM (cvtConstr first_datacon con_name) constrs
-
-        ; derivs' <- cvtDerivs derivs
-        ; let defn = HsDataDefn { dd_ext = noExtField
-                                , dd_cType = Nothing
-                                , dd_ctxt = mkHsContextMaybe ctxt'
-                                , dd_kindSig = ksig'
-                                , dd_cons = DataTypeCons type_data cons'
-                                , dd_derivs = derivs' }
-        ; returnJustLA $ TyClD noExtField $
-          DataDecl { tcdDExt = noAnn
-                   , tcdLName = tc', tcdTyVars = tvs'
-                   , tcdFixity = Prefix
-                   , tcdDataDefn = defn } }
+        ; mapM (cvtConstr first_datacon_name con_name) constrs }
 
 ----------------
 cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
