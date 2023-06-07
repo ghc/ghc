@@ -19,7 +19,7 @@ int main(int argc, char *argv[]) {
     registerInfoProvList(list2);
 
     // Query an IPE to initialize the underlying hash map.
-    lookupIPE(list1->entries[0].info);
+    lookupIPE(list1->tables[0]);
 
     // Trace all IPE events.
     dumpIPEToEventLog();

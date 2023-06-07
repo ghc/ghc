@@ -32,6 +32,10 @@ flag libnuma
   default: @CabalHaveLibNuma@
 flag 64bit
   default: @Cabal64bit@
+flag libzstd
+  default: @CabalHaveLibZstd@
+flag static-libzstd
+  default: @CabalStaticLibZstd@
 flag leading-underscore
   default: @CabalLeadingUnderscore@
 flag smp
@@ -198,6 +202,14 @@ library
          extra-libraries: elf dw
       if flag(libnuma)
          extra-libraries: numa
+      if flag(libzstd)
+         if flag(static-libzstd)
+            if os(darwin)
+               buildable: False
+            else
+               extra-libraries: :libzstd.a
+         else
+            extra-libraries: zstd
       if !flag(smp)
          cpp-options: -DNOSMP
 
