@@ -142,6 +142,7 @@ data BuildConfig
                 , withAssertions :: Bool
                 , withNuma       :: Bool
                 , withZstd       :: Bool
+                , withIpe        :: Bool
                 , crossTarget    :: Maybe String
                 , crossEmulator  :: CrossEmulator
                 , configureWrapper :: Maybe String
@@ -170,7 +171,8 @@ mkJobFlavour BuildConfig{..} = Flavour buildFlavour opts
            [FullyStatic | fullyStatic] ++
            [ThreadSanitiser | threadSanitiser] ++
            [NoSplitSections | noSplitSections, buildFlavour == Release ] ++
-           [BootNonmovingGc | validateNonmovingGc ]
+           [BootNonmovingGc | validateNonmovingGc ] ++
+           [Ipe | withIpe]
 
 data Flavour = Flavour BaseFlavour [FlavourTrans]
 
@@ -181,6 +183,7 @@ data FlavourTrans =
     | ThreadSanitiser
     | NoSplitSections
     | BootNonmovingGc
+    | Ipe
 
 data BaseFlavour = Release | Validate | SlowValidate deriving Eq
 
@@ -199,6 +202,7 @@ vanilla = BuildConfig
   , withAssertions = False
   , withNuma = False
   , withZstd = False
+  , withIpe  = False
   , crossTarget = Nothing
   , crossEmulator = NoEmulator
   , configureWrapper = Nothing
@@ -231,8 +235,10 @@ debug = vanilla { buildFlavour = SlowValidate
                 , withNuma = True
                 }
 
-zstdIpe :: BuildConfig
-zstdIpe = vanilla { withZstd = True }
+ipe :: BuildConfig
+ipe = vanilla { withIpe = True
+              , withZstd = True
+              }
 
 static :: BuildConfig
 static = vanilla { fullyStatic = True }
@@ -335,6 +341,7 @@ flavourString (Flavour base trans) = base_string base ++ concatMap (("+" ++) . f
     flavour_string ThreadSanitiser = "thread_sanitizer"
     flavour_string NoSplitSections = "no_split_sections"
     flavour_string BootNonmovingGc = "boot_nonmoving_gc"
+    flavour_string Ipe = "ipe"
 
 -- The path to the docker image (just for linux builders)
 dockerImage :: Arch -> Opsys -> Maybe String
@@ -886,7 +893,7 @@ job_groups =
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
-     , disableValidate (validateBuilds Amd64 (Linux Debian10) zstdIpe)
+     , disableValidate (validateBuilds Amd64 (Linux Debian10) ipe)
      , -- Nightly allowed to fail: #22520
        modifyNightlyJobs allowFailure
          (modifyValidateJobs manual tsan_jobs)
@@ -894,7 +901,7 @@ job_groups =
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
      , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
-     , addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
+     , addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) ipe)
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
