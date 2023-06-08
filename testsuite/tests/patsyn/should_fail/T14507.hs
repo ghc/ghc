@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# Language PatternSynonyms, ViewPatterns, GADTs, ConstraintKinds, RankNTypes,
              PolyKinds, ScopedTypeVariables, DataKinds, TypeOperators,
              TypeApplications, TypeFamilies, TypeFamilyDependencies #-}
@@ -11,7 +10,8 @@ import Data.Kind
 foo :: TypeRep a -> (Bool :~~: k, TypeRep a)
 foo rep = error "urk"
 
-type family SING :: k -> Type where
+type SING :: k -> Type
+type family SING @k where
   SING = (TypeRep :: Bool -> Type)
 
 pattern RepN :: forall kk (a::kk). () => Bool~kk => SING a -> TypeRep (a::kk)

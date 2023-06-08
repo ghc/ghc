@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -13,19 +12,21 @@
 -- The code from the ticket lacked necessary extension FlexibleContexts
 -- which crashed the compiler with "GHC internal error"
 -- This test case reproduces that scenario
-{- # LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE NoFlexibleContexts #-}
 
 module T12055a where
 
 import GHC.Base ( Constraint, Type )
-import GHC.Exts ( type (~~) )
+import GHC.Exts ( type (~), type (~~) )
 
 type Cat k = k -> k -> Type
 
-class Category (p :: Cat k) where
+type Category :: forall k. Cat k -> Constraint
+class Category @k p where
     type Ob p :: k -> Constraint
 
-class (Category (Dom f), Category (Cod f)) => Functor (f :: j -> k) where
+type Functor :: forall j k. (j -> k) -> Constraint
+class (Category (Dom f), Category (Cod f)) => Functor @j @k f where
     type Dom f :: Cat j
     type Cod f :: Cat k
     functor :: forall a b.

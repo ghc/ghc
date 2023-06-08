@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -16,18 +15,16 @@ type Hom k = k -> k -> Type
 
 type family Ob (p :: Hom k) :: k -> Constraint
 
+type Functor' :: forall i j.
+  (i -> Constraint) -> Hom i -> Hom i ->
+  (j -> Constraint) -> Hom j -> Hom j ->
+  (i -> j) -> Constraint
 class ( obP ~ Ob p
       , opP ~ Dom p
       , obQ ~ Ob q
       , opQ ~ Dom q
       , p ~ Dom f
       , q ~ Cod f
-      ) => Functor' (obP :: i -> Constraint)
-                    (opP :: Hom i)
-                    (p :: Hom i)
-                    (obQ :: j -> Constraint)
-                    (opQ :: Hom j)
-                    (q :: Hom j)
-                    (f :: i -> j) where
+      ) => Functor' @i @j obP opP p obQ opQ q f where
   type Dom f :: Hom i
   type Cod f :: Hom j

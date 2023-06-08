@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module ClosedFam3 where

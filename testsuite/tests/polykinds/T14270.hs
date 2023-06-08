@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
@@ -15,10 +14,12 @@ import Data.Kind (Type)
 import GHC.Fingerprint (Fingerprint, fingerprintFingerprints)
 import GHC.Types (RuntimeRep, TYPE, TyCon)
 
-data (a :: k1) :~~: (b :: k2) where
+type (:~~:) :: k1 -> k2 -> Type
+data a :~~: b where
   HRefl :: a :~~: a
 
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
     TrTyCon :: {-# UNPACK #-} !Fingerprint -> !TyCon -> [SomeTypeRep]
             -> TypeRep (a :: k)
 

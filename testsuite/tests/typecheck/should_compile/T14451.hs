@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators, ConstraintKinds, TypeFamilies, DataKinds, GADTs, AllowAmbiguousTypes, InstanceSigs, RankNTypes, UndecidableInstances #-}
 module T14451 where
 
@@ -10,8 +9,8 @@ type a ~> b = TyFun a b -> Type
 
 type Cat ob = ob -> ob -> Type
 
-type family
-  Apply (f :: a ~> b) (x :: a) :: b where
+type Apply :: (a ~> b) -> (a -> b)
+type family Apply f x where
   Apply (CompSym2 f g) a = Comp f g a
 
 data CompSym2 :: (b ~> c) -> (a ~> b) -> (a ~> c)
@@ -24,6 +23,6 @@ class Varpi (f :: i ~> j) where
 
   varpa :: Dom f a a' -> Cod f (f·a) (f·a')
 
-type family
-  Comp (f::k1 ~> k) (g::k2 ~> k1) (a::k2) :: k where
+type Comp :: (k1 ~> k) -> (k2 ~> k1) -> k2 -> k
+type family Comp f g a where
   Comp f g a = f · (g · a)

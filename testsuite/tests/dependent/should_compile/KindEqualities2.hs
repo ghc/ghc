@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, GADTs, PolyKinds, TypeFamilies, ExplicitForAll,
              TemplateHaskell, UndecidableInstances, ScopedTypeVariables #-}
 
@@ -16,7 +15,8 @@ data Ty :: Kind -> Type where
   TApp :: Ty (Arr k1 k2) -> Ty k1 -> Ty k2
 
 
-data TyRep (k :: Kind) (t :: Ty k) where
+type TyRep :: forall (k :: Kind) -> Ty k -> Type
+data TyRep k t where
   TyInt :: TyRep Star TInt
   TyBool :: TyRep Star TBool
   TyMaybe :: TyRep (Arr Star Star) TMaybe

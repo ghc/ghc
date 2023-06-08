@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE MultiParamTypeClasses     #-}
 {-# LANGUAGE PolyKinds                 #-}
@@ -200,7 +199,8 @@ class Kcl a b where
 
 -- Declaring kind injectivity. Here we only claim that knowing the RHS
 -- determines the LHS kind but not the type.
-type family L (a :: k1) = (r :: k2) | r -> k1 where
+type L :: k1 -> k2
+type family L @k1 a = r | r -> k1 where
     L 'True  = Int
     L 'False = Int
     L Maybe  = 3

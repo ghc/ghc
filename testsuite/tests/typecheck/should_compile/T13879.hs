@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -11,7 +10,8 @@ import Data.Kind
 
 data family Sing (a :: k)
 
-data HR (a :: j) (b :: k) where
+type HR :: j -> k -> Type
+data HR a b where
   HRefl :: HR a a
 
 data instance Sing (z :: HR a b) where

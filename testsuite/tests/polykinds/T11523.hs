@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# language KindSignatures #-}
 {-# language PolyKinds #-}
 {-# language DataKinds #-}
@@ -30,7 +29,8 @@ newtype Y (p :: i -> j -> Type) (a :: j) (b :: i) = Y { getY :: p b a }
 class Vacuous (a :: i)
 instance Vacuous a
 
-class (Functor p, Dom p ~ Op p, Cod p ~ Nat p (->)) => Category (p :: Cat i) where
+type Category :: Cat i -> Constraint
+class (Functor p, Dom p ~ Op p, Cod p ~ Nat p (->)) => Category @i p where
   type Op p :: Cat i
   type Op p = Y p
   type Ob p :: i -> Constraint

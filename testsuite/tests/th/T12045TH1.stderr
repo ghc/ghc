@@ -1,9 +1,12 @@
-T12045TH1.hs:(9,2)-(11,53): Splicing declarations
-    [d| type family F (a :: k) :: Type where
+T12045TH1.hs:(8,2)-(11,53): Splicing declarations
+    [d| type F :: k -> Type
+        
+        type family F a where
           F @Type Int = Bool
           F @(Type -> Type) Maybe = Char |]
   ======>
-    type family F (a :: k) :: Type where
+    type F :: k -> Type
+    type family F a where
       F @Type Int = Bool
       F @(Type -> Type) Maybe = Char
 T12045TH1.hs:14:2-32: Splicing declarations

@@ -1,10 +1,10 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
 module T10997_1a where
 
 import Data.Kind
 
-type family Showable (a :: k) :: Constraint where
+type Showable :: k -> Constraint
+type family Showable a where
   Showable (a :: Type) = (Show a)
   Showable a           = ()
 

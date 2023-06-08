@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ExistentialQuantification, DataKinds, PolyKinds, KindSignatures, GADTs #-}
 module T7503a where
     import Data.Kind
@@ -6,7 +5,8 @@ module T7503a where
 
     data WrappedType = forall a. WrapType a
 
-    data A :: WrappedType -> Type where
+    type A :: WrappedType -> Type
+    data A a where
         MkA :: forall (a :: Type). AW a -> A (WrapType a)
 
     type AW  (a :: k) = A (WrapType a)
