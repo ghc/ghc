@@ -23,47 +23,15 @@ Contributing patches to GHC in a hurry
 ======================================
 
 Make sure your system has the necessary tools to compile GHC. You can
-find an overview here:
+find an overview of how to prepare your system for compiling GHC here:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation>
 
-Next, clone the repository and all the associated libraries:
+After you have prepared your system, you can build GHC following the instructions described here:
 
-```
-$ git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
-```
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/building/hadrian>
 
-On Windows, you need an extra repository containing some build tools.
-These can be downloaded for you by `configure`. This only needs to be done once by running:
-
-```
-$ ./configure --enable-tarballs-autodownload
-```
-
-First copy `mk/build.mk.sample` to `mk/build.mk` and ensure it has
-your preferred build settings. (You probably want to at least set
-`BuildFlavour` to `quick`):
-
-```
-$ cp mk/build.mk.sample mk/build.mk
-$ ... double-check mk/build.mk ...
-```
-
-Now build. The convenient `validate` script will build the tree in a way which
-is both quick to build and consistent with our testsuite:
-
-```
-$ ./validate --build-only
-```
-
-You can use the `_validatebuild/stage1/bin/ghc` binary to play with the
-newly built compiler.
-
-Now, hack on your copy and rebuild (with `make`) as necessary.
-
-Then start by making your commits however you want. When you're done, you can submit
-a pull request on Github for small changes. For larger changes the patch needs to be
-submitted to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
+Then start by making your commits however you want. When you're done, you can submit a merge request to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
 Changes to the `base` library require a proposal to the [core libraries committee](https://github.com/haskell/core-libraries-committee/issues).
 The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs). One or several reviewers will review your PR, and when they are ok with your changes, they will assign the PR to [Marge Bot](https://gitlab.haskell.org/marge-bot) which will automatically rebase, batch and then merge your PR (assuming the build passes).
 
