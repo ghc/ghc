@@ -25,7 +25,6 @@ Build-Type: Custom
 
 extra-source-files:
     GHC/Builtin/primops.txt.pp
-    GHC/Builtin/bytearray-ops.txt.pp
     Unique.h
     CodeGen.Platform.h
     -- Shared with rts via hard-link at configure time. This is safer
