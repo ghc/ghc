@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# language KindSignatures, PolyKinds, TypeFamilies,
   NoImplicitPrelude, FlexibleContexts,
   MultiParamTypeClasses, GADTs,
@@ -12,7 +11,8 @@ import qualified Prelude
 
 data Nat (c :: i -> i -> Type) (d :: j -> j -> Type) (f :: i -> j) (g :: i -> j)
 
-class Functor p (Nat p (->)) p => Category (p :: i -> i -> Type)
+type Category :: (i -> i -> Type) -> Constraint
+class Functor p (Nat p (->)) p => Category p
 
 class (Category dom, Category cod)
    => Functor (dom :: i -> i -> Type) (cod :: j -> j -> Type) (f :: i -> j)

@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
@@ -21,14 +20,9 @@ type DComp a
            (x :: a) =
   f (g x)
 
--- Ensure that ElimList has a CUSK, beuas it is
--- is used polymorphically its RHS (c.f. #16344)
-type family ElimList (a :: Type)
-                     (p :: [a] -> Type)
-                     (s :: [a])
-                     (pNil :: p '[])
-                     (pCons :: forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs))
-                  :: p s where
+type ElimList :: forall (a :: Type) (p :: [a] -> Type) (s :: [a]) ->
+  p '[] -> (forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs)) -> p s
+type family ElimList a p s pNil pCons where
   forall a p pNil (pCons :: forall (x :: a) (xs :: [a]) -> p xs -> p (x:xs)).
     ElimList a p '[] pNil pCons =
       pNil

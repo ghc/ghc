@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -9,7 +8,8 @@ module T15122 where
 import Data.Kind
 import Data.Proxy
 
-data IsStar (a :: k) where
+type IsStar :: k -> Type
+data IsStar a where
   IsStar :: IsStar (a :: Type)
 
 type family F (a :: k) :: k

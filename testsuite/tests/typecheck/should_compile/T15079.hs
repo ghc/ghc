@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
@@ -14,13 +13,16 @@ import           GHC.Exts (Any)
 
 infixl 4 :==
 -- | Heterogeneous Leibnizian equality.
-newtype (a :: j) :== (b :: k)
+type (:==) :: j -> k -> Type
+newtype a :== b
   = HRefl { hsubst :: forall (c :: forall (i :: Type). i -> Type). c a -> c b }
 
 -----
 
 newtype Coerce a = Coerce { uncoerce :: Starify a }
-type family Starify (a :: k) :: Type where
+
+type Starify :: k -> Type
+type family Starify a where
   Starify (a :: Type) = a
   Starify _           = Void
 
@@ -35,7 +37,8 @@ newtype Flay :: (forall (i :: Type). i -> i -> Type)
                  (j :: Type) (k :: Type) (a :: j) (b :: k).
           { unflay :: p a (MassageKind j b) } -> Flay p a b
 
-type family MassageKind (j :: Type) (a :: k) :: j where
+type MassageKind :: forall (j :: Type) -> k -> j
+type family MassageKind j a where
   MassageKind j (a :: j) = a
   MassageKind _ _        = Any
 

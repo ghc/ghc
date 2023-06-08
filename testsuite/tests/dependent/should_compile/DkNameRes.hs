@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
 
 module DkNameRes where
@@ -6,5 +5,6 @@ module DkNameRes where
 import Data.Proxy
 import Data.Kind
 
-type family IfK (e :: Proxy (j :: Bool)) :: Type where
+type IfK :: Proxy (j :: Bool) -> Type
+type family IfK e where
    IfK (_ :: Proxy True) = ()

@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {- Copyright (c) 2016 Richard Eisenberg
  -}
 
@@ -27,7 +26,8 @@ import qualified GHC.Exts as Exts
 -- Utilities
 
 -- Heterogeneous propositional equality
-data (a :: k1) :~~: (b :: k2) where
+type (:~~:) :: k1 -> k2 -> Type
+data a :~~: b where
   HRefl :: a :~~: a
 
 -- Type-level inequality
@@ -76,7 +76,8 @@ Nil %:++ x = x
 -- Type-indexed type representations
 -- Based on "A reflection on types"
 
-data TyCon (a :: k) where
+type TyCon :: k -> Type
+data TyCon a where
   Int :: TyCon Int
   Bool :: TyCon Bool
   Char :: TyCon Char
@@ -110,7 +111,8 @@ type family Primitive (a :: k) :: Constraint where
   Primitive (_ _) = ('False ~ 'True)
   Primitive _     = (() :: Constraint)
 
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
   TyCon :: forall k (a :: k). (Primitive a, Typeable k) => TyCon a -> TypeRep a
   TyApp :: TypeRep a -> TypeRep b -> TypeRep (a b)
 

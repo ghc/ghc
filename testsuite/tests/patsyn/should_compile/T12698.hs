@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# Language ViewPatterns, TypeOperators, KindSignatures, PolyKinds,
              StandaloneDeriving, GADTs, RebindableSyntax,
              RankNTypes, LambdaCase, PatternSynonyms, TypeApplications #-}
@@ -37,7 +36,8 @@ splitApp = \case
   TP -> Nothing
   TA f x -> Just (App f x)
 
-data (a :: k1) :~~: (b :: k2) where
+type (:~~:) :: k1 -> k2 -> Type
+data a :~~: b where
   HRefl :: a :~~: a
 
 eqT :: T a -> T b -> Maybe (a :~~: b)

@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -9,12 +8,13 @@
 {-# LANGUAGE TypeOperators #-}
 module T13333 where
 
+import Data.Kind (Type, Constraint)
 import Data.Data
-import GHC.Exts (Constraint)
 
 data T (phantom :: k) = T
 
-data D (p :: k -> Constraint) (x :: j) where
+type D :: (k -> Constraint) -> j -> Type
+data D p x where
   D :: forall k (p :: k -> Constraint) (x :: k). p x => D p x
 
 class Possibly p x where

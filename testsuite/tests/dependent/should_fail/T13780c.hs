@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds, PolyKinds #-}
@@ -7,7 +6,7 @@ module T13780c where
 import Data.Kind
 import T13780b
 
-type family ElimBool (p :: Bool -> Type) (b :: Bool) (s :: Sing b)
-                     (pFalse :: p False) (pTrue :: p True) :: p b where
+type ElimBool :: (Bool -> Type) -> forall (b :: Bool) -> Sing b -> p False -> p True -> p b
+type family ElimBool p b s pFalse pTrue where
   ElimBool _ _ SFalse pFalse _ = pFalse
   ElimBool _ _ STrue  _ pTrue  = pTrue

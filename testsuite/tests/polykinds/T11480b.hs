@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# language KindSignatures #-}
 {-# language PolyKinds #-}
 {-# language DataKinds #-}
@@ -40,7 +39,8 @@ instance Vacuous p a
 data Dict (p :: Constraint) where
   Dict :: p => Dict p
 
-class Functor (Op p) (Nat p (->)) p => Category (p :: i -> i -> Type) where
+type Category :: (i -> i -> Type) -> Constraint
+class Functor (Op p) (Nat p (->)) p => Category @i p where
   type Ob p :: i -> Constraint
   type Ob p = Vacuous p
 

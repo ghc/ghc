@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, ExistentialQuantification, GADTs, PolyKinds, TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-  # LANGUAGE UndecidableInstances #-}
@@ -22,7 +21,8 @@ type family GetEntryOfVal (eov :: EntryOfVal v kvs)
   where
     GetEntryOfVal ('EntryOfVal e) = e
 
-type family FirstEntryOfVal (v :: Type) (kvs :: [Type]) :: EntryOfVal v kvs
+type FirstEntryOfVal :: forall (v :: Type) (kvs :: [Type]) -> EntryOfVal v kvs
+type family FirstEntryOfVal v kvs
   where FirstEntryOfVal v (_ : kvs)
            = 'EntryOfVal (There (GetEntryOfVal (FirstEntryOfVal v kvs)))
 --type instance FirstEntryOfVal v (_ : kvs)

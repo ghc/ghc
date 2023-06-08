@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeApplications #-}
@@ -9,7 +8,8 @@ import Data.Kind (Type)
 
 data B (a :: k)
 
-type family FClosed :: k -> Type where
+type FClosed :: k -> Type
+type family FClosed @k where
   FClosed @k = B @k
 
 type family FOpen :: k -> Type

@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE AllowAmbiguousTypes    #-}
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE DeriveGeneric          #-}
@@ -160,7 +159,8 @@ iso :: (s -> a) -> (b -> t) -> Iso s t a b
 iso sa bt = dimap sa (fmap bt)
 {-# INLINE iso #-}
 
-type family LookupParam (a :: k) (p :: Nat) :: Maybe Nat where
+type LookupParam :: k -> Nat -> Maybe Nat
+type family LookupParam a p where
   LookupParam (param (n :: Nat)) m = 'Nothing
   LookupParam (a (_ (m :: Nat))) n = IfEq m n ('Just 0) (MaybeAdd (LookupParam a n) 1)
   LookupParam (a _) n = MaybeAdd (LookupParam a n) 1
@@ -177,20 +177,24 @@ type family IfEq (a :: k) (b :: k) (t :: l) (f :: l) :: l where
 data Sub where
   Sub :: Nat -> k -> Sub
 
-type family ReplaceArg (t :: k) (pos :: Nat) (to :: j) :: k where
+type ReplaceArg :: k -> Nat -> j -> k
+type family ReplaceArg t pos to where
   ReplaceArg (t a) 0 to = t to
   ReplaceArg (t a) pos to = ReplaceArg t (pos - 1) to a
   ReplaceArg t _ _ = t
 
-type family ReplaceArgs (t :: k) (subs :: [Sub]) :: k where
+type ReplaceArgs :: k -> [Sub] -> k
+type family ReplaceArgs t subs where
   ReplaceArgs t '[] = t
   ReplaceArgs t ('Sub n arg ': ss) = ReplaceArgs (ReplaceArg t n arg) ss
 
-type family ArgAt (t :: k) (n :: Nat) :: j where
+type ArgAt :: k -> Nat -> j
+type family ArgAt t n where
   ArgAt (t a) 0 = a
   ArgAt (t a) n = ArgAt t (n - 1)
 
-type family Unify (a :: k) (b :: k) :: [Sub] where
+type Unify :: k -> k -> [Sub]
+type family Unify a b where
   Unify (p n _ 'PTag) a' = '[ 'Sub n a']
   Unify (a x) (b y) = Unify x y ++ Unify a b
   Unify a a = '[]
@@ -208,7 +212,8 @@ data PTag = PTag
 type family P :: Nat -> k -> PTag -> k
 type family Param :: Nat -> k where
 
-type family Indexed (t :: k) (i :: Nat) :: k where
+type Indexed :: k -> Nat -> k
+type family Indexed t i where
   Indexed (t a) i = Indexed t (i + 1) (Param i)
   Indexed t _     = t
 

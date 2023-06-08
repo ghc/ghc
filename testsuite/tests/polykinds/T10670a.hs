@@ -1,8 +1,8 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs , PolyKinds #-}
 
 module Bug2 where
 
+import Data.Kind (Type)
 import Unsafe.Coerce
 
 data TyConT (a::k) = TyConT String
@@ -16,7 +16,8 @@ tyConTArr :: TyConT (->)
 tyConTArr = TyConT "(->)"
 
 
-data TypeRepT (a::k) where
+type TypeRepT :: k -> Type
+data TypeRepT a where
   TRCon :: TyConT a -> TypeRepT a
   TRApp :: TypeRepT a -> TypeRepT b -> TypeRepT (a b)
 

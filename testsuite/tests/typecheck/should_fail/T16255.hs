@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -18,5 +17,6 @@ data family D1 :: forall k. k -> Type
 -- instances permit oversaturation in their equations.
 data instance D1 @Bool :: Bool -> Type
 
+type F2 :: j -> forall k. Either j k
 type family F2 (x :: j) :: forall k. Either j k where
   F2 5 @Symbol = Left 4

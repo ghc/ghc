@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -8,7 +7,8 @@ import Language.Haskell.TH hiding (Type)
 import System.IO
 import Data.Kind (Type)
 
-type family F (a :: k) :: Type where
+type F :: k -> Type
+type family F a where
     F (a :: Type -> Type) = Int
     F (a :: k) = Char
 

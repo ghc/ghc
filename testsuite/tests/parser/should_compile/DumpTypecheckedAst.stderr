@@ -1513,7 +1513,7 @@
          (NoTokenLoc)
          (HsTok))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
    (XHsBindsLR
     (AbsBinds
      []
@@ -1529,18 +1529,18 @@
       [(L
         (SrcSpanAnn (EpAnn
                      (Anchor
-                      { DumpTypecheckedAst.hs:19:1-23 }
+                      { DumpTypecheckedAst.hs:20:1-23 }
                       (UnchangedAnchor))
                      (AnnListItem
                       [])
                      (EpaComments
-                      [])) { DumpTypecheckedAst.hs:19:1-23 })
+                      [])) { DumpTypecheckedAst.hs:20:1-23 })
         (FunBind
          ((,)
           (WpHole)
           [])
          (L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-4 })
           {Var: main})
          (MG
           (MatchGroupTc
@@ -1552,14 +1552,14 @@
               [])])
            (FromSource))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+           (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
            [(L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-23 })
+             (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
              (Match
               (EpAnnNotUsed)
               (FunRhs
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:1-4 })
+                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-4 })
                 {Name: main})
                (Prefix)
                (NoSrcStrict))
@@ -1570,27 +1570,27 @@
                [(L
                  (SrcSpanAnn
                   (EpAnnNotUsed)
-                  { DumpTypecheckedAst.hs:19:6-23 })
+                  { DumpTypecheckedAst.hs:20:6-23 })
                  (GRHS
                   (EpAnnNotUsed)
                   []
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-23 })
+                   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:8-23 })
                    (HsApp
                     (EpAnnNotUsed)
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:8-15 })
+                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:8-15 })
                      (HsVar
                       (NoExtField)
                       (L
                        (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
                        {Var: putStrLn})))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:19:17-23 })
+                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:17-23 })
                      (HsLit
                       (EpAnn
                        (Anchor
-                        { DumpTypecheckedAst.hs:19:17-23 }
+                        { DumpTypecheckedAst.hs:20:17-23 }
                         (UnchangedAnchor))
                        (NoEpAnns)
                        (EpaComments

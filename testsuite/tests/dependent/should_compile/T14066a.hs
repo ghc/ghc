@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE TypeFamilies, DataKinds, PolyKinds, ExplicitForAll, GADTs,
              UndecidableInstances, RankNTypes, ScopedTypeVariables #-}
 
@@ -32,7 +31,8 @@ type family G x a where
 
 -- this last example just checks that GADT pattern-matching on kinds still works.
 -- nothing new here.
-data T (a :: k) where
+type T :: k -> Type
+data T a where
   MkT :: T (a :: Type -> Type)
 
 data S (a :: Type -> Type) where
@@ -54,9 +54,12 @@ type P k a = Proxy (a :: k)
 -- Naively, we don't know about c's kind early enough.
 
 data SameKind :: forall k. k -> k -> Type
-type family IfK (e :: Proxy (j :: Bool)) (f :: m) (g :: n) :: If j m n where
+
+type IfK :: Proxy (j :: Bool) -> m -> n -> If j m n
+type family IfK e f g where
    IfK (_ :: Proxy True)  f _ = f
    IfK (_ :: Proxy False) _ g = g
+
 x :: forall c. (forall a b (d :: a). SameKind (IfK c b d) d) -> (Proxy (c :: Proxy True))
 x _ = Proxy
 

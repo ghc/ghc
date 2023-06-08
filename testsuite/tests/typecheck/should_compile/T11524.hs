@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
@@ -7,7 +6,10 @@
 
 module T11524 where
 
-data AType (a :: k) where
+import Data.Kind (Type)
+
+type AType :: k -> Type
+data AType a where
     AMaybe :: AType Maybe
     AInt :: AType Int
     AApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).

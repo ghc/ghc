@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,5 +7,9 @@ module T16244 where
 import Data.Kind
 
 type Const a b = a
-type SameKind (a :: k) (b :: k) = (() :: Constraint)
-class SameKind a b => C (k :: Const Type a) (b :: k)
+
+type SameKind :: k -> k -> Constraint
+type SameKind a b = ()
+
+type C :: forall a. forall (k :: Const Type a) -> k -> Constraint
+class SameKind a b => C @a k b

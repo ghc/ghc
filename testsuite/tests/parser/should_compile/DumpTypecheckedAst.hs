@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds, PolyKinds, TypeOperators, TypeFamilies
              , TypeApplications #-}
 
@@ -7,12 +6,14 @@ import Data.Kind
 
 data Peano = Zero | Succ Peano
 
+type Length :: [k] -> Peano
 type family Length (as :: [k]) :: Peano where
   Length (a : as) = Succ (Length as)
   Length '[]      = Zero
 
 data T f (a :: k) = MkT (f a)
 
+type F :: k -> (k -> Type) -> Type
 type family F (a :: k) (f :: k -> Type) :: Type where
   F @Peano a f = T @Peano f a
 

@@ -1,11 +1,12 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, UndecidableInstances #-}
 
 module T9151 where
 
+import Data.Kind
 import Data.Proxy
 
-class PEnum (kproxy :: KProxy a) where
+type PEnum :: KProxy a -> Constraint
+class PEnum @a kproxy where
   type ToEnum (x :: a) :: Bool
   type ToEnum x = TEHelper
 

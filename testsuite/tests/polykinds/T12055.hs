@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -22,10 +21,12 @@ import Data.Type.Equality (type (~), type (~~))
 
 type Cat k = k -> k -> Type
 
-class Category (p :: Cat k) where
+type Category :: forall k. Cat k -> Constraint
+class Category @k p where
     type Ob p :: k -> Constraint
 
-class (Category (Dom f), Category (Cod f)) => Functor (f :: j -> k) where
+type Functor :: forall j k. (j -> k) -> Constraint
+class (Category (Dom f), Category (Cod f)) => Functor @j @k f where
     type Dom f :: Cat j
     type Cod f :: Cat k
     functor :: forall a b.

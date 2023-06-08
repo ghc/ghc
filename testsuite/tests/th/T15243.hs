@@ -1,4 +1,3 @@
-{-# LANGUAGE Haskell2010 #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,7 +7,8 @@ module T15243 where
 
 data Unit = Unit
 
-$([d| type family F (a :: k) :: k where
+$([d| type F :: k -> k
+      type family F a where
         F 'Unit = 'Unit
         F '(,)  = '(,)
         F '[]   = '[]
