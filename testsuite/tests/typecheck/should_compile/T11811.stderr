@@ -1,0 +1,3 @@
+T11811.hs:1:32: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XCUSKs is deprecated: use -XStandaloneKindSignatures or pragma {-# LANGUAGE StandaloneKindSignatures #-} instead
+

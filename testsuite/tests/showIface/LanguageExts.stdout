@@ -22,7 +22,6 @@ docs:
          NondecreasingIndentation
          TraditionalRecordSyntax
          StarIsType
-         CUSKs
          FieldSelectors
          ListTuplePuns
 extensible fields:

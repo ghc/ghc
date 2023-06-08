@@ -1,5 +1,5 @@
 
-tcfail225.hs:9:19: error: [GHC-25897]
+tcfail225.hs:8:19: error: [GHC-25897]
     • Couldn't match kind ‘k’ with ‘*’
       Expected kind ‘k -> *’, but ‘Maybe’ has kind ‘* -> *’
     • In the first argument of ‘T’, namely ‘Maybe’

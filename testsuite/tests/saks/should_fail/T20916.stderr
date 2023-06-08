@@ -1,4 +1,7 @@
+T20916.hs:1:14: warning: [GHC-53692] [-Wdeprecated-flags (in -Wdefault)]
+    -XCUSKs is deprecated: use -XStandaloneKindSignatures or pragma {-# LANGUAGE StandaloneKindSignatures #-} instead
 
 T20916.hs:8:10: error: [GHC-17370]
     • Different names for the same type variable: ‘p’ and ‘q’
     • In the data type declaration for ‘T3’
+

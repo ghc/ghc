@@ -1331,7 +1331,6 @@ languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.CUSKs,
        LangExt.MonomorphismRestriction,
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
@@ -1352,7 +1351,6 @@ languageExtensions (Just Haskell2010)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.CUSKs,
        LangExt.MonomorphismRestriction,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,

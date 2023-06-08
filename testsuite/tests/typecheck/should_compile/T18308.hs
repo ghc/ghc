@@ -1,4 +1,3 @@
-{-# LANGUAGE NoCUSKs #-}
 {-# LANGUAGE TypeFamilies #-}
 module T18308 where
 

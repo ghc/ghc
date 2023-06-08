@@ -109,6 +109,7 @@ deprecation _ = Deprecated
 extensionDeprecation :: LangExt.Extension -> ExtensionDeprecation
 extensionDeprecation = \case
   LangExt.TypeInType           -> ExtensionDeprecatedFor [LangExt.DataKinds, LangExt.PolyKinds]
+  LangExt.CUSKs                -> ExtensionDeprecatedFor [LangExt.StandaloneKindSignatures]
   LangExt.NullaryTypeClasses   -> ExtensionDeprecatedFor [LangExt.MultiParamTypeClasses]
   LangExt.RelaxedPolyRec       -> ExtensionFlagDeprecatedCond turnOff
                                     "You can't turn off RelaxedPolyRec any more"
