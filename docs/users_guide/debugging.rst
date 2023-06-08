@@ -324,7 +324,15 @@ subexpression elimination pass.
     :shortdesc: Dump specialiser output
     :type: dynamic
 
-    Dump output of specialisation pass
+    Dump output of typeclass specialisation pass
+
+.. ghc-flag:: -ddump-spec-constr
+    :shortdesc: Dump specialiser output from SpecConstr
+    :type: dynamic
+
+    :since: 9.8.1
+
+    Dump output of the SpecConstr specialisation pass
 
 .. ghc-flag:: -ddump-rules
     :shortdesc: Dump rewrite rules

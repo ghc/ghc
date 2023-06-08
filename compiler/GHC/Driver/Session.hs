@@ -1425,6 +1425,8 @@ dynamic_flags_deps = [
       (setDumpFlag Opt_D_dump_simpl_iterations)
   , make_ord_flag defGhcFlag "ddump-spec"
         (setDumpFlag Opt_D_dump_spec)
+  , make_ord_flag defGhcFlag "ddump-spec-constr"
+        (setDumpFlag Opt_D_dump_spec_constr)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-late-cc"

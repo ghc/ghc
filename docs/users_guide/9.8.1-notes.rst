@@ -128,6 +128,10 @@ Compiler
 
   GHC used to accept the contradictory ``Int~Bool`` in the type signature, but reject the ``Int~Bool`` constraint that arises from typechecking the definition itself.  Now it accepts both.  More details in `GHC ticket #23413 <https://gitlab.haskell.org/ghc/ghc/-/issues/23413>`_, which gives examples of the previous inconsistency.  GHC now implements the "PermissivePlan" described in that ticket.
 
+- The `-ddump-spec` flag has been split into `-ddump-spec` and
+  `-ddump-spec-constr`, allowing only output from the typeclass specialiser or
+  `SpecConstr` to be seen if desired.
+
 GHCi
 ~~~~
 
