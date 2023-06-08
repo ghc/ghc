@@ -580,16 +580,23 @@ invoking Haddock through ``cabal haddock``. Upon ``cabal haddock``, Cabal passes
 a ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` (where ``NNNN`` is the Haddock
 version number) flag to Haddock, which forwards the ``-optP=...`` flag to GHC
 and triggers a recompilation (unless the existing build results were also
-created by a ``cabal haddock``). To avoid such a recompilation, one must
-manually extract the arguments passed to Haddock by Cabal and remove the
-``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` flag. This can be achieved using
-the :option:`--trace-args` flag by invoking ``cabal haddock`` with
+created by a ``cabal haddock``). Additionally, Cabal passes a
+``--optghc="-stubdir=<temp directory>"`` flag to Haddock, which forwards the
+``-stubdir=<temp directory>`` flag to GHC and triggers a recompilation since
+``-stubdir`` adds a global include directory. Moreover, since the ``stubdir``
+that Cabal passes is a temporary directory, a recompilation is triggered even
+for immediately successive invocations. To avoid recompilations due to these
+flags, one must manually extract the arguments passed to Haddock by Cabal and
+remove the ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` and
+``--optghc="-stubdir=<temp directory>"`` flags. This can be achieved using the
+:option:`--trace-args` flag by invoking ``cabal haddock`` with
 ``--haddock-option="--trace-args"`` and copying the traced arguments to a script
-which makes an equivalent call to Haddock without the aformentioned flag.
+which makes an equivalent call to Haddock without the aformentioned flags.
 
 In addition to the above, Cabal passes a temporary directory as ``-hidir`` to
 Haddock by default. Obviously, this also triggers a recompilation for every
-invocation of ``cabal haddock``. To remedy this, pass a
+invocation of ``cabal haddock``, since it will never find the necessary
+interface files in that temporary directory. To remedy this, pass a
 ``--optghc="-hidir=/path/to/hidir"`` flag to Haddock, where ``/path/to/hidir``
 is the path to the directory in which your build process is writing ``.hi``
 files.
