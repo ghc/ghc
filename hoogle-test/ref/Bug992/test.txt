@@ -5,5 +5,5 @@
 @version 0.0.0
 
 module Bug992
-data K (m :: * -> *)
-K :: K (m :: * -> *)
+data K (m :: Type -> Type)
+K :: K (m :: Type -> Type)

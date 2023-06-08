@@ -6,4 +6,4 @@
 
 module Bug825
 data a :~: b
-data (:~~:) a b
+data a :~~: b

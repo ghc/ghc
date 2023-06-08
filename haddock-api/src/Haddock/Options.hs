@@ -120,6 +120,7 @@ data Flag
   | Flag_SinceQualification String
   | Flag_IgnoreLinkSymbol String
   | Flag_ParCount (Maybe Int)
+  | Flag_TraceArgs
   deriving (Eq, Show)
 
 
@@ -237,7 +238,9 @@ options backwardsCompat =
     Option [] ["ignore-link-symbol"] (ReqArg Flag_IgnoreLinkSymbol "SYMBOL")
       "name of a symbol which does not trigger a warning in case of link issue",
     Option ['j'] [] (OptArg (\count -> Flag_ParCount (fmap read count)) "n")
-      "load modules in parallel"
+      "load modules in parallel",
+    Option []  ["trace-args"]  (NoArg Flag_TraceArgs)
+      "print the arguments provided for this invocation to stdout"
   ]
 
 
@@ -337,7 +340,6 @@ qualification flags =
       ["full"]       -> Right OptFullQual
       ["local"]      -> Right OptLocalQual
       ["relative"]   -> Right OptRelativeQual
-      ["aliased"]    -> Right OptAliasedQual
       [arg]          -> Left $ "unknown qualification type " ++ show arg
       _:_            -> Left "qualification option given multiple times"
 

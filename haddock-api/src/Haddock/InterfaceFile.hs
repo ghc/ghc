@@ -210,8 +210,7 @@ readInterfaceFile :: NameCache
                   -> IO (Either String InterfaceFile)
 readInterfaceFile name_cache filename bypass_checks = do
   bh <- readBinMem filename
-
-  magic   <- get bh
+  magic <- get bh
   if magic /= binaryInterfaceMagic
     then return . Left $ "Magic number mismatch: couldn't load interface file: " ++ filename
     else do
@@ -310,12 +309,13 @@ putInterfaceFile_ bh (InterfaceFile env info ifaces) = do
   put_ bh ifaces
 
 instance Binary InstalledInterface where
-  put_ bh (InstalledInterface modu is_sig info docMap argMap
+  put_ bh (InstalledInterface modu is_sig info docMap argMap defMeths
            exps visExps opts fixMap) = do
     put_ bh modu
     put_ bh is_sig
     put_ bh info
     lazyPut bh (docMap, argMap)
+    put_ bh defMeths
     put_ bh exps
     put_ bh visExps
     put_ bh opts
@@ -326,13 +326,13 @@ instance Binary InstalledInterface where
     is_sig  <- get bh
     info    <- get bh
     ~(docMap, argMap) <- lazyGet bh
+    defMeths <- get bh
     exps    <- get bh
     visExps <- get bh
     opts    <- get bh
     fixMap  <- get bh
-    return (InstalledInterface modu is_sig info docMap argMap
-            exps visExps opts fixMap)
-
+    return (InstalledInterface modu is_sig info
+            docMap argMap defMeths exps visExps opts fixMap)
 
 instance Binary DocOption where
     put_ bh OptHide = do
@@ -345,6 +345,8 @@ instance Binary DocOption where
             putByte bh 3
     put_ bh OptShowExtensions = do
             putByte bh 4
+    put_ bh OptPrintRuntimeRep = do
+            putByte bh 5
     get bh = do
             h <- getByte bh
             case h of
@@ -358,8 +360,9 @@ instance Binary DocOption where
                     return OptNotHome
               4 -> do
                     return OptShowExtensions
-              _ -> fail "invalid binary data found"
-
+              5 -> do
+                    return OptPrintRuntimeRep
+              n -> fail $ "invalid binary data found: " <> show n
 
 instance Binary Example where
     put_ bh (Example expression result) = do

@@ -64,13 +64,17 @@
 	      ><li
 		><a href="#"
 		  >C1</a
-		  > :: <a href="#" title="GADTRecords"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a b</li
 		><li
 		><a href="#"
 		  >C2</a
-		  > :: <a href="#" title="Data.Ord"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a. <a href="#" title="Data.Ord"
 		  >Ord</a
 		  > a =&gt; [a] -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
@@ -88,11 +92,13 @@
 		><li
 		><a href="#"
 		  >C4</a
-		  > :: {..} -&gt; <a href="#" title="GADTRecords"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > b. {..} -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
 		  > <a href="#" title="Data.Int"
 		  >Int</a
-		  > a</li
+		  > b</li
 		></ul
 	      ></li
 	    ></ul
@@ -124,7 +130,9 @@
 	      ><td class="src"
 		><a id="v:C1" class="def"
 		  >C1</a
-		  > :: <a href="#" title="GADTRecords"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a b</td
 		><td class="doc empty"
@@ -134,7 +142,9 @@
 	      ><td class="src"
 		><a id="v:C2" class="def"
 		  >C2</a
-		  > :: <a href="#" title="Data.Ord"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a. <a href="#" title="Data.Ord"
 		  >Ord</a
 		  > a =&gt; [a] -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
@@ -200,9 +210,11 @@
 		    ><ul
 		    ><li
 		      ><dfn class="src"
-			>:: { <a id="v:field2" class="def"
+			>:: <span class="keyword"
+			  >forall</span
+			  > b. { <a id="v:field2" class="def"
 			  >field2</a
-			  > :: a</dfn
+			  > :: b</dfn
 			><div class="doc"
 			><p
 			  >hello2 docs</p
@@ -214,7 +226,7 @@
 			  >H1</a
 			  > <a href="#" title="Data.Int"
 			  >Int</a
-			  > a</dfn
+			  > b</dfn
 			><div class="doc empty"
 			>&nbsp;</div
 			></li

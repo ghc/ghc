@@ -5,7 +5,6 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections       #-}
 {-# OPTIONS_GHC -Wwarn           #-}
 -----------------------------------------------------------------------------
 -- |
@@ -158,6 +157,12 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   -- or which exits with an error or help message.
   (flags, files) <- parseHaddockOpts args
   shortcutFlags flags
+
+  -- If argument tracing is enabled, print the arguments we were given
+  when (Flag_TraceArgs `elem` flags) $ do
+    putStrLn $ "haddock received arguments:"
+    mapM_ (putStrLn . ("  " ++)) args
+
   qual <- rightOrThrowE (qualification flags)
   sinceQual <- rightOrThrowE (sinceQualification flags)
 
@@ -563,7 +568,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
     logger <- getLogger
     dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
 
-    -- We disable pattern match warnings because than can be very
+    -- We disable pattern match warnings because they can be very
     -- expensive to check
     let dynflags'' = unsetPatternMatchWarnings $ updOptLevel 0 dynflags'
 
@@ -587,8 +592,17 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
     parseGhcFlags logger dynflags = do
       -- TODO: handle warnings?
 
-      let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
-                     | otherwise = [Opt_Haddock]
+      let extra_opts =
+            [ -- Include docstrings in .hi files.
+              Opt_Haddock
+
+              -- Do not recompile because of changes to optimization flags
+            , Opt_IgnoreOptimChanges
+            ]
+              -- Write .hie files if we need them for hyperlinked src
+              ++ if needHieFiles
+                    then [Opt_WriteHie] -- Generate .hie-files
+                    else []
           dynflags' = (foldl' gopt_set dynflags extra_opts)
                         { backend = noBackend
                         , ghcMode = CompManager

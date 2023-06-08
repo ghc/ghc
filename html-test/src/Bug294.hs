@@ -10,11 +10,13 @@
 module Bug294 ( A, problemField, problemField', gadtField
               , TP(ProblemCtor), DP(ProblemCtor'), TO'(PolyCtor)) where
 
+import Data.Kind (Type)
+
 data A
 
 class T t where
-  data TO t :: *
-  data TP t :: *
+  data TO t :: Type
+  data TP t :: Type
 
   t :: t
 
@@ -22,17 +24,17 @@ instance T A where
   data TO A = TA { problemField :: A }
   data TP A = ProblemCtor A
 
-data family DO t :: *
-data family DP t :: *
+data family DO t :: Type
+data family DP t :: Type
 
 data instance DO A = DA { problemField' :: A }
 data instance DP A = ProblemCtor' A
 
-data GADT :: * -> * where
+data GADT :: Type -> Type where
   Ctor :: { gadtField :: A } -> GADT A
 
 class T' t where
-  data TO' t :: *
+  data TO' t :: Type
 
 instance T' a where
   data TO' a = PolyCtor

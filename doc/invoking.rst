@@ -179,7 +179,7 @@ The following options are available:
       * Every entity should span exactly one line. ::
 
             newtype ReaderT r (m :: * -> *) a :: * -> (* -> *) -> * -> *
-          
+
         The one exception to this rule is classes. The body of a class
         is split up with one class member per line, an opening brace on
         the line of the header, and a closing brace on a new line after
@@ -190,7 +190,7 @@ The following options are available:
                 type family Baz a;
                 type Baz a = [(a, a)];
             }
-      
+
       * Entites that are exported only indirectly (for instance data
         constructors visible via a ``ReaderT(..)`` export) have their names
         wrapped in square brackets. ::
@@ -257,10 +257,6 @@ The following options are available:
        name. Note that for the per-entity URLs this is the name of the
        *exporting* module.
 
-    -  The string ``%F`` or ``%{FILE}`` is replaced by the original
-       source file name. Note that for the per-entity URLs this is the
-       name of the *defining* module.
-
     -  The string ``%N`` or ``%{NAME}`` is replaced by the name of the
        exported value or type. This is only valid for the
        :option:`--source-entity` option.
@@ -275,9 +271,6 @@ The following options are available:
 
     -  The string ``%%`` is replaced by ``%``.
 
-    For example, if your sources are online under some directory, you
-    would say ``haddock --source-base=url/ --source-module=url/%F``
-
     If you have html versions of your sources online with anchors for
     each type and function name, you would say
     ``haddock --source-base=url/ --source-module=url/%M.html --source-entity=url/%M.html#%N``
@@ -287,11 +280,6 @@ The following options are available:
     (some web servers are known to get confused by multiple ``.``
     characters in a file name). To replace it with a character c use
     ``%{MODULE/./c}``.
-
-    Similarly, for the ``%{FILE}`` substitution you may want to replace
-    the ``/`` character in the file names with some other character
-    (especially for links to colourised entity source code with a shared
-    css file). To replace it with a character c use ``%{FILE///c}``/
 
     One example of a tool that can generate syntax-highlighted HTML from
     your source code, complete with anchors suitable for use from
@@ -485,13 +473,6 @@ The following options are available:
     :option:`-i` or :option:`--read-interface`). This is used to generate a single
     contents and/or index for multiple sets of Haddock documentation.
 
-.. option:: --ignore-all-exports
-
-    Causes Haddock to behave as if every module has the
-    ``ignore-exports`` attribute (:ref:`module-attrs`). This might be useful for
-    generating implementation documentation rather than interface
-    documentation, for example.
-
 .. option:: --hide <module>
 
     Causes Haddock to behave as if module module has the ``hide``
@@ -554,6 +535,13 @@ The following options are available:
 
     Print extra information about any undocumented entities.
 
+.. option:: --trace-args
+
+    Make Haddock print the arguments it receives to standard output. This is
+    useful for examining arguments when invoking through ``cabal haddock``, as
+    ``cabal`` uses temporary `response files
+    <https://gcc.gnu.org/wiki/Response_Files>`_ to pass arguments to Haddock.
+
 Using literate or pre-processed source
 --------------------------------------
 
@@ -561,3 +549,58 @@ Since Haddock uses GHC internally, both plain and literate Haskell
 sources are accepted without the need for the user to do anything. To
 use the C pre-processor, however, the user must pass the ``-cpp``
 option to GHC using :option:`--optghc`.
+
+Avoiding recompilation
+----------------------
+
+With the advent of "hi-haddock", Haddock now produces documentation from ``.hi``
+(Haskell interface) files and ``.hie`` (``.hi`` extended) files [#]_, rather
+than typechecked module results. This means that as long as the necessary
+``.hi`` and ``.hie`` files are available (i.e. produced by your build process),
+recompilation can be avoided during documentation generation.
+
+.. [#] Note that ``.hie`` files are only necessary to build documentation which
+       includes hyperlinked source files `like this one
+       <https://hackage.haskell.org/package/base-4.18.0.0/docs/src/GHC.Base.html>`_,
+       while ``.hi`` files are required for all Haddock documentation flavors.
+
+The first step is to ensure that your build process is producing ``.hi`` files
+that contain Haddock docstrings. This requires that you somehow provide the
+``-fwrite-interface`` and ``-haddock`` flags to GHC. If you intend to generate
+documentation that includes hyperlinked source files, you should also provide
+the ``-fwrite-ide-info`` flag to GHC. You may specify the directory in which GHC
+should write the ``.hi`` and ``.hie`` files by providing the
+``-hidir=/path/to/hidir`` and ``-hiedir=/path/to/hiedir`` flags to GHC. If you
+are building your application with ``cabal build``, the default location is in
+``dist-newstyle/build/<arch>-<os>/ghc-<ghc-version>/<component>-0.1.0/build``.
+
+The next step is to ensure that the flags which Haddock passes to GHC will not
+trigger recompilation. Unfortunately, this is not very easy to do if you are
+invoking Haddock through ``cabal haddock``. Upon ``cabal haddock``, Cabal passes
+a ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` (where ``NNNN`` is the Haddock
+version number) flag to Haddock, which forwards the ``-optP=...`` flag to GHC
+and triggers a recompilation (unless the existing build results were also
+created by a ``cabal haddock``). Additionally, Cabal passes a
+``--optghc="-stubdir=<temp directory>"`` flag to Haddock, which forwards the
+``-stubdir=<temp directory>`` flag to GHC and triggers a recompilation since
+``-stubdir`` adds a global include directory. Moreover, since the ``stubdir``
+that Cabal passes is a temporary directory, a recompilation is triggered even
+for immediately successive invocations. To avoid recompilations due to these
+flags, one must manually extract the arguments passed to Haddock by Cabal and
+remove the ``--optghc="-optP-D__HADDOCK_VERSION__=NNNN"`` and
+``--optghc="-stubdir=<temp directory>"`` flags. This can be achieved using the
+:option:`--trace-args` flag by invoking ``cabal haddock`` with
+``--haddock-option="--trace-args"`` and copying the traced arguments to a script
+which makes an equivalent call to Haddock without the aformentioned flags.
+
+In addition to the above, Cabal passes a temporary directory as ``-hidir`` to
+Haddock by default. Obviously, this also triggers a recompilation for every
+invocation of ``cabal haddock``, since it will never find the necessary
+interface files in that temporary directory. To remedy this, pass a
+``--optghc="-hidir=/path/to/hidir"`` flag to Haddock, where ``/path/to/hidir``
+is the path to the directory in which your build process is writing ``.hi``
+files.
+
+Following the steps above will allow you to take full advantage of "hi-haddock"
+and generate Haddock documentation from existing build results without requiring
+any further compilation.

@@ -20,8 +20,9 @@
 module SpuriousSuperclassConstraints where
 
 import Control.Applicative
+import Data.Kind (Type)
 
-data SomeType (f :: * -> *) a
+data SomeType (f :: Type -> Type) a
 
 instance Functor (SomeType f) where
   fmap = undefined

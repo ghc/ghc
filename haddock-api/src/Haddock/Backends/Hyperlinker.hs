@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 module Haddock.Backends.Hyperlinker
@@ -54,8 +55,7 @@ ppHyperlinkedSource verbosity outdir libdir mstyle pretty srcs' ifaces = do
 
 -- | Generate hyperlinked source for particular interface.
 ppHyperlinkedModuleSource :: Verbosity -> FilePath -> Bool -> SrcMaps -> Interface -> IO ()
-ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile iface of
-    Just hfp -> do
+ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = do
         -- Parse the GHC-produced HIE file
         nc <- freshNameCache
         HieFile { hie_hs_file = file
@@ -63,7 +63,7 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile
                 , hie_types = types
                 , hie_hs_src = rawSrc
                 } <- hie_file_result
-                 <$> (readHieFile nc hfp)
+                 <$> (readHieFile nc iface.ifaceHieFile )
 
         -- Get the AST and tokens corresponding to the source file we want
         let fileFs = mkFastString file
@@ -89,7 +89,6 @@ ppHyperlinkedModuleSource verbosity srcdir pretty srcs iface = case ifaceHieFile
 
         -- Produce and write out the hyperlinked sources
         writeUtf8File path . renderToString pretty . render' fullAst $ tokens
-    Nothing -> return ()
   where
     df = ifaceDynFlags iface
     render' = render (Just srcCssFile) (Just highlightScript) srcs

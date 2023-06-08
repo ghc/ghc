@@ -153,7 +153,11 @@
 	    >class</span
 	    > <a id="t:Foo" class="def"
 	    >Foo</a
-	    > f <span class="keyword"
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -440,7 +444,7 @@
 		      >Foo</a
 		      > f) =&gt; <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >(,)</a
 		      > (f a))</span
 		    > <a href="#" class="selflink"
@@ -552,7 +556,7 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >(,,)</a
 		      > a a)</span
 		    > <a href="#" class="selflink"
@@ -655,7 +659,11 @@
 	    >Foo</a
 	    > f =&gt; <a id="t:Bar" class="def"
 	    >Bar</a
-	    > f a <span class="keyword"
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) a <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -1154,11 +1162,11 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >(,,)</a
 		      > a b) =&gt; <a href="#" title="Instances"
 		      >Bar</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >(,,)</a
 		      > a b) (a, b, a)</span
 		    > <a href="#" class="selflink"
@@ -1238,9 +1246,9 @@
 	      >baz</a
 	      > :: a -&gt; (<span class="keyword"
 	      >forall</span
-	      > a. a -&gt; a) -&gt; (b, <span class="keyword"
+	      > a1. a1 -&gt; a1) -&gt; (b, <span class="keyword"
 	      >forall</span
-	      > c. c -&gt; a) -&gt; (b, c) <a href="#" class="selflink"
+	      > c1. c1 -&gt; a) -&gt; (b, c) <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
@@ -1248,9 +1256,9 @@
 	      >baz'</a
 	      > :: b -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; (<span class="keyword"
+	      > b1. b1 -&gt; a) -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; [(b, a)] <a href="#" class="selflink"
+	      > b1. b1 -&gt; a) -&gt; [(b, a)] <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
@@ -1258,11 +1266,11 @@
 	      >baz''</a
 	      > :: b -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. (<span class="keyword"
+	      > b1. (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; c) -&gt; <span class="keyword"
+	      > b2. b2 -&gt; a) -&gt; c) -&gt; <span class="keyword"
 	      >forall</span
-	      > c. c -&gt; b <a href="#" class="selflink"
+	      > c1. c1 -&gt; b <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ></div

@@ -5,7 +5,7 @@
 @version 0.0.0
 
 module Classes
-class Foo f
+class Foo (f :: Type -> Type)
 bar :: Foo f => f a -> f b -> f (a, b)
 baz :: Foo f => f ()
 class Quux q

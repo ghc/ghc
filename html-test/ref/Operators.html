@@ -114,7 +114,9 @@
 	      ><li
 		><a href="#"
 		  >(:&lt;-&gt;)</a
-		  > :: a -&gt; b -&gt; a <a href="#" title="Operators"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. a -&gt; b -&gt; a <a href="#" title="Operators"
 		  >&lt;-&gt;</a
 		  > b</li
 		></ul
@@ -144,7 +146,7 @@
 		  >type</span
 		  > a <a href="#"
 		  >&lt;&gt;&lt;</a
-		  > b :: *</li
+		  > b</li
 		><li
 		><span class="keyword"
 		  >data</span
@@ -154,17 +156,25 @@
 		><li
 		><a href="#"
 		  >(&gt;&gt;&lt;)</a
-		  >, <a href="#"
+		  > :: a -&gt; b -&gt; ()</li
+		><li
+		><a href="#"
 		  >(&lt;&lt;&gt;)</a
 		  > :: a -&gt; b -&gt; ()</li
 		><li
 		><a href="#"
 		  >(**&gt;)</a
-		  >, <a href="#"
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
 		  >(**&lt;)</a
-		  >, <a href="#"
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
 		  >(&gt;**)</a
-		  >, <a href="#"
+		  > :: a -&gt; a -&gt; ()</li
+		><li
+		><a href="#"
 		  >(&lt;**)</a
 		  > :: a -&gt; a -&gt; ()</li
 		></ul
@@ -328,7 +338,9 @@
 	      ><td class="src"
 		><a id="v::-60--45--62-" class="def"
 		  >(:&lt;-&gt;)</a
-		  > :: a -&gt; b -&gt; a <a href="#" title="Operators"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a b. a -&gt; b -&gt; a <a href="#" title="Operators"
 		  >&lt;-&gt;</a
 		  > b <span class="fixity"
 		  >infixr 6</span
@@ -404,7 +416,7 @@
 	      >type</span
 	      > a <a id="t:-60--62--60-" class="def"
 	      >&lt;&gt;&lt;</a
-	      > b :: * <span class="fixity"
+	      > b <span class="fixity"
 	      >infixl 2</span
 	      ><span class="rightedge"
 	      ></span

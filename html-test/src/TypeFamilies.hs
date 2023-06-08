@@ -4,6 +4,8 @@
 -- | Doc for: module TypeFamilies
 module TypeFamilies where
 
+import Data.Kind (Type)
+
 import qualified TypeFamilies2 as TF
 
 -- | Doc for: data X
@@ -35,7 +37,7 @@ type instance Foo X = Y
 type instance Foo Y = X
 
 -- | Doc for: data family Bat a
-data family Bat (a :: k) :: *
+data family Bat (a :: k) :: Type
 
 -- | Doc for: data instance Bat X
 data instance Bat X
@@ -53,9 +55,9 @@ data instance Bat (z :: Z) where
 -- | Doc for: class Assoc a
 class Assoc a where
   -- | Doc for: data AssocD a
-  data AssocD a :: *
+  data AssocD a :: Type
   -- | Doc for: type AssocT a
-  type AssocT a :: *
+  type AssocT a :: Type
 
 -- | Doc for: instance Assoc X
 instance Assoc X where
