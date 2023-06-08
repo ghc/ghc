@@ -1,13 +1,21 @@
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE ConstraintKinds            #-}
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedRecordDot        #-}
+{-# LANGUAGE PartialTypeSignatures      #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-} -- Note [Pass sensitive types]
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -30,22 +38,23 @@ module Haddock.Types (
   , HsDocString, LHsDocString
   , Fixity(..)
   , module Documentation.Haddock.Types
-
-  -- $ Reexports
-  , runWriter
-  , tell
  ) where
 
 import Control.DeepSeq
 import Control.Exception (throw)
 import Control.Monad.Catch
-import Control.Monad.IO.Class (MonadIO(..))
-import Control.Monad.Writer.Strict (Writer, WriterT, MonadWriter(..), lift, runWriter, runWriterT)
+import Control.Monad.State.Strict
 import Data.Typeable (Typeable)
 import Data.Map (Map)
 import Data.Data (Data)
+import qualified Data.Set as Set
 import Documentation.Haddock.Types
+import qualified GHC.Data.Strict as Strict
 import GHC.Types.Fixity (Fixity(..))
+import GHC.Types.Name (stableNameCmp)
+import GHC.Types.Name.Reader (RdrName(..))
+import GHC.Types.SourceText (SourceText(..))
+import GHC.Types.SrcLoc (BufSpan(..), BufPos(..))
 import GHC.Types.Var (Specificity)
 
 import GHC
@@ -64,16 +73,16 @@ type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
 type DocMap a      = Map Name (MDoc a)
 type ArgMap a      = Map Name (Map Int (MDoc a))
 type SubMap        = Map Name [Name]
-type DeclMap       = Map Name [LHsDecl GhcRn]
+type DeclMap       = Map Name DeclMapEntry
 type InstMap       = Map RealSrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
+type WarningMap    = Map Name (Doc Name)
 
 
 -----------------------------------------------------------------------------
--- * Interface
+-- * Interfaces and Interface creation
 -----------------------------------------------------------------------------
-
 
 -- | 'Interface' holds all information used to render a single Haddock page.
 -- It represents the /interface/ of a module. The core business of Haddock
@@ -88,9 +97,6 @@ data Interface = Interface
     -- | Is this a signature?
   , ifaceIsSig           :: !Bool
 
-    -- | Original file name of the module.
-  , ifaceOrigFilename    :: !FilePath
-
     -- | Textual information about the module.
   , ifaceInfo            :: !(HaddockModInfo Name)
 
@@ -101,62 +107,50 @@ data Interface = Interface
   , ifaceRnDoc           :: !(Documentation DocName)
 
     -- | Haddock options for this module (prune, ignore-exports, etc).
-  , ifaceOptions         :: ![DocOption]
-
-    -- | Declarations originating from the module. Excludes declarations without
-    -- names (instances and stand-alone documentation comments). Includes
-    -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: !(Map Name [LHsDecl GhcRn])
+  , ifaceOptions         :: [DocOption]
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
   , ifaceDocMap          :: !(DocMap Name)
   , ifaceArgMap          :: !(ArgMap Name)
 
-    -- | Documentation of declarations originating from the module (including
-    -- subordinates).
-  , ifaceRnDocMap        :: !(DocMap DocName)
-  , ifaceRnArgMap        :: !(ArgMap DocName)
+    -- | The names of all the default methods for classes defined in this module
+  , ifaceDefMeths        :: !([(OccName, Name)])
 
   , ifaceFixMap          :: !(Map Name Fixity)
 
-  , ifaceExportItems     :: ![ExportItem GhcRn]
-  , ifaceRnExportItems   :: ![ExportItem DocNameI]
+  , ifaceExportItems     :: [ExportItem GhcRn]
+  , ifaceRnExportItems   :: [ExportItem DocNameI]
 
     -- | All names exported by the module.
-  , ifaceExports         :: ![Name]
+  , ifaceExports         :: [Name]
 
     -- | All \"visible\" names exported by the module.
     -- A visible name is a name that will show up in the documentation of the
     -- module.
-  , ifaceVisibleExports  :: ![Name]
-
-    -- | Aliases of module imports as in @import A.B.C as C@.
-  , ifaceModuleAliases   :: !AliasMap
+    --
+    -- Names from modules that are entirely re-exported don't count as visible.
+  , ifaceVisibleExports  :: [Name]
 
     -- | Instances exported by the module.
-  , ifaceInstances       :: ![ClsInst]
-  , ifaceFamInstances    :: ![FamInst]
+  , ifaceInstances       :: [ClsInst]
 
     -- | Orphan instances
-  , ifaceOrphanInstances :: ![DocInstance GhcRn]
-  , ifaceRnOrphanInstances :: ![DocInstance DocNameI]
+  , ifaceOrphanInstances   :: [DocInstance GhcRn]
+  , ifaceRnOrphanInstances :: [DocInstance DocNameI]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
-  , ifaceHaddockCoverage :: !(Int, Int)
+  , ifaceHaddockCoverage :: (Int, Int)
 
     -- | Warnings for things defined in this module.
-  , ifaceWarningMap :: !WarningMap
+  , ifaceWarningMap :: WarningMap
 
     -- | Tokenized source code of module (available if Haddock is invoked with
     -- source generation flag).
-  , ifaceHieFile :: !(Maybe FilePath)
+  , ifaceHieFile ::  !FilePath
   , ifaceDynFlags :: !DynFlags
   }
-
-type WarningMap = Map Name (Doc Name)
-
 
 -- | A subset of the fields of 'Interface' that we store in the interface
 -- files.
@@ -177,6 +171,9 @@ data InstalledInterface = InstalledInterface
 
   , instArgMap           :: ArgMap Name
 
+    -- | The names of all the default methods for classes defined in this module
+  , instDefMeths         :: [(OccName,Name)]
+
     -- | All names exported by this module.
   , instExports          :: [Name]
 
@@ -191,21 +188,81 @@ data InstalledInterface = InstalledInterface
   , instFixMap           :: Map Name Fixity
   }
 
-
 -- | Convert an 'Interface' to an 'InstalledInterface'
 toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface
-  { instMod              = ifaceMod              interface
-  , instIsSig            = ifaceIsSig            interface
-  , instInfo             = ifaceInfo             interface
-  , instDocMap           = ifaceDocMap           interface
-  , instArgMap           = ifaceArgMap           interface
-  , instExports          = ifaceExports          interface
-  , instVisibleExports   = ifaceVisibleExports   interface
-  , instOptions          = ifaceOptions          interface
-  , instFixMap           = ifaceFixMap           interface
+  { instMod              = interface.ifaceMod
+  , instIsSig            = interface.ifaceIsSig
+  , instInfo             = interface.ifaceInfo
+  , instDocMap           = interface.ifaceDocMap
+  , instArgMap           = interface.ifaceArgMap
+  , instExports          = interface.ifaceExports
+  , instVisibleExports   = interface.ifaceVisibleExports
+  , instOptions          = interface.ifaceOptions
+  , instFixMap           = interface.ifaceFixMap
+  , instDefMeths         = interface.ifaceDefMeths
   }
 
+-- | A monad in which we create Haddock interfaces. Not to be confused with
+-- `GHC.Tc.Types.IfM` which is used to write GHC interfaces.
+--
+-- In the past `createInterface` was running in the `Ghc` monad but proved hard
+-- to sustain as soon as we moved over for Haddock to be a plugin. Also abstracting
+-- over the Ghc specific clarifies where side effects happen.
+newtype IfM m a = IfM { unIfM :: StateT (IfEnv m) m a }
+
+deriving newtype instance Functor m                => Functor (IfM m)
+deriving newtype instance (Monad m, Applicative m) => Applicative (IfM m)
+deriving newtype instance Monad m                  => Monad (IfM m)
+deriving newtype instance MonadIO m                => MonadIO (IfM m)
+deriving newtype instance Monad m                  => MonadState (IfEnv m) (IfM m)
+
+-- | Interface creation environment. The name sets are used primarily during
+-- processing of doc strings to avoid emitting the same type of warning for the
+-- same name twice. This was previously done using a Writer monad and then
+-- nubbing the list of warning messages after accumulation. This new approach
+-- was implemented to avoid the nubbing of potentially large lists of strings.
+data IfEnv m = IfEnv
+  {
+    -- | Lookup names in the environment.
+    ifeLookupName :: Name -> m (Maybe TyThing)
+
+    -- | Names which we have warned about for being out of scope
+  , ifeOutOfScopeNames :: !(Set.Set String)
+
+    -- | Names which we have warned about for being ambiguous
+  , ifeAmbiguousNames  :: !(Set.Set String)
+  }
+
+-- | Run an `IfM` action.
+runIfM
+  :: (Monad m)
+  -- | Lookup a global name in the current session. Used in cases
+  -- where declarations don't
+  => (Name -> m (Maybe TyThing))
+  -- | The action to run.
+  -> IfM m a
+  -- | Result and accumulated error/warning messages.
+  -> m a
+runIfM lookup_name action = do
+  let
+    if_env = IfEnv
+      {
+        ifeLookupName      = lookup_name
+      , ifeOutOfScopeNames = Set.empty
+      , ifeAmbiguousNames  = Set.empty
+      }
+  evalStateT (unIfM action) if_env
+
+-- | Look up a name in the current environment
+lookupName :: Monad m => Name -> IfM m (Maybe TyThing)
+lookupName name = IfM $ do
+  lookup_name <- gets ifeLookupName
+  lift (lookup_name name)
+
+-- | Very basic logging function that simply prints to stdout
+warn :: MonadIO m => String -> IfM m ()
+warn msg = liftIO $ putStrLn msg
 
 -----------------------------------------------------------------------------
 -- * Export items & declarations
@@ -215,32 +272,7 @@ toInstalledIface interface = InstalledInterface
 data ExportItem name
 
   -- | An exported declaration.
-  = ExportDecl
-      {
-        -- | A declaration.
-        expItemDecl :: !(LHsDecl name)
-
-        -- | Bundled patterns for a data type declaration
-      , expItemPats :: ![(HsDecl name, DocForDecl (IdP name))]
-
-        -- | Maybe a doc comment, and possibly docs for arguments (if this
-        -- decl is a function or type-synonym).
-      , expItemMbDoc :: !(DocForDecl (IdP name))
-
-        -- | Subordinate names, possibly with documentation.
-      , expItemSubDocs :: ![(IdP name, DocForDecl (IdP name))]
-
-        -- | Instances relevant to this declaration, possibly with
-        -- documentation.
-      , expItemInstances :: ![DocInstance name]
-
-        -- | Fixity decls relevant to this declaration (including subordinates).
-      , expItemFixities :: ![(IdP name, Fixity)]
-
-        -- | Whether the ExportItem is from a TH splice or not, for generating
-        -- the appropriate type of Source link.
-      , expItemSpliced :: !Bool
-      }
+  = ExportDecl (XExportDecl name)
 
   -- | An exported entity for which we have no documentation (perhaps because it
   -- resides in another package).
@@ -248,7 +280,7 @@ data ExportItem name
       { expItemName :: !(IdP name)
 
         -- | Subordinate names.
-      , expItemSubs :: ![IdP name]
+      , expItemSubs :: [IdP name]
       }
 
   -- | A section heading.
@@ -270,21 +302,105 @@ data ExportItem name
   -- | A cross-reference to another module.
   | ExportModule !Module
 
+-- | A type family mapping a name type index to types of export declarations.
+-- The pre-renaming type index ('GhcRn') is mapped to the type of export
+-- declarations which do not include Hoogle output ('ExportD'), since Hoogle output is
+-- generated during the Haddock renaming step. The post-renaming type index
+-- ('DocNameI') is mapped to the type of export declarations which do include
+-- Hoogle output ('RnExportD').
+type family XExportDecl x where
+  XExportDecl GhcRn    = ExportD GhcRn
+  XExportDecl DocNameI = RnExportD
+
+-- | Represents an export declaration that Haddock has discovered to be exported
+-- from a module. The @name@ index indicated whether the declaration has been
+-- renamed such that each 'Name' points to it's optimal link destination.
+data ExportD name = ExportD
+      {
+        -- | A declaration.
+        expDDecl :: !(LHsDecl name)
+
+        -- | Bundled patterns for a data type declaration
+      , expDPats :: [(HsDecl name, DocForDecl (IdP name))]
+
+        -- | Maybe a doc comment, and possibly docs for arguments (if this
+        -- decl is a function or type-synonym).
+      , expDMbDoc :: !(DocForDecl (IdP name))
+
+        -- | Subordinate names, possibly with documentation.
+      , expDSubDocs :: [(IdP name, DocForDecl (IdP name))]
+
+        -- | Instances relevant to this declaration, possibly with
+        -- documentation.
+      , expDInstances :: [DocInstance name]
+
+        -- | Fixity decls relevant to this declaration (including subordinates).
+      , expDFixities :: [(IdP name, Fixity)]
+
+        -- | Whether the ExportD is from a TH splice or not, for generating
+        -- the appropriate type of Source link.
+      , expDSpliced :: !Bool
+      }
+
+-- | Represents export declarations that have undergone renaming such that every
+-- 'Name' in the declaration points to an optimal link destination. Since Hoogle
+-- output is also generated during the renaming step, each declaration is also
+-- attached to its Hoogle textual database entries, /if/ Hoogle output is
+-- enabled and the module is not hidden in the generated documentation using the
+-- @{-# OPTIONS_HADDOCK hide #-}@ pragma.
+data RnExportD = RnExportD
+      {
+        -- | The renamed export declaration
+        rnExpDExpD :: !(ExportD DocNameI)
+
+      -- | If Hoogle textbase (textual database) output is enabled, the text
+      -- output lines for this declaration. If Hoogle output is not enabled, the
+      -- list will be empty.
+      , rnExpDHoogle :: [String]
+      }
+
 data Documentation name = Documentation
-  { documentationDoc :: Maybe (MDoc name)
-  , documentationWarning :: !(Maybe (Doc name))
+  { documentationDoc     :: Maybe (MDoc name)
+  , documentationWarning :: Maybe (Doc name)
   } deriving Functor
 
+instance NFData name => NFData (Documentation name) where
+  rnf (Documentation d w) = d `deepseq` w `deepseq` ()
 
 -- | Arguments and result are indexed by Int, zero-based from the left,
 -- because that's the easiest to use when recursing over types.
 type FnArgsDoc name = Map Int (MDoc name)
 type DocForDecl name = (Documentation name, FnArgsDoc name)
 
-
 noDocForDecl :: DocForDecl name
 noDocForDecl = (Documentation Nothing Nothing, mempty)
 
+-- | As we build the declaration map, we really only care to track whether we
+-- have only seen a value declaration for a 'Name', or anything else. This type
+-- is used to represent those cases. If the only declaration attached to a
+-- 'Name' is a 'ValD', we will consult the GHC interface file to determine the
+-- type of the value, and attach the 'SrcSpan' from the 'EValD' constructor to
+-- it. If we see any other type of declaration for the 'Name', we can just use
+-- it.
+--
+-- This type saves us from storing /every/ declaration we see for a given 'Name'
+-- in the map, which is unnecessary and very problematic for overall memory
+-- usage.
+data DeclMapEntry
+    = EValD !SrcSpan
+    | EOther (LHsDecl GhcRn)
+
+instance Semigroup DeclMapEntry where
+  (EValD _)   <> e         = e
+  e           <> _         = e
+
+-- | Transform a declaration into a 'DeclMapEntry'. If it is a 'ValD'
+-- declaration, only the source location will be noted (since that is all we
+-- care to store in the 'DeclMap' due to the way top-level bindings with no type
+-- signatures are handled). Otherwise, the entire declaration will be kept.
+toDeclMapEntry :: LHsDecl GhcRn -> DeclMapEntry
+toDeclMapEntry (L l (ValD _ _)) = EValD (locA l)
+toDeclMapEntry d                = EOther d
 
 -----------------------------------------------------------------------------
 -- * Cross-referencing
@@ -299,6 +415,9 @@ data NsRdrName = NsRdrName
   { namespace :: !Namespace
   , rdrName :: !RdrName
   }
+
+instance NFData NsRdrName where
+  rnf (NsRdrName ns rdrN) = ns `seq` rdrN `deepseq` ()
 
 -- | Extends 'Name' with cross-reference information.
 data DocName
@@ -360,6 +479,12 @@ data Wrap n
   | Backticked { unwrap :: n }     -- ^ add backticks around the name
   deriving (Show, Functor, Foldable, Traversable)
 
+instance NFData n => NFData (Wrap n) where
+  rnf w = case w of
+    Unadorned n     -> rnf n
+    Parenthesized n -> rnf n
+    Backticked n    -> rnf n
+
 -- | Useful for debugging
 instance Outputable n => Outputable (Wrap n) where
   ppr (Unadorned n)     = ppr n
@@ -379,13 +504,42 @@ instance HasOccName DocName where
 -- * Instances
 -----------------------------------------------------------------------------
 
+-- | Stable name for stable comparisons. GHC's `Name` uses unstable
+-- ordering based on their `Unique`'s.
+newtype SName = SName Name
+  deriving newtype NFData
+
+instance Eq SName where
+  SName n1 == SName n2 = n1 `stableNameCmp` n2 == EQ
+
+instance Ord SName where
+  SName n1 `compare` SName n2 = n1 `stableNameCmp` n2
+
+-- | Simplified type for sorting types, ignoring qualification (not visible
+-- in Haddock output) and unifying special tycons with normal ones.
+-- For the benefit of the user (looks nice and predictable) and the
+-- tests (which prefer output to be deterministic).
+data SimpleType = SimpleType SName [SimpleType]
+                | SimpleIntTyLit Integer
+                | SimpleStringTyLit String
+                | SimpleCharTyLit Char
+                  deriving (Eq,Ord)
+
+instance NFData SimpleType where
+  rnf st =
+    case st of
+      SimpleType sn sts   -> sn `deepseq` sts `deepseq` ()
+      SimpleIntTyLit i    -> rnf i
+      SimpleStringTyLit s -> rnf s
+      SimpleCharTyLit c   -> rnf c
+
 -- | The three types of instances
 data InstType name
   = ClassInst
       { clsiCtx :: [HsType name]
       , clsiTyVars :: LHsQTyVars name
       , clsiSigs :: [Sig name]
-      , clsiAssocTys :: [PseudoFamilyDecl name]
+      , clsiAssocTys :: [DocInstance name]
       }
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
@@ -398,37 +552,6 @@ instance (OutputableBndrId p)
       <+> ppr clsiSigs
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
-
-
--- | Almost the same as 'FamilyDecl' except for type binders.
---
--- In order to perform type specialization for class instances, we need to
--- substitute class variables to appropriate type. However, type variables in
--- associated type are specified using 'LHsTyVarBndrs' instead of 'HsType'.
--- This makes type substitution impossible and to overcome this issue,
--- 'PseudoFamilyDecl' type is introduced.
-data PseudoFamilyDecl name = PseudoFamilyDecl
-    { pfdInfo :: FamilyInfo name
-    , pfdLName :: LocatedN (IdP name)
-    , pfdTyVars :: [LHsType name]
-    , pfdKindSig :: LFamilyResultSig name
-    }
-
-
-mkPseudoFamilyDecl :: FamilyDecl GhcRn -> PseudoFamilyDecl GhcRn
-mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
-    { pfdInfo = fdInfo
-    , pfdLName = fdLName
-    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_explicit fdTyVars ]
-    , pfdKindSig = fdResultSig
-    }
-  where
-    mkType :: HsTyVarBndr flag GhcRn -> HsType GhcRn
-    mkType (KindedTyVar _ _ (L loc name) lkind) =
-        HsKindSig noAnn tvar lkind
-      where
-        tvar = L (na2la loc) (HsTyVar noAnn NotPromoted (L loc name))
-    mkType (UserTyVar _ _ name) = HsTyVar noAnn NotPromoted name
 
 
 -- | An instance head that may have documentation and a source location.
@@ -471,6 +594,12 @@ type Doc id = DocH (Wrap (ModuleName, OccName)) (Wrap id)
 type MDoc id = MetaDoc (Wrap (ModuleName, OccName)) (Wrap id)
 
 type DocMarkup id a = DocMarkupH (Wrap (ModuleName, OccName)) id a
+
+instance NFData Meta where
+  rnf (Meta v p) = v `deepseq` p `deepseq` ()
+
+instance NFData id => NFData (MDoc id) where
+  rnf (MetaDoc m d) = m `deepseq` d `deepseq` ()
 
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where
@@ -535,6 +664,21 @@ exampleToString :: Example -> String
 exampleToString (Example expression result) =
     ">>> " ++ expression ++ "\n" ++  unlines result
 
+instance NFData name => NFData (HaddockModInfo name) where
+  rnf (HaddockModInfo{..}) =
+              hmi_description
+    `deepseq` hmi_copyright
+    `deepseq` hmi_license
+    `deepseq` hmi_maintainer
+    `deepseq` hmi_stability
+    `deepseq` hmi_portability
+    `deepseq` hmi_safety
+    `deepseq` hmi_language
+    `deepseq` hmi_extensions
+    `deepseq` ()
+
+instance NFData LangExt.Extension
+
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)
   , hmi_copyright   :: Maybe String
@@ -546,7 +690,6 @@ data HaddockModInfo name = HaddockModInfo
   , hmi_language    :: Maybe Language
   , hmi_extensions  :: [LangExt.Extension]
   }
-
 
 emptyHaddockModInfo :: HaddockModInfo a
 emptyHaddockModInfo = HaddockModInfo
@@ -575,6 +718,8 @@ data DocOption
   | OptNotHome         -- ^ Not the best place to get docs for things
                        -- exported by this module.
   | OptShowExtensions  -- ^ Render enabled extensions for this module.
+  | OptPrintRuntimeRep -- ^ Render runtime reps for this module (see
+                       -- the GHC @-fprint-explicit-runtime-reps@ flag)
   deriving (Eq, Show)
 
 
@@ -585,23 +730,12 @@ data QualOption
   | OptLocalQual      -- ^ Qualify all imported names fully.
   | OptRelativeQual   -- ^ Like local, but strip module prefix
                       --   from modules in the same hierarchy.
-  | OptAliasedQual    -- ^ Uses aliases of module names
-                      --   as suggested by module import renamings.
-                      --   However, we are unfortunately not able
-                      --   to maintain the original qualifications.
-                      --   Image a re-export of a whole module,
-                      --   how could the re-exported identifiers be qualified?
-
-type AliasMap = Map Module ModuleName
 
 data Qualification
   = NoQual
   | FullQual
   | LocalQual Module
   | RelativeQual Module
-  | AliasedQual AliasMap Module
-       -- ^ @Module@ contains the current module.
-       --   This way we can distinguish imported and local identifiers.
 
 makeContentsQual :: QualOption -> Qualification
 makeContentsQual qual =
@@ -609,12 +743,11 @@ makeContentsQual qual =
     OptNoQual -> NoQual
     _         -> FullQual
 
-makeModuleQual :: QualOption -> AliasMap -> Module -> Qualification
-makeModuleQual qual aliases mdl =
+makeModuleQual :: QualOption -> Module -> Qualification
+makeModuleQual qual mdl =
   case qual of
     OptLocalQual      -> LocalQual mdl
     OptRelativeQual   -> RelativeQual mdl
-    OptAliasedQual    -> AliasedQual aliases mdl
     OptFullQual       -> FullQual
     OptNoQual         -> NoQual
 
@@ -632,26 +765,23 @@ data SinceQual
              -- an external package
 
 -----------------------------------------------------------------------------
--- * Error handling
+-- * Renaming
 -----------------------------------------------------------------------------
 
+-- | Renames an identifier.
+-- The first input is the identifier as it occurred in the comment
+-- The second input is the possible namespaces of the identifier
+type Renamer = String -> (NameSpace -> Bool) -> [Name]
 
--- A monad which collects error messages, locally defined to avoid a dep on mtl
-
-
-type ErrMsg = String
-type ErrMsgM = Writer [ErrMsg]
-
-
--- Exceptions
-
+-----------------------------------------------------------------------------
+-- * Error handling
+-----------------------------------------------------------------------------
 
 -- | Haddock's own exception type.
 data HaddockException
   = HaddockException String
   | WithContext [String] SomeException
   deriving Typeable
-
 
 instance Show HaddockException where
   show (HaddockException str) = str
@@ -669,29 +799,6 @@ withExceptionContext ctxt =
         WithContext ctxts se -> throwM $ WithContext (ctxt:ctxts) se
           ) .
   handle (throwM . WithContext [ctxt])
-
--- In "Haddock.Interface.Create", we need to gather
--- @Haddock.Types.ErrMsg@s a lot, like @ErrMsgM@ does,
--- but we can't just use @GhcT ErrMsgM@ because GhcT requires the
--- transformed monad to be MonadIO.
-newtype ErrMsgGhc a = ErrMsgGhc { unErrMsgGhc :: WriterT [ErrMsg] Ghc a }
-
-
-deriving newtype instance Functor ErrMsgGhc
-deriving newtype instance Applicative ErrMsgGhc
-deriving newtype instance Monad ErrMsgGhc
-deriving newtype instance (MonadWriter [ErrMsg]) ErrMsgGhc
-deriving newtype instance MonadIO ErrMsgGhc
-
-
-runWriterGhc :: ErrMsgGhc a -> Ghc (a, [ErrMsg])
-runWriterGhc = runWriterT . unErrMsgGhc
-
-liftGhcToErrMsgGhc :: Ghc a -> ErrMsgGhc a
-liftGhcToErrMsgGhc = ErrMsgGhc . lift
-
-liftErrMsg :: ErrMsgM a -> ErrMsgGhc a
-liftErrMsg = writer . runWriter
 
 -----------------------------------------------------------------------------
 -- * Pass sensitive types
@@ -850,3 +957,124 @@ type instance XCInjectivityAnn DocNameI = NoExtField
 type instance XCFunDep DocNameI = NoExtField
 
 type instance XCTyFamInstDecl DocNameI = NoExtField
+
+-----------------------------------------------------------------------------
+-- * NFData instances for GHC types
+-----------------------------------------------------------------------------
+
+instance NFData RdrName where
+  rnf (Unqual on) = rnf on
+  rnf (Qual mn on) = mn `deepseq` on `deepseq` ()
+  rnf (Orig m on) = m `deepseq` on `deepseq` ()
+  rnf (Exact n) = rnf n
+
+instance NFData SourceText where
+  rnf NoSourceText   = ()
+  rnf (SourceText s) = rnf s
+
+instance NFData FixityDirection where
+  rnf InfixL = ()
+  rnf InfixR = ()
+  rnf InfixN = ()
+
+instance NFData Fixity where
+  rnf (Fixity sourceText n dir) =
+    sourceText `deepseq` n `deepseq` dir `deepseq` ()
+
+instance NFData ann => NFData (SrcSpanAnn' ann) where
+  rnf (SrcSpanAnn a ss) = a `deepseq` ss `deepseq` ()
+
+instance NFData (EpAnn NameAnn) where
+  rnf EpAnnNotUsed = ()
+  rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()
+
+instance NFData NameAnn where
+  rnf (NameAnn a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnCommas a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnBars a b c d e) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` e
+    `deepseq` ()
+  rnf (NameAnnOnly a b c d) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` d
+    `deepseq` ()
+  rnf (NameAnnRArrow a b) =
+              a
+    `deepseq` b
+    `deepseq` ()
+  rnf (NameAnnQuote a b c) =
+              a
+    `deepseq` b
+    `deepseq` c
+    `deepseq` ()
+  rnf (NameAnnTrailing a) = rnf a
+
+instance NFData TrailingAnn where
+  rnf (AddSemiAnn epaL)  = rnf epaL
+  rnf (AddCommaAnn epaL) = rnf epaL
+  rnf (AddVbarAnn epaL)  = rnf epaL
+
+instance NFData NameAdornment where
+  rnf NameParens     = ()
+  rnf NameParensHash = ()
+  rnf NameBackquotes = ()
+  rnf NameSquare     = ()
+
+instance NFData EpaLocation where
+  rnf (EpaSpan ss bs)  = ss `seq` bs `deepseq` ()
+  rnf (EpaDelta dp lc) = dp `seq` lc `deepseq` ()
+
+instance NFData EpAnnComments where
+  rnf (EpaComments cs) = rnf cs
+  rnf (EpaCommentsBalanced cs1 cs2) = cs1 `deepseq` cs2 `deepseq` ()
+
+instance NFData EpaComment where
+  rnf (EpaComment t rss) = t `deepseq` rss `seq` ()
+
+instance NFData EpaCommentTok where
+  rnf (EpaDocComment ds)  = rnf ds
+  rnf (EpaDocOptions s)   = rnf s
+  rnf (EpaLineComment s)  = rnf s
+  rnf (EpaBlockComment s) = rnf s
+  rnf EpaEofComment       = ()
+
+
+instance NFData a => NFData (Strict.Maybe a) where
+  rnf Strict.Nothing  = ()
+  rnf (Strict.Just x) = rnf x
+
+instance NFData BufSpan where
+  rnf (BufSpan p1 p2) = p1 `deepseq` p2 `deepseq` ()
+
+instance NFData BufPos where
+  rnf (BufPos n) = rnf n
+
+instance NFData Anchor where
+  rnf (Anchor ss op) = ss `seq` op `deepseq` ()
+
+instance NFData AnchorOperation where
+  rnf UnchangedAnchor  = ()
+  rnf (MovedAnchor dp) = rnf dp
+
+instance NFData DeltaPos where
+  rnf (SameLine n)        = rnf n
+  rnf (DifferentLine n m) = n `deepseq` m `deepseq` ()
+

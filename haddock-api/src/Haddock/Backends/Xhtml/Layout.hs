@@ -37,6 +37,7 @@ module Haddock.Backends.Xhtml.Layout (
   subMethods,
   subDefaults,
   subMinimal,
+  subTableSrc,
 
   topDeclElem, declElem,
 ) where
@@ -50,7 +51,6 @@ import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, quote )
 import Data.Maybe (fromMaybe)
 
-import GHC.Data.FastString ( unpackFS )
 import GHC hiding (anchor)
 import GHC.Types.Name (nameOccName)
 
@@ -294,15 +294,13 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice mdl' docName@(D
                            | otherwise = maybe lineUrl Just nameUrl in
           case mUrl of
             Nothing  -> noHtml
-            Just url -> let url' = spliceURL (Just fname) (Just origMod)
-                                               (Just n) (Just loc) url
+            Just url -> let url' = spliceURL (Just origMod) (Just n) (Just loc) url
                           in anchor ! [href url', theclass "link"] << "Source"
 
         wikiLink =
           case maybe_wiki_url of
             Nothing  -> noHtml
-            Just url -> let url' = spliceURL (Just fname) (Just mdl)
-                                               (Just n) (Just loc) url
+            Just url -> let url' = spliceURL (Just mdl) (Just n) (Just loc) url
                           in anchor ! [href url', theclass "link"] << "Comments"
 
         -- For source links, we want to point to the original module,
@@ -313,7 +311,4 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice mdl' docName@(D
         origMod = fromMaybe (nameModule n) mdl'
         origPkg = moduleUnit origMod
 
-        fname = case loc of
-          RealSrcSpan l _ -> unpackFS (srcSpanFile l)
-          UnhelpfulSpan _ -> error "links: UnhelpfulSpan"
 links _ _ _ _ _ = noHtml

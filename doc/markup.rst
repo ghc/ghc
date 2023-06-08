@@ -755,7 +755,7 @@ specified in a comma-separated list in an
 ``{-# OPTIONS_HADDOCK ... #-}`` pragma at the top of the module, either
 before or after the module description. For example: ::
 
-    {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
+    {-# OPTIONS_HADDOCK hide, prune #-}
 
     -- |Module description
     module A where
@@ -774,11 +774,6 @@ The following attributes are currently understood by Haddock:
     Omit definitions that have no documentation annotations from the
     generated documentation.
 
-``ignore-exports``
-    Ignore the export list. Generate documentation as if the module had
-    no export list - i.e. all the top-level declarations are exported,
-    and section headings may be given in the body of the module.
-
 ``not-home``
     Indicates that the current module should not be considered to be the
     home module for each entity it exports, unless that entity is not
@@ -792,6 +787,12 @@ The following attributes are currently understood by Haddock:
     all the extensions implied by it won't. All enabled extensions will
     be rendered, including those implied by their more powerful
     versions.
+
+``print-explicit-runtime-reps``
+    Print type variables that have kind ``RuntimeRep``. By default, these
+    are defaulted to ``LiftedRep`` so that end users don't have to see the
+    underlying levity polymorphism. This flag is analogous to GHC's
+    ``-fprint-explicit-runtime-reps`` flag.
 
 .. _markup:
 

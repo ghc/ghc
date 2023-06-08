@@ -135,18 +135,84 @@
 		      > <div class="subs associated-types"
 		      ><p class="caption"
 			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="GHC.Generics"
-			  >Rep1</a
-			  > (<a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b) :: k -&gt; <a href="#" title="Data.Kind"
-			  >Type</a
-			  > <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			><table
+			><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Rep1_WrappedArrow:Rep1:1"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="GHC.Generics"
+				>Rep1</a
+				> (<a href="#" title="Bug548"
+				>WrappedArrow</a
+				> a b :: <a href="#" title="Data.Kind"
+				>Type</a
+				> -&gt; <a href="#" title="Data.Kind"
+				>Type</a
+				>)</span
+			      ></td
+			    ><td class="doc"
+			    ><p
+			      ><em
+				>Since: base-4.7.0.0</em
+				></p
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:Rep1_WrappedArrow:Rep1:1"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Control.Applicative</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="GHC.Generics"
+				  >Rep1</a
+				  > (<a href="#" title="Bug548"
+				  >WrappedArrow</a
+				  > a b :: <a href="#" title="Data.Kind"
+				  >Type</a
+				  > -&gt; <a href="#" title="Data.Kind"
+				  >Type</a
+				  >) = <a href="#" title="GHC.Generics"
+				  >D1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaData</a
+				  > &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; '<a href="#" title="Data.Bool"
+				  >True</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >C1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaCons</a
+				  > &quot;WrapArrow&quot; '<a href="#" title="GHC.Generics"
+				  >PrefixI</a
+				  > '<a href="#" title="Data.Bool"
+				  >True</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Just</a
+				  > &quot;unwrapArrow&quot;) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec1</a
+				  > (a b))))</div
+				></details
+			      ></td
+			    ></tr
+			  ></table
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -154,9 +220,7 @@
 			><p class="src"
 			><a href="#"
 			  >from1</a
-			  > :: <span class="keyword"
-			  >forall</span
-			  > (a0 :: k). <a href="#" title="Bug548"
+			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="GHC.Generics"
 			  >Rep1</a
@@ -168,9 +232,7 @@
 			><p class="src"
 			><a href="#"
 			  >to1</a
-			  > :: <span class="keyword"
-			  >forall</span
-			  > (a0 :: k). <a href="#" title="GHC.Generics"
+			  > :: <a href="#" title="GHC.Generics"
 			  >Rep1</a
 			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
@@ -412,7 +474,249 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Generic:5"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Data:5"
+		      ></span
+		      > (<a href="#" title="Type.Reflection"
+		      >Typeable</a
+		      > a, <a href="#" title="Type.Reflection"
+		      >Typeable</a
+		      > b, <a href="#" title="Type.Reflection"
+		      >Typeable</a
+		      > c, <a href="#" title="Data.Data"
+		      >Data</a
+		      > (a b c)) =&gt; <a href="#" title="Data.Data"
+		      >Data</a
+		      > (<a href="#" title="Bug548"
+		      >WrappedArrow</a
+		      > a b c)</span
+		    ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-4.14.0.0</em
+		      ></p
+		    ></td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:WrappedArrow:Data:5"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Data.Data</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >gfoldl</a
+			  > :: (<span class="keyword"
+			  >forall</span
+			  > d b0. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; c0 (d -&gt; b0) -&gt; d -&gt; c0 b0) -&gt; (<span class="keyword"
+			  >forall</span
+			  > g. g -&gt; c0 g) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; c0 (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gunfold</a
+			  > :: (<span class="keyword"
+			  >forall</span
+			  > b0 r. <a href="#" title="Data.Data"
+			  >Data</a
+			  > b0 =&gt; c0 (b0 -&gt; r) -&gt; c0 r) -&gt; (<span class="keyword"
+			  >forall</span
+			  > r. r -&gt; c0 r) -&gt; <a href="#" title="Data.Data"
+			  >Constr</a
+			  > -&gt; c0 (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >toConstr</a
+			  > :: <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; <a href="#" title="Data.Data"
+			  >Constr</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >dataTypeOf</a
+			  > :: <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; <a href="#" title="Data.Data"
+			  >DataType</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >dataCast1</a
+			  > :: <a href="#" title="Type.Reflection"
+			  >Typeable</a
+			  > t =&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; c0 (t d)) -&gt; <a href="#" title="Data.Maybe"
+			  >Maybe</a
+			  > (c0 (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c)) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >dataCast2</a
+			  > :: <a href="#" title="Type.Reflection"
+			  >Typeable</a
+			  > t =&gt; (<span class="keyword"
+			  >forall</span
+			  > d e. (<a href="#" title="Data.Data"
+			  >Data</a
+			  > d, <a href="#" title="Data.Data"
+			  >Data</a
+			  > e) =&gt; c0 (t d e)) -&gt; <a href="#" title="Data.Maybe"
+			  >Maybe</a
+			  > (c0 (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c)) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapT</a
+			  > :: (<span class="keyword"
+			  >forall</span
+			  > b0. <a href="#" title="Data.Data"
+			  >Data</a
+			  > b0 =&gt; b0 -&gt; b0) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapQl</a
+			  > :: (r -&gt; r' -&gt; r) -&gt; r -&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; r') -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; r <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapQr</a
+			  > :: <span class="keyword"
+			  >forall</span
+			  > r r'. (r' -&gt; r -&gt; r) -&gt; r -&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; r') -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; r <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapQ</a
+			  > :: (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; u) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; [u] <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapQi</a
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; u) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; u <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapM</a
+			  > :: <a href="#" title="Control.Monad"
+			  >Monad</a
+			  > m =&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; m d) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; m (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapMp</a
+			  > :: <a href="#" title="Control.Monad"
+			  >MonadPlus</a
+			  > m =&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; m d) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; m (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >gmapMo</a
+			  > :: <a href="#" title="Control.Monad"
+			  >MonadPlus</a
+			  > m =&gt; (<span class="keyword"
+			  >forall</span
+			  > d. <a href="#" title="Data.Data"
+			  >Data</a
+			  > d =&gt; d -&gt; m d) -&gt; <a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c -&gt; m (<a href="#" title="Bug548"
+			  >WrappedArrow</a
+			  > a b c) <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Generic:6"
 		      ></span
 		      > <a href="#" title="GHC.Generics"
 		      >Generic</a
@@ -425,7 +729,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:WrappedArrow:Generic:5"
+		  ><details id="i:id:WrappedArrow:Generic:6"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -435,20 +739,76 @@
 		      > <div class="subs associated-types"
 		      ><p class="caption"
 			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="GHC.Generics"
-			  >Rep</a
-			  > (<a href="#" title="Bug548"
-			  >WrappedArrow</a
-			  > a b c) :: <a href="#" title="Data.Kind"
-			  >Type</a
-			  > -&gt; <a href="#" title="Data.Kind"
-			  >Type</a
-			  > <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			><table
+			><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Rep_WrappedArrow:Rep:1"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="GHC.Generics"
+				>Rep</a
+				> (<a href="#" title="Bug548"
+				>WrappedArrow</a
+				> a b c)</span
+			      ></td
+			    ><td class="doc"
+			    ><p
+			      ><em
+				>Since: base-4.7.0.0</em
+				></p
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:Rep_WrappedArrow:Rep:1"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Control.Applicative</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="GHC.Generics"
+				  >Rep</a
+				  > (<a href="#" title="Bug548"
+				  >WrappedArrow</a
+				  > a b c) = <a href="#" title="GHC.Generics"
+				  >D1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaData</a
+				  > &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; '<a href="#" title="Data.Bool"
+				  >True</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >C1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaCons</a
+				  > &quot;WrapArrow&quot; '<a href="#" title="GHC.Generics"
+				  >PrefixI</a
+				  > '<a href="#" title="Data.Bool"
+				  >True</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Just</a
+				  > &quot;unwrapArrow&quot;) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec0</a
+				  > (a b c))))</div
+				></details
+			      ></td
+			    ></tr
+			  ></table
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -484,7 +844,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Rep1:6"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Rep1:7"
 		      ></span
 		      > <span class="keyword"
 		      >type</span
@@ -507,7 +867,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:WrappedArrow:Rep1:6"
+		  ><details id="i:id:WrappedArrow:Rep1:7"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -560,7 +920,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Rep:7"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Rep:8"
 		      ></span
 		      > <span class="keyword"
 		      >type</span
@@ -579,7 +939,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:WrappedArrow:Rep:7"
+		  ><details id="i:id:WrappedArrow:Rep:8"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p

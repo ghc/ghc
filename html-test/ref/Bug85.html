@@ -57,7 +57,11 @@
 	    >data</span
 	    > <a id="t:Foo" class="def"
 	    >Foo</a
-	    > :: (* -&gt; *) -&gt; * -&gt; * <span class="keyword"
+	    > (a :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) b <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -70,9 +74,15 @@
 	      ><td class="src"
 		><a id="v:Bar" class="def"
 		  >Bar</a
-		  > :: f x -&gt; <a href="#" title="Bug85"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > (a :: <a href="#" title="Data.Kind"
+		  >Type</a
+		  > -&gt; <a href="#" title="Data.Kind"
+		  >Type</a
+		  >) x. a x -&gt; <a href="#" title="Bug85"
 		  >Foo</a
-		  > f (f x)</td
+		  > a (a x)</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -85,7 +95,7 @@
 	    >data</span
 	    > <a id="t:Baz" class="def"
 	    >Baz</a
-	    > :: * <span class="keyword"
+	    > <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a

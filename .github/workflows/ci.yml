@@ -53,4 +53,4 @@ jobs:
         cabal build all
 
     - name: Test
-      run: cabal test all
+      run: cabal test --test-show-details=direct --test-options="--haddock-stdout=/dev/stdout" all

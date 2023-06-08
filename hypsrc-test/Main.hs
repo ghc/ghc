@@ -50,5 +50,10 @@ checkIgnore file
   where
     isHtmlFile = (== ".html") . takeExtension
     isSourceFile = (== "src") . takeDirectory
-    isModuleFile = isUpper . head . takeBaseName
+    isModuleFile f
+      | c : _ <- takeBaseName f
+      , isUpper c
+      = True
+      | otherwise
+      = False
 checkIgnore _ = True

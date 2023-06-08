@@ -1,6 +1,15 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MagicHash       #-}
+{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE LambdaCase      #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections   #-}
+{-# LANGUAGE NamedFieldPuns  #-}
+
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.AttachInstances
@@ -13,19 +22,24 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-module Haddock.Interface.AttachInstances (attachInstances) where
+module Haddock.Interface.AttachInstances (attachInstances, instHead) where
 
 
-import Haddock.Types
 import Haddock.Convert
+import Haddock.GhcUtils (typeNames)
+import Haddock.Types
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
+import Control.DeepSeq (force)
+import Data.Foldable (foldl')
 import Data.List (sortBy)
+import qualified Data.Sequence as Seq
 import Data.Ord (comparing)
 import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import Data.Foldable (toList)
 
 import GHC.Data.FastString (unpackFS)
 import GHC.Core.Class
@@ -33,9 +47,12 @@ import GHC.Core (isOrphan)
 import GHC.Core.FamInstEnv
 import GHC
 import GHC.Core.InstEnv
-import GHC.Unit.Module.Env ( ModuleSet, moduleSetElts )
+import GHC.Unit.Module.Env ( moduleSetElts, mkModuleSet )
+import GHC.Unit.State
 import GHC.Types.Name
+import GHC.Types.Name.Set
 import GHC.Types.Name.Env
+import GHC.Types.Unique.Map
 import GHC.Utils.Outputable (text, sep, (<+>))
 import GHC.Types.SrcLoc
 import GHC.Core.TyCon
@@ -43,30 +60,86 @@ import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Types.Var hiding (varName)
 import GHC.HsToCore.Docs
+import GHC.Driver.Env.Types
+import GHC.Unit.Env
+import GHC.Core.Coercion.Axiom
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Env
+import GHC.Tc.Instance.Family
+import GHC.Iface.Load
+import GHC.Core.TyCo.Compare (eqType)
+import GHC.Core.Coercion
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module
 type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
-attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> ModuleSet -> Ghc [Interface]
-attachInstances expInfo ifaces instIfaceMap mods = do
-  (_msgs, mb_index) <- getNameToInstancesIndex (map ifaceMod ifaces) mods'
-  mapM (attach $ fromMaybe emptyNameEnv mb_index) ifaces
-  where
-    mods' = Just (moduleSetElts mods)
+attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
+attachInstances expInfo ifaces instIfaceMap = do
 
+  -- We need to keep load modules in which we will look for instances. We've
+  -- somewhat arbitrarily decided to load all modules which are available -
+  -- either directly or from a re-export.
+  --
+  -- See https://github.com/haskell/haddock/issues/469.
+  env <- getSession
+  let mod_to_pkg_conf = moduleNameProvidersMap $ ue_units $ hsc_unit_env env
+      mods = mkModuleSet [ m
+                         | mod_map <- nonDetEltsUniqMap mod_to_pkg_conf
+                         , ( m
+                           , ModOrigin { fromOrigUnit = fromOrig
+                                       , fromExposedReexport = reExp
+                                       }
+                           ) <- nonDetUniqMapToList mod_map
+                         , fromOrig == Just True || not (null reExp)
+                         ]
+      mods_to_load = moduleSetElts mods
+      mods_visible = mkModuleSet $ map ifaceMod ifaces
+
+  (_msgs, mb_index) <- do
+    hsc_env <- getSession
+    liftIO $ runTcInteractive hsc_env $ do
+      let doc = text "Need interface for haddock"
+      initIfaceTcRn $ mapM_ (loadSysInterface doc) mods_to_load
+      cls_env@InstEnvs{ie_global, ie_local} <- tcGetInstEnvs
+      fam_env@(pkg_fie, home_fie) <- tcGetFamInstEnvs
+      -- We use Data.Sequence.Seq because we are creating left associated
+      -- mappends.
+      -- cls_index and fam_index below are adapted from GHC.Tc.Module.lookupInsts
+      let cls_index = Map.fromListWith mappend
+             [ (n, Seq.singleton ispec)
+             | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
+             , instIsVisible mods_visible ispec
+             , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
+             ]
+          fam_index = Map.fromListWith mappend
+             [ (n, Seq.singleton fispec)
+             | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
+             , n <- nameSetElemsStable $ orphNamesOfFamInst fispec
+             ]
+          instance_map = mkNameEnv $
+             [ (nm, (toList clss, toList fams))
+             | (nm, (clss, fams)) <- Map.toList $ Map.unionWith mappend
+                 (fmap (,Seq.empty) cls_index)
+                 (fmap (Seq.empty,) fam_index)
+             ]
+      pure $ (cls_env{ie_visible = mods_visible}, fam_env, instance_map)
+
+  let empty_index = (InstEnvs emptyInstEnv emptyInstEnv mods_visible, emptyFamInstEnvs, emptyNameEnv)
+  mapM (attach $ fromMaybe empty_index mb_index) ifaces
+  where
     -- TODO: take an IfaceMap as input
     ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
 
-    attach index iface = do
+    attach (cls_insts, fam_insts, inst_map) iface = do
 
       let getInstDoc = findInstDoc iface ifaceMap instIfaceMap
           getFixity = findFixity iface ifaceMap instIfaceMap
 
-      newItems <- mapM (attachToExportItem index expInfo getInstDoc getFixity)
+      newItems <- mapM (attachToExportItem cls_insts fam_insts inst_map expInfo getInstDoc getFixity)
                        (ifaceExportItems iface)
-      let orphanInstances = attachOrphanInstances expInfo getInstDoc (ifaceInstances iface)
+      let orphanInstances = attachOrphanInstances expInfo getInstDoc (ifaceInstances iface) fam_insts
       return $ iface { ifaceExportItems = newItems
                      , ifaceOrphanInstances = orphanInstances
                      }
@@ -75,50 +148,61 @@ attachOrphanInstances
   :: ExportInfo
   -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
   -> [ClsInst]                        -- ^ a list of orphan instances
+  -> FamInstEnvs                      -- ^ all the family instances (that we know of)
   -> [DocInstance GhcRn]
-attachOrphanInstances expInfo getInstDoc cls_instances =
-  [ (synifyInstHead i, getInstDoc n, (L (getSrcSpan n) n), Nothing)
+attachOrphanInstances expInfo getInstDoc cls_instances fam_index =
+  [ (synifyInstHead i famInsts, getInstDoc n, (L (getSrcSpan n) n), nameModule_maybe n)
   | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
   , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
-  , not $ isInstanceHidden expInfo cls tys
+  , not $ isInstanceHidden expInfo (getName cls) tys
+  , let famInsts = getFamInsts expInfo fam_index getInstDoc cls tys
   ]
 
-
 attachToExportItem
-  :: NameEnv ([ClsInst], [FamInst])   -- ^ all instances (that we know of)
+  :: InstEnvs                         -- ^ all class instances (that we know of)
+  -> FamInstEnvs                      -- ^ all the family instances (that we know of)
+  -> NameEnv ([ClsInst], [FamInst])   -- ^ all instances again, but for looking up instances for data families
   -> ExportInfo
   -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
   -> (Name -> Maybe Fixity)           -- ^ how to lookup a fixity
   -> ExportItem GhcRn
   -> Ghc (ExportItem GhcRn)
-attachToExportItem index expInfo getInstDoc getFixity export =
+attachToExportItem cls_index fam_index index expInfo getInstDoc getFixity export =
   case attachFixities export of
-    e@ExportDecl { expItemDecl = L eSpan (TyClD _ d) } -> do
+    ExportDecl e@(ExportD { expDDecl = L eSpan (TyClD _ d) }) -> do
       insts <-
-        let mb_instances  = lookupNameEnv index (tcdName d)
-            cls_instances = maybeToList mb_instances >>= fst
-            fam_instances = maybeToList mb_instances >>= snd
+        let nm = tcdName d
+            (cls_instances, fam_instances) = case d of
+              -- For type classes we can be more efficient by looking up the class in the inst map
+              ClassDecl{} -> (classNameInstances cls_index nm, familyNameInstances fam_index nm)
+              -- Otherwise, we have to filter through all the instances to see if they mention this
+              -- name. See GHCi :info implementation
+              _ -> fromMaybe ([],[]) $ lookupNameEnv index nm
+
             fam_insts = [ ( synFamInst
                           , getInstDoc n
                           , spanNameE n synFamInst (L (locA eSpan) (tcdName d))
-                          , nameModule_maybe n
+                          , mb_mdl
                           )
                         | i <- sortBy (comparing instFam) fam_instances
                         , let n = getName i
                         , not $ isNameHidden expInfo (fi_fam i)
                         , not $ any (isTypeHidden expInfo) (fi_tys i)
                         , let opaque = isTypeHidden expInfo (fi_rhs i)
-                        , let synFamInst = synifyFamInst i opaque
+                              synFamInst = synifyFamInst i opaque
+                              !mb_mdl = force $ nameModule_maybe n
                         ]
             cls_insts = [ ( synClsInst
                           , getInstDoc n
                           , spanName n synClsInst (L (locA eSpan) (tcdName d))
-                          , nameModule_maybe n
+                          , mb_mdl
                           )
                         | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                         , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
-                        , not $ isInstanceHidden expInfo cls tys
-                        , let synClsInst = synifyInstHead i
+                        , not $ isInstanceHidden expInfo (getName cls) tys
+                        , let synClsInst = synifyInstHead i famInsts
+                              famInsts = getFamInsts expInfo fam_index getInstDoc cls tys
+                              !mb_mdl = force $ nameModule_maybe n
                         ]
               -- fam_insts but with failing type fams filtered out
             cleanFamInsts = [ (fi, n, L l r, m) | (Right fi, n, L l (Right r), m) <- fam_insts ]
@@ -127,22 +211,39 @@ attachToExportItem index expInfo getInstDoc getFixity export =
           let mkBug = (text "haddock-bug:" <+>) . text
           putMsgM (sep $ map mkBug famInstErrs)
           return $ cls_insts ++ cleanFamInsts
-      return $ e { expItemInstances = insts }
+      return $ ExportDecl e { expDInstances = insts }
     e -> return e
   where
-    attachFixities e@ExportDecl{ expItemDecl = L _ d
-                               , expItemPats = patsyns
-                               , expItemSubDocs = subDocs
-                               } = e { expItemFixities =
-      nubByName fst $ expItemFixities e ++
-      [ (n',f) | n <- getMainDeclBinder emptyOccEnv d
-               , n' <- n : (map fst subDocs ++ patsyn_names)
-               , f <- maybeToList (getFixity n')
-      ] }
+    attachFixities
+        ( ExportDecl
+          ( e@ExportD
+              { expDDecl = L _ d
+              , expDPats = patsyns
+              , expDSubDocs = subDocs
+              }
+          )
+        )
+      = ExportDecl e
+          { expDFixities = fixities
+          }
       where
+        fixities :: [(Name, Fixity)]
+        !fixities = force . Map.toList $ foldl' f Map.empty all_names
+
+        f :: Map.Map Name Fixity -> Name -> Map.Map Name Fixity
+        f !fs n = Map.alter (<|> getFixity n) n fs
+
+        patsyn_names :: [Name]
         patsyn_names = concatMap (getMainDeclBinder emptyOccEnv . fst) patsyns
 
+        all_names :: [Name]
+        all_names =
+             getMainDeclBinder emptyOccEnv d
+          ++ map fst subDocs
+          ++ patsyn_names
+
     attachFixities e = e
+
     -- spanName: attach the location to the name that is the same file as the instance location
     spanName s (InstHead { ihdClsName = clsn }) (L instL instn) =
         let s1 = getSrcSpan s
@@ -155,6 +256,44 @@ attachToExportItem index expInfo getInstDoc getFixity export =
     spanNameE s (Right ok) linst =
       let L l r = spanName s ok linst
       in L l (Right r)
+
+substAgrees :: [(TyVar,Type)] -> [(TyVar,Type)] -> Bool
+substAgrees xs ys = go xs
+  where
+    go [] = True
+    go ((v,t1) : zs) = case lookup v ys of
+      Nothing -> go zs
+      Just t2 -> eqType t1 t2 && go zs
+
+getFamInsts
+  :: ExportInfo
+  -> FamInstEnvs                      -- ^ all the family instances (that we know of)
+  -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
+  -> Class -> [Type]
+  -> [(FamInst, Bool, Maybe (MDoc Name), Located Name, Maybe Module)]
+getFamInsts expInfo fam_index getInstDoc cls tys =
+  [ (f_i, opaque, getInstDoc f_n, L (getSrcSpan f_n) f_n, nameModule_maybe f_n)
+  | fam <- classATs cls
+  , let vars = tyConTyVars fam
+        tv_env = zip (classTyVars cls) tys
+        m_instantiation = mapM (\v -> lookup v tv_env) vars
+  , f_i <- case m_instantiation of
+      -- If we have a complete instantation, we can just lookup in the family environment
+      Just instantiation -> map fim_instance $ lookupFamInstEnv fam_index fam instantiation
+      -- If we don't have a complete instantation, we need to look over all possible instances
+      -- for the family and filter out the ones that don't agree with the typeclass instance
+      Nothing -> [ f_i
+                 | f_i <- familyInstances fam_index fam
+                 , let co_tvs = tyConTyVars fam
+                       (_, lhs, _) = etaExpandCoAxBranch $ coAxiomSingleBranch $ fi_axiom f_i
+                 , substAgrees (zip co_tvs lhs) tv_env
+                 ]
+  , let ax = fi_axiom f_i
+        f_n = co_ax_name ax
+  , not $ isNameHidden expInfo (fi_fam f_i)
+  , not $ any (isTypeHidden expInfo) (fi_tys f_i)
+  , let opaque = isTypeHidden expInfo (fi_rhs f_i)
+  ]
 
 -- | Lookup the doc associated with a certain instance
 findInstDoc :: Interface -> IfaceMap -> InstIfaceMap -> Name -> Maybe (MDoc Name)
@@ -174,27 +313,6 @@ findFixity iface ifaceMap instIfaceMap = \name ->
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances
 --------------------------------------------------------------------------------
-
--- | Stable name for stable comparisons. GHC's `Name` uses unstable
--- ordering based on their `Unique`'s.
-newtype SName = SName Name
-
-instance Eq SName where
-  SName n1 == SName n2 = n1 `stableNameCmp` n2 == EQ
-
-instance Ord SName where
-  SName n1 `compare` SName n2 = n1 `stableNameCmp` n2
-
--- | Simplified type for sorting types, ignoring qualification (not visible
--- in Haddock output) and unifying special tycons with normal ones.
--- For the benefit of the user (looks nice and predictable) and the
--- tests (which prefer output to be deterministic).
-data SimpleType = SimpleType SName [SimpleType]
-                | SimpleIntTyLit Integer
-                | SimpleStringTyLit String
-                | SimpleCharTyLit Char
-                  deriving (Eq,Ord)
-
 
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], SName, [SimpleType])
 instHead (_, _, cls, args)
@@ -248,30 +366,21 @@ isNameHidden (names, modules) name =
 
 -- | We say that an instance is «hidden» iff its class or any (part)
 -- of its type(s) is hidden.
-isInstanceHidden :: ExportInfo -> Class -> [Type] -> Bool
-isInstanceHidden expInfo cls tys =
+isInstanceHidden :: ExportInfo -> Name -> [Type] -> Bool
+isInstanceHidden expInfo cls tyNames =
     instClassHidden || instTypeHidden
   where
     instClassHidden :: Bool
-    instClassHidden = isNameHidden expInfo $ getName cls
+    instClassHidden = isNameHidden expInfo cls
 
     instTypeHidden :: Bool
-    instTypeHidden = any (isTypeHidden expInfo) tys
+    instTypeHidden = any (isTypeHidden expInfo) tyNames
 
 isTypeHidden :: ExportInfo -> Type -> Bool
 isTypeHidden expInfo = typeHidden
   where
     typeHidden :: Type -> Bool
-    typeHidden t =
-      case t of
-        TyVarTy {} -> False
-        AppTy t1 t2 -> typeHidden t1 || typeHidden t2
-        FunTy _ _ t1 t2 -> typeHidden t1 || typeHidden t2
-        TyConApp tcon args -> nameHidden (getName tcon) || any typeHidden args
-        ForAllTy bndr ty -> typeHidden (tyVarKind (binderVar bndr)) || typeHidden ty
-        LitTy _ -> False
-        CastTy ty _ -> typeHidden ty
-        CoercionTy {} -> False
+    typeHidden t = any nameHidden $ typeNames t
 
     nameHidden :: Name -> Bool
     nameHidden = isNameHidden expInfo

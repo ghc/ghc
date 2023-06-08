@@ -3,6 +3,8 @@
              ViewPatterns #-}
 module BundledPatterns (Vec(Nil,(:>)), RTree (LR,BR)) where
 
+import Data.Kind (Type)
+
 import GHC.TypeLits
 import Prelude hiding (head, tail)
 import Unsafe.Coerce
@@ -12,7 +14,7 @@ import Unsafe.Coerce
 -- * Lists with their length encoded in their type
 -- * 'Vec'tor elements have an __ASCENDING__ subscript starting from 0 and
 --   ending at @'length' - 1@.
-data Vec :: Nat -> * -> * where
+data Vec :: Nat -> Type -> Type where
   Nil  :: Vec 0 a
   Cons :: a -> Vec n a -> Vec (n + 1) a
 
@@ -58,7 +60,7 @@ tail (_ `Cons` xs) = unsafeCoerce xs
 --
 -- * Only has elements at the leaf of the tree
 -- * A tree of depth /d/ has /2^d/ elements.
-data RTree :: Nat -> * -> * where
+data RTree :: Nat -> Type -> Type where
   LR_ :: a -> RTree 0 a
   BR_ :: RTree d a -> RTree d a -> RTree (d+1) a
 

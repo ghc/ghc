@@ -57,15 +57,11 @@
 	    >newtype</span
 	    > <a id="t:T" class="def"
 	    >T</a
-	    > :: (<span class="keyword"
+	    > (a :: <span class="keyword"
 	    >forall</span
 	    > k. k -&gt; <a href="#" title="Data.Kind"
 	    >Type</a
-	    >) -&gt; <span class="keyword"
-	    >forall</span
-	    > k. k -&gt; <a href="#" title="Data.Kind"
-	    >Type</a
-	    > <span class="keyword"
+	    >) (b :: k) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -80,13 +76,13 @@
 		  >MkT</a
 		  > :: <span class="keyword"
 		  >forall</span
-		  > (f :: <span class="keyword"
+		  > (a :: <span class="keyword"
 		  >forall</span
 		  > k. k -&gt; <a href="#" title="Data.Kind"
 		  >Type</a
-		  >) k (a :: k). f a -&gt; <a href="#" title="Bug1050"
+		  >) k (b :: k). a b -&gt; <a href="#" title="Bug1050"
 		  >T</a
-		  > f a</td
+		  > a b</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -101,7 +97,7 @@
 	    >forall</span
 	    > {k} {f :: <span class="keyword"
 	    >forall</span
-	    > k. k -&gt; <a href="#" title="Data.Kind"
+	    > k1. k1 -&gt; <a href="#" title="Data.Kind"
 	    >Type</a
 	    >} {a :: k}. f a -&gt; <a href="#" title="Bug1050"
 	    >T</a

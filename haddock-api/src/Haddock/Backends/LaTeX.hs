@@ -18,6 +18,7 @@ module Haddock.Backends.LaTeX (
 ) where
 
 import Documentation.Haddock.Markup
+import Haddock.Doc (combineDocumentation)
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
@@ -26,7 +27,7 @@ import qualified GHC.Utils.Ppr as Pretty
 
 import GHC hiding (fromMaybeContext )
 import GHC.Types.Name.Occurrence
-import GHC.Types.Name        ( nameOccName )
+import GHC.Types.Name        ( nameOccName, getOccString, tidyNameOcc )
 import GHC.Types.Name.Reader ( rdrNameOcc )
 import GHC.Core.Type         ( Specificity(..) )
 import GHC.Data.FastString   ( unpackFS )
@@ -41,10 +42,6 @@ import Data.List            ( sort )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import Data.Foldable ( toList )
 import Prelude hiding ((<>))
-
-import Haddock.Doc (combineDocumentation)
-
--- import Debug.Trace
 
 {- SAMPLE OUTPUT
 
@@ -180,12 +177,28 @@ ppLaTeXModule _title odir iface = do
 
 -- | Prints out an entry in a module export list.
 exportListItem :: ExportItem DocNameI -> LaTeX
-exportListItem ExportDecl { expItemDecl = decl, expItemSubDocs = subdocs }
+exportListItem
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+          ( ExportD
+            { expDDecl    = decl
+            , expDSubDocs = subdocs
+            }
+          )
+        }
+      )
+    )
   = let (leader, names) = declNames decl
+        go (n,_)
+          | isDefaultMethodOcc (occName n) = Nothing
+          | otherwise = Just $ ppDocBinder n
+
     in sep (punctuate comma [ leader <+> ppDocBinder name | name <- names ]) <>
          case subdocs of
            [] -> empty
-           _  -> parens (sep (punctuate comma (map (ppDocBinder . fst) subdocs)))
+           _  -> parens (sep (punctuate comma (mapMaybe go subdocs)))
+
 exportListItem (ExportNoDecl y [])
   = ppDocBinder y
 exportListItem (ExportNoDecl y subs)
@@ -215,9 +228,18 @@ processExports (e : es) =
 
 
 isSimpleSig :: ExportItem DocNameI -> Maybe ([DocName], HsSigType DocNameI)
-isSimpleSig ExportDecl { expItemDecl = L _ (SigD _ (TypeSig _ lnames t))
-                       , expItemMbDoc = (Documentation Nothing Nothing, argDocs) }
-  | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCards t))
+isSimpleSig
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+          ExportD
+          { expDDecl  = L _ (SigD _ (TypeSig _ lnames t))
+          , expDMbDoc = (Documentation Nothing Nothing, argDocs)
+          }
+        }
+      )
+    )
+    | Map.null argDocs = Just (map unLoc lnames, unLoc (dropWildCards t))
 isSimpleSig _ = Nothing
 
 
@@ -229,7 +251,7 @@ isExportModule _ = Nothing
 processExport :: ExportItem DocNameI -> LaTeX
 processExport (ExportGroup lev _id0 doc)
   = ppDocGroup lev (docToLaTeX doc)
-processExport (ExportDecl decl pats doc subdocs insts fixities _splice)
+processExport (ExportDecl (RnExportD (ExportD decl pats doc subdocs insts fixities _splice) _))
   = ppDecl decl pats doc insts subdocs fixities
 processExport (ExportNoDecl y [])
   = ppDocName y
@@ -292,13 +314,9 @@ ppDecl :: LHsDecl DocNameI                         -- ^ decl to print
        -> LaTeX
 
 ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
-  TyClD _ d@FamDecl {}         -> ppFamDecl False doc instances d unicode
-  TyClD _ d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
-  TyClD _ d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
--- Family instances happen via FamInst now
---  TyClD _ d@TySynonym{}
---    | Just _  <- tcdTyPats d    -> ppTyInst False loc doc d unicode
--- Family instances happen via FamInst now
+  TyClD _ d@FamDecl {}           -> ppFamDecl False doc instances d unicode
+  TyClD _ d@DataDecl {}          -> ppDataDecl pats instances subdocs (Just doc) d unicode
+  TyClD _ d@SynDecl {}           -> ppTySyn (doc, fnArgsDoc) d unicode
   TyClD _ d@ClassDecl{}          -> ppClassDecl instances doc subdocs d unicode
   SigD _ (TypeSig _ lnames ty)   -> ppFunSig Nothing (doc, fnArgsDoc) (map unLoc lnames) (dropWildCards ty) unicode
   SigD _ (PatSynSig _ lnames ty) -> ppLPatSig (doc, fnArgsDoc) (map unLoc lnames) ty unicode
@@ -656,11 +674,18 @@ ppClassDecl instances doc subdocs
             | L _ (ClassOpSig _ is_def lnames typ) <- lsigs
             , let doc | is_def = noDocForDecl
                       | otherwise = lookupAnySubdoc (head names) subdocs
-                  names = map unLoc lnames
+                  names = map (cleanName . unLoc) lnames
                   leader = if is_def then Just (keyword "default") else Nothing
             ]
             -- N.B. taking just the first name is ok. Signatures with multiple
             -- names are expanded so that each name gets its own signature.
+    -- Get rid of the ugly '$dm' prefix on default method names
+    cleanName n
+      | isDefaultMethodOcc (occName n)
+      , '$':'d':'m':occStr <- getOccString n
+      = setName (tidyNameOcc (getName n) (mkOccName varName occStr)) n
+      | otherwise = n
+
 
     instancesBit = ppDocInstances unicode instances
 

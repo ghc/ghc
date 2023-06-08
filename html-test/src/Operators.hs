@@ -5,6 +5,8 @@
 -- | Test operators with or without fixity declarations
 module Operators where
 
+import Data.Kind (Type)
+
 -- | Operator with no fixity
 (+-) :: a -> a -> a
 a +- _ = a
@@ -48,7 +50,7 @@ infix 9 **
 class a ><> b | a -> b where
   -- Dec 2015: Added @a -> b@ functional dependency to clean up ambiguity
   -- See GHC #11264
-  type a <>< b :: *
+  type a <>< b :: Type
   data a ><< b
   (>><), (<<>) :: a -> b -> ()
 

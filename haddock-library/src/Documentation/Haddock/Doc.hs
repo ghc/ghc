@@ -1,8 +1,13 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-module Documentation.Haddock.Doc (docParagraph, docAppend,
-                                  docConcat, metaDocConcat,
-                                  metaDocAppend, emptyMetaDoc,
-                                  metaAppend, metaConcat) where
+module Documentation.Haddock.Doc
+  ( docParagraph
+  , docAppend
+  , docConcat
+  , metaDocConcat
+  , metaDocAppend
+  , emptyMetaDoc
+  , metaAppend
+  , metaConcat
+  ) where
 
 import Control.Applicative ((<|>), empty)
 import Documentation.Haddock.Types

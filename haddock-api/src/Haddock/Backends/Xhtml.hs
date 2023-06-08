@@ -11,7 +11,12 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-{-# LANGUAGE CPP, NamedFieldPuns, TupleSections, TypeApplications #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE NamedFieldPuns   #-}
+{-# LANGUAGE TupleSections    #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE BangPatterns     #-}
+
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
@@ -41,18 +46,19 @@ import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
 import qualified Data.ByteString.Builder as Builder
+import Control.DeepSeq       (force)
 import Data.Bifunctor        ( bimap )
 import Data.Char             ( toUpper, isSpace )
 import Data.Either           ( partitionEithers )
-import Data.Foldable         ( traverse_)
+import Data.Foldable         ( traverse_, foldl')
 import Data.List             ( sortBy, isPrefixOf, intersperse )
 import Data.Maybe
 import System.Directory
 import System.FilePath hiding ( (</>) )
 import qualified System.IO as IO
 import qualified System.FilePath as FilePath
-import Data.Map              ( Map )
-import qualified Data.Map as Map hiding ( Map )
+import Data.Map.Strict       (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set hiding ( Set )
 import Data.Ord              ( comparing )
 
@@ -179,8 +185,7 @@ srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
   Just (anchor ! [href src_base_url] << "Source")
 srcButton (_, Just src_module_url, _, _) (Just iface) =
-  let url = spliceURL (Just $ ifaceOrigFilename iface)
-                      (Just $ ifaceMod iface) Nothing Nothing src_module_url
+  let url = spliceURL (Just $ ifaceMod iface) Nothing Nothing src_module_url
    in Just (anchor ! [href url] << "Source")
 srcButton _ _ =
   Nothing
@@ -191,7 +196,7 @@ wikiButton (Just wiki_base_url, _, _) Nothing =
   Just (anchor ! [href wiki_base_url] << "User Comments")
 
 wikiButton (_, Just wiki_module_url, _) (Just mdl) =
-  let url = spliceURL Nothing (Just mdl) Nothing Nothing wiki_module_url
+  let url = spliceURL (Just mdl) Nothing Nothing wiki_module_url
    in Just (anchor ! [href url] << "User Comments")
 
 wikiButton _ _ =
@@ -356,7 +361,7 @@ ppPrologue pkg qual title (Just doc) =
 
 ppSignatureTrees :: Maybe Package -> Qualification -> [(PackageInfo, [ModuleTree])] -> Html
 ppSignatureTrees _ _ tss | all (null . snd) tss = mempty
-ppSignatureTrees pkg qual [(info, ts)] = 
+ppSignatureTrees pkg qual [(info, ts)] =
   divPackageList << (sectionName << "Signatures" +++ ppSignatureTree pkg qual "n" info ts)
 ppSignatureTrees pkg qual tss =
   divModuleList <<
@@ -426,8 +431,6 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
         thesummary ! [ theclass "hide-when-js-enabled" ] << "Submodules" +++
         mkNodeList pkg qual (s:ss) p ts
       )
-
-
 
 --------------------------------------------------------------------------------
 -- * Generate the index
@@ -504,8 +507,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
     fromInterface iface =
         mkIndex mdl qual `mapMaybe` ifaceRnExportItems iface
       where
-        aliases = ifaceModuleAliases iface
-        qual    = makeModuleQual qual_opt aliases mdl
+        qual    = makeModuleQual qual_opt mdl
         mdl     = ifaceMod iface
 
     mkIndex :: Module -> Qualification -> ExportItem DocNameI -> Maybe JsonIndexEntry
@@ -522,11 +524,11 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
         names = exportName item ++ exportSubs item
 
     exportSubs :: ExportItem DocNameI -> [IdP DocNameI]
-    exportSubs ExportDecl { expItemSubDocs } = map fst expItemSubDocs
+    exportSubs (ExportDecl (RnExportD { rnExpDExpD = ExportD { expDSubDocs } })) = map fst expDSubDocs
     exportSubs _ = []
 
     exportName :: ExportItem DocNameI -> [IdP DocNameI]
-    exportName ExportDecl { expItemDecl } = getMainDeclBinderI (unLoc expItemDecl)
+    exportName (ExportDecl (RnExportD { rnExpDExpD = ExportD { expDDecl } })) = getMainDeclBinderI (unLoc expDDecl)
     exportName ExportNoDecl { expItemName } = [expItemName]
     exportName _ = []
 
@@ -538,7 +540,7 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces ins
     -- update link using relative path to output directory
     fixLink :: FilePath
             -> JsonIndexEntry -> JsonIndexEntry
-    fixLink ifaceFile jie = 
+    fixLink ifaceFile jie =
       jie { jieLink = makeRelative odir (takeDirectory ifaceFile)
                         FilePath.</> jieLink jie }
 
@@ -623,14 +625,34 @@ ppHtmlIndex odir doctitle _maybe_package themes
     -- that export that entity.  Each of the modules exports the entity
     -- in a visible or invisible way (hence the Bool).
     full_index :: Map String (Map GHC.Name [(Module,Bool)])
-    full_index = Map.fromListWith (flip (Map.unionWith (++)))
-                 (concatMap getIfaceIndex ifaces)
-
-    getIfaceIndex iface =
-      [ (getOccString name
-         , Map.fromList [(name, [(mdl, name `Set.member` visible)])])
-         | name <- instExports iface ]
+    full_index = foldl' f Map.empty ifaces
       where
+        f :: Map String (Map Name [(Module, Bool)])
+          -> InstalledInterface
+          -> Map String (Map Name [(Module, Bool)])
+        f !idx iface =
+          Map.unionWith
+            (Map.unionWith (\a b -> let !x = force $ a ++ b in x))
+            idx
+            (getIfaceIndex iface)
+
+
+    getIfaceIndex :: InstalledInterface -> Map String (Map Name [(Module, Bool)])
+    getIfaceIndex iface =
+        foldl' f Map.empty (instExports iface)
+      where
+        f :: Map String (Map Name [(Module, Bool)])
+          -> Name
+          -> Map String (Map Name [(Module, Bool)])
+        f !idx name =
+          let !vis =  name `Set.member` visible
+          in
+            Map.insertWith
+              (Map.unionWith (++))
+              (getOccString name)
+              (Map.singleton name [(mdl, vis)])
+              idx
+
         mdl = instMod iface
         visible = Set.fromList (instVisibleExports iface)
 
@@ -682,7 +704,6 @@ ppHtmlModule odir doctitle themes
   unicode pkg qual debug iface = do
   let
       mdl = ifaceMod iface
-      aliases = ifaceModuleAliases iface
       mdl_str = moduleString mdl
       mdl_str_annot = mdl_str ++ if ifaceIsSig iface
                                     then " (signature)"
@@ -694,7 +715,7 @@ ppHtmlModule odir doctitle themes
                        ")"
         | otherwise
         = toHtml mdl_str
-      real_qual = makeModuleQual qual aliases mdl
+      real_qual = makeModuleQual qual mdl
       html =
         headHtml mdl_str_annot themes maybe_mathjax_url maybe_base_url +++
         bodyHtml doctitle (Just iface)
@@ -722,7 +743,17 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode pkg qual
 
     -- todo: if something has only sub-docs, or fn-args-docs, should
     -- it be measured here and thus prevent omitting the synopsis?
-    has_doc ExportDecl { expItemMbDoc = (Documentation mDoc mWarning, _) } = isJust mDoc || isJust mWarning
+    has_doc
+      ( ExportDecl
+        ( RnExportD
+          { rnExpDExpD =
+            ExportD
+            { expDMbDoc =
+              ( Documentation mDoc mWarn, _ )
+            }
+          }
+        )
+      ) = isJust mDoc || isJust mWarn
     has_doc (ExportNoDecl _ _) = False
     has_doc (ExportModule _) = False
     has_doc _ = True
@@ -816,11 +847,28 @@ numberSectionHeadings = go 1
 
 processExport :: Bool -> LinksInfo -> Bool -> Maybe Package -> Qualification
               -> ExportItem DocNameI -> Maybe Html
-processExport _ _ _ _ _ ExportDecl { expItemDecl = L _ (InstD {}) } = Nothing -- Hide empty instances
+processExport _ _ _ _ _
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+            ExportD
+            { expDDecl = L _ (InstD {})
+            }
+        }
+      )
+    )
+  = Nothing -- Hide empty instances
+processExport summary links unicode pkg qual
+    ( ExportDecl
+      ( RnExportD
+        { rnExpDExpD =
+            ExportD decl pats doc subdocs insts fixities splice
+        }
+      )
+    )
+  = processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode pkg qual
 processExport summary _ _ pkg qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtmlNoAnchors (Just id0) pkg qual (mkMeta doc)
-processExport summary links unicode pkg qual (ExportDecl decl pats doc subdocs insts fixities splice)
-  = processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode pkg qual
 processExport summary _ _ _ qual (ExportNoDecl y [])
   = processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ _ qual (ExportNoDecl y subs)

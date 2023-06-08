@@ -137,18 +137,104 @@
 		      > <div class="subs associated-types"
 		      ><p class="caption"
 			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="GHC.Generics"
-			  >Rep1</a
-			  > (<a href="#" title="Bug1004"
-			  >Product</a
-			  > f g) :: k -&gt; <a href="#" title="Data.Kind"
-			  >Type</a
-			  > <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			><table
+			><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Rep1_Product:Rep1:1"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="GHC.Generics"
+				>Rep1</a
+				> (<a href="#" title="Bug1004"
+				>Product</a
+				> f g :: k -&gt; <a href="#" title="Data.Kind"
+				>Type</a
+				>)</span
+			      ></td
+			    ><td class="doc"
+			    ><p
+			      ><em
+				>Since: base-4.9.0.0</em
+				></p
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:Rep1_Product:Rep1:1"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Data.Functor.Product</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="GHC.Generics"
+				  >Rep1</a
+				  > (<a href="#" title="Bug1004"
+				  >Product</a
+				  > f g :: k -&gt; <a href="#" title="Data.Kind"
+				  >Type</a
+				  >) = <a href="#" title="GHC.Generics"
+				  >D1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaData</a
+				  > &quot;Product&quot; &quot;Data.Functor.Product&quot; &quot;base&quot; '<a href="#" title="Data.Bool"
+				  >False</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >C1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaCons</a
+				  > &quot;Pair&quot; '<a href="#" title="GHC.Generics"
+				  >PrefixI</a
+				  > '<a href="#" title="Data.Bool"
+				  >False</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Nothing</a
+				  > :: <a href="#" title="Data.Maybe"
+				  >Maybe</a
+				  > <a href="#" title="GHC.TypeLits"
+				  >Symbol</a
+				  >) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec1</a
+				  > f) <a href="#" title="GHC.Generics"
+				  >:*:</a
+				  > <a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Nothing</a
+				  > :: <a href="#" title="Data.Maybe"
+				  >Maybe</a
+				  > <a href="#" title="GHC.TypeLits"
+				  >Symbol</a
+				  >) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec1</a
+				  > g)))</div
+				></details
+			      ></td
+			    ></tr
+			  ></table
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -158,7 +244,7 @@
 			  >from1</a
 			  > :: <span class="keyword"
 			  >forall</span
-			  > (a :: k0). <a href="#" title="Bug1004"
+			  > (a :: k). <a href="#" title="Bug1004"
 			  >Product</a
 			  > f g a -&gt; <a href="#" title="GHC.Generics"
 			  >Rep1</a
@@ -172,7 +258,7 @@
 			  >to1</a
 			  > :: <span class="keyword"
 			  >forall</span
-			  > (a :: k0). <a href="#" title="GHC.Generics"
+			  > (a :: k). <a href="#" title="GHC.Generics"
 			  >Rep1</a
 			  > (<a href="#" title="Bug1004"
 			  >Product</a
@@ -506,7 +592,160 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Eq1:5"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Foldable1:5"
+		      ></span
+		      > (<a href="#" title="Data.Foldable1"
+		      >Foldable1</a
+		      > f, <a href="#" title="Data.Foldable1"
+		      >Foldable1</a
+		      > g) =&gt; <a href="#" title="Data.Foldable1"
+		      >Foldable1</a
+		      > (<a href="#" title="Bug1004"
+		      >Product</a
+		      > f g)</span
+		    ></td
+		  ><td class="doc"
+		  ><p
+		    >It would be enough for either half of a product to be <code
+		      ><a href="#" title="Data.Foldable1"
+			>Foldable1</a
+			></code
+		      >.
+ Other could be <code
+		      ><a href="#" title="Data.Foldable"
+			>Foldable</a
+			></code
+		      >.</p
+		    ></td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:Product:Foldable1:5"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Data.Foldable1</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >fold1</a
+			  > :: <a href="#" title="Prelude"
+			  >Semigroup</a
+			  > m =&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g m -&gt; m <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldMap1</a
+			  > :: <a href="#" title="Prelude"
+			  >Semigroup</a
+			  > m =&gt; (a -&gt; m) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; m <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldMap1'</a
+			  > :: <a href="#" title="Prelude"
+			  >Semigroup</a
+			  > m =&gt; (a -&gt; m) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; m <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >toNonEmpty</a
+			  > :: <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; <a href="#" title="Data.List.NonEmpty"
+			  >NonEmpty</a
+			  > a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >maximum</a
+			  > :: <a href="#" title="Data.Ord"
+			  >Ord</a
+			  > a =&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >minimum</a
+			  > :: <a href="#" title="Data.Ord"
+			  >Ord</a
+			  > a =&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >head</a
+			  > :: <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >last</a
+			  > :: <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldrMap1</a
+			  > :: (a -&gt; b) -&gt; (a -&gt; b -&gt; b) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldlMap1'</a
+			  > :: (a -&gt; b) -&gt; (b -&gt; a -&gt; b) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldlMap1</a
+			  > :: (a -&gt; b) -&gt; (b -&gt; a -&gt; b) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >foldrMap1'</a
+			  > :: (a -&gt; b) -&gt; (a -&gt; b -&gt; b) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; b <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Eq1:6"
 		      ></span
 		      > (<a href="#" title="Data.Functor.Classes"
 		      >Eq1</a
@@ -527,7 +766,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Eq1:5"
+		  ><details id="i:id:Product:Eq1:6"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -558,7 +797,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Ord1:6"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Ord1:7"
 		      ></span
 		      > (<a href="#" title="Data.Functor.Classes"
 		      >Ord1</a
@@ -579,7 +818,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Ord1:6"
+		  ><details id="i:id:Product:Ord1:7"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -610,7 +849,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Read1:7"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Read1:8"
 		      ></span
 		      > (<a href="#" title="Data.Functor.Classes"
 		      >Read1</a
@@ -631,7 +870,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Read1:7"
+		  ><details id="i:id:Product:Read1:8"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -710,7 +949,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Show1:8"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Show1:9"
 		      ></span
 		      > (<a href="#" title="Data.Functor.Classes"
 		      >Show1</a
@@ -731,7 +970,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Show1:8"
+		  ><details id="i:id:Product:Show1:9"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -782,7 +1021,61 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Traversable:9"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Contravariant:10"
+		      ></span
+		      > (<a href="#" title="Data.Functor.Contravariant"
+		      >Contravariant</a
+		      > f, <a href="#" title="Data.Functor.Contravariant"
+		      >Contravariant</a
+		      > g) =&gt; <a href="#" title="Data.Functor.Contravariant"
+		      >Contravariant</a
+		      > (<a href="#" title="Bug1004"
+		      >Product</a
+		      > f g)</span
+		    ></td
+		  ><td class="doc empty"
+		  >&nbsp;</td
+		  ></tr
+		><tr
+		><td colspan="2"
+		  ><details id="i:id:Product:Contravariant:10"
+		    ><summary class="hide-when-js-enabled"
+		      >Instance details</summary
+		      ><p
+		      >Defined in <a href="#"
+			>Data.Functor.Contravariant</a
+			></p
+		      > <div class="subs methods"
+		      ><p class="caption"
+			>Methods</p
+			><p class="src"
+			><a href="#"
+			  >contramap</a
+			  > :: (a' -&gt; a) -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a' <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			><p class="src"
+			><a href="#"
+			  >(&gt;$)</a
+			  > :: b -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g b -&gt; <a href="#" title="Bug1004"
+			  >Product</a
+			  > f g a <a href="#" class="selflink"
+			  >#</a
+			  ></p
+			></div
+		      ></details
+		    ></td
+		  ></tr
+		><tr
+		><td class="src clearfix"
+		  ><span class="inst-left"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Traversable:11"
 		      ></span
 		      > (<a href="#" title="Data.Traversable"
 		      >Traversable</a
@@ -803,7 +1096,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Traversable:9"
+		  ><details id="i:id:Product:Traversable:11"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -868,7 +1161,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Alternative:10"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Alternative:12"
 		      ></span
 		      > (<a href="#" title="Control.Applicative"
 		      >Alternative</a
@@ -889,7 +1182,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Alternative:10"
+		  ><details id="i:id:Product:Alternative:12"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -946,7 +1239,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Applicative:11"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Applicative:13"
 		      ></span
 		      > (<a href="#" title="Control.Applicative"
 		      >Applicative</a
@@ -967,7 +1260,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Applicative:11"
+		  ><details id="i:id:Product:Applicative:13"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1040,7 +1333,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Functor:12"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Functor:14"
 		      ></span
 		      > (<a href="#" title="Data.Functor"
 		      >Functor</a
@@ -1061,7 +1354,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Functor:12"
+		  ><details id="i:id:Product:Functor:14"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1098,7 +1391,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Monad:13"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Monad:15"
 		      ></span
 		      > (<a href="#" title="Control.Monad"
 		      >Monad</a
@@ -1119,7 +1412,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Monad:13"
+		  ><details id="i:id:Product:Monad:15"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1168,7 +1461,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:MonadPlus:14"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:MonadPlus:16"
 		      ></span
 		      > (<a href="#" title="Control.Monad"
 		      >MonadPlus</a
@@ -1189,7 +1482,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:MonadPlus:14"
+		  ><details id="i:id:Product:MonadPlus:16"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1226,7 +1519,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Data:15"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Data:17"
 		      ></span
 		      > (<a href="#" title="Type.Reflection"
 		      >Typeable</a
@@ -1255,7 +1548,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Data:15"
+		  ><details id="i:id:Product:Data:17"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1472,7 +1765,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Monoid:16"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Monoid:18"
 		      ></span
 		      > (<a href="#" title="Data.Monoid"
 		      >Monoid</a
@@ -1493,7 +1786,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Monoid:16"
+		  ><details id="i:id:Product:Monoid:18"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1540,7 +1833,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Semigroup:17"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Semigroup:19"
 		      ></span
 		      > (<a href="#" title="Prelude"
 		      >Semigroup</a
@@ -1561,7 +1854,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Semigroup:17"
+		  ><details id="i:id:Product:Semigroup:19"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1614,7 +1907,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Generic:18"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Generic:20"
 		      ></span
 		      > <a href="#" title="GHC.Generics"
 		      >Generic</a
@@ -1627,7 +1920,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Generic:18"
+		  ><details id="i:id:Product:Generic:20"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1637,20 +1930,100 @@
 		      > <div class="subs associated-types"
 		      ><p class="caption"
 			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="GHC.Generics"
-			  >Rep</a
-			  > (<a href="#" title="Bug1004"
-			  >Product</a
-			  > f g a) :: <a href="#" title="Data.Kind"
-			  >Type</a
-			  > -&gt; <a href="#" title="Data.Kind"
-			  >Type</a
-			  > <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			><table
+			><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:Rep_Product:Rep:1"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="GHC.Generics"
+				>Rep</a
+				> (<a href="#" title="Bug1004"
+				>Product</a
+				> f g a)</span
+			      ></td
+			    ><td class="doc"
+			    ><p
+			      ><em
+				>Since: base-4.9.0.0</em
+				></p
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:Rep_Product:Rep:1"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Data.Functor.Product</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="GHC.Generics"
+				  >Rep</a
+				  > (<a href="#" title="Bug1004"
+				  >Product</a
+				  > f g a) = <a href="#" title="GHC.Generics"
+				  >D1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaData</a
+				  > &quot;Product&quot; &quot;Data.Functor.Product&quot; &quot;base&quot; '<a href="#" title="Data.Bool"
+				  >False</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >C1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaCons</a
+				  > &quot;Pair&quot; '<a href="#" title="GHC.Generics"
+				  >PrefixI</a
+				  > '<a href="#" title="Data.Bool"
+				  >False</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Nothing</a
+				  > :: <a href="#" title="Data.Maybe"
+				  >Maybe</a
+				  > <a href="#" title="GHC.TypeLits"
+				  >Symbol</a
+				  >) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec0</a
+				  > (f a)) <a href="#" title="GHC.Generics"
+				  >:*:</a
+				  > <a href="#" title="GHC.Generics"
+				  >S1</a
+				  > ('<a href="#" title="GHC.Generics"
+				  >MetaSel</a
+				  > ('<a href="#" title="Data.Maybe"
+				  >Nothing</a
+				  > :: <a href="#" title="Data.Maybe"
+				  >Maybe</a
+				  > <a href="#" title="GHC.TypeLits"
+				  >Symbol</a
+				  >) '<a href="#" title="GHC.Generics"
+				  >NoSourceUnpackedness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >NoSourceStrictness</a
+				  > '<a href="#" title="GHC.Generics"
+				  >DecidedLazy</a
+				  >) (<a href="#" title="GHC.Generics"
+				  >Rec0</a
+				  > (g a))))</div
+				></details
+			      ></td
+			    ></tr
+			  ></table
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -1686,7 +2059,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Read:19"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Read:21"
 		      ></span
 		      > (<a href="#" title="Text.Read"
 		      >Read</a
@@ -1707,7 +2080,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Read:19"
+		  ><details id="i:id:Product:Read:21"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1766,7 +2139,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Show:20"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Show:22"
 		      ></span
 		      > (<a href="#" title="Text.Show"
 		      >Show</a
@@ -1787,7 +2160,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Show:20"
+		  ><details id="i:id:Product:Show:22"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1836,7 +2209,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Eq:21"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Eq:23"
 		      ></span
 		      > (<a href="#" title="Data.Eq"
 		      >Eq</a
@@ -1857,7 +2230,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Eq:21"
+		  ><details id="i:id:Product:Eq:23"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -1898,7 +2271,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Ord:22"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Ord:24"
 		      ></span
 		      > (<a href="#" title="Data.Ord"
 		      >Ord</a
@@ -1919,7 +2292,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Ord:22"
+		  ><details id="i:id:Product:Ord:24"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -2020,7 +2393,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Rep1:23"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Rep1:25"
 		      ></span
 		      > <span class="keyword"
 		      >type</span
@@ -2041,7 +2414,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Rep1:23"
+		  ><details id="i:id:Product:Rep1:25"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p
@@ -2116,7 +2489,7 @@
 		><tr
 		><td class="src clearfix"
 		  ><span class="inst-left"
-		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Rep:24"
+		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Product:Rep:26"
 		      ></span
 		      > <span class="keyword"
 		      >type</span
@@ -2135,7 +2508,7 @@
 		  ></tr
 		><tr
 		><td colspan="2"
-		  ><details id="i:id:Product:Rep:24"
+		  ><details id="i:id:Product:Rep:26"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
 		      ><p

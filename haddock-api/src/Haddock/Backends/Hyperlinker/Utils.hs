@@ -39,7 +39,7 @@ hypSrcModuleFile m = moduleNameString (moduleName m) <.> "html"
 
 hypSrcModuleFile' :: ModuleName -> FilePath
 hypSrcModuleFile' mdl = spliceURL'
-    Nothing (Just mdl) Nothing Nothing moduleFormat
+    (Just mdl) Nothing Nothing moduleFormat
 
 hypSrcModuleUrl :: Module -> String
 hypSrcModuleUrl = hypSrcModuleFile

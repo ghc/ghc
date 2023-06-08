@@ -7,13 +7,13 @@
 module Bug806
 
 -- | <a>F1</a> docs
-type family F1 a b :: * -> *
+type family F1 a b :: Type -> Type
 
 -- | <a>F2</a> docs
-type family F2 a b :: * -> *
+type family F2 a b :: Type -> Type
 
 -- | <a>D</a> docs
-data family D a :: * -> *
+data family D a :: Type -> Type
 v :: Int
 
 -- | <a>C</a> docs
@@ -21,5 +21,5 @@ class C a where {
     
     -- | <a>AT</a> docs
     type AT a;
-    type AT a = Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy (Proxy)))))))));
+    type AT a = Proxy Proxy Proxy Proxy Proxy Proxy Proxy Proxy Proxy Proxy :: Type -> Type;
 }

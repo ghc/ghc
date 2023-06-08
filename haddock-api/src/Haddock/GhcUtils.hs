@@ -9,6 +9,7 @@
 {-# LANGUAGE MonadComprehensions #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
@@ -27,27 +28,29 @@ module Haddock.GhcUtils where
 
 import Control.Arrow
 import Data.Char ( isSpace )
-import Data.Foldable ( toList )
+import Data.Foldable ( toList, foldl' )
 import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe ( mapMaybe, fromMaybe )
+import qualified Data.Set as Set
 
 import Haddock.Types( DocName, DocNameI, XRecCond )
 
+import GHC
+import GHC.Builtin.Names
+import GHC.Data.FastString
+import GHC.Driver.Ppr (showPpr )
+import GHC.Driver.Session
+import GHC.Types.Name
 import GHC.Utils.FV as FV
 import GHC.Utils.Outputable ( Outputable )
 import GHC.Utils.Panic ( panic )
-import GHC.Driver.Ppr (showPpr )
-import GHC.Types.Name
-import GHC.Unit.Module
-import GHC
-import GHC.Driver.Session
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
                          , tyVarKind, updateTyVarKind, isInvisibleForAllTyFlag )
 import GHC.Types.Var.Set ( VarSet, emptyVarSet )
 import GHC.Types.Var.Env ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
 import GHC.Core.TyCo.Rep ( Type(..) )
-import GHC.Core.Type     ( isRuntimeRepVar )
+import GHC.Core.Type     ( isRuntimeRepVar, binderVar )
 import GHC.Builtin.Types( liftedRepTy )
 
 import           GHC.Data.StringBuffer ( StringBuffer )
@@ -57,7 +60,7 @@ import           Data.ByteString ( ByteString )
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Internal as BS
 
-import GHC.HsToCore.Docs
+import GHC.HsToCore.Docs hiding (sigNameNoLoc)
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -99,7 +102,16 @@ ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
 sigName :: LSig GhcRn -> [IdP GhcRn]
-sigName (L _ sig) = sigNameNoLoc emptyOccEnv sig
+sigName (L _ sig) = sigNameNoLoc' emptyOccEnv sig
+
+sigNameNoLoc' :: forall pass w. UnXRec pass => w -> Sig pass -> [IdP pass]
+sigNameNoLoc' _ (TypeSig    _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (ClassOpSig _ _ ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (PatSynSig  _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc' _ (SpecSig    _   n _ _)        = [unXRec @pass n]
+sigNameNoLoc' _ (InlineSig  _   n _)          = [unXRec @pass n]
+sigNameNoLoc' _ (FixSig _ (FixitySig _ ns _)) = map (unXRec @pass) ns
+sigNameNoLoc' _ _                             = []
 
 -- | Was this signature given by the user?
 isUserLSig :: forall p. UnXRec p => LSig p -> Bool
@@ -111,6 +123,12 @@ isClassD _ = False
 
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
+
+dataListModule :: Module
+dataListModule = mkBaseModule (fsLit "Data.List")
+
+dataTupleModule :: Module
+dataTupleModule = mkBaseModule (fsLit "Data.Tuple")
 
 -- ---------------------------------------------------------------------
 
@@ -196,7 +214,7 @@ getMainDeclBinderI (ValD _ d) =
   case collectHsBindBinders CollNoDictBinders d of
     []       -> []
     (name:_) -> [name]
-getMainDeclBinderI (SigD _ d) = sigNameNoLoc emptyOccEnv d
+getMainDeclBinderI (SigD _ d) = sigNameNoLoc' emptyOccEnv d
 getMainDeclBinderI (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinderI (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinderI _ = []
@@ -339,7 +357,7 @@ reparenTypePrec = go
   where
 
   -- Shorter name for 'reparenType'
-  go :: XParTy a ~ EpAnn AnnParen => Precedence -> HsType a -> HsType a
+  go :: Precedence -> HsType a -> HsType a
   go _ (HsBangTy x b ty)     = HsBangTy x b (reparenLType ty)
   go _ (HsTupleTy x con tys) = HsTupleTy x con (map reparenLType tys)
   go _ (HsSumTy x tys)       = HsSumTy x (map reparenLType tys)
@@ -359,7 +377,6 @@ reparenTypePrec = go
           p' _   = PREC_TOP -- parens will get added anyways later...
           ctxt' = mapXRec @a (\xs -> map (goL (p' xs)) xs) ctxt
       in paren p PREC_CTX $ HsQualTy x ctxt' (goL PREC_TOP ty)
-    -- = paren p PREC_FUN $ HsQualTy x (fmap (mapXRec @a (map reparenLType)) ctxt) (reparenLType ty)
   go p (HsFunTy x w ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
@@ -377,12 +394,11 @@ reparenTypePrec = go
   go _ t@XHsType{} = t
 
   -- Located variant of 'go'
-  goL :: XParTy a ~ EpAnn AnnParen => Precedence -> LHsType a -> LHsType a
+  goL :: Precedence -> LHsType a -> LHsType a
   goL ctxt_prec = mapXRec @a (go ctxt_prec)
 
   -- Optionally wrap a type in parens
-  paren :: XParTy a ~ EpAnn AnnParen
-        => Precedence            -- Precedence of context
+  paren :: Precedence            -- Precedence of context
         -> Precedence            -- Precedence of top-level operator
         -> HsType a -> HsType a  -- Wrap in parens if (ctxt >= op)
   paren ctxt_prec op_prec | ctxt_prec >= op_prec = HsParTy noAnn . wrapXRec @a
@@ -649,6 +665,27 @@ tryCppLine !loc !buf = spanSpace (S.prevChar buf '\n' == '\n') loc buf
         ('\n', b') -> (splitStringBuffer buf b', advanceSrcLoc l '\n', b')
 
         (c   , b') -> spanCppLine (advanceSrcLoc l c) b'
+
+-------------------------------------------------------------------------------
+-- * Names in a 'Type'
+-------------------------------------------------------------------------------
+
+-- | Given a 'Type', return a set of 'Name's coming from the 'TyCon's within
+-- the type.
+typeNames :: Type -> Set.Set Name
+typeNames ty = go ty Set.empty
+  where
+    go :: Type -> Set.Set Name -> Set.Set Name
+    go t acc =
+      case t of
+        TyVarTy {} -> acc
+        AppTy t1 t2 ->  go t2 $ go t1 acc
+        FunTy _ _ t1 t2 -> go t2 $ go t1 acc
+        TyConApp tcon args -> foldl' (\s t' -> go t' s) (Set.insert (getName tcon) acc) args
+        ForAllTy bndr t' -> go t' $ go (tyVarKind (binderVar bndr)) acc
+        LitTy _ -> acc
+        CastTy t' _ -> go t' acc
+        CoercionTy {} -> acc
 
 -------------------------------------------------------------------------------
 -- * Free variables of a 'Type'

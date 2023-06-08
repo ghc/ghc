@@ -34,8 +34,6 @@ module Haddock.Backends.Xhtml.Utils (
 
 import Haddock.Utils
 
-import Data.Maybe
-
 import Text.XHtml hiding ( name, title, p, quote )
 import qualified Text.XHtml as XHtml
 
@@ -49,19 +47,18 @@ import GHC.Types.Name   ( getOccString, nameOccName, isValOcc )
 -- Used to generate URL for customized external paths, usually provided with
 -- @--source-module@, @--source-entity@ and related command-line arguments.
 --
--- >>> spliceURL Nothing mmod mname Nothing "output/%{MODULE}.hs#%{NAME}"
+-- >>> spliceURL mmod mname Nothing "output/%{MODULE}.hs#%{NAME}"
 -- "output/Foo.hs#foo"
-spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name ->
+spliceURL :: Maybe Module -> Maybe GHC.Name ->
              Maybe SrcSpan -> String -> String
-spliceURL mfile mmod = spliceURL' mfile (moduleName <$> mmod)
+spliceURL mmod = spliceURL' (moduleName <$> mmod)
 
 
 -- | Same as 'spliceURL' but takes 'ModuleName' instead of 'Module'.
-spliceURL' :: Maybe FilePath -> Maybe ModuleName -> Maybe GHC.Name ->
+spliceURL' :: Maybe ModuleName -> Maybe GHC.Name ->
               Maybe SrcSpan -> String -> String
-spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
+spliceURL' maybe_mod maybe_name maybe_loc = run
  where
-  file = fromMaybe "" maybe_file
   mdl = case maybe_mod of
           Nothing           -> ""
           Just m -> moduleNameString m
@@ -82,22 +79,17 @@ spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
 
   run "" = ""
   run ('%':'M':rest) = mdl  ++ run rest
-  run ('%':'F':rest) = file ++ run rest
   run ('%':'N':rest) = name ++ run rest
   run ('%':'K':rest) = kind ++ run rest
   run ('%':'L':rest) = line ++ run rest
   run ('%':'%':rest) = '%'   : run rest
 
   run ('%':'{':'M':'O':'D':'U':'L':'E':'}':rest) = mdl  ++ run rest
-  run ('%':'{':'F':'I':'L':'E':'}':rest)         = file ++ run rest
   run ('%':'{':'N':'A':'M':'E':'}':rest)         = name ++ run rest
   run ('%':'{':'K':'I':'N':'D':'}':rest)         = kind ++ run rest
 
   run ('%':'{':'M':'O':'D':'U':'L':'E':'/':'.':'/':c:'}':rest) =
     map (\x -> if x == '.' then c else x) mdl ++ run rest
-
-  run ('%':'{':'F':'I':'L':'E':'/':'/':'/':c:'}':rest) =
-    map (\x -> if x == '/' then c else x) file ++ run rest
 
   run ('%':'{':'L':'I':'N':'E':'}':rest)         = line ++ run rest
 

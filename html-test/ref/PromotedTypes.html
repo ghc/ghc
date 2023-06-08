@@ -91,7 +91,9 @@
 	    >data</span
 	    > <a id="t:Pattern" class="def"
 	    >Pattern</a
-	    > :: [*] -&gt; * <span class="keyword"
+	    > (a :: [<a href="#" title="Data.Kind"
+	    >Type</a
+	    >]) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -106,7 +108,9 @@
 		  >Nil</a
 		  > :: <a href="#" title="PromotedTypes"
 		  >Pattern</a
-		  > '[]</td
+		  > ('[] :: [<a href="#" title="Data.Kind"
+		  >Type</a
+		  >])</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -114,13 +118,19 @@
 	      ><td class="src"
 		><a id="v:Cons" class="def"
 		  >Cons</a
-		  > :: <a href="#" title="Data.Maybe"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > h (t :: [<a href="#" title="Data.Kind"
+		  >Type</a
+		  >]). <a href="#" title="Data.Maybe"
 		  >Maybe</a
 		  > h -&gt; <a href="#" title="PromotedTypes"
 		  >Pattern</a
 		  > t -&gt; <a href="#" title="PromotedTypes"
 		  >Pattern</a
-		  > (h ': t)</td
+		  > (h '<a href="#" title="Data.List"
+		  >:</a
+		  > t)</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -133,9 +143,11 @@
 	    >data</span
 	    > <a id="t:RevPattern" class="def"
 	    >RevPattern</a
-	    > :: <a href="#" title="PromotedTypes"
+	    > (a :: <a href="#" title="PromotedTypes"
 	    >RevList</a
-	    > * -&gt; * <span class="keyword"
+	    > <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -150,9 +162,13 @@
 		  >RevNil</a
 		  > :: <a href="#" title="PromotedTypes"
 		  >RevPattern</a
-		  > <a href="#" title="PromotedTypes"
+		  > ('<a href="#" title="PromotedTypes"
 		  >RNil</a
-		  ></td
+		  > :: <a href="#" title="PromotedTypes"
+		  >RevList</a
+		  > <a href="#" title="Data.Kind"
+		  >Type</a
+		  >)</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr
@@ -160,13 +176,19 @@
 	      ><td class="src"
 		><a id="v:RevCons" class="def"
 		  >RevCons</a
-		  > :: <a href="#" title="Data.Maybe"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > h (t :: <a href="#" title="PromotedTypes"
+		  >RevList</a
+		  > <a href="#" title="Data.Kind"
+		  >Type</a
+		  >). <a href="#" title="Data.Maybe"
 		  >Maybe</a
 		  > h -&gt; <a href="#" title="PromotedTypes"
 		  >RevPattern</a
 		  > t -&gt; <a href="#" title="PromotedTypes"
 		  >RevPattern</a
-		  > (t <a href="#" title="PromotedTypes"
+		  > (t '<a href="#" title="PromotedTypes"
 		  >:&gt;</a
 		  > h)</td
 		><td class="doc empty"
@@ -181,7 +203,11 @@
 	    >data</span
 	    > <a id="t:Tuple" class="def"
 	    >Tuple</a
-	    > :: (*, *) -&gt; * <span class="keyword"
+	    > (a :: (<a href="#" title="Data.Kind"
+	    >Type</a
+	    >, <a href="#" title="Data.Kind"
+	    >Type</a
+	    >)) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -194,9 +220,11 @@
 	      ><td class="src"
 		><a id="v:Tuple" class="def"
 		  >Tuple</a
-		  > :: a -&gt; b -&gt; <a href="#" title="PromotedTypes"
+		  > :: <span class="keyword"
+		  >forall</span
+		  > a1 b. a1 -&gt; b -&gt; <a href="#" title="PromotedTypes"
 		  >Tuple</a
-		  > '(a, b)</td
+		  > '(a1, b)</td
 		><td class="doc empty"
 		>&nbsp;</td
 		></tr

@@ -153,7 +153,11 @@
 	    >class</span
 	    > <a id="t:Foo" class="def"
 	    >Foo</a
-	    > f <span class="keyword"
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -440,7 +444,7 @@
 		      >Foo</a
 		      > f) =&gt; <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >Tuple2</a
 		      > (f a))</span
 		    > <a href="#" class="selflink"
@@ -464,11 +468,11 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple2</a
 			  > (f a) <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; a0 -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > -&gt; a0 -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple2</a
 			  > (f a) a0 <a href="#" class="selflink"
 			  >#</a
@@ -476,15 +480,15 @@
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple2</a
-			  > (f a) (<a href="#" title="GHC.Tuple.Prim"
+			  > (f a) (<a href="#" title="Data.Tuple"
 			  >Tuple2</a
 			  > (f a) a0) -&gt; <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple2</a
-			  > (f a) (<a href="#" title="GHC.Tuple.Prim"
+			  > (f a) (<a href="#" title="Data.Tuple"
 			  >Tuple2</a
 			  > (f a) <a href="#" title="Data.Int"
 			  >Int</a
@@ -564,7 +568,7 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >Tuple3</a
 		      > a a)</span
 		    > <a href="#" class="selflink"
@@ -588,11 +592,11 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a a <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; a0 -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > -&gt; a0 -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a a a0 <a href="#" class="selflink"
 			  >#</a
@@ -600,15 +604,15 @@
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a a (<a href="#" title="GHC.Tuple.Prim"
+			  > a a (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a a a0) -&gt; <a href="#" title="Data.Int"
 			  >Int</a
-			  > -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a a (<a href="#" title="GHC.Tuple.Prim"
+			  > a a (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a a <a href="#" title="Data.Int"
 			  >Int</a
@@ -679,7 +683,11 @@
 	    >Foo</a
 	    > f =&gt; <a id="t:Bar" class="def"
 	    >Bar</a
-	    > f a <span class="keyword"
+	    > (f :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) a <span class="keyword"
 	    >where</span
 	    > <a href="#" class="selflink"
 	    >#</a
@@ -1178,11 +1186,11 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >Tuple3</a
 		      > a b) =&gt; <a href="#" title="Instances"
 		      >Bar</a
-		      > (<a href="#" title="GHC.Tuple.Prim"
+		      > (<a href="#" title="Data.Tuple"
 		      >Tuple3</a
 		      > a b) (a, b, a)</span
 		    > <a href="#" class="selflink"
@@ -1206,9 +1214,9 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a) -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a) -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a b <a href="#" title="Data.Bool"
 			  >Bool</a
@@ -1218,15 +1226,15 @@
 			><p class="src"
 			><a href="#"
 			  >bar'</a
-			  > :: <a href="#" title="GHC.Tuple.Prim"
+			  > :: <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (<a href="#" title="GHC.Tuple.Prim"
+			  > a b (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a)) -&gt; <a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a)) -&gt; <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (<a href="#" title="GHC.Tuple.Prim"
+			  > a b (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (<a href="#" title="GHC.Tuple.Prim"
+			  > a b (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a b b0)) <a href="#" class="selflink"
 			  >#</a
@@ -1234,13 +1242,13 @@
 			><p class="src"
 			><a href="#"
 			  >bar0</a
-			  > :: (<a href="#" title="GHC.Tuple.Prim"
+			  > :: (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a), <a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a), <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a)) -&gt; (<a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a)) -&gt; (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b b0, <a href="#" title="GHC.Tuple.Prim"
+			  > a b b0, <a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a b c) <a href="#" class="selflink"
 			  >#</a
@@ -1248,13 +1256,13 @@
 			><p class="src"
 			><a href="#"
 			  >bar1</a
-			  > :: (<a href="#" title="GHC.Tuple.Prim"
+			  > :: (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a), <a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a), <a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b (a, b, a)) -&gt; (<a href="#" title="GHC.Tuple.Prim"
+			  > a b (a, b, a)) -&gt; (<a href="#" title="Data.Tuple"
 			  >Tuple3</a
-			  > a b b0, <a href="#" title="GHC.Tuple.Prim"
+			  > a b b0, <a href="#" title="Data.Tuple"
 			  >Tuple3</a
 			  > a b c) <a href="#" class="selflink"
 			  >#</a
@@ -1292,9 +1300,9 @@
 	      >baz</a
 	      > :: a -&gt; (<span class="keyword"
 	      >forall</span
-	      > a. a -&gt; a) -&gt; (b, <span class="keyword"
+	      > a1. a1 -&gt; a1) -&gt; (b, <span class="keyword"
 	      >forall</span
-	      > c. c -&gt; a) -&gt; (b, c) <a href="#" class="selflink"
+	      > c1. c1 -&gt; a) -&gt; (b, c) <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
@@ -1302,9 +1310,9 @@
 	      >baz'</a
 	      > :: b -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; (<span class="keyword"
+	      > b1. b1 -&gt; a) -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; [(b, a)] <a href="#" class="selflink"
+	      > b1. b1 -&gt; a) -&gt; [(b, a)] <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
@@ -1312,11 +1320,11 @@
 	      >baz''</a
 	      > :: b -&gt; (<span class="keyword"
 	      >forall</span
-	      > b. (<span class="keyword"
+	      > b1. (<span class="keyword"
 	      >forall</span
-	      > b. b -&gt; a) -&gt; c) -&gt; <span class="keyword"
+	      > b2. b2 -&gt; a) -&gt; c) -&gt; <span class="keyword"
 	      >forall</span
-	      > c. c -&gt; b <a href="#" class="selflink"
+	      > c1. c1 -&gt; b <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ></div
@@ -2089,28 +2097,182 @@
 		      > <div class="subs associated-types"
 		      ><p class="caption"
 			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="Instances"
-			  >Plugh</a
-			  > <a href="#" title="Data.Int"
-			  >Int</a
-			  > c <a href="#" title="Data.Bool"
-			  >Bool</a
-			  > <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			><p class="src"
-			><span class="keyword"
-			  >data</span
-			  > <a href="#" title="Instances"
-			  >Thud</a
-			  > <a href="#" title="Data.Int"
-			  >Int</a
-			  > c <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			><table
+			><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:D:R:PlughInt-40--44--41-Bool:Plugh:1"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="Instances"
+				>Plugh</a
+				> <a href="#" title="Data.Int"
+				>Int</a
+				> (a, b) <a href="#" title="Data.Bool"
+				>Bool</a
+				></span
+			      ></td
+			    ><td class="doc empty"
+			    >&nbsp;</td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:D:R:PlughInt-40--44--41-Bool:Plugh:1"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Instances</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="Instances"
+				  >Plugh</a
+				  > <a href="#" title="Data.Int"
+				  >Int</a
+				  > (a, b) <a href="#" title="Data.Bool"
+				  >Bool</a
+				  > = (a, [b])</div
+				></details
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:D:R:PlughIntListBool:Plugh:2"
+				></span
+				> <span class="keyword"
+				>type</span
+				> <a href="#" title="Instances"
+				>Plugh</a
+				> <a href="#" title="Data.Int"
+				>Int</a
+				> [a] <a href="#" title="Data.Bool"
+				>Bool</a
+				></span
+			      ></td
+			    ><td class="doc empty"
+			    >&nbsp;</td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:D:R:PlughIntListBool:Plugh:2"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Instances</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >type</span
+				  > <a href="#" title="Instances"
+				  >Plugh</a
+				  > <a href="#" title="Data.Int"
+				  >Int</a
+				  > [a] <a href="#" title="Data.Bool"
+				  >Bool</a
+				  > = a</div
+				></details
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:D:R:ThudIntList0:Thud:3"
+				></span
+				> <span class="keyword"
+				>data</span
+				> <a href="#" title="Instances"
+				>Thud</a
+				> <a href="#" title="Data.Int"
+				>Int</a
+				> [a]</span
+			      ></td
+			    ><td class="doc empty"
+			    >&nbsp;</td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:D:R:ThudIntList0:Thud:3"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Instances</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >data</span
+				  > <a href="#" title="Instances"
+				  >Thud</a
+				  > <a href="#" title="Data.Int"
+				  >Int</a
+				  > [a] = <a id="v:Thuuuud" class="def"
+				  >Thuuuud</a
+				  > <a href="#" title="Data.Bool"
+				  >Bool</a
+				  ></div
+				></details
+			      ></td
+			    ></tr
+			  ><tr
+			  ><td class="src clearfix"
+			    ><span class="inst-left"
+			      ><span class="instance details-toggle-control details-toggle" data-details-id="i:if:D:R:ThudIntQuux0:Thud:4"
+				></span
+				> <span class="keyword"
+				>data</span
+				> <a href="#" title="Instances"
+				>Thud</a
+				> <a href="#" title="Data.Int"
+				>Int</a
+				> (<a href="#" title="Instances"
+				>Quux</a
+				> a [a] c)</span
+			      ></td
+			    ><td class="doc empty"
+			    >&nbsp;</td
+			    ></tr
+			  ><tr
+			  ><td colspan="2"
+			    ><details id="i:if:D:R:ThudIntQuux0:Thud:4"
+			      ><summary class="hide-when-js-enabled"
+				>Instance details</summary
+				><p
+				>Defined in <a href="#"
+				  >Instances</a
+				  ></p
+				> <div class="src"
+				><span class="keyword"
+				  >data</span
+				  > <a href="#" title="Instances"
+				  >Thud</a
+				  > <a href="#" title="Data.Int"
+				  >Int</a
+				  > (<a href="#" title="Instances"
+				  >Quux</a
+				  > a [a] c) <ul class="inst"
+				  ><li class="inst"
+				    >= <a id="v:Thuud" class="def"
+				      >Thuud</a
+				      > a</li
+				    ><li class="inst"
+				    >| <a id="v:Thuuud" class="def"
+				      >Thuuud</a
+				      > <a href="#" title="Data.Int"
+				      >Int</a
+				      > <a href="#" title="Data.Int"
+				      >Int</a
+				      ></li
+				    ></ul
+				  ></div
+				></details
+			      ></td
+			    ></tr
+			  ></table
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -2160,26 +2322,6 @@
 		      >Defined in <a href="#"
 			>Instances</a
 			></p
-		      > <div class="subs associated-types"
-		      ><p class="caption"
-			>Associated Types</p
-			><p class="src"
-			><span class="keyword"
-			  >type</span
-			  > <a href="#" title="Instances"
-			  >Plugh</a
-			  > [a] c [b] <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			><p class="src"
-			><span class="keyword"
-			  >data</span
-			  > <a href="#" title="Instances"
-			  >Thud</a
-			  > [a] c <a href="#" class="selflink"
-			  >#</a
-			  ></p
-			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
 			>Methods</p

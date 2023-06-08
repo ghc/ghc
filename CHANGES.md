@@ -1,3 +1,17 @@
+## Changes in 2.28.0
+ * `hi-haddock` is integrated, which means docstrings are no longer extracted
+   through typchecked module results. Instead, docstrings are taken from Haskell
+   interface (`.hi`) files.
+
+ * Support qualified and unqualified names in `--ignore-link-symbol`.
+
+ * Add `--trace-args` flag which prints arguments to standard output. This is
+   useful for examining arguments passed when Haddock is invoked through `cabal
+   haddock`, as `cabal` uses temporary response files to pass arguments to
+   Haddock.
+
+ * Avoid recompilation due to changes in optimization flags.
+
 ## Changes in 2.24.0
 
  * Reify oversaturated data family instances correctly (#1103)
