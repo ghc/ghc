@@ -21,6 +21,13 @@
 -- This module also contains generalisations of 'div', 'mod', and 'divMod' to
 -- work with any 'Real' instance.
 --
+-- Automatic conversion between different 'Fixed' can be performed through
+-- 'realToFrac', bear in mind that converting to a fixed with a smaller
+-- resolution will truncate the number, losing information.
+--
+-- >>> realToFrac (0.123456 :: Pico) :: Milli
+-- 0.123
+--
 -----------------------------------------------------------------------------
 
 module Data.Fixed
