@@ -811,11 +811,11 @@ class Functor f => Applicative f where
 -- presented.
 --
 -- ==== __Examples__
--- >>> (print 1) <**> (id <$ print 2)
+-- >>> (<**>) (print 1) (id <$ print 2)
 -- 1
 -- 2
 --
--- >>> (print 1) `flip (<*>)` (id <$ print 2)
+-- >>> flip (<*>) (print 1) (id <$ print 2)
 -- 2
 -- 1
 
