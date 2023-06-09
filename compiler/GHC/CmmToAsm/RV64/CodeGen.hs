@@ -954,14 +954,14 @@ getRegister' config plat expr
               code_x
                 `appOL` signExtend (formatToWidth format_x) W64 reg_x reg_x
                 `appOL` code_y
-                `appOL` signExtend (formatToWidth format_y) W64 reg_x reg_y
+                `appOL` signExtend (formatToWidth format_y) W64 reg_y reg_y
                 `appOL` toOL
                   [ annExpr expr (SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
                     MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
-                    ASR (OpReg w lo) (OpReg w reg_x) (OpImm (ImmInt (widthInBits W64 - 1))),
+                    ASR (OpReg w lo) (OpReg w lo) (OpImm (ImmInt (widthInBits W64 - 1))),
                     ann
                       (text "Set flag if result of MULH contains more than sign bits.")
-                      (SUB (OpReg w hi) (OpReg w hi) (OpReg w lo)),
+                      (XOR (OpReg w hi) (OpReg w hi) (OpReg w lo)),
                     CSET (OpReg w dst) (OpReg w hi) nonSense NE
                   ]
           )
@@ -996,7 +996,7 @@ getRegister' config plat expr
                         `appOL` code_y
                         `appOL` signExtend (formatToWidth format_y) W32 reg_y reg_y
                         `snocOL` annExpr expr (MUL (OpReg W32 dst) (OpReg W32 reg_x) (OpReg W32 reg_y))
-                        `appOL` signExtend W32 w dst narrowedReg
+                        `appOL` signExtendAdjustPrecission W32 w dst narrowedReg
                         `appOL` toOL
                           [ ann
                               (text "Check if the multiplied value fits in the narrowed register")
@@ -1005,6 +1005,7 @@ getRegister' config plat expr
                           ]
                   )
             else do
+              -- TODO: Can this case ever happen? Write a test for it!
               -- TODO: Can't we clobber reg_x and reg_y to save registers?
               lo <- getNewRegNat II64
               hi <- getNewRegNat II64
@@ -1023,7 +1024,7 @@ getRegister' config plat expr
                         `appOL` toOL
                           [ annExpr expr (SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y)),
                             MUL (OpReg w lo) (OpReg w reg_x) (OpReg w reg_y),
-                            ASR (OpReg w lo) (OpReg w reg_x) (OpImm (ImmInt (widthInBits W64 - 1))),
+                            ASR (OpReg w lo) (OpReg w lo) (OpImm (ImmInt (widthInBits W64 - 1))),
                             ann
                               (text "Set flag if result of MULH contains more than sign bits.")
                               (SUB (OpReg w hi) (OpReg w hi) (OpReg w lo)),
@@ -1070,6 +1071,42 @@ signExtend w w' r r' =
   toOL
     [ ann
         (text "narrow register signed" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
+        (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+      -- signed (arithmetic) right shift
+      ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+    ]
+  where
+    shift = 64 - widthInBits w
+
+-- | Sign extends to 64bit, if needed and reduces the precission to the target `Width` (@w'@)
+--
+-- Source `Reg` @r@ stays untouched, while the conversion happens on destination
+-- `Reg` @r'@.
+signExtendAdjustPrecission :: Width -> Width -> Reg -> Reg -> OrdList Instr
+signExtendAdjustPrecission w w' _r _r' | w > W64 || w' > W64 = pprPanic "Unexpected width (max is 64bit):" $ ppr w <> text "->" <+> ppr w'
+signExtendAdjustPrecission w w' r r' | w == W64 && w' == W64 && r == r' = nilOL
+signExtendAdjustPrecission w w' r r' | w == W64 && w' == W64 = unitOL $ MOV (OpReg w' r') (OpReg w r)
+signExtendAdjustPrecission w w' r r'
+  | w == W32 && w' == W64 =
+      unitOL $
+        ann
+          (text "sign-extend register (SEXT.W)" <+> ppr r <+> ppr w <> text "->" <> ppr w')
+          -- `ADDIW r r 0` is the pseudo-op SEXT.W
+          (ADD (OpReg w' r') (OpReg w r) (OpImm (ImmInt 0)))
+signExtendAdjustPrecission w w' r r' | w > w' =
+  toOL
+    [ ann
+        (text "narrow register signed" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
+        (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
+      -- signed (arithmetic) right shift
+      ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
+    ]
+  where
+    shift = 64 - widthInBits w'
+signExtendAdjustPrecission w w' r r' =
+  toOL
+    [ ann
+        (text "sign extend register" <+> ppr r <> char ':' <> ppr w <> text "->" <> ppr r <> char ':' <> ppr w')
         (LSL (OpReg w' r') (OpReg w r) (OpImm (ImmInt shift))),
       -- signed (arithmetic) right shift
       ASR (OpReg w' r') (OpReg w' r') (OpImm (ImmInt shift))
