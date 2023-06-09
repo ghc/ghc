@@ -364,18 +364,6 @@ runUniqSM m = do
   us <- mkSplitUniqSupply 'u'
   return (initUs_ us m)
 
-
-dumpGraph :: Logger -> Platform -> Bool -> DumpFlag -> String -> CmmGraph -> IO ()
-dumpGraph logger platform do_linting flag name g = do
-  when do_linting $ do_lint g
-  dumpWith logger flag name FormatCMM (pdoc platform g)
- where
-  do_lint g = case cmmLintGraph platform g of
-                 Just err -> do { fatalErrorMsg logger err
-                                ; ghcExit logger 1
-                                }
-                 Nothing  -> return ()
-
 dumpWith :: Logger -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
 dumpWith logger flag txt fmt sdoc = do
   putDumpFileMaybe logger flag txt fmt sdoc
