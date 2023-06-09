@@ -838,7 +838,7 @@ bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
     platform <- getPlatform
     let offset = n `min` (pc_TICKY_BIN_COUNT (platformConstants platform) - 1)
-    let addr = 
+    let addr =
            cmmIndexExpr platform
                 (wordWidth platform)
                 (CmmLit (CmmLabel (mkRtsCmmDataLabel lbl)))
