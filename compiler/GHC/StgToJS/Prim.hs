@@ -56,6 +56,9 @@ genPrim prof bound ty op = case op of
 
 ------------------------------ Int ----------------------------------------------
 
+-- N.B. See Note [StgToJS design] in GHC.StgToJS for details on
+-- number representation.
+
   IntAddOp        -> \[r] [x,y] -> PrimInline $ r |= toI32 (Add x y)
   IntSubOp        -> \[r] [x,y] -> PrimInline $ r |= toI32 (Sub x y)
   IntMulOp        -> \[r] [x,y] -> PrimInline $ r |= app "Math.imul" [x, y]

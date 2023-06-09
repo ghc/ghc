@@ -21,6 +21,12 @@ function h$logArith() { h$log.apply(h$log,arguments); }
 #define RETURN_W64(x) RETURN_UBX_TUP2(W64h(x), W64l(x))
 #define RETURN_W32(x) return Number(x)
 
+
+// N.B. 64-bit numbers are represented by two JS numbers,
+// each of which can represent a 32-bit integer precisely.
+// See Note [StgToJS design] in GHC.StgToJS for details on
+// number representation.
+
 function h$hs_quotWord64(h1,l1,h2,l2) {
   var a = W64(h1,l1);
   var b = W64(h2,l2);
