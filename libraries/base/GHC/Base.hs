@@ -806,11 +806,21 @@ class Functor f => Applicative f where
     (<*) :: f a -> f b -> f a
     (<*) = liftA2 const
 
--- | A variant of '<*>' with the arguments reversed.
+-- | A variant of '<*>' with the arguments reversed. However, it differs from
+-- `flip <*>` in that the effects are resolved in the order the arguments are
+-- presented.
 --
+-- ==== __Examples__
+-- >>> (print 1) <**> (id <$ print 2)
+-- 1
+-- 2
+--
+-- >>> (print 1) `flip (<*>)` (id <$ print 2)
+-- 2
+-- 1
+
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
--- Don't use $ here, see the note at the top of the page
 
 -- | Lift a function to actions.
 -- Equivalent to Functor's `fmap` but implemented using only `Applicative`'s methods:
