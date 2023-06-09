@@ -14,7 +14,6 @@ import GHC.Cmm.ContFlowOpt
 import GHC.Cmm.CommonBlockElim
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Info.Build
-import GHC.Cmm.Lint
 import GHC.Cmm.LayoutStack
 import GHC.Cmm.ProcPoint
 import GHC.Cmm.Sink
