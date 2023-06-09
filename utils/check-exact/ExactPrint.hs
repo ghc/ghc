@@ -2331,10 +2331,10 @@ instance ExactPrint (HsBind GhcPs) where
           _ -> fid
     return (FunBind x fun_id' matches')
 
-  exact (PatBind x pat grhss) = do
+  exact (PatBind x pat q grhss) = do
     pat' <- markAnnotated pat
     grhss' <- markAnnotated grhss
-    return (PatBind x pat' grhss')
+    return (PatBind x pat' q grhss')
   exact (PatSynBind x bind) = do
     bind' <- markAnnotated bind
     return (PatSynBind x bind')

@@ -75,6 +75,7 @@ module GHC.Parser.PostProcess (
         mkBangTy,
         UnpackednessPragma(..),
         mkMultTy,
+        mkMultAnn,
 
         -- Token location
         mkTokenLocation,
@@ -139,8 +140,7 @@ import GHC.Types.TyThing
 import GHC.Core.Type    ( Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey,
-                          unrestrictedFunTyCon )
+                          listTyConName, listTyConKey, unrestrictedFunTyCon )
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
@@ -742,7 +742,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
     fromDecl (L loc decl@(ValD _ (PatBind _
                                  -- AZ: where should these anns come from?
                          pat@(L _ (ConPat noAnn ln@(L _ name) details))
-                               rhs))) =
+                               _ rhs))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
@@ -1313,17 +1313,17 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 
 checkValDef :: SrcSpan
             -> LocatedA (PatBuilder GhcPs)
-            -> Maybe (AddEpAnn, LHsType GhcPs)
+            -> (HsMultAnn GhcPs, Maybe (AddEpAnn, LHsType GhcPs))
             -> Located (GRHSs GhcPs (LHsExpr GhcPs))
             -> P (HsBind GhcPs)
 
-checkValDef loc lhs (Just (sigAnn, sig)) grhss
+checkValDef loc lhs (mult, Just (sigAnn, sig)) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = do lhs' <- runPV $ mkHsTySigPV (combineLocsA lhs sig) lhs sig [sigAnn]
                         >>= checkLPat
-       checkPatBind loc [] lhs' grhss
+       checkPatBind loc [] lhs' grhss mult
 
-checkValDef loc lhs Nothing g
+checkValDef loc lhs (HsNoMultAnn, Nothing) g
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
@@ -1331,7 +1331,12 @@ checkValDef loc lhs Nothing g
                            fun is_infix pats g
             Nothing -> do
               lhs' <- checkPattern lhs
-              checkPatBind loc [] lhs' g }
+              checkPatBind loc [] lhs' g HsNoMultAnn }
+
+checkValDef loc lhs (mult_ann, Nothing) ghrss
+        -- %p x = rhs  parses as a *pattern* binding
+  = do lhs' <- checkPattern lhs
+       checkPatBind loc [] lhs' ghrss mult_ann
 
 checkFunBind :: SrcStrictness
              -> SrcSpan
@@ -1373,9 +1378,10 @@ checkPatBind :: SrcSpan
              -> [AddEpAnn]
              -> LPat GhcPs
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
+             -> HsMultAnn GhcPs
              -> P (HsBind GhcPs)
 checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
-                        (L _match_span grhss)
+                        (L _match_span grhss) HsNoMultAnn
       = return (makeFunBind v (L (noAnnSrcSpan loc)
                 [L (noAnnSrcSpan loc) (m (EpAnn (spanAsAnchor loc) (ans++annsIn) cs) v)]))
   where
@@ -1386,9 +1392,11 @@ checkPatBind loc annsIn (L _ (BangPat (EpAnn _ ans cs) (L _ (VarPat _ v))))
                   , m_pats = []
                  , m_grhss = grhss }
 
-checkPatBind loc annsIn lhs (L _ grhss) = do
+checkPatBind loc annsIn lhs (L _ grhss) mult = do
   cs <- getCommentsFor loc
-  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) lhs grhss)
+  let mult_ann = MultAnn{mult_ext=NoExtField, mult_ann=mult}
+  return (PatBind (EpAnn (spanAsAnchor loc) annsIn cs) lhs mult_ann grhss)
+
 
 checkValSigLhs :: LHsExpr GhcPs -> P (LocatedN RdrName)
 checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))
@@ -3194,6 +3202,16 @@ mkMultTy pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1))) arr
     locOfPct1 :: TokenLocation
     locOfPct1 = token_location_widenR (getLoc pct) (locA (getLoc t))
 mkMultTy pct t arr = HsExplicitMult pct t arr
+
+mkMultAnn :: LHsToken "%" GhcPs -> LHsType GhcPs -> HsMultAnn GhcPs
+mkMultAnn pct t@(L _ (HsTyLit _ (HsNumTy (SourceText (unpackFS -> "1")) 1)))
+  -- See #18888 for the use of (SourceText "1") above
+  = HsPct1Ann (L locOfPct1 HsTok)
+  where
+    -- The location of "%" combined with the location of "1".
+    locOfPct1 :: TokenLocation
+    locOfPct1 = token_location_widenR (getLoc pct) (locA (getLoc t))
+mkMultAnn pct t = HsMultAnn pct t
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc

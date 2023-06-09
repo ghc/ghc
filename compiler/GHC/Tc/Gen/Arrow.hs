@@ -155,17 +155,17 @@ tc_cmd env (HsCmdPar x lpar cmd rpar) res_ty
         ; return (HsCmdPar x lpar cmd' rpar) }
 
 tc_cmd env (HsCmdLet x tkLet binds tkIn (L body_loc body)) res_ty
-  = do  { (binds', body') <- tcLocalBinds binds         $
-                             setSrcSpan (locA body_loc) $
-                             tc_cmd env body res_ty
+  = do  { (binds', _, body') <- tcLocalBinds binds         $
+                                setSrcSpan (locA body_loc) $
+                                tc_cmd env body res_ty
         ; return (HsCmdLet x tkLet binds' tkIn (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
     do { (scrut', scrut_ty) <- tcInferRho scrut
        ; hasFixedRuntimeRep_syntactic (FRRArrow $ ArrowCmdCase) scrut_ty
-       ; matches' <- tcCmdMatches env scrut_ty matches (stk, res_ty)
-       ; return (HsCmdCase x scrut' matches') }
+       ; (mult_co_wrap, matches') <- tcCmdMatches env scrut_ty matches (stk, res_ty)
+       ; return (HsCmdCase x (mkLHsWrap mult_co_wrap scrut') matches') }
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
   = do  { pred' <- tcCheckMonoExpr pred boolTy
@@ -317,7 +317,7 @@ tcCmdMatches :: CmdEnv
              -> TcTypeFRR -- ^ Type of the scrutinee.
              -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
-             -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
+             -> TcM (HsWrapper, MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
@@ -366,8 +366,8 @@ tcCmdMatchLambda env
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss binds) stk_ty res_ty
-        = do { (binds', grhss') <- tcLocalBinds binds $
-                                   mapM (wrapLocMA (tc_grhs stk_ty res_ty)) grhss
+        = do { (binds', _, grhss') <- tcLocalBinds binds $
+                                      mapM (wrapLocMA (tc_grhs stk_ty res_ty)) grhss
              ; return (GRHSs x grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS x guards body)

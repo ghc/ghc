@@ -890,6 +890,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
             -> HsMatchContext GhcTc     -- ^ Match kind
+            -> Mult                     -- ^ Scaling factor of the case expression
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
@@ -903,15 +904,15 @@ matchSimply :: CoreExpr                 -- ^ Scrutinee
 --     match is awkward
 --   * And we still export 'matchSinglePatVar', so not much is gained if we
 --     don't also implement it in terms of 'matchWrapper'
-matchSimply scrut hs_ctx pat result_expr fail_expr = do
+matchSimply scrut hs_ctx mult pat result_expr fail_expr = do
     let
       match_result = cantFailMatchResult result_expr
       rhs_ty       = exprType fail_expr
         -- Use exprType of fail_expr, because won't refine in the case of failure!
-    match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
+    match_result' <- matchSinglePat scrut hs_ctx pat mult rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcTc -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext GhcTc -> LPat GhcTc -> Mult
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -920,17 +921,12 @@ matchSinglePat :: CoreExpr -> HsMatchContext GhcTc -> LPat GhcTc
 -- Used for things like [ e | pat <- stuff ], where
 -- incomplete patterns are just fine
 
-matchSinglePat (Var var) ctx pat ty match_result
+matchSinglePat (Var var) ctx pat _ ty match_result
   | not (isExternalName (idName var))
   = matchSinglePatVar var Nothing ctx pat ty match_result
 
-matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL ManyTy pat
-                            -- matchSinglePat is only used in matchSimply, which
-                            -- is used in list comprehension, arrow notation,
-                            -- and to create field selectors. All of which only
-                            -- bind unrestricted variables, hence the 'Many'
-                            -- above.
+matchSinglePat scrut hs_ctx pat mult ty match_result
+  = do { var           <- selectSimpleMatchVarL mult pat
        ; match_result' <- matchSinglePatVar var (Just scrut) hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }

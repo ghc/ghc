@@ -108,6 +108,13 @@ deriving instance Data (HsPatSynDir GhcPs)
 deriving instance Data (HsPatSynDir GhcRn)
 deriving instance Data (HsPatSynDir GhcTc)
 
+deriving instance Data (MultAnn GhcPs)
+deriving instance Data (MultAnn GhcRn)
+deriving instance Data (MultAnn GhcTc)
+
+deriving instance Data (HsMultAnn GhcPs)
+deriving instance Data (HsMultAnn GhcRn)
+deriving instance Data (HsMultAnn GhcTc)
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs.Decls ----------------------------------
 

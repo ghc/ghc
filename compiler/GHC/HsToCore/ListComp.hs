@@ -284,7 +284,7 @@ deBindComp pat core_list1 quals core_list2 = do
         letrec_body = App (Var h) core_list1
 
     rest_expr <- deListComp quals core_fail
-    core_match <- matchSimply (Var u2) (StmtCtxt (HsDoStmt ListComp)) pat rest_expr core_fail
+    core_match <- matchSimply (Var u2) (StmtCtxt (HsDoStmt ListComp)) ManyTy pat rest_expr core_fail
 
     let
         rhs = Lam u1 $
@@ -372,7 +372,7 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
     core_rest <- dfListComp c_id b quals
 
     -- build the pattern match
-    core_expr <- matchSimply (Var x) (StmtCtxt (HsDoStmt ListComp))
+    core_expr <- matchSimply (Var x) (StmtCtxt (HsDoStmt ListComp)) ManyTy
                 pat core_rest (Var b)
 
     -- now build the outermost foldr, and return

@@ -926,7 +926,7 @@ hsDeclsPatBindD x = error $ "hsDeclsPatBindD called for:" ++ showGhc x
 -- for 'hsDecls' \/ 'replaceDecls'. 'hsDeclsPatBind' \/ 'replaceDeclsPatBind' is
 -- idempotent.
 hsDeclsPatBind :: LHsBind GhcPs -> [LHsDecl GhcPs]
-hsDeclsPatBind (L _ (PatBind _ _ (GRHSs _ _grhs lb))) = hsDeclsLocalBinds lb
+hsDeclsPatBind (L _ (PatBind _ _ _ (GRHSs _ _grhs lb))) = hsDeclsLocalBinds lb
 hsDeclsPatBind x = error $ "hsDeclsPatBind called for:" ++ showGhc x
 
 -- -------------------------------------
@@ -948,11 +948,11 @@ replaceDeclsPatBindD x _ = error $ "replaceDeclsPatBindD called for:" ++ showGhc
 -- idempotent.
 replaceDeclsPatBind :: (Monad m) => LHsBind GhcPs -> [LHsDecl GhcPs]
                     -> TransformT m (LHsBind GhcPs)
-replaceDeclsPatBind (L l (PatBind x a (GRHSs xr rhss binds))) newDecls
+replaceDeclsPatBind (L l (PatBind x a p (GRHSs xr rhss binds))) newDecls
     = do
         logTr "replaceDecls PatBind"
         binds'' <- replaceDeclsValbinds WithWhere binds newDecls
-        return (L l (PatBind x a (GRHSs xr rhss binds'')))
+        return (L l (PatBind x a p (GRHSs xr rhss binds'')))
 replaceDeclsPatBind x _ = error $ "replaceDeclsPatBind called for:" ++ showGhc x
 
 -- ---------------------------------------------------------------------

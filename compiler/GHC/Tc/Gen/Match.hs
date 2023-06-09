@@ -96,31 +96,29 @@ same number of arguments before using @tcMatches@ to do the work.
 -}
 
 tcMatchesFun :: LocatedN Name -- MatchContext Id
+             -> Mult -- The multiplicity of the binder
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
                                 -- Returns type of body
-tcMatchesFun fun_name matches exp_ty
+tcMatchesFun fun_name mult matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely
            -- sensible location.        Note: we have to do this odd
            -- ann-grabbing, because we don't always have annotations in
            -- hand when we call tcMatchesFun...
-          traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty $$ ppr arity)
+          traceTc "tcMatchesFun" (ppr fun_name $$ ppr mult $$ ppr exp_ty $$ ppr arity)
         ; checkArgCounts what matches
 
-        ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
-             -- NB: exp_type may be polymorphic, but
-             --     matchExpectedFunTys can cope with that
-          tcScalingUsage ManyTy $
-          -- toplevel bindings and let bindings are, at the
-          -- moment, always unrestricted. The value being bound
-          -- must, accordingly, be unrestricted. Hence them
-          -- being scaled by Many. When let binders come with a
-          -- multiplicity, then @tcMatchesFun@ will have to take
-          -- a multiplicity argument, and scale accordingly.
-          tcMatches match_ctxt pat_tys rhs_ty matches }
+        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
+               -- NB: exp_type may be polymorphic, but
+               --     matchExpectedFunTys can cope with that
+            tcScalingUsage mult $
+               -- Makes sure that if the binding is unrestricted, it counts as
+               -- consuming its rhs Many times.
+            tcMatches match_ctxt pat_tys rhs_ty matches
+        ; return (wrapper <.> mult_co_wrap, r) }
   where
     arity  = matchGroupArity matches
     herald = ExpectedFunTyMatches (NameThing (unLoc fun_name)) matches
@@ -145,7 +143,7 @@ tcMatchesCase :: (AnnoBody body, Outputable (body GhcTc)) =>
              -> Scaled TcSigmaTypeFRR -- ^ Type of scrutinee
              -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- ^ The case alternatives
              -> ExpRhoType                               -- ^ Type of the whole case expression
-             -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+             -> TcM (HsWrapper, MatchGroup GhcTc (LocatedA (body GhcTc)))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
@@ -159,30 +157,37 @@ tcMatchLambda :: ExpectedFunTyOrigin -- see Note [Herald for matchExpectedFunTys
               -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
 tcMatchLambda herald match_ctxt match res_ty
   =  do { checkArgCounts (mc_what match_ctxt) match
-        ; matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty -> do
+        ; (wrapper, (mult_co_wrap, r)) <- matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
             -- checking argument counts since this is also used for \cases
-            tcMatches match_ctxt pat_tys rhs_ty match }
+            tcMatches match_ctxt pat_tys rhs_ty match
+        ; return (wrapper <.> mult_co_wrap, r) }
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
            | otherwise               = matchGroupArity match
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
-tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
+tcGRHSsPat :: Mult -> GRHSs GhcRn (LHsExpr GhcRn) -> ExpRhoType
            -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 -- Used for pattern bindings
-tcGRHSsPat grhss res_ty
-  = tcScalingUsage ManyTy $
-      -- Like in tcMatchesFun, this scaling happens because all
-      -- let bindings are unrestricted. A difference, here, is
-      -- that when this is not the case, any more, we will have to
-      -- make sure that the pattern is strict, otherwise this will
-      -- desugar to incorrect code.
-    tcGRHSs match_ctxt grhss res_ty
+tcGRHSsPat mult grhss res_ty
+  = tcScalingUsage mult $ do
+    { (mult_co_wrapper, r) <- tcGRHSs match_ctxt grhss res_ty
+    ; return $ mkWrap mult_co_wrapper r }
   where
     match_ctxt :: TcMatchCtxt HsExpr -- AZ
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }
+
+    mkWrap wrap grhss@(GRHSs { grhssGRHSs = L loc (GRHS x guards body) : rhss }) =
+      grhss { grhssGRHSs = L loc (GRHS x guards (mkLHsWrap wrap body)) : rhss }
+    mkWrap _ (GRHSs { grhssGRHSs = [] }) = panic "tcGRHSsPat: empty GHRSs"
+    mkWrap _ _ = panic "tcGRHSsPat: non-empty extensions"
+    -- Should be the following but it warns of redundant pattern and I couldn't
+    -- find a way to silence them
+    --
+    -- mkWrap _ (GRHSs { grhssGRHSs = L _ (XGRHS absent) : _ }) = dataConCantHappen absent
+    -- mkWrap _ (XGRHSs absent) = dataConCantHappen absent
 
 {- *********************************************************************
 *                                                                      *
@@ -215,7 +220,7 @@ tcMatches :: (AnnoBody body, Outputable (body GhcTc)) =>
           -> [ExpPatType]             -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
-          -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
+          -> TcM (HsWrapper, MatchGroup GhcTc (LocatedA (body GhcTc)))
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_ext = origin })
@@ -226,20 +231,22 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { tcEmitBindingUsage bottomUE
        ; pat_tys <- mapM scaledExpTypeToType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty  <- expTypeToType rhs_ty
-       ; return (MG { mg_alts = L l []
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty origin
-                    }) }
+       ; return (idHsWrapper, MG { mg_alts = L l []
+                                 , mg_ext = MatchGroupTc pat_tys rhs_ty origin
+                                 }) }
 
   | otherwise
   = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
-       ; let (usages,matches') = unzip umatches
+       ; let (usages, wmatches) = unzip umatches
+       ; let (wrappers, matches') = unzip wmatches
+       ; let wrapper = mconcat wrappers
        ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM readScaledExpType (filter_out_forall_pat_tys pat_tys)
        ; rhs_ty   <- readExpType rhs_ty
        ; traceTc "tcMatches" (ppr matches' $$ ppr pat_tys $$ ppr rhs_ty)
-       ; return (MG { mg_alts   = L l matches'
-                    , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
-                    }) }
+       ; return (wrapper, MG { mg_alts   = L l matches'
+                             , mg_ext    = MatchGroupTc pat_tys rhs_ty origin
+                             }) }
   where
     -- We filter out foralls because we have no use for them in HsToCore.
     filter_out_forall_pat_tys :: [ExpPatType] -> [Scaled ExpSigmaTypeFRR]
@@ -253,20 +260,21 @@ tcMatch :: (AnnoBody body) => TcMatchCtxt body
         -> [ExpPatType]          -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
-        -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
+        -> TcM (HsWrapper, LMatch GhcTc (LocatedA (body GhcTc)))
 
 tcMatch ctxt pat_tys rhs_ty match
-  = wrapLocMA (tc_match ctxt pat_tys rhs_ty) match
+  = do { (L loc (wrapper, r)) <- wrapLocMA (tc_match ctxt pat_tys rhs_ty) match
+       ; return (wrapper, L loc r) }
   where
     tc_match ctxt pat_tys rhs_ty
              match@(Match { m_pats = pats, m_grhss = grhss })
       = add_match_ctxt match $
-        do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
+        do { (pats', (wrapper, grhss')) <- tcPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
-           ; return (Match { m_ext = noAnn
-                           , m_ctxt = mc_what ctxt
-                           , m_pats = filter_out_type_pats pats'
-                           , m_grhss = grhss' }) }
+           ; return (wrapper, Match { m_ext = noAnn
+                                    , m_ctxt = mc_what ctxt
+                                    , m_pats = filter_out_type_pats pats'
+                                    , m_grhss = grhss' }) }
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         --     so we don't want to add "In the lambda abstraction \x->e"
@@ -288,7 +296,7 @@ tcMatch ctxt pat_tys rhs_ty match
 -------------
 tcGRHSs :: AnnoBody body
         => TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
-        -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
+        -> TcM (HsWrapper, GRHSs GhcTc (LocatedA (body GhcTc)))
 
 -- Notice that we pass in the full res_ty, so that we get
 -- good inference from simple things like
@@ -297,12 +305,13 @@ tcGRHSs :: AnnoBody body
 -- but we don't need to do that any more
 
 tcGRHSs ctxt (GRHSs _ grhss binds) res_ty
-  = do  { (binds', ugrhss)
-            <- tcLocalBinds binds $
-               mapM (tcCollectingUsage . wrapLocMA (tcGRHS ctxt res_ty)) grhss
-        ; let (usages, grhss') = unzip ugrhss
-        ; tcEmitBindingUsage $ supUEs usages
-        ; return (GRHSs emptyComments grhss' binds') }
+  = do  { (binds', wrapper, grhss')
+            <- tcLocalBinds binds $ do
+               { ugrhss <- mapM (tcCollectingUsage . wrapLocMA (tcGRHS ctxt res_ty)) grhss
+               ; let (usages, grhss') = unzip ugrhss
+               ; tcEmitBindingUsage $ supUEs usages
+               ; return grhss' }
+        ; return (wrapper, GRHSs emptyComments grhss' binds') }
 
 -------------
 tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (LocatedA (body GhcRn))
@@ -403,7 +412,7 @@ tcStmtsAndThen _ _ [] res_ty thing_inside
 -- LetStmts are handled uniformly, regardless of context
 tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt x binds) : stmts)
                                                              res_ty thing_inside
-  = do  { (binds', (stmts',thing)) <- tcLocalBinds binds $
+  = do  { (binds', _, (stmts',thing)) <- tcLocalBinds binds $
               tcStmtsAndThen ctxt stmt_chk stmts res_ty thing_inside
         ; return (L loc (LetStmt x binds') : stmts', thing) }
 

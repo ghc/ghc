@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow 2006
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -70,6 +71,7 @@ module GHC.Tc.Utils.Env(
 
 import GHC.Prelude
 
+
 import GHC.Driver.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.DynFlags
@@ -87,13 +89,16 @@ import GHC.Iface.Load
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
+import {-# SOURCE #-} GHC.Tc.Utils.TcMType ( tcCheckUsage )
 import GHC.Tc.Types.LclEnv
+import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper, (<.>))
 
 import GHC.Core.InstEnv
 import GHC.Core.DataCon ( DataCon, dataConTyCon, flSelector )
 import GHC.Core.PatSyn  ( PatSyn )
 import GHC.Core.ConLike
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
@@ -574,17 +579,17 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
-                  -> [TcId] -> TcM a -> TcM a
+                  -> [Scaled TcId] -> TcM a -> TcM (a, HsWrapper)
 -- Used for both top-level value bindings and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
-  = tcExtendBinderStack [TcIdBndr id top_lvl | id <- ids] $
+  = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
           [ (idName id, ATcId { tct_id   = id
                               , tct_info = mk_tct_info id })
-          | id <- ids ]
-    thing_inside
+          | Scaled _ id <- ids ] $
+    foldr check_usage ((, idHsWrapper) <$> thing_inside) scaled_names
   where
     mk_tct_info id
       | type_closed && isEmptyNameSet rhs_fvs = ClosedLet
@@ -594,6 +599,11 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
         rhs_fvs     = lookupNameEnv fvs name `orElse` emptyNameSet
         type_closed = isTypeClosedLetBndr id &&
                       (fv_type_closed || hasCompleteSig sig_fn name)
+    scaled_names = [Scaled p (idName id) | Scaled p id <- ids ]
+    check_usage :: Scaled Name -> TcM (a, HsWrapper) -> TcM (a, HsWrapper)
+    check_usage (Scaled p id) thing_inside = do
+      ((res, inner_wrap), outer_wrap) <- tcCheckUsage id p thing_inside
+      return $ (res, outer_wrap <.> inner_wrap)
 
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids

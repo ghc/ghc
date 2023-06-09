@@ -17,6 +17,17 @@ Language
     x = idv (type Int) 42
 
   This feature is guarded behind :extension:`RequiredTypeArguments` and :extension:`ExplicitNamespaces`.
+- With :extension:`LinearTypes`, ``let`` and ``where`` bindings can
+  now be linear. So the following now typechecks::
+
+    f :: A %1 -> B
+    g :: B %1 -> C
+
+    h :: A %1 -> C
+    h x = g y
+      where
+        y = f x
+
 
 - Due to an oversight, previous GHC releases (starting from 9.4) allowed the use
   of promoted data types in kinds, even when :extension:`DataKinds` was not

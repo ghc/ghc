@@ -2061,7 +2061,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                           , sig_loc  = getLocA hs_sig_ty }
 
 
-       ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
+       ; (tc_bind, [Scaled _ inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
 
        ; let export = ABE { abe_poly  = local_meth_id
                           , abe_mono  = inner_id
