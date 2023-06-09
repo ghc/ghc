@@ -1,4 +1,91 @@
-runCmmzh() {
+// Suppress empty ASSERT() optimization
+#define USE_ASSERTS_ALL_WAYS 1
 
+#include "Cmm.h"
+
+runCmmzh() {
+// BEWARE: Cmm isn't really type checked. I.e. you may construct
+// 256::I8, which is obviously wrong and let's to strange behaviour.
+
+// N.B. the contract of '%mulmayoflo' is a bit weak:
+// "Return non-zero if there is any possibility that the signed multiply
+// of a and b might overflow.  Return zero only if you are absolutely sure
+// that it won't overflow.  If in doubt, return non-zero." (Stg.h)
+// So, this test might be a bit too strict for some architectures as it
+// expects a perfect implementation.
+
+  // --- I8
+  ASSERT(%mulmayoflo(1::I8, 1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(0::I8, 0::I8) == 0::I8);
+  ASSERT(%mulmayoflo(-1::I8, 1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(1::I8, -1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(127::I8, 1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(1::I8, 127::I8) == 0::I8);
+  ASSERT(%mulmayoflo(63::I8, 2::I8) == 0::I8);
+  ASSERT(%mulmayoflo(2::I8, 63::I8) == 0::I8);
+  ASSERT(%mulmayoflo(64::I8, 2::I8) > 0::I8);
+  ASSERT(%mulmayoflo(2::I8, 64::I8) > 0::I8);
+  ASSERT(%mulmayoflo(127::I8, -1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(-1::I8, 127::I8) == 0::I8);
+  ASSERT(%mulmayoflo(-128::I8, 1::I8) == 0::I8);
+  ASSERT(%mulmayoflo(-64::I8, 2::I8) == 0::I8);
+  ASSERT(%mulmayoflo(2::I8, -64::I8) == 0::I8);
+  ASSERT(%mulmayoflo(-65::I8, 2::I8) > 0::I8);
+  ASSERT(%mulmayoflo(2::I8, -65::I8) > 0::I8);
+
+  // --- I16
+  ASSERT(%mulmayoflo(1::I16, 1::I16) == 0::I16);
+  ASSERT(%mulmayoflo(0::I16, 0::I16) == 0::I16);
+  ASSERT(%mulmayoflo(-1::I16, 1::I16) == 0::I16);
+  ASSERT(%mulmayoflo(1::I16, -1::I16) == 0::I16);
+  ASSERT(%mulmayoflo(32767::I16, 1::I16) == 0::I16);
+  ASSERT(%mulmayoflo(1::I16,32767 ::I16) == 0::I16);
+  ASSERT(%mulmayoflo(16383::I16, 2::I16) == 0::I16);
+  ASSERT(%mulmayoflo(2::I16, 16383::I16) == 0::I16);
+  ASSERT(%mulmayoflo(16384::I16, 2::I16) > 0::I16);
+  ASSERT(%mulmayoflo(2::I16, 16384::I16) > 0::I16);
+  ASSERT(%mulmayoflo(-16384::I16, 2::I16) == 0::I16);
+  ASSERT(%mulmayoflo(2::I16, -16384::I16) == 0::I16);
+  ASSERT(%mulmayoflo(-32768::I16, 1::I16) == 0::I16);
+  ASSERT(%mulmayoflo(1::I16, -32768::I16) == 0::I16);
+
+  // -- I32
+  ASSERT(%mulmayoflo(1::I32, 1::I32) == 0::I32);
+  ASSERT(%mulmayoflo(0::I32, 0::I32) == 0::I32);
+  ASSERT(%mulmayoflo(-1::I32, 1::I32) == 0::I32);
+  ASSERT(%mulmayoflo(1::I32, -1::I32) == 0::I32);
+  ASSERT(%mulmayoflo(2147483647::I32, 1::I32) == 0::I32);
+  ASSERT(%mulmayoflo(1::I32, 2147483647::I32) == 0::I32);
+  ASSERT(%mulmayoflo(-2147483648::I32, 1::I32) == 0::I32);
+  ASSERT(%mulmayoflo(1::I32, -2147483648::I32) == 0::I32);
+  ASSERT(%mulmayoflo(2::I32, 1073741823::I32) == 0::I32);
+  ASSERT(%mulmayoflo(1073741823::I32, 2::I32) == 0::I32);
+  ASSERT(%mulmayoflo(2::I32, 1073741824::I32) > 0::I32);
+  ASSERT(%mulmayoflo(1073741824::I32, 2::I32) > 0::I32);
+  ASSERT(%mulmayoflo(2::I32, -1073741824::I32) == 0::I32);
+  ASSERT(%mulmayoflo(-1073741824::I32, 2::I32) == 0::I32);
+  ASSERT(%mulmayoflo(2::I32, -1073741825::I32) > 0::I32);
+  ASSERT(%mulmayoflo(-1073741825::I32, 2::I32) > 0::I32);
+
+  // -- I64
+  ASSERT(%mulmayoflo(1::I64, 1::I64) == 0::I64);
+  ASSERT(%mulmayoflo(0::I64, 0::I64) == 0::I64);
+  ASSERT(%mulmayoflo(-1::I64, 1::I64) == 0::I64);
+  ASSERT(%mulmayoflo(1::I64, -1::I64) == 0::I64);
+  ASSERT(%mulmayoflo(9223372036854775807::I64, 1::I64) == 0::I64);
+  ASSERT(%mulmayoflo(1::I64, 9223372036854775807::I64) == 0::I64);
+  ASSERT(%mulmayoflo(-9223372036854775808::I64, 1::I64) == 0::I64);
+  ASSERT(%mulmayoflo(1::I64, -9223372036854775808::I64) == 0::I64);
+  ASSERT(%mulmayoflo(4611686018427387903::I64, 2::I64) == 0::I64);
+  ASSERT(%mulmayoflo(2::I64, 4611686018427387903::I64) == 0::I64);
+  ASSERT(%mulmayoflo(-4611686018427387904::I64, 2::I64) == 0::I64);
+  ASSERT(%mulmayoflo(2::I64, -4611686018427387904::I64) == 0::I64);
+  ASSERT(%mulmayoflo(-4611686018427387905::I64, 2::I64) > 0::I64);
+  ASSERT(%mulmayoflo(2::I64, -4611686018427387905::I64) > 0::I64);
+  ASSERT(%mulmayoflo(4611686018427387904::I64, 2::I64) > 0::I64);
+  ASSERT(%mulmayoflo(2::I64, 4611686018427387904::I64) > 0::I64);
+
+  // Gives a linter error
+  // ASSERT(%mulmayoflo(1::I64, 1::I8) == 0);
   return(0);
 }
