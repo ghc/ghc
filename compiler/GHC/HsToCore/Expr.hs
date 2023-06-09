@@ -88,7 +88,8 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 -- caller sets location
 dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsValBinds (XValBindsLR (NValBinds binds _)) body
-  = foldrM ds_val_bind body binds
+  = do { dflags <- getDynFlags
+       ; foldrM (ds_val_bind dflags) body binds }
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
 
 -------------------------
@@ -107,12 +108,12 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: DynFlags -> (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
-ds_val_bind (NonRecursive, hsbinds) body
+ds_val_bind _ (NonRecursive, hsbinds) body
   | [L loc bind] <- bagToList hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
@@ -146,13 +147,38 @@ ds_val_bind (NonRecursive, hsbinds) body
     is_polymorphic _ = False
 
 
-ds_val_bind (is_rec, binds) _body
+ds_val_bind _ (is_rec, binds) _body
   | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = assert (isRec is_rec )
     errDsCoreExpr $ DsRecBindsNotAllowedForUnliftedTys (bagToList binds)
 
+-- Special case: a non-recursive PatBind. No dancing about with lets and seqs,
+-- we make a case immediately. Very important for linear types: let !pat can be
+-- linear, but selectors as used in the general case aren't. So the general case
+-- would transform a linear definition into a non-linear one. See Wrinkle 2
+-- Note [Desugar Strict binds] in GHC.HsToCore.Binds.
+ds_val_bind dflags (NonRecursive, hsbinds) body
+  | [L _loc (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_mult = MultAnn{mult_ext=mult}
+                     , pat_ext = (ty, (rhs_tick, _var_ticks))})] <- bagToList hsbinds
+        -- Non-recursive, non-overloaded bindings only come in ones
+  , pat' <- decideBangHood dflags pat
+  , isBangedLPat pat'
+  = do { rhss_nablas <- pmcGRHSs PatBindGuards grhss
+        ; rhs_expr <- dsGuarded grhss ty rhss_nablas
+        ; let rhs' = mkOptTickBox rhs_tick rhs_expr
+        ; let body_ty = exprType body
+        ; error_expr <- mkErrorAppDs pAT_ERROR_ID body_ty (ppr pat')
+        ; matchSimply rhs' PatBindRhs mult pat' body error_expr }
+    -- This is the one place where matchSimply is given a non-ManyTy
+    -- multiplicity argument.
+    --
+    -- In this form, there isn't a natural place for the var_ticks. In
+    -- mkSelectorBinds, the ticks are around the selector function but there
+    -- aren't any selection functions as we make a single pattern-match. Is this a
+    -- problem?
+
 -- Ordinary case for bindings; none should be unlifted
-ds_val_bind (is_rec, binds) body
+ds_val_bind _ (is_rec, binds) body
   = do  { massert (isRec is_rec || isSingletonBag binds)
                -- we should never produce a non-recursive list of multiple binds
 

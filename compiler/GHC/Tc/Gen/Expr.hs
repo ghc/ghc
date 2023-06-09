@@ -348,9 +348,11 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
 -}
 
 tcExpr (HsLet x tkLet binds tkIn expr) res_ty
-  = do  { (binds', expr') <- tcLocalBinds binds $
-                             tcMonoExpr expr res_ty
-        ; return (HsLet x tkLet binds' tkIn expr') }
+  = do  { (binds', wrapper, expr') <- tcLocalBinds binds $
+                                      tcMonoExpr expr res_ty
+          -- The wrapper checks for correct multiplicities.
+          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        ; return (HsLet x tkLet binds' tkIn (mkLHsWrap wrapper expr')) }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -374,8 +376,8 @@ tcExpr (HsCase x scrut matches) res_ty
 
         ; traceTc "HsCase" (ppr scrut_ty)
         ; hasFixedRuntimeRep_syntactic FRRCase scrut_ty
-        ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
-        ; return (HsCase x scrut' matches') }
+        ; (mult_co_wrap, matches') <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
+        ; return (HsCase x (mkLHsWrap mult_co_wrap scrut') matches') }
  where
     match_ctxt = MC { mc_what = x,
                       mc_body = tcBody }

@@ -97,8 +97,28 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
              penv = PE { pe_lazy = True
                        , pe_ctxt = ctxt
                        , pe_orig = PatOrigin }
+       ; dflags <- getDynFlags
+       ; mult_co_wrap <- manyIfLazy dflags pat
+       -- The wrapper checks for correct multiplicities.
+       -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+       ; (pat', r) <- tc_lpat pat_ty penv pat thing_inside
+       ; pat_ty' <- readExpType (scaledThing pat_ty)
+       ; return (mkLHsWrapPat mult_co_wrap pat' pat_ty', r) }
+  where
+    -- The logic is partly duplicated from decideBangHood in
+    -- GHC.HsToCore.Utils. Ugh…
+    manyIfLazy dflags lpat
+      | xopt LangExt.Strict dflags = xstrict lpat
+      | otherwise = not_xstrict lpat
+      where
+        xstrict (L _ (LazyPat _ _)) = checkManyPattern pat_ty
+        xstrict (L _ (ParPat _ _ p _)) = xstrict p
+        xstrict _ = return WpHole
 
-       ; tc_lpat pat_ty penv pat thing_inside }
+        not_xstrict (L _ (BangPat _ _)) = return WpHole
+        not_xstrict (L _ (VarPat _ _)) = return WpHole
+        not_xstrict (L _ (ParPat _ _ p _)) = not_xstrict p
+        not_xstrict _ = checkManyPattern pat_ty
 
 -----------------
 tcPats :: HsMatchContext GhcTc

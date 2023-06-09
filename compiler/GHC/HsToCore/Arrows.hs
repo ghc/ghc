@@ -295,7 +295,7 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
     fail_expr <- mkFailExpr (ArrowMatchCtxt ProcExpr) env_stk_ty
     var <- selectSimpleMatchVarL ManyTy pat
-    match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) pat env_stk_expr fail_expr
+    match_code <- matchSimply (Var var) (ArrowMatchCtxt ProcExpr) ManyTy pat env_stk_expr fail_expr
     let pat_ty = hsLPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
                     (Lam var match_code)
@@ -963,7 +963,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     fail_expr <- mkFailExpr (StmtCtxt (HsDoStmt (DoExpr Nothing))) out_ty
     pat_id    <- selectSimpleMatchVarL ManyTy pat
     match_code
-      <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) pat body_expr fail_expr
+      <- matchSimply (Var pat_id) (StmtCtxt (HsDoStmt (DoExpr Nothing))) ManyTy pat body_expr fail_expr
     pair_id   <- newSysLocalDs ManyTy after_c_ty
     let
         proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
@@ -1198,7 +1198,7 @@ matchSimplys :: [CoreExpr]              -- Scrutinees
 matchSimplys [] _ctxt [] result_expr _fail_expr = return result_expr
 matchSimplys (exp:exps) ctxt (pat:pats) result_expr fail_expr = do
     match_code <- matchSimplys exps ctxt pats result_expr fail_expr
-    matchSimply exp ctxt pat match_code fail_expr
+    matchSimply exp ctxt ManyTy pat match_code fail_expr
 matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 -- List of leaf expressions, with set of variables bound in each
