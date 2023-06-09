@@ -575,6 +575,8 @@ gtInt, geInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `ltInt` (I# y) = isTrue# (x <#  y)
 (I# x) `leInt` (I# y) = isTrue# (x <=# y)
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+{-# INLINE [1] compareInt #-}
 compareInt :: Int -> Int -> Ordering
 (I# x#) `compareInt` (I# y#) = compareInt# x# y#
 
@@ -602,6 +604,8 @@ gtWord, geWord, ltWord, leWord :: Word -> Word -> Bool
 (W# x) `ltWord` (W# y) = isTrue# (x `ltWord#` y)
 (W# x) `leWord` (W# y) = isTrue# (x `leWord#` y)
 
+-- See GHC.Classes#matching_overloaded_methods_in_rules
+{-# INLINE [1] compareWord #-}
 compareWord :: Word -> Word -> Ordering
 (W# x#) `compareWord` (W# y#) = compareWord# x# y#
 
