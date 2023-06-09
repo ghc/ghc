@@ -2035,7 +2035,7 @@ doIndexOffAddrOp :: Maybe MachOp
                  -> [CmmExpr]
                  -> FCode ()
 doIndexOffAddrOp maybe_post_read_cast rep [res] [addr,idx]
-   = mkBasicIndexedRead NaturallyAligned 0 maybe_post_read_cast rep res addr rep idx
+   = mkBasicIndexedRead False NaturallyAligned 0 maybe_post_read_cast rep res addr rep idx
 doIndexOffAddrOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOp"
 
@@ -2047,7 +2047,7 @@ doIndexOffAddrOpAs :: Maybe MachOp
                    -> FCode ()
 doIndexOffAddrOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = let alignment = alignmentFromTypes rep idx_rep
-     in mkBasicIndexedRead alignment 0 maybe_post_read_cast rep res addr idx_rep idx
+     in mkBasicIndexedRead False alignment 0 maybe_post_read_cast rep res addr idx_rep idx
 doIndexOffAddrOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexOffAddrOpAs"
 
@@ -2059,7 +2059,7 @@ doIndexByteArrayOp :: Maybe MachOp
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
    = do profile <- getProfile
         doByteArrayBoundsCheck idx addr rep rep
-        mkBasicIndexedRead NaturallyAligned (arrWordsHdrSize profile) maybe_post_read_cast rep res addr rep idx
+        mkBasicIndexedRead False NaturallyAligned (arrWordsHdrSize profile) maybe_post_read_cast rep res addr rep idx
 doIndexByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOp"
 
@@ -2073,7 +2073,7 @@ doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
    = do profile <- getProfile
         doByteArrayBoundsCheck idx addr idx_rep rep
         let alignment = alignmentFromTypes rep idx_rep
-        mkBasicIndexedRead alignment (arrWordsHdrSize profile) maybe_post_read_cast rep res addr idx_rep idx
+        mkBasicIndexedRead False alignment (arrWordsHdrSize profile) maybe_post_read_cast rep res addr idx_rep idx
 doIndexByteArrayOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOpAs"
 
@@ -2085,7 +2085,7 @@ doReadPtrArrayOp res addr idx
    = do profile <- getProfile
         platform <- getPlatform
         doPtrArrayBoundsCheck idx addr
-        mkBasicIndexedRead NaturallyAligned (arrPtrsHdrSize profile) Nothing (gcWord platform) res addr (gcWord platform) idx
+        mkBasicIndexedRead True NaturallyAligned (arrPtrsHdrSize profile) Nothing (gcWord platform) res addr (gcWord platform) idx
 
 doWriteOffAddrOp :: Maybe MachOp
                  -> CmmType
@@ -2141,7 +2141,8 @@ doWritePtrArrayOp addr idx val
           (CmmMachOp (mo_wordUShr platform) [idx, mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
          ) (CmmLit (CmmInt 1 W8))
 
-mkBasicIndexedRead :: AlignmentSpec
+mkBasicIndexedRead :: Bool         -- Should this imply an acquire barrier
+                   -> AlignmentSpec
                    -> ByteOff      -- Initial offset in bytes
                    -> Maybe MachOp -- Optional result cast
                    -> CmmType      -- Type of element we are accessing
@@ -2150,13 +2151,23 @@ mkBasicIndexedRead :: AlignmentSpec
                    -> CmmType      -- Type of element by which we are indexing
                    -> CmmExpr      -- Index
                    -> FCode ()
-mkBasicIndexedRead alignment off Nothing ty res base idx_ty idx
+mkBasicIndexedRead barrier alignment off mb_cast ty res base idx_ty idx
    = do platform <- getPlatform
-        emitAssign (CmmLocal res) (cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx)
-mkBasicIndexedRead alignment off (Just cast) ty res base idx_ty idx
-   = do platform <- getPlatform
-        emitAssign (CmmLocal res) (CmmMachOp cast [
-                                   cmmLoadIndexOffExpr platform alignment off ty base idx_ty idx])
+        let addr = cmmIndexOffExpr platform off (typeWidth idx_ty) base idx
+        result <-
+          if barrier
+          then do
+            res <- newTemp ty
+            emitPrimCall [res] (MO_AtomicRead (typeWidth ty) MemOrderAcquire) [addr]
+            return $ CmmReg (CmmLocal res)
+          else
+            return $ CmmLoad addr ty alignment
+
+        let casted =
+              case mb_cast of
+                Just cast -> CmmMachOp cast [result]
+                Nothing   -> result
+        emitAssign (CmmLocal res) casted
 
 mkBasicIndexedWrite :: Bool         -- Should this imply a release barrier
                     -> ByteOff      -- Initial offset in bytes
@@ -2949,7 +2960,7 @@ doReadSmallPtrArrayOp res addr idx = do
     profile <- getProfile
     platform <- getPlatform
     doSmallPtrArrayBoundsCheck idx addr
-    mkBasicIndexedRead NaturallyAligned (smallArrPtrsHdrSize profile) Nothing (gcWord platform) res addr
+    mkBasicIndexedRead True NaturallyAligned (smallArrPtrsHdrSize profile) Nothing (gcWord platform) res addr
         (gcWord platform) idx
 
 doWriteSmallPtrArrayOp :: CmmExpr
@@ -2965,7 +2976,7 @@ doWriteSmallPtrArrayOp addr idx val = do
 
     -- Update remembered set for non-moving collector
     tmp <- newTemp ty
-    mkBasicIndexedRead NaturallyAligned (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
+    mkBasicIndexedRead False NaturallyAligned (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     -- Write barrier needed due to #12469
