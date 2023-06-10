@@ -95,6 +95,7 @@ stage0Packages = do
              , ghci
              , haddock
              , hp2ps
+             , hegg
              , hpc
              , hpcBin
              , hsc2hs
@@ -155,6 +156,7 @@ stage1Packages = do
         , ghcPkg
         , ghcPrim
         , haskeline
+        , hegg
         , hp2ps
         , hsc2hs
         , integerGmp

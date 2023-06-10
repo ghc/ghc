@@ -125,6 +125,7 @@ Library
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.6,
                    hpc        >= 0.6 && < 0.8,
+                   hegg,
                    transformers >= 0.5 && < 0.7,
                    exceptions == 0.10.*,
                    semaphore-compat,

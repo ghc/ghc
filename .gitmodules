@@ -120,3 +120,6 @@
 [submodule "libraries/os-string"]
 	path = libraries/os-string
 	url = https://gitlab.haskell.org/ghc/packages/os-string
+[submodule "libraries/hegg"]
+	path = libraries/hegg
+	url = https://github.com/alt-romes/hegg.git

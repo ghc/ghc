@@ -6,7 +6,7 @@ module Packages (
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
     ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
-    ghcToolchain, ghcToolchainBin, haddock, haskeline,
+    ghcToolchain, ghcToolchainBin, haddock, haskeline, hegg,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, osString, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, templateHaskellNext, terminfo, text, time, timeout,
@@ -39,7 +39,7 @@ ghcPackages =
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform
     , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
-    , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs
+    , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs, hegg
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl, osString
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell, templateHaskellNext
     , terminfo, text, time, transformers, unlit, unix, win32, xhtml
@@ -56,7 +56,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcBootThNext, ghcPlatform,
   ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
-  ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs,
+  ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs, hegg,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
   osString, parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, transformers, unlit, unix, win32, xhtml,
@@ -103,6 +103,7 @@ ghcToolchain        = lib  "ghc-toolchain"     `setPath` "utils/ghc-toolchain"
 ghcToolchainBin     = prg  "ghc-toolchain-bin" `setPath` "utils/ghc-toolchain/exe" -- workaround for #23690
 haddock             = util "haddock"
 haskeline           = lib  "haskeline"
+hegg                = lib  "hegg"
 hsc2hs              = util "hsc2hs"
 hp2ps               = util "hp2ps"
 hpc                 = lib  "hpc"
