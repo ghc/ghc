@@ -238,7 +238,7 @@ throwToMsg (Capability *cap, MessageThrowTo *msg)
     goto check_target;
 
 retry:
-    write_barrier();
+    RELEASE_FENCE(); // TODO: is this necessary?
     debugTrace(DEBUG_sched, "throwTo: retrying...");
 
 check_target:
@@ -874,9 +874,10 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
                 ap->payload[i] = (StgClosure *)*sp++;
             }
 
-            write_barrier(); // XXX: Necessary?
             SET_HDR(ap,&stg_AP_STACK_info,
                     ((StgClosure *)frame)->header.prof.ccs /* ToDo */);
+            // N.B. This will be made visible by updateThunk below, which
+            // implies a release memory barrier.
             TICK_ALLOC_UP_THK(AP_STACK_sizeW(words),0);
 
             //IF_DEBUG(scheduler,

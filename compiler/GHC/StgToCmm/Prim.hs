@@ -2177,7 +2177,7 @@ doWritePtrArrayOp addr idx val
        -- This write barrier is to ensure that the heap writes to the object
        -- referred to by val have happened before we write val into the array.
        -- See #12469 for details.
-       emitPrimCall [] MO_WriteBarrier []
+       emitPrimCall [] MO_ReleaseFence []
        mkBasicIndexedWrite hdr_size addr ty idx val
 
        emit (setInfo addr (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
@@ -3048,7 +3048,7 @@ doWriteSmallPtrArrayOp addr idx val = do
     mkBasicIndexedRead NaturallyAligned (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
-    emitPrimCall [] MO_WriteBarrier [] -- #12469
+    emitPrimCall [] MO_ReleaseFence [] -- #12469
     mkBasicIndexedWrite (smallArrPtrsHdrSize profile) addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 

@@ -354,7 +354,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * Exchange the value pointed to by p with w and return the former. This
  * function is used to acquire a lock. An acquire memory barrier is sufficient
  * for a lock operation because corresponding unlock operation issues a
- * store-store barrier (write_barrier()) immediately before releasing the lock.
+ * store-store barrier (release-store) immediately before releasing the lock.
  */
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)

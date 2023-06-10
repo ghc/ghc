@@ -1562,7 +1562,6 @@ genCCall target dest_regs arg_regs bid = do
         MO_ReleaseFence     ->  return (unitOL DMBISH, Nothing)
         -- TODO DMBSY is probably *way* too much!
         MO_ReadBarrier      ->  return (unitOL DMBSY, Nothing)
-        MO_WriteBarrier     ->  return (unitOL DMBSY, Nothing)
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.
