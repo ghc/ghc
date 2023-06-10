@@ -2357,15 +2357,6 @@ commonly used commands.
     the current breakpoint for the next ``⟨ignoreCount⟩`` iterations.
     See command :ghci-cmd:`:ignore`.
 
-.. ghci-cmd:: :ctags; [⟨filename⟩]
-
-    Generates a "tags" file for Vi-style editors (:ghci-cmd:`:ctags`) or
-    Emacs-style editors (:ghci-cmd:`:etags`). If no filename is specified, the
-    default ``tags`` or ``TAGS`` is used, respectively. Tags for all the
-    functions, constructors and types in the currently loaded modules
-    are created. All modules must be interpreted for these commands to
-    work.
-
 .. ghci-cmd:: :def;[!] ⟨name⟩ ⟨expr⟩
 
     :ghci-cmd:`:def` is used to define new commands, or macros, in GHCi. The
@@ -2467,10 +2458,6 @@ commonly used commands.
     see the number and state of each breakpoint). The ``*`` form enables all the
     disabled breakpoints. Enabling a break point will reset its ``ignore count``
     to 0. (See :ghci-cmd:`:ignore`)
-
-.. ghci-cmd:: :etags
-
-    See :ghci-cmd:`:ctags`.
 
 .. ghci-cmd:: :force; ⟨identifier⟩ ...
 

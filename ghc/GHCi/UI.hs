@@ -33,7 +33,6 @@ module GHCi.UI (
 -- GHCi
 import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
 import GHCi.UI.Monad hiding ( args, runStmt )
-import GHCi.UI.Tags
 import GHCi.UI.Info
 import GHCi.UI.Exception
 import GHC.Runtime.Debugger
@@ -211,8 +210,6 @@ ghciCommands = map mkCmd [
   ("check",     keepGoing' checkModule,         completeHomeModule),
   ("continue",  keepGoing continueCmd,          noCompletion),
   ("cmd",       keepGoing cmdCmd,               completeExpression),
-  ("ctags",     keepGoing createCTagsWithLineNumbersCmd, completeFilename),
-  ("ctags!",    keepGoing createCTagsWithRegExesCmd, completeFilename),
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
@@ -220,7 +217,6 @@ ghciCommands = map mkCmd [
   ("doc",       keepGoing' docCmd,              completeIdentifier),
   ("edit",      keepGoingMulti' editFile,            completeFilename),
   ("enable",    keepGoing enableCmd,            noCompletion),
-  ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
   ("forward",   keepGoing forwardCmd,           noCompletion),
   ("help",      keepGoingMulti help,                 noCompletion),
@@ -360,15 +356,12 @@ defFullHelpText =
   "   :cd <dir>                   change directory to <dir>\n" ++
   "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
   "   :complete <dom> [<rng>] <s> list completions for partial input string\n" ++
-  "   :ctags[!] [<file>]          create tags file <file> for Vi (default: \"tags\")\n" ++
-  "                               (!: use regex instead of line number)\n" ++
   "   :def[!] <cmd> <expr>        define command :<cmd> (later defined command has\n" ++
   "                               precedence, ::<cmd> is always a builtin command)\n" ++
   "                               (!: redefine an existing command name)\n" ++
   "   :doc <name>                 display docs for the given name (experimental)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
-  "   :etags [<file>]             create tags file <file> for Emacs (default: \"TAGS\")\n" ++
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++

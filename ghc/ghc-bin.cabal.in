@@ -68,7 +68,6 @@ Executable ghc
             GHCi.UI
             GHCi.UI.Info
             GHCi.UI.Monad
-            GHCi.UI.Tags
             GHCi.UI.Exception
             GHCi.Util
         Other-Extensions:

@@ -135,6 +135,7 @@ Compiler
 GHCi
 ~~~~
 
+- The deprecated `:ctags` and `:etags` GHCi commands have been removed. See this `wiki page <https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/GHCi/Tags>`_ if you want to add a macro to recover similar functionality.
 
 Runtime system
 ~~~~~~~~~~~~~~
