@@ -1960,9 +1960,13 @@ doDerivInstErrorChecks1 mechanism =
   case mechanism of
     DerivSpecStock{dsm_stock_dit = dit}
       -> data_cons_in_scope_check dit
-    DerivSpecNewtype{dsm_newtype_dit = dit}
-      -> do atf_coerce_based_error_checks
-            data_cons_in_scope_check dit
+    -- No need to 'data_cons_in_scope_check' for newtype deriving.
+    -- Additionally, we also don't need to mark the constructos as
+    -- used because newtypes are handled separately elsewhere.
+    -- See Note [Tracking unused binding and imports] in GHC.Tc.Types
+    -- or #17328 for more.
+    DerivSpecNewtype{}
+      -> atf_coerce_based_error_checks
     DerivSpecAnyClass{}
       -> pure ()
     DerivSpecVia{}
