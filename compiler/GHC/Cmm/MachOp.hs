@@ -701,6 +701,9 @@ data CallishMachOp
   | MO_BSwap Width
   | MO_BRev Width
 
+  | MO_AcquireFence
+  | MO_ReleaseFence
+
   -- | Atomic read-modify-write. Arguments are @[dest, n]@.
   | MO_AtomicRMW Width AtomicMachOp
   -- | Atomic read. Arguments are @[addr]@.

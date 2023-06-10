@@ -1117,6 +1117,11 @@ callishMachOps platform = listToUFM $
         ( "fabs32f", (MO_F32_Fabs,) ),
         ( "sqrt32f", (MO_F32_Sqrt,) ),
 
+        -- TODO: It would be nice to rename the following operations to
+        -- acquire_fence and release_fence. Be aware that there'll be issues
+        -- with an overlapping token ('acquire') in the lexer.
+        ( "fence_acquire", (MO_AcquireFence,)),
+        ( "fence_release", (MO_ReleaseFence,)),
         ( "read_barrier", (MO_ReadBarrier,)),
         ( "write_barrier", (MO_WriteBarrier,)),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
