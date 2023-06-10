@@ -117,10 +117,9 @@ EXTERN_INLINE void busy_wait_nop(void);
  * To check whether you got these right, try the test in
  *   testsuite/tests/rts/testwsdeque.c
  * This tests the work-stealing deque implementation, which relies on
- * properly working store_load and load_load memory barriers.
+ * properly working load_load memory barriers.
  */
 EXTERN_INLINE void write_barrier(void);
-EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
 
 /*
@@ -497,32 +496,6 @@ write_barrier(void) {
 }
 
 EXTERN_INLINE void
-store_load_barrier(void) {
-#if defined(NOSMP)
-    return;
-#elif defined(i386_HOST_ARCH)
-    __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory");
-#elif defined(x86_64_HOST_ARCH)
-    __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
-#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-    || defined(powerpc64le_HOST_ARCH)
-    __asm__ __volatile__ ("sync" : : : "memory");
-#elif defined(s390x_HOST_ARCH)
-    __asm__ __volatile__ ("bcr 14,0" : : : "memory");
-#elif defined(arm_HOST_ARCH)
-    __asm__ __volatile__ ("dmb" : : : "memory");
-#elif defined(aarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dmb sy" : : : "memory");
-#elif defined(riscv64_HOST_ARCH)
-    __asm__ __volatile__ ("fence w,r" : : : "memory");
-#elif defined(loongarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dbar 0" : : : "memory");
-#else
-#error memory barriers unimplemented on this architecture
-#endif
-}
-
-EXTERN_INLINE void
 load_load_barrier(void) {
 #if defined(NOSMP)
     return;
@@ -587,10 +560,8 @@ load_load_barrier(void) {
 #else /* !THREADED_RTS */
 
 EXTERN_INLINE void write_barrier(void);
-EXTERN_INLINE void store_load_barrier(void);
 EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE void write_barrier     (void) {} /* nothing */
-EXTERN_INLINE void store_load_barrier(void) {} /* nothing */
 EXTERN_INLINE void load_load_barrier (void) {} /* nothing */
 
 // Relaxed atomic operations
