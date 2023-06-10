@@ -91,8 +91,8 @@ isAlive(StgClosure *p)
         return TAG_CLOSURE(tag,(StgClosure*)UN_FORWARDING_PTR(info));
     }
 
+    ACQUIRE_LOAD(&q->header.info);
     info = INFO_PTR_TO_STRUCT(info);
-    load_load_barrier();
 
     switch (info->type) {
 

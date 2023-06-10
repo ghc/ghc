@@ -34,47 +34,25 @@ void *
 myStealWSDeque_ (WSDeque *q, uint32_t n)
 {
     void * stolen;
-    StgWord b,t; 
     
 // Can't do this on someone else's spark pool:
 // ASSERT_WSDEQUE_INVARIANTS(q); 
     
     // NB. these loads must be ordered, otherwise there is a race
     // between steal and pop.
-    t = q->top;
-    load_load_barrier();
-    b = q->bottom;
+    StgWord t = ACQUIRE_LOAD(&q->top);
+    SEQ_CST_FENCE();
+    StgWord b = ACQUIRE_LOAD(&q->bottom);
     
-    // NB. b and t are unsigned; we need a signed value for the test
-    // below, because it is possible that t > b during a
-    // concurrent popWSQueue() operation.
-    if ((long)b - (long)t <= 0 ) { 
-        return NULL; /* already looks empty, abort */
+    void *result = NULL;
+    if (t < b) {
+        /* Non-empty queue */
+        result = RELAXED_LOAD(&q->elements[t % q->size]);
+        if (!cas_top(q, t, t+1)) {
+            return NULL;
+        }
     }
-    // NB. the load of q->bottom must be ordered before the load of
-    // q->elements[t & q-> moduloSize]. See comment "KG:..." below
-    // and Ticket #13633.
-    load_load_barrier();
-    /* now access array, see pushBottom() */
-    stolen = q->elements[t & q->moduloSize];
-    
-    /* now decide whether we have won */
-    if ( !(CASTOP(&(q->top),t,t+1)) ) {
-        /* lost the race, someone else has changed top in the meantime */
-        return NULL;
-    }  /* else: OK, top has been incremented by the cas call */
-
-    // debugBelch("stealWSDeque_: t=%d b=%d\n", t, b);
-
-// Can't do this on someone else's spark pool:
-// ASSERT_WSDEQUE_INVARIANTS(q); 
-
-    bufs[n] ++;
-    if (bufs[n] == BUF) { bufs[n] = 0; }
-    last_b[n][bufs[n]] = b;
-    last_t[n][bufs[n]] = t;
-    last_v[n][bufs[n]] = (StgWord)stolen;
-    return stolen;
+    return result;
 }
 
 void *
