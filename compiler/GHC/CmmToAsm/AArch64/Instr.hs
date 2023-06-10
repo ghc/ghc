@@ -136,6 +136,7 @@ regUsageOfInstr platform instr = case instr of
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY                    -> usage ([], [])
+  DMBISH                   -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT dst src             -> usage (regOp src, regOp dst)
@@ -276,6 +277,7 @@ patchRegsOfInstr instr env = case instr of
 
     -- 8. Synchronization Instructions -----------------------------------------
     DMBSY          -> DMBSY
+    DMBISH         -> DMBISH
 
     -- 9. Floating Point Instructions ------------------------------------------
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
@@ -645,6 +647,7 @@ data Instr
 
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBSY
+    | DMBISH
     -- 9. Floating Point Instructions
     -- Float ConVerT
     | FCVT Operand Operand
@@ -724,6 +727,7 @@ instrCon i =
       BL{} -> "BL"
       BCOND{} -> "BCOND"
       DMBSY{} -> "DMBSY"
+      DMBISH{} -> "DMBISH"
       FCVT{} -> "FCVT"
       SCVTF{} -> "SCVTF"
       FCVTZS{} -> "FCVTZS"

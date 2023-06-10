@@ -677,7 +677,7 @@
  * explicit ordered accesses to make ordering apparent to TSAN.
  */
 
-// Memory barriers.
+// Memory barriers
 // For discussion of how these are used to fence heap object
 // accesses see Note [Heap memory barriers] in SMP.h.
 #if defined(THREADED_RTS)
@@ -685,8 +685,8 @@
 #define prim_write_barrier prim %write_barrier()
 
 // See Note [ThreadSanitizer and fences]
-#define RELEASE_FENCE prim %write_barrier()
-#define ACQUIRE_FENCE prim %read_barrier()
+#define RELEASE_FENCE prim %fence_release();
+#define ACQUIRE_FENCE prim %fence_acquire();
 
 #else
 

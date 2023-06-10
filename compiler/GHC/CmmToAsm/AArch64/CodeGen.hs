@@ -1558,6 +1558,8 @@ genCCall target dest_regs arg_regs bid = do
         MO_U_Mul2     _w -> unsupported mop
 
         -- Memory Ordering
+        MO_AcquireFence     ->  return (unitOL DMBISH, Nothing)
+        MO_ReleaseFence     ->  return (unitOL DMBISH, Nothing)
         -- TODO DMBSY is probably *way* too much!
         MO_ReadBarrier      ->  return (unitOL DMBSY, Nothing)
         MO_WriteBarrier     ->  return (unitOL DMBSY, Nothing)

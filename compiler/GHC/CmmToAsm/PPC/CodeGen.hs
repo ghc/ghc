@@ -1126,6 +1126,11 @@ genCCall :: ForeignTarget      -- function to call
          -> [CmmFormal]        -- where to put the result
          -> [CmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
+genCCall (PrimTarget MO_AcquireFence) _ _
+ = return $ unitOL LWSYNC
+genCCall (PrimTarget MO_ReleaseFence) _ _
+ = return $ unitOL LWSYNC
+
 genCCall (PrimTarget MO_ReadBarrier) _ _
  = return $ unitOL LWSYNC
 genCCall (PrimTarget MO_WriteBarrier) _ _
@@ -2096,6 +2101,8 @@ genCCall' config gcp target dest_regs args
                     MO_U_Mul2 {}     -> unsupported
                     MO_ReadBarrier   -> unsupported
                     MO_WriteBarrier  -> unsupported
+                    MO_AcquireFence  -> unsupported
+                    MO_ReleaseFence  -> unsupported
                     MO_Touch         -> unsupported
                     MO_Prefetch_Data _ -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop

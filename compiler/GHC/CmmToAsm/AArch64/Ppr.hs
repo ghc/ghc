@@ -530,6 +530,7 @@ pprInstr platform instr = case instr of
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY -> line $ text "\tdmb sy"
+  DMBISH -> line $ text "\tdmb ish"
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
