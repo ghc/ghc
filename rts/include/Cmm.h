@@ -690,8 +690,6 @@
 
 #else
 
-#define prim_read_barrier /* nothing */
-#define prim_write_barrier /* nothing */
 #define RELEASE_FENCE /* nothing */
 #define ACQUIRE_FENCE /* nothing */
 #endif /* THREADED_RTS */
