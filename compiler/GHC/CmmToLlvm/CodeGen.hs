@@ -191,6 +191,11 @@ genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 
 -- Barriers need to be handled specially as they are implemented as LLVM
 -- intrinsic functions.
+genCall (PrimTarget MO_AcquireFence) _ _ = runStmtsDecls $
+    statement $ Fence False SyncAcquire
+genCall (PrimTarget MO_ReleaseFence) _ _ = runStmtsDecls $
+    statement $ Fence False SyncRelease
+
 genCall (PrimTarget MO_ReadBarrier) _ _ =
     barrierUnless [ArchX86, ArchX86_64]
 
@@ -1010,6 +1015,8 @@ cmmPrimOpFunctions mop = do
     MO_U_Mul2 {}     -> unsupported
     MO_ReadBarrier   -> unsupported
     MO_WriteBarrier  -> unsupported
+    MO_ReleaseFence  -> unsupported
+    MO_AcquireFence  -> unsupported
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported
 
