@@ -65,6 +65,7 @@ import GHC.Utils.Logger
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Data.BooleanFormula ( isUnsatisfied )
 
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -1442,19 +1443,24 @@ mk_eqn_no_strategy = do
                  -- See Note [DerivEnv and DerivSpecMechanism] in GHC.Tc.Deriv.Utils
                  whenIsJust (hasStockDeriving cls) $ \_ ->
                    expectNonDataFamTyCon dit
-                 mk_eqn_originative dit
+                 mk_eqn_originative cls dit
 
      |  otherwise
      -> mk_eqn_anyclass
   where
     -- Use heuristics (checkOriginativeSideConditions) to determine whether
     -- stock or anyclass deriving should be used.
-    mk_eqn_originative :: DerivInstTys -> DerivM EarlyDerivSpec
-    mk_eqn_originative dit@(DerivInstTys { dit_tc     = tc
-                                         , dit_rep_tc = rep_tc }) = do
+    mk_eqn_originative :: Class -> DerivInstTys -> DerivM EarlyDerivSpec
+    mk_eqn_originative cls dit@(DerivInstTys { dit_tc     = tc
+                                             , dit_rep_tc = rep_tc }) = do
       dflags <- getDynFlags
-      let isDeriveAnyClassEnabled =
-            deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
+      let isDeriveAnyClassEnabled
+            | canSafelyDeriveAnyClass cls
+            = deriveAnyClassEnabled (xopt LangExt.DeriveAnyClass dflags)
+            | otherwise
+            -- Pretend that the extension is enabled so that we won't suggest
+            -- enabling it.
+            = YesDeriveAnyClassEnabled
 
       -- See Note [Deriving instances for classes themselves]
       let dac_error
@@ -1470,6 +1476,12 @@ mk_eqn_no_strategy = do
                                   DerivSpecStock { dsm_stock_dit     = dit
                                                  , dsm_stock_gen_fns = gen_fns }
         CanDeriveAnyClass      -> mk_eqn_from_mechanism DerivSpecAnyClass
+
+    canSafelyDeriveAnyClass cls =
+      -- If the set of minimal required definitions is nonempty,
+      -- `DeriveAnyClass` will generate an instance with undefined methods or
+      -- associated types, so don't suggest enabling it.
+      isNothing $ isUnsatisfied (const False) (classMinimalDef cls)
 
 {-
 ************************************************************************
