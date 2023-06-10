@@ -32,8 +32,7 @@ StgTSO *getTopHandlerThread(void) {
         // topHandlerPtr was never initialised
         return NULL;
     }
-    const StgInfoTable *info = weak->header.info;
-    load_load_barrier();
+    const StgInfoTable *info = ACQUIRE_LOAD(&weak->header.info);
     if (info == &stg_WEAK_info) {
         StgClosure *key = ((StgWeak*)weak)->key;
 
