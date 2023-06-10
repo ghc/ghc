@@ -649,7 +649,9 @@ pprInstr platform instr = case instr of
   -- LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY -> line $ text "\tdmb sy"
+  DMBSY DmbRead -> line $ text "\tfence r,r"
+  DMBSY DmbWrite -> line $ text "\tfence w,w"
+
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
   SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2

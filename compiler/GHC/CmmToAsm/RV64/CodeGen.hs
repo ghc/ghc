@@ -1576,9 +1576,9 @@ genCCall target dest_regs arg_regs bid = do
         MO_U_Mul2     _w -> unsupported mop
 
         -- Memory Ordering
-        -- TODO DMBSY is probably *way* too much!
-        MO_ReadBarrier      ->  return (unitOL DMBSY, Nothing)
-        MO_WriteBarrier     ->  return (unitOL DMBSY, Nothing)
+        -- The concrete encoding is copied from load_load_barrier() and write_barrier() (SMP.h)
+        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead), Nothing)
+        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite), Nothing)
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.

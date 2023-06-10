@@ -132,7 +132,7 @@ regUsageOfInstr platform instr = case instr of
   -- LDP _ dst1 dst2 src      -> usage (regOp src, regOp dst1 ++ regOp dst2)
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY                    -> usage ([], [])
+  DMBSY _                  -> usage ([], [])
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT dst src             -> usage (regOp src, regOp dst)
@@ -268,7 +268,7 @@ patchRegsOfInstr instr env = case instr of
     -- LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
 
     -- 8. Synchronization Instructions -----------------------------------------
-    DMBSY          -> DMBSY
+    DMBSY op         -> DMBSY op
 
     -- 9. Floating Point Instructions ------------------------------------------
     FCVT o1 o2     -> FCVT (patchOp o1) (patchOp o2)
@@ -654,7 +654,7 @@ data Instr
     | BCOND Cond Operand Operand Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
-    | DMBSY
+    | DMBSY DmbType
     -- 9. Floating Point Instructions
     -- Float ConVerT
     | FCVT Operand Operand
@@ -664,6 +664,8 @@ data Instr
     | FCVTZS Operand Operand
     -- Float ABSolute value
     | FABS Operand Operand
+
+data DmbType = DmbRead | DmbWrite
 
 instrCon :: Instr -> String
 instrCon i =
