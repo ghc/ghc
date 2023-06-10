@@ -108,19 +108,14 @@ EXTERN_INLINE void busy_wait_nop(void);
 /*
  * Various kinds of memory barrier.
  *  write_barrier: prevents future stores occurring before preceding stores.
- *  store_load_barrier: prevents future loads occurring before preceding stores.
- *  load_load_barrier: prevents future loads occurring before earlier loads.
  *
  * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
  * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
  *
  * To check whether you got these right, try the test in
  *   testsuite/tests/rts/testwsdeque.c
- * This tests the work-stealing deque implementation, which relies on
- * properly working load_load memory barriers.
  */
 EXTERN_INLINE void write_barrier(void);
-EXTERN_INLINE void load_load_barrier(void);
 
 /*
  * Note [Heap memory barriers]
@@ -495,32 +490,6 @@ write_barrier(void) {
 #endif
 }
 
-EXTERN_INLINE void
-load_load_barrier(void) {
-#if defined(NOSMP)
-    return;
-#elif defined(i386_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(x86_64_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-    || defined(powerpc64le_HOST_ARCH)
-    __asm__ __volatile__ ("lwsync" : : : "memory");
-#elif defined(s390x_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(arm_HOST_ARCH)
-    __asm__ __volatile__ ("dmb" : : : "memory");
-#elif defined(aarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dmb ld" : : : "memory");
-#elif defined(riscv64_HOST_ARCH)
-    __asm__ __volatile__ ("fence r,r" : : : "memory");
-#elif defined(loongarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dbar 0" : : : "memory");
-#else
-#error memory barriers unimplemented on this architecture
-#endif
-}
-
 // Load a pointer from a memory location that might be being modified
 // concurrently.  This prevents the compiler from optimising away
 // multiple loads of the memory location, as it might otherwise do in
@@ -560,9 +529,7 @@ load_load_barrier(void) {
 #else /* !THREADED_RTS */
 
 EXTERN_INLINE void write_barrier(void);
-EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE void write_barrier     (void) {} /* nothing */
-EXTERN_INLINE void load_load_barrier (void) {} /* nothing */
 
 // Relaxed atomic operations
 #define RELAXED_LOAD(ptr) *ptr
