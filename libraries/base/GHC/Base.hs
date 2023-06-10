@@ -807,7 +807,7 @@ class Functor f => Applicative f where
     (<*) = liftA2 const
 
 -- | A variant of '<*>' with the types of the arguments reversed. It differs from
--- `flip <*>` in that the effects are resolved in the order the arguments are
+-- @`flip` `(<*>)`@ in that the effects are resolved in the order the arguments are
 -- presented.
 --
 -- ==== __Examples__
