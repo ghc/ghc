@@ -51,6 +51,7 @@ libraries/deepseq            -           -                               ssh://g
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
+libraries/hegg               -           -                               https://github.com/alt-romes/hegg.git
 libraries/hpc                -           -                               -
 libraries/mtl                -           -                               https://github.com/haskell/mtl.git
 libraries/parsec             -           -                               https://github.com/haskell/parsec.git

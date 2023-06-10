@@ -117,3 +117,6 @@
 [submodule "utils/hpc"]
 	path = utils/hpc
 	url = https://gitlab.haskell.org/hpc/hpc-bin.git
+[submodule "libraries/hegg"]
+	path = libraries/hegg
+	url = https://github.com/alt-romes/hegg.git
