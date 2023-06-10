@@ -671,7 +671,6 @@ data CallishMachOp
   | MO_U_Mul2    Width
 
   | MO_ReadBarrier
-  | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)
 
   -- Prefetch

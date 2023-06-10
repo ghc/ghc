@@ -1189,7 +1189,6 @@ lower_CallishMachOp lbl (MO_UF_Conv w0) rs xs = lower_MO_UF_Conv lbl w0 rs xs
 lower_CallishMachOp _ MO_AcquireFence _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp _ MO_ReleaseFence _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp _ MO_ReadBarrier _ _ = pure $ WasmStatements WasmNop
-lower_CallishMachOp _ MO_WriteBarrier _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp _ MO_Touch _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp _ (MO_Prefetch_Data {}) _ _ = pure $ WasmStatements WasmNop
 lower_CallishMachOp lbl (MO_Memcpy {}) [] xs = do

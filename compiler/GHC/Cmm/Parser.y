@@ -1123,7 +1123,6 @@ callishMachOps platform = listToUFM $
         ( "fence_acquire", (MO_AcquireFence,)),
         ( "fence_release", (MO_ReleaseFence,)),
         ( "read_barrier", (MO_ReadBarrier,)),
-        ( "write_barrier", (MO_WriteBarrier,)),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
