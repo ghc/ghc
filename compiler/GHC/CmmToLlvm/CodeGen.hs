@@ -199,9 +199,6 @@ genCall (PrimTarget MO_ReleaseFence) _ _ = runStmtsDecls $
 genCall (PrimTarget MO_ReadBarrier) _ _ =
     barrierUnless [ArchX86, ArchX86_64]
 
-genCall (PrimTarget MO_WriteBarrier) _ _ =
-    barrierUnless [ArchX86, ArchX86_64]
-
 genCall (PrimTarget MO_Touch) _ _ =
     return (nilOL, [])
 
@@ -1014,7 +1011,6 @@ cmmPrimOpFunctions mop = do
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
     MO_ReadBarrier   -> unsupported
-    MO_WriteBarrier  -> unsupported
     MO_ReleaseFence  -> unsupported
     MO_AcquireFence  -> unsupported
     MO_Touch         -> unsupported

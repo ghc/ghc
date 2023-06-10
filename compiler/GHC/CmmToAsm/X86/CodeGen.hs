@@ -2163,7 +2163,6 @@ genSimplePrim bid (MO_Memset align)    []      [dst,c,n]      = genMemSet  bid a
 genSimplePrim _   MO_AcquireFence      []      []             = return nilOL -- barriers compile to no code on x86/x86-64;
 genSimplePrim _   MO_ReleaseFence      []      []             = return nilOL -- we keep it this long in order to prevent earlier optimisations.
 genSimplePrim _   MO_ReadBarrier       []      []             = return nilOL -- barriers compile to no code on x86/x86-64;
-genSimplePrim _   MO_WriteBarrier      []      []             = return nilOL -- we keep it this long in order to prevent earlier optimisations.
 genSimplePrim _   MO_Touch             []      [_]            = return nilOL
 genSimplePrim _   (MO_Prefetch_Data n) []      [src]          = genPrefetchData n src
 genSimplePrim _   (MO_BSwap width)     [dst]   [src]          = genByteSwap width dst src

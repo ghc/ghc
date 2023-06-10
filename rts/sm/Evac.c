@@ -1394,8 +1394,7 @@ selector_loop:
                   // the same selector thunk.
                   SET_INFO((StgClosure*)p, (StgInfoTable *)info_ptr);
                   OVERWRITING_CLOSURE((StgClosure*)p);
-                  SET_INFO((StgClosure*)p, &stg_WHITEHOLE_info);
-                  write_barrier();
+                  SET_INFO_RELEASE((StgClosure*)p, &stg_WHITEHOLE_info);
 #if defined(PARALLEL_GC)
                   abort();  // LDV is incompatible with parallel GC
 #endif

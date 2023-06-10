@@ -392,7 +392,7 @@ external prototype return neither of these types to workaround #11395.
 #endif
 
 #include "stg/Prim.h" /* ghc-prim fallbacks */
-#include "stg/SMP.h" // write_barrier() inline is required
+#include "stg/SMP.h"
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles

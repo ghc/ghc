@@ -1508,7 +1508,6 @@ waitForGcThreads (Capability *cap, bool idle_cap[])
             if (i == me || idle_cap[i]) { continue; }
             if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(getCapability(i), cap->running_task);
-                write_barrier();
                 interruptCapability(getCapability(i));
             }
         }
