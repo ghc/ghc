@@ -2505,8 +2505,8 @@ stg_unpackClosurezh ( P_ closure )
 {
     W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
     MAYBE_GC_P(stg_unpackClosurezh, closure);
-    info  = %GET_STD_INFO(UNTAG(closure));
-    prim_read_barrier;
+    info  = GET_INFO_ACQUIRE(UNTAG(closure));
+    info  = %STD_INFO(info);
 
     ptrs  = TO_W_(%INFO_PTRS(info));
     nptrs = TO_W_(%INFO_NPTRS(info));
@@ -2820,8 +2820,7 @@ stg_noDuplicatezh /* no arg list: explicit stack layout */
 stg_getApStackValzh ( P_ ap_stack, W_ offset )
 {
    W_ ap_stackinfo;
-   ap_stackinfo = %INFO_PTR(UNTAG(ap_stack));
-   prim_read_barrier;
+   ap_stackinfo = GET_INFO_ACQUIRE(UNTAG(ap_stack));
    if (ap_stackinfo == stg_AP_STACK_info) {
        return (1,StgAP_STACK_payload(ap_stack,offset));
    } else {
