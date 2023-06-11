@@ -830,7 +830,7 @@ pprCtOrigin (InstProvidedOrigin mod cls_inst)
 
 pprCtOrigin (ImpedanceMatching x)
   = vcat [ text "arising when matching required constraints"
-         , text "in a recursive group involving" <+> quotes (ppr x)]
+         , text "in a group involving" <+> quotes (ppr x)]
 
 pprCtOrigin (CycleBreakerOrigin orig)
   = pprCtOrigin orig
