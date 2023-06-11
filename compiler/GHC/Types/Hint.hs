@@ -35,7 +35,7 @@ import GHC.Hs.Extension (GhcTc, GhcRn)
 import GHC.Core.Coercion
 import GHC.Core.FamInstEnv (FamFlavor)
 import GHC.Core.TyCon (TyCon)
-import GHC.Core.Type (PredType)
+import GHC.Core.Type (PredType, Type)
 import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Types.Name (Name, NameSpace, OccName (occNameFS), isSymOcc, nameOccName)
 import GHC.Types.Name.Reader (RdrName (Unqual), ImpDeclSpec)
@@ -44,7 +44,7 @@ import GHC.Types.Basic (Activation, RuleName)
 import {-# SOURCE #-} GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Parser.Errors.Basic
 import GHC.Utils.Outputable
-import GHC.Data.FastString (fsLit)
+import GHC.Data.FastString (fsLit, FastString)
 
 import Data.Typeable ( Typeable )
 
@@ -465,6 +465,9 @@ data GhcHint
   {-| Suggest eta-reducing a type synonym used in the implementation
       of abstract data. -}
   | SuggestEtaReduceAbsDataTySyn TyCon
+  {-| Remind the user that there is no field of a type and name in the record,
+      constructors are in the usual order $x$, $r$, $a$ -}
+  | RemindRecordMissingField FastString Type Type
   {-| Suggest binding the type variable on the LHS of the type declaration
   -}
   | SuggestBindTyVarOnLhs RdrName
