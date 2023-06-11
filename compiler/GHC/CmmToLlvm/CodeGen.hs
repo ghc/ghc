@@ -171,21 +171,6 @@ getInstrinct fname retTy parTys =
         fty = LMFunction funSig
     in getInstrinct2 fname fty
 
--- | Memory barrier instruction for LLVM >= 3.0
-barrier :: LlvmM StmtData
-barrier = do
-    let s = Fence False SyncSeqCst
-    return (unitOL s, [])
-
--- | Insert a 'barrier', unless the target platform is in the provided list of
---   exceptions (where no code will be emitted instead).
-barrierUnless :: [Arch] -> LlvmM StmtData
-barrierUnless exs = do
-    platform <- getPlatform
-    if platformArch platform `elem` exs
-        then return (nilOL, [])
-        else barrier
-
 -- | Foreign Calls
 genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> LlvmM StmtData
 
@@ -195,12 +180,6 @@ genCall (PrimTarget MO_AcquireFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncAcquire
 genCall (PrimTarget MO_ReleaseFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncRelease
-
-genCall (PrimTarget MO_ReadBarrier) _ _ =
-    barrierUnless [ArchX86, ArchX86_64]
-
-genCall (PrimTarget MO_Touch) _ _ =
-    return (nilOL, [])
 
 genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
@@ -1010,7 +989,6 @@ cmmPrimOpFunctions mop = do
     -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
-    MO_ReadBarrier   -> unsupported
     MO_ReleaseFence  -> unsupported
     MO_AcquireFence  -> unsupported
     MO_Touch         -> unsupported

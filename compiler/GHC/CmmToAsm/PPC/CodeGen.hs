@@ -1131,9 +1131,6 @@ genCCall (PrimTarget MO_AcquireFence) _ _
 genCCall (PrimTarget MO_ReleaseFence) _ _
  = return $ unitOL LWSYNC
 
-genCCall (PrimTarget MO_ReadBarrier) _ _
- = return $ unitOL LWSYNC
-
 genCCall (PrimTarget MO_Touch) _ _
  = return $ nilOL
 
@@ -2097,7 +2094,6 @@ genCCall' config gcp target dest_regs args
                     MO_AddIntC {}    -> unsupported
                     MO_SubIntC {}    -> unsupported
                     MO_U_Mul2 {}     -> unsupported
-                    MO_ReadBarrier   -> unsupported
                     MO_AcquireFence  -> unsupported
                     MO_ReleaseFence  -> unsupported
                     MO_Touch         -> unsupported
