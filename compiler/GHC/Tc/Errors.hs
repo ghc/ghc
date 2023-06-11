@@ -2316,7 +2316,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
   (Nothing, _)  -> do -- No matches but perhaps several unifiers
     { (_, rel_binds, item) <- relevantBindings True ctxt item
     ; candidate_insts <- get_candidate_instances
-    ; (imp_errs, field_suggestions) <- record_field_suggestions
+    ; (imp_errs, field_suggestions) <- record_field_suggestions item
     ; return (cannot_resolve_msg item candidate_insts rel_binds imp_errs field_suggestions) }
 
   -- Some matches => overlap errors
@@ -2352,13 +2352,33 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
       | otherwise = False
 
     -- See Note [Out-of-scope fields with -XOverloadedRecordDot]
-    record_field_suggestions :: TcM ([ImportError], [GhcHint])
-    record_field_suggestions = flip (maybe $ return ([], noHints)) record_field $ \name ->
+    record_field_suggestions :: ErrorItem -> TcM ([ImportError], [GhcHint])
+    record_field_suggestions item = flip (maybe $ return ([], noHints)) record_field $ \name ->
        do { glb_env <- getGlobalRdrEnv
           ; lcl_env <- getLocalRdrEnv
-          ; if occ_name_in_scope glb_env lcl_env name
-            then return ([], noHints)
-            else unknownNameSuggestions emptyLocalRdrEnv WL_RecField (mkRdrUnqual name) }
+          ; let field_name_hints = report_no_fieldnames item
+          ; (errs, hints) <- if occ_name_in_scope glb_env lcl_env name
+              then return ([], noHints)
+              else unknownNameSuggestions emptyLocalRdrEnv WL_RecField (mkRdrUnqual name)
+          ; pure (errs, hints ++ field_name_hints)
+          }
+
+    -- get type names from instance
+    -- resolve the type - if it's in scope is it a record?
+    -- if it's a record, report an error - the record name + the field that could not be found
+    report_no_fieldnames :: ErrorItem -> [GhcHint]
+    report_no_fieldnames item
+       | Just (EvVarDest evvar) <- ei_evdest item
+       -- we can assume that here we have a `HasField @Symbol x r a` instance
+       -- because of HasFieldOrigin in record_field
+       , Just (_, [_symbol, x, r, a]) <- tcSplitTyConApp_maybe (varType evvar)
+       , Just (r_tycon, _) <- tcSplitTyConApp_maybe r
+       , Just x_name <- isStrLitTy x
+       -- we check that this is a record type by checking whether it has any
+       -- fields (in scope)
+       , not . null $ tyConFieldLabels r_tycon
+       = [RemindRecordMissingField x_name r a]
+       | otherwise = []
 
     occ_name_in_scope glb_env lcl_env occ_name = not $
       null (lookupGRE_OccName (IncludeFields WantNormal) glb_env occ_name) &&

@@ -14,6 +14,7 @@ import GHC.Types.Hint
 
 import GHC.Core.FamInstEnv (FamFlavor(..))
 import GHC.Core.TyCon
+import GHC.Core.TyCo.Rep     ( mkVisFunTyMany )
 import GHC.Hs.Expr ()   -- instance Outputable
 import GHC.Tc.Types.Origin ( ClsInstOrQC(..) )
 import GHC.Types.Id
@@ -251,6 +252,12 @@ instance Outputable GhcHint where
     SuggestEtaReduceAbsDataTySyn tc
       -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
         where ppr_tc = quotes (ppr $ tyConName tc)
+    RemindRecordMissingField x r a ->
+      text "NB: There is no field selector" <+> ppr_sel
+        <+> text "in scope for record type" <+> ppr_r
+      where ppr_sel = quotes (ftext x <+> dcolon <+> ppr_arr_r_a)
+            ppr_arr_r_a = ppr $ mkVisFunTyMany r a
+            ppr_r = quotes $ ppr r
     SuggestBindTyVarOnLhs tv
       -> text "Bind" <+> quotes (ppr tv) <+> text "on the LHS of the type declaration"
 
