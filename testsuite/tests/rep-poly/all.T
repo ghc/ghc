@@ -115,3 +115,4 @@ test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 ###############################################################################
 test('T23153', normal, compile_fail, [''])
 test('T23154', normal, compile_fail, [''])
+test('T23176', normal, compile_fail, ['-XPartialTypeSignatures -fdefer-out-of-scope-variables'])
