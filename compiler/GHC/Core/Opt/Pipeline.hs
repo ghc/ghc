@@ -138,6 +138,7 @@ getCoreToDo dflags hpt_rule_base extra_vars
     late_specialise = gopt Opt_LateSpecialise             dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
+    builtin_rules_on = gopt Opt_EnableBuiltinRules        dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
     profiling     = ways dflags `hasWay` WayProf

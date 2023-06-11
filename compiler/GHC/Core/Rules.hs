@@ -523,6 +523,7 @@ map.
 -- successful.
 lookupRule :: RuleOpts -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
+           -> Bool -- Whether builtin rules are active
            -> Id -- Function head
            -> [CoreExpr] -- Args
            -> [CoreRule] -- Rules
@@ -530,7 +531,7 @@ lookupRule :: RuleOpts -> InScopeEnv
 
 -- See Note [Extra args in the target]
 -- See comments on matchRule
-lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
+lookupRule opts rule_env@(ISE in_scope _) is_active builtin_is_active fn args rules
   = -- pprTrace "lookupRule" (ppr fn <+> ppr args $$ ppr rules $$ ppr in_scope) $
     case go [] rules of
         []     -> Nothing
@@ -547,7 +548,7 @@ lookupRule opts rule_env@(ISE in_scope _) is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule opts rule_env is_active fn args' rough_args r
+      | Just e <- matchRule opts rule_env is_active builtin_is_active fn args' rough_args r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -645,7 +646,7 @@ start, in general eta expansion wastes work.  SLPJ July 99
 -}
 
 ------------------------------------
-matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
+matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool) -> Bool
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -674,14 +675,13 @@ matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
 -- NB: The 'surplus' argument e4 in the input is simply dropped.
 -- See Note [Extra args in the target]
 
-matchRule opts rule_env _is_active fn args _rough_args
+matchRule opts rule_env _is_active builtin_is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
--- Built-in rules can't be switched off, it seems
-  = case match_fn opts rule_env fn args of
-        Nothing   -> Nothing
-        Just expr -> Just expr
+  = if builtin_is_active
+      then match_fn opts rule_env fn args
+      else Nothing
 
-matchRule _ rule_env is_active _ args rough_args
+matchRule _ rule_env is_active _ _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
   | not (is_active act)               = Nothing
@@ -1870,7 +1870,7 @@ ruleAppCheck_help env fn args rules
 
     rule_info opts rule
         | Just _ <- matchRule opts (ISE emptyInScopeSet (rc_id_unf env))
-                              noBlackList fn args rough_args rule
+                              noBlackList True fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
     rule_info _ (BuiltinRule {}) = text "does not match"

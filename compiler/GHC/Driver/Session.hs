@@ -2340,6 +2340,7 @@ fFlagsDeps = [
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
+  flagSpec "enable-builtin-rules"             Opt_EnableBuiltinRules,
   flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,

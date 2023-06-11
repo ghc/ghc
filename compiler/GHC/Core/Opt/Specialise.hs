@@ -1822,7 +1822,7 @@ specLookupRule :: SpecEnv -> Id -> [CoreExpr]
                -> CompilerPhase  -- Look up rules as if we were in this phase
                -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 specLookupRule env fn args phase rules
-  = lookupRule ropts in_scope_env is_active fn args rules
+  = lookupRule ropts in_scope_env is_active True fn args rules
   where
     dflags       = se_dflags env
     in_scope     = getSubstInScope (se_subst env)

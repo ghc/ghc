@@ -271,6 +271,7 @@ data GeneralFlag
    | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
+   | Opt_EnableBuiltinRules             -- Apply built-in rules during simplification
    | Opt_EnableThSpliceWarnings         -- Enable warnings for TH splices
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
@@ -516,6 +517,7 @@ optimisationFlags = EnumSet.fromList
    , Opt_UnboxSmallStrictFields
    , Opt_DictsCheap
    , Opt_EnableRewriteRules
+   , Opt_EnableBuiltinRules
    , Opt_RegsGraph
    , Opt_RegsIterative
    , Opt_PedanticBottoms

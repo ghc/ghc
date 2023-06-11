@@ -1273,7 +1273,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
           -- to 'build' but don't run the simplifier passes that
           -- would rewrite them back to cons cells!  This seems
           -- silly, and matters for the GHCi debugger.
-
+    , ([0,1,2], Opt_EnableBuiltinRules)
     , ([1,2],   Opt_FloatIn)
     , ([1,2],   Opt_FullLaziness)
     , ([1,2],   Opt_IgnoreAsserts)

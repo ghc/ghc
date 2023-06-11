@@ -2484,7 +2484,8 @@ tryRules env rules fn args call_cont
 -}
 
   | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
-                                        (activeRule (seMode env)) fn
+                                        (activeRule (seMode env))
+                                        (sm_builtin_rules (seMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
   = do { logger <- getLogger
