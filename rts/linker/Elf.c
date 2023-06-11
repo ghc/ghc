@@ -132,6 +132,11 @@
 
 */
 
+#if defined(SHN_XINDEX)
+/* global variable which address is used to signal an uninitialised shndx_table */
+Elf_Word shndx_table_uninit_label = 0;
+#endif
+
 static Elf_Word elf_shnum(Elf_Ehdr* ehdr)
 {
    Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
@@ -154,16 +159,22 @@ static Elf_Word elf_shstrndx(Elf_Ehdr* ehdr)
 
 #if defined(SHN_XINDEX)
 static Elf_Word*
-get_shndx_table(Elf_Ehdr* ehdr)
+get_shndx_table(ObjectCode* oc)
 {
+   if (RTS_LIKELY(oc->shndx_table != SHNDX_TABLE_UNINIT)) {
+      return oc->shndx_table;
+   }
+
    Elf_Word  i;
-   char*     ehdrC    = (char*)ehdr;
+   char*     ehdrC    = oc->image;
+   Elf_Ehdr* ehdr     = (Elf_Ehdr*)ehdrC;
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
    const Elf_Word shnum = elf_shnum(ehdr);
 
    for (i = 0; i < shnum; i++) {
      if (shdr[i].sh_type == SHT_SYMTAB_SHNDX) {
-       return (Elf32_Word*)(ehdrC + shdr[i].sh_offset);
+       oc->shndx_table = (Elf32_Word*)(ehdrC + shdr[i].sh_offset);
+       return oc->shndx_table;
      }
    }
    return NULL;
@@ -193,6 +204,10 @@ ocInit_ELF(ObjectCode * oc)
 
     oc->n_sections = elf_shnum(oc->info->elfHeader);
 
+    ElfRelocationTable *relTableLast = NULL;
+    ElfRelocationATable *relaTableLast = NULL;
+    ElfSymbolTable *symbolTablesLast = NULL;
+
     /* get the symbol table(s) */
     for(int i=0; i < oc->n_sections; i++) {
         if(SHT_REL  == oc->info->sectionHeader[i].sh_type) {
@@ -210,12 +225,12 @@ ocInit_ELF(ObjectCode * oc)
 
             relTab->sectionHeader      = &oc->info->sectionHeader[i];
 
-            if(oc->info->relTable == NULL) {
+            if(relTableLast == NULL) {
                 oc->info->relTable = relTab;
+                relTableLast = relTab;
             } else {
-                ElfRelocationTable * tail = oc->info->relTable;
-                while(tail->next != NULL) tail = tail->next;
-                tail->next = relTab;
+                relTableLast->next = relTab;
+                relTableLast = relTab;
             }
 
         } else if(SHT_RELA == oc->info->sectionHeader[i].sh_type) {
@@ -233,12 +248,12 @@ ocInit_ELF(ObjectCode * oc)
 
             relTab->sectionHeader      = &oc->info->sectionHeader[i];
 
-            if(oc->info->relaTable == NULL) {
+            if(relaTableLast == NULL) {
                 oc->info->relaTable = relTab;
+                relaTableLast = relTab;
             } else {
-                ElfRelocationATable * tail = oc->info->relaTable;
-                while(tail->next != NULL) tail = tail->next;
-                tail->next = relTab;
+                relaTableLast->next = relTab;
+                relaTableLast = relTab;
             }
 
         } else if(SHT_SYMTAB == oc->info->sectionHeader[i].sh_type) {
@@ -279,12 +294,12 @@ ocInit_ELF(ObjectCode * oc)
             }
 
             /* append the ElfSymbolTable */
-            if(oc->info->symbolTables == NULL) {
+            if(symbolTablesLast == NULL) {
                 oc->info->symbolTables = symTab;
+                symbolTablesLast = symTab;
             } else {
-                ElfSymbolTable * tail = oc->info->symbolTables;
-                while(tail->next != NULL) tail = tail->next;
-                tail->next = symTab;
+                symbolTablesLast->next = symTab;
+                symbolTablesLast = symTab;
             }
         }
     }
@@ -329,6 +344,9 @@ ocDeinit_ELF(ObjectCode * oc)
 
         stgFree(oc->info);
         oc->info = NULL;
+#if defined(SHN_XINDEX)
+        oc->shndx_table = SHNDX_TABLE_UNINIT;
+#endif
     }
 }
 
@@ -532,7 +550,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       IF_DEBUG(linker_verbose,debugBelch("   no normal string tables (potentially, but not necessarily a problem)\n"));
    }
 #if defined(SHN_XINDEX)
-   Elf_Word* shndxTable = get_shndx_table(ehdr);
+   Elf_Word* shndxTable = get_shndx_table(oc);
 #endif
    nsymtabs = 0;
    IF_DEBUG(linker_verbose,debugBelch( "Symbol tables\n" ));
@@ -683,7 +701,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    Elf_Shdr* shdr     = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
    Section * sections;
 #if defined(SHN_XINDEX)
-   Elf_Word* shndxTable = get_shndx_table(ehdr);
+   Elf_Word* shndxTable = get_shndx_table(oc);
 #endif
    const Elf_Word shnum = elf_shnum(ehdr);
 
@@ -1251,7 +1269,11 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        IF_DEBUG(linker_verbose,
                 debugBelch("Reloc: P = %p   S = %p   A = %p   type=%d\n",
                            (void*)P, (void*)S, (void*)A, reloc_type ));
+#if defined(DEBUG)
        checkProddableBlock ( oc, pP, sizeof(Elf_Word) );
+#else
+       (void) pP; /* suppress unused varialbe warning in non-debug build */
+#endif
 
 #if defined(i386_HOST_ARCH)
        value = S + A;
@@ -1555,7 +1577,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    int strtab_shndx = shdr[symtab_shndx].sh_link;
    int target_shndx = shdr[shnum].sh_info;
 #if defined(SHN_XINDEX)
-   Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
+   Elf_Word* shndx_table = get_shndx_table(oc);
 #endif
 #if defined(DEBUG) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
    /* This #if def only serves to avoid unused-var warnings. */
@@ -1657,7 +1679,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker_verbose,debugBelch("`%s' resolves to %p\n", symbol, (void*)S));
       }
 
-#if defined(DEBUG) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG)
       IF_DEBUG(linker_verbose,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
                                          (void*)P, (void*)S, (void*)A ));
       checkProddableBlock(oc, (void*)P, sizeof(Elf_Word));
@@ -1920,7 +1942,7 @@ ocResolve_ELF ( ObjectCode* oc )
    const Elf_Word shnum = elf_shnum(ehdr);
 
 #if defined(SHN_XINDEX)
-    Elf_Word* shndxTable = get_shndx_table(ehdr);
+    Elf_Word* shndxTable = get_shndx_table(oc);
 #endif
 
     /* resolve section symbols
