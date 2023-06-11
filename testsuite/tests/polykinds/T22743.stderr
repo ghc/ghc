@@ -1,7 +1,10 @@
 
 T22743.hs:10:1: error:
-    • Quantified type's kind mentions quantified type variable
-        type: ‘forall {f :: * -> RuntimeRep} {g} {a :: TYPE (f g)}. a’
-      where the body of the forall has this kind: ‘TYPE (f g)’
-    • When checking the inferred type
-        x :: forall {f :: * -> RuntimeRep} {g} {a :: TYPE (f g)}. a
+    The binder ‘x’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.
+
+T22743.hs:10:1: error:
+    The binder ‘x’
+    cannot be assigned a fixed runtime representation, not even by defaulting.
+    Suggested fix: Add a type signature.

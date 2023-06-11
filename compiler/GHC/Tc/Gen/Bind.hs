@@ -1095,6 +1095,22 @@ Examples that might fail:
                                 or multi-parameter type classes
  - an inferred type that includes unboxed tuples
 
+Note [Inferred type with escaping kind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Check for an inferred type with an escaping kind; e.g. #23051
+   forall {k} {f :: k -> RuntimeRep} {g :: k} {a :: TYPE (f g)}. a
+where the kind of the body of the forall mentions `f` and `g` which
+are bound by the forall.  No no no.
+
+This check, mkInferredPolyId, is really in the wrong place:
+`inferred_poly_ty` doesn't obey the PKTI and it would be better not to
+generalise it in the first place; see #20686.  But for now it works.
+
+I considered adjusting the generalisation in GHC.Tc.Solver to directly check for
+escaping kind variables; instead, promoting or defaulting them. But that
+gets into the defaulting swamp and is a non-trivial and unforced
+change, so I have left it alone for now.
+
 Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1184,7 +1200,9 @@ tcMonoBinds is_rec sig_fn no_gen
   , Nothing <- sig_fn name   -- ...with no type signature
   = setSrcSpanA b_loc    $
     do  { ((co_fn, matches'), rhs_ty')
-            <- tcInfer $ \ exp_ty ->
+            <- tcInferFRR (FRRBinder name) $ \ exp_ty ->
+                          -- tcInferFRR: the type of a let-binder must have
+                          -- a fixed runtime rep. See #23176
                        tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                           -- We extend the error context even for a non-recursive
                           -- function so that in type error messages we show the
@@ -1206,7 +1224,9 @@ tcMonoBinds is_rec sig_fn no_gen
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , all (isNothing . sig_fn) bndrs
   = addErrCtxt (patMonoBindsCtxt pat grhss) $
-    do { (grhss', pat_ty) <- tcInfer $ \ exp_ty ->
+    do { (grhss', pat_ty) <- tcInferFRR FRRPatBind $ \ exp_ty ->
+                          -- tcInferFRR: the type of each let-binder must have
+                          -- a fixed runtime rep. See #23176
                              tcGRHSsPat grhss exp_ty
 
        ; let exp_pat_ty :: Scaled ExpSigmaTypeFRR
