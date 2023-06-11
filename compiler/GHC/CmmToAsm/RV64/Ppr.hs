@@ -561,6 +561,7 @@ pprInstr platform instr = case instr of
     ULE -> line $ text "\tbgeu" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
     UGE -> line $ text "\tbgeu" <+> pprOp platform l <> comma <+> pprOp platform r <> comma <+> getLabel platform t
     UGT -> line $ text "\tbltu" <+> pprOp platform r <> comma <+> pprOp platform l <> comma <+> getLabel platform t
+    _   -> panic $ "RV64.ppr: unhandled BCOND conditional: " ++ show c
 
   BCOND _ _ _ (TReg _)     -> panic "RV64.ppr: No conditional branching to registers!"
 
@@ -583,7 +584,7 @@ pprInstr platform instr = case instr of
     UGE -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform r
                   , text "\txori" <+>  pprOp platform o <> comma <+> pprOp platform o <> comma <+> text "1" ]
     UGT -> lines_ [ sltuFor l r <+> pprOp platform o <> comma <+> pprOp platform r <> comma <+> pprOp platform l ]
-    _  -> panic "RV64.ppr: unhandled CSET conditional"
+    _  -> panic $ "RV64.ppr: unhandled CSET conditional: " ++ show c
     where
       subFor l r | (OpImm _) <- r = text "\taddi" <+> pprOp platform o <> comma <+> pprOp platform l <> comma <+> pprOp platform (negOp r)
                  | (OpImm _) <- l = panic "RV64.ppr: Cannot SUB IMM _"
@@ -649,8 +650,7 @@ pprInstr platform instr = case instr of
   -- LDP _f o1 o2 o3 -> op3 (text "\tldp") o1 o2 o3
 
   -- 8. Synchronization Instructions -------------------------------------------
-  DMBSY DmbRead -> line $ text "\tfence r,r"
-  DMBSY DmbWrite -> line $ text "\tfence w,w"
+  DMBSY r w -> line $ text "\tfence" <+> pprDmbType r <> char ',' <+> pprDmbType w
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
@@ -664,6 +664,9 @@ pprInstr platform instr = case instr of
       --  op_ldr o1 rest      = line $ text "\tld" <+> pprOp platform o1 <> comma <+> rest  <+> text "(" <> pprOp platform o1 <> text ")"
       --  op_adrp o1 rest     = line $ text "\tauipc" <+> pprOp platform o1 <> comma <+> rest
       --  op_add o1 rest      = line $ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> rest
+       pprDmbType DmbRead = text "r"
+       pprDmbType DmbWrite = text "w"
+       pprDmbType DmbReadWrite = text "rw"
 
 pprBcond :: IsLine doc => Cond -> doc
 pprBcond c = text "b." <> pprCond c

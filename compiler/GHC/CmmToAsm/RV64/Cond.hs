@@ -65,4 +65,4 @@ data Cond
     | NEVER  -- b.nv
     | VS     -- oVerflow set
     | VC     -- oVerflow clear
-    deriving Eq
+    deriving (Eq, Show)

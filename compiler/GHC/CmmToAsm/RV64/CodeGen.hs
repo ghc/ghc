@@ -1577,8 +1577,12 @@ genCCall target dest_regs arg_regs bid = do
 
         -- Memory Ordering
         -- The concrete encoding is copied from load_load_barrier() and write_barrier() (SMP.h)
-        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead), Nothing)
-        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite), Nothing)
+        -- TODO: This needs to be changed for https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10628
+        -- The related C functions are:
+        -- atomic_thread_fence(memory_order_acquire);
+        -- atomic_thread_fence(memory_order_release);
+        MO_ReadBarrier      ->  return (unitOL (DMBSY DmbRead DmbRead), Nothing)
+        MO_WriteBarrier     ->  return (unitOL (DMBSY DmbWrite DmbWrite), Nothing)
         MO_Touch            ->  return (nilOL, Nothing) -- Keep variables live (when using interior pointers)
         -- Prefetch
         MO_Prefetch_Data _n -> return (nilOL, Nothing) -- Prefetch hint.
@@ -1606,32 +1610,53 @@ genCCall target dest_regs arg_regs bid = do
         MO_BSwap w          -> mkCCall (bSwapLabel w)
         MO_BRev w           -> mkCCall (bRevLabel w)
 
-        -- -- Atomic read-modify-write.
-        MO_AtomicRead w ord
+        -- Atomic read-modify-write.
+        mo@(MO_AtomicRead w ord)
           | [p_reg] <- arg_regs
           , [dst_reg] <- dest_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               platform <- getPlatform
-              let instr = case ord of
-                      MemOrderRelaxed -> LDR
-                      _               -> panic "no proper atomic write support" -- LDAR
+              -- See __atomic_load_n (in C)
+              let instrs = case ord of
+                      MemOrderRelaxed -> unitOL $ ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p))
+                      MemOrderAcquire -> toOL [
+                                                ann moDescr (LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)),
+                                                DMBSY DmbRead DmbReadWrite
+                                              ]
+                      MemOrderSeqCst -> toOL [
+                                                ann moDescr (DMBSY DmbReadWrite DmbReadWrite),
+                                                LDR (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p),
+                                                DMBSY DmbRead DmbReadWrite
+                                              ]
+                      MemOrderRelease -> panic $ "Unexpected MemOrderRelease on an AtomicRead: " ++ show mo
                   dst = getRegisterReg platform (CmmLocal dst_reg)
+                  moDescr = (text . show) mo
                   code =
-                    code_p `snocOL`
-                    instr (intFormat w) (OpReg w dst) (OpAddr $ AddrReg p)
+                    code_p `appOL`
+                    instrs
               return (code, Nothing)
           | otherwise -> panic "mal-formed AtomicRead"
-        MO_AtomicWrite w ord
+        mo@(MO_AtomicWrite w ord)
           | [p_reg, val_reg] <- arg_regs -> do
               (p, _fmt_p, code_p) <- getSomeReg p_reg
               (val, fmt_val, code_val) <- getSomeReg val_reg
-              let instr = case ord of
-                      MemOrderRelaxed -> STR
-                      _               -> panic "no proper atomic write support" -- STLR
+              -- See __atomic_store_n (in C)
+              let instrs = case ord of
+                      MemOrderRelaxed -> unitOL $ ann moDescr (STR fmt_val (OpReg w val) (OpAddr $ AddrReg p))
+                      MemOrderSeqCst  -> toOL [
+                                                ann moDescr (DMBSY DmbReadWrite DmbWrite),
+                                                STR fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                                              ]
+                      MemOrderRelease -> toOL [
+                                                ann moDescr (DMBSY DmbReadWrite DmbWrite),
+                                                STR fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                                              ]
+                      MemOrderAcquire ->  panic $ "Unexpected MemOrderAcquire on an AtomicWrite" ++ show mo
+                  moDescr = (text . show) mo
                   code =
                     code_p `appOL`
-                    code_val `snocOL`
-                    instr fmt_val (OpReg w val) (OpAddr $ AddrReg p)
+                    code_val `appOL`
+                    instrs
               return (code, Nothing)
           | otherwise -> panic "mal-formed AtomicWrite"
         MO_AtomicRMW w amop -> mkCCall (atomicRMWLabel w amop)
