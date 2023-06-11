@@ -681,7 +681,6 @@
 // For discussion of how these are used to fence heap object
 // accesses see Note [Heap memory barriers] in SMP.h.
 #if defined(THREADED_RTS)
-#define prim_read_barrier prim %read_barrier()
 #define prim_write_barrier prim %write_barrier()
 
 // See Note [ThreadSanitizer and fences]
