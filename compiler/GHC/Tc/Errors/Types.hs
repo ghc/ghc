@@ -523,10 +523,13 @@ data TcRnMessage where
       a warning is declared twice.
 
       Examples(s):
-        None.
+        {-# DEPRECATED foo "Don't use me" #-}
+        {-# DEPRECATED foo "Don't use me" #-}
+        foo :: Int
+        foo = 2
 
      Test cases:
-        None.
+        rename/should_fail/rnfail058
   -}
   TcRnDuplicateWarningDecls :: !(LocatedN RdrName) -> !RdrName -> TcRnMessage
 
