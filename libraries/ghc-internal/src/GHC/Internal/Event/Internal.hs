@@ -41,6 +41,14 @@ data Backend = forall a. Backend {
 
     -- | Register, modify, or unregister interest in the given events
     -- on the given file descriptor.
+    --
+    -- Returns 'True' if the modification succeeded.
+    -- Returns 'False' if this backend does not support
+    -- event notifications on this type of file.
+    --
+    -- If this function throws, the IO manager assumes that the registration
+    -- of the file descriptor failed, so the backend must not throw if the
+    -- registration was successful.
     , _beModifyFd :: a
                   -> Fd       -- file descriptor
                   -> Event    -- old events to watch for ('mempty' for new)
@@ -49,6 +57,14 @@ data Backend = forall a. Backend {
 
     -- | Register interest in new events on a given file descriptor, set
     -- to be deactivated after the first event.
+    --
+    -- Returns 'True' if the modification succeeded.
+    -- Returns 'False' if this backend does not support
+    -- event notifications on this type of file.
+    --
+    -- If this function throws, the IO manager assumes that the registration
+    -- of the file descriptor failed, so the backend must not throw if the
+    -- registration was successful.
     , _beModifyFdOnce :: a
                          -> Fd    -- file descriptor
                          -> Event -- new events to watch

@@ -312,6 +312,11 @@ step mgr@EventManager{..} = do
 -- platform's @select@ or @epoll@ system call, which tend to vary in
 -- what sort of fds are permitted. For instance, waiting on regular files
 -- is not allowed on many platforms.
+--
+-- This function rethrows exceptions originating from the underlying backend,
+-- for instance due to concurrently closing a file descriptor while it is
+-- just being registered. In that case, it assumes that the registration was
+-- not successful. See #21969.
 registerFd_ :: EventManager -> IOCallback -> Fd -> Event -> Lifetime
             -> IO (FdKey, Bool)
 registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
@@ -327,13 +332,20 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
 
         el' :: EventLifetime
         el' = prevEvs `mappend` el
+
+        -- Used for restoring the old state if registering the FD
+        -- in the backend failed, due to either
+        -- 1. that file type not being supported, or
+        -- 2. the backend throwing an exception
+        undoRegistration = IT.reset fd' oldFdd tbl
     case I.elLifetime el' of
       -- All registrations want one-shot semantics and this is supported
       OneShot | haveOneShot -> do
         ok <- I.modifyFdOnce emBackend fd (I.elEvent el')
+          `onException` undoRegistration
         if ok
           then return (False, True)
-          else IT.reset fd' oldFdd tbl >> return (False, False)
+          else undoRegistration >> return (False, False)
 
       -- We don't want or don't support one-shot semantics
       _ -> do
@@ -342,10 +354,11 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
               then let newEvs = I.elEvent el'
                        oldEvs = I.elEvent prevEvs
                    in I.modifyFd emBackend fd oldEvs newEvs
+                        `onException` undoRegistration
               else return True
         if ok
           then return (modify, True)
-          else IT.reset fd' oldFdd tbl >> return (False, False)
+          else undoRegistration >> return (False, False)
   -- this simulates behavior of old IO manager:
   -- i.e. just call the callback if the registration fails.
   when (not ok) (cb reg evs)

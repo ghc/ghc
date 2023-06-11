@@ -265,6 +265,16 @@ test('T21651',
      ],
      compile_and_run, [''])
 
+test('T21969',
+     [ only_ways(['threaded1','threaded2', 'nonmoving_thr', 'profthreaded']),
+       when(opsys('mingw32'),skip), # uses POSIX pipes
+       extra_run_opts('50000'),
+       run_timeout_multiplier(0.3), # default timeout seems to be 300, but lockups happen quickly
+       req_target_smp,
+       req_ghc_smp
+     ],
+     compile_and_run, [''])
+
 test('hs_try_putmvar001',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code

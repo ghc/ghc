@@ -61,6 +61,11 @@ evtWrite = Event 2
 {-# INLINE evtWrite #-}
 
 -- | Another thread closed the file descriptor.
+--
+-- This event is only meant to be used by @'closeFdWith'@ to signal other
+-- threads currently waiting on the same file descriptor that it was closed.
+-- It is not meant to be waited on directly and intentionally not exposed
+-- in the external interface (only @'evtRead'@ and @'evtWrite'@ are).
 evtClose :: Event
 evtClose = Event 4
 {-# INLINE evtClose #-}

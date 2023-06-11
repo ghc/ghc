@@ -112,6 +112,13 @@ threadWaitWrite = threadWait evtWrite
 -- Any threads that are blocked on the file descriptor via
 -- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
 -- IO exceptions thrown.
+--
+-- Closing file descriptors on one thread while they are still being
+-- used by other threads is always prone to race conditions (since e.g.
+-- on Linux file descriptors can be immediately reused after closing).
+--
+-- It is recommended to only call @'closeFdWith'@ when the file descriptor
+-- can no longer be used by other threads.
 closeFdWith :: (Fd -> IO ())        -- ^ Action that performs the close.
             -> Fd                   -- ^ File descriptor to close.
             -> IO ()
@@ -154,6 +161,10 @@ closeFdWith close fd = close_loop
             close fd `finally` sequence_ (zipWith3 finish mgrs tables cbApps)
             pure (pure ())
 
+-- | Wait for an event on a file descriptor.
+--
+-- The given @'Event'@ may only be (a combination of) @'evtRead'@ or
+-- @'evtWrite'@, but not @'evtClose'@. See @'evtClose'@ for more details.
 threadWait :: Event -> Fd -> IO ()
 threadWait evt fd = mask_ $ do
   m <- newEmptyMVar

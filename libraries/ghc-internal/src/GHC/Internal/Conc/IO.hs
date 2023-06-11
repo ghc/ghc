@@ -176,14 +176,22 @@ threadWaitWriteSTM fd
       let killAction = Sync.killThread t
       return (waitAction, killAction)
 
--- | Close a file descriptor in a concurrency-safe way (GHC only).  If
--- you are using 'threadWaitRead' or 'threadWaitWrite' to perform
--- blocking I\/O, you /must/ use this function to close file
--- descriptors, or blocked threads may not be woken.
+-- | Close a file descriptor in a concurrency-safe way as far as the runtime
+-- system is concerned (GHC only).  If you are using 'threadWaitRead' or
+-- 'threadWaitWrite' to perform blocking I\/O, you /must/ use this function
+-- to close file descriptors, or blocked threads may not be woken.
 --
 -- Any threads that are blocked on the file descriptor via
 -- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
 -- IO exceptions thrown.
+--
+-- Note that on systems that reuse file descriptors (such as Linux),
+-- using this function on a file descriptor while other threads can still
+-- potentially use it is always prone to race conditions without further
+-- synchronization.
+--
+-- It is recommended to only call @'closeFdWith'@ once no other threads can
+-- use the given file descriptor anymore.
 closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
             -> Fd            -- ^ File descriptor to close.
             -> IO ()
