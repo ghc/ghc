@@ -929,7 +929,6 @@ extern char **environ;
       SymI_HasProto(hs_spt_remove)                                      \
       SymI_HasProto(hs_spt_keys)                                        \
       SymI_HasProto(hs_spt_key_count)                                   \
-      SymI_HasProto(write_barrier)                                      \
       SymI_HasProto(cas)                                                \
       SymI_HasProto(_assertFail)                                        \
       SymI_HasProto(keepCAFs)                                           \

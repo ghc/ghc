@@ -44,11 +44,6 @@ void arm_atomic_spin_unlock(void);
    ------------------------------------------------------------------------- */
 
 #if !IN_STG_CODE || IN_STGCRUN
-// We only want the barriers, e.g. write_barrier(), declared in .hc
-// files.  Defining the other inline functions here causes type
-// mismatch errors from gcc, because the generated C code is assuming
-// that there are no prototypes in scope.
-
 /*
  * The atomic exchange operation: xchg(p,w) exchanges the value
  * pointed to by p with the value w, returning the old value.
@@ -104,18 +99,6 @@ EXTERN_INLINE StgWord atomic_dec(StgVolatilePtr p);
 EXTERN_INLINE void busy_wait_nop(void);
 
 #endif // !IN_STG_CODE
-
-/*
- * Various kinds of memory barrier.
- *  write_barrier: prevents future stores occurring before preceding stores.
- *
- * Reference for these: "The JSR-133 Cookbook for Compiler Writers"
- * http://gee.cs.oswego.edu/dl/jmm/cookbook.html
- *
- * To check whether you got these right, try the test in
- *   testsuite/tests/rts/testwsdeque.c
- */
-EXTERN_INLINE void write_barrier(void);
 
 /*
  * Note [Heap memory barriers]
@@ -457,39 +440,6 @@ busy_wait_nop(void)
 
 #endif // !IN_STG_CODE
 
-/*
- * We need to tell both the compiler AND the CPU about the barriers.
- * It's no good preventing the CPU from reordering the operations if
- * the compiler has already done so - hence the "memory" restriction
- * on each of the barriers below.
- */
-EXTERN_INLINE void
-write_barrier(void) {
-#if defined(NOSMP)
-    return;
-#elif defined(TSAN_ENABLED)
-    // RELEASE is a bit stronger than the store-store barrier provided by
-    // write_barrier, consequently we only use this case as a conservative
-    // approximation when using ThreadSanitizer. See Note [ThreadSanitizer].
-    __atomic_thread_fence(__ATOMIC_RELEASE);
-#elif defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-    || defined(powerpc64le_HOST_ARCH)
-    __asm__ __volatile__ ("lwsync" : : : "memory");
-#elif defined(s390x_HOST_ARCH)
-    __asm__ __volatile__ ("" : : : "memory");
-#elif defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dmb  st" : : : "memory");
-#elif defined(riscv64_HOST_ARCH)
-    __asm__ __volatile__ ("fence w,w" : : : "memory");
-#elif defined(loongarch64_HOST_ARCH)
-    __asm__ __volatile__ ("dbar 0" : : : "memory");
-#else
-#error memory barriers unimplemented on this architecture
-#endif
-}
-
 // Load a pointer from a memory location that might be being modified
 // concurrently.  This prevents the compiler from optimising away
 // multiple loads of the memory location, as it might otherwise do in
@@ -527,9 +477,6 @@ write_barrier(void) {
 
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
-
-EXTERN_INLINE void write_barrier(void);
-EXTERN_INLINE void write_barrier     (void) {} /* nothing */
 
 // Relaxed atomic operations
 #define RELAXED_LOAD(ptr) *ptr
