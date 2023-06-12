@@ -102,7 +102,8 @@ trivColorable
         -> Triv VirtualReg RegClass RealReg
 
 trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts exclusions
-        | let cALLOCATABLE_REGS_INTEGER
+        | -- Allocatable are all regs of this class, where freeReg == True (MachRegs.h)
+          let cALLOCATABLE_REGS_INTEGER
                   =        (case platformArch platform of
                             ArchX86       -> 3
                             ArchX86_64    -> 5
@@ -110,6 +111,9 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchPPC_64 _  -> 15
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
                             -- N.B. x18 is reserved by the platform on AArch64/Darwin
+                            -- 32 - Base - Sp - Hp - R1..R6 - SpLim - IP0 - SP - LR - FP - X18
+                            -- -> 32 - 15 = 17
+                            -- (one stack pointer for Haskell, one for C)
                             ArchAArch64   -> 17
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
@@ -179,7 +183,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchPPC       -> 26
                             ArchPPC_64 _  -> 20
                             ArchARM _ _ _ -> panic "trivColorable ArchARM"
-                            ArchAArch64   -> 32
+                            ArchAArch64   -> 28 -- 32 - D1..D4
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
