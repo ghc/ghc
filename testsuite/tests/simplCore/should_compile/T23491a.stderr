@@ -1,0 +1,4 @@
+==================== Float out(FOS {Lam = Just 0, Consts = True, OverSatApps = False}) ====================
+Result size of Float out(FOS {Lam = Just 0, Consts = True, OverSatApps = False})
+==================== Float out(FOS {Lam = Just 0, Consts = True, OverSatApps = True}) ====================
+Result size of Float out(FOS {Lam = Just 0, Consts = True, OverSatApps = True})
