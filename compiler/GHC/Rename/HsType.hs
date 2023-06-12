@@ -1799,8 +1799,7 @@ one exists:
     a free variable 'a', which we implicitly quantify over. That is why we can
     also use it to the left of the double colon: 'Left a
 
-The logic resides in extractHsTyRdrTyVarsKindVars. We use it both for type
-synonyms and type family instances.
+The logic resides in extractHsTyRdrTyVarsKindVars.
 
 This was a stopgap solution until we could explicitly bind invisible
 type/kind variables:

@@ -634,14 +634,10 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 
 rnFamEqn :: HsDocContext
          -> AssocTyFamInfo
-         -> FreeKiTyVars
-         -- ^ Additional kind variables to implicitly bind if there is no
-         --   explicit forall. (See the comments on @all_imp_vars@ below for a
-         --   more detailed explanation.)
          -> FamEqn GhcPs rhs
          -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
          -> RnM (FamEqn GhcRn rhs', FreeVars)
-rnFamEqn doc atfi extra_kvars
+rnFamEqn doc atfi
     (FamEqn { feqn_tycon  = tycon
             , feqn_bndrs  = outer_bndrs
             , feqn_pats   = pats
@@ -652,19 +648,8 @@ rnFamEqn doc atfi extra_kvars
          -- all_imp_vars represent the implicitly bound type variables. This is
          -- empty if we have an explicit `forall` (see
          -- Note [forall-or-nothing rule] in GHC.Hs.Type), which means
-         -- ignoring:
-         --
-         -- - pat_kity_vars, the free variables mentioned in the type patterns
-         --   on the LHS of the equation, and
-         -- - extra_kvars, which is one of the following:
-         --   * For type family instances, extra_kvars are the free kind
-         --     variables mentioned in an outermost kind signature on the RHS
-         --     of the equation.
-         --     (See Note [Implicit quantification in type synonyms] in
-         --     GHC.Rename.HsType.)
-         --   * For data family instances, extra_kvars are the free kind
-         --     variables mentioned in the explicit return kind, if one is
-         --     provided. (e.g., the `k` in `data instance T :: k -> Type`).
+         -- ignoring pat_kity_vars, the free variables mentioned in the type patterns
+         -- on the LHS of the equation
          --
          -- Some examples:
          --
@@ -678,8 +663,6 @@ rnFamEqn doc atfi extra_kvars
          -- type family G :: Maybe a
          -- type instance forall a. G = (Nothing :: Maybe a)
          --   -- all_imp_vars = []
-         -- type instance G = (Nothing :: Maybe a)
-         --   -- all_imp_vars = [a]
          --
          -- data family H :: k -> Type
          -- data instance forall k. H :: k -> Type where ...
@@ -690,7 +673,7 @@ rnFamEqn doc atfi extra_kvars
          --
          -- For associated type family instances, exclude the type variables
          -- bound by the instance head with filterInScopeM (#19649).
-       ; all_imp_vars <- filterInScopeM $ pat_kity_vars ++ extra_kvars
+       ; all_imp_vars <- filterInScopeM $ pat_kity_vars
 
        ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
@@ -727,21 +710,12 @@ rnFamEqn doc atfi extra_kvars
          -- associated family instance but not bound on the LHS, then reject
          -- that type variable as being out of scope.
          -- See Note [Renaming associated types].
-         -- Per that Note, the LHS type variables consist of:
-         --
-         -- - The variables mentioned in the instance's type patterns
-         --   (pat_fvs), and
-         --
-         -- - The variables mentioned in an outermost kind signature on the
-         --   RHS. This is a subset of `rhs_fvs`. To compute it, we look up
-         --   each RdrName in `extra_kvars` to find its corresponding Name in
-         --   the LocalRdrEnv.
-       ; extra_kvar_nms <- mapMaybeM (lookupLocalOccRn_maybe . unLoc) extra_kvars
-       ; let lhs_bound_vars = pat_fvs `extendNameSetList` extra_kvar_nms
-             improperly_scoped cls_tkv =
+         -- Per that Note, the LHS type variables consist of the variables
+         -- mentioned in the instance's type patterns (pat_fvs)
+       ; let improperly_scoped cls_tkv =
                   cls_tkv `elemNameSet` rhs_fvs
                     -- Mentioned on the RHS...
-               && not (cls_tkv `elemNameSet` lhs_bound_vars)
+               && not (cls_tkv `elemNameSet` pat_fvs)
                     -- ...but not bound on the LHS.
              bad_tvs = filter improperly_scoped inst_head_tvs
        ; unless (null bad_tvs) (addErr (TcRnBadAssocRhs bad_tvs))
@@ -786,7 +760,7 @@ rnFamEqn doc atfi extra_kvars
     --
     --   type instance F a b c = Either a b
     --                   ^^^^^
-    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLocA extra_kvars of
+    lhs_loc = case map lhsTypeArgSrcSpan pats of
       []         -> panic "rnFamEqn.lhs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
@@ -845,10 +819,9 @@ data ClosedTyFamInfo
 rnTyFamInstEqn :: AssocTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn atfi eqn@(FamEqn { feqn_tycon = tycon, feqn_rhs = rhs })
-  = rnFamEqn (TySynCtx tycon) atfi extra_kvs eqn rnTySyn
-  where
-    extra_kvs = extractHsTyRdrTyVarsKindVars rhs
+rnTyFamInstEqn atfi eqn@(FamEqn { feqn_tycon = tycon })
+  = rnFamEqn (TySynCtx tycon) atfi eqn rnTySyn
+
 
 rnTyFamDefltDecl :: Name
                  -> TyFamDefltDecl GhcPs
@@ -859,11 +832,9 @@ rnDataFamInstDecl :: AssocTyFamInfo
                   -> DataFamInstDecl GhcPs
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
 rnDataFamInstDecl atfi (DataFamInstDecl { dfid_eqn =
-                    eqn@(FamEqn { feqn_tycon = tycon
-                                , feqn_rhs   = rhs })})
-  = do { let extra_kvs = extractDataDefnKindVars rhs
-       ; (eqn', fvs) <-
-           rnFamEqn (TyDataCtx tycon) atfi extra_kvs eqn rnDataDefn
+                    eqn@(FamEqn { feqn_tycon = tycon })})
+  = do { (eqn', fvs) <-
+           rnFamEqn (TyDataCtx tycon) atfi eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
@@ -949,10 +920,7 @@ a class, we must check that all of the type variables mentioned on the RHS are
 properly scoped. Specifically, the rule is this:
 
   Every variable mentioned on the RHS of a type instance declaration
-  (whether associated or not) must be either
-  * Mentioned on the LHS, or
-  * Mentioned in an outermost kind signature on the RHS
-    (see Note [Implicit quantification in type synonyms])
+  (whether associated or not) must be mentioned on the LHS
 
 Here is a simple example of something we should reject:
 
@@ -962,8 +930,7 @@ Here is a simple example of something we should reject:
     type F Int x = z
 
 Here, `z` is mentioned on the RHS of the associated instance without being
-mentioned on the LHS, nor is `z` mentioned in an outermost kind signature. The
-renamer will reject `z` as being out of scope without much fuss.
+mentioned on the LHS. The renamer will reject `z` as being out of scope without much fuss.
 
 Things get slightly trickier when the instance header itself binds type
 variables. Consider this example (adapted from #5515):
@@ -1055,10 +1022,8 @@ Some additional wrinkles:
 
     Note that the `o` in the `Codomain 'KProxy` instance should be considered
     improperly scoped. It does not meet the criteria for being explicitly
-    quantified, as it is not mentioned by name on the LHS, nor does it meet the
-    criteria for being implicitly quantified, as it is used in a RHS kind
-    signature that is not outermost (see Note [Implicit quantification in type
-    synonyms]). However, `o` /is/ bound by the instance header, so if this
+    quantified, as it is not mentioned by name on the LHS.
+    However, `o` /is/ bound by the instance header, so if this
     program is not rejected by the renamer, the typechecker would treat it as
     though you had written this:
 
@@ -1069,6 +1034,12 @@ Some additional wrinkles:
     `type Codomain 'KProxy = ...` into `type Codomain ('KProxy @o) = ...` here.
     If the user really wants the latter, it is simple enough to communicate
     their intent by mentioning `o` on the LHS by name.
+
+* Historical note: Previously we had to add type variables from the outermost
+  kind signature on the RHS to the scope of associated type family instance,
+  i.e. GHC did implicit quantification over them. But now that we implement
+  GHC Proposal #425 "Invisible binders in type declarations"
+  we don't need to do this anymore.
 
 Note [Type family equations and occurrences]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

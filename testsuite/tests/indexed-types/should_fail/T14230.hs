@@ -8,4 +8,4 @@ class C k where
   data CD :: k -> k -> *
 
 instance C (Maybe a) where
-  data CD :: (k -> *) -> (k -> *) -> *
+  data forall k . CD :: (k -> *) -> (k -> *) -> *

@@ -7,4 +7,4 @@ import Data.Kind
 import Data.Proxy
 
 data family DF a (b :: k)
-data instance DF (Proxy c) :: Proxy j -> Type
+data instance DF @(Proxy j) (Proxy c) :: Proxy j -> Type

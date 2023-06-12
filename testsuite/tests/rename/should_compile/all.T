@@ -213,3 +213,4 @@ test('T23240', [req_th, extra_files(['T23240_aux.hs'])], multimod_compile, ['T23
 test('T23318', normal, compile, ['-Wduplicate-exports'])
 test('T23434', normal, compile, [''])
 test('T23510b', normal, compile, [''])
+test('T23512b', normal, compile, [''])

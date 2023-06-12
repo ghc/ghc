@@ -1,5 +1,5 @@
 
-T7938.hs:12:17: error: [GHC-83865]
+T7938.hs:12:29: error: [GHC-83865]
     • Expected a type, but ‘KP :: KProxy k2’ has kind ‘KProxy k2’
     • In the type ‘(KP :: KProxy k2)’
       In the type instance declaration for ‘Bar’

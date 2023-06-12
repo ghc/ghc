@@ -19,6 +19,22 @@ Language
 
   This feature is guarded behind :extension:`TypeAbstractions`.
 
+- In accordance with GHC proposal `#425
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
+  GHC no longer implicitly quantifies over type variables that appear only in the RHS of type and
+  data family instances. This code will no longer work: ::
+
+    type family F1 a :: k
+    type instance F1 Int = Any :: j -> j
+
+  Instead you should write::
+
+    type instance F1 @(j -> j) Int = Any :: j -> j
+
+  Or::
+
+    type instance forall j . F1 Int = Any :: j -> j
+
 Compiler
 ~~~~~~~~
 
