@@ -36,7 +36,7 @@
 --     construct new terms in the EDSL. Crucially, missing from this module are
 --     corresponding /elimination/ or /destructing/ functions which would
 --     project information from the EDSL back to Haskell. See
---     'GHC.StgToJS.UnitUtils' and 'GHC.StgToJS.CoreUtils' for such functions.
+--     'GHC.StgToJS.Utils' for such functions.
 --
 --      * /Introduction/ functions
 --

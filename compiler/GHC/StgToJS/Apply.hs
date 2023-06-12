@@ -39,7 +39,6 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.Types
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
-import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Rts.Types
 import GHC.StgToJS.Stack
@@ -205,7 +204,7 @@ genApp ctx i args
     -- no args and Id can't be a function: just enter it
     | [] <- args
     , idFunRepArity i == 0
-    , not (might_be_a_function (idType i))
+    , not (mightBeAFunction (idType i))
     = do
       enter_id <- genIdArg i >>=
                     \case

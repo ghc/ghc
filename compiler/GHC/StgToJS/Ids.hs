@@ -40,7 +40,7 @@ import GHC.Prelude
 
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 import GHC.StgToJS.Symbols
 
 import GHC.JS.Unsat.Syntax

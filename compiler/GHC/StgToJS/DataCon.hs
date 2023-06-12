@@ -35,7 +35,6 @@ import GHC.StgToJS.Closure
 import GHC.StgToJS.ExprCtx
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
-import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Ids

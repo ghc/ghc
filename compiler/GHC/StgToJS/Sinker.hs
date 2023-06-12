@@ -15,7 +15,7 @@ import GHC.Unit.Module
 import GHC.Types.Literal
 import GHC.Data.Graph.Directed
 
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 
 import Data.Char
 import Data.Either

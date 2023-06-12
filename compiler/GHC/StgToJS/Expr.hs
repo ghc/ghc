@@ -47,8 +47,6 @@ import GHC.StgToJS.Literal
 import GHC.StgToJS.Prim
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Regs
-import GHC.StgToJS.StgUtils
-import GHC.StgToJS.CoreUtils
 import GHC.StgToJS.Utils
 import GHC.StgToJS.Stack
 import GHC.StgToJS.Ids

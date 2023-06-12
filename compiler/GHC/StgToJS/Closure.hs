@@ -27,7 +27,7 @@ import GHC.Data.FastString
 
 import GHC.StgToJS.Heap
 import GHC.StgToJS.Types
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 import GHC.StgToJS.Regs (stack,sp)
 
 import GHC.JS.Make

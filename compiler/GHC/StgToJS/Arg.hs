@@ -37,7 +37,7 @@ import GHC.StgToJS.DataCon
 import GHC.StgToJS.Types
 import GHC.StgToJS.Monad
 import GHC.StgToJS.Literal
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 import GHC.StgToJS.Profiling
 import GHC.StgToJS.Ids
 

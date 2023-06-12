@@ -22,8 +22,7 @@ import GHC.StgToJS.Arg
 import GHC.StgToJS.Sinker
 import GHC.StgToJS.Types
 import qualified GHC.StgToJS.Object as Object
-import GHC.StgToJS.StgUtils
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 import GHC.StgToJS.Deps
 import GHC.StgToJS.Expr
 import GHC.StgToJS.ExprCtx

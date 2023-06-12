@@ -663,7 +663,6 @@ Library
         GHC.StgToJS.Arg
         GHC.StgToJS.Closure
         GHC.StgToJS.CodeGen
-        GHC.StgToJS.CoreUtils
         GHC.StgToJS.DataCon
         GHC.StgToJS.Deps
         GHC.StgToJS.Expr
@@ -682,7 +681,6 @@ Library
         GHC.StgToJS.Sinker
         GHC.StgToJS.Stack
         GHC.StgToJS.StaticPtr
-        GHC.StgToJS.StgUtils
         GHC.StgToJS.Symbols
         GHC.StgToJS.Types
         GHC.StgToJS.Utils

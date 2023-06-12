@@ -22,7 +22,7 @@ import GHC.StgToJS.Monad
 import GHC.StgToJS.Types
 import GHC.StgToJS.Literal
 import GHC.StgToJS.Regs
-import GHC.StgToJS.CoreUtils
+import GHC.StgToJS.Utils
 import GHC.StgToJS.Ids
 
 import GHC.Types.RepType
