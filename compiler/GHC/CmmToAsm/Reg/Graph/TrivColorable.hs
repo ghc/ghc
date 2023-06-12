@@ -115,7 +115,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchRISCV64   -> 15
                             ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
@@ -150,7 +150,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchRISCV64   -> 0
                             ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
@@ -184,7 +184,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
                             ArchS390X     -> panic "trivColorable ArchS390X"
-                            ArchRISCV64   -> panic "trivColorable ArchRISCV64"
+                            ArchRISCV64   -> 26
                             ArchLoongArch64->panic "trivColorable ArchLoongArch64"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchWasm32    -> panic "trivColorable ArchWasm32"
