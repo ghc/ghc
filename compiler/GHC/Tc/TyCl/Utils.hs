@@ -64,7 +64,7 @@ import GHC.Data.FastString
 
 import GHC.Unit.Module
 
-import GHC.Rename.Utils (wrapGenSpan)
+import GHC.Rename.Utils (genHsVar, genLHsApp, genLHsLit, genWildPat)
 
 import GHC.Types.Basic
 import GHC.Types.FieldLabel
@@ -956,11 +956,10 @@ mkOneRecordSelector all_cons idDetails fl has_sel
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [wrapGenSpan (WildPat noExtField)]
-                            (wrapGenSpan
-                                (HsApp noComments
-                                    (wrapGenSpan (HsVar noExtField (wrapGenSpan (getName rEC_SEL_ERROR_ID))))
-                                    (wrapGenSpan (HsLit noComments msg_lit))))]
+                            [genWildPat]
+                            (genLHsApp
+                                (genHsVar (getName rEC_SEL_ERROR_ID))
+                                (genLHsLit msg_lit))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we
