@@ -1851,6 +1851,11 @@ instance Diagnostic TcRnMessage where
              , text "or a complete user-supplied kind (CUSK, legacy feature)"
              , text "is required to use invisible binders." ]
 
+    TcRnImplicitRhsQuantification kv -> mkSimpleDecorated $
+      vcat [ text "The variable" <+> quotes (ppr kv) <+> text "occurs free on the RHS of the type declaration"
+           , text "In the future GHC will no longer implicitly quantify over such variables"
+           ]
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2467,6 +2472,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnInvisBndrWithoutSig{}
       -> ErrorWithoutFlag
+    TcRnImplicitRhsQuantification{}
+      -> WarningWithFlag Opt_WarnImplicitRhsQuantification
 
   diagnosticHints = \case
     TcRnUnknownMessage m
@@ -3130,6 +3137,8 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnInvisBndrWithoutSig name _
       -> [SuggestAddStandaloneKindSignature name]
+    TcRnImplicitRhsQuantification kv
+      -> [SuggestBindTyVarOnLhs (unLoc kv)]
 
   diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode

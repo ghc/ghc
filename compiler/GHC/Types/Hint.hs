@@ -465,6 +465,9 @@ data GhcHint
   {-| Suggest eta-reducing a type synonym used in the implementation
       of abstract data. -}
   | SuggestEtaReduceAbsDataTySyn TyCon
+  {-| Suggest binding the type variable on the LHS of the type declaration
+  -}
+  | SuggestBindTyVarOnLhs RdrName
 
 -- | An 'InstantiationSuggestion' for a '.hsig' file. This is generated
 -- by GHC in case of a 'DriverUnexpectedSignature' and suggests a way

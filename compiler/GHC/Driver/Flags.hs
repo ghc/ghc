@@ -646,6 +646,7 @@ data WarningFlag =
    | Opt_WarnLoopySuperclassSolve                    -- Since 9.6
    | Opt_WarnTermVariableCapture                     -- Since 9.8
    | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
+   | Opt_WarnImplicitRhsQuantification               -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -754,6 +755,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnLoopySuperclassSolve                    -> "loopy-superclass-solve" :| []
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
   Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
+  Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -945,6 +947,7 @@ minusWcompatOpts
       , Opt_WarnNonCanonicalMonadInstances
       , Opt_WarnCompatUnqualifiedImports
       , Opt_WarnTypeEqualityOutOfScope
+      , Opt_WarnImplicitRhsQuantification
       ]
 
 -- | Things you get with -Wunused-binds

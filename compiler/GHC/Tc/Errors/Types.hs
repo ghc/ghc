@@ -4096,6 +4096,23 @@ data TcRnMessage where
   -}
   TcRnMissingRoleAnnotation :: Name -> [Role] -> TcRnMessage
 
+  {-| TcRnImplicitRhsQuantification is a warning that occurs when GHC implicitly
+      quantifies over a type variable that occurs free on the RHS of the type declaration
+      that is not mentioned on the LHS
+
+      Example:
+
+        type T = 'Nothing :: Maybe a
+
+      Controlled by flags:
+       - Wimplicit-rhs-quantification
+
+      Test cases:
+          T23510a
+          T23510b
+  -}
+  TcRnImplicitRhsQuantification :: LocatedN RdrName -> TcRnMessage
+
   deriving Generic
 
 

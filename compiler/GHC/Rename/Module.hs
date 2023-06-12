@@ -1709,11 +1709,16 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
              doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' _ ->
-    do { (rhs', fvs) <- rnTySyn doc rhs
+       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
+    do { mapM_ warn_implicit_kvs (nubL free_rhs_kvs)
+       ; (rhs', fvs) <- rnTySyn doc rhs
        ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
                          , tcdFixity = fixity
                          , tcdRhs = rhs', tcdSExt = fvs }, fvs) } }
+  where
+    warn_implicit_kvs :: LocatedN RdrName -> RnM ()
+    warn_implicit_kvs kv =
+      addDiagnosticAt (getLocA kv) (TcRnImplicitRhsQuantification kv)
 
 -- "data", "newtype" declarations
 rnTyClDecl (DataDecl
@@ -1725,12 +1730,12 @@ rnTyClDecl (DataDecl
              doc = TyDataCtx tycon
              new_or_data = dataDefnConsNewOrData cons
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
+       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
-       ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
+       ; cusk <- data_decl_has_cusk tyvars' new_or_data (null free_rhs_kvs) kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
-       ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
+       ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr free_rhs_kvs)
        ; return (DataDecl { tcdLName    = tycon'
                           , tcdTyVars   = tyvars'
                           , tcdFixity   = fixity

@@ -166,6 +166,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wnoncanonical-monad-instances`
         * :ghc-flag:`-Wcompat-unqualified-imports`
         * :ghc-flag:`-Wtype-equality-out-of-scope`
+        * :ghc-flag:`-Wimplicit-rhs-quantification`
 
 .. ghc-flag:: -w
     :shortdesc: disable all warnings
@@ -2440,6 +2441,28 @@ of ``-W(no-)*``.
     In other words the type-class role cannot be accidentally left
     representational or phantom, which could affected the code correctness.
 
+.. ghc-flag:: -Wimplicit-rhs-quantification
+    :shortdesc: warn when type variables on the RHS of a type synonym are implicitly quantified
+    :type: dynamic
+    :reverse: -Wno-implicit-rhs-quantification
+    :category:
+
+    :since: 9.8
+    :default: off
+
+    In accordance with `GHC Proposal #425
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`__,
+    GHC will stop implicitly quantifying over type variables that occur free on the
+    right-hand side of a type synonym but are not mentioned on the left-hand side.
+    Type synonym declarations that rely on this form of quantification should be rewritten with invisible binders.
+
+    For example: ::
+
+      type T1 :: forall a . Maybe a
+      type T1    = 'Nothing :: Maybe a      -- old
+      type T1 @a = 'Nothing :: Maybe a      -- new
+
+    This warning detects code that will be affected by this breaking change.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

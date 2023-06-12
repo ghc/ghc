@@ -918,8 +918,8 @@ bindHsQTyVars :: forall a b.
               -> Maybe a            -- Just _  => an associated type decl
               -> FreeKiTyVars       -- Kind variables from scope
               -> LHsQTyVars GhcPs
-              -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
-                  -- The Bool is True <=> all kind variables used in the
+              -> (LHsQTyVars GhcRn -> FreeKiTyVars -> RnM (b, FreeVars))
+                  -- The FreeKiTyVars is null <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
                   -- the last clause of Note [CUSKs: complete user-supplied kind signatures]
                   -- in GHC.Hs.Decls
@@ -942,7 +942,6 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                bndr_kv_occs ++ body_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
-             all_bound_on_lhs = null body_remaining
 
        ; traceRn "checkMixedVars3" $
            vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
@@ -969,7 +968,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
        ; traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
                               , hsq_explicit  = rn_bndrs })
-                      all_bound_on_lhs } }
+                      body_remaining } }
   where
     hs_tv_bndrs = hsQTvExplicit hsq_bndrs
 
@@ -1802,11 +1801,14 @@ one exists:
 The logic resides in extractHsTyRdrTyVarsKindVars. We use it both for type
 synonyms and type family instances.
 
-This is something of a stopgap solution until we can explicitly bind invisible
+This was a stopgap solution until we could explicitly bind invisible
 type/kind variables:
 
   type TySyn3 :: forall a. Maybe a
   type TySyn3 @a = 'Just ('Nothing :: Maybe a)
+
+Now that the new syntax was proposed in #425 and implemented in 9.8, we issue a warning
+-Wimplicit-rhs-quantification for TySyn2 and TySyn4 and will eventually disallow them.
 
 Note [Implicit quantification in type synonyms: non-taken alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

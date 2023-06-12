@@ -251,6 +251,8 @@ instance Outputable GhcHint where
     SuggestEtaReduceAbsDataTySyn tc
       -> text "If possible, eta-reduce the type synonym" <+> ppr_tc <+> text "so that it is nullary."
         where ppr_tc = quotes (ppr $ tyConName tc)
+    SuggestBindTyVarOnLhs tv
+      -> text "Bind" <+> quotes (ppr tv) <+> text "on the LHS of the type declaration"
 
 perhapsAsPat :: SDoc
 perhapsAsPat = text "Perhaps you meant an as-pattern, which must not be surrounded by whitespace"
