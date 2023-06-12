@@ -4640,8 +4640,13 @@ checkValidDataCon dflags existential_ok tc con
 
                -- See Note [Detecting useless UNPACK pragmas] in GHC.Core.DataCon.
                , isSrcUnpacked want_unpack  -- this means the user wrote {-# UNPACK #-}
-               , case rep_bang of { HsUnpack {} -> False; HsStrict True -> False; _ -> True }
-
+               , case rep_bang of { HsUnpack {} -> False
+                                  ; HsStrict should_unpack -> not should_unpack
+                                  -- if the type is of kind UnliftedType then
+                                  -- the unpack pragma still valid. However the
+                                  -- pragma has of course no effect for primitive types.
+                                  ; HsLazy -> not (isUnliftedType orig_arg_ty && not (isPrimitiveType orig_arg_ty))
+                                  }
                -- When typechecking an indefinite package in Backpack, we
                -- may attempt to UNPACK an abstract type.  The test here will
                -- conclude that this is unusable, but it might become usable
