@@ -350,33 +350,31 @@ patchJumpInstr instr patchF
 -- always points to the top of the stack, and we can't use it for computation.
 --
 -- | An instruction to spill a register into a spill slot.
-mkSpillInstr
-   :: HasCallStack
-   => NCGConfig
-   -> Reg       -- register to spill
-   -> Int       -- current stack delta
-   -> Int       -- spill slot to use
-   -> [Instr]
-
+mkSpillInstr ::
+  HasCallStack =>
+  NCGConfig ->
+  Reg -> -- register to spill
+  Int -> -- current stack delta
+  Int -> -- spill slot to use
+  [Instr]
 mkSpillInstr config reg delta slot =
-  case (spillSlotToOffset config slot) - delta of
-    imm | -256 <= imm && imm <= 255                               -> [ mkStrSp imm ]
-    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStrSp imm ]
-    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
-                                                                     , mkStrIp0 (imm .&.  0xfff)
-                                                                     ]
-    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
-    where
-        a .&~. b = a .&. (complement b)
+  case off - delta of
+    imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
+    imm ->
+      [ movImmToIp0 imm,
+        addSpToIp0,
+        mkStrIp0
+      ]
+  where
+    fmt = case reg of
+      RegReal (RealRegSingle n) | n < 32 -> II64
+      _ -> FF64
+    mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
+    movImmToIp0 imm = ANN (text "Spill: IP0 <- " <> int imm) $ MOV ip0 (OpImm (ImmInt imm))
+    addSpToIp0 = ANN (text "Spill: IP0 <- SP + IP0 ") $ ADD ip0 ip0 sp
+    mkStrIp0 = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ip0_reg))
 
-        fmt = case reg of
-            RegReal (RealRegSingle n) | n < 32 -> II64
-            _                                  -> FF64
-        mkIp0SpillAddr imm = ANN (text "Spill: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
-        mkStrSp imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 2) (ImmInt imm)))
-        mkStrIp0 imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
-
-        off = spillSlotToOffset config slot
+    off = spillSlotToOffset config slot
 
 mkLoadInstr
    :: NCGConfig
@@ -386,27 +384,25 @@ mkLoadInstr
    -> [Instr]
 
 mkLoadInstr config reg delta slot =
-  case (spillSlotToOffset config slot) - delta of
-    imm | -256 <= imm && imm <= 255                               -> [ mkLdrSp imm ]
-    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdrSp imm ]
-    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
-                                                                     , mkLdrIp0 (imm .&.  0xfff)
-                                                                     ]
-    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
-    where
-        a .&~. b = a .&. (complement b)
+  case off - delta of
+    imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
+    imm ->
+      [ movImmToIp0 imm,
+        addSpToIp0,
+        mkLdrIp0
+      ]
+  where
+    fmt = case reg of
+      RegReal (RealRegSingle n) | n < 32 -> II64
+      _ -> FF64
+    mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
+    movImmToIp0 imm = ANN (text "Reload: IP0 <- " <> int imm) $ MOV ip0 (OpImm (ImmInt imm))
+    addSpToIp0 = ANN (text "Reload: IP0 <- SP + IP0 ") $ ADD ip0 ip0 sp
+    mkLdrIp0 = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ip0_reg))
 
-        fmt = case reg of
-            RegReal (RealRegSingle n) | n < 32 -> II64
-            _                                  -> FF64
+    off = spillSlotToOffset config slot
 
-        mkIp0SpillAddr imm = ANN (text "Reload: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
-        mkLdrSp imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 2) (ImmInt imm)))
-        mkLdrIp0 imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
-
-        off = spillSlotToOffset config slot
-
---------------------------------------------------------------------------------
+  --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
 takeDeltaInstr :: Instr -> Maybe Int
 takeDeltaInstr (ANN _ i) = takeDeltaInstr i
@@ -770,6 +766,7 @@ ra_reg, sp_reg :: Reg
 zero_reg = RegReal (RealRegSingle 0)
 ra_reg = RegReal (RealRegSingle 1)
 sp_reg = RegReal (RealRegSingle 2)
+ip0_reg = RegReal (RealRegSingle 16)
 
 zero, sp, ip0 :: Operand
 zero = OpReg W64 zero_reg
@@ -779,7 +776,7 @@ gp  = OpReg W64 (RegReal (RealRegSingle 3))
 tp  = OpReg W64 (RegReal (RealRegSingle 4))
 fp  = OpReg W64 (RegReal (RealRegSingle 8))
 
-ip0 = OpReg W64 (RegReal (RealRegSingle 16))
+ip0 = OpReg W64 ip0_reg
 
 _x :: Int -> Operand
 _x i = OpReg W64 (RegReal (RealRegSingle i))
