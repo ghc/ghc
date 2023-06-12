@@ -3243,7 +3243,7 @@ lookupIdInScope id_occ
   = do { in_scope_ids <- getInScopeIds
        ; case lookupVarEnv in_scope_ids id_occ of
            Just (id_bndr, linted_ty)
-             -> do { checkL (not (bad_global id_bndr)) global_in_scope
+             -> do { checkL (not (bad_global id_bndr)) $ global_in_scope id_bndr
                    ; return (id_bndr, linted_ty) }
            Nothing -> do { checkL (not is_local) local_out_of_scope
                          ; return (id_occ, idType id_occ) } }
@@ -3252,8 +3252,10 @@ lookupIdInScope id_occ
   where
     is_local = mustHaveLocalBinding id_occ
     local_out_of_scope = text "Out of scope:" <+> pprBndr LetBind id_occ
-    global_in_scope    = hang (text "Occurrence is GlobalId, but binding is LocalId")
-                            2 (pprBndr LetBind id_occ)
+    global_in_scope id_bndr = hang (text "Occurrence is GlobalId, but binding is LocalId")
+                                 2 $ vcat [hang (text "occurrence:") 2 $ pprBndr LetBind id_occ
+                                          ,hang (text "binder    :") 2 $ pprBndr LetBind id_bndr
+                                          ]
     bad_global id_bnd = isGlobalId id_occ
                      && isLocalId id_bnd
                      && not (isWiredIn id_occ)
