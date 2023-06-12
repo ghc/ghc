@@ -718,6 +718,12 @@ hackage-lint:
     - job: nightly-x86_64-linux-deb10-numa-slow-validate
       optional: true
       artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
+      optional: true
+      artifacts: false
+    - job: aarch64-linux-deb10-validate
+      optional: true
+      artifacts: false
   extends: .hackage
   variables:
     SLOW_VALIDATE: 1
@@ -731,6 +737,9 @@ hackage-lint:
 hackage-label-lint:
   needs:
     - job: x86_64-linux-deb10-numa-slow-validate
+      optional: true
+      artifacts: false
+    - job: aarch64-linux-deb10-validate
       optional: true
       artifacts: false
   extends: .hackage
@@ -747,6 +756,9 @@ nightly-hackage-lint:
     - job: nightly-x86_64-linux-deb10-numa-slow-validate
       optional: true
       artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
+      optional: true
+      artifacts: false
   rules:
     - if: $NIGHTLY
       variables:
@@ -759,6 +771,9 @@ nightly-hackage-lint:
 nightly-hackage-perf:
   needs:
     - job: nightly-x86_64-linux-fedora33-release
+      optional: true
+      artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
       optional: true
       artifacts: false
   rules:
@@ -775,6 +790,9 @@ nightly-hackage-perf:
 release-hackage-lint:
   needs:
     - job: release-x86_64-linux-fedora33-release
+      optional: true
+      artifacts: false
+    - job: release-aarch64-linux-deb10-release+no_split_sections
       optional: true
       artifacts: false
   rules:
