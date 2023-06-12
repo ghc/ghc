@@ -369,13 +369,13 @@ mkSpillInstr
    -> [Instr]
 
 mkSpillInstr config reg delta slot =
-  case (spillSlotToOffset config slot) - delta of
+  case off - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkStrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStrSp imm ]
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
                                                                      , mkStrIp0 (imm .&.  0xfff)
                                                                      ]
-    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
+    imm -> pprPanic "mkSpillInstr" (text "Unable to spill register into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
@@ -396,13 +396,13 @@ mkLoadInstr
    -> [Instr]
 
 mkLoadInstr config reg delta slot =
-  case (spillSlotToOffset config slot) - delta of
+  case off - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkLdrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdrSp imm ]
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
                                                                      , mkLdrIp0 (imm .&.  0xfff)
                                                                      ]
-    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
+    imm -> pprPanic "mkLoadInstr" (text "Unable to load spilled register at" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
