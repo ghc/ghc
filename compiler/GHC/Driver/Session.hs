@@ -1468,6 +1468,16 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_rules)
   , make_ord_flag defGhcFlag "ddump-cse"
         (setDumpFlag Opt_D_dump_cse)
+  , make_ord_flag defGhcFlag "ddump-float-out"
+        (setDumpFlag Opt_D_dump_float_out)
+  , make_ord_flag defGhcFlag "ddump-full-laziness"
+        (setDumpFlag Opt_D_dump_float_out)
+  , make_ord_flag defGhcFlag "ddump-float-in"
+        (setDumpFlag Opt_D_dump_float_in)
+  , make_ord_flag defGhcFlag "ddump-liberate-case"
+        (setDumpFlag Opt_D_dump_liberate_case)
+  , make_ord_flag defGhcFlag "ddump-static-argument-transformation"
+        (setDumpFlag Opt_D_dump_static_argument_transformation)
   , make_ord_flag defGhcFlag "ddump-worker-wrapper"
         (setDumpFlag Opt_D_dump_worker_wrapper)
   , make_ord_flag defGhcFlag "ddump-rn-trace"

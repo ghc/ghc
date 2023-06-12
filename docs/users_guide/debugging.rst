@@ -436,6 +436,31 @@ subexpression elimination pass.
 
     Dump common subexpression elimination (CSE) pass output
 
+.. ghc-flag:: -ddump-full-laziness
+              -ddump-float-out
+    :shortdesc: Dump full laziness pass output
+    :type: dynamic
+
+    Dump full laziness pass (also known as float-out) output (see :ghc-flag:`-ffull-laziness`)
+
+.. ghc-flag:: -ddump-float-in
+    :shortdesc: Dump float in output
+    :type: dynamic
+
+    Dump float-in pass output (see :ghc-flag:`-ffloat-in`)
+
+.. ghc-flag:: -ddump-liberate-case
+    :shortdesc: Dump liberate case output
+    :type: dynamic
+
+    Dump liberate case pass output (see :ghc-flag:`-fliberate-case`)
+
+.. ghc-flag:: -ddump-static-argument-transformation
+    :shortdesc: Dump static argument transformation output
+    :type: dynamic
+
+    Dump static argument transformation pass output (see :ghc-flag:`-fstatic-argument-transformation`)
+
 .. ghc-flag:: -ddump-worker-wrapper
     :shortdesc: Dump worker-wrapper output
     :type: dynamic

@@ -127,6 +127,10 @@ data DumpFlag
    | Opt_D_dump_types
    | Opt_D_dump_rules
    | Opt_D_dump_cse
+   | Opt_D_dump_float_out
+   | Opt_D_dump_float_in
+   | Opt_D_dump_liberate_case
+   | Opt_D_dump_static_argument_transformation
    | Opt_D_dump_worker_wrapper
    | Opt_D_dump_rn_trace
    | Opt_D_dump_rn_stats
