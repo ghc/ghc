@@ -18,8 +18,9 @@ module GHC.Rename.Utils (
         warnForallIdentifier,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
-        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genAppType,
-        genHsIntegralLit, genHsTyLit, genSimpleConPat,
+        wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genLHsApp,
+        genAppType,
+        genLHsLit, genHsIntegralLit, genHsTyLit, genSimpleConPat,
         genVarPat, genWildPat,
         genSimpleFunBind, genFunBind,
 
@@ -572,6 +573,9 @@ genHsApps fun args = foldl genHsApp (genHsVar fun) args
 genHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> HsExpr GhcRn
 genHsApp fun arg = HsApp noAnn (wrapGenSpan fun) arg
 
+genLHsApp :: HsExpr GhcRn -> LHsExpr GhcRn -> LHsExpr GhcRn
+genLHsApp fun arg = wrapGenSpan (genHsApp fun arg)
+
 genLHsVar :: Name -> LHsExpr GhcRn
 genLHsVar nm = wrapGenSpan $ genHsVar nm
 
@@ -581,8 +585,11 @@ genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
+genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+genLHsLit = wrapGenSpan . HsLit noAnn
+
 genHsIntegralLit :: IntegralLit -> LocatedAn an (HsExpr GhcRn)
-genHsIntegralLit lit = wrapGenSpan $ HsLit noAnn (HsInt noExtField lit)
+genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn
 genHsTyLit = HsTyLit noExtField . HsStrTy NoSourceText
