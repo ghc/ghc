@@ -963,15 +963,15 @@ strictOnceApply1Dmd = C_11 :* mkCall C_11 topSubDmd
 strictManyApply1Dmd :: Demand
 strictManyApply1Dmd = C_1N :* mkCall C_1N topSubDmd
 
--- | First argument of catch#: @MC(M,L)@.
+-- | First argument of catch#: @MC(1,L)@.
 -- Evaluates its arg lazily, but then applies it exactly once to one argument.
 lazyApply1Dmd :: Demand
-lazyApply1Dmd = C_01 :* mkCall C_01 topSubDmd
+lazyApply1Dmd = C_01 :* mkCall C_11 topSubDmd
 
--- | Second argument of catch#: @MC(M,C(1,L))@.
--- Calls its arg lazily, but then applies it exactly once to an additional argument.
+-- | Second argument of catch#: @MC(1,C(1,L))@.
+-- Evaluates its arg lazily, but then applies it exactly once to two arguments.
 lazyApply2Dmd :: Demand
-lazyApply2Dmd = C_01 :* mkCall C_01 (mkCall C_11 topSubDmd)
+lazyApply2Dmd = C_01 :* mkCall C_11 (mkCall C_11 topSubDmd)
 
 -- | Make a 'Demand' evaluated at-most-once.
 oneifyDmd :: Demand -> Demand

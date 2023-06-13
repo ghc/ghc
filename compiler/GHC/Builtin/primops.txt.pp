@@ -2715,6 +2715,7 @@ primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
    out_of_line = True
    has_side_effects = True
    can_fail         = True
+   strictness  = { \ _arity -> mkClosedDmdSig [ topDmd, lazyApply1Dmd, topDmd ] topDiv }
 
 primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    MutVar# s a -> (a -> a) -> State# s -> (# State# s, a, a #)
@@ -2725,6 +2726,7 @@ primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    out_of_line = True
    has_side_effects = True
    can_fail         = True
+   strictness  = { \ _arity -> mkClosedDmdSig [ topDmd, lazyApply1Dmd, topDmd ] topDiv }
 
 primop  CasMutVarOp "casMutVar#" GenPrimOp
   MutVar# s v -> v -> v -> State# s -> (# State# s, Int#, v #)
