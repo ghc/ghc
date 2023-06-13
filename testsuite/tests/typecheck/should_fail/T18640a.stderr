@@ -5,5 +5,5 @@ T18640a.hs:11:1: error: [GHC-25897]
         Actual: forall (b :: k). * -> a
       ‘a’ is a rigid type variable bound by
         the type family declaration for ‘F2’
-        at T18640a.hs:10:19
+        at T18640a.hs:11:17
     • In the type family declaration for ‘F2’

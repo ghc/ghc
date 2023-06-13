@@ -52,7 +52,7 @@ type SameKind :: k -> k -> Constraint
 type SameKind (a :: k) (b :: k) = (() :: Constraint)
 
 type Sing :: k -> Type
-type family Sing :: k -> Type
+type family Sing @k :: k -> Type
 
 type SLambda :: (k1 ~> k2) -> Type
 newtype SLambda (f :: k1 ~> k2) =
@@ -386,7 +386,7 @@ type family (<>@#@$$$) (a6989586621679047054 :: a_a9GJ) (a6989586621679047055 ::
 class PSemigroup a_a9GJ where
   type family (<>) (arg_a9GX :: a_a9GJ) (arg_a9GY :: a_a9GJ) :: a_a9GJ
 type MemptySym0 :: forall a_a9GK. a_a9GK
-type family MemptySym0 :: a_a9GK where
+type family MemptySym0 @a_a9GK :: a_a9GK where
   MemptySym0 = Mempty
 type MappendSym0 :: forall a_a9GK. (~>) a_a9GK ((~>) a_a9GK a_a9GK)
 data MappendSym0 :: (~>) a_a9GK ((~>) a_a9GK a_a9GK)
@@ -450,10 +450,10 @@ type family TFHelper_6989586621679047079Sym2 (a6989586621679047084 :: Dual a_a9G
 instance PSemigroup (Dual a_a9GL) where
   type (<>) a_a9Hn a_a9Ho = Apply (Apply TFHelper_6989586621679047079Sym0 a_a9Hn) a_a9Ho
 type Mempty_6989586621679047088 :: Dual a_a9GO
-type family Mempty_6989586621679047088 :: Dual a_a9GO where
+type family Mempty_6989586621679047088 @a_a9GO :: Dual a_a9GO where
   Mempty_6989586621679047088 = Apply DualSym0 MemptySym0
 type Mempty_6989586621679047088Sym0 :: Dual a_a9GO
-type family Mempty_6989586621679047088Sym0 :: Dual a_a9GO where
+type family Mempty_6989586621679047088Sym0 @a_a9GO :: Dual a_a9GO where
   Mempty_6989586621679047088Sym0 = Mempty_6989586621679047088
 instance PMonoid (Dual a_a9GO) where
   type Mempty = Mempty_6989586621679047088Sym0
@@ -549,10 +549,10 @@ type family TFHelper_6989586621679075091Sym2 (a6989586621679075096 :: Endo a_agC
 instance PSemigroup (Endo a_agCk) where
   type (<>) a_agZb a_agZc = Apply (Apply TFHelper_6989586621679075091Sym0 a_agZb) a_agZc
 type Mempty_6989586621679075313 :: Endo a_agCn
-type family Mempty_6989586621679075313 :: Endo a_agCn where
+type family Mempty_6989586621679075313 @a_agCn :: Endo a_agCn where
   Mempty_6989586621679075313 = Apply EndoSym0 IdSym0
 type Mempty_6989586621679075313Sym0 :: Endo a_agCn
-type family Mempty_6989586621679075313Sym0 :: Endo a_agCn where
+type family Mempty_6989586621679075313Sym0 @a_agCn :: Endo a_agCn where
   Mempty_6989586621679075313Sym0 = Mempty_6989586621679075313
 instance PMonoid (Endo a_agCn) where
   type Mempty = Mempty_6989586621679075313Sym0

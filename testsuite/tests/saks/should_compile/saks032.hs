@@ -18,4 +18,4 @@ type F1 :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
 type family F1 a b
 
 type F2 :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
-type family F2 a b :: forall r2. (r1, r2) -> Type
+type family F2 a b @r1 :: forall r2. (r1, r2) -> Type

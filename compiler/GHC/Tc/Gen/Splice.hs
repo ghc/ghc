@@ -797,7 +797,7 @@ tcTExpTy m_ty exp_ty
           TcRnTHError $ TypedTHError $ TypedTHWithPolyType exp_ty
        ; codeCon <- tcLookupTyCon codeTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkTyConApp codeCon [rep, m_ty, exp_ty]) }
+       ; return (mkTyConApp codeCon [m_ty, rep, exp_ty]) }
 
 quotationCtxtDoc :: LHsExpr GhcRn -> SDoc
 quotationCtxtDoc br_body

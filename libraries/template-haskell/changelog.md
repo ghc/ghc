@@ -1,10 +1,15 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.22.0.0
+
+  * The kind of `Code` was changed from `forall r. (Type -> Type) -> TYPE r -> Type`
+    to `(Type -> Type) -> forall r. TYPE r -> Type`. This enables higher-kinded usage.
+
 ## 2.21.0.0
 
   * Record fields now belong to separate `NameSpace`s, keyed by the parent of
     the record field. This is the name of the first constructor of the parent type,
-    even if this constructor does not have the field in question.  
+    even if this constructor does not have the field in question.
 
     This change enables TemplateHaskell support for `DuplicateRecordFields`.
 
@@ -21,7 +26,7 @@
 
 ## 2.20.0.0
 
-  * The `Ppr.pprInfixT` function has gained a `Precedence` argument. 
+  * The `Ppr.pprInfixT` function has gained a `Precedence` argument.
   * The values of named precedence levels like `Ppr.appPrec` have changed.
 
   * Add `TypeDataD` constructor to the `Dec` type for `type data`

@@ -10,7 +10,7 @@ import Data.Type.Equality
 type T1 :: forall k (a :: k). Bool
 type T2 :: k -> Bool
 
-type family T1 where
+type family T1 @k @a where
   T1 @Bool @True  = False
   T1 @Bool @False = True
 

@@ -378,8 +378,13 @@ The splice will evaluate to (MkAge 3) and you can't add that to
 4::Int. So you can't coerce a (Code Q Age) to a (Code Q Int). -}
 
 -- Code constructor
-
+#if __GLASGOW_HASKELL__ >= 909
+type Code :: (Kind.Type -> Kind.Type) -> forall r. TYPE r -> Kind.Type
+  -- The nested `forall` makes it possible to assign the arity of 0 to
+  --   type CodeQ = Code Q
+#else
 type Code :: (Kind.Type -> Kind.Type) -> TYPE r -> Kind.Type
+#endif
 type role Code representational nominal   -- See Note [Role of TExp]
 newtype Code m a = Code
   { examineCode :: m (TExp a) -- ^ Underlying monadic value

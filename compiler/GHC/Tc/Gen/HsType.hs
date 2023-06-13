@@ -2556,37 +2556,30 @@ kcCheckDeclHeader_sig sig_kind name flav
                    --               ^^^^^^^^^
                    -- We do it here because at this point the environment has been
                    -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
+                   --
+                   -- Also see Note [Arity of type families and type synonyms]
                  ; ctx_k <- kc_res_ki
 
-                 -- Work out extra_arity, the number of extra invisible binders from
-                 -- the kind signature that should be part of the TyCon's arity.
-                 -- See Note [Arity inference in kcCheckDeclHeader_sig]
-                 ; let n_invis_tcbs = countWhile isInvisibleTyConBinder excess_sig_tcbs
-                       invis_arity = case ctx_k of
-                          AnyKind    -> n_invis_tcbs -- No kind signature, so make all the invisible binders
-                                                     -- the signature into part of the arity of the TyCon
-                          OpenKind   -> n_invis_tcbs -- Result kind is (TYPE rr), so again make all the
-                                                     -- invisible binders part of the arity of the TyCon
-                          TheKind ki -> 0 `max` (n_invis_tcbs - invisibleTyBndrCount ki)
+                 ; let sig_res_kind' = mkTyConKind excess_sig_tcbs sig_res_kind
 
-                 ; let (invis_tcbs, resid_tcbs) = splitAt invis_arity excess_sig_tcbs
-                 ; let sig_res_kind' = mkTyConKind resid_tcbs sig_res_kind
-
-                 ; traceTc "kcCheckDeclHeader_sig 2" $ vcat [ ppr excess_sig_tcbs
-                                                            , ppr invis_arity, ppr invis_tcbs
-                                                            , ppr n_invis_tcbs ]
+                 ; traceTc "kcCheckDeclHeader_sig 2" $
+                    vcat [ text "excess_sig_tcbs" <+> ppr excess_sig_tcbs
+                         , text "ctx_k" <+> ppr ctx_k
+                         , text "sig_res_kind'" <+> ppr sig_res_kind'
+                         ]
 
                  -- Unify res_ki (from the type declaration) with the residual kind from
                  -- the kind signature. Don't forget to apply the skolemising 'subst' first.
                  ; case ctx_k of
                       AnyKind -> return ()   -- No signature
-                      _ -> do { res_ki <- newExpectedKind ctx_k
-                              ; discardResult (unifyKind Nothing sig_res_kind' res_ki) }
+                      _ -> do
+                        res_ki <- newExpectedKind ctx_k
+                        check_exp_res_ki sig_res_kind' res_ki
 
                  -- Add more binders for data/newtype, so the result kind has no arrows
                  -- See Note [Datatype return kinds]
-                 ; if null resid_tcbs || not (needsEtaExpansion flav)
-                   then return (invis_tcbs,      sig_res_kind')
+                 ; if null excess_sig_tcbs || not (needsEtaExpansion flav)
+                   then return ([],              sig_res_kind')
                    else return (excess_sig_tcbs, sig_res_kind)
           }
 
@@ -2641,6 +2634,22 @@ kcCheckDeclHeader_sig sig_kind name flav
           , text "tyConResKind" <+> debugPprType (tyConResKind tc)
           ]
         ; return tc }
+
+-- | Check the result kind annotation on a type constructor against
+-- the corresponding section of the standalone kind signature.
+-- Drops invisible binders that interfere with unification.
+check_exp_res_ki :: TcKind    -- ^ the actual kind
+                 -> TcKind    -- ^ the expected kind
+                 -> TcM ()
+check_exp_res_ki act_kind exp_kind
+  = discardResult $ unifyKind Nothing act_kind' exp_kind
+    where
+      (_, act_kind') = splitInvisPiTysN n_to_inst act_kind
+
+      -- by analogy with checkExpectedKind
+      n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
+      n_act_invis_bndrs = invisibleTyBndrCount act_kind
+      n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
 
 matchUpSigWithDecl
   :: Name                        -- Name of the type constructor for error messages
@@ -2739,8 +2748,8 @@ swizzleTcb swizzle_env subst (Bndr tv vis)
     -- See Note [Source locations for implicitly bound type variables]
     -- in GHC.Tc.Rename.HsType
 
-{- See Note [kcCheckDeclHeader_sig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [kcCheckDeclHeader_sig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a kind signature 'sig_kind' and a declaration header,
 kcCheckDeclHeader_sig verifies that the declaration conforms to the
 signature. The end result is a PolyTcTyCon 'tc' such that:
@@ -2781,85 +2790,43 @@ Basic plan is this:
     part of the signature (k -> Type) with the kind signature of the decl,
     (j -> Type).  This unification, done in kcCheckDeclHeader, needs TcTyVars.
 
-  * The tricky extra_arity part is described in
-    Note [Arity inference in kcCheckDeclHeader_sig]
-
-Note [Arity inference in kcCheckDeclHeader_sig]
+Note [Arity of type families and type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider these declarations:
-  type family S1 :: forall k2. k1 -> k2 -> Type
-  type family S2 (a :: k1) (b :: k2) :: Type
+Consider
 
-Both S1 and S2 can be given the same standalone kind signature:
-  type S1 :: forall k1 k2. k1 -> k2 -> Type
-  type S2 :: forall k1 k2. k1 -> k2 -> Type
+  type F0 :: forall k. k -> k -> Type
+  type family F0
 
-And, indeed, tyConKind S1 == tyConKind S2. However,
-tyConBinders and tyConResKind for S1 and S2 are different:
+  type F1 :: forall k. k -> k -> Type
+  type family F1 @k
 
-  tyConBinders S1  ==  [spec k1]
-  tyConResKind S1  ==  forall k2. k1 -> k2 -> Type
-  tyConKind    S1  ==  forall k1 k2. k1 -> k2 -> Type
+  type F2a :: forall k. k -> k -> Type
+  type family F2a @k a
 
-  tyConBinders S2  ==  [spec k1, spec k2, anon-vis (a :: k1), anon-vis (b :: k2)]
-  tyConResKind S2  ==  Type
-  tyConKind    S1  ==  forall k1 k2. k1 -> k2 -> Type
+  type F2b :: forall k. k -> k -> Type
+  type family F2b a
 
-This difference determines the /arity/:
-  tyConArity tc == length (tyConBinders tc)
-That is, the arity of S1 is 1, while the arity of S2 is 4.
+  type F3 :: forall k. k -> k -> Type
+  type family F3 a b
 
-'kcCheckDeclHeader_sig' needs to infer the desired arity, to split the
-standalone kind signature into binders and the result kind. It does so
-in two rounds:
+All five have the same /kind/, but what /arity/ do they have?
+For a type family, the arity is critical:
+* A type family must always appear saturated (up to its arity)
+* A type family can match only on `arity` arguments, not further ones
+* The arity is recorded by `tyConArity`, and is equal to the number of
+  `TyConBinders` in the `TyCon`.
+* In this context "arity" includes both kind and type arguments.
 
-1. matchUpSigWithDecl matches up
-   - the [TyConBinder] from (applying splitTyConKind to) the kind signature
-   - with the [LHsTyVarBndr] from the type declaration.
-   That may leave some excess TyConBinder: in the case of S2 there are
-   no excess TyConBinders, but in the case of S1 there are two (since
-   there are no LHsTYVarBndrs.
+The arity is not determined by the kind signature (all five have the same signature).
+Rather, it is determined by the declaration of the family:
+* `F0` has arity 0.
+* `F1` has arity 1.
+* `F2a` has arity 2.
+* `F2b` also has arity 2: the kind argument is invisible.
+* `F3` has arity 3; again the kind argument is invisible.
 
-2. Split off further TyConBinders (in the case of S1, one more) to
-   make it possible to unify the residual return kind with the
-   signature in the type declaration.  More precisely, split off such
-   enough invisible that the remainder of the standalone kind
-   signature and the user-written result kind signature have the same
-   number of invisible quantifiers.
-
-As another example consider the following declarations:
-
-    type F :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
-    type family F a b
-
-    type G :: Type -> forall j. j -> forall k1 k2. (k1, k2) -> Type
-    type family G a b :: forall r2. (r1, r2) -> Type
-
-For both F and G, the signature (after splitTyConKind) has
-  sig_tcbs :: [TyConBinder]
-    = [ anon-vis (@a_aBq), spec (@j_auA), anon-vis (@(b_aBr :: j_auA))
-      , spec (@k1_auB), spec (@k2_auC)
-      , anon-vis (@(c_aBs :: (k1_auB, k2_auC)))]
-
-matchUpSigWithDecl will consume the first three of these, passing on
-  excess_sig_tcbs
-    = [ spec (@k1_auB), spec (@k2_auC)
-      , anon-vis (@(c_aBs :: (k1_auB, k2_auC)))]
-
-For F, there is no result kind signature in the declaration for F, so
-we absorb all invisible binders into F's arity. The resulting arity of
-F is 3+2=5.
-
-Now, in the case of G, we have a result kind sig 'forall r2. (r2,r2)->Type'.
-This has one invisible binder, so we split of enough extra binders from
-our excess_sig_tcbs to leave just one to match 'r2'.
-
-    res_ki  =  forall    r2. (r1, r2) -> Type
-    kisig   =  forall k1 k2. (k1, k2) -> Type
-                     ^^^
-                     split off this one.
-
-The resulting arity of G is 3+1=4.
+The matching-up of kind signature with the declaration itself is done by
+`matchUpWithSigDecl`.
 
 Note [discardResult in kcCheckDeclHeader_sig]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2949,6 +2916,12 @@ these first.
 data ContextKind = TheKind TcKind   -- ^ a specific kind
                  | AnyKind        -- ^ any kind will do
                  | OpenKind       -- ^ something of the form @TYPE _@
+
+-- debug only
+instance Outputable ContextKind where
+  ppr AnyKind = text "AnyKind"
+  ppr OpenKind = text "OpenKind"
+  ppr (TheKind k) = text "TheKind" <+> ppr k
 
 -----------------------
 newExpectedKind :: ContextKind -> TcM TcKind

@@ -920,12 +920,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
-    pp_kind    = ppUnless (if ki_sig_printable
-                              then isIfaceRhoType kind
-                                      -- Even in the presence of a standalone kind signature, a non-tau
-                                      -- result kind annotation cannot be discarded as it determines the arity.
-                                      -- See Note [Arity inference in kcCheckDeclHeader_sig] in GHC.Tc.Gen.HsType
-                              else isIfaceLiftedTypeKind kind)
+    pp_kind    = ppUnless (ki_sig_printable || isIfaceLiftedTypeKind kind)
                           (dcolon <+> ppr kind)
 
     pp_lhs = case parent of
