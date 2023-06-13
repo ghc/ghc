@@ -5,9 +5,14 @@
 {-# OPTIONS_HADDOCK not-home #-}
 
 {-|
-This module exports the Type Literal kinds as well as the comparison type
-families for those kinds.  It is needed to prevent module cycles while still
-allowing these identifiers to be imported in 'Data.Type.Ord'.
+DO NOT USE THIS MODULE.  Use "GHC.TypeLits" instead.
+
+This module is internal-only and was exposed by accident.  It may be
+removed without warning in a future version.
+
+(The technical reason for this module's existence is that it is needed
+to prevent module cycles while still allowing these identifiers to be
+imported in 'Data.Type.Ord'.)
 
 @since 4.16.0.0
 -}
