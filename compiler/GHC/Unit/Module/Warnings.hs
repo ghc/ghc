@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- | Warnings for a module
 module GHC.Unit.Module.Warnings
@@ -40,7 +41,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Hs.Doc
-import GHC.Hs.Extension
 
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
@@ -51,6 +51,7 @@ import Language.Haskell.Syntax.Extension
 import Data.Data
 import Data.List (isPrefixOf)
 import GHC.Generics ( Generic )
+import Control.DeepSeq
 
 
 {-
@@ -103,7 +104,7 @@ the possibility of them being infinite.
 
 -- See Note [Warning categories]
 newtype WarningCategory = WarningCategory FastString
-  deriving (Binary, Data, Eq, Outputable, Show, Uniquable)
+  deriving (Binary, Data, Eq, Outputable, Show, Uniquable, NFData)
 
 mkWarningCategory :: FastString -> WarningCategory
 mkWarningCategory = WarningCategory
@@ -203,29 +204,6 @@ instance Outputable (WarningTxt pass) where
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
-instance Binary (WarningTxt GhcRn) where
-    put_ bh (WarningTxt c s w) = do
-            putByte bh 0
-            put_ bh $ unLoc <$> c
-            put_ bh $ unLoc s
-            put_ bh $ unLoc <$> w
-    put_ bh (DeprecatedTxt s d) = do
-            putByte bh 1
-            put_ bh $ unLoc s
-            put_ bh $ unLoc <$> d
-
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> do c <- fmap noLoc <$> get bh
-                      s <- noLoc <$> get bh
-                      w <- fmap noLoc  <$> get bh
-                      return (WarningTxt c s w)
-              _ -> do s <- noLoc <$> get bh
-                      d <- fmap noLoc <$> get bh
-                      return (DeprecatedTxt s d)
-
-
 pp_ws :: [Located (WithHsDocIdentifiers StringLiteral pass)] -> SDoc
 pp_ws [l] = ppr $ unLoc l
 pp_ws ws
@@ -270,24 +248,6 @@ data Warnings pass
      --        a Name to its fixity declaration.
 
 deriving instance Eq (IdP pass) => Eq (Warnings pass)
-
-instance Binary (Warnings GhcRn) where
-    put_ bh NoWarnings     = putByte bh 0
-    put_ bh (WarnAll t) = do
-            putByte bh 1
-            put_ bh t
-    put_ bh (WarnSome ts) = do
-            putByte bh 2
-            put_ bh ts
-
-    get bh = do
-            h <- getByte bh
-            case h of
-              0 -> return NoWarnings
-              1 -> do aa <- get bh
-                      return (WarnAll aa)
-              _ -> do aa <- get bh
-                      return (WarnSome aa)
 
 -- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
 mkIfaceWarnCache :: Warnings p -> OccName -> Maybe (WarningTxt p)

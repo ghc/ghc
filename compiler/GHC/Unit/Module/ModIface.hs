@@ -185,7 +185,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Fixities
                 -- NOT STRICT!  we read this field lazily from the interface file
 
-        mi_warns    :: (Warnings GhcRn),
+        mi_warns    :: IfaceWarnings,
                 -- ^ Warnings
                 -- NOT STRICT!  we read this field lazily from the interface file
 
@@ -479,7 +479,7 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
-                   mi_warn_fn = mkIfaceWarnCache warns,
+                   mi_warn_fn = mkIfaceWarnCache $ fromIfaceWarnings warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
                  }})
@@ -498,7 +498,7 @@ emptyPartialModIface mod
                mi_exports     = [],
                mi_used_th     = False,
                mi_fixities    = [],
-               mi_warns       = NoWarnings,
+               mi_warns       = IfNoWarnings,
                mi_anns        = [],
                mi_insts       = [],
                mi_fam_insts   = [],
@@ -567,7 +567,7 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
     `seq`     mi_exports
     `seq` rnf mi_used_th
     `seq`     mi_fixities
-    `seq`     mi_warns
+    `seq` rnf mi_warns
     `seq` rnf mi_anns
     `seq` rnf mi_decls
     `seq` rnf mi_extra_decls
