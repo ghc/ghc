@@ -808,7 +808,7 @@ var h$base_stderr_fd =
   , refs:   1
   };
 
-var h$base_fdN = -2; // negative file descriptors are 'virtual', -1 is already used to indicated error
+var h$base_fdN = -3; // negative file descriptors are 'virtual', -1 and -2 are reserved
 var h$base_fds = [h$base_stdin_fd, h$base_stdout_fd, h$base_stderr_fd];
 
 function h$shutdownHaskellAndExit(code, fast) {
