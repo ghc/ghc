@@ -16,6 +16,7 @@ module GHC.Iface.Syntax (
         IfaceBindingX(..), IfaceMaybeRhs(..), IfaceConAlt(..),
         IfaceIdInfo, IfaceIdDetails(..), IfaceUnfolding(..), IfGuidance(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
+        IfaceWarnings(..), IfaceWarningTxt(..), IfaceStringLiteral(..),
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
         IfaceClassBody(..), IfaceBooleanFormula(..),
         IfaceBang(..),
@@ -33,6 +34,7 @@ module GHC.Iface.Syntax (
         ifaceDeclImplicitBndrs, visibleIfConDecls,
         ifaceDeclFingerprints,
         fromIfaceBooleanFormula,
+        fromIfaceWarnings,
 
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
@@ -66,7 +68,9 @@ import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
 import GHC.Types.SrcLoc
+import GHC.Types.SourceText
 import GHC.Data.BooleanFormula ( BooleanFormula(..), pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders, visArgTypeLike )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
@@ -74,6 +78,8 @@ import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
 import GHC.Parser.Annotation (noLocA)
+import GHC.Hs.Extension ( GhcRn )
+import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
 import GHC.Utils.Lexeme (isLexSym)
 import GHC.Utils.Fingerprint
@@ -338,6 +344,18 @@ data IfaceRule
         ifRuleOrph   :: IsOrphan   -- Just like IfaceClsInst
     }
 
+data IfaceWarnings
+  = IfNoWarnings
+  | IfWarnAll IfaceWarningTxt
+  | IfWarnSome [(OccName, IfaceWarningTxt)]
+
+data IfaceWarningTxt
+  = IfWarningTxt (Maybe WarningCategory) SourceText [(IfaceStringLiteral, [IfExtName])]
+  | IfDeprecatedTxt                      SourceText [(IfaceStringLiteral, [IfExtName])]
+
+data IfaceStringLiteral
+  = IfStringLiteral SourceText FastString
+
 data IfaceAnnotation
   = IfaceAnnotation {
         ifAnnotatedTarget :: IfaceAnnTarget,
@@ -564,6 +582,24 @@ ifaceDeclFingerprints hash decl
        unsafeDupablePerformIO
         . computeFingerprint (panic "ifaceDeclFingerprints")
 
+fromIfaceWarnings :: IfaceWarnings -> Warnings GhcRn
+fromIfaceWarnings = \case
+    IfNoWarnings -> NoWarnings
+    IfWarnAll txt -> WarnAll (fromIfaceWarningTxt txt)
+    IfWarnSome prs -> WarnSome [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- prs]
+
+fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
+fromIfaceWarningTxt = \case
+    IfWarningTxt mb_cat src strs -> WarningTxt (noLoc <$> mb_cat) (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+    IfDeprecatedTxt src strs -> DeprecatedTxt (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+
+fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn
+fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
+
+fromIfaceStringLiteral :: IfaceStringLiteral -> StringLiteral
+fromIfaceStringLiteral (IfStringLiteral st fs) = StringLiteral st fs Nothing
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -714,6 +750,25 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
           ppWhen (notNull incomps) $
             text "--" <+> text "incompatible with:"
             <+> pprWithCommas (\incomp -> text "#" <> ppr incomp) incomps
+
+instance Outputable IfaceWarnings where
+    ppr = \case
+        IfNoWarnings -> empty
+        IfWarnAll txt -> text "Warn all" <+> ppr txt
+        IfWarnSome prs -> text "Warnings:" <+> vcat [ppr name <+> ppr txt | (name, txt) <- prs]
+
+instance Outputable IfaceWarningTxt where
+    ppr = \case
+        IfWarningTxt _ _ ws  -> pp_ws ws
+        IfDeprecatedTxt _ ds -> pp_ws ds
+      where
+        pp_ws [msg] = pp_with_name msg
+        pp_ws msgs = brackets $ vcat . punctuate comma . map pp_with_name $ msgs
+
+        pp_with_name = ppr . fst
+
+instance Outputable IfaceStringLiteral where
+    ppr (IfStringLiteral st fs) = pprWithSourceText st (ftext fs)
 
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
@@ -2265,6 +2320,28 @@ instance Binary IfaceRule where
         a8 <- get bh
         return (IfaceRule a1 a2 a3 a4 a5 a6 a7 a8)
 
+instance Binary IfaceWarnings where
+    put_ bh = \case
+        IfNoWarnings   -> putByte bh 0
+        IfWarnAll txt  -> putByte bh 1 *> put_ bh txt
+        IfWarnSome prs -> putByte bh 2 *> put_ bh prs
+    get bh = getByte bh >>= \case
+        0 -> pure IfNoWarnings
+        1 -> pure IfWarnAll    <*> get bh
+        _ -> pure IfWarnSome   <*> get bh
+
+instance Binary IfaceWarningTxt where
+    put_ bh = \case
+        IfWarningTxt a1 a2 a3 -> putByte bh 0 *> put_ bh a1 *> put_ bh a2 *> put_ bh a3
+        IfDeprecatedTxt a1 a2 -> putByte bh 1 *> put_ bh a1 *> put_ bh a2
+    get bh = getByte bh >>= \case
+        0 -> pure IfWarningTxt    <*> get bh <*> get bh <*> get bh
+        _ -> pure IfDeprecatedTxt <*> get bh <*> get bh
+
+instance Binary IfaceStringLiteral where
+    put_ bh (IfStringLiteral a1 a2) = put_ bh a1 *> put_ bh a2
+    get bh = IfStringLiteral <$> get bh <*> get bh
+
 instance Binary IfaceAnnotation where
     put_ bh (IfaceAnnotation a1 a2) = do
         put_ bh a1
@@ -2821,6 +2898,20 @@ instance NFData IfaceFamInst where
 instance NFData IfaceClsInst where
   rnf (IfaceClsInst f1 f2 f3 f4 f5) =
     f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` ()
+
+instance NFData IfaceWarnings where
+  rnf = \case
+      IfNoWarnings    -> ()
+      IfWarnAll txt   -> rnf txt
+      IfWarnSome txts -> rnf txts
+
+instance NFData IfaceWarningTxt where
+    rnf = \case
+        IfWarningTxt f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+        IfDeprecatedTxt f1 f2 -> rnf f1 `seq` rnf f2
+
+instance NFData IfaceStringLiteral where
+    rnf (IfStringLiteral f1 f2) = rnf f1 `seq` rnf f2
 
 instance NFData IfaceAnnotation where
   rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()

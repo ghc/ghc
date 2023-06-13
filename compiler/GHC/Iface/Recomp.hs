@@ -962,7 +962,7 @@ addFingerprints hsc_env iface0
    eps <- hscEPS hsc_env
    let
        decls = mi_decls iface0
-       warn_fn = mkIfaceWarnCache (mi_warns iface0)
+       warn_fn = mkIfaceWarnCache (fromIfaceWarnings $ mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
         -- The ABI of a declaration represents everything that is made

@@ -102,7 +102,6 @@ import GHC.Types.PkgQual
 
 import GHC.Unit.External
 import GHC.Unit.Module
-import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Module.Deps
 import GHC.Unit.State
@@ -1205,16 +1204,6 @@ pprTrustInfo trust = text "trusted:" <+> ppr trust
 
 pprTrustPkg :: Bool -> SDoc
 pprTrustPkg tpkg = text "require own pkg trusted:" <+> ppr tpkg
-
-instance Outputable (Warnings pass) where
-    ppr = pprWarns
-
-pprWarns :: Warnings pass -> SDoc
-pprWarns NoWarnings         = Outputable.empty
-pprWarns (WarnAll txt)  = text "Warn all" <+> ppr txt
-pprWarns (WarnSome prs) = text "Warnings:"
-                        <+> vcat (map pprWarning prs)
-    where pprWarning (name, txt) = ppr name <+> ppr txt
 
 pprIfaceAnnotation :: IfaceAnnotation -> SDoc
 pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedValue = serialized })

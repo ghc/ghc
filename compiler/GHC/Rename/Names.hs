@@ -47,6 +47,7 @@ import GHC.Tc.Zonk.TcType ( tcInitTidyEnv )
 
 import GHC.Hs
 import GHC.Iface.Load   ( loadSrcInterface )
+import GHC.Iface.Syntax ( fromIfaceWarnings )
 import GHC.Builtin.Names
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Core.Type
@@ -422,7 +423,7 @@ rnImportDecl this_mod
         imports = calculateAvails home_unit other_home_units iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
-    case mi_warns iface of
+    case fromIfaceWarnings (mi_warns iface) of
        WarnAll txt -> addDiagnostic (TcRnDeprecatedModule imp_mod_name txt)
        _           -> return ()
 

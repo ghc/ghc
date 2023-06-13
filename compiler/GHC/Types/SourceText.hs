@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Source text
 --
@@ -39,6 +41,7 @@ import Data.Function (on)
 import Data.Data
 import GHC.Real ( Ratio(..) )
 import GHC.Types.SrcLoc
+import Control.DeepSeq
 
 {-
 Note [Pragma source text]
@@ -106,6 +109,11 @@ data SourceText
 instance Outputable SourceText where
   ppr (SourceText s) = text "SourceText" <+> ftext s
   ppr NoSourceText   = text "NoSourceText"
+
+instance NFData SourceText where
+    rnf = \case
+        SourceText s -> rnf s
+        NoSourceText -> ()
 
 instance Binary SourceText where
   put_ bh NoSourceText = putByte bh 0
@@ -315,12 +323,3 @@ instance Eq StringLiteral where
 
 instance Outputable StringLiteral where
   ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
-
-instance Binary StringLiteral where
-  put_ bh (StringLiteral st fs _) = do
-            put_ bh st
-            put_ bh fs
-  get bh = do
-            st <- get bh
-            fs <- get bh
-            return (StringLiteral st fs Nothing)

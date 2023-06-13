@@ -66,6 +66,8 @@ import GHC.Types.SourceFile
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 import GHC.Types.CompleteMatch
+import GHC.Types.SourceText
+import GHC.Types.SrcLoc ( unLoc )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -291,7 +293,7 @@ mkIface_ hsc_env
           -- The order of fixities returned from nonDetNameEnvElts is not
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details.
-        warns       = src_warns
+        warns       = toIfaceWarnings src_warns
         iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode (instEnvElts insts)
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
@@ -393,6 +395,21 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
     do_rough (RM_KnownTc n) = Just (toIfaceTyCon_name n)
 
 --------------------------
+toIfaceWarnings :: Warnings GhcRn -> IfaceWarnings
+toIfaceWarnings NoWarnings = IfNoWarnings
+toIfaceWarnings (WarnAll txt) = IfWarnAll (toIfaceWarningTxt txt)
+toIfaceWarnings (WarnSome prs) = IfWarnSome [(occ, toIfaceWarningTxt txt) | (occ, txt) <- prs]
+
+toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
+toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc <$> mb_cat) (unLoc src) (map (toIfaceStringLiteralWithNames . unLoc) strs)
+toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt (unLoc src) (map (toIfaceStringLiteralWithNames . unLoc) strs)
+
+toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (IfaceStringLiteral, [IfExtName])
+toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
+
+toIfaceStringLiteral :: StringLiteral -> IfaceStringLiteral
+toIfaceStringLiteral (StringLiteral sl fs _) = IfStringLiteral sl fs
+
 coreRuleToIfaceRule :: CoreRule -> IfaceRule
 -- A plugin that installs a BuiltinRule in a CoreDoPluginPass should
 -- ensure that there's another CoreDoPluginPass that removes the rule.
