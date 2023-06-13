@@ -664,8 +664,14 @@ if(h$isNode()) {
         });
     }
 
+    var h$base_stdinHandlerInstalled = false;
+
     h$base_readStdin = function(fd, fdo, buf, buf_offset, n, c) {
         TRACE_IO("read stdin")
+        if(!h$base_stdinHandlerInstalled) {
+            process.stdin.on('readable', h$base_process_stdin);
+            h$base_stdinHandlerInstalled = true;
+        }
         h$base_stdin_waiting.enqueue({buf: buf, off: buf_offset, n: n, c: c});
         h$base_process_stdin();
     }
@@ -720,7 +726,6 @@ if(h$isNode()) {
         c(0);
     }
 
-    process.stdin.on('readable', h$base_process_stdin);
     process.stdin.on('end', function() { h$base_stdin_eof = true; h$base_process_stdin(); });
 
     h$base_isattyStdin  = function() { return process.stdin.isTTY;  };
