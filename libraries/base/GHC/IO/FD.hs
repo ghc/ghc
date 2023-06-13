@@ -571,7 +571,7 @@ indicates that there's no data, we call threadWaitRead.
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtr loc !fd !buf !off !len
 #if defined(javascript_HOST_ARCH)
-  = fmap fromIntegral . uninterruptibleMask_ $
+  = fmap fromIntegral . mask_ $
     throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
 #else
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
@@ -593,7 +593,7 @@ readRawBufferPtr loc !fd !buf !off !len
 readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
 readRawBufferPtrNoBlock loc !fd !buf !off !len
 #if defined(javascript_HOST_ARCH)
-  = uninterruptibleMask_ $ do
+  = mask_ $ do
       r <- throwErrnoIfMinus1 loc (c_read (fdFD fd) (buf `plusPtr` off) len)
       case r of
        (-1) -> return 0
@@ -618,7 +618,7 @@ readRawBufferPtrNoBlock loc !fd !buf !off !len
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtr loc !fd !buf !off !len
 #if defined(javascript_HOST_ARCH)
-  = fmap fromIntegral . uninterruptibleMask_ $
+  = fmap fromIntegral . mask_ $
     throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
 #else
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
@@ -638,7 +638,7 @@ writeRawBufferPtr loc !fd !buf !off !len
 writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 writeRawBufferPtrNoBlock loc !fd !buf !off !len
 #if defined(javascript_HOST_ARCH)
-  = uninterruptibleMask_ $ do
+  = mask_ $ do
       r <- throwErrnoIfMinus1 loc (c_write (fdFD fd) (buf `plusPtr` off) len)
       case r of
         (-1) -> return 0
