@@ -8,6 +8,7 @@
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -57,6 +58,7 @@ import GHC.CString      ( unpackCString# )
 import GHC.Generics     ( Generic )
 import GHC.Types        ( Int(..), Word(..), Char(..), Double(..), Float(..),
                           TYPE, RuntimeRep(..), Multiplicity (..) )
+import qualified Data.Kind as Kind (Type)
 import GHC.Prim         ( Int#, Word#, Char#, Double#, Float#, Addr# )
 import GHC.Ptr          ( Ptr, plusPtr )
 import GHC.Lexeme       ( startsVarSym, startsVarId )
@@ -332,8 +334,9 @@ instance Quote Q where
 --
 -----------------------------------------------------
 
+type TExp :: TYPE r -> Kind.Type
 type role TExp nominal   -- See Note [Role of TExp]
-newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
+newtype TExp a = TExp
   { unType :: Exp -- ^ Underlying untyped Template Haskell expression
   }
 -- ^ Typed wrapper around an 'Exp'.
@@ -376,8 +379,9 @@ The splice will evaluate to (MkAge 3) and you can't add that to
 
 -- Code constructor
 
+type Code :: (Kind.Type -> Kind.Type) -> TYPE r -> Kind.Type
 type role Code representational nominal   -- See Note [Role of TExp]
-newtype Code m (a :: TYPE (r :: RuntimeRep)) = Code
+newtype Code m a = Code
   { examineCode :: m (TExp a) -- ^ Underlying monadic value
   }
 -- ^ Represents an expression which has type @a@, built in monadic context @m@. Built on top of 'TExp', typed
