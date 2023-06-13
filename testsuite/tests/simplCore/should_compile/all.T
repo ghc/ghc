@@ -134,7 +134,7 @@ test('T5366',
      normal,
      makefile_test, ['T5366'])
 test('T7796', [], makefile_test, ['T7796'])
-test('T5550', req_interp, compile, [''])
+test('T5550', req_th, compile, [''])
 test('T7865', normal, makefile_test, ['T7865'])
 
 # T7785: we want to check that we specialise 'shared'. But Tidy discards the
@@ -347,7 +347,7 @@ test('T18747B', normal, compile, [''])
 test('T18815', only_ways(['optasm']), makefile_test, ['T18815'])
 test('T18668', normal, compile, ['-dsuppress-uniques'])
 test('T18995', [ grep_errmsg(r'print') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('T19168', req_interp, compile, [''])
+test('T19168', req_th, compile, [''])
 test('T19246', only_ways(['optasm']), multimod_compile, ['T19246', '-v0 -ddump-rules'])
 test('T19360', only_ways(['optasm']), compile, [''])
 
@@ -393,7 +393,7 @@ test('OpaqueNoCastWW', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoRebox', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoRebox2', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoRebox3', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
-test('OpaqueNoSpecConstr', [ req_interp, grep_errmsg(r'$sloop') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('OpaqueNoSpecConstr', [ req_th, grep_errmsg(r'$sloop') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoSpecialise', [ grep_errmsg(r'$sf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoStrictArgWW', [ grep_errmsg(r'$wf') ], compile, ['-O -fworker-wrapper-cbv -ddump-simpl -dsuppress-uniques'])
 test('OpaqueNoWW', [ grep_errmsg(r'$wf') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])

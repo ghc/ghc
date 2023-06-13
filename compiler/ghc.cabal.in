@@ -626,8 +626,11 @@ Library
         GHC.Runtime.Heap.Inspect
         GHC.Runtime.Heap.Layout
         GHC.Runtime.Interpreter
+        GHC.Runtime.Interpreter.JS
+        GHC.Runtime.Interpreter.Process
         GHC.Runtime.Interpreter.Types
         GHC.Runtime.Loader
+        GHC.Runtime.Utils
         GHC.Settings
         GHC.Settings.Config
         GHC.Settings.Constants

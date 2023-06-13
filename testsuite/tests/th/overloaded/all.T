@@ -7,7 +7,7 @@
 def f(name, opts):
     opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
 setTestOpts(f)
-setTestOpts(req_interp)
+setTestOpts(req_th)
 # TH should work with -fexternal-interpreter too
 if config.have_ext_interp :
      setTestOpts(extra_ways(['ext-interp']))

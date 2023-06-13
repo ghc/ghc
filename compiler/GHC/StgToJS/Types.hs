@@ -288,9 +288,9 @@ data ForeignJSRef = ForeignJSRef
   , foreignRefResult   :: !FastString
   }
 
--- | data used to generate one ObjUnit in our object file
+-- | data used to generate one ObjBlock in our object file
 data LinkableUnit = LinkableUnit
-  { luObjUnit      :: ObjUnit       -- ^ serializable unit info
+  { luObjBlock     :: ObjBlock      -- ^ serializable unit info
   , luIdExports    :: [Id]          -- ^ exported names from haskell identifiers
   , luOtherExports :: [FastString]  -- ^ other exports
   , luIdDeps       :: [Id]          -- ^ identifiers this unit depends on
@@ -301,7 +301,7 @@ data LinkableUnit = LinkableUnit
   }
 
 -- | one toplevel block in the object file
-data ObjUnit = ObjUnit
+data ObjBlock = ObjBlock
   { oiSymbols  :: ![FastString]   -- ^ toplevel symbols (stored in index)
   , oiClInfo   :: ![ClosureInfo]  -- ^ closure information of all closures in block
   , oiStatic   :: ![StaticInfo]   -- ^ static closure data

@@ -1,7 +1,7 @@
 
 ==================== CodeGenInput STG: ====================
 BCO_toplevel :: GHC.Types.IO [GHC.Types.Any]
-[LclId] =
+[LclIdX] =
     {} \u []
         let {
           sat :: [GHC.Types.Any]

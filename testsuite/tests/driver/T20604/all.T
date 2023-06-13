@@ -10,5 +10,6 @@ def normalise_paths(s):
 
 
 test('T20604', [ req_th
+               , js_broken(23013)
                , extra_files(['A.hs', 'A1.hs'])
                , normalise_fun(normalise_paths)], makefile_test, [])

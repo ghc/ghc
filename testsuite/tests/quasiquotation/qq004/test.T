@@ -1,1 +1,1 @@
-test('qq004', req_interp, compile_fail, [''])
+test('qq004', req_th, compile_fail, [''])

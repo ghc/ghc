@@ -130,6 +130,7 @@ ghcLibDeps stage iplace = do
     ps <- mapM (\f -> stageLibPath stage <&> (-/- f))
         [ "llvm-targets"
         , "llvm-passes"
+        , "ghc-interp.js"
         , "settings"
         ]
     cxxStdLib <- systemCxxStdLibConfPath (PackageDbLoc stage iplace)

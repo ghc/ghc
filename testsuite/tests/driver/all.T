@@ -288,6 +288,7 @@ test('T15396', normal, compile_and_run, ['-package ghc'])
 test('T16737',
      [extra_files(['T16737include/']),
       req_th,
+      req_c,
       expect_broken_for(16541, ghci_ways)],
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
 

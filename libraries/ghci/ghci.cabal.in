@@ -50,7 +50,6 @@ library
     if flag(internal-interpreter)
         CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         exposed-modules:
-            GHCi.InfoTable
             GHCi.Run
             GHCi.CreateBCO
             GHCi.ObjLink
@@ -58,6 +57,10 @@ library
             GHCi.StaticPtrTable
             GHCi.TH
             GHCi.Server
+
+        if !arch(javascript)
+          exposed-modules:
+            GHCi.InfoTable
 
     exposed-modules:
         GHCi.BreakArray

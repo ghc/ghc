@@ -21,7 +21,17 @@
 
 module GHC.StgToJS.Linker.Linker
   ( jsLinkBinary
+  , jsLink
   , embedJsFile
+  , staticInitStat
+  , staticDeclStat
+  , mkExportedFuns
+  , mkExportedModFuns
+  , computeLinkDependencies
+  , LinkSpec (..)
+  , LinkPlan (..)
+  , emptyLinkPlan
+  , incrementLinkPlan
   )
 where
 
@@ -41,6 +51,7 @@ import GHC.SysTools.Cpp
 import GHC.SysTools
 
 import GHC.Linker.Static.Utils (exeFileName)
+import GHC.Linker.Types (Unlinked(..), linkableUnlinked)
 
 import GHC.StgToJS.Linker.Types
 import GHC.StgToJS.Linker.Utils
@@ -54,7 +65,7 @@ import GHC.StgToJS.Closure
 
 import GHC.Unit.State
 import GHC.Unit.Env
-import GHC.Unit.Home
+import GHC.Unit.Home.ModInfo
 import GHC.Unit.Types
 import GHC.Unit.Module (moduleStableString)
 
@@ -75,7 +86,6 @@ import qualified GHC.SysTools.Ar          as Ar
 import qualified GHC.Data.ShortText as ST
 import GHC.Data.FastString
 
-import Control.Concurrent.MVar
 import Control.Monad
 
 import Data.Array
@@ -84,13 +94,9 @@ import qualified Data.ByteString.Char8    as BC
 import qualified Data.ByteString.Lazy     as BL
 import qualified Data.ByteString          as BS
 import Data.Function            (on)
-import Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IS
 import Data.IORef
-import Data.List  ( partition, nub, intercalate, sort
-                  , groupBy, intersperse,
-                  )
-import qualified Data.List.NonEmpty       as NE
+import Data.List  ( nub, intercalate, groupBy, intersperse, sortBy)
 import Data.Map.Strict          (Map)
 import qualified Data.Map.Strict          as M
 import Data.Maybe
@@ -108,6 +114,10 @@ import System.Directory ( createDirectoryIfMissing
                         , getPermissions
                         )
 
+import GHC.Unit.Finder.Types
+import GHC.Unit.Finder (findObjectLinkableMaybe, findHomeModule)
+import GHC.Driver.Config.Finder (initFinderOpts)
+
 data LinkerStats = LinkerStats
   { bytesPerModule     :: !(Map Module Word64) -- ^ number of bytes linked per module
   , packedMetaDataSize :: !Word64              -- ^ number of bytes for metadata
@@ -122,7 +132,8 @@ defaultJsContext :: SDocContext
 defaultJsContext = defaultSDocContext{sdocStyle = PprCode}
 
 jsLinkBinary
-  :: JSLinkConfig
+  :: FinderCache
+  -> JSLinkConfig
   -> StgToJSConfig
   -> [FilePath]
   -> Logger
@@ -131,7 +142,7 @@ jsLinkBinary
   -> [FilePath]
   -> [UnitId]
   -> IO ()
-jsLinkBinary lc_cfg cfg js_srcs logger dflags u_env objs dep_pkgs
+jsLinkBinary finder_cache lc_cfg cfg js_srcs logger dflags unit_env objs dep_units
   | lcNoJSExecutables lc_cfg = return ()
   | otherwise = do
     -- additional objects to link are passed as FileOption ldInputs...
@@ -141,47 +152,56 @@ jsLinkBinary lc_cfg cfg js_srcs logger dflags u_env objs dep_pkgs
     let
         objs'    = map ObjFile (objs ++ cmdline_js_objs)
         js_srcs' = js_srcs ++ cmdline_js_srcs
-        isRoot _ = True
+        is_root _ = True -- FIXME: we shouldn't consider every function as a root,
+                         -- but only the program entry point (main), either the
+                         -- generated one or coming from an object
         exe      = jsExeFileName dflags
 
-    void $ link lc_cfg cfg logger u_env exe mempty dep_pkgs objs' js_srcs' isRoot mempty
+    -- compute dependencies
+    let link_spec = LinkSpec
+          { lks_unit_ids        = dep_units
+          , lks_obj_files       = objs'
+          , lks_obj_root_filter = is_root
+          , lks_extra_roots     = mempty
+          , lks_extra_js        = js_srcs'
+          }
+
+    let finder_opts = initFinderOpts dflags
+
+    link_plan <- computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache
+
+    void $ jsLink lc_cfg cfg logger exe link_plan
 
 -- | link and write result to disk (jsexe directory)
-link :: JSLinkConfig
+jsLink
+     :: JSLinkConfig
      -> StgToJSConfig
      -> Logger
-     -> UnitEnv
      -> FilePath               -- ^ output file/directory
-     -> [FilePath]             -- ^ include path for home package
-     -> [UnitId]               -- ^ packages to link
-     -> [LinkedObj]            -- ^ the object files we're linking
-     -> [FilePath]             -- ^ extra js files to include
-     -> (ExportedFun -> Bool)  -- ^ functions from the objects to use as roots (include all their deps)
-     -> Set ExportedFun        -- ^ extra symbols to link in
+     -> LinkPlan
      -> IO ()
-link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun extraStaticDeps = do
+jsLink lc_cfg cfg logger out link_plan = do
 
       -- create output directory
       createDirectoryIfMissing False out
 
+      when (logVerbAtLeast logger 2) $
+        logInfo logger $ hang (text "jsLink:") 2 (ppr link_plan)
+
       -------------------------------------------------------------
       -- link all Haskell code (program + dependencies) into out.js
 
-      -- compute dependencies
-      (dep_map, dep_units, all_deps, _rts_wired_functions, dep_archives)
-        <- computeLinkDependencies cfg logger out unit_env units objFiles extraStaticDeps isRootFun
-
-      -- retrieve code for dependencies
-      mods <- collectDeps dep_map dep_units all_deps
+      -- retrieve code for Haskell dependencies
+      mods <- collectModuleCodes link_plan
 
       -- LTO + rendering of JS code
       link_stats <- withBinaryFile (out </> "out.js") WriteMode $ \h ->
-        renderLinker h (csPrettyRender cfg) mods jsFiles
+        renderLinker h (csPrettyRender cfg) mods (lkp_extra_js link_plan)
 
       -------------------------------------------------------------
 
       -- dump foreign references file (.frefs)
-      unless (lcOnlyOut lc_cfg) $ do
+      when (lcForeignRefs lc_cfg) $ do
         let frefsFile  = "out.frefs"
             -- frefs      = concatMap mc_frefs mods
             jsonFrefs  = mempty -- FIXME: toJson frefs
@@ -202,7 +222,7 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
 
       -- link dependencies' JS files into lib.js
       withBinaryFile (out </> "lib.js") WriteMode $ \h -> do
-        forM_ dep_archives $ \archive_file -> do
+        forM_ (lkp_archives link_plan) $ \archive_file -> do
           Ar.Archive entries <- Ar.loadAr archive_file
           forM_ entries $ \entry -> do
             case getJsArchiveEntry entry of
@@ -211,47 +231,106 @@ link lc_cfg cfg logger unit_env out _include units objFiles jsFiles isRootFun ex
                 B.hPut   h bs
                 hPutChar h '\n'
 
-      -- link everything together into all.js
-      when (generateAllJs lc_cfg) $ do
+      -- link everything together into a runnable all.js
+      -- only if we link a complete application,
+      --   no incremental linking and no skipped parts
+      when (lcCombineAll lc_cfg && not (lcNoRts lc_cfg)) $ do
         _ <- combineFiles lc_cfg out
         writeHtml    out
         writeRunMain out
         writeRunner lc_cfg out
         writeExterns out
 
+data LinkSpec = LinkSpec
+  { lks_unit_ids        :: [UnitId]
+
+  , lks_obj_files       :: [LinkedObj]
+
+  , lks_obj_root_filter :: ExportedFun -> Bool
+      -- ^ Predicate for exported functions in objects to declare as root
+
+  , lks_extra_roots     :: Set ExportedFun
+      -- ^ Extra root functions from loaded units
+
+  , lks_extra_js        :: [FilePath]
+      -- ^ Extra JS files to link
+  }
+
+instance Outputable LinkSpec where
+  ppr s = hang (text "LinkSpec") 2 $ vcat
+            [ hcat [text "Unit ids: ", ppr (lks_unit_ids s)]
+            , hcat [text "Object files:", ppr (lks_obj_files s)]
+            , text "Object root filter: <function>"
+            , hcat [text "Extra roots: ", ppr (lks_extra_roots s)]
+            , hang (text "Extra JS:") 2 (vcat (fmap text (lks_extra_js s)))
+            ]
+
+emptyLinkPlan :: LinkPlan
+emptyLinkPlan = LinkPlan
+  { lkp_block_info = mempty
+  , lkp_dep_blocks = mempty
+  , lkp_archives   = mempty
+  , lkp_extra_js   = mempty
+  }
+
+-- | Given a `base` link plan (assumed to be already linked) and a `new` link
+-- plan, compute `(diff, total)` link plans.
+--
+-- - `diff` is the incremental link plan to get from `base` to `total`
+-- - `total` is the total link plan as if `base` and `new` were linked at once
+incrementLinkPlan :: LinkPlan -> LinkPlan -> (LinkPlan, LinkPlan)
+incrementLinkPlan base new = (diff,total)
+  where
+    total = LinkPlan
+      { lkp_block_info = M.union (lkp_block_info base) (lkp_block_info new)
+      , lkp_dep_blocks = S.union (lkp_dep_blocks base) (lkp_dep_blocks new)
+      , lkp_archives   = S.union (lkp_archives base) (lkp_archives new)
+      , lkp_extra_js   = S.union (lkp_extra_js base) (lkp_extra_js new)
+      }
+    diff = LinkPlan
+      { lkp_block_info = lkp_block_info new -- block info from "new" contains all we need to load new blocks
+      , lkp_dep_blocks = S.difference (lkp_dep_blocks new) (lkp_dep_blocks base)
+      , lkp_archives   = S.difference (lkp_archives new)   (lkp_archives base)
+      , lkp_extra_js   = S.difference (lkp_extra_js new)   (lkp_extra_js base)
+      }
+
 
 computeLinkDependencies
   :: StgToJSConfig
-  -> Logger
-  -> String
   -> UnitEnv
-  -> [UnitId]
-  -> [LinkedObj]
-  -> Set ExportedFun
-  -> (ExportedFun -> Bool)
-  -> IO (Map Module (Deps, DepsLocation), [UnitId], Set LinkableUnit, Set ExportedFun, [FilePath])
-computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDeps isRootFun = do
+  -> LinkSpec
+  -> FinderOpts
+  -> FinderCache
+  -> IO LinkPlan
+computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
 
-  (objDepsMap, objRequiredUnits) <- loadObjDeps objFiles
+  let units       = lks_unit_ids        link_spec
+  let obj_files   = lks_obj_files       link_spec
+  let extra_roots = lks_extra_roots     link_spec
+  let obj_is_root = lks_obj_root_filter link_spec
 
-  let roots    = S.fromList . filter isRootFun $ concatMap (M.keys . depsHaskellExported . fst) (M.elems objDepsMap)
-      rootMods = map (moduleNameString . moduleName . NE.head) . NE.group . sort . map funModule . S.toList $ roots
-      objPkgs  = map moduleUnitId $ nub (M.keys objDepsMap)
+  -- Process:
+  -- 1) Find new required linkables (object files, libraries, etc.) for all
+  -- transitive dependencies
+  -- 2) Load ObjBlockInfo from them and cache them
+  -- 3) Compute ObjBlock dependencies and return the link plan
 
-  when (logVerbAtLeast logger 2) $ void $ do
-    compilationProgressMsg logger $ hcat
-      [ text "Linking ", text target, text " (", text (intercalate "," rootMods), char ')' ]
-    compilationProgressMsg logger $ hcat
-      [ text "objDepsMap ", ppr objDepsMap ]
-    compilationProgressMsg logger $ hcat
-      [ text "objFiles ", ppr objFiles ]
+  -- TODO (#23013): currently we directly compute the ObjBlock dependencies and
+  -- find/load linkable on-demand when a module is missing.
+
+
+  (objs_block_info, objs_required_blocks) <- loadObjBlockInfo obj_files
+
+  let obj_roots = S.fromList . filter obj_is_root $ concatMap (M.keys . bi_exports . lbi_info) (M.elems objs_block_info)
+      obj_units = map moduleUnitId $ nub (M.keys objs_block_info)
 
   let (rts_wired_units, rts_wired_functions) = rtsDeps units
 
   -- all the units we want to link together, without their dependencies
   let root_units = filter (/= mainUnitId)
+                   $ filter (/= interactiveUnitId)
                    $ nub
-                   $ rts_wired_units ++ reverse objPkgs ++ reverse units
+                   $ rts_wired_units ++ reverse obj_units ++ reverse units
 
   -- all the units we want to link together, including their dependencies,
   -- preload units, and backpack instantiations
@@ -260,26 +339,72 @@ computeLinkDependencies cfg logger target unit_env units objFiles extraStaticDep
   let all_units = fmap unitId all_units_infos
 
   dep_archives <- getPackageArchives cfg unit_env all_units
-  env <- newGhcjsEnv
-  (archsDepsMap, archsRequiredUnits) <- loadArchiveDeps env dep_archives
-
-  when (logVerbAtLeast logger 2) $
-    logInfo logger $ hang (text "Linking with archives:") 2 (vcat (fmap text dep_archives))
+  (archives_block_info, archives_required_blocks) <- loadArchiveBlockInfo dep_archives
 
   -- compute dependencies
-  let dep_units      = all_units ++ [homeUnitId (ue_unsafeHomeUnit $ unit_env)]
-      dep_map        = objDepsMap `M.union` archsDepsMap
-      excluded_units = S.empty
-      dep_fun_roots  = roots `S.union` rts_wired_functions `S.union` extraStaticDeps
-      dep_unit_roots = archsRequiredUnits ++ objRequiredUnits
+  let block_info      = objs_block_info `M.union` archives_block_info
+      dep_fun_roots   = obj_roots `S.union` rts_wired_functions `S.union` extra_roots
 
-  all_deps <- getDeps (fmap fst dep_map) excluded_units dep_fun_roots dep_unit_roots
+  -- read transitive dependencies
+  new_required_blocks_var <- newIORef []
+  let load_info mod = do
+        -- Adapted from the tangled code in GHC.Linker.Loader.getLinkDeps.
+        linkable <- case lookupHugByModule mod (ue_home_unit_graph unit_env) of
+          Nothing ->
+                -- It's not in the HPT because we are in one shot mode,
+                -- so use the Finder to get a ModLocation...
+              case ue_homeUnit unit_env of
+                Nothing -> pprPanic "getDeps: No home-unit: " (pprModule mod)
+                Just home_unit -> do
+                    mb_stuff <- findHomeModule finder_cache finder_opts home_unit (moduleName mod)
+                    case mb_stuff of
+                      Found loc mod -> found loc mod
+                      _ -> pprPanic "getDeps: Couldn't find home-module: " (pprModule mod)
+                where
+                    found loc mod = do {
+                      mb_lnk <- findObjectLinkableMaybe mod loc ;
+                      case mb_lnk of {
+                          Nothing  -> pprPanic "getDeps: Couldn't find linkable for module: " (pprModule mod) ;
+                          Just lnk -> pure lnk
+                      }}
 
-  when (logVerbAtLeast logger 2) $
-    logInfo logger $ hang (text "Units to link:") 2 (vcat (fmap ppr dep_units))
-    -- logInfo logger $ hang (text "All deps:") 2 (vcat (fmap ppr (S.toList all_deps)))
+          Just mod_info -> case homeModInfoObject mod_info of
+            Nothing  -> pprPanic "getDeps: Couldn't find object file for home-module: " (pprModule mod)
+            Just lnk -> pure lnk
 
-  return (dep_map, dep_units, all_deps, rts_wired_functions, dep_archives)
+        case linkableUnlinked linkable of
+              [DotO p] -> do
+                  (bis, req_b) <- loadObjBlockInfo [ObjFile p]
+                  -- Store new required blocks in IORef
+                  modifyIORef new_required_blocks_var ((++) req_b)
+                  case M.lookup mod bis of
+                    Nothing -> pprPanic "getDeps: Didn't load any block info for home-module: " (pprModule mod)
+                    Just bi -> pure bi
+              ul -> pprPanic "getDeps: Unrecognized linkable for home-module: "
+                      (vcat [ pprModule mod
+                            , ppr ul])
+
+  -- required blocks have no dependencies, so don't have to use them as roots in
+  -- the traversal
+  (updated_block_info, transitive_deps) <- getDeps block_info load_info dep_fun_roots mempty
+
+  new_required_blocks <- readIORef new_required_blocks_var
+  let required_blocks = S.fromList $ mconcat
+        [ archives_required_blocks
+        , objs_required_blocks
+        , new_required_blocks
+        ]
+
+  let all_deps = S.union transitive_deps required_blocks
+
+  let plan = LinkPlan
+        { lkp_block_info = updated_block_info
+        , lkp_dep_blocks = all_deps
+        , lkp_archives   = S.fromList dep_archives
+        , lkp_extra_js   = S.fromList (lks_extra_js link_spec)
+        }
+
+  return plan
 
 
 -- | Compiled module
@@ -325,9 +450,9 @@ renderLinker
   :: Handle
   -> Bool         -- ^ should we render readable JS for debugging?
   -> [ModuleCode] -- ^ linked code per module
-  -> [FilePath]   -- ^ additional JS files
+  -> Set FilePath -- ^ additional JS files
   -> IO LinkerStats
-renderLinker h render_pretty mods jsFiles = do
+renderLinker h render_pretty mods js_files = do
 
   -- link modules
   let (compacted_mods, meta) = linkModules mods
@@ -356,7 +481,7 @@ renderLinker h render_pretty mods jsFiles = do
   mapM_ (putBS . cmc_exports) compacted_mods
 
   -- explicit additional JS files
-  mapM_ (\i -> B.readFile i >>= putBS) jsFiles
+  mapM_ (\i -> B.readFile i >>= putBS) (S.toList js_files)
 
   -- stats
   let link_stats = LinkerStats
@@ -489,99 +614,147 @@ writeExterns :: FilePath -> IO ()
 writeExterns out = writeFile (out </> "all.js.externs")
   $ unpackFS rtsExterns
 
--- | get all dependencies for a given set of roots
-getDeps :: Map Module Deps  -- ^ loaded deps
-        -> Set LinkableUnit -- ^ don't link these blocks
-        -> Set ExportedFun  -- ^ start here
-        -> [LinkableUnit]   -- ^ and also link these
-        -> IO (Set LinkableUnit)
-getDeps loaded_deps base fun startlu = go' S.empty (S.fromList startlu) (S.toList fun)
+-- | Get all block dependencies for a given set of roots
+--
+-- Returns the update block info map and the blocks.
+getDeps :: Map Module LocatedBlockInfo     -- ^ Block info per module
+        -> (Module -> IO LocatedBlockInfo) -- ^ Used to load block info if missing
+        -> Set ExportedFun                 -- ^ start here
+        -> Set BlockRef                    -- ^ and also link these
+        -> IO (Map Module LocatedBlockInfo, Set BlockRef)
+getDeps init_infos load_info root_funs root_blocks = traverse_funs init_infos S.empty root_blocks (S.toList root_funs)
   where
-    go :: Set LinkableUnit
-       -> Set LinkableUnit
-       -> IO (Set LinkableUnit)
-    go result open = case S.minView open of
-      Nothing -> return result
-      Just (lu@(lmod,n), open') ->
-          case M.lookup lmod loaded_deps of
-            Nothing -> pprPanic "getDeps.go: object file not loaded for:  " (pprModule lmod)
-            Just (Deps _ _ _ b) ->
-              let block = b!n
-                  result' = S.insert lu result
-              in go' result'
-                 (addOpen result' open' $
-                   map (lmod,) (blockBlockDeps block)) (blockFunDeps block)
+    -- A block may depend on:
+    --  1. other blocks from the same module
+    --  2. exported functions from another module
+    --
+    -- Process:
+    --  1. We use the BlockInfos to find the block corresponding to every
+    --  exported root functions.
+    --
+    --  2. We had these blocks to the set of root_blocks if they aren't already
+    --  added to the result.
+    --
+    --  3. Then we traverse the root_blocks to find their dependencies and we
+    --  add them to root_blocks (if they aren't already added to the result) and
+    --  to root_funs.
+    --
+    --  4. back to 1
 
-    go' :: Set LinkableUnit
-        -> Set LinkableUnit
-        -> [ExportedFun]
-        -> IO (Set LinkableUnit)
-    go' result open [] = go result open
-    go' result open (f:fs) =
-        let key = funModule f
-        in  case M.lookup key loaded_deps of
-              Nothing -> pprPanic "getDeps.go': object file not loaded for:  " $ pprModule key
-              Just (Deps _m _r e _b) ->
-                 let lun :: Int
-                     lun = fromMaybe (pprPanic "exported function not found: " $ ppr f)
-                                     (M.lookup f e)
-                     lu  = (key, lun)
-                 in  go' result (addOpen result open [lu]) fs
+    lookup_info infos mod = case M.lookup mod infos of
+      Just info -> pure (infos, lbi_info info)
+      Nothing   -> do
+        -- load info and update cache with it
+        info <- load_info mod
+        pure (M.insert mod info infos, lbi_info info)
 
-    addOpen :: Set LinkableUnit -> Set LinkableUnit -> [LinkableUnit]
-            -> Set LinkableUnit
-    addOpen result open newUnits =
-      let alreadyLinked s = S.member s result ||
-                            S.member s open   ||
-                            S.member s base
-      in  open `S.union` S.fromList (filter (not . alreadyLinked) newUnits)
+    traverse_blocks
+      :: Map Module LocatedBlockInfo
+      -> Set BlockRef
+      -> Set BlockRef
+      -> IO (Map Module LocatedBlockInfo, Set BlockRef)
+    traverse_blocks infos result open = case S.minView open of
+      Nothing -> return (infos, result)
+      Just (ref, open') -> do
+          let mod = block_ref_mod ref
+          !(infos',info) <- lookup_info infos mod
+          let block =  bi_block_deps info ! block_ref_idx ref
+              result' = S.insert ref result
+              to_block_ref i = BlockRef
+                                { block_ref_mod = mod
+                                , block_ref_idx = i
+                                }
+          traverse_funs infos' result'
+             (addOpen result' open' $
+               map to_block_ref (blockBlockDeps block)) (blockFunDeps block)
+
+    traverse_funs
+      :: Map Module LocatedBlockInfo
+      -> Set BlockRef
+      -> Set BlockRef
+      -> [ExportedFun]
+      -> IO (Map Module LocatedBlockInfo, Set BlockRef)
+    traverse_funs infos result open = \case
+      []     -> traverse_blocks infos result open
+      (f:fs) -> do
+        let mod = funModule f
+        -- lookup module block info for the module that exports the function
+        !(infos',info) <- lookup_info infos mod
+        -- lookup block index associated to the function in the block info
+        case M.lookup f (bi_exports info) of
+          Nothing  -> pprPanic "exported function not found: " $ ppr f
+          Just idx -> do
+            let fun_block_ref = BlockRef
+                   { block_ref_mod = mod
+                   , block_ref_idx = idx
+                   }
+            -- always add the module "global block" when we link a module
+            let global_block_ref = BlockRef
+                   { block_ref_mod = mod
+                   , block_ref_idx = 0
+                   }
+            traverse_funs infos' result (addOpen result open [fun_block_ref,global_block_ref]) fs
+
+    -- extend the open block set with new blocks that are not already in the
+    -- result block set nor in the open block set.
+    addOpen
+      :: Set BlockRef
+      -> Set BlockRef
+      -> [BlockRef]
+      -> Set BlockRef
+    addOpen result open new_blocks =
+      let alreadyLinked s = S.member s result || S.member s open
+      in  open `S.union` S.fromList (filter (not . alreadyLinked) new_blocks)
 
 -- | collect dependencies for a set of roots
-collectDeps :: Map Module (Deps, DepsLocation) -- ^ Dependency map
-            -> [UnitId]                        -- ^ packages, code linked in this order
-            -> Set LinkableUnit                -- ^ All dependencides
-            -> IO [ModuleCode]
-collectDeps mod_deps packages all_deps = do
+collectModuleCodes :: LinkPlan -> IO [ModuleCode]
+collectModuleCodes link_plan = do
 
-  -- read ghc-prim first, since we depend on that for static initialization
-  let packages' = uncurry (++) $ partition (== primUnitId) (nub packages)
+  let block_info = lkp_block_info link_plan
+  let blocks     = lkp_dep_blocks link_plan
 
-      units_by_module :: Map Module IntSet
-      units_by_module = M.fromListWith IS.union $
-                      map (\(m,n) -> (m, IS.singleton n)) (S.toList all_deps)
+  -- we're going to load all the blocks. Instead of doing this randomly, we
+  -- group them by module first.
+  let module_blocks :: Map Module BlockIds
+      module_blocks = M.fromListWith IS.union $
+                      map (\ref -> (block_ref_mod ref, IS.singleton (block_ref_idx ref))) (S.toList blocks)
 
-      mod_deps_bypkg :: Map UnitId [(Deps, DepsLocation)]
-      mod_deps_bypkg = M.fromListWith (++)
-                        (map (\(m,v) -> (moduleUnitId m,[v])) (M.toList mod_deps))
+  -- GHCJS had this comment: "read ghc-prim first, since we depend on that for
+  -- static initialization". Not sure if it's still true as we haven't ported
+  -- the compactor yet. Still we sort to read ghc-prim blocks first just in
+  -- case.
+  let pred x = moduleUnitId (fst x) == primUnitId
+      cmp x y = case (pred x, pred y) of
+        (True,False)  -> LT
+        (False,True)  -> GT
+        (True,True)   -> EQ
+        (False,False) -> EQ
 
+      sorted_module_blocks :: [(Module,BlockIds)]
+      sorted_module_blocks = sortBy cmp (M.toList module_blocks)
+
+  -- load blocks
   ar_state <- emptyArchiveState
-  fmap (catMaybes . concat) . forM packages' $ \pkg ->
-    mapM (uncurry $ extractDeps ar_state units_by_module)
-         (fromMaybe [] $ M.lookup pkg mod_deps_bypkg)
+  forM sorted_module_blocks $ \(mod,bids) -> do
+    case M.lookup mod block_info of
+      Nothing  -> pprPanic "collectModuleCodes: couldn't find block info for module" (ppr mod)
+      Just lbi -> extractBlocks ar_state lbi bids
 
-extractDeps :: ArchiveState
-            -> Map Module IntSet
-            -> Deps
-            -> DepsLocation
-            -> IO (Maybe ModuleCode)
-extractDeps ar_state units deps loc =
-  case M.lookup mod units of
-    Nothing       -> return Nothing
-    Just mod_units -> Just <$> do
-      let selector n _  = fromIntegral n `IS.member` mod_units || isGlobalUnit (fromIntegral n)
-      case loc of
-        ObjectFile fp -> do
-          us <- readObjectUnits fp selector
-          pure (collectCode us)
-        ArchiveFile a -> do
-          obj <- readArObject ar_state mod a
-          us <- getObjectUnits obj selector
-          pure (collectCode us)
-        InMemory _n obj -> do
-          us <- getObjectUnits obj selector
-          pure (collectCode us)
+extractBlocks :: ArchiveState -> LocatedBlockInfo -> BlockIds -> IO ModuleCode
+extractBlocks ar_state lbi blocks = do
+  case lbi_loc lbi of
+    ObjectFile fp -> do
+      us <- readObjectBlocks fp blocks
+      pure (collectCode us)
+    ArchiveFile a -> do
+      obj <- readArObject ar_state mod a
+      us <- getObjectBlocks obj blocks
+      pure (collectCode us)
+    InMemory _n obj -> do
+      us <- getObjectBlocks obj blocks
+      pure (collectCode us)
   where
-    mod           = depsModule deps
+    mod           = bi_module (lbi_info lbi)
     newline       = BC.pack "\n"
     mk_exports    = mconcat . intersperse newline . filter (not . BS.null) . map oiRaw
     mk_js_code    = mconcat . map oiStat
@@ -713,40 +886,32 @@ mkPrimFuns = mkExportedFuns primUnitId
 -- | Given a @UnitId@, a module name, and a set of symbols in the module,
 -- package these into an @ExportedFun@.
 mkExportedFuns :: UnitId -> FastString -> [FastString] -> [ExportedFun]
-mkExportedFuns uid mod_name symbols = map mk_fun symbols
+mkExportedFuns uid mod_name symbols = mkExportedModFuns mod names
   where
     mod        = mkModule (RealUnit (Definite uid)) (mkModuleNameFS mod_name)
-    mk_fun sym = ExportedFun mod (LexicalFastString (mkJsSymbol True mod sym))
+    names      = map (mkJsSymbol True mod) symbols
+
+-- | Given a @Module@ and a set of symbols in the module, package these into an
+-- @ExportedFun@.
+mkExportedModFuns :: Module -> [FastString] -> [ExportedFun]
+mkExportedModFuns mod symbols = map mk_fun symbols
+  where
+    mk_fun sym = ExportedFun mod (LexicalFastString sym)
 
 -- | read all dependency data from the to-be-linked files
-loadObjDeps :: [LinkedObj] -- ^ object files to link
-            -> IO (Map Module (Deps, DepsLocation), [LinkableUnit])
-loadObjDeps objs = (prepareLoadedDeps . catMaybes) <$> mapM readDepsFromObj objs
+loadObjBlockInfo :: [LinkedObj] -- ^ object files to link
+            -> IO (Map Module LocatedBlockInfo, [BlockRef])
+loadObjBlockInfo objs = (prepareLoadedDeps . catMaybes) <$> mapM readBlockInfoFromObj objs
 
 -- | Load dependencies for the Linker from Ar
-loadArchiveDeps :: GhcjsEnv
-                -> [FilePath]
-                -> IO ( Map Module (Deps, DepsLocation)
-                      , [LinkableUnit]
-                      )
-loadArchiveDeps env archives = modifyMVar (linkerArchiveDeps env) $ \m ->
-  case M.lookup archives' m of
-    Just r  -> return (m, r)
-    Nothing -> loadArchiveDeps' archives >>= \r -> return (M.insert archives' r m, r)
-  where
-     archives' = S.fromList archives
-
-loadArchiveDeps' :: [FilePath]
-                 -> IO ( Map Module (Deps, DepsLocation)
-                       , [LinkableUnit]
-                       )
-loadArchiveDeps' archives = do
+loadArchiveBlockInfo :: [FilePath] -> IO (Map Module LocatedBlockInfo, [BlockRef])
+loadArchiveBlockInfo archives = do
   archDeps <- forM archives $ \file -> do
     (Ar.Archive entries) <- Ar.loadAr file
     catMaybes <$> mapM (readEntry file) entries
   return (prepareLoadedDeps $ concat archDeps)
     where
-      readEntry :: FilePath -> Ar.ArchiveEntry -> IO (Maybe (Deps, DepsLocation))
+      readEntry :: FilePath -> Ar.ArchiveEntry -> IO (Maybe LocatedBlockInfo)
       readEntry ar_file ar_entry = do
           let bs = Ar.filedata ar_entry
           bh <- unsafeUnpackBinBuffer bs
@@ -754,8 +919,8 @@ loadArchiveDeps' archives = do
             Left _         -> pure Nothing -- not a valid object entry
             Right mod_name -> do
               obj <- getObjectBody bh mod_name
-              let !deps = objDeps obj
-              pure $ Just (deps, ArchiveFile ar_file)
+              let !info = objBlockInfo obj
+              pure $ Just (LocatedBlockInfo (ArchiveFile ar_file) info)
 
 -- | Predicate to check that an entry in Ar is a JS source
 -- and to return it without its header
@@ -785,29 +950,32 @@ jsHeaderLength = B.length jsHeader
 
 
 
-prepareLoadedDeps :: [(Deps, DepsLocation)]
-                  -> ( Map Module (Deps, DepsLocation)
-                     , [LinkableUnit]
-                     )
-prepareLoadedDeps deps =
-  let req     = concatMap (requiredUnits . fst) deps
-      depsMap = M.fromList $ map (\d -> (depsModule (fst d), d)) deps
-  in  (depsMap, req)
+prepareLoadedDeps :: [LocatedBlockInfo]
+                  -> (Map Module LocatedBlockInfo, [BlockRef])
+prepareLoadedDeps lbis = (module_blocks, must_link)
+  where
+    must_link     = concatMap (requiredBlocks . lbi_info) lbis
+    module_blocks = M.fromList $ map (\d -> (bi_module (lbi_info d), d)) lbis
 
-requiredUnits :: Deps -> [LinkableUnit]
-requiredUnits d = map (depsModule d,) (IS.toList $ depsRequired d)
+requiredBlocks :: BlockInfo -> [BlockRef]
+requiredBlocks d = map mk_block_ref (IS.toList $ bi_must_link d)
+  where
+    mk_block_ref i = BlockRef
+                      { block_ref_mod = bi_module d
+                      , block_ref_idx = i
+                      }
 
--- | read dependencies from an object that might have already been into memory
+-- | read block info from an object that might have already been into memory
 -- pulls in all Deps from an archive
-readDepsFromObj :: LinkedObj -> IO (Maybe (Deps, DepsLocation))
-readDepsFromObj = \case
+readBlockInfoFromObj :: LinkedObj -> IO (Maybe LocatedBlockInfo)
+readBlockInfoFromObj = \case
   ObjLoaded name obj -> do
-    let !deps = objDeps obj
-    pure $ Just (deps,InMemory name obj)
+    let !info = objBlockInfo obj
+    pure $ Just (LocatedBlockInfo (InMemory name obj) info)
   ObjFile file -> do
-    readObjectDeps file >>= \case
+    readObjectBlockInfo file >>= \case
       Nothing   -> pure Nothing
-      Just deps -> pure $ Just (deps,ObjectFile file)
+      Just info -> pure $ Just (LocatedBlockInfo (ObjectFile file) info)
 
 
 -- | Embed a JS file into a .o file

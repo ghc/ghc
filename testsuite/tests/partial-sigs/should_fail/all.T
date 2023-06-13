@@ -3,9 +3,9 @@ test('AnnotatedConstraintNotForgotten', normal, compile_fail, [''])
 test('Defaulting1MROff', expect_broken(23232), compile, [''])
 test('ExtraConstraintsWildcardInExpressionSignature', normal, compile, [''])
 test('ExtraConstraintsWildcardInPatternSignature', normal, compile_fail, [''])
-test('ExtraConstraintsWildcardInPatternSplice', [req_interp, normal], compile_fail, [''])
+test('ExtraConstraintsWildcardInPatternSplice', [req_th, normal], compile_fail, [''])
 test('ExtraConstraintsWildcardInTypeSpliceUsed', [extra_files(['ExtraConstraintsWildcardInTypeSplice.hs']),
-                                                  req_interp],
+                                                  req_th],
      multimod_compile_fail,
      ['ExtraConstraintsWildcardInTypeSpliceUsed', config.ghc_th_way_flags])
 test('ExtraConstraintsWildcardInTypeSplice2',

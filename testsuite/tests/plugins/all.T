@@ -1,5 +1,9 @@
 setTestOpts([
     req_interp,
+    # Plugins aren't supported with the JS backend so we get unexpected passes
+    # for tests that expected to fail... Just skipping them for now until #14335
+    # is fixed
+    js_skip,
     # The implementation of ghc-pkg doesn't seem to be multi-concurrent process
     # safe on windows. These tests which mutate the package db need to be run
     # sequentially until this is fixed.  This likely means that #13194 isn't fully

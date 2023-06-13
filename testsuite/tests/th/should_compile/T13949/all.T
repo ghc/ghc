@@ -7,6 +7,6 @@
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T13949', [extra_files(['ASCII.hs', 'PatternGenerator.hs', 'These.hs', 'Tree.hs']), req_interp,
+test('T13949', [extra_files(['ASCII.hs', 'PatternGenerator.hs', 'These.hs', 'Tree.hs']), req_th,
 	        omit_ways(['profasm'])],
      multimod_compile, ['ASCII PatternGenerator These Tree', '-fno-code -v0'])

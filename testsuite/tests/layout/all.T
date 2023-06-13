@@ -11,7 +11,7 @@ test('layout005', [], makefile_test, ['layout005'])
 
 test('layout006', [], makefile_test, ['layout006'])
 
-test('layout007', [req_interp], makefile_test, ['layout007'])
+test('layout007', [req_th], makefile_test, ['layout007'])
 
 test('layout008', [], makefile_test, ['layout008'])
 

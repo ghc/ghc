@@ -7,7 +7,7 @@ test('DocsInHiFile1',
      makefile_test, ['DocsInHiFile1'])
 test('T17871', [extra_files(['T17871a.hs'])], multimod_compile, ['T17871', '-v0'])
 test('DocsInHiFileTH',
-     [extra_files(['DocsInHiFileTHExternal.hs', 'DocsInHiFileTH.hs']), js_broken(22261)],
+     [extra_files(['DocsInHiFileTHExternal.hs', 'DocsInHiFileTH.hs']), req_th],
      makefile_test, ['DocsInHiFileTH'])
 test('NoExportList',
      normal,
