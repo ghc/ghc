@@ -8,7 +8,8 @@ setTestOpts(when(fast(), skip))
 # config.ghc_th_way_flags.
 test('annrun01',
      [extra_files(['Annrun01_Help.hs']),
-      req_interp,
+      req_th,
+      when(js_arch(), compile_timeout_multiplier(5)),
       pre_cmd('$MAKE -s --no-print-directory config'),
       omit_ways(['dyn'] + prof_ways)],
      multimod_compile_and_run,

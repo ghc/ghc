@@ -111,7 +111,7 @@ import GHC.Types.SourceError
 
 import GHC.Unit
 import GHC.Unit.Env
---import GHC.Unit.Finder
+import GHC.Unit.Finder
 --import GHC.Unit.State
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
@@ -351,6 +351,7 @@ compileOne' mHscMessage
 link :: GhcLink                 -- ^ interactive or batch
      -> Logger                  -- ^ Logger
      -> TmpFs
+     -> FinderCache
      -> Hooks
      -> DynFlags                -- ^ dynamic flags
      -> UnitEnv                 -- ^ unit environment
@@ -366,7 +367,7 @@ link :: GhcLink                 -- ^ interactive or batch
 -- exports main, i.e., we have good reason to believe that linking
 -- will succeed.
 
-link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessage hpt =
+link ghcLink logger tmpfs fc hooks dflags unit_env batch_attempt_linking mHscMessage hpt =
   case linkHook hooks of
       Nothing -> case ghcLink of
         NoLink        -> return Succeeded
@@ -382,7 +383,7 @@ link ghcLink logger tmpfs hooks dflags unit_env batch_attempt_linking mHscMessag
             -> panicBadLink LinkInMemory
       Just h  -> h ghcLink dflags batch_attempt_linking hpt
   where
-    normal_link = link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessage hpt
+    normal_link = link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessage hpt
 
 
 panicBadLink :: GhcLink -> a
@@ -391,6 +392,7 @@ panicBadLink other = panic ("link: GHC not built to link this way: " ++
 
 link' :: Logger
       -> TmpFs
+      -> FinderCache
       -> DynFlags                -- ^ dynamic flags
       -> UnitEnv                 -- ^ unit environment
       -> Bool                    -- ^ attempt linking in batch mode?
@@ -398,7 +400,7 @@ link' :: Logger
       -> HomePackageTable        -- ^ what to link
       -> IO SuccessFlag
 
-link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
+link' logger tmpfs fc dflags unit_env batch_attempt_linking mHscMessager hpt
    | batch_attempt_linking
    = do
         let
@@ -445,7 +447,7 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         -- Don't showPass in Batch mode; doLink will do that for us.
         case ghcLink dflags of
           LinkBinary
-            | backendUseJSLinker (backend dflags) -> linkJSBinary logger dflags unit_env obj_files pkg_deps
+            | backendUseJSLinker (backend dflags) -> linkJSBinary logger fc dflags unit_env obj_files pkg_deps
             | otherwise -> linkBinary logger tmpfs dflags unit_env obj_files pkg_deps
           LinkStaticLib -> linkStaticLib logger dflags unit_env obj_files pkg_deps
           LinkDynLib    -> linkDynLibCheck logger tmpfs dflags unit_env obj_files pkg_deps
@@ -462,14 +464,14 @@ link' logger tmpfs dflags unit_env batch_attempt_linking mHscMessager hpt
         return Succeeded
 
 
-linkJSBinary :: Logger -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
-linkJSBinary logger dflags unit_env obj_files pkg_deps = do
+linkJSBinary :: Logger -> FinderCache -> DynFlags -> UnitEnv -> [FilePath] -> [UnitId] -> IO ()
+linkJSBinary logger fc dflags unit_env obj_files pkg_deps = do
   -- we use the default configuration for now. In the future we may expose
   -- settings to the user via DynFlags.
   let lc_cfg   = defaultJSLinkConfig
   let cfg      = initStgToJSConfig dflags
   let extra_js = mempty
-  jsLinkBinary lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
+  jsLinkBinary fc lc_cfg cfg extra_js logger dflags unit_env obj_files pkg_deps
 
 linkingNeeded :: Logger -> DynFlags -> UnitEnv -> Bool -> [Linkable] -> [UnitId] -> IO RecompileRequired
 linkingNeeded logger dflags unit_env staticLink linkables pkg_deps = do
@@ -574,12 +576,13 @@ doLink hsc_env o_files = do
     logger   = hsc_logger   hsc_env
     unit_env = hsc_unit_env hsc_env
     tmpfs    = hsc_tmpfs    hsc_env
+    fc       = hsc_FC       hsc_env
 
   case ghcLink dflags of
     NoLink        -> return ()
     LinkBinary
       | backendUseJSLinker (backend dflags)
-                  -> linkJSBinary logger dflags unit_env o_files []
+                  -> linkJSBinary logger fc dflags unit_env o_files []
       | otherwise -> linkBinary logger tmpfs dflags unit_env o_files []
     LinkStaticLib -> linkStaticLib      logger       dflags unit_env o_files []
     LinkDynLib    -> linkDynLibCheck    logger tmpfs dflags unit_env o_files []

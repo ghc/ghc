@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs, RecordWildCards, MagicHash, ScopedTypeVariables, CPP,
-    UnboxedTuples #-}
+    UnboxedTuples, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- |
@@ -13,8 +13,14 @@ module GHCi.Run
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
+
+#if !defined(javascript_HOST_ARCH)
 import GHCi.CreateBCO
 import GHCi.InfoTable
+import Data.Binary
+import Data.Binary.Get
+#endif
+
 import GHCi.FFI
 import GHCi.Message
 import GHCi.ObjLink
@@ -27,8 +33,6 @@ import Control.Concurrent
 import Control.DeepSeq
 import Control.Exception
 import Control.Monad
-import Data.Binary
-import Data.Binary.Get
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as B
 import GHC.Exts
@@ -49,19 +53,36 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 
 run :: Message a -> IO a
 run m = case m of
+#if defined(javascript_HOST_ARCH)
+  LoadObj p                   -> withCString p loadJS
+  InitLinker                  -> notSupportedJS m
+  LoadDLL {}                  -> notSupportedJS m
+  LoadArchive {}              -> notSupportedJS m
+  UnloadObj {}                -> notSupportedJS m
+  AddLibrarySearchPath {}     -> notSupportedJS m
+  RemoveLibrarySearchPath {}  -> notSupportedJS m
+  MkConInfoTable {}           -> notSupportedJS m
+  ResolveObjs                 -> notSupportedJS m
+  FindSystemLibrary {}        -> notSupportedJS m
+  CreateBCOs {}               -> notSupportedJS m
+  LookupClosure str           -> lookupJSClosure str
+#else
   InitLinker -> initObjLinker RetainCAFs
-  RtsRevertCAFs -> rts_revertCAFs
-  LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str
-  LookupClosure str -> lookupClosure str
   LoadDLL str -> loadDLL str
   LoadArchive str -> loadArchive str
   LoadObj str -> loadObj str
   UnloadObj str -> unloadObj str
   AddLibrarySearchPath str -> toRemotePtr <$> addLibrarySearchPath str
   RemoveLibrarySearchPath ptr -> removeLibrarySearchPath (fromRemotePtr ptr)
+  MkConInfoTable tc ptrs nptrs tag ptrtag desc ->
+    toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   ResolveObjs -> resolveObjs
   FindSystemLibrary str -> findSystemLibrary str
   CreateBCOs bcos -> createBCOs (concatMap (runGet get) bcos)
+  LookupClosure str -> lookupClosure str
+#endif
+  RtsRevertCAFs -> rts_revertCAFs
+  LookupSymbol str -> fmap toRemotePtr <$> lookupSymbol str
   FreeHValueRefs rs -> mapM_ freeRemoteRef rs
   AddSptEntry fpr r -> localRef r >>= sptAddEntry fpr
   EvalStmt opts r -> evalStmt opts r
@@ -89,15 +110,38 @@ run m = case m of
   MallocStrings bss -> mapM mkString0 bss
   PrepFFI conv args res -> toRemotePtr <$> prepForeignCall conv args res
   FreeFFI p -> freeForeignCallInfo (fromRemotePtr p)
-  MkConInfoTable tc ptrs nptrs tag ptrtag desc ->
-    toRemotePtr <$> mkConInfoTable tc ptrs nptrs tag ptrtag desc
   StartTH -> startTH
   GetClosure ref -> do
     clos <- Heap.getClosureData =<< localRef ref
     mapM (\(Heap.Box x) -> mkRemoteRef (HValue x)) clos
   Seq ref -> doSeq ref
   ResumeSeq ref -> resumeSeq ref
-  _other -> error "GHCi.Run.run"
+
+  Shutdown            -> unexpectedMessage m
+  RunTH {}            -> unexpectedMessage m
+  RunModFinalizers {} -> unexpectedMessage m
+
+unexpectedMessage :: Message a -> b
+unexpectedMessage m = error ("GHCi.Run.Run: unexpected message: " ++ show m)
+
+#if defined(javascript_HOST_ARCH)
+foreign import javascript "((ptr,off) => globalThis.h$loadJS(h$decodeUtf8z(ptr,off)))" loadJS :: CString -> IO ()
+
+foreign import javascript "((ptr,off) => globalThis.h$lookupClosure(h$decodeUtf8z(ptr,off)))" lookupJSClosure# :: CString -> State# RealWorld -> (# State# RealWorld, Int# #)
+
+lookupJSClosure' :: String -> IO Int
+lookupJSClosure' str = withCString str $ \cstr -> IO (\s ->
+  case lookupJSClosure# cstr s of
+    (# s', r #) -> (# s', I# r #))
+
+lookupJSClosure :: String -> IO (Maybe HValueRef)
+lookupJSClosure str = lookupJSClosure' str >>= \case
+  0 -> pure Nothing
+  r -> pure (Just (RemoteRef (RemotePtr (fromIntegral r))))
+
+notSupportedJS :: Message a -> b
+notSupportedJS m = error ("Message not supported with the JavaScript interpreter: " ++ show m)
+#endif
 
 evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
 evalStmt opts expr = do

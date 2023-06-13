@@ -4,10 +4,22 @@
 module GHC.Runtime.Interpreter.Types
    ( Interp(..)
    , InterpInstance(..)
-   , IServ(..)
-   , IServInstance(..)
+   , InterpProcess (..)
+   , ExtInterp (..)
+   , ExtInterpStatusVar
+   , ExtInterpInstance (..)
+   , ExtInterpState (..)
+   , InterpStatus(..)
+   -- * IServ
+   , IServ
    , IServConfig(..)
-   , IServState(..)
+   -- * JSInterp
+   , JSInterp
+   , JSInterpExtra (..)
+   , JSInterpConfig (..)
+   , JSState (..)
+   , NodeJsSettings (..)
+   , defaultNodeJsSettings
    )
 where
 
@@ -20,8 +32,17 @@ import GHC.Types.Unique.FM
 import GHC.Data.FastString ( FastString )
 import Foreign
 
+import GHC.Utils.TmpFs
+import GHC.Utils.Logger
+import GHC.Unit.Env
+import GHC.Unit.Types
+import GHC.StgToJS.Types
+import GHC.StgToJS.Linker.Types
+
 import Control.Concurrent
 import System.Process   ( ProcessHandle, CreateProcess )
+import System.IO
+import GHC.Unit.Finder.Types (FinderCache, FinderOpts)
 
 -- | Interpreter
 data Interp = Interp
@@ -32,24 +53,40 @@ data Interp = Interp
       -- ^ Interpreter loader
   }
 
-
 data InterpInstance
-   = ExternalInterp !IServConfig !IServ -- ^ External interpreter
+   = ExternalInterp !ExtInterp -- ^ External interpreter
 #if defined(HAVE_INTERNAL_INTERPRETER)
-   | InternalInterp                     -- ^ Internal interpreter
+   | InternalInterp            -- ^ Internal interpreter
 #endif
+
+data ExtInterp
+  = ExtIServ !IServ
+  | ExtJS !JSInterp
 
 -- | External interpreter
 --
 -- The external interpreter is spawned lazily (on first use) to avoid slowing
 -- down sessions that don't require it. The contents of the MVar reflects the
 -- state of the interpreter (running or not).
-newtype IServ = IServ (MVar IServState)
+data ExtInterpState cfg details = ExtInterpState
+  { interpConfig :: !cfg
+  , interpStatus :: !(ExtInterpStatusVar details)
+  }
 
--- | State of an external interpreter
-data IServState
-   = IServPending                 -- ^ Not spawned yet
-   | IServRunning !IServInstance  -- ^ Running
+type ExtInterpStatusVar d = MVar (InterpStatus (ExtInterpInstance d))
+
+type IServ    = ExtInterpState IServConfig    ()
+type JSInterp = ExtInterpState JSInterpConfig JSInterpExtra
+
+data InterpProcess = InterpProcess
+  { interpPipe   :: !Pipe           -- ^ Pipe to communicate with the server
+  , interpHandle :: !ProcessHandle  -- ^ Process handle of the server
+  }
+
+-- | Status of an external interpreter
+data InterpStatus inst
+   = InterpPending       -- ^ Not spawned yet
+   | InterpRunning !inst -- ^ Running
 
 -- | Configuration needed to spawn an external interpreter
 data IServConfig = IServConfig
@@ -61,14 +98,66 @@ data IServConfig = IServConfig
   , iservConfTrace    :: IO ()     -- ^ Trace action executed after spawn
   }
 
--- | External interpreter instance
-data IServInstance = IServInstance
-  { iservPipe              :: !Pipe
-  , iservProcess           :: !ProcessHandle
-  , iservLookupSymbolCache :: !(UniqFM FastString (Ptr ()))
-  , iservPendingFrees      :: ![HValueRef]
+-- | Common field between native external interpreter and the JS one
+data ExtInterpInstance c = ExtInterpInstance
+  { instProcess       :: {-# UNPACK #-} !InterpProcess
+      -- ^ External interpreter process and its pipe (communication channel)
+
+  , instPendingFrees  :: !(MVar [HValueRef])
       -- ^ Values that need to be freed before the next command is sent.
-      -- Threads can append values to this list asynchronously (by modifying the
-      -- IServ state MVar).
+      -- Finalizers for ForeignRefs can append values to this list
+      -- asynchronously.
+
+  , instLookupSymbolCache :: !(MVar (UniqFM FastString (Ptr ())))
+      -- ^ LookupSymbol cache
+
+  , instExtra             :: !c
+      -- ^ Instance specific extra fields
+  }
+
+------------------------
+-- JS Stuff
+------------------------
+
+data JSInterpExtra = JSInterpExtra
+  { instStdIn       :: !Handle         -- ^ Stdin for the process
+  , instFinderCache :: !FinderCache
+  , instFinderOpts  :: !FinderOpts
+  , instJSState     :: !(MVar JSState) -- ^ Mutable state
+  , instGhciUnitId  :: !UnitId         -- ^ GHCi unit-id
+  }
+
+data JSState = JSState
+  { jsLinkState     :: !LinkPlan -- ^ Linker state of the interpreter
+  , jsServerStarted :: !Bool     -- ^ Is the Haskell server started?
+  }
+
+-- | NodeJs configuration
+data NodeJsSettings = NodeJsSettings
+  { nodeProgram         :: FilePath        -- ^ location of node.js program
+  , nodePath            :: Maybe FilePath  -- ^ value of NODE_PATH environment variable (search path for Node modules; GHCJS used to provide some)
+  , nodeExtraArgs       :: [String]        -- ^ extra arguments to pass to node.js
+  , nodeKeepAliveMaxMem :: Integer         -- ^ keep node.js (TH, GHCJSi) processes alive if they don't use more than this
+  }
+
+defaultNodeJsSettings :: NodeJsSettings
+defaultNodeJsSettings = NodeJsSettings
+  { nodeProgram         = "node"
+  , nodePath            = Nothing
+  , nodeExtraArgs       = []
+  , nodeKeepAliveMaxMem = 536870912
+  }
+
+
+data JSInterpConfig = JSInterpConfig
+  { jsInterpNodeConfig  :: !NodeJsSettings  -- ^ NodeJS settings
+  , jsInterpScript      :: !FilePath        -- ^ Path to "ghc-interp.js" script
+  , jsInterpTmpFs       :: !TmpFs
+  , jsInterpTmpDir      :: !TempDir
+  , jsInterpLogger      :: !Logger
+  , jsInterpCodegenCfg  :: !StgToJSConfig
+  , jsInterpUnitEnv     :: !UnitEnv
+  , jsInterpFinderOpts  :: !FinderOpts
+  , jsInterpFinderCache :: !FinderCache
   }
 

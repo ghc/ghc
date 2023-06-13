@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
@@ -315,6 +316,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Config.Finder (initFinderOpts)
 import GHC.Driver.Config.Parser (initParserOpts)
 import GHC.Driver.Config.Logger (initLogFlags)
+import GHC.Driver.Config.StgToJS (initStgToJSConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Main
 import GHC.Driver.Make
@@ -676,8 +678,10 @@ setTopSessionDynFlags dflags = do
   logger  <- getLogger
 
   -- Interpreter
-  interp <- if gopt Opt_ExternalInterpreter dflags
-    then do
+  interp <- if
+    -- external interpreter
+    | gopt Opt_ExternalInterpreter dflags
+    -> do
          let
            prog = pgm_i dflags ++ flavour
            profiled = ways dflags `hasWay` WayProf
@@ -699,10 +703,31 @@ setTopSessionDynFlags dflags = do
             , iservConfHook     = createIservProcessHook (hsc_hooks hsc_env)
             , iservConfTrace    = tr
             }
-         s <- liftIO $ newMVar IServPending
+         s <- liftIO $ newMVar InterpPending
          loader <- liftIO Loader.uninitializedLoader
-         return (Just (Interp (ExternalInterp conf (IServ s)) loader))
-    else
+         return (Just (Interp (ExternalInterp (ExtIServ (ExtInterpState conf s))) loader))
+
+    -- JavaScript interpreter
+    | ArchJavaScript <- platformArch (targetPlatform dflags)
+    -> do
+         s <- liftIO $ newMVar InterpPending
+         loader <- liftIO Loader.uninitializedLoader
+         let cfg = JSInterpConfig
+              { jsInterpNodeConfig  = defaultNodeJsSettings
+              , jsInterpScript      = topDir dflags </> "ghc-interp.js"
+              , jsInterpTmpFs       = hsc_tmpfs hsc_env
+              , jsInterpTmpDir      = tmpDir dflags
+              , jsInterpLogger      = hsc_logger hsc_env
+              , jsInterpCodegenCfg  = initStgToJSConfig dflags
+              , jsInterpUnitEnv     = hsc_unit_env hsc_env
+              , jsInterpFinderOpts  = initFinderOpts dflags
+              , jsInterpFinderCache = hsc_FC hsc_env
+              }
+         return (Just (Interp (ExternalInterp (ExtJS (ExtInterpState cfg s))) loader))
+
+    -- Internal interpreter
+    | otherwise
+    ->
 #if defined(HAVE_INTERNAL_INTERPRETER)
      do
       loader <- liftIO Loader.uninitializedLoader

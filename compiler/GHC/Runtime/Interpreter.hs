@@ -3,6 +3,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- | Interacting with the iserv interpreter, whether it is running on an
 -- external process or in the current process.
@@ -45,22 +47,30 @@ module GHC.Runtime.Interpreter
   , resolveObjs
   , findSystemLibrary
 
-  -- * Lower-level API using messages
-  , interpCmd, Message(..), withIServ, withIServ_
+  , interpCmd
+  , withExtInterp
+  , withExtInterpStatus
+  , withIServ
+  , withJSInterp
   , stopInterp
-  , iservCall, readIServ, writeIServ
   , purgeLookupSymbolCache
+  , freeReallyRemoteRef
   , freeHValueRefs
   , mkFinalizedHValue
   , wormhole, wormholeRef
   , fromEvalResult
+
+  -- * Reexport for convenience
+  , Message (..)
+  , module GHC.Runtime.Interpreter.Process
   ) where
 
 import GHC.Prelude
 
-import GHC.IO (catchException)
-
 import GHC.Runtime.Interpreter.Types
+import GHC.Runtime.Interpreter.JS
+import GHC.Runtime.Interpreter.Process
+import GHC.Runtime.Utils
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
@@ -97,7 +107,7 @@ import GHC.Platform.Ways
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
-import Control.Monad.Catch as MC (mask, onException)
+import Control.Monad.Catch as MC (mask)
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
@@ -107,19 +117,6 @@ import Data.IORef
 import Foreign hiding (void)
 import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
-import System.Exit
-import GHC.IO.Handle.Types (Handle)
-#if defined(mingw32_HOST_OS)
-import Foreign.C
-import GHC.IO.Handle.FD (fdToHandle)
-# if defined(__IO_MANAGER_WINIO__)
-import GHC.IO.SubSystem ((<!>))
-import GHC.IO.Handle.Windows (handleToHANDLE)
-import GHC.Event.Windows (associateHandle')
-# endif
-#else
-import System.Posix as Posix
-#endif
 import System.Directory
 import System.Process
 import GHC.Conc (pseq, par)
@@ -198,10 +195,20 @@ interpCmd interp msg = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> run msg -- Just run it directly
 #endif
-  ExternalInterp c i -> withIServ_ c i $ \iserv ->
+  ExternalInterp ext -> withExtInterp ext $ \inst ->
     uninterruptibleMask_ $ -- Note [uninterruptibleMask_ and interpCmd]
-      iservCall iserv msg
+      sendMessage inst msg
 
+
+withExtInterp :: ExceptionMonad m => ExtInterp -> (forall d. ExtInterpInstance d -> m a) -> m a
+withExtInterp ext action = case ext of
+  ExtJS    i -> withJSInterp i action
+  ExtIServ i -> withIServ    i action
+
+withExtInterpStatus :: ExtInterp -> (forall d. ExtInterpStatusVar d -> m a) -> m a
+withExtInterpStatus ext action = case ext of
+  ExtJS    i -> action (interpStatus i)
+  ExtIServ i -> action (interpStatus i)
 
 -- Note [uninterruptibleMask_ and interpCmd]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -216,37 +223,51 @@ interpCmd interp msg = case interpInstance interp of
 -- Overloaded because this is used from TcM as well as IO.
 withIServ
   :: (ExceptionMonad m)
-  => IServConfig -> IServ -> (IServInstance -> m (IServInstance, a)) -> m a
-withIServ conf (IServ mIServState) action =
-  MC.mask $ \restore -> do
-    state <- liftIO $ takeMVar mIServState
+  => IServ -> (ExtInterpInstance () -> m a) -> m a
+withIServ (ExtInterpState cfg mstate) action = do
+  inst <- spawnInterpMaybe cfg spawnIServ mstate
+  action inst
 
-    iserv <- case state of
-      -- start the external iserv process if we haven't done so yet
-      IServPending ->
-         liftIO (spawnIServ conf)
-           `MC.onException` (liftIO $ putMVar mIServState state)
+-- | Spawn JS interpreter if it isn't already running and execute the given action
+--
+-- Update the interpreter state.
+withJSInterp :: ExceptionMonad m => JSInterp -> (ExtInterpInstance JSInterpExtra -> m a) -> m a
+withJSInterp (ExtInterpState cfg mstate) action = do
+  inst <- spawnInterpMaybe cfg spawnJSInterp mstate
+  action inst
 
-      IServRunning inst -> return inst
+-- | Spawn an interpreter if not already running according to the status in the
+-- MVar. Update the status, free pending heap references, and return the
+-- interpreter instance.
+--
+-- This function is generic to support both the native external interpreter and
+-- the JS one.
+spawnInterpMaybe :: ExceptionMonad m => cfg -> (cfg -> IO (ExtInterpInstance d)) -> ExtInterpStatusVar d -> m (ExtInterpInstance d)
+spawnInterpMaybe cfg spawn mstatus = do
+  inst <- liftIO $ modifyMVarMasked mstatus $ \case
+    -- start the external iserv process if we haven't done so yet
+    InterpPending -> do
+      inst <- spawn cfg
+      pure (InterpRunning inst, inst)
 
+    InterpRunning inst -> do
+      pure (InterpRunning inst, inst)
 
-    let iserv'  = iserv{ iservPendingFrees = [] }
+  -- free any ForeignRef that have been garbage collected.
+  pending_frees <- liftIO $ swapMVar (instPendingFrees inst) []
+  liftIO $ when (not (null (pending_frees))) $
+    sendMessage inst (FreeHValueRefs pending_frees)
 
-    (iserv'',a) <- (do
-      -- free any ForeignHValues that have been garbage collected.
-      liftIO $ when (not (null (iservPendingFrees iserv))) $
-        iservCall iserv (FreeHValueRefs (iservPendingFrees iserv))
-      -- run the inner action
-      restore $ action iserv')
-          `MC.onException` (liftIO $ putMVar mIServState (IServRunning iserv'))
-    liftIO $ putMVar mIServState (IServRunning iserv'')
-    return a
+  -- run the inner action
+  pure inst
 
-withIServ_
-  :: (MonadIO m, ExceptionMonad m)
-  => IServConfig -> IServ -> (IServInstance -> m a) -> m a
-withIServ_ conf iserv action = withIServ conf iserv $ \inst ->
-   (inst,) <$> action inst
+withExtInterpMaybe
+  :: (ExceptionMonad m)
+  => ExtInterp -> (forall d. Maybe (ExtInterpInstance d) -> m a) -> m a
+withExtInterpMaybe ext action = withExtInterpStatus ext $ \mstate -> do
+  liftIO (readMVar mstate) >>= \case
+    InterpPending {}   -> action Nothing -- already shut down or never launched
+    InterpRunning inst -> action (Just inst)
 
 -- -----------------------------------------------------------------------------
 -- Wrappers around messages
@@ -435,24 +456,27 @@ lookupSymbol interp str = case interpInstance interp of
   InternalInterp -> fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #endif
 
-  ExternalInterp c i -> withIServ c i $ \iserv -> do
-    -- Profiling of GHCi showed a lot of time and allocation spent
-    -- making cross-process LookupSymbol calls, so I added a GHC-side
-    -- cache which sped things up quite a lot.  We have to be careful
-    -- to purge this cache when unloading code though.
-    let cache = iservLookupSymbolCache iserv
-    case lookupUFM cache str of
-      Just p -> return (iserv, Just p)
-      Nothing -> do
-        m <- uninterruptibleMask_ $
-                 iservCall iserv (LookupSymbol (unpackFS str))
-        case m of
-          Nothing -> return (iserv, Nothing)
-          Just r -> do
-            let p      = fromRemotePtr r
-                cache' = addToUFM cache str p
-                iserv' = iserv {iservLookupSymbolCache = cache'}
-            return (iserv', Just p)
+  ExternalInterp ext -> case ext of
+    ExtIServ i -> withIServ i $ \inst -> do
+      -- Profiling of GHCi showed a lot of time and allocation spent
+      -- making cross-process LookupSymbol calls, so I added a GHC-side
+      -- cache which sped things up quite a lot.  We have to be careful
+      -- to purge this cache when unloading code though.
+      cache <- readMVar (instLookupSymbolCache inst)
+      case lookupUFM cache str of
+        Just p -> return (Just p)
+        Nothing -> do
+          m <- uninterruptibleMask_ $
+                   sendMessage inst (LookupSymbol (unpackFS str))
+          case m of
+            Nothing -> return Nothing
+            Just r -> do
+              let p        = fromRemotePtr r
+                  cache'   = addToUFM cache str p
+              modifyMVar_ (instLookupSymbolCache inst) (const (pure cache'))
+              return (Just p)
+
+    ExtJS {} -> pprPanic "lookupSymbol not supported by the JS interpreter" (ppr str)
 
 lookupClosure :: Interp -> String -> IO (Maybe HValueRef)
 lookupClosure interp str =
@@ -463,12 +487,9 @@ purgeLookupSymbolCache interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp -> pure ()
 #endif
-  ExternalInterp _ (IServ mstate) ->
-    modifyMVar_ mstate $ \state -> pure $ case state of
-      IServPending       -> state
-      IServRunning iserv -> IServRunning
-        (iserv { iservLookupSymbolCache = emptyUFM })
-
+  ExternalInterp ext -> withExtInterpMaybe ext $ \case
+    Nothing   -> pure () -- interpreter stopped, nothing to do
+    Just inst -> modifyMVar_ (instLookupSymbolCache inst) (const (pure emptyUFM))
 
 -- | loadDLL loads a dynamic library using the OS's native linker
 -- (i.e. dlopen() on Unix, LoadLibrary() on Windows).  It takes either
@@ -518,56 +539,35 @@ resolveObjs interp = successIf <$> interpCmd interp ResolveObjs
 findSystemLibrary :: Interp -> String -> IO (Maybe String)
 findSystemLibrary interp str = interpCmd interp (FindSystemLibrary str)
 
-
 -- -----------------------------------------------------------------------------
--- Raw calls and messages
-
--- | Send a 'Message' and receive the response from the iserv process
-iservCall :: Binary a => IServInstance -> Message a -> IO a
-iservCall iserv msg =
-  remoteCall (iservPipe iserv) msg
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-
--- | Read a value from the iserv process
-readIServ :: IServInstance -> Get a -> IO a
-readIServ iserv get =
-  readPipe (iservPipe iserv) get
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-
--- | Send a value to the iserv process
-writeIServ :: IServInstance -> Put -> IO ()
-writeIServ iserv put =
-  writePipe (iservPipe iserv) put
-    `catchException` \(e :: SomeException) -> handleIServFailure iserv e
-
-handleIServFailure :: IServInstance -> SomeException -> IO a
-handleIServFailure iserv e = do
-  let proc = iservProcess iserv
-  ex <- getProcessExitCode proc
-  case ex of
-    Just (ExitFailure n) ->
-      throwIO (InstallationError ("ghc-iserv terminated (" ++ show n ++ ")"))
-    _ -> do
-      terminateProcess proc
-      _ <- waitForProcess proc
-      throw e
+-- IServ specific calls and messages
 
 -- | Spawn an external interpreter
-spawnIServ :: IServConfig -> IO IServInstance
+spawnIServ :: IServConfig -> IO (ExtInterpInstance ())
 spawnIServ conf = do
   iservConfTrace conf
   let createProc = fromMaybe (\cp -> do { (_,_,_,ph) <- createProcess cp
                                         ; return ph })
                              (iservConfHook conf)
   (ph, rh, wh) <- runWithPipes createProc (iservConfProgram conf)
+                                          []
                                           (iservConfOpts    conf)
   lo_ref <- newIORef Nothing
-  return $ IServInstance
-    { iservPipe              = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
-    , iservProcess           = ph
-    , iservLookupSymbolCache = emptyUFM
-    , iservPendingFrees      = []
-    }
+  let pipe = Pipe { pipeRead = rh, pipeWrite = wh, pipeLeftovers = lo_ref }
+  let process = InterpProcess
+                  { interpHandle = ph
+                  , interpPipe   = pipe
+                  }
+
+  pending_frees <- newMVar []
+  lookup_cache  <- newMVar emptyUFM
+  let inst = ExtInterpInstance
+        { instProcess           = process
+        , instPendingFrees      = pending_frees
+        , instLookupSymbolCache = lookup_cache
+        , instExtra             = ()
+        }
+  pure inst
 
 -- | Stop the interpreter
 stopInterp :: Interp -> IO ()
@@ -575,76 +575,16 @@ stopInterp interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
     InternalInterp -> pure ()
 #endif
-    ExternalInterp _ (IServ mstate) ->
+    ExternalInterp ext -> withExtInterpStatus ext $ \mstate -> do
       MC.mask $ \_restore -> modifyMVar_ mstate $ \state -> do
         case state of
-          IServPending    -> pure state -- already stopped
-          IServRunning i  -> do
-            ex <- getProcessExitCode (iservProcess i)
+          InterpPending    -> pure state -- already stopped
+          InterpRunning i  -> do
+            ex <- getProcessExitCode (interpHandle (instProcess i))
             if isJust ex
                then pure ()
-               else iservCall i Shutdown
-            pure IServPending
-
-runWithPipes :: (CreateProcess -> IO ProcessHandle)
-             -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
-#if defined(mingw32_HOST_OS)
-foreign import ccall "io.h _close"
-   c__close :: CInt -> IO CInt
-
-foreign import ccall unsafe "io.h _get_osfhandle"
-   _get_osfhandle :: CInt -> IO CInt
-
-runWithPipesPOSIX :: (CreateProcess -> IO ProcessHandle)
-                  -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
-runWithPipesPOSIX createProc prog opts = do
-    (rfd1, wfd1) <- createPipeFd -- we read on rfd1
-    (rfd2, wfd2) <- createPipeFd -- we write on wfd2
-    wh_client    <- _get_osfhandle wfd1
-    rh_client    <- _get_osfhandle rfd2
-    let args = show wh_client : show rh_client : opts
-    ph <- createProc (proc prog args)
-    rh <- mkHandle rfd1
-    wh <- mkHandle wfd2
-    return (ph, rh, wh)
-      where mkHandle :: CInt -> IO Handle
-            mkHandle fd = (fdToHandle fd) `Ex.onException` (c__close fd)
-
-# if defined (__IO_MANAGER_WINIO__)
-runWithPipesNative :: (CreateProcess -> IO ProcessHandle)
-                   -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
-runWithPipesNative createProc prog opts = do
-    (rh, wfd1) <- createPipe -- we read on rfd1
-    (rfd2, wh) <- createPipe -- we write on wfd2
-    wh_client    <- handleToHANDLE wfd1
-    rh_client    <- handleToHANDLE rfd2
-    -- Associate the handle with the current manager
-    -- but don't touch the ones we're passing to the child
-    -- since it needs to register the handle with its own manager.
-    associateHandle' =<< handleToHANDLE rh
-    associateHandle' =<< handleToHANDLE wh
-    let args = show wh_client : show rh_client : opts
-    ph <- createProc (proc prog args)
-    return (ph, rh, wh)
-
-runWithPipes = runWithPipesPOSIX <!> runWithPipesNative
-# else
-runWithPipes = runWithPipesPOSIX
-# endif
-#else
-runWithPipes createProc prog opts = do
-    (rfd1, wfd1) <- Posix.createPipe -- we read on rfd1
-    (rfd2, wfd2) <- Posix.createPipe -- we write on wfd2
-    setFdOption rfd1 CloseOnExec True
-    setFdOption wfd2 CloseOnExec True
-    let args = show wfd1 : show rfd2 : opts
-    ph <- createProc (proc prog args)
-    closeFd wfd1
-    closeFd rfd2
-    rh <- fdToHandle rfd1
-    wh <- fdToHandle wfd2
-    return (ph, rh, wh)
-#endif
+               else sendMessage i Shutdown
+            pure InterpPending
 
 -- -----------------------------------------------------------------------------
 {- Note [External GHCi pointers]
@@ -661,10 +601,10 @@ we cannot use this to refer to things in the external process.
 RemoteRef
 ---------
 
-RemoteRef is a StablePtr to a heap-resident value.  When
--fexternal-interpreter is used, this value resides in the external
-process's heap.  RemoteRefs are mostly used to send pointers in
-messages between GHC and iserv.
+RemoteRef is a StablePtr to a heap-resident value.  When -fexternal-interpreter
+or the JS interpreter is used, this value resides in the external process's
+heap. RemoteRefs are mostly used to send pointers in messages between GHC and
+iserv.
 
 A RemoteRef must be explicitly freed when no longer required, using
 freeHValueRefs, or by attaching a finalizer with mkForeignHValue.
@@ -690,18 +630,18 @@ principle it would probably be ok, but it seems less hairy this way.
 -- 'RemoteRef' when it is no longer referenced.
 mkFinalizedHValue :: Interp -> RemoteRef a -> IO (ForeignRef a)
 mkFinalizedHValue interp rref = do
-   free <- case interpInstance interp of
+  case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
-      InternalInterp             -> return (freeRemoteRef rref)
+    InternalInterp     -> mkForeignRef rref (freeRemoteRef rref)
 #endif
-      ExternalInterp _ (IServ i) -> return $ modifyMVar_ i $ \state ->
-       case state of
-         IServPending {}   -> pure state -- already shut down
-         IServRunning inst -> do
-            let !inst' = inst {iservPendingFrees = castRemoteRef rref : iservPendingFrees inst}
-            pure (IServRunning inst')
+    ExternalInterp ext -> withExtInterpMaybe ext $ \case
+      Nothing   -> mkForeignRef rref (pure ()) -- nothing to do, interpreter already stopped
+      Just inst -> mkForeignRef rref (freeReallyRemoteRef inst rref)
 
-   mkForeignRef rref free
+freeReallyRemoteRef :: ExtInterpInstance d -> RemoteRef a -> IO ()
+freeReallyRemoteRef inst rref =
+  -- add to the list of HValues to free
+  modifyMVar_ (instPendingFrees inst) (\xs -> pure (castRemoteRef rref : xs))
 
 
 freeHValueRefs :: Interp -> [HValueRef] -> IO ()
@@ -751,7 +691,9 @@ interpreterProfiled interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> hostIsProfiled
 #endif
-  ExternalInterp c _ -> iservConfProfiled c
+  ExternalInterp ext -> case ext of
+    ExtIServ i -> iservConfProfiled (interpConfig i)
+    ExtJS {}   -> False -- we don't support profiling yet in the JS backend
 
 -- | Interpreter uses Dynamic way
 interpreterDynamic :: Interp -> Bool
@@ -759,4 +701,6 @@ interpreterDynamic interp = case interpInstance interp of
 #if defined(HAVE_INTERNAL_INTERPRETER)
   InternalInterp     -> hostIsDynamic
 #endif
-  ExternalInterp c _ -> iservConfDynamic c
+  ExternalInterp ext -> case ext of
+    ExtIServ i -> iservConfDynamic (interpConfig i)
+    ExtJS {}   -> False -- dynamic doesn't make sense for JS

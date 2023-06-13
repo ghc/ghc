@@ -46,14 +46,20 @@ module GHC.StgToJS.Object
   , getObjectBody
   , getObject
   , readObject
-  , getObjectUnits
-  , readObjectUnits
-  , readObjectDeps
-  , isGlobalUnit
+  , getObjectBlocks
+  , readObjectBlocks
+  , readObjectBlockInfo
+  , isGlobalBlock
   , isJsObjectFile
   , Object(..)
   , IndexEntry(..)
-  , Deps (..), BlockDeps (..), DepsLocation (..)
+  , LocatedBlockInfo (..)
+  , BlockInfo (..)
+  , BlockDeps (..)
+  , BlockLocation (..)
+  , BlockId
+  , BlockIds
+  , BlockRef (..)
   , ExportedFun (..)
   )
 where
@@ -97,63 +103,75 @@ data Object = Object
   { objModuleName    :: !ModuleName
     -- ^ name of the module
   , objHandle        :: !BinHandle
-    -- ^ BinHandle that can be used to read the ObjUnits
-  , objPayloadOffset :: !(Bin ObjUnit)
+    -- ^ BinHandle that can be used to read the ObjBlocks
+  , objPayloadOffset :: !(Bin ObjBlock)
     -- ^ Offset of the payload (units)
-  , objDeps          :: !Deps
-    -- ^ Dependencies
+  , objBlockInfo     :: !BlockInfo
+    -- ^ Information about blocks
   , objIndex         :: !Index
-    -- ^ The Index, serialed unit indices and their linkable units
+    -- ^ Block index: symbols per block and block offset in the object file
   }
 
 type BlockId  = Int
 type BlockIds = IntSet
 
--- | dependencies for a single module
-data Deps = Deps
-  { depsModule          :: !Module
-      -- ^ module
-  , depsRequired        :: !BlockIds
+-- | Information about blocks (linkable units)
+data BlockInfo = BlockInfo
+  { bi_module     :: !Module
+      -- ^ Module they were generated from
+  , bi_must_link  :: !BlockIds
       -- ^ blocks that always need to be linked when this object is loaded (e.g.
       -- everything that contains initializer code or foreign exports)
-  , depsHaskellExported :: !(Map ExportedFun BlockId)
+  , bi_exports    :: !(Map ExportedFun BlockId)
       -- ^ exported Haskell functions -> block
-  , depsBlocks          :: !(Array BlockId BlockDeps)
-      -- ^ info about each block
+  , bi_block_deps :: !(Array BlockId BlockDeps)
+      -- ^ dependencies of each block
   }
 
-instance Outputable Deps where
+data LocatedBlockInfo = LocatedBlockInfo
+  { lbi_loc  :: !BlockLocation -- ^ Where to find the blocks
+  , lbi_info :: !BlockInfo     -- ^ Block information
+  }
+
+instance Outputable BlockInfo where
   ppr d = vcat
-    [ hcat [ text "module: ", pprModule (depsModule d) ]
-    , hcat [ text "exports: ", ppr (M.keys (depsHaskellExported d)) ]
+    [ hcat [ text "module: ", pprModule (bi_module d) ]
+    , hcat [ text "exports: ", ppr (M.keys (bi_exports d)) ]
     ]
 
--- | Where are the dependencies
-data DepsLocation
+-- | Where are the blocks
+data BlockLocation
   = ObjectFile  FilePath       -- ^ In an object file at path
   | ArchiveFile FilePath       -- ^ In a Ar file at path
   | InMemory    String Object  -- ^ In memory
 
-instance Outputable DepsLocation where
+instance Outputable BlockLocation where
   ppr = \case
     ObjectFile fp  -> hsep [text "ObjectFile", text fp]
     ArchiveFile fp -> hsep [text "ArchiveFile", text fp]
     InMemory s o   -> hsep [text "InMemory", text s, ppr (objModuleName o)]
 
+-- | A @BlockRef@ is a pair of a module and the index of the block in the
+-- object file
+data BlockRef = BlockRef
+  { block_ref_mod :: !Module  -- ^ Module
+  , block_ref_idx :: !BlockId -- ^ Block index in the object file
+  }
+  deriving (Eq,Ord)
+
 data BlockDeps = BlockDeps
-  { blockBlockDeps       :: [Int]         -- ^ dependencies on blocks in this object
+  { blockBlockDeps       :: [BlockId]     -- ^ dependencies on blocks in this object
   , blockFunDeps         :: [ExportedFun] -- ^ dependencies on exported symbols in other objects
   -- , blockForeignExported :: [ExpFun]
   -- , blockForeignImported :: [ForeignRef]
   }
 
-{- | we use the convention that the first unit (0) is a module-global
-     unit that's always included when something from the module
-     is loaded. everything in a module implicitly depends on the
-     global block. the global unit itself can't have dependencies
- -}
-isGlobalUnit :: Int -> Bool
-isGlobalUnit n = n == 0
+-- | we use the convention that the first block (0) is a module-global block
+-- that's always included when something from the module is loaded. everything
+-- in a module implicitly depends on the global block. The global block itself
+-- can't have dependencies
+isGlobalBlock :: BlockId -> Bool
+isGlobalBlock n = n == 0
 
 -- | Exported Functions
 data ExportedFun = ExportedFun
@@ -167,10 +185,10 @@ instance Outputable ExportedFun where
     , hcat [ text "symbol: ", ppr f ]
     ]
 
--- | Write an ObjUnit, except for the top level symbols which are stored in the
+-- | Write an ObjBlock, except for the top level symbols which are stored in the
 -- index
-putObjUnit :: BinHandle -> ObjUnit -> IO ()
-putObjUnit bh (ObjUnit _syms b c d e f g) = do
+putObjBlock :: BinHandle -> ObjBlock -> IO ()
+putObjBlock bh (ObjBlock _syms b c d e f g) = do
     put_ bh b
     put_ bh c
     lazyPut bh d
@@ -178,17 +196,17 @@ putObjUnit bh (ObjUnit _syms b c d e f g) = do
     put_ bh f
     put_ bh g
 
--- | Read an ObjUnit and associate it to the given symbols (that must have been
+-- | Read an ObjBlock and associate it to the given symbols (that must have been
 -- read from the index)
-getObjUnit :: [FastString] -> BinHandle -> IO ObjUnit
-getObjUnit syms bh = do
+getObjBlock :: [FastString] -> BinHandle -> IO ObjBlock
+getObjBlock syms bh = do
     b <- get bh
     c <- get bh
     d <- lazyGet bh
     e <- get bh
     f <- get bh
     g <- get bh
-    pure $ ObjUnit
+    pure $ ObjBlock
       { oiSymbols  = syms
       , oiClInfo   = b
       , oiStatic   = c
@@ -204,12 +222,12 @@ getObjUnit syms bh = do
 magic :: String
 magic = "GHCJSOBJ"
 
--- | Serialized unit indexes and their exported symbols
--- (the first unit is module-global)
+-- | Serialized block indexes and their exported symbols
+-- (the first block is module-global)
 type Index = [IndexEntry]
 data IndexEntry = IndexEntry
-  { idxSymbols :: ![FastString]  -- ^ Symbols exported by a unit
-  , idxOffset  :: !(Bin ObjUnit) -- ^ Offset of the unit in the object file
+  { idxSymbols :: ![FastString]  -- ^ Symbols exported by a block
+  , idxOffset  :: !(Bin ObjBlock) -- ^ Offset of the block in the object file
   }
 
 
@@ -222,8 +240,8 @@ data IndexEntry = IndexEntry
 putObject
   :: BinHandle
   -> ModuleName -- ^ module
-  -> Deps       -- ^ dependencies
-  -> [ObjUnit]  -- ^ linkable units and their symbols
+  -> BlockInfo  -- ^ block infos
+  -> [ObjBlock] -- ^ linkable units and their symbols
   -> IO ()
 putObject bh mod_name deps os = do
   forM_ magic (putByte bh . fromIntegral . ord)
@@ -244,7 +262,7 @@ putObject bh mod_name deps os = do
       idx <- forM os $ \o -> do
         p <- tellBin bh_fs
         -- write units without their symbols
-        putObjUnit bh_fs o
+        putObjBlock bh_fs o
         -- return symbols and offset to store in the index
         pure (oiSymbols o,p)
       pure idx
@@ -296,15 +314,15 @@ getObjectBody bh0 mod_name = do
   dict <- forwardGet bh0 (getDictionary bh0)
   let bh = setUserData bh0 $ noUserData { ud_get_fs = getDictFastString dict }
 
-  deps     <- get bh
-  idx      <- forwardGet bh (get bh)
+  block_info  <- get bh
+  idx         <- forwardGet bh (get bh)
   payload_pos <- tellBin bh
 
   pure $ Object
     { objModuleName    = mod_name
     , objHandle        = bh
     , objPayloadOffset = payload_pos
-    , objDeps          = deps
+    , objBlockInfo     = block_info
     , objIndex         = idx
     }
 
@@ -323,31 +341,31 @@ readObject file = do
   bh <- readBinMem file
   getObject bh
 
--- | Reads only the part necessary to get the dependencies
-readObjectDeps :: FilePath -> IO (Maybe Deps)
-readObjectDeps file = do
+-- | Reads only the part necessary to get the block info
+readObjectBlockInfo :: FilePath -> IO (Maybe BlockInfo)
+readObjectBlockInfo file = do
   bh <- readBinMem file
   getObject bh >>= \case
-    Just obj -> pure $! Just $! objDeps obj
+    Just obj -> pure $! Just $! objBlockInfo obj
     Nothing  -> pure Nothing
 
--- | Get units in the object file, using the given filtering function
-getObjectUnits :: Object -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
-getObjectUnits obj pred = mapMaybeM read_entry (zip (objIndex obj) [0..])
+-- | Get blocks in the object file, using the given filtering function
+getObjectBlocks :: Object -> BlockIds -> IO [ObjBlock]
+getObjectBlocks obj bids = mapMaybeM read_entry (zip (objIndex obj) [0..])
   where
     bh = objHandle obj
-    read_entry (e@(IndexEntry syms offset),i)
-      | pred i e  = do
+    read_entry (IndexEntry syms offset,i)
+      | IS.member i bids = do
           seekBin bh offset
-          Just <$> getObjUnit syms bh
+          Just <$> getObjBlock syms bh
       | otherwise = pure Nothing
 
--- | Read units in the object file, using the given filtering function
-readObjectUnits :: FilePath -> (Word -> IndexEntry -> Bool) -> IO [ObjUnit]
-readObjectUnits file pred = do
+-- | Read blocks in the object file, using the given filtering function
+readObjectBlocks :: FilePath -> BlockIds -> IO [ObjBlock]
+readObjectBlocks file bids = do
   readObject file >>= \case
     Nothing  -> pure []
-    Just obj -> getObjectUnits obj pred
+    Just obj -> getObjectBlocks obj bids
 
 
 --------------------------------------------------------------------------------
@@ -379,13 +397,13 @@ instance Binary IndexEntry where
   put_ bh (IndexEntry a b) = put_ bh a >> put_ bh b
   get bh = IndexEntry <$> get bh <*> get bh
 
-instance Binary Deps where
-  put_ bh (Deps m r e b) = do
+instance Binary BlockInfo where
+  put_ bh (BlockInfo m r e b) = do
       put_ bh m
       put_ bh (map toI32 $ IS.toList r)
       put_ bh (map (\(x,y) -> (x, toI32 y)) $ M.toList e)
       put_ bh (elems b)
-  get bh = Deps <$> get bh
+  get bh = BlockInfo <$> get bh
              <*> (IS.fromList . map fromI32 <$> get bh)
              <*> (M.fromList . map (\(x,y) -> (x, fromI32 y)) <$> get bh)
              <*> ((\xs -> listArray (0, length xs - 1) xs) <$> get bh)

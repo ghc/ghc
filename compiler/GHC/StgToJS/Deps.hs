@@ -22,7 +22,7 @@ where
 
 import GHC.Prelude
 
-import GHC.StgToJS.Object as Object
+import GHC.StgToJS.Object
 import GHC.StgToJS.Types
 import GHC.StgToJS.Ids
 
@@ -55,9 +55,9 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
 
 data DependencyDataCache = DDC
-  { ddcModule :: !(IntMap Unit)               -- ^ Unique Module -> Unit
-  , ddcId     :: !(IntMap Object.ExportedFun) -- ^ Unique Id     -> Object.ExportedFun (only to other modules)
-  , ddcOther  :: !(Map OtherSymb Object.ExportedFun)
+  { ddcModule :: !(IntMap Unit)        -- ^ Unique Module -> Unit
+  , ddcId     :: !(IntMap ExportedFun) -- ^ Unique Id     -> ExportedFun (only to other modules)
+  , ddcOther  :: !(Map OtherSymb ExportedFun)
   }
 
 -- | Generate module dependency data
@@ -68,16 +68,15 @@ genDependencyData
   :: HasDebugCallStack
   => Module
   -> [LinkableUnit]
-  -> G Object.Deps
+  -> G BlockInfo
 genDependencyData mod units = do
-    -- [(blockindex, blockdeps, required, exported)]
     ds <- evalStateT (mapM (uncurry oneDep) blocks)
                      (DDC IM.empty IM.empty M.empty)
-    return $ Object.Deps
-      { depsModule          = mod
-      , depsRequired        = IS.fromList [ n | (n, _, True, _) <- ds ]
-      , depsHaskellExported = M.fromList $ (\(n,_,_,es) -> map (,n) es) =<< ds
-      , depsBlocks          = listArray (0, length blocks-1) (map (\(_,deps,_,_) -> deps) ds)
+    return $ BlockInfo
+      { bi_module     = mod
+      , bi_must_link  = IS.fromList [ n | (n, _, True, _) <- ds ]
+      , bi_exports    = M.fromList $ (\(n,_,_,es) -> map (,n) es) =<< ds
+      , bi_block_deps = listArray (0, length blocks-1) (map (\(_,deps,_,_) -> deps) ds)
       }
   where
       -- Id -> Block
@@ -99,7 +98,7 @@ genDependencyData mod units = do
       -- generate the list of exports and set of dependencies for one unit
       oneDep :: LinkableUnit
              -> Int
-             -> StateT DependencyDataCache G (Int, Object.BlockDeps, Bool, [Object.ExportedFun])
+             -> StateT DependencyDataCache G (Int, BlockDeps, Bool, [ExportedFun])
       oneDep (LinkableUnit _ idExports otherExports idDeps pseudoIdDeps otherDeps req _frefs) n = do
         (edi, bdi) <- partitionEithers <$> mapM (lookupIdFun n) idDeps
         (edo, bdo) <- partitionEithers <$> mapM lookupOtherFun otherDeps
@@ -107,9 +106,10 @@ genDependencyData mod units = do
         expi <- mapM lookupExportedId (filter isExportedId idExports)
         expo <- mapM lookupExportedOther otherExports
         -- fixme thin deps, remove all transitive dependencies!
-        let bdeps = Object.BlockDeps
-                      (IS.toList . IS.fromList . filter (/=n) $ bdi++bdo++bdp)
-                      (S.toList . S.fromList $ edi++edo++edp)
+        let bdeps = BlockDeps
+                      { blockBlockDeps = IS.toList . IS.fromList . filter (/=n) $ bdi++bdo++bdp
+                      , blockFunDeps   = S.toList . S.fromList $ edi++edo++edp
+                      }
         return (n, bdeps, req, expi++expo)
 
       idModule :: Id -> Maybe Module
@@ -117,7 +117,7 @@ genDependencyData mod units = do
                    guard (m /= mod) >> return m
 
       lookupPseudoIdFun :: Int -> Unique
-                        -> StateT DependencyDataCache G (Either Object.ExportedFun Int)
+                        -> StateT DependencyDataCache G (Either ExportedFun Int)
       lookupPseudoIdFun _n u =
         case lookupUFM_Directly unitIdExports u of
           Just k -> return (Right k)
@@ -130,14 +130,14 @@ genDependencyData mod units = do
       --         assumes function is internal to the current block if it's
       --         from teh current module and not in the unitIdExports map.
       lookupIdFun :: Int -> Id
-                  -> StateT DependencyDataCache G (Either Object.ExportedFun Int)
+                  -> StateT DependencyDataCache G (Either ExportedFun Int)
       lookupIdFun n i = case lookupUFM unitIdExports i of
         Just k  -> return (Right k)
         Nothing -> case idModule i of
           Nothing -> return (Right n)
           Just m ->
             let k = getKey . getUnique $ i
-                addEntry :: StateT DependencyDataCache G Object.ExportedFun
+                addEntry :: StateT DependencyDataCache G ExportedFun
                 addEntry = do
                   (TxtI idTxt) <- lift (identForId i)
                   lookupExternalFun (Just k) (OtherSymb m idTxt)
@@ -149,7 +149,7 @@ genDependencyData mod units = do
 
       -- get the function for an OtherSymb from the cache, add it if necessary
       lookupOtherFun :: OtherSymb
-                     -> StateT DependencyDataCache G (Either Object.ExportedFun Int)
+                     -> StateT DependencyDataCache G (Either ExportedFun Int)
       lookupOtherFun od@(OtherSymb m idTxt) =
         case M.lookup od unitOtherExports of
           Just n  -> return (Right n)
@@ -157,22 +157,22 @@ genDependencyData mod units = do
           Nothing ->  Left <$> (maybe (lookupExternalFun Nothing od) return =<<
                         gets (M.lookup od . ddcOther))
 
-      lookupExportedId :: Id -> StateT DependencyDataCache G Object.ExportedFun
+      lookupExportedId :: Id -> StateT DependencyDataCache G ExportedFun
       lookupExportedId i = do
         (TxtI idTxt) <- lift (identForId i)
         lookupExternalFun (Just . getKey . getUnique $ i) (OtherSymb mod idTxt)
 
-      lookupExportedOther :: FastString -> StateT DependencyDataCache G Object.ExportedFun
+      lookupExportedOther :: FastString -> StateT DependencyDataCache G ExportedFun
       lookupExportedOther = lookupExternalFun Nothing . OtherSymb mod
 
       -- lookup a dependency to another module, add to the id cache if there's
       -- an id key, otherwise add to other cache
       lookupExternalFun :: Maybe Int
-                        -> OtherSymb -> StateT DependencyDataCache G Object.ExportedFun
+                        -> OtherSymb -> StateT DependencyDataCache G ExportedFun
       lookupExternalFun mbIdKey od@(OtherSymb m idTxt) = do
         let mk        = getKey . getUnique $ m
             mpk       = moduleUnit m
-            exp_fun   = Object.ExportedFun m (LexicalFastString idTxt)
+            exp_fun   = ExportedFun m (LexicalFastString idTxt)
             addCache  = do
               ms <- gets ddcModule
               let !cache' = IM.insert mk mpk ms

@@ -91,11 +91,11 @@ stgToJS logger config stg_binds0 this_mod spt_entries foreign_stubs cccs output_
   -- Doc to dump when -ddump-js is enabled
   when (logHasDumpFlag logger Opt_D_dump_js) $ do
     putDumpFileMaybe logger Opt_D_dump_js "JavaScript code" FormatJS
-      $ vcat (fmap (jsToDoc . oiStat . luObjUnit) lus)
+      $ vcat (fmap (jsToDoc . oiStat . luObjBlock) lus)
 
   -- Write the object file
   bh <- openBinMem (4 * 1024 * 1000) -- a bit less than 4kB
-  Object.putObject bh (moduleName this_mod) deps (map luObjUnit lus)
+  Object.putObject bh (moduleName this_mod) deps (map luObjBlock lus)
 
   createDirectoryIfMissing True (takeDirectory output_fn)
   writeBinMem bh output_fn
@@ -138,7 +138,7 @@ genUnits m ss spt_entries foreign_stubs = do
                      satJStat (Just $ modulePrefix m 1)
                    $ mconcat (reverse glbl) <> staticInit)
         let syms = [moduleGlobalSymbol m]
-        let oi = ObjUnit
+        let oi = ObjBlock
                   { oiSymbols  = syms
                   , oiClInfo   = []
                   , oiStatic   = []
@@ -148,7 +148,7 @@ genUnits m ss spt_entries foreign_stubs = do
                   , oiFImports = []
                   }
         let lu = LinkableUnit
-                  { luObjUnit      = oi
+                  { luObjBlock     = oi
                   , luIdExports    = []
                   , luOtherExports = syms
                   , luIdDeps       = []
@@ -170,7 +170,7 @@ genUnits m ss spt_entries foreign_stubs = do
 
         let syms = [moduleExportsSymbol m]
         let raw  = utf8EncodeByteString $ renderWithContext defaultSDocContext f_c
-        let oi = ObjUnit
+        let oi = ObjBlock
                   { oiSymbols  = syms
                   , oiClInfo   = []
                   , oiStatic   = []
@@ -180,7 +180,7 @@ genUnits m ss spt_entries foreign_stubs = do
                   , oiFImports = []
                   }
         let lu = LinkableUnit
-                  { luObjUnit      = oi
+                  { luObjBlock     = oi
                   , luIdExports    = []
                   , luOtherExports = syms
                   , luIdDeps       = []
@@ -212,7 +212,7 @@ genUnits m ss spt_entries foreign_stubs = do
                           $ satJStat (Just $ modulePrefix m n) body
               let ids = [bnd]
               syms <- (\(TxtI i) -> [i]) <$> identForId bnd
-              let oi = ObjUnit
+              let oi = ObjBlock
                         { oiSymbols  = syms
                         , oiClInfo   = []
                         , oiStatic   = si
@@ -222,7 +222,7 @@ genUnits m ss spt_entries foreign_stubs = do
                         , oiFImports = []
                         }
               let lu = LinkableUnit
-                        { luObjUnit      = oi
+                        { luObjBlock     = oi
                         , luIdExports    = ids
                         , luOtherExports = []
                         , luIdDeps       = []
@@ -250,7 +250,7 @@ genUnits m ss spt_entries foreign_stubs = do
                          . satJStat (Just $ modulePrefix m n)
                          $ mconcat (reverse extraTl) <> tl
           syms <- mapM (fmap (\(TxtI i) -> i) . identForId) topDeps
-          let oi = ObjUnit
+          let oi = ObjBlock
                     { oiSymbols  = syms
                     , oiClInfo   = ci
                     , oiStatic   = si
@@ -260,7 +260,7 @@ genUnits m ss spt_entries foreign_stubs = do
                     , oiFImports = fRefs
                     }
           let lu = LinkableUnit
-                    { luObjUnit      = oi
+                    { luObjBlock     = oi
                     , luIdExports    = topDeps
                     , luOtherExports = []
                     , luIdDeps       = allDeps

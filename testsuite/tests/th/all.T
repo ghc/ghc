@@ -7,7 +7,8 @@
 def f(name, opts):
     opts.extra_hc_opts = '-XTemplateHaskell -package template-haskell'
 setTestOpts(f)
-setTestOpts(req_interp)
+setTestOpts(req_th)
+
 # TH should work with -fexternal-interpreter too
 if config.have_ext_interp :
      setTestOpts(extra_ways(['ext-interp']))
@@ -272,7 +273,7 @@ test('TH_Roles4', normal, compile, ['-v0'])
 test('T8186', normal, compile_and_run, ['-v0'])
 
 test('T8333',
-     only_ways(['normal']),
+     [req_interp, only_ways(['normal'])],
      makefile_test, ['T8333'])
 
 test('T4124', normal, compile, ['-v0'])
@@ -336,8 +337,8 @@ test('T10704', [], multimod_compile_and_run,
 test('T6018th', normal, compile_fail, ['-v0'])
 test('TH_namePackage', normal, compile_and_run, ['-v0'])
 test('TH_nameSpace', normal, compile_and_run, ['-v0'])
-test('T10796a', normal, compile, ['-v0'])
-test('T10796b', normal, compile_fail, ['-v0'])
+test('T10796a', normal, compile, ['-v0 -package containers'])
+test('T10796b', normal, compile_fail, ['-v0 -package containers'])
 test('T10811', normal, compile, ['-v0'])
 test('T10810', normal, compile, ['-v0'])
 test('T10828', normal, compile, ['-v0 -dsuppress-uniques'])
@@ -400,11 +401,11 @@ test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366C',
-     [expect_broken_for(13366, ghci_ways)],
+     [req_c, expect_broken_for(13366, ghci_ways)],
      compile_and_run,
      ['-v0'])
 test('T13366Cxx',
-     [expect_broken_for(13366, ghci_ways)],
+     [req_c, expect_broken_for(13366, ghci_ways)],
      compile_and_run,
      ['-package system-cxx-std-lib -v0'])
 test('T13473', normal, multimod_compile_and_run,
@@ -435,7 +436,7 @@ test('T14888', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 # There is a phasing issue in the ghci way which prevents us from being
 # able to compile and link the foreign file while compiling the haskell module.
-test('T14298', expect_broken_for(15161, ghci_ways), compile_and_run, ['-v0'])
+test('T14298', [req_c, expect_broken_for(15161, ghci_ways)], compile_and_run, ['-v0'])
 test('T14875', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14885a', normal, compile, [''])
 test('T14885b', normal, compile, [''])
@@ -484,6 +485,7 @@ test('T16133', normal, compile_fail, [''])
 test('T15471', normal, multimod_compile, ['T15471.hs', '-v0'])
 test('T16180',
      [when(llvm_build(), expect_broken_for(16541, ['ext-interp'])),
+      req_asm,
       # Ideally OpenBSD should have expect_broken_for(14012, ['ext-interp']).
       # Except the failure is in compilation so skip seems the best we can do.
       when(opsys('openbsd'), skip),

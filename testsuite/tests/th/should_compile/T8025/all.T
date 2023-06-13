@@ -5,5 +5,5 @@
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T8025', [extra_files(['A.hs', 'B.hs']), omit_ways(['profasm']), req_interp],
+test('T8025', [extra_files(['A.hs', 'B.hs']), omit_ways(['profasm']), req_th],
 	      multimod_compile, ['A B', '-fno-code -v0'])

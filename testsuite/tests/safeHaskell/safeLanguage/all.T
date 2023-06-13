@@ -23,7 +23,7 @@ test('SafeLang07', normal, compile_fail, [''])
 test('SafeLang08', normal, compile_fail, [''])
 test('SafeLang09', [exit_code(1)], compile_and_run, [''])
 test('SafeLang10', [], multimod_compile_fail, ['SafeLang10', ''])
-test('SafeLang11', [req_interp], multimod_compile_and_run,
+test('SafeLang11', [req_th], multimod_compile_and_run,
      ['SafeLang11', config.ghc_th_way_flags])
 test('SafeLang12', normal, multimod_compile_fail, ['SafeLang12', ''])
 test('SafeLang15', [exit_code(1)], multimod_compile_and_run,

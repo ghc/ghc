@@ -49,7 +49,7 @@ test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signat
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('PatternSplice', [req_interp, omit_ways(['profasm'])], compile, ['-fno-warn-partial-type-signatures'])
+test('PatternSplice', [req_th, omit_ways(['profasm'])], compile, ['-fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcardsGood', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
@@ -62,7 +62,7 @@ test('Uncurry', normal, compile, ['-ddump-types -fno-warn-partial-type-signature
 test('UncurryNamed', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('WarningWildcardInstantiations', normal, compile, ['-ddump-types'])
 test('SplicesUsed', [extra_files(['Splices.hs']),
-                     req_interp, omit_ways(prof_ways)], multimod_compile,
+                     req_th, omit_ways(prof_ways)], multimod_compile,
      ['SplicesUsed', config.ghc_th_way_flags])
 test('TypedSplice', normal, compile, [''])
 test('T10403', normal, compile, [''])

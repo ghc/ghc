@@ -2778,6 +2778,7 @@ executeLinkNode hug kn uid deps = do
                             link (ghcLink dflags)
                                 (hsc_logger hsc_env')
                                 (hsc_tmpfs hsc_env')
+                                (hsc_FC hsc_env')
                                 (hsc_hooks hsc_env')
                                 dflags
                                 (hsc_unit_env hsc_env')

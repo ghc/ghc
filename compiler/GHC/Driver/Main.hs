@@ -140,9 +140,10 @@ import GHC.Driver.Hooks
 import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
 
 import GHC.Runtime.Context
-import GHC.Runtime.Interpreter ( addSptEntry )
+import GHC.Runtime.Interpreter
+import GHC.Runtime.Interpreter.JS
 import GHC.Runtime.Loader      ( initializePlugins )
-import GHCi.RemoteTypes        ( ForeignHValue )
+import GHCi.RemoteTypes
 import GHC.ByteCode.Types
 
 import GHC.Linker.Loader
@@ -156,6 +157,9 @@ import GHC.HsToCore
 
 import GHC.StgToByteCode    ( byteCodeGen )
 import GHC.StgToJS          ( stgToJS )
+import GHC.StgToJS.Ids
+import GHC.StgToJS.Types
+import GHC.JS.Syntax
 
 import GHC.IfaceToCore  ( typecheckIface, typecheckWholeCoreBindings )
 
@@ -172,7 +176,6 @@ import GHC.Core
 import GHC.Core.Lint.Interactive ( interactiveInScope )
 import GHC.Core.Tidy           ( tidyExpr )
 import GHC.Core.Type           ( Type, Kind )
-import GHC.Core.Multiplicity
 import GHC.Core.Utils          ( exprType )
 import GHC.Core.ConLike
 import GHC.Core.Opt.Pipeline
@@ -201,7 +204,6 @@ import GHC.Stg.Pipeline ( stg2stg, StgCgInfos )
 
 import GHC.Builtin.Utils
 import GHC.Builtin.Names
-import GHC.Builtin.Uniques ( mkPseudoUniqueE )
 
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos, LambdaFormInfo(..))
@@ -231,7 +233,7 @@ import GHC.Types.SourceError
 import GHC.Types.SafeHaskell
 import GHC.Types.ForeignStubs
 import GHC.Types.Name.Env      ( mkNameEnv )
-import GHC.Types.Var.Env       ( emptyTidyEnv )
+import GHC.Types.Var.Env       ( mkEmptyTidyEnv )
 import GHC.Types.Error
 import GHC.Types.Fixity.Env
 import GHC.Types.CostCentre
@@ -245,6 +247,8 @@ import GHC.Types.Name.Ppr
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
+import GHC.Types.Unique.Supply (uniqFromMask)
+import GHC.Types.Unique (getKey)
 
 import GHC.Utils.Fingerprint ( Fingerprint )
 import GHC.Utils.Panic
@@ -289,6 +293,7 @@ import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
 import GHC.Stg.InferTags.TagSig (seqTagSig)
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 
 
 {- **********************************************************************
@@ -1853,7 +1858,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
                         c `seqList`
                         d `seqList`
                         (seqEltsUFM (seqTagSig) tag_env))
-                   (myCoreToStg logger dflags (hsc_IC hsc_env) False this_mod location prepd_binds)
+                   (myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) False this_mod location prepd_binds)
 
         let cost_centre_info =
               (late_local_ccs ++ caf_ccs, caf_cc_stacks)
@@ -1975,7 +1980,7 @@ hscInteractive hsc_env cgguts location = do
     -- omit it here
     (stg_binds, _infotable_prov, _caf_ccs__caf_cc_stacks, _ignore_stg_cg_infos)
       <- {-# SCC "CoreToStg" #-}
-          myCoreToStg logger dflags (hsc_IC hsc_env) True this_mod location prepd_binds
+          myCoreToStg logger dflags (interactiveInScope (hsc_IC hsc_env)) True this_mod location prepd_binds
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod stg_binds data_tycons mod_breaks
     ------------------ Create f-x-dynamic C-side stuff -----
@@ -2150,46 +2155,21 @@ doCodeGen hsc_env this_mod denv data_tycons
 
     return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv pipeline_stream
 
-myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
-                -> Bool
-                -> Module -> ModLocation -> CoreExpr
-                -> IO ( Id
-                      , [CgStgTopBinding]
-                      , InfoTableProvMap
-                      , CollectedCCs
-                      , StgCgInfos )
-myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
-    {- Create a temporary binding (just because myCoreToStg needs a
-       binding for the stg2stg step) -}
-    let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
-                                (mkPseudoUniqueE 0)
-                                ManyTy
-                                (exprType prepd_expr)
-    (stg_binds, prov_map, collected_ccs, stg_cg_infos) <-
-       myCoreToStg logger
-                   dflags
-                   ictxt
-                   for_bytecode
-                   this_mod
-                   ml
-                   [NonRec bco_tmp_id prepd_expr]
-    return (bco_tmp_id, stg_binds, prov_map, collected_ccs, stg_cg_infos)
-
-myCoreToStg :: Logger -> DynFlags -> InteractiveContext
+myCoreToStg :: Logger -> DynFlags -> [Var]
             -> Bool
             -> Module -> ModLocation -> CoreProgram
             -> IO ( [CgStgTopBinding] -- output program
                   , InfoTableProvMap
                   , CollectedCCs -- CAF cost centre info (declared and used)
                   , StgCgInfos )
-myCoreToStg logger dflags ictxt for_bytecode this_mod ml prepd_binds = do
+myCoreToStg logger dflags ic_inscope for_bytecode this_mod ml prepd_binds = do
     let (stg_binds, denv, cost_centre_info)
          = {-# SCC "Core2Stg" #-}
            coreToStg (initCoreToStgOpts dflags) this_mod ml prepd_binds
 
     (stg_binds_with_fvs,stg_cg_info)
         <- {-# SCC "Stg2Stg" #-}
-           stg2stg logger (interactiveInScope ictxt) (initStgPipelineOpts dflags for_bytecode)
+           stg2stg logger ic_inscope (initStgPipelineOpts dflags for_bytecode)
                    this_mod stg_binds
 
     putDumpFileMaybe logger Opt_D_dump_stg_cg "CodeGenInput STG:" FormatSTG
@@ -2350,7 +2330,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
         <- {-# SCC "CoreToStg" #-}
            liftIO $ myCoreToStg (hsc_logger hsc_env)
                                 (hsc_dflags hsc_env)
-                                (hsc_IC hsc_env)
+                                (interactiveInScope (hsc_IC hsc_env))
                                 True
                                 this_mod
                                 iNTERACTIVELoc
@@ -2558,56 +2538,135 @@ hscCompileCoreExpr hsc_env loc expr =
       Just h  -> h                   hsc_env loc expr
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO (ForeignHValue, [Linkable], PkgsLoaded)
-hscCompileCoreExpr' hsc_env srcspan ds_expr
-    = do { {- Simplify it -}
-           -- Question: should we call SimpleOpt.simpleOptExpr here instead?
-           -- It is, well, simpler, and does less inlining etc.
-           let dflags = hsc_dflags hsc_env
-         ; let logger = hsc_logger hsc_env
-         ; let ic = hsc_IC hsc_env
-         ; let unit_env = hsc_unit_env hsc_env
-         ; let simplify_expr_opts = initSimplifyExprOpts dflags ic
-         ; simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
+hscCompileCoreExpr' hsc_env srcspan ds_expr = do
+  {- Simplify it -}
+  -- Question: should we call SimpleOpt.simpleOptExpr here instead?
+  -- It is, well, simpler, and does less inlining etc.
+  let dflags = hsc_dflags hsc_env
+  let logger = hsc_logger hsc_env
+  let ic = hsc_IC hsc_env
+  let unit_env = hsc_unit_env hsc_env
+  let simplify_expr_opts = initSimplifyExprOpts dflags ic
 
-           {- Tidy it (temporary, until coreSat does cloning) -}
-         ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
+  simpl_expr <- simplifyExpr logger (ue_eps unit_env) simplify_expr_opts ds_expr
 
-           {- Prepare for codegen -}
-         ; cp_cfg <- initCorePrepConfig hsc_env
-         ; prepd_expr <- corePrepExpr
-            logger cp_cfg
-            tidy_expr
+  -- Create a unique temporary binding
+  --
+  -- The id has to be exported for the JS backend. This isn't required for the
+  -- byte-code interpreter but it does no harm to always do it.
+  u <- uniqFromMask 'I'
+  let binding_name = mkSystemVarName u (fsLit ("BCO_toplevel"))
+  let binding_id   = mkExportedVanillaId binding_name (exprType simpl_expr)
 
-           {- Lint if necessary -}
-         ; lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
-         ; let iNTERACTIVELoc = ModLocation{ ml_hs_file   = Nothing,
-                                      ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
-                                      ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
-                                      ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
-                                      ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
-                                      ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
+  {- Tidy it (temporary, until coreSat does cloning) -}
+  let tidy_occ_env = initTidyOccEnv [occName binding_id]
+  let tidy_env     = mkEmptyTidyEnv tidy_occ_env
+  let tidy_expr    = tidyExpr tidy_env simpl_expr
 
-         ; let ictxt = hsc_IC hsc_env
-         ; (binding_id, stg_expr, _, _, _stg_cg_info) <-
-             myCoreToStgExpr logger
-                             dflags
-                             ictxt
-                             True
-                             (icInteractiveModule ictxt)
-                             iNTERACTIVELoc
-                             prepd_expr
+  {- Prepare for codegen -}
+  cp_cfg <- initCorePrepConfig hsc_env
+  prepd_expr <- corePrepExpr
+   logger cp_cfg
+   tidy_expr
 
-           {- Convert to BCOs -}
-         ; bcos <- byteCodeGen hsc_env
-                     (icInteractiveModule ictxt)
-                     stg_expr
-                     [] Nothing
+  {- Lint if necessary -}
+  lintInteractiveExpr (text "hscCompileExpr") hsc_env prepd_expr
+  let this_loc = ModLocation{ ml_hs_file   = Nothing,
+                              ml_hi_file   = panic "hscCompileCoreExpr':ml_hi_file",
+                              ml_obj_file  = panic "hscCompileCoreExpr':ml_obj_file",
+                              ml_dyn_obj_file = panic "hscCompileCoreExpr': ml_obj_file",
+                              ml_dyn_hi_file  = panic "hscCompileCoreExpr': ml_dyn_hi_file",
+                              ml_hie_file  = panic "hscCompileCoreExpr':ml_hie_file" }
 
-           {- load it -}
-         ; (fv_hvs, mods_needed, units_needed) <- loadDecls (hscInterp hsc_env) hsc_env srcspan bcos
-           {- Get the HValue for the root -}
-         ; return (expectJust "hscCompileCoreExpr'"
-              $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed) }
+  -- Ensure module uniqueness by giving it a name like "GhciNNNN".
+  -- This uniqueness is needed by the JS linker. Without it we break the 1-1
+  -- relationship between modules and object files, i.e. we get different object
+  -- files for the same module and the JS linker doesn't support this.
+  --
+  -- Note that we can't use icInteractiveModule because the ic_mod_index value
+  -- isn't bumped between invocations of hscCompileExpr, so uniqueness isn't
+  -- guaranteed.
+  --
+  -- We reuse the unique we obtained for the binding, but any unique would do.
+  let this_mod = mkInteractiveModule (getKey u)
+  let for_bytecode = True
+
+  (stg_binds, _prov_map, _collected_ccs, _stg_cg_infos) <-
+       myCoreToStg logger
+                   dflags
+                   (interactiveInScope (hsc_IC hsc_env))
+                   for_bytecode
+                   this_mod
+                   this_loc
+                   [NonRec binding_id prepd_expr]
+
+  let interp = hscInterp hsc_env
+  let tmpfs = hsc_tmpfs hsc_env
+  let tmp_dir = tmpDir dflags
+
+  case interp of
+    -- always generate JS code for the JS interpreter (no bytecode!)
+    Interp (ExternalInterp (ExtJS i)) _ ->
+      jsCodeGen logger tmpfs tmp_dir unit_env (initStgToJSConfig dflags) interp i
+                this_mod stg_binds binding_id
+
+    _ -> do
+      {- Convert to BCOs -}
+      bcos <- byteCodeGen hsc_env
+                this_mod
+                stg_binds
+                [] Nothing
+
+      {- load it -}
+      (fv_hvs, mods_needed, units_needed) <- loadDecls interp hsc_env srcspan bcos
+      {- Get the HValue for the root -}
+      return (expectJust "hscCompileCoreExpr'"
+         $ lookup (idName binding_id) fv_hvs, mods_needed, units_needed)
+
+
+
+-- | Generate JS code for the given bindings and return the HValue for the given id
+jsCodeGen
+  :: Logger
+  -> TmpFs
+  -> TempDir
+  -> UnitEnv
+  -> StgToJSConfig
+  -> Interp
+  -> JSInterp
+  -> Module
+  -> [CgStgTopBinding]
+  -> Id
+  -> IO (ForeignHValue, [Linkable], PkgsLoaded)
+jsCodeGen logger tmpfs tmp_dir unit_env js_config interp i this_mod stg_binds binding_id = do
+  let foreign_stubs    = NoStubs
+      spt_entries      = mempty
+      cost_centre_info = mempty
+
+  -- codegen into object file whose path is in out_obj
+  out_obj <- newTempName logger tmpfs tmp_dir TFL_CurrentModule "o"
+  stgToJS logger js_config stg_binds this_mod spt_entries foreign_stubs cost_centre_info out_obj
+
+  let TxtI id_sym = makeIdentForId binding_id Nothing IdPlain this_mod
+  -- link code containing binding "id_sym = expr", using id_sym as root
+  withJSInterp i $ \inst -> do
+    let roots = mkExportedModFuns this_mod [id_sym]
+    jsLinkObject logger tmpfs tmp_dir js_config unit_env inst out_obj roots
+
+  -- look up "id_sym" closure and create a StablePtr (HValue) from it
+  href <- lookupClosure interp (unpackFS id_sym) >>= \case
+    Nothing -> pprPanic "Couldn't find just linked TH closure" (ppr id_sym)
+    Just r  -> pure r
+
+  binding_fref <- withJSInterp i $ \inst ->
+                    mkForeignRef href (freeReallyRemoteRef inst href)
+
+  -- FIXME (#23013): the JS linker doesn't use the LoaderState.
+  -- The state is only maintained in the interpreter instance (jsLinkState field) for now.
+  let linkables   = mempty
+  let loaded_pkgs = emptyUDFM
+
+  return (castForeignRef binding_fref, linkables, loaded_pkgs)
 
 
 {- **********************************************************************
