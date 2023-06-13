@@ -658,7 +658,7 @@ test('T21839c',
     ['-O'])
 
 test ('InfiniteListFusion',
-      [collect_stats('bytes allocated',2), when(wordsize(32), skip), js_broken(22576)],
+      [collect_stats('bytes allocated',2), when(wordsize(32), skip)],
       compile_and_run,
       ['-O2 -package ghc'])
 
