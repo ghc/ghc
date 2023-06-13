@@ -388,9 +388,8 @@ can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   = canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
 
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel
-           s1@(ForAllTy (Bndr _ vis1) _) _
-           s2@(ForAllTy (Bndr _ vis2) _) _
-  | vis1 `eqForAllVis` vis2 -- Note [ForAllTy and type equality]
+           s1@ForAllTy{} _
+           s2@ForAllTy{} _
   = can_eq_nc_forall ev eq_rel s1 s2
 
 -- See Note [Canonicalising type applications] about why we require rewritten types
@@ -481,11 +480,12 @@ can_eq_nc_forall ev eq_rel s1 s2
  = do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
             (bndrs1, phi1) = tcSplitForAllTyVarBinders s1
             (bndrs2, phi2) = tcSplitForAllTyVarBinders s2
-      ; if not (equalLength bndrs1 bndrs2)
+            flags1 = binderFlags bndrs1
+            flags2 = binderFlags bndrs2
+      ; if not (all2 eqForAllVis flags1 flags2) -- Note [ForAllTy and type equality]
         then do { traceTcS "Forall failure" $
                      vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2
-                          , ppr (binderFlags bndrs1)
-                          , ppr (binderFlags bndrs2) ]
+                          , ppr flags1, ppr flags2 ]
                 ; canEqHardFailure ev s1 s2 }
         else
    do { traceTcS "Creating implication for polytype equality" $ ppr ev
