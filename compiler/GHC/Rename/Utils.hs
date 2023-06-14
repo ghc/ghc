@@ -56,7 +56,7 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..), IntegralLit )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Types.Basic  ( TopLevelFlag(..), Origin(Generated), TypeOrKind )
+import GHC.Types.Basic
 import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.DynFlags
@@ -628,7 +628,7 @@ genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
 genFunBind fn ms
   = FunBind { fun_id = fn
-            , fun_matches = mkMatchGroup Generated (wrapGenSpan ms)
+            , fun_matches = mkMatchGroup (Generated SkipPmc) (wrapGenSpan ms)
             , fun_ext = emptyNameSet
             }
 

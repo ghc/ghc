@@ -14,7 +14,7 @@ module GHC.HsToCore.Pmc.Utils (
 
 import GHC.Prelude
 
-import GHC.Types.Basic (Origin(..), isGenerated)
+import GHC.Types.Basic (Origin(..), requiresPMC)
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Core.Type
@@ -109,23 +109,20 @@ arrowMatchContextExhaustiveWarningFlag = \ case
 -- exhaustiveness check).
 isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
 isMatchContextPmChecked dflags origin kind
-  | isGenerated origin
-  = False
-  | otherwise
-  = overlapping dflags kind || exhaustive dflags kind
+  =  requiresPMC origin
+  && (overlapping dflags kind || exhaustive dflags kind)
 
 -- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
 -- are enabled, in which case we need to run the pattern match checker.
 needToRunPmCheck :: DynFlags -> Origin -> Bool
 needToRunPmCheck dflags origin
-  | isGenerated origin
-  = False
-  | otherwise
-  = notNull (filter (`wopt` dflags) allPmCheckWarnings)
+  =  requiresPMC origin
+  && notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#12957)
+Consider (#12957):
+
   data T a where
     T1 :: { x :: Int } -> T Bool
     T2 :: { x :: Int } -> T a
@@ -134,8 +131,9 @@ Consider (#12957)
   f :: T Char -> T a
   f r = r { x = 3 }
 
-The desugarer will conservatively generate a case for T1 even though
-it's impossible:
+In GHC.Tc.Gen.Expr.desugarRecordUpd, we will conservatively generate a case
+for T1 even though it's impossible:
+
   f r = case r of
           T1 x -> T1 3   -- Inaccessible branch
           T2 x -> T2 3
@@ -143,13 +141,14 @@ it's impossible:
 
 We don't want to warn about the inaccessible branch because the programmer
 didn't put it there!  So we filter out the warning here.
+The test case T12957a checks this.
 
 The same can happen for long distance term constraints instead of type
 constraints (#17783):
 
-  data T = A { x :: Int } | B { x :: Int }
+  data T = A { x :: Int } | B
   f r@A{} = r { x = 3 }
-  f _     = B 0
+  f _     = B
 
 Here, the long distance info from the FunRhs match (@r ~ A x@) will make the
 clause matching on @B@ of the desugaring to @case@ redundant. It's generated

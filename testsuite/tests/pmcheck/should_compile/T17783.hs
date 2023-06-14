@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wincomplete-record-updates #-}
-
 module Bug where
 
 data PartialRec = No
@@ -7,3 +5,9 @@ data PartialRec = No
 
 update No = No
 update r@(Yes {}) = r { b = False }
+
+
+data T = A { x :: Int } | B
+
+f r@A{} = r { x = 3 }
+f _     = B

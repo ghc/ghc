@@ -61,7 +61,8 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA, inGeneratedCode,
+  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA,
+  inGeneratedCode, setInGeneratedCode,
   wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
@@ -979,10 +980,17 @@ setSrcSpan (RealSrcSpan loc _) thing_inside
 
 setSrcSpan loc@(UnhelpfulSpan _) thing_inside
   | isGeneratedSrcSpan loc
-  = updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
+  = setInGeneratedCode thing_inside
 
   | otherwise
   = thing_inside
+
+-- | Mark the inner computation as being done inside generated code.
+--
+-- See Note [Error contexts in generated code]
+setInGeneratedCode :: TcRn a -> TcRn a
+setInGeneratedCode thing_inside =
+  updLclCtxt (\env -> env { tcl_in_gen_code = True }) thing_inside
 
 setSrcSpanA :: SrcSpanAnn' ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
@@ -1204,15 +1212,17 @@ problem.
 
 Note [Error contexts in generated code]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* setSrcSpan sets tc_in_gen_code to True if the SrcSpan is GeneratedSrcSpan,
+* setSrcSpan sets tcl_in_gen_code to True if the SrcSpan is GeneratedSrcSpan,
   and back to False when we get a useful SrcSpan
 
-* When tc_in_gen_code is True, addErrCtxt becomes a no-op.
+* When tcl_in_gen_code is True, addErrCtxt becomes a no-op.
 
 So typically it's better to do setSrcSpan /before/ addErrCtxt.
 
 See Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr for
-more discussion of this fancy footwork.
+more discussion of this fancy footwork, as well as
+Note [Generated code and pattern-match checking] in GHC.Types.Basic for the
+relation with pattern-match checks.
 -}
 
 getErrCtxt :: TcM [ErrCtxt]

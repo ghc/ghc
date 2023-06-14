@@ -28,7 +28,7 @@ import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Types.Basic ( Origin(..), isGenerated )
+import GHC.Types.Basic ( Origin(..), isGenerated, requiresPMC )
 import GHC.Types.SourceText
 import GHC.Driver.DynFlags
 import GHC.Hs
@@ -736,7 +736,7 @@ Call @match@ with all of this information!
 --                         p2 q2 -> ...
 
 matchWrapper
-  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
+  :: HsMatchContext GhcTc              -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
@@ -798,7 +798,7 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
 
         ; eqns_info   <- zipWithM mk_eqn_info matches matches_nablas
 
-        ; result_expr <- discard_warnings_if_generated origin $
+        ; result_expr <- discard_warnings_if_skip_pmc origin $
                          matchEquations ctxt new_vars eqns_info rhs_ty
 
         ; return (new_vars, result_expr) }
@@ -818,10 +818,10 @@ matchWrapper ctxt scrs (MG { mg_alts = L _ matches
                             , eqn_orig = FromSource
                             , eqn_rhs  = match_result } }
 
-    discard_warnings_if_generated orig =
-      if isGenerated orig
-      then discardWarningsDs
-      else id
+    discard_warnings_if_skip_pmc orig =
+      if requiresPMC orig
+      then id
+      else discardWarningsDs
 
     initNablasMatches :: Nablas -> [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
     initNablasMatches ldi_nablas ms
@@ -880,7 +880,7 @@ the expression (in this case, it will end up recursively calling 'matchWrapper'
 on the user-written case statement).
 -}
 
-matchEquations  :: HsMatchContext GhcRn
+matchEquations  :: HsMatchContext GhcTc
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -894,7 +894,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- situation where we want to match a single expression against a single
 -- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
-            -> HsMatchContext GhcRn     -- ^ Match kind
+            -> HsMatchContext GhcTc     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
@@ -916,7 +916,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext GhcTc -> LPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -942,7 +942,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
-                  -> HsMatchContext GhcRn -> LPat GhcTc
+                  -> HsMatchContext GhcTc -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $

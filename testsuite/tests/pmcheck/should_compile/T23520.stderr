@@ -1,0 +1,4 @@
+
+T23520.hs:5:7: warning: [GHC-62161] [-Wincomplete-record-updates (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a record update: Patterns of type ‘T’ not matched: T2

@@ -373,9 +373,9 @@ dsExpr (ExplicitSum types alt arity expr)
 dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
-dsExpr (HsCase _ discrim matches)
+dsExpr (HsCase ctxt discrim matches)
   = do { core_discrim <- dsLExpr discrim
-       ; ([discrim_var], matching_code) <- matchWrapper CaseAlt (Just [discrim]) matches
+       ; ([discrim_var], matching_code) <- matchWrapper ctxt (Just [discrim]) matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
@@ -755,11 +755,12 @@ dsDo ctx stmts
         later_pats   = rec_tup_pats
         rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
+        match_group  = MatchGroupTc [unrestricted tup_ty] body_ty (Generated SkipPmc)
         mfix_arg     = noLocA $ HsLam noExtField
                            (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Generated
+                               , mg_ext = match_group
                                })
         mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLocA $ HsDo body_ty

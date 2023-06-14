@@ -812,17 +812,18 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                      then [mkHsCaseAlt lpat  cont']
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
+             gen = Generated SkipPmc
              body = mkLHsWrap (mkWpLet req_ev_binds) $
                     L (getLoc lpat) $
-                    HsCase noExtField (nlHsVar scrutinee) $
+                    HsCase PatSyn (nlHsVar scrutinee) $
                     MG{ mg_alts = L (l2l $ getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty Generated
+                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty gen
                       }
              body' = noLocA $
                      HsLam noExtField $
                      MG{ mg_alts = noLocA [mkSimpleMatch LambdaExpr
                                                          args body]
-                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty Generated
+                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty gen
                        }
              match = mkMatch (mkPrefixFunRhs (L loc (idName patsyn_id))) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
@@ -830,7 +831,7 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
                              (EmptyLocalBinds noExtField)
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (l2l $ getLoc match) [match]
-                    , mg_ext = MatchGroupTc [] res_ty Generated
+                    , mg_ext = MatchGroupTc [] res_ty gen
                     }
              matcher_arity = length req_theta + 3
              -- See Note [Pragmas for pattern synonyms]
@@ -963,7 +964,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
-    mk_mg body = mkMatchGroup Generated (noLocA [builder_match])
+    mk_mg body = mkMatchGroup (Generated SkipPmc) (noLocA [builder_match])
           where
             builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
