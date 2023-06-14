@@ -77,8 +77,8 @@ type ExportInfo = (ExportedNames, Modules)
 attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
 attachInstances expInfo ifaces instIfaceMap = do
 
- -- We need to keep load modules in which we will look for instances. We've
-  --empty_index somewhat arbitraridecided to load all modules which are available -
+  -- We need to keep load modules in which we will look for instances. We've
+  -- somewhat arbitrarily decided to load all modules which are available -
   -- either directly or from a re-export.
   --
   -- See https://github.com/haskell/haddock/issues/469.

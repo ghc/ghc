@@ -245,8 +245,6 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
       mod_iface = hm_iface hmi
       unit_state = hsc_units hsc_env
 
-      -- We do not want to retain the ClsInsts, so force the creation of this
-      -- list
       cls_insts = instEnvElts . md_insts $ hm_details hmi
 
       fam_insts = md_fam_insts $ hm_details hmi
