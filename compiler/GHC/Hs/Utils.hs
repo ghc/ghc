@@ -271,7 +271,7 @@ mkHsLam :: (IsPass p, XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ Origin)
         -> LHsExpr (GhcPass p)
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
   where
-    matches = mkMatchGroup Generated
+    matches = mkMatchGroup (Generated SkipPmc)
                            (noLocA [mkSimpleMatch LambdaExpr pats' body])
     pats' = map (parenthesizePat appPrec) pats
 
@@ -599,7 +599,8 @@ nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
 -- AZ:Is this used?
-nlHsLam match = noLocA (HsLam noExtField (mkMatchGroup Generated (noLocA [match])))
+nlHsLam match = noLocA $ HsLam noExtField
+              $ mkMatchGroup (Generated SkipPmc) (noLocA [match])
 nlHsPar e     = noLocA (gHsPar e)
 
 -- nlHsIf should generate if-expressions which are NOT subject to
@@ -608,7 +609,7 @@ nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsIf cond true false = noLocA (HsIf noAnn cond true false)
 
 nlHsCase expr matches
-  = noLocA (HsCase noAnn expr (mkMatchGroup Generated (noLocA matches)))
+  = noLocA (HsCase noAnn expr (mkMatchGroup (Generated SkipPmc) (noLocA matches)))
 nlList exprs          = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
@@ -865,9 +866,9 @@ spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
 -- | Convenience function using 'mkFunBind'.
 -- This is for generated bindings only, do not use for user-written code.
 mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
-                -> LHsExpr GhcPs -> LHsBind GhcPs
+                         -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
-  = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpan loc) fun)
+  = L (noAnnSrcSpan loc) $ mkFunBind (Generated SkipPmc) (L (noAnnSrcSpan loc) fun)
               [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)) pats expr
                        emptyLocalBinds]
 

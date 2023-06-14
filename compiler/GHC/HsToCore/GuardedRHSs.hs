@@ -55,7 +55,7 @@ dsGuarded grhss rhs_ty rhss_nablas = do
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult CoreExpr@.
 
-dsGRHSs :: HsMatchContext GhcRn
+dsGRHSs :: HsMatchContext GhcTc
         -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> NonEmpty Nablas             -- ^ Refined pattern match checking
@@ -76,7 +76,7 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_nablas
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> Nablas -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContext GhcTc -> Type -> Nablas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM (MatchResult CoreExpr)
 dsGRHS hs_ctx rhs_ty rhs_nablas (L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs_nablas rhs rhs_ty
@@ -90,7 +90,7 @@ dsGRHS hs_ctx rhs_ty rhs_nablas (L _ (GRHS _ guards rhs))
 -}
 
 matchGuards :: [GuardStmt GhcTc]     -- Guard
-            -> HsStmtContext GhcRn   -- Context
+            -> HsStmtContext GhcTc   -- Context
             -> Nablas                -- The RHS's covered set for PmCheck
             -> LHsExpr GhcTc         -- RHS
             -> Type                  -- Type of RHS of guard

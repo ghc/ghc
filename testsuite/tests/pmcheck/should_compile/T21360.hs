@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wincomplete-record-updates #-}
-
 module T21360 where
 
 data Foo = A {a :: Int} | B deriving Show

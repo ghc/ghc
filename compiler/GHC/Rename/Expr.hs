@@ -428,7 +428,7 @@ rnExpr (HsLamCase x lc_variant matches)
 rnExpr (HsCase _ expr matches)
   = do { (new_expr, e_fvs) <- rnLExpr expr
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
-       ; return (HsCase noExtField new_expr new_matches, e_fvs `plusFV` ms_fvs) }
+       ; return (HsCase CaseAlt new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
 rnExpr (HsLet _ tkLet binds tkIn expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do

@@ -906,7 +906,7 @@ instance ( HiePass p
 
 setOrigin :: Origin -> NodeOrigin -> NodeOrigin
 setOrigin FromSource _ = SourceInfo
-setOrigin Generated _ = GeneratedInfo
+setOrigin (Generated {}) _ = GeneratedInfo
 
 instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
     toHie (L sp psb) = concatM $ case psb of

@@ -393,7 +393,7 @@ tcExpr (HsCase x scrut matches) res_ty
         ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
-    match_ctxt = MC { mc_what = CaseAlt,
+    match_ctxt = MC { mc_what = x,
                       mc_body = tcBody }
 
 tcExpr (HsIf x pred b1 b2) res_ty
@@ -1259,7 +1259,8 @@ desugarRecordUpd record_expr possible_parents rbnds res_ty
              ds_expr = HsLet noExtField noHsTok let_binds noHsTok (L gen case_expr)
 
              case_expr :: HsExpr GhcRn
-             case_expr = HsCase noExtField record_expr (mkMatchGroup Generated (wrapGenSpan matches))
+             case_expr = HsCase RecUpd record_expr
+                       $ mkMatchGroup (Generated DoPmc) (wrapGenSpan matches)
              matches :: [LMatch GhcRn (LHsExpr GhcRn)]
              matches = map make_pat relevant_cons
 

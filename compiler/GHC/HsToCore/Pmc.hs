@@ -112,7 +112,7 @@ pmcPatBind _ _ _ = pure ()
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
 pmcGRHSs
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  :: HsMatchContext GhcTc         -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info

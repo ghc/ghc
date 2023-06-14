@@ -286,8 +286,8 @@ type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          GhcPs = EpAnn EpAnnHsCase
-type instance XCase          GhcRn = NoExtField
-type instance XCase          GhcTc = NoExtField
+type instance XCase          GhcRn = HsMatchContext GhcTc
+type instance XCase          GhcTc = HsMatchContext GhcTc
 
 type instance XIf            GhcPs = EpAnn AnnsIf
 type instance XIf            GhcRn = NoExtField
@@ -1973,7 +1973,7 @@ matchContextErrString LambdaExpr                    = text "lambda"
 matchContextErrString (ArrowMatchCtxt c)            = matchArrowContextErrString c
 matchContextErrString ThPatSplice                   = panic "matchContextErrString"  -- Not used at runtime
 matchContextErrString ThPatQuote                    = panic "matchContextErrString"  -- Not used at runtime
-matchContextErrString PatSyn                        = panic "matchContextErrString"  -- Not used at runtime
+matchContextErrString PatSyn                        = text "pattern synonym"
 matchContextErrString (StmtCtxt (ParStmtCtxt c))    = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (TransStmtCtxt c))  = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _))       = text "pattern guard"
@@ -2030,11 +2030,10 @@ matchSeparator ArrowMatchCtxt{} = text "->"
 matchSeparator PatBindRhs       = text "="
 matchSeparator PatBindGuards    = text "="
 matchSeparator StmtCtxt{}       = text "<-"
-matchSeparator RecUpd           = text "=" -- This can be printed by the pattern
-                                       -- match checker trace
+matchSeparator RecUpd           = text "="  -- This can be printed by the pattern
+matchSeparator PatSyn           = text "<-" -- match checker trace
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
-matchSeparator PatSyn       = panic "unused"
 
 pprMatchContext :: (Outputable (IdP (NoGhcTc p)), UnXRec (NoGhcTc p))
                 => HsMatchContext p -> SDoc
@@ -2055,7 +2054,7 @@ pprMatchContextNoun CaseAlt                 = text "case alternative"
 pprMatchContextNoun (LamCaseAlt lc_variant) = lamCaseKeyword lc_variant
                                               <+> text "alternative"
 pprMatchContextNoun IfAlt                   = text "multi-way if alternative"
-pprMatchContextNoun RecUpd                  = text "record-update construct"
+pprMatchContextNoun RecUpd                  = text "record update"
 pprMatchContextNoun ThPatSplice             = text "Template Haskell pattern splice"
 pprMatchContextNoun ThPatQuote              = text "Template Haskell pattern quotation"
 pprMatchContextNoun PatBindRhs              = text "pattern binding"

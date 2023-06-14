@@ -453,7 +453,7 @@ For uniformity, calls to 'error' in both cases are wrapped even if -XLinearTypes
 is disabled.
 -}
 
-mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContext GhcTc -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 

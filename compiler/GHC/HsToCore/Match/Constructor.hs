@@ -20,7 +20,7 @@ import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 import GHC.Hs
 import GHC.HsToCore.Binds
 import GHC.Core.ConLike
-import GHC.Types.Basic ( Origin(..) )
+import GHC.Types.Basic
 import GHC.Tc.Utils.TcType
 import GHC.Core.Multiplicity
 import GHC.HsToCore.Monad
@@ -167,7 +167,7 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
                        return ( wrapBinds (tvs `zip` tvs1)
                               . wrapBinds (ds  `zip` dicts1)
                               . mkCoreLets ds_bind
-                              , eqn { eqn_orig = Generated
+                              , eqn { eqn_orig = Generated SkipPmc
                                     , eqn_pats = conArgPats val_arg_tys args ++ pats }
                               )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)

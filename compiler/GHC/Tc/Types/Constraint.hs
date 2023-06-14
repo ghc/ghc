@@ -1456,8 +1456,7 @@ data Implication
       ic_given_eqs :: HasGivenEqs,  -- Are there Given equalities here?
 
       ic_warn_inaccessible :: Bool,
-                                 -- True  <=> -Winaccessible-code is enabled
-                                 -- at construction. See
+                                 -- True <=> we should report inaccessible code
                                  -- Note [Avoid -Winaccessible-code when deriving]
                                  -- in GHC.Tc.TyCl.Instance
 

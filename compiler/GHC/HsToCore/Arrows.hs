@@ -510,7 +510,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdCase _ exp match) env_ids = do
     let MG{ mg_ext = MatchGroupTc _ sum_ty _ } = match'
         in_ty = envStackType env_ids stack_ty
 
-    core_body <- dsExpr (HsCase noExtField exp match')
+    core_body <- dsExpr (HsCase (ArrowMatchCtxt ArrowCaseAlt) exp match')
 
     core_matches <- matchEnvStack env_ids stack_id core_body
     return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
@@ -811,7 +811,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
       dsExpr (HsLamCase EpAnnNotUsed LamCase
         (MG { mg_alts = noLocA []
-            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty Generated
+            , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated SkipPmc)
             }))
 
       -- Replace the commands in the case with these tagged tuples,
@@ -1191,7 +1191,7 @@ dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
 -- Match a list of expressions against a list of patterns, left-to-right.
 
 matchSimplys :: [CoreExpr]              -- Scrutinees
-             -> HsMatchContext GhcRn    -- Match kind
+             -> HsMatchContext GhcTc    -- Match kind
              -> [LPat GhcTc]            -- Patterns they should match
              -> CoreExpr                -- Return this if they all match
              -> CoreExpr                -- Return this if they don't

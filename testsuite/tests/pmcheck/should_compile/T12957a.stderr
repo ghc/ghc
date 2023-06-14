@@ -1,13 +1,7 @@
 
-T12957a.hs:25:35: warning: [GHC-40564] [-Winaccessible-code (in -Wdefault)]
-    • Inaccessible code in
-        a pattern with constructor: BFields :: [()] -> Fields B,
-        in a case alternative
-      Couldn't match type ‘A’ with ‘B’
-    • In a record update at field ‘list’,
-      with type constructor ‘Fields’
-      and data constructor ‘BFields’.
-      In the expression: emptyA {list = [a]}
-      In a record update at field ‘sFields’,
-      with type constructor ‘S’
-      and data constructor ‘S’.
+T12957a.hs:25:35: warning: [GHC-62161] [-Wincomplete-record-updates (in -Wall)]
+    Pattern match(es) are non-exhaustive
+    In a record update:
+        Patterns of type ‘Fields A’ not matched:
+            AFields
+            EmptyFields

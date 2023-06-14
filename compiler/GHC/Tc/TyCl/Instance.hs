@@ -1955,17 +1955,15 @@ through typing information everywhere in the algorithm that generates Ord
 instances in order to determine which cases were unreachable. This seems like
 a lot of work for minimal gain, so we have opted not to go for this approach.
 
-Instead, we take the much simpler approach of always disabling
--Winaccessible-code for derived code. To accomplish this, we do the following:
+Instead, we take the following approach:
 
-1. In tcMethods (which typechecks method bindings), disable
-   -Winaccessible-code.
+1. In tcMethods (which typechecks method bindings), use 'setInGeneratedCode'.
 2. When creating Implications during typechecking, record this flag
    (in ic_warn_inaccessible) at the time of creation.
 3. After typechecking comes error reporting, where GHC must decide how to
    report inaccessible code to the user, on an Implication-by-Implication
-   basis. If an Implication's DynFlags indicate that -Winaccessible-code was
-   disabled, then don't bother reporting it. That's it!
+   basis. If the ic_warn_inaccessible field of the Implication is False, then
+   we don't bother reporting it. That's it!
 -}
 
 ------------------------
@@ -2214,7 +2212,7 @@ mkDefMethBind loc dfun_id clas sel_id dm_name
                                       , tyConBinderForAllTyFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = L (noAnnSrcSpan loc)
-                    $ mkTopFunBind Generated fn
+                    $ mkTopFunBind (Generated SkipPmc) fn
                         [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Filling in method body"
