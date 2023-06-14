@@ -133,7 +133,7 @@ data Interface = Interface
   , ifaceVisibleExports  :: [Name]
 
     -- | Instances exported by the module.
-  , ifaceInstances       :: [HaddockClsInst]
+  , ifaceInstances       :: [ClsInst]
 
     -- | Orphan instances
   , ifaceOrphanInstances   :: [DocInstance GhcRn]
@@ -565,7 +565,7 @@ data InstType name
       { clsiCtx :: [HsType name]
       , clsiTyVars :: LHsQTyVars name
       , clsiSigs :: [Sig name]
-      , clsiAssocTys :: [PseudoFamilyDecl name]
+      , clsiAssocTys :: [DocInstance name]
       }
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
@@ -578,37 +578,6 @@ instance (OutputableBndrId p)
       <+> ppr clsiSigs
   ppr (TypeInst  a) = text "TypeInst"  <+> ppr a
   ppr (DataInst  a) = text "DataInst"  <+> ppr a
-
-
--- | Almost the same as 'FamilyDecl' except for type binders.
---
--- In order to perform type specialization for class instances, we need to
--- substitute class variables to appropriate type. However, type variables in
--- associated type are specified using 'LHsTyVarBndrs' instead of 'HsType'.
--- This makes type substitution impossible and to overcome this issue,
--- 'PseudoFamilyDecl' type is introduced.
-data PseudoFamilyDecl name = PseudoFamilyDecl
-    { pfdInfo :: FamilyInfo name
-    , pfdLName :: LocatedN (IdP name)
-    , pfdTyVars :: [LHsType name]
-    , pfdKindSig :: LFamilyResultSig name
-    }
-
-
-mkPseudoFamilyDecl :: FamilyDecl GhcRn -> PseudoFamilyDecl GhcRn
-mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
-    { pfdInfo = fdInfo
-    , pfdLName = fdLName
-    , pfdTyVars = [ L loc (mkType bndr) | L loc bndr <- hsq_explicit fdTyVars ]
-    , pfdKindSig = fdResultSig
-    }
-  where
-    mkType :: HsTyVarBndr flag GhcRn -> HsType GhcRn
-    mkType (KindedTyVar _ _ (L loc name) lkind) =
-        HsKindSig noAnn tvar lkind
-      where
-        tvar = L (na2la loc) (HsTyVar noAnn NotPromoted (L loc name))
-    mkType (UserTyVar _ _ name) = HsTyVar noAnn NotPromoted name
 
 
 -- | An instance head that may have documentation and a source location.

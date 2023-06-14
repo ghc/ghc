@@ -85,12 +85,12 @@ library
     Haddock
     Haddock.Interface
     Haddock.Interface.Rename
+    Haddock.Interface.RenameType
     Haddock.Interface.Create
     Haddock.Interface.AttachInstances
     Haddock.Interface.Json
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
-    Haddock.Interface.Specialize
     Haddock.Parser
     Haddock.Utils
     Haddock.Utils.Json
@@ -120,7 +120,6 @@ library
     Haddock.InterfaceFile
     Haddock.Options
     Haddock.GhcUtils
-    Haddock.Syb
     Haddock.Convert
     Paths_haddock_api
 
@@ -163,12 +162,10 @@ test-suite spec
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
     Haddock.Interface.Rename
-    Haddock.Interface.Specialize
     Haddock.InterfaceFile
     Haddock.ModuleTree
     Haddock.Options
     Haddock.Parser
-    Haddock.Syb
     Haddock.Types
     Haddock.Utils
     Haddock.Utils.Json

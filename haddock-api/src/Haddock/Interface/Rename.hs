@@ -457,7 +457,7 @@ renameInstHead InstHead {..} = do
         <$> mapM renameType clsiCtx
         <*> renameLHsQTyVars clsiTyVars
         <*> mapM renameSig clsiSigs
-        <*> mapM renamePseudoFamilyDecl clsiAssocTys
+        <*> mapM renameDocInstance clsiAssocTys
     TypeInst  ts -> TypeInst  <$> traverse renameType ts
     DataInst  dd -> DataInst  <$> renameTyClD dd
   return InstHead
@@ -567,15 +567,6 @@ renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
                        , fdFixity = fixity
                        , fdResultSig = result'
                        , fdInjectivityAnn = injectivity' })
-
-
-renamePseudoFamilyDecl :: PseudoFamilyDecl GhcRn
-                       -> RnM (PseudoFamilyDecl DocNameI)
-renamePseudoFamilyDecl (PseudoFamilyDecl { .. }) =  PseudoFamilyDecl
-    <$> renameFamilyInfo pfdInfo
-    <*> renameNameL pfdLName
-    <*> mapM renameLType pfdTyVars
-    <*> renameFamilyResultSig pfdKindSig
 
 
 renameFamilyInfo :: FamilyInfo GhcRn -> RnM (FamilyInfo DocNameI)

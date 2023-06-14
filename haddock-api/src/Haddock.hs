@@ -507,7 +507,7 @@ render log' dflags unit_state flags sinceQual qual ifaces packages extSrcMap = d
 
             pkgVer =
               fromMaybe (makeVersion []) mpkgVer
-          in ppHoogle dflags' pkgNameStr pkgVer title (fmap _doc prologue)
+          in ppHoogle dflags' unit_state pkgNameStr pkgVer title (fmap _doc prologue)
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "

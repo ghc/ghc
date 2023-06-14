@@ -42,6 +42,8 @@ import GHC.Core.TyCo.Compare( eqTypes )
 import GHC.Hs
 import GHC.Types.TyThing
 import GHC.Types.Name
+import GHC.Unit.Types
+import GHC.Types.Id          ( setIdType, idType )
 import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Builtin.Types.Prim ( alphaTyVars )
@@ -60,8 +62,8 @@ import GHC.Types.SrcLoc
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Haddock.Types
-import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars, mkEmptySigType )
+import Haddock.Interface.RenameType
 
 import Data.Either (lefts, rights)
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
@@ -157,7 +159,8 @@ tyThingToLHsDecl prr t = case t of
           , tcdATs = atFamDecls
           , tcdATDefs = catMaybes atDefFamDecls
           , tcdDocs = [] --we don't have any docs at this point
-          , tcdCExt = emptyNameSet }
+          , tcdCExt = emptyNameSet
+          }
     | otherwise
     -> synifyTyCon prr Nothing tc >>= allOK . TyClD noExtField
 
@@ -595,7 +598,7 @@ synifySigType s vs ty = mkEmptySigType (synifyType s vs ty)
 
 synifySigWcType :: SynifyTypeState -> [TyVar] -> Type -> LHsSigWcType GhcRn
 -- Ditto (see synifySigType)
-synifySigWcType s vs ty = mkEmptyWildCardBndrs (mkEmptySigType (synifyType s vs ty))
+synifySigWcType s vs ty = mkEmptyWildCardBndrs (mkEmptySigType (rename (map getName vs) $ synifyType s vs ty))
 
 synifyPatSynSigType :: PatSyn -> LHsSigType GhcRn
 -- Ditto (see synifySigType)
@@ -893,18 +896,18 @@ stripKindSig :: LHsType GhcRn -> LHsType GhcRn
 stripKindSig (L _ (HsKindSig _ t _)) = t
 stripKindSig t = t
 
-synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead GhcRn
-synifyInstHead (vs, preds, cls, types) = specializeInstHead $ InstHead
+synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> [(FamInst, Bool, Maybe (MDoc Name), Located Name, Maybe Module)] -> InstHead GhcRn
+synifyInstHead (vs, preds, cls, types) associated_families = InstHead
     { ihdClsName = getName cls
     , ihdTypes = map unLoc annot_ts
     , ihdInstType = ClassInst
         { clsiCtx = map (unLoc . synifyType WithinType []) preds
         , clsiTyVars = synifyTyVars (tyConVisibleTyVars cls_tycon)
-        , clsiSigs = map synifyClsIdSig $ classMethods cls
-        , clsiAssocTys = do
-            (Right (FamDecl _ fam)) <- map (synifyTyCon HideRuntimeRep Nothing)
-                                           (classATs cls)
-            pure $ mkPseudoFamilyDecl fam
+        , clsiSigs = map synifyClsIdSig $ specialized_class_methods
+        , clsiAssocTys = [ (f_inst, f_doc, f_name, f_mod)
+                         | (f_i, opaque, f_doc, f_name, f_mod) <- associated_families
+                         , Right f_inst <- [synifyFamInst f_i opaque]
+                         ]
         }
     }
   where
@@ -914,6 +917,7 @@ synifyInstHead (vs, preds, cls, types) = specializeInstHead $ InstHead
     annot_ts = zipWith3 annotHsType args_poly ts ts'
     args_poly = tyConArgsPolyKinded cls_tycon
     synifyClsIdSig = synifyIdSig ShowRuntimeRep DeleteTopLevelQuantification vs
+    specialized_class_methods = [ setIdType m (piResultTys (idType m) types) | m <- classMethods cls ]
 
 -- Convert a family instance, this could be a type family or data family
 synifyFamInst :: FamInst -> Bool -> Either String (InstHead GhcRn)
