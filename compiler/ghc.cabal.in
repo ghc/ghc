@@ -811,6 +811,7 @@ Library
         GHC.Types.ProfAuto
         GHC.Types.RepType
         GHC.Types.SafeHaskell
+        GHC.Types.SaneDouble
         GHC.Types.SourceError
         GHC.Types.SourceFile
         GHC.Types.SourceText

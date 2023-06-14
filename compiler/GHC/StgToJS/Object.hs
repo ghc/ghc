@@ -86,7 +86,6 @@ import GHC.Unit.Module
 import GHC.Data.FastString
 
 import GHC.Types.Unique.Map
-import GHC.Float (castDoubleToWord64, castWord64ToDouble)
 
 import GHC.Utils.Binary hiding (SymbolTable)
 import GHC.Utils.Outputable (ppr, Outputable, hcat, vcat, text, hsep)
@@ -482,39 +481,6 @@ instance Binary Sat.JVal where
 instance Binary Ident where
   put_ bh (TxtI xs) = put_ bh xs
   get bh = TxtI <$> get bh
-
--- we need to preserve NaN and infinities, unfortunately the Binary instance for Double does not do this
-instance Binary Sat.SaneDouble where
-  put_ bh (Sat.SaneDouble d)
-    | isNaN d               = putByte bh 1
-    | isInfinite d && d > 0 = putByte bh 2
-    | isInfinite d && d < 0 = putByte bh 3
-    | isNegativeZero d      = putByte bh 4
-    | otherwise             = putByte bh 5 >> put_ bh (castDoubleToWord64 d)
-  get bh = getByte bh >>= \case
-    1 -> pure $ Sat.SaneDouble (0    / 0)
-    2 -> pure $ Sat.SaneDouble (1    / 0)
-    3 -> pure $ Sat.SaneDouble ((-1) / 0)
-    4 -> pure $ Sat.SaneDouble (-0)
-    5 -> Sat.SaneDouble . castWord64ToDouble <$> get bh
-    n -> error ("Binary get bh SaneDouble: invalid tag: " ++ show n)
-
--- FIXME: remove after Unsat replaces JStat
--- we need to preserve NaN and infinities, unfortunately the Binary instance for Double does not do this
-instance Binary SaneDouble where
-  put_ bh (SaneDouble d)
-    | isNaN d               = putByte bh 1
-    | isInfinite d && d > 0 = putByte bh 2
-    | isInfinite d && d < 0 = putByte bh 3
-    | isNegativeZero d      = putByte bh 4
-    | otherwise             = putByte bh 5 >> put_ bh (castDoubleToWord64 d)
-  get bh = getByte bh >>= \case
-    1 -> pure $ SaneDouble (0    / 0)
-    2 -> pure $ SaneDouble (1    / 0)
-    3 -> pure $ SaneDouble ((-1) / 0)
-    4 -> pure $ SaneDouble (-0)
-    5 -> SaneDouble . castWord64ToDouble <$> get bh
-    n -> error ("Binary get bh SaneDouble: invalid tag: " ++ show n)
 
 instance Binary ClosureInfo where
   put_ bh (ClosureInfo v regs name layo typ static) = do

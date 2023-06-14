@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
@@ -48,9 +47,6 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.ByteString as BS
 import           Data.Monoid
-import           Data.Typeable (Typeable)
-import           GHC.Generics (Generic)
-import           Control.DeepSeq
 
 -- | A State monad over IO holding the generator state.
 type G = StateT GenState IO
@@ -107,7 +103,7 @@ data ClosureInfo = ClosureInfo
   , ciType    :: CIType     -- ^ type of the object, with extra info where required
   , ciStatic  :: CIStatic   -- ^ static references of this object
   }
-  deriving stock (Eq, Show, Generic)
+  deriving stock (Eq, Show)
 
 -- | Closure information, 'ClosureInfo', registers
 data CIRegs
@@ -115,9 +111,7 @@ data CIRegs
   | CIRegs { ciRegsSkip  :: Int       -- ^ unused registers before actual args start
            , ciRegsTypes :: [VarType] -- ^ args
            }
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData CIRegs
+  deriving stock (Eq, Ord, Show)
 
 -- | Closure Information, 'ClosureInfo', layout
 data CILayout
@@ -129,9 +123,7 @@ data CILayout
       { layoutSize :: !Int      -- ^ closure size in array positions, including entry
       , layout     :: [VarType] -- ^ The set of sized Types to layout
       }
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData CILayout
+  deriving stock (Eq, Ord, Show)
 
 -- | The type of 'ClosureInfo'
 data CIType
@@ -143,13 +135,11 @@ data CIType
   | CIPap                            -- ^ The closure is a Partial Application
   | CIBlackhole                      -- ^ The closure is a black hole
   | CIStackFrame                     -- ^ The closure is a stack frame
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData CIType
+  deriving stock (Eq, Ord, Show)
 
 -- | Static references that must be kept alive
 newtype CIStatic = CIStaticRefs { staticRefs :: [FastString] }
-  deriving stock   (Eq, Generic)
+  deriving stock   (Eq)
   deriving newtype (Semigroup, Monoid, Show)
 
 -- | static refs: array = references, null = nothing to report
@@ -169,9 +159,7 @@ data VarType
   | RtsObjV  -- ^ some RTS object from GHCJS (for example TVar#, MVar#, MutVar#, Weak#)
   | ObjV     -- ^ some JS object, user supplied, be careful around these, can be anything
   | ArrV     -- ^ boxed array
-  deriving stock (Eq, Ord, Enum, Bounded, Show, Generic)
-
-instance NFData VarType
+  deriving stock (Eq, Ord, Enum, Bounded, Show)
 
 instance ToJExpr VarType where
   toJExpr = toJExpr . fromEnum
@@ -231,7 +219,7 @@ data StaticInfo = StaticInfo
   { siVar    :: !FastString    -- ^ global object
   , siVal    :: !StaticVal     -- ^ static initialization
   , siCC     :: !(Maybe Ident) -- ^ optional CCS name
-  } deriving stock (Eq, Show, Typeable, Generic)
+  } deriving stock (Eq, Show)
 
 data StaticVal
   = StaticFun     !FastString [StaticArg]
@@ -245,7 +233,7 @@ data StaticVal
     -- ^ regular datacon app
   | StaticList    [StaticArg] (Maybe FastString)
     -- ^ list initializer (with optional tail)
-  deriving stock (Eq, Show, Generic)
+  deriving stock (Eq, Show)
 
 data StaticUnboxed
   = StaticUnboxedBool         !Bool
@@ -253,9 +241,7 @@ data StaticUnboxed
   | StaticUnboxedDouble       !SaneDouble
   | StaticUnboxedString       !BS.ByteString
   | StaticUnboxedStringOffset !BS.ByteString
-  deriving stock (Eq, Ord, Show, Generic)
-
-instance NFData StaticUnboxed
+  deriving stock (Eq, Ord, Show)
 
 -- | Static Arguments. Static Arguments are things that are statically
 -- allocated, i.e., they exist at program startup. These are static heap objects
@@ -264,7 +250,7 @@ data StaticArg
   = StaticObjArg !FastString             -- ^ reference to a heap object
   | StaticLitArg !StaticLit              -- ^ literal
   | StaticConArg !FastString [StaticArg] -- ^ unfloated constructor
-  deriving stock (Eq, Show, Generic)
+  deriving stock (Eq, Show)
 
 instance Outputable StaticArg where
   ppr x = text (show x)
@@ -278,7 +264,7 @@ data StaticLit
   | StringLit !FastString
   | BinLit    !BS.ByteString
   | LabelLit  !Bool !FastString -- ^ is function pointer, label (also used for string / binary init)
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show)
 
 instance Outputable StaticLit where
   ppr x = text (show x)
@@ -300,7 +286,7 @@ data ForeignJSRef = ForeignJSRef
   , foreignRefCConv    :: !CCallConv
   , foreignRefArgs     :: ![FastString]
   , foreignRefResult   :: !FastString
-  } deriving stock (Generic)
+  }
 
 -- | data used to generate one ObjUnit in our object file
 data LinkableUnit = LinkableUnit

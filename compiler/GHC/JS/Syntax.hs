@@ -94,6 +94,7 @@ import GHC.Prelude
 import GHC.JS.Unsat.Syntax (Ident(..))
 import GHC.Data.FastString
 import GHC.Types.Unique.Map
+import GHC.Types.SaneDouble
 import GHC.Utils.Misc
 
 import Control.DeepSeq
@@ -332,25 +333,6 @@ data AOp
   deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
 
 instance NFData AOp
-
--- | A newtype wrapper around 'Double' to ensure we never generate a 'Double'
--- that becomes a 'NaN', see 'Eq SaneDouble', 'Ord SaneDouble' for details on
--- Sane-ness
-newtype SaneDouble = SaneDouble
-  { unSaneDouble :: Double
-  }
-  deriving (Data, Typeable, Fractional, Num, Generic, NFData)
-
-instance Eq SaneDouble where
-    (SaneDouble x) == (SaneDouble y) = x == y || (isNaN x && isNaN y)
-
-instance Ord SaneDouble where
-    compare (SaneDouble x) (SaneDouble y) = compare (fromNaN x) (fromNaN y)
-        where fromNaN z | isNaN z = Nothing
-                        | otherwise = Just z
-
-instance Show SaneDouble where
-    show (SaneDouble x) = show x
 
 --------------------------------------------------------------------------------
 --                            Helper Functions

@@ -103,6 +103,7 @@ import GHC.Data.FastString
 import GHC.Utils.Monad.State.Strict
 import GHC.Types.Unique
 import GHC.Types.Unique.Map
+import GHC.Types.SaneDouble
 
 -- | A supply of identifiers, possibly empty
 newtype IdentSupply a
@@ -358,26 +359,6 @@ data JUOp
   deriving (Show, Eq, Ord, Enum, Data, Typeable, Generic)
 
 instance NFData JUOp
-
--- | A newtype wrapper around 'Double' to ensure we never generate a 'Double'
--- that becomes a 'NaN', see 'Eq SaneDouble', 'Ord SaneDouble' for details on
--- Sane-ness
-newtype SaneDouble = SaneDouble
-  { unSaneDouble :: Double
-  }
-  deriving (Data, Typeable, Fractional, Num, Generic, NFData)
-
-instance Eq SaneDouble where
-    (SaneDouble x) == (SaneDouble y) = x == y || (isNaN x && isNaN y)
-
-instance Ord SaneDouble where
-    compare (SaneDouble x) (SaneDouble y) = compare (fromNaN x) (fromNaN y)
-        where fromNaN z | isNaN z = Nothing
-                        | otherwise = Just z
-
-instance Show SaneDouble where
-    show (SaneDouble x) = show x
-
 
 --------------------------------------------------------------------------------
 --                            Identifiers
