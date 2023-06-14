@@ -1,4 +1,5 @@
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE PatternSynonyms #-}
@@ -72,7 +73,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
-import Control.Monad ( zipWithM, unless, when )
+import Control.Monad ( zipWithM, unless )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -948,16 +949,31 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
   = assertPpr (isInternalName (idName var)) (ppr var) $
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
-       -- Pattern match check warnings
-       ; when (isMatchContextPmChecked dflags FromSource ctx) $
+       -- Pattern match check warnings.
+       -- See Note [Long-distance information in matchWrapper] and
+       -- Note [Long-distance information in do notation] in GHC.HsToCore.Expr.
+       ; ldi_nablas <-
+         if isMatchContextPmChecked dflags FromSource ctx
+         then
            addCoreScrutTmCs (maybeToList mb_scrut) [var] $
            pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
+         else getLdiNablas
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource
-                                , eqn_rhs  = match_result }
+                                , eqn_rhs  =
+               updPmNablasMatchResult ldi_nablas match_result }
+               -- See Note [Long-distance information in do notation]
+               -- in GHC.HsToCore.Expr.
+
        ; match [var] ty [eqn_info] }
 
+updPmNablasMatchResult :: Nablas -> MatchResult r -> MatchResult r
+updPmNablasMatchResult nablas = \case
+  MR_Infallible body_fn -> MR_Infallible $
+    updPmNablas nablas body_fn
+  MR_Fallible body_fn -> MR_Fallible $ \fail ->
+    updPmNablas nablas $ body_fn fail
 
 {-
 ************************************************************************

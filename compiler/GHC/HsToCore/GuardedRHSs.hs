@@ -79,7 +79,7 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty rhss_nablas
 dsGRHS :: HsMatchContext GhcTc -> Type -> Nablas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM (MatchResult CoreExpr)
 dsGRHS hs_ctx rhs_ty rhs_nablas (L _ (GRHS _ guards rhs))
-  = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs_nablas rhs rhs_ty
+  = matchGuards (map unLoc guards) hs_ctx rhs_nablas rhs rhs_ty
 
 {-
 ************************************************************************
@@ -90,7 +90,7 @@ dsGRHS hs_ctx rhs_ty rhs_nablas (L _ (GRHS _ guards rhs))
 -}
 
 matchGuards :: [GuardStmt GhcTc]     -- Guard
-            -> HsStmtContext GhcTc   -- Context
+            -> HsMatchContext GhcTc  -- Context
             -> Nablas                -- The RHS's covered set for PmCheck
             -> LHsExpr GhcTc         -- RHS
             -> Type                  -- Type of RHS of guard
@@ -130,15 +130,16 @@ matchGuards (LetStmt _ binds : stmts) ctx nablas rhs rhs_ty = do
 matchGuards (BindStmt _ pat bind_rhs : stmts) ctx nablas rhs rhs_ty = do
     let upat = unLoc pat
     match_var <- selectMatchVar ManyTy upat
-       -- We only allow unrestricted patterns in guard, hence the `Many`
+       -- We only allow unrestricted patterns in guards, hence the `Many`
        -- above. It isn't clear what linear patterns would mean, maybe we will
        -- figure it out in the future.
 
     match_result <- matchGuards stmts ctx nablas rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
-    match_result' <- matchSinglePatVar match_var (Just core_rhs) (StmtCtxt ctx)
-                                       pat rhs_ty match_result
-    pure $ bindNonRec match_var core_rhs <$> match_result'
+    match_result' <-
+      matchSinglePatVar match_var (Just core_rhs) (StmtCtxt $ PatGuard ctx)
+      pat rhs_ty match_result
+    return $ bindNonRec match_var core_rhs <$> match_result'
 
 matchGuards (LastStmt  {} : _) _ _ _ _ = panic "matchGuards LastStmt"
 matchGuards (ParStmt   {} : _) _ _ _ _ = panic "matchGuards ParStmt"

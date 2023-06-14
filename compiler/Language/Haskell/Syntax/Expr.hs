@@ -1600,11 +1600,11 @@ isPatSynCtxt ctxt =
 
 -- | Haskell Statement Context.
 data HsStmtContext p
-  = HsDoStmt HsDoFlavour             -- ^Context for HsDo (do-notation and comprehensions)
-  | PatGuard (HsMatchContext p)      -- ^Pattern guard for specified thing
-  | ParStmtCtxt (HsStmtContext p)    -- ^A branch of a parallel stmt
-  | TransStmtCtxt (HsStmtContext p)  -- ^A branch of a transform stmt
-  | ArrowExpr                        -- ^do-notation in an arrow-command context
+  = HsDoStmt HsDoFlavour             -- ^ Context for HsDo (do-notation and comprehensions)
+  | PatGuard (HsMatchContext p)      -- ^ Pattern guard for specified thing
+  | ParStmtCtxt (HsStmtContext p)    -- ^ A branch of a parallel stmt
+  | TransStmtCtxt (HsStmtContext p)  -- ^ A branch of a transform stmt
+  | ArrowExpr                        -- ^ do-notation in an arrow-command context
 
 -- | Haskell arrow match context.
 data HsArrowMatchContext

@@ -98,16 +98,31 @@ noCheckDs :: DsM a -> DsM a
 noCheckDs = updTopFlags (\dflags -> foldl' wopt_unset dflags allPmCheckWarnings)
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
-pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
--- See Note [pmcPatBind only checks PatBindRhs]
-pmcPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
-  !missing <- getLdiNablas
-  pat_bind <- noCheckDs $ desugarPatBind loc var p
-  tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
-  result <- unCA (checkPatBind pat_bind) missing
-  tracePm "}: " (ppr (cr_uncov result))
-  formatReportWarnings ReportPatBind ctxt [var] result
-pmcPatBind _ _ _ = pure ()
+pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM Nablas
+pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
+  = mb_discard_warnings $ do
+      !missing <- getLdiNablas
+      pat_bind <- noCheckDs $ desugarPatBind loc var p
+      tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
+      result <- unCA (checkPatBind pat_bind) missing
+      let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result
+      tracePm "pmcPatBind }: " $
+        vcat [ text "cr_uncov:" <+> ppr (cr_uncov result)
+             , text "ldi:" <+> ppr ldi ]
+      formatReportWarnings ReportPatBind ctxt [var] result
+      return ldi
+  where
+    -- See Note [pmcPatBind doesn't warn on pattern guards]
+    mb_discard_warnings
+      = if want_pmc match_ctxt
+        then id
+        else discardWarningsDs
+    want_pmc PatBindRhs = True
+    want_pmc (StmtCtxt stmt_ctxt) =
+      case stmt_ctxt of
+        PatGuard {} -> False
+        _           -> True
+    want_pmc _ = False
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
@@ -178,22 +193,29 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
 
-{- Note [pmcPatBind only checks PatBindRhs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-@pmcPatBind@'s sole purpose is to check vanilla pattern bindings, like
+{- Note [pmcPatBind doesn't warn on pattern guards]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+@pmcPatBind@'s main purpose is to check vanilla pattern bindings, like
 @x :: Int; Just x = e@, which is in a @PatBindRhs@ context.
 But its caller is also called for individual pattern guards in a @StmtCtxt@.
 For example, both pattern guards in @f x y | True <- x, False <- y = ...@ will
-go through this function. It makes no sense to do coverage checking there:
+go through this function. It makes no sense to report pattern match warnings
+for these pattern guards:
+
   * Pattern guards may well fail. Fall-through is not an unrecoverable panic,
     but rather behavior the programmer expects, so inexhaustivity should not be
     reported.
+
   * Redundancy is already reported for the whole GRHS via one of the other
-    exported coverage checking functions. Also reporting individual redundant
+    exported coverage checking functions. Also, reporting individual redundant
     guards is... redundant. See #17646.
-Note that we can't just omit checking of @StmtCtxt@ altogether (by adjusting
-'isMatchContextPmChecked'), because that affects the other checking functions,
-too.
+
+However, we should not skip pattern-match checking altogether, as it may reveal
+important long-distance information. One example is described in
+Note [Long-distance information in do notation] in GHC.HsToCore.Expr.
+
+Instead, we simply discard warnings when in pattern-guards, by using the function
+discardWarningsDs.
 -}
 
 --
