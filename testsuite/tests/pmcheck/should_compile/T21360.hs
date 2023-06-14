@@ -1,20 +1,23 @@
+{-# LANGUAGE MonadComprehensions #-}
+
 module T21360 where
 
 data Foo = A {a :: Int} | B deriving Show
 
-foo = A 4
-
--- wibble is safe - no warning
-wibble = do
-  case foo of
-    bar@A{} -> Just bar{a = 9}
-    _ -> fail ":("
-
--- using guards doesn't throw a warning
-twomble | bar@A{} <- foo = Just bar{a = 9}
-        | otherwise  = fail ":("
-
--- sworble has the same semantics as wibble and twomble - but we get a warning!
-sworble = do
+sworble :: Foo -> Maybe Foo
+sworble foo = do
   bar@A{} <- Just foo
-  Just bar{a = 9}
+  return $ bar { a = 9 }
+    -- we should not get a warning, because long-distance information
+    -- from the previous line should allow us to see that the record update
+    -- is not partial
+
+swooble :: Foo -> Maybe Foo
+swooble foo = do
+  bar@A{} <- Just foo
+  return $ case bar of { A _ -> A 9 }
+  -- same here
+
+-- same as swooble but using a monad comprehension
+blorble :: Foo -> Maybe Foo
+blorble foo = [ case bar of { A _ -> A 9 } | bar@A{} <- Just foo ]

@@ -28,7 +28,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.Pmc ( addTyCs, pmcGRHSs )
+import GHC.HsToCore.Pmc
 import GHC.HsToCore.Errors.Types
 import GHC.Types.SourceText
 import GHC.Types.Name
@@ -223,19 +223,11 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 ************************************************************************
 -}
 
-
--- | Replace the body of the function with this block to test the hsExprType
--- function in GHC.Tc.Zonk.Type:
--- putSrcSpanDs loc $ do
---   { core_expr <- dsExpr e
---   ; massertPpr (exprType core_expr `eqType` hsExprType e)
---                (ppr e <+> dcolon <+> ppr (hsExprType e) $$
---                 ppr core_expr <+> dcolon <+> ppr (exprType core_expr))
---   ; return core_expr }
+-- | Desugar a located typechecked expression.
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
-dsLExpr (L loc e) =
-  putSrcSpanDsA loc $ dsExpr e
+dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 
+-- | Desugar a typechecked expression.
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
 dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
@@ -691,11 +683,13 @@ dsDo ctx stmts
            ; dsLocalBinds binds rest }
 
     go _ (BindStmt xbs pat rhs) stmts
-      = do  { body     <- goL stmts
-            ; rhs'     <- dsLExpr rhs
-            ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
+      = do  { var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
+            ; rhs'  <- dsLExpr rhs
             ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt ctx)) pat
-                         (xbstc_boundResultType xbs) (cantFailMatchResult body)
+                                 (xbstc_boundResultType xbs) (MR_Infallible $ goL stmts)
+            -- NB: "goL stmts" needs to happen inside matchSinglePatVar, and not
+            -- before it, so that long-distance information is properly threaded.
+            -- See Note [Long-distance information in do notation].
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
@@ -774,7 +768,52 @@ dsDo ctx stmts
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
 
-{-
+{- Note [Long-distance information in do notation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider T21360:
+
+  data Foo = A Int | B
+
+  swooble :: Foo -> Maybe Foo
+  swooble foo = do
+    bar@A{} <- Just foo
+    return $ case bar of { A _ -> A 9 }
+
+The pattern-match checker **should not** complain that the case statement
+is incomplete, because we know that 'bar' is headed by the constructor 'A',
+due to the pattern match in the line above. However, we need to ensure that we
+propagate this long-distance information; failing to do so lead to #21360.
+
+To do this, we use "matchSinglePatVar" to handle the first pattern match
+
+  bar@A{} <- Just foo
+
+"matchSinglePatVar" then threads through the long-distance information to the
+desugaring of the remaining statements by using updPmNablasMatchResult.
+This avoids any spurious pattern-match warnings when handling the case
+statement on the last line.
+
+Other places that requires from the same treatment:
+
+  - monad comprehensions, e.g.
+
+     blorble :: Foo -> Maybe Foo
+     blorble foo = [ case bar of { A _ -> A 9 } | bar@A{} <- Just foo ]
+
+     See GHC.HsToCore.ListComp.dsMcBindStmt. Also tested in T21360.
+
+  - guards, e.g.
+
+      giddy :: Maybe Char -> Char
+      giddy x
+        | y@(Just _) <- x
+        , let z = case y of { Just w -> w }
+        = z
+
+    We don't want any inexhaustive pattern match warnings for the case statement,
+    because we already know 'y' is of the form "Just ...".
+    See test case T21360b.
+
 ************************************************************************
 *                                                                      *
    Desugaring Variables

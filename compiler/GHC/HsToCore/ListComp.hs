@@ -603,10 +603,12 @@ dsMcBindStmt :: LPat GhcTc
              -> [ExprLStmt GhcTc]
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
-  = do  { body     <- dsMcStmts stmts
-        ; var      <- selectSimpleMatchVarL ManyTy pat
+  = do  { var   <- selectSimpleMatchVarL ManyTy pat
         ; match <- matchSinglePatVar var Nothing (StmtCtxt (HsDoStmt (DoExpr Nothing))) pat
-                                  res1_ty (cantFailMatchResult body)
+                      res1_ty (MR_Infallible $ dsMcStmts stmts)
+            -- NB: dsMcStmts needs to happen inside matchSinglePatVar, and not
+            -- before it, so that long-distance information is properly threaded.
+            -- See Note [Long-distance information in do notation] in GHC.HsToCore.Expr.
         ; match_code <- dsHandleMonadicFailure MonadComp pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
