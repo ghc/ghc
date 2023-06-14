@@ -30,7 +30,7 @@ test('T10955',
 
 test('T10955dyn',
     [extra_files(['A.c', 'B.c', 'A.def', 'B.def'])
-    , js_broken(22351) # dynamic linking not supported by the JS backend
+    , req_c
     ],
      makefile_test, ['compile_libAB_dyn'])
 
