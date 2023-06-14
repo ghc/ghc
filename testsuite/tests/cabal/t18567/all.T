@@ -5,7 +5,7 @@ else:
 
 test('T18567',
      [ extra_files(['Setup.hs', 'sublib/', 'sublib-unused', 'src/', 'internal-lib.cabal'])
-     , js_broken(22356)
+     , js_broken(22349)
      , normalise_version('internal-lib')
      ],
      run_command,

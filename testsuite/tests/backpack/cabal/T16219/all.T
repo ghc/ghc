@@ -6,7 +6,7 @@ else:
 test('T16219',
      [ extra_files(['Setup.hs', 'backpack-issue.cabal', 'library-a', 'library-a-impl', 'library-b'])
      , when(opsys('mingw32'), fragile(17452))
-     , js_broken(22356)
+     , js_broken(22349)
      ],
      run_command,
      ['$MAKE -s --no-print-directory T16219 ' + cleanup])

@@ -5,7 +5,7 @@ else:
 
 test('mhu-closure',
      [ extra_files(['p/', 'q/', 'r/', 'r1/', 'unitP', 'unitQ', 'unitR', 'unitR1', 'Setup.hs'])
-     , js_broken(22356)
+     , js_broken(22349)
      ],
      run_command,
      ['$MAKE -s --no-print-directory mhu-closure ' + cleanup])
