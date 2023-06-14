@@ -80,6 +80,7 @@ if not config.arch == "javascript":
     config.compile_ways.append('hpc')
     config.run_ways.append('hpc')
 
+# WASM
 if config.arch == "wasm32":
     config.have_process = False
     config.supports_dynamic_libs = False
@@ -269,7 +270,12 @@ def get_compiler_info():
 
     config.have_vanilla   = compiler_supports_way([])
     config.have_dynamic   = compiler_supports_way(['-dynamic'])
-    config.have_profiling = compiler_supports_way(['-prof'])
+
+    # JavaScript doesn't support profiling yet. See #22261
+    if config.arch == "javascript":
+        config.have_profiling = False
+    else:
+        config.have_profiling = compiler_supports_way(['-prof'])
 
     if config.have_profiling:
         config.compile_ways.append('profasm')

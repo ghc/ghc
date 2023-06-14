@@ -236,6 +236,11 @@ def req_profiling( name, opts ):
     '''Require the profiling libraries (add 'GhcLibWays += p' to mk/build.mk)'''
     if not config.have_profiling:
         opts.expect = 'fail'
+    # many profiling tests must be skipped for the JS backend. That is
+    # because they unexpectedly pass even though the JS backend does not
+    # support profiling yet. See #22251
+    if js_arch():
+        js_skip(name, opts)
 
     # JS backend doesn't support profiling yet
     if arch("js"):
