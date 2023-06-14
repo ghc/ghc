@@ -41,7 +41,7 @@ specifically:
          infixl 7 T, :*:
 
    sets the fixity for both type constructor ``T`` and data constructor
-   ``T``, and similarly for ``:*:``. ``Int `a` Bool``.
+   ``T``, and similarly for ``:*:``.
 
 -  The function arrow ``->`` is ``infixr`` with fixity -1.
 
