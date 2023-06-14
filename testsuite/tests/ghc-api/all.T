@@ -26,7 +26,7 @@ test('T18181',
      compile_and_run,
      ['-package ghc'])
 test('T18522-dbg-ppr',
-  [extra_run_opts('"' + config.libdir + '"'), fragile(22362)],
+  [extra_run_opts('"' + config.libdir + '"')],
   compile_and_run,
   ['-package ghc'])
 test('T19156', [ extra_run_opts('"' + config.libdir + '"')

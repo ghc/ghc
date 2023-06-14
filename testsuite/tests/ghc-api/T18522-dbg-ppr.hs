@@ -10,7 +10,7 @@ import GHC.Driver.Session
 import GHC.Core.TyCo.Ppr
 import GHC.Utils.Outputable
 import GHC.Tc.Module
-import GHC.Tc.Utils.Zonk
+import GHC.Tc.Zonk.Env
 import GHC.Utils.Error
 import GHC.Driver.Ppr
 import GHC.Driver.Env
