@@ -9,6 +9,10 @@ Language
 - There is a new extension :extension:`ExtendedLiterals`, which enables
   sized primitive literals, e.g. ``123#Int8`` is a literal of type ``Int8#``.
   See the GHC proposal `#451 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0451-sized-literals.rst>`_.
+  Derived ``Show`` instances for datatypes containing sized literals (``Int8#``, ``Word8#``, ``Int16#`` etc.)
+  now use the extended literal syntax, per GHC proposal `#596 <https://github.com/ghc-proposals/ghc-proposals/pull/596>`_.
+  Furthermore, it is now possible to derive ``Show`` for datatypes containing
+  fields of types ``Int64#`` and ``Word64#``.
 
 - GHC Proposal `#425
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
