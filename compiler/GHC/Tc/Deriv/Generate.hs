@@ -1282,8 +1282,7 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
              show_arg b arg_ty
                  | isUnliftedType arg_ty
                  -- See Note [Deriving and unboxed types] in GHC.Tc.Deriv.Infer
-                 = with_conv $
-                    nlHsApps compose_RDR
+                 = nlHsApps compose_RDR
                         [mk_shows_app boxed_arg, mk_showString_app postfixMod]
                  | otherwise
                  = mk_showsPrec_app arg_prec arg
@@ -1291,14 +1290,6 @@ gen_Show_binds get_fixity loc dit@(DerivInstTys{ dit_rep_tc = tycon
                  arg        = nlHsVar b
                  boxed_arg  = box "Show" arg arg_ty
                  postfixMod = assoc_ty_id "Show" postfixModTbl arg_ty
-                 with_conv expr
-                    | (Just conv) <- assoc_ty_id_maybe primConvTbl arg_ty =
-                        nested_compose_Expr
-                            [ mk_showString_app ("(" ++ conv ++ " ")
-                            , expr
-                            , mk_showString_app ")"
-                            ]
-                    | otherwise = expr
 
                 -- Fixity stuff
              is_infix = dataConIsInfix data_con
@@ -1514,9 +1505,8 @@ gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
     eqAddr_RDR  , ltAddr_RDR  , geAddr_RDR  , gtAddr_RDR  , leAddr_RDR  ,
     eqFloat_RDR , ltFloat_RDR , geFloat_RDR , gtFloat_RDR , leFloat_RDR ,
     eqDouble_RDR, ltDouble_RDR, geDouble_RDR, gtDouble_RDR, leDouble_RDR,
-    word8ToWord_RDR , int8ToInt_RDR ,
-    word16ToWord_RDR, int16ToInt_RDR,
-    word32ToWord_RDR, int32ToInt_RDR
+    int8DataCon_RDR, int16DataCon_RDR, int32DataCon_RDR, int64DataCon_RDR,
+    word8DataCon_RDR, word16DataCon_RDR, word32DataCon_RDR, word64DataCon_RDR
     :: RdrName
 gfoldl_RDR     = varQual_RDR  gENERICS (fsLit "gfoldl")
 gunfold_RDR    = varQual_RDR  gENERICS (fsLit "gunfold")
@@ -1619,15 +1609,14 @@ leDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit "<=##")
 gtDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">##" )
 geDouble_RDR   = varQual_RDR  gHC_PRIM (fsLit ">=##")
 
-word8ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word8ToWord#")
-int8ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int8ToInt#")
-
-word16ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word16ToWord#")
-int16ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int16ToInt#")
-
-word32ToWord_RDR = varQual_RDR  gHC_PRIM (fsLit "word32ToWord#")
-int32ToInt_RDR   = varQual_RDR  gHC_PRIM (fsLit "int32ToInt#")
-
+int8DataCon_RDR   = dataQual_RDR gHC_INT (fsLit "I8#")
+int16DataCon_RDR  = dataQual_RDR gHC_INT (fsLit "I16#")
+int32DataCon_RDR  = dataQual_RDR gHC_INT (fsLit "I32#")
+int64DataCon_RDR  = dataQual_RDR gHC_INT (fsLit "I64#")
+word8DataCon_RDR  = dataQual_RDR gHC_WORD (fsLit "W8#")
+word16DataCon_RDR = dataQual_RDR gHC_WORD (fsLit "W16#")
+word32DataCon_RDR = dataQual_RDR gHC_WORD (fsLit "W32#")
+word64DataCon_RDR = dataQual_RDR gHC_WORD (fsLit "W64#")
 {-
 ************************************************************************
 *                                                                      *
@@ -2416,7 +2405,6 @@ ordOpTbl
 
 -- A mapping from a primitive type to a function that constructs its boxed
 -- version.
--- NOTE: Int8#/Word8# will become Int/Word.
 boxConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]
 boxConTbl =
     [ (charPrimTy  , nlHsApp (nlHsVar $ getRdrName charDataCon))
@@ -2424,28 +2412,20 @@ boxConTbl =
     , (wordPrimTy  , nlHsApp (nlHsVar $ getRdrName wordDataCon ))
     , (floatPrimTy , nlHsApp (nlHsVar $ getRdrName floatDataCon ))
     , (doublePrimTy, nlHsApp (nlHsVar $ getRdrName doubleDataCon))
-    , (int8PrimTy,
-        nlHsApp (nlHsVar $ getRdrName intDataCon)
-        . nlHsApp (nlHsVar int8ToInt_RDR))
-    , (word8PrimTy,
-        nlHsApp (nlHsVar $ getRdrName wordDataCon)
-        . nlHsApp (nlHsVar word8ToWord_RDR))
-    , (int16PrimTy,
-        nlHsApp (nlHsVar $ getRdrName intDataCon)
-        . nlHsApp (nlHsVar int16ToInt_RDR))
-    , (word16PrimTy,
-        nlHsApp (nlHsVar $ getRdrName wordDataCon)
-        . nlHsApp (nlHsVar word16ToWord_RDR))
-    , (int32PrimTy,
-        nlHsApp (nlHsVar $ getRdrName intDataCon)
-        . nlHsApp (nlHsVar int32ToInt_RDR))
-    , (word32PrimTy,
-        nlHsApp (nlHsVar $ getRdrName wordDataCon)
-        . nlHsApp (nlHsVar word32ToWord_RDR))
+    , (int8PrimTy,   nlHsApp (nlHsVar int8DataCon_RDR))
+    , (word8PrimTy,  nlHsApp (nlHsVar word8DataCon_RDR))
+    , (int16PrimTy,  nlHsApp (nlHsVar int16DataCon_RDR))
+    , (word16PrimTy, nlHsApp (nlHsVar word16DataCon_RDR))
+    , (int32PrimTy,  nlHsApp (nlHsVar int32DataCon_RDR))
+    , (word32PrimTy, nlHsApp (nlHsVar word32DataCon_RDR))
+    , (int64PrimTy,  nlHsApp (nlHsVar int64DataCon_RDR))
+    , (word64PrimTy, nlHsApp (nlHsVar word64DataCon_RDR))
     ]
 
 
 -- | A table of postfix modifiers for unboxed values.
+-- Following https://github.com/ghc-proposals/ghc-proposals/pull/596,
+-- we use the ExtendedLiterals syntax for sized literals.
 postfixModTbl :: [(Type, String)]
 postfixModTbl
   = [(charPrimTy  , "#" )
@@ -2453,22 +2433,14 @@ postfixModTbl
     ,(wordPrimTy  , "##")
     ,(floatPrimTy , "#" )
     ,(doublePrimTy, "##")
-    ,(int8PrimTy, "#")
-    ,(word8PrimTy, "##")
-    ,(int16PrimTy, "#")
-    ,(word16PrimTy, "##")
-    ,(int32PrimTy, "#")
-    ,(word32PrimTy, "##")
-    ]
-
-primConvTbl :: [(Type, String)]
-primConvTbl =
-    [ (int8PrimTy, "intToInt8#")
-    , (word8PrimTy, "wordToWord8#")
-    , (int16PrimTy, "intToInt16#")
-    , (word16PrimTy, "wordToWord16#")
-    , (int32PrimTy, "intToInt32#")
-    , (word32PrimTy, "wordToWord32#")
+    ,(int8PrimTy  , "#Int8")
+    ,(word8PrimTy , "#Word8")
+    ,(int16PrimTy , "#Int16")
+    ,(word16PrimTy, "#Word16")
+    ,(int32PrimTy , "#Int32")
+    ,(word32PrimTy, "#Word32")
+    ,(int64PrimTy , "#Int64")
+    ,(word64PrimTy, "#Word64")
     ]
 
 litConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]
