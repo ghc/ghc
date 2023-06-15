@@ -331,3 +331,7 @@ function h$buildCCSPtr(o) {
 function h$clearCCS(a) {
   throw new Error("ClearCCSOp not implemented");
 }
+
+function h$rts_isProfiled() {
+  return 0;
+}

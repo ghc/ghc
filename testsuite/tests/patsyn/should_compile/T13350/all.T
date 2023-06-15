@@ -2,5 +2,5 @@
 
 test('T13350',
      [extra_files(['T13350.hs', 'boolean']),
-     js_broken(22352)],
+     js_broken(22349)],
      makefile_test, ['T13350'])
