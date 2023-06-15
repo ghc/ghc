@@ -1,0 +1,3 @@
+T21973a: True
+CallStack (from HasCallStack):
+  error, called at T21973a.hs:42:23 in main:Main
