@@ -3244,6 +3244,8 @@ lookupIdInScope id_occ
        ; case lookupVarEnv in_scope_ids id_occ of
            Just (id_bndr, linted_ty)
              -> do { checkL (not (bad_global id_bndr)) $ global_in_scope id_bndr
+                   ; checkL (occName id_occ == occName id_bndr) $ occName_mismatch id_bndr
+                   ; checkL (not (bad_module_externals id_bndr)) $ same_module_externals id_bndr
                    ; return (id_bndr, linted_ty) }
            Nothing -> do { checkL (not is_local) local_out_of_scope
                          ; return (id_occ, idType id_occ) } }
@@ -3268,6 +3270,22 @@ lookupIdInScope id_occ
        --     are defined locally, but appear in expressions as (global)
        --     wired-in Ids after worker/wrapper
        --     So we simply disable the test in this case
+    occName_mismatch id_bnd = hang (text "Occurrence and binding have different 'OccName's")
+                                 2 $ vcat [text "occurrence:" <+> ppr (occName id_occ)
+                                          ,text "binder    :" <+> ppr (occName id_bnd)
+                                          ]
+       -- If an occurrence has an OccName "foo", but the binder has OccName "bar", then we would
+       -- generate broken code which references "foo" but only has a code label for "bar"
+    same_module_externals id_bnd = hang (text "Occurrence and binding names have different 'Module's")
+                                 2 $ vcat [text "occName:" <+> ppr (occName id_occ)
+                                          ,text "occurrence module:" <+> ppr (nameModule $ getName id_occ)
+                                          ,text "binder module    :" <+> ppr (nameModule $ getName id_bnd)
+                                          ]
+    bad_module_externals id_bnd = case (nameModule_maybe $ getName id_occ, nameModule_maybe $ getName id_bnd) of
+      (Just m1, Just m2) -> m1 /= m2
+      _ -> False
+       -- Similarly to the occName_mismatch, it is an error to have names which are supposed
+       -- to refer to the same thing, but claim they are in different modules.
 
 lookupJoinId :: Id -> LintM (Maybe JoinArity)
 -- Look up an Id which should be a join point, valid here
