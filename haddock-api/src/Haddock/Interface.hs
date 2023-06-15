@@ -62,6 +62,7 @@ import GHC.Data.Maybe
 import GHC.Driver.Env
 import GHC.Driver.Monad
 import GHC.Driver.Make
+import GHC.Driver.Main
 import GHC.Core.InstEnv
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
@@ -160,7 +161,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   liftIO $ traceMarkerIO "Load started"
   -- Create (if necessary) and load .hi-files.
   success <- withTimingM "load'" (const ()) $
-               load' noIfaceCache LoadAllTargets Nothing modGraph
+               load' noIfaceCache LoadAllTargets (Just batchMsg) modGraph
   when (failed success) $ do
     out verbosity normal "load' failed"
     liftIO exitFailure

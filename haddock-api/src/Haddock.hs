@@ -77,6 +77,7 @@ import GHC.Settings.Config
 import GHC.Driver.Config.Logger (initLogFlags)
 import GHC.Driver.Env
 import GHC.Driver.Session hiding (projectVersion, verbosity)
+import qualified GHC.Driver.Session as DynFlags (DynFlags(..))
 import GHC.Utils.Error
 import GHC.Utils.Logger
 import GHC.Types.Name.Cache
@@ -566,10 +567,16 @@ readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
 withGhc' :: String -> Bool -> [String] -> (DynFlags -> Ghc a) -> IO a
 withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
     logger <- getLogger
-    dynflags' <- parseGhcFlags logger =<< getSessionDynFlags
 
-    -- We disable pattern match warnings because they can be very
-    -- expensive to check
+    -- Set default GHC verbosity to 1. This is better for hi-haddock since -v0
+    -- creates an awkward silence during the load operation
+    default_dflags <- getSessionDynFlags >>= \dflags ->
+      pure dflags { DynFlags.verbosity = 1 }
+
+    dynflags' <- parseGhcFlags logger default_dflags
+
+    -- Disable pattern match warnings because they can be very expensive to
+    -- check, set optimization level to 0 for fastest compilation.
     let dynflags'' = unsetPatternMatchWarnings $ updOptLevel 0 dynflags'
 
     -- ignore the following return-value, which is a list of packages
