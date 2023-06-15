@@ -341,7 +341,7 @@ patchJumpInstr instr patchF
 -- is essentially [-256,255], or [0, 0xFFF]*8 = [0, 32760] for 64bits.
 --
 -- The @RESERVED_C_STACK_BYTES@ is 16k, so we can't address any location in a
--- single instruction.  The idea is to use the Inter Procedure 0 (ip0) register
+-- single instruction.  The idea is to use the Inter Procedure 0 (ip) register
 -- to perform the computations for larger offsets.
 --
 -- Using sp to compute the offset will violate assumptions about the stack pointer
@@ -361,18 +361,18 @@ mkSpillInstr config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkStrSpImm imm]
     imm ->
-      [ movImmToIp0 imm,
-        addSpToIp0,
-        mkStrIp0
+      [ movImmToIp imm,
+        addSpToIp,
+        mkStrIp
       ]
   where
     fmt = case reg of
       RegReal (RealRegSingle n) | n < 32 -> II64
       _ -> FF64
     mkStrSpImm imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
-    movImmToIp0 imm = ANN (text "Spill: IP0 <- " <> int imm) $ MOV ip0 (OpImm (ImmInt imm))
-    addSpToIp0 = ANN (text "Spill: IP0 <- SP + IP0 ") $ ADD ip0 ip0 sp
-    mkStrIp0 = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ip0_reg))
+    movImmToIp imm = ANN (text "Spill: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
+    addSpToIp = ANN (text "Spill: IP <- SP + IP ") $ ADD ip ip sp
+    mkStrIp = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
 
     off = spillSlotToOffset config slot
 
@@ -387,18 +387,18 @@ mkLoadInstr config reg delta slot =
   case off - delta of
     imm | fitsIn12bitImm imm -> [mkLdrSpImm imm]
     imm ->
-      [ movImmToIp0 imm,
-        addSpToIp0,
-        mkLdrIp0
+      [ movImmToIp imm,
+        addSpToIp,
+        mkLdrIp
       ]
   where
     fmt = case reg of
       RegReal (RealRegSingle n) | n < 32 -> II64
       _ -> FF64
     mkLdrSpImm imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm sp_reg (ImmInt imm)))
-    movImmToIp0 imm = ANN (text "Reload: IP0 <- " <> int imm) $ MOV ip0 (OpImm (ImmInt imm))
-    addSpToIp0 = ANN (text "Reload: IP0 <- SP + IP0 ") $ ADD ip0 ip0 sp
-    mkLdrIp0 = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ip0_reg))
+    movImmToIp imm = ANN (text "Reload: IP <- " <> int imm) $ MOV ip (OpImm (ImmInt imm))
+    addSpToIp = ANN (text "Reload: IP <- SP + IP ") $ ADD ip ip sp
+    mkLdrIp = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrReg ip_reg))
 
     off = spillSlotToOffset config slot
 
@@ -443,6 +443,7 @@ mkStackAllocInstr :: Platform -> Int -> [Instr]
 mkStackAllocInstr platform n
     | n == 0 = []
     | n > 0 && fitsIn12bitImm n = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
+    -- TODO: This case may be optimized with the IP register for large n-s
     | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt intMax12bit))) : mkStackAllocInstr platform (n - intMax12bit)
 mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 
@@ -450,6 +451,7 @@ mkStackDeallocInstr :: Platform -> Int -> [Instr]
 mkStackDeallocInstr platform n
     | n == 0 = []
     | n > 0 && fitsIn12bitImm n = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
+    -- TODO: This case may be optimized with the IP register for large n-s
     | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt intMax12bit))) : mkStackDeallocInstr platform (n - intMax12bit)
 mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
@@ -762,21 +764,38 @@ data Operand
 opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
-ra_reg, sp_reg :: Reg
+-- Note [The made-up RISCV64 IP register]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- RISCV64 has no inter-procedural register in its ABI. However, we need one to
+-- make register spills/loads to/from high number slots. I.e. slot numbers that
+-- do not fit in a 12bit integer which is used as immediate in the arithmetic
+-- operations. Thus, we're marking one additional register (x31) as permanently
+-- non-free and call it IP.
+--
+-- IP can be used as temporary register in all operations. Just be aware that it
+-- may be clobbered as soon as you loose direct control over it (i.e. using IP
+-- by-passes the register allocation/spilling mechanisms.) It should be fine to
+-- use it as temporary register in a MachOp translation as long as you don't
+-- rely on its value beyond this limited scope.
+--
+-- X31 is a caller-saved register. I.e. there are no guarantees about what the
+-- callee does with it. That's exactly what we want here.
+
+zero_reg, ra_reg, sp_reg, ip_reg :: Reg
 zero_reg = RegReal (RealRegSingle 0)
 ra_reg = RegReal (RealRegSingle 1)
 sp_reg = RegReal (RealRegSingle 2)
-ip0_reg = RegReal (RealRegSingle 16)
+ip_reg = RegReal (RealRegSingle 31)
 
-zero, sp, ip0 :: Operand
+zero, ra, sp, gp, tp, fp, ip :: Operand
 zero = OpReg W64 zero_reg
 ra  = OpReg W64 ra_reg
 sp  = OpReg W64 sp_reg
 gp  = OpReg W64 (RegReal (RealRegSingle 3))
 tp  = OpReg W64 (RegReal (RealRegSingle 4))
 fp  = OpReg W64 (RegReal (RealRegSingle 8))
-
-ip0 = OpReg W64 ip0_reg
+ip = OpReg W64 ip_reg
 
 _x :: Int -> Operand
 _x i = OpReg W64 (RegReal (RealRegSingle i))
