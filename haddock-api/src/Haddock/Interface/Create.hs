@@ -30,12 +30,10 @@
 -- which creates a Haddock 'Interface' from the typechecking
 -- results 'TypecheckedModule' from GHC.
 -----------------------------------------------------------------------------
-module Haddock.Interface.Create (IfM, runIfM, createInterface1, fromClsInst) where
+module Haddock.Interface.Create (IfM, runIfM, createInterface1) where
 
-import Haddock.Backends.Hoogle (outWith)
-import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl, synifyInstHead)
+import Haddock.Convert (PrintRuntimeReps (..), tyThingToLHsDecl)
 import Haddock.GhcUtils
-import Haddock.Interface.AttachInstances (instHead)
 import Haddock.Interface.LexParseRn
 import Haddock.Options (Flag (..), modulePackageInfo)
 import Haddock.Types
@@ -51,14 +49,11 @@ import qualified Data.List.NonEmpty as NE
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, isJust, mapMaybe, maybeToList)
-import qualified Data.Set as Set
 import Data.Traversable (for)
 
 import GHC hiding (lookupName)
 import qualified GHC.Types.Unique.Map as UniqMap
-import GHC.Core (isOrphan)
 import GHC.Core.ConLike (ConLike (..))
-import GHC.Core.InstEnv (ClsInst(..), instanceSig)
 import GHC.Data.FastString (unpackFS, bytesFS)
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Types.Avail hiding (avail)
@@ -90,7 +85,7 @@ createInterface1
   -> ModIface
   -> IfaceMap
   -> InstIfaceMap
-  -> ([HaddockClsInst],[FamInst])
+  -> ([ClsInst],[FamInst])
   -> IfM m Interface
 createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instances, fam_instances) = do
 
@@ -278,54 +273,6 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
                 , let tyName = tupleTyConName BoxedTuple i
                 , let datName = getName $ tupleDataCon Boxed i
                 ]
-
--- | Prune a 'ClsInst' down to a 'HaddockClsInst'. The goal is to remove as much
--- unnecessary information from the 'ClsInst' as possible by precomputing the
--- information we eventually want from it.
-fromClsInst
-  :: Bool
-  -- ^ Was Hoogle output requested?
-  -> DynFlags
-  -- ^ GHC session dynflags
-  -> UnitState
-  -- ^ GHC session dynflags
-  -> ClsInst
-  -- ^ Class instance to convert
-  -> HaddockClsInst
-  -- ^ Resulting Haddock class instance
-fromClsInst doHoogle dflags unitState inst =
-    HaddockClsInst
-      { haddockClsInstPprHoogle =
-          if doHoogle then Just (ppInstance inst) else Nothing
-      , haddockClsInstName = getName inst
-      , haddockClsInstClsName = getName cls
-      , haddockClsInstIsOrphan = isOrphan $ is_orphan inst
-      , haddockClsInstSynified = synifyInstHead instSig
-      , haddockClsInstHead = instHead instSig
-      , haddockClsInstTyNames =
-          foldl' (\ns t -> ns `Set.union` typeNames t) Set.empty tys
-      }
-  where
-    instSig :: ([TyVar], [Type], Class, [Type])
-    instSig@(_,_,cls,tys) = instanceSig inst
-
-    ppInstance :: ClsInst -> String
-    ppInstance i =
-        dropComment $ outWith (showSDocForUser dflags unitState alwaysQualify) i'
-      where
-        -- As per #168, we don't want safety information about the class
-        -- in Hoogle output. The easiest way to achieve this is to set the
-        -- safety information to a state where the Outputable instance
-        -- produces no output which means no overlap and unsafe (or [safe]
-        -- is generated).
-        i' = i { is_flag = OverlapFlag { overlapMode = NoOverlap NoSourceText
-                                        , isSafeOverlap = False } }
-
-        dropComment :: String -> String
-        dropComment (' ':'-':'-':' ':_) = []
-        dropComment (x:xs) = x : dropComment xs
-        dropComment [] = []
-
 
 -------------------------------------------------------------------------------
 -- Warnings

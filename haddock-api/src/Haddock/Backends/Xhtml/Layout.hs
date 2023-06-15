@@ -37,6 +37,7 @@ module Haddock.Backends.Xhtml.Layout (
   subMethods,
   subDefaults,
   subMinimal,
+  subTableSrc,
 
   topDeclElem, declElem,
 ) where

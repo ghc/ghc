@@ -320,24 +320,6 @@ ppFamDecl summary associated links instances fixities loc doc decl splice unicod
         , []
         )
 
-
--- | Print a pseudo family declaration
-ppPseudoFamDecl :: LinksInfo -> Splice
-                -> PseudoFamilyDecl DocNameI   -- ^ this decl
-                -> Unicode -> Qualification -> Html
-ppPseudoFamDecl links splice
-                (PseudoFamilyDecl { pfdInfo = info
-                                  , pfdKindSig = L _ kindSig
-                                  , pfdTyVars = tvs
-                                  , pfdLName = L loc name })
-                unicode qual =
-    topDeclElem links (locA loc) splice [name] leader
-  where
-    leader = hsep [ ppFamilyLeader True info
-                  , ppAppNameTypes name (map unLoc tvs) unicode qual
-                  , ppResultSig kindSig unicode qual
-                  ]
-
 -- | Print the LHS of a type\/data family declaration
 ppFamHeader :: Bool                 -- ^ is a summary
             -> Bool                 -- ^ is an associated type
@@ -688,7 +670,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) m
             )
           where
             sigs = ppInstanceSigs links splice unicode qual clsiSigs
-            ats = ppInstanceAssocTys links splice unicode qual clsiAssocTys
+            ats = ppInstanceAssocTys links splice unicode qual orphan clsiAssocTys
         TypeInst rhs ->
             ( subInstHead iid ptype
             , mdoc
@@ -713,11 +695,20 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) m
     typ = ppAppNameTypes ihdClsName ihdTypes unicode qual
 
 
-ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
-                   -> [PseudoFamilyDecl DocNameI]
+ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification -> Bool
+                   -> [DocInstance DocNameI]
                    -> [Html]
-ppInstanceAssocTys links splice unicode qual =
-    map (\pseudo -> ppPseudoFamDecl links splice pseudo unicode qual)
+ppInstanceAssocTys links splice unicode qual orphan insts =
+    maybeToList $
+    subTableSrc Nothing qual links True $
+    zipWith mkInstHead
+            insts
+            [1..]
+    where
+      mkInstHead (inst, doc, name, mdl) no =
+        (ppInstHead links splice unicode qual doc (OriginFamily (unLoc name)) orphan no inst mdl
+        , mdl
+        , name)
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification

@@ -109,7 +109,7 @@ executable haddock
       Haddock.Interface.AttachInstances
       Haddock.Interface.LexParseRn
       Haddock.Interface.ParseModuleHeader
-      Haddock.Interface.Specialize
+      Haddock.Interface.RenameType
       Haddock.Parser
       Haddock.Utils
       Haddock.Utils.Json
@@ -139,7 +139,6 @@ executable haddock
       Haddock.InterfaceFile
       Haddock.Options
       Haddock.GhcUtils
-      Haddock.Syb
       Haddock.Convert
 
       Paths_haddock

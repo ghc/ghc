@@ -39,14 +39,13 @@ module Haddock.Interface (
 
 import Haddock.GhcUtils (moduleString, pretty)
 import Haddock.Interface.AttachInstances (attachInstances)
-import Haddock.Interface.Create (createInterface1, fromClsInst)
+import Haddock.Interface.Create (createInterface1)
 import Haddock.Interface.Rename (renameInterface)
 import Haddock.InterfaceFile (InterfaceFile, ifInstalledIfaces, ifLinkEnv)
 import Haddock.Options hiding (verbosity)
 import Haddock.Types
 import Haddock.Utils (Verbosity (..), normal, out, verbose)
 
-import Control.DeepSeq (force)
 import Control.Monad
 import Data.List (foldl', isPrefixOf)
 import Data.Traversable (for)
@@ -57,13 +56,14 @@ import System.Exit (exitFailure ) -- TODO use Haddock's die
 import Text.Printf
 
 import GHC hiding (verbosity, SuccessFlag(..))
-import GHC.Core.InstEnv (instEnvElts)
 import GHC.Data.FastString (unpackFS)
 import GHC.Data.Graph.Directed
 import GHC.Data.Maybe
 import GHC.Driver.Env
 import GHC.Driver.Monad
 import GHC.Driver.Make
+import GHC.Driver.Main
+import GHC.Core.InstEnv
 import GHC.Driver.Session hiding (verbosity)
 import GHC.HsToCore.Docs (getMainDeclBinder)
 import GHC.Types.Name.Occurrence (emptyOccEnv)
@@ -161,7 +161,7 @@ createIfaces verbosity modules flags instIfaceMap = do
   liftIO $ traceMarkerIO "Load started"
   -- Create (if necessary) and load .hi-files.
   success <- withTimingM "load'" (const ()) $
-               load' noIfaceCache LoadAllTargets Nothing modGraph
+               load' noIfaceCache LoadAllTargets (Just batchMsg) modGraph
   when (failed success) $ do
     out verbosity normal "load' failed"
     liftIO exitFailure
@@ -246,13 +246,7 @@ processModule verbosity modSummary flags ifaceMap instIfaceMap = do
       mod_iface = hm_iface hmi
       unit_state = hsc_units hsc_env
 
-      do_hoogle = Flag_Hoogle `elem` flags
-
-      -- We do not want to retain the ClsInsts, so force the creation of this
-      -- list
-      !cls_insts = force $
-          map (fromClsInst do_hoogle dflags unit_state)
-        . instEnvElts . md_insts $ hm_details hmi
+      cls_insts = instEnvElts . md_insts $ hm_details hmi
 
       fam_insts = md_fam_insts $ hm_details hmi
 
@@ -342,7 +336,7 @@ buildHomeLinks ifaces = foldl' upd Map.empty (reverse ifaces)
       | otherwise =
           foldl' keep_new old_env exported_names
       where
-        exported_names = ifaceVisibleExports iface ++ map haddockClsInstName (ifaceInstances iface)
+        exported_names = ifaceVisibleExports iface ++ map getName (ifaceInstances iface)
         mdl            = ifaceMod iface
         keep_old env n = Map.insertWith (\_ old -> old) n mdl env
         keep_new env n = Map.insert n mdl env
