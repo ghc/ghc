@@ -442,15 +442,15 @@ mkJumpInstr id = [B (TBlock id)]
 mkStackAllocInstr :: Platform -> Int -> [Instr]
 mkStackAllocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : mkStackAllocInstr platform (n - 4095)
+    | n > 0 && fitsIn12bitImm n = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt intMax12bit))) : mkStackAllocInstr platform (n - intMax12bit)
 mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 
 mkStackDeallocInstr :: Platform -> Int -> [Instr]
 mkStackDeallocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : mkStackDeallocInstr platform (n - 4095)
+    | n > 0 && fitsIn12bitImm n = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt intMax12bit))) : mkStackDeallocInstr platform (n - intMax12bit)
 mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
 --
@@ -865,9 +865,12 @@ opRegSExt w  _r = pprPanic "opRegSExt" (ppr w)
 
 fitsIn12bitImm :: (Num a, Ord a) => a -> Bool
 fitsIn12bitImm off = off >= intMin12bit && off <= intMax12bit
-  where
-    intMin12bit = -2048
-    intMax12bit = 2047
+
+intMin12bit :: Num a => a
+intMin12bit = -2048
+
+intMax12bit :: Num a => a
+intMax12bit = 2047
 
 fitsIn32bits  :: (Num a, Ord a, Bits a) => a -> Bool
 fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 -1)
