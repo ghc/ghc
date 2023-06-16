@@ -94,6 +94,7 @@ library
         js/debug.js
         js/enum.js
         js/environment.js
+        js/eventlog.js
         js/gc.js
         js/goog.js
         js/hscore.js

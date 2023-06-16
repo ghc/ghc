@@ -411,14 +411,6 @@ function h$gettimeofday(tv_v,tv_o,tz_v,tz_o) {
   return 0;
 }
 
-function h$traceEvent(ev_v,ev_o) {
-  h$errorMsg(h$decodeUtf8z(ev_v, ev_o));
-}
-
-function h$traceMarker(ev_v,ev_o) {
-  h$errorMsg(h$decodeUtf8z(ev_v, ev_o));
-}
-
 var h$__hscore_gettimeofday = h$gettimeofday;
 
 var h$myTimeZone = h$encodeUtf8("UTC");
