@@ -3108,7 +3108,9 @@ instance Diagnostic TcRnMessage where
       in case k of
         BadImportAvailVar         -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
         BadImportNotExported      -> noHints
-        BadImportAvailTyCon       -> [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
+        BadImportAvailTyCon ex_ns ->
+          [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not ex_ns]
+          ++ [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
         BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
         BadImportNotExportedSubordinates{} -> noHints
     TcRnImportLookup{}

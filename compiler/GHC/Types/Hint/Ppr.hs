@@ -310,12 +310,12 @@ pprImportSuggestion occ_name (CouldUnhideFrom mods)
         | (mod,imv) <- NE.toList mods
         ])
 pprImportSuggestion occ_name (CouldAddTypeKeyword mod)
- = vcat [ text "Add the" <+> quotes (text "type")
+  = vcat [ text "Add the" <+> quotes (text "type")
           <+> text "keyword to the import statement:"
-        , nest 2 $ text "import"
+         , nest 2 $ text "import"
             <+> ppr mod
             <+> parens_sp (text "type" <+> pprPrefixOcc occ_name)
-        ]
+         ]
   where
     parens_sp d = parens (space <> d <> space)
 pprImportSuggestion occ_name (CouldRemoveTypeKeyword mod)

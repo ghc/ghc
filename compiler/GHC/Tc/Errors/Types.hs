@@ -5263,7 +5263,9 @@ data BadImportKind
   -- | Module does not export...
   = BadImportNotExported
   -- | Missing @type@ keyword when importing a type.
-  | BadImportAvailTyCon
+  -- e.g.  `import TypeLits( (+) )`, where TypeLits exports a /type/ (+), not a /term/ (+)
+  -- Then we want to suggest using `import TypeLits( type (+) )`
+  | BadImportAvailTyCon Bool -- ^ is ExplicitNamespaces enabled?
   -- | Trying to import a data constructor directly, e.g.
   -- @import Data.Maybe (Just)@ instead of @import Data.Maybe (Maybe(Just))@
   | BadImportAvailDataCon OccName

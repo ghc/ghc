@@ -2139,11 +2139,12 @@ badImportItemErr
   -> TcRn ImportLookupReason
 badImportItemErr iface decl_spec ie sub avails = do
   patsyns_enabled <- xoptM LangExt.PatternSynonyms
-  pure (ImportLookupBad importErrorKind iface decl_spec ie patsyns_enabled)
+  expl_ns_enabled <- xoptM LangExt.ExplicitNamespaces
+  pure (ImportLookupBad (importErrorKind expl_ns_enabled) iface decl_spec ie patsyns_enabled)
   where
-    importErrorKind
+    importErrorKind expl_ns_enabled
       | any checkIfTyCon avails = case sub of
-          BadImportIsParent -> BadImportAvailTyCon
+          BadImportIsParent -> BadImportAvailTyCon expl_ns_enabled
           BadImportIsSubordinate -> BadImportNotExportedSubordinates unavailableChildren
       | any checkIfVarName avails = BadImportAvailVar
       | Just con <- find checkIfDataCon avails = BadImportAvailDataCon (availOccName con)
