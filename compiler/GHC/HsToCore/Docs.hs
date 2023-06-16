@@ -192,7 +192,13 @@ mkDocStructureFromDecls env all_exports decls =
         Just loc -> L loc (DsiExports [avail])
         -- FIXME: This is just a workaround that we use when handling e.g.
         -- associated data families like in the html-test Instances.hs.
-        Nothing -> noLoc (DsiExports [avail])
+        Nothing -> noLoc (DsiExports [])
+
+        -- This causes the associated data family to be incorrectly documented
+        -- separately from its class:
+        -- Nothing -> noLoc (DsiExports [avail])
+
+        -- This panics on the associated data family:
         -- Nothing -> panicDoc "mkDocStructureFromDecls: No loc found for"
         --                     (ppr avail)
 
