@@ -18,9 +18,11 @@
    since we compile these things these days with cabal we can no longer
    specify optimization per file.  So we have to resort to pragmas.  */
 #if defined(__GNUC__) || defined(__GNUG__)
+#if !defined(__clang__)
 #if !defined(DEBUG)
 #pragma GCC push_options
 #pragma GCC optimize ("O3")
+#endif
 #endif
 #endif
 
@@ -565,7 +567,9 @@ int keyCountHashTable (HashTable *table)
 
 
 #if defined(__GNUC__) || defined(__GNUG__)
+#if !defined(__clang__)
 #if !defined(DEBUG)
 #pragma GCC pop_options
+#endif
 #endif
 #endif
