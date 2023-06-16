@@ -284,7 +284,7 @@ mkWarningMap
   -> IfM m WarningMap
 mkWarningMap dflags warnings exps =
   case warnings of
-    WarnSome ws ->
+    WarnSome ws _ ->
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
           ws' = flip mapMaybe ws $ \(occ, w) ->
             -- Ensure we also look in the record field namespace. If the OccName
