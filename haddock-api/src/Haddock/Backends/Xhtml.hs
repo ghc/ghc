@@ -15,6 +15,7 @@
 {-# LANGUAGE NamedFieldPuns   #-}
 {-# LANGUAGE TupleSections    #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE BangPatterns     #-}
 
 module Haddock.Backends.Xhtml (
