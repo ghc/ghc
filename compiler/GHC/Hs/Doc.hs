@@ -123,7 +123,7 @@ type LHsDoc pass = Located (HsDoc pass)
 data DocStructureItem
   = DsiSectionHeading !Int !(HsDoc GhcRn)
   | DsiDocChunk !(HsDoc GhcRn)
-  | DsiNamedChunkRef !(String)
+  | DsiNamedChunkRef !String
   | DsiExports !Avails
   | DsiModExport
       !(NonEmpty ModuleName) -- ^ We might re-export avails from multiple
