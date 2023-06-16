@@ -340,7 +340,6 @@ rts' s =
           , TxtI "h$vt_double" ||= toJExpr IntV
           , TxtI "h$vt_long"   ||= toJExpr LongV
           , TxtI "h$vt_addr"   ||= toJExpr AddrV
-          , TxtI "h$vt_rtsobj" ||= toJExpr RtsObjV
           , TxtI "h$vt_obj"    ||= toJExpr ObjV
           , TxtI "h$vt_arr"    ||= toJExpr ArrV
           , jFun (TxtI "h$bh")     (bhStats s True)

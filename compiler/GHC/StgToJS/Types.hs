@@ -150,13 +150,13 @@ instance ToJExpr CIStatic where
 
 -- | Free variable types
 data VarType
-  = PtrV     -- ^ pointer = reference to heap object (closure object)
+  = PtrV     -- ^ pointer = reference to heap object (closure object), lifted or not.
+             -- Can also be some RTS object (e.g. TVar#, MVar#, MutVar#, Weak#)
   | VoidV    -- ^ no fields
   | DoubleV  -- ^ A Double: one field
   | IntV     -- ^ An Int (32bit because JS): one field
   | LongV    -- ^ A Long: two fields one for the upper 32bits, one for the lower (NB: JS is little endian)
   | AddrV    -- ^ a pointer not to the heap: two fields, array + index
-  | RtsObjV  -- ^ some RTS object from GHCJS (for example TVar#, MVar#, MutVar#, Weak#)
   | ObjV     -- ^ some JS object, user supplied, be careful around these, can be anything
   | ArrV     -- ^ boxed array
   deriving stock (Eq, Ord, Enum, Bounded, Show)

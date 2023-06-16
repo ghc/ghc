@@ -1636,10 +1636,11 @@ boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
   where
     -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [lev]
-      = case tyConPromDataConInfo (tyConAppTyCon lev) of
-          Levity Lifted   -> [LiftedRep]
-          Levity Unlifted -> [UnliftedRep]
-          _ -> pprPanic "boxedRepDataCon" (ppr lev)
+      = case tyConAppTyCon_maybe lev of
+          Just tc -> case tyConPromDataConInfo tc of
+            Levity l -> [BoxedRep (Just l)]
+            _        -> [BoxedRep Nothing]
+          Nothing    -> [BoxedRep Nothing]
     prim_rep_fun args
       = pprPanic "boxedRepDataCon" (ppr args)
 

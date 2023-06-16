@@ -20,6 +20,7 @@ types that
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Types.Basic (
         LeftOrRight(..),
@@ -1956,11 +1957,19 @@ isKindLevel KindLevel = True
 data Levity
   = Lifted
   | Unlifted
-  deriving Eq
+  deriving (Data,Eq,Ord,Show)
 
 instance Outputable Levity where
   ppr Lifted   = text "Lifted"
   ppr Unlifted = text "Unlifted"
+
+instance Binary Levity where
+  put_ bh = \case
+    Lifted   -> putByte bh 0
+    Unlifted -> putByte bh 1
+  get bh = getByte bh >>= \case
+    0 -> pure Lifted
+    _ -> pure Unlifted
 
 mightBeLifted :: Maybe Levity -> Bool
 mightBeLifted (Just Unlifted) = False

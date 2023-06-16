@@ -8,7 +8,7 @@ test('T10481', exit_code(1), compile_and_run, [''])
 test('T10678',
      [ collect_stats('bytes allocated',5),
        only_ways(['normal']),
-       js_broken(22360)
+       js_broken(22361)
      ],
      compile_and_run, ['-O'])
 test('T11296', normal, compile_and_run, [''])
