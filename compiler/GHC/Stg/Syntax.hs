@@ -174,10 +174,9 @@ isDllConApp platform ext_dyn_refs this_mod con args
 --
 -- The coercion argument here gets VoidRep
 isAddrRep :: PrimRep -> Bool
-isAddrRep AddrRep     = True
-isAddrRep LiftedRep   = True
-isAddrRep UnliftedRep = True
-isAddrRep _           = False
+isAddrRep AddrRep      = True
+isAddrRep (BoxedRep _) = True -- FIXME: not true for JavaScript
+isAddrRep _            = False
 
 -- | Type of an @StgArg@
 --

@@ -98,8 +98,7 @@ import GHC.Cmm.Dataflow.Collections
 primRepCmmType :: Platform -> PrimRep -> CmmType
 primRepCmmType platform = \case
    VoidRep          -> panic "primRepCmmType:VoidRep"
-   LiftedRep        -> gcWord platform
-   UnliftedRep      -> gcWord platform
+   BoxedRep _       -> gcWord platform
    IntRep           -> bWord platform
    WordRep          -> bWord platform
    Int8Rep          -> b8
@@ -142,8 +141,7 @@ typeCmmType platform ty = primRepCmmType platform (typePrimRep1 ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
 primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
-primRepForeignHint LiftedRep    = AddrHint
-primRepForeignHint UnliftedRep  = AddrHint
+primRepForeignHint (BoxedRep _) = AddrHint
 primRepForeignHint IntRep       = SignedHint
 primRepForeignHint Int8Rep      = SignedHint
 primRepForeignHint Int16Rep     = SignedHint

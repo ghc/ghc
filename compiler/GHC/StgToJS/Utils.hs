@@ -38,7 +38,6 @@ module GHC.StgToJS.Utils
   , assocPrimReps
   , assocIdPrimReps
   , assocIdExprs
-  , mightBeAFunction
   , mkArityTag
   , toTypeList
   -- * Stg Utils
@@ -147,11 +146,11 @@ assignCoerce1 _x _y   = pprPanic "assignCoerce1"
 -- | Assign p2 to p1 with optional coercion
 assignCoerce :: TypedExpr -> TypedExpr -> JStat
 -- Coercion between StablePtr# and Addr#
-assignCoerce (TypedExpr AddrRep [a_val, a_off]) (TypedExpr UnliftedRep [sptr]) = mconcat
+assignCoerce (TypedExpr AddrRep [a_val, a_off]) (TypedExpr (BoxedRep (Just Unlifted)) [sptr]) = mconcat
     [ a_val |= var "h$stablePtrBuf"
     , a_off |= sptr
     ]
-assignCoerce (TypedExpr UnliftedRep [sptr]) (TypedExpr AddrRep [_a_val, a_off]) =
+assignCoerce (TypedExpr (BoxedRep (Just Unlifted)) [sptr]) (TypedExpr AddrRep [_a_val, a_off]) =
   sptr |= a_off
 assignCoerce p1 p2 = assignTypedExprs [p1] [p2]
 
@@ -258,8 +257,7 @@ uTypeVt ut
 
 primRepVt :: HasDebugCallStack => PrimRep -> VarType
 primRepVt VoidRep     = VoidV
-primRepVt LiftedRep   = PtrV -- fixme does ByteArray# ever map to this?
-primRepVt UnliftedRep = RtsObjV
+primRepVt (BoxedRep _) = PtrV -- fixme does ByteArray# ever map to this?
 primRepVt IntRep      = IntV
 primRepVt Int8Rep     = IntV
 primRepVt Int16Rep    = IntV
@@ -316,26 +314,26 @@ primTypeVt t = case tyConAppTyCon_maybe (unwrapType t) of
     | tc == word64PrimTyCon            -> LongV
     | tc == addrPrimTyCon              -> AddrV
     | tc == stablePtrPrimTyCon         -> AddrV
-    | tc == stableNamePrimTyCon        -> RtsObjV
+    | tc == stableNamePrimTyCon        -> PtrV
     | tc == statePrimTyCon             -> VoidV
     | tc == proxyPrimTyCon             -> VoidV
     | tc == realWorldTyCon             -> VoidV
-    | tc == threadIdPrimTyCon          -> RtsObjV
-    | tc == weakPrimTyCon              -> RtsObjV
+    | tc == threadIdPrimTyCon          -> PtrV
+    | tc == weakPrimTyCon              -> PtrV
     | tc == arrayPrimTyCon             -> ArrV
     | tc == smallArrayPrimTyCon        -> ArrV
     | tc == byteArrayPrimTyCon         -> ObjV -- can contain any JS reference, used for JSVal
     | tc == mutableArrayPrimTyCon      -> ArrV
     | tc == smallMutableArrayPrimTyCon -> ArrV
     | tc == mutableByteArrayPrimTyCon  -> ObjV -- can contain any JS reference, used for JSVal
-    | tc == mutVarPrimTyCon            -> RtsObjV
-    | tc == mVarPrimTyCon              -> RtsObjV
-    | tc == tVarPrimTyCon              -> RtsObjV
-    | tc == bcoPrimTyCon               -> RtsObjV -- unsupported?
-    | tc == stackSnapshotPrimTyCon     -> RtsObjV
-    | tc == ioPortPrimTyCon            -> RtsObjV -- unsupported?
+    | tc == mutVarPrimTyCon            -> PtrV
+    | tc == mVarPrimTyCon              -> PtrV
+    | tc == tVarPrimTyCon              -> PtrV
+    | tc == bcoPrimTyCon               -> PtrV -- unsupported?
+    | tc == stackSnapshotPrimTyCon     -> PtrV
+    | tc == ioPortPrimTyCon            -> PtrV -- unsupported?
     | tc == anyTyCon                   -> PtrV
-    | tc == compactPrimTyCon           -> ObjV -- unsupported?
+    | tc == compactPrimTyCon           -> PtrV -- unsupported?
     | tc == eqPrimTyCon                -> VoidV -- coercion token?
     | tc == eqReprPrimTyCon            -> VoidV -- role
     | tc == unboxedUnitTyCon           -> VoidV -- Void#
@@ -391,17 +389,6 @@ assocIdPrimReps i = assocPrimReps (idPrimReps i)
 -- number of slots per PrimRep
 assocIdExprs :: Id -> [JExpr] -> [TypedExpr]
 assocIdExprs i es = fmap (uncurry TypedExpr) (assocIdPrimReps i es)
-
--- | Return False only if we are *sure* it's a data type
--- Look through newtypes etc as much as possible
-mightBeAFunction :: HasDebugCallStack => Type -> Bool
-mightBeAFunction ty
-  | [LiftedRep] <- typePrimRep ty
-  , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
-  , isDataTyCon tc
-  = False
-  | otherwise
-  = True
 
 mkArityTag :: Int -> Int -> Int
 mkArityTag arity registers = arity Bits..|. (registers `Bits.shiftL` 8)

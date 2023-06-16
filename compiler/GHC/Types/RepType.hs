@@ -315,8 +315,10 @@ typeSlotTy ty = case typePrimRep ty of
 
 primRepSlot :: PrimRep -> SlotTy
 primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")
-primRepSlot LiftedRep   = PtrLiftedSlot
-primRepSlot UnliftedRep = PtrUnliftedSlot
+primRepSlot (BoxedRep mlev) = case mlev of
+  Nothing       -> panic "primRepSlot: levity polymorphic BoxedRep"
+  Just Lifted   -> PtrLiftedSlot
+  Just Unlifted -> PtrUnliftedSlot
 primRepSlot IntRep      = WordSlot
 primRepSlot Int8Rep     = WordSlot
 primRepSlot Int16Rep    = WordSlot
@@ -333,8 +335,8 @@ primRepSlot DoubleRep   = DoubleSlot
 primRepSlot (VecRep n e) = VecSlot n e
 
 slotPrimRep :: SlotTy -> PrimRep
-slotPrimRep PtrLiftedSlot   = LiftedRep
-slotPrimRep PtrUnliftedSlot = UnliftedRep
+slotPrimRep PtrLiftedSlot   = BoxedRep (Just Lifted)
+slotPrimRep PtrUnliftedSlot = BoxedRep (Just Unlifted)
 slotPrimRep Word64Slot      = Word64Rep
 slotPrimRep WordSlot        = WordRep
 slotPrimRep DoubleSlot      = DoubleRep
@@ -635,8 +637,10 @@ runtimeRepPrimRep_maybe rr_ty
 primRepToRuntimeRep :: PrimRep -> RuntimeRepType
 primRepToRuntimeRep rep = case rep of
   VoidRep       -> zeroBitRepTy
-  LiftedRep     -> liftedRepTy
-  UnliftedRep   -> unliftedRepTy
+  BoxedRep mlev -> case mlev of
+    Nothing       -> panic "primRepToRuntimeRep: levity polymorphic BoxedRep"
+    Just Lifted   -> liftedRepTy
+    Just Unlifted -> unliftedRepTy
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy
@@ -688,7 +692,7 @@ mightBeFunTy :: Type -> Bool
 -- AK: It would be nice to figure out and document the difference
 -- between this and isFunTy at some point.
 mightBeFunTy ty
-  | [LiftedRep] <- typePrimRep ty
+  | [BoxedRep _] <- typePrimRep ty
   , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc
   = False

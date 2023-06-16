@@ -113,7 +113,7 @@ function h$verify_rep_is_bytearray(o) {
 function h$verify_rep_heapobj(o) {
   // possibly an unlifted rts object
   // XXX: we should do a different check for these
-  if(h$verify_rep_is_rtsobj(o)) return;
+  if(h$verify_rep_is_rtsobj(o)) return h$verify_rep_rtsobj(o);
   // unboxed rep
   if(typeof o === 'number' || typeof o === 'boolean') return;
   // boxed rep

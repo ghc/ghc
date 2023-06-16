@@ -53,8 +53,7 @@ cgLit (LitString s) =
 cgLit (LitRubbish _ rep) =
   case expectOnly "cgLit" prim_reps of -- Note [Post-unarisation invariants]
     VoidRep     -> panic "cgLit:VoidRep"   -- ditto
-    LiftedRep   -> idInfoToAmode <$> getCgIdInfo unitDataConId
-    UnliftedRep -> idInfoToAmode <$> getCgIdInfo unitDataConId
+    BoxedRep _  -> idInfoToAmode <$> getCgIdInfo unitDataConId
     AddrRep     -> cgLit LitNullAddr
     VecRep n elem -> do
       platform <- getPlatform

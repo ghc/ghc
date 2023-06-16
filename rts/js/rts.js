@@ -245,7 +245,7 @@ function h$printcl(i) {
     r += " ";
     switch(cl.i[i]) {
       case h$vt_ptr:
-      r += "[ Ptr :: " + d["d"+idx].f.n + "]";
+      r += "[ Ptr :: " + d["d"+idx] + "]";
       idx++;
       break;
       case h$vt_void:
@@ -266,10 +266,6 @@ function h$printcl(i) {
       case h$vt_addr:
       r += "(" + d["d"+idx].length + "," + d["d"+(idx+1)] + " :: ptr)";
       idx+=2;
-      break;
-      case h$vt_rtsobj:
-      r += "(" + d["d"+idx].toString() + " :: RTS object)";
-      idx++;
       break;
       default:
       r += "unknown field: " + cl.i[i];

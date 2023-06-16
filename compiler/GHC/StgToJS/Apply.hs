@@ -48,6 +48,7 @@ import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.CostCentre
+import GHC.Types.RepType (mightBeFunTy)
 
 import GHC.Stg.Syntax
 
@@ -204,7 +205,7 @@ genApp ctx i args
     -- no args and Id can't be a function: just enter it
     | [] <- args
     , idFunRepArity i == 0
-    , not (mightBeAFunction (idType i))
+    , not (mightBeFunTy (idType i))
     = do
       enter_id <- genIdArg i >>=
                     \case

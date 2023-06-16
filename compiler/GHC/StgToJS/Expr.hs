@@ -382,7 +382,6 @@ verifyRuntimeReps xs = do
     go _          _          = pprPanic "verifyRuntimeReps: inconsistent sizes" (ppr xs)
     ver j PtrV    = v "h$verify_rep_heapobj" [j]
     ver j IntV    = v "h$verify_rep_int"     [j]
-    ver j RtsObjV = v "h$verify_rep_rtsobj"  [j]
     ver j DoubleV = v "h$verify_rep_double"  [j]
     ver j ArrV    = v "h$verify_rep_arr"     [j]
     ver _ _       = mempty

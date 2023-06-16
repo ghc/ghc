@@ -1603,8 +1603,7 @@ primRepToFFIType platform r
      AddrRep     -> FFIPointer
      FloatRep    -> FFIFloat
      DoubleRep   -> FFIDouble
-     LiftedRep   -> FFIPointer
-     UnliftedRep -> FFIPointer
+     BoxedRep _  -> FFIPointer
      _           -> pprPanic "primRepToFFIType" (ppr r)
   where
     (signed_word, unsigned_word) = case platformWordSize platform of
@@ -1629,9 +1628,8 @@ mkDummyLiteral platform pr
         AddrRep     -> LitNullAddr
         DoubleRep   -> LitDouble 0
         FloatRep    -> LitFloat 0
-        LiftedRep   -> LitNullAddr
-        UnliftedRep -> LitNullAddr
-        _         -> pprPanic "mkDummyLiteral" (ppr pr)
+        BoxedRep _  -> LitNullAddr
+        _           -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
 -- Convert (eg)
