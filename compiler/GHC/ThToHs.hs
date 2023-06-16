@@ -2177,9 +2177,11 @@ thRdrNameGuesses (TH.Name occ flavour)
   where
     -- guessed_ns are the name spaces guessed from looking at the TH name
     guessed_nss
-      | isLexCon (mkFastString occ_str) = [OccName.tcName,  OccName.dataName]
-      | otherwise                       = [OccName.varName, OccName.tvName]
+      | isLexCon occ_txt    = [OccName.tcName,  OccName.dataName]
+      | isLexVarSym occ_txt = [OccName.tcName,  OccName.varName] -- #23525
+      | otherwise           = [OccName.varName, OccName.tvName]
     occ_str = TH.occString occ
+    occ_txt = mkFastString occ_str
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> String -> OccName.OccName
