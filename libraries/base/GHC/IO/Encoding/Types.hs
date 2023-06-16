@@ -145,6 +145,7 @@ data CodingProgress = InputUnderflow  -- ^ Stopped because the input contains in
                              , Show -- ^ @since 4.4.0.0
                              )
 
+{-# COMPLETE BufferCodec #-}
 pattern BufferCodec :: CodeBuffer from to
                     -> (Buffer from -> Buffer to -> IO (Buffer from, Buffer to))
                     -> IO ()
