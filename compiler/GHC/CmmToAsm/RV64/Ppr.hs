@@ -654,8 +654,20 @@ pprInstr platform instr = case instr of
 
   -- 9. Floating Point Instructions --------------------------------------------
   FCVT o1 o2 -> op2 (text "\tfcvt") o1 o2
-  SCVTF o1 o2 -> op2 (text "\tscvtf") o1 o2
-  FCVTZS o1 o2 -> op2 (text "\tfcvtzs") o1 o2
+  SCVTF o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.w") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\tfcvt.s.l") o1 o2
+  SCVTF o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.w") o1 o2
+  SCVTF o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\tfcvt.d.l") o1 o2
+  SCVTF o1 o2 -> pprPanic "RV64.pprInstr - impossible integer to float conversion" $
+                  line (pprOp platform o1 <> text "->" <> pprOp platform o2)
+
+  FCVTZS o1@(OpReg W32 _) o2@(OpReg W32 _) -> op2 (text "\fcvt.w.s") o1 o2
+  FCVTZS o1@(OpReg W32 _) o2@(OpReg W64 _) -> op2 (text "\fcvt.l.s") o1 o2
+  FCVTZS o1@(OpReg W64 _) o2@(OpReg W32 _) -> op2 (text "\fcvt.w.d") o1 o2
+  FCVTZS o1@(OpReg W64 _) o2@(OpReg W64 _) -> op2 (text "\fcvt.l.d") o1 o2
+  FCVTZS o1 o2 -> pprPanic "RV64.pprInstr - impossible float to integer conversion" $
+                  line (pprOp platform o1 <> text "->" <> pprOp platform o2)
+
   FABS o1 o2 -> op2 (text "\tfabs") o1 o2
   instr -> panic $ "RV64.pprInstr - Unknown instruction: " ++ (instrCon instr)
  where op2 op o1 o2        = line $ op <+> pprOp platform o1 <> comma <+> pprOp platform o2
