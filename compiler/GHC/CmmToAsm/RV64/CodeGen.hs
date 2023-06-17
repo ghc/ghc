@@ -611,8 +611,20 @@ getRegister' config plat expr
         MO_S_Neg w -> negate code w reg
         MO_F_Neg w -> return $ Any (floatFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
 
-        MO_SF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
-        MO_FS_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVTZS (OpReg to dst) (OpReg from reg)) -- (float convert (-> zero) signed)
+        -- TODO: Can this case happen?
+        MO_SF_Conv from to | from < W32 -> do
+                               -- extend to the smallest available representation
+                               (reg_x, code_x) <- signExtendReg from W32 reg
+                               pure $ Any (floatFormat to)
+                                                    (\dst -> code `appOL` code_x `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg_x)))  -- (Signed ConVerT Float)
+        MO_SF_Conv from to -> pure $ Any (floatFormat to) (\dst -> code `snocOL` annExpr expr (SCVTF (OpReg to dst) (OpReg from reg)))  -- (Signed ConVerT Float)
+        -- TODO: Can this case happen?
+        MO_FS_Conv from to | to < W32 -> pure $ Any (intFormat to) (\dst ->
+                                                                      code `snocOL`
+                                                                      -- W32 is the smallest width to convert to. Decrease width afterwards.
+                                                                      annExpr expr (FCVTZS (OpReg W32 dst) (OpReg from reg)) `appOL`
+                                                                      signExtendAdjustPrecission W32 to dst dst) -- (float convert (-> zero) signed)
+        MO_FS_Conv from to -> pure $ Any (intFormat to) (\dst -> code `snocOL` annExpr expr (FCVTZS (OpReg to dst) (OpReg from reg))) -- (float convert (-> zero) signed)
 
         -- TODO this is very slow. We effectively use store + load (byte, half, word, double)
         --      for this in memory.
