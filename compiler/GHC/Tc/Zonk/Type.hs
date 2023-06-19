@@ -456,21 +456,20 @@ commitFlexi tv zonked_kind
              --    y = (\x -> True) undefined
              -- We need *some* known RuntimeRep for the x and undefined, but no one
              -- will choose it until we get here, in the zonker.
-           | isRuntimeRepTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
-                 ; return liftedRepTy }
-           | isLevityTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVar tv)
-                 ; return liftedDataConTy }
-           | isMultiplicityTy zonked_kind
-           -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
-                 ; return manyDataConTy }
-           | Just (ConcreteFRR origin) <- isConcreteTyVar_maybe tv
-           -> do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
-                 ; return (anyTypeOfKind zonked_kind) }
-           | otherwise
-           -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
-                 ; return (anyTypeOfKind zonked_kind) }
+           -> case isConcreteTyVar_maybe tv of
+                Nothing
+                  -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
+                        ; return (anyTypeOfKind zonked_kind) }
+                Just (ConcreteFRR origin)
+                  | isRuntimeRepTy zonked_kind
+                  -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
+                        ; return liftedRepTy }
+                  | isLevityTy zonked_kind
+                  -> do { traceTc "Defaulting flexi tyvar to Lifted:" (pprTyVar tv)
+                        ; return liftedDataConTy }
+                  | otherwise
+                 -> do { addErr $ TcRnZonkerMessage (ZonkerCannotDefaultConcrete origin)
+                       ; return (anyTypeOfKind zonked_kind) }
 
          RuntimeUnkFlexi
            -> do { traceTc "Defaulting flexi tyvar to RuntimeUnk:" (pprTyVar tv)
