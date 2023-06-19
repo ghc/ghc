@@ -171,11 +171,12 @@ eqDeBruijnExpr (D env1 e1) (D env2 e2) = go e1 e2 where
       && eqDeBruijnExpr (D (extendCME env1 v1) e1) (D (extendCME env2 v2) e2)
 
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = equalLength ps1 ps2
+      =
       -- See Note [Alpha-equality for let-bindings]
-      && all2 (\b1 b2 -> eqDeBruijnType (D env1 (varType b1))
-                                        (D env2 (varType b2)))
-              bs1 bs2
+      -- NB: `all2` returns False if its argument lists differ in length
+      all2 (\b1 b2 -> eqDeBruijnType (D env1 (varType b1))
+                                     (D env2 (varType b2)))
+           bs1 bs2
       && D env1' rs1 == D env2' rs2
       && eqDeBruijnExpr (D env1' e1) (D env2' e2)
       where
