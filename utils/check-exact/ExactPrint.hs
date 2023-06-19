@@ -15,7 +15,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE BlockArguments       #-}
 {-# LANGUAGE UndecidableInstances  #-} -- For the (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ExactPrint instance
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns -Wno-incomplete-record-updates #-}
 
 module ExactPrint
   (
