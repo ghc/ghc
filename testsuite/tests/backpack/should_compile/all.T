@@ -35,7 +35,7 @@ test('bkp40', normal, backpack_compile, [''])
 test('bkp41', normal, backpack_compile, [''])
 test('bkp42', normal, backpack_compile, [''])
 test('bkp43', normal, backpack_compile, [''])
-test('bkp44', normal, backpack_compile, [''])
+# bkp44 moved to bkpcabal08
 test('bkp45', normal, backpack_compile, [''])
 test('bkp46', normal, backpack_compile, [''])
 test('bkp47', normal, backpack_compile, [''])

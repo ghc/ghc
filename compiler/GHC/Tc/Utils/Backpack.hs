@@ -636,7 +636,7 @@ mergeSignatures
                                             -- because we need module
                                             -- LocalSig (from the local
                                             -- export list) to match it!
-                                            is_mod  = mod_name,
+                                            is_mod  = mi_module ireq_iface,
                                             is_as   = mod_name,
                                             is_qual = False,
                                             is_dloc = locA loc
@@ -649,7 +649,7 @@ mergeSignatures
                                     emptyImportAvails
                                     (tcg_semantic_mod tcg_env)
                         case mb_r of
-                            Just (_, as2) -> return (thinModIface as2 ireq_iface, as2)
+                            Just (_, as2, _) -> return (thinModIface as2 ireq_iface, as2)
                             Nothing -> addMessages msgs >> failM
                     -- We can't thin signatures from non-signature packages
                     _ -> return (ireq_iface, as1)
@@ -676,7 +676,7 @@ mergeSignatures
         exports        = nameShapeExports nsubst
         rdr_env        = mkGlobalRdrEnv (gresFromAvails hsc_env Nothing exports)
         _warn_occs     = filter (not . (`elemOccSet` ok_to_use)) (exportOccs exports)
-        warns          = NoWarnings
+        warns          = emptyWarn
         {-
         -- TODO: Warnings are transitive, but this is not what we want here:
         -- if a module reexports an entity from a signature, that should be OK.
@@ -706,7 +706,7 @@ mergeSignatures
 
     -- Make sure we didn't refer to anything that doesn't actually exist
     -- pprTrace "mergeSignatures: exports_from_avail" (ppr exports) $ return ()
-    (mb_lies, _) <- exports_from_avail mb_exports rdr_env
+    (mb_lies, _, _) <- exports_from_avail mb_exports rdr_env
                         (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
 
     {- -- NB: This is commented out, because warns above is disabled.

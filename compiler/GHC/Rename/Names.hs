@@ -387,9 +387,9 @@ rnImportDecl this_mod
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (TcRnSafeImportsDisabled imp_mod_name)
 
-    let
+    let imp_mod = mi_module iface
         qual_mod_name = fmap unLoc as_mod `orElse` imp_mod_name
-        imp_spec  = ImpDeclSpec { is_mod = imp_mod_name, is_qual = qual_only,
+        imp_spec  = ImpDeclSpec { is_mod = imp_mod, is_qual = qual_only,
                                   is_dloc = locA loc, is_as = qual_mod_name }
 
     -- filter the imports according to the import declaration
@@ -620,7 +620,6 @@ warnUnqualifiedImport decl iface =
 
     -- Modules for which we warn if we see unqualified imports
     qualifiedMods = mkModuleSet [ dATA_LIST ]
-
 
 {-
 ************************************************************************
@@ -1193,6 +1192,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
+    import_mod = mi_module iface
     all_avails = mi_exports iface
     hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
     imp_occ_env = mkImportOccEnv hsc_env decl_spec all_avails
@@ -1254,6 +1254,13 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               -- 'badImportItemErr'.
               reason <- badImportItemErr iface decl_spec ie BadImportIsParent all_avails
               pure (TcRnDodgyImports (DodgyImportsHiding reason))
+            warning_msg (DeprecatedExport n w) =
+              pure (TcRnPragmaWarning {
+                      pragma_warning_occ = occName n
+                    , pragma_warning_msg = w
+                    , pragma_warning_import_mod = moduleName import_mod
+                    , pragma_warning_defined_mod = Nothing
+                    })
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of
@@ -1283,15 +1290,20 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
         IEVar _ (L l n) -> do
             -- See Note [Importing DuplicateRecordFields]
             xs <- lookup_names ie (ieWrappedName n)
-            return ( [ (IEVar noExtField (L l (replaceWrappedName n name)), [gre])
-                     | ImpOccItem { imp_item = gre } <- NE.toList xs
+            let gres = map imp_item $ NE.toList xs
+                export_depr_warns
+                  | want_hiding == Exactly
+                      = mapMaybe mk_depr_export_warning gres
+                  | otherwise = []
+            return ( [ (IEVar Nothing (L l (replaceWrappedName n name)), [gre])
+                     | gre <- gres
                      , let name = greName gre ]
-                   , [] )
+                   , export_depr_warns )
 
         IEThingAll _ (L l tc) -> do
             ImpOccItem gre child_gres _ <- lookup_parent ie $ ieWrappedName tc
             let name = greName gre
-                warns
+                imp_list_warn
 
                   | null child_gres
                   -- e.g. f(..) or T(..) where T is a type synonym
@@ -1304,9 +1316,17 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                   | otherwise
                   = []
 
-                renamed_ie = IEThingAll noAnn (L l (replaceWrappedName tc name))
+                renamed_ie = IEThingAll (Nothing, noAnn) (L l (replaceWrappedName tc name))
+                export_depr_warn
+                  | want_hiding == Exactly
+                      = maybeToList $ mk_depr_export_warning gre
+                        -- We don't want to warn about the children as they
+                        -- are not explicitly mentioned; the warning will
+                        -- be emitted later on if they are used
+                  | otherwise = []
 
-            return ([(renamed_ie, gre:child_gres)], warns)
+            return ( [(renamed_ie, gre:child_gres)]
+                   , imp_list_warn ++ export_depr_warn)
 
 
         IEThingAbs _ (L l tc')
@@ -1319,33 +1339,38 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                in
                case catIELookupM [ tc_name, dc_name ] of
                  []    -> failLookupWith (BadImport ie BadImportIsParent)
-                 names -> return ([mkIEThingAbs tc' l (imp_item name) | name <- names], [])
+                 names -> return ( [mkIEThingAbs tc' l (imp_item name) | name <- names], [])
             | otherwise
             -> do ImpOccItem { imp_item = gre } <- lookup_parent ie (ieWrappedName tc')
-                  return ([mkIEThingAbs tc' l gre], [])
+                  return ( [mkIEThingAbs tc' l gre]
+                         , maybeToList $ mk_depr_export_warning gre)
 
-        IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns -> do
+        IEThingWith (deprecation, ann) ltc@(L l rdr_tc) wc rdr_ns -> do
            ImpOccItem { imp_item = gre, imp_bundled = subnames }
-               <- lookup_parent (IEThingAbs noAnn ltc) (ieWrappedName rdr_tc)
+               <- lookup_parent (IEThingAbs (Nothing, noAnn) ltc) (ieWrappedName rdr_tc)
            let name = greName gre
 
            -- Look up the children in the sub-names of the parent
            -- See Note [Importing DuplicateRecordFields]
            case lookupChildren subnames rdr_ns of
 
-             Failed rdrs -> failLookupWith (BadImport (IEThingWith xt ltc wc rdrs) BadImportIsSubordinate)
+             Failed rdrs -> failLookupWith (BadImport (IEThingWith (deprecation, ann) ltc wc rdrs ) BadImportIsSubordinate)
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
                                 -- c.f. #15412
 
              Succeeded childnames ->
-                return ([ (IEThingWith xt (L l name') wc childnames'
-                          ,gre : map unLoc childnames)]
-                       , [])
+                return ([ (IEThingWith (Nothing, ann) (L l name') wc childnames'
+                          ,gres)]
+                       , export_depr_warns)
 
               where name' = replaceWrappedName rdr_tc name
                     childnames' = map (to_ie_post_rn . fmap greName) childnames
+                    gres = gre : map unLoc childnames
+                    export_depr_warns
+                      | want_hiding == Exactly = mapMaybe mk_depr_export_warning gres
+                      | otherwise              = []
 
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed...
@@ -1353,12 +1378,17 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
 
       where
         mkIEThingAbs tc l gre
-          = (IEThingAbs noAnn (L l (replaceWrappedName tc n)), [gre])
+          = (IEThingAbs (Nothing, noAnn) (L l (replaceWrappedName tc n)), [gre])
           where n = greName gre
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport ie _ | want_hiding == EverythingBut -> return ([], [BadImportW ie])
           _ -> failLookupWith err
+
+        mk_depr_export_warning gre
+          = DeprecatedExport name <$> mi_export_warn_fn (mi_final_exts iface) name
+          where
+            name = greName gre
 
 type IELookupM = MaybeErr IELookupError
 
@@ -1366,6 +1396,7 @@ data IELookupWarning
   = BadImportW (IE GhcPs)
   | MissingImportList
   | DodgyImport GlobalRdrElt
+  | DeprecatedExport Name (WarningTxt GhcRn)
 
 data BadImportIsSubordinate = BadImportIsParent | BadImportIsSubordinate
 
@@ -1947,10 +1978,10 @@ getMinimalImports ie_decls
     to_ie rdr_env _ (Avail c)  -- Note [Overloaded field import]
       = do { let
                gre = expectJust "getMinimalImports Avail" $ lookupGRE_Name rdr_env c
-           ; return $ [IEVar noExtField (to_ie_post_rn $ noLocA $ greName gre)] }
+           ; return $ [IEVar Nothing (to_ie_post_rn $ noLocA $ greName gre)] }
     to_ie _ _ avail@(AvailTC n [_])  -- Exporting the main decl and nothing else
       | availExportsDecl avail
-      = return [IEThingAbs noAnn (to_ie_post_rn $ noLocA n)]
+      = return [IEThingAbs (Nothing, noAnn) (to_ie_post_rn $ noLocA n)]
     to_ie rdr_env iface (AvailTC n cs) =
       case [ xs | avail@(AvailTC x xs) <- mi_exports iface
            , x == n
@@ -1958,11 +1989,11 @@ getMinimalImports ie_decls
            ] of
         [xs]
           | all_used xs
-          -> return [IEThingAll noAnn (to_ie_post_rn $ noLocA n)]
+          -> return [IEThingAll (Nothing, noAnn) (to_ie_post_rn $ noLocA n)]
           | otherwise
           -> do { let ns_gres = map (expectJust "getMinimalImports AvailTC" . lookupGRE_Name rdr_env) cs
                       ns = map greName ns_gres
-                ; return [IEThingWith noAnn (to_ie_post_rn $ noLocA n) NoIEWildcard
+                ; return [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
                                  (map (to_ie_post_rn . noLocA) (filter (/= n) ns))] }
                                        -- Note [Overloaded field import]
         _other
@@ -1972,8 +2003,8 @@ getMinimalImports ie_decls
                       fs = map fieldGREInfo fs_gres
                 ; return $
                   if all_non_overloaded fs
-                  then map (IEVar noExtField . to_ie_post_rn_var . noLocA) ns
-                  else [IEThingWith noAnn (to_ie_post_rn $ noLocA n) NoIEWildcard
+                  then map (IEVar Nothing . to_ie_post_rn_var . noLocA) ns
+                  else [IEThingWith (Nothing, noAnn) (to_ie_post_rn $ noLocA n) NoIEWildcard
                          (map (to_ie_post_rn . noLocA) (filter (/= n) ns))] }
         where
 

@@ -194,7 +194,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    -- Rename deprec decls;
    -- check for duplicates and ensure that deprecated things are defined locally
    -- at the moment, we don't keep these around past renaming
-   rn_warns <- rnSrcWarnDecls all_bndrs warn_decls ;
+   rn_decl_warns <- rnSrcWarnDecls all_bndrs warn_decls ;
 
    -- (H) Rename Everything else
 
@@ -236,7 +236,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
 
         final_tcg_env = let tcg_env' = (last_tcg_env `addTcgDUs` src_dus)
                         in -- we return the deprecs in the env, not in the HsGroup above
-                        tcg_env' { tcg_warns = tcg_warns tcg_env' `plusWarns` rn_warns };
+                        tcg_env' { tcg_warns = insertWarnDecls (tcg_warns tcg_env') rn_decl_warns };
        } ;
    traceRn "finish rnSrc" (ppr rn_group) ;
    traceRn "finish Dus" (ppr src_dus ) ;
@@ -266,9 +266,9 @@ gather them together.
 -}
 
 -- checks that the deprecations are defined locally, and that there are no duplicates
-rnSrcWarnDecls :: NameSet -> [LWarnDecls GhcPs] -> RnM (Warnings GhcRn)
+rnSrcWarnDecls :: NameSet -> [LWarnDecls GhcPs] -> RnM (DeclWarnOccNames GhcRn)
 rnSrcWarnDecls _ []
-  = return NoWarnings
+  = return []
 
 rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
@@ -276,7 +276,7 @@ rnSrcWarnDecls bndr_set decls'
                           in addErrAt (locA loc) (TcRnDuplicateWarningDecls lrdr' rdr))
                warn_rdr_dups
        ; pairs_s <- mapM (addLocMA rn_deprec) decls
-       ; return (WarnSome ((concat pairs_s))) }
+       ; return $ concat pairs_s }
  where
    decls = concatMap (wd_warnings . unLoc) decls'
 

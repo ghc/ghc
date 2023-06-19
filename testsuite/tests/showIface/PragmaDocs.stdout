@@ -1,6 +1,8 @@
-Warnings: x "These are useless"
-          y "These are useless"
-          contains "Use `elem` instead."
+Warnings:
+  Deprecated names: x "These are useless"
+                    y "These are useless"
+                    contains "Use `elem` instead."
+  Deprecated exports: contains "Do not use"
 trusted: none
 require own pkg trusted: False
 docs:
@@ -13,10 +15,6 @@ docs:
        documentation structure:
          avails:
            [contains]
-         avails:
-           [x]
-         avails:
-           [y]
        named chunks:
        haddock options:
        language:

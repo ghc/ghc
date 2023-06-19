@@ -964,7 +964,8 @@ addFingerprints hsc_env iface0
    eps <- hscEPS hsc_env
    let
        decls = mi_decls iface0
-       warn_fn = mkIfaceWarnCache (fromIfaceWarnings $ mi_warns iface0)
+       decl_warn_fn = mkIfaceDeclWarnCache (fromIfaceWarnings $ mi_warns iface0)
+       export_warn_fn = mkIfaceExportWarnCache (fromIfaceWarnings $ mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
         -- The ABI of a declaration represents everything that is made
@@ -1265,22 +1266,23 @@ addFingerprints hsc_env iface0
 
    let
     final_iface_exts = ModIfaceBackend
-      { mi_iface_hash  = iface_hash
-      , mi_mod_hash    = mod_hash
-      , mi_flag_hash   = flag_hash
-      , mi_opt_hash    = opt_hash
-      , mi_hpc_hash    = hpc_hash
-      , mi_plugin_hash = plugin_hash
-      , mi_orphan      = not (   all ifRuleAuto orph_rules
-                                   -- See Note [Orphans and auto-generated rules]
-                              && null orph_insts
-                              && null orph_fis)
-      , mi_finsts      = not (null (mi_fam_insts iface0))
-      , mi_exp_hash    = export_hash
-      , mi_orphan_hash = orphan_hash
-      , mi_warn_fn     = warn_fn
-      , mi_fix_fn      = fix_fn
-      , mi_hash_fn     = lookupOccEnv local_env
+      { mi_iface_hash     = iface_hash
+      , mi_mod_hash       = mod_hash
+      , mi_flag_hash      = flag_hash
+      , mi_opt_hash       = opt_hash
+      , mi_hpc_hash       = hpc_hash
+      , mi_plugin_hash    = plugin_hash
+      , mi_orphan         = not (   all ifRuleAuto orph_rules
+                                      -- See Note [Orphans and auto-generated rules]
+                                 && null orph_insts
+                                 && null orph_fis)
+      , mi_finsts         = not (null (mi_fam_insts iface0))
+      , mi_exp_hash       = export_hash
+      , mi_orphan_hash    = orphan_hash
+      , mi_decl_warn_fn   = decl_warn_fn
+      , mi_export_warn_fn = export_warn_fn
+      , mi_fix_fn         = fix_fn
+      , mi_hash_fn        = lookupOccEnv local_env
       }
     final_iface = iface0 { mi_decls = sorted_decls, mi_extra_decls = sorted_extra_decls, mi_final_exts = final_iface_exts }
    --

@@ -1503,7 +1503,7 @@ shadowNames drop_only_qualified env new_gres = minusOccEnv_C_Ns do_shadowing env
       = ImpSpec id_spec ImpAll
       where
         old_mod_name = moduleName old_mod
-        id_spec      = ImpDeclSpec { is_mod = old_mod_name
+        id_spec      = ImpDeclSpec { is_mod = old_mod
                                    , is_as = old_mod_name
                                    , is_qual = True
                                    , is_dloc = greDefinitionSrcSpan old_gre }
@@ -1653,7 +1653,7 @@ data ImportSpec = ImpSpec { is_decl :: ImpDeclSpec,
 -- shared among all the 'Provenance's for that decl
 data ImpDeclSpec
   = ImpDeclSpec {
-        is_mod      :: ModuleName, -- ^ Module imported, e.g. @import Muggle@
+        is_mod      :: Module,     -- ^ Module imported, e.g. @import Muggle@
                                    -- Note the @Muggle@ may well not be
                                    -- the defining module for this thing!
 
@@ -1774,7 +1774,7 @@ importSpecLoc (ImpSpec decl ImpAll) = is_dloc decl
 importSpecLoc (ImpSpec _    item)   = is_iloc item
 
 importSpecModule :: ImportSpec -> ModuleName
-importSpecModule is = is_mod (is_decl is)
+importSpecModule = moduleName . is_mod . is_decl
 
 isExplicitItem :: ImpItemSpec -> Bool
 isExplicitItem ImpAll                        = False

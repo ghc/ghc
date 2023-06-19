@@ -1,0 +1,37 @@
+
+ExportWarnings3.hs:8:8: warning: [GHC-63394] [-Wx-custom (in -Wextended-warnings)]
+    In the use of type constructor or class ‘S’
+    (imported from ExportWarnings_aux):
+    "is
+     deprecated"
+
+ExportWarnings3.hs:8:20: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘T’
+    (imported from ExportWarnings_base):
+    Deprecated: "warn"
+
+ExportWarnings3.hs:9:5: warning: [GHC-63394] [-Wx-custom (in -Wextended-warnings)]
+    In the use of data constructor ‘S1’
+    (imported from ExportWarnings_aux):
+    "is
+     deprecated"
+
+ExportWarnings3.hs:9:12: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘T1’
+    (imported from ExportWarnings_base):
+    Deprecated: "warn"
+
+ExportWarnings3.hs:10:12: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of data constructor ‘T2’
+    (imported from ExportWarnings_base):
+    Deprecated: "warn"
+
+ExportWarnings3.hs:13:8: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘V’
+    (imported from ExportWarnings_base):
+    Deprecated: ""
+
+ExportWarnings3.hs:13:13: warning: [GHC-68441] [-Wdeprecations (in -Wextended-warnings)]
+    In the use of type constructor or class ‘V’
+    (imported from ExportWarnings_base):
+    Deprecated: ""

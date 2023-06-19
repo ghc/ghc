@@ -101,16 +101,16 @@ other compilers.
     :where: declaration or module name
 
     The ``WARNING`` pragma allows you to attach an arbitrary warning to a
-    particular function, class, type, or module.
+    particular function, class, type, export field or module.
 
 .. pragma:: DEPRECATED
 
     :where: declaration or module name
 
     A ``DEPRECATED`` pragma lets you specify that a particular function, class,
-    type, or module is deprecated.
+    type, export or module is deprecated.
 
-There are two ways of using these pragmas.
+There are three ways of using these pragmas.
 
 -  You can work on an entire module thus: ::
 
@@ -141,6 +141,53 @@ There are two ways of using these pragmas.
    both are in scope. If both are in scope, there is currently no way to
    specify one without the other (c.f. fixities :ref:`infix-tycons`).
 
+-  You can also attach a warning to an export field, be it a regular export: ::
+
+          module Wibble (
+              {-# DEPRECATED "Do not use this type" #-} T,
+              {-# WARNING "This is a hacky function" #-} f
+            ) where
+            ...
+    
+    Or a re-export of import from another module: ::
+          
+          module Wibble (
+              {-# DEPRECATED "Import this function from A instead" #-} g
+            ) where
+          import A
+    
+   Or a re-export of an entire module: ::
+        
+          module Wibble (
+              {-# DEPRECATED "This declaration has been moved to B instead"
+                module B
+            ) where
+          import B
+   
+   When you compile any module that imports and uses any of the
+   specified entities, GHC will print the specified message.
+
+   An entity will only be warned about if all of its exports are deprecated: ::
+          
+          module Wibble (
+              {-# WARNING "This would not be warned about" #-} g,
+              module A
+            )
+          import A (g)
+   
+   If the :ghc-flag: `-Wincomplete-export-warnings` is on, 
+   such occurences are warned about.
+
+   Moreover, all warning declarations of a specific name have to 
+   be warned with the same pragma and message: ::
+          
+          module Wibble (
+              {-# WARNING "This would throw an error" #-} T(T1),
+              {-# WARNING "Because the warning messages differ for T" #-} T,
+          )
+          ...
+
+
 Also note that the argument to ``DEPRECATED`` and ``WARNING`` can also be a list
 of strings, in which case the strings will be presented on separate lines in the
 resulting warning message, ::
@@ -148,10 +195,12 @@ resulting warning message, ::
     {-# DEPRECATED foo, bar ["Don't use these", "Use gar instead"] #-}
 
 Warnings and deprecations are not reported for (a) uses within the
-defining module, (b) defining a method in a class instance, and (c) uses
-in an export list. The latter reduces spurious complaints within a
-library in which one module gathers together and re-exports the exports
-of several others.
+defining module, (b) defining a method in a class instance, 
+(c) unqualified uses of an entity imported through different modules 
+when not all of them are warned about, and (d) uses in an 
+export list (except for export warnings). The latter reduces 
+spurious complaints within a library in which one module gathers together 
+and re-exports the exports of several others.
 
 A ``WARNING`` pragma (but not a ``DEPRECATED`` pragma) may optionally specify a
 *warning category* as a string literal following the ``in`` keyword.  This affects the flag used to suppress
@@ -168,7 +217,7 @@ suppressed with ``-Wno-x-partial``::
 
 Alternatively, warnings from all ``WARNING`` and ``DEPRECATED`` pragmas
 regardless of category can be suppressed with
-:ghc-flag:`-Wno-extended-warnings <-Wextended-warnings>`).
+:ghc-flag:`-Wno-extended-warnings <-Wextended-warnings>`.
 
 
 .. _minimal-pragma:

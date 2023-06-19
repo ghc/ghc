@@ -830,7 +830,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              HsRecFieldCon {} -> arg_in_scope lbl
                              _other           -> True ]
 
-           ; addUsedGREs dot_dot_gres
+           ; addUsedGREs NoDeprecationWarnings dot_dot_gres
            ; let locn = noAnnSrcSpan loc
            ; return [ L (noAnnSrcSpan loc) (HsFieldBind
                         { hfbAnn = noAnn

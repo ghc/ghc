@@ -729,6 +729,11 @@ PprCommentPlacement2:
 	$(CHECK_PPR)   $(LIBDIR) PprCommentPlacement2.hs
 	$(CHECK_EXACT) $(LIBDIR) PprCommentPlacement2.hs
 
+.PHONY: PprExportWarn
+PprExportWarn:
+	$(CHECK_PPR)   $(LIBDIR) PprExportWarn.hs
+	$(CHECK_EXACT) $(LIBDIR) PprExportWarn.hs
+
 .PHONY: Test20243
 Test20243:
 	$(CHECK_PPR)   $(LIBDIR) Test20243.hs

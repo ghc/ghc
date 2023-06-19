@@ -38,6 +38,8 @@ import GHC.Hs.Extension
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
+import GHC.Unit.Module.Warnings (WarningTxt)
+
 import Data.Data
 import Data.Maybe
 
@@ -198,16 +200,39 @@ type instance Anno (IEWrappedName (GhcPass _)) = SrcSpanAnnA
 
 type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 
-type instance XIEVar             GhcPs = NoExtField
-type instance XIEVar             GhcRn = NoExtField
-type instance XIEVar             GhcTc = NoExtField
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEVar       GhcPs = Maybe (LocatedP (WarningTxt GhcPs))
+type instance XIEVar       GhcRn = Maybe (LocatedP (WarningTxt GhcRn))
+type instance XIEVar       GhcTc = NoExtField
 
-type instance XIEThingAbs        (GhcPass _) = EpAnn [AddEpAnn]
-type instance XIEThingAll        (GhcPass _) = EpAnn [AddEpAnn]
-type instance XIEThingWith       (GhcPass _) = EpAnn [AddEpAnn]
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEThingAbs  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
+type instance XIEThingAbs  GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingAbs  GhcTc = EpAnn [AddEpAnn]
 
-type instance XIEModuleContents  GhcPs = EpAnn [AddEpAnn]
-type instance XIEModuleContents  GhcRn = NoExtField
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEThingAll  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
+type instance XIEThingAll  GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingAll  GhcTc = EpAnn [AddEpAnn]
+
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEThingWith GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
+type instance XIEThingWith GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingWith GhcTc = EpAnn [AddEpAnn]
+
+-- The additional field of type 'Maybe (WarningTxt pass)' holds information
+-- about export deprecation annotations and is thus set to Nothing when `IE`
+-- is used in an import list (since export deprecation can only be used in exports)
+type instance XIEModuleContents  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
+type instance XIEModuleContents  GhcRn = Maybe (LocatedP (WarningTxt GhcRn))
 type instance XIEModuleContents  GhcTc = NoExtField
 
 type instance XIEGroup           (GhcPass _) = NoExtField
@@ -236,6 +261,22 @@ ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
 
+ieDeprecation :: forall p. IsPass p => IE (GhcPass p) -> Maybe (WarningTxt (GhcPass p))
+ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
+  where
+    ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+    ie_deprecation GhcPs (IEVar xie _) = xie
+    ie_deprecation GhcPs (IEThingAbs (xie, _) _) = xie
+    ie_deprecation GhcPs (IEThingAll (xie, _) _) = xie
+    ie_deprecation GhcPs (IEThingWith (xie, _) _ _ _) = xie
+    ie_deprecation GhcPs (IEModuleContents (xie, _) _) = xie
+    ie_deprecation GhcRn (IEVar xie _) = xie
+    ie_deprecation GhcRn (IEThingAbs (xie, _) _) = xie
+    ie_deprecation GhcRn (IEThingAll (xie, _) _) = xie
+    ie_deprecation GhcRn (IEThingWith (xie, _) _ _ _) = xie
+    ie_deprecation GhcRn (IEModuleContents xie _) = xie
+    ie_deprecation _ _ = Nothing
+
 ieWrappedLName :: IEWrappedName (GhcPass p) -> LIdP (GhcPass p)
 ieWrappedLName (IEName    _ (L l n)) = L l n
 ieWrappedLName (IEPattern _ (L l n)) = L l n
@@ -260,11 +301,11 @@ replaceLWrappedName :: LIEWrappedName GhcPs -> IdP GhcRn -> LIEWrappedName GhcRn
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
 instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
-    ppr (IEVar       _     var) = ppr (unLoc var)
-    ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
-    ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
-    ppr (IEThingWith _ thing wc withs)
-        = ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))
+    ppr ie@(IEVar       _     var) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc var)]
+    ppr ie@(IEThingAbs  _   thing) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc thing)]
+    ppr ie@(IEThingAll  _   thing) = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ hcat [ppr (unLoc thing), text "(..)"]]
+    ppr ie@(IEThingWith _ thing wc withs)
+        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ ppr (unLoc thing) <> parens (fsep (punctuate comma ppWiths))]
       where
         ppWiths =
           case wc of
@@ -273,8 +314,8 @@ instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
               IEWildcard pos ->
                 let (bs, as) = splitAt pos (map (ppr . unLoc) withs)
                 in bs ++ [text ".."] ++ as
-    ppr (IEModuleContents _ mod')
-        = text "module" <+> ppr mod'
+    ppr ie@(IEModuleContents _ mod')
+        = sep $ catMaybes [ppr <$> ieDeprecation ie, Just $ text "module" <+> ppr mod']
     ppr (IEGroup _ n _)           = text ("<IEGroup: " ++ show n ++ ">")
     ppr (IEDoc _ doc)             = ppr doc
     ppr (IEDocNamed _ string)     = text ("<IEDocNamed: " ++ string ++ ">")

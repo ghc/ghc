@@ -1419,7 +1419,7 @@ getPackageModuleInfo hsc_env mdl
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
 
-        let !rdr_env = availsToGlobalRdrEnv hsc_env (moduleName mdl) avails
+        let !rdr_env = availsToGlobalRdrEnv hsc_env mdl avails
         -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
 
         return (Just (ModuleInfo {
@@ -1432,7 +1432,7 @@ getPackageModuleInfo hsc_env mdl
                         minf_modBreaks = emptyModBreaks
                 }))
 
-availsToGlobalRdrEnv :: HasDebugCallStack => HscEnv -> ModuleName -> [AvailInfo] -> IfGlobalRdrEnv
+availsToGlobalRdrEnv :: HasDebugCallStack => HscEnv -> Module -> [AvailInfo] -> IfGlobalRdrEnv
 availsToGlobalRdrEnv hsc_env mod avails
   = forceGlobalRdrEnv rdr_env
     -- See Note [Forcing GREInfo] in GHC.Types.GREInfo.
@@ -1441,7 +1441,7 @@ availsToGlobalRdrEnv hsc_env mod avails
       -- We're building a GlobalRdrEnv as if the user imported
       -- all the specified modules into the global interactive module
     imp_spec = ImpSpec { is_decl = decl, is_item = ImpAll}
-    decl = ImpDeclSpec { is_mod = mod, is_as = mod,
+    decl = ImpDeclSpec { is_mod = mod, is_as = moduleName mod,
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
 

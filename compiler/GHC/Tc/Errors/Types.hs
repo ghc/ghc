@@ -2528,8 +2528,30 @@ data TcRnMessage where
     pragma_warning_occ :: OccName,
     pragma_warning_msg :: WarningTxt GhcRn,
     pragma_warning_import_mod :: ModuleName,
-    pragma_warning_defined_mod :: ModuleName
+    pragma_warning_defined_mod :: Maybe ModuleName
   } -> TcRnMessage
+
+  {-| TcRnDifferentExportWarnings is an error that occurs when the
+     warning messages for exports of a name differ between several export items.
+
+     Test case:
+      DifferentExportWarnings
+  -}
+  TcRnDifferentExportWarnings :: !Name -- ^ The name with different export warnings
+                              -> NE.NonEmpty SrcSpan -- ^ The locations of export list items that differ
+                                            --   from the one at which the error is reported
+                              -> TcRnMessage
+
+  {-| TcRnIncompleteExportWarnings is a warning (controlled by -Wincomplete-export-warnings) that
+     occurs when some of the exports of a name do not have an export warning and some do
+
+     Test case:
+      ExportWarnings6
+  -}
+  TcRnIncompleteExportWarnings :: !Name -- ^ The name that is exported
+                               -> NE.NonEmpty SrcSpan -- ^ The locations of export list items that are
+                                             --   missing the export warning
+                               -> TcRnMessage
 
   {-| TcRnIllegalHsigDefaultMethods is an error that occurs when a binding for
      a class default method is provided in a Backpack signature file.

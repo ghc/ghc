@@ -647,6 +647,7 @@ data WarningFlag =
    | Opt_WarnTermVariableCapture                     -- Since 9.8
    | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
+   | Opt_WarnIncompleteExportWarnings                -- Since 9.8
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -756,6 +757,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnTypeEqualityRequiresOperators           -> "type-equality-requires-operators" :| []
   Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
+  Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -928,7 +930,8 @@ minusWallOpts
         Opt_WarnUnusedRecordWildcards,
         Opt_WarnRedundantRecordWildcards,
         Opt_WarnIncompleteUniPatterns,
-        Opt_WarnIncompletePatternsRecUpd
+        Opt_WarnIncompletePatternsRecUpd,
+        Opt_WarnIncompleteExportWarnings
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

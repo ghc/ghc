@@ -198,6 +198,7 @@ import Data.List ( mapAccumL )
 import Data.Foldable
 import qualified Data.Semigroup as S
 import GHC.Types.SrcLoc
+import GHC.Rename.Env
 
 #if defined(DEBUG)
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -1372,7 +1373,7 @@ tcLookupTyCon n = wrapTcS $ TcM.tcLookupTyCon n
 -- might), so it's not worth losing sleep over.
 recordUsedGREs :: Bag GlobalRdrElt -> TcS ()
 recordUsedGREs gres
-  = do { wrapTcS $ TcM.addUsedGREs gre_list
+  = do { wrapTcS $ TcM.addUsedGREs NoDeprecationWarnings gre_list
          -- If a newtype constructor was imported, don't warn about not
          -- importing it...
        ; wrapTcS $ traverse_ (TcM.keepAlive . greName) gre_list }

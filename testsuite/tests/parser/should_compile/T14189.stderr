@@ -186,14 +186,16 @@
      (L
       (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-15 })
       (IEThingWith
-       (EpAnn
-        (Anchor
-         { T14189.hs:3:3-8 }
-         (UnchangedAnchor))
-        [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
-        (EpaComments
-         []))
+       ((,)
+        (Nothing)
+        (EpAnn
+         (Anchor
+          { T14189.hs:3:3-8 }
+          (UnchangedAnchor))
+         [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
+         ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
+         (EpaComments
+          [])))
        (L
         (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:3:3-8 })
         (IEName

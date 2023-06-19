@@ -345,9 +345,9 @@ data IfaceRule
     }
 
 data IfaceWarnings
-  = IfNoWarnings
-  | IfWarnAll IfaceWarningTxt
+  = IfWarnAll IfaceWarningTxt
   | IfWarnSome [(OccName, IfaceWarningTxt)]
+               [(IfExtName, IfaceWarningTxt)]
 
 data IfaceWarningTxt
   = IfWarningTxt (Maybe WarningCategory) SourceText [(IfaceStringLiteral, [IfExtName])]
@@ -584,9 +584,9 @@ ifaceDeclFingerprints hash decl
 
 fromIfaceWarnings :: IfaceWarnings -> Warnings GhcRn
 fromIfaceWarnings = \case
-    IfNoWarnings -> NoWarnings
     IfWarnAll txt -> WarnAll (fromIfaceWarningTxt txt)
-    IfWarnSome prs -> WarnSome [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- prs]
+    IfWarnSome vs ds -> WarnSome [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- vs]
+                                 [(occ, fromIfaceWarningTxt txt) | (occ, txt) <- ds]
 
 fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
@@ -753,9 +753,11 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
 
 instance Outputable IfaceWarnings where
     ppr = \case
-        IfNoWarnings -> empty
         IfWarnAll txt -> text "Warn all" <+> ppr txt
-        IfWarnSome prs -> text "Warnings:" <+> vcat [ppr name <+> ppr txt | (name, txt) <- prs]
+        IfWarnSome vs ds ->
+          hang (text "Warnings:") 2 $
+            text "Deprecated names:" <+> vcat [ppr name <+> ppr txt | (name, txt) <- vs] $$
+            text "Deprecated exports:" <+> vcat [ppr name <+> ppr txt | (name, txt) <- ds]
 
 instance Outputable IfaceWarningTxt where
     ppr = \case
@@ -2322,13 +2324,12 @@ instance Binary IfaceRule where
 
 instance Binary IfaceWarnings where
     put_ bh = \case
-        IfNoWarnings   -> putByte bh 0
-        IfWarnAll txt  -> putByte bh 1 *> put_ bh txt
-        IfWarnSome prs -> putByte bh 2 *> put_ bh prs
+        IfWarnAll txt  -> putByte bh 0 *> put_ bh txt
+        IfWarnSome vs ds -> putByte bh 1 *> put_ bh vs *> put_ bh ds
     get bh = getByte bh >>= \case
-        0 -> pure IfNoWarnings
-        1 -> pure IfWarnAll    <*> get bh
-        _ -> pure IfWarnSome   <*> get bh
+        0 -> pure IfWarnAll    <*> get bh
+        1 -> pure IfWarnSome   <*> get bh <*> get bh
+        _ -> fail "invalid tag(IfaceWarnings)"
 
 instance Binary IfaceWarningTxt where
     put_ bh = \case
@@ -2901,9 +2902,8 @@ instance NFData IfaceClsInst where
 
 instance NFData IfaceWarnings where
   rnf = \case
-      IfNoWarnings    -> ()
       IfWarnAll txt   -> rnf txt
-      IfWarnSome txts -> rnf txts
+      IfWarnSome vs ds -> rnf vs `seq` rnf ds
 
 instance NFData IfaceWarningTxt where
     rnf = \case

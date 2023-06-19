@@ -15,6 +15,7 @@ module GHC.Types.Name.Env (
 
         -- ** Manipulating these environments
         mkNameEnv, mkNameEnvWith,
+        fromUniqMap,
         emptyNameEnv, isEmptyNameEnv,
         unitNameEnv, nonDetNameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
@@ -23,6 +24,7 @@ module GHC.Types.Name.Env (
         mapMaybeNameEnv,
         extendNameEnvListWith,
         plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
+        plusNameEnvList, plusNameEnvListWith,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
         seqEltsNameEnv,
@@ -49,6 +51,7 @@ import GHC.Data.Graph.Directed
 import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
+import GHC.Types.Unique.Map
 import GHC.Data.Maybe
 
 {-
@@ -105,6 +108,7 @@ emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
 mkNameEnv          :: [(Name,a)] -> NameEnv a
 mkNameEnvWith      :: (a -> Name) -> [a] -> NameEnv a
+fromUniqMap        :: UniqMap Name a -> NameEnv a
 nonDetNameEnvElts  :: NameEnv a -> [a]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
@@ -114,6 +118,8 @@ plusNameEnv        :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C      :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_CD     :: (a->a->a) -> NameEnv a -> a -> NameEnv a -> a -> NameEnv a
 plusNameEnv_CD2    :: (Maybe a->Maybe a->a) -> NameEnv a -> NameEnv a -> NameEnv a
+plusNameEnvList    :: [NameEnv a] -> NameEnv a
+plusNameEnvListWith :: (a->a->a) -> [NameEnv a] -> NameEnv a
 extendNameEnvList  :: NameEnv a -> [(Name,a)] -> NameEnv a
 extendNameEnvListWith :: (a -> Name) -> NameEnv a -> [a] -> NameEnv a
 extendNameEnvList_C :: (a->a->a) -> NameEnv a -> [(Name,a)] -> NameEnv a
@@ -141,12 +147,17 @@ lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
 mkNameEnv     l       = listToUFM l
 mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
+fromUniqMap           = mapUFM snd . getUniqMap
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
 {-# INLINE plusNameEnv_CD #-}
 plusNameEnv_CD f x d y b = plusUFM_CD f x d y b
 plusNameEnv_CD2 f x y    = plusUFM_CD2 f x y
+{-# INLINE plusNameEnvList #-}
+plusNameEnvList xs       = plusUFMList xs
+{-# INLINE plusNameEnvListWith #-}
+plusNameEnvListWith f xs = plusUFMListWith f xs
 extendNameEnv_C f x y z  = addToUFM_C f x y z
 mapNameEnv f x           = mapUFM f x
 extendNameEnv_Acc x y z a b  = addToUFM_Acc x y z a b

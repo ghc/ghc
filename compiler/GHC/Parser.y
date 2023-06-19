@@ -1026,11 +1026,24 @@ exportlist1 :: { OrdList (LIE GhcPs) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE GhcPs) }
-        : qcname_ext export_subspec  {% mkModuleImpExp (fst $ unLoc $2) $1 (snd $ unLoc $2)
-                                          >>= \ie -> fmap (unitOL . reLocA) (return (sLL (reLoc $1) $> ie)) }
-        |  'module' modid            {% fmap (unitOL . reLocA) (acs (\cs -> sLL $1 (reLoc $>) (IEModuleContents (EpAnn (glR $1) [mj AnnModule $1] cs) $2))) }
-        |  'pattern' qcon            { unitOL (reLocA (sLL $1 (reLocN $>)
-                                              (IEVar noExtField (sLLa $1 (reLocN $>) (IEPattern (glAA $1) $2))))) }
+        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 (comb3 . reLoc) $1) (reLoc $2) $> }
+                                                          ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
+                                                          ; return $ unitOL $ reLocA $ sL span $ impExp } }
+        | maybeexportwarning 'module' modid            {% do { let { span = (maybe comb2 (comb3 . reLoc) $1) $2 (reLoc $>)
+                                                                   ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 (reLoc loc)) $1) $2 }
+                                                          ; locImpExp <- acs (\cs -> sL span (IEModuleContents ($1, EpAnn anchor [mj AnnModule $2] cs) $3))
+                                                          ; return $ unitOL $ reLocA $ locImpExp } }
+        | maybeexportwarning 'pattern' qcon            { let span = (maybe comb2 (comb3 . reLoc) $1) $2 (reLoc $>)
+                                                       in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 (reLocN $>) (IEPattern (glAA $2) $3)) }
+
+maybeexportwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
+        : '{-# DEPRECATED' strings '#-}'
+                            {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
+                                (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
+        | '{-# WARNING' warning_category strings '#-}'
+                            {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                                (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
+        |  {- empty -}      { Nothing }
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1166,12 +1179,39 @@ maybeimpspec :: { Located (Maybe (ImportListInterpretation, LocatedL [LIE GhcPs]
         | {- empty -}              { noLoc Nothing }
 
 impspec :: { Located (ImportListInterpretation, LocatedL [LIE GhcPs]) }
-        :  '(' exportlist ')'               {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $2)
+        :  '(' importlist ')'               {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $2)
                                                                (AnnList Nothing (Just $ mop $1) (Just $ mcp $3) (fst $2) [])
                                                   ; return $ sLL $1 $> (Exactly, es)} }
-        |  'hiding' '(' exportlist ')'      {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $3)
+        |  'hiding' '(' importlist ')'      {% do { es <- amsrl (sLL $1 $> $ fromOL $ snd $3)
                                                                (AnnList Nothing (Just $ mop $2) (Just $ mcp $4) (mj AnnHiding $1:fst $3) [])
                                                   ; return $ sLL $1 $> (EverythingBut, es)} }
+
+importlist :: { ([AddEpAnn], OrdList (LIE GhcPs)) }
+        : importlist1     { ([], $1) }
+        | {- empty -}     { ([], nilOL) }
+
+        -- trailing comma:
+        | importlist1 ',' {% case $1 of
+                               SnocOL hs t -> do
+                                 t' <- addTrailingCommaA t (gl $2)
+                                 return ([], snocOL hs t')}
+        | ','             { ([mj AnnComma $1], nilOL) }
+
+importlist1 :: { OrdList (LIE GhcPs) }
+        : importlist1 ',' import
+                          {% let ls = $1
+                             in if isNilOL ls
+                                  then return (ls `appOL` $3)
+                                  else case ls of
+                                         SnocOL hs t -> do
+                                           t' <- addTrailingCommaA t (gl $2)
+                                           return (snocOL hs t' `appOL` $3)}
+        | import          { $1 }
+
+import  :: { OrdList (LIE GhcPs) }
+        : qcname_ext export_subspec {% fmap (unitOL . reLocA . (sLL (reLoc $1) $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
+        | 'module' modid            {% fmap (unitOL . reLocA) $ acs (\cs -> sLL $1 (reLoc $>) (IEModuleContents (Nothing, EpAnn (glR $1) [mj AnnModule $1] cs) $2)) }
+        | 'pattern' qcon            { unitOL $ reLocA $ sLL $1 (reLocN $>) $ IEVar Nothing (sLLa $1 (reLocN $>) (IEPattern (glAA $1) $2)) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations

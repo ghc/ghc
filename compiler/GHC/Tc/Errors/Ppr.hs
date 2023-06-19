@@ -1095,8 +1095,14 @@ instance Diagnostic TcRnMessage where
           , pprWarningTxtForMsg pragma_warning_msg ]
           where
             impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
-            extra | pragma_warning_import_mod == pragma_warning_defined_mod = empty
+            extra | maybe True (pragma_warning_import_mod ==) pragma_warning_defined_mod = empty
                   | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
+    TcRnDifferentExportWarnings name locs
+      -> mkSimpleDecorated $ vcat [quotes (ppr name) <+> text "exported with different error messages",
+                                   text "at" <+> vcat (map ppr $ sortBy leftmost_smallest $ NE.toList locs)]
+    TcRnIncompleteExportWarnings name locs
+      -> mkSimpleDecorated $ vcat [quotes (ppr name) <+> text "will not have its export warned about",
+                                   text "missing export warning at" <+> vcat (map ppr $ sortBy leftmost_smallest $ NE.toList locs)]
     TcRnIllegalHsigDefaultMethods name meths
       -> mkSimpleDecorated $
         text "Illegal default method" <> plural (NE.toList meths) <+> text "in class definition of" <+> ppr name <+> text "in hsig file"
@@ -2180,6 +2186,10 @@ instance Diagnostic TcRnMessage where
       -> WarningWithoutFlag
     TcRnPragmaWarning{pragma_warning_msg}
       -> WarningWithCategory (warningTxtCategory pragma_warning_msg)
+    TcRnDifferentExportWarnings _ _
+      -> ErrorWithoutFlag
+    TcRnIncompleteExportWarnings _ _
+      -> WarningWithFlag Opt_WarnIncompleteExportWarnings
     TcRnIllegalHsigDefaultMethods{}
       -> ErrorWithoutFlag
     TcRnHsigFixityMismatch{}
@@ -2818,6 +2828,10 @@ instance Diagnostic TcRnMessage where
       -> [SuggestSpecialiseVisibilityHints name]
     TcRnPragmaWarning{}
       -> noHints
+    TcRnDifferentExportWarnings _ _
+      -> noHints
+    TcRnIncompleteExportWarnings _ _
+      -> noHints
     TcRnIllegalHsigDefaultMethods{}
       -> noHints
     TcRnIllegalQuasiQuotes{}
@@ -3074,13 +3088,13 @@ instance Diagnostic TcRnMessage where
     TcRnRedundantSourceImport{}
       -> noHints
     TcRnImportLookup (ImportLookupBad k _ is ie patsyns_enabled) ->
-      let mod = is_mod is
+      let mod_name = moduleName $ is_mod is
           occ = rdrNameOcc $ ieName ie
       in case k of
-        BadImportAvailVar         -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod]
+        BadImportAvailVar         -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
         BadImportNotExported      -> noHints
-        BadImportAvailTyCon       -> [ImportSuggestion occ $ CouldAddTypeKeyword (is_mod is)]
-        BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (is_mod is, patsyns_enabled)) par]
+        BadImportAvailTyCon       -> [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
+        BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
         BadImportNotExportedSubordinates{} -> noHints
     TcRnImportLookup{}
       -> noHints
@@ -3272,7 +3286,7 @@ dodgy_msg kind tc ie
              , text "but it is not a type constructor or a class" ]
 
 dodgy_msg_insert :: GlobalRdrElt -> IE GhcRn
-dodgy_msg_insert tc_gre = IEThingAll noAnn ii
+dodgy_msg_insert tc_gre = IEThingAll (Nothing, noAnn) ii
   where
     ii = noLocA (IEName noExtField $ noLocA $ greName tc_gre)
 
@@ -5322,7 +5336,7 @@ pprImportLookup = \case
     let
       pprImpDeclSpec :: ModIface -> ImpDeclSpec -> SDoc
       pprImpDeclSpec iface decl_spec =
-        quotes (ppr (is_mod decl_spec)) <+> case mi_boot iface of
+        quotes (ppr (moduleName $ is_mod decl_spec)) <+> case mi_boot iface of
             IsBoot  -> text "(hi-boot interface)"
             NotBoot -> empty
       withContext msgs =

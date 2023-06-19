@@ -162,6 +162,23 @@ Compiler
   In a test compiling GHC itself, the size of the :ghc-flag:`-finfo-table-map`
   enabled build results was reduced by over 20% when compression was enabled.
 
+- GHC Proposal `#134
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0134-deprecating-exports-proposal.rst>`_
+  has been implemented. This makes it possible to deprecate certain names exported from a module, without deprecating
+  the name itself. You can check the full specification of the feature at :ref:`warning-deprecated-pragma`.
+
+  For example ::
+
+      module X (
+          {-# WARNING "do not use that constructor" D(D1),
+          D(D2)
+        )
+        D = D1 | D2
+      
+  This allows for changing the structure of a library without immediately breaking user code,
+  but instead being able to warn the user that a change in the library interface
+  will occur in the future.
+
 GHCi
 ~~~~
 
@@ -222,6 +239,11 @@ Runtime system
   to embed GHC diagnostics in their own diagnostic type before they are printed.
   This allows how messages are rendered and explained to users to be modified.
   We use this functionality in GHCi to modify how some messages are displayed.
+
+- The extensions fields of constructors of ``IE`` now take ``Maybe (WarningTxt p)``
+  in ``GhcPs`` and ``GhcRn`` variants of the Syntax Tree. 
+  This represents the warning assigned to a certain export item, 
+  which is used for :ref:`deprecated-exports`.
 
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~

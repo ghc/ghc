@@ -362,7 +362,7 @@ pprSimilarName tried_ns (SimilarRdrName rdr_name how_in_scope)
               RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
       ImportedBy is ->
         pp_ns rdr_name <+> quotes (ppr rdr_name) <+>
-        parens (text "imported from" <+> ppr (is_mod is))
+        parens (text "imported from" <+> ppr (moduleName $ is_mod is))
 
   where
     pp_ns :: RdrName -> SDoc

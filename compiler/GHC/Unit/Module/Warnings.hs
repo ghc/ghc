@@ -5,6 +5,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 
 -- | Warnings for a module
@@ -24,11 +25,18 @@ module GHC.Unit.Module.Warnings
 
    , Warnings (..)
    , WarningTxt (..)
+   , DeclWarnOccNames
+   , ExportWarnNames
    , warningTxtCategory
+   , warningTxtMessage
+   , warningTxtSame
    , pprWarningTxtForMsg
-   , mkIfaceWarnCache
+   , emptyWarn
+   , mkIfaceDeclWarnCache
+   , mkIfaceExportWarnCache
    , emptyIfaceWarnCache
-   , plusWarns
+   , insertWarnDecls
+   , insertWarnExports
    )
 where
 
@@ -37,6 +45,8 @@ import GHC.Prelude
 import GHC.Data.FastString (FastString, mkFastString, unpackFS)
 import GHC.Types.SourceText
 import GHC.Types.Name.Occurrence
+import GHC.Types.Name.Env
+import GHC.Types.Name (Name)
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
@@ -190,6 +200,24 @@ warningTxtCategory :: WarningTxt pass -> WarningCategory
 warningTxtCategory (WarningTxt (Just (L _ cat)) _ _) = cat
 warningTxtCategory _ = defaultWarningCategory
 
+-- | The message that the WarningTxt was specified to output
+warningTxtMessage :: WarningTxt p -> [Located (WithHsDocIdentifiers StringLiteral p)]
+warningTxtMessage (WarningTxt _ _ m) = m
+warningTxtMessage (DeprecatedTxt _ m) = m
+
+-- | True if the 2 WarningTxts have the same category and messages
+warningTxtSame :: WarningTxt p1 -> WarningTxt p2 -> Bool
+warningTxtSame w1 w2
+  = warningTxtCategory w1 == warningTxtCategory w2
+  && literal_message w1 == literal_message w2
+  && same_type
+  where
+    literal_message :: WarningTxt p -> [StringLiteral]
+    literal_message = map (hsDocString . unLoc) . warningTxtMessage
+    same_type | DeprecatedTxt {} <- w1, DeprecatedTxt {} <- w2 = True
+              | WarningTxt {} <- w1, WarningTxt {} <- w2       = True
+              | otherwise                                      = False
+
 deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
@@ -220,13 +248,13 @@ pprWarningTxtForMsg (DeprecatedTxt _ ds)
                        doubleQuotes (vcat (map (ftext . sl_fs . hsDocString . unLoc) ds))
 
 
--- | Warning information for a module
+-- | Warning information from a module
 data Warnings pass
-  = NoWarnings                          -- ^ Nothing deprecated
-  | WarnAll (WarningTxt pass)                  -- ^ Whole module deprecated
-  | WarnSome [(OccName,WarningTxt pass)]     -- ^ Some specific things deprecated
+  = WarnSome (DeclWarnOccNames pass) -- ^ Names deprecated (may be empty)
+             (ExportWarnNames pass)  -- ^ Exports deprecated (may be empty)
+  | WarnAll (WarningTxt pass)        -- ^ Whole module deprecated
 
-     -- Only an OccName is needed because
+     -- For the module-specific names only an OccName is needed because
      --    (1) a deprecation always applies to a binding
      --        defined in the module in which the deprecation appears.
      --    (2) deprecations are only reported outside the defining module.
@@ -246,22 +274,44 @@ data Warnings pass
      --
      --        this is in contrast with fixity declarations, where we need to map
      --        a Name to its fixity declaration.
+     --
+     -- For export deprecations we need to know where the symbol comes from, since
+     -- we need to be able to check if the deprecated export that was imported is
+     -- the same thing as imported by another import, which would not trigger
+     -- a deprecation message.
+
+-- | Deprecated declarations
+type DeclWarnOccNames pass = [(OccName, WarningTxt pass)]
+
+-- | Names that are deprecated as exports
+type ExportWarnNames pass = [(Name, WarningTxt pass)]
 
 deriving instance Eq (IdP pass) => Eq (Warnings pass)
 
--- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
-mkIfaceWarnCache :: Warnings p -> OccName -> Maybe (WarningTxt p)
-mkIfaceWarnCache NoWarnings  = \_ -> Nothing
-mkIfaceWarnCache (WarnAll t) = \_ -> Just t
-mkIfaceWarnCache (WarnSome pairs) = lookupOccEnv (mkOccEnv pairs)
+emptyWarn :: Warnings p
+emptyWarn = WarnSome [] []
 
-emptyIfaceWarnCache :: OccName -> Maybe (WarningTxt p)
+-- | Constructs the cache for the 'mi_decl_warn_fn' field of a 'ModIface'
+mkIfaceDeclWarnCache :: Warnings p -> OccName -> Maybe (WarningTxt p)
+mkIfaceDeclWarnCache (WarnAll t) = \_ -> Just t
+mkIfaceDeclWarnCache (WarnSome vs _) = lookupOccEnv (mkOccEnv vs)
+
+-- | Constructs the cache for the 'mi_export_warn_fn' field of a 'ModIface'
+mkIfaceExportWarnCache :: Warnings p -> Name -> Maybe (WarningTxt p)
+mkIfaceExportWarnCache (WarnAll _) = const Nothing -- We do not want a double report of the module deprecation
+mkIfaceExportWarnCache (WarnSome _ ds) = lookupNameEnv (mkNameEnv ds)
+
+emptyIfaceWarnCache :: name -> Maybe (WarningTxt p)
 emptyIfaceWarnCache _ = Nothing
 
-plusWarns :: Warnings p -> Warnings p -> Warnings p
-plusWarns d NoWarnings = d
-plusWarns NoWarnings d = d
-plusWarns _ (WarnAll t) = WarnAll t
-plusWarns (WarnAll t) _ = WarnAll t
-plusWarns (WarnSome v1) (WarnSome v2) = WarnSome (v1 ++ v2)
+insertWarnDecls :: Warnings p                -- ^ Existing warnings
+                -> [(OccName, WarningTxt p)] -- ^ New declaration deprecations
+                -> Warnings p                -- ^ Updated warnings
+insertWarnDecls ws@(WarnAll _) _        = ws
+insertWarnDecls (WarnSome wns wes) wns' = WarnSome (wns ++ wns') wes
 
+insertWarnExports :: Warnings p             -- ^ Existing warnings
+                  -> [(Name, WarningTxt p)] -- ^ New export deprecations
+                  -> Warnings p             -- ^ Updated warnings
+insertWarnExports ws@(WarnAll _) _ = ws
+insertWarnExports (WarnSome wns wes) wes' = WarnSome wns (wes ++ wes')

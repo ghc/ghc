@@ -396,9 +396,11 @@ ifaceRoughMatchTcs tcs = map do_rough tcs
 
 --------------------------
 toIfaceWarnings :: Warnings GhcRn -> IfaceWarnings
-toIfaceWarnings NoWarnings = IfNoWarnings
 toIfaceWarnings (WarnAll txt) = IfWarnAll (toIfaceWarningTxt txt)
-toIfaceWarnings (WarnSome prs) = IfWarnSome [(occ, toIfaceWarningTxt txt) | (occ, txt) <- prs]
+toIfaceWarnings (WarnSome vs ds) = IfWarnSome vs' ds'
+  where
+    vs' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- vs]
+    ds' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- ds]
 
 toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
 toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc <$> mb_cat) (unLoc src) (map (toIfaceStringLiteralWithNames . unLoc) strs)

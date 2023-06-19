@@ -153,6 +153,7 @@ import Data.Either
 import Data.List        ( findIndex )
 import Data.Foldable
 import qualified Data.Semigroup as Semi
+import GHC.Unit.Module.Warnings
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import qualified GHC.Data.Strict as Strict
@@ -2791,18 +2792,20 @@ data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
                   | ImpExpQcType EpaLocation (LocatedN RdrName)
                   | ImpExpQcWildcard
 
-mkModuleImpExp :: [AddEpAnn] -> LocatedA ImpExpQcSpec -> ImpExpSubSpec -> P (IE GhcPs)
-mkModuleImpExp anns (L l specname) subs = do
+mkModuleImpExp :: Maybe (LocatedP (WarningTxt GhcPs)) -> [AddEpAnn] -> LocatedA ImpExpQcSpec
+               -> ImpExpSubSpec -> P (IE GhcPs)
+mkModuleImpExp warning anns (L l specname) subs = do
   cs <- getCommentsFor (locA l) -- AZ: IEVar can discard comments
-  let ann = EpAnn (spanAsAnchor $ locA l) anns cs
+  let ann = EpAnn (spanAsAnchor $ maybe (locA l) getLocA warning) anns cs
   case subs of
     ImpExpAbs
       | isVarNameSpace (rdrNameSpace name)
-                       -> return $ IEVar noExtField (L l (ieNameFromSpec specname))
-      | otherwise      -> IEThingAbs ann . L l <$> nameT
-    ImpExpAll          -> IEThingAll ann . L l <$> nameT
+                       -> return $ IEVar warning
+                           (L l (ieNameFromSpec specname))
+      | otherwise      -> IEThingAbs (warning, ann) . L l <$> nameT
+    ImpExpAll          -> IEThingAll (warning, ann) . L l <$> nameT
     ImpExpList xs      ->
-      (\newName -> IEThingWith ann (L l newName)
+      (\newName -> IEThingWith (warning, ann) (L l newName)
         NoIEWildcard (wrapped xs)) <$> nameT
     ImpExpAllWith xs                       ->
       do allowed <- getBit PatternSynonymsBit
@@ -2814,7 +2817,7 @@ mkModuleImpExp anns (L l specname) subs = do
                 ies :: [LocatedA (IEWrappedName GhcPs)]
                 ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName
-                        -> IEThingWith ann (L l newName) pos ies)
+                        -> IEThingWith (warning, ann) (L l newName) pos ies)
                <$> nameT
           else addFatalError $ mkPlainErrorMsgEnvelope (locA l) $
                  PsErrIllegalPatSynExport

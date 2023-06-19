@@ -131,6 +131,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wtype-defaults`
         * :ghc-flag:`-Wunused-do-bind`
         * :ghc-flag:`-Wunused-record-wildcards`
+        * :ghc-flag:`-Wincomplete-export-warnings`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -2467,3 +2468,33 @@ of ``-W(no-)*``.
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
+
+.. ghc-flag:: -Wincomplete-export-warnings
+    :shortdesc: warn when some but not all of exports for a name are warned about
+    :type: dynamic
+    :reverse: -Wno-incomplete-export-warnings
+
+    :since: 9.8.1
+
+    Ino accordance with `GHC Proposal #134
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0134-deprecating-exports-proposal.rst>`__,
+    it is now possible to deprecate certain exports of a name without deprecating the name itself.
+
+    As explained in :ref:`warning-deprecated-pragma`, when a name is exported in several ways in the same module, 
+    but only some of those ways have a warning, it will not end up deprecated when imported in another module.
+
+    For example: ::
+        
+        module A (x) where
+    
+        x :: Int
+        x = 2
+
+        module M (
+            {-# WARNING x "deprecated" #-} x
+            module A
+          )
+        import A
+
+     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports 
+     that are not deprecating a name that is deprecated with another export in that module.

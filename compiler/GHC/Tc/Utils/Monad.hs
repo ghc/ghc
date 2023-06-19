@@ -68,7 +68,7 @@ module GHC.Tc.Utils.Monad(
   addErr,
   failWith, failAt,
   addErrAt, addErrs,
-  checkErr,
+  checkErr, checkErrAt,
   addMessages,
   discardWarnings, mkDetailedMessage,
 
@@ -338,7 +338,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_sigs           = emptyNameSet,
                 tcg_ksigs          = emptyNameSet,
                 tcg_ev_binds       = emptyBag,
-                tcg_warns          = NoWarnings,
+                tcg_warns          = emptyWarn,
                 tcg_anns           = [],
                 tcg_tcs            = [],
                 tcg_insts          = [],
@@ -1083,6 +1083,9 @@ addErrs msgs = mapM_ add msgs
 checkErr :: Bool -> TcRnMessage -> TcRn ()
 -- Add the error if the bool is False
 checkErr ok msg = unless ok (addErr msg)
+
+checkErrAt :: SrcSpan -> Bool -> TcRnMessage -> TcRn ()
+checkErrAt loc ok msg = unless ok (addErrAt loc msg)
 
 addMessages :: Messages TcRnMessage -> TcRn ()
 addMessages msgs1

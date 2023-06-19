@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE TupleSections     #-}
 
 module GHC.Tc.Gen.Export (rnExports, exports_from_avail, classifyGREs) where
 
@@ -15,12 +16,14 @@ import GHC.Tc.Utils.Env
     ( TyThing(AConLike, AnId), tcLookupGlobal, tcLookupTyCon )
 import GHC.Tc.Utils.TcType
 import GHC.Rename.Doc
+import GHC.Rename.Module
 import GHC.Rename.Names
 import GHC.Rename.Env
 import GHC.Rename.Unbound ( reportUnboundName )
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.Imported
+import GHC.Unit.Module.Warnings
 import GHC.Core.TyCon
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -33,7 +36,7 @@ import GHC.Driver.DynFlags
 import GHC.Parser.PostProcess ( setRdrNameSpace )
 import qualified GHC.LanguageExtensions as LangExt
 
-import GHC.Types.Unique.Set
+import GHC.Types.Unique.Map
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -48,6 +51,7 @@ import Control.Arrow ( first )
 import Control.Monad ( when )
 import qualified Data.List.NonEmpty as NE
 import Data.Traversable   ( for )
+import Data.List ( sortBy )
 
 {-
 ************************************************************************
@@ -133,22 +137,34 @@ into @[C{C, T;}, T{T, D;}]@ (which satisfies the AvailTC invariant).
 
 data ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
-     = ExportAccum
-        ExportOccMap           --  Tracks exported occurrence names
-        (UniqSet ModuleName)   --  Tracks (re-)exported module names
+     = ExportAccum {
+         expacc_exp_occs :: ExportOccMap,
+           -- ^ Tracks exported occurrence names
+         expacc_mods :: UniqMap ModuleName [Name],
+           -- ^ Tracks (re-)exported module names
+           --   and the names they re-export
+         expacc_warn_spans :: ExportWarnSpanNames,
+           -- ^ Information about warnings for names
+         expacc_dont_warn :: DontWarnExportNames
+           -- ^ What names not to export warnings for
+           --   (because they are exported without a warning)
+     }
+
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum emptyOccEnv emptyUniqSet
+emptyExportAccum = ExportAccum emptyOccEnv emptyUniqMap [] emptyNameEnv
 
-accumExports :: (ExportAccum -> x -> TcRn (Maybe (ExportAccum, y)))
+accumExports :: (ExportAccum -> x -> TcRn (ExportAccum, Maybe y))
              -> [x]
-             -> TcRn [y]
-accumExports f = fmap (catMaybes . snd) . mapAccumLM f' emptyExportAccum
-  where f' acc x = do
-          m <- attemptM (f acc x)
-          pure $ case m of
-            Just (Just (acc', y)) -> (acc', Just y)
-            _                     -> (acc, Nothing)
+             -> TcRn ([y], ExportWarnSpanNames, DontWarnExportNames)
+accumExports f xs = do
+  (ExportAccum _ _ export_warn_spans dont_warn_export, ys)
+    <- mapAccumLM f' emptyExportAccum xs
+  return ( catMaybes ys
+         , export_warn_spans
+         , dont_warn_export )
+  where f' acc x
+          = fromMaybe (acc, Nothing) <$> attemptM (f acc x)
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName
@@ -173,6 +189,7 @@ rnExports explicit_mod exports
               TcGblEnv { tcg_mod     = this_mod
                        , tcg_rdr_env = rdr_env
                        , tcg_imports = imports
+                       , tcg_warns   = warns
                        , tcg_src     = hsc_src } = tcg_env
               default_main | mainModIs (hsc_HUE hsc_env) == this_mod
                            , Just main_fun <- mainFunIs dflags
@@ -188,7 +205,7 @@ rnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLocA [noLocA (IEVar noExtField
+                          = Just (noLocA [noLocA (IEVar Nothing
                                      (noLocA (IEName noExtField $ noLocA default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
@@ -196,7 +213,7 @@ rnExports explicit_mod exports
 
         -- Rename the export list
         ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
-        ; (rn_exports, final_avails)
+        ; (rn_exports, final_avails, new_export_warns)
             <- if hsc_src == HsigFile
                 then do (mb_r, msgs) <- tryTc do_it
                         case mb_r of
@@ -214,7 +231,17 @@ rnExports explicit_mod exports
                                                 Nothing -> Nothing
                                                 Just _  -> rn_exports
                           , tcg_dus = tcg_dus tcg_env `plusDU`
-                                      usesOnly final_ns }) }
+                                      usesOnly final_ns
+                          , tcg_warns = insertWarnExports
+                                        warns new_export_warns}) }
+
+-- | List of names and the information about their warnings
+--   (warning, export list item span)
+type ExportWarnSpanNames = [(Name, WarningTxt GhcRn, SrcSpan)]
+
+-- | Map from names that should not have export warnings to
+--   the spans of export list items that are missing those warnings
+type DontWarnExportNames = NameEnv (NE.NonEmpty SrcSpan)
 
 exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
@@ -224,8 +251,8 @@ exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- @module Foo@ export is valid (it's not valid
                          -- if we didn't import @Foo@!)
                    -> Module
-                   -> RnM (Maybe [(LIE GhcRn, Avails)], Avails)
-                         -- (Nothing, _) <=> no explicit export list
+                   -> RnM (Maybe [(LIE GhcRn, Avails)], Avails, ExportWarnNames GhcRn)
+                         -- (Nothing, _, _) <=> no explicit export list
                          -- if explicit export list is present it contains
                          -- each renamed export item together with its exported
                          -- names.
@@ -240,7 +267,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
     ; let avails =
             map fix_faminst . gresToAvailInfo
               . filter isLocalGRE . globalRdrEnvElts $ rdr_env
-    ; return (Nothing, avails) }
+    ; return (Nothing, avails, []) }
   where
     -- #11164: when we define a data instance
     -- but not data family, re-export the family
@@ -256,12 +283,14 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
-  = do ie_avails <- accumExports do_litem rdr_items
+  = do (ie_avails, export_warn_spans, dont_warn_export)
+         <- accumExports do_litem rdr_items
        let final_exports = nubAvails (concatMap snd ie_avails) -- Combine families
-       return (Just ie_avails, final_exports)
+       export_warn_names <- aggregate_warnings export_warn_spans dont_warn_export
+       return (Just ie_avails, final_exports, export_warn_names)
   where
     do_litem :: ExportAccum -> LIE GhcPs
-             -> RnM (Maybe (ExportAccum, (LIE GhcRn, Avails)))
+             -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
     do_litem acc lie = setSrcSpan (getLocA lie) (exports_from_item acc lie)
 
     -- Maps a parent to its in-scope children
@@ -282,30 +311,45 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs
-                      -> RnM (Maybe (ExportAccum, (LIE GhcRn, Avails)))
-    exports_from_item (ExportAccum occs earlier_mods)
-                      (L loc ie@(IEModuleContents _ lmod@(L _ mod)))
-      | mod `elementOfUniqSet` earlier_mods    -- Duplicate export of M
+                      -> RnM (ExportAccum, Maybe (LIE GhcRn, Avails))
+    exports_from_item expacc@ExportAccum{
+                        expacc_exp_occs   = occs,
+                        expacc_mods       = earlier_mods,
+                        expacc_warn_spans = export_warn_spans,
+                        expacc_dont_warn  = dont_warn_export
+                      } (L loc ie@(IEModuleContents (warn_txt_ps, _) lmod@(L _ mod)))
+      | Just exported_names <- lookupUniqMap earlier_mods mod  -- Duplicate export of M
       = do { addDiagnostic (TcRnDupeModuleExport mod)
-           ; return Nothing}
+           ; (export_warn_spans', dont_warn_export', _) <-
+                process_warning export_warn_spans
+                                dont_warn_export
+                                exported_names
+                                warn_txt_ps
+                                (locA loc)
+                   -- Checks if all the names are exported with the same warning message
+                   -- or if they should not be warned about
+           ; return ( expacc{ expacc_warn_spans = export_warn_spans'
+                            , expacc_dont_warn  = dont_warn_export' }
+                    , Nothing ) }
 
       | otherwise
-      = do { let { exportValid = (mod `elem` imported_modules)
-                               || (moduleName this_mod == mod)
-                 ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
-                 ; new_gres    = [ gre'
-                                 | (gre, _) <- gre_prs
-                                 , gre' <- expand_tyty_gre gre ]
-                 ; new_exports = map availFromGRE new_gres
-                 ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
-                 ; mods        = addOneToUniqSet earlier_mods mod
+      = do { let { exportValid    = (mod `elem` imported_modules)
+                                  || (moduleName this_mod == mod)
+                 ; gre_prs        = pickGREsModExp mod (globalRdrEnvElts rdr_env)
+                 ; new_gres       = [ gre'
+                                    | (gre, _) <- gre_prs
+                                    , gre' <- expand_tyty_gre gre ]
+                 ; new_exports    = map availFromGRE new_gres
+                 ; all_gres       = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
+                 ; exported_names = map greName new_gres
+                 ; mods           = addToUniqMap earlier_mods mod exported_names
                  }
 
             ; checkErr exportValid (TcRnExportedModNotImported mod)
             ; warnIf (exportValid && null gre_prs) (TcRnNullExportedModule mod)
 
             ; traceRn "efa" (ppr mod $$ ppr all_gres)
-            ; addUsedGREs all_gres
+            ; addUsedGREs ExportDeprecationWarnings all_gres
 
             ; occs' <- check_occs occs ie new_gres
                           -- This check_occs not only finds conflicts
@@ -314,54 +358,114 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                           -- 'M.x' is in scope in several ways, we'll have
                           -- several members of mod_avails with the same
                           -- OccName.
+            ; (export_warn_spans', dont_warn_export', warn_txt_rn) <-
+                process_warning export_warn_spans
+                                dont_warn_export
+                                exported_names
+                                warn_txt_ps
+                                (locA loc)
+
             ; traceRn "export_mod"
                       (vcat [ ppr mod
                             , ppr new_exports ])
-            ; return $ Just $
-                ( ExportAccum occs' mods
-                , ( L loc (IEModuleContents noExtField lmod)
-                , new_exports) ) }
+            ; return ( ExportAccum { expacc_exp_occs   = occs'
+                                   , expacc_mods       = mods
+                                   , expacc_warn_spans = export_warn_spans'
+                                   , expacc_dont_warn  = dont_warn_export' }
+                     , Just (L loc (IEModuleContents warn_txt_rn lmod), new_exports) ) }
 
-    exports_from_item acc@(ExportAccum occs mods) (L loc ie) = do
-        m_new_ie <- lookup_doc_ie ie
-        case m_new_ie of
-          Just new_ie -> return $ Just (acc, (L loc new_ie, []))
+    exports_from_item acc lie = do
+        m_doc_ie <- lookup_doc_ie lie
+        case m_doc_ie of
+          Just new_ie -> return (acc, Just (new_ie, []))
           Nothing -> do
-            let finish (occs', new_ie, avail) = (ExportAccum occs' mods, (L loc new_ie, [avail]))
-            fmap finish <$> lookup_ie occs ie
+            m_ie <- lookup_ie acc lie
+            case m_ie of
+              Nothing -> return (acc, Nothing)
+              Just (acc', new_ie, avail)
+                -> return (acc', Just (new_ie, [avail]))
 
     -------------
-    lookup_ie :: ExportOccMap -> IE GhcPs -> RnM (Maybe (ExportOccMap, IE GhcRn, AvailInfo))
-    lookup_ie occs ie@(IEVar ann l)
+    lookup_ie :: ExportAccum -> LIE GhcPs -> RnM (Maybe (ExportAccum, LIE GhcRn, AvailInfo))
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_occs   = occs,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEVar warn_txt_ps l))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
-               occs' <- check_occs occs ie [gre]
-               return (occs', IEVar ann (replaceLWrappedName l name), avail)
 
-    lookup_ie occs ie@(IEThingAbs ann l)
+               occs' <- check_occs occs ie [gre]
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    [name]
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEVar warn_txt_rn (replaceLWrappedName l name))
+                      , avail )
+
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_occs   = occs,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEThingAbs (warn_txt_ps, ann) l))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ gre -> do
                let avail = availFromGRE gre
                    name = greName gre
-               occs' <- check_occs occs ie [gre]
-               return ( occs'
-                      , IEThingAbs ann (replaceLWrappedName l name)
-                      , avail)
 
-    lookup_ie occs ie@(IEThingAll ann l)
+               occs' <- check_occs occs ie [gre]
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    [name]
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEThingAbs (warn_txt_rn, ann) (replaceLWrappedName l name))
+                      , avail )
+
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_occs   = occs,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEThingAll (warn_txt_ps, ann) l))
         = do mb_gre <- lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ par -> do
                all_kids <- lookup_ie_kids_all ie l par
                let name = greName par
-                   kids_avails = map greName all_kids
-               occs' <- check_occs occs ie (par:all_kids)
-               return ( occs'
-                       , IEThingAll ann (replaceLWrappedName l name)
-                       , AvailTC name (name:kids_avails))
+                   all_gres = par : all_kids
+                   all_names = map greName all_gres
 
-    lookup_ie occs ie@(IEThingWith ann l wc sub_rdrs)
+               occs' <- check_occs occs ie all_gres
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    all_names
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEThingAll (warn_txt_rn, ann) (replaceLWrappedName l name))
+                      , AvailTC name all_names )
+
+    lookup_ie expacc@ExportAccum{
+            expacc_exp_occs   = occs,
+            expacc_warn_spans = export_warn_spans,
+            expacc_dont_warn  = dont_warn_export
+          } (L loc ie@(IEThingWith (warn_txt_ps, ann) l wc sub_rdrs))
         = do mb_gre <- addExportErrCtxt ie
                      $ lookupGreAvailRn $ lieWrappedName l
              for mb_gre $ \ par -> do
@@ -376,11 +480,22 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
                let name = greName par
                    all_kids = with_kids ++ wc_kids
-                   kids_avails = map greName all_kids
-               occs' <- check_occs occs ie (par:all_kids)
-               return ( occs'
-                       , IEThingWith ann (replaceLWrappedName l name) wc subs
-                       , AvailTC name (name:kids_avails))
+                   all_gres = par : all_kids
+                   all_names = map greName all_gres
+
+               occs' <- check_occs occs ie all_gres
+               (export_warn_spans', dont_warn_export', warn_txt_rn)
+                 <- process_warning export_warn_spans
+                                    dont_warn_export
+                                    all_names
+                                    warn_txt_ps
+                                    (locA loc)
+
+               return ( expacc{ expacc_exp_occs   = occs'
+                              , expacc_warn_spans = export_warn_spans'
+                              , expacc_dont_warn  = dont_warn_export' }
+                      , L loc (IEThingWith (warn_txt_rn, ann) (replaceLWrappedName l name) wc subs)
+                      , AvailTC name all_names )
 
     lookup_ie _ _ = panic "lookup_ie"    -- Other cases covered earlier
 
@@ -407,21 +522,102 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
          ; return gres }
 
     -------------
-    lookup_doc_ie :: IE GhcPs -> RnM (Maybe (IE GhcRn))
-    lookup_doc_ie (IEGroup _ lev doc) = do
+
+    rn_warning_txt_loc :: LocatedP (WarningTxt GhcPs) -> RnM (LocatedP (WarningTxt GhcRn))
+    rn_warning_txt_loc (L loc warn_txt) = L loc <$> rnWarningTxt warn_txt
+
+    -- Runs for every Name
+    -- - If there is no new warning, flags that the old warning should not be
+    --     included (since a warning should only be emitted if all
+    --     of the export statements have a warning)
+    -- - If the Name already has a warning, adds it
+    process_warning :: ExportWarnSpanNames       -- Old aggregate data about warnins
+                    -> DontWarnExportNames       -- Old names not to warn about
+                    -> [Name]                              -- Names to warn about
+                    -> Maybe (LocatedP (WarningTxt GhcPs)) -- Warning
+                    -> SrcSpan                             -- Span of the export list item
+                    -> RnM (ExportWarnSpanNames, -- Aggregate data about the warnings
+                            DontWarnExportNames, -- Names not to warn about in the end
+                                                 -- (when there was a non-warned export)
+                            Maybe (LocatedP (WarningTxt GhcRn))) -- Renamed warning
+    process_warning export_warn_spans
+                    dont_warn_export
+                    names Nothing loc
+      = return ( export_warn_spans
+               , foldr update_dont_warn_export
+                       dont_warn_export names
+               , Nothing )
+      where
+        update_dont_warn_export :: Name -> DontWarnExportNames -> DontWarnExportNames
+        update_dont_warn_export name dont_warn_export'
+          = extendNameEnv_Acc (NE.<|)
+                              NE.singleton
+                              dont_warn_export'
+                              name
+                              loc
+
+    process_warning export_warn_spans
+                    dont_warn_export
+                    names (Just warn_txt_ps) loc
+      = do
+          warn_txt_rn <- rn_warning_txt_loc warn_txt_ps
+          let new_export_warn_spans = map (, unLoc warn_txt_rn, loc) names
+          return ( new_export_warn_spans ++ export_warn_spans
+                 , dont_warn_export
+                 , Just warn_txt_rn )
+
+    -- For each name exported with any warnings throws an error
+    --   if there are any exports of that name with a different warning
+    aggregate_warnings :: ExportWarnSpanNames
+                       -> DontWarnExportNames
+                       -> RnM (ExportWarnNames GhcRn)
+    aggregate_warnings export_warn_spans dont_warn_export
+      = fmap catMaybes
+      $ mapM (aggregate_single . extract_name)
+      $ NE.groupBy (\(n1, _, _) (n2, _, _) -> n1 == n2)
+      $ sortBy (\(n1, _, _) (n2, _, _) -> n1 `compare` n2) export_warn_spans
+      where
+        extract_name :: NE.NonEmpty (Name, WarningTxt GhcRn, SrcSpan)
+                     -> (Name, NE.NonEmpty (WarningTxt GhcRn, SrcSpan))
+        extract_name l@((name, _, _) NE.:| _)
+          = (name, NE.map (\(_, warn_txt, span) -> (warn_txt, span)) l)
+
+        aggregate_single :: (Name, NE.NonEmpty (WarningTxt GhcRn, SrcSpan))
+                         -> RnM (Maybe (Name, WarningTxt GhcRn))
+        aggregate_single (name, (warn_txt_rn, loc) NE.:| warn_spans)
+          = do
+              -- Emit an error if the warnings differ
+              case NE.nonEmpty spans_different of
+                Nothing -> return ()
+                Just spans_different
+                  -> addErrAt loc (TcRnDifferentExportWarnings name spans_different)
+              -- Emit a warning if some export list items do not have a warning
+              case lookupNameEnv dont_warn_export name of
+                Nothing -> return $ Just (name, warn_txt_rn)
+                Just not_warned_spans -> do
+                  addDiagnosticAt loc (TcRnIncompleteExportWarnings name not_warned_spans)
+                  return Nothing
+          where
+            spans_different = map snd $ filter (not . warningTxtSame warn_txt_rn . fst) warn_spans
+
+    -------------
+    lookup_doc_ie :: LIE GhcPs -> RnM (Maybe (LIE GhcRn))
+    lookup_doc_ie (L loc (IEGroup _ lev doc)) = do
       doc' <- rnLHsDoc doc
-      pure $ Just (IEGroup noExtField lev doc')
-    lookup_doc_ie (IEDoc _ doc)       = do
+      pure $ Just (L loc (IEGroup noExtField lev doc'))
+    lookup_doc_ie (L loc (IEDoc _ doc))       = do
       doc' <- rnLHsDoc doc
-      pure $ Just (IEDoc noExtField doc')
-    lookup_doc_ie (IEDocNamed _ str)  = pure $ Just (IEDocNamed noExtField str)
+      pure $ Just (L loc (IEDoc noExtField doc'))
+    lookup_doc_ie (L loc (IEDocNamed _ str))
+      = pure $ Just (L loc (IEDocNamed noExtField str))
     lookup_doc_ie _ = pure Nothing
 
     -- In an export item M.T(A,B,C), we want to treat the uses of
     -- A,B,C as if they were M.A, M.B, M.C
     -- Happily pickGREs does just the right thing
     addUsedKids :: RdrName -> [GlobalRdrElt] -> RnM ()
-    addUsedKids parent_rdr kid_gres = addUsedGREs (pickGREs parent_rdr kid_gres)
+    addUsedKids parent_rdr kid_gres
+      = addUsedGREs ExportDeprecationWarnings (pickGREs parent_rdr kid_gres)
 
 -- Renaming and typechecking of exports happens after everything else has
 -- been typechecked.
@@ -503,7 +699,8 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
-              lkup v = lookupSubBndrOcc_helper False DisableDeprecationWarnings -- Do not report export list deprecations
+                -- Do not report export list declaration deprecations
+              lkup v = lookupSubBndrOcc_helper False ExportDeprecationWarnings
                         spec_parent (setRdrNameSpace bareName v)
 
           name <-  combineChildLookupResult $ map lkup $

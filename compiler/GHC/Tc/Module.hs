@@ -1691,7 +1691,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                  -- tcg_dus: see Note [Newtype constructor usage in foreign declarations]
 
         -- See Note [Newtype constructor usage in foreign declarations]
-        addUsedGREs (bagToList fo_gres) ;
+        addUsedGREs NoDeprecationWarnings (bagToList fo_gres) ;
 
         return (tcg_env', tcl_env)
     }}}}}}

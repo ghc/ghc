@@ -23,7 +23,7 @@ import GHC.Tc.Utils.TcMType
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin (InstanceWhat (..), SafeOverlapping)
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
-import GHC.Rename.Env( addUsedGRE, DeprecationWarnings(EnableDeprecationWarnings) )
+import GHC.Rename.Env( addUsedGRE, DeprecationWarnings (..) )
 
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
@@ -942,7 +942,7 @@ matchHasField dflags short_cut clas tys
                      -- it must not be higher-rank.
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
                      then do { -- See Note [Unused name reporting and HasField]
-                               addUsedGRE EnableDeprecationWarnings gre
+                               addUsedGRE AllDeprecationWarnings gre
                              ; keepAlive (greName gre)
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev

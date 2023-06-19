@@ -4467,37 +4467,41 @@ instance ExactPrint (LocatedL (BF.BooleanFormula (LocatedN RdrName))) where
 
 instance ExactPrint (IE GhcPs) where
   getAnnotationEntry (IEVar _ _)            = NoEntryVal
-  getAnnotationEntry (IEThingAbs an _)      = fromAnn an
-  getAnnotationEntry (IEThingAll an _)      = fromAnn an
-  getAnnotationEntry (IEThingWith an _ _ _) = fromAnn an
-  getAnnotationEntry (IEModuleContents an _)= fromAnn an
+  getAnnotationEntry (IEThingAbs (_, an) _)      = fromAnn an
+  getAnnotationEntry (IEThingAll (_, an) _)      = fromAnn an
+  getAnnotationEntry (IEThingWith (_, an) _ _ _) = fromAnn an
+  getAnnotationEntry (IEModuleContents (_, an) _)= fromAnn an
   getAnnotationEntry (IEGroup _ _ _)        = NoEntryVal
   getAnnotationEntry (IEDoc _ _)            = NoEntryVal
   getAnnotationEntry (IEDocNamed _ _)       = NoEntryVal
 
   setAnnotationAnchor a@(IEVar _ _)             _ _s = a
-  setAnnotationAnchor (IEThingAbs an a)       anc cs = (IEThingAbs (setAnchorEpa an anc cs) a)
-  setAnnotationAnchor (IEThingAll an a)       anc cs = (IEThingAll (setAnchorEpa an anc cs) a)
-  setAnnotationAnchor (IEThingWith an a b c)  anc cs = (IEThingWith (setAnchorEpa an anc cs) a b c)
-  setAnnotationAnchor (IEModuleContents an a) anc cs = (IEModuleContents (setAnchorEpa an anc cs) a)
+  setAnnotationAnchor (IEThingAbs (depr, an) a)       anc cs = (IEThingAbs (depr, setAnchorEpa an anc cs) a)
+  setAnnotationAnchor (IEThingAll (depr, an) a)       anc cs = (IEThingAll (depr, setAnchorEpa an anc cs) a)
+  setAnnotationAnchor (IEThingWith (depr, an) a b c)  anc cs = (IEThingWith (depr, setAnchorEpa an anc cs) a b c)
+  setAnnotationAnchor (IEModuleContents (depr, an) a) anc cs = (IEModuleContents (depr, setAnchorEpa an anc cs) a)
   setAnnotationAnchor a@(IEGroup _ _ _)         _ _s = a
   setAnnotationAnchor a@(IEDoc _ _)             _ _s = a
   setAnnotationAnchor a@(IEDocNamed _ _)        _ _s = a
 
-  exact (IEVar x ln) = do
+  exact (IEVar depr ln) = do
+    depr' <- markAnnotated depr
     ln' <- markAnnotated ln
-    return (IEVar x ln')
-  exact (IEThingAbs x thing) = do
+    return (IEVar depr' ln')
+  exact (IEThingAbs (depr, an) thing) = do
+    depr' <- markAnnotated depr
     thing' <- markAnnotated thing
-    return (IEThingAbs x thing')
-  exact (IEThingAll an thing) = do
+    return (IEThingAbs (depr', an) thing')
+  exact (IEThingAll (depr, an) thing) = do
+    depr' <- markAnnotated depr
     thing' <- markAnnotated thing
     an0 <- markEpAnnL an  lidl AnnOpenP
     an1 <- markEpAnnL an0 lidl AnnDotdot
     an2 <- markEpAnnL an1 lidl AnnCloseP
-    return (IEThingAll an2 thing')
+    return (IEThingAll (depr', an2) thing')
 
-  exact (IEThingWith an thing wc withs) = do
+  exact (IEThingWith (depr, an) thing wc withs) = do
+    depr' <- markAnnotated depr
     thing' <- markAnnotated thing
     an0 <- markEpAnnL an lidl AnnOpenP
     (an1, wc', withs') <-
@@ -4513,12 +4517,13 @@ instance ExactPrint (IE GhcPs) where
           as' <- markAnnotated as
           return (an2, wc, bs'++as')
     an2 <- markEpAnnL an1 lidl AnnCloseP
-    return (IEThingWith an2 thing' wc' withs')
+    return (IEThingWith (depr', an2) thing' wc' withs')
 
-  exact (IEModuleContents an m) = do
+  exact (IEModuleContents (depr, an) m) = do
+    depr' <- markAnnotated depr
     an0 <- markEpAnnL an lidl AnnModule
     m' <- markAnnotated m
-    return (IEModuleContents an0 m')
+    return (IEModuleContents (depr', an0) m')
 
   exact x = error $ "missing match for IE:" ++ showAst x
 
@@ -4849,7 +4854,7 @@ getPosP = gets epPos
 
 setPosP :: (Monad m, Monoid w) => Pos -> EP w m ()
 setPosP l = do
-  -- debugM $ "setPosP:" ++ show l
+  debugM $ "setPosP:" ++ show l
   modify (\s -> s {epPos = l})
 
 getExtraDP :: (Monad m, Monoid w) => EP w m (Maybe Anchor)

@@ -110,8 +110,10 @@ data ModIfaceBackend = ModIfaceBackend
     -- other fields and are not put into the interface file.
     -- Not really produced by the backend but there is no need to create them
     -- any earlier.
-  , mi_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
-    -- ^ Cached lookup for 'mi_warns'
+  , mi_decl_warn_fn :: !(OccName -> Maybe (WarningTxt GhcRn))
+    -- ^ Cached lookup for 'mi_warns' for declaration deprecations
+  , mi_export_warn_fn :: !(Name -> Maybe (WarningTxt GhcRn))
+    -- ^ Cached lookup for 'mi_warns' for export deprecations
   , mi_fix_fn :: !(OccName -> Maybe Fixity)
     -- ^ Cached lookup for 'mi_fixities'
   , mi_hash_fn :: !(OccName -> Maybe (OccName, Fingerprint))
@@ -479,7 +481,8 @@ instance Binary ModIface where
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash,
-                   mi_warn_fn = mkIfaceWarnCache $ fromIfaceWarnings warns,
+                   mi_decl_warn_fn = mkIfaceDeclWarnCache $ fromIfaceWarnings warns,
+                   mi_export_warn_fn = mkIfaceExportWarnCache $ fromIfaceWarnings warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls
                  }})
@@ -498,7 +501,7 @@ emptyPartialModIface mod
                mi_exports     = [],
                mi_used_th     = False,
                mi_fixities    = [],
-               mi_warns       = IfNoWarnings,
+               mi_warns       = IfWarnSome [] [],
                mi_anns        = [],
                mi_insts       = [],
                mi_fam_insts   = [],
@@ -530,7 +533,8 @@ emptyFullModIface mod =
           mi_finsts = False,
           mi_exp_hash = fingerprint0,
           mi_orphan_hash = fingerprint0,
-          mi_warn_fn = emptyIfaceWarnCache,
+          mi_decl_warn_fn = emptyIfaceWarnCache,
+          mi_export_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
           mi_hash_fn = emptyIfaceHashCache } }
 
@@ -592,7 +596,8 @@ instance ( NFData (IfaceBackendExts (phase :: ModIfacePhase))
 instance NFData (ModIfaceBackend) where
   rnf (ModIfaceBackend{ mi_iface_hash, mi_mod_hash, mi_flag_hash, mi_opt_hash
                       , mi_hpc_hash, mi_plugin_hash, mi_orphan, mi_finsts, mi_exp_hash
-                      , mi_orphan_hash, mi_warn_fn, mi_fix_fn, mi_hash_fn})
+                      , mi_orphan_hash, mi_decl_warn_fn, mi_export_warn_fn, mi_fix_fn
+                      , mi_hash_fn})
     =     rnf mi_iface_hash
     `seq` rnf mi_mod_hash
     `seq` rnf mi_flag_hash
@@ -603,7 +608,8 @@ instance NFData (ModIfaceBackend) where
     `seq` rnf mi_finsts
     `seq` rnf mi_exp_hash
     `seq` rnf mi_orphan_hash
-    `seq` rnf mi_warn_fn
+    `seq` rnf mi_decl_warn_fn
+    `seq` rnf mi_export_warn_fn
     `seq` rnf mi_fix_fn
     `seq` rnf mi_hash_fn
 

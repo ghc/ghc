@@ -1373,7 +1373,9 @@
         [(L
           (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:8:19-22 })
           (IEThingAbs
-           (EpAnnNotUsed)
+           ((,)
+            (Nothing)
+            (EpAnnNotUsed))
            (L
             (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:8:19-22 })
             (IEName
