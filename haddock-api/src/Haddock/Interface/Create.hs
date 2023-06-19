@@ -54,7 +54,7 @@ import Data.Traversable (for)
 import GHC hiding (lookupName)
 import qualified GHC.Types.Unique.Map as UniqMap
 import GHC.Core.ConLike (ConLike (..))
-import GHC.Data.FastString (unpackFS, bytesFS)
+import GHC.Data.FastString (FastString, unpackFS, bytesFS)
 import GHC.HsToCore.Docs hiding (mkMaps)
 import GHC.Types.Avail
 import GHC.Types.Basic
@@ -64,7 +64,6 @@ import qualified GHC.Types.SrcLoc as SrcLoc
 import GHC.Unit.State (PackageName (..), UnitState)
 import qualified GHC.Utils.Outputable as O
 import GHC.Utils.Panic (pprPanic)
-import GHC.Unit.Module.Warnings
 import GHC.Driver.Ppr
 import GHC.Unit.Module.ModIface
 import GHC.Builtin.Names
@@ -73,7 +72,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.SafeHaskell
 import Control.Arrow ((&&&))
 import GHC.Iface.Syntax
-import GHC.Types.SourceText
 
 createInterface1
   :: MonadIO m
@@ -279,12 +277,12 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
 mkWarningMap
   :: MonadIO m
   => DynFlags
-  -> Warnings GhcRn
+  -> IfaceWarnings
   -> [Name]
   -> IfM m WarningMap
 mkWarningMap dflags warnings exps =
   case warnings of
-    WarnSome ws ->
+    IfWarnSome ws ->
       let expsOccEnv = mkOccEnv [(nameOccName n, n) | n <- exps]
           ws' = flip mapMaybe ws $ \(occ, w) ->
             -- Ensure we also look in the record field namespace. If the OccName
@@ -298,22 +296,26 @@ mkWarningMap dflags warnings exps =
 moduleWarning
   :: MonadIO m
   => DynFlags
-  -> Warnings GhcRn
+  -> IfaceWarnings
   -> IfM m (Maybe (Doc Name))
-moduleWarning dflags (WarnAll w) = Just <$> parseWarning dflags w
-moduleWarning _      _           = pure Nothing
+moduleWarning dflags (IfWarnAll w) = Just <$> parseWarning dflags w
+moduleWarning _      _             = pure Nothing
 
 parseWarning
   :: MonadIO m
   => DynFlags
-  -> WarningTxt GhcRn
+  -> IfaceWarningTxt
   -> IfM m (Doc Name)
 parseWarning dflags w = case w of
-  DeprecatedTxt _ msg -> format "Deprecated: " (map (dstToDoc . unLoc) msg)
-  WarningTxt  _ _ msg -> format "Warning: "    (map (dstToDoc . unLoc) msg)
+  IfDeprecatedTxt _ msg -> format "Deprecated: " (map dstToDoc msg)
+  IfWarningTxt _  _ msg -> format "Warning: "    (map dstToDoc msg)
   where
-    dstToDoc (WithHsDocIdentifiers st ids) = WithHsDocIdentifiers (stToDoc st) ids
-    stToDoc (StringLiteral _ fs _) = GeneratedDocString $ HsDocStringChunk (bytesFS fs)
+    dstToDoc :: (IfaceStringLiteral, [Name]) -> HsDoc GhcRn
+    dstToDoc ((IfStringLiteral _ fs), ids) = WithHsDocIdentifiers (fsToDoc fs) (map noLoc ids)
+
+    fsToDoc :: FastString -> HsDocString
+    fsToDoc fs = GeneratedDocString $ HsDocStringChunk (bytesFS fs)
+
     format x bs = DocWarning . DocParagraph . DocAppend (DocString x)
                   <$> foldrM (\doc rest -> docAppend <$> processDocString dflags doc <*> pure rest) DocEmpty bs
 -------------------------------------------------------------------------------

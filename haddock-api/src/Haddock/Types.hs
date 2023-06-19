@@ -53,7 +53,6 @@ import qualified GHC.Data.Strict as Strict
 import GHC.Types.Fixity (Fixity(..))
 import GHC.Types.Name (stableNameCmp)
 import GHC.Types.Name.Reader (RdrName(..))
-import GHC.Types.SourceText (SourceText(..))
 import GHC.Types.SrcLoc (BufSpan(..), BufPos(..))
 import GHC.Types.Var (Specificity)
 
@@ -967,10 +966,6 @@ instance NFData RdrName where
   rnf (Qual mn on) = mn `deepseq` on `deepseq` ()
   rnf (Orig m on) = m `deepseq` on `deepseq` ()
   rnf (Exact n) = rnf n
-
-instance NFData SourceText where
-  rnf NoSourceText   = ()
-  rnf (SourceText s) = rnf s
 
 instance NFData FixityDirection where
   rnf InfixL = ()
