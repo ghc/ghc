@@ -216,14 +216,14 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
         ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
                 -- Group the equations and match each group in turn
         ; let grouped = groupEquations platform tidy_eqns
-        -- ; grouped' <- mapM (moveGroupVarsIntoRhs vs ty) grouped
-        ; let grouped' = grouped
+        ; grouped' <- mapM (moveGroupVarsIntoRhs vs ty) grouped
+      --  ; let grouped' = grouped
 
-       -- ; traceM ("Before moving: " ++ show (length grouped) ++ " groups:")
-       -- ; testPrint grouped
-       -- ; traceM ("After moving: " ++ show (length grouped') ++ " groups:")
-       -- ; testPrint grouped'
-       -- ; traceM ""
+        ; traceM ("Before moving: " ++ show (length grouped) ++ " groups:")
+        ; testPrint grouped
+        ; traceM ("After moving: " ++ show (length grouped') ++ " groups:")
+        ; testPrint grouped'
+        ; traceM ""
 
          -- print the view patterns that are commoned up to help debug
         ; whenDOptM Opt_D_dump_view_pattern_commoning (debug grouped')
@@ -265,7 +265,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
 
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
-{-
+
     testPrint :: Applicative f => [NonEmpty (PatGroup, EquationInfo)] -> f ()
     testPrint groups =
       traceM $ intercalate "\n" $ map
@@ -277,7 +277,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
           pats (EqnMatch pat _ rest) = pat : pats rest
           pats (EqnDone _) = []
           mklpat pat = L noSrcSpanA pat
--}
+
     -- print some stuff to see what's getting grouped
     -- use -dppr-debug to see the resolution of overloaded literals
     debug eqns =
@@ -441,7 +441,6 @@ only these which can be assigned a PatternGroup (see patGroup).
 
 -}
 
-{-
 moveGroupVarsIntoRhs :: HasCallStack => [Id] -> Type -> NonEmpty (PatGroup, EquationInfo) -> DsM (NonEmpty (PatGroup, EquationInfo))
 moveGroupVarsIntoRhs vs ty group = do
   let (gp, eq) = NEL.head group
@@ -451,7 +450,6 @@ moveGroupVarsIntoRhs vs ty group = do
       let rest = NEL.map (\(_, EqnMatch _ _ rest) -> rest) group
       rhs <- match vs ty (NEL.toList rest)
       return $ NEL.singleton (gp, EqnMatch pat orig (EqnDone rhs))
--}
 
 tidyEqnInfo :: HasCallStack => Id -> EquationInfo
             -> DsM (DsWrapper, EquationInfo)
@@ -486,7 +484,20 @@ tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
 
-tidy1 v o (OrPat x pats) = do
+tidy1 v o pat@(OrPat x pats)
+  = do {
+          --let all_pats = flatten_or pat
+          -- what to do *after* the OrPat matches
+          match_result <- match vars ty (shiftEqns [eqn])
+          -- share match_result across the different cases of the OrPat match
+          ; shareSuccessHandler match_result ty (\expr -> do {
+          let or_eqns = map (singleEqn expr) pats
+          ; match [var] ty or_eqns -- todo: not if pats is empty
+          })
+  } where
+    --flatten_or (OrPat _ pats) = concatMap flatten_or pats
+    --flatten_or (...)
+    singleEqn expr (L _ pat) = EqnMatch pat FromSource (EqnDone $ pure expr)
   (wraps, pats) <- mapAndUnzipM (tidy1 v o . unLoc) pats
   let wrap = foldr (.) id wraps in
     return (wrap, OrPat x (map (L noSrcSpanA) pats))
