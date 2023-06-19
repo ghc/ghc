@@ -623,7 +623,7 @@ INLINE_HEADER void overwritingMutableClosureOfs (StgClosure *p, uint32_t offset)
 }
 
 // Version of 'overwritingClosure' which takes closure size as argument.
-void stg_OverwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
+void stg_overwritingClosureSize (StgClosure *p, uint32_t size /* in words */);
 INLINE_HEADER void overwritingClosureSize (StgClosure *p, uint32_t size)
 {
     // This function is only called from stg_AP_STACK so we can assume it's not
