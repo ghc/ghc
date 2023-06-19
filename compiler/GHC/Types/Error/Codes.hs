@@ -532,6 +532,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnIncorrectTyVarOnLhsOfInjCond"              = 88333
   GhcDiagnosticCode "TcRnUnknownTyVarsOnRhsOfInjCond"               = 48254
   GhcDiagnosticCode "TcRnBadlyStaged"                               = 28914
+  GhcDiagnosticCode "TcRnBadlyStagedType"                           = 86357
   GhcDiagnosticCode "TcRnStageRestriction"                          = 18157
   GhcDiagnosticCode "TcRnTyThingUsedWrong"                          = 10969
   GhcDiagnosticCode "TcRnCannotDefaultKindVar"                      = 79924

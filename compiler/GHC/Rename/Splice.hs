@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module GHC.Rename.Splice (
         rnTopSpliceDecls,
@@ -12,7 +13,8 @@ module GHC.Rename.Splice (
         -- Brackets
         rnTypedBracket, rnUntypedBracket,
 
-        checkThLocalName, traceSplice, SpliceInfo(..)
+        checkThLocalName, traceSplice, SpliceInfo(..),
+        checkThLocalTyName,
   ) where
 
 import GHC.Prelude
@@ -903,6 +905,34 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
       = vcat [ text "--" <+> ppr loc <> colon <+> text "Splicing" <+> text sd
              , gen ]
 
+checkThLocalTyName :: Name -> RnM ()
+checkThLocalTyName name
+  | isUnboundName name   -- Do not report two errors for
+  = return ()            --   $(not_in_scope args)
+
+  | otherwise
+  = do  { traceRn "checkThLocalTyName" (ppr name)
+        ; mb_local_use <- getStageAndBindLevel name
+        ; case mb_local_use of {
+             Nothing -> return () ;  -- Not a locally-bound thing
+             Just (top_lvl, bind_lvl, use_stage) ->
+    do  { let use_lvl = thLevel use_stage
+        -- We don't check the well stageness of name here.
+        -- this would break test for #20969
+        --
+        -- Consequently there is no check&restiction for top level splices.
+        -- But it's annoying anyway.
+        --
+        -- Therefore checkCrossStageLiftingTy shouldn't assume anything
+        -- about bind_lvl and use_lvl relation.
+        --
+        -- ; checkWellStaged (StageCheckSplice name) bind_lvl use_lvl
+
+        ; traceRn "checkThLocalTyName" (ppr name <+> ppr bind_lvl
+                                                 <+> ppr use_stage
+                                                 <+> ppr use_lvl)
+        ; checkCrossStageLiftingTy top_lvl bind_lvl use_stage use_lvl name } } }
+
 checkThLocalName :: Name -> RnM ()
 checkThLocalName name
   | isUnboundName name   -- Do not report two errors for
@@ -974,6 +1004,24 @@ check_cross_stage_lifting top_lvl name ps_var
           -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; writeMutVar ps_var (pend_splice : ps) }
+
+checkCrossStageLiftingTy :: TopLevelFlag -> ThLevel -> ThStage -> ThLevel -> Name -> TcM ()
+checkCrossStageLiftingTy top_lvl bind_lvl _use_stage use_lvl name
+  | isTopLevel top_lvl
+  = return ()
+
+  -- There is no liftType (yet), so we could error, or more conservatively, just warn.
+  --
+  -- For now, we check here for both untyped and typed splices, as we don't create splices.
+  | use_lvl > bind_lvl
+  = addDiagnostic $ TcRnBadlyStagedType name bind_lvl use_lvl
+
+  -- See comment in checkThLocalTyName: this can also happen.
+  | bind_lvl < use_lvl
+  = addDiagnostic $ TcRnBadlyStagedType name bind_lvl use_lvl
+
+  | otherwise
+  = return ()
 
 {-
 Note [Keeping things alive for Template Haskell]

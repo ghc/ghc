@@ -44,7 +44,7 @@ module GHC.Rename.HsType (
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
+import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType, checkThLocalTyName )
 
 import GHC.Core.TyCo.FVs ( tyCoVarsOfTypeList )
 import GHC.Hs
@@ -59,6 +59,7 @@ import GHC.Rename.Unbound ( notInScopeErr, WhereLooking(WL_LocalOnly) )
 import GHC.Tc.Errors.Types
 import GHC.Tc.Errors.Ppr ( pprHsDocContext )
 import GHC.Tc.Utils.Monad
+import GHC.Unit.Module ( getModule )
 import GHC.Types.Name.Reader
 import GHC.Builtin.Names
 import GHC.Types.Hint ( UntickedPromotedThing(..) )
@@ -535,6 +536,9 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
            -- Any type variable at the kind level is illegal without the use
            -- of PolyKinds (see #14710)
        ; name <- rnTyVar env rdr_name
+       ; this_mod <- getModule
+       ; when (nameIsLocalOrFrom this_mod name) $
+         checkThLocalTyName name
        ; when (isDataConName name && not (isPromoted ip)) $
          -- NB: a prefix symbolic operator such as (:) is represented as HsTyVar.
             addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Prefix name)
