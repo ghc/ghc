@@ -456,6 +456,10 @@ commitFlexi tv zonked_kind
              --    y = (\x -> True) undefined
              -- We need *some* known RuntimeRep for the x and undefined, but no one
              -- will choose it until we get here, in the zonker.
+           | isMultiplicityTy zonked_kind
+           -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
+                 ; return manyDataConTy }
+           | otherwise
            -> case isConcreteTyVar_maybe tv of
                 Nothing
                   -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
