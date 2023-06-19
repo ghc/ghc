@@ -3301,6 +3301,21 @@ data TcRnMessage where
     :: !StageCheckReason -- ^ The binding being spliced.
     -> TcRnMessage
 
+  {-| TcRnBadlyStagedWarn is a warning that occurs when a TH type binding is
+    used in an invalid stage.
+
+    Controlled by flags:
+       - Wbadly-staged-type
+
+    Test cases:
+      T23829_timely T23829_tardy T23829_hasty
+  -}
+  TcRnBadlyStagedType
+    :: !Name  -- ^ The type binding being spliced.
+    -> !Int -- ^ The binding stage.
+    -> !Int -- ^ The stage at which the binding is used.
+    -> TcRnMessage
+
   {-| TcRnTyThingUsedWrong is an error that occurs when a thing is used where another
     thing was expected.
 

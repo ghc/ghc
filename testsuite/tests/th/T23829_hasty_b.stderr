@@ -1,0 +1,6 @@
+
+T23829_hasty_b.hs:8:42: error: [GHC-28914]
+    • Stage error: ‘ty’ is bound at stage 2 but used at stage 1
+    • In the untyped splice: $ty
+      In the Template Haskell quotation
+        [t| forall (ty :: TypeQ). Proxy $ty |]

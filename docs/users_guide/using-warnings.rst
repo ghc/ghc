@@ -78,6 +78,7 @@ as ``-Wno-...`` for every individual warning in the group.
         * :ghc-flag:`-Wforall-identifier`
         * :ghc-flag:`-Wgadt-mono-local-binds`
         * :ghc-flag:`-Wtype-equality-requires-operators`
+        * :ghc-flag:`-Wbadly-staged-types"
 
 .. ghc-flag:: -W
     :shortdesc: enable normal warnings
@@ -2532,3 +2533,20 @@ sanity, not yours.)
 
      When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
      that are not deprecating a name that is deprecated with another export in that module.
+
+.. ghc-flag:: -Wbadly-staged-types
+    :shortdesc: warn when type binding is used at the wrong TH stage.
+    :type: dynamic
+    :reverse: -Wno-badly-staged-types
+
+    :since: 9.10.1
+
+    Consider an example: ::
+
+        tardy :: forall a. Proxy a -> IO Type
+        tardy _ = [t| a |]
+
+    The type binding ``a`` is bound at stage 1 but used on stage 2.
+
+    This is badly staged program, and the ``tardy (Proxy @Int)`` won't produce
+    a type representation of ``Int``, but rather a local name ``a``.

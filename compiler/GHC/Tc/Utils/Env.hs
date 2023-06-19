@@ -644,8 +644,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
                           -- (GlobalRdrEnv handles the top level)
 
               , tcl_th_bndrs = extendNameEnvList th_bndrs
-                               [(n, thlvl) | (n, ATcId {}) <- extra_env]
-                               -- We only track Ids in tcl_th_bndrs
+                               [(n, thlvl) | (n, _) <- extra_env]
 
               , tcl_env = extendNameEnvList lcl_type_env extra_env }
               -- tcl_rdr and tcl_th_bndrs: extend the local LocalRdrEnv and

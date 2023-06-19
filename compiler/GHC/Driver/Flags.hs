@@ -693,6 +693,7 @@ data WarningFlag =
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
    | Opt_WarnIncompleteExportWarnings                -- Since 9.8
    | Opt_WarnIncompleteRecordSelectors                  -- Since 9.10
+   | Opt_WarnBadlyStagedTypes                        -- Since 9.10
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -804,6 +805,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
   Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
   Opt_WarnIncompleteRecordSelectors                  -> "incomplete-record-selectors" :| []
+  Opt_WarnBadlyStagedTypes                        -> "badly-staged-types" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -942,6 +944,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
         Opt_WarnLoopySuperclassSolve,
+        Opt_WarnBadlyStagedTypes,
         Opt_WarnTypeEqualityRequiresOperators
       ]
 

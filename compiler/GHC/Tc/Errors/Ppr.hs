@@ -1421,6 +1421,11 @@ instance Diagnostic TcRnMessage where
          text "Stage error:" <+> pprStageCheckReason reason <+>
          hsep [text "is bound at stage" <+> ppr bind_lvl,
                text "but used at stage" <+> ppr use_lvl]
+    TcRnBadlyStagedType name bind_lvl use_lvl
+      -> mkSimpleDecorated $
+         text "Badly staged type:" <+> ppr name <+>
+         hsep [text "is bound at stage" <+> ppr bind_lvl,
+               text "but used at stage" <+> ppr use_lvl]
     TcRnStageRestriction reason
       -> mkSimpleDecorated $
          sep [ text "GHC stage restriction:"
@@ -2306,6 +2311,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnBadlyStaged{}
       -> ErrorWithoutFlag
+    TcRnBadlyStagedType{}
+      -> WarningWithFlag Opt_WarnBadlyStagedTypes
     TcRnStageRestriction{}
       -> ErrorWithoutFlag
     TcRnTyThingUsedWrong{}
@@ -2946,6 +2953,8 @@ instance Diagnostic TcRnMessage where
     TcRnUnknownTyVarsOnRhsOfInjCond{}
       -> noHints
     TcRnBadlyStaged{}
+      -> noHints
+    TcRnBadlyStagedType{}
       -> noHints
     TcRnStageRestriction{}
       -> noHints

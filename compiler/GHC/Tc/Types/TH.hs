@@ -17,7 +17,6 @@ import qualified Language.Haskell.TH as TH
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
 import GHC.Prelude
-import GHC.Utils.Panic
 import GHC.Tc.Types.TcRef
 import GHC.Tc.Types.Constraint
 import GHC.Hs.Expr ( PendingTcSplice, PendingRnSplice )
@@ -105,13 +104,19 @@ thLevel :: ThStage -> ThLevel
 thLevel (Splice _)    = 0
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
-thLevel (RunSplice _) = panic "thLevel: called when running a splice"
+thLevel (RunSplice _) = 0 -- previously: panic "thLevel: called when running a splice"
                         -- See Note [RunSplice ThLevel].
 
 {- Note [RunSplice ThLevel]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The 'RunSplice' stage is set when executing a splice, and only when running a
 splice. In particular it is not set when the splice is renamed or typechecked.
+
+However, this is not true. `reifyInstances` for example does rename the given type,
+and these types may contain variables (#9262 allow free variables in reifyInstances).
+Therefore here we assume that thLevel (RunSplice _) = 0.
+Proper fix would probably require renaming argument `reifyInstances` separately prior
+to evaluation of the overall splice.
 
 'RunSplice' is needed to provide a reference where 'addModFinalizer' can insert
 the finalizer (see Note [Delaying modFinalizers in untyped splices]), and
