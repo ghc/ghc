@@ -315,8 +315,9 @@ interpretBCO (Capability* cap)
 
     LOAD_THREAD_STATE();
 
-    cap->r.rHpLim = (P_)1; // HpLim is the context-switch flag; when it
-                           // goes to zero we must return to the scheduler.
+    // N.B. HpLim is the context-switch flag; when it
+    // goes to zero we must return to the scheduler.
+    RELAXED_STORE_ALWAYS(&cap->r.rHpLim, (P_)1);
 
     IF_DEBUG(interpreter,
              debugBelch(
@@ -1967,7 +1968,7 @@ run_BCO:
             // context switching: sometimes the scheduler can invoke
             // the interpreter with context_switch == 1, particularly
             // if the -C0 flag has been given on the cmd line.
-            if (cap->r.rHpLim == NULL) {
+            if (RELAXED_LOAD(&cap->r.rHpLim) == NULL) {
                 Sp_subW(1); SpW(0) = (W_)&stg_enter_info;
                 RETURN_TO_SCHEDULER(ThreadInterpret, ThreadYielding);
             }
