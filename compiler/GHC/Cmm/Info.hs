@@ -450,7 +450,7 @@ wordAligned platform align_check e
 -- | Takes a closure pointer and returns the info table pointer
 closureInfoPtr :: Platform -> DoAlignSanitisation -> CmmExpr -> CmmExpr
 closureInfoPtr platform align_check e =
-    cmmLoadBWord platform (wordAligned platform align_check e)
+    CmmMachOp (MO_RelaxedRead (wordWidth platform)) [wordAligned platform align_check e]
 
 -- | Takes an info pointer (the first word of a closure) and returns its entry
 -- code
