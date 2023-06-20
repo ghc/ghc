@@ -1,17 +1,19 @@
 {-# LANGUAGE LambdaCase, ScopedTypeVariables #-}
 
 -- | Platform architecture and OS
---
--- We need it in ghc-boot because ghc-pkg needs it.
 module GHC.Platform.ArchOS
    ( ArchOS(..)
+
+     -- * Architectures
    , Arch(..)
-   , OS(..)
    , ArmISA(..)
    , ArmISAExt(..)
    , ArmABI(..)
    , PPC_64ABI(..)
    , stringEncodeArch
+
+     -- * Operating systems
+   , OS(..)
    , stringEncodeOS
    )
 where
@@ -27,10 +29,6 @@ data ArchOS
    deriving (Read, Show, Eq, Ord)
 
 -- | Architectures
---
--- TODO: It might be nice to extend these constructors with information about
--- what instruction set extensions an architecture might support.
---
 data Arch
    = ArchUnknown
    | ArchX86
