@@ -1013,10 +1013,10 @@ printGlobalThreads(void)
   for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
     debugBelch("\ngen %d\n", g);
     for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
-      debugBelch("thread %p (id=%lu)\n", t, t->id);
+      debugBelch("thread %p (id=%lu)\n", t, (unsigned long)t->id);
     }
     for (StgTSO *t = generations[g].old_threads; t != END_TSO_QUEUE; t = t->global_link) {
-      debugBelch("thread %p (id=%lu) (old)\n", t, t->id);
+      debugBelch("thread %p (id=%lu) (old)\n", t, (unsigned long)t->id);
     }
   }
 }
