@@ -450,7 +450,7 @@
 
 #define CHECK_GC()                                                      \
   (bdescr_link(CurrentNursery) == NULL ||                               \
-   generation_n_new_large_words(W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
+   RELAXED_LOAD_FIELD(generation_n_new_large_words, W_[g0]) >= TO_W_(CLong[large_alloc_lim]))
 
 // allocate() allocates from the nursery, so we check to see
 // whether the nursery is nearly empty in any function that uses
