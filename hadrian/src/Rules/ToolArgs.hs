@@ -158,6 +158,7 @@ toolTargets = [ binary
               -- , runGhc  -- # depends on ghc library
               , ghcBoot
               , ghcBootTh
+              , ghcPlatform
               , ghcHeap
               , ghci
               , ghcPkg  -- # executable

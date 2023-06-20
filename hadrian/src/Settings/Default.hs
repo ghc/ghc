@@ -85,6 +85,7 @@ stage0Packages = do
              , runGhc
              , ghcBoot
              , ghcBootTh
+             , ghcPlatform
              , ghcHeap
              , ghci
              , ghcPkg
