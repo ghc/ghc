@@ -288,7 +288,7 @@ INLINE_HEADER Task *
 myTask (void)
 {
 #if defined(THREADED_RTS) && !defined(MYTASK_USE_TLV)
-    return getThreadLocalVar(&currentTaskKey);
+    return (Task*) getThreadLocalVar(&currentTaskKey);
 #else
     return my_task;
 #endif
