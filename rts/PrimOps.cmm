@@ -1170,12 +1170,11 @@ stg_threadLabelzh ( gcptr tso )
 
 stg_threadStatuszh ( gcptr tso )
 {
-    W_ why_blocked;
-    W_ what_next;
-    W_ ret, cap, locked;
+    W_ why_blocked, what_next, flags, cap;
+    W_ ret, cap_no, locked;
 
-    what_next   = TO_W_(StgTSO_what_next(tso));
-    why_blocked = TO_W_(StgTSO_why_blocked(tso));
+    what_next   = TO_W_(RELAXED_LOAD_FIELD(StgTSO_what_next, tso));
+    why_blocked = TO_W_(RELAXED_LOAD_FIELD(StgTSO_why_blocked, tso));
     // Note: these two reads are not atomic, so they might end up
     // being inconsistent.  It doesn't matter, since we
     // only return one or the other.  If we wanted to return the
@@ -1191,15 +1190,17 @@ stg_threadStatuszh ( gcptr tso )
         }
     }
 
-    cap = TO_W_(Capability_no(StgTSO_cap(tso)));
+    cap = RELAXED_LOAD_FIELD(StgTSO_cap, tso);
+    cap_no = TO_W_(Capability_no(cap));
 
-    if ((TO_W_(StgTSO_flags(tso)) & TSO_LOCKED) != 0) {
+    flags = TO_W_(RELAXED_LOAD_FIELD(StgTSO_flags, tso));
+    if ((flags & TSO_LOCKED) != 0) {
         locked = 1;
     } else {
         locked = 0;
     }
 
-    return (ret,cap,locked);
+    return (ret,cap_no,locked);
 }
 
 /* -----------------------------------------------------------------------------
