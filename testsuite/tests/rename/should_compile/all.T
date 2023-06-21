@@ -31,7 +31,7 @@ test('rn037', normal, compile, [''])
 # Missing:
 # test('rn038', normal, compile, [''])
 
-test('rn039', normal, compile, [''])
+test('rn039', normal, warn_and_run, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
 test('rn041', normal, compile, [''])
 test('rn042', [extra_files(['Rn042_A.hs'])], multimod_compile, ['rn042', '-v0'])
