@@ -821,7 +821,7 @@ pprIfaceLamBndr (b, IfaceNoOneShot) = ppr b
 pprIfaceLamBndr (b, IfaceOneShot)   = ppr b <> text "[OneShot]"
 
 pprIfaceIdBndr :: IfaceIdBndr -> SDoc
-pprIfaceIdBndr (w, name, ty) = parens (ppr name <> brackets (ppr w) <+> dcolon <+> ppr ty)
+pprIfaceIdBndr (w, name, ty) = parens (ppr name <> brackets (ppr_ty_nested w) <+> dcolon <+> ppr_ty_nested ty)
 
 {- Note [Suppressing binder signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -881,7 +881,7 @@ pprIfaceTvBndr :: IfaceTvBndr -> SuppressBndrSig -> UseBndrParens -> SDoc
 pprIfaceTvBndr (tv, ki) (SuppressBndrSig suppress_sig) (UseBndrParens use_parens)
   | suppress_sig             = ppr tv
   | isIfaceLiftedTypeKind ki = ppr tv
-  | otherwise                = maybe_parens (ppr tv <+> dcolon <+> ppr ki)
+  | otherwise                = maybe_parens (ppr tv <+> dcolon <+> ppr_ty_nested ki)
   where
     maybe_parens | use_parens = parens
                  | otherwise  = id
@@ -933,9 +933,13 @@ instance Binary IfaceOneShot where
 instance Outputable IfaceType where
   ppr ty = pprIfaceType ty
 
-pprIfaceType, pprParendIfaceType :: IfaceType -> SDoc
+-- The purpose of 'ppr_ty_nested' is to distinguish calls that should not
+-- trigger 'hideNonStandardTypes', see Note [Defaulting RuntimeRep variables]
+-- wrinkle (W2).
+pprIfaceType, pprParendIfaceType, ppr_ty_nested :: IfaceType -> SDoc
 pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
+ppr_ty_nested = ppr_ty topPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 -- We still need `hideNonStandardTypes`, since the `pprPrecIfaceType` may be
@@ -987,7 +991,7 @@ ppr_ty ctxt_prec ty@(IfaceFunTy af w ty1 ty2)  -- Should be a visible argument
       | isVisibleFunArg af
       = (pprTypeArrow af wthis <+> ppr_ty funPrec ty1) : ppr_fun_tail wnext ty2
     ppr_fun_tail wthis other_ty
-      = [pprTypeArrow af wthis <+> pprIfaceType other_ty]
+      = [pprTypeArrow af wthis <+> ppr_ty_nested other_ty]
 
 ppr_ty ctxt_prec (IfaceAppTy t ts)
   = if_print_coercions
@@ -1044,9 +1048,11 @@ Haskell programs, so it makes little sense to make all users pay this
 syntactic overhead.
 
 For this reason it was decided that we would hide RuntimeRep variables
-for now (see #11549). We do this by defaulting all type variables of
-kind RuntimeRep to LiftedRep.
-Likewise, we default all Multiplicity variables to Many.
+for now (see #11549). We do this right in the pretty-printer, by pre-processing
+the type we are about to print, to default any type variables of kind RuntimeRep
+that are bound by toplevel invisible quantification to LiftedRep.
+Likewise, we default Multiplicity variables to Many and Levity variables to
+Lifted.
 
 This is done in a pass right before pretty-printing
 (defaultIfaceTyVarsOfKind, controlled by
@@ -1073,6 +1079,32 @@ metavariables are converted, skolem variables are not.
 There's one exception though: TyVarTv metavariables should not be defaulted,
 as they appear during kind-checking of "newtype T :: TYPE r where..."
 (test T18357a). Therefore, we additionally test for isTyConableTyVar.
+
+Wrinkles:
+
+(W1) The loop 'go' in 'defaultIfaceTyVarsOfKind' passes a Bool flag, 'rank1',
+     around that indicates whether we haven't yet descended into the arguments
+     of a function type.
+     This is used to decide whether newly bound variables are eligible for
+     defaulting – we do not want contravariant foralls to be defaulted because
+     that would result in an incorrect, rather than specialized, type.
+     For example:
+       ∀ p (r1 :: RuntimeRep) . (∀ (r2 :: RuntimeRep) . p r2) -> p r1
+     We want to default 'r1', but not 'r2'.
+     When examining the first forall, 'rank1' is True.
+     The toplevel function type is matched as IfaceFunTy, where we recurse into
+     'go' by passing False for 'rank1'.
+     The forall in the first argument then skips adding a substitution for 'r2'.
+
+(W2) 'defaultIfaceTyVarsOfKind' ought to be called only once when printing a
+     type.
+     A few components of the printing machinery used to invoke 'ppr' on types
+     nested in secondary structures like IfaceBndr, which would repeat the
+     defaulting process, but treating the type as if it were top-level, causing
+     unwanted defaulting.
+     In order to prevent future developers from using 'ppr' again or being
+     confused that @ppr_ty topPrec@ is used, we introduced a marker function,
+     'ppr_ty_nested'.
 -}
 
 -- | Default 'RuntimeRep' variables to 'LiftedRep',
@@ -1097,28 +1129,29 @@ as they appear during kind-checking of "newtype T :: TYPE r where..."
 defaultIfaceTyVarsOfKind :: Bool -- ^ default 'RuntimeRep'/'Levity' variables?
                          -> Bool -- ^ default 'Multiplicity' variables?
                          -> IfaceType -> IfaceType
-defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv ty
+defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
   where
     go :: FastStringEnv IfaceType -- Set of enclosing forall-ed RuntimeRep/Levity/Multiplicity variables
+       -> Bool -- Are we in a toplevel forall, where defaulting is allowed?
        -> IfaceType
        -> IfaceType
-    go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
+    go subs True (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
      | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
       = let subs' = extendFsEnv subs var substituted_ty
             -- Record that we should replace it with LiftedRep/Lifted/Many,
             -- and recurse, discarding the forall
-        in go subs' ty
+        in go subs' True ty
 
-    go subs (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
+    go subs rank1 (IfaceForAllTy bndr ty)
+      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
 
-    go subs ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
+    go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
       Just s -> s
       Nothing -> ty
 
-    go _ ty@(IfaceFreeTyVar tv)
+    go _ _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
       | def_rep
       , GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
@@ -1138,34 +1171,34 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv ty
       | otherwise
       = ty
 
-    go subs (IfaceTyConApp tc tc_args)
+    go subs _ (IfaceTyConApp tc tc_args)
       = IfaceTyConApp tc (go_args subs tc_args)
 
-    go subs (IfaceTupleTy sort is_prom tc_args)
+    go subs _ (IfaceTupleTy sort is_prom tc_args)
       = IfaceTupleTy sort is_prom (go_args subs tc_args)
 
-    go subs (IfaceFunTy af w arg res)
-      = IfaceFunTy af (go subs w) (go subs arg) (go subs res)
+    go subs rank1 (IfaceFunTy af w arg res)
+      = IfaceFunTy af (go subs False w) (go subs False arg) (go subs rank1 res)
 
-    go subs (IfaceAppTy t ts)
-      = IfaceAppTy (go subs t) (go_args subs ts)
+    go subs _ (IfaceAppTy t ts)
+      = IfaceAppTy (go subs False t) (go_args subs ts)
 
-    go subs (IfaceCastTy x co)
-      = IfaceCastTy (go subs x) co
+    go subs rank1 (IfaceCastTy x co)
+      = IfaceCastTy (go subs rank1 x) co
 
-    go _ ty@(IfaceLitTy {}) = ty
-    go _ ty@(IfaceCoercionTy {}) = ty
+    go _ _ ty@(IfaceLitTy {}) = ty
+    go _ _ ty@(IfaceCoercionTy {}) = ty
 
     go_ifacebndr :: FastStringEnv IfaceType -> IfaceForAllBndr -> IfaceForAllBndr
     go_ifacebndr subs (Bndr (IfaceIdBndr (w, n, t)) argf)
-      = Bndr (IfaceIdBndr (w, n, go subs t)) argf
+      = Bndr (IfaceIdBndr (w, n, go subs False t)) argf
     go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
-      = Bndr (IfaceTvBndr (n, go subs t)) argf
+      = Bndr (IfaceTvBndr (n, go subs False t)) argf
 
     go_args :: FastStringEnv IfaceType -> IfaceAppArgs -> IfaceAppArgs
     go_args _ IA_Nil = IA_Nil
     go_args subs (IA_Arg ty argf args)
-      = IA_Arg (go subs ty) argf (go_args subs args)
+      = IA_Arg (go subs False ty) argf (go_args subs args)
 
     check_substitution :: IfaceType -> Maybe IfaceType
     check_substitution (IfaceTyConApp tc _)
@@ -1236,7 +1269,7 @@ ppr_app_arg ctx_prec (t, argf) =
        Specified |  print_kinds
                  -> char '@' <> ppr_ty appPrec t
        Inferred  |  print_kinds
-                 -> char '@' <> braces (ppr_ty topPrec t)
+                 -> char '@' <> braces (ppr_ty_nested t)
        _         -> empty
 
 -------------------
@@ -1367,7 +1400,7 @@ ppr_sigma show_forall ctxt_prec iface_ty
           -- Then it could handle both invisible and required binders, and
           -- splitIfaceReqForallTy wouldn't be necessary here.
     in ppr_iface_forall_part show_forall invis_tvs theta $
-       sep [pprIfaceForAll req_tvs, ppr tau']
+       sep [pprIfaceForAll req_tvs, ppr_ty_nested tau']
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs

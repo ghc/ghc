@@ -94,7 +94,7 @@ import qualified Data.IntSet as I
 -- order then `udfmToList` returns them in deterministic order.
 --
 -- There is an implementation cost: each element is given a serial number
--- as it is added, and `udfmToList` sorts it's result by this serial
+-- as it is added, and `udfmToList` sorts its result by this serial
 -- number. So you should only use `UniqDFM` if you need the deterministic
 -- property.
 --
