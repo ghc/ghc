@@ -25,7 +25,7 @@ import GHC.Prelude
 import GHC.Types.Name (Name)
 import GHC.Types.TyThing (TyThing)
 import GHC.Unit.Types (Module, InstalledModule, UnitId, Unit)
-import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnitReason, UnitInfo)
+import GHC.Unit.State (UnitState, ModuleSuggestion, ModuleOrigin, UnusableUnit, UnitInfo)
 import GHC.Exception.Type (SomeException)
 import GHC.Unit.Types ( IsBootInterface )
 import Language.Haskell.Syntax.Module.Name ( ModuleName )
@@ -80,7 +80,7 @@ data CantFindInstalledReason
   | CouldntFindInFiles [FilePath]
   | GenericMissing
       [(Unit, Maybe UnitInfo)] [Unit]
-      [(Unit, UnusableUnitReason)] [FilePath]
+      [UnusableUnit] [FilePath]
   | MultiplePackages [(Module, ModuleOrigin)]
   deriving Generic
 

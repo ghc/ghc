@@ -301,7 +301,7 @@ findLookupResult fc fopts r = case r of
                        , fr_suggestions = [] })
      LookupUnusable unusable ->
        let unusables' = map get_unusable unusable
-           get_unusable (m, ModUnusable r) = (moduleUnit m, r)
+           get_unusable (_, ModUnusable r) = r
            get_unusable (_, r)             =
              pprPanic "findLookupResult: unexpected origin" (ppr r)
        in return (NotFound{ fr_paths = [], fr_pkg = Nothing
