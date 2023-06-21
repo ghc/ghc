@@ -279,9 +279,10 @@ cantFindErrorX pkg_hidden_hint may_show_locations mod_or_interface (CantFindInst
     mod_hidden pkg =
         text "it is a hidden module in the package" <+> quotes (ppr pkg)
 
-    unusable (pkg, reason)
-      = text "It is a member of the package"
-      <+> quotes (ppr pkg)
+    unusable (UnusableUnit unit reason reexport)
+      = text "It is " <> (if reexport then text "reexported from the package"
+                                      else text "a member of the package")
+      <+> quotes (ppr unit)
       $$ pprReason (text "which is") reason
 
 
