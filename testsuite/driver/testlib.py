@@ -1653,7 +1653,8 @@ async def compile_and_run__(name: TestName,
                       top_mod: Path,
                       extra_mods: List[str],
                       extra_hc_opts: str,
-                      backpack: bool=False
+                      backpack: bool=False,
+                      compile_stderr: bool=False
                       ) -> PassFail:
     # print 'Compile and run, extra args = ', extra_hc_opts
 
@@ -1670,6 +1671,23 @@ async def compile_and_run__(name: TestName,
         if badResult(result):
             return result
 
+        if compile_stderr:
+            expected_stderr_file = find_expected_file(name, 'ghc.stderr')
+            actual_stderr_file = add_suffix(name, 'comp.stderr')
+            diff_file_name = in_testdir(add_suffix(name, 'comp.diff'))
+
+            if not await compare_outputs(way, 'stderr',
+                           join_normalisers(getTestOpts().extra_errmsg_normaliser,
+                                            normalise_errmsg),
+                           expected_stderr_file, actual_stderr_file,
+                           diff_file=diff_file_name,
+                           whitespace_normaliser=getattr(getTestOpts(),
+                                                         "whitespace_normaliser",
+                                                         normalise_whitespace)):
+             stderr = diff_file_name.read_text()
+             diff_file_name.unlink()
+             return failBecause('ghc.stderr mismatch', stderr=stderr)
+#
         cmd = './' + name + exe_extension()
 
         # we don't check the compiler's stderr for a compile-and-run test
@@ -1683,6 +1701,9 @@ async def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
 
 async def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
     return await compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
+
+async def warn_and_run( name, way, extra_hc_opts ):
+    return await compile_and_run__( name, way, None, [], extra_hc_opts, compile_stderr = True)
 
 def stats( name, way, stats_file ):
     opts = getTestOpts()
