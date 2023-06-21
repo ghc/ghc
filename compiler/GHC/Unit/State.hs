@@ -43,6 +43,7 @@ module GHC.Unit.State (
         LookupResult(..),
         ModuleSuggestion(..),
         ModuleOrigin(..),
+        UnusableUnit(..),
         UnusableUnitReason(..),
         pprReason,
 
@@ -174,8 +175,10 @@ data ModuleOrigin =
     -- (But maybe the user didn't realize), so we'll still keep track
     -- of these modules.)
     ModHidden
-    -- | Module is unavailable because the package is unusable.
-  | ModUnusable UnusableUnitReason
+
+    -- | Module is unavailable because the unit is unusable.
+  | ModUnusable !UnusableUnit
+
     -- | Module is public, and could have come from some places.
   | ModOrigin {
         -- | @Just False@ means that this module is in
@@ -192,6 +195,13 @@ data ModuleOrigin =
         -- more information.
       , fromPackageFlag :: Bool
       }
+
+-- | A unusable unit module origin
+data UnusableUnit = UnusableUnit
+  { uuUnit        :: !Unit               -- ^ Unusable unit
+  , uuReason      :: !UnusableUnitReason -- ^ Reason
+  , uuIsReexport  :: !Bool               -- ^ Is the "module" a reexport?
+  }
 
 instance Outputable ModuleOrigin where
     ppr ModHidden = text "hidden module"
@@ -237,7 +247,8 @@ instance Semigroup ModuleOrigin where
                     text "x: " <> ppr x $$ text "y: " <> ppr y
             g Nothing x = x
             g x Nothing = x
-    x <> y = pprPanic "ModOrigin: hidden module redefined" $
+
+    x <> y = pprPanic "ModOrigin: module origin mismatch" $
                  text "x: " <> ppr x $$ text "y: " <> ppr y
 
 instance Monoid ModuleOrigin where
@@ -1816,21 +1827,36 @@ mkUnusableModuleNameProvidersMap :: UnusableUnits -> ModuleNameProvidersMap
 mkUnusableModuleNameProvidersMap unusables =
     Map.foldl' extend_modmap Map.empty unusables
  where
-    extend_modmap modmap (pkg, reason) = addListTo modmap bindings
+    extend_modmap modmap (unit_info, reason) = addListTo modmap bindings
       where bindings :: [(ModuleName, Map Module ModuleOrigin)]
             bindings = exposed ++ hidden
 
-            origin = ModUnusable reason
-            pkg_id = mkUnit pkg
+            origin_reexport =  ModUnusable (UnusableUnit unit reason True)
+            origin_normal   =  ModUnusable (UnusableUnit unit reason False)
+            unit = mkUnit unit_info
 
             exposed = map get_exposed exposed_mods
-            hidden = [(m, mkModMap pkg_id m origin) | m <- hidden_mods]
+            hidden = [(m, mkModMap unit m origin_normal) | m <- hidden_mods]
 
-            get_exposed (mod, Just mod') = (mod, Map.singleton mod' origin)
-            get_exposed (mod, _)         = (mod, mkModMap pkg_id mod origin)
+            -- with re-exports, c:Foo can be reexported from two (or more)
+            -- unusable packages:
+            --  Foo -> a:Foo (unusable reason A) -> c:Foo
+            --      -> b:Foo (unusable reason B) -> c:Foo
+            --
+            -- We must be careful to not record the following (#21097):
+            --  Foo -> c:Foo (unusable reason A)
+            --      -> c:Foo (unusable reason B)
+            -- But:
+            --  Foo -> a:Foo (unusable reason A)
+            --      -> b:Foo (unusable reason B)
+            --
+            get_exposed (mod, Just _) = (mod, mkModMap unit mod origin_reexport)
+            get_exposed (mod, _) = (mod, mkModMap unit mod origin_normal)
+              -- in the reexport case, we create a virtual module that doesn't
+              -- exist but we don't care as it's only used as a key in the map.
 
-            exposed_mods = unitExposedModules pkg
-            hidden_mods  = unitHiddenModules pkg
+            exposed_mods = unitExposedModules unit_info
+            hidden_mods  = unitHiddenModules  unit_info
 
 -- | Add a list of key/value pairs to a nested map.
 --

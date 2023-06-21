@@ -61,7 +61,7 @@ data FindResult
                                            --   but the *unit* is hidden
 
         -- | Module is in these units, but it is unusable
-      , fr_unusables   :: [(Unit, UnusableUnitReason)]
+      , fr_unusables   :: [UnusableUnit]
 
       , fr_suggestions :: [ModuleSuggestion] -- ^ Possible mis-spelled modules
       }
