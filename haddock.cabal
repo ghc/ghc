@@ -83,7 +83,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       ghc-boot,
       ghc-boot-th,
-      ghc == 9.8.*,
+      ghc == 9.9.*,
       bytestring,
       parsec,
       text,
