@@ -237,11 +237,14 @@ wayGhcArgs = do
     mconcat [ if Dynamic `wayUnit` way
                 then pure ["-fPIC", "-dynamic"]
                 else arg "-static"
-            , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
-            , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
-            , (way == debug || way == debugDynamic) ?
-              pure ["-ticky", "-DTICKY_TICKY"] ]
+            , (way == debug || way == debugDynamic) ? arg "-ticky"
+            , wayCcArgs
+              -- We must pass CPP flags via -optc as well to ensure that they
+              -- are passed to the preprocessor when, e.g., compiling Cmm
+              -- sources.
+            , map ("-optc"++) <$> wayCcArgs
+            ]
 
 packageGhcArgs :: Args
 packageGhcArgs = do
