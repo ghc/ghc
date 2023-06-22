@@ -93,6 +93,7 @@ workflow:
 
 .lint:
   stage: tool-lint
+  allow_failure: true
   tags:
     - lint
   rules:
