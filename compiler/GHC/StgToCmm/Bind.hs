@@ -702,11 +702,11 @@ emitBlackHoleCode node = do
 
   when eager_blackholing $ do
     whenUpdRemSetEnabled $ emitUpdRemSetPushThunk node
-    emitAtomicStore platform MemOrderSeqCst
+    emitAtomicStore platform MemOrderRelease
         (cmmOffsetW platform node (fixedHdrSizeW profile))
         (currentTSOExpr platform)
     -- See Note [Heap memory barriers] in SMP.h.
-    emitAtomicStore platform MemOrderRelaxed
+    emitAtomicStore platform MemOrderRelease
         node
         (CmmReg (CmmGlobal $ GlobalRegUse EagerBlackholeInfo $ bWord platform))
 
