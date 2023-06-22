@@ -6,6 +6,7 @@ import Oracles.Setting
 import Oracles.Flag
 import Packages
 import Settings
+import Settings.Builders.Common (wayCcArgs)
 
 import GHC.Toolchain.Target
 import GHC.Platform.ArchOS
@@ -315,6 +316,7 @@ rtsPackageArgs = package rts ? do
 
     let cArgs = mconcat
           [ rtsWarnings
+          , wayCcArgs
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
