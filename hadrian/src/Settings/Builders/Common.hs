@@ -6,7 +6,8 @@ module Settings.Builders.Common (
     module Settings,
     module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cppArgs, cWarnings,
-    packageDatabaseArgs, bootPackageDatabaseArgs
+    packageDatabaseArgs, bootPackageDatabaseArgs,
+    wayCcArgs
     ) where
 
 import Hadrian.Haskell.Cabal.Type
@@ -65,3 +66,12 @@ bootPackageDatabaseArgs = do
     dbPath <- expr $ packageDbPath loc
     expr $ need [dbPath -/- packageDbStamp]
     stage0 ? packageDatabaseArgs
+
+wayCcArgs :: Args
+wayCcArgs = do
+    way <- getWay
+    mconcat [ (Threaded  `wayUnit` way) ? arg "-DTHREADED_RTS"
+            , (Debug     `wayUnit` way) ? arg "-DDEBUG"
+            , (way == debug || way == debugDynamic) ? arg "-DTICKY_TICKY"
+            ]
+
