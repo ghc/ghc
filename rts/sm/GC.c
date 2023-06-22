@@ -340,8 +340,8 @@ GarbageCollect (struct GcConfig config,
   // attribute any costs to CCS_GC
 #if defined(PROFILING)
   for (n = 0; n < getNumCapabilities(); n++) {
-      save_CCS[n] = getCapability(n)->r.rCCCS;
-      getCapability(n)->r.rCCCS = CCS_GC;
+      save_CCS[n] = RELAXED_LOAD(&getCapability(n)->r.rCCCS);
+      RELAXED_STORE(&getCapability(n)->r.rCCCS, CCS_GC);
   }
 #endif
 

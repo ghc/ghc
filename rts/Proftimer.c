@@ -124,7 +124,8 @@ handleProfTick(void)
         uint32_t n;
         for (n=0; n < getNumCapabilities(); n++) {
             Capability *cap = getCapability(n);
-            cap->r.rCCCS->time_ticks++;
+            CostCentreStack *ccs = RELAXED_LOAD(&cap->r.rCCCS);
+            ccs->time_ticks++;
             traceProfSampleCostCentre(cap, cap->r.rCCCS, total_ticks);
         }
     }
