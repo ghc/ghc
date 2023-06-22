@@ -7,7 +7,7 @@ module Settings.Builders.Common (
     module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cppArgs, cWarnings,
     packageDatabaseArgs, bootPackageDatabaseArgs,
-    getStagedCCFlags
+    getStagedCCFlags, wayCcArgs
     ) where
 
 import Hadrian.Haskell.Cabal.Type
@@ -72,3 +72,12 @@ bootPackageDatabaseArgs = do
 
 getStagedCCFlags :: Args
 getStagedCCFlags = prgFlags . ccProgram . tgtCCompiler <$> getStagedTarget
+
+wayCcArgs :: Args
+wayCcArgs = do
+    way <- getWay
+    mconcat [ (Threaded  `wayUnit` way) ? arg "-DTHREADED_RTS"
+            , (Debug     `wayUnit` way) ? arg "-DDEBUG"
+            , (way == debug || way == debugDynamic) ? arg "-DTICKY_TICKY"
+            ]
+
