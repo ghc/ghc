@@ -1431,7 +1431,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // Note [Heap memory barriers] in SMP.h.
-    SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
+    SET_INFO_RELAXED((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
     recordClosureMutated(cap, (StgClosure *) mvar);
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         // See Note [Dirty flags in the non-moving collector] in NonMoving.c
@@ -1453,7 +1453,7 @@ dirty_TVAR(Capability *cap, StgTVar *p,
     // No barrier required here as no other heap object fields are read. See
     // Note [Heap memory barriers] in SMP.h.
     if (RELAXED_LOAD(&p->header.info) == &stg_TVAR_CLEAN_info) {
-        SET_INFO((StgClosure*) p, &stg_TVAR_DIRTY_info);
+        SET_INFO_RELAXED((StgClosure*) p, &stg_TVAR_DIRTY_info);
         recordClosureMutated(cap,(StgClosure*)p);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             // See Note [Dirty flags in the non-moving collector] in NonMoving.c
