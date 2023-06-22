@@ -315,8 +315,9 @@ interpretBCO (Capability* cap)
 
     LOAD_THREAD_STATE();
 
-    RELAXED_STORE(&cap->r.rHpLim, (P_)1); // HpLim is the context-switch flag; when it
-                           // goes to zero we must return to the scheduler.
+    // N.B. HpLim is the context-switch flag; when it
+    // goes to zero we must return to the scheduler.
+    RELAXED_STORE_ALWAYS(&cap->r.rHpLim, (P_)1);
 
     IF_DEBUG(interpreter,
              debugBelch(
