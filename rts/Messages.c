@@ -205,7 +205,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
         StgTSO *owner = (StgTSO*)p;
 
 #if defined(THREADED_RTS)
-        if (owner->cap != cap) {
+        if (RELAXED_LOAD(&owner->cap) != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
                           owner->cap->no);
@@ -275,7 +275,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
         ASSERT(owner != END_TSO_QUEUE);
 
 #if defined(THREADED_RTS)
-        if (owner->cap != cap) {
+        if (RELAXED_LOAD(&owner->cap) != cap) {
             sendMessage(cap, owner->cap, (Message*)msg);
             debugTraceCap(DEBUG_sched, cap, "forwarding message to cap %d",
                           owner->cap->no);
