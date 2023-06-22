@@ -11,6 +11,21 @@ setTestOpts([
     when(opsys('mingw32'), multi_cpu_race),
 ])
 
+import itertools
+
+# Check the simple-plugin tests without
+# caring about the order of loading of interfaces
+def normalizeIfaces(unnormalized_str):
+    iface_plugin_prefix = "interfacePlugin: "
+    grouped_plugins = itertools.groupby(
+        unnormalized_str.split('\n'),
+        lambda l: l.startswith(iface_plugin_prefix)
+    )
+    return "\n".join([
+        line
+        for k, lines in grouped_plugins
+        for line in (sorted(lines) if k else lines)
+    ])
 
 test('plugins01',
      [extra_files(['simple-plugin/']),
@@ -175,9 +190,11 @@ test('static-plugins',
      [extra_files(['simple-plugin/']),
       unless(config.have_RTS_linker, skip),
       expect_broken_for(16803, prof_ways),
-      extra_run_opts('"' + config.libdir + '"')],
+      extra_run_opts('"' + config.libdir + '"'),
+      normalise_fun(normalizeIfaces)
+      ],
      compile_and_run,
-     ['-package ghc -isimple-plugin/'])
+     ['-package ghc -isimple-plugin/ -j1'])
 
 test('T15858',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),

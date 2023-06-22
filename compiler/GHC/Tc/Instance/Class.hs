@@ -54,6 +54,9 @@ import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+import GHC.Types.Id.Info
+import GHC.Tc.Errors.Types
+import Control.Monad
 
 {- *******************************************************************
 *                                                                    *
@@ -913,7 +916,8 @@ matchHasField dflags short_cut clas tys
                -- the field selector should be in scope
              , Just gre <- lookupGRE_FieldLabel rdr_env fl
 
-             -> do { sel_id <- tcLookupId (flSelector fl)
+             -> do { let name = flSelector fl
+                   ; sel_id <- tcLookupId name
                    ; (tv_prs, preds, sel_ty) <- tcInstType newMetaTyVars sel_id
 
                          -- The first new wanted constraint equates the actual
@@ -943,7 +947,11 @@ matchHasField dflags short_cut clas tys
                    ; if not (isNaughtyRecordSelector sel_id) && isTauTy sel_ty
                      then do { -- See Note [Unused name reporting and HasField]
                                addUsedGRE AllDeprecationWarnings gre
-                             ; keepAlive (greName gre)
+                             ; keepAlive name
+                             ; unless (null $ snd $ sel_cons $ idDetails sel_id)
+                                 $ addDiagnostic $ TcRnHasFieldResolvedIncomplete name
+                                 -- Only emit an incomplete selector warning if it's an implicit instance
+                                 -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
                              ; return OneInst { cir_new_theta   = theta
                                               , cir_mk_ev       = mk_ev
                                               , cir_coherence   = IsCoherent

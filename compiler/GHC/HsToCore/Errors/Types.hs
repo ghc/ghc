@@ -8,6 +8,7 @@ import GHC.Prelude
 
 import GHC.Core (CoreRule, CoreExpr, RuleName)
 import GHC.Core.DataCon
+import GHC.Core.ConLike
 import GHC.Core.Type
 import GHC.Driver.DynFlags (DynFlags, xopt)
 import GHC.Driver.Flags (WarningFlag)
@@ -146,6 +147,23 @@ data DsMessage
   | DsAnotherRuleMightFireFirst !RuleName
                                 !RuleName -- the \"bad\" rule
                                 !Var
+
+  {-| DsIncompleteRecordSelector is a warning triggered when we are not certain whether
+      a record selector application will be successful. Currently, this means that
+      the warning is triggered when there is a record selector of a data type that
+      does not have that field in all its constructors.
+
+      Example(s):
+      data T = T1 | T2 {x :: Bool}
+      f :: T -> Bool
+      f a = x a
+
+     Test cases:
+       DsIncompleteRecSel1
+       DsIncompleteRecSel2
+       DsIncompleteRecSel3
+  -}
+  | DsIncompleteRecordSelector !Name ![ConLike] !Bool
 
   deriving Generic
 

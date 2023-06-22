@@ -21,7 +21,8 @@ module GHC.HsToCore.Pmc.Types (
         SrcInfo(..), PmGrd(..), GrdVec(..),
 
         -- ** Guard tree language
-        PmMatchGroup(..), PmMatch(..), PmGRHSs(..), PmGRHS(..), PmPatBind(..), PmEmptyCase(..),
+        PmMatchGroup(..), PmMatch(..), PmGRHSs(..), PmGRHS(..),
+        PmPatBind(..), PmEmptyCase(..), PmRecSel(..),
 
         -- * Coverage Checking types
         RedSets (..), Precision (..), CheckResult (..),
@@ -43,6 +44,7 @@ import GHC.Types.Id
 import GHC.Types.Var (EvVar)
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Core.ConLike
 import GHC.Core.Type
 import GHC.Core
 
@@ -130,6 +132,8 @@ newtype PmPatBind p =
   -- rather than on the pattern bindings.
   PmPatBind (PmGRHS p)
 
+-- A guard tree denoting a record selector application
+data PmRecSel v = PmRecSel { pr_arg_var :: v, pr_arg :: CoreExpr, pr_cons :: [ConLike] }
 instance Outputable SrcInfo where
   ppr (SrcInfo (L (RealSrcSpan rss _) _)) = ppr (srcSpanStartLine rss)
   ppr (SrcInfo (L s                   _)) = ppr s

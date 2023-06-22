@@ -21,6 +21,7 @@ module GHC.Types.Error
    , addMessage
    , unionMessages
    , unionManyMessages
+   , filterMessages
    , MsgEnvelope (..)
 
    -- * Classifying Messages
@@ -193,6 +194,10 @@ unionMessages (Messages msgs1) (Messages msgs2) =
 -- | Joins many 'Messages's together
 unionManyMessages :: Foldable f => f (Messages e) -> Messages e
 unionManyMessages = fold
+
+filterMessages :: (MsgEnvelope e -> Bool) -> Messages e -> Messages e
+filterMessages f (Messages msgs) =
+  Messages (filterBag f msgs)
 
 -- | A 'DecoratedSDoc' is isomorphic to a '[SDoc]' but it carries the
 -- invariant that the input '[SDoc]' needs to be rendered /decorated/ into its

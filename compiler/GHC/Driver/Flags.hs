@@ -684,6 +684,7 @@ data WarningFlag =
    | Opt_WarnMissingRoleAnnotations                  -- Since 9.8
    | Opt_WarnImplicitRhsQuantification               -- Since 9.8
    | Opt_WarnIncompleteExportWarnings                -- Since 9.8
+   | Opt_WarnIncompleteRecordSelectors                  -- Since 9.10
    deriving (Eq, Ord, Show, Enum)
 
 -- | Return the names of a WarningFlag
@@ -794,6 +795,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnMissingRoleAnnotations                  -> "missing-role-annotations" :| []
   Opt_WarnImplicitRhsQuantification               -> "implicit-rhs-quantification" :| []
   Opt_WarnIncompleteExportWarnings                -> "incomplete-export-warnings" :| []
+  Opt_WarnIncompleteRecordSelectors                  -> "incomplete-record-selectors" :| []
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options

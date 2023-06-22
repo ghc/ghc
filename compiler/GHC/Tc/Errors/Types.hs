@@ -3416,6 +3416,24 @@ data TcRnMessage where
   TcRnPartialFieldSelector :: !FieldLabel -- ^ The selector
                            -> TcRnMessage
 
+  {-| TcRnHasFieldResolvedIncomplete is a warning triggered when a HasField constraint
+      is resolved for a record field for which a `getField @"field"` application
+      might not be successful. Currently, this means that the warning is triggered when
+      the parent data type of that record field does not have that field in all
+      its constructors.
+
+      Example(s):
+      data T = T1 | T2 {x :: Bool}
+      f :: HasField t "x" Bool => t -> Bool
+      f = getField @"x"
+      g :: T -> Bool
+      g = f
+
+     Test cases:
+       TcIncompleteRecSel
+  -}
+  TcRnHasFieldResolvedIncomplete :: !Name -> TcRnMessage
+
   {-| TcRnBadFieldAnnotation is an error/warning group indicating that a
     strictness/unpack related data type field annotation is invalid.
   -}

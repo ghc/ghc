@@ -1479,6 +1479,9 @@ instance Diagnostic TcRnMessage where
     TcRnPartialFieldSelector fld -> mkSimpleDecorated $
       sep [text "Use of partial record field selector" <> colon,
            nest 2 $ quotes (ppr (occName fld))]
+    TcRnHasFieldResolvedIncomplete name -> mkSimpleDecorated $
+      text "The invocation of `getField` on the record field" <+> quotes (ppr name)
+      <+> text "may produce an error since it is not defined for all data constructors"
     TcRnBadFieldAnnotation n con reason -> mkSimpleDecorated $
       hang (pprBadFieldAnnotationReason reason)
          2 (text "on the" <+> speakNth n
@@ -2291,6 +2294,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnPartialFieldSelector{}
       -> WarningWithFlag Opt_WarnPartialFields
+    TcRnHasFieldResolvedIncomplete{}
+      -> WarningWithFlag Opt_WarnIncompleteRecordSelectors
     TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
       -> ErrorWithoutFlag
     TcRnBadFieldAnnotation{}
@@ -2927,6 +2932,8 @@ instance Diagnostic TcRnMessage where
     TcRnAbstractClosedTyFamDecl{}
       -> noHints
     TcRnPartialFieldSelector{}
+      -> noHints
+    TcRnHasFieldResolvedIncomplete{}
       -> noHints
     TcRnBadFieldAnnotation _ _ LazyFieldsDisabled
       -> [suggestExtension LangExt.StrictData]

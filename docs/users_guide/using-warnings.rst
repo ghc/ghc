@@ -120,6 +120,7 @@ as ``-Wno-...`` for every individual warning in the group.
 
         * :ghc-flag:`-Whi-shadowing`
         * :ghc-flag:`-Wincomplete-record-updates`
+        * :ghc-flag:`-Wincomplete-record-selectors`
         * :ghc-flag:`-Wincomplete-uni-patterns`
         * :ghc-flag:`-Wmissing-pattern-synonym-signatures`
         * :ghc-flag:`-Wmissing-signatures`
@@ -1078,6 +1079,39 @@ of ``-W(no-)*``.
 
     This option isn't enabled by default because it can be very noisy,
     and it often doesn't indicate a bug in the program.
+
+.. ghc-flag:: -Wincomplete-record-selectors
+    :shortdesc: warn when a record selector application could fail
+    :type: dynamic
+    :reverse: -Wno-incomplete-record-selectors
+    :category:
+
+    :since: 9.10
+
+    .. index::
+        single: incomplete record selectors, warning
+        single: record selectors, incomplete
+
+    When a record selector is applied to a constructor that does not
+    contain that field, it will produce an error. For example ::
+
+        data T = T1 | T2 { x :: Int }
+
+        f :: T -> Int
+        f a = x a -- `f T1` will fail
+
+        g1 :: HasField "x" t Int => t -> Int
+        g1 a = 1 + getField @"x" a
+
+        g2 :: T -> Int
+        g2 a = g1 a + 2 -- `g2 T1` will fail as well
+
+    The warning warns about cases like that. It also takes into account
+    previously pattern-matched cases, for example ::
+
+        d :: T -> Int
+        d T1 = 0
+        d a = x a -- would not warn
 
 .. ghc-flag:: -Wmissing-deriving-strategies
     :shortdesc: warn when a deriving clause is missing a deriving strategy
@@ -2480,13 +2514,13 @@ sanity, not yours.)
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0134-deprecating-exports-proposal.rst>`__,
     it is now possible to deprecate certain exports of a name without deprecating the name itself.
 
-    As explained in :ref:`warning-deprecated-pragma`, when a name is exported in several ways in the same module, 
+    As explained in :ref:`warning-deprecated-pragma`, when a name is exported in several ways in the same module,
     but only some of those ways have a warning, it will not end up deprecated when imported in another module.
 
     For example: ::
-        
+
         module A (x) where
-    
+
         x :: Int
         x = 2
 
@@ -2496,5 +2530,5 @@ sanity, not yours.)
           )
         import A
 
-     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports 
+     When :ghc-flag:`-Wincomplete-export-warnings` is enabled, GHC warns about exports
      that are not deprecating a name that is deprecated with another export in that module.

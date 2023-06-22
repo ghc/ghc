@@ -19,7 +19,7 @@
 -- "GHC.HsToCore.Pmc.Solver".
 module GHC.HsToCore.Pmc.Check (
         CheckAction(..),
-        checkMatchGroup, checkGRHSs, checkPatBind, checkEmptyCase
+        checkMatchGroup, checkGRHSs, checkPatBind, checkEmptyCase, checkRecSel
     ) where
 
 import GHC.Prelude
@@ -33,11 +33,15 @@ import GHC.Driver.DynFlags
 import GHC.Utils.Outputable
 import GHC.Tc.Utils.TcType (evVarPred)
 import GHC.Data.OrdList
+import GHC.Data.Bag
 
 import qualified Data.Semigroup as Semi
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Coerce
+import GHC.Types.Var
+import GHC.Core
+import GHC.Core.Utils
 
 -- | Coverage checking action. Can be composed 'leftToRight' or 'topToBottom'.
 newtype CheckAction a = CA { unCA :: Nablas -> DsM (CheckResult a) }
@@ -184,6 +188,20 @@ checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
 
 checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
 checkPatBind = coerce checkGRHS
+
+checkRecSel :: PmRecSel () -> CheckAction (PmRecSel Id)
+-- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+checkRecSel pr@(PmRecSel { pr_arg = arg, pr_cons = cons }) = CA $ \inc -> do
+  arg_id <- case arg of
+           Var arg_id -> return arg_id
+           _ -> mkPmId $ exprType arg
+
+  let con_cts = map (PhiNotConCt arg_id . PmAltConLike) cons
+      arg_ct  = PhiCoreCt arg_id arg
+      phi_cts = listToBag (arg_ct : con_cts)
+  unc <- addPhiCtsNablas inc phi_cts
+  pure CheckResult { cr_ret = pr{ pr_arg_var = arg_id }, cr_uncov = unc, cr_approx = mempty }
+
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1641,9 +1641,9 @@ instFlexiXTcM subst (tv:tvs)
 matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
                              -- See Note [Shortcut solving: overlap]
-                -> Class -> [Type] -> TcS TcM.ClsInstResult
-matchGlobalInst dflags short_cut cls tys
-  = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
+                -> Class -> [Type] -> CtLoc -> TcS TcM.ClsInstResult
+matchGlobalInst dflags short_cut cls tys loc
+  = wrapTcS $ TcM.setCtLocM loc $ TcM.matchGlobalInst dflags short_cut cls tys
 
 tcInstSkolTyVarsX :: SkolemInfo -> Subst -> [TyVar] -> TcS (Subst, [TcTyVar])
 tcInstSkolTyVarsX skol_info subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX skol_info subst tvs

@@ -164,4 +164,6 @@ test('EmptyCase007', [],  compile, [overlapping_incomplete])
 test('EmptyCase008', [],  compile, [overlapping_incomplete])
 test('EmptyCase009', [],  compile, [overlapping_incomplete])
 test('EmptyCase010', [],  compile, [overlapping_incomplete])
-
+test('DsIncompleteRecSel1', normal, compile, ['-Wincomplete-record-selectors'])
+test('DsIncompleteRecSel2', normal, compile, ['-Wincomplete-record-selectors'])
+test('DsIncompleteRecSel3', [collect_compiler_stats('bytes allocated', 10)], compile, ['-Wincomplete-record-selectors'])

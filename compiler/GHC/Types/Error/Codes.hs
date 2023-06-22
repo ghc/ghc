@@ -148,6 +148,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "DsRecBindsNotAllowedForUnliftedTys"            = 20185
   GhcDiagnosticCode "DsRuleMightInlineFirst"                        = 95396
   GhcDiagnosticCode "DsAnotherRuleMightFireFirst"                   = 87502
+  GhcDiagnosticCode "DsIncompleteRecordSelector"                    = 17335
 
 
   -- Parser diagnostic codes
@@ -528,6 +529,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
   GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
   GhcDiagnosticCode "TcRnPartialFieldSelector"                      = 82712
+  GhcDiagnosticCode "TcRnHasFieldResolvedIncomplete"                = 86894
   GhcDiagnosticCode "TcRnSuperclassCycle"                           = 29210
   GhcDiagnosticCode "TcRnDefaultSigMismatch"                        = 72771
   GhcDiagnosticCode "TcRnTyFamResultDisabled"                       = 44012

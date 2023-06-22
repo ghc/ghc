@@ -35,11 +35,12 @@
 --     'ldiMatch'. See Section 4.1 of the paper.
 module GHC.HsToCore.Pmc (
         -- Checking and printing
-        pmcPatBind, pmcMatches, pmcGRHSs,
+        pmcPatBind, pmcMatches, pmcGRHSs, pmcRecSel,
         isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
-        addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas
+        addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas,
+        getNFirstUncovered
     ) where
 
 import GHC.Prelude
@@ -51,7 +52,7 @@ import GHC.HsToCore.Pmc.Desugar
 import GHC.HsToCore.Pmc.Check
 import GHC.HsToCore.Pmc.Solver
 import GHC.Types.Basic (Origin(..))
-import GHC.Core (CoreExpr)
+import GHC.Core
 import GHC.Driver.DynFlags
 import GHC.Hs
 import GHC.Types.Id
@@ -59,21 +60,20 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.Var (EvVar)
+import GHC.Types.Var (EvVar, Var (..))
+import GHC.Types.Id.Info
 import GHC.Tc.Utils.TcType (evVarPred)
-import GHC.Tc.Utils.Monad (updTopFlags)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsLExpr)
 import GHC.HsToCore.Monad
 import GHC.Data.Bag
-import GHC.Data.IOEnv (unsafeInterleaveM)
 import GHC.Data.OrdList
-import GHC.Utils.Monad (mapMaybeM)
 
 import Control.Monad (when, forM_)
 import qualified Data.Semigroup as Semi
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Coerce
+import GHC.Tc.Utils.Monad
 
 --
 -- * Exported entry points to the checker
@@ -193,9 +193,92 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
 
+{-
+Note [Detecting incomplete record selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A record selector occurence is incomplete iff. it could fail due to
+being applied to a data type constructor not present for this record field.
+
+e.g.
+  data T = T1 | T2 {x :: Int}
+  d = x someComputation -- `d` may fail
+
+There are 4 parts to detecting and warning about
+incomplete record selectors to consider:
+
+  - Computing which constructors a general application of a record field will succeed on,
+    and which ones it will fail on. This is stored in the `sel_cons` field of
+    `IdDetails` datatype, which is a part of an `Id` and calculated when renaming a
+    record selector in `mkOneRecordSelector`
+
+  - Emitting a warning whenever a `HasField` constraint is solved.
+    This is checked in `matchHasField` and emitted only for when
+    the constraint is resolved with an implicit instance rather than a
+    custom one (since otherwise the warning will be emitted in
+      the custom implementation anyways)
+
+    e.g.
+      g :: HasField "x" t Int => t -> Int
+      g = getField @"x"
+
+      f :: T -> Int
+      f = g -- warning will be emitted here
+
+  - Emitting a warning for a general occurence of the record selector
+    This is done during the renaming of a `HsRecSel` expression in `dsExpr`
+    and simply pulls the information about incompleteness from the `Id`
+
+    e.g.
+      l :: T -> Int
+      l a = x a -- warning will be emitted here
+
+  - Emitting a warning for a record selector `sel` applied to a variable `y`.
+    In that case we want to use the long-distance information from the
+    pattern match checker to rule out impossible constructors
+    (See Note [Long-distance information]). We first add constraints to
+    the long-distance `Nablas` that `y` cannot be one of the constructors that
+    contain `sel` (function `checkRecSel` in GHC.HsToCore.Pmc.Check). If the
+    `Nablas` are still inhabited, we emit a warning with the inhabiting constructors
+    as examples of where `sel` may fail.
+
+    e.g.
+      z :: T -> Int
+      z T1 = 0
+      z a = x a -- warning will not be emitted here since `a` can only be `T2`
+-}
+
+pmcRecSel :: Id       -- ^ Id of the selector
+          -> CoreExpr -- ^ Core expression of the argument to the selector
+          -> DsM ()
+pmcRecSel sel_id arg
+  | RecSelId{ sel_cons = (cons_w_field, _ : _) } <- idDetails sel_id = do
+      !missing <- getLdiNablas
+
+      tracePm "pmcRecSel {" (ppr sel_id)
+      CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
+        <- unCA (checkRecSel (PmRecSel () arg cons_w_field)) missing
+      tracePm "}: " $ ppr uncov_nablas
+
+      inhabited <- isInhabited uncov_nablas
+      when inhabited $ warn_incomplete arg_id uncov_nablas
+        where
+          sel_name = varName sel_id
+          warn_incomplete arg_id uncov_nablas = do
+            dflags <- getDynFlags
+            let maxConstructors = maxUncoveredPatterns dflags
+            unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxConstructors + 1) uncov_nablas
+            let cons = [con | unc_example <- unc_examples
+                      , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example arg_id]]
+                not_full_examples = length cons == (maxConstructors + 1)
+                cons' = take maxConstructors cons
+            diagnosticDs $ DsIncompleteRecordSelector sel_name cons' not_full_examples
+
+pmcRecSel _ _ = return ()
+
 {- Note [pmcPatBind doesn't warn on pattern guards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @pmcPatBind@'s main purpose is to check vanilla pattern bindings, like
+>>>>>>> 8760510af3 (This MR is an implementation of the proposal #516.)
 @x :: Int; Just x = e@, which is in a @PatBindRhs@ context.
 But its caller is also called for individual pattern guards in a @StmtCtxt@.
 For example, both pattern guards in @f x y | True <- x, False <- y = ...@ will

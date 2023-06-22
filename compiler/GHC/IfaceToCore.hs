@@ -1688,7 +1688,16 @@ tcIdDetails nm _ (IfRecSelId tc _first_con naughty fl)
   = do { tc' <- either (fmap RecSelData . tcIfaceTyCon)
                        (fmap (RecSelPatSyn . tyThingPatSyn) . tcIfaceDecl False)
                        tc
-       ; return (RecSelId { sel_tycon = tc', sel_naughty = naughty, sel_fieldLabel = fl { flSelector = nm } }) }
+       ; let all_cons = recSelParentCons tc'
+             cons_partitioned
+                 = conLikesWithFields all_cons [flLabel fl]
+       ; return (RecSelId
+                   { sel_tycon = tc'
+                   , sel_naughty = naughty
+                   , sel_fieldLabel = fl { flSelector = nm }
+                   , sel_cons = cons_partitioned }
+                       -- Reconstructed here since we don't want Uniques in the Iface file
+                ) }
   where
     tyThingPatSyn (AConLike (PatSynCon ps)) = ps
     tyThingPatSyn _ = panic "tcIdDetails: expecting patsyn"

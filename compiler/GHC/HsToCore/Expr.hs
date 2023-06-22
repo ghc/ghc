@@ -3,6 +3,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -31,7 +32,7 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Pmc
 import GHC.HsToCore.Errors.Types
 import GHC.Types.SourceText
-import GHC.Types.Name
+import GHC.Types.Name hiding (varName)
 import GHC.Core.FamInstEnv( topNormaliseType )
 import GHC.HsToCore.Quote
 import GHC.HsToCore.Ticks (stripTicksTopHsExpr)
@@ -51,6 +52,7 @@ import GHC.Core.Make
 import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
+import GHC.Types.Id.Info
 import GHC.Types.Id.Make
 import GHC.Unit.Module
 import GHC.Core.ConLike
@@ -67,6 +69,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Core.PatSyn
 import Control.Monad
+import GHC.Types.Error
 
 {-
 ************************************************************************
@@ -230,7 +233,38 @@ dsLExpr (L loc e) = putSrcSpanDsA loc $ dsExpr e
 -- | Desugar a typechecked expression.
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
-dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
+
+{- Record selectors are warned about if they are not
+present in all of the parent data type's constructor,
+or always in case of pattern synonym record selectors
+(regulated by a flag). However, this only produces
+a warning if it's not a part of a record selector
+application. For example:
+
+        data T = T1 | T2 {s :: Bool}
+        f x = s x -- the warning from this case will be supressed
+
+See the `HsApp` case for where it is filtered out
+-}
+dsExpr (HsRecSel _ (FieldOcc id _))
+  = do { let name = getName id
+             RecSelId {sel_cons = (_, cons_wo_field)}
+                  = idDetails id
+       ; cons_trimmed <- trim_cons cons_wo_field
+       ; unless (null cons_wo_field) $ diagnosticDs
+             $ DsIncompleteRecordSelector name cons_trimmed (cons_trimmed /= cons_wo_field)
+                 -- This only produces a warning if it's not a part of a
+                 -- record selector application (e.g. `s a` where `s` is a selector)
+                 -- See the `HsApp` case for where it is filtered out
+       ; dsHsVar id }
+  where
+    trim_cons :: [ConLike] -> DsM [ConLike]
+    trim_cons cons_wo_field = do
+      dflags <- getDynFlags
+      let maxConstructors = maxUncoveredPatterns dflags
+      return $ take maxConstructors cons_wo_field
+
+
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
@@ -297,9 +331,27 @@ dsExpr (HsLamCase _ lc_variant matches)
   = uncurry mkCoreLams <$> matchWrapper (LamCaseAlt lc_variant) Nothing matches
 
 dsExpr e@(HsApp _ fun arg)
-  = do { fun' <- dsLExpr fun
+         -- We want to have a special case that uses the PMC information to filter
+         -- out some of the incomplete record selectors warnings and not trigger
+         -- the warning emitted during the desugaring of dsExpr(HsRecSel)
+         -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
+  = do { (msgs, fun') <- captureMessagesDs $ dsLExpr fun
+             -- Make sure to filter out the generic incomplete record selector warning
+             -- if it's a raw record selector
        ; arg' <- dsLExpr arg
+       ; case getIdFromTrivialExpr_maybe fun' of
+           Just fun_id | isRecordSelector fun_id
+             -> do { let msgs' = filterMessages is_incomplete_rec_sel_msg msgs
+                   ; addMessagesDs msgs'
+                   ; pmcRecSel fun_id arg' }
+           _ -> addMessagesDs msgs
        ; return $ mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg' }
+  where
+    is_incomplete_rec_sel_msg :: MsgEnvelope DsMessage -> Bool
+    is_incomplete_rec_sel_msg (MsgEnvelope {errMsgDiagnostic = DsIncompleteRecordSelector{}})
+                                = False
+    is_incomplete_rec_sel_msg _ = True
+
 
 dsExpr e@(HsAppType {}) = dsHsWrapped e
 

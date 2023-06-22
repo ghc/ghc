@@ -780,7 +780,7 @@ shortCutSolver dflags ev_w ev_i
     try_solve_from_instance (ev_binds, solved_dicts) ev
       | let pred = ctEvPred ev
       , ClassPred cls tys <- classifyPredType pred
-      = do { inst_res <- lift $ matchGlobalInst dflags True cls tys
+      = do { inst_res <- lift $ matchGlobalInst dflags True cls tys loc_w
            ; case inst_res of
                OneInst { cir_new_theta   = preds
                        , cir_mk_ev       = mk_ev
@@ -939,7 +939,7 @@ matchClassInst dflags inerts clas tys loc
                    ; return local_res }
 
            NoInstance  -- No local instances, so try global ones
-              -> do { global_res <- matchGlobalInst dflags False clas tys
+              -> do { global_res <- matchGlobalInst dflags False clas tys loc
                     ; traceTcS "} matchClassInst global result" $ ppr global_res
                     ; return global_res } }
   where

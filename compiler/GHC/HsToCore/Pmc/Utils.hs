@@ -61,6 +61,7 @@ allPmCheckWarnings =
   , Opt_WarnIncompleteUniPatterns
   , Opt_WarnIncompletePatternsRecUpd
   , Opt_WarnOverlappingPatterns
+  , Opt_WarnIncompleteRecordSelectors
   ]
 
 -- | Check whether the redundancy checker should run (redundancy only)

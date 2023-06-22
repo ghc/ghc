@@ -22,7 +22,7 @@ module GHC.Types.Id.Info (
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
         JoinArity, isJoinIdDetails_maybe,
         RecSelParent(..), recSelParentName, recSelFirstConName,
-        idDetailsConcreteTvs,
+        recSelParentCons, idDetailsConcreteTvs,
 
         -- * The IdInfo type
         IdInfo,         -- Abstract
@@ -101,6 +101,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Type (mkTyConApp)
 import GHC.Core.PatSyn
+import GHC.Core.ConLike
 import GHC.Types.ForeignCall
 import GHC.Unit.Module
 import GHC.Types.Demand
@@ -149,7 +150,13 @@ data IdDetails
     , sel_fieldLabel :: FieldLabel
     , sel_naughty    :: Bool    -- True <=> a "naughty" selector which can't actually exist, for example @x@ in:
                                 --    data T = forall a. MkT { x :: a }
-    }                           -- See Note [Naughty record selectors] in GHC.Tc.TyCl
+                                -- See Note [Naughty record selectors] in GHC.Tc.TyCl
+    , sel_cons       :: ([ConLike], [ConLike])
+                                -- If record selector is not defined for all constructors
+                                -- of a parent type, this is the pair of lists of constructors that
+                                -- it is and is not defined for. Otherwise, it's Nothing.
+                                -- Cached here based on the RecSelParent.
+    }                           -- See Note [Detecting incomplete record selectors] in GHC.HsToCore.Pmc
 
   | DataConWorkId DataCon       -- ^ The 'Id' is for a data constructor /worker/
   | DataConWrapId DataCon       -- ^ The 'Id' is for a data constructor /wrapper/
@@ -331,6 +338,15 @@ recSelParentName (RecSelPatSyn ps) = patSynName ps
 recSelFirstConName :: RecSelParent -> Name
 recSelFirstConName (RecSelData   tc) = dataConName $ head $ tyConDataCons tc
 recSelFirstConName (RecSelPatSyn ps) = patSynName ps
+
+recSelParentCons :: RecSelParent -> [ConLike]
+recSelParentCons (RecSelData tc)
+  | isAlgTyCon tc
+      = map RealDataCon $ visibleDataCons
+      $ algTyConRhs tc
+  | otherwise
+      = []
+recSelParentCons (RecSelPatSyn ps) = [PatSynCon ps]
 
 instance Outputable RecSelParent where
   ppr p = case p of

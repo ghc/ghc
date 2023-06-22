@@ -207,6 +207,10 @@ instance Diagnostic DsMessage where
                           <+> text "for"<+> quotes (ppr lhs_id)
                           <+> text "might fire first")
                 ]
+    DsIncompleteRecordSelector name cons_wo_field not_full_examples -> mkSimpleDecorated $
+      text "The application of the record field" <+> quotes (ppr name)
+      <+> text "may fail for the following constructors:"
+      <+> vcat (map ppr cons_wo_field ++ [text "..." | not_full_examples])
 
   diagnosticReason = \case
     DsUnknownMessage m          -> diagnosticReason m
@@ -237,6 +241,7 @@ instance Diagnostic DsMessage where
     DsRecBindsNotAllowedForUnliftedTys{}        -> ErrorWithoutFlag
     DsRuleMightInlineFirst{}                    -> WarningWithFlag Opt_WarnInlineRuleShadowing
     DsAnotherRuleMightFireFirst{}               -> WarningWithFlag Opt_WarnInlineRuleShadowing
+    DsIncompleteRecordSelector{}                -> WarningWithFlag Opt_WarnIncompleteRecordSelectors
 
   diagnosticHints = \case
     DsUnknownMessage m          -> diagnosticHints m
@@ -273,6 +278,7 @@ instance Diagnostic DsMessage where
     DsRecBindsNotAllowedForUnliftedTys{}        -> noHints
     DsRuleMightInlineFirst _ lhs_id rule_act    -> [SuggestAddInlineOrNoInlinePragma lhs_id rule_act]
     DsAnotherRuleMightFireFirst _ bad_rule _    -> [SuggestAddPhaseToCompetingRule bad_rule]
+    DsIncompleteRecordSelector{}                -> noHints
 
   diagnosticCode = constructorCode
 

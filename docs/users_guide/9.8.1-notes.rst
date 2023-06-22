@@ -177,7 +177,7 @@ Compiler
           {-# WARNING "do not use that constructor" D(D1),
           D(D2)
         )
-        D = D1 | D2
+        data D = D1 | D2
 
   This allows for changing the structure of a library without immediately breaking user code,
   but instead being able to warn the user that a change in the library interface
