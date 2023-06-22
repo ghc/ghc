@@ -1,5 +1,6 @@
 module TestUtils
-  ( readTestHie
+  ( explainEv
+  , readTestHie
   , render
   , text
   , SDoc
@@ -44,3 +45,21 @@ render df = renderWithContext (initSDocContext df defaultUserStyle) . ppr
 
 text :: String -> SDoc
 text = O.text -- SDoc-only version
+
+explainEv :: DynFlags -> HieFile -> RefMap Int -> (Int,Int) -> IO ()
+explainEv df hf refmap point = do
+  putStrLn $ replicate 26 '='
+  putStrLn $ "At point " ++ show point ++ ", we found:"
+  putStrLn $ replicate 26 '='
+  putStr $ drawForest ptrees
+  where
+    trees = getEvidenceTreesAtPoint hf refmap point
+
+    ptrees = fmap (pprint . fmap expandType) <$> trees
+
+    expandType = text . renderHieType df .
+      flip recoverFullType (hie_types hf)
+
+    pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
+
+    pprint = pretty . render df
