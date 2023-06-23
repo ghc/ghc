@@ -2249,8 +2249,8 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
--- ROMES:TODO: 
-           _ -> do { s' <- newId (fsLit "s") (LambdaBound OneTy) realWorldStatePrimTy
+-- ROMES:TODO: Ideally this would be newId ... (LambdaBound OneTy) realWorldStatePrimTy, since it's a real world state prim token which must get used only once, but we can't bc the type wouldn't match runRW#'s signature
+           _ -> do { s' <- newId (fsLit "s") (LambdaBound ManyTy) realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
                          cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s'
