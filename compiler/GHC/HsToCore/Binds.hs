@@ -117,56 +117,10 @@ dsTopLHsBinds binds
     top_level_err bindsType (L loc bind)
       = putSrcSpanDs (locA loc) $
         diagnosticDs (DsTopLevelBindsNotAllowed bindsType bind)
-{-
-Note [Return bindings in dependency order]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The desugarer tries to desugar a non-recursive let-binding to a collection of
-one or more non-recursive let-bindings. The alternative is to generate a letrec
-and wait for the occurrence analyser to sort it out later, but it is pretty easy
-to arrange that the [(Id,CoreExpr)] pairs returned by dsLHsBinds are returned in
-dependency order
 
-It's most important for linear types, where non-recursive lets can be linear
-whereas recursive-let can't. Since we check the output of the desugarer for
-linearity (see also Note [Linting linearity]), desugaring non-recursive lets to
-recursive lets would break linearity checks. An alternative is to refine the
-typing rule for recursive lets so that we don't have to care (see in particular
-#23218 and #18694), but the outcome of this line of work is still unclear. In
-the meantime, being a little precise in the desugarer is cheap. (paragraph
-written on 2023-06-09)
-
-In dsLHSBinds (and dependencies), a single binding can be desugared to multiple
-bindings. For instance because the source binding has the {-# SPECIALIZE #-}
-pragma. In:
-
-f _ = …
- where
-  {-# SPECIALIZE g :: F Int -> F Int #-}
-  g :: C a => F a -> F a
-  g _ = …
-
-The g binding desugars to
-
-let {
-  $sg = … } in
-
-  g
-  [RULES: "SPEC g" g @Int $dC = $sg]
-  g = …
-
-In order to avoid generating a letrec that will immediately be reordered, we
-make sure to return the binding in dependency order [$sg, g].
-
-This only matters when the source binding is non-recursive as recursive bindings
-are always desugared to a single mutually recursive block.
-
--}
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
 -- later be forced in the binding group body, see Note [Desugar Strict binds]
---
--- Invariant: the desugared bindings are returned in dependency order,
--- see Note [Return bindings in dependency order]
 dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
   = do { ds_bs <- mapBagM dsLHsBind binds
@@ -180,9 +134,6 @@ dsLHsBind (L loc bind) = do dflags <- getDynFlags
                             putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
---
--- Invariant: the desugared bindings are returned in dependency order,
--- see Note [Return bindings in dependency order]
 dsHsBind :: DynFlags
          -> HsBind GhcTc
          -> DsM ([Id], [(Id,CoreExpr)])
@@ -312,7 +263,7 @@ dsAbsBinds dflags tyvars dicts exports
                                        (isDefaultMethod prags)
                                        (dictArity dicts) rhs
 
-       ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
+       ; return (force_vars', main_bind : fromOL spec_binds) } }
 
     -- Another common case: no tyvars, no dicts
     -- In this case we can have a much simpler desugaring
@@ -371,7 +322,7 @@ dsAbsBinds dflags tyvars dicts exports
                            -- Kill the INLINE pragma because it applies to
                            -- the user written (local) function.  The global
                            -- Id is just the selector.  Hmm.
-                     ; return (fromOL spec_binds ++ [(global', rhs)]) } }
+                     ; return ((global', rhs) : fromOL spec_binds) } }
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 

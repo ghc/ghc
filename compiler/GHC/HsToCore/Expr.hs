@@ -160,20 +160,17 @@ ds_val_bind (is_rec, binds) body
           -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType
           case prs of
             [] -> return body
-            _  -> return (mkLets (mk_binds is_rec prs) body') }
-            -- We can make a non-recursive let because we make sure to return
-            -- the bindings in dependency order in dsLHsBinds, see Note [Return bindings in dependency order]
-
--- | Helper function. You can use the result of 'mk_binds' with 'mkLets' for
--- instance.
---
---   * @'mk_binds' 'Recursive' binds@ makes a single mutually-recursive
---     bindings with all the rhs/lhs pairs in @binds@
---   * @'mk_binds' 'NonRecursive' binds@ makes one non-recursive binding
---     for each rhs/lhs pairs in @binds@
-mk_binds :: RecFlag -> [(b, (Expr b))] -> [Bind b]
-mk_binds Recursive binds = [Rec binds]
-mk_binds NonRecursive binds = map (uncurry NonRec) binds
+            _  -> return (Let (Rec prs) body') }
+        -- Use a Rec regardless of is_rec.
+        -- Why? Because it allows the binds to be all
+        -- mixed up, which is what happens in one rare case
+        -- Namely, for an AbsBind with no tyvars and no dicts,
+        --         but which does have dictionary bindings.
+        -- See notes with GHC.Tc.Solver.inferLoop [NO TYVARS]
+        -- It turned out that wrapping a Rec here was the easiest solution
+        --
+        -- NB The previous case dealt with unlifted bindings, so we
+        --    only have to deal with lifted ones now; so Rec is ok
 
 ------------------
 dsUnliftedBind :: HsBind GhcTc -> CoreExpr -> DsM CoreExpr
