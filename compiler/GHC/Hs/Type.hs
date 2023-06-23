@@ -92,7 +92,7 @@ module GHC.Hs.Type (
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
-import Data.Typeable
+
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Type
@@ -936,16 +936,14 @@ type instance XAmbiguous GhcTc = Id
 
 type instance XXAmbiguousFieldOcc (GhcPass _) = DataConCantHappen
 
-
--- ROMES:TODO: 3 typeable temporary instances
-instance Typeable p => Outputable (AmbiguousFieldOcc (GhcPass p)) where
+instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
   ppr = ppr . ambiguousFieldOccRdrName
 
-instance Typeable p => OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
+instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . ambiguousFieldOccRdrName
   pprPrefixOcc = pprPrefixOcc . ambiguousFieldOccRdrName
 
-instance Typeable p => OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
+instance OutputableBndr (Located (AmbiguousFieldOcc (GhcPass p))) where
   pprInfixOcc  = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc
 
@@ -1153,7 +1151,7 @@ pprLHsContextAlways (L _ ctxt)
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
       _        -> parens (interpp'SP ctxt) <+> darrow
 
-pprConDeclFields :: forall p. OutputableBndrId p
+pprConDeclFields :: OutputableBndrId p
                  => [LConDeclField (GhcPass p)] -> SDoc
 pprConDeclFields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where

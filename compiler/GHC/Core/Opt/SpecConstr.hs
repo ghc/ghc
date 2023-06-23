@@ -47,7 +47,7 @@ import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
-import GHC.Types.Var (pprIdWithBinding, isLetBinding, isLambdaBinding, zeroUE)
+import GHC.Types.Var (pprIdWithBinding, zeroUE)
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -1486,21 +1486,11 @@ scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
 scExpr' env (Lam b e)
-  | not (isLambdaBinding b)
-  = pprPanic "scExpr':Lam" (pprIdWithBinding b)
-  | otherwise
   = do let (env', b') = extendBndr env b
        (usg, e') <- scExpr env' e
        return (usg, Lam b' e')
 
 scExpr' env (Let bind body)
-  | NonRec b _ <- bind
-  , not (isLetBinding b)
-  = pprPanic "scExpr':Let:NonRec" (pprIdWithBinding b)
-  | Rec bs <- bind
-  , any (not . isLetBinding . fst) bs
-  = pprPanic "scExpr':Let:Rec" (ppr bs)
-  | otherwise
   = do { (final_usage, binds', body') <- scBind NotTopLevel env bind $
                                          (\env -> scExpr env body)
        ; return (final_usage, mkLets binds' body') }

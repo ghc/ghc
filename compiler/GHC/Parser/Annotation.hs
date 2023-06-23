@@ -1265,7 +1265,7 @@ instance (Outputable a, Outputable e)
      => Outputable (GenLocated (SrcSpanAnn' a) e) where
   ppr = pprLocated
 
-instance (Outputable a, OutputableBndr e, Typeable a) -- ROMES:TODO: Typeable is temporary!
+instance (Outputable a, OutputableBndr e)
      => OutputableBndr (GenLocated (SrcSpanAnn' a) e) where
   pprInfixOcc = pprInfixOcc . unLoc
   pprPrefixOcc = pprPrefixOcc . unLoc

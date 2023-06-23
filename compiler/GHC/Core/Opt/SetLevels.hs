@@ -1106,8 +1106,7 @@ call of 'f'.  Hence the (not float_is_lam) in float_me.
 The binding stuff works for top level too.
 -}
 
-lvlBind :: HasCallStack
-        => LevelEnv
+lvlBind :: LevelEnv
         -> CoreBindWithFVs
         -> LvlM (LevelledBind, LevelEnv)
 
@@ -1265,7 +1264,7 @@ profitableFloat env dest_lvl
 -- Three help functions for the type-abstraction case
 
 -- ROMES:TODO: What does this do? Why does it start with lvl?
-lvlRhs :: HasCallStack => LevelEnv
+lvlRhs :: LevelEnv
        -> RecFlag
        -> Bool               -- Is this a bottoming function
        -> Maybe JoinArity
@@ -1275,8 +1274,8 @@ lvlRhs env rec_flag is_bot mb_join_arity expr
   = lvlFloatRhs [] (le_ctxt_lvl env) env
                 rec_flag is_bot mb_join_arity expr
 
--- ROMES:TODO: Document this function, what does it do? With some examples.
-lvlFloatRhs :: HasCallStack => [OutVar] -> Level -> LevelEnv -> RecFlag
+-- ROMES:TODO: Document this function, what does it do?
+lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
             -> Bool   -- Binding is for a bottoming function
             -> Maybe JoinArity
             -> CoreExprWithFVs

@@ -66,7 +66,7 @@ import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var( EvVar, isLetBinding, toLambdaBound )
+import GHC.Types.Var( EvVar, toLambdaBound )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -94,8 +94,7 @@ import Control.Monad
 
 -- | Desugar top level binds, strict binds are treated like normal
 -- binds since there is no good time to force before first usage.
-dsTopLHsBinds :: HasCallStack
-              => LHsBinds GhcTc -> DsM (OrdList (Id,CoreExpr))
+dsTopLHsBinds :: LHsBinds GhcTc -> DsM (OrdList (Id,CoreExpr))
 dsTopLHsBinds binds
      -- see Note [Strict binds checks]
   | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
@@ -123,23 +122,20 @@ dsTopLHsBinds binds
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
 -- later be forced in the binding group body, see Note [Desugar Strict binds]
-dsLHsBinds :: HasCallStack
-           => LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
+dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
   = do { ds_bs <- mapBagM dsLHsBind binds
        ; return (foldBag (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
                          id ([], []) ds_bs) }
 
 ------------------------
-dsLHsBind :: HasCallStack
-          => LHsBind GhcTc
+dsLHsBind :: LHsBind GhcTc
           -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
                             putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
-dsHsBind :: HasCallStack
-         => DynFlags
+dsHsBind :: DynFlags
          -> HsBind GhcTc
          -> DsM ([Id], [(Id,CoreExpr)])
          -- ^ The Ids of strict binds, to be forced in the body of the
@@ -148,9 +144,6 @@ dsHsBind :: HasCallStack
 
 dsHsBind dflags (VarBind { var_id = var
                          , var_rhs = expr })
-  | not (isLetBinding var)
-  = pprPanic "dsHsBind:VarBind" (ppr var <+> text " should be let bound!")
-  | otherwise
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
@@ -164,8 +157,6 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = (co_fn, tick)
                            })
- | not (isLetBinding fun)
- = pprPanic "dsHsBind:FunBind" (ppr fun <+> text " should be let bound!")
  | otherwise
  = do   { dsHsWrapper co_fn $ \core_wrap -> do
         { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
@@ -1199,7 +1190,7 @@ dsl_coherence field of DsM's local environment.
 
 -}
 
-dsHsWrapper :: HasCallStack => HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
+dsHsWrapper :: HsWrapper -> ((CoreExpr -> CoreExpr) -> DsM a) -> DsM a
 dsHsWrapper WpHole            k = k $ \e -> e
 dsHsWrapper (WpTyApp ty)      k = k $ \e -> App e (Type ty)
 dsHsWrapper (WpEvLam ev)      k = k $ Lam ev
@@ -1239,17 +1230,14 @@ dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps ->
 dsHsWrappers [] k = k []
 
 --------------------------------------
-dsTcEvBinds_s :: HasCallStack => [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a
+dsTcEvBinds_s :: [TcEvBinds] -> ([CoreBind] -> DsM a) -> DsM a
 dsTcEvBinds_s []       k = k []
 dsTcEvBinds_s (b:rest) k = assert (null rest) $  -- Zonker ensures null
                            dsTcEvBinds b k
 
-dsTcEvBinds :: HasCallStack => TcEvBinds -> ([CoreBind] -> DsM a) -> DsM a
+dsTcEvBinds :: TcEvBinds -> ([CoreBind] -> DsM a) -> DsM a
 dsTcEvBinds (TcEvBinds {}) _ = panic "dsEvBinds"    -- Zonker has got rid of this
-dsTcEvBinds (EvBinds bs) f = do
-  -- ROMES:TODO:
-  -- mapBagM (\b -> if not (isLetBinding (evBindVar b)) then pprPanic "dsTcEvBinds" (ppr $ evBindVar b) else pure ()) bs
-  dsEvBinds bs f
+dsTcEvBinds (EvBinds bs) f   = dsEvBinds bs f
 
 --   * Desugars the ev_binds, sorts them into dependency order, and
 --     passes the resulting [CoreBind] to thing_inside
@@ -1257,7 +1245,7 @@ dsTcEvBinds (EvBinds bs) f = do
 --     for each binder in ev_binds, before invoking thing_inside
 --
 -- ROMES:TODO: Does this always result in let bindings?
-dsEvBinds :: HasCallStack => Bag EvBind -> ([CoreBind] -> DsM a) -> DsM a
+dsEvBinds :: Bag EvBind -> ([CoreBind] -> DsM a) -> DsM a
 dsEvBinds ev_binds thing_inside
   = do { ds_binds <- mapBagM dsEvBind ev_binds
        ; let comps = sort_ev_binds ds_binds

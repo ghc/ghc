@@ -67,7 +67,6 @@ module GHC.Types.Var (
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
-        isLetBinding, isLambdaBinding,
 
         -- * ForAllTyFlags
         ForAllTyFlag(Invisible,Required,Specified,Inferred),
@@ -368,24 +367,6 @@ pprIdWithBinding x
   = ppr x <> text "[" <> ppr (idBinding x) <> text "]"
   | otherwise
   = ppr x <+> text "is not an Id"
-
-isLetBinding :: Id -> Bool
-isLetBinding x
-  | isId x
-  = case idBinding x of
-                   LetBound -> True
-                   LambdaBound _ -> False
-  | otherwise
-  = True -- ROMES:TODO: ouch
-
-isLambdaBinding :: Id -> Bool
-isLambdaBinding x
-  | isId x
-  = case idBinding x of
-                     LetBound -> False
-                     LambdaBound _ -> True
-  | otherwise
-  = True -- ROMES:TODO: ouch
 
 {-
 Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)

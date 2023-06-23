@@ -65,7 +65,6 @@ module GHC.Core.Utils (
         dumpIdInfoOfProgram
     ) where
 
-import Data.Typeable (Typeable)
 import GHC.Prelude
 import GHC.Platform
 
@@ -454,7 +453,7 @@ stripTicksTopT p = go []
 
 -- | Completely strip ticks satisfying a predicate from an
 -- expression. Note this is O(n) in the size of the expression!
-stripTicksE :: Typeable b => (CoreTickish -> Bool) -> Expr b -> Expr b
+stripTicksE :: (CoreTickish -> Bool) -> Expr b -> Expr b
 stripTicksE p expr = go expr
   where go (App e a)        = App (go e) (go a)
         go (Lam b e)        = Lam b (go e)
@@ -470,7 +469,7 @@ stripTicksE p expr = go expr
         go_b (b, e)         = (b, go e)
         go_a (Alt c bs e)   = Alt c bs (go e)
 
-stripTicksT :: Typeable b => (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
+stripTicksT :: (CoreTickish -> Bool) -> Expr b -> [CoreTickish]
 stripTicksT p expr = fromOL $ go expr
   where go (App e a)        = go e `appOL` go a
         go (Lam _ e)        = go e
@@ -607,21 +606,21 @@ This makes it easy to find, though it makes matching marginally harder.
 -}
 
 -- | Extract the default case alternative
-findDefault :: Typeable b => [Alt b] -> ([Alt b], Maybe (Expr b))
+findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
 findDefault alts                          =                    (alts, Nothing)
 
-addDefault :: HasCallStack => Typeable b => [Alt b] -> Maybe (Expr b) -> [Alt b]
+addDefault :: HasCallStack => [Alt b] -> Maybe (Expr b) -> [Alt b]
 addDefault alts Nothing    = alts
 addDefault alts (Just rhs) = Alt DEFAULT [] rhs : alts
 
-isDefaultAlt :: Typeable b => Alt b -> Bool
+isDefaultAlt :: Alt b -> Bool
 isDefaultAlt (Alt DEFAULT _ _) = True
 isDefaultAlt _                 = False
 
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
-findAlt :: Typeable b => AltCon -> [Alt b] -> Maybe (Alt b)
+findAlt :: AltCon -> [Alt b] -> Maybe (Alt b)
     -- A "Nothing" result *is* legitimate
     -- See Note [Unreachable code]
 findAlt con alts
@@ -667,7 +666,7 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
-mergeAlts :: Typeable a => [Alt a] -> [Alt a] -> [Alt a]
+mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
 -- ^ Merge alternatives preserving order; alternatives in
 -- the first argument shadow ones in the second
 mergeAlts [] as2 = as2
@@ -693,7 +692,7 @@ trimConArgs DEFAULT      args = assert (null args) []
 trimConArgs (LitAlt _)   args = assert (null args) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
-filterAlts :: Typeable b => HasCallStack
+filterAlts :: HasCallStack
            => TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
            -> [Type]               -- ^ And its type arguments
            -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
@@ -733,7 +732,7 @@ filterAlts _tycon inst_tys imposs_cons alts
          --   EITHER by the context,
          --   OR by a non-DEFAULT branch in this case expression.
 
-    impossible_alt :: Typeable b => [Type] -> Alt b -> Bool
+    impossible_alt :: [Type] -> Alt b -> Bool
     impossible_alt _ (Alt con _ _) | con `Set.member` imposs_cons_set = True
     impossible_alt inst_tys (Alt (DataAlt con) _ _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                             = False
@@ -1697,7 +1696,7 @@ app_ok fun_ok primop_ok fun args
        = expr_ok fun_ok primop_ok arg
 
 -----------------------------
-altsAreExhaustive :: Typeable b => [Alt b] -> Bool
+altsAreExhaustive :: [Alt b] -> Bool
 -- True  <=> the case alternatives are definitely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []

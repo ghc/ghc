@@ -2342,9 +2342,6 @@ occAnal env expr@(Lam {})
   = adjustNonRecRhs Nothing $ occAnalLamTail env expr -- mb_join_arity == Nothing <=> markAllManyNonTail
 
 occAnal env (Case scrut bndr ty alts)
-  | isLetBinding bndr || any isLetBinding (bindersOfAlts alts)
-  = pprPanic "simplExprF1:ouch!" (pprIdWithBinding bndr <+> ppr alts)
-  | otherwise
   = let
       (WithUsageDetails scrut_usage scrut') = occAnal (scrutCtxt env alts) scrut
       alt_env = addBndrSwap scrut' bndr $ env { occ_encl = OccVanilla } `addOneInScope` bndr
@@ -2363,14 +2360,6 @@ occAnal env (Case scrut bndr ty alts)
         (alt_usg, Alt con tagged_bndrs rhs1)
 
 occAnal env (Let bind body)
-  | NonRec b _ <- bind
-  , not (isLetBinding b)
-  , isId b
-  = pprPanic "occAnal:NonRec" (pprIdWithBinding b)
-  | Rec bs <- bind
-  , any (\x -> isId (fst x) && (not . isLetBinding . fst) x) bs
-  = pprPanic "occAnal:Rec" (ppr bs)
-  | otherwise
   = let
       body_env = env { occ_encl = OccVanilla } `addInScope` bindersOf bind
       (WithUsageDetails body_usage  body')  = occAnal body_env body

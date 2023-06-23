@@ -60,7 +60,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, isLetBinding, isLambdaBinding, toLambdaBound )
+import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, toLambdaBound )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
@@ -1214,9 +1214,6 @@ simplExprF1 env expr@(Lam {}) cont
         -- and likewise drop counts all binders (incl type lambdas)
 
 simplExprF1 env (Case scrut bndr _ alts) cont
-  | isLetBinding bndr || any isLetBinding (bindersOfAlts alts)
-  = pprPanic "simplExprF1:ouch!" (pprIdWithBinding bndr <+> ppr alts)
-  | otherwise
   = {-#SCC "simplExprF1-Case" #-}
     pprTrace "simplExprF1:Case:" (ppr bndr <+> ppr (idBinding bndr)) $
     simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
@@ -2938,9 +2935,6 @@ rebuildCase, reallyRebuildCase
 --------------------------------------------------
 
 rebuildCase env scrut case_bndr alts cont
-  | isLetBinding case_bndr || any isLetBinding (bindersOfAlts alts)
-  = pprPanic "reallyRebuildCase:ouch!" (pprIdWithBinding case_bndr <+> ppr alts)
-
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
@@ -3839,8 +3833,6 @@ mkDupableAlt :: HasCallStack => Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
 mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
-  | any (not . isLambdaBinding) alt_bndrs
-  = pprPanic "mkDupableAlt: Alt has let binders" (ppr $ map pprIdWithBinding alt_bndrs)
   | exprIsTrivial alt_rhs_in   -- See point (2) of Note [Duplicating join points]
   = return (jfloats, Alt con alt_bndrs alt_rhs_in)
 

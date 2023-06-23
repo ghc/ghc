@@ -149,8 +149,7 @@ pass-polymorphic code that deals with `XRec`s
 
 -- | We can strip off the XRec to access the underlying data.
 -- See Note [XRec and SrcSpans in the AST]
--- ROMES:TODO: Typeable temporary!
-class Typeable p => UnXRec p where
+class UnXRec p where
   unXRec :: XRec p a -> a
 
 -- | We can map over the underlying type contained in an @XRec@ while preserving

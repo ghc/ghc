@@ -5,14 +5,13 @@
 
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GADTs, StandaloneDeriving, PatternSynonyms #-}
+{-# LANGUAGE GADTs, StandaloneDeriving #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types
-        Expr(..,Let,Lam,Case), Alt(..,Alt), Bind(..,Rec,NonRec), AltCon(..), Arg,
+        Expr(..), Alt(..), Bind(..), AltCon(..), Arg,
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -253,53 +252,15 @@ data Expr b
   = Var   Id
   | Lit   Literal
   | App   (Expr b) (Arg b)
-  | HasCallStack => Lam'   b (Expr b)
-  | HasCallStack => Let'   (Bind b) (Expr b)
-  | HasCallStack => Case'  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+  | Lam   b (Expr b)
+  | Let   (Bind b) (Expr b)
+  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
   | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
 deriving instance Data b => Data (Expr b)
-
-{-# COMPLETE Var, Lit, App, Lam, Let, Case, Cast, Tick, Type, Coercion #-}
-
-pattern Lam :: forall b. (HasCallStack, Typeable b) => b -> Expr b -> Expr b
-pattern Lam x y <- Lam' x y where
-  Lam x y
-    | Just Refl <- eqT @b @Id
-    , not (isLambdaBinding x)
-    = pprPanic "pattern Lam1!" (pprIdWithBinding x)
-    | Just Refl <- eqT @b @(TaggedBndr FloatSpec)
-    , TB b _ <- x
-    , not (isLambdaBinding b)
-    = pprPanic "pattern Lam2!" (pprIdWithBinding b)
-    | otherwise
-    = Lam' x y
-
-pattern Case :: forall b. (HasCallStack, Typeable b) => Expr b -> b -> Type -> [Alt b] -> Expr b
-pattern Case a b c d <- Case' a b c d where
-  Case a b c d
-    | Just Refl <- eqT @b @Id
-    , not (isLambdaBinding b)
-    = pprPanic "pattern Case!" (pprIdWithBinding b)
-    | otherwise
-    = Case' a b c d
-
-pattern Let :: forall b. (HasCallStack, Typeable b) => Bind b -> Expr b -> Expr b
-pattern Let x y <- Let' x y where
-  Let x y
-    | Just Refl <- eqT @b @Id
-    , NonRec z _ <- x
-    , not (isLetBinding z)
-    = pprPanic "pattern Let 1!" (pprIdWithBinding z)
-    | Just Refl <- eqT @b @Id
-    , Rec zs <- x
-    , any (not . isLetBinding . fst) zs
-    = pprPanic "pattern Let 2!" (ppr zs)
-    | otherwise
-    = Let' x y
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -315,18 +276,9 @@ type Arg b = Expr b
 --     = Alt AltCon [b] (Expr b)
 --     deriving (Data)
 data Alt b where
-    Alt' :: HasCallStack => AltCon -> [b] -> (Expr b) -> Alt b
+    Alt :: AltCon -> [b] -> (Expr b) -> Alt b
 deriving instance Data b => Data (Alt b)
 {-# COMPLETE Alt #-}
-
-pattern Alt :: forall b. (HasCallStack, Typeable b) => AltCon -> [b] -> Expr b -> Alt b
-pattern Alt a b c <- Alt' a b c where
-  Alt a b c
-    | Just Refl <- eqT @b @Id
-    , any (not . isLambdaBinding) b
-    = pprPanic "pattern Alt!" (ppr b)
-    | otherwise
-    = Alt' a b c
 
 -- | A case alternative constructor (i.e. pattern match)
 
@@ -362,30 +314,9 @@ instance Ord AltCon where
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-data Bind b = HasCallStack => NonRec' b (Expr b)
-            | HasCallStack => Rec' [(b, (Expr b))]
-
-{-# COMPLETE NonRec, Rec #-}
-
-pattern NonRec :: forall b. (HasCallStack, Typeable b) => b -> Expr b -> Bind b
-pattern NonRec b e <- NonRec' b e where
-  NonRec b e
-    | Just Refl <- eqT @b @Id
-    , not (isLetBinding b)
-    = pprPanic "NonRec" (pprIdWithBinding b)
-    | otherwise
-    = NonRec' b e
-
-pattern Rec :: forall b. (HasCallStack, Typeable b) => [(b, Expr b)] -> Bind b
-pattern Rec bs <- Rec' bs where
-  Rec bs
-    | Just Refl <- eqT @b @Id
-    , any (not . isLetBinding . fst) bs
-    = pprPanic "Rec" (ppr bs)
-    | otherwise
-    = Rec' bs
-
-deriving instance Data b => Data (Bind b)
+data Bind b = NonRec b (Expr b)
+            | Rec [(b, (Expr b))]
+            deriving Data
 
 {-
 Note [Shadowing]
@@ -1794,10 +1725,10 @@ instance Outputable AltCon where
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = text "__DEFAULT"
 
-cmpAlt :: Typeable a => Alt a -> Alt a -> Ordering
+cmpAlt :: Alt a -> Alt a -> Ordering
 cmpAlt (Alt con1 _ _) (Alt con2 _ _) = con1 `cmpAltCon` con2
 
-ltAlt :: Typeable a => Alt a -> Alt a -> Bool
+ltAlt :: Alt a -> Alt a -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
@@ -1877,7 +1808,7 @@ type TaggedAlt  t = Alt  (TaggedBndr t)
 instance Outputable b => Outputable (TaggedBndr b) where
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
-deTagExpr :: Typeable t => TaggedExpr t -> CoreExpr
+deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
 deTagExpr (Lit l)                   = Lit l
 deTagExpr (Type ty)                 = Type ty
@@ -1889,11 +1820,11 @@ deTagExpr (Case e (TB b _) ty alts) = Case (deTagExpr e) b ty (map deTagAlt alts
 deTagExpr (Tick t e)                = Tick t (deTagExpr e)
 deTagExpr (Cast e co)               = Cast (deTagExpr e) co
 
-deTagBind :: Typeable t => TaggedBind t -> CoreBind
+deTagBind :: TaggedBind t -> CoreBind
 deTagBind (NonRec (TB b _) rhs) = NonRec b (deTagExpr rhs)
 deTagBind (Rec prs)             = Rec [(b, deTagExpr rhs) | (TB b _, rhs) <- prs]
 
-deTagAlt :: Typeable t => TaggedAlt t -> CoreAlt
+deTagAlt :: TaggedAlt t -> CoreAlt
 deTagAlt (Alt con bndrs rhs) = Alt con [b | TB b _ <- bndrs] (deTagExpr rhs)
 
 {-
@@ -1998,37 +1929,27 @@ mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
 -- that the rhs satisfies the let-can-float invariant.  Prefer to use
 -- 'GHC.Core.Make.mkCoreLets' if possible, which does guarantee the invariant
-mkLets        :: HasCallStack => Typeable b => [Bind b] -> Expr b -> Expr b
+mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
-mkLams        :: forall b. HasCallStack => Typeable b => [b] -> Expr b -> Expr b
+mkLams        :: HasCallStack => [b] -> Expr b -> Expr b
 
-mkLams binders body = case eqT @b @Id of Just Refl -> if any (not . isLambdaBinding) binders then pprPanic "mkLams" (text "A let-bound var [" <+> hsep (map pprIdWithBinding binders) <+> text "] was used to construct a lambda binder!") else foldr Lam body binders
-                                         Nothing -> foldr Lam body binders
+mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr mkLet body binds
 
--- ROMES:TODO: temporary assertions, this is validated in the linter...
-
-mkLet :: forall b. HasCallStack => Typeable b
-      => Bind b -> Expr b -> Expr b
+mkLet :: Bind b -> Expr b -> Expr b
 -- The desugarer sometimes generates an empty Rec group
 -- which Lint rejects, so we kill it off right away
 mkLet (Rec []) body = body
-mkLet bind     body = case (eqT @b @Id) of Just Refl -> if not (isLetBinder bind) then pprPanic "mkLet" (text "A lambda-bound var [" <+> pprLetBinderId bind <+> text "] was used to construct a let binder!") else Let bind body
-                                           Nothing   -> Let bind body
-  where
-    isLetBinder (NonRec b _) = isLetBinding b
-    isLetBinder (Rec ls) = all (isLetBinding . fst) ls
-    pprLetBinderId (NonRec b _) = pprIdWithBinding b
-    pprLetBinderId (Rec ls)     = hsep $ map (pprIdWithBinding . fst) ls
+mkLet bind     body = Let bind body
 
 -- | @mkLetNonRec bndr rhs body@ wraps @body@ in a @let@ binding @bndr@.
-mkLetNonRec :: Typeable b => b -> Expr b -> Expr b -> Expr b
+mkLetNonRec :: b -> Expr b -> Expr b -> Expr b
 mkLetNonRec b rhs body = Let (NonRec b rhs) body
 
 -- | @mkLetRec binds body@ wraps @body@ in a @let rec@ with the given set of
 -- @binds@ if binds is non-empty.
-mkLetRec :: Typeable b => [(b, Expr b)] -> Expr b -> Expr b
+mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
@@ -2079,45 +2000,45 @@ exprToType _bad          = pprPanic "exprToType" empty
 -}
 
 -- | Extract every variable by this group
-bindersOf  :: Typeable b => Bind b -> [b]
+bindersOf  :: Bind b -> [b]
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
 bindersOf (NonRec binder _) = [binder]
 bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
 -- | 'bindersOf' applied to a list of binding groups
-bindersOfBinds :: Typeable b => [Bind b] -> [b]
+bindersOfBinds :: [Bind b] -> [b]
 bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
 
 -- We inline this to avoid unknown function calls.
 {-# INLINE foldBindersOfBindStrict #-}
-foldBindersOfBindStrict :: Typeable b => (a -> b -> a) -> a -> Bind b -> a
+foldBindersOfBindStrict :: (a -> b -> a) -> a -> Bind b -> a
 foldBindersOfBindStrict f
   = \z bind -> case bind of
       NonRec b _rhs -> f z b
       Rec pairs -> foldl' f z $ map fst pairs
 
 {-# INLINE foldBindersOfBindsStrict #-}
-foldBindersOfBindsStrict :: Typeable b => (a -> b -> a) -> a -> [Bind b] -> a
+foldBindersOfBindsStrict :: (a -> b -> a) -> a -> [Bind b] -> a
 foldBindersOfBindsStrict f = \z binds -> foldl' fold_bind z binds
   where
     fold_bind = (foldBindersOfBindStrict f)
 
 
-rhssOfBind :: Typeable b => Bind b -> [Expr b]
+rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
 -- | Concat together all the binders in each alternative
-bindersOfAlts :: Typeable b => [Alt b] -> [b]
+bindersOfAlts :: [Alt b] -> [b]
 bindersOfAlts = concatMap (\(Alt _ ids _) -> ids)
 
-rhssOfAlts :: Typeable b => [Alt b] -> [Expr b]
+rhssOfAlts :: [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | Alt _ _ e <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single
 -- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
-flattenBinds :: Typeable b => [Bind b] -> [(b, Expr b)]
+flattenBinds :: [Bind b] -> [(b, Expr b)]
 flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
 flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
 flattenBinds []                   = []
@@ -2125,7 +2046,7 @@ flattenBinds []                   = []
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',
 -- and 'collectTyAndValBinders'
-collectBinders         :: Typeable b => Expr b   -> ([b],     Expr b)
+collectBinders         :: Expr b   -> ([b],     Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar], CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],    CoreExpr)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
@@ -2133,7 +2054,7 @@ collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
 -- | Strip off exactly N leading lambdas (type or value).
 -- Good for use with join points.
 -- Panic if there aren't enough
-collectNBinders :: Typeable b => JoinArity -> Expr b -> ([b], Expr b)
+collectNBinders :: JoinArity -> Expr b -> ([b], Expr b)
 
 collectBinders expr
   = go [] expr
@@ -2180,7 +2101,7 @@ collectNValBinders_maybe orig_n orig_expr
 
 -- | Takes a nested application expression and returns the function
 -- being applied and the arguments to which it is applied
-collectArgs :: Typeable b => Expr b -> (Expr b, [Arg b])
+collectArgs :: Expr b -> (Expr b, [Arg b])
 collectArgs expr
   = go expr []
   where
@@ -2189,7 +2110,7 @@ collectArgs expr
 
 -- | Takes a nested application expression and returns the function
 -- being applied. Looking through casts and ticks to find it.
-collectFunSimple :: Typeable b => Expr b -> Expr b
+collectFunSimple :: Expr b -> Expr b
 collectFunSimple expr
   = go expr
   where
@@ -2337,10 +2258,10 @@ collectAnnArgsTicks tickishOk expr
                               = go e as (t:ts)
     go e                as ts = (e, as, reverse ts)
 
-deAnnotate :: Typeable bndr => AnnExpr bndr annot -> Expr bndr
+deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
-deAnnotate' :: Typeable bndr => AnnExpr' bndr annot -> Expr bndr
+deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
 deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnCoercion co)      = Coercion co
 deAnnotate' (AnnVar  v)           = Var v
@@ -2355,15 +2276,15 @@ deAnnotate' (AnnLet bind body)
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
-deAnnAlt :: Typeable bndr => AnnAlt bndr annot -> Alt bndr
+deAnnAlt :: AnnAlt bndr annot -> Alt bndr
 deAnnAlt (AnnAlt con args rhs) = Alt con args (deAnnotate rhs)
 
-deAnnBind  :: Typeable b => AnnBind b annot -> Bind b
+deAnnBind  :: AnnBind b annot -> Bind b
 deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
 deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'
-collectAnnBndrs :: Typeable bndr => AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
+collectAnnBndrs :: AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
 collectAnnBndrs e
   = collect [] e
   where
