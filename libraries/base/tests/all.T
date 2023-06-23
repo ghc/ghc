@@ -308,5 +308,6 @@ test('listThreads', expect_broken_for(23272, ['ghci-opt']), compile_and_run, [''
 test('listThreads1', omit_ghci, compile_and_run, [''])
 test('inits1tails1', normal, compile_and_run, [''])
 test('CLC149', normal, compile, [''])
+test('AtomicModifyIORef', normal, compile_and_run, [''])
 test('AtomicSwapIORef', normal, compile_and_run, [''])
 test('T23454', normal, compile_fail, [''])
