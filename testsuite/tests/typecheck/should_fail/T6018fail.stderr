@@ -52,18 +52,18 @@ T6018fail.hs:53:15: error: [GHC-05175]
 
 T6018fail.hs:61:10: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
-    Type/kind variable ‘k1’
+    Type/kind variable ‘a1’
     cannot be inferred from the right-hand side.
     In the type family equation:
-      PolyKindVarsF @{[k1]} @[k2] ('[] @k1) = '[] @k2
+      PolyKindVarsF @{[a1]} @[a2] ('[] @a1) = '[] @a2
         -- Defined at T6018fail.hs:61:10
 
 T6018fail.hs:64:15: error: [GHC-05175]
     Type family equation violates the family's injectivity annotation.
-    Type/kind variable ‘k1’
+    Type/kind variable ‘a1’
     cannot be inferred from the right-hand side.
     In the type family equation:
-      PolyKindVars @[k1] @[k2] ('[] @k1) = '[] @k2
+      PolyKindVars @[a1] @[a2] ('[] @a1) = '[] @a2
         -- Defined at T6018fail.hs:64:15
 
 T6018fail.hs:68:15: error: [GHC-05175]
