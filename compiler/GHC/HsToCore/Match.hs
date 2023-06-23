@@ -288,7 +288,6 @@ matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
-          -- romes:I don't know
         { let bind = NonRec (toLetBound var') (core_wrap (Var var))
         ; return (mkCoLetMatchResult bind match_result) } }
 

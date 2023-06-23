@@ -57,7 +57,6 @@ import GHC.Tc.Zonk.TcType
 import GHC.Core.Predicate ( getEqPredTys_maybe )
 import GHC.Core.Reduction ( Reduction(..) )
 import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Core.Class   ( Class )
 import GHC.Core.Coercion( mkSymCo )

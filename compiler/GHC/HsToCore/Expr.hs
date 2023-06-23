@@ -51,7 +51,6 @@ import GHC.Core.Make
 import GHC.Driver.Session
 import GHC.Types.CostCentre
 import GHC.Types.Id
-import GHC.Types.Var (pprIdWithBinding)
 import GHC.Types.Id.Make
 import GHC.Unit.Module
 import GHC.Core.ConLike

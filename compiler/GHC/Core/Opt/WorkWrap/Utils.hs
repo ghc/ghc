@@ -987,7 +987,7 @@ unbox_one_arg opts arg_var
        ; let wrap_arg = mkConApp dc (map Type tc_args ++ wrap_args) `mkCast` mkSymCo co
        -- See Note [Unboxing through unboxed tuples]
        ; return $ if isUnboxedTupleDataCon dc && not nested_useful
-                     then (boringSplit, [(arg_var,NotMarkedStrict)], nop_fn, varToCoreExpr arg_var)
+                     then (boringSplit, [(toLambdaBound arg_var,NotMarkedStrict)], nop_fn, varToCoreExpr $ toLambdaBound arg_var)
                      else (usefulSplit, worker_args, unbox_fn . wrap_fn, wrap_arg) }
 
 -- | Tries to find a suitable absent filler to bind the given absent identifier

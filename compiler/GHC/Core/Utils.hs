@@ -523,7 +523,7 @@ bindNonRec bndr rhs body
     lambda_bndr = toLambdaBound bndr -- ROMES:TODO: Explain, is this the best place to do this?
     case_bind = mkDefaultCase rhs lambda_bndr body
     -- ROMES:TODO: I couldn't find the root cause, for now we simply override the idBinding here
-    let_bind 
+    let_bind
       | isId bndr
       = Let (NonRec (toLetBound bndr) rhs) body
       | otherwise

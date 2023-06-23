@@ -2539,7 +2539,7 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                 -- that outer_bndr is not shadowed by the inner patterns
               wrap_rhs rhs = Let (NonRec (toLetBound inner_bndr) (Var outer_bndr)) rhs
                 -- IdBinding: See Note [Keeping the IdBinding up to date]
-                -- 
+                --
                 -- The let is OK even for unboxed binders,
 
               wrapped_alts | isDeadBinder inner_bndr = inner_alts

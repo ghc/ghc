@@ -597,8 +597,15 @@ zonkIdBndrX v
 
 zonkIdBndr :: TcId -> ZonkTcM Id
 zonkIdBndr v
-  = do { Scaled w' ty' <- zonkScaledTcTypeToTypeX (idScaledType v)
-       ; return $ setIdMult (setIdType v ty') w' }
+  = do idBinding' <- zonkIdBinding     (idBinding v)
+       ty'        <- zonkTcTypeToTypeX (idType v)
+       return $ setIdBinding (setIdType v ty') idBinding'
+
+zonkIdBinding :: IdBinding -> ZonkTcM IdBinding
+zonkIdBinding b = case b of
+   LambdaBound m -> LambdaBound <$> zonkTcTypeToTypeX m
+   -- LetBound ue -> LetBound    <$> mapUEM zonkTcTypeToTypeX ue
+   LetBound -> pure LetBound
 
 zonkIdBndrs :: [TcId] -> ZonkTcM [Id]
 zonkIdBndrs ids = mapM zonkIdBndr ids
@@ -626,7 +633,7 @@ zonkEvBndr :: EvVar -> ZonkTcM EvVar
 -- Works for dictionaries and coercions
 -- Does not extend the ZonkEnv
 zonkEvBndr var
-  = updateIdTypeAndMultM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX) var
+  = updateIdTypeAndMultsM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX) var
 
 {-
 zonkEvVarOcc :: EvVar -> ZonkTcM EvTerm
@@ -770,7 +777,7 @@ zonk_bind (XHsBindsLR (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
       , (L loc bind@(FunBind { fun_id      = (L mloc mono_id)
                              , fun_matches = ms
                              , fun_ext     = (co_fn, ticks) })) <- lbind
-      = do { new_mono_id <- updateIdTypeAndMultM zonkTcTypeToTypeX mono_id
+      = do { new_mono_id <- updateIdTypeAndMultsM zonkTcTypeToTypeX mono_id
                             -- Specifically /not/ zonkIdBndr; we do not want to
                             -- complain about a representation-polymorphic binder
            ; runZonkBndrT (zonkCoFn co_fn) $ \ new_co_fn ->

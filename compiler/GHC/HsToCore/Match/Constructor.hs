@@ -107,7 +107,7 @@ have-we-used-all-the-constructors? question; the local function
 --
 -- case <expr> of
 --    C a b -> ...
---    D c   -> ... -- not sure about this second constructor being correct 
+--    D c   -> ... -- not sure about this second constructor being correct
 --
 -- Relevant notes seem to be [Match Ids] and [Localise pattern binders]
 matchConFamily :: NonEmpty Id

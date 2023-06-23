@@ -245,8 +245,9 @@ dsAbsBinds dflags tyvars dicts exports
        -- If there is a variable to force, it's just the
        -- single variable we are binding here
   = do { dsHsWrapper wrap $ \core_wrap -> do -- Usually the identity
-       { let rhs = core_wrap $
-                   mkLams tyvars $ mkLams (map toLambdaBound dicts) $
+       { let dicts' = map toLambdaBound dicts
+             rhs = core_wrap $
+                   mkLams tyvars $ mkLams dicts' $
                      -- The tyvars aren't really just TyVars, right? $dEq can end up there it seems
                      -- and
                      -- So dicts names mention the
@@ -266,7 +267,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; let global_id' = addIdSpecialisations global_id rules
              main_bind  = makeCorePair dflags global_id'
                                        (isDefaultMethod prags)
-                                       (dictArity dicts) rhs
+                                       (dictArity dicts') rhs
 
        ; return (force_vars', main_bind : fromOL spec_binds) } }
 
@@ -719,8 +720,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
+             spec_bndrs' = map toLambdaBound spec_bndrs
              simpl_opts = initSimpleOpts dflags
-             spec_unf   = specUnfolding simpl_opts (map toLambdaBound spec_bndrs) core_app rule_lhs_args fn_unf
+             spec_unf   = specUnfolding simpl_opts spec_bndrs' core_app rule_lhs_args fn_unf
              spec_id    = mkLocalId spec_name LetBound spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
@@ -728,8 +730,8 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
              rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
                                -- ROMES:TODO: Perhaps this kind of SetIdBinding is something that the functions actually constructing the lambda abstractions could always do by default
-                               (mkVarApps (Var spec_id) spec_bndrs)
-             spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
+                               (mkVarApps (Var spec_id) spec_bndrs')
+             spec_rhs = mkLams spec_bndrs' (core_app poly_rhs)
 
        ; dsWarnOrphanRule rule
 

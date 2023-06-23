@@ -337,7 +337,7 @@ zonkTyCoVarBndrKind (Bndr tv flag) =
 
 -- | zonkId is used *during* typechecking just to zonk the 'Id''s type
 zonkId :: TcId -> ZonkM TcId
-zonkId id = updateIdTypeAndMultM zonkTcType id
+zonkId id = updateIdTypeAndMultsM zonkTcType id
 
 zonkCoVar :: CoVar -> ZonkM CoVar
 zonkCoVar = zonkId
@@ -402,7 +402,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
                         , ic_info   = info' }) }
 
 zonkEvVar :: EvVar -> ZonkM EvVar
-zonkEvVar var = updateIdTypeAndMultM zonkTcType var
+zonkEvVar var = updateIdTypeAndMultsM zonkTcType var
 
 
 zonkWC :: WantedConstraints -> ZonkM WantedConstraints
@@ -677,4 +677,4 @@ tidyFRROrigin env (FixedRuntimeRepOrigin ty orig)
 
 ----------------
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
-tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
+tidyEvVar env var = updateIdTypeAndMults (tidyType env) var

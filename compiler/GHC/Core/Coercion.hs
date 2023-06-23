@@ -1677,7 +1677,7 @@ mkFunResCo role id res_co
   = mkFunCoNoFTF role mult arg_co res_co
   where
     arg_co = mkReflCo role (varType id) -- (arg ~ arg)
-    mult   = multToCo $ case idBinding id of 
+    mult   = multToCo $ case idBinding id of
                           LambdaBound m -> m
                           LetBound -> panic "mkFunResCo"
     -- ROMES:

@@ -1,4 +1,5 @@
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Functions for converting Core things to interface file things.
 module GHC.CoreToIface
@@ -135,10 +136,11 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceType (idMult $ toLambdaBound covar) -- idMult of coercion variable should already always be ManyTy?...
-                          , occNameFS (getOccName covar)
-                          , toIfaceTypeX fr (varType covar)
-                          )
+toIfaceIdBndrX fr (toLambdaBound -> covar)
+  = ( toIfaceType (idMult covar) -- idMult of coercion variable should already always be ManyTy?...
+    , occNameFS (getOccName covar)
+    , toIfaceTypeX fr (varType covar)
+    )
 
 toIfaceBndr :: Var -> IfaceBndr
 toIfaceBndr var
