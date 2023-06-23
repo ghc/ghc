@@ -1253,6 +1253,12 @@ tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
 
 --------- Promoted lists and tuples
 tc_hs_type mode rn_ty@(HsExplicitListTy _ _ tys) exp_kind
+  -- The '[] case is handled in tc_infer_hs_type.
+  -- See Note [Future-proofing the type checker].
+  | null tys
+  = tc_infer_hs_type_ek mode rn_ty exp_kind
+
+  | otherwise
   = do { tks <- mapM (tc_infer_lhs_type mode) tys
        ; (taus', kind) <- unifyKinds tys tks
        ; let ty = (foldr (mk_cons kind) (mk_nil kind) taus')
