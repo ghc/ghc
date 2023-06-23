@@ -790,9 +790,9 @@ tcPatSynMatcher (L loc ps_name) lpat prag_fn
              fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder ps_name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") (LambdaBound ManyTy) pat_ty  --ROMES:TODO
-       ; cont         <- newSysLocalId (fsLit "cont")  (LambdaBound ManyTy) cont_ty --ROMES:TODO
-       ; fail         <- newSysLocalId (fsLit "fail")  (LambdaBound ManyTy) fail_ty --ROMES:TODO
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") (LambdaBound ManyTy) pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  (LambdaBound ManyTy) cont_ty --ROMES:TODO LambdaBound or LetBound?
+       ; fail         <- newSysLocalId (fsLit "fail")  (LambdaBound ManyTy) fail_ty --ROMES:TODO LambdaBound or LetBound?
 
        ; dflags       <- getDynFlags
        ; let matcher_tau   = mkVisFunTysMany [pat_ty, cont_ty, fail_ty] res_ty

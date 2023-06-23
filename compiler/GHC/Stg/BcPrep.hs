@@ -146,7 +146,7 @@ newUnique = state $
 newId :: Type -> BcPrepM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal prepFS uniq (LambdaBound ManyTy) ty -- ROMES:TODO: LAmbdaBound?
+    return $ mkSysLocal prepFS uniq LetBound ty
 
 prepFS :: FastString
 prepFS = fsLit "bcprep"

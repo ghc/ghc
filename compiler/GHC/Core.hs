@@ -6,7 +6,6 @@
 {-# LANGUAGE DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE GADTs, StandaloneDeriving #-}
 
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
@@ -92,7 +91,6 @@ module GHC.Core (
         isBuiltinRule, isLocalRule, isAutoRule,
     ) where
 
-import {-# SOURCE #-} GHC.Core.Opt.SetLevels (FloatSpec) -- ROMES:TODO: TEMPORARY FOR DEBUG!!!
 import GHC.Prelude
 import GHC.Platform
 
@@ -260,7 +258,7 @@ data Expr b
   | Tick  CoreTickish (Expr b)
   | Type  Type
   | Coercion Coercion
-deriving instance Data b => Data (Expr b)
+  deriving Data
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not
@@ -272,13 +270,9 @@ type Arg b = Expr b
 
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
--- data Alt b
---     = Alt AltCon [b] (Expr b)
---     deriving (Data)
-data Alt b where
-    Alt :: AltCon -> [b] -> (Expr b) -> Alt b
-deriving instance Data b => Data (Alt b)
-{-# COMPLETE Alt #-}
+data Alt b
+    = Alt AltCon [b] (Expr b)
+    deriving (Data)
 
 -- | A case alternative constructor (i.e. pattern match)
 
@@ -316,7 +310,7 @@ instance Ord AltCon where
 -- See Note [GHC Formalism] in GHC.Core.Lint
 data Bind b = NonRec b (Expr b)
             | Rec [(b, (Expr b))]
-            deriving Data
+  deriving Data
 
 {-
 Note [Shadowing]
@@ -1932,9 +1926,9 @@ mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 mkLets        :: [Bind b] -> Expr b -> Expr b
 -- | Bind all supplied binders over an expression in a nested lambda expression. Prefer to
 -- use 'GHC.Core.Make.mkCoreLams' if possible
-mkLams        :: HasCallStack => [b] -> Expr b -> Expr b
+mkLams        :: [b] -> Expr b -> Expr b
 
-mkLams binders body = foldr Lam body binders
+mkLams binders body = foldr Lam body binders -- ROMES:TODO: Consider adding `toLambdaBound` here.
 mkLets binds body   = foldr mkLet body binds
 
 mkLet :: Bind b -> Expr b -> Expr b
@@ -2232,7 +2226,7 @@ data AnnExpr' bndr annot
   | AnnCoercion Coercion
 
 -- | A clone of the 'Alt' type but allowing annotation at every tree node
-data AnnAlt bndr annot = HasCallStack => AnnAlt AltCon [bndr] (AnnExpr bndr annot)
+data AnnAlt bndr annot = AnnAlt AltCon [bndr] (AnnExpr bndr annot)
 
 -- | A clone of the 'Bind' type but allowing annotation at every tree node
 data AnnBind bndr annot

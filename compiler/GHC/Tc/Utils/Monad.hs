@@ -751,7 +751,7 @@ newSysLocalId fs w ty
 newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- getUniquesM
-        ; let mkId' n (Scaled w t) = mkSysLocal fs n (LambdaBound w) t -- Scaled -> LambdaBound
+        ; let mkId' n (Scaled w t) = mkSysLocal fs n (LambdaBound w) t
         ; return (zipWith mkId' us tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where

@@ -154,7 +154,6 @@ import Data.IORef
 import GHC.Data.Maybe
 import qualified Data.Semigroup as Semi
 import GHC.Types.Name.Reader
-import GHC.Core.UsageEnv (zeroUE)
 
 {-
 ************************************************************************
@@ -193,7 +192,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name LetBound ty) }
+                 ; return (mkLocalIdOrCoVar name LetBound ty) } -- ROMES:TODO: LetBound? I Don't think that's so right.
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
@@ -322,7 +321,7 @@ newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
        ; return (mkLocalId name LetBound (mkClassPred cls tys)) }
-                 -- Dictionaries are let-bound at the top-level?
+                 -- Dictionaries made with newDict seem to get LetBound
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of

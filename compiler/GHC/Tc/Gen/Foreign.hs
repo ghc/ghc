@@ -52,7 +52,6 @@ import GHC.Core.Coercion
 import GHC.Core.Reduction
 import GHC.Core.Type
 import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.TyCon.RecWalk

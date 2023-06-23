@@ -2023,7 +2023,7 @@ tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
       | is_derived = addLandmarkErrCtxt (derivBindCtxt sel_id clas inst_tys) thing
       | otherwise  = thing
 
-tcMethodBodyHelp :: HasCallStack => HsSigFun -> Id -> TcId
+tcMethodBodyHelp :: HsSigFun -> Id -> TcId
                  -> LHsBind GhcRn -> TcM (LHsBinds GhcTc)
 tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
   | Just hs_sig_ty <- hs_sig_fn sel_name
@@ -2089,7 +2089,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- they are all for meth_id
 
 ------------------------
--- | Romes:TODO: What is a MethId?
+-- | Make Ids for methods
 mkMethIds :: Class -> [TcTyVar] -> [EvVar]
           -> [TcType] -> Id -> TcM (TcId, TcId)
              -- returns (poly_id, local_id), but ignoring any instance signature
@@ -2099,7 +2099,7 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name LetBound poly_meth_ty -- ROMES:TODO: methIds
+        ; let poly_meth_id  = mkLocalId poly_meth_name LetBound poly_meth_ty
               local_meth_id = mkLocalId local_meth_name LetBound local_meth_ty
 
         ; return (poly_meth_id, local_meth_id) }

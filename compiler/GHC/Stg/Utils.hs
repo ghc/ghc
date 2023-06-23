@@ -35,7 +35,7 @@ mkUnarisedIds :: MonadUnique m => FastString -> [UnaryType] -> m [Id]
 mkUnarisedIds fs tys = mapM (mkUnarisedId fs) tys
 
 mkUnarisedId :: MonadUnique m => FastString -> UnaryType -> m Id
-mkUnarisedId s t = mkSysLocalM s (LambdaBound ManyTy) t -- ROMES:TODO: Are these really LambdaBound!? doesn't it depend on the caller? But these are mkSysLocalM...?
+mkUnarisedId s t = mkSysLocalM s (LambdaBound ManyTy) t -- ROMES:TODO: LetBound or LambdaBound? Seems like it is always used in a lambda bound position
 
 -- Checks if id is a top level error application.
 -- isErrorAp_maybe :: Id ->

@@ -113,7 +113,6 @@ import Data.List           ( sort, sortBy, partition, zipWith4, mapAccumL )
 import Data.Ord            ( comparing )
 import qualified Data.Set as Set
 import GHC.Types.RepType (isZeroBitTy)
-import GHC.Core.UsageEnv (zeroUE)
 
 {-
 ************************************************************************
@@ -123,7 +122,7 @@ import GHC.Core.UsageEnv (zeroUE)
 ************************************************************************
 -}
 
-exprType :: HasCallStack => HasDebugCallStack => CoreExpr -> Type
+exprType :: HasDebugCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'GHC.Core.Type' expression as it cannot
 -- really be said to have a type
@@ -158,13 +157,12 @@ coreAltsType :: [CoreAlt] -> Type
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "coreAltsType"
 
--- mkLamType  :: HasDebugCallStack => Var -> Type -> Type
-mkLamType  :: HasCallStack => Var -> Type -> Type
+mkLamType  :: HasDebugCallStack => Var -> Type -> Type
 -- ^ Makes a @(->)@ type or an implicit forall type, depending
 -- on whether it is given a type variable or a term variable.
 -- This is used, for example, when producing the type of a lambda.
 -- Always uses Inferred binders.
-mkLamTypes :: HasCallStack => [Var] -> Type -> Type
+mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
 mkLamType v body_ty
@@ -176,7 +174,7 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v Required) body_ty
 
    | otherwise
-   = pprTrace "mkLamType" (ppr $ idBinding v) $! mkFunctionType mult (varType v) body_ty
+   = mkFunctionType mult (varType v) body_ty
      where
        !mult = case varMultMaybe v of
                  -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
@@ -185,7 +183,7 @@ mkLamType v body_ty
                    -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
                  Just m  -> m
 
-mkLamTypes vs ty = pprTrace "mkLamTypes" (ppr vs) $ foldr mkLamType ty vs
+mkLamTypes vs ty = foldr mkLamType ty vs
 
 {-
 Note [Type bindings]
@@ -493,7 +491,9 @@ stripTicksT p expr = fromOL $ go expr
 ************************************************************************
 -}
 
-bindNonRec :: HasCallStack => HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
+-- romes:TODO: this `Id` is wrong, it can be a `Var` can't it? At least that
+-- came up when I was debugging things.
+bindNonRec :: HasDebugCallStack => Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- ^ @bindNonRec x r b@ produces either:
 --
 -- > let x = r in b
@@ -517,15 +517,15 @@ bindNonRec bndr rhs body
   | isCoVar bndr                       = if isCoArg rhs then let_bind
     {- See Note [Binding coercions] -}                  else case_bind
   | isJoinId bndr                      = let_bind
-  | needsCaseBinding (idType bndr) rhs = pprTrace "bindNonRec:needsCaseBinding:" (ppr bndr <+> ppr (idBinding bndr)) case_bind
+  | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    lambda_bndr = setIdBinding bndr (maybe (LambdaBound ManyTy) LambdaBound (varMultMaybe bndr)) -- ROMES:TODO: Explain, is this the best place to do this?
+    lambda_bndr = toLambdaBound bndr -- ROMES:TODO: Explain, is this the best place to do this?
     case_bind = mkDefaultCase rhs lambda_bndr body
     -- ROMES:TODO: I couldn't find the root cause, for now we simply override the idBinding here
     let_bind 
       | isId bndr
-      = Let (NonRec (bndr `setIdBinding` LetBound) rhs) body
+      = Let (NonRec (toLetBound bndr) rhs) body
       | otherwise
       = Let (NonRec bndr rhs) body
 
@@ -551,13 +551,12 @@ mkAltExpr (LitAlt lit) [] []
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 
-mkDefaultCase :: HasCallStack => CoreExpr -> Id -> CoreExpr -> CoreExpr
+mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
 -- Make (case x of y { DEFAULT -> e }
 mkDefaultCase scrut case_bndr body
-  = assertPpr (isJust (varMultMaybe case_bndr)) (text "mkDefaultCase:Case binder is marked LetBound!") $
-    Case scrut case_bndr (exprType body) [Alt DEFAULT [] body]
+  = Case scrut case_bndr (exprType body) [Alt DEFAULT [] body]
 
-mkSingleAltCase :: HasCallStack => CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
+mkSingleAltCase :: CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
 -- Use this function if possible, when building a case,
 -- because it ensures that the type on the Case itself
 -- doesn't mention variables bound by the case
@@ -610,7 +609,7 @@ findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
 findDefault alts                          =                    (alts, Nothing)
 
-addDefault :: HasCallStack => [Alt b] -> Maybe (Expr b) -> [Alt b]
+addDefault :: [Alt b] -> Maybe (Expr b) -> [Alt b]
 addDefault alts Nothing    = alts
 addDefault alts (Just rhs) = Alt DEFAULT [] rhs : alts
 
@@ -692,8 +691,7 @@ trimConArgs DEFAULT      args = assert (null args) []
 trimConArgs (LitAlt _)   args = assert (null args) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
-filterAlts :: HasCallStack
-           => TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
+filterAlts :: TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
            -> [Type]               -- ^ And its type arguments
            -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
            -> [Alt b] -- ^ Alternatives

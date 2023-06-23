@@ -534,6 +534,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 
 -- | A 'BndrMap' is a 'TypeMapG' which allows us to distinguish between
 -- binding forms whose binders have different types.  For example,
+--
 -- if we are doing a 'TrieMap' lookup on @\(x :: Int) -> ()@, we should
 -- not pick up an entry in the 'TrieMap' for @\(x :: Bool) -> ()@:
 -- we can disambiguate this by matching on the type (or kind, if this
@@ -548,7 +549,8 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- and will require a new kind of TrieMap which matches IdBindings which also
 -- only exist for Ids, not TyVars and such
 -- The impl for varMultMaybe will surely chnge
-newtype BndrMap a = BndrMap (TypeMapG (MaybeMap (MaybeMap TypeMapG) a))
+-- ROMES:TODO: Moving this to newtype should be done on an individual patch, one such attempt caused multiple regressions (!
+data BndrMap a = BndrMap (TypeMapG (MaybeMap (MaybeMap TypeMapG) a))
 -- ROMES:TODO: AGAIN; FIX THIS when IdBinding is no longer isomorphic to maybe.
 
 -- TODO(22292): derive

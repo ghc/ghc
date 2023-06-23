@@ -78,7 +78,6 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Ppr
-import GHC.Core.UsageEnv
 
 import GHC.Unit.Env
 import GHC.Unit.External
@@ -2073,7 +2072,7 @@ bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
         ; w' <- tcIfaceType w
-        ; let id = mkLocalIdOrCoVar name (LambdaBound w') ty' -- ROMES:TODO: I don't know what here
+        ; let id = mkLocalIdOrCoVar name (LambdaBound w') ty' -- ROMES:TODO: LetBound or LambdaBound?
           -- We should not have "OrCoVar" here, this is a bug (#17545)
         ; extendIfaceIdEnv [id] (thing_inside id) }
 

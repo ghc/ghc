@@ -37,7 +37,7 @@ import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.DynFlags
 import GHC.Data.Bag
-import GHC.Types.Var ( VarBndr(..), pprIdWithBinding )
+import GHC.Types.Var ( VarBndr(..) )
 import GHC.Core.Map.Type
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
@@ -48,9 +48,6 @@ import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Class (lift)
 import Data.Maybe ( isJust )
-
-import GHC.Core.UsageEnv (zeroUE)
-import GHC.Stack ( HasCallStack )
 
 {- Note [Grand plan for Typeable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -276,7 +273,7 @@ todoForExportedKindReps kinds = do
     return $ ExportedKindRepsTodo $ map mkId kinds
 
 -- | Generate TyCon bindings for a set of type constructors
-mkTypeRepTodoBinds :: HasCallStack => [TypeRepTodo] -> TcM TcGblEnv
+mkTypeRepTodoBinds :: [TypeRepTodo] -> TcM TcGblEnv
 mkTypeRepTodoBinds [] = getGblEnv
 mkTypeRepTodoBinds todos
   = do { stuff <- collect_stuff
@@ -420,7 +417,7 @@ mkTrNameLit = do
     return trNameLit
 
 -- | Make Typeable bindings for the given 'TyCon'.
-mkTyConRepBinds :: HasCallStack => TypeableStuff -> TypeRepTodo
+mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
 mkTyConRepBinds stuff todo (TypeableTyCon {..})
   = do -- Make a KindRep
@@ -526,7 +523,7 @@ addKindRepBind in_scope k bndr rhs =
 
 -- | Run a 'KindRepM' and add the produced 'KindRep's to the typechecking
 -- environment.
-runKindRepM :: HasCallStack => KindRepM a -> TcRn (TcGblEnv, a)
+runKindRepM :: KindRepM a -> TcRn (TcGblEnv, a)
 runKindRepM (KindRepM action) = do
     kindRepEnv <- initialKindRepEnv
     (res, reps_env) <- runStateT action kindRepEnv

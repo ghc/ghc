@@ -54,7 +54,6 @@ import GHC.Core.Coercion
 import GHC.Core.Multiplicity
 import GHC.Core.Rules
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.UsageEnv ( zeroUE )
 
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( naturalTy, typeSymbolKind, charTy )
@@ -157,7 +156,6 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = (co_fn, tick)
                            })
- | otherwise
  = do   { dsHsWrapper co_fn $ \core_wrap -> do
         { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
                           -- FromSource might not be accurate (we don't have any
@@ -317,7 +315,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs LetBound tup_ty
+                = do { tup_id  <- newSysLocalDs LetBound tup_ty -- ROMES:TODO: LetBound or LambdaBound?
                      ; dsHsWrapper wrap $ \core_wrap -> do
                      { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $
@@ -723,7 +721,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let fn_unf    = realIdUnfolding poly_id
              simpl_opts = initSimpleOpts dflags
              spec_unf   = specUnfolding simpl_opts (map toLambdaBound spec_bndrs) core_app rule_lhs_args fn_unf
-             spec_id    = mkLocalId spec_name LetBound spec_ty -- Specialised binding is toplevel? why localId?
+             spec_id    = mkLocalId spec_name LetBound spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -893,7 +891,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
                 extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) LetBound (idType d)
+                  [ mkLocalId (localiseName (idName d)) (LambdaBound ManyTy) (idType d)
                   | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v
@@ -1201,7 +1199,7 @@ dsHsWrapper (WpCompose c1 c2) k = do { dsHsWrapper c1 $ \w1 -> do
                                      { dsHsWrapper c2 $ \w2 -> do
                                      { k (w1 . w2) } } }
 dsHsWrapper (WpFun c1 c2 (Scaled w t1)) k -- See Note [Desugaring WpFun]
-                                = do { x <- newSysLocalDs (LambdaBound w) t1 -- ROMES: Scaled - LambdaBound
+                                = do { x <- newSysLocalDs (LambdaBound w) t1
                                      ; dsHsWrapper c1 $ \w1 -> do
                                      { dsHsWrapper c2 $ \w2 -> do
                                      { let app f a = mkCoreAppDs (text "dsHsWrapper") f a

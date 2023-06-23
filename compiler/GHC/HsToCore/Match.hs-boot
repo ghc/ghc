@@ -8,22 +8,19 @@ import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import GHC.Hs.Extension ( GhcTc, GhcRn )
 
-import GHC.Stack (HasCallStack)
-
-match   :: HasCallStack => [Id]
+match   :: [Id]
         -> Type
         -> [EquationInfo]
         -> DsM (MatchResult CoreExpr)
 
 matchWrapper
-        :: HasCallStack
-        => HsMatchContext GhcRn
+        :: HsMatchContext GhcRn
         -> Maybe [LHsExpr GhcTc]
         -> MatchGroup GhcTc (LHsExpr GhcTc)
         -> DsM ([Id], CoreExpr)
 
 matchSimply
-        :: HasCallStack => CoreExpr
+        :: CoreExpr
         -> HsMatchContext GhcRn
         -> LPat GhcTc
         -> CoreExpr
@@ -31,7 +28,7 @@ matchSimply
         -> DsM CoreExpr
 
 matchSinglePatVar
-        :: HasCallStack => Id
+        :: Id
         -> Maybe CoreExpr
         -> HsMatchContext GhcRn
         -> LPat GhcTc

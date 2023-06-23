@@ -108,7 +108,7 @@ import Data.Traversable (for)
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HasCallStack => HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsMessage, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsMessage, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -187,7 +187,6 @@ deSugar hsc_env
                           ; core_prs <- patchMagicDefns core_prs
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
-                          ; pprTraceM "foreign_prs" (ppr foreign_prs)
                           ; ds_rules <- mapMaybeM dsRule rules
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode (targetPlatform $ hsc_dflags hsc_env) mod ds_hpc_info
@@ -300,7 +299,7 @@ dsImpSpecs imp_specs
       ; let (spec_binds, spec_rules) = unzip spec_prs
       ; return (concatOL spec_binds, spec_rules) }
 
-combineEvBinds :: HasCallStack => [CoreBind] -> [(Id,CoreExpr)] -> [CoreBind]
+combineEvBinds :: [CoreBind] -> [(Id,CoreExpr)] -> [CoreBind]
 -- Top-level bindings can include coercion bindings, but not via superclasses
 -- See Note [Top-level evidence]
 combineEvBinds [] val_prs
@@ -528,7 +527,7 @@ unfold_coerce bndrs lhs rhs = do
             let ty' = mkTyConApp eqReprPrimTyCon [k, k, t1, t2]
                 v'  = mkLocalCoVar
                         (mkDerivedInternalName mkRepEqOcc u (getName v))
-                        (LambdaBound ManyTy) ty'
+                        (LambdaBound ManyTy) ty' -- ROMES:TODO: LetBound or LambdaBound?
                 box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
                       [k, t1, t2] `App`
                       Coercion (mkCoVarCo v')

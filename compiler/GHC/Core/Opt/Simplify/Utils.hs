@@ -4,7 +4,6 @@
 The simplifier utilities
 -}
 
-{-# LANGUAGE ExistentialQuantification #-}
 
 module GHC.Core.Opt.Simplify.Utils (
         -- Rebuilding
@@ -50,7 +49,6 @@ import GHC.Types.Literal ( isLitRubbish )
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Simplify.Inline
 import GHC.Core.Opt.Stats ( Tick(..) )
-import GHC.Core.UsageEnv (zeroUE)
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
 import GHC.Core.TyCo.Ppr ( pprParendType )
@@ -69,6 +67,7 @@ import GHC.Core.Opt.ConstantFold
 
 import GHC.Types.Name
 import GHC.Types.Id
+import GHC.Types.Var (toLetBound, toLambdaBound)
 import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.Demand
@@ -180,7 +179,7 @@ data SimplCont
                                   -- See Note [The hole type in ApplyToTy]
       , sc_cont    :: SimplCont }
 
-  | HasCallStack => Select             -- (Select alts K)[e] = K[ case e of alts ]
+  | Select             -- (Select alts K)[e] = K[ case e of alts ]
       { sc_dup  :: DupFlag        -- See Note [DupFlag invariants]
       , sc_bndr :: InId           -- case binder
       , sc_alts :: [InAlt]        -- Alternatives
@@ -527,15 +526,15 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 -- The scaling factor at the hole of E[] is used to determine how a binder
 -- should be scaled if it commutes with E. This appears, in particular, in the
 -- case-of-case transformation.
-contHoleScaling :: HasCallStack => SimplCont -> Mult
+contHoleScaling :: SimplCont -> Mult
 contHoleScaling (Stop _ _ _) = OneTy
 contHoleScaling (CastIt _ k) = contHoleScaling k
 contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
-  -- = idMult id `mkMultMul` contHoleScaling k
-  = contHoleScaling k -- ROMES:TODO!!!: Scaling doesn't make that much sense for now that some variables we might not have a multiplicity per say
+  = idMult (toLambdaBound id) `mkMultMul` contHoleScaling k
+  -- Scaling doesn't make all that much sense now that some variables are let
+  -- bound without a Mult.
 contHoleScaling (Select { sc_bndr = id, sc_cont = k })
-  -- = idMult id `mkMultMul` contHoleScaling k
-  = contHoleScaling k
+  = idMult (toLambdaBound id) `mkMultMul` contHoleScaling k
 contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
   = w `mkMultMul` contHoleScaling k
   where
@@ -2290,7 +2289,7 @@ OutId.  Test simplCore/should_compile/simpl013 apparently shows this
 up, although I'm not sure exactly how..
 -}
 
-prepareAlts :: HasCallStack => OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: OutExpr -> InId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 --
 -- Note that case_bndr is an InId; see Note [Shadowing in prepareAlts]
@@ -2532,14 +2531,13 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
   , (ticks, Case (Var inner_scrut_var) inner_bndr _ inner_alts)
        <- stripTicksTop tickishFloatable deflt_rhs
   , inner_scrut_var == outer_bndr
-  = pprTrace "mkCase" (ppr outer_bndr <+> ppr (idBinding outer_bndr) <+> ppr inner_bndr <+> ppr (idBinding inner_bndr)) $
-    do  { tick (CaseMerge outer_bndr)
+  = do  { tick (CaseMerge outer_bndr)
 
         ; let wrap_alt (Alt con args rhs) = assert (outer_bndr `notElem` args)
                                             (Alt con args (wrap_rhs rhs))
                 -- Simplifier's no-shadowing invariant should ensure
                 -- that outer_bndr is not shadowed by the inner patterns
-              wrap_rhs rhs = Let (NonRec (inner_bndr `setIdBinding` LetBound) (Var outer_bndr)) rhs
+              wrap_rhs rhs = Let (NonRec (toLetBound inner_bndr) (Var outer_bndr)) rhs
                 -- IdBinding: See Note [Keeping the IdBinding up to date]
                 -- 
                 -- The let is OK even for unboxed binders,
@@ -2624,7 +2622,7 @@ mkCase2 mode scrut bndr alts_ty alts
       _                 -> True
   , sm_case_folding mode
   , Just (scrut', tx_con, mk_orig) <- caseRules (smPlatform mode) scrut
-  = do { bndr' <- newId (fsLit "lwild") (LambdaBound ManyTy) (exprType scrut') -- ROMES:Again, case binder with LambdaBound temporarily
+  = do { bndr' <- newId (fsLit "lwild") (LambdaBound ManyTy) (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives
@@ -2714,7 +2712,7 @@ in GHC.Core.Opt.ConstantFold)
 --      Catch-all
 --------------------------------------------------
 mkCase3 _mode scrut bndr alts_ty alts
-  = pprTrace "mkCase3" (ppr bndr <+> ppr (idBinding bndr)) $ return (Case scrut bndr alts_ty alts)
+  = return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in
 -- GHC.Core.Opt.Exitify

@@ -3139,7 +3139,7 @@ freshEtaId n subst ty
       where
         Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
         eta_id' = uniqAway (getSubstInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (LambdaBound mult') ty' -- ROMES:TODO: LambdaBound here? Comes from a ScaledType, which should mean its lambda bound (only fields and lambdas Ids have Scaled Types)
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (LambdaBound mult') ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
         subst'  = extendSubstInScope subst eta_id'

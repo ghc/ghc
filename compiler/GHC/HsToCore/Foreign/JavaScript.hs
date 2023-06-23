@@ -29,7 +29,6 @@ import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv (zeroUE)
 
 import GHC.Types.Id
 import GHC.Types.Id.Make
@@ -285,7 +284,7 @@ dsJsFExportDynamic id co0 cconv = do
             ("h$" ++ moduleStableString mod ++ "$" ++ toJsName id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
-    cback <- newSysLocalDs (LambdaBound arg_mult) arg_ty -- Provenance: Scaled -> LambdaBound
+    cback <- newSysLocalDs (LambdaBound arg_mult) arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
@@ -435,8 +434,8 @@ unboxJsArg arg
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc; also Ptr, ForeignPtr
   | is_product_type && data_con_arity == 1
-    = do case_bndr <- newSysLocalDs (LambdaBound ManyTy) arg_ty -- ROMES:TODO: Case bindr lambda bound
-         prim_arg <- newSysLocalDs  (LambdaBound ManyTy) (scaledThing data_con_arg_ty1) -- ROMES:TODO what is this alternative prim arg
+    = do case_bndr <- newSysLocalDs (LambdaBound ManyTy) arg_ty
+         prim_arg <- newSysLocalDs  (LambdaBound ManyTy) (scaledThing data_con_arg_ty1)
          return (Var prim_arg,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) [prim_arg] body]
               )
@@ -450,7 +449,7 @@ unboxJsArg arg
     isJust maybe_arg3_tycon &&
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-  = do case_bndr <- newSysLocalDs (LambdaBound ManyTy) arg_ty -- ROMES:TODO: Case binder lambda bound
+  = do case_bndr <- newSysLocalDs (LambdaBound ManyTy) arg_ty
        vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [Alt (DataAlt data_con) vars body]
@@ -551,7 +550,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     let
         Just ls = fmap dropRuntimeRepArgs (tyConAppArgs_maybe prim_res_ty)
         arity = 1 + length ls
-    args_ids <- mapM (newSysLocalDs (LambdaBound ManyTy)) ls -- ROMES:TODO: Unboxed tuple args and state id?
+    args_ids <- mapM (newSysLocalDs (LambdaBound ManyTy)) ls
     state_id <- newSysLocalDs (LambdaBound ManyTy) realWorldStatePrimTy
     let
         result_tup = mkCoreUnboxedTuple (map Var args_ids)
@@ -564,7 +563,7 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
     return (ccall_res_ty, the_alt)
 
   | otherwise = do
-    result_id <- newSysLocalDs (LambdaBound ManyTy) prim_res_ty -- ROMES:TODO: as above...
+    result_id <- newSysLocalDs (LambdaBound ManyTy) prim_res_ty
     state_id  <- newSysLocalDs (LambdaBound ManyTy) realWorldStatePrimTy
     let
         the_rhs = return_result (Var state_id)

@@ -786,7 +786,7 @@ mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPatCo co pat ty | isReflCo co = pat
                         | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
-mkHsDictLet :: HasCallStack => TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
+mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
 
 {-
@@ -816,10 +816,10 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                                               --     binding
                                     }
 
-mkHsVarBind :: HasCallStack => SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
+mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
 mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
 
-mkVarBind :: HasCallStack => IdP GhcTc -> LHsExpr GhcTc -> LHsBind GhcTc
+mkVarBind :: IdP GhcTc -> LHsExpr GhcTc -> LHsBind GhcTc
 mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
                               var_id = var, var_rhs = rhs }

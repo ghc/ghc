@@ -251,16 +251,15 @@ tcHsBootSigs binds sigs
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
 ------------------------
-tcLocalBinds :: HasCallStack => HsLocalBinds GhcRn -> TcM thing
+tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
              -> TcM (HsLocalBinds GhcTc, thing)
 
 tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
         ; return (EmptyLocalBinds x, thing) }
 
-tcLocalBinds h@(HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
-  = pprTrace "tcLocalBinds:HsValBinds" (ppr h) $
-    do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
+tcLocalBinds (HsValBinds x (XValBindsLR (NValBinds binds sigs))) thing_inside
+  = do  { (binds', thing) <- tcValBinds NotTopLevel binds sigs thing_inside
         ; return (HsValBinds x (XValBindsLR (NValBinds binds' sigs)), thing) }
 tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 
@@ -299,7 +298,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
-tcValBinds :: HasCallStack => TopLevelFlag
+tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
            -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
@@ -336,7 +335,7 @@ tcValBinds top_lvl binds sigs thing_inside
     prag_fn = mkPragEnv sigs (foldr (unionBags . snd) emptyBag binds)
 
 ------------------------
-tcBindGroups :: HasCallStack => TopLevelFlag -> TcSigFun -> TcPragEnv
+tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
              -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 -- Typecheck a whole lot of value bindings,
@@ -376,7 +375,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 --
 
 ------------------------
-tc_group :: forall thing. HasCallStack =>
+tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
          -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
@@ -441,7 +440,7 @@ recursivePatSynErr loc binds
   = failAt loc $ TcRnRecursivePatternSynonym binds
 
 -- | ROMES:TODO: Document
-tc_single :: forall thing. HasCallStack =>
+tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTc, thing)
@@ -491,7 +490,7 @@ mkEdges sig_fn binds
                                      , bndr <- collectHsBindBinders CollNoDictBinders bind ]
 
 ------------------------
-tcPolyBinds :: HasCallStack => TopLevelFlag -> TcSigFun -> TcPragEnv
+tcPolyBinds :: TopLevelFlag -> TcSigFun -> TcPragEnv
             -> RecFlag         -- Whether the group is really recursive
             -> RecFlag         -- Whether it's recursive after breaking
                                -- dependencies based on type signatures
@@ -610,12 +609,11 @@ tcPolyCheck :: TcPragEnv
 --   it is a FunBind
 --   it has a complete type signature,
 tcPolyCheck prag_fn
-            cs
+            (CompleteSig { sig_bndr  = poly_id
+                         , sig_ctxt  = ctxt
+                         , sig_loc   = sig_loc })
             (L bind_loc (FunBind { fun_id = L nm_loc name
                                  , fun_matches = matches }))
-  | (CompleteSig { sig_bndr  = poly_id
-                 , sig_ctxt  = ctxt
-                 , sig_loc   = sig_loc }) <- cs
   = do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
 
        ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
@@ -714,14 +712,13 @@ it's all cool; each signature has distinct type variables from the renamer.)
 
 -- | ROMES:TODO: Document...
 tcPolyInfer
-  :: HasCallStack => RecFlag       -- Whether it's recursive after breaking
+  :: RecFlag       -- Whether it's recursive after breaking
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
   -> TcM (LHsBinds GhcTc, [TcId])
 tcPolyInfer rec_tc prag_fn tc_sig_fn bind_list
-  = pprTrace "tcPolyInfer" (ppr bind_list) $
-    do { (tclvl, wanted, (binds', mono_infos))
+  = do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
                 tcMonoBinds rec_tc tc_sig_fn LetLclBndr bind_list
 
@@ -1291,7 +1288,7 @@ data MonoBindInfo = MBI { mbi_poly_name :: Name
 
 -- | @tcMonoBinds@ deals with a perhaps-recursive group of HsBinds.
 -- The signatures have been dealt with already.
-tcMonoBinds :: HasCallStack => RecFlag  -- Whether the binding is recursive for typechecking purposes
+tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking purposes
                         -- i.e. the binders are mentioned in their RHSs, and
                         --      we are not rescued by a type signature
             -> TcSigFun -> LetBndrSpec
@@ -1315,7 +1312,7 @@ tcMonoBinds is_rec sig_fn no_gen
                           -- function so that in type error messages we show the
                           -- type of the thing whose rhs we are type checking
                        tcMatchesFun (L nm_loc name) matches exp_ty
-        ; mono_id <- newLetBndr no_gen name zeroUE rhs_ty' -- ROMES:TODO: zeroUE!
+        ; mono_id <- newLetBndr no_gen name rhs_ty'
 
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
@@ -1475,7 +1472,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name zeroUE mono_ty -- ROMES:TODO: zeroUE !
+       ; mono_id <- newLetBndr no_gen name mono_ty
           -- This ^ generates a binder with Many multiplicity because all
           -- let/where-binders are unrestricted. When we introduce linear let
           -- binders, we will need to retrieve the multiplicity information.
@@ -1548,7 +1545,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name zeroUE tau -- ROMES:TODO: zeroUE! edit comment below and similar others in this module
+  = newLetBndr no_gen name tau
     -- Binders with a signature are currently always of multiplicity
     -- Many. Because they come either from toplevel, let, or where
     -- declarations. Which are all unrestricted currently.

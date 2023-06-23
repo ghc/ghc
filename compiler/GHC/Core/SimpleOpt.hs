@@ -32,7 +32,7 @@ import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm, zapLambdaBndrs
 import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
-import GHC.Types.Var      ( isNonCoVarId )
+import GHC.Types.Var      ( isNonCoVarId, toLetBound )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.UsageEnv
@@ -236,7 +236,7 @@ simple_opt_clo :: InScopeSet
 simple_opt_clo in_scope (e_env, e)
   = simple_opt_expr (soeSetInScope in_scope e_env) e
 
-simple_opt_expr :: HasCallStack => SimpleOptEnv -> InExpr -> OutExpr
+simple_opt_expr :: SimpleOptEnv -> InExpr -> OutExpr
 simple_opt_expr env expr
   = go expr
   where
@@ -769,9 +769,9 @@ add_info env old_bndr top_level new_rhs new_bndr
                                     False -- may be bottom or not
                                     new_rhs Nothing
 
-wrapLet :: HasCallStack => Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
+wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
-wrapLet (Just (b,r)) body = Let (NonRec (b `setIdBinding` LetBound) r) body
+wrapLet (Just (b,r)) body = Let (NonRec (toLetBound b) r) body
                             -- See Note [Keeping the IdBinding up to date]
                             -- wrapLet is called always on binders lambda bound
 

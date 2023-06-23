@@ -60,7 +60,7 @@ module GHC.Types.Var (
         updateIdTypeButNotMults,
         updateIdTypeAndMults, updateIdTypeAndMultsM,
         IdBinding(..), idBinding, pprIdWithBinding, zeroUE,
-        toLambdaBound,
+        toLambdaBound, toLetBound,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -113,7 +113,6 @@ module GHC.Types.Var (
 import GHC.Prelude
 import GHC.Stack (callStack)
 
-import {-# SOURCE #-}   GHC.Core.UsageEnv ( UsageEnv, nonDetMults, mapUE, mapUEM )
 import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult, Scaled, scaledThing )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTvUnk )
@@ -294,6 +293,11 @@ toLambdaBound :: Var -> Var
 toLambdaBound v@Id{idBinding=LetBound} = v{idBinding=LambdaBound manyDataConTy}
 toLambdaBound v = v
 
+-- | Make an 'IdBinding' definitely LetBound
+toLetBound :: Var -> Var
+toLetBound v@Id{idBinding=LambdaBound _} = v{idBinding=LetBound}
+toLetBound v = v
+
 {-
 Note [The IdBinding of an Id]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -460,9 +464,9 @@ instance Outputable Var where
                      | dumpStyle sty || debug
                      -> brackets (pprTcTyVarDetails d)
 
-                  (Id { idScope = s, id_details = d })
+                  (Id { idScope = s, id_details = d, idBinding = b })
                      | debug
-                     -> brackets (ppr_id_scope s <> pprIdDetails d)
+                     -> brackets (ppr_id_scope s <> pprIdDetails d <> ppr b)
 
                   _  -> empty
             in if

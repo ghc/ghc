@@ -211,6 +211,7 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
+-- romes: please delete this function, it's a footgun in so many ways
 idMult :: HasCallStack => Id -> Mult
 idMult x = case Var.varMultMaybe x of
              Nothing   -> pprPanic "idMult" (ppr x <+> ppr (Var.idDetails x) <+> Var.ppr_id_scope (Var.idScope x) <+> ppr (Var.idBinding x))
@@ -332,6 +333,7 @@ mkLocalId :: HasDebugCallStack => Name -> IdBinding -> Type -> Id
 mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
+-- ROMES:TODO: are CoVars always lambda bound s.t. we don't need IdBinding here??
 mkLocalCoVar :: Name -> IdBinding -> Type -> CoVar
 mkLocalCoVar name w ty
   = assert (isCoVarType ty) $
@@ -410,7 +412,7 @@ mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkScaledTemplateLocal i (unrestricted ty)
 
 mkScaledTemplateLocal :: Int -> Scaled Type -> Id
-mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (LambdaBound w) ty -- ROMES:...Scaled things are always lambda bound?
+mkScaledTemplateLocal i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (LambdaBound w) ty
    -- "OrCoVar" since this is used in a superclass selector,
    -- and "~" and "~~" have coercion "superclasses".
 

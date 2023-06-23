@@ -75,8 +75,6 @@ import GHC.Data.Maybe( orElse, whenIsJust )
 import Data.Maybe( mapMaybe )
 import qualified Data.List.NonEmpty as NE
 import Control.Monad( unless )
-import GHC.Core.UsageEnv (zeroUE)
-import GHC.Stack
 
 
 {- -------------------------------------------------------------
@@ -281,7 +279,7 @@ lhsSigTypeContextSpan (L _ HsSig { sig_body = sig_ty }) = go sig_ty
     go (L _ (HsParTy _ hs_ty)) = go hs_ty  -- Look under parens
     go _ = NoRRC  -- Did not find it
 
-completeSigFromId :: HasCallStack => UserTypeCtxt -> Id -> TcIdSigInfo
+completeSigFromId :: UserTypeCtxt -> Id -> TcIdSigInfo
 -- Used for instance methods and record selectors
 completeSigFromId ctxt id
   = CompleteSig { sig_bndr = id

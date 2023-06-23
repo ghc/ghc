@@ -29,7 +29,6 @@ import GHC.Core ( CoreExpr )
 import GHC.Core.Make ( mkCoreLets )
 import GHC.Utils.Misc
 import GHC.Types.Id
-import GHC.Types.Var (pprIdWithBinding)
 import GHC.Types.Name.Env
 import GHC.Types.FieldLabel ( flSelector )
 import GHC.Types.SrcLoc
@@ -111,14 +110,13 @@ have-we-used-all-the-constructors? question; the local function
 --    D c   -> ... -- not sure about this second constructor being correct 
 --
 -- Relevant notes seem to be [Match Ids] and [Localise pattern binders]
-matchConFamily :: HasCallStack => NonEmpty Id
+matchConFamily :: NonEmpty Id
                -> Type
                -> NonEmpty (NonEmpty EquationInfo)
                -> DsM (MatchResult CoreExpr)
 -- Each group of eqns is for a single constructor
 matchConFamily (var :| vars) ty groups
-  = pprTrace "matchConFamily" (ppr var <+> hsep (map ppr vars) $$ ppr (map idBinding (var:vars)) $$ ppr groups) $
-    do let !mult = idMult var
+  = do let !mult = idMult var
            -- Each variable in the argument list correspond to one column in the
            -- pattern matching equations. Its multiplicity is the context
            -- multiplicity of the pattern. We extract that multiplicity, so that
@@ -146,7 +144,7 @@ matchPatSyn (var :| vars) ty eqns
 
 type ConArgPats = HsConPatDetails GhcTc
 
-matchOneConLike :: HasCallStack => [Id]
+matchOneConLike :: [Id]
                 -> Type
                 -> Mult
                 -> NonEmpty EquationInfo
@@ -210,7 +208,6 @@ matchOneConLike vars ty mult (eqn1 :| eqns)   -- All eqns for a single construct
 
         ; match_results <- mapM (match_group arg_vars) groups
 
-        ; pprTraceM "matchOneConLike" (text "Dicts:" <+> ppr (map pprIdWithBinding dicts1) $$ text "Args:" <+> ppr (map pprIdWithBinding arg_vars))
         -- ROMES:TODO: Understand better if we could determine this elsewhere, but:
         --
         -- The provenence of the variables put in the alt_bndrs is not
@@ -278,12 +275,12 @@ same_fields flds1 flds2
 
 
 -----------------
-selectConMatchVars :: HasCallStack => [Scaled Type] -> ConArgPats -> DsM [Id]
+selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys con
   = case con of
       RecCon {}      -> newSysLocalsDs arg_tys
-      PrefixCon _ ps -> pprTrace "selectConMatchVars:InfixCon" (ppr ps) $ selectMatchVars (zipMults arg_tys ps)
-      InfixCon p1 p2 -> pprTrace "selectConMatchVars:InfixCon" (ppr p1 <+> ppr p2) $ selectMatchVars (zipMults arg_tys [p1, p2])
+      PrefixCon _ ps -> selectMatchVars (zipMults arg_tys ps)
+      InfixCon p1 p2 -> selectMatchVars (zipMults arg_tys [p1, p2])
   where
     zipMults = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
 

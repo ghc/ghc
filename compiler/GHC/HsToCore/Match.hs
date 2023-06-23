@@ -28,7 +28,6 @@ import Language.Haskell.Syntax.Basic (Boxity(..))
 
 import {-#SOURCE#-} GHC.HsToCore.Expr (dsExpr)
 
-import GHC.Core.UsageEnv (zeroUE)
 import GHC.Types.Basic ( Origin(..), isGenerated )
 import GHC.Types.SourceText
 import GHC.Driver.DynFlags
@@ -59,6 +58,7 @@ import GHC.Core.TyCon    ( isNewTyCon )
 import GHC.Core.Multiplicity
 import GHC.Builtin.Types
 
+import GHC.Types.Var (toLetBound)
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Types.SrcLoc
@@ -182,7 +182,7 @@ See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 type MatchId = Id   -- See Note [Match Ids]
 
 -- | Described by the comment block above
-match :: HasCallStack => [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
+match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
                           -- ^ See Note [Match Ids]
                           --
                           -- ^ Note that the Match Ids carry not only a name, but
@@ -289,7 +289,7 @@ matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
           -- romes:I don't know
-        { let bind = NonRec (var' `setIdBinding` LetBound) (core_wrap (Var var))
+        { let bind = NonRec (toLetBound var') (core_wrap (Var var))
         ; return (mkCoLetMatchResult bind match_result) } }
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
@@ -437,14 +437,14 @@ tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
 tidy1 v _ (VarPat _ (L _ var))
-  = return (wrapBind (var `setIdBinding` LetBound) v, WildPat (idType var))
+  = return (wrapBind (toLetBound var) v, WildPat (idType var))
                       -- See Note [Keeping the IdBinding up to date]
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
 tidy1 v o (AsPat _ (L _ var) _ pat)
   = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
-        ; return (wrapBind (var `setIdBinding` LetBound) v . wrap, pat') }
+        ; return (wrapBind (toLetBound var) v . wrap, pat') }
                  -- See Note [Keeping the IdBinding up to date]
 
 {- now, here we handle lazy patterns:
@@ -744,8 +744,7 @@ Call @match@ with all of this information!
 --                         p2 q2 -> ...
 
 matchWrapper
-  :: HasCallStack
-  => HsMatchContext GhcRn              -- ^ For shadowing warning messages
+  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
   -> Maybe [LHsExpr GhcTc]             -- ^ Scrutinee(s)
                                        -- see Note [matchWrapper scrutinees]
   -> MatchGroup GhcTc (LHsExpr GhcTc)  -- ^ Matches being desugared
@@ -889,7 +888,7 @@ the expression (in this case, it will end up recursively calling 'matchWrapper'
 on the user-written case statement).
 -}
 
--- No wait, doesn't seem quite right?
+-- romes:TODO: No wait, doesn't seem quite right?
 -- | Matching will turn a group of pattern-matching equations and MatchId's
 -- into a case expression
 --
@@ -907,7 +906,7 @@ on the user-written case statement).
 --                          (y:ys) -> f x y : mappairs f xs ys
 --
 -- See also 'match'
-matchEquations  :: HasCallStack => HsMatchContext GhcRn
+matchEquations  :: HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -920,7 +919,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- | @matchSimply@ is a wrapper for 'match' which deals with the
 -- situation where we want to match a single expression against a single
 -- pattern. It returns an expression.
-matchSimply :: HasCallStack => CoreExpr -- ^ Scrutinee
+matchSimply :: CoreExpr -- ^ Scrutinee
             -> HsMatchContext GhcRn     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
@@ -943,7 +942,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: HasCallStack => CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -967,7 +966,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
 
-matchSinglePatVar :: HasCallStack => Id   -- See Note [Match Ids]
+matchSinglePatVar :: Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
@@ -1037,7 +1036,7 @@ groupEquations :: Platform -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInf
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations platform eqns
-  = NEL.groupBy same_gp $ [pprTrace "groupEquations" (ppr (firstPat eqn)) $! (patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
+  = NEL.groupBy same_gp $ [(patGroup platform (firstPat eqn), eqn) | eqn <- eqns]
   -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool

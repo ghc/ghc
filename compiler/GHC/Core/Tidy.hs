@@ -8,6 +8,7 @@ This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in GHC.Iface.Tidy.
 -}
 
+
 module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyCbvInfoTop, tidyBndrs
     ) where
@@ -16,7 +17,6 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.Type
-import GHC.Core.UsageEnv
 
 import GHC.Core.Seq ( seqUnfolding )
 import GHC.Types.Id
@@ -127,8 +127,7 @@ tidyCbvInfoLocal id rhs = computeCbvInfo id rhs
 -- See Note [CBV Function Ids]
 -- See Note [Attaching CBV Marks to ids]
 
-computeCbvInfo :: HasCallStack
-               => Id            -- The function
+computeCbvInfo :: Id            -- The function
                -> CoreExpr      -- It's RHS
                -> Id
 -- computeCbvInfo fun_id rhs = fun_id
@@ -229,9 +228,8 @@ tidyExpr env (Lam b e)
 
 ------------  Case alternatives  --------------
 tidyAlt :: TidyEnv -> CoreAlt -> CoreAlt
-tidyAlt env a@(Alt con vs rhs)
-  = pprTrace "tidyAlt" (ppr a $$ ppr (map (\x -> (idBinding x, x)) vs) $$ callStackDoc) $
-    tidyBndrs env vs    =: \ (env', vs) ->
+tidyAlt env (Alt con vs rhs)
+  = tidyBndrs env vs    =: \ (env', vs) ->
     (Alt con vs (tidyExpr env' rhs))
 
 ------------  Tickish  --------------
@@ -278,16 +276,16 @@ tidyVarOcc :: TidyEnv -> Var -> Var
 tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 
 -- tidyBndr is used for lambda and case binders
-tidyBndr :: HasCallStack => TidyEnv -> Var -> (TidyEnv, Var)
+tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
   | isTyCoVar var = tidyVarBndr env var
   | otherwise     = tidyIdBndr env var
 
-tidyBndrs :: HasCallStack => TidyEnv -> [Var] -> (TidyEnv, [Var])
+tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- Non-top-level variables, not covars
-tidyIdBndr :: HasCallStack => TidyEnv -> Id -> (TidyEnv, Id)
+tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id
   = -- Do this pattern match strictly, otherwise we end up holding on to
     -- stuff in the OccName.

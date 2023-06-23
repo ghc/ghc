@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GADTs #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -61,7 +60,7 @@ import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Types.Id.Make
 import GHC.Types.Id
-import GHC.Types.Var (pprIdWithBinding, varMultMaybe, toLambdaBound)
+import GHC.Types.Var (toLambdaBound, toLetBound)
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -89,10 +88,8 @@ import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (maybeToList, fromMaybe)
+import Data.Maybe (maybeToList)
 import qualified Data.List.NonEmpty as NEL
-
-import GHC.Core.UsageEnv (zeroUE)
 
 {-
 ************************************************************************
@@ -127,7 +124,7 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --      f (T2 i) (y::a)   = 0
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
-selectMatchVars :: HasCallStack => [(Mult, Pat GhcTc)] -> DsM [Id]
+selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
@@ -140,12 +137,12 @@ selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 --  (1) let !(x@(C a b)) = ... -- `x` is chosen
 --  (2) let ~y = ...           -- `y` is chosen
 --  (3) let (a,b) = ...        -- fresh `z` is chosen
-selectMatchVar :: HasCallStack => Mult -> Pat GhcTc -> DsM Id
+selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId (toLambdaBound (unLoc var))) -- ROMES:TODO: see comment below about match variables being put in cases
+selectMatchVar _w (VarPat _ var)    = return (localiseId (toLambdaBound (unLoc var)))
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -154,9 +151,7 @@ selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWit
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (toLambdaBound (unLoc var)))
-                                     -- ROMES:TODO: Are match variables always put in cases? If yes, then this could be a way to guarantee match variables are lambda bound/case bound
--- selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
-selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: Can match variables end up in lets and cases?, I think yes.
+selectMatchVar w  other_pat         = newSysLocalDs (LambdaBound w) (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -252,18 +247,18 @@ adjustMatchResultDs encl_fn = \case
   MR_Fallible body_fn -> MR_Fallible $ \fail ->
     encl_fn =<< body_fn fail
 
-wrapBinds :: HasCallStack => [(Var,Var)] -> CoreExpr -> CoreExpr
+wrapBinds :: [(Var,Var)] -> CoreExpr -> CoreExpr
 wrapBinds [] e = e
 wrapBinds ((new,old):prs) e = wrapBind new old (wrapBinds prs e)
 
-wrapBind :: HasCallStack => Var -> Var -> CoreExpr -> CoreExpr
+wrapBind :: Var -> Var -> CoreExpr -> CoreExpr
 wrapBind new old body   -- NB: this function must deal with term
   | new==old    = body  -- variables, type variables or coercion variables
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 -- | 'seqVar' produces a 'CoreExpr' in which the evaluation of 'Var' is forced
 -- by means of scrutinizing it in a case expression with a single DEFAULT alternative.
-seqVar :: HasCallStack => Var -> CoreExpr -> CoreExpr
+seqVar :: Var -> CoreExpr -> CoreExpr
 -- romes:TODO: it's not evident how to consider the case of a variable that was
 -- let bound being used for the case scrutinee. Now I'm making them ManyTy to
 -- move forward
@@ -274,8 +269,8 @@ mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 
 -- (mkViewMatchResult var' viewExpr mr) makes the expression
 -- let var' = viewExpr in mr
-mkViewMatchResult :: HasCallStack => Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
-mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec (var' `setIdBinding` LetBound) viewExpr
+mkViewMatchResult :: Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec (toLetBound var') viewExpr
 
 mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkEvalMatchResult var ty = fmap $ \e ->
@@ -303,25 +298,25 @@ mkCoPrimCaseMatchResult var ty match_alts
          do body <- runMatchResult fail mr
             return (Alt (LitAlt lit) [] body)
 
-data CaseAlt a = HasCallStack => MkCaseAlt{ alt_pat :: a,
+data CaseAlt a = MkCaseAlt{ alt_pat :: a,
                             alt_bndrs :: [Var],
                             alt_wrapper :: HsWrapper,
                             alt_result :: MatchResult CoreExpr }
 
 mkCoAlgCaseMatchResult
-  :: HasCallStack => Id -- ^ Scrutinee
+  :: Id -- ^ Scrutinee
   -> Type -- ^ Type of exp
   -> NonEmpty (CaseAlt DataCon) -- ^ Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult CoreExpr
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
   = assert (null match_alts_tail && null (tail arg_ids1)) $
-    mkCoLetMatchResult (NonRec (arg_id1 `setIdBinding` LetBound) newtype_rhs) match_result1
+    mkCoLetMatchResult (NonRec (toLetBound arg_id1) newtype_rhs) match_result1
                                               -- mkCoAlgCase expects LambdaBound Id?
                                               -- it's only in the case of newtypes that we do a let instead of a case...
 
   | otherwise
-  = pprTrace "mkCoAlgCaseMatchResult" (pprIdWithBinding var) $ mkDataConCase var ty match_alts
+  = mkDataConCase var ty match_alts
   where
     isNewtype = isNewTyCon (dataConTyCon (alt_pat alt1))
 
@@ -359,9 +354,9 @@ mkPatSynCase var ty alt fail = do
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
 
-mkDataConCase :: HasCallStack => Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
+mkDataConCase :: Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult CoreExpr
 mkDataConCase var ty alts@(alt1 :| _)
-    = pprTrace "mkDataConCase" (ppr var <+> ppr (idBinding var)) $ liftA2 mk_case mk_default mk_alts
+    = liftA2 mk_case mk_default mk_alts
     -- The liftA2 combines the failability of all the alternatives and the default
   where
     con1          = alt_pat alt1
@@ -376,7 +371,7 @@ mkDataConCase var ty alts@(alt1 :| _)
                                           -- (not that splitTyConApp does, these days)
 
     mk_case :: Maybe CoreAlt -> [CoreAlt] -> CoreExpr
-    mk_case def alts = mkWildCase (Var var) (pprTrace "mk_case:var" (pprIdWithBinding var) $ idScaledType var) ty $
+    mk_case def alts = mkWildCase (Var var) (idScaledType var) ty $
       maybeToList def ++ alts
 
     mk_alts :: MatchResult [CoreAlt]
@@ -388,14 +383,11 @@ mkDataConCase var ty alts@(alt1 :| _)
                      , alt_result = match_result } =
       flip adjustMatchResultDs match_result $ \body -> do
         case dataConBoxer con of
-          Nothing -> pprTrace "mk_alt" (hsep (map pprIdWithBinding args)) $ return (Alt (DataAlt con) args body)
+          Nothing -> return (Alt (DataAlt con) args body)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-            let rep_ids' = map (\x -> case idBinding x of
-                                        LambdaBound m -> scaleVarBy m var
-                                        LetBound -> var `setIdBinding` LambdaBound ManyTy
-                               ) rep_ids -- ROMES:TODO: I don't know
+            let rep_ids' = map ((`scaleVarBy` var) . idMult . toLambdaBound) rep_ids
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
@@ -761,7 +753,7 @@ mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
 -- See also Note [Keeping the IdBinding up to date]
 mkSelectorBinds ticks pat val_expr
   | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
-  = return (v, [(v `setIdBinding` LetBound, val_expr)])
+  = return (v, [(toLetBound v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
@@ -770,15 +762,17 @@ mkSelectorBinds ticks pat val_expr
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var (toLambdaBound val_var)) PatBindRhs pat'
+               = do { rhs_expr <- matchSimply (Var (toLambdaBound val_var)) PatBindRhs pat' -- ROMES:TODO: why do I need 'toLambdaBound' here?
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
                       -- "fail-expr" passed to matchSimply is not
                       -- used. But it /is/ used for its type, and for
                       -- that bndr_var is just the ticket.
-                    ; return (bndr_var `setIdBinding` LetBound, mkOptTickBox tick rhs_expr) }
-                    -- ROMES:TODO: This back and forth must be wrong, I don't understand completely what matchSimply expect
+                    ; return (toLetBound bndr_var, mkOptTickBox tick rhs_expr) }
+                    -- ROMES:TODO: This back and forth between letbound and
+                    -- lambdabound must be wrong, I don't understand completely
+                    -- what matchSimply expect
 
        ; binds <- zipWithM mk_bind ticks' binders
        ; return ( val_var, (val_var, val_expr) : binds) }

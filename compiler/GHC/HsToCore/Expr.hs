@@ -77,7 +77,7 @@ import Control.Monad
 ************************************************************************
 -}
 
-dsLocalBinds :: HasCallStack => HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsLocalBinds :: HsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsLocalBinds (EmptyLocalBinds _)  body = return body
 dsLocalBinds b@(HsValBinds _ binds) body = putSrcSpanDs (spanHsLocaLBinds b) $
                                            dsValBinds binds body
@@ -85,7 +85,7 @@ dsLocalBinds (HsIPBinds _ binds)  body = dsIPBinds  binds body
 
 -------------------------
 -- caller sets location
-dsValBinds :: HasCallStack => HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
+dsValBinds :: HsValBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsValBinds (XValBindsLR (NValBinds binds _)) body
   = foldrM ds_val_bind body binds
 dsValBinds (ValBinds {})       _    = panic "dsValBinds ValBindsIn"
@@ -106,7 +106,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
 
 -------------------------
 -- caller sets location
-ds_val_bind :: HasCallStack => (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
+ds_val_bind :: (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
@@ -156,8 +156,6 @@ ds_val_bind (is_rec, binds) body
                -- we should never produce a non-recursive list of multiple binds
 
         ; (force_vars,prs) <- dsLHsBinds binds
-        ; pprTraceM "ds_val_bind:binds" (ppr binds)
-        ; pprTraceM "ds_val_bind:prs" (ppr $ map (pprIdWithBinding . fst) prs)
         ; let body' = foldr seqVar body force_vars
         ; assertPpr (not (any (isUnliftedType . idType . fst) prs)) (ppr is_rec $$ ppr binds) $
           -- NB: bindings have a fixed RuntimeRep, so it's OK to call isUnliftedType
@@ -200,14 +198,14 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        { let rhs' = core_wrap (mkOptTickBox tick rhs)
        ; return (bindNonRec fun rhs' body) } }
 
-dsUnliftedBind p@(PatBind { pat_lhs = pat, pat_rhs = grhss
+dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = (ty, _) }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
        ; let upat = unLoc pat
-             eqn = pprTrace "dsUnliftedBind" (ppr p $$ ppr upat) $ EqnInfo { eqn_pats = [upat],
+             eqn = EqnInfo { eqn_pats = [upat],
                              eqn_orig = FromSource,
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar ManyTy upat

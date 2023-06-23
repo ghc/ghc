@@ -59,7 +59,6 @@ import GHC.Core.Type as Type
    , substTy, getTyVar_maybe )
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
-import GHC.Core.Multiplicity
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
@@ -194,7 +193,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name   = name
          , ru_act    = act
          , ru_fn     = fn
-         , ru_bndrs  = map toLambdaBound bndrs -- rOMES:TODO: idMult LetBound = ManyTy; LambdaBound m = m
+         , ru_bndrs  = bndrs
          , ru_args   = args
          , ru_rhs    = occurAnalyseExpr rhs
                        -- See Note [OccInfo in unfoldings and rules]
@@ -691,7 +690,7 @@ matchRule _ rule_env is_active _ args rough_args
 
 
 ---------------------------------------
-matchN  :: HasCallStack => InScopeEnv
+matchN  :: InScopeEnv
         -> RuleName -> [Var] -> [CoreExpr]
         -> [CoreExpr] -> CoreExpr           -- ^ Target; can have more elements than the template
         -> Maybe CoreExpr

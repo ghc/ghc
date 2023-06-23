@@ -36,11 +36,10 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Monad
 import GHC.Utils.Logger as Logger
-import GHC.Utils.Misc      ( count, HasCallStack )
+import GHC.Utils.Misc      ( count )
 import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
-import GHC.Core.UsageEnv   ( zeroUE )
 import GHC.Exts( oneShot )
 
 {-
@@ -209,7 +208,7 @@ newId :: FastString -> IdBinding -> Type -> SimplM Id
 newId fs w ty = mkSysLocalOrCoVarM fs w ty
 
 -- | Make a join id with given type and arity but without call-by-value annotations.
-newJoinId :: HasCallStack => [Var] -> Type -> SimplM Id
+newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty
   = do { uniq <- getUniqueM
        ; let name       = mkSystemVarName uniq (fsLit "$j")

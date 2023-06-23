@@ -1,7 +1,5 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-{-# LANGUAGE GADTs #-}
-
 -- | Handy functions for creating much Core syntax
 module GHC.Core.Make (
         -- * Constructing normal syntax
@@ -112,7 +110,7 @@ sortQuantVars vs = sorted_tcvs ++ ids
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "GHC.Core#let_can_float_invariant")
-mkCoreLet :: HasCallStack => CoreBind -> CoreExpr -> CoreExpr
+mkCoreLet :: CoreBind -> CoreExpr -> CoreExpr
 mkCoreLet (NonRec bndr rhs) body        -- See Note [Core let-can-float invariant]
   = bindNonRec bndr rhs body
 mkCoreLet bind body
@@ -182,7 +180,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 --
 -- See Note [WildCard binders] in "GHC.Core.Opt.Simplify.Env"
 mkWildValBinder :: Mult -> Type -> Id
-mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (LambdaBound w) ty -- ROMES: just tepmorarily now we consider wildcards to be lambdabound
+mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (LambdaBound w) ty -- case bound wildcard
   -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
   -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
 
@@ -516,7 +514,7 @@ boxTy ty
 
 unwrapBox :: UniqSupply -> Id -> CoreExpr
                  -> (UniqSupply, Id, CoreExpr)
--- If v's type required boxing (i.e it is unlifted or a constraint)
+-- ^ If v's type required boxing (i.e it is unlifted or a constraint)
 -- then (unwrapBox us v body) returns
 --          (case box_v of MkDict v -> body)
 --          together with box_v
@@ -531,7 +529,7 @@ unwrapBox us var body
       BI_Box { bi_data_con = box_con, bi_boxed_type = box_ty }
          -> (us', var', body')
          where
-           var'  = mkSysLocal (fsLit "uc") uniq (LambdaBound ManyTy) box_ty -- ROMES:TODO: LambdaBound since its put in case binder
+           var'  = mkSysLocal (fsLit "uc") uniq (LambdaBound ManyTy) box_ty
            body' = Case (Var var') var' (exprType body)
                         [Alt (DataAlt box_con) [var] body]
   where
@@ -585,7 +583,7 @@ chunkify xs
 -- expression built by `mkBigTupleSelector` must consume its scrutinee 'Many'
 -- times. And all the argument variables must have multiplicity 'Many'.
 mkBigTupleSelector, mkBigTupleSelectorSolo
-    :: HasCallStack => [Id]         -- ^ The 'Id's to pattern match the tuple against
+    :: [Id]         -- ^ The 'Id's to pattern match the tuple against
     -> Id           -- ^ The 'Id' to select
     -> Id           -- ^ A variable of the same type as the scrutinee
     -> CoreExpr     -- ^ Scrutinee
@@ -638,7 +636,7 @@ mkSmallTupleSelector [var] should_be_the_same_var _ scrut
 mkSmallTupleSelector vars the_var scrut_var scrut
   = mkSmallTupleSelector1 vars the_var scrut_var scrut
 
--- ^ 'mkSmallTupleSelector1' is like 'mkSmallTupleSelector'
+-- | 'mkSmallTupleSelector1' is like 'mkSmallTupleSelector'
 -- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
 mkSmallTupleSelector1 vars the_var scrut_var scrut
   = assert (notNull vars) $
@@ -734,7 +732,7 @@ mkSmallTupleCase vars body scrut_var scrut
 
 data FloatBind
   = FloatLet  CoreBind
-  | HasCallStack => FloatCase CoreExpr Id AltCon [Var]
+  | FloatCase CoreExpr Id AltCon [Var]
       -- case e of y { C ys -> ... }
       -- See Note [Floating single-alternative cases] in GHC.Core.Opt.SetLevels
 
@@ -743,7 +741,7 @@ instance Outputable FloatBind where
   ppr (FloatCase e b c bs) = hang (text "CASE" <+> ppr e <+> text "of" <+> ppr b)
                                 2 (ppr c <+> ppr bs)
 
-wrapFloat :: HasCallStack => FloatBind -> CoreExpr -> CoreExpr
+wrapFloat :: FloatBind -> CoreExpr -> CoreExpr
 wrapFloat (FloatLet defns)       body = Let defns body
 wrapFloat (FloatCase e b con bs) body = mkSingleAltCase e b con bs body
 
@@ -810,7 +808,7 @@ mkBuildExpr elt_ty mk_build_inside = do
     n_tyvar <- newTyVar alphaTyVar
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkVisFunTysMany [elt_ty, n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") (LambdaBound ManyTy) c_ty, mkSysLocalM (fsLit "n") (LambdaBound ManyTy) n_ty] -- ROMES: LambdaBound explanation for case expressions...
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") (LambdaBound ManyTy) c_ty, mkSysLocalM (fsLit "n") (LambdaBound ManyTy) n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 

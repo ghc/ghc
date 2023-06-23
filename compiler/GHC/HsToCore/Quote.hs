@@ -2144,8 +2144,7 @@ type GenSymBind = (Name, Id)    -- Gensym the string and bind it to the Id
                                 -- I.e.         (x, x_id) means
                                 --      let x_id = gensym "x" in ...
 
--- Generate a fresh name for a locally bound entity
-
+-- | Generate a fresh name for a locally bound entity
 mkGenSyms :: [Name] -> MetaM [GenSymBind]
 -- We can use the existing name.  For example:
 --      [| \x_77 -> x_77 + x_77 |]
@@ -2158,17 +2157,17 @@ mkGenSyms :: [Name] -> MetaM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [ (nm, mkLocalId (localiseName nm) (LambdaBound ManyTy) var_ty) -- ROMES:TODO: Locally bound how?
+                  ; return [ (nm, mkLocalId (localiseName nm) (LambdaBound ManyTy) var_ty)
                            | nm <- ns] }
 
 
 addBinds :: [GenSymBind] -> MetaM a -> MetaM a
--- Add a list of fresh names for locally bound entities to the
+-- ^ Add a list of fresh names for locally bound entities to the
 -- meta environment (which is part of the state carried around
 -- by the desugarer monad)
 addBinds bs m = mapReaderT (dsExtendMetaEnv (mkNameEnv [(n,DsBound id) | (n,id) <- bs])) m
 
--- Look up a locally bound name
+-- | Look up a locally bound name
 --
 lookupNBinder :: LocatedN Name -> MetaM (Core TH.Name)
 lookupNBinder n = lookupBinder (unLoc n)
@@ -2180,7 +2179,7 @@ lookupBinder = lookupOcc
   -- will be the selector Id and hence a global; so we need the
   -- globalVar case of lookupOcc
 
--- Look up a name that is either locally bound or a global name
+-- | Look up a name that is either locally bound or a global name
 --
 --  * If it is a global name, generate the "original name" representation (ie,
 --   the <module>:<name> form) for the associated entity

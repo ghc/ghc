@@ -846,7 +846,7 @@ castArgRename ops in_arg rhs =
 
 -- Construct a case binder used when casting sums, of a given type and unique.
 mkCastVar :: Unique -> Type -> Id
-mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq (LambdaBound ManyTy) ty -- ROMES:TODO: CastVar - LambdaBound?
+mkCastVar uq ty = mkSysLocal (fsLit "cst_sum") uq (LambdaBound ManyTy) ty -- ROMES:TODO: LetBound or LambdaBound?
 
 mkCast :: StgArg -> PrimOp -> OutId -> Type -> StgExpr -> StgExpr
 mkCast arg_in cast_op out_id out_ty in_rhs =

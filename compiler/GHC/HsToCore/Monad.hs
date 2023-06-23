@@ -394,8 +394,9 @@ newSysLocalDs, newFailLocalDs :: IdBinding -> Type -> DsM Id
 newSysLocalDs = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
 
+-- ROMES:TODO: What does this do?
 newSysLocalsDs :: [Scaled Type] -> DsM [Id]
-newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs (LambdaBound w) t) -- Scaled -> LambdaBound?
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs (LambdaBound w) t)
 
 {-
 We can also reach out and either set/grab location information from

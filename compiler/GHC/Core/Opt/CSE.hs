@@ -9,7 +9,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 import GHC.Prelude
 
 import GHC.Core.Subst
-import GHC.Types.Var    ( Var, IdBinding(..), toLambdaBound )
+import GHC.Types.Var    ( Var, toLambdaBound )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
@@ -20,13 +20,12 @@ import GHC.Core.Utils   ( mkAltExpr
                         , stripTicksE, stripTicksT, mkTicks )
 import GHC.Core.FVs     ( exprFreeVars )
 import GHC.Core.Type    ( tyConAppArgs )
-import GHC.Core.Multiplicity
 import GHC.Core
 import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Types.Tickish
 import GHC.Core.Map.Expr
-import GHC.Utils.Misc   ( filterOut, equalLength, HasCallStack )
+import GHC.Utils.Misc   ( filterOut, equalLength )
 import GHC.Utils.Panic
 import Data.Functor.Identity ( Identity (..) )
 import Data.List        ( mapAccumL )
@@ -881,13 +880,13 @@ extendCSEnv cse expr triv_expr
   where
     sexpr = stripTicksE tickishFloatable expr
 
-extendCSRecEnv :: HasCallStack => CSEnv -> OutId -> OutExpr -> OutExpr -> CSEnv
+extendCSRecEnv :: CSEnv -> OutId -> OutExpr -> OutExpr -> CSEnv
 -- See Note [CSE for recursive bindings]
 extendCSRecEnv cse bndr expr triv_expr
   = cse { cs_rec_map = extendCoreMap (cs_rec_map cse) (Lam (toLambdaBound bndr) expr) triv_expr }
                                                         -- Set binding as below
 
-lookupCSRecEnv :: HasCallStack => CSEnv -> OutId -> OutExpr -> Maybe OutExpr
+lookupCSRecEnv :: CSEnv -> OutId -> OutExpr -> Maybe OutExpr
 -- See Note [CSE for recursive bindings]
 lookupCSRecEnv (CS { cs_rec_map = csmap }) bndr expr
   = lookupCoreMap csmap (Lam (toLambdaBound bndr) expr)

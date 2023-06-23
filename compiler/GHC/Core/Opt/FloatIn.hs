@@ -143,7 +143,7 @@ instance Outputable FloatInBind where
   ppr (FB bvs fvs _) = text "FB" <> braces (sep [ text "bndrs =" <+> ppr bvs
                                                 , text "fvs =" <+> ppr fvs ])
 
-fiExpr :: HasCallStack => Platform
+fiExpr :: Platform
        -> RevFloatInBinds   -- Binds we're trying to drop
                             -- as far "inwards" as possible
        -> CoreExprWithFVs   -- Input expr
@@ -805,7 +805,7 @@ floatedBindsFVs binds = mapUnionDVarSet fbFVs binds
 fbFVs :: FloatInBind -> DVarSet
 fbFVs (FB _ fvs _) = fvs
 
-wrapFloats :: HasCallStack => RevFloatInBinds -> CoreExpr -> CoreExpr
+wrapFloats :: RevFloatInBinds -> CoreExpr -> CoreExpr
 -- Remember RevFloatInBinds is in *reverse* dependency order
 wrapFloats []               e = e
 wrapFloats (FB _ _ fl : bs) e = wrapFloats bs (wrapFloat fl e)

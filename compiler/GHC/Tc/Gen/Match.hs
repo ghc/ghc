@@ -94,7 +94,7 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 -}
 
-tcMatchesFun :: HasCallStack => LocatedN Name -- MatchContext Id
+tcMatchesFun :: LocatedN Name -- MatchContext Id
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))
@@ -209,7 +209,7 @@ type AnnoBody body
     )
 
 -- | Type-check a MatchGroup.
-tcMatches :: HasCallStack => (AnnoBody body ) => TcMatchCtxt body
+tcMatches :: (AnnoBody body ) => TcMatchCtxt body
           -> [Scaled ExpSigmaTypeFRR] -- ^ Expected pattern types.
           -> ExpRhoType               -- ^ Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
@@ -239,7 +239,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     }) }
 
 -------------
-tcMatch :: HasCallStack => (AnnoBody body) => TcMatchCtxt body
+tcMatch :: (AnnoBody body) => TcMatchCtxt body
         -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
@@ -265,7 +265,7 @@ tcMatch ctxt pat_tys rhs_ty match
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
 -------------
-tcGRHSs :: HasCallStack => AnnoBody body
+tcGRHSs :: AnnoBody body
         => TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
         -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 
@@ -542,7 +542,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (LambdaBound ManyTy) (n_app (idType bndr_id)) -- ROMES:TODO:
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name LetBound (n_app (idType bndr_id)) -- romes:TODO: LetBound or LambdaBound?
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -735,7 +735,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Building the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name (LambdaBound ManyTy) (n_app (idType bndr_id)) -- ROMES:TODO:
+             mk_n_bndr n_bndr_name bndr_id = mkLocalId n_bndr_name LetBound (n_app (idType bndr_id)) -- ROMES:TODO: LetBound or LambdaBound?
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -916,7 +916,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n t -> mkLocalId n (LambdaBound ManyTy) t) tup_names tup_elt_tys -- ROMES:TODO:
+        ; let tup_ids = zipWith (\n t -> mkLocalId n LetBound t) tup_names tup_elt_tys -- ROMES:TODO: LetBound or LambdaBound?
                 -- Many because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 

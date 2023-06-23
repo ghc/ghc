@@ -47,7 +47,7 @@ import GHC.Core.TyCon   (TyCon, tyConName )
 import GHC.Core.Multiplicity
 import GHC.Core.Ppr     ( pprParendExpr )
 import GHC.Core.Make    ( mkImpossibleExpr )
-import GHC.Types.Var (pprIdWithBinding, zeroUE)
+import GHC.Types.Var (toLetBound)
 
 import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
@@ -1485,10 +1485,9 @@ scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               -- Important to use mkCast here
                               -- See Note [SpecConstr call patterns]
 scExpr' env e@(App _ _)  = scApp env (collectArgs e)
-scExpr' env (Lam b e)
-  = do let (env', b') = extendBndr env b
-       (usg, e') <- scExpr env' e
-       return (usg, Lam b' e')
+scExpr' env (Lam b e)    = do let (env', b') = extendBndr env b
+                              (usg, e') <- scExpr env' e
+                              return (usg, Lam b' e')
 
 scExpr' env (Let bind body)
   = do { (final_usage, binds', body') <- scBind NotTopLevel env bind $
@@ -1607,9 +1606,7 @@ scApp env (Var fn, args)        -- Function is a variable
                 --     we can fix it.
   where
     doBeta :: OutExpr -> [OutExpr] -> OutExpr
-    doBeta (Lam bndr body) (arg : args) = Let (NonRec bndr arg) (doBeta body args)
-      where bndr' | isId bndr = bndr `setIdBinding` LetBound
-                  | otherwise = bndr
+    doBeta (Lam bndr body) (arg : args) = Let (NonRec (toLetBound bndr) arg) (doBeta body args)
     doBeta fn              args         = mkApps fn args
 
 -- The function is almost always a variable, but not always.
@@ -1894,8 +1891,7 @@ spec_one :: ScEnv
          -> UniqSM (ScUsage, OneSpec) -- ^ Rule and binding
 spec_one env fn arg_bndrs body (call_pat, rule_number)
   | CP { cp_qvars = qvars, cp_args = pats, cp_strict_args = cbv_args } <- call_pat
-  = do  {
-          spec_uniq <- getUniqueM
+  = do  { spec_uniq <- getUniqueM
         ; let env1 = extendScSubstList (extendScInScope env qvars)
                                        (arg_bndrs `zip` pats)
               (body_env, extra_bndrs) = extendBndrs env1 (dropList pats arg_bndrs)
@@ -2721,7 +2717,7 @@ argToPat1 _env _in_scope _val_env arg _arg_occ arg_str
 -- | wildCardPats are always boring
 wildCardPat :: Type -> StrictnessMark -> UniqSM (Bool, CoreArg, [Id])
 wildCardPat ty str
-  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") (LambdaBound ManyTy) ty -- ROMES:TODO: Wildcard binders... 
+  = do { id <- mkSysLocalOrCoVarM (fsLit "sc") (LambdaBound ManyTy) ty
        -- ; pprTraceM "wildCardPat" (ppr id' <+> ppr (idUnfolding id'))
        ; return (False, varToCoreExpr id, if isMarkedStrict str then [id] else []) }
 

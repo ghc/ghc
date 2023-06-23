@@ -37,7 +37,7 @@ import GHC.Core.TyCon.RecWalk
 import GHC.Core.SimpleOpt( SimpleOpts )
 
 import GHC.Types.Id
-import GHC.Types.Var (pprIdWithBinding)
+import GHC.Types.Var (toLambdaBound)
 import GHC.Types.Id.Info
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -965,7 +965,7 @@ unbox_one_arg opts arg_var
 
              -- Create new arguments we get when unboxing dc
              (ex_tvs', arg_ids) = dataConRepFSInstPat (ex_name_fss ++ repeat ww_prefix)
-                                            pat_bndrs_uniqs ManyTy dc tc_args -- ROMES:TODO: idMult arg_var instead
+                                            pat_bndrs_uniqs (idMult $ toLambdaBound arg_var) dc tc_args
              con_str_marks = dataConRepStrictness dc
 
              -- Apply str info to new args. Also remove OtherCon unfoldings so they
@@ -974,7 +974,7 @@ unbox_one_arg opts arg_var
              arg_ids' = map zapIdUnfolding $
                         zipWithEqual "unbox_one_arg" setIdDemandInfo arg_ids ds
 
-             unbox_fn = mkUnpackCase (Var arg_var) co ManyTy -- ROMES:TODO: idMult arg_var
+             unbox_fn = mkUnpackCase (Var arg_var) co (idMult $ toLambdaBound arg_var)
                                      dc (ex_tvs' ++ arg_ids')
 
              -- Mark arguments coming out of strict fields so we can seq them in the worker

@@ -40,7 +40,6 @@ import GHC.Core.Opt.Stats ( Tick(..) )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Unfold.Make
-import GHC.Core.UsageEnv
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType, exprArity, arityTypeBotSigs_maybe
                           , pushCoTyArg, pushCoValArg, exprIsDeadEnd
@@ -60,7 +59,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, toLambdaBound )
+import GHC.Types.Var    ( isTyCoVar, toLambdaBound )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
@@ -587,7 +586,7 @@ unless the kind of the type of rhs is concrete, in the sense of
 Note [Concrete types] in GHC.Tc.Utils.Concrete.
 -}
 
-tryCastWorkerWrapper :: HasCallStack => SimplEnv -> BindContext
+tryCastWorkerWrapper :: SimplEnv -> BindContext
                      -> InId -> OccInfo
                      -> OutId -> OutExpr
                      -> SimplM (SimplFloats, SimplEnv)
@@ -809,14 +808,14 @@ prepareRhs env top_lvl occ rhs0
 
     anfise other = return (emptyLetFloats, other)
 
-makeTrivialArg :: HasCallStack => HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats, ArgSpec)
+makeTrivialArg :: HasDebugCallStack => SimplEnv -> ArgSpec -> SimplM (LetFloats, ArgSpec)
 makeTrivialArg env arg@(ValArg { as_arg = e, as_dmd = dmd })
   = do { (floats, e') <- makeTrivial env NotTopLevel dmd (fsLit "arg") e
        ; return (floats, arg { as_arg = e' }) }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
 
-makeTrivial :: HasCallStack => HasDebugCallStack
+makeTrivial :: HasDebugCallStack
             => SimplEnv -> TopLevelFlag -> Demand
             -> FastString  -- ^ A "friendly name" to build the new binder from
             -> OutExpr
@@ -918,7 +917,7 @@ It does *not* attempt to do let-to-case.  Why?  Because it is used for
 Nor does it do the atomic-argument thing
 -}
 
-completeBind :: HasCallStack => SimplEnv
+completeBind :: SimplEnv
              -> BindContext
              -> InId           -- Old binder
              -> OutId          -- New binder; can be a JoinId
@@ -1124,7 +1123,7 @@ simplExpr env expr
     -- NB: Since 'expr' is term-valued, not (Type ty), this call
     --     to exprType will succeed.  exprType fails on (Type ty).
 
-simplExprC :: HasCallStack => SimplEnv
+simplExprC :: SimplEnv
            -> InExpr     -- A term-valued expression, never (Type ty)
            -> SimplCont
            -> SimplM OutExpr
@@ -1138,7 +1137,7 @@ simplExprC env expr cont
           return (wrapFloats floats expr') }
 
 --------------------------------------------------
-simplExprF :: HasCallStack => SimplEnv
+simplExprF :: SimplEnv
            -> InExpr     -- A term-valued expression, never (Type ty)
            -> SimplCont
            -> SimplM (SimplFloats, OutExpr)
@@ -1154,7 +1153,7 @@ simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
       ]) $ -}
     simplExprF1 env e cont
 
-simplExprF1 :: HasCallStack => SimplEnv -> InExpr -> SimplCont
+simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
 simplExprF1 _ (Type ty) cont
@@ -1215,7 +1214,6 @@ simplExprF1 env expr@(Lam {}) cont
 
 simplExprF1 env (Case scrut bndr _ alts) cont
   = {-#SCC "simplExprF1-Case" #-}
-    pprTrace "simplExprF1:Case:" (ppr bndr <+> ppr (idBinding bndr)) $
     simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
                                  , sc_alts = alts
                                  , sc_env = env, sc_cont = cont })
@@ -1495,7 +1493,7 @@ simplTick env tickish expr cont
 ************************************************************************
 -}
 
-rebuild :: HasCallStack => SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
+rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant;
 -- only the in-scope set matters
 rebuild env expr cont
@@ -1506,7 +1504,7 @@ rebuild env expr cont
                        -- NB: mkCast implements the (Coercion co |> g) optimisation
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
-        -> pprTrace "rebuild:Select" (ppr bndr <+> ppr (idBinding bndr)) $ rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
+        -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
         -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
@@ -2124,7 +2122,7 @@ simplVar env var
         DoneId var1          -> return (Var var1)
         DoneEx e _           -> return e
 
-simplIdF :: HasCallStack => SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
+simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplFloats, OutExpr)
 simplIdF env var cont
   | isDataConWorkId var         -- See Note [Fast path for data constructors]
   = rebuild env (Var var) cont
@@ -2150,7 +2148,7 @@ simplIdF env var cont
 ---------------------------------------------------------
 --      Dealing with a call site
 
-rebuildCall :: HasCallStack => SimplEnv -> ArgInfo -> SimplCont
+rebuildCall :: SimplEnv -> ArgInfo -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
 ---------- Bottoming applications --------------
@@ -2246,7 +2244,11 @@ rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
                             ; return (Lam s' body') }
                             -- Important: do not try to eta-expand this lambda
                             -- See Note [No eta-expansion in runRW#]
--- ROMES:TODO: Ideally this would be newId ... (LambdaBound OneTy) realWorldStatePrimTy, since it's a real world state prim token which must get used only once, but we can't bc the type wouldn't match runRW#'s signature
+                            --
+                            -- Ideally the Id would be linearly bound, since
+                            -- this is a RealWorld token, but currently we
+                            -- can't because runRW# expects an unrestricted
+                            -- function as an argument.
            _ -> do { s' <- newId (fsLit "s") (LambdaBound ManyTy) realWorldStatePrimTy
                    ; let (m,_,_) = splitFunTy fun_ty
                          env'  = arg_env `addNewInScopeIds` [s']
@@ -2923,7 +2925,7 @@ We want to bind x' to x, and not to a duplicated (a,b)).
 --      Eliminate the case if possible
 
 rebuildCase, reallyRebuildCase
-   :: HasCallStack => SimplEnv
+   :: SimplEnv
    -> OutExpr          -- Scrutinee
    -> InId             -- Case binder
    -> [InAlt]          -- Alternatives (increasing order)
@@ -3217,7 +3219,7 @@ scale the entire case we are simplifying, by a scaling factor which can be
 computed in the continuation (with function `contHoleScaling`).
 -}
 
-simplAlts :: HasCallStack => SimplEnv
+simplAlts :: SimplEnv
           -> OutExpr         -- Scrutinee
           -> InId            -- Case binder
           -> [InAlt]         -- Non-empty
@@ -3269,7 +3271,7 @@ improveSeq _ env scrut _ case_bndr1 _
 
 
 ------------------------------------
-simplAlt :: HasCallStack => SimplEnv
+simplAlt :: SimplEnv
          -> Maybe OutExpr  -- The scrutinee
          -> [AltCon]       -- These constructors can't be present when
                            -- matching the DEFAULT alternative
@@ -3614,7 +3616,7 @@ join points and inlining them away.  See #4930.
 -}
 
 --------------------
-mkDupableCaseCont :: HasCallStack => SimplEnv -> [InAlt] -> SimplCont
+mkDupableCaseCont :: SimplEnv -> [InAlt] -> SimplCont
                   -> SimplM ( SimplFloats  -- Join points (if any)
                             , SimplEnv     -- Use this for the alts
                             , SimplCont)
@@ -3636,7 +3638,7 @@ altsWouldDup (alt:alts)
     is_bot_alt (Alt _ _ rhs) = exprIsDeadEnd rhs
 
 -------------------------
-mkDupableCont :: HasCallStack => SimplEnv
+mkDupableCont :: SimplEnv
               -> SimplCont
               -> SimplM ( SimplFloats  -- Incoming SimplEnv augmented with
                                        --   extra let/join-floats and in-scope variables
@@ -3645,7 +3647,7 @@ mkDupableCont env cont
   = mkDupableContWithDmds env (repeat topDmd) cont
 
 mkDupableContWithDmds
-   :: HasCallStack => SimplEnv  -> [Demand]  -- Demands on arguments; always infinite
+   :: SimplEnv  -> [Demand]  -- Demands on arguments; always infinite
    -> SimplCont -> SimplM ( SimplFloats, SimplCont)
 
 mkDupableContWithDmds env _ cont
@@ -3755,7 +3757,7 @@ mkDupableContWithDmds env dmds
                               , sc_hole_ty = hole_ty }) }
 
 mkDupableContWithDmds env _
-    s@(Select { sc_bndr = case_bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
+    (Select { sc_bndr = case_bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
   =     -- e.g.         (case [...hole...] of { pi -> ei })
         --      ===>
         --              let ji = \xij -> ei
@@ -3769,7 +3771,6 @@ mkDupableContWithDmds env _
 
         ; let cont_scaling = contHoleScaling cont
           -- See Note [Scaling in case-of-case]
-        ; pprTraceM "mkDupableContWithDmds:alts" (ppr s $$ ppr (map (\case Alt _ vars _ -> map idBinding vars) alts))
         ; (alt_env', case_bndr') <- simplBinder alt_env (scaleIdBy cont_scaling case_bndr)
         ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' alt_cont) (scaleAltsBy cont_scaling alts)
         -- Safe to say that there are no handled-cons for the DEFAULT case
@@ -3785,7 +3786,6 @@ mkDupableContWithDmds env _
         --     the alternatives, and we don't want that
 
         ; let platform = sePlatform env
-        ; pprTraceM "mkDupableContWithDmds:alts'" (ppr (map (\case Alt c vars _ -> ppr c <+> ppr (map idBinding vars)) alts'))
         ; (join_floats, alts'') <- mapAccumLM (mkDupableAlt platform case_bndr')
                                               emptyJoinFloats alts'
 
@@ -3801,7 +3801,7 @@ mkDupableContWithDmds env _
 
 -- ROMES:TODO: What does this function do?
 -- Refer to Note [Dupable StrictBind]? StrictBind con?
-mkDupableStrictBind :: HasCallStack => SimplEnv -> OutId -> OutExpr -> OutType
+mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
 mkDupableStrictBind env arg_bndr join_rhs res_ty
   | exprIsTrivial join_rhs   -- See point (2) of Note [Duplicating join points]
@@ -3829,7 +3829,7 @@ mkDupableStrictBind env arg_bndr join_rhs res_ty
                             , sc_cont   = mkBoringStop res_ty
                             } ) }
 
-mkDupableAlt :: HasCallStack => Platform -> OutId
+mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
              -> SimplM (JoinFloats, OutAlt)
 mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
@@ -3850,7 +3850,7 @@ mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
               abstract_binders [] []
                 -- Abstract over the case binder too if it's used.
                 | isDeadBinder case_bndr  = []
-                | otherwise               = pprTrace "abstract_binders:otherwise" (ppr case_bndr <+> ppr (idBinding case_bndr)) [(case_bndr,MarkedStrict)]
+                | otherwise               = [(case_bndr,MarkedStrict)]
               abstract_binders (alt_bndr:alt_bndrs) marks
                 -- Abstract over all type variables just in case
                 | isTyVar alt_bndr        = (alt_bndr,NotMarkedStrict) : abstract_binders alt_bndrs marks
@@ -3858,7 +3858,7 @@ mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
                 -- The deadness info on the new Ids is preserved by simplBinders
                 -- We don't abstract over dead ids here.
                 | isDeadBinder alt_bndr   = abstract_binders alt_bndrs marks
-                | otherwise               = pprTrace "abstract_binders:alt_otherwise" (ppr alt_bndr <+> ppr (idBinding alt_bndr)) $ (alt_bndr,mark) : abstract_binders alt_bndrs marks
+                | otherwise               = (alt_bndr,mark) : abstract_binders alt_bndrs marks
               abstract_binders _ _ = pprPanic "abstrict_binders - failed to abstract" (ppr $ Alt con alt_bndrs alt_rhs_in)
 
               filtered_binders = map fst abstracted_binders
@@ -3881,8 +3881,6 @@ mkDupableAlt _platform case_bndr jfloats (Alt con alt_bndrs alt_rhs_in)
               -- so we must zap them here.
               join_rhs   = mkLams (map zapIdUnfolding final_bndrs) rhs_with_seqs
 
-        ; pprTraceM "mkDupableAlt:final_bndrs" (ppr $ map pprIdWithBinding final_bndrs)
-        ; pprTraceM "mkDupableAlt:filtered_binders" (ppr $ map pprIdWithBinding filtered_binders)
         ; join_bndr <- newJoinId filtered_binders rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args

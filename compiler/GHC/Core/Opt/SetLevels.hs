@@ -602,8 +602,7 @@ lvlNonTailMFE :: LevelEnv             -- Level of in-scope names/tyvars
 lvlNonTailMFE env strict_ctxt ann_expr
   = lvlMFE (placeJoinCeiling env) strict_ctxt ann_expr
 
-lvlMFE ::  HasCallStack
-       => LevelEnv             -- Level of in-scope names/tyvars
+lvlMFE :: LevelEnv             -- Level of in-scope names/tyvars
        -> Bool                 -- True <=> strict context [body of case or let]
        -> CoreExprWithFVs      -- input expression
        -> LvlM LevelledExpr    -- Result expression
@@ -1263,7 +1262,7 @@ profitableFloat env dest_lvl
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
 
--- ROMES:TODO: What does this do? Why does it start with lvl?
+-- ROMES:TODO: What does this do?
 lvlRhs :: LevelEnv
        -> RecFlag
        -> Bool               -- Is this a bottoming function
@@ -1287,7 +1286,6 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
        ; return (mkLams (map (\(TB b x) -> TB (toLambdaBound b) x) bndrs') body') }
-                  -- ROMES: I don't even know
   where
     (bndrs, body)     | Just join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs

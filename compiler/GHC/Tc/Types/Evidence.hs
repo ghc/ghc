@@ -2,13 +2,11 @@
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ExistentialQuantification, PatternSynonyms #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module GHC.Tc.Types.Evidence (
 
   -- * HsWrapper
-  HsWrapper(.., WpLet, WpEvLam),
+  HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
@@ -179,7 +177,6 @@ data HsWrapper
                                 -- Note [Wrapper returned from tcSubMult]
   deriving Data.Data
 
-
 -- | The Semigroup instance is a bit fishy, since @WpCompose@, as a data
 -- constructor, is "syntactic" and not associative. Concretely, if @a@, @b@,
 -- and @c@ aren't @WpHole@:
@@ -261,13 +258,13 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 
-mkWpEvLams :: HasCallStack => [Var] -> HsWrapper
+mkWpEvLams :: [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
 
-mkWpLet :: HasCallStack => TcEvBinds -> HsWrapper
+mkWpLet :: TcEvBinds -> HsWrapper
 -- This no-op is a quite a common case
 mkWpLet (EvBinds b) | isEmptyBag b = WpHole
-mkWpLet ev_binds = WpLet ev_binds
+mkWpLet ev_binds                   = WpLet ev_binds
 
 mk_co_lam_fn :: (a -> HsWrapper) -> [a] -> HsWrapper
 mk_co_lam_fn f as = foldr (\x wrap -> f x <.> wrap) WpHole as
@@ -460,7 +457,7 @@ data EvBindInfo
 -----------------
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
-  = HasCallStack => EvBind { eb_lhs  :: EvVar
+  = EvBind { eb_lhs  :: EvVar
            , eb_rhs  :: EvTerm
            , eb_info :: EvBindInfo
     }

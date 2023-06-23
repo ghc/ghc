@@ -19,7 +19,6 @@ module GHC.Core.TyCo.Tidy
 import GHC.Prelude
 import GHC.Data.FastString
 
-import {-# SOURCE #-} GHC.Core.UsageEnv (mapUE)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 

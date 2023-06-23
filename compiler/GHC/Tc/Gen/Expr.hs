@@ -1508,7 +1508,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc sel_name lbl)) rhs
                 field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        (LambdaBound ManyTy) field_ty (locA loc) -- ROMES:TODO
+                                        LetBound field_ty (locA loc) -- ROMES:TODO: LetBound or LambdaBound?
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

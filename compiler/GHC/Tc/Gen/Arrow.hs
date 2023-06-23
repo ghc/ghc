@@ -424,7 +424,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_n
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n p -> mkLocalId n (LambdaBound ManyTy) p) tup_names tup_elt_tys -- ROMES:TODO:
+        ; let tup_ids = zipWith (\n p -> mkLocalId n (LambdaBound ManyTy) p) tup_names tup_elt_tys -- ROMES:TODO: LambdaBound or LetBound, for recursive do binders?
                         -- Many because it's a recursive definition
         ; tcExtendIdEnv tup_ids $ do
         { (stmts', tup_rets)

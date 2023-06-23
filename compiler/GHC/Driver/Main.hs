@@ -182,7 +182,6 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Rules
 import GHC.Core.Stats
 import GHC.Core.LateCC (addLateCostCentresPgm)
-import GHC.Core.UsageEnv ( zeroUE )
 
 
 import GHC.CoreToStg.Prep

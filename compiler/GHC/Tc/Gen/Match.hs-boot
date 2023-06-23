@@ -7,13 +7,11 @@ import GHC.Hs.Extension ( GhcRn, GhcTc )
 import GHC.Parser.Annotation ( LocatedN )
 import GHC.Types.Name (Name)
 
-import GHC.Stack
-
 tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> ExpRhoType
               -> TcM (GRHSs GhcTc (LHsExpr GhcTc))
 
-tcMatchesFun :: HasCallStack => LocatedN Name
+tcMatchesFun :: LocatedN Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpSigmaType
              -> TcM (HsWrapper, MatchGroup GhcTc (LHsExpr GhcTc))

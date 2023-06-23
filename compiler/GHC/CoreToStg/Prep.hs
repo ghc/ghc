@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ExistentialQuantification #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -74,8 +73,6 @@ import GHC.Types.Unique.Supply
 import Data.List        ( unfoldr )
 import Data.Functor.Identity
 import Control.Monad
-
-import GHC.Core.UsageEnv (zeroUE)
 
 {-
 Note [CorePrep Overview]
@@ -1725,7 +1722,7 @@ data FloatingBind
                          -- They are always of lifted type;
                          -- unlifted ones are done with FloatCase
 
- | HasCallStack => FloatCase
+ | FloatCase
       CpeBody         -- Always ok-for-speculation
       Id              -- Case binder
       AltCon [Var]    -- Single alternative
@@ -1764,7 +1761,7 @@ data OkToSpec
                         -- ok-to-speculate unlifted bindings
    | NotOkToSpec        -- Some not-ok-to-speculate unlifted bindings
 
-mkFloat :: HasCallStack => CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
+mkFloat :: CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 -- romes:TODO: See Note [Keeping the IdBinding up to date]
 mkFloat env dmd is_unlifted bndr rhs
   | is_strict || ok_for_spec -- See Note [Speculative evaluation]
@@ -1847,7 +1844,7 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b)               bs = get_bind b                 : bs
-    get (FloatCase body var _ _ _) bs = get_bind (NonRec (var `setIdBinding` LetBound) body) : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec (toLetBound var) body) : bs
                                                  -- See Note [Keeping the IdBinding up to date]
     get b _ = pprPanic "corePrepPgm" (ppr b)
 

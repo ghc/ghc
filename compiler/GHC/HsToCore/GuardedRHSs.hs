@@ -55,7 +55,7 @@ dsGuarded grhss rhs_ty rhss_nablas = do
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult CoreExpr@.
 
-dsGRHSs :: HasCallStack => HsMatchContext GhcRn
+dsGRHSs :: HsMatchContext GhcRn
         -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> NonEmpty Nablas             -- ^ Refined pattern match checking

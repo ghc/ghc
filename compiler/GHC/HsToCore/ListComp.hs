@@ -397,7 +397,7 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --                              (a2:as'2) -> (a1, a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys = do
-    ass  <- mapM (newSysLocalDs (LambdaBound ManyTy))  elt_list_tys -- ROMES:TODO: LambdaBound for Case Binders tmp...
+    ass  <- mapM (newSysLocalDs (LambdaBound ManyTy))  elt_list_tys
     as'  <- mapM (newSysLocalDs (LambdaBound ManyTy))  elt_tys
     as's <- mapM (newSysLocalDs (LambdaBound ManyTy))  elt_list_tys
 
@@ -645,7 +645,7 @@ mkMcUnzipM ThenForm _ ys _
 
 mkMcUnzipM _ fmap_op ys elt_tys
   = do { fmap_op' <- dsExpr fmap_op
-       ; xs       <- mapM (newSysLocalDs (LambdaBound ManyTy)) elt_tys -- ROMES:TODO: Don't know
+       ; xs       <- mapM (newSysLocalDs (LambdaBound ManyTy)) elt_tys -- ROMES:TODO: LetBound or LambdaBound?
        ; let tup_ty = mkBigCoreTupTy elt_tys
        ; tup_xs   <- newSysLocalDs (LambdaBound ManyTy) tup_ty
 

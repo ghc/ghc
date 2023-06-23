@@ -378,7 +378,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
         | otherwise      = updateIdTypeAndMults (substTyUnchecked subst) id1
 
     old_ty = idType old_id
-    old_w = fromMaybe ManyTy (varMultMaybe old_id)
+    old_w = idMult (toLambdaBound old_id) -- rm:todo: seriously, delete idMult or make it total
     no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
                      (noFreeVarsOfType old_ty && noFreeVarsOfType old_w)
 

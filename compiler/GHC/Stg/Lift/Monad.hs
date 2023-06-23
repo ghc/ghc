@@ -42,7 +42,6 @@ import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Core.Multiplicity
 
 import Control.Arrow ( second )
 import Control.Monad.Trans.Class

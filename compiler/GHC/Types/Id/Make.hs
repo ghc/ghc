@@ -75,7 +75,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike)
+import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike, toLetBound)
 
 import GHC.Tc.Utils.TcType as TcType
 
@@ -955,7 +955,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     go subst (Boxer boxer : boxers) (src_var : src_vars)
       = do { (rep_ids1, arg)  <- boxer subst
            ; (rep_ids2, binds) <- go subst boxers src_vars
-           ; return (rep_ids1 ++ rep_ids2, NonRec (src_var `setIdBinding` LetBound) arg : binds) } -- ROMES:TODO: I don't know
+           ; return (rep_ids1 ++ rep_ids2, NonRec (toLetBound src_var) arg : binds) }
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
     mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
@@ -1119,7 +1119,7 @@ newLocal :: FastString   -- ^ a string which will form part of the 'Var'\'s name
          -> Scaled Type  -- ^ the type of the 'Var'
          -> UniqSM Var
 newLocal name_stem (Scaled w ty) =
-    mkSysLocalOrCoVarM name_stem (LambdaBound w) ty -- ROMES: LambdaBound bc comes from Scaled?
+    mkSysLocalOrCoVarM name_stem (LambdaBound w) ty
          -- We should not have "OrCoVar" here, this is a bug (#17545)
 
 
@@ -1996,7 +1996,7 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
                                                 , Scaled mult2 openBetaTy ] openGammaTy
                                , openAlphaTy, openBetaTy ]
     xmult = setIdBinding x (LambdaBound mult1)
-    ymult = setIdBinding y (LambdaBound mult2) -- ROMES:TODO: Where is it bound
+    ymult = setIdBinding y (LambdaBound mult2)
     rhs  = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep3TyVar
                   , multiplicityTyVar1, multiplicityTyVar2
                   , openAlphaTyVar,   openBetaTyVar,    openGammaTyVar ] body

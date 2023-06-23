@@ -17,7 +17,6 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
 import GHC.Core.Multiplicity
-import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
@@ -3223,7 +3222,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
 
 -- | Flatten a set of "dumped" 'DictBind's, and some other binding
 -- pairs, into a single recursive binding.
-recWithDumpedDicts :: HasCallStack => [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
+recWithDumpedDicts :: [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
 recWithDumpedDicts pairs dbs
   = DB { db_bind = Rec bindings
        , db_fvs = fvs `delVarSetList` map fst bindings }
@@ -3467,7 +3466,7 @@ cloneRecBndrsSM env@(SE { se_subst = subst }) bndrs
        ; return (env', bndrs') }
 
 newDictBndr :: SpecEnv -> CoreBndr -> SpecM (SpecEnv, CoreBndr)
--- Make up completely fresh binders for the dictionaries
+-- ^ Make up completely fresh binders for the dictionaries
 -- Their bindings are going to float outwards
 newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
