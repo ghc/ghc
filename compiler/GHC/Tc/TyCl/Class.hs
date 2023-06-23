@@ -294,7 +294,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; let local_dm_id = mkLocalId local_dm_name (LetBound zeroUE) local_dm_ty
+       ; let local_dm_id = mkLocalId local_dm_name LetBound local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
                                         , sig_loc   = getLocA hs_ty }

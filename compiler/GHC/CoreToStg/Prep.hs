@@ -1768,11 +1768,11 @@ mkFloat :: HasCallStack => CorePrepEnv -> Demand -> Bool -> Id -> CpeRhs -> Floa
 -- romes:TODO: See Note [Keeping the IdBinding up to date]
 mkFloat env dmd is_unlifted bndr rhs
   | is_strict || ok_for_spec -- See Note [Speculative evaluation]
-  , not is_hnf  = FloatCase rhs (bndr `setIdBinding` LambdaBound ManyTy) DEFAULT [] ok_for_spec
+  , not is_hnf  = FloatCase rhs (toLambdaBound bndr) DEFAULT [] ok_for_spec
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
-  | is_unlifted = FloatCase rhs (bndr `setIdBinding` LambdaBound ManyTy) DEFAULT [] True
+  | is_unlifted = FloatCase rhs (toLambdaBound bndr) DEFAULT [] True
       -- we used to assertPpr ok_for_spec (ppr rhs) here, but it is now disabled
       -- because exprOkForSpeculation isn't stable under ANF-ing. See for
       -- example #19489 where the following unlifted expression:
@@ -1847,7 +1847,7 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b)               bs = get_bind b                 : bs
-    get (FloatCase body var _ _ _) bs = get_bind (NonRec (var `setIdBinding` LetBound zeroUE) body) : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec (var `setIdBinding` LetBound) body) : bs
                                                  -- See Note [Keeping the IdBinding up to date]
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
@@ -1868,7 +1868,7 @@ canFloat (Floats ok_to_spec fs) rhs
     go :: OrdList FloatingBind -> [FloatingBind]
        -> Maybe (OrdList FloatingBind)
 
-    go (fbs_out) [] = Just fbs_out
+    go fbs_out [] = Just fbs_out
 
     go fbs_out (fb@(FloatLet _) : fbs_in)
       = go (fbs_out `snocOL` fb) fbs_in
@@ -2228,7 +2228,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") (LetBound zeroUE) ty
+ = seqType ty `seq` mkSysLocalOrCoVarM (fsLit "sat") LetBound ty
 
 
 ------------------------------------------------------------------------------

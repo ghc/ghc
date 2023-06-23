@@ -45,7 +45,7 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
-        varMultMaybe, varMults,
+        varMultMaybe, varMults, varIdBindingMaybe,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
@@ -60,6 +60,7 @@ module GHC.Types.Var (
         updateIdTypeButNotMults,
         updateIdTypeAndMults, updateIdTypeAndMultsM,
         IdBinding(..), idBinding, pprIdWithBinding, zeroUE,
+        toLambdaBound,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -282,10 +283,17 @@ data Var
 
 data IdBinding where
   LambdaBound :: HasCallStack => !Mult -> IdBinding -- ^ includes lambda-bound and constructor fields---pattern bound
-  LetBound    :: HasCallStack => UsageEnv -> IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
+  LetBound    :: HasCallStack => IdBinding -- ^ a local let binding has a usage env bc it might have free linear variables in its body
   -- ROMES:TODO: What about type variables? LambdaBound too? Do type variables have a multiplicity?
   -- Removed globalbinding in exchange for LetBound with zero Ue (closed top-level let bound)
   -- Might no longer make sense to merge with IdScope at all
+
+-- | Make an 'IdBinding' definitely LambdaBound.
+--
+-- If the Id was LetBound, it becomes LambdaBound ManyTy
+toLambdaBound :: Var -> Var
+toLambdaBound v@Id{idBinding=LetBound} = v{idBinding=LambdaBound manyDataConTy}
+toLambdaBound v = v
 
 {-
 Note [The IdBinding of an Id]
@@ -365,7 +373,7 @@ isLetBinding :: Id -> Bool
 isLetBinding x
   | isId x
   = case idBinding x of
-                   LetBound _ -> True
+                   LetBound -> True
                    LambdaBound _ -> False
   | otherwise
   = True -- ROMES:TODO: ouch
@@ -374,7 +382,7 @@ isLambdaBinding :: Id -> Bool
 isLambdaBinding x
   | isId x
   = case idBinding x of
-                     LetBound _ -> False
+                     LetBound -> False
                      LambdaBound _ -> True
   | otherwise
   = True -- ROMES:TODO: ouch
@@ -391,7 +399,7 @@ Note the binding sites considered in Core (see lintCoreExpr, lintIdBinder)
 
 instance Outputable IdBinding where
   ppr (LambdaBound m) = text "LambdaBound" <+> ppr m
-  ppr (LetBound ue)   = text "LetBound" <+> ppr (nonDetMults ue) <+> prettyCallStackDoc callStack
+  ppr (LetBound)   = text "LetBound" -- <+> ppr (nonDetMults ue) <+> prettyCallStackDoc callStack
 
 -- | Identifier Scope
 -- ROMES:TODO: Merge with IdBinding and extend Note [GlobalId/LocaLId]
@@ -531,8 +539,13 @@ varUnique var = mkUniqueGrimily (realUnique var)
 -- in Note [Multiplicity of let binders]
 varMultMaybe :: Var -> Maybe Mult
 varMultMaybe (Id { idBinding = LambdaBound mult }) = Just mult
-varMultMaybe (Id { idBinding = LetBound mult }) = pprTrace "varMultMaybe:failed" (prettyCallStackDoc callStack) $ Nothing
-varMultMaybe _ = pprTrace "varMultMaybe:NotAnId" empty $ Nothing
+varMultMaybe (Id { idBinding = LetBound }) = pprTrace "varMultMaybe:failed" (prettyCallStackDoc callStack) Nothing
+varMultMaybe _ = pprTrace "varMultMaybe:NotAnId" empty Nothing
+
+-- | Returns an IdBinding of a Var if it is an Id
+varIdBindingMaybe :: Var -> Maybe IdBinding
+varIdBindingMaybe Id {idBinding = idb} = Just idb
+varIdBindingMaybe _ = Nothing
 
 -- | Returns all the multiplicities from a variable
 -- In the case of a lambda bound var, this will be the only multiplicity, in
@@ -541,7 +554,7 @@ varMults :: Var -> [Mult]
 varMults (Id { idBinding = idB }) =
   case idB of
     LambdaBound x -> [x]
-    LetBound ue -> nonDetMults ue -- the order of the multiplicities does not matter
+    LetBound -> [] -- ue -> nonDetMults ue -- the order of the multiplicities does not matter
 varMults _ = panic "varMults"
 
 setVarUnique :: Var -> Unique -> Var
@@ -1259,7 +1272,7 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
   -- ROMES: A global variable is let-bound with a closed linear environment
-  = mk_id name (LetBound zeroUE) ty GlobalId details info
+  = mk_id name LetBound ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
@@ -1276,7 +1289,7 @@ mkCoVar name ty = mk_id name (LambdaBound manyDataConTy) ty (LocalId NotExported
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
   -- ROMES: Exported variables are as global bound, let-bound with a closed usage env
-  = mk_id name (LetBound zeroUE) ty (LocalId Exported) details info
+  = mk_id name LetBound ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
 mk_id :: Name -> IdBinding -> Type -> IdScope -> IdDetails -> IdInfo -> Id
@@ -1329,7 +1342,8 @@ updateIdTypeAndMults f id@(Id { varType = ty
     !ty'   = f ty
     !binding' = case binding of
                   LambdaBound mult -> LambdaBound (f mult)
-                  LetBound ue      -> LetBound (mapUE f ue)
+                  LetBound -> LetBound
+                  -- LetBound ue      -> LetBound (mapUE f ue)
 updateIdTypeAndMults _ other = pprPanic "updateIdTypeAndMult" (ppr other)
 
 -- | As 'updateIdTypeAndMults' -- the monadic version.
@@ -1339,13 +1353,16 @@ updateIdTypeAndMultsM f id@(Id { varType = ty
   = do { !ty' <- f ty
        ; !binding' <- case binding of
                         LambdaBound mult -> LambdaBound <$> f mult
-                        LetBound ue      -> LetBound    <$> mapUEM f ue
+                        LetBound -> pure LetBound
+                        -- LetBound ue      -> LetBound    <$> mapUEM f ue
        ; return (id { varType = ty', idBinding = binding' }) }
 updateIdTypeAndMultsM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
 
 setIdBinding :: HasCallStack => Id -> IdBinding -> Id
 setIdBinding id !r | isId id = id { idBinding = r }
-                   | otherwise = pprPanic "setIdBinding" (ppr id <+> ppr r)
+                   | otherwise = id -- updating the idbinding of a tyvar is a no-op.
+                   --                  -- one might consider making this a panic
+                   -- | otherwise = pprPanic "setIdBinding" (ppr id <+> ppr r)
 
 {-
 ************************************************************************

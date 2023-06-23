@@ -1389,7 +1389,7 @@ deeplySkolemise skol_info ty
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tv_prs1 = map tyVarName tvs `zip` tvs1
            ; return ( mkWpEta ids1 (mkWpTyLams tvs1
-                                    <.> mkWpEvLams ev_vars1
+                                    <.> mkWpEvLams (map toLambdaBound ev_vars1)
                                     <.> wrap)
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2

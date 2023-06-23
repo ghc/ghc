@@ -236,7 +236,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
                                    -- Romes: If this identifier gets bound, it is a
                                    -- top-level let binder with a closed usage
                                    -- env.
-         CompleteSig { sig_bndr  = mkLocalId name (LetBound zeroUE) sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name LetBound sigma_ty
                                    -- We use `Many' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level

@@ -1287,7 +1287,8 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
                      && any isId bndrs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
-       ; return (mkLams bndrs' body') }
+       ; return (mkLams (map (\(TB b x) -> TB (toLambdaBound b) x) bndrs') body') }
+                  -- ROMES: I don't even know
   where
     (bndrs, body)     | Just join_arity <- mb_join_arity
                       = collectNAnnBndrs join_arity rhs
@@ -1751,7 +1752,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq (LetBound zeroUE) rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq LetBound rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

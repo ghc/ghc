@@ -8,7 +8,7 @@
 module GHC.Tc.Types.Evidence (
 
   -- * HsWrapper
-  HsWrapper(.., WpLet),
+  HsWrapper(.., WpLet, WpEvLam),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpEvLams, mkWpLet, mkWpFun, mkWpCastN, mkWpCastR, mkWpEta,
   collectHsWrapBinders,
@@ -163,7 +163,7 @@ data HsWrapper
         -- (both dictionaries and coercions)
         -- Both WpEvLam and WpEvApp abstract and apply values
         --      of kind CONSTRAINT rep
-  | WpEvLam EvVar               -- \d. []       the 'd' is an evidence variable
+  | WpEvLam' EvVar               -- \d. []       the 'd' is an evidence variable
   | WpEvApp EvTerm              -- [] d         the 'd' is evidence for a constraint
 
         -- Kind and Type abstraction and application
@@ -181,6 +181,14 @@ data HsWrapper
 {-# COMPLETE WpHole, WpCompose, WpFun, WpCast, WpEvLam, WpEvApp, WpTyLam, WpTyApp, WpLet, WpMultCoercion #-}
 
 deriving instance Data.Data HsWrapper
+
+pattern WpEvLam :: HasCallStack => Var -> HsWrapper
+pattern WpEvLam x <- WpEvLam' x where
+  WpEvLam x
+    | not (isLambdaBinding x)
+    = pprPanic "pattern WpEvLam!" (pprIdWithBinding x)
+    | otherwise
+    = WpEvLam' x
 
 pattern WpLet :: HasCallStack => TcEvBinds -> HsWrapper
 pattern WpLet x <- WpLet' x where
@@ -272,7 +280,7 @@ mkWpEvVarApps vs = mk_co_app_fn WpEvApp (map (EvExpr . evId) vs)
 mkWpTyLams :: [TyVar] -> HsWrapper
 mkWpTyLams ids = mk_co_lam_fn WpTyLam ids
 
-mkWpEvLams :: [Var] -> HsWrapper
+mkWpEvLams :: HasCallStack => [Var] -> HsWrapper
 mkWpEvLams ids = mk_co_lam_fn WpEvLam ids
 
 mkWpLet :: HasCallStack => TcEvBinds -> HsWrapper

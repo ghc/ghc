@@ -955,7 +955,7 @@ mkDataConRep dc_bang_opts fam_envs wrap_name data_con
     go subst (Boxer boxer : boxers) (src_var : src_vars)
       = do { (rep_ids1, arg)  <- boxer subst
            ; (rep_ids2, binds) <- go subst boxers src_vars
-           ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
+           ; return (rep_ids1 ++ rep_ids2, NonRec (src_var `setIdBinding` LetBound) arg : binds) } -- ROMES:TODO: I don't know
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
     mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr

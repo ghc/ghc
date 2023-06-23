@@ -325,7 +325,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal (fsLit "$wccall") work_uniq (LetBound zeroUE) worker_ty -- Top-level binding has zeroUE
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq LetBound worker_ty -- Top-level binding has zeroUE
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args

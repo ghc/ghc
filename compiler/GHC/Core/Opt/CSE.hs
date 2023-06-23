@@ -9,7 +9,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 import GHC.Prelude
 
 import GHC.Core.Subst
-import GHC.Types.Var    ( Var, setIdBinding, IdBinding(..) )
+import GHC.Types.Var    ( Var, IdBinding(..), toLambdaBound )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules, zapStableUnfolding
                         , idInlineActivation, setInlineActivation
@@ -884,13 +884,13 @@ extendCSEnv cse expr triv_expr
 extendCSRecEnv :: HasCallStack => CSEnv -> OutId -> OutExpr -> OutExpr -> CSEnv
 -- See Note [CSE for recursive bindings]
 extendCSRecEnv cse bndr expr triv_expr
-  = cse { cs_rec_map = extendCoreMap (cs_rec_map cse) (Lam (bndr `setIdBinding` LambdaBound ManyTy) expr) triv_expr }
+  = cse { cs_rec_map = extendCoreMap (cs_rec_map cse) (Lam (toLambdaBound bndr) expr) triv_expr }
                                                         -- Set binding as below
 
 lookupCSRecEnv :: HasCallStack => CSEnv -> OutId -> OutExpr -> Maybe OutExpr
 -- See Note [CSE for recursive bindings]
 lookupCSRecEnv (CS { cs_rec_map = csmap }) bndr expr
-  = lookupCoreMap csmap (Lam (bndr `setIdBinding` LambdaBound ManyTy) expr)
+  = lookupCoreMap csmap (Lam (toLambdaBound bndr) expr)
                          -- See Note [Keeping the IdBinding up to date]
                          -- We look up recursive let-bindings as explained in
                          -- Note [CSE for recursive bindings]

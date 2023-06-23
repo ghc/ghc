@@ -1618,7 +1618,7 @@ scApp env (Var fn, args)        -- Function is a variable
   where
     doBeta :: OutExpr -> [OutExpr] -> OutExpr
     doBeta (Lam bndr body) (arg : args) = Let (NonRec bndr arg) (doBeta body args)
-      where bndr' | isId bndr = bndr `setIdBinding` LetBound zeroUE
+      where bndr' | isId bndr = bndr `setIdBinding` LetBound
                   | otherwise = bndr
     doBeta fn              args         = mkApps fn args
 
@@ -1940,7 +1940,7 @@ spec_one env fn arg_bndrs body (call_pat, rule_number)
               spec_join_arity | isJoinId fn = Just (length spec_call_args)
                               | otherwise   = Nothing
               spec_id    = asWorkerLikeId $
-                           mkLocalId spec_name (LetBound zeroUE) -- Specialized bindings are let-bound
+                           mkLocalId spec_name LetBound -- Specialized bindings are let-bound
                                      (mkLamTypes spec_lam_args spec_body_ty)
                              -- See Note [Transfer strictness]
                              `setIdDmdSig`    spec_sig

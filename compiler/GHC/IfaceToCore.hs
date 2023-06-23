@@ -1587,7 +1587,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name (LetBound zeroUE) ty' id_info -- ROMES:TODO: zeroUE!
+        ; let id = mkLocalIdWithInfo name LetBound ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1603,7 +1603,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name (LetBound zeroUE) ty' `asJoinId_maybe` tcJoinInfo ji) } -- ROMES:TODO: zeroUE!
+          ; return (mkLocalId name LetBound ty' `asJoinId_maybe` tcJoinInfo ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}

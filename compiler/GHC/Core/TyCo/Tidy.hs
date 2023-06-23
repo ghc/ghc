@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 -- | Tidying types and coercions for printing in error messages.
@@ -18,6 +19,7 @@ module GHC.Core.TyCo.Tidy
 import GHC.Prelude
 import GHC.Data.FastString
 
+import {-# SOURCE #-} GHC.Core.UsageEnv (mapUE)
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 
@@ -256,3 +258,4 @@ tidyCo env@(_, subst) co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = strictMap (tidyCo env)
+

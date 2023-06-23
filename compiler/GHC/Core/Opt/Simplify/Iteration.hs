@@ -60,7 +60,7 @@ import GHC.Types.Demand
 import GHC.Types.Unique ( hasKey )
 import GHC.Types.Basic
 import GHC.Types.Tickish
-import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, isLetBinding, isLambdaBinding )
+import GHC.Types.Var    ( isTyCoVar, pprIdWithBinding, isLetBinding, isLambdaBinding, toLambdaBound )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
 import GHC.Builtin.Names( runRWKey )
@@ -605,7 +605,7 @@ tryCastWorkerWrapper env bind_cxt old_bndr occ_info bndr (Cast rhs co)
                                                    -- See Note [OPAQUE pragma]
   = do  { uniq <- getUniqueM
         ; let work_name = mkSystemVarName uniq occ_fs
-              work_id   = mkLocalIdWithInfo work_name (LetBound zeroUE) work_ty work_info -- ROMES: I think it's top-level, so it's closed with zeroUE
+              work_id   = mkLocalIdWithInfo work_name LetBound work_ty work_info -- ROMES: I think it's top-level, so it's closed with zeroUE
               is_strict = isStrictId bndr
 
         ; (rhs_floats, work_rhs) <- prepareBinding env top_lvl is_rec is_strict
@@ -837,7 +837,7 @@ makeTrivial env top_lvl dmd occ_fs expr
   = do  { (floats, expr1) <- prepareRhs env top_lvl occ_fs expr
         ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdWithInfo name (LetBound zeroUE) expr_ty id_info -- ROMES:TODO: zeroUE?
+              var  = mkLocalIdWithInfo name LetBound expr_ty id_info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
@@ -973,7 +973,7 @@ completeBind env bind_cxt old_bndr new_bndr new_rhs
 addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
 addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
-             `setIdBinding` LetBound zeroUE -- See Note [Keeping the IdBinding up to date]
+             `setIdBinding` LetBound -- See Note [Keeping the IdBinding up to date]
   where
     new_arity = arityTypeArity new_arity_type
     info1 = idInfo new_bndr `setArityInfo` new_arity
@@ -3687,7 +3687,7 @@ mkDupableContWithDmds env _
          -- romes: The `x` becomes an arg of the join point, so it should move
          -- from let bound to lambda bound (with which multiplicity? ROMES:TODO).
          -- (Note [Duplicating StrictBind] explains the transformation)
-             bndr'' = bndr' `setIdBinding` LambdaBound ManyTy
+             bndr'' = toLambdaBound bndr'
 
        ; mkDupableStrictBind env bndr'' join_body res_ty }
 

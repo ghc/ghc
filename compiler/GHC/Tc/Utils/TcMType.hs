@@ -193,7 +193,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name (LambdaBound ManyTy) ty) } -- ROMES:TODO: variables for predicates?
+                 ; return (mkLocalIdOrCoVar name LetBound ty) }
 
 -- | Create a new Wanted constraint with the given 'CtLoc'.
 newWantedWithLoc :: CtLoc -> PredType -> TcM CtEvidence
@@ -321,7 +321,8 @@ emitNewExprHole occ ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (LetBound zeroUE) (mkClassPred cls tys)) }
+       ; return (mkLocalId name LetBound (mkClassPred cls tys)) }
+                 -- Dictionaries are let-bound at the top-level?
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of

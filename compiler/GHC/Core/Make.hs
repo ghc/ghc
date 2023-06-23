@@ -56,7 +56,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Types.Id
-import GHC.Types.Var  ( setTyVarUnique, visArgConstraintLike )
+import GHC.Types.Var  ( setTyVarUnique, visArgConstraintLike, toLambdaBound )
 import GHC.Types.TyThing
 import GHC.Types.Id.Info
 import GHC.Types.Cpr
@@ -585,7 +585,7 @@ chunkify xs
 -- expression built by `mkBigTupleSelector` must consume its scrutinee 'Many'
 -- times. And all the argument variables must have multiplicity 'Many'.
 mkBigTupleSelector, mkBigTupleSelectorSolo
-    :: [Id]         -- ^ The 'Id's to pattern match the tuple against
+    :: HasCallStack => [Id]         -- ^ The 'Id's to pattern match the tuple against
     -> Id           -- ^ The 'Id' to select
     -> Id           -- ^ A variable of the same type as the scrutinee
     -> CoreExpr     -- ^ Scrutinee
@@ -627,7 +627,7 @@ mkBigTupleSelectorSolo vars the_var scrut_var scrut
 -- > mkSmallTupleSelector [x] x v e = [| e |]
 -- > mkSmallTupleSelector [x,y,z] x v e = [| case e of v { (x,y,z) -> x } |]
 mkSmallTupleSelector, mkSmallTupleSelector1
-          :: [Id]        -- The tuple args
+          :: HasCallStack => [Id]        -- The tuple args
           -> Id          -- The selected one
           -> Id          -- A variable of the same type as the scrutinee
           -> CoreExpr    -- Scrutinee
@@ -642,7 +642,7 @@ mkSmallTupleSelector vars the_var scrut_var scrut
 -- but one-tuples are NOT flattened (see Note [Flattening one-tuples])
 mkSmallTupleSelector1 vars the_var scrut_var scrut
   = assert (notNull vars) $
-    Case scrut scrut_var (idType the_var)
+    Case scrut (toLambdaBound scrut_var) (idType the_var)
          [Alt (DataAlt (tupleDataCon Boxed (length vars))) vars (Var the_var)]
 
 -- | A generalization of 'mkBigTupleSelector', allowing the body
@@ -707,7 +707,7 @@ mkBigTupleCase vars body scrut
     new_var us ty = (us', id)
        where
          (uniq, us') = takeUniqFromSupply us
-         id = mkSysLocal (fsLit "ds") uniq (LambdaBound ManyTy) ty -- ROMES:LambdaBound here as elsewhere in mkTuple functions here...
+         id = mkSysLocal (fsLit "ds") uniq LetBound ty
 
 -- | As 'mkBigTupleCase', but for a tuple that is small enough to be guaranteed
 -- not to need nesting.

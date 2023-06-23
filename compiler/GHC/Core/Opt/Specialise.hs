@@ -17,6 +17,7 @@ import GHC.Driver.Config.Core.Rules ( initRuleOpts )
 
 import GHC.Core.Type  hiding( substTy, substCo, extendTvSubst, zapSubst )
 import GHC.Core.Multiplicity
+import GHC.Core.UsageEnv (zeroUE)
 import GHC.Core.SimpleOpt( defaultSimpleOpts, simpleOptExprWith )
 import GHC.Core.Predicate
 import GHC.Core.Coercion( Coercion )
@@ -3222,7 +3223,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
 
 -- | Flatten a set of "dumped" 'DictBind's, and some other binding
 -- pairs, into a single recursive binding.
-recWithDumpedDicts :: [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
+recWithDumpedDicts :: HasCallStack => [(Id,CoreExpr)] -> OrdList DictBind -> DictBind
 recWithDumpedDicts pairs dbs
   = DB { db_bind = Rec bindings
        , db_fvs = fvs `delVarSetList` map fst bindings }
@@ -3472,7 +3473,7 @@ newDictBndr env@(SE { se_subst = subst }) b
   = do { uniq <- getUniqueM
        ; let n    = idName b
              ty'  = substTyUnchecked subst (idType b)
-             b'   = mkUserLocal (nameOccName n) uniq (LambdaBound ManyTy) ty' (getSrcSpan n)
+             b'   = mkUserLocal (nameOccName n) uniq LetBound ty' (getSrcSpan n)
              env' = env { se_subst = subst `Core.extendSubstInScope` b' }
        ; pure (env', b') }
 
@@ -3483,7 +3484,8 @@ newSpecIdSM old_name new_ty details info
         ; let new_occ  = mkSpecOcc (nameOccName old_name)
               new_name = mkInternalName uniq new_occ  (getSrcSpan old_name)
         ; return (assert (not (isCoVarType new_ty)) $
-                  mkLocalVar details new_name (LambdaBound ManyTy) new_ty info) } -- ROMES:TODO: LambdaBound?
+                  mkLocalVar details new_name LetBound new_ty info) }
+                  -- Specialize Ids are top-level let bound
 
 {-
                 Old (but interesting) stuff about unboxed bindings

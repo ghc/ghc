@@ -12,7 +12,7 @@
 -- | GHC.Core holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module GHC.Core (
         -- * Main data types
-        Expr(..,Let,Lam), Alt(..), Bind(..,Rec,NonRec), AltCon(..), Arg,
+        Expr(..,Let,Lam,Case), Alt(..,Alt), Bind(..,Rec,NonRec), AltCon(..), Arg,
         CoreProgram, CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
@@ -93,6 +93,7 @@ module GHC.Core (
         isBuiltinRule, isLocalRule, isAutoRule,
     ) where
 
+import {-# SOURCE #-} GHC.Core.Opt.SetLevels (FloatSpec) -- ROMES:TODO: TEMPORARY FOR DEBUG!!!
 import GHC.Prelude
 import GHC.Platform
 
@@ -254,7 +255,7 @@ data Expr b
   | App   (Expr b) (Arg b)
   | HasCallStack => Lam'   b (Expr b)
   | HasCallStack => Let'   (Bind b) (Expr b)
-  | HasCallStack => Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+  | HasCallStack => Case'  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
                                     -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) CoercionR        -- The Coercion has Representational role
   | Tick  CoreTickish (Expr b)
@@ -269,9 +270,22 @@ pattern Lam x y <- Lam' x y where
   Lam x y
     | Just Refl <- eqT @b @Id
     , not (isLambdaBinding x)
-    = pprPanic "pattern Lam!" (pprIdWithBinding x)
+    = pprPanic "pattern Lam1!" (pprIdWithBinding x)
+    | Just Refl <- eqT @b @(TaggedBndr FloatSpec)
+    , TB b _ <- x
+    , not (isLambdaBinding b)
+    = pprPanic "pattern Lam2!" (pprIdWithBinding b)
     | otherwise
     = Lam' x y
+
+pattern Case :: forall b. (HasCallStack, Typeable b) => Expr b -> b -> Type -> [Alt b] -> Expr b
+pattern Case a b c d <- Case' a b c d where
+  Case a b c d
+    | Just Refl <- eqT @b @Id
+    , not (isLambdaBinding b)
+    = pprPanic "pattern Case!" (pprIdWithBinding b)
+    | otherwise
+    = Case' a b c d
 
 pattern Let :: forall b. (HasCallStack, Typeable b) => Bind b -> Expr b -> Expr b
 pattern Let x y <- Let' x y where
@@ -301,8 +315,18 @@ type Arg b = Expr b
 --     = Alt AltCon [b] (Expr b)
 --     deriving (Data)
 data Alt b where
-    Alt :: HasCallStack => AltCon -> [b] -> (Expr b) -> Alt b
+    Alt' :: HasCallStack => AltCon -> [b] -> (Expr b) -> Alt b
 deriving instance Data b => Data (Alt b)
+{-# COMPLETE Alt #-}
+
+pattern Alt :: forall b. (HasCallStack, Typeable b) => AltCon -> [b] -> Expr b -> Alt b
+pattern Alt a b c <- Alt' a b c where
+  Alt a b c
+    | Just Refl <- eqT @b @Id
+    , any (not . isLambdaBinding) b
+    = pprPanic "pattern Alt!" (ppr b)
+    | otherwise
+    = Alt' a b c
 
 -- | A case alternative constructor (i.e. pattern match)
 
@@ -1770,10 +1794,10 @@ instance Outputable AltCon where
   ppr (LitAlt lit) = ppr lit
   ppr DEFAULT      = text "__DEFAULT"
 
-cmpAlt :: Alt a -> Alt a -> Ordering
+cmpAlt :: Typeable a => Alt a -> Alt a -> Ordering
 cmpAlt (Alt con1 _ _) (Alt con2 _ _) = con1 `cmpAltCon` con2
 
-ltAlt :: Alt a -> Alt a -> Bool
+ltAlt :: Typeable a => Alt a -> Alt a -> Bool
 ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
@@ -2085,10 +2109,10 @@ rhssOfBind (NonRec _ rhs) = [rhs]
 rhssOfBind (Rec pairs)    = [rhs | (_,rhs) <- pairs]
 
 -- | Concat together all the binders in each alternative
-bindersOfAlts :: [Alt b] -> [b]
+bindersOfAlts :: Typeable b => [Alt b] -> [b]
 bindersOfAlts = concatMap (\(Alt _ ids _) -> ids)
 
-rhssOfAlts :: [Alt b] -> [Expr b]
+rhssOfAlts :: Typeable b => [Alt b] -> [Expr b]
 rhssOfAlts alts = [e | Alt _ _ e <- alts]
 
 -- | Collapse all the bindings in the supplied groups into a single

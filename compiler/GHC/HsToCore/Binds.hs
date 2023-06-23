@@ -66,7 +66,7 @@ import GHC.Types.Id.Make ( nospecId )
 import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Var( EvVar, isLetBinding )
+import GHC.Types.Var( EvVar, isLetBinding, toLambdaBound )
 import GHC.Types.SrcLoc
 import GHC.Types.Basic
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -257,7 +257,12 @@ dsAbsBinds dflags tyvars dicts exports
        -- single variable we are binding here
   = do { dsHsWrapper wrap $ \core_wrap -> do -- Usually the identity
        { let rhs = core_wrap $
-                   mkLams tyvars $ mkLams dicts $
+                   mkLams tyvars $ mkLams (map toLambdaBound dicts) $
+                     -- The tyvars aren't really just TyVars, right? $dEq can end up there it seems
+                     -- and
+                     -- So dicts names mention the
+                     -- top-level let bound dict, but here are being used as lambda arguments?
+                     -- I don't understand really...
                    mkCoreLets ds_ev_binds $
                    body
 
@@ -310,7 +315,7 @@ dsAbsBinds dflags tyvars dicts exports
                             mkLet aux_binds $
                             tup_expr
 
-       ; poly_tup_id <- newSysLocalDs (LetBound zeroUE) (exprType poly_tup_rhs) -- ROMES:TODO zeroUE
+       ; poly_tup_id <- newSysLocalDs LetBound (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -321,7 +326,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [ABExport wrapper] in "GHC.Hs.Binds"
-                = do { tup_id  <- newSysLocalDs (LetBound zeroUE) tup_ty -- ROMES:TODO?
+                = do { tup_id  <- newSysLocalDs LetBound tup_ty
                      ; dsHsWrapper wrap $ \core_wrap -> do
                      { let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkBigTupleSelector all_locals local tup_id $
@@ -381,7 +386,7 @@ dsAbsBinds dflags tyvars dicts exports
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs (LetBound zeroUE) -- top level is closed letbound id
+      do global <- newSysLocalDs LetBound -- top level is closed letbound id
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE { abe_poly  = global
                      , abe_mono  = local
@@ -673,7 +678,7 @@ dsSpecs :: CoreExpr     -- Its rhs
         -> TcSpecPrags
         -> DsM ( OrdList (Id,CoreExpr)  -- Binding for specialised Ids
                , [CoreRule] )           -- Rules for the Global Ids
--- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Bind
+-- See Note [Handling SPECIALISE pragmas] in GHC.Tc.Gen.Sig
 dsSpecs _ IsDefaultMethod = return (nilOL, [])
 dsSpecs poly_rhs (SpecPrags sps)
   = do { pairs <- mapMaybeM (dsSpec (Just poly_rhs)) sps
@@ -726,13 +731,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              simpl_opts = initSimpleOpts dflags
-             spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id    = mkLocalId spec_name (LetBound zeroUE) spec_ty -- Specialised binding is toplevel, hence LetBound with zeroUE (can be used Many times, is closed)
+             spec_unf   = specUnfolding simpl_opts (map toLambdaBound spec_bndrs) core_app rule_lhs_args fn_unf
+             spec_id    = mkLocalId spec_name LetBound spec_ty -- Specialised binding is toplevel? why localId?
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
              rule = mkSpecRule dflags this_mod False rule_act (text "USPEC")
                                poly_id rule_bndrs rule_lhs_args
+                               -- ROMES:TODO: Perhaps this kind of SetIdBinding is something that the functions actually constructing the lambda abstractions could always do by default
                                (mkVarApps (Var spec_id) spec_bndrs)
              spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
 
@@ -896,7 +902,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs rhs_fvs
                   where
                     extra_tvs   = [ v | v <- extra_vars, isTyVar v ]
                 extra_dicts =
-                  [ mkLocalId (localiseName (idName d)) (LetBound zeroUE) (idType d)
+                  [ mkLocalId (localiseName (idName d)) LetBound (idType d)
                   | d <- extra_vars, isDictId d ]
                 extra_vars  =
                   [ v

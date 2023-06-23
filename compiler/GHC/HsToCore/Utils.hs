@@ -61,7 +61,7 @@ import GHC.Core.Utils
 import GHC.Core.Make
 import GHC.Types.Id.Make
 import GHC.Types.Id
-import GHC.Types.Var (pprIdWithBinding)
+import GHC.Types.Var (pprIdWithBinding, varMultMaybe, toLambdaBound)
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.DataCon
@@ -89,7 +89,7 @@ import GHC.Tc.Types.Evidence
 
 import Control.Monad    ( zipWithM )
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, fromMaybe)
 import qualified Data.List.NonEmpty as NEL
 
 import GHC.Core.UsageEnv (zeroUE)
@@ -145,7 +145,7 @@ selectMatchVar :: HasCallStack => Mult -> Pat GhcTc -> DsM Id
 selectMatchVar w (BangPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat)    = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ _ pat _) = selectMatchVar w (unLoc pat)
-selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId ((unLoc var) `setIdBinding` (LambdaBound ManyTy))) -- ROMES:TODO: see comment below about match variables being put in cases
+selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWithBinding (unLoc var)) $ return (localiseId (toLambdaBound (unLoc var))) -- ROMES:TODO: see comment below about match variables being put in cases
                                   -- Note [Localise pattern binders]
                                   --
                                   -- Remark: when the pattern is a variable (or
@@ -153,7 +153,7 @@ selectMatchVar _w (VarPat _ var)    = pprTrace "selectMatchVar:VarPat" (pprIdWit
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return ((unLoc var) `setIdBinding` (LambdaBound ManyTy)))
+selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (toLambdaBound (unLoc var)))
                                      -- ROMES:TODO: Are match variables always put in cases? If yes, then this could be a way to guarantee match variables are lambda bound/case bound
 -- selectMatchVar _w (AsPat _ var _ _) = assert (isManyTy _w ) (return (unLoc var))
 selectMatchVar w  other_pat        = newSysLocalDs (LambdaBound w) (hsPatType other_pat) -- ROMES:TODO: Can match variables end up in lets and cases?, I think yes.
@@ -267,15 +267,15 @@ seqVar :: HasCallStack => Var -> CoreExpr -> CoreExpr
 -- romes:TODO: it's not evident how to consider the case of a variable that was
 -- let bound being used for the case scrutinee. Now I'm making them ManyTy to
 -- move forward
-seqVar var body = mkDefaultCase (Var var) (var `setIdBinding` LambdaBound ManyTy) body
+seqVar var body = mkDefaultCase (Var var) (toLambdaBound var) body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkCoLetMatchResult bind = fmap (mkCoreLet bind)
 
 -- (mkViewMatchResult var' viewExpr mr) makes the expression
 -- let var' = viewExpr in mr
-mkViewMatchResult :: Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
-mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec var' viewExpr
+mkViewMatchResult :: HasCallStack => Id -> CoreExpr -> MatchResult CoreExpr -> MatchResult CoreExpr
+mkViewMatchResult var' viewExpr = fmap $ mkCoreLet $ NonRec (var' `setIdBinding` LetBound) viewExpr
 
 mkEvalMatchResult :: Id -> Type -> MatchResult CoreExpr -> MatchResult CoreExpr
 mkEvalMatchResult var ty = fmap $ \e ->
@@ -316,7 +316,9 @@ mkCoAlgCaseMatchResult
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
   = assert (null match_alts_tail && null (tail arg_ids1)) $
-    mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
+    mkCoLetMatchResult (NonRec (arg_id1 `setIdBinding` LetBound) newtype_rhs) match_result1
+                                              -- mkCoAlgCase expects LambdaBound Id?
+                                              -- it's only in the case of newtypes that we do a let instead of a case...
 
   | otherwise
   = pprTrace "mkCoAlgCaseMatchResult" (pprIdWithBinding var) $ mkDataConCase var ty match_alts
@@ -390,7 +392,10 @@ mkDataConCase var ty alts@(alt1 :| _)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-            let rep_ids' = map (scaleVarBy (idMult var)) rep_ids
+            let rep_ids' = map (\x -> case idBinding x of
+                                        LambdaBound m -> scaleVarBy m var
+                                        LetBound -> var `setIdBinding` LambdaBound ManyTy
+                               ) rep_ids -- ROMES:TODO: I don't know
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
@@ -556,7 +561,7 @@ mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg
   where
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
-                          -> v1        -- Note [Desugaring seq], points (2) and (3)
+                          -> toLambdaBound v1 -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ManyTy ty1
 
 mkCoreAppDs _ (Var f `App` Type _r) arg
@@ -756,29 +761,30 @@ mkSelectorBinds :: [[CoreTickish]] -- ^ ticks to add, possibly
 -- See also Note [Keeping the IdBinding up to date]
 mkSelectorBinds ticks pat val_expr
   | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
-  = return (v, [(v, val_expr)])
+  = return (v, [(v `setIdBinding` LetBound, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs (LetBound zeroUE) pat_ty
+       ; val_var <- newSysLocalDs LetBound pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
                -- Remember, 'pat' binds 'bv'
-               = do { rhs_expr <- matchSimply (Var val_var) PatBindRhs pat'
+               = do { rhs_expr <- matchSimply (Var (toLambdaBound val_var)) PatBindRhs pat'
                                        (Var bndr_var)
                                        (Var bndr_var)  -- Neat hack
                       -- Neat hack: since 'pat' can't fail, the
                       -- "fail-expr" passed to matchSimply is not
                       -- used. But it /is/ used for its type, and for
                       -- that bndr_var is just the ticket.
-                    ; return (bndr_var, mkOptTickBox tick rhs_expr) }
+                    ; return (bndr_var `setIdBinding` LetBound, mkOptTickBox tick rhs_expr) }
+                    -- ROMES:TODO: This back and forth must be wrong, I don't understand completely what matchSimply expect
 
        ; binds <- zipWithM mk_bind ticks' binders
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs (LetBound zeroUE) tuple_ty
+  = do { tuple_var  <- newSysLocalDs LetBound tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
@@ -796,7 +802,7 @@ mkSelectorBinds ticks pat val_expr
     binders = collectPatBinders CollNoDictBinders pat'
     ticks'  = ticks ++ repeat []
 
-    local_binders = map localiseId binders      -- See Note [Localise pattern binders]
+    local_binders = map (toLambdaBound . localiseId) binders      -- See Note [Localise pattern binders]
     local_tuple   = mkBigCoreVarTupSolo binders
     tuple_ty      = exprType local_tuple
 
@@ -935,7 +941,7 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs (LetBound zeroUE) (unboxedUnitTy `mkVisFunTyMany` ty)
+  = do { fail_fun_var <- newFailLocalDs LetBound (unboxedUnitTy `mkVisFunTyMany` ty)
        ; fail_fun_arg <- newSysLocalDs  (LambdaBound ManyTy) unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),

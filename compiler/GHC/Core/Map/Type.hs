@@ -548,8 +548,8 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- and will require a new kind of TrieMap which matches IdBindings which also
 -- only exist for Ids, not TyVars and such
 -- The impl for varMultMaybe will surely chnge
-data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
--- ROMES:TODO: AGAIN; FIX THIS.
+newtype BndrMap a = BndrMap (TypeMapG (MaybeMap (MaybeMap TypeMapG) a))
+-- ROMES:TODO: AGAIN; FIX THIS when IdBinding is no longer isomorphic to maybe.
 
 -- TODO(22292): derive
 instance Functor BndrMap where
@@ -567,6 +567,10 @@ instance TrieMap BndrMap where
 fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
 fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
 
+idBindingToMaybeMult :: IdBinding -> Maybe Mult
+idBindingToMaybeMult LetBound = Nothing
+idBindingToMaybeMult (LambdaBound m) = Just m
+
 
 -- We need to use 'BndrMap' for 'Coercion', 'CoreExpr' AND 'Type', since all
 -- of these data types have binding forms.
@@ -576,13 +580,13 @@ fdBndrMap f (BndrMap tm) = foldTM (foldTM f) tm
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   multmap <- lkG (D env (varType v)) tymap
-  lookupTM (D env <$> varMultMaybe v) multmap
+  lookupTM (fmap (D env) . idBindingToMaybeMult <$> varIdBindingMaybe v) multmap
 
 -- ROMES:NOTE: The lookup for let binders ignores the multiplicity, whereas it
 -- previously used the rubbish argument... document this all
 xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
-  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> varMultMaybe v) xt))
+  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (fmap (D env) . idBindingToMaybeMult <$> varIdBindingMaybe v) xt))
 
 ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
 ftBndrMap f (BndrMap tm) = BndrMap (fmap (filterTM f) tm)

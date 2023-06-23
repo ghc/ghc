@@ -59,6 +59,7 @@ import GHC.Core.Type as Type
    , substTy, getTyVar_maybe )
 import GHC.Core.TyCo.Ppr( pprParendType )
 import GHC.Core.Coercion as Coercion
+import GHC.Core.Multiplicity
 import GHC.Core.Tidy     ( tidyRules )
 import GHC.Core.Map.Expr ( eqCoreExpr )
 import GHC.Core.Opt.Arity( etaExpandToJoinPointRule )
@@ -193,7 +194,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name   = name
          , ru_act    = act
          , ru_fn     = fn
-         , ru_bndrs  = bndrs
+         , ru_bndrs  = map toLambdaBound bndrs -- rOMES:TODO: idMult LetBound = ManyTy; LambdaBound m = m
          , ru_args   = args
          , ru_rhs    = occurAnalyseExpr rhs
                        -- See Note [OccInfo in unfoldings and rules]
@@ -690,7 +691,7 @@ matchRule _ rule_env is_active _ args rough_args
 
 
 ---------------------------------------
-matchN  :: InScopeEnv
+matchN  :: HasCallStack => InScopeEnv
         -> RuleName -> [Var] -> [CoreExpr]
         -> [CoreExpr] -> CoreExpr           -- ^ Target; can have more elements than the template
         -> Maybe CoreExpr
@@ -712,7 +713,9 @@ matchN (ISE in_scope id_unf) rule_name tmpl_vars tmpl_es target_es rhs
               bind_wrapper = rs_binds rule_subst
                              -- Floated bindings; see Note [Matching lets]
        ; return (bind_wrapper $
-                 mkLams tmpl_vars rhs `mkApps` matched_es) }
+                 mkLams (map toLambdaBound tmpl_vars) rhs `mkApps` matched_es) }
+                        -- Again, dictionary variables being used as lambda arguments.
+                        -- I don't know. Perhaps this whole approach is wrong.
   where
     (init_rn_env, tmpl_vars1) = mapAccumL rnBndrL (mkRnEnv2 in_scope) tmpl_vars
                   -- See Note [Cloning the template binders]

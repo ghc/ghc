@@ -269,11 +269,11 @@ newLetBndr :: HasCallStack => LetBndrSpec -> Name -> UsageEnv -> TcType -> TcM T
 -- In the monomorphic case when we are not going to generalise
 --    (plan NoGen, no_gen = LetGblBndr) there is no AbsBinds,
 --    and we use the original name directly
-newLetBndr LetLclBndr name ue ty
+newLetBndr LetLclBndr name _ue ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name (LetBound ue) ty) }
-newLetBndr (LetGblBndr prags) name ue ty
-  = addInlinePrags (mkLocalId name (LetBound ue) ty) (lookupPragEnv prags name)
+       ; return (mkLocalId mono_name LetBound ty) } -- TODO: Pass ue to LetBound
+newLetBndr (LetGblBndr prags) name _ue ty
+  = addInlinePrags (mkLocalId name LetBound ty) (lookupPragEnv prags name) -- TODO: Pass ue to LetBound
 
 tc_sub_type :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt

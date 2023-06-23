@@ -177,14 +177,14 @@ mkLamType v body_ty
    = mkForAllTy (Bndr v Required) body_ty
 
    | otherwise
-   = pprTrace "mkLamType" (ppr $ idBinding v) $ mkFunctionType mult (varType v) body_ty
+   = pprTrace "mkLamType" (ppr $ idBinding v) $! mkFunctionType mult (varType v) body_ty
      where
-       mult = case varMultMaybe v of
-                -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
-                -- ... it could prove pretty invasive...
-                Nothing -> pprPanic "mkLamType" (ppr v <+> ppr (idBinding v))
-                  -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
-                Just m  -> m
+       !mult = case varMultMaybe v of
+                 -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
+                 -- ... it could prove pretty invasive...
+                 Nothing -> pprTrace "mkLamType: LetBound var turned to LambdaBound" (ppr v <+> ppr (idBinding v)) ManyTy
+                   -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
+                 Just m  -> m
 
 mkLamTypes vs ty = pprTrace "mkLamTypes" (ppr vs) $ foldr mkLamType ty vs
 
@@ -526,7 +526,7 @@ bindNonRec bndr rhs body
     -- ROMES:TODO: I couldn't find the root cause, for now we simply override the idBinding here
     let_bind 
       | isId bndr
-      = Let (NonRec (bndr `setIdBinding` LetBound zeroUE) rhs) body
+      = Let (NonRec (bndr `setIdBinding` LetBound) rhs) body
       | otherwise
       = Let (NonRec bndr rhs) body
 
@@ -607,21 +607,21 @@ This makes it easy to find, though it makes matching marginally harder.
 -}
 
 -- | Extract the default case alternative
-findDefault :: [Alt b] -> ([Alt b], Maybe (Expr b))
+findDefault :: Typeable b => [Alt b] -> ([Alt b], Maybe (Expr b))
 findDefault (Alt DEFAULT args rhs : alts) = assert (null args) (alts, Just rhs)
 findDefault alts                          =                    (alts, Nothing)
 
-addDefault :: HasCallStack => [Alt b] -> Maybe (Expr b) -> [Alt b]
+addDefault :: HasCallStack => Typeable b => [Alt b] -> Maybe (Expr b) -> [Alt b]
 addDefault alts Nothing    = alts
 addDefault alts (Just rhs) = Alt DEFAULT [] rhs : alts
 
-isDefaultAlt :: Alt b -> Bool
+isDefaultAlt :: Typeable b => Alt b -> Bool
 isDefaultAlt (Alt DEFAULT _ _) = True
 isDefaultAlt _                 = False
 
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
-findAlt :: AltCon -> [Alt b] -> Maybe (Alt b)
+findAlt :: Typeable b => AltCon -> [Alt b] -> Maybe (Alt b)
     -- A "Nothing" result *is* legitimate
     -- See Note [Unreachable code]
 findAlt con alts
@@ -667,7 +667,7 @@ filters down the matching alternatives in GHC.Core.Opt.Simplify.rebuildCase.
 -}
 
 ---------------------------------
-mergeAlts :: [Alt a] -> [Alt a] -> [Alt a]
+mergeAlts :: Typeable a => [Alt a] -> [Alt a] -> [Alt a]
 -- ^ Merge alternatives preserving order; alternatives in
 -- the first argument shadow ones in the second
 mergeAlts [] as2 = as2
@@ -693,7 +693,7 @@ trimConArgs DEFAULT      args = assert (null args) []
 trimConArgs (LitAlt _)   args = assert (null args) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 
-filterAlts :: HasCallStack
+filterAlts :: Typeable b => HasCallStack
            => TyCon                -- ^ Type constructor of scrutinee's type (used to prune possibilities)
            -> [Type]               -- ^ And its type arguments
            -> [AltCon]             -- ^ 'imposs_cons': constructors known to be impossible due to the form of the scrutinee
@@ -733,7 +733,7 @@ filterAlts _tycon inst_tys imposs_cons alts
          --   EITHER by the context,
          --   OR by a non-DEFAULT branch in this case expression.
 
-    impossible_alt :: [Type] -> Alt b -> Bool
+    impossible_alt :: Typeable b => [Type] -> Alt b -> Bool
     impossible_alt _ (Alt con _ _) | con `Set.member` imposs_cons_set = True
     impossible_alt inst_tys (Alt (DataAlt con) _ _) = dataConCannotMatch inst_tys con
     impossible_alt _  _                             = False
@@ -1697,7 +1697,7 @@ app_ok fun_ok primop_ok fun args
        = expr_ok fun_ok primop_ok arg
 
 -----------------------------
-altsAreExhaustive :: [Alt b] -> Bool
+altsAreExhaustive :: Typeable b => [Alt b] -> Bool
 -- True  <=> the case alternatives are definitely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []

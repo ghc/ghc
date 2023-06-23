@@ -2539,7 +2539,7 @@ mkCase mode scrut outer_bndr alts_ty (Alt DEFAULT _ deflt_rhs : outer_alts)
                                             (Alt con args (wrap_rhs rhs))
                 -- Simplifier's no-shadowing invariant should ensure
                 -- that outer_bndr is not shadowed by the inner patterns
-              wrap_rhs rhs = Let (NonRec (inner_bndr `setIdBinding` LetBound zeroUE) (Var outer_bndr)) rhs
+              wrap_rhs rhs = Let (NonRec (inner_bndr `setIdBinding` LetBound) (Var outer_bndr)) rhs
                 -- IdBinding: See Note [Keeping the IdBinding up to date]
                 -- 
                 -- The let is OK even for unboxed binders,

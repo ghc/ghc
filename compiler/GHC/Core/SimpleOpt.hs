@@ -771,7 +771,7 @@ add_info env old_bndr top_level new_rhs new_bndr
 
 wrapLet :: HasCallStack => Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
-wrapLet (Just (b,r)) body = Let (NonRec (b `setIdBinding` LetBound zeroUE) r) body
+wrapLet (Just (b,r)) body = Let (NonRec (b `setIdBinding` LetBound) r) body
                             -- See Note [Keeping the IdBinding up to date]
                             -- wrapLet is called always on binders lambda bound
 

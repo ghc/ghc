@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-
 (c) The University of Glasgow 2006
 (c) The AQUA Project, Glasgow University, 1996-1998
@@ -6,7 +7,6 @@
 This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in GHC.Iface.Tidy.
 -}
-
 
 module GHC.Core.Tidy (
         tidyExpr, tidyRules, tidyCbvInfoTop, tidyBndrs
@@ -298,9 +298,9 @@ tidyIdBndr env@(tidy_env, var_env) id
         -- though we could extract it from the Id
         --
         ty'      = tidyType env (idType id)
-        mult'    = LambdaBound $ tidyType env (idMult id) -- LambdaBound vars in tidyIdBndr since this is used for lambda and case binders (TODO See to case binders differently...), LetBound in tidyLetBndr
+        idBnd'   = tidyIdBinding env (idBinding id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' mult' ty' new_info
+        id'      = mkLocalIdWithInfo name' idBnd' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -324,10 +324,10 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
   = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
         ty'      = tidyType env (idType id)
-        mult'    = LetBound $ mapUE (tidyType env) (idUsageEnv id) -- Let bound binding with tidied usage env
+        idBnd'   = tidyIdBinding env (idBinding id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
-        id'      = mkLocalVar details name' mult' ty' new_info
+        id'      = mkLocalVar details name' idBnd' ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -364,6 +364,12 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
 
     in
     ((tidy_env', var_env'), id') }
+
+tidyIdBinding :: TidyEnv -> IdBinding -> IdBinding
+tidyIdBinding env = \case
+  LetBound -> LetBound
+  -- LetBound ue -> LetBound $ mapUE (tidyType env) ue
+  LambdaBound m -> LambdaBound $ tidyType env m
 
 ------------ Unfolding  --------------
 tidyNestedUnfolding :: TidyEnv -> Unfolding -> Unfolding

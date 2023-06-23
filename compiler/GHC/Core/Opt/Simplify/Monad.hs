@@ -221,7 +221,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name (LetBound zeroUE) join_id_ty id_info) }
+       ; return (mkLocalVar details name LetBound join_id_ty id_info) }
 
 {-
 ************************************************************************

@@ -1679,7 +1679,7 @@ mkFunResCo role id res_co
     arg_co = mkReflCo role (varType id) -- (arg ~ arg)
     mult   = multToCo $ case idBinding id of 
                           LambdaBound m -> m
-                          LetBound _ -> panic "mkFunResCo"
+                          LetBound -> panic "mkFunResCo"
     -- ROMES:
     -- to make (arg %π -> res1) ~r (arg %π -> res2), we need π.
     --

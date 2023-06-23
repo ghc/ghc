@@ -23,7 +23,7 @@ matchWrapper
         -> DsM ([Id], CoreExpr)
 
 matchSimply
-        :: CoreExpr
+        :: HasCallStack => CoreExpr
         -> HsMatchContext GhcRn
         -> LPat GhcTc
         -> CoreExpr
@@ -31,7 +31,7 @@ matchSimply
         -> DsM CoreExpr
 
 matchSinglePatVar
-        :: Id
+        :: HasCallStack => Id
         -> Maybe CoreExpr
         -> HsMatchContext GhcRn
         -> LPat GhcTc

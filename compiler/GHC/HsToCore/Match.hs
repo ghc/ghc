@@ -288,7 +288,8 @@ matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
         ; match_result <- match (var':vars) ty $ NEL.toList $
             decomposeFirstPat getCoPat <$> eqns
         ; dsHsWrapper co $ \core_wrap -> do
-        { let bind = NonRec var' (core_wrap (Var var))
+          -- romes:I don't know
+        { let bind = NonRec (var' `setIdBinding` LetBound) (core_wrap (Var var))
         ; return (mkCoLetMatchResult bind match_result) } }
 
 matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
@@ -436,14 +437,14 @@ tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
 tidy1 v _ (VarPat _ (L _ var))
-  = return (wrapBind (var `setIdBinding` LetBound zeroUE) v, WildPat (idType var))
+  = return (wrapBind (var `setIdBinding` LetBound) v, WildPat (idType var))
                       -- See Note [Keeping the IdBinding up to date]
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
 tidy1 v o (AsPat _ (L _ var) _ pat)
   = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
-        ; return (wrapBind (var `setIdBinding` LetBound zeroUE) v . wrap, pat') }
+        ; return (wrapBind (var `setIdBinding` LetBound) v . wrap, pat') }
                  -- See Note [Keeping the IdBinding up to date]
 
 {- now, here we handle lazy patterns:
@@ -919,7 +920,7 @@ matchEquations ctxt vars eqns_info rhs_ty
 -- | @matchSimply@ is a wrapper for 'match' which deals with the
 -- situation where we want to match a single expression against a single
 -- pattern. It returns an expression.
-matchSimply :: CoreExpr                 -- ^ Scrutinee
+matchSimply :: HasCallStack => CoreExpr -- ^ Scrutinee
             -> HsMatchContext GhcRn     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
@@ -942,7 +943,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: HasCallStack => CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -966,7 +967,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
 
-matchSinglePatVar :: Id   -- See Note [Match Ids]
+matchSinglePatVar :: HasCallStack => Id   -- See Note [Match Ids]
                   -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)

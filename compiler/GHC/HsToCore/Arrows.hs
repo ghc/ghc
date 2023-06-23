@@ -86,7 +86,7 @@ mkCmdEnv tc_meths
   where
     mk_bind (std_name, expr)
       = do { rhs <- dsExpr expr
-           ; id <- newSysLocalDs (LetBound zeroUE) (exprType rhs) -- ROMES:TODO: zeroUE
+           ; id <- newSysLocalDs LetBound (exprType rhs)
            -- no check needed; these are functions
            ; return (NonRec id rhs, (std_name, id)) }
 

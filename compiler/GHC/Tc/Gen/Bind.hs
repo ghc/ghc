@@ -556,7 +556,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name (LetBound zeroUE) forall_a_a -- ROMES:TODO: Does it matter?
+      = mkLocalId name LetBound forall_a_a
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -968,7 +968,7 @@ mkInferredPolyId residual insoluble qtvs inferred_theta poly_name mb_sig_inst mo
          -- (#14000) we may report an ambiguity error for a rather
          -- bogus type.
 
-       ; return (mkLocalId poly_name (LetBound zeroUE) inferred_poly_ty) } -- ROMES:TODO: Inferred poly id is prob forall bound, consider lambda bound (its lambda alright, a big one) ?
+       ; return (mkLocalId poly_name LetBound inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: WantedConstraints  -- residual constraints

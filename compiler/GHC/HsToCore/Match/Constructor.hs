@@ -136,7 +136,7 @@ matchPatSyn :: NonEmpty Id
             -> NonEmpty EquationInfo
             -> DsM (MatchResult CoreExpr)
 matchPatSyn (var :| vars) ty eqns
-  = do let mult = idMult var
+  = do let !mult = idMult var
        alt <- fmap toSynAlt $ matchOneConLike vars ty mult eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where

@@ -1701,7 +1701,7 @@ lintIdBndr top_lvl bind_site id thing_inside
        -- Check that the binding site matches the binding provenance of the id
        -- (we do this regardless of -dlinear-core-lint as it should always be true?)
        ; checkL (matchesBindingSite (idBinding id) bind_site)
-                (text "Core Id binding doesn't match binding site" <+> ppr (idBinding id) <+> text (show bind_site))
+                (text "Core Id binding doesn't match binding site" <+> pprIdWithBinding id <+> text (show bind_site))
 
        -- Check that if the binder is nested, it is not marked as exported
        ; checkL (not (isExportedId id) || is_top_lvl)
@@ -1745,7 +1745,7 @@ lintIdBndr top_lvl bind_site id thing_inside
                     _       -> False
 
     matchesBindingSite :: IdBinding -> BindingSite -> Bool
-    matchesBindingSite (LetBound _) LetBind = True
+    matchesBindingSite LetBound LetBind = True
     matchesBindingSite (LambdaBound _) LambdaBind = True
     matchesBindingSite (LambdaBound _) CaseBind = True
     matchesBindingSite (LambdaBound _) CasePatBind = True

@@ -135,7 +135,7 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceType (idMult covar)
+toIfaceIdBndrX fr covar = ( toIfaceType ManyTy -- (idMult covar) -- idMult of coercion variable should always be ManyTy. This is kind of a hack... ROMES:TODO
                           , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )

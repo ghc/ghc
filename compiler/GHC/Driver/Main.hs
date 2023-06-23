@@ -2163,7 +2163,7 @@ myCoreToStgExpr logger dflags ictxt for_bytecode this_mod ml prepd_expr = do
        binding for the stg2stg step) -}
     let bco_tmp_id = mkSysLocal (fsLit "BCO_toplevel")
                                 (mkPseudoUniqueE 0)
-                                (LetBound zeroUE) -- ROMES:TODO: zeroUE
+                                LetBound
                                 (exprType prepd_expr)
     (stg_binds, prov_map, collected_ccs, stg_cg_infos) <-
        myCoreToStg logger

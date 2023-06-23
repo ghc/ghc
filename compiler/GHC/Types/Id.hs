@@ -219,7 +219,8 @@ idMult x = case Var.varMultMaybe x of
 idUsageEnv :: HasCallStack => Id -> UsageEnv
 idUsageEnv x = case Var.idBinding x of
              LambdaBound _ -> pprPanic "idUsageEnv" (ppr x)
-             LetBound ue -> ue
+             LetBound -> zeroUE
+             -- LetBound ue -> ue
 
 -- ROMES: Scaled Types seem to be used mainly in data cons; I think Scaled
 -- things remain as they are, bc they seem to only occur in places where the Id is definitely a lambda bound (or datacon, which would be the same) variable
@@ -232,7 +233,8 @@ idScaledType id = Scaled (idMult id) (idType id)
 -- (update Note [Scaling in case-of-case] and other usage sites)
 scaleIdBy :: Mult -> Id -> Id
 scaleIdBy m id = case Var.idBinding id of
-                   LetBound   ue -> setIdBinding id (LetBound (mapUE (m `mkMultMul`) ue))
+                   -- LetBound   ue -> setIdBinding id (LetBound (mapUE (m `mkMultMul`) ue))
+                   LetBound -> id
                    LambdaBound w -> setIdBinding id (LambdaBound (m `mkMultMul` w))
 
 -- | Like 'scaleIdBy', but skips non-Ids. Useful for scaling
@@ -401,7 +403,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) (LetBound zeroUE) ty -- Top-level binding is a closed let-bound expression, hence zeroUE
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) LetBound ty -- Top-level binding is a closed let-bound expression, hence zeroUE
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
