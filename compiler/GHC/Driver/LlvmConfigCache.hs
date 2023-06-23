@@ -18,6 +18,8 @@ import System.IO.Unsafe
 -- Currently implemented with unsafe lazy IO. But it could be implemented with
 -- an IORef as the exposed interface is in IO.
 data LlvmConfigCache = LlvmConfigCache LlvmConfig
+-- NB: It is crucial for this to be a datatype, not a newtype.
+-- Allocations can increase across the board over 20% otherwise (see the discussion on !10708 and non-final pipelines)
 
 initLlvmConfigCache :: FilePath -> IO LlvmConfigCache
 initLlvmConfigCache top_dir = pure $ LlvmConfigCache (unsafePerformIO $ initLlvmConfig top_dir)

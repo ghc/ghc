@@ -52,4 +52,4 @@ data TPhase res where
   T_MergeForeign :: PipeEnv -> HscEnv -> FilePath -> [FilePath] -> TPhase FilePath
 
 -- | A wrapper around the interpretation function for phases.
-data PhaseHook = PhaseHook (forall a . TPhase a -> IO a)
+newtype PhaseHook = PhaseHook (forall a . TPhase a -> IO a)

@@ -554,7 +554,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- We also need to do the same for multiplicity! Which, since multiplicities are
 -- encoded simply as a 'Type', amounts to have a Trie for a pair of types. Tries
 -- of pairs are composition.
-data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
+newtype BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
 
 -- TODO(22292): derive
 instance Functor BndrMap where

@@ -8,7 +8,7 @@ import GHC.Cmm
 
 import GHC.Utils.Outputable
 
-data JumpDest = DestBlockId BlockId
+newtype JumpDest = DestBlockId BlockId
 
 -- Debug Instance
 instance Outputable JumpDest where
