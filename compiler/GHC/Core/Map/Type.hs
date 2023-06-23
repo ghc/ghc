@@ -550,7 +550,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- only exist for Ids, not TyVars and such
 -- The impl for varMultMaybe will surely chnge
 -- ROMES:TODO: Moving this to newtype should be done on an individual patch, one such attempt caused multiple regressions (!
-data BndrMap a = BndrMap (TypeMapG (MaybeMap (MaybeMap TypeMapG) a))
+data BndrMap a = BndrMap (TypeMapG (MaybeMap TypeMapG a))
 -- ROMES:TODO: AGAIN; FIX THIS when IdBinding is no longer isomorphic to maybe.
 
 -- TODO(22292): derive
@@ -582,13 +582,13 @@ idBindingToMaybeMult (LambdaBound m) = Just m
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   multmap <- lkG (D env (varType v)) tymap
-  lookupTM (fmap (D env) . idBindingToMaybeMult <$> varIdBindingMaybe v) multmap
+  lookupTM (D env <$> (varMultMaybe . toLambdaBound) v) multmap
 
 -- ROMES:NOTE: The lookup for let binders ignores the multiplicity, whereas it
 -- previously used the rubbish argument... document this all
 xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
-  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (fmap (D env) . idBindingToMaybeMult <$> varIdBindingMaybe v) xt))
+  BndrMap (tymap |> xtG (D env (varType v)) |>> (alterTM (D env <$> (varMultMaybe . toLambdaBound) v) xt))
 
 ftBndrMap :: (a -> Bool) -> BndrMap a -> BndrMap a
 ftBndrMap f (BndrMap tm) = BndrMap (fmap (filterTM f) tm)
