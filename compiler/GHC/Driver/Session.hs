@@ -2861,6 +2861,9 @@ impliedXFlags
     -- The extensions needed to declare an H98 unlifted data type
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
     , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
+
+    -- See Note [Destructuring AbsBinds aren't linear] in GHC.Tc.Gen.Bind
+    , (LangExt.LinearTypes, turnOn, LangExt.MonoLocalBinds)
   ]
 
 -- | Things you get with `-dlint`.

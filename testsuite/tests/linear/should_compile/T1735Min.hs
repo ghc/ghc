@@ -1,4 +1,4 @@
-{-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE LinearTypes, NoMonoLocalBinds #-}
 {-# LANGUAGE UndecidableInstances, Rank2Types,
     KindSignatures, EmptyDataDecls, MultiParamTypeClasses, CPP #-}
 
