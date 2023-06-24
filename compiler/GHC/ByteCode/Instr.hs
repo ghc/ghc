@@ -23,7 +23,7 @@ import GHC.Types.Unique
 import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
-import GHC.Runtime.Heap.Layout
+import GHC.Runtime.Heap.Layout ( StgWord )
 
 import Data.Int
 import Data.Word
@@ -41,7 +41,7 @@ data ProtoBCO a
         protoBCOInstrs     :: [BCInstr],  -- instrs
         -- arity and GC info
         protoBCOBitmap     :: [StgWord],
-        protoBCOBitmapSize :: Word16,
+        protoBCOBitmapSize :: Word,
         protoBCOArity      :: Int,
         -- what the BCO came from, for debugging only
         protoBCOExpr       :: Either [CgStgAlt] CgStgRhs,
@@ -58,18 +58,18 @@ instance Outputable LocalLabel where
 
 data BCInstr
    -- Messing with the stack
-   = STKCHECK  Word
+   = STKCHECK  !Word
 
    -- Push locals (existing bits of the stack)
-   | PUSH_L    !Word16{-offset-}
-   | PUSH_LL   !Word16 !Word16{-2 offsets-}
-   | PUSH_LLL  !Word16 !Word16 !Word16{-3 offsets-}
+   | PUSH_L    !WordOff{-offset-}
+   | PUSH_LL   !WordOff !WordOff{-2 offsets-}
+   | PUSH_LLL  !WordOff !WordOff !WordOff{-3 offsets-}
 
    -- Push the specified local as a 8, 16, 32 bit value onto the stack. (i.e.,
    -- the stack will grow by 8, 16 or 32 bits)
-   | PUSH8  !Word16
-   | PUSH16 !Word16
-   | PUSH32 !Word16
+   | PUSH8  !ByteOff
+   | PUSH16 !ByteOff
+   | PUSH32 !ByteOff
 
    -- Push the specified local as a 8, 16, 32 bit value onto the stack, but the
    -- value will take the whole word on the stack (i.e., the stack will grow by
@@ -78,9 +78,9 @@ data BCInstr
    -- Currently we expect all values on the stack to take full words, except for
    -- the ones used for PACK (i.e., actually constructing new data types, in
    -- which case we use PUSH{8,16,32})
-   | PUSH8_W  !Word16
-   | PUSH16_W !Word16
-   | PUSH32_W !Word16
+   | PUSH8_W  !ByteOff
+   | PUSH16_W !ByteOff
+   | PUSH32_W !ByteOff
 
    -- Push a ptr  (these all map to PUSH_G really)
    | PUSH_G       Name
@@ -102,8 +102,8 @@ data BCInstr
    | PUSH_UBX8  Literal
    | PUSH_UBX16 Literal
    | PUSH_UBX32 Literal
-   | PUSH_UBX   Literal Word16
-        -- push this int/float/double/addr, on the stack. Word16
+   | PUSH_UBX   Literal !WordOff
+        -- push this int/float/double/addr, on the stack. Word
         -- is # of words to copy from literal pool.  Eitherness reflects
         -- the difficulty of dealing with MachAddr here, mostly due to
         -- the excessive (and unnecessary) restrictions imposed by the
@@ -129,58 +129,61 @@ data BCInstr
    | PUSH_APPLY_PPPPP
    | PUSH_APPLY_PPPPPP
 
-   | SLIDE     Word16{-this many-} Word16{-down by this much-}
+   | SLIDE     !WordOff{-this many-} !WordOff{-down by this much-}
 
    -- To do with the heap
-   | ALLOC_AP  !Word16 -- make an AP with this many payload words
-   | ALLOC_AP_NOUPD !Word16 -- make an AP_NOUPD with this many payload words
-   | ALLOC_PAP !Word16 !Word16 -- make a PAP with this arity / payload words
-   | MKAP      !Word16{-ptr to AP is this far down stack-} !Word16{-number of words-}
-   | MKPAP     !Word16{-ptr to PAP is this far down stack-} !Word16{-number of words-}
-   | UNPACK    !Word16 -- unpack N words from t.o.s Constr
-   | PACK      DataCon !Word16
+   | ALLOC_AP  !HalfWord {- make an AP with this many payload words.
+                            HalfWord matches the size of the n_args field in StgAP,
+                            make sure that we handle truncation when generating
+                            bytecode using this HalfWord type here -}
+   | ALLOC_AP_NOUPD !HalfWord -- make an AP_NOUPD with this many payload words
+   | ALLOC_PAP !HalfWord !HalfWord -- make a PAP with this arity / payload words
+   | MKAP      !WordOff{-ptr to AP is this far down stack-} !HalfWord{-number of words-}
+   | MKPAP     !WordOff{-ptr to PAP is this far down stack-} !HalfWord{-number of words-}
+   | UNPACK    !WordOff -- unpack N words from t.o.s Constr
+   | PACK      DataCon !WordOff
                         -- after assembly, the DataCon is an index into the
                         -- itbl array
    -- For doing case trees
    | LABEL     LocalLabel
-   | TESTLT_I  Int    LocalLabel
-   | TESTEQ_I  Int    LocalLabel
-   | TESTLT_W  Word   LocalLabel
-   | TESTEQ_W  Word   LocalLabel
-   | TESTLT_I64 Int64 LocalLabel
-   | TESTEQ_I64 Int64 LocalLabel
-   | TESTLT_I32 Int32 LocalLabel
-   | TESTEQ_I32 Int32 LocalLabel
-   | TESTLT_I16 Int16 LocalLabel
-   | TESTEQ_I16 Int16 LocalLabel
-   | TESTLT_I8 Int8   LocalLabel
-   | TESTEQ_I8 Int16  LocalLabel
-   | TESTLT_W64 Word64 LocalLabel
-   | TESTEQ_W64 Word64 LocalLabel
-   | TESTLT_W32 Word32 LocalLabel
-   | TESTEQ_W32 Word32 LocalLabel
-   | TESTLT_W16 Word16 LocalLabel
-   | TESTEQ_W16 Word16 LocalLabel
-   | TESTLT_W8 Word8 LocalLabel
-   | TESTEQ_W8 Word8 LocalLabel
-   | TESTLT_F  Float  LocalLabel
-   | TESTEQ_F  Float  LocalLabel
-   | TESTLT_D  Double LocalLabel
-   | TESTEQ_D  Double LocalLabel
+   | TESTLT_I   !Int    LocalLabel
+   | TESTEQ_I   !Int    LocalLabel
+   | TESTLT_W   !Word   LocalLabel
+   | TESTEQ_W   !Word   LocalLabel
+   | TESTLT_I64 !Int64  LocalLabel
+   | TESTEQ_I64 !Int64  LocalLabel
+   | TESTLT_I32 !Int32  LocalLabel
+   | TESTEQ_I32 !Int32  LocalLabel
+   | TESTLT_I16 !Int16  LocalLabel
+   | TESTEQ_I16 !Int16  LocalLabel
+   | TESTLT_I8  !Int8   LocalLabel
+   | TESTEQ_I8  !Int16  LocalLabel
+   | TESTLT_W64 !Word64 LocalLabel
+   | TESTEQ_W64 !Word64 LocalLabel
+   | TESTLT_W32 !Word32 LocalLabel
+   | TESTEQ_W32 !Word32 LocalLabel
+   | TESTLT_W16 !Word16 LocalLabel
+   | TESTEQ_W16 !Word16 LocalLabel
+   | TESTLT_W8  !Word8  LocalLabel
+   | TESTEQ_W8  !Word8  LocalLabel
+   | TESTLT_F   !Float  LocalLabel
+   | TESTEQ_F   !Float  LocalLabel
+   | TESTLT_D   !Double LocalLabel
+   | TESTEQ_D   !Double LocalLabel
 
    -- The Word16 value is a constructor number and therefore
    -- stored in the insn stream rather than as an offset into
    -- the literal pool.
-   | TESTLT_P  Word16 LocalLabel
-   | TESTEQ_P  Word16 LocalLabel
+   | TESTLT_P  !Word16 LocalLabel
+   | TESTEQ_P  !Word16 LocalLabel
 
    | CASEFAIL
    | JMP              LocalLabel
 
    -- For doing calls to C (via glue code generated by libffi)
-   | CCALL            Word16    -- stack frame size
+   | CCALL            !WordOff  -- stack frame size
                       (RemotePtr C_ffi_cif) -- addr of the glue code
-                      Word16    -- flags.
+                      !Word16   -- flags.
                                 --
                                 -- 0x1: call is interruptible
                                 -- 0x2: call is unsafe
@@ -191,8 +194,8 @@ data BCInstr
    | PRIMCALL
 
    -- For doing magic ByteArray passing to foreign calls
-   | SWIZZLE          Word16 -- to the ptr N words down the stack,
-                      Word16 -- add M (interpreted as a signed 16-bit entity)
+   | SWIZZLE          !WordOff -- to the ptr N words down the stack,
+                      !Int     -- add M
 
    -- To Infinity And Beyond
    | ENTER
@@ -202,7 +205,7 @@ data BCInstr
                    -- Note [unboxed tuple bytecodes and tuple_BCO] in GHC.StgToByteCode
 
    -- Breakpoints
-   | BRK_FUN          Word16 Unique (RemotePtr CostCentre)
+   | BRK_FUN         !Word16 Unique (RemotePtr CostCentre)
 
 -- -----------------------------------------------------------------------------
 -- Printing bytecode instructions

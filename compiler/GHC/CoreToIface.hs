@@ -49,8 +49,6 @@ module GHC.CoreToIface
 
 import GHC.Prelude
 
-import Data.Word
-
 import GHC.StgToCmm.Types
 
 import GHC.ByteCode.Types
@@ -698,7 +696,7 @@ toIfaceLFInfo nm lfi = case lfi of
 
 -- Dehydrating CgBreakInfo
 
-dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word16)] -> Type -> CgBreakInfo
+dehydrateCgBreakInfo :: [TyVar] -> [Maybe (Id, Word)] -> Type -> CgBreakInfo
 dehydrateCgBreakInfo ty_vars idOffSets tick_ty =
           CgBreakInfo
             { cgb_tyvars = map toIfaceTvBndr ty_vars

@@ -22,7 +22,7 @@ import GHC.ByteCode.InfoTable
 import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHC.Runtime.Interpreter
-import GHC.Runtime.Heap.Layout hiding ( WordOff )
+import GHC.Runtime.Heap.Layout ( fromStgWord, StgWord )
 
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -199,8 +199,8 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
       -- this BCO to be long.
       (n_insns0, lbl_map0) = inspectAsm platform False initial_offset asm
       ((n_insns, lbl_map), long_jumps)
-        | isLarge (fromIntegral $ Map.size lbl_map0)
-          || isLarge n_insns0
+        | isLargeW (fromIntegral $ Map.size lbl_map0)
+          || isLargeW n_insns0
                     = (inspectAsm platform True initial_offset asm, True)
         | otherwise = ((n_insns0, lbl_map0), False)
 
@@ -229,7 +229,7 @@ assembleBCO platform (ProtoBCO { protoBCOName       = nm
 
   return ul_bco
 
-mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word64
+mkBitmapArray :: Word -> [StgWord] -> UArray Int Word64
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.
@@ -244,9 +244,21 @@ type AsmState = (SizedSeq Word16,
 
 data Operand
   = Op Word
+  | IOp Int
   | SmallOp Word16
   | LabelOp LocalLabel
--- (unused)  | LargeOp Word
+
+wOp :: WordOff -> Operand
+wOp = Op . fromIntegral
+
+bOp :: ByteOff -> Operand
+bOp = Op . fromIntegral
+
+truncHalfWord :: Platform -> HalfWord -> Operand
+truncHalfWord platform w = case platformWordSize platform of
+  PW4 | w <= 65535      -> Op (fromIntegral w)
+  PW8 | w <= 4294967295 -> Op (fromIntegral w)
+  _ -> pprPanic "GHC.ByteCode.Asm.truncHalfWord" (ppr w)
 
 data Assembler a
   = AllocPtr (IO BCOPtr) (Word -> Assembler a)
@@ -287,9 +299,9 @@ type LabelEnv = LocalLabel -> Word
 largeOp :: Bool -> Operand -> Bool
 largeOp long_jumps op = case op of
    SmallOp _ -> False
-   Op w      -> isLarge w
+   Op w      -> isLargeW w
+   IOp i     -> isLargeI i
    LabelOp _ -> long_jumps
--- LargeOp _ -> True
 
 runAsm :: Platform -> Bool -> LabelEnv -> Assembler a -> StateT AsmState IO a
 runAsm platform long_jumps e = go
@@ -308,15 +320,15 @@ runAsm platform long_jumps e = go
       go $ k w
     go (AllocLabel _ k) = go k
     go (Emit w ops k) = do
-      let largeOps = any (largeOp long_jumps) ops
+      let largeArgs = any (largeOp long_jumps) ops
           opcode
-            | largeOps = largeArgInstr w
+            | largeArgs = largeArgInstr w
             | otherwise = w
           words = concatMap expand ops
           expand (SmallOp w) = [w]
           expand (LabelOp w) = expand (Op (e w))
-          expand (Op w) = if largeOps then largeArg platform (fromIntegral w) else [fromIntegral w]
---        expand (LargeOp w) = largeArg platform w
+          expand (Op w) = if largeArgs then largeArg platform (fromIntegral w) else [fromIntegral w]
+          expand (IOp i) = if largeArgs then largeArg platform (fromIntegral i) else [fromIntegral i]
       state $ \(st_i0,st_l0,st_p0) ->
         let st_i1 = addListToSS st_i0 (opcode : words)
         in ((), (st_i1,st_l0,st_p0))
@@ -350,7 +362,7 @@ inspectAsm platform long_jumps initial_offset
         count (SmallOp _) = 1
         count (LabelOp _) = count (Op 0)
         count (Op _) = if largeOps then largeArg16s platform else 1
---      count (LargeOp _) = largeArg16s platform
+        count (IOp _) = if largeOps then largeArg16s platform else 1
 
 -- Bring in all the bci_ bytecode constants.
 #include "Bytecodes.h"
@@ -379,15 +391,15 @@ assembleI :: Platform
           -> Assembler ()
 assembleI platform i = case i of
   STKCHECK n               -> emit bci_STKCHECK [Op n]
-  PUSH_L o1                -> emit bci_PUSH_L [SmallOp o1]
-  PUSH_LL o1 o2            -> emit bci_PUSH_LL [SmallOp o1, SmallOp o2]
-  PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [SmallOp o1, SmallOp o2, SmallOp o3]
-  PUSH8 o1                 -> emit bci_PUSH8 [SmallOp o1]
-  PUSH16 o1                -> emit bci_PUSH16 [SmallOp o1]
-  PUSH32 o1                -> emit bci_PUSH32 [SmallOp o1]
-  PUSH8_W o1               -> emit bci_PUSH8_W [SmallOp o1]
-  PUSH16_W o1              -> emit bci_PUSH16_W [SmallOp o1]
-  PUSH32_W o1              -> emit bci_PUSH32_W [SmallOp o1]
+  PUSH_L o1                -> emit bci_PUSH_L [wOp o1]
+  PUSH_LL o1 o2            -> emit bci_PUSH_LL [wOp o1, wOp o2]
+  PUSH_LLL o1 o2 o3        -> emit bci_PUSH_LLL [wOp o1, wOp o2, wOp o3]
+  PUSH8 o1                 -> emit bci_PUSH8 [bOp o1]
+  PUSH16 o1                -> emit bci_PUSH16 [bOp o1]
+  PUSH32 o1                -> emit bci_PUSH32 [bOp o1]
+  PUSH8_W o1               -> emit bci_PUSH8_W [bOp o1]
+  PUSH16_W o1              -> emit bci_PUSH16_W [bOp o1]
+  PUSH32_W o1              -> emit bci_PUSH32_W [bOp o1]
   PUSH_G nm                -> do p <- ptr (BCOPtrName nm)
                                  emit bci_PUSH_G [Op p]
   PUSH_PRIMOP op           -> do p <- ptr (BCOPtrPrimOp op)
@@ -419,7 +431,7 @@ assembleI platform i = case i of
   PUSH_UBX32 lit           -> do np <- literal lit
                                  emit bci_PUSH_UBX32 [Op np]
   PUSH_UBX lit nws         -> do np <- literal lit
-                                 emit bci_PUSH_UBX [Op np, SmallOp nws]
+                                 emit bci_PUSH_UBX [Op np, wOp nws]
 
   -- see Note [Generating code for top-level string literal bindings] in GHC.StgToByteCode
   PUSH_ADDR nm             -> do np <- lit [BCONPtrAddr nm]
@@ -437,15 +449,15 @@ assembleI platform i = case i of
   PUSH_APPLY_PPPPP         -> emit bci_PUSH_APPLY_PPPPP []
   PUSH_APPLY_PPPPPP        -> emit bci_PUSH_APPLY_PPPPPP []
 
-  SLIDE     n by           -> emit bci_SLIDE [SmallOp n, SmallOp by]
-  ALLOC_AP  n              -> emit bci_ALLOC_AP [SmallOp n]
-  ALLOC_AP_NOUPD n         -> emit bci_ALLOC_AP_NOUPD [SmallOp n]
-  ALLOC_PAP arity n        -> emit bci_ALLOC_PAP [SmallOp arity, SmallOp n]
-  MKAP      off sz         -> emit bci_MKAP [SmallOp off, SmallOp sz]
-  MKPAP     off sz         -> emit bci_MKPAP [SmallOp off, SmallOp sz]
-  UNPACK    n              -> emit bci_UNPACK [SmallOp n]
+  SLIDE     n by           -> emit bci_SLIDE [wOp n, wOp by]
+  ALLOC_AP  n              -> emit bci_ALLOC_AP [truncHalfWord platform n]
+  ALLOC_AP_NOUPD n         -> emit bci_ALLOC_AP_NOUPD [truncHalfWord platform n]
+  ALLOC_PAP arity n        -> emit bci_ALLOC_PAP [truncHalfWord platform arity, truncHalfWord platform n]
+  MKAP      off sz         -> emit bci_MKAP [wOp off, truncHalfWord platform sz]
+  MKPAP     off sz         -> emit bci_MKPAP [wOp off, truncHalfWord platform sz]
+  UNPACK    n              -> emit bci_UNPACK [wOp n]
   PACK      dcon sz        -> do itbl_no <- lit [BCONPtrItbl (getName dcon)]
-                                 emit bci_PACK [Op itbl_no, SmallOp sz]
+                                 emit bci_PACK [Op itbl_no, wOp sz]
   LABEL     lbl            -> label lbl
   TESTLT_I  i l            -> do np <- int i
                                  emit bci_TESTLT_I [Op np, LabelOp l]
@@ -498,13 +510,13 @@ assembleI platform i = case i of
   TESTLT_P  i l            -> emit bci_TESTLT_P [SmallOp i, LabelOp l]
   TESTEQ_P  i l            -> emit bci_TESTEQ_P [SmallOp i, LabelOp l]
   CASEFAIL                 -> emit bci_CASEFAIL []
-  SWIZZLE   stkoff n       -> emit bci_SWIZZLE [SmallOp stkoff, SmallOp n]
+  SWIZZLE   stkoff n       -> emit bci_SWIZZLE [wOp stkoff, IOp n]
   JMP       l              -> emit bci_JMP [LabelOp l]
   ENTER                    -> emit bci_ENTER []
   RETURN rep               -> emit (return_non_tuple rep) []
   RETURN_TUPLE             -> emit bci_RETURN_T []
   CCALL off m_addr i       -> do np <- addr m_addr
-                                 emit bci_CCALL [SmallOp off, Op np, SmallOp i]
+                                 emit bci_CCALL [wOp off, Op np, SmallOp i]
   PRIMCALL                 -> emit bci_PRIMCALL []
   BRK_FUN index uniq cc    -> do p1 <- ptr BCOPtrBreakArray
                                  q <- int (getKey uniq)
@@ -556,8 +568,11 @@ assembleI platform i = case i of
     words ws = lit (map BCONPtrWord ws)
     word w = words [w]
 
-isLarge :: Word -> Bool
-isLarge n = n > 65535
+isLargeW :: Word -> Bool
+isLargeW n = n > 65535
+
+isLargeI :: Int -> Bool
+isLargeI n = n > 32767 || n < -32768
 
 push_alts :: ArgRep -> Word16
 push_alts V   = bci_PUSH_ALTS_V
