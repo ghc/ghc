@@ -894,3 +894,8 @@ intMax12bit = 2047
 fitsIn32bits  :: (Num a, Ord a, Bits a) => a -> Bool
 fitsIn32bits i = (-1 `shiftL` 31) <= i && i <= (1 `shiftL` 31 -1)
 
+isNbitEncodeable :: Int -> Integer -> Bool
+isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
+
+isEncodeableInWidth :: Width -> Integer -> Bool
+isEncodeableInWidth = isNbitEncodeable . widthInBits

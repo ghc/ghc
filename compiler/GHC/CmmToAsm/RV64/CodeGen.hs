@@ -496,35 +496,44 @@ getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i <
 
 
 -- Generic case.
-getRegister' config plat expr
-  = case expr of
-    CmmReg (CmmGlobal PicBaseReg)
-      -> pprPanic "getRegisterReg-memory" (ppr $ PicBaseReg)
-    CmmLit lit
-      -> case lit of
+getRegister' config plat expr =
+  case expr of
+    CmmReg (CmmGlobal PicBaseReg) ->
+      pprPanic "getRegisterReg-memory" (ppr PicBaseReg)
 
+    CmmLit lit ->
+      case lit of
         CmmInt 0 w -> pure $ Fixed (intFormat w) zero_reg nilOL
+        CmmInt i w | isEncodeableInWidth w i -> do
+          pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) (OpImm (ImmInteger i)))))
 
-        CmmInt i W8 | i >= 0 -> do
-          return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowU W8 i))))))
-        CmmInt i W16 | i >= 0 -> do
-          return (Any (intFormat W16) (\dst -> unitOL $ annExpr expr (MOV (OpReg W16 dst) (OpImm (ImmInteger (narrowU W16 i))))))
-
-        CmmInt i W8  -> do
-          return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowU W8 i))))))
-        CmmInt i W16 -> do
-          return (Any (intFormat W16) (\dst -> unitOL $ annExpr expr (MOV (OpReg W16 dst) (OpImm (ImmInteger (narrowU W16 i))))))
-
-        -- We need to be careful to not shorten this for negative literals.
-        -- Those need the upper bits set. We'd either have to explicitly sign
-        -- or figure out something smarter. Lowered to
-        -- `MOV dst XZR`
+        -- i does not fit. Be careful to keep the sign.
         CmmInt i w -> do
-          return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) (OpImm (ImmInteger i)))))
+          let -- select all but the sign (most significant) bit
+              mask = allOneMask (maxBitNo - 1)
+              numBits = i .&. mask
+              truncatedI = numBits .|. signBit i
+          pure
+            ( Any
+                (intFormat w)
+                ( \dst ->
+                    toOL
+                      [ annExpr
+                          expr
+                          (MOV (OpReg w dst) (OpImm (ImmInteger truncatedI)))
+                      ]
+                )
+            )
+          where
+            allOneMask :: Int -> Integer
+            allOneMask 0 = bit 0
+            allOneMask n = bit n .|. allOneMask (n - 1)
 
-        CmmInt _i rep -> do
-          (op, imm_code) <- litToImm' lit
-          return (Any (intFormat rep) (\dst -> imm_code `snocOL` annExpr expr (MOV (OpReg rep dst) op)))
+            signBit :: Integer -> Integer
+            signBit i | signum i < 0 = bit maxBitNo
+            signBit _i = 0
+
+            maxBitNo = widthInBits w - 1
 
         -- floatToBytes (fromRational f)
         CmmFloat 0 w   -> do
