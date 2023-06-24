@@ -11,7 +11,7 @@ module GHC.ByteCode.Types
   , FFIInfo(..)
   , RegBitmap(..)
   , NativeCallType(..), NativeCallInfo(..), voidTupleReturnInfo, voidPrimCallInfo
-  , ByteOff(..), WordOff(..)
+  , ByteOff(..), WordOff(..), HalfWord(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
   , AddrEnv, AddrPtr(..)
@@ -77,6 +77,12 @@ newtype ByteOff = ByteOff Int
     deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
 
 newtype WordOff = WordOff Int
+    deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
+
+-- A type for values that are half the size of a word on the target
+-- platform where the interpreter runs (which may be a different
+-- wordsize than the compiler).
+newtype HalfWord = HalfWord Word
     deriving (Enum, Eq, Show, Integral, Num, Ord, Real, Outputable)
 
 newtype RegBitmap = RegBitmap { unRegBitmap :: Word32 }
@@ -188,7 +194,7 @@ instance NFData BCONPtr where
 data CgBreakInfo
    = CgBreakInfo
    { cgb_tyvars :: ![IfaceTvBndr] -- ^ Type variables in scope at the breakpoint
-   , cgb_vars   :: ![Maybe (IfaceIdBndr, Word16)]
+   , cgb_vars   :: ![Maybe (IfaceIdBndr, Word)]
    , cgb_resty  :: !IfaceType
    }
 -- See Note [Syncing breakpoint info] in GHC.Runtime.Eval

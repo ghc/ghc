@@ -242,7 +242,7 @@ mkProtoBCO
    -> Either  [CgStgAlt] (CgStgRhs)
                 -- ^ original expression; for debugging only
    -> Int       -- ^ arity
-   -> Word16    -- ^ bitmap size
+   -> WordOff   -- ^ bitmap size
    -> [StgWord] -- ^ bitmap
    -> Bool      -- ^ True <=> is a return point, rather than a function
    -> [FFIInfo]
@@ -252,7 +252,7 @@ mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffi
         protoBCOName = nm,
         protoBCOInstrs = maybe_with_stack_check,
         protoBCOBitmap = bitmap,
-        protoBCOBitmapSize = bitmap_size,
+        protoBCOBitmapSize = fromIntegral bitmap_size,
         protoBCOArity = arity,
         protoBCOExpr = origin,
         protoBCOFFIs = ffis
@@ -396,7 +396,9 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
         platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
             ty_vars   = tyCoVarsOfTypesWellScoped (tick_ty:map idType fvs)
-        let breakInfo = dehydrateCgBreakInfo ty_vars idOffSets tick_ty
+        let toWord :: Maybe (Id, WordOff) -> Maybe (Id, Word)
+            toWord = fmap (\(i, wo) -> (i, fromIntegral wo))
+            breakInfo  = dehydrateCgBreakInfo ty_vars (map toWord idOffSets) tick_ty
         newBreakInfo tick_no breakInfo
         hsc_env <- getHscEnv
         let cc | Just interp <- hsc_interp hsc_env
@@ -407,7 +409,7 @@ schemeER_wrk d p (StgTick (Breakpoint tick_ty tick_no fvs) rhs)
         return $ breakInstr `consOL` code
 schemeER_wrk d p rhs = schemeE d 0 p rhs
 
-getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
+getVarOffSets :: Platform -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, WordOff)]
 getVarOffSets platform depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
@@ -420,22 +422,8 @@ getVarOffSets platform depth env = map getOffSet
             -- this "adjustment" is needed due to stack manipulation for
             -- BRK_FUN in Interpreter.c In any case, this is used only when
             -- we trigger a breakpoint.
-            let !var_depth_ws =
-                    trunc16W $ bytesToWords platform (depth - offset) + 2
+            let !var_depth_ws = bytesToWords platform (depth - offset) + 2
             in Just (id, var_depth_ws)
-
-truncIntegral16 :: Integral a => a -> Word16
-truncIntegral16 w
-    | w > fromIntegral (maxBound :: Word16)
-    = panic "stack depth overflow"
-    | otherwise
-    = fromIntegral w
-
-trunc16B :: ByteOff -> Word16
-trunc16B = truncIntegral16
-
-trunc16W :: WordOff -> Word16
-trunc16W = truncIntegral16
 
 fvsToEnv :: BCEnv -> CgStgRhs -> [Id]
 -- Takes the free variables of a right-hand side, and
@@ -493,7 +481,7 @@ returnUnliftedReps d s szb reps = do
                         PUSH_BCO tuple_bco `consOL`
                         unitOL RETURN_TUPLE
     return ( mkSlideB platform szb (d - s) -- clear to sequel
-             `appOL`  ret)                 -- go
+             `consOL` ret)                 -- go
 
 -- construct and return an unboxed tuple
 returnUnboxedTuple
@@ -557,7 +545,7 @@ schemeE d s p (StgLet _ext binds body) = do
          fvss  = map (fvsToEnv p') rhss
 
          -- Sizes of free vars
-         size_w = trunc16W . idSizeW platform
+         size_w = idSizeW platform
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
@@ -576,13 +564,13 @@ schemeE d s p (StgLet _ext binds body) = do
          build_thunk
              :: StackDepth
              -> [Id]
-             -> Word16
+             -> WordOff
              -> ProtoBCO Name
-             -> Word16
-             -> Word16
+             -> WordOff
+             -> HalfWord
              -> BcM BCInstrList
          build_thunk _ [] size bco off arity
-            = return (PUSH_BCO bco `consOL` unitOL (mkap (off+size) size))
+            = return (PUSH_BCO bco `consOL` unitOL (mkap (off+size) (fromIntegral size)))
            where
                 mkap | arity == 0 = MKAP
                      | otherwise  = MKPAP
@@ -594,9 +582,9 @@ schemeE d s p (StgLet _ext binds body) = do
 
          alloc_code = toOL (zipWith mkAlloc sizes arities)
            where mkAlloc sz 0
-                    | is_tick     = ALLOC_AP_NOUPD sz
-                    | otherwise   = ALLOC_AP sz
-                 mkAlloc sz arity = ALLOC_PAP arity sz
+                    | is_tick     = ALLOC_AP_NOUPD (fromIntegral sz)
+                    | otherwise   = ALLOC_AP (fromIntegral sz)
+                 mkAlloc sz arity = ALLOC_PAP arity (fromIntegral sz)
 
          is_tick = case binds of
                      StgNonRec id _ -> occNameFS (getOccName id) == tickFS
@@ -607,7 +595,7 @@ schemeE d s p (StgLet _ext binds body) = do
                 build_thunk d' fvs size bco off arity
 
          compile_binds =
-            [ compile_bind d' fvs x rhs size arity (trunc16W n)
+            [ compile_bind d' fvs x rhs size arity n
             | (fvs, x, rhs, size, arity, n) <-
                 zip6 fvss xs rhss sizes arities [n_binds, n_binds-1 .. 1]
             ]
@@ -735,7 +723,7 @@ mkConAppCode orig_d _ p con args = app_code
                 more_push_code <- do_pushery (d + arg_bytes) args
                 return (push `appOL` more_push_code)
             do_pushery !d [] = do
-                let !n_arg_words = trunc16W $ bytesToWords platform (d - orig_d)
+                let !n_arg_words = bytesToWords platform (d - orig_d)
                 return (unitOL (PACK con n_arg_words))
 
         -- Push on the stack in the reverse order.
@@ -761,7 +749,7 @@ doTailCall init_d s p fn args = do
         platform <- profilePlatform <$> getProfile
         assert (sz == wordSize platform) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
-        return (push_fn `appOL` (slide `appOL` unitOL ENTER))
+        return (push_fn `appOL` (slide `consOL` unitOL ENTER))
   do_pushes !d args reps = do
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
@@ -948,7 +936,7 @@ doCase d s p scrut bndr alts
              massert isAlgCase
              rhs_code <- schemeE stack_bot s p' rhs
              return (my_discr alt,
-                     unitOL (UNPACK (trunc16W size)) `appOL` rhs_code)
+                     unitOL (UNPACK size) `appOL` rhs_code)
            where
              real_bndrs = filterOut isTyVar bndrs
 
@@ -1009,8 +997,9 @@ doCase d s p scrut bndr alts
            | ubx_tuple_frame              = ([1], 2) -- call_info, tuple_BCO
            | otherwise                    = ([], 0)
 
-        bitmap_size = trunc16W $ fromIntegral extra_slots +
-                                 bytesToWords platform (d - s)
+        bitmap_size :: WordOff
+        bitmap_size = fromIntegral extra_slots +
+                      bytesToWords platform (d - s)
 
         bitmap_size' :: Int
         bitmap_size' = fromIntegral bitmap_size
@@ -1028,15 +1017,15 @@ doCase d s p scrut bndr alts
                              isUnboxedSumType (idType id) = Nothing
                            | isFollowableArg (bcIdArgRep platform id) = Just (fromIntegral rel_offset)
                            | otherwise                      = Nothing
-                where rel_offset = trunc16W $ bytesToWords platform (d - offset)
+                where rel_offset = bytesToWords platform (d - offset)
 
-        bitmap = intsToReverseBitmap platform bitmap_size'{-size-} pointers
+        bitmap = intsToReverseBitmap platform bitmap_size' pointers
 
      alt_stuff <- mapM codeAlt alts
      alt_final0 <- mkMultiBranch maybe_ncons alt_stuff
 
      let alt_final
-           | ubx_tuple_frame    = mkSlideW 0 2 `mappend` alt_final0
+           | ubx_tuple_frame    = SLIDE 0 2 `consOL` alt_final0
            | otherwise          = alt_final0
 
      let
@@ -1306,11 +1295,11 @@ mkStackBitmap
   -- ^ The stack layout of the arguments, where each offset is relative to the
   -- /bottom/ of the stack space they occupy. Their offsets must be word-aligned,
   -- and the list must be sorted in order of ascending offset (i.e. bottom to top).
-  -> (Word16, [StgWord])
+  -> (WordOff, [StgWord])
 mkStackBitmap platform nptrs_prefix args_info args
   = (bitmap_size, bitmap)
   where
-    bitmap_size = trunc16W $ nptrs_prefix + arg_bottom
+    bitmap_size = nptrs_prefix + arg_bottom
     bitmap = intsToReverseBitmap platform (fromIntegral bitmap_size) ptr_offsets
 
     arg_bottom = nativeCallSize args_info
@@ -1384,7 +1373,7 @@ generatePrimCall d s p target _mb_unit _result_ty args
               (push_target `consOL`
                push_info `consOL`
                PUSH_BCO args_bco `consOL`
-               (mkSlideB platform szb (d - s) `appOL` unitOL PRIMCALL))
+               (mkSlideB platform szb (d - s) `consOL` unitOL PRIMCALL))
 
 -- -----------------------------------------------------------------------------
 -- Deal with a CCall.
@@ -1552,7 +1541,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          push_r =
              if returns_void
                 then nilOL
-                else unitOL (PUSH_UBX (mkDummyLiteral platform r_rep) (trunc16W r_sizeW))
+                else unitOL (PUSH_UBX (mkDummyLiteral platform r_rep) (r_sizeW))
 
          -- generate the marshalling code we're going to call
 
@@ -1560,7 +1549,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
          -- instruction needs to describe the chunk of stack containing
          -- the ccall args to the GC, so it needs to know how large it
          -- is.  See comment in Interpreter.c with the CCALL instruction.
-         stk_offset   = trunc16W $ bytesToWords platform (d_after_r - s)
+         stk_offset   = bytesToWords platform (d_after_r - s)
 
          conv = case cconv of
            CCallConv -> FFICCall
@@ -1589,7 +1578,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) result_ty args
 
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)
-         wrapup       = mkSlideW (trunc16W r_sizeW) (d_after_r_min_s - r_sizeW)
+         wrapup       = mkSlideW r_sizeW (d_after_r_min_s - r_sizeW)
                         `snocOL` RETURN (toArgRep platform r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
      return (
@@ -1793,8 +1782,9 @@ pushAtom d p (StgVarArg var)
    = do platform <- targetPlatform <$> getDynFlags
 
         let !szb = idSizeCon platform var
+            with_instr :: (ByteOff -> BCInstr) -> BcM (OrdList BCInstr, ByteOff)
             with_instr instr = do
-                let !off_b = trunc16B $ d - d_v
+                let !off_b = d - d_v
                 return (unitOL (instr off_b), wordSize platform)
 
         case szb of
@@ -1803,7 +1793,7 @@ pushAtom d p (StgVarArg var)
             4 -> with_instr PUSH32_W
             _ -> do
                 let !szw = bytesToWords platform szb
-                    !off_w = trunc16W $ bytesToWords platform (d - d_v) + szw - 1
+                    !off_w = bytesToWords platform (d - d_v) + szw - 1
                 return (toOL (genericReplicate szw (PUSH_L off_w)),
                               wordsToBytes platform szw)
         -- d - d_v           offset from TOS to the first slot of the object
@@ -1864,7 +1854,7 @@ pushLiteral padded lit =
                 1  -> PUSH_UBX8 lit
                 2  -> PUSH_UBX16 lit
                 4  -> PUSH_UBX32 lit
-                _  -> PUSH_UBX lit (trunc16W $ bytesToWords platform size_bytes)
+                _  -> PUSH_UBX lit (bytesToWords platform size_bytes)
 
      case lit of
         LitLabel {}     -> code AddrRep
@@ -1903,7 +1893,7 @@ pushConstrAtom d p va@(StgVarArg v)
         platform <- targetPlatform <$> getDynFlags
         let !szb = idSizeCon platform v
             done instr = do
-                let !off = trunc16B $ d - d_v
+                let !off = d - d_v
                 return (unitOL (instr off), szb)
         case szb of
             1 -> done PUSH8
@@ -2153,25 +2143,20 @@ unsupportedCConvException = throwGhcException (ProgramError
   ("Error: bytecode compiler can't handle some foreign calling conventions\n"++
    "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
-mkSlideB :: Platform -> ByteOff -> ByteOff -> OrdList BCInstr
-mkSlideB platform !nb !db = mkSlideW n d
+mkSlideB :: Platform -> ByteOff -> ByteOff -> BCInstr
+mkSlideB platform nb db = SLIDE n d
   where
-    !n = trunc16W $ bytesToWords platform nb
+    !n = bytesToWords platform nb
     !d = bytesToWords platform db
 
-mkSlideW :: Word16 -> WordOff -> OrdList BCInstr
+mkSlideW :: WordOff -> WordOff -> OrdList BCInstr
 mkSlideW !n !ws
-    | ws > fromIntegral limit
-    -- If the amount to slide doesn't fit in a Word16, generate multiple slide
-    -- instructions
-    = SLIDE n limit `consOL` mkSlideW n (ws - fromIntegral limit)
     | ws == 0
     = nilOL
     | otherwise
     = unitOL (SLIDE n $ fromIntegral ws)
-  where
-    limit :: Word16
-    limit = maxBound
+
+
 
 atomPrimRep :: StgArg -> PrimRep
 atomPrimRep (StgVarArg v) = bcIdPrimRep v

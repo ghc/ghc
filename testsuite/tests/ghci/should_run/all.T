@@ -85,10 +85,10 @@ test('T19628', [extra_files(['T19628a.hs']), only_ways(['ghci']) ], compile_and_
 test('T21052', just_ghci, ghci_script, ['T21052.script'])
 test('T21300', just_ghci, ghci_script, ['T21300.script'])
 test('UnliftedDataType2', just_ghci, compile_and_run, [''])
-
 test('T22829', just_ghci + [extra_hc_opts("-Wmissing-import-lists -Werror")], compile_and_run, [''])
 test('T23229', just_ghci + [extra_hc_opts("-this-unit-id my-package -Wno-missing-methods T23229")], ghci_script, ['T23229.script'])
 test('T22958a', just_ghci, compile_and_run, [''])
 test('T22958b', just_ghci, compile_and_run, [''])
 test('T22958c', just_ghci, compile_and_run, [''])
 test('GhciMainIs', just_ghci, compile_and_run, ['-main-is otherMain'])
+test('LargeBCO', [extra_files(['LargeBCO_A.hs']), req_interp, extra_hc_opts("-O -fbyte-code-and-object-code -fprefer-byte-code")], compile_and_run, [''])

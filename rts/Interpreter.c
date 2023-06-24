@@ -1226,15 +1226,15 @@ run_BCO:
         }
 
         case bci_PUSH_L: {
-            int o1 = BCO_NEXT;
+            W_ o1 = BCO_GET_LARGE_ARG;
             SpW(-1) = SpW(o1);
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH_LL: {
-            int o1 = BCO_NEXT;
-            int o2 = BCO_NEXT;
+            W_ o1 = BCO_GET_LARGE_ARG;
+            W_ o2 = BCO_GET_LARGE_ARG;
             SpW(-1) = SpW(o1);
             SpW(-2) = SpW(o2);
             Sp_subW(2);
@@ -1242,9 +1242,9 @@ run_BCO:
         }
 
         case bci_PUSH_LLL: {
-            int o1 = BCO_NEXT;
-            int o2 = BCO_NEXT;
-            int o3 = BCO_NEXT;
+            W_ o1 = BCO_GET_LARGE_ARG;
+            W_ o2 = BCO_GET_LARGE_ARG;
+            W_ o3 = BCO_GET_LARGE_ARG;
             SpW(-1) = SpW(o1);
             SpW(-2) = SpW(o2);
             SpW(-3) = SpW(o3);
@@ -1253,56 +1253,56 @@ run_BCO:
         }
 
         case bci_PUSH8: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(1);
             *(StgWord8*)Sp = *(StgWord8*)(Sp_plusB(off+1));
             goto nextInsn;
         }
 
         case bci_PUSH16: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(2);
             *(StgWord16*)Sp = *(StgWord16*)(Sp_plusB(off+2));
             goto nextInsn;
         }
 
         case bci_PUSH32: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             Sp_subB(4);
             *(StgWord32*)Sp = *(StgWord32*)(Sp_plusB(off+4));
             goto nextInsn;
         }
 
         case bci_PUSH8_W: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             *(StgWord*)(Sp_minusW(1)) = *(StgWord8*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH16_W: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             *(StgWord*)(Sp_minusW(1)) = *(StgWord16*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH32_W: {
-            int off = BCO_NEXT;
+            W_ off = BCO_GET_LARGE_ARG;
             *(StgWord*)(Sp_minusW(1)) = *(StgWord32*)(Sp_plusB(off));
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH_G: {
-            int o1 = BCO_GET_LARGE_ARG;
+            W_ o1 = BCO_GET_LARGE_ARG;
             SpW(-1) = BCO_PTR(o1);
             Sp_subW(1);
             goto nextInsn;
         }
 
         case bci_PUSH_ALTS_P: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             Sp_subW(2);
             SpW(1) = BCO_PTR(o_bco);
             SpW(0) = (W_)&stg_ctoi_R1p_info;
@@ -1315,7 +1315,7 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_N: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_R1n_info;
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
@@ -1328,7 +1328,7 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_F: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_F1_info;
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
@@ -1341,7 +1341,7 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_D: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_D1_info;
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
@@ -1354,7 +1354,7 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_L: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_L1_info;
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
@@ -1367,7 +1367,7 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_V: {
-            int o_bco  = BCO_GET_LARGE_ARG;
+            W_ o_bco  = BCO_GET_LARGE_ARG;
             SpW(-2) = (W_)&stg_ctoi_V_info;
             SpW(-1) = BCO_PTR(o_bco);
             Sp_subW(2);
@@ -1380,9 +1380,9 @@ run_BCO:
         }
 
         case bci_PUSH_ALTS_T: {
-            int o_bco = BCO_GET_LARGE_ARG;
+            W_ o_bco = BCO_GET_LARGE_ARG;
             W_ tuple_info = (W_)BCO_LIT(BCO_GET_LARGE_ARG);
-            int o_tuple_bco = BCO_GET_LARGE_ARG;
+            W_ o_tuple_bco = BCO_GET_LARGE_ARG;
 
 #if defined(PROFILING)
             SpW(-1) = (W_)cap->r.rCCCS;
@@ -1526,30 +1526,30 @@ run_BCO:
         }
 
         case bci_PUSH_UBX8: {
-            int o_lit = BCO_GET_LARGE_ARG;
+            W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(1);
             *(StgWord8*)Sp = *(StgWord8*)(literals+o_lit);
             goto nextInsn;
         }
 
         case bci_PUSH_UBX16: {
-            int o_lit = BCO_GET_LARGE_ARG;
+            W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(2);
             *(StgWord16*)Sp = *(StgWord16*)(literals+o_lit);
             goto nextInsn;
         }
 
         case bci_PUSH_UBX32: {
-            int o_lit = BCO_GET_LARGE_ARG;
+            W_ o_lit = BCO_GET_LARGE_ARG;
             Sp_subB(4);
             *(StgWord32*)Sp = *(StgWord32*)(literals+o_lit);
             goto nextInsn;
         }
 
         case bci_PUSH_UBX: {
-            int i;
-            int o_lits = BCO_GET_LARGE_ARG;
-            int n_words = BCO_NEXT;
+            W_ i;
+            W_ o_lits = BCO_GET_LARGE_ARG;
+            W_ n_words = BCO_GET_LARGE_ARG;
             Sp_subW(n_words);
             for (i = 0; i < n_words; i++) {
                 SpW(i) = (W_)BCO_LIT(o_lits+i);
@@ -1558,10 +1558,10 @@ run_BCO:
         }
 
         case bci_SLIDE: {
-            int n  = BCO_NEXT;
-            int by = BCO_NEXT;
+            W_ n  = BCO_GET_LARGE_ARG;
+            W_ by = BCO_GET_LARGE_ARG;
             /* a_1, .. a_n, b_1, .. b_by, s => a_1, .. a_n, s */
-            while(--n >= 0) {
+            while(n-- > 0) {
                 SpW(n+by) = SpW(n);
             }
             Sp_addW(by);
@@ -1570,7 +1570,7 @@ run_BCO:
         }
 
         case bci_ALLOC_AP: {
-            int n_payload = BCO_NEXT;
+            StgHalfWord n_payload = BCO_GET_LARGE_ARG;
             StgAP *ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
             SpW(-1) = (W_)ap;
             ap->n_args = n_payload;
@@ -1583,7 +1583,7 @@ run_BCO:
         }
 
         case bci_ALLOC_AP_NOUPD: {
-            int n_payload = BCO_NEXT;
+            StgHalfWord n_payload = BCO_GET_LARGE_ARG;
             StgAP *ap = (StgAP*)allocate(cap, AP_sizeW(n_payload));
             SpW(-1) = (W_)ap;
             ap->n_args = n_payload;
@@ -1597,8 +1597,8 @@ run_BCO:
 
         case bci_ALLOC_PAP: {
             StgPAP* pap;
-            int arity = BCO_NEXT;
-            int n_payload = BCO_NEXT;
+            StgHalfWord arity = BCO_GET_LARGE_ARG;
+            StgHalfWord n_payload = BCO_GET_LARGE_ARG;
             pap = (StgPAP*)allocate(cap, PAP_sizeW(n_payload));
             SpW(-1) = (W_)pap;
             pap->n_args = n_payload;
@@ -1611,11 +1611,11 @@ run_BCO:
         }
 
         case bci_MKAP: {
-            int i;
-            int stkoff = BCO_NEXT;
-            int n_payload = BCO_NEXT;
+            StgHalfWord i;
+            W_ stkoff = BCO_GET_LARGE_ARG;
+            StgHalfWord n_payload = BCO_GET_LARGE_ARG;
             StgAP* ap = (StgAP*)SpW(stkoff);
-            ASSERT((int)ap->n_args == n_payload);
+            ASSERT(ap->n_args == n_payload);
             ap->fun = (StgClosure*)SpW(0);
 
             // The function should be a BCO, and its bitmap should
@@ -1635,11 +1635,11 @@ run_BCO:
         }
 
         case bci_MKPAP: {
-            int i;
-            int stkoff = BCO_NEXT;
-            int n_payload = BCO_NEXT;
+            StgHalfWord i;
+            W_ stkoff = BCO_GET_LARGE_ARG;
+            StgHalfWord n_payload = BCO_GET_LARGE_ARG;
             StgPAP* pap = (StgPAP*)SpW(stkoff);
-            ASSERT((int)pap->n_args == n_payload);
+            ASSERT(pap->n_args == n_payload);
             pap->fun = (StgClosure*)SpW(0);
 
             // The function should be a BCO
@@ -1663,8 +1663,8 @@ run_BCO:
 
         case bci_UNPACK: {
             /* Unpack N ptr words from t.o.s constructor */
-            int i;
-            int n_words = BCO_NEXT;
+            W_ i;
+            W_ n_words = BCO_GET_LARGE_ARG;
             StgClosure* con = UNTAG_CLOSURE((StgClosure*)SpW(0));
             Sp_subW(n_words);
             for (i = 0; i < n_words; i++) {
@@ -1674,9 +1674,9 @@ run_BCO:
         }
 
         case bci_PACK: {
-            int i;
-            int o_itbl         = BCO_GET_LARGE_ARG;
-            int n_words        = BCO_NEXT;
+            W_ i;
+            W_ o_itbl         = BCO_GET_LARGE_ARG;
+            W_ n_words        = BCO_GET_LARGE_ARG;
             StgInfoTable* itbl = INFO_PTR_TO_STRUCT((StgInfoTable *)BCO_LIT(o_itbl));
             int request        = CONSTR_sizeW( itbl->layout.payload.ptrs,
                                                itbl->layout.payload.nptrs );
@@ -2006,9 +2006,9 @@ run_BCO:
         }
 
         case bci_SWIZZLE: {
-            int stkoff = BCO_NEXT;
-            signed short n = (signed short)(BCO_NEXT);
-            SpW(stkoff) += (W_)n;
+            W_ stkoff = BCO_GET_LARGE_ARG;
+            StgInt n = BCO_GET_LARGE_ARG;
+            (*(StgInt*)(Sp_plusW(stkoff))) += n;
             goto nextInsn;
         }
 
@@ -2020,7 +2020,7 @@ run_BCO:
 
         case bci_CCALL: {
             void *tok;
-            int stk_offset            = BCO_NEXT;
+            W_ stk_offset             = BCO_GET_LARGE_ARG;
             int o_itbl                = BCO_GET_LARGE_ARG;
             int flags                 = BCO_NEXT;
             bool interruptible        = flags & 0x1;
@@ -2056,7 +2056,7 @@ run_BCO:
             uint32_t nargs = cif->nargs;
             uint32_t ret_size;
             uint32_t i;
-            int j;
+            W_ j;
             StgPtr p;
             W_ ret[2];                  // max needed
             W_ *arguments[stk_offset];  // max needed

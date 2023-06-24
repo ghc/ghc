@@ -35,8 +35,6 @@ import GHC.Prelude
 
 import GHC.ByteCode.Types
 
-import Data.Word
-
 import GHC.Driver.Env
 import GHC.Driver.Session
 import GHC.Driver.Config.Core.Lint ( initLintConfig )
@@ -2164,7 +2162,7 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 
 -- CgBreakInfo
 
-hydrateCgBreakInfo :: CgBreakInfo -> IfL ([Maybe (Id, Word16)], Type)
+hydrateCgBreakInfo :: CgBreakInfo -> IfL ([Maybe (Id, Word)], Type)
 hydrateCgBreakInfo CgBreakInfo{..} = do
   bindIfaceTyVars cgb_tyvars $ \_ -> do
     result_ty <- tcIfaceType cgb_resty
