@@ -14,7 +14,7 @@ Linear types
 warts, and bad error messages; everything down to the syntax is
 subject to change**.  See, in particular,
 :ref:`linear-types-limitations` below. We encourage you to experiment
-with this extension and report issues in the GHC bug tracker `the GHC
+with this extension and report issues in `the GHC
 bug tracker <https://gitlab.haskell.org/ghc/ghc/issues>`__, adding the
 tag ``LinearTypes``.
 
