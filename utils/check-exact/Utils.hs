@@ -164,6 +164,12 @@ badRealSrcSpan = mkRealSrcSpan bad bad
 spanLength :: RealSrcSpan -> Int
 spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol
 
+
+-- | Useful for debug dumps
+eloc2str :: EpaLocation -> String
+eloc2str (EpaSpan (RealSrcSpan r _)) = "EpaSpan " ++ show (rs2range r)
+eloc2str epaLoc = show epaLoc
+
 -- ---------------------------------------------------------------------
 -- | Checks whether a SrcSpan has zero length.
 isPointSrcSpan :: RealSrcSpan -> Bool

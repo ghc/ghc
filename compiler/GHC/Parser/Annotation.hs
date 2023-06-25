@@ -902,8 +902,7 @@ addTrailingAnnToA t cs (EpAnnS anc (AnnListItem ts) csa) =
 -- | Helper function used in the parser to add a comma location to an
 -- existing annotation.
 addTrailingCommaToN :: EpAnnS NameAnn -> EpaLocation -> EpAnnS NameAnn
-addTrailingCommaToN n l = n { s_entry = widenAnchorTA (s_entry n) (AddCommaAnn l)
-                            , s_anns = addTrailing (s_anns n) l }
+addTrailingCommaToN n l = n { s_anns = addTrailing (s_anns n) l }
   where
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn

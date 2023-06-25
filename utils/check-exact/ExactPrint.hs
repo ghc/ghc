@@ -284,9 +284,10 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
   case anchor' of
     EpaDelta _ _ -> setAcceptSpan True
     EpaSpan _ -> return ()
+    -- EpaSpan _ -> setAcceptSpan False
   p <- getPosP
-  debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
-  debugM $ "enterAnn:(anchor') =" ++ showGhc anchor'
+  pe0 <- getPriorEndD
+  debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, eloc2str anchor', astId a)
   debugM $ "enterAnn:anchor_op=" ++ showGhc (anchor_op anchor')
   prevAnchor <- getAnchorU
   let curAnchor = case anchor' of
@@ -422,8 +423,17 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor emptyComments
             NoCanUpdateAnchor -> a'
   -- debugM $ "calling setAnnotationAnchor:(curAnchor, newAchor,priorCs,postCs)=" ++ showAst (show (rs2range curAnchor), newAchor, priorCs, postCs)
-  -- debugM $ "calling setAnnotationAnchor:(newAchor,postCs)=" ++ showAst (newAchor, postCs)
-  debugM $ "enterAnn:done:(p,a) =" ++ show (p0, astId a')
+  p1 <- getPosP
+  pe1 <- getPriorEndD
+  debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, eloc2str anchor', astId a')
+
+  case anchor' of
+    -- EpaDelta _ _ -> setPriorEndD p1
+    EpaDelta _ _ -> return ()
+    EpaSpan (RealSrcSpan rs _) -> do
+      setAcceptSpan False
+      setPriorEndD (snd $ rs2range rs)
+    EpaSpan _ -> return ()
 
   return r
 
