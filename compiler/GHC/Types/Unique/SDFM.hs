@@ -82,6 +82,7 @@ lookupUSDFM usdfm x = snd (lookupReprAndEntryUSDFM usdfm x)
 -- >>> equateUSDFM [({u1,u3}, Just ele1)] u3 u4 == (Nothing, [({u1,u3,u4}, Just ele1)])
 -- >>> equateUSDFM [({u1,u3}, Just ele1)] u4 u3 == (Nothing, [({u1,u3,u4}, Just ele1)])
 -- >>> equateUSDFM [({u1,u3}, Just ele1), ({u2}, Just ele2)] u3 u2 == (Just ele1, [({u2,u1,u3}, Just ele2)])
+-- ROMES:TODO: Are all USDFM functions just for the PMC Nabla TM?
 equateUSDFM
   :: Uniquable key => UniqSDFM key ele -> key -> key -> (Maybe ele, UniqSDFM key ele)
 equateUSDFM usdfm@(USDFM env) x y =
