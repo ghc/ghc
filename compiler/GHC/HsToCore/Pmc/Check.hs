@@ -110,6 +110,8 @@ checkGrd :: PmGrd -> CheckAction RedSets
 checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
   PmLet x e -> do
+    -- romes: we could potentially do update the trees to use e-class ids here,
+    -- or in pmcMatches
     matched <- addPhiCtNablas inc (PhiCoreCt x e)
     tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
@@ -186,7 +188,7 @@ checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
   unc <- addPhiCtNablas inc (PhiNotBotCt var)
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
-checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
+checkPatBind :: PmPatBind Pre -> CheckAction (PmPatBind Post)
 checkPatBind = coerce checkGRHS
 
 checkRecSel :: PmRecSel () -> CheckAction (PmRecSel Id)

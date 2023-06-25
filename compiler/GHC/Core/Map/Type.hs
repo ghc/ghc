@@ -17,7 +17,7 @@ module GHC.Core.Map.Type (
    LooseTypeMap,
    -- ** With explicit scoping
    CmEnv, lookupCME, extendTypeMapWithScope, lookupTypeMapWithScope,
-   mkDeBruijnContext, extendCME, extendCMEs, emptyCME,
+   mkDeBruijnContext, extendCME, extendCMEs, emptyCME, sizeCME,
 
    -- * Utilities for use by friends only
    TypeMapG, CoercionMapG,
@@ -516,6 +516,10 @@ extendCMEs env vs = foldl' extendCME env vs
 
 lookupCME :: CmEnv -> Var -> Maybe BoundVar
 lookupCME (CME { cme_env = env }) v = lookupVarEnv env v
+
+-- | \(O(1)\). Number of elements in the CmEnv.
+sizeCME :: CmEnv -> Int
+sizeCME CME{cme_next=next} = next
 
 -- | @DeBruijn a@ represents @a@ modulo alpha-renaming.  This is achieved
 -- by equipping the value with a 'CmEnv', which tracks an on-the-fly deBruijn

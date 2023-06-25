@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE RankNTypes   #-}
+{-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ApplicativeDo       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
@@ -10,12 +14,12 @@
 module GHC.HsToCore.Pmc.Solver.Types (
 
         -- * Normalised refinement types
-        BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..),
+        BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TmEGraph, TyState(..),
         Nabla(..), Nablas(..), initNablas,
         lookupRefuts, lookupSolution,
 
         -- ** Looking up 'VarInfo'
-        lookupVarInfo, lookupVarInfoNT, trvVarInfo,
+        lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo, representId, representIds,
 
         -- ** Caching residual COMPLETE sets
         CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
@@ -42,10 +46,9 @@ import GHC.Prelude
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
-import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
-import GHC.Types.Unique.SDFM
 import GHC.Types.Name
+import GHC.Core.Equality
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Utils.Outputable
@@ -58,7 +61,7 @@ import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.Map.Expr
+import GHC.Core.Map.Type
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -74,6 +77,17 @@ import Data.Foldable (find)
 import Data.Ratio
 import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
+
+import Data.Tuple (swap)
+import Data.Traversable (mapAccumL)
+import Data.Functor.Compose
+import Data.Equality.Analysis (Analysis(..))
+import Data.Equality.Graph (EGraph, ClassId)
+import Data.Equality.Graph.Lens
+import qualified Data.Equality.Graph as EG
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IS (empty)
+import Data.Bifunctor (second)
 
 -- import GHC.Driver.Ppr
 
@@ -131,21 +145,19 @@ instance Outputable TyState where
 initTyState :: TyState
 initTyState = TySt 0 emptyInert
 
--- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
--- entries are possibly shared when we figure out that two variables must be
--- equal, thus represent the same set of values.
+-- | The term oracle state. Stores 'VarInfo' for encountered 'Id's and
+-- 'CoreExpr's. These entries are possibly shared when we figure out that two
+-- variables must be equal, thus represent the same set of values.
 --
 -- See Note [TmState invariants] in "GHC.HsToCore.Pmc.Solver".
 data TmState
   = TmSt
-  { ts_facts :: !(UniqSDFM Id VarInfo)
-  -- ^ Facts about term variables. Deterministic env, so that we generate
-  -- deterministic error messages.
-  , ts_reps  :: !(CoreMap Id)
-  -- ^ An environment for looking up whether we already encountered semantically
-  -- equivalent expressions that we want to represent by the same 'Id'
-  -- representative.
-  , ts_dirty :: !DIdSet
+  { ts_facts :: !TmEGraph
+  -- ^ Facts about terms.
+
+  -- ROMES:TODO: ts_dirty looks a bit to me like the bookeeping needed to know
+  -- which nodes to upward merge, perhaps we can get rid of it too.
+  , ts_dirty :: !IntSet
   -- ^ Which 'VarInfo' needs to be checked for inhabitants because of new
   -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
@@ -161,6 +173,8 @@ data VarInfo
   { vi_id  :: !Id
   -- ^ The 'Id' in question. Important for adding new constraints relative to
   -- this 'VarInfo' when we don't easily have the 'Id' available.
+  -- ROMES:TODO: What is the Id in question when we might have multiple Ids in the same equivalence class?
+  -- It seems currenlty this is the representative of the e-class, so we could probably drop it, in favour of Type or so (since sometimes we need to know the type, and that's also reasonable data for the e-class to have)
 
   , vi_pos :: ![PmAltConApp]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
@@ -168,7 +182,7 @@ data VarInfo
   -- pattern matches involving pattern synonym
   --    case x of { Just y -> case x of PatSyn z -> ... }
   -- However, no more than one RealDataCon in the list, otherwise contradiction
-  -- because of generativity.
+  -- because of generativity (which would violate Invariant 1 from the paper).
 
   , vi_neg :: !PmAltConSet
   -- ^ Negative info: A list of 'PmAltCon's that it cannot match.
@@ -206,7 +220,7 @@ data PmAltConApp
   = PACA
   { paca_con :: !PmAltCon
   , paca_tvs :: ![TyVar]
-  , paca_ids :: ![Id]
+  , paca_ids :: ![ClassId]
   }
 
 -- | See 'vi_bot'.
@@ -227,7 +241,7 @@ instance Outputable BotInfo where
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt state reps dirty) = ppr state $$ ppr reps $$ ppr dirty
+  ppr (TmSt _ dirty) = text "<e-graph>" $$ ppr dirty
 
 -- | Not user-facing.
 instance Outputable VarInfo where
@@ -248,7 +262,7 @@ instance Outputable VarInfo where
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptyUSDFM emptyCoreMap emptyDVarSet
+initTmState = TmSt EG.emptyEGraph IS.empty
 
 -- | A data type that caches for the 'VarInfo' of @x@ the results of querying
 -- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
@@ -300,9 +314,14 @@ emptyVarInfo x
   , vi_rcm = emptyRCM
   }
 
-lookupVarInfo :: TmState -> Id -> VarInfo
--- (lookupVarInfo tms x) tells what we know about 'x'
-lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
+-- | @lookupVarInfo tms x@ tells what we know about 'x'
+--- romes:TODO: This will have a different type. I don't know what yet.
+-- romes:TODO I don't think this is what we want any longer, more like represent Id and see if it was previously represented by some data or not?
+-- romes:TodO should return VarInfo rather than Maybe VarInfo
+lookupVarInfo :: TmState -> ClassId -> VarInfo
+lookupVarInfo (TmSt eg _) x
+-- RM: Yea, I don't like the fact that currently all e-classes are created by Ids and have an Empty Var info, yet we must call "fromMaybe" here. Not good.
+  = eg ^._class x._data
 
 -- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
 -- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
@@ -314,26 +333,32 @@ lookupVarInfo (TmSt env _ _) x = fromMaybe (emptyVarInfo x) (lookupUSDFM env x)
 -- modulo type normalisation!
 --
 -- See also Note [Coverage checking Newtype matches] in GHC.HsToCore.Pmc.Solver.
-lookupVarInfoNT :: TmState -> Id -> (Id, VarInfo)
+--
+-- RM: looks like we could get perhaps represent the newtypes in the e-graph instead and somehow simplify this?
+lookupVarInfoNT :: TmState -> ClassId -> (ClassId, VarInfo)
 lookupVarInfoNT ts x = case lookupVarInfo ts x of
   VI{ vi_pos = as_newtype -> Just y } -> lookupVarInfoNT ts y
-  res                                 -> (x, res)
+  res -> (x, res)
   where
     as_newtype = listToMaybe . mapMaybe go
     go PACA{paca_con = PmAltConLike (RealDataCon dc), paca_ids = [y]}
       | isNewDataCon dc = Just y
     go _                = Nothing
 
-trvVarInfo :: Functor f => (VarInfo -> f (a, VarInfo)) -> Nabla -> Id -> f (a, Nabla)
+-- romes: We could probably inline this
+trvVarInfo :: forall f a. Functor f => (VarInfo -> f (a,VarInfo)) -> Nabla -> ClassId -> f (a,Nabla)
 trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
-  = set_vi <$> f (lookupVarInfo ts x)
-  where
-    set_vi (a, vi') =
-      (a, nabla{ nabla_tm_st = ts{ ts_facts = addToUSDFM env (vi_id vi') vi' } })
+  = second (\g -> nabla{nabla_tm_st = ts{ts_facts=g}}) <$> updateAccum (_class x._data) f env
+    where
+      updateAccum :: forall f a s c. Functor f => Lens' s a -> (a -> f (c,a)) -> s -> f (c,s)
+      updateAccum lens g = getCompose . lens @(Compose f ((,) c)) (Compose . g)
 
 ------------------------------------------------
 -- * Exported utility functions querying 'Nabla'
 
+-- ROMES:TODO: Document
+-- | Lookup the refutable patterns, i.e. the pattern alt cons that certainly can't happen??
+-- ROMES:TODO: ClassId?
 lookupRefuts :: Nabla -> Id -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
@@ -465,6 +490,7 @@ extendPmAltConSet (PACS cls lits) (PmAltConLike cl)
 extendPmAltConSet (PACS cls lits) (PmAltLit lit)
   = PACS cls (unionLists lits [lit])
 
+-- | The elements of a 'PmAltConSet'
 pmAltConSetElems :: PmAltConSet -> [PmAltCon]
 pmAltConSetElems (PACS cls lits)
   = map PmAltConLike (uniqDSetToList cls) ++ map PmAltLit lits
@@ -789,7 +815,7 @@ instance Outputable PmLit where
             , (charPrimTy, primCharSuffix)
             , (floatPrimTy, primFloatSuffix)
             , (doublePrimTy, primDoubleSuffix) ]
-      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
+      suffix = maybe empty snd (find (eqType ty . fst) tbl)
 
 instance Outputable PmAltCon where
   ppr (PmAltConLike cl) = ppr cl
@@ -797,3 +823,42 @@ instance Outputable PmAltCon where
 
 instance Outputable PmEquality where
   ppr = text . show
+
+--
+-- * E-graphs to represent normalised refinment types
+--
+
+type TmEGraph = EGraph VarInfo (DeBruijnF CoreExprF)
+
+representId :: Id -> Nabla -> (ClassId, Nabla)
+-- Will need to justify this well
+representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0})
+  = case EG.add (EG.Node (DF (deBruijnize (VarF x)))) eg0 of
+      (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=eg1})
+
+representIds :: [Id] -> Nabla -> ([ClassId], Nabla)
+representIds xs nabla = swap $ mapAccumL (\acc x -> swap $ representId x acc) nabla xs
+
+-- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
+-- There ought to be a better way.
+instance Eq VarInfo where
+  (==) _ _ = False
+instance Analysis VarInfo (DeBruijnF CoreExprF) where
+  {-# INLINE makeA #-}
+  {-# INLINE joinA #-}
+
+  -- When an e-class is created for a variable, we create an VarInfo from it.
+  -- It doesn't matter if this variable is bound or free, since it's the first
+  -- variable in this e-class (and all others would have to be equivalent to
+  -- it)
+  --
+  -- Also, the Eq instance for DeBruijn Vars will ensure that two free
+  -- variables with the same Id are equal and so they will be represented in
+  -- the same e-class
+  makeA (DF (D _ (VarF x))) = emptyVarInfo x
+  makeA _ = error "All e-classes in this e-graph must be started by a match variable"
+
+  -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
+  -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble
+  joinA _a b = b
+

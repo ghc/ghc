@@ -327,6 +327,8 @@ desugarEmptyCase :: Id -> DsM PmEmptyCase
 desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
 -- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
+--
+-- Returns a desugared guard tree of guard expressions.
 desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
                -> DsM (PmMatchGroup Pre)
 desugarMatches vars matches =
