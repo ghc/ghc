@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Core.Map.Type (
      -- * Re-export generic interface
@@ -22,6 +23,7 @@ module GHC.Core.Map.Type (
    TypeMapG, CoercionMapG,
 
    DeBruijn(..), deBruijnize, eqDeBruijnType, eqDeBruijnVar,
+   cmpDeBruijnVar,
 
    BndrMap, xtBndr, lkBndr,
    VarMap, xtVar, lkVar, lkDFreeVar, xtDFreeVar,
@@ -282,12 +284,22 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
 instance Eq (DeBruijn Var) where
   (==) = eqDeBruijnVar
 
+instance Ord (DeBruijn Var) where
+  compare = cmpDeBruijnVar
+
 eqDeBruijnVar :: DeBruijn Var -> DeBruijn Var -> Bool
 eqDeBruijnVar (D env1 v1) (D env2 v2) =
     case (lookupCME env1 v1, lookupCME env2 v2) of
         (Just b1, Just b2) -> b1 == b2
         (Nothing, Nothing) -> v1 == v2
         _ -> False
+
+cmpDeBruijnVar :: DeBruijn Var -> DeBruijn Var -> Ordering
+cmpDeBruijnVar (D env1 v1) (D env2 v2) =
+    case (lookupCME env1 v1, lookupCME env2 v2) of
+        (Just b1, Just b2) -> compare b1 b2
+        (Nothing, Nothing) -> compare v1 v2
+        (z,w) -> compare z w -- Compare Maybes on whether they're Just or Nothing
 
 instance {-# OVERLAPPING #-}
          Outputable a => Outputable (TypeMapG a) where
@@ -512,6 +524,7 @@ lookupCME (CME { cme_env = env }) v = lookupVarEnv env v
 -- export the constructor.  Make a helper function if you find yourself
 -- needing it.
 data DeBruijn a = D CmEnv a
+  deriving (Functor, Foldable, Traversable) -- romes:TODO: for internal use only!
 
 -- | Synthesizes a @DeBruijn a@ from an @a@, by assuming that there are no
 -- bound binders (an empty 'CmEnv').  This is usually what you want if there
@@ -524,6 +537,15 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
     D env (x:xs) == D env' (x':xs') = D env x  == D env' x' &&
                                       D env xs == D env' xs'
     _            == _               = False
+
+instance Ord (DeBruijn a) => Ord (DeBruijn [a]) where
+    D _   []     `compare` D _    []       = EQ
+    D env (x:xs) `compare` D env' (x':xs') = case D env x `compare` D env' x' of
+                                               LT -> LT
+                                               EQ -> D env xs `compare` D env' xs'
+                                               GT -> GT
+    D _   []     `compare` D _    (_:_)    = LT
+    D _   (_:_)  `compare` D _    []       = GT
 
 instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
     D _   Nothing  == D _    Nothing   = True

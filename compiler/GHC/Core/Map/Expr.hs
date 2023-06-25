@@ -18,6 +18,8 @@ module GHC.Core.Map.Expr (
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
    -- * Alpha equality
    eqDeBruijnExpr, eqCoreExpr,
+   -- ** Exports for CoreExprF instances
+   eqDeBruijnTickish, eqDeBruijnVar,
    -- * 'TrieMap' class reexports
    TrieMap(..), insertTM, deleteTM,
    lkDFreeVar, xtDFreeVar,
