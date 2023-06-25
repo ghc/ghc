@@ -596,7 +596,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
 
-    caf->indirectee = (StgClosure *) bh;
+    RELEASE_STORE(&caf->indirectee, (StgClosure *) bh);
     SET_INFO_RELEASE((StgClosure*)caf, &stg_IND_STATIC_info);
 
     return bh;

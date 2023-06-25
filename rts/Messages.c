@@ -288,7 +288,7 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
             // makes it into the update remembered set
             updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);
         }
-        RELAXED_STORE(&msg->link, bq->queue);
+        msg->link = bq->queue;
         bq->queue = msg;
         // No barrier is necessary here: we are only exposing the
         // closure to the GC. See Note [Heap memory barriers] in SMP.h.

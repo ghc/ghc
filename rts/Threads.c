@@ -809,7 +809,7 @@ loop:
     qinfo = ACQUIRE_LOAD(&q->header.info);
     if (qinfo == &stg_IND_info ||
         qinfo == &stg_MSG_NULL_info) {
-        q = (StgMVarTSOQueue*)((StgInd*)q)->indirectee;
+        q = (StgMVarTSOQueue*) ACQUIRE_LOAD(&((StgInd*)q)->indirectee);
         goto loop;
     }
 
