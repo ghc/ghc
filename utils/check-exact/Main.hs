@@ -80,7 +80,6 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
- -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs" Nothing
@@ -100,7 +99,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr007.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr008.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr009.hs" Nothing
- -- "../../testsuite/tests/printer/Ppr011.hs" Nothing
+ "../../testsuite/tests/printer/Ppr011.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr012.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr013.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr014.hs" Nothing
