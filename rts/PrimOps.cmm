@@ -785,12 +785,13 @@ stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
     if (h != x) { goto retry; }
 #else
-    h = StgMutVar_var(mv);
     StgMutVar_var(mv) = y;
 #endif
 
-    if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
-        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", h "ptr");
+    W_ info;
+    info = %relaxed GET_INFO(mv);
+    if (info == stg_MUT_VAR_CLEAN_info) {
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr", x "ptr");
     }
 
     return (x,z);
