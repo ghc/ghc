@@ -409,7 +409,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- sort the relative order.
 data EpaLocation = EpaSpan !RealSrcSpan !(Strict.Maybe BufSpan)
                  | EpaDelta !DeltaPos ![LEpaComment]
-               deriving (Data,Eq)
+               deriving (Data,Eq,Show)
 
 -- | Tokens embedded in the AST have an EpaLocation, unless they come from
 -- generated code (e.g. by TH).

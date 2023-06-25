@@ -79,7 +79,6 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/RmTypeSig2.hs" (Just rmTypeSig2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
- -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs" Nothing
