@@ -114,6 +114,7 @@ defaultEPState = EPState
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
              , uExtraDP = Nothing
+             , pAcceptSpan = False
              , epComments = []
              , epCommentsApplied = []
              , epEof = Nothing
@@ -175,6 +176,14 @@ data EPState = EPState
                                           -- Annotation
              , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
                                              -- list
+
+             , pAcceptSpan :: Bool -- ^ When we have processed an
+                                   -- entry of EpaDelta, accept the
+                                   -- next `EpaSpan` start as the
+                                   -- current output position. i.e. do
+                                   -- not advance epPos. Achieved by
+                                   -- setting dPriorEndPosition to the
+                                   -- end of the span.
 
              -- Print phase
              , epPos        :: !Pos -- ^ Current output position
@@ -268,10 +277,22 @@ enterAnn NoEntryVal a = do
   debugM $ "enterAnn:done:NO ANN:p =" ++ show (p, astId a)
   return r
 enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
+  acceptSpan <- getAcceptSpan
+  setAcceptSpan False
+  case anchor' of
+    -- EpaDelta _ _ -> setAcceptSpan True
+    -- EpaSpan _ _ -> return ()
+    Anchor _ (MovedAnchor _) -> setAcceptSpan True
+    _                        -> return ()
   p <- getPosP
-  debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
-  -- debugM $ "enterAnn:(cs) =" ++ showGhc (cs)
-  let curAnchor = anchor anchor' -- As a base for the current AST element
+  pe0 <- getPriorEndD
+  debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, showAst anchor', astId a)
+  debugM $ "enterAnn:anchor_op=" ++ showGhc (anchor_op anchor')
+  prevAnchor <- getAnchorU
+  let curAnchor = case anchor' of
+        -- EpaSpan (RealSrcSpan r _) -> r
+        Anchor r UnchangedAnchor -> r
+        _ -> prevAnchor
   debugM $ "enterAnn:(curAnchor):=" ++ show (rs2range curAnchor)
   case canUpdateAnchor of
     CanUpdateAnchor -> pushAppliedComments
@@ -386,8 +407,21 @@ enterAnn (Entry anchor' cs flush canUpdateAnchor) a = do
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor emptyComments
             NoCanUpdateAnchor -> a'
   -- debugM $ "calling setAnnotationAnchor:(curAnchor, newAchor,priorCs,postCs)=" ++ showAst (show (rs2range curAnchor), newAchor, priorCs, postCs)
-  -- debugM $ "calling setAnnotationAnchor:(newAchor,postCs)=" ++ showAst (newAchor, postCs)
-  debugM $ "enterAnn:done:(p,a) =" ++ show (p0, astId a')
+  p1 <- getPosP
+  pe1 <- getPriorEndD
+  debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, showAst anchor', astId a')
+
+  case anchor' of
+    -- EpaDelta _ _ -> return ()
+    -- EpaSpan (RealSrcSpan rs _) -> do
+    --   setAcceptSpan False
+    --   setPriorEndD (snd $ rs2range rs)
+    -- EpaSpan _ -> return ()
+    Anchor _ (MovedAnchor _) -> return ()
+    Anchor rs UnchangedAnchor -> do
+      setAcceptSpan False
+      setPriorEndD (snd $ rs2range rs)
+
   return r
 
 -- ---------------------------------------------------------------------
@@ -4878,6 +4912,13 @@ getPriorEndD = gets dPriorEndPosition
 
 getAnchorU :: (Monad m, Monoid w) => EP w m RealSrcSpan
 getAnchorU = gets uAnchorSpan
+
+getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
+getAcceptSpan = gets pAcceptSpan
+
+setAcceptSpan ::(Monad m, Monoid w) => Bool -> EP w m ()
+setAcceptSpan f =
+  modify (\s -> s { pAcceptSpan = f })
 
 setPriorEndD :: (Monad m, Monoid w) => Pos -> EP w m ()
 setPriorEndD pe = do
