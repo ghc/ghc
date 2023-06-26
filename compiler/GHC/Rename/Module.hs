@@ -1427,8 +1427,8 @@ rnTyClDecls tycl_ds
              role_annot_env = mkRoleAnnotEnv role_annots
              (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
 
-             inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
-             (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
+             inst_ds_map = mkDeclFreeVarsMap rdr_env tc_names instds_w_fvs
+             (init_inst_ds, rest_inst_ds) = getDeclsWithEmptyFVs [] inst_ds_map
 
              first_group
                | null init_inst_ds = []
@@ -1468,7 +1468,7 @@ rnTyClDecls tycl_ds
         bndrs                = map (tcdName . unLoc) tycl_ds
         roles                = getRoleAnnots bndrs role_env
         kisigs               = getKindSigs   bndrs kisig_env
-        (inst_ds, inst_map') = getInsts      bndrs inst_map
+        (inst_ds, inst_map') = getDeclsWithEmptyFVs bndrs inst_map
         group = TyClGroup { group_ext    = noExtField
                           , group_tyclds = tycl_ds
                           , group_kisigs = kisigs
@@ -1621,38 +1621,39 @@ lookupGlobalOccRn led to #8485).
 ****************************************************** -}
 
 ----------------------------------------------------------
--- | 'InstDeclFreeVarsMap is an association of an
---   @InstDecl@ with @FreeVars@. The @FreeVars@ are
+-- | 'DeclFreeVarsMap' is an association of an
+--   @decl@s with @FreeVars@. The @FreeVars@ are
 --   the tycon names that are both
---     a) free in the instance declaration
+--     a) free in the declaration
 --     b) bound by this group of type/class/instance decls
-type InstDeclFreeVarsMap = [(LInstDecl GhcRn, FreeVars)]
+type DeclFreeVarsMap decl = [(decl, FreeVars)]
+type InstDeclFreeVarsMap = DeclFreeVarsMap (LInstDecl GhcRn)
 
--- | Construct an @InstDeclFreeVarsMap@ by eliminating any @Name@s from the
+-- | Construct an 'DeclFreeVarsMap' by eliminating any @Name@s from the
 --   @FreeVars@ which are *not* the binders of a @TyClDecl@.
-mkInstDeclFreeVarsMap :: GlobalRdrEnv
-                      -> NameSet
-                      -> [(LInstDecl GhcRn, FreeVars)]
-                      -> InstDeclFreeVarsMap
-mkInstDeclFreeVarsMap rdr_env tycl_bndrs inst_ds_fvs
+mkDeclFreeVarsMap :: GlobalRdrEnv
+                  -> NameSet
+                  -> [(decl, FreeVars)]
+                  -> DeclFreeVarsMap decl
+mkDeclFreeVarsMap rdr_env tycl_bndrs inst_ds_fvs
   = [ (inst_decl, toParents rdr_env fvs `intersectFVs` tycl_bndrs)
     | (inst_decl, fvs) <- inst_ds_fvs ]
 
--- | Get the @LInstDecl@s which have empty @FreeVars@ sets, and the
---   @InstDeclFreeVarsMap@ with these entries removed.
--- We call (getInsts tcs instd_map) when we've completed the declarations
--- for 'tcs'.  The call returns (inst_decls, instd_map'), where
---   inst_decls are the instance declarations all of
---              whose free vars are now defined
---   instd_map' is the inst-decl map with 'tcs' removed from
---               the free-var set
-getInsts :: [Name] -> InstDeclFreeVarsMap
-         -> ([LInstDecl GhcRn], InstDeclFreeVarsMap)
-getInsts bndrs inst_decl_map
+-- | Get the declarations which have empty @FreeVars@ sets, and the
+-- 'DeclFreeVarsMap' with these entries removed. We call
+-- @'getDeclsWithEmptyFVs' tcs decl_fv_map@ when we've completed the
+-- declarations for @tcs@. The call returns @(decls, decl_fv_map')@, where:
+--
+-- * @decls@ are the declarations all of whose free vars are now defined
+--
+-- * @decl_fv__map'@ is the decl map with 'tcs' removed from the free-var set
+getDeclsWithEmptyFVs :: [Name] -> DeclFreeVarsMap decl
+         -> ([decl], DeclFreeVarsMap decl)
+getDeclsWithEmptyFVs bndrs inst_decl_map
   = partitionWith pick_me inst_decl_map
   where
-    pick_me :: (LInstDecl GhcRn, FreeVars)
-            -> Either (LInstDecl GhcRn) (LInstDecl GhcRn, FreeVars)
+    pick_me :: (decl, FreeVars)
+            -> Either decl (decl, FreeVars)
     pick_me (decl, fvs)
       | isEmptyNameSet depleted_fvs = Left decl
       | otherwise                   = Right (decl, depleted_fvs)
