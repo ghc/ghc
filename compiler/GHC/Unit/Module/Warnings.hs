@@ -62,6 +62,7 @@ import Data.Data
 import Data.List (isPrefixOf)
 import GHC.Generics ( Generic )
 import Control.DeepSeq
+import GHC.Hs.Extension
 
 
 {-
@@ -338,8 +339,3 @@ insertWarnExports :: Warnings p             -- ^ Existing warnings
                   -> Warnings p             -- ^ Updated warnings
 insertWarnExports ws@(WarnAll _) _ = ws
 insertWarnExports (WarnSome wns wes) wes' = WarnSome wns (wes ++ wes')
-
-
--- plusWarns :: Warnings p -> Warnings p -> Warnings p
--- plusWarns (WarnAll t) _ = WarnAll t
--- plusWarns (WarnSome wns1 wes1) (WarnSome wns2 wes2) = WarnSome (wns1 ++ wns2) (wes1 ++ wes2)
