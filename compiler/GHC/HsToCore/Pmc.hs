@@ -498,7 +498,8 @@ getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
     go 0 _              = pure []
     go _ []             = pure []
     go n (nabla:nablas) = do
-      front <- generateInhabitingPatterns mode vars n nabla
+      let (vars', nabla') = representIds vars nabla -- they're already there, we're just getting the e-class ids back
+      front <- generateInhabitingPatterns mode vars' n nabla'
       back <- go (n - length front) nablas
       pure (front ++ back)
 

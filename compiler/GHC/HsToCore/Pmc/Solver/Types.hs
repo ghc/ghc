@@ -359,7 +359,7 @@ trvVarInfo f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ts_facts = env} } x
 -- ROMES:TODO: Document
 -- | Lookup the refutable patterns, i.e. the pattern alt cons that certainly can't happen??
 -- ROMES:TODO: ClassId?
-lookupRefuts :: Nabla -> Id -> [PmAltCon]
+lookupRefuts :: Nabla -> ClassId -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
 lookupRefuts MkNabla{ nabla_tm_st = ts } x =
@@ -371,7 +371,7 @@ isDataConSolution _                                             = False
 
 -- @lookupSolution nabla x@ picks a single solution ('vi_pos') of @x@ from
 -- possibly many, preferring 'RealDataCon' solutions whenever possible.
-lookupSolution :: Nabla -> Id -> Maybe PmAltConApp
+lookupSolution :: Nabla -> ClassId -> Maybe PmAltConApp
 lookupSolution nabla x = case vi_pos (lookupVarInfo (nabla_tm_st nabla) x) of
   []                                         -> Nothing
   pos@(x:_)
@@ -856,7 +856,10 @@ instance Analysis VarInfo (DeBruijnF CoreExprF) where
   -- variables with the same Id are equal and so they will be represented in
   -- the same e-class
   makeA (DF (D _ (VarF x))) = emptyVarInfo x
-  makeA _ = error "All e-classes in this e-graph must be started by a match variable"
+  makeA _ = emptyVarInfo unitDataConId -- ROMES:TODO: this is dummy information which should never be used, this is quite wrong :)
+                                       -- I think the reason we end up in this
+                                       -- situation is bc we first represent an expression and only then merge it with some Id.
+                                       -- we'd need a way to represent directly into an e-class then, to not trigger the new e-class.
 
   -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
   -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble

@@ -13,8 +13,6 @@ import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Types.Basic
 import GHC.Types.Id
-import GHC.Types.Var.Env
-import GHC.Types.Unique.DFM
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
@@ -25,6 +23,10 @@ import GHC.Data.Maybe
 import Data.List.NonEmpty (NonEmpty, nonEmpty, toList)
 
 import GHC.HsToCore.Pmc.Types
+
+import Data.Equality.Graph (ClassId)
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as IM
 
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.
@@ -41,18 +43,19 @@ import GHC.HsToCore.Pmc.Types
 -- additional elements are indicated by "...".
 pprUncovered :: Nabla -> [Id] -> SDoc
 pprUncovered nabla vas
-  | isNullUDFM refuts = fsep vec -- there are no refutations
-  | otherwise         = hang (fsep vec) 4 $
-                          text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
+  | IM.null refuts = fsep vec -- there are no refutations
+  | otherwise      = hang (fsep vec) 4 $
+                       text "where" <+> vcat (map (pprRefutableShapes . snd) (IM.toList refuts))
   where
     init_prec
       -- No outer parentheses when it's a unary pattern by assuming lowest
       -- precedence
       | [_] <- vas   = topPrec
       | otherwise    = appPrec
-    ppr_action       = mapM (pprPmVar init_prec) vas
-    (vec, renamings) = runPmPpr nabla ppr_action
-    refuts           = prettifyRefuts nabla renamings
+    (vas',nabla')    = representIds vas nabla
+    ppr_action       = mapM (pprPmVar init_prec) vas'
+    (vec, renamings) = runPmPpr nabla' ppr_action
+    refuts           = prettifyRefuts nabla' renamings
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
@@ -95,35 +98,37 @@ substitution to the vectors before printing them out (see function `pprOne' in
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: Nabla -> DIdEnv (Id, SDoc) -> DIdEnv (SDoc, [PmAltCon])
-prettifyRefuts nabla = listToUDFM_Directly . map attach_refuts . udfmToList
+prettifyRefuts :: Nabla -> IntMap (ClassId, SDoc) -> IntMap (SDoc, [PmAltCon])
+prettifyRefuts nabla = IM.mapWithKey attach_refuts
   where
-    attach_refuts (u, (x, sdoc)) = (u, (sdoc, lookupRefuts nabla x))
+    -- RM: why map with key?
+    attach_refuts :: ClassId -> (ClassId, SDoc) -> (SDoc, [PmAltCon])
+    attach_refuts _u (x, sdoc) = (sdoc, lookupRefuts nabla x)
 
 
-type PmPprM a = RWS Nabla () (DIdEnv (Id, SDoc), Infinite SDoc) a
+type PmPprM a = RWS Nabla () (IntMap (ClassId, SDoc), Infinite SDoc) a
 
 -- Try nice names p,q,r,s,t before using the (ugly) t_i
 nameList :: Infinite SDoc
 nameList = map text ["p","q","r","s","t"] Inf.++ flip Inf.unfoldr (0 :: Int) (\ u -> (text ('t':show u), u+1))
 
-runPmPpr :: Nabla -> PmPprM a -> (a, DIdEnv (Id, SDoc))
-runPmPpr nabla m = case runRWS m nabla (emptyDVarEnv, nameList) of
+runPmPpr :: Nabla -> PmPprM a -> (a, IntMap (ClassId, SDoc))
+runPmPpr nabla m = case runRWS m nabla (IM.empty, nameList) of
   (a, (renamings, _), _) -> (a, renamings)
 
 -- | Allocates a new, clean name for the given 'Id' if it doesn't already have
 -- one.
-getCleanName :: Id -> PmPprM SDoc
+getCleanName :: ClassId -> PmPprM SDoc
 getCleanName x = do
   (renamings, name_supply) <- get
   let Inf clean_name name_supply' = name_supply
-  case lookupDVarEnv renamings x of
+  case IM.lookup x renamings of
     Just (_, nm) -> pure nm
     Nothing -> do
-      put (extendDVarEnv renamings x (x, clean_name), name_supply')
+      put (IM.insert x (x, clean_name) renamings, name_supply')
       pure clean_name
 
-checkRefuts :: Id -> PmPprM (Maybe SDoc) -- the clean name if it has negative info attached
+checkRefuts :: ClassId -> PmPprM (Maybe SDoc) -- the clean name if it has negative info attached
 checkRefuts x = do
   nabla <- ask
   case lookupRefuts nabla x of
@@ -133,20 +138,20 @@ checkRefuts x = do
 -- | Pretty print a variable, but remember to prettify the names of the variables
 -- that refer to neg-literals. The ones that cannot be shown are printed as
 -- underscores.
-pprPmVar :: PprPrec -> Id -> PmPprM SDoc
+pprPmVar :: PprPrec -> ClassId -> PmPprM SDoc
 pprPmVar prec x = do
   nabla <- ask
   case lookupSolution nabla x of
     Just (PACA alt _tvs args) -> pprPmAltCon prec alt args
     Nothing                   -> fromMaybe underscore <$> checkRefuts x
 
-pprPmAltCon :: PprPrec -> PmAltCon -> [Id] -> PmPprM SDoc
+pprPmAltCon :: PprPrec -> PmAltCon -> [ClassId] -> PmPprM SDoc
 pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)
 pprPmAltCon prec  (PmAltConLike cl) args = do
   nabla <- ask
   pprConLike nabla prec cl args
 
-pprConLike :: Nabla -> PprPrec -> ConLike -> [Id] -> PmPprM SDoc
+pprConLike :: Nabla -> PprPrec -> ConLike -> [ClassId] -> PmPprM SDoc
 pprConLike nabla _prec cl args
   | Just pm_expr_list <- pmExprAsList nabla (PmAltConLike cl) args
   = case pm_expr_list of
@@ -173,8 +178,8 @@ pprConLike _nabla prec cl args
 
 -- | The result of 'pmExprAsList'.
 data PmExprList
-  = NilTerminated [Id]
-  | WcVarTerminated (NonEmpty Id) Id
+  = NilTerminated [ClassId]
+  | WcVarTerminated (NonEmpty ClassId) ClassId
 
 -- | Extract a list of 'Id's out of a sequence of cons cells, optionally
 -- terminated by a wildcard variable instead of @[]@. Some examples:
@@ -185,7 +190,7 @@ data PmExprList
 --   ending in a wildcard variable x (of list type). Should be pretty-printed as
 --   (1:2:_).
 -- * @pmExprAsList [] == Just ('NilTerminated' [])@
-pmExprAsList :: Nabla -> PmAltCon -> [Id] -> Maybe PmExprList
+pmExprAsList :: Nabla -> PmAltCon -> [ClassId] -> Maybe PmExprList
 pmExprAsList nabla = go_con []
   where
     go_var rev_pref x

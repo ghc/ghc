@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 
@@ -96,12 +97,14 @@ import Data.List     (sortBy, find)
 import qualified Data.List.NonEmpty as NE
 import Data.Ord      (comparing)
 
-import Data.Equality.Graph (EGraph, ClassId)
+import Data.Equality.Graph (ClassId)
 import Data.Equality.Graph.Lens
 import qualified Data.Equality.Graph as EG
 import Data.Bifunctor (second)
 import Data.Function ((&))
 import qualified Data.IntSet as IS
+import Data.Tuple (swap)
+import Data.Traversable (mapAccumL)
 
 --
 -- * Main exports
@@ -686,7 +689,7 @@ addPhiTmCt nabla (PhiConCt x con tvs dicts args) = do
 addPhiTmCt nabla (PhiNotConCt x con)       = let (xid, nabla') = representId x nabla
                                               in addNotConCt nabla' xid con
 addPhiTmCt nabla (PhiBotCt x)              = let (xid, nabla') = representId x nabla
-                                              in addBotCt nabla' (xid,x)
+                                              in addBotCt nabla' xid
 addPhiTmCt nabla (PhiNotBotCt x)           = let (xid, nabla') = representId x nabla
                                               in addNotBotCt nabla' xid
 
@@ -698,8 +701,8 @@ filterUnliftedFields con args =
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
 -- ⊥.
-addBotCt :: Nabla -> (ClassId,Id) -> MaybeT DsM Nabla
-addBotCt nabla (xid,x) = updateVarInfo xid go nabla
+addBotCt :: Nabla -> ClassId -> MaybeT DsM Nabla
+addBotCt nabla x = updateVarInfo x go nabla
   where
     go :: VarInfo -> MaybeT DsM VarInfo
     go vi@VI { vi_bot = bot }
@@ -707,7 +710,7 @@ addBotCt nabla (xid,x) = updateVarInfo xid go nabla
           IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
           IsBot    -> return vi  -- There already is x ~ ⊥. Nothing left to do
           MaybeBot               -- We add x ~ ⊥
-            | definitelyUnliftedType (idType x)
+            | definitelyUnliftedType (eclassType x nabla)
             -- Case (3) in Note [Strict fields and variables of unlifted type]
             -> mzero -- unlifted vars can never be ⊥
             | otherwise
@@ -910,15 +913,19 @@ addCoreCt nabla x e = do
       | Just (in_scope, _empty_floats@[], dc, _arg_tys, args)
             <- exprIsConApp_maybe in_scope_env e
       = data_con_app x in_scope dc args
-      -- See Note [Detecting pattern synonym applications in expressions]
-      | Var y <- e, Nothing <- isDataConId_maybe x
-      -- We don't consider DataCons flexible variables
-      = modifyT (\nabla -> let (yid, nabla') = representId y nabla
-                            in addVarCt nabla' x yid)
       | otherwise
-      -- Any other expression. Try to find other uses of a semantically
-      -- equivalent expression and represent them by the same variable!
-      = equate_with_similar_expr x e
+      = do
+        nabla' <- get
+        if
+          -- See Note [Detecting pattern synonym applications in expressions]
+          | Var y <- e, Nothing <- isDataConId_maybe (eclassMatchId x nabla')
+          -- We don't consider DataCons flexible variables
+          -> modifyT (\nabla -> let (yid, nabla') = representId y nabla
+                                in addVarCt nabla' x yid)
+          | otherwise
+          -- Any other expression. Try to find other uses of a semantically
+          -- equivalent expression and represent them by the same variable!
+          -> equate_with_similar_expr x e
       where
         expr_ty       = exprType e
         expr_in_scope = mkInScopeSet (exprFreeVars e)
@@ -1312,7 +1319,7 @@ markDirty :: ClassId -> Nabla -> Nabla
 markDirty x nabla@MkNabla{nabla_tm_st = ts@TmSt{ts_dirty = dirty} } =
   nabla{nabla_tm_st = ts{ ts_dirty = IS.insert x dirty }}
 
-traverseDirty :: Monad m => (ClassId -> Maybe VarInfo -> m (Maybe VarInfo)) -> TmState -> m TmState
+traverseDirty :: Monad m => (ClassId -> VarInfo -> m VarInfo) -> TmState -> m TmState
 traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
 
   go (IS.elems dirty) env
@@ -1323,7 +1330,7 @@ traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
       vi' <- f x vi
       go xs (env & _class x._data .~ vi') -- Use 'over' or so instead?
 
-traverseAll :: Monad m => (ClassId -> Maybe VarInfo -> m (Maybe VarInfo)) -> TmState -> m TmState
+traverseAll :: Monad m => (ClassId -> VarInfo -> m VarInfo) -> TmState -> m TmState
 traverseAll f ts@TmSt{ts_facts = env} = do
   env' <- (_iclasses.(\fab (i,cl) -> let mvi = fab (i,cl^._data) in (cl &) . (_data .~) <$> mvi)) (uncurry f) env
   pure ts{ts_facts = env'}
@@ -1350,16 +1357,15 @@ inhabitationTest fuel  old_ty_st nabla@MkNabla{ nabla_tm_st = ts } = {-# SCC "in
   pure nabla{ nabla_tm_st = ts'{ts_dirty=IS.empty}}
   where
     nabla_not_dirty = nabla{ nabla_tm_st = ts{ts_dirty=IS.empty} }
-    test_one :: ClassId -> Maybe VarInfo -> MaybeT DsM (Maybe VarInfo)
-    test_one _ Nothing = pure Nothing
-    test_one cid (Just vi) =
+    test_one :: ClassId -> VarInfo -> MaybeT DsM VarInfo
+    test_one cid vi =
       lift (varNeedsTesting old_ty_st nabla cid vi) >>= \case
         True -> do
           -- lift $ tracePm "test_one" (ppr vi)
           -- No solution yet and needs testing
           -- We have to test with a Nabla where all dirty bits are cleared
-          Just <$> instantiate (fuel-1) nabla_not_dirty (cid,vi)
-        _ -> pure (Just vi)
+          instantiate (fuel-1) nabla_not_dirty (cid,vi)
+        _ -> return vi
 
 -- ROMES:TODO: The dirty shortcutting bit seems like the bookeeping on nodes to
 -- upward merge, perhaps we can rid of it too
@@ -1392,25 +1398,25 @@ varNeedsTesting old_ty_st MkNabla{nabla_ty_st=new_ty_st} _ vi = do
 -- NB: Does /not/ filter each CompleteMatch with the oracle; members may
 --     remain that do not satisfy it.  This lazy approach just
 --     avoids doing unnecessary work.
-instantiate :: Int -> Nabla -> (ClassId,VarInfo) -> MaybeT DsM VarInfo
-instantiate fuel nabla (cid,vi) = {-# SCC "instantiate" #-}
-  (instBot fuel nabla (cid,vi) <|> instCompleteSets fuel nabla (cid,vi))
+instantiate :: Int -> Nabla -> (ClassId, VarInfo) -> MaybeT DsM VarInfo
+instantiate fuel nabla (ci,vi) = {-# SCC "instantiate" #-}
+  (instBot fuel nabla (ci,vi) <|> instCompleteSets fuel nabla ci)
 
 -- | The \(⊢_{Bot}\) rule from the paper
 instBot :: Int -> Nabla -> (ClassId,VarInfo) -> MaybeT DsM VarInfo
 instBot _fuel nabla (cid,vi) = {-# SCC "instBot" #-} do
-  _nabla' <- addBotCt nabla (cid, vi_id vi)
+  _nabla' <- addBotCt nabla cid
   pure vi
 
-addNormalisedTypeMatches :: Nabla -> (ClassId, Id) -> DsM (ResidualCompleteMatches, Nabla)
-addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } (xid,x)
+addNormalisedTypeMatches :: Nabla -> ClassId -> DsM (ResidualCompleteMatches, Nabla)
+addNormalisedTypeMatches nabla@MkNabla{ nabla_ty_st = ty_st } xid
   = trvVarInfo add_matches nabla xid
   where
     add_matches vi@VI{ vi_rcm = rcm }
       -- important common case, shaving down allocations of PmSeriesG by -5%
       | isRcmInitialised rcm = pure (rcm, vi)
     add_matches vi@VI{ vi_rcm = rcm } = do
-      norm_res_ty <- normaliseSourceTypeWHNF ty_st (idType x)
+      norm_res_ty <- normaliseSourceTypeWHNF ty_st (eclassType xid nabla)
       env <- dsGetFamInstEnvs
       rcm' <- case splitReprTyConApp_maybe env norm_res_ty of
         Just (rep_tc, _args, _co)  -> addTyConMatches rep_tc rcm
@@ -1431,11 +1437,10 @@ splitReprTyConApp_maybe env ty =
 -- inhabitant, the whole thing is uninhabited. It returns the updated 'VarInfo'
 -- where all the attempted ConLike instantiations have been purged from the
 -- 'ResidualCompleteMatches', which functions as a cache.
-instCompleteSets :: Int -> Nabla -> (ClassId,VarInfo) -> MaybeT DsM VarInfo
-instCompleteSets fuel nabla (cid,vi) = {-# SCC "instCompleteSets" #-} do
-  let x = vi_id vi
-  (rcm, nabla) <- lift (addNormalisedTypeMatches nabla (cid,x))
-  nabla <- foldM (\nabla cls -> instCompleteSet fuel nabla x cls) nabla (getRcm rcm)
+instCompleteSets :: Int -> Nabla -> ClassId -> MaybeT DsM VarInfo
+instCompleteSets fuel nabla cid = {-# SCC "instCompleteSets" #-} do
+  (rcm, nabla) <- lift (addNormalisedTypeMatches nabla cid)
+  nabla <- foldM (\nabla cls -> instCompleteSet fuel nabla cid cls) nabla (getRcm rcm)
   pure (lookupVarInfo (nabla_tm_st nabla) cid)
 
 anyConLikeSolution :: (ConLike -> Bool) -> [PmAltConApp] -> Bool
@@ -1454,18 +1459,19 @@ anyConLikeSolution p = any (go . paca_con)
 -- original Nabla, not a proper refinement! No positive information will be
 -- added, only negative information from failed instantiation attempts,
 -- entirely as an optimisation.
-instCompleteSet :: Int -> Nabla -> (ClassId,Id) -> CompleteMatch -> MaybeT DsM Nabla
-instCompleteSet fuel nabla (xid,x) cs
+instCompleteSet :: Int -> Nabla -> ClassId -> CompleteMatch -> MaybeT DsM Nabla
+instCompleteSet fuel nabla xid cs
   | anyConLikeSolution (`elementOfUniqDSet` cmConLikes cs) (vi_pos vi)
   -- No need to instantiate a constructor of this COMPLETE set if we already
   -- have a solution!
   = pure nabla
-  | not (completeMatchAppliesAtType (varType x) cs)
+  | not (completeMatchAppliesAtType (eclassType xid nabla) cs)
   = pure nabla
   | otherwise
   = {-# SCC "instCompleteSet" #-} go nabla (sorted_candidates cs)
   where
     vi = lookupVarInfo (nabla_tm_st nabla) xid
+    x = vi_id vi
 
     sorted_candidates :: CompleteMatch -> [ConLike]
     sorted_candidates cm
@@ -1490,7 +1496,7 @@ instCompleteSet fuel nabla (xid,x) cs
             nabla' <- addNotConCt nabla xid (PmAltConLike con)
             go nabla' cons
       (nabla <$ instCon fuel nabla x con) -- return the original nabla, not the
-                                          -- refined one!
+                                                -- refined one!
             <|> recur_not_con -- Assume that x can't be con. Encode that fact
                               -- with addNotConCt and recur.
 
@@ -1574,6 +1580,7 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
       arg_ids <- mapM mkPmId field_tys'
+      let (nabla', arg_class_ids) = mapAccumL (\nab id -> swap $ representId id nab) nabla arg_ids
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
@@ -1586,10 +1593,10 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       runMaybeT $ do
         -- Case (2) of Note [Strict fields and variables of unlifted type]
         let alt = PmAltConLike con
-        let branching_factor = length $ filterUnliftedFields alt arg_ids
+        let branching_factor = length $ filterUnliftedFields alt (zip arg_class_ids arg_ids)
         let ct = PhiConCt x alt ex_tvs gammas arg_ids
         nabla1 <- traceWhenFailPm (hdr "(ct unsatisfiable) }") (ppr ct) $
-                  addPhiTmCt nabla ct
+                  addPhiTmCt nabla' ct
         -- See Note [Fuel for the inhabitation test]
         let new_fuel
               | branching_factor <= 1 = fuel
@@ -1606,13 +1613,13 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
           , ppr new_fuel
           ]
         nabla2 <- traceWhenFailPm (hdr "(inh test failed) }") (ppr nabla1) $
-                  inhabitationTest new_fuel (nabla_ty_st nabla) nabla1
+                  inhabitationTest new_fuel (nabla_ty_st nabla') nabla1
         lift $ tracePm (hdr "(inh test succeeded) }") (ppr nabla2)
         pure nabla2
     Nothing -> do
       tracePm (hdr "(match_ty not instance of res_ty) }") empty
       pure (Just nabla) -- Matching against match_ty failed. Inhabited!
-                        -- See Note [Instantiating a ConLike].
+                         -- See Note [Instantiating a ConLike].
 
 -- | @matchConLikeResTy _ _ ty K@ tries to match @ty@ against the result
 -- type of @K@, @res_ty@. It returns a substitution @s@ for @K@'s universal
@@ -1947,13 +1954,15 @@ instance Outputable GenerateInhabitingPatternsMode where
 -- perhaps empty) refinements of @nabla@ that represent inhabited patterns.
 -- Negative information is only retained if literals are involved or for
 -- recursive GADTs.
-generateInhabitingPatterns :: GenerateInhabitingPatternsMode -> [Id] -> Int -> Nabla -> DsM [Nabla]
+--
+-- The list of 'Id's @vs@ is the list of match-ids ? and they have all already been represented in the e-graph, we just represent them again to re-gain class id information
+generateInhabitingPatterns :: GenerateInhabitingPatternsMode -> [ClassId] -> Int -> Nabla -> DsM [Nabla]
 -- See Note [Why inhabitationTest doesn't call generateInhabitingPatterns]
 generateInhabitingPatterns _    _      0 _     = pure []
 generateInhabitingPatterns _    []     _ nabla = pure [nabla]
 generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
   tracePm "generateInhabitingPatterns" (ppr mode <+> ppr n <+> ppr (x:xs) $$ ppr nabla)
-  let (VI _ pos neg _ _) = fromMaybe (emptyVarInfo x) $ lookupVarInfo ts x
+  let VI _ pos neg _ _ = lookupVarInfo ts x
   case pos of
     _:_ -> do
       -- Example for multiple solutions (must involve a PatSyn):
@@ -1983,15 +1992,15 @@ generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
     -- Tries to instantiate a variable by possibly following the chain of
     -- newtypes and then instantiating to all ConLikes of the wrapped type's
     -- minimal residual COMPLETE set.
-    try_instantiate :: Id -> [Id] -> Int -> Nabla -> DsM [Nabla]
+    try_instantiate :: ClassId -> [ClassId] -> Int -> Nabla -> DsM [Nabla]
     -- Convention: x binds the outer constructor in the chain, y the inner one.
     try_instantiate x xs n nabla = do
-      (_src_ty, dcs, rep_ty) <- tntrGuts <$> pmTopNormaliseType (nabla_ty_st nabla) (idType x)
+      (_src_ty, dcs, rep_ty) <- tntrGuts <$> pmTopNormaliseType (nabla_ty_st nabla) (eclassType x nabla)
       mb_stuff <- runMaybeT $ instantiate_newtype_chain x nabla dcs
       case mb_stuff of
         Nothing -> pure []
         Just (y, newty_nabla@MkNabla{nabla_tm_st=ts}) -> do
-          let vi = fromMaybe (emptyVarInfo y) $ lookupVarInfo ts y
+          let vi = lookupVarInfo ts y
           env <- dsGetFamInstEnvs
           rcm <- case splitReprTyConApp_maybe env rep_ty of
             Just (tc, _, _) -> addTyConMatches tc (vi_rcm vi)
@@ -2015,16 +2024,17 @@ generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
     -- Instantiates a chain of newtypes, beginning at @x@.
     -- Turns @x nabla [T,U,V]@ to @(y, nabla')@, where @nabla'@ we has the fact
     -- @x ~ T (U (V y))@.
-    instantiate_newtype_chain :: Id -> Nabla -> [(Type, DataCon, Type)] -> MaybeT DsM (Id, Nabla)
+    instantiate_newtype_chain :: ClassId -> Nabla -> [(Type, DataCon, Type)] -> MaybeT DsM (ClassId, Nabla)
     instantiate_newtype_chain x nabla []                      = pure (x, nabla)
     instantiate_newtype_chain x nabla ((_ty, dc, arg_ty):dcs) = do
       y <- lift $ mkPmId arg_ty
+      let (yid,nabla') = representId y nabla
       -- Newtypes don't have existentials (yet?!), so passing an empty
       -- list as ex_tvs.
-      nabla' <- addConCt nabla x (PmAltConLike (RealDataCon dc)) [] [y]
-      instantiate_newtype_chain y nabla' dcs
+      nabla'' <- addConCt nabla' x (PmAltConLike (RealDataCon dc)) [] [yid]
+      instantiate_newtype_chain yid nabla'' dcs
 
-    instantiate_cons :: Id -> Type -> [Id] -> Int -> Nabla -> [ConLike] -> DsM [Nabla]
+    instantiate_cons :: ClassId -> Type -> [ClassId] -> Int -> Nabla -> [ConLike] -> DsM [Nabla]
     instantiate_cons _ _  _  _ _     []       = pure []
     instantiate_cons _ _  _  0 _     _        = pure []
     instantiate_cons _ ty xs n nabla _
@@ -2033,8 +2043,8 @@ generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
       = generateInhabitingPatterns mode xs n nabla
     instantiate_cons x ty xs n nabla (cl:cls) = do
       -- The following line is where we call out to the inhabitationTest!
-      mb_nabla <- runMaybeT $ instCon 4 nabla x cl
-      tracePm "instantiate_cons" (vcat [ ppr x <+> dcolon <+> ppr (idType x)
+      mb_nabla <- runMaybeT $ instCon 4 nabla (eclassMatchId x nabla) cl
+      tracePm "instantiate_cons" (vcat [ ppr x <+> dcolon <+> ppr (eclassType x nabla)
                                        , ppr ty
                                        , ppr cl
                                        , ppr nabla
@@ -2129,5 +2139,12 @@ the -XEmptyCase case in 'reportWarnings' by looking for 'ReportEmptyCase'.
 updateVarInfo :: Functor f => ClassId -> (VarInfo -> f VarInfo) -> Nabla -> f Nabla
 -- Update the data at class @xid@ using lenses and the monadic action @go@
 updateVarInfo xid f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=eg } } = (\eg' -> nabla{ nabla_tm_st = ts{ts_facts = eg'} }) <$> (_class xid . _data) f eg
+
+eclassMatchId :: HasCallStack => ClassId -> Nabla -> Id
+eclassMatchId cid = vi_id . (^. _class cid . _data) . (ts_facts . nabla_tm_st)
+
+eclassType :: ClassId -> Nabla -> Type
+eclassType cid = idType . eclassMatchId cid
+
 
 -- ROMES:TODO: When exactly to rebuild?

@@ -26,6 +26,8 @@ import qualified Data.Equality.Graph.Monad as EGM
 import Data.Equality.Utils (Fix(..))
 
 import GHC.Utils.Misc (all2)
+import GHC.Utils.Outputable (showPprUnsafe)
+import GHC.Core.Coercion (coercionType)
 
 -- Important to note the binders are also represented by $a$
 -- This is because in the e-graph we will represent binders with the
@@ -343,8 +345,14 @@ cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
 
 -- ROMES:TODO: DEBRUIJN ORDERING ON TYPES!!!
 cmpDeBruijnType :: DeBruijn Type -> DeBruijn Type -> Ordering
-cmpDeBruijnType _ _ = EQ
+cmpDeBruijnType d1@(D _ t1) d2@(D _ t2)
+  = if eqDeBruijnType d1 d2
+       then EQ
+       else compare (showPprUnsafe t1) (showPprUnsafe t2)
+       
 
 -- ROMES:TODO: DEBRUIJN ORDERING ON COERCIONS!!!
 cmpDeBruijnCoercion :: DeBruijn Coercion -> DeBruijn Coercion -> Ordering
-cmpDeBruijnCoercion _ _ = EQ
+cmpDeBruijnCoercion (D env1 co1) (D env2 co2)
+  = cmpDeBruijnType (D env1 (coercionType co1)) (D env2 (coercionType co2))
+
