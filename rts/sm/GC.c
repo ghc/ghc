@@ -979,9 +979,9 @@ GarbageCollect (struct GcConfig config,
   // Post ticky counter sample.
   // We do this at the end of execution since tickers are registered in the
   // course of program execution.
-  if (performTickySample) {
+  if (RELAXED_LOAD(&performTickySample)) {
       emitTickyCounterSamples();
-      performTickySample = false;
+      RELAXED_STORE(&performTickySample, false);
   }
 #endif
 
