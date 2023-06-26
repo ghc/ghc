@@ -8,6 +8,7 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
@@ -93,6 +94,7 @@ import Control.Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.IntMap.Strict as I
 import qualified Data.Semigroup (Semigroup(..))
+import GHC.Utils.Monad
 
 --------------------------------------------------------------------------
 --
@@ -612,18 +614,22 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
 
 data IPEStats = IPEStats { ipe_total :: !Int
                          , ipe_closure_types :: !(I.IntMap Int)
-                         , ipe_default :: !Int }
+                         , ipe_default :: !Int
+                         , ipe_skipped :: !Int }
 
 instance Semigroup IPEStats where
-  (IPEStats a1 a2 a3) <> (IPEStats b1 b2 b3) = IPEStats (a1 + b1) (I.unionWith (+) a2 b2) (a3 + b3)
+  (IPEStats a1 a2 a3 a4) <> (IPEStats b1 b2 b3 b4) = IPEStats (a1 + b1) (I.unionWith (+) a2 b2) (a3 + b3) (a4 + b4)
 
 instance Monoid IPEStats where
-  mempty = IPEStats 0 I.empty 0
+  mempty = IPEStats 0 I.empty 0 0
 
 defaultIpeStats :: IPEStats
-defaultIpeStats = IPEStats { ipe_total = 0, ipe_closure_types = I.empty, ipe_default = 1}
+defaultIpeStats = IPEStats { ipe_total = 0, ipe_closure_types = I.empty, ipe_default = 1, ipe_skipped = 0 }
 closureIpeStats :: Int -> IPEStats
-closureIpeStats t = IPEStats { ipe_total = 1, ipe_closure_types = I.singleton t 1, ipe_default = 0}
+closureIpeStats t = IPEStats { ipe_total = 1, ipe_closure_types = I.singleton t 1, ipe_default = 0, ipe_skipped = 0 }
+
+skippedIpeStats :: IPEStats
+skippedIpeStats = mempty { ipe_skipped = 1}
 
 instance Outputable IPEStats where
   ppr = pprIPEStats
@@ -632,13 +638,14 @@ pprIPEStats :: IPEStats -> SDoc
 pprIPEStats (IPEStats{..}) =
   vcat $ [ text "Tables with info:" <+> ppr ipe_total
          , text "Tables with fallback:" <+> ppr ipe_default
+         , text "Tables skipped:" <+> ppr ipe_skipped
          ] ++ [ text "Info(" <> ppr k <> text "):" <+> ppr n | (k, n) <- I.assocs ipe_closure_types ]
 
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenance table.
-convertInfoProvMap :: [CmmInfoTable] -> Module -> InfoTableProvMap -> (IPEStats, [InfoProvEnt])
-convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
-  traverse (\cmit ->
+convertInfoProvMap :: StgToCmmConfig -> [CmmInfoTable] -> Module -> InfoTableProvMap -> (IPEStats, [InfoProvEnt])
+convertInfoProvMap cfg defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
+  mapMaybeM (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
 
@@ -650,23 +657,34 @@ convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTab
                                 Just (ty, mbspan) -> Just (closureIpeStats cn, (InfoProvEnt cl cn (tyString ty) this_mod mbspan))
                                 Nothing -> Nothing
 
-        lookupDataConMap = do
+        lookupDataConMap :: Maybe (IPEStats, InfoProvEnt)
+        lookupDataConMap = (closureIpeStats cn,) <$> do
             UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique
             -- Lookup is linear but lists will be small (< 100)
-            return $ (closureIpeStats cn, InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns)))
+            return $ (InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns)))
 
+        lookupInfoTableToSourceLocation :: Maybe (IPEStats, InfoProvEnt)
         lookupInfoTableToSourceLocation = do
             sourceNote <- Map.lookup (cit_lbl cmit) infoTableToSourceLocationMap
-            return $ (closureIpeStats cn, InfoProvEnt cl cn "" this_mod sourceNote)
+            return $ (closureIpeStats cn, (InfoProvEnt cl cn "" this_mod sourceNote))
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
-        simpleFallback = (defaultIpeStats, cmmInfoTableToInfoProvEnt this_mod cmit)
+        simpleFallback =
+          if stgToCmmInfoTableMapFallback cfg
+            then Just (defaultIpeStats, cmmInfoTableToInfoProvEnt this_mod cmit)
+            else Nothing
+
+        twiddle :: Maybe (IPEStats, InfoProvEnt) -> (IPEStats, Maybe InfoProvEnt)
+        twiddle Nothing = (skippedIpeStats, Nothing)
+        twiddle (Just (s, c)) = (s, Just c)
 
   in
-    if (isStackRep . cit_rep) cmit then
-      fromMaybe simpleFallback lookupInfoTableToSourceLocation
+    twiddle $ if (isStackRep . cit_rep) cmit then
+      if stgToCmmInfoTableMapStackFrame cfg
+        then fromMaybe simpleFallback (Just <$> lookupInfoTableToSourceLocation)
+        else Nothing
     else
-      fromMaybe simpleFallback (lookupDataConMap `firstJust` lookupClosureMap)) defns
+      fromMaybe simpleFallback (Just <$> firstJust (lookupDataConMap) (lookupClosureMap))) defns

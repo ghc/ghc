@@ -1198,7 +1198,7 @@ Other
     if things go wrong. Which would otherwise be quite difficult.
 
 .. ghc-flag:: -funoptimized-core-for-interpreter
-    :shortdesc: Disable optimizations with the interpreter 
+    :shortdesc: Disable optimizations with the interpreter
     :reverse: -fno-unoptimized-core-for-interpreter
     :type: dynamic
 
