@@ -28,7 +28,7 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
-import Oracles.Setting (bashPath)
+import Oracles.Setting (bashPath, targetStage)
 import System.Exit
 import System.IO (stderr)
 
@@ -42,6 +42,10 @@ import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified Data.ByteString as BS
 import qualified GHC.Foreign as GHC
 import GHC.ResponseFile
+
+import GHC.Toolchain (Target(..))
+import qualified GHC.Toolchain as Toolchain
+import GHC.Toolchain.Program
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -402,31 +406,33 @@ runHaddock haddockPath flagArgs fileInputs = withTempFile $ \tmp -> do
 -- 'Objdump' is only required on OpenBSD and AIX. Add support for platform
 -- specific optional builders as soon as we can reliably test this feature.
 -- See https://github.com/snowleopard/hadrian/issues/211.
-isOptional :: Builder -> Bool
-isOptional = \case
+isOptional :: Toolchain.Target -- ^ Some builders are optional depending on the target
+           -> Builder
+           -> Bool
+isOptional target = \case
     Objdump  -> True
     -- alex and happy are not required when building source distributions
     -- and ./configure will complain if they are not available when building in-tree
     Happy    -> True
     Alex     -> True
+    -- Most ar implemententions no longer need ranlib, but some still do
+    Ranlib   -> not $ Toolchain.arNeedsRanlib (tgtAr target)
     _        -> False
 
 -- | Determine the location of a system 'Builder'.
 systemBuilderPath :: Builder -> Action FilePath
 systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
-    Ar _ (Stage0 {})-> fromKey "system-ar"
-    Ar _ _          -> fromKey "ar"
+    Ar _ stage      -> fromStageTC stage "ar"  (Toolchain.arMkArchive . tgtAr)
     Autoreconf _    -> stripExe =<< fromKey "autoreconf"
-    Cc  _  (Stage0 {}) -> fromKey "system-cc"
-    Cc  _  _        -> fromKey "cc"
+    Cc  _ stage     -> fromStageTC stage "cc" (Toolchain.ccProgram . tgtCCompiler)
     -- We can't ask configure for the path to configure!
     Configure _     -> return "configure"
     Ghc _  (Stage0 {})   -> fromKey "system-ghc"
     GhcPkg _ (Stage0 {}) -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
-    HsCpp           -> fromKey "hs-cpp"
-    Ld _            -> fromKey "ld"
+    HsCpp           -> fromTargetTC "hs-cpp" (Toolchain.hsCppProgram . tgtHsCPreprocessor)
+    Ld _            -> fromTargetTC "ld" (Toolchain.ccLinkProgram . tgtCCompilerLink)
     -- MergeObjects Stage0 is a special case in case of
     -- cross-compiling. We're building stage1, e.g. code which will be
     -- executed on the host and hence we need to use host's merge
@@ -435,15 +441,14 @@ systemBuilderPath builder = case builder of
     -- parameters. E.g. building a cross-compiler on and for x86_64
     -- which will target ppc64 means that MergeObjects Stage0 will use
     -- x86_64 linker and MergeObject _ will use ppc64 linker.
-    MergeObjects (Stage0 {}) -> fromKey "system-merge-objects"
-    MergeObjects _  -> fromKey "merge-objects"
+    MergeObjects st -> fromStageTC st "merge-objects" (maybeProg Toolchain.mergeObjsProgram . tgtMergeObjs)
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
-    Nm              -> fromKey "nm"
+    Nm              -> fromTargetTC "nm" (Toolchain.nmProgram . tgtNm)
     Objdump         -> fromKey "objdump"
     Patch           -> fromKey "patch"
     Python          -> fromKey "python"
-    Ranlib          -> fromKey "ranlib"
+    Ranlib          -> fromTargetTC "ranlib" (maybeProg Toolchain.ranlibProgram . tgtRanlib)
     Testsuite _     -> fromKey "python"
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
@@ -459,10 +464,24 @@ systemBuilderPath builder = case builder of
         let unpack = fromMaybe . error $ "Cannot find path to builder "
                 ++ quote key ++ inCfg ++ " Did you skip configure?"
         path <- unpack <$> lookupValue configFile key
+        validate key path
+
+    -- Get program from a certain stage's target configuration
+    fromStageTC stage keyname key = do
+        path <- prgPath . key <$> targetStage stage
+        validate keyname path
+
+    -- Get program from the target's target configuration
+    fromTargetTC keyname key = do
+        path <- queryTargetTarget (prgPath . key)
+        validate keyname path
+
+    validate keyname path = do
+        target <- getTargetTarget
         if null path
         then do
-            unless (isOptional builder) . error $ "Non optional builder "
-                ++ quote key ++ " is not specified" ++ inCfg
+            unless (isOptional target builder) . error $ "Non optional builder "
+                ++ quote keyname ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
         else do
             -- angerman: I find this lookupInPath rather questionable.
@@ -487,6 +506,8 @@ systemBuilderPath builder = case builder of
         let sNoExt = dropExtension s
         exists <- doesFileExist s
         if exists then return s else return sNoExt
+
+    maybeProg = maybe (Program "" [])
 
 
 -- | Was the path to a given system 'Builder' specified in configuration files?

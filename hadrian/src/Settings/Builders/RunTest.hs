@@ -20,6 +20,8 @@ import System.Directory (findExecutable)
 import Settings.Program
 import qualified Context.Type
 
+import GHC.Toolchain.Target
+
 getTestSetting :: TestSetting -> Action String
 getTestSetting key = testSetting key
 
@@ -32,7 +34,7 @@ getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Action String
 runTestGhcFlags = do
-    unregisterised <- flag GhcUnregisterised
+    unregisterised <- queryTargetTarget tgtUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt
@@ -99,10 +101,10 @@ inTreeCompilerArgs stg = do
     hasDynamic          <- (dynamic ==) . Context.Type.way <$> (programContext stg ghc)
     -- LeadingUnderscore is a property of the system so if cross-compiling stage1/stage2 could
     -- have different values? Currently not possible to express.
-    leadingUnderscore   <- flag LeadingUnderscore
+    leadingUnderscore   <- queryTargetTarget tgtSymbolsHaveLeadingUnderscore
     withInterpreter     <- ghcWithInterpreter
-    unregisterised      <- flag GhcUnregisterised
-    tables_next_to_code <- flag TablesNextToCode
+    unregisterised      <- queryTargetTarget tgtUnregisterised
+    tables_next_to_code <- queryTargetTarget tgtTablesNextToCode
     targetWithSMP       <- targetSupportsSMP
 
     cross <- flag CrossCompiling
@@ -114,17 +116,17 @@ inTreeCompilerArgs stg = do
     debugged            <- ghcDebugged        <$> flavour <*> pure ghcStage
     profiled            <- ghcProfiled        <$> flavour <*> pure ghcStage
 
-    os          <- setting HostOs
-    arch        <- setting TargetArch
+    os          <- queryHostTarget queryOS
+    arch        <- queryTargetTarget queryArch
     let codegen_arches = ["x86_64", "i386", "powerpc", "powerpc64", "powerpc64le", "aarch64"]
     let withNativeCodeGen
           | unregisterised = False
           | arch `elem` codegen_arches = True
           | otherwise = False
-    platform    <- setting TargetPlatform
-    wordsize    <- (show @Int . (*8) . read) <$> setting TargetWordSize
+    platform    <- queryTargetTarget targetPlatformTriple
+    wordsize    <- show @Int . (*8) <$> queryTargetTarget (wordSize2Bytes . tgtWordSize)
 
-    llc_cmd   <- settingsFileSetting SettingsFileSetting_LlcCommand
+    llc_cmd   <- settingsFileSetting ToolchainSetting_LlcCommand
     have_llvm <- liftIO (isJust <$> findExecutable llc_cmd)
 
     top         <- topDirectory

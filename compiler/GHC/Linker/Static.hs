@@ -239,6 +239,7 @@ linkBinary' staticLink logger tmpfs dflags unit_env o_files dep_units = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
+                          -- We should rather be asking does it support --gc-sections?
                       ++ (if toolSettings_ldIsGnuLd toolSettings' &&
                              not (gopt Opt_WholeArchiveHsLibs dflags)
                           then ["-Wl,--gc-sections"]

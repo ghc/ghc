@@ -46,4 +46,5 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
     fi
     AC_SUBST([REAL_RANLIB_CMD])
     AC_SUBST([RANLIB_CMD])
+    AC_SUBST([ArNeedsRanLib],[`echo $fp_cv_prog_ar_needs_ranlib | tr 'a-z' 'A-Z'`])
 ])# FP_PROG_AR_NEEDS_RANLIB

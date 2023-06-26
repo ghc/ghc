@@ -5,12 +5,14 @@ module Rules.Generate (
     templateRules
     ) where
 
+import Development.Shake.FilePath
 import qualified Data.Set as Set
+import qualified Data.Text as T
 import Base
 import qualified Context
 import Expression
 import Hadrian.Oracles.TextFile (lookupSystemConfig)
-import Oracles.Flag
+import Oracles.Flag hiding (arSupportsAtFile, arSupportsDashL)
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Hadrian.Haskell.Cabal.Type (PackageData(version))
@@ -21,6 +23,10 @@ import Rules.Libffi
 import Settings
 import Target
 import Utilities
+
+import GHC.Toolchain as Toolchain hiding (HsCpp(HsCpp))
+import GHC.Toolchain.Program
+import GHC.Platform.ArchOS
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -321,11 +327,14 @@ rtsCabalFlags = mconcat
     , flag "CabalStaticLibZstd" StaticLibzstd
     , flag "CabalNeedLibatomic" NeedLibatomic
     , flag "CabalUseSystemLibFFI" UseSystemFfi
-    , flag "CabalLibffiAdjustors" UseLibffiForAdjustors
-    , flag "CabalLeadingUnderscore" LeadingUnderscore
+    , targetFlag "CabalLibffiAdjustors" tgtUseLibffiForAdjustors
+    , targetFlag "CabalLeadingUnderscore" tgtSymbolsHaveLeadingUnderscore
     ]
   where
     flag = interpolateCabalFlag
+    targetFlag name q = interpolateVar name $ do
+      val <- queryTargetTarget q
+      return (toCabalBool val)
 
 ghcPrimCabalFlags :: Interpolations
 ghcPrimCabalFlags = interpolateCabalFlag "CabalNeedLibatomic" NeedLibatomic
@@ -390,20 +399,23 @@ cppify :: String -> String
 cppify = replaceEq '-' '_' . replaceEq '.' '_'
 
 -- | Generate @ghcplatform.h@ header.
+-- ROMES:TODO: For the runtime-retargetable GHC, these will eventually have to
+-- be determined at runtime, and no longer hardcoded to a file (passed as -D
+-- flags to the preprocessor, probably)
 generateGhcPlatformH :: Expr String
 generateGhcPlatformH = do
     trackGenerateHs
     stage    <- getStage
-    let chooseSetting x y = getSetting $ case stage of { Stage0 {} -> x; _ -> y }
-    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
-    buildArch      <- chooseSetting BuildArch     HostArch
-    buildOs        <- chooseSetting BuildOs       HostOs
-    buildVendor    <- chooseSetting BuildVendor   HostVendor
-    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
-    hostArch       <- chooseSetting HostArch      TargetArch
-    hostOs         <- chooseSetting HostOs        TargetOs
-    hostVendor     <- chooseSetting HostVendor    TargetVendor
-    ghcUnreg       <- getFlag    GhcUnregisterised
+    let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    buildPlatform  <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
+    buildArch      <- chooseSetting (queryBuild queryArch)   (queryHost queryArch)
+    buildOs        <- chooseSetting (queryBuild queryOS)     (queryHost queryOS)
+    buildVendor    <- chooseSetting (queryBuild queryVendor) (queryHost queryVendor)
+    hostPlatform   <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
+    hostArch       <- chooseSetting (queryHost queryArch)    (queryTarget queryArch)
+    hostOs         <- chooseSetting (queryHost queryOS)      (queryTarget queryOS)
+    hostVendor     <- chooseSetting (queryHost queryVendor)  (queryTarget queryVendor)
+    ghcUnreg       <- queryTarget tgtUnregisterised
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -437,58 +449,57 @@ generateGhcPlatformH = do
         , "#endif /* __GHCPLATFORM_H__ */"
         ]
 
--- See Note [tooldir: How GHC finds mingw on Windows]
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
     settings <- traverse sequence $
-        [ ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
-        , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
-        , ("C++ compiler command", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerCommand)
-        , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
-        , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
-        , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
-        , ("CPP command", expr $ settingsFileSetting SettingsFileSetting_CPPCommand)
-        , ("CPP flags", expr $ settingsFileSetting SettingsFileSetting_CPPFlags)
-        , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
-        , ("Haskell CPP flags", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPFlags)
-        , ("ld supports compact unwind", expr $ lookupSystemConfig "ld-has-no-compact-unwind")
-        , ("ld supports filelist", expr $ lookupSystemConfig "ld-has-filelist")
-        , ("ld is GNU ld", expr $ lookupSystemConfig "ld-is-gnu-ld")
-        , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
-        , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
-        , ("Merge objects supports response files", expr $ lookupSystemConfig "merge-objs-supports-response-files")
-        , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
-        , ("ar flags", expr $ lookupSystemConfig "ar-args")
-        , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
-        , ("ar supports -L", expr $ yesNo <$> flag ArSupportsDashL)
-        , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
-        , ("otool command", expr $ settingsFileSetting SettingsFileSetting_OtoolCommand)
-        , ("install_name_tool command", expr $ settingsFileSetting SettingsFileSetting_InstallNameToolCommand)
-        , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
-        , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
+        [ ("C compiler command",   queryTarget' ccPath)
+        , ("C compiler flags",     queryTarget' ccFlags)
+        , ("C++ compiler command", queryTarget' cxxPath)
+        , ("C++ compiler flags",   queryTarget' cxxFlags)
+        , ("C compiler link flags",       queryTarget' clinkFlags)
+        , ("C compiler supports -no-pie", queryTarget' linkSupportsNoPie)
+        , ("CPP command",         queryTarget' cppPath)
+        , ("CPP flags",           queryTarget' cppFlags)
+        , ("Haskell CPP command", queryTarget' hsCppPath)
+        , ("Haskell CPP flags",   queryTarget' hsCppFlags)
+        , ("ld supports compact unwind", queryTarget' linkSupportsCompactUnwind)
+        , ("ld supports filelist",       queryTarget' linkSupportsFilelist)
+        , ("ld is GNU ld",               queryTarget' linkIsGnu)
+        , ("Merge objects command", queryTarget' mergeObjsPath)
+        , ("Merge objects flags", queryTarget' mergeObjsFlags)
+        , ("Merge objects supports response files", queryTarget' mergeObjsSupportsResponseFiles')
+        , ("ar command",          queryTarget' arPath)
+        , ("ar flags",            queryTarget' arFlags)
+        , ("ar supports at file", queryTarget' arSupportsAtFile')
+        , ("ar supports -L",      queryTarget' arSupportsDashL')
+        , ("ranlib command", queryTarget' ranlibPath)
+        , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
+        , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
+        , ("touch command", expr $ settingsFileSetting ToolchainSetting_TouchCommand)
+        , ("windres command", queryTarget' (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
-        , ("target platform string", getSetting TargetPlatform)
-        , ("target os", getSetting TargetOsHaskell)
-        , ("target arch", getSetting TargetArchHaskell)
-        , ("target word size", expr $ lookupSystemConfig "target-word-size")
-        , ("target word big endian", expr $ lookupSystemConfig "target-word-big-endian")
-        , ("target has GNU nonexec stack", expr $ lookupSystemConfig "target-has-gnu-nonexec-stack")
-        , ("target has .ident directive", expr $ lookupSystemConfig "target-has-ident-directive")
-        , ("target has subsections via symbols", expr $ lookupSystemConfig "target-has-subsections-via-symbols")
+        , ("target platform string", queryTarget' targetPlatformTriple)
+        , ("target os",        queryTarget' (show . archOS_OS . tgtArchOs))
+        , ("target arch",      queryTarget' (show . archOS_arch . tgtArchOs))
+        , ("target word size", queryTarget' wordSize)
+        , ("target word big endian",       queryTarget' isBigEndian)
+        , ("target has GNU nonexec stack", queryTarget' (yesNo . Toolchain.tgtSupportsGnuNonexecStack))
+        , ("target has .ident directive",  queryTarget' (yesNo . Toolchain.tgtSupportsIdentDirective))
+        , ("target has subsections via symbols", queryTarget' (yesNo . Toolchain.tgtSupportsSubsectionsViaSymbols))
         , ("target has libm", expr $  lookupSystemConfig "target-has-libm")
-        , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
-        , ("LLVM target", getSetting LlvmTarget)
-        , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
-        , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
-        , ("Use inplace MinGW toolchain", expr $ settingsFileSetting SettingsFileSetting_DistroMinGW)
+        , ("Unregisterised", queryTarget' (yesNo . tgtUnregisterised))
+        , ("LLVM target", queryTarget' tgtLlvmTarget)
+        , ("LLVM llc command", expr $ settingsFileSetting ToolchainSetting_LlcCommand)
+        , ("LLVM opt command", expr $ settingsFileSetting ToolchainSetting_OptCommand)
+        , ("Use inplace MinGW toolchain", expr $ settingsFileSetting ToolchainSetting_DistroMinGW)
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show . Set.toList <$> getRtsWays)
-        , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
-        , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
+        , ("Tables next to code", queryTarget' (yesNo . tgtTablesNextToCode))
+        , ("Leading underscore",  queryTarget' (yesNo . tgtSymbolsHaveLeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibffiForAdjustors)
         , ("RTS expects libdw", yesNo <$> getFlag UseLibdw)
         ]
@@ -499,15 +510,54 @@ generateSettings = do
             ("[" ++ showTuple s)
             : ((\s' -> "," ++ showTuple s') <$> ss)
             ++ ["]"]
+  where
+    ccPath  = prgPath . ccProgram . tgtCCompiler
+    ccFlags = unwords . prgFlags . ccProgram . tgtCCompiler
+    cxxPath  = prgPath . cxxProgram . tgtCxxCompiler
+    cxxFlags = unwords . prgFlags . cxxProgram . tgtCxxCompiler
+    clinkFlags = unwords . prgFlags . ccLinkProgram . tgtCCompilerLink
+    linkSupportsNoPie = yesNo . ccLinkSupportsNoPie . tgtCCompilerLink
+    cppPath  = prgPath . cppProgram . tgtCPreprocessor
+    cppFlags = unwords . prgFlags . cppProgram . tgtCPreprocessor
+    hsCppPath  = prgPath . hsCppProgram . tgtHsCPreprocessor
+    hsCppFlags = unwords . prgFlags . hsCppProgram . tgtHsCPreprocessor
+    mergeObjsPath  = maybe "" (prgPath . mergeObjsProgram) . tgtMergeObjs
+    mergeObjsFlags = maybe "" (unwords . prgFlags . mergeObjsProgram) . tgtMergeObjs
+    linkSupportsFilelist        = yesNo . ccLinkSupportsFilelist . tgtCCompilerLink
+    linkSupportsCompactUnwind   = yesNo . ccLinkSupportsCompactUnwind . tgtCCompilerLink
+    linkIsGnu                   = yesNo . ccLinkIsGnu . tgtCCompilerLink
+    arPath  = prgPath . arMkArchive . tgtAr
+    arFlags = unwords . prgFlags . arMkArchive . tgtAr
+    arSupportsAtFile' = yesNo . arSupportsAtFile . tgtAr
+    arSupportsDashL' = yesNo . arSupportsDashL . tgtAr
+    ranlibPath  = maybe "" (prgPath . ranlibProgram) . tgtRanlib
+    isBigEndian = yesNo . (\case BigEndian -> True; LittleEndian -> False) . tgtEndianness
+    wordSize    = show . wordSize2Bytes . tgtWordSize
+    mergeObjsSupportsResponseFiles' = maybe "NO" (yesNo . mergeObjsSupportsResponseFiles) . tgtMergeObjs
+
+    -- Like @'queryTarget'@ specialized to String, but replace occurrences of
+    -- @topDirectory </> inplace/mingw@ with @$tooldir/mingw@ in the resulting string
+    --
+    -- See Note [How we configure the bundled windows toolchain]
+    queryTarget' :: (Toolchain.Target -> String) -> Expr String
+    queryTarget' f = do
+      topdir <- expr $ topDirectory
+      queryTarget (\t -> substTooldir topdir (archOS_OS $ tgtArchOs t) (f t))
+      where
+        substTooldir :: String -> OS -> String -> String
+        substTooldir topdir OSMinGW32 s
+          = T.unpack $
+            T.replace (T.pack $ normalise $ topdir </> "inplace" </> "mingw") (T.pack "$tooldir/mingw") (T.pack $ normalise s)
+        substTooldir _ _ s = s
 
 
 -- | Generate @Config.hs@ files.
 generateConfigHs :: Expr String
 generateConfigHs = do
     stage <- getStage
-    let chooseSetting x y = getSetting $ case stage of { Stage0 {} -> x; _ -> y }
-    buildPlatform <- chooseSetting BuildPlatform HostPlatform
-    hostPlatform <- chooseSetting HostPlatform TargetPlatform
+    let chooseSetting x y = case stage of { Stage0 {} -> x; _ -> y }
+    buildPlatform <- chooseSetting (queryBuild targetPlatformTriple) (queryHost targetPlatformTriple)
+    hostPlatform <- chooseSetting (queryHost targetPlatformTriple) (queryTarget targetPlatformTriple)
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
     cBooterVersion      <- getSetting GhcVersion
@@ -600,18 +650,18 @@ generateVersionHs = do
 generatePlatformHostHs :: Expr String
 generatePlatformHostHs = do
     trackGenerateHs
-    cHostPlatformArch <- getSetting HostArchHaskell
-    cHostPlatformOS   <- getSetting HostOsHaskell
+    cHostPlatformArch <- queryHost (archOS_arch . tgtArchOs)
+    cHostPlatformOS   <- queryHost (archOS_OS . tgtArchOs)
     return $ unlines
         [ "module GHC.Platform.Host where"
         , ""
         , "import GHC.Platform.ArchOS"
         , ""
         , "hostPlatformArch :: Arch"
-        , "hostPlatformArch = " ++ cHostPlatformArch
+        , "hostPlatformArch = " ++ show cHostPlatformArch
         , ""
         , "hostPlatformOS   :: OS"
-        , "hostPlatformOS   = " ++ cHostPlatformOS
+        , "hostPlatformOS   = " ++ show cHostPlatformOS
         , ""
         , "hostPlatformArchOS :: ArchOS"
         , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"

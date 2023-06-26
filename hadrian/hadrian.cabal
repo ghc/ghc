@@ -166,6 +166,8 @@ executable hadrian
                        , text                 >= 1.2     && < 3
                        , cryptohash-sha256    >= 0.11    && < 0.12
                        , base16-bytestring    >= 0.1.1 && < 1.1.0.0
+                       , ghc-platform
+                       , ghc-toolchain
     ghc-options:       -Wall
                        -Wincomplete-record-updates
                        -Wredundant-constraints

@@ -17,21 +17,17 @@ import Hadrian.Expression
 import Base
 import Oracles.Setting
 
-data Flag = ArSupportsAtFile
-          | ArSupportsDashL
-          | SystemArSupportsAtFile
-          | SystemArSupportsDashL
-          | CrossCompiling
+import GHC.Toolchain.Target (Target(..))
+import qualified GHC.Toolchain as Toolchain
+import GHC.Platform.ArchOS
+
+data Flag = CrossCompiling
           | CcLlvmBackend
-          | GhcUnregisterised
-          | TablesNextToCode
           | GmpInTree
           | GmpFrameworkPref
-          | LeadingUnderscore
           | UseSystemFfi
           | BootstrapThreadedRts
           | BootstrapEventLoggingRts
-          | UseLibffiForAdjustors
           | UseLibdw
           | UseLibnuma
           | UseLibzstd
@@ -48,21 +44,13 @@ data Flag = ArSupportsAtFile
 flag :: Flag -> Action Bool
 flag f = do
     let key = case f of
-            ArSupportsAtFile     -> "ar-supports-at-file"
-            ArSupportsDashL      -> "ar-supports-dash-l"
-            SystemArSupportsAtFile-> "system-ar-supports-at-file"
-            SystemArSupportsDashL-> "system-ar-supports-dash-l"
             CrossCompiling       -> "cross-compiling"
             CcLlvmBackend        -> "cc-llvm-backend"
-            GhcUnregisterised    -> "ghc-unregisterised"
-            TablesNextToCode     -> "tables-next-to-code"
             GmpInTree            -> "intree-gmp"
             GmpFrameworkPref     -> "gmp-framework-preferred"
-            LeadingUnderscore    -> "leading-underscore"
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
             BootstrapEventLoggingRts -> "bootstrap-event-logging-rts"
-            UseLibffiForAdjustors -> "use-libffi-for-adjustors"
             UseLibdw             -> "use-lib-dw"
             UseLibnuma           -> "use-lib-numa"
             UseLibzstd           -> "use-lib-zstd"
@@ -85,47 +73,46 @@ getFlag = expr . flag
 -- | Does the platform support object merging (and therefore we can build GHCi objects
 -- when appropriate).
 platformSupportsGhciObjects :: Action Bool
-platformSupportsGhciObjects =
-    not . null <$> settingsFileSetting SettingsFileSetting_MergeObjectsCommand
+-- FIXME: The name of the function is not entirely clear about which platform, it would be better named targetSupportsGhciObjects
+platformSupportsGhciObjects = isJust <$> queryTargetTarget tgtMergeObjs
 
 arSupportsDashL :: Stage -> Action Bool
-arSupportsDashL (Stage0 {}) = flag SystemArSupportsDashL
-arSupportsDashL _           = flag ArSupportsDashL
+arSupportsDashL stage = Toolchain.arSupportsDashL . tgtAr <$> targetStage stage
 
 arSupportsAtFile :: Stage -> Action Bool
-arSupportsAtFile (Stage0 {}) = flag SystemArSupportsAtFile
-arSupportsAtFile _           = flag ArSupportsAtFile
+arSupportsAtFile stage = Toolchain.arSupportsAtFile . tgtAr <$> targetStage stage
 
 platformSupportsSharedLibs :: Action Bool
+-- FIXME: This is querying about the target but is named "platformXXX", targetSupportsSharedLibs would be better
 platformSupportsSharedLibs = do
     windows       <- isWinTarget
-    wasm          <- anyTargetArch [ "wasm32" ]
-    ppc_linux     <- anyTargetPlatform [ "powerpc-unknown-linux" ]
-    solaris       <- anyTargetPlatform [ "i386-unknown-solaris2" ]
-    javascript    <- anyTargetArch     [ "javascript" ]
+    wasm          <- anyTargetArch [ ArchWasm32 ]
+    ppc_linux     <- (&&) <$> anyTargetArch [ ArchPPC ] <*> anyTargetOs [ OSLinux ]
+    solaris       <- (&&) <$> anyTargetArch [ ArchX86 ] <*> anyTargetOs [ OSSolaris2 ]
+    javascript    <- anyTargetArch     [ ArchJavaScript ]
     return $ not (windows || wasm || javascript || ppc_linux || solaris)
 
 -- | Does the target support threaded RTS?
 targetSupportsThreadedRts :: Action Bool
 targetSupportsThreadedRts = do
-    bad_arch <- anyTargetArch [ "wasm32", "javascript" ]
+    bad_arch <- anyTargetArch [ ArchWasm32, ArchJavaScript ]
     return $ not bad_arch
 
 -- | Does the target support the -N RTS flag?
 targetSupportsSMP :: Action Bool
 targetSupportsSMP = do
-  unreg <- flag GhcUnregisterised
+  unreg <- queryTargetTarget tgtUnregisterised
   armVer <- targetArmVersion
-  goodArch <- anyTargetArch ["i386"
-                            , "x86_64"
-                            , "powerpc"
-                            , "powerpc64"
-                            , "powerpc64le"
-                            , "arm"
-                            , "aarch64"
-                            , "s390x"
-                            , "riscv64"
-                            , "loongarch64"]
+  goodArch <- (||) <$>
+              anyTargetArch [ ArchX86
+                            , ArchX86_64
+                            , ArchPPC
+                            , ArchPPC_64 ELF_V1
+                            , ArchPPC_64 ELF_V2
+                            , ArchAArch64
+                            , ArchS390X
+                            , ArchRISCV64
+                            , ArchLoongArch64 ] <*> isArmTarget
   if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
        -- Unregisterised mode doesn't allow that.
      | unreg                -> return False
@@ -136,4 +123,4 @@ targetSupportsSMP = do
      | otherwise            -> return False
 
 useLibffiForAdjustors :: Action Bool
-useLibffiForAdjustors = flag UseLibffiForAdjustors
+useLibffiForAdjustors = queryTargetTarget tgtUseLibffiForAdjustors

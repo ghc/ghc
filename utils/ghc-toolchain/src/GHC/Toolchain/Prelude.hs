@@ -8,4 +8,4 @@ module GHC.Toolchain.Prelude
 import GHC.Toolchain.Monad
 import GHC.Toolchain.Lens
 import Control.Applicative
-import Prelude hiding (writeFile, readFile)
+import Prelude hiding (writeFile, readFile, appendFile)

@@ -8,7 +8,7 @@ ccBuilderArgs = do
     way <- getWay
     builder Cc ? mconcat
         [ getContextData ccOpts
-        , getStagedSettingList ConfCcArgs
+        , getStagedCCFlags
 
         , builder (Cc CompileC) ? mconcat
             [ arg "-Wall"

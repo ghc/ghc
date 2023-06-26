@@ -6,12 +6,14 @@ module GHC.Toolchain.Monad
     , M
     , runM
     , getEnv
+    , makeM
     , throwE
     , ifCrossCompiling
 
       -- * File I/O
     , readFile
     , writeFile
+    , appendFile
     , createFile
 
       -- * Logging
@@ -21,28 +23,30 @@ module GHC.Toolchain.Monad
     , withLogContext
     ) where
 
-import Prelude hiding (readFile, writeFile)
+import Prelude hiding (readFile, writeFile, appendFile)
 import qualified Prelude
 
 import Control.Applicative
 import Control.Monad
-import qualified Control.Monad.Catch as MC
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import qualified Control.Monad.Trans.Reader as Reader
 import qualified Control.Monad.Trans.Except as Except
-import System.IO hiding (readFile, writeFile)
+import System.IO hiding (readFile, writeFile, appendFile)
+-- import qualified System.Directory
+import qualified Data.Text    as T
+import qualified Data.Text.IO as T
+
 
 data Env = Env { verbosity    :: Int
                , targetPrefix :: Maybe String
                , keepTemp     :: Bool
+               , canLocallyExecute :: Bool
                , logContexts  :: [String]
                }
 
 newtype M a = M (Except.ExceptT [Error] (Reader.ReaderT Env IO) a)
-    deriving (Functor, Applicative, Monad, MonadIO, Alternative,
-              -- TODO: Eliminate these instances
-              MC.MonadThrow, MC.MonadCatch, MC.MonadMask)
+    deriving (Functor, Applicative, Monad, MonadIO, Alternative)
 
 runM :: Env -> M a -> IO (Either [Error] a)
 runM env (M k) =
@@ -50,6 +54,9 @@ runM env (M k) =
 
 getEnv :: M Env
 getEnv = M $ lift Reader.ask
+
+makeM :: IO (Either [Error] a) -> M a
+makeM io = M (Except.ExceptT (Reader.ReaderT (\_env -> io)))
 
 data Error = Error { errorMessage :: String
                    , errorLogContexts :: [String]
@@ -59,6 +66,7 @@ data Error = Error { errorMessage :: String
 throwE :: String -> M a
 throwE msg = do
     e <- getEnv
+    logInfo msg
     let err = Error { errorMessage = msg
                     , errorLogContexts = logContexts e
                     }
@@ -93,17 +101,26 @@ logMsg v msg = do
     when (verbosity e >= v) (liftIO $ hPutStrLn stderr $ indent ++ msg)
 
 readFile :: FilePath -> M String
-readFile path = liftIO $ Prelude.readFile path
+readFile path = liftIO $ T.unpack <$> T.readFile path
+              -- Use T.readfile to read the file strictly, or otherwise run
+              -- into file locking bugs on Windows
 
 writeFile :: FilePath -> String -> M ()
 writeFile path s = liftIO $ Prelude.writeFile path s
+
+appendFile :: FilePath -> String -> M ()
+appendFile path s = liftIO $ Prelude.appendFile path s
 
 -- | Create an empty file.
 createFile :: FilePath -> M ()
 createFile path = writeFile path ""
 
+-- | Branch on whether we can execute target code locally.
 ifCrossCompiling
     :: M a  -- ^ what to do when cross-compiling
     -> M a  -- ^ what to do otherwise
     -> M a
-ifCrossCompiling cross other = other -- TODO
+ifCrossCompiling cross other = do
+  canExec <- canLocallyExecute <$> getEnv
+  if not canExec then cross -- can't execute, this is a cross target
+                 else other -- can execute, run the other action

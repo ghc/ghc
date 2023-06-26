@@ -22,6 +22,9 @@ import Utilities
 import Context.Type
 import qualified System.Directory as IO
 
+import GHC.Toolchain as Toolchain
+import GHC.Toolchain.Program as Toolchain
+
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
@@ -236,8 +239,8 @@ testRules = do
               [ "--interactive", "-v0", "-ignore-dot-ghci"
               , "-fno-ghci-history"
               ]
-        ccPath          <- settingsFileSetting SettingsFileSetting_CCompilerCommand
-        ccFlags         <- settingsFileSetting SettingsFileSetting_CCompilerFlags
+        ccPath          <- queryTargetTarget (Toolchain.prgPath . Toolchain.ccProgram . Toolchain.tgtCCompiler)
+        ccFlags         <- queryTargetTarget (unwords . Toolchain.prgFlags . Toolchain.ccProgram . Toolchain.tgtCCompiler)
 
         pythonPath      <- builderPath Python
 

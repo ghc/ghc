@@ -4,10 +4,8 @@
 module GHC.Toolchain.Tools.MergeObjs ( MergeObjs(..), findMergeObjs ) where
 
 import Control.Monad
-import Control.Monad.IO.Class
 import Data.List
 import System.FilePath
-import System.Process
 
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils
@@ -18,32 +16,51 @@ import GHC.Toolchain.Tools.Nm
 
 -- | Configuration on how the C compiler can be used to link
 data MergeObjs = MergeObjs { mergeObjsProgram :: Program
+                           , mergeObjsSupportsResponseFiles :: Bool
                            }
-    deriving (Show, Read)
+    deriving (Show, Read, Eq, Ord)
 
 findMergeObjs :: ProgOpt -> Cc -> CcLink -> Nm -> M MergeObjs
 findMergeObjs progOpt cc ccLink nm = checking "for linker for merging objects" $ do
-    prog <- findProgram "linker for merging objects" progOpt ["ld"]
-    let mo = MergeObjs $ over _prgFlags (++["-r"]) prog
+    prog <- findProgram "linker for merging objects" progOpt ["ld.gold", "ld"]
+    let mo = prog & _prgFlags %++ "-r"
     checkMergingWorks cc nm mo
     checkForGoldT22266 cc ccLink mo
-    return mo
+    supportsResponseFiles <- checkSupportsResponseFiles cc nm mo
+    return (MergeObjs mo supportsResponseFiles)
 
-checkMergingWorks :: Cc -> Nm -> MergeObjs -> M ()
+checkMergingWorks :: Cc -> Nm -> Program -> M ()
 checkMergingWorks cc nm mergeObjs =
     checking "whether object merging works" $ withTempDir $ \dir -> do
         let fo s = dir </> s <.> "o"
-        compileC cc (fo "a") "void funA(int x) { return x; }"
-        compileC cc (fo "b") "void funB(int x) { return x; }"
-        callProgram (mergeObjsProgram mergeObjs) [fo "a", fo "b", "-o", fo "out"]
-        out <- readProgram (nmProgram nm) [fo "out"]
+        compileC cc (fo "a") "int funA(int x) { return x; }"
+        compileC cc (fo "b") "int funB(int x) { return x; }"
+        callProgram mergeObjs [fo "a", fo "b", "-o", fo "out"]
+        out <- readProgramStdout (nmProgram nm) [fo "out"]
         let ok = all (`isInfixOf` out) ["funA", "funB"]
         unless ok $ throwE "merged objects is missing symbols"
 
-checkForGoldT22266 :: Cc -> CcLink -> MergeObjs -> M ()
+checkSupportsResponseFiles :: Cc -> Nm -> Program -> M Bool
+checkSupportsResponseFiles cc nm mergeObjs = checking "whether the merge objects tool supports response files" $
+  withTempDir $ \dir -> do
+    -- Like 'checkMergingWorks', but pass the arguments in a response file
+    let fo s     = dir </> s <.> "o"
+        args_txt = dir </> "args.txt"
+    compileC cc (fo "a") "int funA(int x) { return x; }"
+    compileC cc (fo "b") "int funB(int x) { return x; }"
+    writeFile args_txt (unlines [fo "a", fo "b", "-o", fo "out"])
+    callProgram mergeObjs ["@" <> args_txt]
+    out <- readProgramStdout (nmProgram nm) [fo "out"]
+    return $ all (`isInfixOf` out) ["funA", "funB"]
+
+-- Test for binutils #22266. This bug manifested as GHC bug #14328 (see also:
+-- #14675, #14291).
+-- Uses test from
+-- https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;h=033bfb739b525703bfe23f151d09e9beee3a2afe
+checkForGoldT22266 :: Cc -> CcLink -> Program -> M ()
 checkForGoldT22266 cc ccLink mergeObjs = do
     version <- checking "for ld.gold object merging bug (binutils #22266)" $
-        readProgram (mergeObjsProgram mergeObjs) ["--version"]
+        readProgramStdout mergeObjs ["--version"]
     when ("gold" `isInfixOf` version) check_it
   where
     check_it =
@@ -58,12 +75,12 @@ checkForGoldT22266 cc ccLink mergeObjs = do
                 exe = f "main"
             compileC cc a_o progA
             writeFile link_script ldScript
-            callProgram (mergeObjsProgram mergeObjs)
-                ["-T", link_script, "-o", merged_o]
+            callProgram mergeObjs
+                ["-T", link_script, a_o, "-o", merged_o]
             compileC cc main_o progMain
             callProgram (ccLinkProgram ccLink)
                 ["-o", exe, merged_o, main_o]
-            liftIO $ callProcess exe []
+            callProgram (Program exe []) []
 
     progA = unlines
         [ "__attribute__((section(\".data.a\")))"

@@ -37,7 +37,6 @@ import Text.Parsec.Combinator as P
 import Text.Parsec.Char as P
 import Control.Monad.Except
 import UserSettings
-import Oracles.Flag
 
 
 flavourTransformers :: Map String (Flavour -> Flavour)

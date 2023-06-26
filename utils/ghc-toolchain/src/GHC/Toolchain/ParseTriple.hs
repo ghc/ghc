@@ -8,17 +8,24 @@ import GHC.Toolchain.Prelude
 import GHC.Toolchain.CheckArm
 import GHC.Toolchain.Tools.Cc
 
-parseTriple :: Cc -> String -> M ArchOS
+-- | Parse a triple `arch-vendor-os` into an 'ArchOS' and a vendor name 'String'
+--
+-- If the user specified a duple (`arch-os`) instead, the vendor name is 'Nothing'
+parseTriple :: Cc -> String -> M (ArchOS, Maybe String)
 parseTriple cc triple
+  | [archName, osName] <- parts
+  = do arch <- parseArch cc archName
+       os   <- parseOs osName
+       return (ArchOS arch os, Nothing)
   | [archName, vendorName, osName] <- parts
   = do arch <- parseArch cc archName
-       os <- parseOs vendorName osName
-       return $ ArchOS arch os
+       os   <- parseOs osName
+       return (ArchOS arch os, Just vendorName)
 
   | [archName, vendorName, osName, _abi] <- parts
   = do arch <- parseArch cc archName
-       os <- parseOs vendorName osName
-       return $ ArchOS arch os
+       os   <- parseOs osName
+       return (ArchOS arch os, Just vendorName)
 
   | otherwise
   = throwE $ "malformed triple " ++ triple
@@ -37,6 +44,7 @@ parseArch cc arch =
       "s390x" -> pure ArchS390X
       "arm" -> findArmIsa cc
       _ | "armv" `isPrefixOf` arch -> findArmIsa cc
+      "arm64" -> pure ArchAArch64
       "aarch64" -> pure ArchAArch64
       "alpha" -> pure ArchAlpha
       "mips" -> pure ArchMipseb
@@ -44,10 +52,11 @@ parseArch cc arch =
       "mipsel" -> pure ArchMipsel
       "riscv64" -> pure ArchRISCV64
       "hppa" -> pure ArchUnknown
+      "wasm32" -> pure ArchWasm32
       _ -> throwE $ "Unknown architecture " ++ arch
 
-parseOs :: String -> String -> M OS
-parseOs vendor os =
+parseOs :: String -> M OS
+parseOs os =
     case os of
       "linux" -> pure OSLinux
       "linux-android" -> pure OSLinux
@@ -66,7 +75,8 @@ parseOs vendor os =
       "nto-qnc" -> pure OSQNXNTO
       "aix" -> pure OSAIX
       "gnu" -> pure OSHurd
-      _ -> throwE $ "Unknown vendor/operating system " ++ vendor ++ "-" ++ os
+      "wasi" -> pure OSWasi
+      _ -> throwE $ "Unknown operating system " ++ os
 
 splitOn :: Char -> String -> [String]
 splitOn sep = go

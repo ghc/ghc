@@ -17,12 +17,25 @@ data Ar = Ar { arMkArchive :: Program
              , arSupportsDashL :: Bool
              , arNeedsRanlib :: Bool
              }
-    deriving (Show, Read)
+    deriving (Read, Eq, Ord)
 
-findAr :: ProgOpt -> M Ar
-findAr progOpt = checking "for 'ar'" $ do
-    bareAr <- findProgram "ar archiver" progOpt ["ar"]
-    arIsGnu <- ("GNU" `isInfixOf`) <$> readProgram bareAr ["--version"]
+-- These instances are more suitable for diffing
+instance Show Ar where
+  show Ar{..} = unlines
+    [ "Ar"
+    , "{ arMkArchive = " ++ show arMkArchive
+    , ", arIsGnu = " ++ show arIsGnu
+    , ", arSupportsAtFile = " ++ show arSupportsAtFile
+    , ", arSupportsDashL = " ++ show arSupportsDashL
+    , ", arNeedsRanlib = " ++ show arNeedsRanlib
+    , "}"
+    ]
+
+findAr :: Maybe String -- ^ Vendor name from the target triple, if specified
+       -> ProgOpt -> M Ar
+findAr vendor progOpt = checking "for 'ar'" $ do
+    bareAr <- findProgram "ar archiver" progOpt ["ar", "llvm-ar"]
+    arIsGnu <- ("GNU" `isInfixOf`) <$> readProgramStdout bareAr ["--version"]
 
     -- Figure out how to invoke ar to create archives...
     mkArchive <- checking "for how to make archives"
@@ -32,7 +45,10 @@ findAr progOpt = checking "for 'ar'" $ do
     arSupportsDashL <- checkArSupportsDashL bareAr <|> return False
     let arNeedsRanlib
           | arIsGnu = False
-          -- TODO: Autoconf handles Apple specifically here
+          -- TODO: It'd be better not to handle Apple specifically here?
+          -- It's quite tedious to check for Apple's crazy timestamps in
+          -- .a files, so we hardcode it.
+          | vendor == Just "apple" = True
           | mode:_ <- prgFlags mkArchive
           , 's' `elem` mode = False
           | otherwise = True
@@ -47,7 +63,7 @@ findAr progOpt = checking "for 'ar'" $ do
 makeArchiveProgram :: Bool  -- ^ is GNU ar?
                    -> Program -> M Program
 makeArchiveProgram isGnuAr ar
-  | isGnuAr = 
+  | isGnuAr =
     -- GNU ar needs special treatment: it appears to have problems with
     -- object files with the same name if you use the 's' modifier, but
     -- simple 'ar q' works fine, and doesn't need a separate ranlib.
@@ -73,9 +89,9 @@ checkArWorks prog = checking "that ar works" $ withTempDir $ \dir -> do
 checkArSupportsDashL :: Program -> M Bool
 checkArSupportsDashL bareAr = checking "that ar supports -L" $ withTempDir $ \dir -> do
     let file ext = dir </> "conftest" <.> ext
-        archive1 = dir </> "conttest-a.a"
-        archive2 = dir </> "conttest-b.a"
-        merged   = dir </> "conttest.a"
+        archive1 = dir </> "conftest-a.a"
+        archive2 = dir </> "conftest-b.a"
+        merged   = dir </> "conftest.a"
     mapM_ (createFile . file) ["file", "a0", "a1", "b0", "b1"]
     -- Build two archives, merge them, and check that the
     -- result contains the original files rather than the two
@@ -84,21 +100,24 @@ checkArSupportsDashL bareAr = checking "that ar supports -L" $ withTempDir $ \di
     callProgram bareAr ["qc", archive2, file "b0", file "b1"]
     oneOf "trying -L"
         [ do callProgram bareAr ["qcL", merged, archive1, archive2]
-             contents <- readProgram bareAr ["t", merged]
-             return $ not $ "conftest.a1" `isInfixOf` contents
+             contents <- readProgramStdout bareAr ["t", merged]
+             return $ "conftest.a1" `isInfixOf` contents
         , return False
         ]
 
 checkArSupportsAtFile :: Program -> Program -> M Bool
 checkArSupportsAtFile bareAr mkArchive = checking "that ar supports @-files" $ withTempDir $ \dir -> do
-    let f = dir </> "conftest.file"
+    let conftest = "conftest.file"
+        f = dir </> conftest
         atfile = dir </> "conftest.atfile"
         archive = dir </> "conftest.a"
         objs = replicate 2 f
     createFile f
     writeFile atfile (unlines objs)
-    callProgram mkArchive [archive, "@" ++ dir </> "conftest.atfile"]
-    contents <- readProgram bareAr ["t", archive]
-    if lines contents == objs
+    callProgram mkArchive [archive, "@" ++ atfile]
+    contents <- readProgramStdout bareAr ["t", archive]
+    -- Careful: The files output by `ar t` use relative paths, so we can't
+    -- compare against `objs`
+    if lines contents == replicate 2 conftest
       then return True
       else logDebug "Contents didn't match" >> return False

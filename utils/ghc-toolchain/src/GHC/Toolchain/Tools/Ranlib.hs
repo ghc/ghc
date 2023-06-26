@@ -8,12 +8,12 @@ module GHC.Toolchain.Tools.Ranlib
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
-data Ranlib = Ranlib { ranlibProgram :: Program
-                     }
-    deriving (Show, Read)
+newtype Ranlib = Ranlib { ranlibProgram :: Program
+                        }
+    deriving (Show, Read, Eq, Ord)
 
 findRanlib :: ProgOpt -> M Ranlib
 findRanlib progOpt = checking "for 'ranlib'" $ do
-    ranlibProgram <- findProgram "ranlib archiver" progOpt ["ranlib"]
+    ranlibProgram <- findProgram "ranlib archiver" progOpt ["ranlib", "llvm-ranlib"]
     return $ Ranlib {ranlibProgram}
 

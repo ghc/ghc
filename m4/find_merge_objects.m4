@@ -7,7 +7,7 @@ AC_DEFUN([FIND_MERGE_OBJECTS],[
     AC_REQUIRE([FIND_LD])
 
     if test -z "$MergeObjsCmd"; then
-        MergeObjsCmd="$LD"
+        MergeObjsCmd="$(command -v $LD)"
     fi
     if test -z "$MergeObjsArgs"; then
         MergeObjsArgs="-r"
