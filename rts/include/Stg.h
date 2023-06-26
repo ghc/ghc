@@ -285,6 +285,17 @@
 #endif
 
 /* -----------------------------------------------------------------------------
+   Suppressing C warnings
+   -------------------------------------------------------------------------- */
+
+#define DO_PRAGMA(x) _Pragma(#x)
+#define NO_WARN(warnoption, ...)                   \
+    DO_PRAGMA(GCC diagnostic push)                 \
+    DO_PRAGMA(GCC diagnostic ignored #warnoption)  \
+    __VA_ARGS__                                    \
+    DO_PRAGMA(GCC diagnostic pop)
+
+/* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
 
