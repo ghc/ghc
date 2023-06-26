@@ -279,7 +279,7 @@ initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> FCode (Maybe (IPESta
 initInfoTableProv infos itmap
   = do
        cfg <- getStgToCmmConfig
-       let (stats, ents)       = convertInfoProvMap infos this_mod itmap
+       let (stats, ents)       = convertInfoProvMap cfg infos this_mod itmap
            info_table = stgToCmmInfoTableMap cfg
            platform   = stgToCmmPlatform     cfg
            this_mod   = stgToCmmThisModule   cfg

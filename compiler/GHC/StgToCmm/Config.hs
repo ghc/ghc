@@ -50,6 +50,8 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
   , stgToCmmEagerBlackHole :: !Bool              -- ^
   , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See note [Mapping
+  , stgToCmmInfoTableMapFallback :: !Bool
+  , stgToCmmInfoTableMapStackFrame :: !Bool
                                                  -- Info Tables to Source Positions]
   , stgToCmmOmitYields     :: !Bool              -- ^ true means omit heap checks when no allocation is performed
   , stgToCmmOmitIfPragmas  :: !Bool              -- ^ true means don't generate interface programs (implied by -O0)

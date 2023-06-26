@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
@@ -212,7 +213,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
     collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
     collect platform acc cmmGroupSRTs = do
       let labelsToInfoTables = collectInfoTables cmmGroupSRTs
-          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i, lookupEstimatedTick platform cmmGroupSRTs l i)) labelsToInfoTables
+          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i,lookupEstimatedTick platform cmmGroupSRTs l i)) labelsToInfoTables
       return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
 
     collectNothing :: [a] -> CmmGroupSRTs -> IO ([a], CmmGroupSRTs)
