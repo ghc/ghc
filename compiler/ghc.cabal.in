@@ -94,7 +94,7 @@ Library
         extra-libraries: zstd
       CPP-Options: -DHAVE_LIBZSTD
 
-    Build-Depends: base       >= 4.11 && < 4.19,
+    Build-Depends: base       >= 4.11 && < 4.20,
                    deepseq    >= 1.4 && < 1.6,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
