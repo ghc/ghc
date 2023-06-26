@@ -10,12 +10,13 @@ struct callback {
     int *presult;
 };
 
-void* callback(struct callback *p)
+void* callback(void *p)
 {
+    struct callback *cb = (struct callback *) p;
     usleep(200);
-    *p->presult = 42;
-    hs_try_putmvar(p->cap,p->mvar);
-    free(p);
+    *cb->presult = 42;
+    hs_try_putmvar(cb->cap, cb->mvar);
+    free(cb);
     hs_thread_done();
     return NULL;
 }
