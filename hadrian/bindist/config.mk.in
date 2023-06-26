@@ -254,6 +254,8 @@ TargetHasIdentDirective = @TargetHasIdentDirective@
 TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
 TargetHasLibm = @TargetHasLibm@
 TablesNextToCode = @TablesNextToCode@
+LeadingUnderscore = @LeadingUnderscore@
+LlvmTarget = @LlvmTarget@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@
 SettingsCxxCompilerCommand = @SettingsCxxCompilerCommand@

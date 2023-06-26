@@ -8,8 +8,8 @@ import Control.Monad
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
-data Readelf = Readelf { readelfProgram :: Program
-                       }
+newtype Readelf = Readelf { readelfProgram :: Program
+                          }
     deriving (Show, Read)
 
 -- | Readelf is only needed by 'GHC.Toolchain.Tools.Link.checkBfdCopyBug'.

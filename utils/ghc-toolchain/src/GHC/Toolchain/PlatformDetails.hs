@@ -31,7 +31,7 @@ checkWordSize cc = checking "word size" $ do
       []            -> throwE "test program produced no output"
       "undefined":_ -> throwE "__SIZEOF_POINTER__ is undefined"
       "8":_         -> return WS8
-      "4":_         -> return WS8
+      "4":_         -> return WS4
       _             -> throwE $ "unexpected output:\n" ++ output
   where
     program = unlines
@@ -96,17 +96,23 @@ checkLeadingUnderscore :: Cc -> Nm -> M Bool
 checkLeadingUnderscore cc nm = checking ctxt $ withTempDir $ \dir -> do
     let test_o = dir </> "test.o"
     compileC cc test_o prog
-    out <- readProgram (nmProgram nm) [test_o]
+    out <- readProgramStdout (nmProgram nm) [test_o]
     return $ "_func" `isInfixOf` out
   where
     prog = "int func(void) { return 0; }"
     ctxt = "whether symbols have leading underscores"
 
-checkSubsectionsViaSymbols :: Cc -> M Bool
-checkSubsectionsViaSymbols =
-    testCompile
-      "whether .subsections-via-symbols directive is supported"
-      (asmStmt ".subsections_via_symbols")
+checkSubsectionsViaSymbols :: ArchOS -> Cc -> M Bool
+checkSubsectionsViaSymbols archos cc =
+  case archOS_arch archos of
+    ArchAArch64 ->
+      -- subsections via symbols is busted on arm64
+      -- TODO: ^ is this comment up to date?
+      return False
+    _ ->
+      testCompile
+        "whether .subsections-via-symbols directive is supported"
+        (asmStmt ".subsections_via_symbols") cc
 
 checkIdentDirective :: Cc -> M Bool
 checkIdentDirective =
@@ -124,7 +130,7 @@ checkGnuNonexecStack archOs =
                  ArchARM{} -> "%progbits" -- See #13937
                  _         -> "@progbits"
 
-    prog = unlines [ asmStmt ".section .note.GNU-stack,\"\","++progbits
+    prog = unlines [ asmStmt (".section .note.GNU-stack,\"\","++progbits)
                    , asmStmt ".section .text"
                    ]
 

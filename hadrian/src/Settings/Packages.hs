@@ -7,6 +7,9 @@ import Oracles.Flag
 import Packages
 import Settings
 
+import GHC.Toolchain.Target
+import GHC.Platform.ArchOS
+
 -- | Package-specific command-line arguments.
 packageArgs :: Args
 packageArgs = do
@@ -67,7 +70,7 @@ packageArgs = do
 
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
-            , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
+            , anyTargetOs [OSOpenBSD] ? arg "--ld-options=-E"
             , compilerStageOption ghcProfiled ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
@@ -161,7 +164,7 @@ packageArgs = do
         -- does not need it since it exports all dynamic symbols by default
         , package iserv
           ? expr isElfTarget
-          ? notM (expr $ anyTargetOs ["freebsd", "solaris2"])? mconcat
+          ? notM (expr $ anyTargetOs [OSFreeBSD, OSSolaris2])? mconcat
           [ builder (Ghc LinkHs) ? arg "-optl-Wl,--export-dynamic" ]
 
         -------------------------------- haddock -------------------------------
@@ -265,25 +268,25 @@ ghcBignumArgs = package ghcBignum ? do
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
     projectVersion <- getSetting ProjectVersion
-    hostPlatform   <- getSetting HostPlatform
-    hostArch       <- getSetting HostArch
-    hostOs         <- getSetting HostOs
-    hostVendor     <- getSetting HostVendor
-    buildPlatform  <- getSetting BuildPlatform
-    buildArch      <- getSetting BuildArch
-    buildOs        <- getSetting BuildOs
-    buildVendor    <- getSetting BuildVendor
-    targetPlatform <- getSetting TargetPlatform
-    targetArch     <- getSetting TargetArch
-    targetOs       <- getSetting TargetOs
-    targetVendor   <- getSetting TargetVendor
-    ghcUnreg       <- expr $ yesNo <$> flag GhcUnregisterised
-    ghcEnableTNC   <- expr $ yesNo <$> flag TablesNextToCode
+    hostPlatform   <- queryHost targetPlatformTriple
+    hostArch       <- queryHost queryArch
+    hostOs         <- queryHost queryOS
+    hostVendor     <- queryHost queryVendor
+    buildPlatform  <- queryBuild targetPlatformTriple
+    buildArch      <- queryBuild queryArch
+    buildOs        <- queryBuild queryOS
+    buildVendor    <- queryBuild queryVendor
+    targetPlatform <- queryTarget targetPlatformTriple
+    targetArch     <- queryTarget queryArch
+    targetOs       <- queryTarget queryOS
+    targetVendor   <- queryTarget queryVendor
+    ghcUnreg       <- yesNo <$> queryTarget tgtUnregisterised
+    ghcEnableTNC   <- yesNo <$> queryTarget tgtTablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory
-    useSystemFfi   <- expr $ flag UseSystemFfi
+    useSystemFfi   <- getFlag UseSystemFfi
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     libdwIncludeDir   <- getSetting LibdwIncludeDir
@@ -444,8 +447,8 @@ rtsPackageArgs = package rts ? do
 -- collect2: ld returned 1 exit status
 speedHack :: Action Bool
 speedHack = do
-    i386   <- anyTargetArch ["i386"]
-    goodOS <- not <$> anyTargetOs ["darwin", "solaris2"]
+    i386   <- anyTargetArch [ArchX86]
+    goodOS <- not <$> anyTargetOs [OSDarwin, OSSolaris2]
     return $ i386 && goodOS
 
 -- See @rts/ghc.mk@.

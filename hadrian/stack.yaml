@@ -4,6 +4,8 @@ resolver: lts-20.26 # GHC 9.2.8
 
 packages:
 - '.'
+- '../utils/ghc-toolchain'
+- '../libraries/ghc-platform'
 
 nix:
    enable: false
@@ -14,3 +16,4 @@ nix:
    - git
    - ncurses
    - perl
+   - ghc-toolchain
