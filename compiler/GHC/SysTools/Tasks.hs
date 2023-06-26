@@ -363,7 +363,7 @@ runMergeObjects logger tmpfs dflags args =
             , "does not support object merging." ]
         optl_args = map Option (getOpts dflags opt_lm)
         args2     = args0 ++ args ++ optl_args
-    if toolSettings_ldSupportsResponseFiles (toolSettings dflags)
+    if toolSettings_mergeObjsSupportsResponseFiles (toolSettings dflags)
       then do
         mb_env <- getGccEnv args2
         runSomethingResponseFile logger tmpfs dflags id "Merge objects" p args2 mb_env
