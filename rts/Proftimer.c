@@ -101,7 +101,7 @@ requestHeapCensus( void ){
 void
 initProfTimer( void )
 {
-    performHeapProfile = false;
+    RELAXED_STORE_ALWAYS(&performHeapProfile, false);
 
     ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
@@ -136,7 +136,7 @@ handleProfTick(void)
         ticks_to_ticky_sample--;
         if (ticks_to_ticky_sample <= 0) {
             ticks_to_ticky_sample = RtsFlags.ProfFlags.heapProfileIntervalTicks;
-            performTickySample = true;
+            RELAXED_STORE_ALWAYS(&performTickySample, true);
         }
     }
 #endif
@@ -145,7 +145,7 @@ handleProfTick(void)
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
-            performHeapProfile = true;
+            RELAXED_STORE_ALWAYS(&performHeapProfile, true);
         }
     }
 }
