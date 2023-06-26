@@ -443,8 +443,8 @@ test('T22347a', normal, compile, ['-O2 -fno-full-laziness'])
 
 # T17366: expecting to see a rule
 #    Rule fired: SPEC/T17366 f @(Tagged tag) @_ (T17366)
-test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings'])
-test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings'])
+test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
+test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
 test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds -dsuppress-unfoldings'])
 
 # One module, T21851_2.hs, has OPTIONS_GHC -ddump-simpl
@@ -461,7 +461,12 @@ test('T22272', normal, multimod_compile, ['T22272', '-O -fexpose-all-unfoldings 
 test('T22459', normal, compile, [''])
 test('T22623', normal, multimod_compile, ['T22623', '-O -v0'])
 test('T22725', normal, compile, ['-O'])
+<<<<<<< HEAD
 test('T22662', normal, compile, [''])
+=======
+test('T22502', normal, compile, ['-O'])
+test('T22611', [when(wordsize(32), skip), grep_errmsg(r'\$salterF') ], compile, ['-O -ddump-simpl -dsuppress-uniques -dsuppress-all -fpolymorphic-specialisation'])
+>>>>>>> 9449a8df88d (Add -fpolymorphic-specialisation flag (off by default at all optimisation levels))
 test('T22715_2', normal, multimod_compile, ['T22715_2', '-v0 -O -fspecialise-aggressively'])
 test('T22802', normal, compile, ['-O'])
 test('T22761', normal, multimod_compile, ['T22761', '-O2 -v0'])
