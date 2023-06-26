@@ -291,7 +291,7 @@ static StgClosure *lock_tvar(Capability *cap,
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
   do {
-    StgInfoTable *info;
+    const StgInfoTable *info;
     do {
       result = ACQUIRE_LOAD(&s->current_value);
       info = GET_INFO(UNTAG_CLOSURE(result));
