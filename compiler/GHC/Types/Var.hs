@@ -257,7 +257,8 @@ data Var
                                      -- ^ Key for fast comparison
                                      -- Identical to the Unique in the name,
                                      -- cached here for speed
-        varType    :: Kind           -- ^ The type or kind of the 'Var' in question
+        varType    :: Kind,          -- ^ The type or kind of the 'Var' in question
+        idBinding :: HasCallStack => IdBinding -- Never put anything here, it's just to catch location of bugs when using field accessors
  }
 
   | TcTyVar {                           -- Used only during type inference
@@ -266,7 +267,8 @@ data Var
         varName        :: !Name,
         realUnique     :: {-# UNPACK #-} !Int,
         varType        :: Kind,
-        tc_tv_details  :: TcTyVarDetails
+        tc_tv_details  :: TcTyVarDetails,
+        idBinding :: HasCallStack => IdBinding -- Never put anything here, it's just to catch location of bugs when using field accessors
   }
 
   | Id {
@@ -1215,6 +1217,7 @@ mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = TyVar { varName    = name
                           , realUnique = getKey (nameUnique name)
                           , varType  = kind
+                          , idBinding = error "here"
                           }
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
@@ -1224,6 +1227,7 @@ mkTcTyVar name kind details
                 realUnique = getKey (nameUnique name),
                 varType  = kind,
                 tc_tv_details = details
+                , idBinding = error "here"
         }
 
 tcTyVarDetails :: TyVar -> TcTyVarDetails

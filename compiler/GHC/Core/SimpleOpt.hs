@@ -35,7 +35,6 @@ import GHC.Types.Id.Info  ( realUnfoldingInfo, setUnfoldingInfo, setRuleInfo, Id
 import GHC.Types.Var      ( isNonCoVarId, toLetBound )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Core.UsageEnv
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertDmdSig, topSubDmd )
 import GHC.Types.Tickish

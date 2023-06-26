@@ -193,7 +193,7 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name   = name
          , ru_act    = act
          , ru_fn     = fn
-         , ru_bndrs  = bndrs
+         , ru_bndrs  = map toLambdaBound bndrs -- romes:todo: the issue being if we don't do this elsewhere we'll get our vars and binders out of sync (let bound vs lambda bound)
          , ru_args   = args
          , ru_rhs    = occurAnalyseExpr rhs
                        -- See Note [OccInfo in unfoldings and rules]

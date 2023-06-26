@@ -176,12 +176,12 @@ mkLamType v body_ty
    | otherwise
    = mkFunctionType mult (varType v) body_ty
      where
-       !mult = case varMultMaybe v of
-                 -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
-                 -- ... it could prove pretty invasive...
-                 Nothing -> pprTrace "mkLamType: LetBound var turned to LambdaBound" (ppr v <+> ppr (idBinding v)) ManyTy
-                   -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
-                 Just m  -> m
+       mult = case varMultMaybe v of
+                -- ROMES: Can we avoid this panic by encoding this at the type level somehow?
+                -- ... it could prove pretty invasive...
+                Nothing -> pprTrace "mkLamType: LetBound var turned to LambdaBound" (ppr v <+> ppr (idBinding v)) ManyTy
+                  -- panic "mkLamTypes: lambda bound var (be it a big or small lambda) should be annotated with LambdaBound"
+                Just m  -> m
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 
