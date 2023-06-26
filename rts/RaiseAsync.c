@@ -238,7 +238,6 @@ throwToMsg (Capability *cap, MessageThrowTo *msg)
     goto check_target;
 
 retry:
-    RELEASE_FENCE();
     debugTrace(DEBUG_sched, "throwTo: retrying...");
 
 check_target:
