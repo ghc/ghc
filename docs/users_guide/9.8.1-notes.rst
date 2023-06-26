@@ -174,10 +174,15 @@ Compiler
           D(D2)
         )
         D = D1 | D2
-      
+
   This allows for changing the structure of a library without immediately breaking user code,
   but instead being able to warn the user that a change in the library interface
   will occur in the future.
+
+- Guard polymorphic specialisation behind the flag :ghc-flag:`-fpolymorphic-specialisation`.
+  This optimisation has led to a number of incorrect runtime result bugs, so we are disabling it
+  by default for now whilst we consider more carefully an appropiate fix.
+  (See :ghc-ticket:`23469`, :ghc-ticket:`23109`, :ghc-ticket:`21229`, :ghc-ticket:`23445`)
 
 GHCi
 ~~~~
@@ -241,8 +246,8 @@ Runtime system
   We use this functionality in GHCi to modify how some messages are displayed.
 
 - The extensions fields of constructors of ``IE`` now take ``Maybe (WarningTxt p)``
-  in ``GhcPs`` and ``GhcRn`` variants of the Syntax Tree. 
-  This represents the warning assigned to a certain export item, 
+  in ``GhcPs`` and ``GhcRn`` variants of the Syntax Tree.
+  This represents the warning assigned to a certain export item,
   which is used for :ref:`deprecated-exports`.
 
 ``ghc-heap`` library
