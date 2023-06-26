@@ -607,7 +607,7 @@ tidyNPat over_lit mb_neg eq outer_ty
 
 matchLiterals :: NonEmpty Id
               -> Type -- ^ Type of the whole case expression
-              -> NonEmpty (NonEmpty EquationInfo) -- ^ All PgLits
+              -> NonEmpty (NonEmpty EquationInfoNE) -- ^ All PgLits
               -> DsM (MatchResult CoreExpr)
 
 matchLiterals (var :| vars) ty sub_groups
@@ -625,11 +625,11 @@ matchLiterals (var :| vars) ty sub_groups
             return (mkCoPrimCaseMatchResult var ty $ NEL.toList alts)
         }
   where
-    match_group :: NonEmpty EquationInfo -> DsM (Literal, MatchResult CoreExpr)
-    match_group eqns@(firstEqn :| _)
+    match_group :: NonEmpty EquationInfoNE -> DsM (Literal, MatchResult CoreExpr)
+    match_group eqns
         = do { dflags <- getDynFlags
              ; let platform = targetPlatform dflags
-             ; let LitPat _ hs_lit = firstPat firstEqn
+             ; let EqnMatch { eqn_pat = L _ (LitPat _ hs_lit) } = NEL.head eqns
              ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
              ; return (hsLitKey platform hs_lit, match_result) }
 
@@ -682,7 +682,7 @@ hsLitKey _        l                   = pprPanic "hsLitKey" (ppr l)
 ************************************************************************
 -}
 
-matchNPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
+matchNPats :: NonEmpty Id -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 matchNPats (var :| vars) ty (eqn1 :| eqns)    -- All for the same literal
   = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
@@ -711,7 +711,7 @@ We generate:
 \end{verbatim}
 -}
 
-matchNPlusKPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
+matchNPlusKPats :: NonEmpty Id -> Type -> NonEmpty EquationInfoNE -> DsM (MatchResult CoreExpr)
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
   = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus
@@ -727,7 +727,7 @@ matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
                    fmap (foldr1 (.) wraps)                      $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
-        = (wrapBind n n1, eqn { eqn_pats = pats })
+    shift n1 (EqnMatch { eqn_pat = L _ (NPlusKPat _ (L _ n) _ _ _ _), eqn_rest = rest })
+        = (wrapBind n n1, rest)
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)

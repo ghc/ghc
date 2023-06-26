@@ -49,7 +49,8 @@ module GHC.HsToCore.Monad (
 
         -- Data types
         DsMatchContext(..),
-        EquationInfo(..), MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
+        EquationInfo(..), EquationInfoNE, prependPats, mkEqnInfo, eqnMatchResult,
+        MatchResult (..), runMatchResult, DsWrapper, idDsWrapper,
 
         -- Trace injection
         pprRuntimeTrace
@@ -92,7 +93,6 @@ import GHC.Unit.Module
 import GHC.Unit.Module.ModGuts
 
 import GHC.Types.Name.Reader
-import GHC.Types.Basic ( Origin )
 import GHC.Types.SourceFile
 import GHC.Types.Id
 import GHC.Types.Var (EvId)
@@ -132,27 +132,42 @@ instance Outputable DsMatchContext where
   ppr (DsMatchContext hs_match ss) = ppr ss <+> pprMatchContext hs_match
 
 data EquationInfo
-  = EqnInfo { eqn_pats :: [Pat GhcTc]
-              -- ^ The patterns for an equation
-              --
-              -- NB: We have /already/ applied 'decideBangHood' to
-              -- these patterns.  See Note [decideBangHood] in "GHC.HsToCore.Utils"
+  = EqnMatch  { eqn_pat :: LPat GhcTc
+                -- ^ The first pattern of the equation
+                --
+                -- NB: The location info is used to determine whether the
+                -- pattern is generated or not.
+                -- This helps us avoid warnings on patterns that GHC elaborated.
+                --
+                -- NB: We have /already/ applied 'decideBangHood' to this
+                -- pattern. See Note [decideBangHood] in "GHC.HsToCore.Utils"
 
-            , eqn_orig :: Origin
-              -- ^ Was this equation present in the user source?
-              --
-              -- This helps us avoid warnings on patterns that GHC elaborated.
-              --
-              -- For instance, the pattern @-1 :: Word@ gets desugared into
-              -- @W# -1## :: Word@, but we shouldn't warn about an overflowed
-              -- literal for /both/ of these cases.
+              , eqn_rest :: EquationInfo }
+                -- ^ The rest of the equation after its first pattern
 
-            , eqn_rhs  :: MatchResult CoreExpr
-              -- ^ What to do after match
-            }
+  | EqnDone
+  -- The empty tail of an equation having no more patterns
+            (MatchResult CoreExpr)
+            -- ^ What to do after match
+
+type EquationInfoNE = EquationInfo
+-- An EquationInfo which has at least one pattern
+
+prependPats :: [LPat GhcTc] -> EquationInfo -> EquationInfo
+prependPats [] eqn = eqn
+prependPats (pat:pats) eqn = EqnMatch { eqn_pat = pat, eqn_rest = prependPats pats eqn }
+
+mkEqnInfo :: [LPat GhcTc] -> MatchResult CoreExpr -> EquationInfo
+mkEqnInfo pats = prependPats pats . EqnDone
+
+eqnMatchResult :: EquationInfo -> MatchResult CoreExpr
+eqnMatchResult (EqnDone rhs) = rhs
+eqnMatchResult (EqnMatch { eqn_rest = eq }) = eqnMatchResult eq
 
 instance Outputable EquationInfo where
-    ppr (EqnInfo pats _ _) = ppr pats
+    ppr = ppr . allEqnPats where
+      allEqnPats (EqnDone {}) = []
+      allEqnPats (EqnMatch { eqn_pat = pat, eqn_rest = eq }) = unLoc pat : allEqnPats eq
 
 type DsWrapper = CoreExpr -> CoreExpr
 idDsWrapper :: DsWrapper

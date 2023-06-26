@@ -206,11 +206,8 @@ dsUnliftedBind (PatBind { pat_lhs = pat, pat_rhs = grhss
         -- ==> case rhs of C x# y# -> body
     do { match_nablas <- pmcGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_nablas
-       ; let upat = unLoc pat
-             eqn = EqnInfo { eqn_pats = [upat],
-                             eqn_orig = FromSource,
-                             eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar ManyTy upat
+       ; let eqn = EqnMatch { eqn_pat = pat, eqn_rest = EqnDone (cantFailMatchResult body) }
+       ; var    <- selectMatchVar ManyTy (unLoc pat)
                     -- `var` will end up in a let binder, so the multiplicity
                     -- doesn't matter.
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)

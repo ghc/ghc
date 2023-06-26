@@ -15,7 +15,7 @@ This module exports some utility functions of no great interest.
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module GHC.HsToCore.Utils (
         EquationInfo(..),
-        firstPat, shiftEqns,
+        firstPat, shiftEqns, combineEqnRhss,
 
         MatchResult (..), CaseAlt(..),
         cantFailMatchResult, alwaysFailMatchResult,
@@ -194,12 +194,16 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 -}
 
-firstPat :: EquationInfo -> Pat GhcTc
-firstPat eqn = assert (notNull (eqn_pats eqn)) $ head (eqn_pats eqn)
+firstPat :: EquationInfoNE -> Pat GhcTc
+firstPat (EqnMatch { eqn_pat = pat }) = unLoc pat
+firstPat (EqnDone {}) = error "firstPat: no patterns"
 
-shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
+shiftEqns :: Functor f => f EquationInfoNE -> f EquationInfo
 -- Drop the first pattern in each equation
-shiftEqns = fmap $ \eqn -> eqn { eqn_pats = tail (eqn_pats eqn) }
+shiftEqns = fmap eqn_rest
+
+combineEqnRhss :: NonEmpty EquationInfo -> DsM (MatchResult CoreExpr)
+combineEqnRhss eqns = return $ foldr1 combineMatchResults $ map eqnMatchResult (NEL.toList eqns)
 
 -- Functions on MatchResult CoreExprs
 
