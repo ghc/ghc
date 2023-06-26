@@ -1247,6 +1247,7 @@ inner_loop:
             traversePushClosure(ts, tso->block_info.closure, c, sep, child_data);
             break;
         default:
+            break;
         }
         goto loop;
     }
