@@ -139,7 +139,7 @@ conf-merge-objects-args-stage3  = @MergeObjsArgs@
 
 ld-has-no-compact-unwind = @LdHasNoCompactUnwind@
 ld-has-filelist = @LdHasFilelist@
-ld-supports-response-files = @LdSupportsResponseFiles@
+merge-objs-supports-response-files = @MergeObjsSupportsResponseFiles@
 ld-is-gnu-ld = @LdIsGNULd@
 ar-args = @ArArgs@
 

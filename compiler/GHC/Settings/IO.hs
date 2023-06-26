@@ -104,7 +104,7 @@ initSettings top_dir = do
 
   ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
   ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
-  ldSupportsResponseFiles <- getBooleanSetting "ld supports response files"
+  mergeObjsSupportsResponseFiles <- getBooleanSetting "Merge objects supports response files"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
   arSupportsDashL         <- getBooleanSetting "ar supports -L"
 
@@ -173,7 +173,7 @@ initSettings top_dir = do
     , sToolSettings = ToolSettings
       { toolSettings_ldSupportsCompactUnwind = ldSupportsCompactUnwind
       , toolSettings_ldSupportsFilelist      = ldSupportsFilelist
-      , toolSettings_ldSupportsResponseFiles = ldSupportsResponseFiles
+      , toolSettings_mergeObjsSupportsResponseFiles = mergeObjsSupportsResponseFiles
       , toolSettings_ldIsGnuLd               = ldIsGnuLd
       , toolSettings_ccSupportsNoPie         = gccSupportsNoPie
       , toolSettings_useInplaceMinGW         = useInplaceMinGW
