@@ -2490,6 +2490,12 @@ specArgFreeIds (SpecDict dx) = exprFreeIds dx
 specArgFreeIds UnspecType    = emptyVarSet
 specArgFreeIds UnspecArg     = emptyVarSet
 
+specArgFreeVars :: SpecArg -> VarSet
+specArgFreeVars (SpecType ty) = tyCoVarsOfType ty
+specArgFreeVars (SpecDict dx) = exprFreeVars dx
+specArgFreeVars UnspecType    = emptyVarSet
+specArgFreeVars UnspecArg     = emptyVarSet
+
 isSpecDict :: SpecArg -> Bool
 isSpecDict (SpecDict {}) = True
 isSpecDict _             = False
@@ -2798,6 +2804,12 @@ non-dictionary bindings too.
 
 Note [Specialising polymorphic dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Note June 2023: This has proved to be quite a tricky optimisation to get right
+see (#23469, #23109, #21229, #23445) so it is now guarded by a flag
+`-fpolymorphic-specialisation`.
+
+
 Consider
     class M a where { foo :: a -> Int }
 
@@ -2988,14 +3000,23 @@ getTheta = fmap piTyBinderType . filter isInvisiblePiTyBinder . filter isAnonPiT
 
 
 ------------------------------------------------------------
-singleCall :: Id -> [SpecArg] -> UsageDetails
-singleCall id args
+singleCall :: SpecEnv -> Id -> [SpecArg] -> UsageDetails
+singleCall spec_env id args
   = MkUD {ud_binds = emptyFDBs,
           ud_calls = unitDVarEnv id $ CIS id $
                      unitBag (CI { ci_key  = args
                                  , ci_fvs  = call_fvs }) }
   where
-    call_fvs = foldr (unionVarSet . specArgFreeIds) emptyVarSet args
+    call_fvs =
+      foldr (unionVarSet . free_var_fn) emptyVarSet args
+
+    free_var_fn =
+      if gopt Opt_PolymorphicSpecialisation (se_dflags spec_env)
+        then specArgFreeIds
+        else specArgFreeVars
+
+
+
         -- specArgFreeIds: we specifically look for free Ids, not TyVars
         --    see (MP1) in Note [Specialising polymorphic dictionaries]
         --
@@ -3014,7 +3035,7 @@ mkCallUDs' env f args
   | wantCallsFor env f    -- We want it, and...
   , not (null ci_key)     -- this call site has a useful specialisation
   = -- pprTrace "mkCallUDs: keeping" _trace_doc
-    singleCall f ci_key
+    singleCall env f ci_key
 
   | otherwise  -- See also Note [Specialisations already covered]
   = -- pprTrace "mkCallUDs: discarding" _trace_doc

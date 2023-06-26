@@ -2432,6 +2432,7 @@ fFlagsDeps = [
   flagSpec "specialize-aggressively"          Opt_SpecialiseAggressively,
   flagSpec "cross-module-specialise"          Opt_CrossModuleSpecialise,
   flagSpec "cross-module-specialize"          Opt_CrossModuleSpecialise,
+  flagSpec "polymorphic-specialisation"       Opt_PolymorphicSpecialisation,
   flagSpec "inline-generics"                  Opt_InlineGenerics,
   flagSpec "inline-generics-aggressively"     Opt_InlineGenericsAggressively,
   flagSpec "static-argument-transformation"   Opt_StaticArgumentTransformation,
