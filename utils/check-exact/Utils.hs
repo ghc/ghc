@@ -353,27 +353,27 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
-setAnchorAn :: (NoAnn an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
-setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc noAnn cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+-- setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+-- setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
+--   = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
+--      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
+-- setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
+--   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
+--      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpa :: (NoAnn an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
-setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
+-- setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
+-- setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
+-- setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
 
-setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
-setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
+-- setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
+-- setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
+-- setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
 
-setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
-setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
-  where
-    anc' = anc { anchor_op = UnchangedAnchor }
-    an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
+-- setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
+-- setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
+--   where
+--     anc' = anc { anchor_op = UnchangedAnchor }
+--     an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
 
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
@@ -387,11 +387,15 @@ trailingAnnLoc :: TrailingAnn -> EpaLocation
 trailingAnnLoc (AddSemiAnn ss)    = ss
 trailingAnnLoc (AddCommaAnn ss)   = ss
 trailingAnnLoc (AddVbarAnn ss)    = ss
+trailingAnnLoc (AddDarrowAnn ss)  = ss
+trailingAnnLoc (AddDarrowUAnn ss) = ss
 
 setTrailingAnnLoc :: TrailingAnn -> EpaLocation -> TrailingAnn
 setTrailingAnnLoc (AddSemiAnn _)    ss = (AddSemiAnn ss)
 setTrailingAnnLoc (AddCommaAnn _)   ss = (AddCommaAnn ss)
 setTrailingAnnLoc (AddVbarAnn _)    ss = (AddVbarAnn ss)
+setTrailingAnnLoc (AddDarrowAnn _)  ss = (AddDarrowAnn ss)
+setTrailingAnnLoc (AddDarrowUAnn _) ss = (AddDarrowUAnn ss)
 
 addEpAnnLoc :: AddEpAnn -> EpaLocation
 addEpAnnLoc (AddEpAnn _ l) = l
