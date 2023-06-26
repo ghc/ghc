@@ -991,6 +991,7 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalRecordSyntax either_ty_ty
       -> mkSimpleDecorated $
            text "Record syntax is illegal here:" <+> either ppr ppr either_ty_ty
+
     TcRnInvalidVisibleKindArgument arg ty
       -> mkSimpleDecorated $
            text "Cannot apply function of kind" <+> quotes (ppr ty)
@@ -1612,20 +1613,6 @@ instance Diagnostic TcRnMessage where
       hang (text "Mismatched type name in type family instance.")
          2 (vcat [ text "Expected:" <+> ppr fam_tc_name
                  , text "  Actual:" <+> ppr eqn_tc_name ])
-
-    TcRnBindVarAlreadyInScope tv_names_in_scope
-      -> mkSimpleDecorated $
-        vcat
-          [ text "Type variable" <> plural tv_names_in_scope
-            <+> hcat (punctuate (text ",") (map (quotes . ppr) tv_names_in_scope))
-            <+> isOrAre tv_names_in_scope
-            <+> text "already in scope."
-          , text "Type applications in patterns must bind fresh variables, without shadowing."
-          ]
-
-    TcRnBindMultipleVariables ctx tv_name_w_loc
-      -> mkSimpleDecorated $
-        text "Variable" <+> text "`" <> ppr tv_name_w_loc <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
 
     TcRnUnexpectedKindVar tv_name
       -> mkSimpleDecorated $ text "Unexpected kind variable" <+> quotes (ppr tv_name)
@@ -2395,10 +2382,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnTyFamNameMismatch{}
       -> ErrorWithoutFlag
-    TcRnBindVarAlreadyInScope{}
-      -> ErrorWithoutFlag
-    TcRnBindMultipleVariables{}
-      -> ErrorWithoutFlag
     TcRnUnexpectedKindVar{}
       -> ErrorWithoutFlag
     TcRnNegativeNumTypeLiteral{}
@@ -3059,10 +3042,6 @@ instance Diagnostic TcRnMessage where
     TcRnIncoherentRoles{}
       -> [suggestExtension LangExt.IncoherentInstances]
     TcRnTyFamNameMismatch{}
-      -> noHints
-    TcRnBindVarAlreadyInScope{}
-      -> noHints
-    TcRnBindMultipleVariables{}
       -> noHints
     TcRnUnexpectedKindVar{}
       -> [suggestExtension LangExt.PolyKinds]

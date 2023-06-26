@@ -2095,7 +2095,7 @@ repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon tyargs ps -> do { qs <- repLPs ps
-                                   ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hsps_body t)
+                                   ; let unwrapTyArg (HsConPatTyArg _ t) = unLoc (hstp_body t)
                                    ; ts <- repListM typeTyConName (repTy . unwrapTyArg) tyargs
                                    ; repPcon con_str ts qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)

@@ -507,11 +507,11 @@ taScopes
   :: Scope
   -> Scope
   -> [HsConPatTyArg (GhcPass a)]
-  -> [TScoped (HsPatSigType (GhcPass a))]
+  -> [TScoped (HsTyPat (GhcPass a))]
 taScopes scope rhsScope xs =
   map (\(RS sc a) -> TS (ResolvedScopes [scope, sc]) (unLoc a)) $
-    listScopes rhsScope (map (\(HsConPatTyArg _ hsps) -> L (getLoc $ hsps_body hsps) hsps) xs)
-  -- We make the HsPatSigType into a Located one by using the location of the underlying LHsType.
+    listScopes rhsScope (map (\(HsConPatTyArg _ hstp) -> L (getLoc $ hstp_body hstp) hstp) xs)
+  -- We make the HsTyPat into a Located one by using the location of the underlying LHsType.
   -- We then strip off the redundant location information afterward, and take the union of the given scope and those to the right when forming the TS.
 
 -- | 'listScopes' specialised to 'TVScoped' things
@@ -1039,7 +1039,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
             ExpansionPat _ p -> [ toHie $ PS rsp scope pscope (L ospan p) ]
     where
       contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsConPatTyArg GhcRn) a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (TScoped (HsPatSigType GhcRn)) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+                 -> HsConDetails (TScoped (HsTyPat GhcRn)) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
       contextify (PrefixCon tyargs args) =
         PrefixCon (taScopes scope argscope tyargs)
                   (patScopes rsp scope pscope args)
@@ -1061,6 +1061,12 @@ instance ToHie (TScoped (HsPatSigType GhcRn)) where
       , toHie body
       ]
   -- See Note [Scoping Rules for SigPat]
+
+instance ToHie (TScoped (HsTyPat GhcRn)) where
+  toHie (TS sc (HsTP (HsTPRn wcs imp_tvs exp_tvs) body@(L span _))) = concatM $
+      [ bindingsOnly $ map (C $ TyVarBind (mkScopeA span) sc) (wcs ++ imp_tvs ++ exp_tvs)
+      , toHie body
+      ]
 
 instance ( ToHie (LocatedA (body (GhcPass p)))
          , HiePass p

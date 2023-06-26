@@ -1838,7 +1838,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsAppTypePV l p at t = do
     cs <- getCommentsFor (locA l)
     let anns = EpAnn (spanAsAnchor (getLocA t)) NoEpAnns cs
-    return $ L l (PatBuilderAppType p at (mkHsPatSigType anns t))
+    return $ L l (PatBuilderAppType p at (mkHsTyPat anns t))
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)

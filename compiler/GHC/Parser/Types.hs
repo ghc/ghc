@@ -55,7 +55,7 @@ data PatBuilder p
   = PatBuilderPat (Pat p)
   | PatBuilderPar (LHsToken "(" p) (LocatedA (PatBuilder p)) (LHsToken ")" p)
   | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
-  | PatBuilderAppType (LocatedA (PatBuilder p)) (LHsToken "@" p) (HsPatSigType GhcPs)
+  | PatBuilderAppType (LocatedA (PatBuilder p)) (LHsToken "@" p) (HsTyPat GhcPs)
   | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
                     (LocatedA (PatBuilder p)) (EpAnn [AddEpAnn])
   | PatBuilderVar (LocatedN RdrName)

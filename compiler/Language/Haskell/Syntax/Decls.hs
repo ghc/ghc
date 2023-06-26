@@ -49,7 +49,7 @@ module Language.Haskell.Syntax.Decls (
   TyFamInstDecl(..), LTyFamInstDecl,
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
-  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsTyPats,
+  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsFamEqnPats,
   LClsInstDecl, ClsInstDecl(..),
 
   -- ** Standalone deriving declarations
@@ -1283,8 +1283,12 @@ type LTyFamInstEqn pass = XRec pass (TyFamInstEqn pass)
 
 -- For details on above see Note [exact print annotations] in GHC.Parser.Annotation
 
--- | Haskell Type Patterns
-type HsTyPats pass = [LHsTypeArg pass]
+-- | HsFamEqnPats represents patterns on the left-hand side of a type instance,
+-- e.g. `type instance F @k (a :: k) = a` has patterns `@k` and `(a :: k)`.
+--
+-- HsFamEqnPats used to be called HsTyPats but it was renamed to avoid confusion
+-- with a different notion of type patterns, see #23657.
+type HsFamEqnPats pass = [LHsTypeArg pass]
 
 {- Note [Family instance declaration binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1374,7 +1378,7 @@ data FamEqn pass rhs
        { feqn_ext    :: XCFamEqn pass rhs
        , feqn_tycon  :: LIdP pass
        , feqn_bndrs  :: HsOuterFamEqnTyVarBndrs pass -- ^ Optional quantified type vars
-       , feqn_pats   :: HsTyPats pass
+       , feqn_pats   :: HsFamEqnPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
        , feqn_rhs    :: rhs
        }

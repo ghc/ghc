@@ -902,7 +902,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 tcDataFamInstHeader
     :: AssocInstInfo -> SkolemInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
     -> LexicalFixity -> Maybe (LHsContext GhcRn)
-    -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn)
+    -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
     -> TcM ([TcTyVar], [TcType], TcKind, TcThetaType)
          -- All skolem TcTyVars, all zonked so it's clear what the free vars are
@@ -2458,4 +2458,3 @@ instDeclCtxt2 dfun_ty
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
-

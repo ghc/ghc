@@ -220,3 +220,4 @@ test('ExportWarnings3', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_a
 test('ExportWarnings4', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_aux.hs']), multimod_compile, ['ExportWarnings4', '-v0 -Wno-duplicate-exports -Wx-custom'])
 test('ExportWarnings5', extra_files(['ExportWarnings_base.hs', 'ExportWarnings_aux.hs']), multimod_compile, ['ExportWarnings5', '-v0 -Wno-duplicate-exports -Wx-custom'])
 test('ExportWarnings6', normal, compile, ['-Wincomplete-export-warnings'])
+test('T22478a', req_th, compile, [''])

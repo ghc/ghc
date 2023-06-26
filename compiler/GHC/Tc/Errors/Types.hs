@@ -513,6 +513,8 @@ data TcRnMessage where
                  rename/should_fail/T2723
                  rename/should_compile/T3262
                  driver/werror
+                 rename/should_fail/T22478d
+                 typecheck/should_fail/TyAppPat_ScopedTyVarConflict
   -}
   TcRnShadowedName :: OccName -> ShadowedNameProvenance -> TcRnMessage
 
@@ -728,7 +730,7 @@ data TcRnMessage where
      Test cases: th/T8412
                  typecheck/should_fail/T8306
   -}
-  TcRnNegativeNumTypeLiteral :: HsType GhcPs -> TcRnMessage
+  TcRnNegativeNumTypeLiteral :: HsTyLit GhcPs -> TcRnMessage
 
   {-| TcRnIllegalWildcardsInConstructor is an error that occurs whenever
       the record wildcards '..' are used inside a constructor without labeled fields.
@@ -1937,25 +1939,6 @@ data TcRnMessage where
  -}
   TcRnCapturedTermName :: RdrName -> Either [GlobalRdrElt] Name -> TcRnMessage
 
-  {-| TcRnTypeMultipleOccurenceOfBindVar is an error that occurs if a bound
-      type variable's name is already in use.
-    Example:
-      f :: forall a. ...
-      f (MkT @a ...) = ...
-
-    Test cases: TyAppPat_ScopedTyVarConflict TyAppPat_NonlinearMultiPat TyAppPat_NonlinearMultiAppPat
-  -}
-  TcRnBindVarAlreadyInScope :: [LocatedN RdrName] -> TcRnMessage
-
-  {-| TcRnBindMultipleVariables is an error that occurs in the case of
-    multiple occurrences of a bound variable.
-    Example:
-      foo (MkFoo @(a,a) ...) = ...
-
-    Test case: typecheck/should_fail/TyAppPat_NonlinearSinglePat
-  -}
-  TcRnBindMultipleVariables :: HsDocContext -> LocatedN RdrName -> TcRnMessage
-
   {-| TcRnTypeEqualityOutOfScope is a warning (controlled by -Wtype-equality-out-of-scope)
       that occurs when the type equality (a ~ b) is not in scope.
 
@@ -2237,6 +2220,7 @@ data TcRnMessage where
 
     Test cases: parser/should_fail/unpack_inside_type
                 typecheck/should_fail/T7210
+                rename/should_fail/T22478b
   -}
   TcRnUnexpectedAnnotation :: !(HsType GhcRn) -> !HsSrcBang -> TcRnMessage
 
@@ -2247,6 +2231,7 @@ data TcRnMessage where
 
     Test cases: rename/should_fail/T7943
                 rename/should_fail/T9077
+                rename/should_fail/T22478b
   -}
   TcRnIllegalRecordSyntax :: Either (HsType GhcPs) (HsType GhcRn) -> TcRnMessage
 
@@ -4047,7 +4032,9 @@ data TcRnMessage where
 
     Test cases:
       dsrun006, mdofail002, mdofail003, mod23, mod24, qq006, rnfail001,
-      rnfail004, SimpleFail6, T14114, T16110_Fail1, tcfail038, TH_spliceD1
+      rnfail004, SimpleFail6, T14114, T16110_Fail1, tcfail038, TH_spliceD1,
+      T22478b, TyAppPat_NonlinearMultiAppPat, TyAppPat_NonlinearMultiPat,
+      TyAppPat_NonlinearSinglePat,
   -}
   TcRnBindingNameConflict :: !RdrName -- ^ The conflicting name
                           -> !(NE.NonEmpty SrcSpan)

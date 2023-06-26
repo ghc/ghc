@@ -26,7 +26,7 @@ module GHC.Rename.Utils (
 
         newLocalBndrRn, newLocalBndrsRn,
 
-        bindLocalNames, bindLocalNamesFV,
+        bindLocalNames, bindLocalNamesFV, delLocalNames,
 
         addNameClashErrRn, mkNameClashErr,
 
@@ -107,6 +107,14 @@ bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
         ; return (result, delFVs names fvs) }
+
+delLocalNames :: [Name] -> RnM a -> RnM a
+delLocalNames names
+  = updLclCtxt $ \ lcl_env ->
+    let th_bndrs' = delListFromNameEnv (tcl_th_bndrs lcl_env) names
+        rdr_env'  = minusLocalRdrEnvList (tcl_rdr lcl_env) (map occName names)
+    in lcl_env { tcl_th_bndrs = th_bndrs'
+               , tcl_rdr      = rdr_env' }
 
 -------------------------------------
 checkDupRdrNames :: [LocatedN RdrName] -> RnM ()

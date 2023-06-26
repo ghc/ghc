@@ -7,7 +7,7 @@ module GHC.Rename.Splice (
         -- Typed splices
         rnTypedSplice,
         -- Untyped splices
-        rnSpliceType, rnUntypedSpliceExpr, rnSplicePat, rnSpliceDecl,
+        rnSpliceType, rnUntypedSpliceExpr, rnSplicePat, rnSpliceTyPat, rnSpliceDecl,
 
         -- Brackets
         rnTypedBracket, rnUntypedBracket,
@@ -738,6 +738,26 @@ rnSplicePat splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; let p = HsUntypedSpliceTop (ThModFinalizers mod_finalizers) pat
            ; return ((rn_splice, p), emptyFVs) }
+              -- Wrap the result of the quasi-quoter in parens so that we don't
+              -- lose the outermost location set by runQuasiQuote (#7918)
+
+-- | Rename a splice type pattern. Much the same as `rnSplicePat`, but works with LHsType instead of LPat
+rnSpliceTyPat :: HsUntypedSplice GhcPs -> RnM ( (HsUntypedSplice GhcRn, HsUntypedSpliceResult (LHsType GhcPs))
+                                            , FreeVars)
+rnSpliceTyPat splice
+  = rnUntypedSpliceGen run_ty_pat_splice pend_ty_pat_splice splice
+  where
+    pend_ty_pat_splice name rn_splice
+      = (makePending UntypedTypeSplice name rn_splice
+        , (rn_splice, HsUntypedSpliceNested name)) -- HsType splice is nested and thus simply renamed
+
+    run_ty_pat_splice rn_splice
+      = do { traceRn "rnSpliceTyPat: untyped pattern splice" empty
+           ; (ty, mod_finalizers) <-
+                runRnSplice UntypedTypeSplice runMetaT ppr rn_splice
+             -- See Note [Delaying modFinalizers in untyped splices].
+           ; let t = HsUntypedSpliceTop (ThModFinalizers mod_finalizers) ty
+           ; return ((rn_splice, t), emptyFVs) }
               -- Wrap the result of the quasi-quoter in parens so that we don't
               -- lose the outermost location set by runQuasiQuote (#7918)
 

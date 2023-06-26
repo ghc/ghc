@@ -14,11 +14,11 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext, rnMaybeContext,
         rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
-        HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
+        rnHsSigType, rnHsWcType, rnHsTyLit,
+        HsPatSigTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsPatSigKind,
         newTyVarNameRn,
         rnConDeclFields,
-        lookupField,
+        lookupField, mkHsOpTyRn,
         rnLTyVar,
 
         rnScaledLHsType,
@@ -37,7 +37,9 @@ module GHC.Rename.HsType (
         extractHsTysRdrTyVars, extractRdrKindSigVars,
         extractConDeclGADTDetailsTyVars, extractDataDefnKindVars,
         extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
-        nubL, nubN
+        nubL, nubN,
+        -- Error helpers
+        badKindSigErr
   ) where
 
 import GHC.Prelude
@@ -79,8 +81,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 
 import Data.List (nubBy, partition)
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
 import Control.Monad
 
 {-
@@ -138,13 +138,28 @@ rnHsSigWcType doc (HsWC { hswc_body =
        ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
-    do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
+    do { (wcs, body_ty', fvs) <- rnWcBodyType doc nwc_rdrs body_ty
        ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
                 HsSig { sig_ext = noExtField
                       , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
               , fvs) } }
 
 rnHsPatSigType :: HsPatSigTypeScoping
+               -> HsDocContext
+               -> HsPatSigType GhcPs
+               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
+               -> RnM (a, FreeVars)
+rnHsPatSigType = rnHsPatSigTyKi TypeLevel
+
+rnHsPatSigKind :: HsPatSigTypeScoping
+               -> HsDocContext
+               -> HsPatSigType GhcPs
+               -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
+               -> RnM (a, FreeVars)
+rnHsPatSigKind = rnHsPatSigTyKi KindLevel
+
+rnHsPatSigTyKi :: TypeOrKind
+               -> HsPatSigTypeScoping
                -> HsDocContext
                -> HsPatSigType GhcPs
                -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
@@ -156,7 +171,7 @@ rnHsPatSigType :: HsPatSigTypeScoping
 -- Wildcards are allowed
 --
 -- See Note [Pattern signature binders and scoping] in GHC.Hs.Type
-rnHsPatSigType scoping ctx sig_ty thing_inside
+rnHsPatSigTyKi level scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
        ; free_vars <- filterInScopeM (extractHsTyRdrTyVars pat_sig_ty)
@@ -166,7 +181,7 @@ rnHsPatSigType scoping ctx sig_ty thing_inside
                AlwaysBind -> tv_rdrs
                NeverBind  -> []
        ; rnImplicitTvOccs Nothing implicit_bndrs $ \ imp_tvs ->
-    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBody ctx nwc_rdrs pat_sig_ty
+    do { (nwcs, pat_sig_ty', fvs1) <- rnWcBodyTyKi level ctx nwc_rdrs pat_sig_ty
        ; let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = pat_sig_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
@@ -179,59 +194,20 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
   = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', _) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-       ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
+       ; (wcs, hs_ty', fvs) <- rnWcBodyType ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
 
--- Similar to rnHsWcType, but rather than requiring free variables in the type to
--- already be in scope, we are going to require them not to be in scope,
--- and we bind them.
-rnHsPatSigTypeBindingVars :: HsDocContext
-                          -> HsPatSigType GhcPs
-                          -> (HsPatSigType GhcRn -> RnM (r, FreeVars))
-                          -> RnM (r, FreeVars)
-rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
-  (HsPS { hsps_body = hs_ty }) -> do
-    rdr_env <- getLocalRdrEnv
-    let (varsInScope, varsNotInScope) =
-          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty)
-    -- TODO: Resolve and remove this comment.
-    -- This next bit is in some contention. The original proposal #126
-    -- (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0126-type-applications-in-patterns.rst)
-    -- says that in-scope variables are fine here: don't bind them, just use
-    -- the existing vars, like in type signatures. An amendment #291
-    -- (https://github.com/ghc-proposals/ghc-proposals/pull/291) says that the
-    -- use of an in-scope variable should *shadow* an in-scope tyvar, like in
-    -- terms. In an effort to make forward progress, the current implementation
-    -- just rejects any use of an in-scope variable, meaning GHC will accept
-    -- a subset of programs common to both variants. If this comment still exists
-    -- in mid-to-late 2021 or thereafter, we have done a poor job on following
-    -- up on this point.
-    -- Example:
-    --   f :: forall a. ...
-    --   f (MkT @a ...) = ...
-    -- Should the inner `a` refer to the outer one? shadow it? We are, as yet, undecided,
-    -- so we currently reject.
-    when (not (null varsInScope)) $
-      addErr $ TcRnBindVarAlreadyInScope varsInScope
-    (wcVars, ibVars) <- partition_nwcs varsNotInScope
-    rnImplicitTvBndrs ctxt Nothing ibVars $ \ ibVars' -> do
-      (wcVars', hs_ty', fvs) <- rnWcBody ctxt wcVars hs_ty
-      let sig_ty = HsPS
-            { hsps_body = hs_ty'
-            , hsps_ext = HsPSRn
-              { hsps_nwcs    = wcVars'
-              , hsps_imp_tvs = ibVars'
-              }
-            }
-      (res, fvs') <- thing_inside sig_ty
-      return (res, fvs `plusFV` fvs')
 
-rnWcBody :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
+rnWcBodyType :: HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
+  -> RnM ([Name], LHsType GhcRn, FreeVars)
+rnWcBodyType = rnWcBodyTyKi TypeLevel
+
+rnWcBodyTyKi :: TypeOrKind -> HsDocContext -> [LocatedN RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
-rnWcBody ctxt nwc_rdrs hs_ty
+rnWcBodyTyKi level ctxt nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
-       ; let env = RTKE { rtke_level = TypeLevel
+       ; let env = RTKE { rtke_level = level
                         , rtke_what  = RnTypeBody
                         , rtke_nwcs  = mkNameSet nwcs
                         , rtke_ctxt  = ctxt }
@@ -422,32 +398,6 @@ type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
 
--- | Create fresh type variables for binders, disallowing multiple occurrences of the same variable. Similar to `rnImplicitTvOccs` except that duplicate occurrences will
--- result in an error, and the source locations of the variables are not adjusted, as these variable occurrences are themselves the binding sites for the type variables,
--- rather than the variables being implicitly bound by a signature.
-rnImplicitTvBndrs :: HsDocContext
-                  -> Maybe assoc
-                  -- ^ @'Just' _@ => an associated type decl
-                  -> FreeKiTyVars
-                  -- ^ Surface-syntax free vars that we will implicitly bind.
-                  -- Duplicate variables will cause a compile-time error regarding repeated bindings.
-                  -> ([Name] -> RnM (a, FreeVars))
-                  -> RnM (a, FreeVars)
-rnImplicitTvBndrs ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (NE.groupAllWith unLoc $ implicit_vs_with_dups) $ \case
-           (x :| []) -> return x
-           (x :| _) -> do
-             addErr $ TcRnBindMultipleVariables ctx x
-             return x
-
-       ; traceRn "rnImplicitTvBndrs" $
-         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
-
-       ; vars <- mapM (newTyVarNameRn mb_assoc) implicit_vs
-
-       ; bindLocalNamesFV vars $
-         thing_inside vars }
-
 {- ******************************************************
 *                                                       *
            LHsType and HsType
@@ -616,17 +566,19 @@ rnHsTyKi env ty@(HsRecTy _ flds)
        ; (flds', fvs) <- rnConDeclFields ctxt fls flds
        ; return (HsRecTy noExtField flds', fvs) }
   where
-    get_fields (ConDeclCtx names)
+    get_fields ctxt@(ConDeclCtx names)
       = do res <- concatMapM (lookupConstructorFields . unLoc) names
            if equalLength res names
            -- Lookup can fail when the record syntax is incorrect, e.g.
            -- data D = D Int { fld :: Bool }. See T7943.
            then return res
-           else err
-    get_fields _ = err
+           else err ctxt
+    get_fields ctxt = err ctxt
 
-    err =
-      do { addErr $ TcRnIllegalRecordSyntax (Left ty)
+    err ctxt =
+      do { addErr $
+            TcRnWithHsDocContext ctxt $
+            TcRnIllegalRecordSyntax (Left ty)
          ; return [] }
 
 rnHsTyKi env (HsFunTy u mult ty1 ty2)
@@ -645,7 +597,7 @@ rnHsTyKi env listTy@(HsListTy x ty)
 
 rnHsTyKi env (HsKindSig x ty k)
   = do { kind_sigs_ok <- xoptM LangExt.KindSignatures
-       ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) ty)
+       ; unless kind_sigs_ok (badKindSigErr (rtke_ctxt env) k)
        ; (k', sig_fvs)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
        ; (ty', lhs_fvs) <- bindSigTyVarsFV (hsScopedKvs k') $
                            rnLHsTyKi env ty
@@ -671,13 +623,8 @@ rnHsTyKi env sumTy@(HsSumTy x tys)
 rnHsTyKi env tyLit@(HsTyLit src t)
   = do { data_kinds <- xoptM LangExt.DataKinds
        ; unless data_kinds (addErr (dataKindsErr env tyLit))
-       ; when (negLit t) (addErr $ TcRnNegativeNumTypeLiteral tyLit)
-       ; return (HsTyLit src (rnHsTyLit t), emptyFVs) }
-  where
-    negLit :: HsTyLit (GhcPass p) -> Bool
-    negLit (HsStrTy _ _) = False
-    negLit (HsNumTy _ i) = i < 0
-    negLit (HsCharTy _ _) = False
+       ; t' <- rnHsTyLit t
+       ; return (HsTyLit src t', emptyFVs) }
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
@@ -742,10 +689,13 @@ rnHsTyKi env (HsWildCardTy _)
        ; return (HsWildCardTy noExtField, emptyFVs) }
 
 
-rnHsTyLit :: HsTyLit GhcPs -> HsTyLit GhcRn
-rnHsTyLit (HsStrTy x s) = HsStrTy x s
-rnHsTyLit (HsNumTy x i) = HsNumTy x i
-rnHsTyLit (HsCharTy x c) = HsCharTy x c
+rnHsTyLit :: HsTyLit GhcPs -> RnM (HsTyLit GhcRn)
+rnHsTyLit (HsStrTy x s) = pure (HsStrTy x s)
+rnHsTyLit tyLit@(HsNumTy x i) = do
+  when (i < 0) $
+    addErr $ TcRnNegativeNumTypeLiteral tyLit
+  pure (HsNumTy x i)
+rnHsTyLit (HsCharTy x c) = pure (HsCharTy x c)
 
 
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)

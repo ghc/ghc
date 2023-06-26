@@ -1426,12 +1426,7 @@ tcConTyArgs tenv penv prs thing_inside
 
 tcConTyArg :: Subst -> Checker (HsConPatTyArg GhcRn, TyVar) ()
 tcConTyArg tenv penv (HsConPatTyArg _ rn_ty, con_tv) thing_inside
-  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt HM_TyAppPat rn_ty AnyKind
-               -- AnyKind is a bit suspect: it really should be the kind gotten
-               -- from instantiating the constructor type. But this would be
-               -- hard to get right, because earlier type patterns might influence
-               -- the kinds of later patterns. In any case, it all gets checked
-               -- by the calls to unifyType below which unifies kinds
+  = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat rn_ty (substTy tenv (varType con_tv))
 
        ; case NE.nonEmpty sig_ibs of
            Just sig_ibs_ne | inPatBind penv ->

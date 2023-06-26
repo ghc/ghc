@@ -49,7 +49,7 @@ module GHC.Hs.Decls (
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
   pprDataFamInstFlavour, pprTyFamInstDecl, pprHsFamInstLHS,
-  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsTyPats,
+  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsFamEqnPats,
   LClsInstDecl, ClsInstDecl(..),
 
   -- ** Standalone deriving declarations
@@ -867,7 +867,7 @@ pprDataFamInstFlavour DataFamInstDecl
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
    -> HsOuterFamEqnTyVarBndrs (GhcPass p)
-   -> HsTyPats (GhcPass p)
+   -> HsFamEqnPats (GhcPass p)
    -> LexicalFixity
    -> Maybe (LHsContext (GhcPass p))
    -> SDoc

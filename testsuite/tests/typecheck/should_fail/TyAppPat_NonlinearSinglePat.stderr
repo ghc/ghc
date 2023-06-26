@@ -1,3 +1,6 @@
 
-TyAppPat_NonlinearSinglePat.hs:13:6: error: [GHC-92957]
-    Variable `a' would be bound multiple times by a type argument.
+TyAppPat_NonlinearSinglePat.hs:13:14: error: [GHC-10498]
+    • Conflicting definitions for ‘a’
+      Bound at: TyAppPat_NonlinearSinglePat.hs:13:14
+                TyAppPat_NonlinearSinglePat.hs:13:16
+    • In an equation for ‘foo’

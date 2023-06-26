@@ -3290,7 +3290,7 @@ generalising over the type of a rewrite rule.
 --------------------------
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                    -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
-                   -> HsTyPats GhcRn                    -- Patterns
+                   -> HsFamEqnPats GhcRn                    -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], [TcType], TcType)   -- (tyvars, pats, rhs)
 -- Used only for type families, not data families

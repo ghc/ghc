@@ -886,4 +886,5 @@ test('T22560e', normal, compile, [''])
 test('T23514b', normal, compile, [''])
 test('T23514c', normal, compile, [''])
 test('T22537', normal, compile, [''])
-
+test('T18986a', normal, compile, [''])
+test('T18986b', normal, compile, [''])

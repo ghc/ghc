@@ -604,7 +604,7 @@ cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr ()] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , LocatedN RdrName
                        , HsOuterFamEqnTyVarBndrs GhcPs
-                       , HsTyPats GhcPs)
+                       , HsFamEqnPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
   = do { cxt' <- cvtContext funPrec cxt
        ; bndrs' <- traverse (mapM cvt_tv) bndrs
@@ -1438,7 +1438,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameN s
                             ; ps' <- cvtPats ps
                             ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
-                                  pts = map (\t -> HsConPatTyArg noHsTok (mkHsPatSigType noAnn t)) ts'
+                                  pts = map (\t -> HsConPatTyArg noHsTok (mkHsTyPat noAnn t)) ts'
                             ; return $ ConPat
                                 { pat_con_ext = noAnn
                                 , pat_con = s'

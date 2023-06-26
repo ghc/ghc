@@ -641,6 +641,11 @@ type family XHsPS x
 type family XXHsPatSigType x
 
 -- -------------------------------------
+-- HsTyPat type families
+type family XHsTP x
+type family XXHsTyPat x
+
+-- -------------------------------------
 -- HsType type families
 type family XForAllTy        x
 type family XQualTy          x

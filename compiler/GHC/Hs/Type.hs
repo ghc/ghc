@@ -37,6 +37,7 @@ module GHC.Hs.Type (
         HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsWildCardBndrs(..),
         HsPatSigType(..), HsPSRn(..),
+        HsTyPat(..), HsTyPatRn(..),
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, fromMaybeContext,
@@ -68,14 +69,15 @@ module GHC.Hs.Type (
         hsOuterTyVarNames, hsOuterExplicitBndrs, mapHsOuterImplicit,
         mkHsOuterImplicit, mkHsOuterExplicit,
         mkHsImplicitSigType, mkHsExplicitSigType,
-        mkHsWildCardBndrs, mkHsPatSigType,
+        mkHsWildCardBndrs, mkHsPatSigType, mkHsTyPat,
         mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded,
         hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
-        hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
+        hsLTyVarName, hsLTyVarNames, hsForAllTelescopeNames,
+        hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTyInvis, splitLHsForAllTyInvis_KP, splitLHsQualTy,
@@ -218,6 +220,10 @@ type instance XHsPS GhcPs = EpAnnCO
 type instance XHsPS GhcRn = HsPSRn
 type instance XHsPS GhcTc = HsPSRn
 
+type instance XHsTP GhcPs = EpAnnCO
+type instance XHsTP GhcRn = HsTyPatRn
+type instance XHsTP GhcTc = DataConCantHappen
+
 -- | The extension field for 'HsPatSigType', which is only used in the
 -- renamer onwards. See @Note [Pattern signature binders and scoping]@.
 data HsPSRn = HsPSRn
@@ -226,7 +232,22 @@ data HsPSRn = HsPSRn
   }
   deriving Data
 
+-- HsTyPatRn is the extension field for `HsTyPat`, after renaming
+-- E.g. pattern K @(Maybe (_x, a, b::Proxy k)
+-- In the type pattern @(Maybe ...):
+--    '_x' is a named wildcard
+--    'a'  is explicitly bound
+--    'k'  is implicitly bound
+-- See Note [Implicit and explicit type variable binders] in GHC.Rename.Pat
+data HsTyPatRn = HsTPRn
+  { hstp_nwcs    :: [Name] -- ^ Wildcard names
+  , hstp_imp_tvs :: [Name] -- ^ Implicitly bound variable names
+  , hstp_exp_tvs :: [Name] -- ^ Explicitly bound variable names
+  }
+  deriving Data
+
 type instance XXHsPatSigType (GhcPass _) = DataConCantHappen
+type instance XXHsTyPat      (GhcPass _) = DataConCantHappen
 
 type instance XHsSig (GhcPass _) = NoExtField
 type instance XXHsSigType (GhcPass _) = DataConCantHappen
@@ -274,6 +295,10 @@ mkHsWildCardBndrs x = HsWC { hswc_body = x
 mkHsPatSigType :: EpAnnCO -> LHsType GhcPs -> HsPatSigType GhcPs
 mkHsPatSigType ann x = HsPS { hsps_ext  = ann
                             , hsps_body = x }
+
+mkHsTyPat :: EpAnnCO -> LHsType GhcPs -> HsTyPat GhcPs
+mkHsTyPat ann x = HsTP { hstp_ext  = ann
+                       , hstp_body = x }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x
@@ -448,6 +473,10 @@ hsLTyVarName = hsTyVarName . unLoc
 
 hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = map hsLTyVarName
+
+hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
+hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
+hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
 
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
@@ -1059,6 +1088,11 @@ instance Outputable thing
 instance (OutputableBndrId p)
        => Outputable (HsPatSigType (GhcPass p)) where
     ppr (HsPS { hsps_body = ty }) = ppr ty
+
+
+instance (OutputableBndrId p)
+       => Outputable (HsTyPat (GhcPass p)) where
+    ppr (HsTP { hstp_body = ty }) = ppr ty
 
 
 instance (OutputableBndrId p)

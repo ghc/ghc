@@ -1184,11 +1184,16 @@ collectPatsBinders flag pats = foldr (collect_lpat flag) [] pats
 
 -------------
 
--- | Indicate if evidence binders have to be collected.
+-- | Indicate if evidence binders and type variable binders have
+--   to be collected.
 --
--- This type is used as a boolean (should we collect evidence binders or not?)
--- but also to pass an evidence that the AST has been typechecked when we do
--- want to collect evidence binders, otherwise these binders are not available.
+-- This type enumerates the modes of collecting bound variables
+--                     | evidence |   type    |   term    |  ghc  |
+--                     | binders  | variables | variables |  pass |
+--                     --------------------------------------------
+-- CollNoDictBinders   |  no      |    no     |    yes    |  any  |
+-- CollWithDictBinders |  yes     |    no     |    yes    | GhcTc |
+-- CollVarTyVarBinders |  no      |    yes    |    yes    | GhcRn |
 --
 -- See Note [Dictionary binders in ConPatOut]
 data CollectFlag p where
@@ -1196,6 +1201,9 @@ data CollectFlag p where
     CollNoDictBinders   :: CollectFlag p
     -- | Collect evidence binders
     CollWithDictBinders :: CollectFlag GhcTc
+    -- | Collect variable and type variable binders, but no evidence binders
+    CollVarTyVarBinders :: CollectFlag GhcRn
+
 
 collect_lpat :: forall p. CollectPass p
              => CollectFlag p
@@ -1223,7 +1231,10 @@ collect_pat flag pat bndrs = case pat of
   LitPat _ _            -> bndrs
   NPat {}               -> bndrs
   NPlusKPat _ n _ _ _ _ -> unXRec @p n : bndrs
-  SigPat _ pat _        -> collect_lpat flag pat bndrs
+  SigPat _ pat sig      -> case flag of
+    CollVarTyVarBinders -> collect_lpat flag pat bndrs
+                            ++ collectPatSigBndrs sig
+    _                   -> collect_lpat flag pat bndrs
   XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
   -- See Note [Dictionary binders in ConPatOut]
@@ -1231,10 +1242,21 @@ collect_pat flag pat bndrs = case pat of
     CollNoDictBinders   -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
     CollWithDictBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
                            ++ collectEvBinders (cpt_binds (pat_con_ext pat))
+    CollVarTyVarBinders -> foldr (collect_lpat flag) bndrs (hsConPatArgs ps)
+                           ++ concatMap collectConPatTyArgBndrs (hsConPatTyArgs ps)
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
 collectEvBinders (TcEvBinds {}) = panic "ToDo: collectEvBinders"
+
+collectConPatTyArgBndrs :: HsConPatTyArg GhcRn -> [Name]
+collectConPatTyArgBndrs (HsConPatTyArg _ tp) = collectTyPatBndrs tp
+
+collectTyPatBndrs :: HsTyPat GhcRn -> [Name]
+collectTyPatBndrs (HsTP (HsTPRn nwcs imp_tvs exp_tvs) _) = nwcs ++ imp_tvs ++ exp_tvs
+
+collectPatSigBndrs :: HsPatSigType GhcRn -> [Name]
+collectPatSigBndrs (HsPS (HsPSRn nwcs imp_tvs) _) = nwcs ++ imp_tvs
 
 add_ev_bndr :: EvBind -> [Id] -> [Id]
 add_ev_bndr (EvBind { eb_lhs = b }) bs | isId b    = b:bs

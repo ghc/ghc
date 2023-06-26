@@ -475,8 +475,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDifferentExportWarnings"                   = 92878
   GhcDiagnosticCode "TcRnIncompleteExportWarnings"                  = 94721
   GhcDiagnosticCode "TcRnIllegalTypeOperatorDecl"                   = 50649
-  GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = 69710
-  GhcDiagnosticCode "TcRnBindMultipleVariables"                     = 92957
   GhcDiagnosticCode "TcRnIllegalKind"                               = 64861
   GhcDiagnosticCode "TcRnUnexpectedPatSigType"                      = 74097
   GhcDiagnosticCode "TcRnIllegalKindSignature"                      = 91382
@@ -851,6 +849,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrUnexpectedTypeAppInDecl"                  = 45054
   GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634
   GhcDiagnosticCode "UntouchableVariable"                           = 34699
+  GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = 69710
+  GhcDiagnosticCode "TcRnBindMultipleVariables"                     = 92957
 
 {- *********************************************************************
 *                                                                      *

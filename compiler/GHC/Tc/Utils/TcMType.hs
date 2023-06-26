@@ -56,7 +56,7 @@ module GHC.Tc.Utils.TcMType (
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
-  newPatSigTyVar, newSkolemTyVar, newWildCardX,
+  newPatTyVar, newSkolemTyVar, newWildCardX,
 
   --------------------------------
   -- Expected types
@@ -796,15 +796,15 @@ newConcreteTyVar reason fs kind
   where
     assert_msg = text "newConcreteTyVar: non-concrete kind" <+> ppr kind
 
-newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
-newPatSigTyVar name kind
+newPatTyVar :: Name -> Kind -> TcM TcTyVar
+newPatTyVar name kind
   = do { details <- newMetaDetails TauTv
        ; uniq <- newUnique
        ; let name' = name `setNameUnique` uniq
              tyvar = mkTcTyVar name' kind details
          -- Don't use cloneMetaTyVar;
          -- same reasoning as in newTyVarTyVar
-       ; traceTc "newPatSigTyVar" (ppr tyvar)
+       ; traceTc "newPatTyVar" (ppr tyvar)
        ; return tyvar }
 
 cloneAnonMetaTyVar :: MetaInfo -> TyVar -> TcKind -> TcM TcTyVar

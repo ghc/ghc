@@ -28,7 +28,7 @@ module GHC.Hs.Pat (
         HsPatExpansion(..),
         XXPatGhcTc(..),
 
-        HsConPatDetails, hsConPatArgs,
+        HsConPatDetails, hsConPatArgs, hsConPatTyArgs,
         HsConPatTyArg(..),
         HsRecFields(..), HsFieldBind(..), LHsFieldBind,
         HsRecField, LHsRecField,
@@ -260,7 +260,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hfbLHS
 ************************************************************************
 -}
 
-instance Outputable (HsPatSigType p) => Outputable (HsConPatTyArg p) where
+instance Outputable (HsTyPat p) => Outputable (HsConPatTyArg p) where
   ppr (HsConPatTyArg _ ty) = char '@' <> ppr ty
 
 instance (Outputable arg, Outputable (XRec p (HsRecField p arg)), XRec p RecFieldsDotDot ~ Located RecFieldsDotDot)

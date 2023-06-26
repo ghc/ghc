@@ -69,7 +69,7 @@ module GHC.Tc.Gen.HsType (
         tcMult,
 
         -- Pattern type signatures
-        tcHsPatSigType,
+        tcHsPatSigType, tcHsTyPat,
         HoleMode(..),
 
         -- Error messages
@@ -747,7 +747,7 @@ There is also the possibility of mentioning a wildcard
 -}
 
 tcFamTyPats :: TyCon
-            -> HsTyPats GhcRn                -- Patterns
+            -> HsFamEqnPats GhcRn                -- Patterns
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Check the LHS of a type/data family instance
 -- e.g.   type instance F ty1 .. tyn = ...
@@ -4165,34 +4165,122 @@ tcHsPatSigType ctxt hole_mode
   (HsPS { hsps_ext  = HsPSRn { hsps_nwcs = sig_wcs, hsps_imp_tvs = sig_ns }
         , hsps_body = hs_ty })
   ctxt_kind
+  = tc_type_in_pat ctxt hole_mode hs_ty sig_wcs sig_ns ctxt_kind
+
+
+-- Typecheck type patterns, in data constructor patterns, e.g
+--    f (MkT @a @(Maybe b) ...) = ...
+--
+-- We have two competely separate typing rules,
+--   one for binder type patterns  (handled by `tc_bndr_in_pat`)
+--   one for unifier type patterns (handled by `tc_type_in_pat`)
+-- The two cases are distingished by `tyPatToBndr`.
+-- See Note [Type patterns: binders and unifiers]
+tcHsTyPat :: HsTyPat GhcRn               -- The type pattern
+          -> Kind                        -- What kind is expected
+          -> TcM ( [(Name, TcTyVar)]     -- Wildcards
+                 , [(Name, TcTyVar)]     -- The new bit of type environment, binding
+                                         -- the scoped type variables
+                 , TcType)               -- The type
+tcHsTyPat hs_pat@(HsTP{hstp_ext = hstp_rn, hstp_body = hs_ty}) expected_kind
+  = case tyPatToBndr hs_pat of
+    Nothing   -> tc_unif_in_pat hs_ty wcs all_ns (TheKind expected_kind)
+    Just bndr -> tc_bndr_in_pat bndr  wcs imp_ns  expected_kind
+  where
+    all_ns = imp_ns ++ exp_ns
+    HsTPRn{hstp_nwcs = wcs, hstp_imp_tvs = imp_ns, hstp_exp_tvs = exp_ns} = hstp_rn
+    tc_unif_in_pat = tc_type_in_pat TypeAppCtxt HM_TyAppPat
+
+-- `tc_bndr_in_pat` is used in type patterns to handle the binders case.
+-- See Note [Type patterns: binders and unifiers]
+tc_bndr_in_pat :: HsTyVarBndr flag GhcRn
+               -> [Name]  -- All named wildcards in type
+               -> [Name]  -- Implicit (but not explicit) binders in type
+               -> Kind    -- Expected kind
+               -> TcM ( [(Name, TcTyVar)]     -- Wildcards
+                      , [(Name, TcTyVar)]     -- The new bit of type environment, binding
+                                              -- the scoped type variables
+                      , TcType)               -- The type
+tc_bndr_in_pat bndr wcs imp_ns expected_kind = do
+  traceTc "tc_bndr_in_pat 1" (ppr expected_kind)
+  case bndr of
+    UserTyVar _ _ (L _ name) -> do
+      tv <- newPatTyVar name expected_kind
+      pure ([], [(name,tv)], mkTyVarTy tv)
+    KindedTyVar _ _ (L _ name) ki -> do
+      tkv_prs <- mapM new_implicit_tv imp_ns
+      wcs <- addTypeCtxt ki              $
+             solveEqualities "tc_bndr_in_pat" $
+               -- See Note [Failure in local type signatures]
+               -- and c.f #16033
+             bindNamedWildCardBinders wcs $ \ wcs ->
+             tcExtendNameTyVarEnv tkv_prs $
+             do { sig_kind <- tcLHsKindSig (TyVarBndrKindCtxt name) ki
+                ; discardResult $
+                  unifyKind (Just (NameThing name)) sig_kind expected_kind
+                ; pure wcs }
+
+      mapM_ emitNamedTypeHole wcs
+
+      tv <- newPatTyVar name expected_kind
+
+      traceTc "tc_bndr_in_pat 2" $ vcat
+        [ text "expected_kind" <+> ppr expected_kind
+        , text "wcs" <+> ppr wcs
+        , text "(name,tv)" <+>  ppr (name,tv)
+        , text "tkv_prs" <+> ppr tkv_prs]
+
+      pure (wcs, (name,tv) : tkv_prs, mkTyVarTy tv)
+  where
+    new_implicit_tv name
+      = do { kind <- newMetaKindVar
+           ; tv   <- newPatTyVar name kind
+             -- NB: tv's Name is fresh
+           ; return (name, tv) }
+
+-- * In type patterns `tc_type_in_pat` is used to handle the unifiers case.
+--   See Note [Type patterns: binders and unifiers]
+--
+-- * In patterns `tc_type_in_pat` is used to check pattern signatures.
+tc_type_in_pat :: UserTypeCtxt
+               -> HoleMode -- HM_Sig when in a SigPat, HM_TyAppPat when in a ConPat checking type applications.
+               -> LHsType GhcRn          -- The type in pattern
+               -> [Name]                 -- All named wildcards in type
+               -> [Name]                 -- All binders in type
+               -> ContextKind                -- What kind is expected
+               -> TcM ( [(Name, TcTyVar)]     -- Wildcards
+                      , [(Name, TcTyVar)]     -- The new bit of type environment, binding
+                                              -- the scoped type variables
+                      , TcType)       -- The type
+tc_type_in_pat ctxt hole_mode hs_ty wcs ns ctxt_kind
   = addSigCtxt ctxt hs_ty $
-    do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
+    do { tkv_prs <- mapM new_implicit_tv ns
        ; mode <- mkHoleMode TypeLevel hole_mode
-       ; (wcs, sig_ty)
-            <- addTypeCtxt hs_ty                     $
-               solveEqualities "tcHsPatSigType" $
+       ; (wcs, ty)
+            <- addTypeCtxt hs_ty                $
+               solveEqualities "tc_type_in_pat" $
                  -- See Note [Failure in local type signatures]
                  -- and c.f #16033
-               bindNamedWildCardBinders sig_wcs $ \ wcs ->
-               tcExtendNameTyVarEnv sig_tkv_prs $
+               bindNamedWildCardBinders wcs $ \ wcs ->
+               tcExtendNameTyVarEnv tkv_prs $
                do { ek     <- newExpectedKind ctxt_kind
-                  ; sig_ty <- tc_lhs_type mode hs_ty ek
-                  ; return (wcs, sig_ty) }
+                  ; ty <- tc_lhs_type mode hs_ty ek
+                  ; return (wcs, ty) }
 
         ; mapM_ emitNamedTypeHole wcs
 
-          -- sig_ty might have tyvars that are at a higher TcLevel (if hs_ty
+          -- ty might have tyvars that are at a higher TcLevel (if hs_ty
           -- contains a forall). Promote these.
           -- Ex: f (x :: forall a. Proxy a -> ()) = ... x ...
           -- When we instantiate x, we have to compare the kind of the argument
           -- to a's kind, which will be a metavariable.
           -- kindGeneralizeNone does this:
-        ; kindGeneralizeNone sig_ty
-        ; sig_ty <- liftZonkM $ zonkTcType sig_ty
-        ; checkValidType ctxt sig_ty
+        ; kindGeneralizeNone ty
+        ; ty <- liftZonkM $ zonkTcType ty
+        ; checkValidType ctxt ty
 
-        ; traceTc "tcHsPatSigType" (ppr sig_tkv_prs)
-        ; return (wcs, sig_tkv_prs, sig_ty) }
+        ; traceTc "tc_type_in_pat" (ppr tkv_prs)
+        ; return (wcs, tkv_prs, ty) }
   where
     new_implicit_tv name
       = do { kind <- newMetaKindVar
@@ -4200,13 +4288,76 @@ tcHsPatSigType ctxt hole_mode
                        RuleSigCtxt rname _  -> do
                         skol_info <- mkSkolemInfo (RuleSkol rname)
                         newSkolemTyVar skol_info name kind
-                       _              -> newPatSigTyVar name kind
+                       _              -> newPatTyVar name kind
                        -- See Note [Typechecking pattern signature binders]
-             -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
+             -- NB: tv's Name may be fresh (in the case of newPatTyVar)
            ; return (name, tv) }
 
-{- Note [Typechecking pattern signature binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- See Note [Type patterns: binders and unifiers]
+tyPatToBndr :: HsTyPat GhcRn -> Maybe (HsTyVarBndr () GhcRn)
+tyPatToBndr HsTP{hstp_body = (L _ hs_ty)} = go hs_ty where
+  go :: HsType GhcRn -> Maybe (HsTyVarBndr () GhcRn)
+  go (HsParTy _ (L _ ty)) = go ty
+  go (HsTyVar an _ name)
+    | isTyVarName (unLoc name)
+    = Just (UserTyVar an () name)
+  go (HsKindSig an (L _ (HsTyVar _ _ name)) ki)
+    | isTyVarName (unLoc name)
+    = Just (KindedTyVar an () name ki)
+  go _ = Nothing
+
+{- Note [Type patterns: binders and unifiers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A type pattern, of type `HsTyPat`, represents a type argument in a data
+constructor pattern.  For example
+    f (MkT @a @(Maybe b) p q) = ...
+Here the `@a` and `@(Maybe b)` are type patterns.  In general, then a
+`HsTyPat` is represented by a `HsType`.
+
+However, for /typechecking/ purposes (only) we distinguish two categories of
+type pattern:
+* Binder type patterns
+* Unifier type patterns
+
+Binder type patterns are a subset of type patterns described by the following grammar:
+
+  tp_bndr ::=
+      tv                    -- type variable
+    | tv '::' kind          -- type variable with kind annotation
+    | '(' tp_bndr ')'       -- parentheses
+
+This subset of HsTyPat can be represented by HsTyVarBndr, which is also used
+in foralls and type declaration headers. We could also extend this with wildcards (#23501).
+
+Unifier type patterns include all other forms of type patterns, such as `Maybe x`.
+This distinction allows the typechecker to accept more programs.
+Consider this example from #18986:
+
+  data T where
+    MkT :: forall (f :: forall k. k -> Type).
+      f Int -> f Maybe -> T
+
+  k :: T -> ()
+  k (MkT @f (x :: f Int) (y :: f Maybe)) = ()
+
+In general case (if we treat `f` as a unifier) we would create a metavariable for its kind:
+  f :: kappa
+Checking `x :: f Int` would unify
+  kappa := Type -> Type
+and then checking `y :: f Maybe` would unify
+  kappa := (Type -> Type) -> Type
+leading to a type error:
+    • Expecting one more argument to ‘Maybe’
+      Expected a type, but ‘Maybe’ has kind ‘* -> *’
+
+However, `@f` is a simple type variable binder, we don't need a metavariable for its kind, we
+can add it directly to the context with its polymorphic kind:
+  f :: forall k . k -> Type
+This way both `f Int` and `f Maybe` can be accepted because `k` can be instantiated differently at
+each call site.
+
+Note [Typechecking pattern signature binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Type variables in the type environment] in GHC.Tc.Utils.
 Consider
 

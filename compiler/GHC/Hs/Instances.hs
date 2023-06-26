@@ -488,6 +488,11 @@ deriving instance Data (HsPatSigType GhcPs)
 deriving instance Data (HsPatSigType GhcRn)
 deriving instance Data (HsPatSigType GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (HsTyPat p)
+deriving instance Data (HsTyPat GhcPs)
+deriving instance Data (HsTyPat GhcRn)
+deriving instance Data (HsTyPat GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsForAllTelescope p)
 deriving instance Data (HsForAllTelescope GhcPs)
 deriving instance Data (HsForAllTelescope GhcRn)

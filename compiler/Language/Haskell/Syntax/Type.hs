@@ -33,6 +33,7 @@ module Language.Haskell.Syntax.Type (
         HsWildCardBndrs(..),
         HsPatSigType(..),
         HsSigType(..), LHsSigType, LHsSigWcType, LHsWcType,
+        HsTyPat(..), LHsTyPat,
         HsTupleSort(..),
         HsContext, LHsContext,
         HsTyLit(..),
@@ -359,7 +360,7 @@ hsQTvExplicit = hsq_explicit
 -- the forall-or-nothing rule. These are used to represent the outermost
 -- quantification in:
 --    * Type signatures (LHsSigType/LHsSigWcType)
---    * Patterns in a type/data family instance (HsTyPats)
+--    * Patterns in a type/data family instance (HsFamEqnPats)
 --
 -- We support two forms:
 --   HsOuterImplicit (implicit quantification, added by renamer)
@@ -447,6 +448,14 @@ type LHsWcType    pass = HsWildCardBndrs pass (LHsType pass)    -- Wildcard only
 
 -- | Located Haskell Signature Wildcard Type
 type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
+
+data HsTyPat pass
+  = HsTP { hstp_ext  :: XHsTP pass   -- ^ After renamer: 'HsTyPatRn'
+         , hstp_body :: LHsType pass -- ^ Main payload (the type itself)
+    }
+  | XHsTyPat !(XXHsTyPat pass)
+
+type LHsTyPat  pass = XRec pass (HsTyPat pass)
 
 -- | A type signature that obeys the @forall@-or-nothing rule. In other
 -- words, an 'LHsType' that uses an 'HsOuterSigTyVarBndrs' to represent its

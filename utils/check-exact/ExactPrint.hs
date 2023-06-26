@@ -1624,7 +1624,7 @@ exactDataFamInstDecl an top_lvl
            -> EP w m ( EpAnn [AddEpAnn]
                      , LocatedN RdrName
                      , HsOuterTyVarBndrs () GhcPs
-                     , HsTyPats GhcPs
+                     , HsFamEqnPats GhcPs
                      , Maybe (LHsContext GhcPs))
     pp_hdr mctxt = do
       an0 <- case top_lvl of
@@ -1944,13 +1944,13 @@ exactHsFamInstLHS ::
    => EpAnn [AddEpAnn]
    -> LocatedN RdrName
    -> HsOuterTyVarBndrs () GhcPs
-   -> HsTyPats GhcPs
+   -> HsFamEqnPats GhcPs
    -> LexicalFixity
    -> Maybe (LHsContext GhcPs)
    -> EP w m ( EpAnn [AddEpAnn]
              , LocatedN RdrName
              , HsOuterTyVarBndrs () GhcPs
-             , HsTyPats GhcPs, Maybe (LHsContext GhcPs))
+             , HsFamEqnPats GhcPs, Maybe (LHsContext GhcPs))
 exactHsFamInstLHS an thing bndrs typats fixity mb_ctxt = do
   an0 <- markEpAnnL an lidl AnnForall
   bndrs' <- markAnnotated bndrs
@@ -1960,7 +1960,7 @@ exactHsFamInstLHS an thing bndrs typats fixity mb_ctxt = do
   return (an2, thing', bndrs', typats', mb_ctxt')
   where
     exact_pats :: (Monad m, Monoid w)
-      => EpAnn [AddEpAnn] -> HsTyPats GhcPs -> EP w m (EpAnn [AddEpAnn], LocatedN RdrName, HsTyPats GhcPs)
+      => EpAnn [AddEpAnn] -> HsFamEqnPats GhcPs -> EP w m (EpAnn [AddEpAnn], LocatedN RdrName, HsFamEqnPats GhcPs)
     exact_pats an' (patl:patr:pats)
       | Infix <- fixity
       = let exact_op_app = do
@@ -4679,6 +4679,14 @@ instance ExactPrint (HsPatSigType GhcPs) where
   exact (HsPS an ty) = do
     ty' <- markAnnotated ty
     return (HsPS an ty')
+
+instance ExactPrint (HsTyPat GhcPs) where
+  getAnnotationEntry = const NoEntryVal
+  setAnnotationAnchor a _ _ = a
+
+  exact (HsTP an ty) = do
+    ty' <- markAnnotated ty
+    return (HsTP an ty')
 
 -- ---------------------------------------------------------------------
 
