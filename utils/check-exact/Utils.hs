@@ -376,32 +376,6 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
-setAnchorAnI :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
-setAnchorAnI (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-setAnchorAnI (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
-     -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
-
-setAnchorAn :: LocatedAnS an a -> Anchor -> EpAnnComments -> LocatedAnS an a
-setAnchorAn (L (EpAnnS _ an _) a) anc cs = (L (EpAnnS anc an cs) a)
-
-setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
-setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
-
-setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
-setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
-
-setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
-setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn = an'} }
-  where
-    -- anc' = anc { anchor_op = UnchangedAnchor }
-    anc' = anc
-    an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' cs
-
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
 moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
