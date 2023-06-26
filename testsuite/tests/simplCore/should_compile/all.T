@@ -435,7 +435,7 @@ test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O 
 # One module, T22097.hs, has OPTIONS_GHC -ddump-simpl
 test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-O -dno-typeable-binds -dsuppress-uniques'])
 
-test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
+test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules -fpolymorphic-specialisation'])
 test('T22357',  normal, compile, ['-O'])
 test('T22471',  normal, compile, ['-O'])
 test('T22347',  normal, compile, ['-O -fno-full-laziness'])
@@ -443,8 +443,8 @@ test('T22347a', normal, compile, ['-O2 -fno-full-laziness'])
 
 # T17366: expecting to see a rule
 #    Rule fired: SPEC/T17366 f @(Tagged tag) @_ (T17366)
-test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings'])
-test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings'])
+test('T17366',  normal, multimod_compile, ['T17366', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
+test('T17366_AR',  [grep_errmsg(r'SPEC')], multimod_compile, ['T17366_AR', '-O -v0 -ddump-rule-firings -fpolymorphic-specialisation'])
 test('T22375', normal, compile, ['-O -ddump-simpl -dsuppress-uniques -dno-typeable-binds -dsuppress-unfoldings'])
 
 # One module, T21851_2.hs, has OPTIONS_GHC -ddump-simpl
