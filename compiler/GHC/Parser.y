@@ -1026,7 +1026,7 @@ exportlist1 :: { OrdList (LIE GhcPs) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE GhcPs) }
-        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) (reLoc $2) $> }
+        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ unitOL $ reLocA $ sL span $ impExp } }
         | maybeexportwarning 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
@@ -1034,7 +1034,7 @@ export  :: { OrdList (LIE GhcPs) }
                                                           ; locImpExp <- acs (\cs -> sL span (IEModuleContents ($1, EpAnn anchor [mj AnnModule $2] cs) $3))
                                                           ; return $ unitOL $ reLocA $ locImpExp } }
         | maybeexportwarning 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
-                                                       in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 (reLocN $>) (IEPattern (glAA $2) $3)) }
+                                                       in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) }
 
 maybeexportwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
         : '{-# DEPRECATED' strings '#-}'
@@ -1079,7 +1079,7 @@ qcname_ext_w_wildcard :: { Located ([AddEpAnn], LocatedA ImpExpQcSpec) }
 qcname_ext :: { LocatedA ImpExpQcSpec }
         :  qcname                   { sL1a $1 (ImpExpQcName $1) }
         |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
-                                          ; return $ sLLa $1 (reLocN $>) (ImpExpQcType (glAA $1) n) }}
+                                          ; return $ sLLa $1 $> (ImpExpQcType (glAA $1) n) }}
 
 qcname  :: { LocatedN RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions
@@ -1134,7 +1134,7 @@ importdecl :: { LImportDecl GhcPs }
                              , importDeclAnnPackage   = fst $5
                              , importDeclAnnAs        = fst $8
                              }
-                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 (reLoc $6) $7 (snd $8) $9) $
+                  ; fmap reLocA $ acs (\cs -> L (comb5 $1 $6 $7 (snd $8) $9) $
                       ImportDecl { ideclExt = XImportDeclPass (EpAnn (glR $1) anns cs) (snd $ fst $2) False
                                   , ideclName = $6, ideclPkgQual = snd $5
                                   , ideclSource = snd $2, ideclSafe = snd $3
@@ -1211,7 +1211,7 @@ importlist1 :: { OrdList (LIE GhcPs) }
 import  :: { OrdList (LIE GhcPs) }
         : qcname_ext export_subspec {% fmap (unitOL . reLocA . (sLL $1 $>)) $ mkModuleImpExp Nothing (fst $ unLoc $2) $1 (snd $ unLoc $2) }
         | 'module' modid            {% fmap (unitOL . reLocA) $ acs (\cs -> sLL $1 $> (IEModuleContents (Nothing, EpAnn (glR $1) [mj AnnModule $1] cs) $2)) }
-        | 'pattern' qcon            { unitOL $ reLocA $ sLL $1 $> $ IEVar Nothing (sLLa $1 (reLocN $>) (IEPattern (glAA $1) $2)) }
+        | 'pattern' qcon            { unitOL $ reLocA $ sLL $1 $> $ IEVar Nothing (sLLa $1 $> (IEPattern (glAA $1) $2)) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
@@ -1314,7 +1314,7 @@ ty_decl :: { LTyClDecl GhcPs }
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% mkFamDecl (comb5 $1 (reLoc $3) $4 $5 $6) (snd $ unLoc $6) TopLevel $3
+                {% mkFamDecl (comb5 $1 $3 $4 $5 $6) (snd $ unLoc $6) TopLevel $3
                                    (snd $ unLoc $4) (snd $ unLoc $5)
                            (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
                            ++ (fst $ unLoc $5) ++ (fst $ unLoc $6))  }
@@ -1576,13 +1576,13 @@ opt_kind_sig :: { Located ([AddEpAnn], Maybe (LHsKind GhcPs)) }
 
 opt_datafam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
         :               { noLoc     ([]               , noLocA (NoSig noExtField)         )}
-        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 (reLoc $>) (KindSig noExtField $2))}
+        | '::' kind     { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 $> (KindSig noExtField $2))}
 
 opt_tyfam_kind_sig :: { Located ([AddEpAnn], LFamilyResultSig GhcPs) }
         :              { noLoc     ([]               , noLocA     (NoSig    noExtField)   )}
-        | '::' kind    { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 (reLoc $>) (KindSig  noExtField $2))}
+        | '::' kind    { sLL $1 $> ([mu AnnDcolon $1], sLLa $1 $> (KindSig  noExtField $2))}
         | '='  tv_bndr {% do { tvb <- fromSpecTyVarBndr $2
-                             ; return $ sLL $1 $> ([mj AnnEqual $1], sLLa $1 (reLoc $>) (TyVarSig noExtField tvb))} }
+                             ; return $ sLL $1 $> ([mj AnnEqual $1], sLLa $1 $> (TyVarSig noExtField tvb))} }
 
 opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
@@ -1592,7 +1592,7 @@ opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
         | '='  tv_bndr_no_braces '|' injectivity_cond
                 {% do { tvb <- fromSpecTyVarBndr $2
                       ; return $ sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
-                                           , (sLLa $1 (reLoc $2) (TyVarSig noExtField tvb), Just $4))} }
+                                           , (sLLa $1 $2 (TyVarSig noExtField tvb), Just $4))} }
 
 -- tycl_hdr parses the header of a class or data type decl,
 -- which takes the form
@@ -2128,7 +2128,7 @@ opt_tyconsig :: { ([AddEpAnn], Maybe (LocatedN RdrName)) }
 sigktype :: { LHsSigType GhcPs }
         : sigtype              { $1 }
         | ctype '::' kind      {% acsA (\cs -> sLL $1 $> $ mkHsImplicitSigType $
-                                               sLLa (reLoc $1) (reLoc $>) $ HsKindSig (EpAnn (glAR $1) [mu AnnDcolon $2] cs) $1 $3) }
+                                               sLLa $1 $> $ HsKindSig (EpAnn (glAR $1) [mu AnnDcolon $2] cs) $1 $3) }
 
 -- Like ctype, but for types that obey the forall-or-nothing rule.
 -- See Note [forall-or-nothing rule] in GHC.Hs.Type. To avoid duplicating the
@@ -2172,7 +2172,7 @@ ktype :: { LHsType GhcPs }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
-        : forall_telescope ctype      { reLocA $ sLL $1 (reLoc $>) $
+        : forall_telescope ctype      { sLLa $1 $> $
                                               HsForAllTy { hst_tele = unLoc $1
                                                          , hst_xforall = noExtField
                                                          , hst_body = $2 } }
@@ -2305,13 +2305,13 @@ atype :: { LHsType GhcPs }
         -- so you have to quote those.)
         | '[' ktype ',' comma_types1 ']'  {% do { h <- addTrailingCommaA $2 (gl $3)
                                                 ; acsA (\cs -> sLL $1 $> $ HsExplicitListTy (EpAnn (glR $1) [mos $1,mcs $5] cs) NotPromoted (h:$4)) }}
-        | INTEGER              { reLocA $ sLL $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
+        | INTEGER              { sLLa $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
-        | CHAR                 { reLocA $ sLL $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
+        | CHAR                 { sLLa $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
                                                                         (getCHAR $1) }
-        | STRING               { reLocA $ sLL $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
+        | STRING               { sLLa $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
-        | '_'                  { reLocA $ sL1 $1 $ mkAnonWildCardTy }
+        | '_'                  { sL1a $1 $ mkAnonWildCardTy }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
@@ -2470,8 +2470,8 @@ constrs1 :: { Located [LConDecl GhcPs] }
 constr :: { LConDecl GhcPs }
         : forall context '=>' constr_stuff
                 {% acsA (\cs -> let (con,details) = unLoc $4 in
-                  (L (comb4 $1 (reLoc $2) $3 $4) (mkConDeclH98
-                                                       (EpAnn (spanAsAnchor (comb4 $1 (reLoc $2) $3 $4))
+                  (L (comb4 $1 $2 $3 $4) (mkConDeclH98
+                                                       (EpAnn (spanAsAnchor (comb4 $1 $2 $3 $4))
                                                                     (mu AnnDarrow $3:(fst $ unLoc $1)) cs)
                                                        con
                                                        (snd $ unLoc $1)
@@ -2758,7 +2758,7 @@ exp_prag(e) :: { ECP }
   : prag_e e  -- See Note [Pragmas and operator fixity]
       {% runPV (unECP $2) >>= \ $2 ->
          fmap ecpFromExp $
-         return $ (reLocA $ sLL $1 $> $ HsPragE noExtField (unLoc $1) $2) }
+         return $ (sLLa $1 $> $ HsPragE noExtField (unLoc $1) $2) }
 
 exp10 :: { ECP }
         -- See Note [%shift: exp10 -> '-' fexp]
@@ -2872,8 +2872,8 @@ aexp    :: { ECP }
                    {  ECP $
                       unECP $4 >>= \ $4 ->
                       mkHsLamPV (comb2 $1 $>) (\cs -> mkMatchGroup FromSource
-                            (reLocA $ sLL $1 $>
-                            [reLocA $ sLL $1 $>
+                            (sLLa $1 $>
+                            [sLLa $1 $>
                                          $ Match { m_ext = EpAnn (glR $1) [mj AnnLam $1] cs
                                                  , m_ctxt = LambdaExpr
                                                  , m_pats = $2
@@ -2929,7 +2929,7 @@ aexp    :: { ECP }
                        {% (checkPattern <=< runPV) (unECP $2) >>= \ p ->
                            runPV (unECP $4) >>= \ $4@cmd ->
                            fmap ecpFromExp $
-                           acsA (\cs -> sLL $1 $> $ HsProc (EpAnn (glR $1) [mj AnnProc $1,mu AnnRarrow $3] cs) p (sLLa $1 (reLoc $>) $ HsCmdTop noExtField cmd)) }
+                           acsA (\cs -> sLL $1 $> $ HsProc (EpAnn (glR $1) [mj AnnProc $1,mu AnnRarrow $3] cs) p (sLLa $1 $> $ HsCmdTop noExtField cmd)) }
 
         | aexp1                 { $1 }
 
@@ -2946,7 +2946,7 @@ aexp1   :: { ECP }
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ acsa (\cs ->
-                 let fl = sLLa $2 (reLoc $>) (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
+                 let fl = sLLa $2 $> (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
                  mkRdrGetField (noAnnSrcSpan $ comb2 $1 $>) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
 
 
@@ -3032,8 +3032,8 @@ projection :: { Located (NonEmpty (LocatedAn NoEpAnns (DotFieldOcc GhcPs))) }
 projection
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parsing.Lexer
         : projection TIGHT_INFIX_PROJ field
-                             {% acs (\cs -> sLL $1 $> ((sLLa $2 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
-        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLLa $1 (reLoc $>) $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
+                             {% acs (\cs -> sLL $1 $> ((sLLa $2 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $2)) cs) $3) `NE.cons` unLoc $1)) }
+        | PREFIX_PROJ field  {% acs (\cs -> sLL $1 $> ((sLLa $1 $> $ DotFieldOcc (EpAnn (glR $1) (AnnFieldLabel (Just $ glAA $1)) cs) $2) :| [])) }
 
 splice_exp :: { LHsExpr GhcPs }
         : splice_untyped { fmap (HsUntypedSplice noAnn) (reLocA $1) }
@@ -3057,7 +3057,7 @@ cmdargs :: { [LHsCmdTop GhcPs] }
 acmd    :: { LHsCmdTop GhcPs }
         : aexp                  {% runPV (unECP $1) >>= \ (cmd :: LHsCmd GhcPs) ->
                                    runPV (checkCmdBlockArguments cmd) >>= \ _ ->
-                                   return (sL1a (reLoc cmd) $ HsCmdTop noExtField cmd) }
+                                   return (sL1a cmd $ HsCmdTop noExtField cmd) }
 
 cvtopbody :: { ([AddEpAnn],[LHsDecl GhcPs]) }
         :  '{'            cvtopdecls0 '}'      { ([mj AnnOpenC $1
@@ -3093,7 +3093,7 @@ texp :: { ECP }
                                 runPV (rejectPragmaPV $1) >>
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
-                                reLocA $ sLL $1 $> $ SectionL noAnn $1 (n2l $2) }
+                                sLLa $1 $> $ SectionL noAnn $1 (n2l $2) }
         | qopm infixexp      { ECP $
                                 superInfixOp $
                                 unECP $2 >>= \ $2 ->
@@ -3345,7 +3345,7 @@ ralt :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
 gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : gdpats gdpat { $1 >>= \gdpats ->
                          $2 >>= \gdpat ->
-                         return $ sLL gdpats (reLoc gdpat) (gdpat : unLoc gdpats) }
+                         return $ sLL gdpats gdpat (gdpat : unLoc gdpats) }
         | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat [gdpat] }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
@@ -3512,7 +3512,7 @@ fieldToUpdate :: { Located [LocatedAn NoEpAnns (DotFieldOcc GhcPs)] }
 fieldToUpdate
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
         : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLocA $3) >>= \cs ->
-                                                     return (sLL $1 $> ((sLLa $2 (reLoc $>) (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
+                                                     return (sLL $1 $> ((sLLa $2 $> (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
         | field       {% getCommentsFor (getLocA $1) >>= \cs ->
                         return (sL1 $1 [sL1a $1 (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
 
@@ -3557,11 +3557,11 @@ name_boolformula :: { LBooleanFormula (LocatedN RdrName) }
         : name_boolformula_and                      { $1 }
         | name_boolformula_and '|' name_boolformula
                            {% do { h <- addTrailingVbarL $1 (gl $2)
-                                 ; return (reLocA $ sLL $1 $> (Or [h,$3])) } }
+                                 ; return (sLLa $1 $> (Or [h,$3])) } }
 
 name_boolformula_and :: { LBooleanFormula (LocatedN RdrName) }
         : name_boolformula_and_list
-                  { reLocA $ sLL (head $1) (last $1) (And ($1)) }
+                  { sLLa (head $1) (last $1) (And ($1)) }
 
 name_boolformula_and_list :: { [LBooleanFormula (LocatedN RdrName)] }
         : name_boolformula_atom                               { [$1] }
@@ -4094,15 +4094,15 @@ comb3 :: (HasLoc a, HasLoc b, HasLoc c) => a -> b -> c -> SrcSpan
 comb3 a b c = a `seq` b `seq` c `seq`
     combineSrcSpans (getHasLoc a) (combineHasLocs b c)
 
-comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
+comb4 :: (HasLoc a, HasLoc b, HasLoc c, HasLoc d) => a -> b -> c -> d -> SrcSpan
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
-    (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
-                combineSrcSpans (getLoc c) (getLoc d))
+    (combineSrcSpans (getHasLoc a) $ combineSrcSpans (getHasLoc b) $
+                combineSrcSpans (getHasLoc c) (getHasLoc d))
 
-comb5 :: Located a -> Located b -> Located c -> Located d -> Located e -> SrcSpan
+comb5 :: (HasLoc a, HasLoc b, HasLoc c, HasLoc d, HasLoc e) => a -> b -> c -> d -> e -> SrcSpan
 comb5 a b c d e = a `seq` b `seq` c `seq` d `seq` e `seq`
-    (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
-       combineSrcSpans (getLoc c) $ combineSrcSpans (getLoc d) (getLoc e))
+    (combineSrcSpans (getHasLoc a) $ combineSrcSpans (getHasLoc b) $
+       combineSrcSpans (getHasLoc c) $ combineSrcSpans (getHasLoc d) (getHasLoc e))
 
 -- strict constructor version:
 {-# INLINE sL #-}
@@ -4133,7 +4133,7 @@ sLL :: (HasLoc a, HasLoc b) => a -> b -> c -> Located c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLa #-}
-sLLa :: Located a -> Located b -> c -> LocatedAn t c
+sLLa :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedAn t c
 sLLa x y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLAsl #-}
