@@ -739,7 +739,7 @@ function h$throwJSException(e) {
   if(typeof e === 'string') {
     strVal = e;
   } else if(e instanceof Error) {
-    strVal = e.toString() + '\n' + Array.prototype.join.call(e.stack, '\n');
+    strVal = e.toString() + '\n' + e.stack;
   } else {
     strVal = "" + e;
   }
