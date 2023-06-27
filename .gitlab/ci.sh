@@ -805,7 +805,7 @@ function shell() {
   if [ -z "$cmd" ]; then
     cmd="bash -i"
   fi
-  run "$cmd"
+  run $cmd
 }
 
 function lint_author(){
