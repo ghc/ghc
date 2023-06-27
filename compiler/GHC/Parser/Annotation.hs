@@ -51,6 +51,7 @@ module GHC.Parser.Annotation (
   -- ** we do not care about the annotations.
   la2na, na2la, n2l, l2n, l2l, la2la,
   reLoc, reLocA, reLocL, reLocC, reLocN,
+  HasLoc(..), getHasLocList,
 
   srcSpan2e, la2e, realSrcSpan,
 
@@ -90,7 +91,7 @@ import GHC.Prelude
 
 import Data.Data
 import Data.Function (on)
-import Data.List (sortBy)
+import Data.List (sortBy, foldl1')
 import Data.Semigroup
 import GHC.Data.FastString
 import GHC.Types.Name
@@ -913,6 +914,22 @@ reLocC (L l a) = (L (na2la l) a)
 
 reLocN :: LocatedN a -> Located a
 reLocN (L (SrcSpanAnn _ l) a) = L l a
+
+-- ---------------------------------------------------------------------
+
+class HasLoc a where
+  -- ^ conveniently calculate locations for things without locations attached
+  getHasLoc :: a -> SrcSpan
+
+instance HasLoc (Located a) where
+  getHasLoc (L l _) = l
+
+instance HasLoc (LocatedAn t a) where
+  getHasLoc (L la _) = locA la
+
+getHasLocList :: HasLoc a => [a] -> SrcSpan
+getHasLocList [] = noSrcSpan
+getHasLocList xs = foldl1' combineSrcSpans $ map getHasLoc xs
 
 -- ---------------------------------------------------------------------
 
