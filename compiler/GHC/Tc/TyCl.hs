@@ -115,6 +115,7 @@ import Data.List ( partition)
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Tuple( swap )
+import Data.Void
 
 {-
 ************************************************************************
@@ -201,8 +202,29 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
        ; (tyclss, data_deriv_info, kindless) <-
            tcExtendKindEnv (mkPromotionErrorEnv tyclds) $ -- See Note [Type environment evolution]
-           do { kisig_env <- mkNameEnv <$> traverse tcStandaloneKindSig kisigs
-              ; tcTyClDecls tyclds kisig_env role_annots }
+           do { checked_tcs <-
+                  tcExtendKindEnv (mkSigPromotionErrorEnv kisigs) $
+                  mapM tcDeclSig kisigs
+                  -- FIXME: false positives because there might be signatures/cusks
+                  --        in previous declaration groups
+              ; let is_kinded_decl name = any (\tctc -> tyConName tctc == name) checked_tcs
+              ; tcExtendKindEnvWithTyCons checked_tcs $
+                tcTyClDecls tyclds is_kinded_decl role_annots }
+{-
+           do { checked_tcs <-
+                  tcExtendKindEnv (mkSigPromotionErrorEnv kisigs) $
+                  mapMaybeM tcDeclSig kisigs
+              ; let extended_inter_group_env = extendInterGroupEnv checked_tcs inter_group_env
+                    is_kinded_decl = interGroupElem extended_inter_group_env
+              ; (tyclss, data_deriv_info) <-
+                  tcExtendKindEnvWithTyCons (interGroupEnvTyCons extended_inter_group_env) $
+                  tcTyClDecls tyclds is_kinded_decl role_annots
+              ; let purged_inter_group_env = purgeInterGroupEnv tyclss extended_inter_group_env
+              ; return (purged_inter_group_env, tyclss, data_deriv_info)
+              }
+-}
+
+
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
        ; traceTc "Starting synonym cycle check" (ppr tyclss)
@@ -238,20 +260,83 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; return (gbl_env'', inst_info, deriv_info,
                  th_bndrs' `plusNameEnv` th_bndrs) }
 
--- Gives the kind for every TyCon that has a standalone kind signature
-type KindSigEnv = NameEnv Kind
+mkSigPromotionErrorEnv :: [LStandaloneKindSig GhcRn] -> TcTypeEnv
+mkSigPromotionErrorEnv =
+  foldr (plusNameEnv . mk_sig_prom_err_env . unLoc) emptyNameEnv
+
+mk_sig_prom_err_env :: StandaloneKindSig GhcRn -> TcTypeEnv
+mk_sig_prom_err_env sig =
+  unitNameEnv (decl_header_name hdr)
+    (case decl_header_flav hdr of
+        ClassFlavour -> APromotionErr ClassPE
+        _ -> APromotionErr TyConPE)
+  where
+    (L _ hdr) = case sig of
+      StandaloneKindSig hdr _ _ -> hdr
+      XStandaloneKindSig hdr -> hdr
+
+tcDeclSig :: LStandaloneKindSig GhcRn -> TcM TcTyCon
+tcDeclSig kisig = do
+    (_, ki) <- tcStandaloneKindSig kisig
+    tc <- check_decl_sig ki hdr
+    return tc
+  where
+    (L _ hdr) = case unLoc kisig of
+      StandaloneKindSig hdr _ _ -> hdr
+      XStandaloneKindSig hdr -> hdr
+
+check_decl_sig :: SAKS_or_CUSK -> DeclHeaderRn -> TcM TcTyCon
+check_decl_sig msig hdr =
+  kcDeclHeader strategy name flav (decl_header_bndrs hdr) $
+    if | flav == ClassFlavour
+       -> return (TheKind constraintKind)
+
+       | flav == DataTypeFlavour
+       -> case res_sig of
+            Just ksig -> TheKind <$> tcLHsKindSig (DataKindCtxt name) ksig
+            Nothing -> return $ dataDeclDefaultResultKind strategy DataType
+
+       | flav == NewtypeFlavour
+       -> case res_sig of
+            Just ksig -> TheKind <$> tcLHsKindSig (DataKindCtxt name) ksig
+            Nothing -> return $ dataDeclDefaultResultKind strategy NewType
+
+       | is_fam_flav flav
+       -> case res_sig of
+            Just ksig -> TheKind <$> tcLHsKindSig (TyFamResKindCtxt name) ksig
+            Nothing ->
+              case msig of
+                CUSK -> return (TheKind liftedTypeKind)
+                SAKS _ -> return AnyKind
+
+       | flav == TypeSynonymFlavour
+       -> case res_sig of
+            Just rhs_sig -> TheKind <$> tcLHsKindSig (TySynKindCtxt name) rhs_sig
+            Nothing -> return AnyKind
+
+       | otherwise -> return AnyKind
+  where
+    name = decl_header_name hdr
+    flav = fmap absurd (decl_header_flav hdr)
+    res_sig = decl_header_res_sig hdr
+    strategy = InitialKindCheck msig
+
+is_fam_flav :: TyConFlavour tc -> Bool
+is_fam_flav OpenFamilyFlavour{} = True
+is_fam_flav ClosedTypeFamilyFlavour = True
+is_fam_flav _ = False
 
 tcTyClDecls
   :: [LTyClDecl GhcRn]
-  -> KindSigEnv
+  -> (Name -> Bool) -- Does this declaration have a SAKS or a CUSK?
   -> RoleAnnotEnv
   -> TcM ([TyCon], [DerivInfo], NameSet)
-tcTyClDecls tyclds kisig_env role_annots
+tcTyClDecls tyclds is_kinded_decl role_annots
   = do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
          (tc_tycons, kindless) <- checkNoErrs $
-                                  kcTyClGroup kisig_env tyclds
+                                  kcTyClGroup is_kinded_decl tyclds
             -- checkNoErrs: If the TyCons are ill-kinded, stop now.  Else we
             -- can get follow-on errors. Example: #23252, where the TyCon
             -- had an ill-scoped kind forall (d::k) k (a::k). blah
@@ -857,7 +942,7 @@ been generalized.
 
 -}
 
-kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet)
+kcTyClGroup :: (Name -> Bool) -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet)
 
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
@@ -865,7 +950,7 @@ kcTyClGroup :: KindSigEnv -> [LTyClDecl GhcRn] -> TcM ([PolyTcTyCon], NameSet)
 -- and Note [Inferring kinds for type declarations]
 --
 -- The NameSet returned contains kindless tycon names, without CUSK or SAKS.
-kcTyClGroup kisig_env decls
+kcTyClGroup is_kinded_decl decls
   = do  { mod <- getModule
         ; traceTc "---- kcTyClGroup ---- {"
                   (text "module" <+> ppr mod $$ vcat (map ppr decls))
@@ -876,31 +961,36 @@ kcTyClGroup kisig_env decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
-                    -- See Note [CUSKs and PolyKinds]
-        ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
+        -- ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+        --             -- See Note [CUSKs and PolyKinds]
+        -- ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
+        --       kindless_names = mkNameSet $ map get_name kindless_decls
+
+        --       get_name d = tcdName (unLoc d)
+
+        --       get_kind d
+        --         | Just ki <- lookupNameEnv kisig_env (get_name d)
+        --         = Right (d, SAKS ki)
+
+        --         | cusks_enabled && hsDeclHasCusk (unLoc d)
+        --         = Right (d, CUSK)
+
+        --         | otherwise = Left d
+        ; let (kinded_decls, kindless_decls) = partition (is_kinded_decl . tcdName . unLoc) decls
               kindless_names = mkNameSet $ map get_name kindless_decls
-
               get_name d = tcdName (unLoc d)
+        ; (checked_tcs, concat -> checked_assoc_tcs) <-
+            mapAndUnzipM checkKindedDecl kinded_decls
 
-              get_kind d
-                | Just ki <- lookupNameEnv kisig_env (get_name d)
-                = Right (d, SAKS ki)
-
-                | cusks_enabled && hsDeclHasCusk (unLoc d)
-                = Right (d, CUSK)
-
-                | otherwise = Left d
-
-        ; checked_tcs <- checkNoErrs $
-                         checkInitialKinds kinded_decls
-                         -- checkNoErrs because we are about to extend
-                         -- the envt with these tycons, and we get
-                         -- knock-on errors if we have tycons with
-                         -- malformed kinds
+        -- ; checked_tcs <- checkNoErrs $
+        --                  checkInitialKinds kinded_decls
+        --                  -- checkNoErrs because we are about to extend
+        --                  -- the envt with these tycons, and we get
+        --                  -- knock-on errors if we have tycons with
+        --                  -- malformed kinds
 
         ; inferred_tcs
-            <- tcExtendKindEnvWithTyCons checked_tcs  $
+            <- tcExtendKindEnvWithTyCons checked_assoc_tcs  $
                pushLevelAndSolveEqualities unkSkolAnon [] $
                      -- We are going to kind-generalise, so unification
                      -- variables in here must be one level in
@@ -929,12 +1019,24 @@ kcTyClGroup kisig_env decls
         ; generalized_tcs <- concatMapM (generaliseTyClDecl inferred_tc_env)
                                         kindless_decls
 
-        ; let poly_tcs = checked_tcs ++ generalized_tcs
+        ; let poly_tcs = checked_tcs ++ checked_assoc_tcs ++ generalized_tcs
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return (poly_tcs, kindless_names) }
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+checkKindedDecl :: LTyClDecl GhcRn -> TcM (TcTyCon, [TcTyCon])
+checkKindedDecl (L _ (ClassDecl { tcdLName = L _ name , tcdATs = ats }))
+  = do { cls <- tcLookupTcTyCon name
+       ; let parent_tv_prs = tcTyConScopedTyVars cls
+       ; inner_tcs <-
+           tcExtendNameTyVarEnv parent_tv_prs $
+           mapM (addLocMA (check_initial_kind_assoc_fam cls)) ats
+       ; return (cls, inner_tcs) }
+checkKindedDecl (L _ d)
+  = do { tc <- tcLookupTcTyCon (tcdName d)
+       ; return (tc, []) }
 
 type ScopedPairs = [(Name, TcTyVar)]
   -- The ScopedPairs for a TcTyCon are precisely
@@ -1510,17 +1612,17 @@ inferInitialKinds decls
   where
     infer_initial_kind = addLocMA (getInitialKind InitialKindInfer)
 
--- Check type/class declarations against their standalone kind signatures or
--- CUSKs, producing a generalized TcTyCon for each.
-checkInitialKinds :: [(LTyClDecl GhcRn, SAKS_or_CUSK)] -> TcM [PolyTcTyCon]
-checkInitialKinds decls
-  = do { traceTc "checkInitialKinds {" $ ppr (mapFst (tcdName . unLoc) decls)
-       ; tcs <- concatMapM check_initial_kind decls
-       ; traceTc "checkInitialKinds done }" empty
-       ; return tcs }
-  where
-    check_initial_kind (ldecl, msig) =
-      addLocMA (getInitialKind (InitialKindCheck msig)) ldecl
+-- -- Check type/class declarations against their standalone kind signatures or
+-- -- CUSKs, producing a generalized TcTyCon for each.
+-- checkInitialKinds :: [(LTyClDecl GhcRn, SAKS_or_CUSK)] -> TcM [PolyTcTyCon]
+-- checkInitialKinds decls
+--   = do { traceTc "checkInitialKinds {" $ ppr (mapFst (tcdName . unLoc) decls)
+--        ; tcs <- concatMapM check_initial_kind decls
+--        ; traceTc "checkInitialKinds done }" empty
+--        ; return tcs }
+--   where
+--     check_initial_kind (ldecl, msig) =
+--       addLocMA (getInitialKind (InitialKindCheck msig)) ldecl
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
 -- depending on the 'InitialKindStrategy'.

@@ -62,7 +62,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
-import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
+import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq, stronglyConnCompFromEdgedVerticesOrd )
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
@@ -1414,13 +1414,11 @@ rnTyClDecls :: [TyClGroup GhcPs]
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declarations
        ; tycls_w_fvs' <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
-       ; let
-            tycls_w_fvs = map (\(L l (t, fv1), fv2) -> (L l t, fv1 `plusFV` fv2)) tycls_w_fvs'
-            tycls_w_fvs_new = map (\(L l (t, fv1), fv2) -> ((L l t, fv1), fv2)) tycls_w_fvs'
-       ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
-       ; let decl_headers = mkNameEnv (map mk_pair tycls_w_fvs_new)
+       ; let tycls_w_fvs = map (\(L l (t, fv1), fv2) -> ((L l t, fv1), fv2)) tycls_w_fvs'
+       ; let tc_names = mkNameSet (map (tcdName . unLoc . fst . fst) tycls_w_fvs)
+       ; let decl_headers = mkNameEnv (map mk_pair tycls_w_fvs)
                 where
-                  mk_pair = \((L l t, _fv1), fv2)->
+                  mk_pair ((L l t, _fv1), fv2) =
                     let hdr = mkDeclHeaderRn t
                     in (decl_header_name hdr, (L l hdr, fv2))
        ; traceRn "rnTyClDecls" $
@@ -1428,67 +1426,21 @@ rnTyClDecls tycl_ds
                 , text "tc_names:" <+> ppr tc_names ]
        ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names decl_headers (tyClGroupKindSigs tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstMA rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
-       ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
+       -- ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
        ; rdr_env <- getGlobalRdrEnv
        ; traceRn "rnTyClDecls SCC analysis" $
            vcat [ text "rdr_env:" <+> ppr rdr_env ]
-       ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
-             role_annot_env = mkRoleAnnotEnv role_annots
-             (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
-
-             inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
-             (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
-
-             first_group
-               | null init_inst_ds = []
-               | otherwise = [TyClGroup { group_ext    = noExtField
-                                        , group_tyclds = []
-                                        , group_kisigs = []
-                                        , group_roles  = []
-                                        , group_instds = init_inst_ds }]
-
-             (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
-
-             all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
+       ; let all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
                        foldr (plusFV . snd) emptyFVs kisigs_w_fvs
+       ; let all_groups = doDepAnal kisigs_w_fvs instds_w_fvs tycls_w_fvs rdr_env
 
-             all_groups = first_group ++ groups
-
-       ; massertPpr (null final_inst_ds)
-                    (ppr instds_w_fvs
-                     $$ ppr inst_ds_map
-                     $$ ppr (flattenSCCs tycl_sccs)
-                     $$ ppr final_inst_ds)
-
-       ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
-
-       ; traceRn "rnTyClDecls NEW SCC anal could have made groups" $
-          (ppr (doDepAnal kisigs_w_fvs instds_w_fvs tycls_w_fvs_new rdr_env))
+       ; traceRn "rnTyClDecls made groups" $
+          (ppr all_groups)
 
        ; return (all_groups, all_fvs) }
-  where
-    mk_group :: RoleAnnotEnv
-             -> KindSigEnv
-             -> InstDeclFreeVarsMap
-             -> SCC (LTyClDecl GhcRn)
-             -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env kisig_env inst_map scc
-      = (inst_map', group)
-      where
-        tycl_ds              = flattenSCC scc
-        bndrs                = map (tcdName . unLoc) tycl_ds
-        roles                = getRoleAnnots bndrs role_env
-        kisigs               = getKindSigs   bndrs kisig_env
-        (inst_ds, inst_map') = getInsts      bndrs inst_map
-        group = TyClGroup { group_ext    = noExtField
-                          , group_tyclds = tycl_ds
-                          , group_kisigs = kisigs
-                          , group_roles  = roles
-                          , group_instds = inst_ds }
 
 -- | Free variables of standalone kind signatures.
 newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)

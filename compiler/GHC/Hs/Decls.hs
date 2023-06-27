@@ -132,6 +132,7 @@ import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data (Data)
 import Data.Foldable (toList)
+import Data.Void
 
 {-
 ************************************************************************
@@ -671,7 +672,7 @@ type LDeclHeaderRn = LocatedA DeclHeaderRn
 --
 data DeclHeaderRn
   = DeclHeaderRn
-      { decl_header_flav :: TyConFlavour GhcRn,
+      { decl_header_flav :: TyConFlavour Void,
         decl_header_name :: Name,
         decl_header_cusk :: Bool,
         decl_header_bndrs :: LHsQTyVars GhcRn,

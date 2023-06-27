@@ -580,14 +580,16 @@ top level of a signature.
 -}
 
 -- Does validity checking and zonking.
-tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
+tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, SAKS_or_CUSK)
 tcStandaloneKindSig (L _ (StandaloneKindSig _ (L _ name) ksig))
   = addSigCtxt ctxt ksig $
     do { kind <- tc_top_lhs_type KindLevel ctxt ksig
        ; checkValidType ctxt kind
-       ; return (name, kind) }
+       ; return (name, SAKS kind) }
   where
    ctxt = StandaloneKindSigCtxt name
+tcStandaloneKindSig (L _ (XStandaloneKindSig hdr)) =
+    return (decl_header_name (unLoc hdr), CUSK)
 
 tcTopLHsType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 tcTopLHsType ctxt lsig_ty
