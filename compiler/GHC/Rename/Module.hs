@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeFamilies        #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -53,7 +54,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Data.Bag
-import GHC.Types.Basic  ( TypeOrKind(..) )
+import GHC.Types.Basic  ( TypeOrKind(..), TyConFlavour (..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
@@ -62,7 +63,7 @@ import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
-                               , stronglyConnCompFromEdgedVerticesUniq )
+                               , stronglyConnCompFromEdgedVerticesUniq, stronglyConnCompFromEdgedVerticesOrd )
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
@@ -73,7 +74,7 @@ import Control.Arrow ( first )
 import Data.Foldable ( toList )
 import Data.List ( mapAccumL )
 import Data.List.NonEmpty ( NonEmpty(..), head )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import Data.Maybe ( isNothing, fromMaybe, mapMaybe, listToMaybe, isJust )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import GHC.Types.GREInfo (ConInfo, mkConInfo, conInfoFields)
 
@@ -844,7 +845,9 @@ rnATDecls :: Name      -- Class
           -> [LFamilyDecl GhcPs]
           -> RnM ([LFamilyDecl GhcRn], FreeVars)
 rnATDecls cls at_decls
-  = rnList (rnFamDecl (Just cls)) at_decls
+  = rnList (fmap fmap fmap updateFVs (rnFamDecl (Just cls))) at_decls
+  where
+    updateFVs ((t,fv1),fv2) = (t, fv1 `plusFV` fv2)
 
 rnATInstDecls :: (AssocTyFamInfo ->           -- The function that renames
                   decl GhcPs ->               -- an instance. rnTyFamInstDecl
@@ -1410,7 +1413,10 @@ rnTyClDecls :: [TyClGroup GhcPs]
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declarations
-       ; tycls_w_fvs <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; tycls_w_fvs' <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; let
+            tycls_w_fvs = map (\(L l (t, fv1), fv2) -> (L l t, fv1 `plusFV` fv2)) tycls_w_fvs'
+            tycls_w_fvs_new = map (\(L l (t, fv1), fv2) -> ((L l t, fv1), fv2)) tycls_w_fvs'
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
        ; traceRn "rnTyClDecls" $
            vcat [ text "tyClGroupTyClDecls:" <+> ppr tycls_w_fvs
@@ -1454,6 +1460,10 @@ rnTyClDecls tycl_ds
                      $$ ppr final_inst_ds)
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
+
+       ; traceRn "rnTyClDecls NEW SCC anal could have made groups" $
+          (ppr (doDepAnal kisigs_w_fvs instds_w_fvs tycls_w_fvs_new rdr_env))
+
        ; return (all_groups, all_fvs) }
   where
     mk_group :: RoleAnnotEnv
@@ -1666,13 +1676,15 @@ getInsts bndrs inst_decl_map
 ****************************************************** -}
 
 rnTyClDecl :: TyClDecl GhcPs
-           -> RnM (TyClDecl GhcRn, FreeVars)
+           -> RnM ((TyClDecl GhcRn,
+                          FreeVars), -- RHS free variables
+                          FreeVars)  -- LHS free variables
 
 -- All flavours of top-level type family declarations ("type family", "newtype
 -- family", and "data family")
 rnTyClDecl (FamDecl { tcdFam = fam })
-  = do { (fam', fvs) <- rnFamDecl Nothing fam
-       ; return (FamDecl noExtField fam', fvs) }
+  = do { ((fam', fvs_rhs), fvs_lhs) <- rnFamDecl Nothing fam
+       ; return ((FamDecl noExtField fam',fvs_rhs), fvs_lhs)}
 
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
@@ -1683,9 +1695,9 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' free_rhs_kvs ->
     do { mapM_ warn_implicit_kvs (nubL free_rhs_kvs)
        ; (rhs', fvs) <- rnTySyn doc rhs
-       ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
+       ; return ((SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
                          , tcdFixity = fixity
-                         , tcdRhs = rhs', tcdSExt = fvs }, fvs) } }
+                         , tcdRhs = rhs', tcdSExt = fvs }, fvs), emptyFVs) } }
   where
     warn_implicit_kvs :: LocatedN RdrName -> RnM ()
     warn_implicit_kvs kv =
@@ -1707,11 +1719,11 @@ rnTyClDecl (DataDecl
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr free_rhs_kvs)
-       ; return (DataDecl { tcdLName    = tycon'
+       ; return ((DataDecl { tcdLName    = tycon'
                           , tcdTyVars   = tyvars'
                           , tcdFixity   = fixity
                           , tcdDataDefn = defn'
-                          , tcdDExt     = rn_info }, fvs) } }
+                          , tcdDExt     = rn_info }, fvs), emptyFVs) } }
 
 rnTyClDecl (ClassDecl { tcdLayout = layout,
                         tcdCtxt = context, tcdLName = lcls,
@@ -1725,16 +1737,14 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
                         -- kind signatures on the tyvars
 
         -- Tyvars scope over superclass context and method signatures
-        ; ((tyvars', context', fds', ats'), stuff_fvs)
+        ; (((tyvars', context', fds', ats'), fv_ats), hdr_fvs)
             <- bindHsQTyVars cls_doc Nothing kvs tyvars $ \ tyvars' _ -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnMaybeContext cls_doc context
              ; fds'  <- rnFds fds
                          -- The fundeps have no free variables
              ; (ats', fv_ats) <- rnATDecls cls' ats
-             ; let fvs = cxt_fvs     `plusFV`
-                         fv_ats
-             ; return ((tyvars', context', fds', ats'), fvs) }
+             ; return (((tyvars', context', fds', ats'), fv_ats), cxt_fvs) }
 
         ; (at_defs', fv_at_defs) <- rnList (rnTyFamDefltDecl cls') at_defs
 
@@ -1766,15 +1776,15 @@ rnTyClDecl (ClassDecl { tcdLayout = layout,
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
                 -- and the methods are already in scope
 
-        ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
+        ; let body_fvs = meth_fvs `plusFV` fv_ats `plusFV` fv_at_defs
         ; docs' <- traverse rnLDocDecl docs
-        ; return (ClassDecl { tcdLayout = rnLayoutInfo layout,
+        ; return ((ClassDecl { tcdLayout = rnLayoutInfo layout,
                               tcdCtxt = context', tcdLName = lcls',
                               tcdTyVars = tyvars', tcdFixity = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdCExt = all_fvs },
-                  all_fvs ) }
+                              tcdDocs = docs', tcdCExt = body_fvs `plusFV` hdr_fvs },
+                  body_fvs ), hdr_fvs) }
   where
     cls_doc  = ClassDeclCtx lcls
 
@@ -2182,7 +2192,9 @@ rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
                         --             inside an *class decl* for cls
                         --             used for associated types
           -> FamilyDecl GhcPs
-          -> RnM (FamilyDecl GhcRn, FreeVars)
+          -> RnM ((FamilyDecl GhcRn,
+                            FreeVars), -- RHS free vars
+                            FreeVars) -- LHS free vars
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdTopLevel = toplevel
                              , fdFixity = fixity
@@ -2197,13 +2209,13 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
        ; (info', fv2) <- rn_info info
-       ; return (FamilyDecl { fdExt = noAnn
+       ; return ((FamilyDecl { fdExt = noAnn
                             , fdLName = tycon', fdTyVars = tyvars'
                             , fdTopLevel = toplevel
                             , fdFixity = fixity
                             , fdInfo = info', fdResultSig = res_sig'
                             , fdInjectivityAnn = injectivity' }
-                , fv1 `plusFV` fv2) }
+                , fv2), fv1)}
   where
      doc = TyFamilyCtx tycon
      kvs = extractRdrKindSigVars res_sig
@@ -2705,3 +2717,267 @@ add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
 add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
 add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"
+
+
+type LDeclHeaderRn = Located DeclHeaderRn
+
+-- | Renamed declaration header (left-hand side of a declaration):
+--
+-- 1. data T a b = MkT (a -> b)
+--    ^^^^^^^^^^
+--
+-- 2. class C a where
+--    ^^^^^^^^^
+--
+-- 3. type family F a b :: r where
+--    ^^^^^^^^^^^^^^^^^^^^^^
+--
+-- Supplies arity and flavor information not covered by a standalone kind
+-- signature.
+--
+data DeclHeaderRn
+  = DeclHeaderRn
+      { decl_header_flav :: TyConFlavour GhcRn,
+        decl_header_name :: Name,
+        decl_header_cusk :: Bool,
+        decl_header_bndrs :: LHsQTyVars GhcRn,
+        decl_header_res_sig :: Maybe (LHsType GhcRn)
+      }
+
+instance Outputable DeclHeaderRn where
+  ppr (DeclHeaderRn flav name cusk bndrs res_sig) =
+    ppr flav <+>
+    ppr name <+>
+    ppr bndrs <+>
+    maybe empty ((text "::" <+>) . ppr) res_sig <+>
+    if cusk then text "{- CUSK -}" else empty
+
+data DAKey = DAInst Name | DASig Name | DADef Name
+  deriving (Eq, Ord)
+
+data DAPayload =
+    DAPhantom Name
+  | DAInsts [LInstDecl GhcRn]
+  | DATyClDecl (LTyClDecl GhcRn)
+  | DANodeSig
+      (Maybe (LStandaloneKindSig GhcRn))
+      DeclHeaderRn
+
+instance Outputable DAPayload where
+  ppr (DAPhantom n) = text "{- No sig for" <+> ppr n <+> text "-}"
+  ppr (DAInsts insts) = ppr insts
+  ppr (DATyClDecl decl) = ppr decl
+  ppr (DANodeSig msig decl_header) = vcat
+    [ maybe empty ppr msig,
+      ppr decl_header
+    ]
+
+type DANode = Node DAKey DAPayload
+
+doDepAnal ::
+  [(LStandaloneKindSig GhcRn, FreeVars)] ->
+  [(LInstDecl GhcRn,FreeVars)] ->
+  [((LTyClDecl GhcRn, FreeVars), FreeVars)] ->
+  GlobalRdrEnv ->
+  [SCC DAPayload] -- Inv: no DAPhantom
+doDepAnal sigs insts decls rdr_env =
+  let
+    -- FIXME: do not discard orphans
+    declNodes :: [DANode]
+    declNodes = do
+      ((ldecl@(L _ decl), fvs_rhs), fvs_lhs) <- decls
+
+      let
+        decl_header@DeclHeaderRn{decl_header_cusk = cusk, decl_header_name = name, decl_header_flav = flav} = mkDeclHeaderRn decl
+        (msig, sig_fvs) = findSig name
+        sigNodeKey = DASig name
+        defNodeKey = DADef name
+        sigNode = case msig of
+          Nothing | not cusk -> DigraphNode (DAPhantom name) sigNodeKey [defNodeKey]
+          _ -> DigraphNode (DANodeSig msig decl_header) sigNodeKey (getDeps (fvs_lhs `plusFV` sig_fvs))
+
+      sigNode : case decl of
+        FamDecl{} | OpenFamilyFlavour{} <- flav -> do
+          let (fvs, insts') = getInsts name
+
+          pure (DigraphNode (DAInsts insts') defNodeKey (sigNodeKey : getDeps fvs))
+        ClassDecl{} -> do
+          let
+            (fvs, insts') = getInsts name
+            defNode = DigraphNode (DATyClDecl ldecl) defNodeKey (sigNodeKey : getDeps (fvs_lhs `plusFV` fvs_rhs))
+            instNode = DigraphNode (DAInsts insts') (DAInst name) (defNodeKey : getDeps fvs)
+          [defNode, instNode]
+        _ ->
+          pure (DigraphNode (DATyClDecl ldecl) defNodeKey (sigNodeKey : getDeps (fvs_lhs `plusFV` fvs_rhs)))
+  in (stronglyConnCompFromEdgedVerticesOrd declNodes)
+  where
+    -- decl_headers = [mkDeclHeaderRn decl | (((L _ decl), _), _) <- decls]
+
+    getInsts :: Name -> (FreeVars, [LInstDecl GhcRn])
+    getInsts name = mapAccumL (\acc (inst, fvs) -> (acc `plusFV` fvs, inst)) emptyFVs $
+                    filter ( (name ==) . getInstName . fst ) insts
+
+    findSig :: Name -> (Maybe (LStandaloneKindSig GhcRn), FreeVars)
+    findSig name = unwrapMaybe $ listToMaybe $ do
+      sig@(L _ (StandaloneKindSig _ (L _ name') _),_) <- sigs
+      guard (name == name')
+      pure sig
+
+    unwrapMaybe Nothing = (Nothing, emptyFVs)
+    unwrapMaybe (Just (sig, fvs)) = (Just sig, fvs)
+
+    getDeps :: FreeVars -> [DAKey]
+    getDeps = map toParent . concatMap getDep . nonDetEltsUniqSet
+
+    getDep :: Name -> [DAKey]
+    getDep name =
+      case lookupGRE_Name rdr_env name of
+
+        Just gre | IAmTyCon flav <- gre_info gre -> do
+          case flav of
+              ClassFlavour{} -> [DASig name]
+              DataTypeFlavour{} -> [DASig name]
+              NewtypeFlavour{} -> [DASig name]
+              TypeSynonymFlavour{} -> [DASig name, DADef name]
+              OpenFamilyFlavour{} -> [DASig name, DADef name]
+              ClosedTypeFamilyFlavour{} -> [DASig name, DADef name]
+              _ -> panic "doDepAnal: getDep"
+        Just _ -> [DASig name]
+        Nothing -> []
+{-
+data GREInfo
+      -- | No particular information... e.g. a function
+    = Vanilla
+      -- | 'TyCon'
+    | IAmTyCon    !(TyConFlavour Name)
+      -- | 'ConLike'
+    | IAmConLike  !ConInfo
+      -- ^ The constructor fields.
+      -- See Note [Local constructor info in the renamer].
+      -- | Record field
+    | IAmRecField !RecFieldInfo
+-}
+
+    toParent :: DAKey -> DAKey
+    toParent (DASig name)
+      | Just p <- getParentMaybe name = DADef p
+    toParent (DADef name)
+      | Just p <- getParentMaybe name = DAInst p
+    toParent key = key
+
+    getParentMaybe :: Name -> Maybe Name
+    getParentMaybe name = case lookupGRE_Name rdr_env name of
+      Just gre -> case gre_par gre of
+                    ParentIs  { par_is = p } -> Just p
+                    _                        -> Nothing
+      Nothing -> Nothing
+
+getInstName :: LInstDecl GhcRn -> Name
+getInstName (L _ inst) = case inst of
+  ClsInstD { cid_inst = ClsInstDecl{cid_poly_ty = (L _ class_ty)}} -> getClassNameFromTy (unLoc $ sig_body class_ty)
+    where
+      getClassNameFromTy HsQualTy{hst_body = L _ ty} = getClassNameFromTy ty
+      getClassNameFromTy (HsAppTy _ (L _ ty) _) = getClassNameFromTy ty
+      getClassNameFromTy (HsTyVar _ _ (L _ name)) = name
+      getClassNameFromTy _ = panic "go fix getInstName"
+
+  DataFamInstD { dfid_inst = inst } -> unLoc $ feqn_tycon (dfid_eqn inst)
+  TyFamInstD {  tfid_inst = inst } -> unLoc $ feqn_tycon (tfid_eqn inst)
+
+
+mkDeclHeaderRn :: TyClDecl GhcRn -> DeclHeaderRn
+
+-- Class
+mkDeclHeaderRn
+  (ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs })
+  = DeclHeaderRn
+    { decl_header_flav = ClassFlavour,
+      decl_header_name = name,
+      decl_header_cusk = hsTvbAllKinded ktvs,
+      decl_header_bndrs = ktvs,
+      decl_header_res_sig = Nothing }
+
+-- Data/Newtype
+mkDeclHeaderRn
+  (DataDecl { tcdLName = L _ name
+            , tcdTyVars = ktvs
+            , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                       , dd_cons = new_or_data }
+            , tcdDExt = DataDeclRn { tcdDataCusk = has_cusk }})
+  = DeclHeaderRn
+      { decl_header_flav = newOrDataToFlavour (dataDefnConsNewOrData new_or_data),
+        decl_header_name = name,
+        decl_header_cusk = has_cusk,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = m_sig }
+
+-- Type/data family
+mkDeclHeaderRn
+  (FamDecl { tcdFam =
+     FamilyDecl { fdLName     = L _ name
+                , fdTyVars    = ktvs
+                , fdResultSig = L _ resultSig
+                , fdInfo      = info } })
+  = DeclHeaderRn
+      { decl_header_flav = familyInfoTyConFlavour Nothing info,
+        decl_header_name = name,
+        decl_header_cusk = has_cusk,
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = famResultKindSignature resultSig }
+  where
+    has_cusk =
+      case info of
+        ClosedTypeFamily {} -> hsTvbAllKinded ktvs
+                            && isJust (famResultKindSignature resultSig)
+        _ -> True -- Un-associated open type/data families have CUSKs
+
+-- Type synonym
+mkDeclHeaderRn
+  (SynDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdRhs = rhs })
+  = DeclHeaderRn
+      { decl_header_flav = TypeSynonymFlavour,
+        decl_header_name = name,
+        decl_header_cusk = hsTvbAllKinded ktvs && isJust (hsTyKindSig rhs),
+        decl_header_bndrs = ktvs,
+        decl_header_res_sig = hsTyKindSig rhs }
+
+
+{-
+data TyClDecl pass
+  =
+    FamDecl { tcdFExt :: XFamDecl pass, tcdFam :: FamilyDecl pass }
+
+  |
+    SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renamer, FVs
+            , tcdLName  :: LIdP pass              -- ^ Type constructor
+            , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
+                                                  -- associated type these
+                                                  -- include outer binders
+            , tcdFixity :: LexicalFixity          -- ^ Fixity used in the declaration
+            , tcdRhs    :: LHsType pass }         -- ^ RHS of type declaration
+
+  |
+    DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
+             , tcdLName    :: LIdP pass             -- ^ Type constructor
+             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
+                              -- See Note [TyVar binders for associated decls]
+             , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
+             , tcdDataDefn :: HsDataDefn pass }
+
+  | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
+                tcdLayout  :: !(LayoutInfo pass),      -- ^ Explicit or virtual braces
+                              -- See Note [Class LayoutInfo]
+                tcdCtxt    :: Maybe (LHsContext pass), -- ^ Context...
+                tcdLName   :: LIdP pass,               -- ^ Name of the class
+                tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
+                tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
+                tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
+                tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
+                tcdMeths   :: LHsBinds pass,            -- ^ Default methods
+                tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
+                tcdATDefs  :: [LTyFamDefltDecl pass],   -- ^ Associated type defaults
+                tcdDocs    :: [LDocDecl pass]           -- ^ Haddock docs
+    }
+  | XTyClDecl !(XXTyClDecl pass)
+
+-}

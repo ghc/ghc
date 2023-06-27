@@ -2458,4 +2458,3 @@ instDeclCtxt2 dfun_ty
 inst_decl_ctxt :: SDoc -> SDoc
 inst_decl_ctxt doc = hang (text "In the instance declaration for")
                         2 (quotes doc)
-
