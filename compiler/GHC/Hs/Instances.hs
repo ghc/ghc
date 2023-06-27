@@ -98,6 +98,8 @@ deriving instance Data (FixitySig GhcPs)
 deriving instance Data (FixitySig GhcRn)
 deriving instance Data (FixitySig GhcTc)
 
+deriving instance Data DeclHeaderRn
+
 -- deriving instance (DataId p)       => Data (StandaloneKindSig p)
 deriving instance Data (StandaloneKindSig GhcPs)
 deriving instance Data (StandaloneKindSig GhcRn)

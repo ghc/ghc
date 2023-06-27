@@ -1418,10 +1418,15 @@ rnTyClDecls tycl_ds
             tycls_w_fvs = map (\(L l (t, fv1), fv2) -> (L l t, fv1 `plusFV` fv2)) tycls_w_fvs'
             tycls_w_fvs_new = map (\(L l (t, fv1), fv2) -> ((L l t, fv1), fv2)) tycls_w_fvs'
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
+       ; let decl_headers = mkNameEnv (map mk_pair tycls_w_fvs_new)
+                where
+                  mk_pair = \((L l t, _fv1), fv2)->
+                    let hdr = mkDeclHeaderRn t
+                    in (decl_header_name hdr, (L l hdr, fv2))
        ; traceRn "rnTyClDecls" $
            vcat [ text "tyClGroupTyClDecls:" <+> ppr tycls_w_fvs
                 , text "tc_names:" <+> ppr tc_names ]
-       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
+       ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names decl_headers (tyClGroupKindSigs tycl_ds)
        ; instds_w_fvs <- mapM (wrapLocFstMA rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
@@ -1508,26 +1513,31 @@ getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
 
 rnStandaloneKindSignatures
   :: NameSet  -- names of types and classes in the current TyClGroup
+  -> NameEnv (LDeclHeaderRn, FreeVars)  -- headers of types and classes in the current HsGroup
   -> [LStandaloneKindSig GhcPs]
   -> RnM [(LStandaloneKindSig GhcRn, FreeVars)]
-rnStandaloneKindSignatures tc_names kisigs
+rnStandaloneKindSignatures tc_names decl_headers kisigs
   = do { let (no_dups, dup_kisigs) = removeDupsOn get_name kisigs
              get_name = standaloneKindSigName . unLoc
        ; mapM_ dupKindSig_Err dup_kisigs
-       ; mapM (wrapLocFstMA (rnStandaloneKindSignature tc_names)) no_dups
+       ; mapM (wrapLocFstMA (rnStandaloneKindSignature tc_names decl_headers)) no_dups
        }
 
 rnStandaloneKindSignature
   :: NameSet  -- names of types and classes in the current TyClGroup
+  -> NameEnv (LDeclHeaderRn, FreeVars)  -- headers of types and classes in the current HsGroup
   -> StandaloneKindSig GhcPs
   -> RnM (StandaloneKindSig GhcRn, FreeVars)
-rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
+rnStandaloneKindSignature tc_names decl_headers (StandaloneKindSig _ v ki)
   = do  { standalone_ki_sig_ok <- xoptM LangExt.StandaloneKindSignatures
         ; unless standalone_ki_sig_ok $ addErr TcRnUnexpectedStandaloneKindSig
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
-        ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
+        ; let (hdr, hdr_fvs) = case lookupNameEnv decl_headers (unLoc new_v) of
+                Nothing -> panic "SPANK SPANK SPANK!\nTHE KIND SIGNATURE HAS NO ASSOCIATED DECLARATION"
+                Just a  -> a
+        ; return (StandaloneKindSig hdr new_v new_ki, fvs `plusFV` hdr_fvs)
         }
 
 depAnalTyClDecls :: GlobalRdrEnv
@@ -2717,40 +2727,6 @@ add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
 add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
 add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"
-
-
-type LDeclHeaderRn = Located DeclHeaderRn
-
--- | Renamed declaration header (left-hand side of a declaration):
---
--- 1. data T a b = MkT (a -> b)
---    ^^^^^^^^^^
---
--- 2. class C a where
---    ^^^^^^^^^
---
--- 3. type family F a b :: r where
---    ^^^^^^^^^^^^^^^^^^^^^^
---
--- Supplies arity and flavor information not covered by a standalone kind
--- signature.
---
-data DeclHeaderRn
-  = DeclHeaderRn
-      { decl_header_flav :: TyConFlavour GhcRn,
-        decl_header_name :: Name,
-        decl_header_cusk :: Bool,
-        decl_header_bndrs :: LHsQTyVars GhcRn,
-        decl_header_res_sig :: Maybe (LHsType GhcRn)
-      }
-
-instance Outputable DeclHeaderRn where
-  ppr (DeclHeaderRn flav name cusk bndrs res_sig) =
-    ppr flav <+>
-    ppr name <+>
-    ppr bndrs <+>
-    maybe empty ((text "::" <+>) . ppr) res_sig <+>
-    if cusk then text "{- CUSK -}" else empty
 
 data DAKey = DAInst Name | DASig Name | DADef Name
   deriving (Eq, Ord)

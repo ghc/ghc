@@ -26,6 +26,7 @@ module GHC.Hs.Decls (
   HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
   NewOrData, newOrDataToFlavour, anyLConIsGadt,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
+  DeclHeaderRn(..), LDeclHeaderRn,
 
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
@@ -652,14 +653,52 @@ instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
   ppr (DctSingle _ ty) = ppr ty
   ppr (DctMulti _ tys) = parens (interpp'SP tys)
 
+type LDeclHeaderRn = LocatedA DeclHeaderRn
+
+-- | Renamed declaration header (left-hand side of a declaration):
+--
+-- 1. data T a b = MkT (a -> b)
+--    ^^^^^^^^^^
+--
+-- 2. class C a where
+--    ^^^^^^^^^
+--
+-- 3. type family F a b :: r where
+--    ^^^^^^^^^^^^^^^^^^^^^^
+--
+-- Supplies arity and flavor information not covered by a standalone kind
+-- signature.
+--
+data DeclHeaderRn
+  = DeclHeaderRn
+      { decl_header_flav :: TyConFlavour GhcRn,
+        decl_header_name :: Name,
+        decl_header_cusk :: Bool,
+        decl_header_bndrs :: LHsQTyVars GhcRn,
+        decl_header_res_sig :: Maybe (LHsType GhcRn)
+      }
+
+instance Outputable DeclHeaderRn where
+  ppr (DeclHeaderRn flav name cusk bndrs res_sig) =
+    ppr flav <+>
+    ppr name <+>
+    ppr bndrs <+>
+    maybe empty ((text "::" <+>) . ppr) res_sig <+>
+    if cusk then text "{- CUSK -}" else empty
+
 type instance XStandaloneKindSig GhcPs = EpAnn [AddEpAnn]
-type instance XStandaloneKindSig GhcRn = NoExtField
+type instance XStandaloneKindSig GhcRn = LDeclHeaderRn
 type instance XStandaloneKindSig GhcTc = NoExtField
 
-type instance XXStandaloneKindSig (GhcPass p) = DataConCantHappen
+type instance XXStandaloneKindSig GhcPs = DataConCantHappen
+type instance XXStandaloneKindSig GhcRn = LDeclHeaderRn  -- CUSK
+type instance XXStandaloneKindSig GhcTc = DataConCantHappen
 
-standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
+standaloneKindSigName :: forall p. IsPass p => StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
 standaloneKindSigName (StandaloneKindSig _ lname _) = unLoc lname
+standaloneKindSigName (XStandaloneKindSig x) =
+  case ghcPass @p of
+    GhcRn -> decl_header_name (unLoc x)
 
 type instance XConDeclGADT (GhcPass _) = EpAnn [AddEpAnn]
 type instance XConDeclH98  (GhcPass _) = EpAnn [AddEpAnn]
@@ -732,6 +771,10 @@ instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
   ppr (StandaloneKindSig _ v ki)
     = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
+  ppr (XStandaloneKindSig x) =
+    case ghcPass @p of
+      GhcRn -> whenPprDebug $
+        text "CUSK:" <+> ppr (decl_header_name (unLoc x))
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs
