@@ -2735,18 +2735,12 @@ data DAPayload =
     DAPhantom Name
   | DAInsts [LInstDecl GhcRn]
   | DATyClDecl (LTyClDecl GhcRn)
-  | DANodeSig
-      (Maybe (LStandaloneKindSig GhcRn))
-      DeclHeaderRn
-
+  | DANodeSig (LStandaloneKindSig GhcRn)
 instance Outputable DAPayload where
   ppr (DAPhantom n) = text "{- No sig for" <+> ppr n <+> text "-}"
   ppr (DAInsts insts) = ppr insts
   ppr (DATyClDecl decl) = ppr decl
-  ppr (DANodeSig msig decl_header) = vcat
-    [ maybe empty ppr msig,
-      ppr decl_header
-    ]
+  ppr (DANodeSig sig) = ppr sig
 
 type DANode = Node DAKey DAPayload
 
@@ -2769,8 +2763,9 @@ doDepAnal sigs insts decls rdr_env =
         sigNodeKey = DASig name
         defNodeKey = DADef name
         sigNode = case msig of
-          Nothing | not cusk -> DigraphNode (DAPhantom name) sigNodeKey [defNodeKey]
-          _ -> DigraphNode (DANodeSig msig decl_header) sigNodeKey (getDeps (fvs_lhs `plusFV` sig_fvs))
+          Nothing | cusk      -> DigraphNode (DANodeSig (noLocA (XStandaloneKindSig (noLocA decl_header))) ) sigNodeKey (getDeps (fvs_lhs `plusFV` sig_fvs))
+                  | otherwise -> DigraphNode (DAPhantom name) sigNodeKey [defNodeKey]
+          Just sig -> DigraphNode (DANodeSig sig) sigNodeKey (getDeps (fvs_lhs `plusFV` sig_fvs))
 
       sigNode : case decl of
         FamDecl{} | OpenFamilyFlavour{} <- flav -> do
