@@ -457,7 +457,7 @@ static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
  * Traverse the capabilities' local new-weak-pointer lists at the beginning of
  * GC and move them to the nursery's weak_ptr_list.
  */
-void collectFreshWeakPtrs()
+void collectFreshWeakPtrs( void )
 {
     uint32_t i;
     // move recently allocated weak_ptr_list to the old list as well
