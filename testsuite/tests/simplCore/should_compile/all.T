@@ -435,7 +435,7 @@ test('T21851', [grep_errmsg(r'case.*w\$sf') ], multimod_compile, ['T21851', '-O 
 # One module, T22097.hs, has OPTIONS_GHC -ddump-simpl
 test('T22097', [grep_errmsg(r'case.*wgoEven') ], multimod_compile, ['T22097', '-O -dno-typeable-binds -dsuppress-uniques'])
 
-test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules -fpolymorphic-specialisation'])
+test('T13873',  [ grep_errmsg(r'SPEC') ], compile, ['-O -ddump-rules'])
 test('T22357',  normal, compile, ['-O'])
 test('T22471',  normal, compile, ['-O'])
 test('T22347',  normal, compile, ['-O -fno-full-laziness'])

@@ -249,7 +249,6 @@ data GeneralFlag
    | Opt_Specialise
    | Opt_SpecialiseAggressively
    | Opt_CrossModuleSpecialise
-   | Opt_PolymorphicSpecialisation
    | Opt_InlineGenerics
    | Opt_InlineGenericsAggressively
    | Opt_StaticArgumentTransformation

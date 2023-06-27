@@ -1113,21 +1113,6 @@ by saying ``-fno-wombat``.
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
 
-.. ghc-flag:: -fpolymorphic-specialisation
-    :shortdesc: Allow specialisation to abstract over free type variables
-    :type: dynamic
-    :reverse: -fno-polymorphic-specialisation
-    :category:
-
-    :default: off
-
-    Warning, this feature is highly experimental and may lead to incorrect runtime
-    results. Use at your own risk (:ghc-ticket:`23469`, :ghc-ticket:`23109`, :ghc-ticket:`21229`, :ghc-ticket:`23445`).
-
-    Enable specialisation of function calls to known dictionaries with free type variables.
-    The created specialisation will abstract over the type variables free in the dictionary.
-
-
 .. ghc-flag:: -flate-specialise
     :shortdesc: Run a late specialisation pass
     :type: dynamic
