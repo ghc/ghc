@@ -218,10 +218,10 @@ function set_toolchain_paths() {
       # These are generally set by the Docker image but
       # we provide these handy fallbacks in case the
       # script isn't run from within a GHC CI docker image.
-      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
-      if [ -z "$CABAL" ]; then CABAL="$(which cabal)"; fi
-      if [ -z "$HAPPY" ]; then HAPPY="$(which happy)"; fi
-      if [ -z "$ALEX" ]; then ALEX="$(which alex)"; fi
+      : ${GHC:=$(which ghc)}
+      : ${CABAL:=$(which cabal)}
+      : ${HAPPY:=$(which happy)}
+      : ${ALEX:=$(which alex)}
       ;;
     *) fail "bad toolchain_source"
   esac
@@ -914,8 +914,8 @@ determine_metric_baseline
 
 set_toolchain_paths
 
-case $1 in
-  usage) usage ;;
+case ${1:-help} in
+  help|usage) usage ;;
   setup) setup && cleanup_submodules ;;
   configure) time_it "configure" configure ;;
   build_hadrian) time_it "build" build_hadrian ;;
