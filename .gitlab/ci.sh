@@ -211,7 +211,6 @@ function set_toolchain_paths() {
         esac
         info "Building toolchain for $NIX_SYSTEM"
         nix-build --quiet .gitlab/darwin/toolchain.nix --argstr system "$NIX_SYSTEM" -o toolchain.sh
-        cat toolchain.sh
       fi
       source toolchain.sh
       ;;
