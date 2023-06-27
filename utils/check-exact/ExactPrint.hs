@@ -548,13 +548,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
        printStringAtLsDelta dp ""
        setEofPos Nothing -- Only do this once
 
-  let trailing' = trailing_anns
-  let newAchor = EpaDelta edp []
-  let r = case canUpdateAnchor of
-            CanUpdateAnchor -> setAnnotationAnchor a' newAchor trailing' (mkEpaComments (priorCs ++ postCs) [])
-            CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor [] emptyComments
-            NoCanUpdateAnchor -> a'
-  -- debugM $ "calling setAnnotationAnchor:(curAnchor, newAchor,priorCs,postCs)=" ++ showAst (show (rs2range curAnchor), newAchor, priorCs, postCs)
+  -- Deal with exit from the current anchor
   p1 <- getPosP
   pe1 <- getPriorEndD
   debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, eloc2str anchor', astId a')
@@ -567,6 +561,15 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
       setPriorEndD (snd $ rs2range rss)
     EpaSpan _ -> return ()
 
+  -- Outside the anchor, mark any trailing
+  trailing' <- markTrailing trailing_anns
+
+  -- Update original anchor, comments based on the printing process
+  let newAchor = EpaDelta edp []
+  let r = case canUpdateAnchor of
+            CanUpdateAnchor -> setAnnotationAnchor a' newAchor trailing' (mkEpaComments (priorCs ++ postCs) [])
+            CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor [] emptyComments
+            NoCanUpdateAnchor -> a'
   return r
 
 -- ---------------------------------------------------------------------
@@ -4339,41 +4342,34 @@ instance ExactPrint (LocatedN RdrName) where
           mn <- markName a o (Just (l,n)) c
           case mn of
             (o', (Just (l',_n)), c') -> do -- (o', (Just (l',n')), c')
-              t' <- markTrailing t
-              return (NameAnn a o' l' c' t')
+              return (NameAnn a o' l' c' t)
             _ -> error "ExactPrint (LocatedN RdrName)"
         NameAnnCommas a o commas c t -> do
           let (kwo,kwc) = adornments a
           (AddEpAnn _ o') <- markKwC NoCaptureComments (AddEpAnn kwo o)
           commas' <- forM commas (\loc -> locFromAdd <$> markKwC NoCaptureComments (AddEpAnn AnnComma loc))
           (AddEpAnn _ c') <- markKwC NoCaptureComments (AddEpAnn kwc c)
-          t' <- markTrailing t
-          return (NameAnnCommas a o' commas' c' t')
+          return (NameAnnCommas a o' commas' c' t)
         NameAnnBars a o bars c t -> do
           let (kwo,kwc) = adornments a
           (AddEpAnn _ o') <- markKwC NoCaptureComments (AddEpAnn kwo o)
           bars' <- forM bars (\loc -> locFromAdd <$> markKwC NoCaptureComments (AddEpAnn AnnVbar loc))
           (AddEpAnn _ c') <- markKwC NoCaptureComments (AddEpAnn kwc c)
-          t' <- markTrailing t
-          return (NameAnnBars a o' bars' c' t')
+          return (NameAnnBars a o' bars' c' t)
         NameAnnOnly a o c t -> do
           (o',_,c') <- markName a o Nothing c
-          t' <- markTrailing t
-          return (NameAnnOnly a o' c' t')
+          return (NameAnnOnly a o' c' t)
         NameAnnRArrow nl t -> do
           (AddEpAnn _ nl') <- markKwC NoCaptureComments (AddEpAnn AnnRarrow nl)
-          t' <- markTrailing t
-          return (NameAnnRArrow nl' t')
+          return (NameAnnRArrow nl' t)
         NameAnnQuote q name t -> do
           debugM $ "NameAnnQuote"
           (AddEpAnn _ q') <- markKwC NoCaptureComments (AddEpAnn AnnSimpleQuote q)
           (L name' _) <- markAnnotated (L name n)
-          t' <- markTrailing t
-          return (NameAnnQuote q' name' t')
+          return (NameAnnQuote q' name' t)
         NameAnnTrailing t -> do
           _anc' <- printUnicode anc n
-          t' <- markTrailing t
-          return (NameAnnTrailing t')
+          return (NameAnnTrailing t)
     return (L (EpAnnS anc ann' cs) n)
 
 locFromAdd :: AddEpAnn -> EpaLocation
