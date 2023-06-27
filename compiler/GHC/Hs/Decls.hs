@@ -773,8 +773,7 @@ instance OutputableBndrId p
     = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
   ppr (XStandaloneKindSig x) =
     case ghcPass @p of
-      GhcRn -> whenPprDebug $
-        text "CUSK:" <+> ppr (decl_header_name (unLoc x))
+      GhcRn -> ppr x
 
 pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
 pp_condecls cs

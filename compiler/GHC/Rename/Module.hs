@@ -58,7 +58,7 @@ import GHC.Types.Basic  ( TypeOrKind(..), TyConFlavour (..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
-import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
+import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
@@ -2736,6 +2736,7 @@ data DAPayload =
   | DAInsts [LInstDecl GhcRn]
   | DATyClDecl (LTyClDecl GhcRn)
   | DANodeSig (LStandaloneKindSig GhcRn)
+
 instance Outputable DAPayload where
   ppr (DAPhantom n) = text "{- No sig for" <+> ppr n <+> text "-}"
   ppr (DAInsts insts) = ppr insts
@@ -2749,7 +2750,7 @@ doDepAnal ::
   [(LInstDecl GhcRn,FreeVars)] ->
   [((LTyClDecl GhcRn, FreeVars), FreeVars)] ->
   GlobalRdrEnv ->
-  [SCC DAPayload] -- Inv: no DAPhantom
+  [TyClGroup GhcRn]
 doDepAnal sigs insts decls rdr_env =
   let
     -- FIXME: do not discard orphans
@@ -2780,7 +2781,7 @@ doDepAnal sigs insts decls rdr_env =
           [defNode, instNode]
         _ ->
           pure (DigraphNode (DATyClDecl ldecl) defNodeKey (sigNodeKey : getDeps (fvs_lhs `plusFV` fvs_rhs)))
-  in (stronglyConnCompFromEdgedVerticesOrd declNodes)
+  in filterOut isEmptyTyClGroup $ map mk_group (stronglyConnCompFromEdgedVerticesOrd declNodes)
   where
     -- decl_headers = [mkDeclHeaderRn decl | (((L _ decl), _), _) <- decls]
 
@@ -2815,6 +2816,18 @@ doDepAnal sigs insts decls rdr_env =
               _ -> panic "doDepAnal: getDep"
         Just _ -> [DASig name]
         Nothing -> []
+
+    mk_group :: SCC DAPayload -> TyClGroup GhcRn
+    mk_group = foldr f (TyClGroup noExtField [] [] [] []) . flattenSCC
+      where
+        f :: DAPayload -> TyClGroup GhcRn -> TyClGroup GhcRn
+        f (DAPhantom _) = id
+        f (DAInsts insts) = \g -> g { group_instds = insts ++ group_instds g }
+        f (DATyClDecl decl) = \g -> g { group_tyclds = decl : group_tyclds g }
+        f (DANodeSig sig) = \g -> g { group_kisigs = sig : group_kisigs g }
+
+    isEmptyTyClGroup (TyClGroup _ [] [] [] []) = True
+    isEmptyTyClGroup _ = False
 {-
 data GREInfo
       -- | No particular information... e.g. a function
