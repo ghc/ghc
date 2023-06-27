@@ -489,7 +489,6 @@ topDecls = filterClasses . filterDecls . collectDocs . sortLocatedA . ungroup
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
   mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
-  mkDecls hs_derivds             (DerivD noExtField) group_ ++
   mkDecls hs_defds               (DefD noExtField)   group_ ++
   mkDecls hs_fords               (ForD noExtField)   group_ ++
   mkDecls hs_docs                (DocD noExtField)   group_ ++

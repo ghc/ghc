@@ -388,7 +388,6 @@ processGrp grp = concatM
       [ toHie $ fmap (RS ModuleScope ) hs_valds grp
       , toHie $ hs_splcds grp
       , toHie $ hs_tyclds grp
-      , toHie $ hs_derivds grp
       , toHie $ hs_fixds grp
       , toHie $ hs_defds grp
       , toHie $ hs_fords grp
@@ -1463,12 +1462,14 @@ instance ToHie (TyClGroup GhcRn) where
   toHie TyClGroup{ group_tyclds = classes
                  , group_roles  = roles
                  , group_kisigs = sigs
-                 , group_instds = instances } =
+                 , group_instds = instances
+                 , group_derivds = derivs } =
     concatM
     [ toHie classes
     , toHie sigs
     , toHie roles
     , toHie instances
+    , toHie derivs
     ]
 
 instance ToHie (LocatedA (TyClDecl GhcRn)) where

@@ -691,7 +691,6 @@ tcRnHsBootDecls boot_or_sig decls
 
                 -- Rename the declarations
         ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
-                            , hs_derivds = deriv_decls
                             , hs_fords  = for_decls
                             , hs_defds  = def_decls
                             , hs_ruleds = rule_decls
@@ -714,7 +713,7 @@ tcRnHsBootDecls boot_or_sig decls
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds, _th_bndrs)
-             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
+             <- tcTyClsInstDecls tycl_decls (tyClGroupDerivDecls tycl_decls) val_binds
         ; setGblEnv tcg_env     $ do {
 
         -- Emit Typeable bindings
@@ -1604,7 +1603,6 @@ rnTopSrcDecls group
 
 tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
-                         hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
                          hs_annds  = annotation_decls,
@@ -1620,7 +1618,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, th_bndrs,
          XValBindsLR (NValBinds deriv_binds deriv_sigs))
-            <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
+            <- tcTyClsInstDecls tycl_decls (tyClGroupDerivDecls tycl_decls) val_binds ;
 
         updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {

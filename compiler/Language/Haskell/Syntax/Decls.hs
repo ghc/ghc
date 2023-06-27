@@ -36,8 +36,8 @@ module Language.Haskell.Syntax.Decls (
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl,
   TyClGroup(..),
-  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
-  tyClGroupKindSigs,
+  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupDerivDecls,
+  tyClGroupRoleDecls, tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
@@ -85,7 +85,7 @@ module Language.Haskell.Syntax.Decls (
   FamilyResultSig(..), LFamilyResultSig, InjectivityAnn(..), LInjectivityAnn,
 
   -- * Grouping
-  HsGroup(..), hsGroupInstDecls,
+  HsGroup(..), hsGroupInstDecls, hsGroupDerivDecls
     ) where
 
 -- friends:
@@ -217,11 +217,9 @@ data HsGroup p
 
         hs_tyclds :: [TyClGroup p],
                 -- A list of mutually-recursive groups;
-                -- This includes `InstDecl`s as well;
+                -- This includes `InstDecl`s and `DerivDecl`s as well;
                 -- Parser generates a singleton list;
                 -- renamer does dependency analysis
-
-        hs_derivds :: [LDerivDecl p],
 
         hs_fixds  :: [LFixitySig p],
                 -- A list of fixity signatures defined for top-level
@@ -242,6 +240,9 @@ data HsGroup p
 
 hsGroupInstDecls :: HsGroup id -> [LInstDecl id]
 hsGroupInstDecls = (=<<) group_instds . hs_tyclds
+
+hsGroupDerivDecls :: HsGroup id -> [LDerivDecl id]
+hsGroupDerivDecls = (=<<) group_derivds . hs_tyclds
 
 -- | Located Splice Declaration
 type LSpliceDecl pass = XRec pass (SpliceDecl pass)
@@ -686,8 +687,8 @@ Invariants
  * The role annotations, group_roles, are role-annotations for some or
    all of the types and classes in group_tyclds (only).
 
- * The instance declarations, group_instds, may (and usually will)
-   depend on group_tyclds, or on earlier TyClGroups, but not on later
+ * The instance declarations, group_instds and group_derivds, may (and usually
+   will) depend on group_tyclds, or on earlier TyClGroups, but not on later
    ones.
 
 See Note [Dependency analysis of type, class, and instance decls]
@@ -696,11 +697,12 @@ in GHC.Rename.Module for more info.
 
 -- | Type or Class Group
 data TyClGroup pass  -- See Note [TyClGroups and dependency analysis]
-  = TyClGroup { group_ext    :: XCTyClGroup pass
-              , group_tyclds :: [LTyClDecl pass]
-              , group_roles  :: [LRoleAnnotDecl pass]
-              , group_kisigs :: [LStandaloneKindSig pass]
-              , group_instds :: [LInstDecl pass] }
+  = TyClGroup { group_ext     :: XCTyClGroup pass
+              , group_tyclds  :: [LTyClDecl pass]
+              , group_roles   :: [LRoleAnnotDecl pass]
+              , group_kisigs  :: [LStandaloneKindSig pass]
+              , group_instds  :: [LInstDecl pass]
+              , group_derivds :: [LDerivDecl pass] }
   | XTyClGroup !(XXTyClGroup pass)
 
 
@@ -709,6 +711,9 @@ tyClGroupTyClDecls = Data.List.concatMap group_tyclds
 
 tyClGroupInstDecls :: [TyClGroup pass] -> [LInstDecl pass]
 tyClGroupInstDecls = Data.List.concatMap group_instds
+
+tyClGroupDerivDecls :: [TyClGroup pass] -> [LDerivDecl pass]
+tyClGroupDerivDecls = Data.List.concatMap group_derivds
 
 tyClGroupRoleDecls :: [TyClGroup pass] -> [LRoleAnnotDecl pass]
 tyClGroupRoleDecls = Data.List.concatMap group_roles

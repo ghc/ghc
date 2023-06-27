@@ -30,8 +30,8 @@ module GHC.Hs.Decls (
   -- ** Class or type declarations
   TyClDecl(..), LTyClDecl, DataDeclRn(..),
   TyClGroup(..),
-  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupRoleDecls,
-  tyClGroupKindSigs,
+  tyClGroupTyClDecls, tyClGroupInstDecls, tyClGroupDerivDecls,
+  tyClGroupRoleDecls, tyClGroupKindSigs,
   isClassDecl, isDataDecl, isSynDecl, tcdName,
   isFamilyDecl, isTypeFamilyDecl, isDataFamilyDecl,
   isOpenTypeFamilyInfo, isClosedTypeFamilyInfo,
@@ -91,7 +91,8 @@ module GHC.Hs.Decls (
   resultVariableName, familyDeclLName, familyDeclName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
+  hsGroupInstDecls, hsGroupDerivDecls,
   hsGroupTopLevelFixitySigs,
 
   partitionBindsAndSigs,
@@ -202,7 +203,6 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_tyclds = [],
-                       hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
@@ -228,7 +228,6 @@ appendGroups
         hs_valds  = val_groups1,
         hs_splcds = spliceds1,
         hs_tyclds = tyclds1,
-        hs_derivds = derivds1,
         hs_fixds  = fixds1,
         hs_defds  = defds1,
         hs_annds  = annds1,
@@ -240,7 +239,6 @@ appendGroups
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
         hs_tyclds = tyclds2,
-        hs_derivds = derivds2,
         hs_fixds  = fixds2,
         hs_defds  = defds2,
         hs_annds  = annds2,
@@ -254,7 +252,6 @@ appendGroups
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
         hs_splcds = spliceds1 ++ spliceds2,
         hs_tyclds = tyclds1 ++ tyclds2,
-        hs_derivds = derivds1 ++ derivds2,
         hs_fixds  = fixds1 ++ fixds2,
         hs_annds  = annds1 ++ annds2,
         hs_defds  = defds1 ++ defds2,
@@ -282,7 +279,6 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
 instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
-                   hs_derivds = deriv_decls,
                    hs_fixds  = fix_decls,
                    hs_warnds = deprec_decls,
                    hs_annds  = ann_decls,
@@ -296,11 +292,11 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
-             ppr_ds (tyClGroupRoleDecls tycl_decls),
-             ppr_ds (tyClGroupKindSigs  tycl_decls),
-             ppr_ds (tyClGroupTyClDecls tycl_decls),
-             ppr_ds (tyClGroupInstDecls tycl_decls),
-             ppr_ds deriv_decls,
+             ppr_ds (tyClGroupRoleDecls  tycl_decls),
+             ppr_ds (tyClGroupKindSigs   tycl_decls),
+             ppr_ds (tyClGroupTyClDecls  tycl_decls),
+             ppr_ds (tyClGroupInstDecls  tycl_decls),
+             ppr_ds (tyClGroupDerivDecls tycl_decls),
              ppr_ds foreign_decls]
         where
           ppr_ds :: Outputable a => [a] -> Maybe SDoc
@@ -467,13 +463,15 @@ instance OutputableBndrId p
                  , group_roles = roles
                  , group_kisigs = kisigs
                  , group_instds = instds
+                 , group_derivds = derivds
                  }
       )
     = hang (text "TyClGroup") 2 $
       ppr kisigs $$
       ppr tyclds $$
       ppr roles $$
-      ppr instds
+      ppr instds $$
+      ppr derivds
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => XRec (GhcPass p) (IdP (GhcPass p))

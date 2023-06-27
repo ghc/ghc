@@ -276,7 +276,6 @@ repTopDs :: HsGroup GhcRn -> MetaM (Core (M [TH.Dec]))
 repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_splcds  = splcds
                         , hs_tyclds  = tyclds
-                        , hs_derivds = derivds
                         , hs_fixds   = fixds
                         , hs_defds   = defds
                         , hs_fords   = fords
@@ -287,7 +286,8 @@ repTopDs group@(HsGroup { hs_valds   = valds
  = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
                        ++ map foExt (hsPatSynSelectors valds)
-            ; instds = tyclds >>= group_instds } ;
+            ; instds = tyclds >>= group_instds
+            ; derivds = tyclds >>= group_derivds } ;
         ss <- mkGenSyms bndrs ;
 
         -- Bind all the names mainly to avoid repeated use of explicit strings.
