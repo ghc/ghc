@@ -14,6 +14,7 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- For the HasLoc instances
 
 {-
 Main functions for .hie file generation
@@ -541,43 +542,26 @@ bax (x :: a) = ... -- a is in scope here
 This case in handled in the instance for HsPatSigType
 -}
 
-class HasLoc a where
-  -- ^ conveniently calculate locations for things without locations attached
-  loc :: a -> SrcSpan
-
 instance HasLoc thing => HasLoc (PScoped thing) where
-  loc (PS _ _ _ a) = loc a
-
-instance HasLoc (Located a) where
-  loc (L l _) = l
-
-instance HasLoc (LocatedA a) where
-  loc (L la _) = locA la
-
-instance HasLoc (LocatedN a) where
-  loc (L la _) = locA la
-
-instance HasLoc a => HasLoc [a] where
-  loc [] = noSrcSpan
-  loc xs = foldl1' combineSrcSpans $ map loc xs
+  getHasLoc (PS _ _ _ a) = getHasLoc a
 
 instance HasLoc a => HasLoc (DataDefnCons a) where
-  loc = loc . toList
+  getHasLoc = getHasLocList . toList
 
 instance (HasLoc a, HiePass p) => HasLoc (FamEqn (GhcPass p) a) where
-  loc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
+  getHasLoc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
     HsOuterImplicit{} ->
-      foldl1' combineSrcSpans [loc a, loc b, loc c]
+      foldl1' combineSrcSpans [getHasLoc a, getHasLocList b, getHasLoc c]
     HsOuterExplicit{hso_bndrs = tvs} ->
-      foldl1' combineSrcSpans [loc a, loc tvs, loc b, loc c]
+      foldl1' combineSrcSpans [getHasLoc a, getHasLocList tvs, getHasLocList b, getHasLoc c]
 
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg p tm ty) where
-  loc (HsValArg tm) = loc tm
-  loc (HsTypeArg _ ty) = loc ty
-  loc (HsArgPar sp)  = sp
+  getHasLoc (HsValArg tm) = getHasLoc tm
+  getHasLoc (HsTypeArg _ ty) = getHasLoc ty
+  getHasLoc (HsArgPar sp)  = sp
 
 instance HasLoc (HsDataDefn GhcRn) where
-  loc def@(HsDataDefn{}) = loc $ dd_cons def
+  getHasLoc def@(HsDataDefn{}) = getHasLoc $ dd_cons def
     -- Only used for data family instances, so we only need rhs
     -- Most probably the rest will be unhelpful anyway
 
@@ -1370,7 +1354,7 @@ instance ( ToHie (RFContext label)
          ) => ToHie (RContext (LocatedA (HsFieldBind label arg))) where
   toHie (RC c (L span recfld)) = concatM $ makeNode recfld (locA span) : case recfld of
     HsFieldBind _ label expr _ ->
-      [ toHie $ RFC c (getRealSpan $ loc expr) label
+      [ toHie $ RFC c (getRealSpan $ getHasLoc expr) label
       , toHie expr
       ]
 
@@ -1514,7 +1498,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         where
           context_scope = mkLScopeA $ fromMaybe (noLocA []) context
           rhs_scope = foldl1' combineScopes $ map mkScope
-            [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
+            [ getHasLocList deps, getHasLocList sigs, getHasLocList (bagToList meths), getHasLocList typs, getHasLocList deftyps]
 
 instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
@@ -1567,14 +1551,14 @@ instance ToHie (TScoped (FamEqn GhcRn (LocatedA (HsType GhcRn)))) where
 instance (ToHie rhs, HasLoc rhs)
     => ToHie (FamEqn GhcRn rhs) where
   toHie fe@(FamEqn _ var outer_bndrs pats _ rhs) = concatM $
-    [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
+    [ toHie $ C (Decl InstDec $ getRealSpan $ getHasLoc fe) var
     , toHie $ TVS (ResolvedScopes []) scope outer_bndrs
     , toHie pats
     , toHie rhs
     ]
     where scope = combineScopes patsScope rhsScope
-          patsScope = mkScope (loc pats)
-          rhsScope = mkScope (loc rhs)
+          patsScope = mkScope (getHasLocList pats)
+          rhsScope = mkScope (getHasLoc rhs)
 
 instance ToHie (LocatedAn NoEpAnns (InjectivityAnn GhcRn)) where
   toHie (L span ann) = concatM $ makeNodeA ann span : case ann of
@@ -1677,14 +1661,14 @@ instance ToHie (TScoped (HsWildCardBndrs GhcRn (LocatedA (HsSigType GhcRn)))) wh
       [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
       , toHie $ TS sc a
       ]
-    where span = loc a
+    where span = getHasLoc a
 
 instance ToHie (TScoped (HsWildCardBndrs GhcRn (LocatedA (HsType GhcRn)))) where
   toHie (TS sc (HsWC names a)) = concatM $
       [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) names
       , toHie a
       ]
-    where span = loc a
+    where span = getHasLoc a
 
 instance ToHie (LocatedA (StandaloneKindSig GhcRn)) where
   toHie (L sp sig) = concatM [makeNodeA sig sp, toHie sig]
@@ -1855,7 +1839,7 @@ instance ToHie (TScoped (LHsQTyVars GhcRn)) where
     , toHie $ tvScopes sc NoScope vars
     ]
     where
-      varLoc = loc vars
+      varLoc = getHasLocList vars
       bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
 
 instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
@@ -1867,7 +1851,7 @@ instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
 instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
       ConDeclField _ fields typ doc ->
-        [ toHie $ map (RFC RecFieldDecl (getRealSpan $ loc typ)) fields
+        [ toHie $ map (RFC RecFieldDecl (getRealSpan $ getHasLoc typ)) fields
         , toHie typ
         , toHie doc
         ]
