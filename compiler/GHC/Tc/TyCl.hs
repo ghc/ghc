@@ -53,7 +53,7 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
-import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
+import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1, tcInstDeclsDeriv )
 import GHC.Tc.Deriv (DerivInfo(..))
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
@@ -158,42 +158,44 @@ tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
                                             -- classes
                                             -- and their implicit Ids,DataCons
                          , [InstInfo GhcRn] -- Source-code instance decls info
-                         , [DerivInfo]      -- Deriving info
                          , ThBindEnv        -- TH binding levels
+                         , HsValBinds GhcRn -- Supporting bindings for derived
+                                            -- instances
                          )
 -- Fails if there are any errors
 tcTyAndClassDecls tyclds_s
   -- The code recovers internally, but if anything gave rise to
   -- an error we'd better stop now, to avoid a cascade
   -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
+  = checkNoErrs $ fold_env [] emptyNameEnv emptyValBindsOut tyclds_s
   where
     fold_env :: [InstInfo GhcRn]
-             -> [DerivInfo]
              -> ThBindEnv
+             -> HsValBinds GhcRn
              -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
-    fold_env inst_info deriv_info th_bndrs []
+             -> TcM (TcGblEnv, [InstInfo GhcRn], ThBindEnv, HsValBinds GhcRn)
+    fold_env inst_info th_bndrs val_binds []
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info, th_bndrs) }
-    fold_env inst_info deriv_info th_bndrs (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info', th_bndrs')
+           ; return (gbl_env, inst_info, th_bndrs, val_binds) }
+    fold_env inst_info th_bndrs val_binds (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', th_bndrs', val_binds')
                <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
              fold_env (inst_info' ++ inst_info)
-                      (deriv_info' ++ deriv_info)
                       (th_bndrs' `plusNameEnv` th_bndrs)
+                      (val_binds' `plusHsValBinds` val_binds)
                       tyclds_s }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+            -> TcM (TcGblEnv, [InstInfo GhcRn], ThBindEnv, HsValBinds GhcRn)
 -- Typecheck one strongly-connected component of type, class, and instance decls
 -- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
-tcTyClGroup (TyClGroup { group_tyclds = tyclds
-                       , group_roles  = roles
-                       , group_kisigs = kisigs
-                       , group_instds = instds })
+tcTyClGroup (TyClGroup { group_tyclds  = tyclds
+                       , group_roles   = roles
+                       , group_kisigs  = kisigs
+                       , group_instds  = instds
+                       , group_derivds = derivds})
   = do { let role_annots = mkRoleAnnotEnv roles
 
            -- Step 1: Typecheck the standalone kind signatures and type/class declarations
@@ -235,8 +237,14 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info,
-                 th_bndrs' `plusNameEnv` th_bndrs) }
+
+           -- Step 5: check deriving declarations
+       ; (gbl_env''', inst_info', val_binds) <-
+           setGblEnv gbl_env'' $
+           tcInstDeclsDeriv deriv_info derivds
+
+       ; return (gbl_env''', inst_info' ++ inst_info,
+                 th_bndrs' `plusNameEnv` th_bndrs, val_binds) }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind
