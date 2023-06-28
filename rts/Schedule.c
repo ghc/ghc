@@ -1143,9 +1143,11 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
             barf("allocation of %ld bytes too large (GHC should have complained at compile-time)", (long)cap->r.rHpAlloc);
         }
 
+#if defined(DEBUG)
         debugTrace(DEBUG_sched,
                    "--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n",
                    (long)t->id, what_next_strs[t->what_next], blocks);
+#endif
 
         // don't do this if the nursery is (nearly) full, we'll GC first.
         if (cap->r.rCurrentNursery->link != NULL ||
@@ -1214,9 +1216,11 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
     // Shortcut if we're just switching evaluators: just run the thread.  See
     // Note [avoiding threadPaused] in Interpreter.c.
     if (t->what_next != prev_what_next) {
+#if defined(DEBUG)
         debugTrace(DEBUG_sched,
                    "--<< thread %ld (%s) stopped to switch evaluators",
                    (long)t->id, what_next_strs[t->what_next]);
+#endif
         return true;
     }
 
@@ -1785,7 +1789,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
                 }
             }
         }
-        debugTrace(DEBUG_sched, "%d idle caps", n_idle_caps);
+        debugTrace(DEBUG_sched, "%d idle caps, %d failed grabs", n_idle_caps, n_failed_trygrab_idles);
 
         for (i=0; i < n_capabilities; i++) {
             NONATOMIC_ADD(&getCapability(i)->idle, 1);
@@ -2621,7 +2625,6 @@ void
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 {
     Task *task;
-    DEBUG_ONLY( StgThreadID id );
     Capability *cap;
 
     cap = *pcap;
@@ -2640,8 +2643,9 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 
     appendToRunQueue(cap,tso);
 
-    DEBUG_ONLY( id = tso->id );
-    debugTrace(DEBUG_sched, "new bound thread (%" FMT_StgThreadID ")", id);
+    DEBUG_ONLY(
+        debugTrace(DEBUG_sched, "new bound thread (%" FMT_StgThreadID ")", (StgThreadID) tso->id);
+    );
 
     // As the TSO is bound and on the run queue, schedule() will run the TSO.
     cap = schedule(cap,task);
@@ -2649,7 +2653,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
     ASSERT(task->incall->rstat != NoStatus);
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    debugTrace(DEBUG_sched, "bound thread (%" FMT_StgThreadID ") finished", id);
+    debugTrace(DEBUG_sched, "bound thread (%" FMT_StgThreadID ") finished", (StgThreadID) tso->id);
     *pcap = cap;
 }
 
