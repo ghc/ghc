@@ -18,9 +18,8 @@ import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
-import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
+import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap, Opt_InfoTableMapStackFrame), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.Session (gopt, targetPlatform)
-import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Config.Cmm
 import GHC.Prelude
@@ -213,7 +212,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
     collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
     collect platform acc cmmGroupSRTs = do
       let labelsToInfoTables = collectInfoTables cmmGroupSRTs
-          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i,lookupEstimatedTick platform cmmGroupSRTs l i)) labelsToInfoTables
+          labelsToInfoTablesToTickishes = mapMaybe (\(l, i) -> (l, i,) <$> lookupEstimatedTick platform cmmGroupSRTs l i) labelsToInfoTables
       return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
 
     collectNothing :: [a] -> CmmGroupSRTs -> IO ([a], CmmGroupSRTs)
@@ -226,7 +225,7 @@ generateCgIPEStub hsc_env this_mod denv s = do
     extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
     extractInfoTables _ = Nothing
 
-    lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe IpeSourceLocation
+    lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe (Maybe IpeSourceLocation)
     lookupEstimatedTick platform cmmGroup infoTableLabel infoTable = do
       -- All return frame info tables are stack represented, though not all stack represented info
       -- tables have to be return frames.
@@ -237,8 +236,10 @@ generateCgIPEStub hsc_env this_mod denv s = do
                   then findCmmTickishWithTNTC infoTableLabel
                   else findCmmTickishSansTNTC (cit_lbl infoTable)
               blocks = concatMap toBlockList (graphs cmmGroup)
-          firstJusts $ map findFun blocks
-        else Nothing
+          if gopt Opt_InfoTableMapStackFrame (hsc_dflags hsc_env)
+            then Just (firstJusts $ map findFun blocks)
+            else Nothing
+        else Just Nothing
     graphs :: CmmGroupSRTs -> [CmmGraph]
     graphs = foldl' go []
       where

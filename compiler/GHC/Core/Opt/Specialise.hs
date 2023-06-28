@@ -1495,7 +1495,8 @@ specBind top_lvl env (NonRec fn rhs) do_body
              -- Destroying demand info is not terrible; specialisation is
              -- always followed soon by demand analysis.
 
-             body_env2 = body_env1 `extendInScope` fn3
+             body_env2 = body_env1  `bringFloatedDictsIntoScope` (ud_binds rhs_uds)
+                                    `extendInScope` fn3
 
        ; (body', body_uds) <- do_body body_env2
 

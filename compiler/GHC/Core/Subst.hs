@@ -185,7 +185,7 @@ extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var r
 
 -- | Find the substitution for an 'Id' in the 'Subst'
 -- The Id should not be a CoVar
-lookupIdSubst :: HasDebugCallStack => Subst -> Id -> CoreExpr
+lookupIdSubst :: HasCallStack => Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids _ _) v
   | assertPpr (isId v && not (isCoVar v)) (ppr v)
     not (isLocalId v)                   = Var v
