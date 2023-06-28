@@ -39,7 +39,7 @@
 #endif
 #endif
 
-#include "ffi.h"
+#include "rts/ghc_ffi.h"
 
 /* --------------------------------------------------------------------------
  * The bytecode interpreter
