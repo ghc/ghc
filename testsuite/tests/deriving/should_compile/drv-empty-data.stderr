@@ -33,14 +33,17 @@ Derived class instances:
   instance Data.Traversable.Traversable DrvEmptyData.Void where
     Data.Traversable.traverse _ z = GHC.Base.pure (case z of {})
   
-  instance GHC.Generics.Generic (DrvEmptyData.Void a) where
-    GHC.Generics.from x = GHC.Generics.M1 (case x of x -> case x of {})
-    GHC.Generics.to (GHC.Generics.M1 x) = case x of x -> case x of {}
+  instance GHC.Generics.Internal.Generic (DrvEmptyData.Void a) where
+    GHC.Generics.Internal.from x
+      = GHC.Generics.Internal.M1 (case x of x -> case x of {})
+    GHC.Generics.Internal.to (GHC.Generics.Internal.M1 x)
+      = case x of x -> case x of {}
   
-  instance GHC.Generics.Generic1 DrvEmptyData.Void where
-    GHC.Generics.from1 x
-      = GHC.Generics.M1 (case x of x -> case x of {})
-    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of x -> case x of {}
+  instance GHC.Generics.Internal.Generic1 DrvEmptyData.Void where
+    GHC.Generics.Internal.from1 x
+      = GHC.Generics.Internal.M1 (case x of x -> case x of {})
+    GHC.Generics.Internal.to1 (GHC.Generics.Internal.M1 x)
+      = case x of x -> case x of {}
   
   instance Language.Haskell.TH.Syntax.Lift
              (DrvEmptyData.Void a) where
@@ -53,14 +56,16 @@ Derived class instances:
   $tVoid = Data.Data.mkDataType "DrvEmptyData.Void" []
 
 Derived type family instances:
-  type GHC.Generics.Rep (DrvEmptyData.Void a) = GHC.Generics.D1
-                                                  ('GHC.Generics.MetaData
-                                                     "Void" "DrvEmptyData" "main" 'GHC.Types.False)
-                                                  GHC.Generics.V1
-  type GHC.Generics.Rep1 DrvEmptyData.Void = GHC.Generics.D1
-                                               ('GHC.Generics.MetaData
-                                                  "Void" "DrvEmptyData" "main" 'GHC.Types.False)
-                                               GHC.Generics.V1
+  type GHC.Generics.Internal.Rep
+         (DrvEmptyData.Void a) = GHC.Generics.Internal.D1
+                                   ('GHC.Generics.Internal.MetaData
+                                      "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                                   GHC.Generics.Internal.V1
+  type GHC.Generics.Internal.Rep1
+         DrvEmptyData.Void = GHC.Generics.Internal.D1
+                               ('GHC.Generics.Internal.MetaData
+                                  "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                               GHC.Generics.Internal.V1
 
 
 

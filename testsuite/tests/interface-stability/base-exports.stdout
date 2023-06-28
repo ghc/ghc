@@ -10729,7 +10729,7 @@ instance Control.Monad.Fix.MonadFix Data.Monoid.Last -- Defined in ‘Control.Mo
 instance Control.Monad.Fix.MonadFix [] -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Maybe.Maybe -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Base.NonEmpty -- Defined in ‘Control.Monad.Fix’
-instance Control.Monad.Fix.MonadFix GHC.Generics.Par1 -- Defined in ‘Control.Monad.Fix’
+instance Control.Monad.Fix.MonadFix base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Fix’
 instance forall s. Control.Monad.Fix.MonadFix (GHC.ST.ST s) -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix Solo -- Defined in ‘Control.Monad.Fix’
@@ -10750,7 +10750,7 @@ instance [safe] Control.Monad.Zip.MonadZip Data.Monoid.Last -- Defined in ‘Con
 instance [safe] Control.Monad.Zip.MonadZip [] -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Maybe.Maybe -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Base.NonEmpty -- Defined in ‘Control.Monad.Zip’
-instance [safe] Control.Monad.Zip.MonadZip GHC.Generics.Par1 -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip Solo -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Zip’
@@ -10792,18 +10792,18 @@ instance forall i j (a :: i) (b :: j). (base-4.18.0.0:Data.Typeable.Internal.Typ
 instance Data.Data.Data base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘Data.Data’
 instance Data.Data.Data base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b, GHC.Ix.Ix a) => Data.Data.Data (GHC.Arr.Array a b) -- Defined in ‘Data.Data’
-instance Data.Data.Data GHC.Generics.Associativity -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Bool -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Char -- Defined in ‘Data.Data’
 instance forall k a (b :: k). (base-4.18.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data a, base-4.18.0.0:Data.Typeable.Internal.Typeable b) => Data.Data.Data (Data.Functor.Const.Const a b) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Data.Data’
-instance Data.Data.Data GHC.Generics.DecidedStrictness -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Double -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Ord.Down a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b) => Data.Data.Data (Data.Either.Either a b) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Monoid.First a) -- Defined in ‘Data.Data’
-instance Data.Data.Data GHC.Generics.Fixity -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Float -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (GHC.ForeignPtr.ForeignPtr a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Data’
@@ -10820,13 +10820,13 @@ instance forall a. Data.Data.Data a => Data.Data.Data (GHC.Maybe.Maybe a) -- Def
 instance Data.Data.Data GHC.Num.Natural.Natural -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (GHC.Base.NonEmpty a) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Ordering -- Defined in ‘Data.Data’
-instance forall p. Data.Data.Data p => Data.Data.Data (GHC.Generics.Par1 p) -- Defined in ‘Data.Data’
+instance forall p. Data.Data.Data p => Data.Data.Data (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (GHC.Ptr.Ptr a) -- Defined in ‘Data.Data’
 instance forall a. (Data.Data.Data a, GHC.Real.Integral a) => Data.Data.Data (GHC.Real.Ratio a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Solo a) -- Defined in ‘Data.Data’
-instance Data.Data.Data GHC.Generics.SourceStrictness -- Defined in ‘Data.Data’
-instance Data.Data.Data GHC.Generics.SourceUnpackedness -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b) => Data.Data.Data (a, b) -- Defined in ‘Data.Data’
 instance forall a b c. (Data.Data.Data a, Data.Data.Data b, Data.Data.Data c) => Data.Data.Data (a, b, c) -- Defined in ‘Data.Data’
@@ -10868,7 +10868,7 @@ instance Data.Foldable.Foldable Data.Monoid.Last -- Defined in ‘Data.Foldable�
 instance Data.Foldable.Foldable [] -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable GHC.Maybe.Maybe -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable GHC.Base.NonEmpty -- Defined in ‘Data.Foldable’
-instance Data.Foldable.Foldable GHC.Generics.Par1 -- Defined in ‘Data.Foldable’
+instance Data.Foldable.Foldable base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Solo -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable’
@@ -10889,7 +10889,7 @@ instance Data.Foldable1.Foldable1 Data.Semigroup.Last -- Defined in ‘Data.Fold
 instance Data.Foldable1.Foldable1 Data.Semigroup.Max -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Semigroup.Min -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Base.NonEmpty -- Defined in ‘Data.Foldable1’
-instance Data.Foldable1.Foldable1 GHC.Generics.Par1 -- Defined in ‘Data.Foldable1’
+instance Data.Foldable1.Foldable1 base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Solo -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable1’
@@ -10970,7 +10970,7 @@ instance Data.Traversable.Traversable Data.Monoid.Last -- Defined in ‘Data.Tra
 instance Data.Traversable.Traversable [] -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable GHC.Maybe.Maybe -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable GHC.Base.NonEmpty -- Defined in ‘Data.Traversable’
-instance Data.Traversable.Traversable GHC.Generics.Par1 -- Defined in ‘Data.Traversable’
+instance Data.Traversable.Traversable base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Solo -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Traversable’
@@ -11065,7 +11065,7 @@ instance GHC.Base.Applicative Data.Semigroup.Last -- Defined in ‘Data.Semigrou
 instance GHC.Base.Applicative Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Applicative Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Applicative GHC.GHCi.NoIO -- Defined in ‘GHC.GHCi’
-instance GHC.Base.Applicative GHC.Generics.Par1 -- Defined in ‘GHC.Generics’
+instance GHC.Base.Applicative base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Base.Applicative Text.ParserCombinators.ReadP.P -- Defined in ‘Text.ParserCombinators.ReadP’
 instance GHC.Base.Applicative Text.ParserCombinators.ReadP.ReadP -- Defined in ‘Text.ParserCombinators.ReadP’
 instance GHC.Base.Applicative Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘Text.ParserCombinators.ReadPrec’
@@ -11105,7 +11105,7 @@ instance GHC.Base.Functor Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Functor Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance forall i. GHC.Base.Functor (GHC.Arr.Array i) -- Defined in ‘GHC.Arr’
 instance GHC.Base.Functor GHC.GHCi.NoIO -- Defined in ‘GHC.GHCi’
-instance GHC.Base.Functor GHC.Generics.Par1 -- Defined in ‘GHC.Generics’
+instance GHC.Base.Functor base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Base.Functor Text.ParserCombinators.ReadP.P -- Defined in ‘Text.ParserCombinators.ReadP’
 instance GHC.Base.Functor Text.ParserCombinators.ReadP.ReadP -- Defined in ‘Text.ParserCombinators.ReadP’
 instance [safe] GHC.Base.Functor System.Console.GetOpt.ArgDescr -- Defined in ‘System.Console.GetOpt’
@@ -11140,7 +11140,7 @@ instance GHC.Base.Monad Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Monad Data.Semigroup.Max -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Monad Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Monad GHC.GHCi.NoIO -- Defined in ‘GHC.GHCi’
-instance GHC.Base.Monad GHC.Generics.Par1 -- Defined in ‘GHC.Generics’
+instance GHC.Base.Monad base-4.18.0.0:GHC.Generics.Internal.Par1 -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Base.Monad Text.ParserCombinators.ReadP.P -- Defined in ‘Text.ParserCombinators.ReadP’
 instance GHC.Base.Monad Text.ParserCombinators.ReadP.ReadP -- Defined in ‘Text.ParserCombinators.ReadP’
 instance GHC.Base.Monad Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘Text.ParserCombinators.ReadPrec’
@@ -11194,14 +11194,14 @@ instance forall m. GHC.Base.Monoid m => GHC.Base.Monoid (Data.Semigroup.WrappedM
 instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Monoid (f p), GHC.Base.Monoid (g p)) => GHC.Base.Monoid ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Monoid (f (g p)) => GHC.Base.Monoid ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance forall a. (GHC.Generics.Generic a, GHC.Base.Monoid (GHC.Generics.Rep a ())) => GHC.Base.Monoid (GHC.Generics.Generically a) -- Defined in ‘GHC.Generics’
-instance forall k c i (p :: k). GHC.Base.Monoid c => GHC.Base.Monoid (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k) i (c :: GHC.Generics.Meta). GHC.Base.Monoid (f p) => GHC.Base.Monoid (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Base.Monoid p => GHC.Base.Monoid (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Base.Monoid (f p) => GHC.Base.Monoid (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Base.Monoid (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Monoid (f p), GHC.Base.Monoid (g p)) => GHC.Base.Monoid ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Monoid (f (g p)) => GHC.Base.Monoid ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall a. (base-4.18.0.0:GHC.Generics.Internal.Generic a, GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.Rep a ())) => GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.Generically a) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k c i (p :: k). GHC.Base.Monoid c => GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k) i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta). GHC.Base.Monoid (f p) => GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Base.Monoid p => GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Base.Monoid (f p) => GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Base.Monoid (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (GHC.Types.IO a) -- Defined in ‘GHC.Base’
 instance forall a. GHC.Base.Semigroup [a] -- Defined in ‘GHC.Base’
 instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (GHC.Maybe.Maybe a) -- Defined in ‘GHC.Base’
@@ -11251,15 +11251,15 @@ instance forall m. GHC.Base.Monoid m => GHC.Base.Semigroup (Data.Semigroup.Wrapp
 instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
 instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Semigroup (f p), GHC.Base.Semigroup (g p)) => GHC.Base.Semigroup ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Semigroup (f (g p)) => GHC.Base.Semigroup ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance forall a. (GHC.Generics.Generic a, GHC.Base.Semigroup (GHC.Generics.Rep a ())) => GHC.Base.Semigroup (GHC.Generics.Generically a) -- Defined in ‘GHC.Generics’
-instance forall k c i (p :: k). GHC.Base.Semigroup c => GHC.Base.Semigroup (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k) i (c :: GHC.Generics.Meta). GHC.Base.Semigroup (f p) => GHC.Base.Semigroup (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Base.Semigroup p => GHC.Base.Semigroup (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Base.Semigroup (f p) => GHC.Base.Semigroup (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Base.Semigroup (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Base.Semigroup (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Semigroup (f p), GHC.Base.Semigroup (g p)) => GHC.Base.Semigroup ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Semigroup (f (g p)) => GHC.Base.Semigroup ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall a. (base-4.18.0.0:GHC.Generics.Internal.Generic a, GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.Rep a ())) => GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.Generically a) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k c i (p :: k). GHC.Base.Semigroup c => GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k) i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta). GHC.Base.Semigroup (f p) => GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Base.Semigroup p => GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Base.Semigroup (f p) => GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Base.Semigroup (base-4.18.0.0:GHC.Generics.Internal.V1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance forall a k (b :: k). GHC.Bits.Bits a => GHC.Bits.Bits (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall a. GHC.Bits.Bits a => GHC.Bits.Bits (Data.Bits.And a) -- Defined in ‘Data.Bits’
 instance forall a. GHC.Bits.Bits a => GHC.Bits.Bits (Data.Bits.Iff a) -- Defined in ‘Data.Bits’
@@ -11360,10 +11360,10 @@ instance GHC.Enum.Bounded () -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.VecCount -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.VecElem -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Bounded GHC.Types.Word -- Defined in ‘GHC.Enum’
-instance GHC.Enum.Bounded GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Bounded GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Bounded GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Bounded GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
+instance GHC.Enum.Bounded base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Bounded base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Bounded base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Bounded base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance forall a k (b :: k). GHC.Enum.Enum a => GHC.Enum.Enum (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Data.Bits.And a) -- Defined in ‘Data.Bits’
 instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Data.Bits.Iff a) -- Defined in ‘Data.Bits’
@@ -11411,10 +11411,10 @@ instance GHC.Enum.Enum GHC.Types.VecElem -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Types.Word -- Defined in ‘GHC.Enum’
 instance GHC.Enum.Enum GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Enum.Enum GHC.Types.Float -- Defined in ‘GHC.Float’
-instance GHC.Enum.Enum GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Enum GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Enum GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Enum.Enum GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
+instance GHC.Enum.Enum base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Enum base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Enum base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Enum.Enum base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Enum.Enum GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
 instance GHC.Enum.Enum GHC.IO.IOMode.IOMode -- Defined in ‘GHC.IO.IOMode’
 instance GHC.Enum.Enum GHC.RTS.Flags.DoCostCentres -- Defined in ‘GHC.RTS.Flags’
@@ -11465,148 +11465,119 @@ instance GHC.Float.RealFloat GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Float.RealFloat GHC.Types.Float -- Defined in ‘GHC.Float’
 instance GHC.GHCi.GHCiSandboxIO GHC.Types.IO -- Defined in ‘GHC.GHCi’
 instance GHC.GHCi.GHCiSandboxIO GHC.GHCi.NoIO -- Defined in ‘GHC.GHCi’
-instance forall (n :: GHC.Types.Symbol) (f :: GHC.Generics.FixityI) (r :: GHC.Types.Bool). (GHC.TypeLits.KnownSymbol n, GHC.Generics.SingI f, GHC.Generics.SingI r) => GHC.Generics.Constructor (GHC.Generics.MetaCons n f r) -- Defined in ‘GHC.Generics’
-instance forall (n :: GHC.Types.Symbol) (m :: GHC.Types.Symbol) (p :: GHC.Types.Symbol) (nt :: GHC.Types.Bool). (GHC.TypeLits.KnownSymbol n, GHC.TypeLits.KnownSymbol m, GHC.TypeLits.KnownSymbol p, GHC.Generics.SingI nt) => GHC.Generics.Datatype (GHC.Generics.MetaData n m p nt) -- Defined in ‘GHC.Generics’
-instance forall (a :: * -> * -> *) b c. GHC.Generics.Generic (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
-instance forall (m :: * -> *) a. GHC.Generics.Generic (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
-instance forall a. GHC.Generics.Generic (Control.Applicative.ZipList a) -- Defined in ‘Control.Applicative’
-instance forall a k (b :: k). GHC.Generics.Generic (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
-instance forall (m :: * -> *) a b. GHC.Generics.Generic (Control.Arrow.Kleisli m a b) -- Defined in ‘Control.Arrow’
-instance GHC.Generics.Generic GHC.IO.Exception.ExitCode -- Defined in ‘GHC.IO.Exception’
-instance forall a. GHC.Generics.Generic (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
-instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). GHC.Generics.Generic (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
-instance forall a. GHC.Generics.Generic (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). GHC.Generics.Generic (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). GHC.Generics.Generic (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
-instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
-instance forall a. GHC.Generics.Generic (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
-instance forall a. GHC.Generics.Generic (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a b. GHC.Generics.Generic (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
-instance forall a. GHC.Generics.Generic (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
-instance forall a. GHC.Generics.Generic (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
-instance forall a. GHC.Generics.Generic (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
-instance forall a. GHC.Generics.Generic (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
-instance forall m. GHC.Generics.Generic (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
-instance [safe] GHC.Generics.Generic Data.Version.Version -- Defined in ‘Data.Version’
-instance [safe] GHC.Generics.Generic GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Generics.Generic ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). GHC.Generics.Generic ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Generics.Generic ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Types.Bool -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.Generic (Data.Ord.Down a) -- Defined in ‘GHC.Generics’
-instance forall a b. GHC.Generics.Generic (Data.Either.Either a b) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Generics’
-instance forall i c k (p :: k). GHC.Generics.Generic (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.Generic [a] -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *) (p :: k). GHC.Generics.Generic (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.Generic (GHC.Maybe.Maybe a) -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.Generic (GHC.Base.NonEmpty a) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Types.Ordering -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Generics.Generic (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (t :: k). GHC.Generics.Generic (Data.Proxy.Proxy t) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Generics.Generic (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.Generic (Solo a) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Stack.Types.SrcLoc -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j k. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j k l. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k, l) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j k l m. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j k l m n. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i j k l m n o. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -- Defined in ‘GHC.Generics’
-instance forall a b. GHC.Generics.Generic (a, b) -- Defined in ‘GHC.Generics’
-instance forall a b c. GHC.Generics.Generic (a, b, c) -- Defined in ‘GHC.Generics’
-instance forall a b c d. GHC.Generics.Generic (a, b, c, d) -- Defined in ‘GHC.Generics’
-instance forall a b c d e. GHC.Generics.Generic (a, b, c, d, e) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f. GHC.Generics.Generic (a, b, c, d, e, f) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g. GHC.Generics.Generic (a, b, c, d, e, f, g) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h. GHC.Generics.Generic (a, b, c, d, e, f, g, h) -- Defined in ‘GHC.Generics’
-instance forall a b c d e f g h i. GHC.Generics.Generic (a, b, c, d, e, f, g, h, i) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec (GHC.Ptr.Ptr ()) p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec GHC.Types.Char p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec GHC.Types.Double p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec GHC.Types.Float p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec GHC.Types.Int p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.URec GHC.Types.Word p) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic () -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Generics.Generic (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.Base.Void -- Defined in ‘GHC.Generics’
-instance GHC.Generics.Generic GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.DoCostCentres -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.RTSFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
-instance GHC.Generics.Generic GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
-instance GHC.Generics.Generic GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
-instance forall k a. GHC.Generics.Generic1 (Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Const’
-instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
-instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
-instance forall k (f :: k -> *). GHC.Generics.Generic1 (Data.Monoid.Ap f) -- Defined in ‘Data.Monoid’
-instance forall k (f :: k -> *). GHC.Generics.Generic1 (base-4.18.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:*: g) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:+: g) -- Defined in ‘GHC.Generics’
-instance forall k i c. GHC.Generics.Generic1 (GHC.Generics.K1 i c) -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *). GHC.Generics.Generic1 (GHC.Generics.M1 i c f) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 Data.Proxy.Proxy -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *). GHC.Generics.Generic1 (GHC.Generics.Rec1 f) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 GHC.Generics.U1 -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec (GHC.Ptr.Ptr ())) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec GHC.Types.Char) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec GHC.Types.Double) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec GHC.Types.Float) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec GHC.Types.Int) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 (GHC.Generics.URec GHC.Types.Word) -- Defined in ‘GHC.Generics’
-instance forall k. GHC.Generics.Generic1 GHC.Generics.V1 -- Defined in ‘GHC.Generics’
-instance forall (mn :: GHC.Maybe.Maybe GHC.Types.Symbol) (su :: GHC.Generics.SourceUnpackedness) (ss :: GHC.Generics.SourceStrictness) (ds :: GHC.Generics.DecidedStrictness). (GHC.Generics.SingI mn, GHC.Generics.SingI su, GHC.Generics.SingI ss, GHC.Generics.SingI ds) => GHC.Generics.Selector (GHC.Generics.MetaSel mn su ss ds) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.LeftAssociative -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.NotAssociative -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.RightAssociative -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Types.False -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Types.True -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.DecidedLazy -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.DecidedStrict -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.DecidedUnpack -- Defined in ‘GHC.Generics’
-instance forall (a :: GHC.Generics.Associativity) (n :: GHC.TypeNats.Nat). (GHC.Generics.SingI a, GHC.TypeNats.KnownNat n) => GHC.Generics.SingI (GHC.Generics.InfixI a n) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.PrefixI -- Defined in ‘GHC.Generics’
-instance forall a1 (a2 :: a1). GHC.Generics.SingI a2 => GHC.Generics.SingI (GHC.Maybe.Just a2) -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.SingI GHC.Maybe.Nothing -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.NoSourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.SourceLazy -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.SourceStrict -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.NoSourceUnpackedness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.SourceNoUnpack -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingI GHC.Generics.SourceUnpack -- Defined in ‘GHC.Generics’
-instance forall (a :: GHC.Types.Symbol). GHC.TypeLits.KnownSymbol a => GHC.Generics.SingI a -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Types.Bool -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Generics.FixityI -- Defined in ‘GHC.Generics’
-instance forall a. GHC.Generics.SingKind a => GHC.Generics.SingKind (GHC.Maybe.Maybe a) -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind GHC.Types.Symbol -- Defined in ‘GHC.Generics’
+instance forall (n :: GHC.Types.Symbol) (f :: base-4.18.0.0:GHC.Generics.Internal.FixityI) (r :: GHC.Types.Bool). (GHC.TypeLits.KnownSymbol n, base-4.18.0.0:GHC.Generics.Internal.SingI f, base-4.18.0.0:GHC.Generics.Internal.SingI r) => base-4.18.0.0:GHC.Generics.Internal.Constructor (base-4.18.0.0:GHC.Generics.Internal.MetaCons n f r) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall (n :: GHC.Types.Symbol) (m :: GHC.Types.Symbol) (p :: GHC.Types.Symbol) (nt :: GHC.Types.Bool). (GHC.TypeLits.KnownSymbol n, GHC.TypeLits.KnownSymbol m, GHC.TypeLits.KnownSymbol p, base-4.18.0.0:GHC.Generics.Internal.SingI nt) => base-4.18.0.0:GHC.Generics.Internal.Datatype (base-4.18.0.0:GHC.Generics.Internal.MetaData n m p nt) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall (a :: * -> * -> *) b c. base-4.18.0.0:GHC.Generics.Internal.Generic (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Control.Applicative’
+instance forall (m :: * -> *) a. base-4.18.0.0:GHC.Generics.Internal.Generic (Control.Applicative.WrappedMonad m a) -- Defined in ‘Control.Applicative’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Control.Applicative.ZipList a) -- Defined in ‘Control.Applicative’
+instance forall a k (b :: k). base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
+instance forall (m :: * -> *) a b. base-4.18.0.0:GHC.Generics.Internal.Generic (Control.Arrow.Kleisli m a b) -- Defined in ‘Control.Arrow’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.IO.Exception.ExitCode -- Defined in ‘GHC.IO.Exception’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
+instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Functor.Identity.Identity a) -- Defined in ‘Data.Functor.Identity’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
+instance forall k (f :: k -> *) (a :: k). base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall a b. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
+instance forall m. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
+instance [safe] base-4.18.0.0:GHC.Generics.Internal.Generic Data.Version.Version -- Defined in ‘Data.Version’
+instance [safe] base-4.18.0.0:GHC.Generics.Internal.Generic GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Types.Bool -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘GHC.Generics’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Ord.Down a) -- Defined in ‘GHC.Generics’
+instance forall a b. base-4.18.0.0:GHC.Generics.Internal.Generic (Data.Either.Either a b) -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Generics’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic [a] -- Defined in ‘GHC.Generics’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (GHC.Maybe.Maybe a) -- Defined in ‘GHC.Generics’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (GHC.Base.NonEmpty a) -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Types.Ordering -- Defined in ‘GHC.Generics’
+instance forall p. base-4.18.0.0:GHC.Generics.Internal.Generic (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘GHC.Generics’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.Generic (Solo a) -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Stack.Types.SrcLoc -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j k. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j, k) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j k l. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j, k, l) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j k l m. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j k l m n. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m, n) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i j k l m n o. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) -- Defined in ‘GHC.Generics’
+instance forall a b. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b) -- Defined in ‘GHC.Generics’
+instance forall a b c. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c) -- Defined in ‘GHC.Generics’
+instance forall a b c d. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d) -- Defined in ‘GHC.Generics’
+instance forall a b c d e. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h) -- Defined in ‘GHC.Generics’
+instance forall a b c d e f g h i. base-4.18.0.0:GHC.Generics.Internal.Generic (a, b, c, d, e, f, g, h, i) -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic () -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Base.Void -- Defined in ‘GHC.Generics’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.DebugFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.DoCostCentres -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.DoHeapProfile -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.DoTrace -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.GCFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.GiveGCStats -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.MiscFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.ParFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.ProfFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.RTSFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.TickyFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.RTS.Flags.TraceFlags -- Defined in ‘GHC.RTS.Flags’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Stats.GCDetails -- Defined in ‘GHC.Stats’
+instance base-4.18.0.0:GHC.Generics.Internal.Generic GHC.Stats.RTSStats -- Defined in ‘GHC.Stats’
+instance forall k a. base-4.18.0.0:GHC.Generics.Internal.Generic1 (Data.Functor.Const.Const a) -- Defined in ‘Data.Functor.Const’
+instance [safe] forall k (f :: k -> *) (g :: k -> *). base-4.18.0.0:GHC.Generics.Internal.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
+instance [safe] forall k (f :: k -> *) (g :: k -> *). base-4.18.0.0:GHC.Generics.Internal.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
+instance forall k (f :: k -> *). base-4.18.0.0:GHC.Generics.Internal.Generic1 (Data.Monoid.Ap f) -- Defined in ‘Data.Monoid’
+instance forall k (f :: k -> *). base-4.18.0.0:GHC.Generics.Internal.Generic1 (base-4.18.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall (mn :: GHC.Maybe.Maybe GHC.Types.Symbol) (su :: base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness) (ss :: base-4.18.0.0:GHC.Generics.Internal.SourceStrictness) (ds :: base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness). (base-4.18.0.0:GHC.Generics.Internal.SingI mn, base-4.18.0.0:GHC.Generics.Internal.SingI su, base-4.18.0.0:GHC.Generics.Internal.SingI ss, base-4.18.0.0:GHC.Generics.Internal.SingI ds) => base-4.18.0.0:GHC.Generics.Internal.Selector (base-4.18.0.0:GHC.Generics.Internal.MetaSel mn su ss ds) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.LeftAssociative -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.NotAssociative -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.RightAssociative -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI GHC.Types.False -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI GHC.Types.True -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.DecidedLazy -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.DecidedStrict -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.DecidedUnpack -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall (a :: base-4.18.0.0:GHC.Generics.Internal.Associativity) (n :: GHC.TypeNats.Nat). (base-4.18.0.0:GHC.Generics.Internal.SingI a, GHC.TypeNats.KnownNat n) => base-4.18.0.0:GHC.Generics.Internal.SingI (base-4.18.0.0:GHC.Generics.Internal.InfixI a n) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.PrefixI -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall a1 (a2 :: a1). base-4.18.0.0:GHC.Generics.Internal.SingI a2 => base-4.18.0.0:GHC.Generics.Internal.SingI (GHC.Maybe.Just a2) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.SingI GHC.Maybe.Nothing -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.NoSourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.SourceLazy -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.SourceStrict -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.NoSourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.SourceNoUnpack -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingI base-4.18.0.0:GHC.Generics.Internal.SourceUnpack -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall (a :: GHC.Types.Symbol). GHC.TypeLits.KnownSymbol a => base-4.18.0.0:GHC.Generics.Internal.SingI a -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind GHC.Types.Bool -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind base-4.18.0.0:GHC.Generics.Internal.FixityI -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall a. base-4.18.0.0:GHC.Generics.Internal.SingKind a => base-4.18.0.0:GHC.Generics.Internal.SingKind (GHC.Maybe.Maybe a) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance base-4.18.0.0:GHC.Generics.Internal.SingKind GHC.Types.Symbol -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.IO.BufferedIO.BufferedIO GHC.IO.FD.FD -- Defined in ‘GHC.IO.FD’
 instance GHC.IO.Device.IODevice GHC.IO.FD.FD -- Defined in ‘GHC.IO.FD’
 instance GHC.IO.Device.RawIO GHC.IO.FD.FD -- Defined in ‘GHC.IO.FD’
@@ -11655,10 +11626,10 @@ instance GHC.Ix.Ix GHC.Word.Word64 -- Defined in ‘GHC.Word’
 instance GHC.Ix.Ix GHC.Word.Word8 -- Defined in ‘GHC.Word’
 instance GHC.Ix.Ix Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Ix.Ix Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
-instance GHC.Ix.Ix GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Ix.Ix GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Ix.Ix GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Ix.Ix GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
+instance GHC.Ix.Ix base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Ix.Ix base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Ix.Ix base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Ix.Ix base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Ix.Ix GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
 instance GHC.Ix.Ix GHC.IO.IOMode.IOMode -- Defined in ‘GHC.IO.IOMode’
 instance forall a k (b :: k). GHC.Num.Num a => GHC.Num.Num (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
@@ -11769,20 +11740,20 @@ instance [safe] GHC.Read.Read Data.Version.Version -- Defined in ‘Data.Version
 instance GHC.Read.Read Foreign.Ptr.IntPtr -- Defined in ‘Foreign.Ptr’
 instance GHC.Read.Read Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance [safe] GHC.Read.Read GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Read.Read (f (g p)) => GHC.Read.Read ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance GHC.Read.Read GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Read.Read GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Read.Read GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
-instance forall i c k (p :: k). GHC.Read.Read c => GHC.Read.Read (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *) (p :: k). GHC.Read.Read (f p) => GHC.Read.Read (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Read.Read p => GHC.Read.Read (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Read.Read (f p) => GHC.Read.Read (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance GHC.Read.Read GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Read.Read GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Read.Read (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Read.Read (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Read.Read (f p), GHC.Read.Read (g p)) => GHC.Read.Read ((base-4.18.0.0:GHC.Generics.Internal.:+:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Read.Read (f (g p)) => GHC.Read.Read ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Read.Read base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Read.Read base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Read.Read base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i c k (p :: k). GHC.Read.Read c => GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta) k (f :: k -> *) (p :: k). GHC.Read.Read (f p) => GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Read.Read p => GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Read.Read (f p) => GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Read.Read base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Read.Read base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Read.Read (base-4.18.0.0:GHC.Generics.Internal.V1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Read.Read GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
 instance GHC.Read.Read GHC.IO.Handle.Types.BufferMode -- Defined in ‘GHC.IO.Handle.Types’
 instance GHC.Read.Read GHC.IO.Handle.Types.Newline -- Defined in ‘GHC.IO.Handle.Types’
@@ -11989,25 +11960,25 @@ instance GHC.Show.Show base-4.18.0.0:GHC.Event.TimerManager.State -- Defined in 
 instance GHC.Show.Show GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
 instance GHC.Show.Show GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Show.Show GHC.Types.Float -- Defined in ‘GHC.Float’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Show.Show (f p), GHC.Show.Show (g p)) => GHC.Show.Show ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Show.Show (f p), GHC.Show.Show (g p)) => GHC.Show.Show ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Show.Show (f (g p)) => GHC.Show.Show ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance GHC.Show.Show GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Show.Show GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Show.Show GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
-instance forall i c k (p :: k). GHC.Show.Show c => GHC.Show.Show (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *) (p :: k). GHC.Show.Show (f p) => GHC.Show.Show (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Show.Show p => GHC.Show.Show (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Show.Show (f p) => GHC.Show.Show (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance GHC.Show.Show GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Show.Show GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.URec GHC.Types.Char p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.URec GHC.Types.Double p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.URec GHC.Types.Float p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.URec GHC.Types.Int p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.URec GHC.Types.Word p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Show.Show (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Show.Show (f p), GHC.Show.Show (g p)) => GHC.Show.Show ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Show.Show (f p), GHC.Show.Show (g p)) => GHC.Show.Show ((base-4.18.0.0:GHC.Generics.Internal.:+:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Show.Show (f (g p)) => GHC.Show.Show ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Show.Show base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Show.Show base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Show.Show base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i c k (p :: k). GHC.Show.Show c => GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta) k (f :: k -> *) (p :: k). GHC.Show.Show (f p) => GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Show.Show p => GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Show.Show (f p) => GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Show.Show base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Show.Show base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Char p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Double p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Float p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Int p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Word p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Show.Show (base-4.18.0.0:GHC.Generics.Internal.V1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Show.Show GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
 instance GHC.Show.Show GHC.IO.Encoding.Types.CodingProgress -- Defined in ‘GHC.IO.Encoding.Types’
 instance GHC.Show.Show GHC.IO.Encoding.Types.TextEncoding -- Defined in ‘GHC.IO.Encoding.Types’
@@ -12193,27 +12164,27 @@ instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.TimerManager.State -- Defined in
 instance GHC.Classes.Eq GHC.Stack.Types.SrcLoc -- Defined in ‘GHC.Stack.Types’
 instance GHC.Classes.Eq GHC.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Exts’
 instance GHC.Classes.Eq GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Eq (f p), GHC.Classes.Eq (g p)) => GHC.Classes.Eq ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Eq (f p), GHC.Classes.Eq (g p)) => GHC.Classes.Eq ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Classes.Eq (f (g p)) => GHC.Classes.Eq ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Eq GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Eq GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Eq GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (a :: k). (GHC.Generics.Generic1 f, GHC.Classes.Eq (GHC.Generics.Rep1 f a)) => GHC.Classes.Eq (GHC.Generics.Generically1 f a) -- Defined in ‘GHC.Generics’
-instance forall i c k (p :: k). GHC.Classes.Eq c => GHC.Classes.Eq (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *) (p :: k). GHC.Classes.Eq (f p) => GHC.Classes.Eq (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Classes.Eq p => GHC.Classes.Eq (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Classes.Eq (f p) => GHC.Classes.Eq (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Eq GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Eq GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec (GHC.Ptr.Ptr ()) p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec GHC.Types.Char p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec GHC.Types.Double p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec GHC.Types.Float p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec GHC.Types.Int p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.URec GHC.Types.Word p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Eq (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Eq (f p), GHC.Classes.Eq (g p)) => GHC.Classes.Eq ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Eq (f p), GHC.Classes.Eq (g p)) => GHC.Classes.Eq ((base-4.18.0.0:GHC.Generics.Internal.:+:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Classes.Eq (f (g p)) => GHC.Classes.Eq ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Eq base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Eq base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Eq base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (a :: k). (base-4.18.0.0:GHC.Generics.Internal.Generic1 f, GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.Rep1 f a)) => GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.Generically1 f a) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i c k (p :: k). GHC.Classes.Eq c => GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta) k (f :: k -> *) (p :: k). GHC.Classes.Eq (f p) => GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Classes.Eq p => GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Classes.Eq (f p) => GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Eq base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Eq base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec (GHC.Ptr.Ptr ()) p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Char p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Double p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Float p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Int p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Word p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Eq (base-4.18.0.0:GHC.Generics.Internal.V1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Classes.Eq GHC.IO.Buffer.BufferState -- Defined in ‘GHC.IO.Buffer’
 instance GHC.Classes.Eq GHC.IO.Device.IODeviceType -- Defined in ‘GHC.IO.Device’
 instance GHC.Classes.Eq GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
@@ -12331,27 +12302,27 @@ instance forall i e. (GHC.Ix.Ix i, GHC.Classes.Ord e) => GHC.Classes.Ord (GHC.Ar
 instance [safe] GHC.Classes.Ord GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
 instance GHC.Classes.Ord GHC.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Event.TimeOut’
 instance GHC.Classes.Ord GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((GHC.Generics.:+:) f g p) -- Defined in ‘GHC.Generics’
-instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Classes.Ord (f (g p)) => GHC.Classes.Ord ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Ord GHC.Generics.Associativity -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Ord GHC.Generics.DecidedStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Ord GHC.Generics.Fixity -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (a :: k). (GHC.Generics.Generic1 f, GHC.Classes.Ord (GHC.Generics.Rep1 f a)) => GHC.Classes.Ord (GHC.Generics.Generically1 f a) -- Defined in ‘GHC.Generics’
-instance forall i c k (p :: k). GHC.Classes.Ord c => GHC.Classes.Ord (GHC.Generics.K1 i c p) -- Defined in ‘GHC.Generics’
-instance forall i (c :: GHC.Generics.Meta) k (f :: k -> *) (p :: k). GHC.Classes.Ord (f p) => GHC.Classes.Ord (GHC.Generics.M1 i c f p) -- Defined in ‘GHC.Generics’
-instance forall p. GHC.Classes.Ord p => GHC.Classes.Ord (GHC.Generics.Par1 p) -- Defined in ‘GHC.Generics’
-instance forall k (f :: k -> *) (p :: k). GHC.Classes.Ord (f p) => GHC.Classes.Ord (GHC.Generics.Rec1 f p) -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Ord GHC.Generics.SourceStrictness -- Defined in ‘GHC.Generics’
-instance GHC.Classes.Ord GHC.Generics.SourceUnpackedness -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.U1 p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec (GHC.Ptr.Ptr ()) p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec GHC.Types.Char p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec GHC.Types.Double p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec GHC.Types.Float p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec GHC.Types.Int p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.URec GHC.Types.Word p) -- Defined in ‘GHC.Generics’
-instance forall k (p :: k). GHC.Classes.Ord (GHC.Generics.V1 p) -- Defined in ‘GHC.Generics’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((base-4.18.0.0:GHC.Generics.Internal.:*:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (g :: k -> *) (p :: k). (GHC.Classes.Ord (f p), GHC.Classes.Ord (g p)) => GHC.Classes.Ord ((base-4.18.0.0:GHC.Generics.Internal.:+:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k2 (f :: k2 -> *) k1 (g :: k1 -> k2) (p :: k1). GHC.Classes.Ord (f (g p)) => GHC.Classes.Ord ((base-4.18.0.0:GHC.Generics.Internal.:.:) f g p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Ord base-4.18.0.0:GHC.Generics.Internal.Associativity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Ord base-4.18.0.0:GHC.Generics.Internal.DecidedStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Ord base-4.18.0.0:GHC.Generics.Internal.Fixity -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (a :: k). (base-4.18.0.0:GHC.Generics.Internal.Generic1 f, GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.Rep1 f a)) => GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.Generically1 f a) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i c k (p :: k). GHC.Classes.Ord c => GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.K1 i c p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall i (c :: base-4.18.0.0:GHC.Generics.Internal.Meta) k (f :: k -> *) (p :: k). GHC.Classes.Ord (f p) => GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.M1 i c f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall p. GHC.Classes.Ord p => GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.Par1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (f :: k -> *) (p :: k). GHC.Classes.Ord (f p) => GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.Rec1 f p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Ord base-4.18.0.0:GHC.Generics.Internal.SourceStrictness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance GHC.Classes.Ord base-4.18.0.0:GHC.Generics.Internal.SourceUnpackedness -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.U1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec (GHC.Ptr.Ptr ()) p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Char p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Double p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Float p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Int p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.URec GHC.Types.Word p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
+instance forall k (p :: k). GHC.Classes.Ord (base-4.18.0.0:GHC.Generics.Internal.V1 p) -- Defined in ‘base-4.18.0.0:GHC.Generics.Internal’
 instance GHC.Classes.Ord GHC.IO.Device.SeekMode -- Defined in ‘GHC.IO.Device’
 instance GHC.Classes.Ord GHC.IO.Handle.Types.BufferMode -- Defined in ‘GHC.IO.Handle.Types’
 instance GHC.Classes.Ord GHC.IO.Handle.Types.Newline -- Defined in ‘GHC.IO.Handle.Types’
