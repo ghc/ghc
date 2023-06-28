@@ -11,7 +11,7 @@
 #include "Hash.h"
 #include "Adjustor.h"
 
-#include "ffi.h"
+#include "rts/ghc_ffi.h"
 #include <string.h>
 
 // Note that ffi_alloc_prep_closure is a non-standard libffi closure

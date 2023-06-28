@@ -214,6 +214,7 @@ library
                         rts/EventLogConstants.h
                         rts/EventTypes.h
                         -- ^ generated
+                        rts/ghc_ffi.h
                         rts/Adjustor.h
                         rts/ExecPage.h
                         rts/BlockSignals.h
