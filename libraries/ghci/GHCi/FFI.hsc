@@ -22,6 +22,14 @@
 -}
 
 #if !defined(javascript_HOST_ARCH)
+-- See Note [FFI_GO_CLOSURES workaround] in ghc_ffi.h
+-- We can't include ghc_ffi.h here as we must build with stage0
+#if defined(darwin_HOST_OS)
+#if !defined(FFI_GO_CLOSURES)
+#define FFI_GO_CLOSURES 0
+#endif
+#endif
+
 #include <ffi.h>
 #endif
 
