@@ -70,7 +70,7 @@ import GHC.Types.Basic
 import GHC.Core
 import GHC.Core.Class (Class, classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
-import GHC.Core.InstEnv ( Coherence(..) )
+import GHC.Core.InstEnv ( Canonical )
 
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -451,7 +451,7 @@ instance Outputable EvBindMap where
 data EvBindInfo
   = EvBindGiven { -- See Note [Tracking redundant constraints] in GHC.Tc.Solver
     }
-  | EvBindWanted { ebi_coherence :: Coherence -- See Note [Desugaring incoherent evidence]
+  | EvBindWanted { ebi_canonical :: Canonical -- See Note [Desugaring non-canonical evidence]
     }
 
 -----------------
@@ -465,7 +465,7 @@ data EvBind
 evBindVar :: EvBind -> EvVar
 evBindVar = eb_lhs
 
-mkWantedEvBind :: EvVar -> Coherence -> EvTerm -> EvBind
+mkWantedEvBind :: EvVar -> Canonical -> EvTerm -> EvBind
 mkWantedEvBind ev c tm = EvBind { eb_info = EvBindWanted c, eb_lhs = ev, eb_rhs = tm }
 
 -- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm

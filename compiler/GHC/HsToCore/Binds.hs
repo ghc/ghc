@@ -41,7 +41,7 @@ import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
 import GHC.Core.SimpleOpt    ( simpleOptExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
-import GHC.Core.InstEnv ( Coherence(..) )
+import GHC.Core.InstEnv ( Canonical )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
@@ -1153,14 +1153,14 @@ evidence that is used in `e`.
 This question arose when thinking about deep subsumption; see
 https://github.com/ghc-proposals/ghc-proposals/pull/287#issuecomment-1125419649).
 
-Note [Desugaring incoherent evidence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the evidence is coherent, we desugar WpEvApp by simply passing
+Note [Desugaring non-canonical evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If the evidence is canonical, we desugar WpEvApp by simply passing
 core_tm directly to k:
 
   k core_tm
 
-If the evidence is not coherent, we mark the application with nospec:
+If the evidence is not canonical, we mark the application with nospec:
 
   nospec @(cls => a) k core_tm
 
@@ -1171,14 +1171,14 @@ of the same type (see Note [nospecId magic] in GHC.Types.Id.Make).
 See Note [Coherence and specialisation: overview] for why we shouldn't
 specialise incoherent evidence.
 
-We can find out if a given evidence is coherent or not during the
-desugaring of its WpLet wrapper: an evidence is incoherent if its
+We can find out if a given evidence is canonical or not during the
+desugaring of its WpLet wrapper: an evidence is non-canonical if its
 own resolution was incoherent (see Note [Incoherent instances]), or
-if its definition refers to other incoherent evidence. dsEvBinds is
+if its definition refers to other non-canonical evidence. dsEvBinds is
 the convenient place to compute this, since it already needs to do
 inter-evidence dependency analysis to generate well-scoped
-bindings. We then record this coherence information in the
-dsl_coherence field of DsM's local environment.
+bindings. We then record this specialisability information in the
+dsl_unspecables field of DsM's local environment.
 
 -}
 
@@ -1202,20 +1202,27 @@ dsHsWrapper (WpFun c1 c2 (Scaled w t1)) k -- See Note [Desugaring WpFun]
 dsHsWrapper (WpCast co)       k = assert (coercionRole co == Representational) $
                                   k $ \e -> mkCastDs e co
 dsHsWrapper (WpEvApp tm)      k = do { core_tm <- dsEvTerm tm
-                                     ; incoherents <- getIncoherents
+                                     ; unspecables <- getUnspecables
                                      ; let vs = exprFreeVarsList core_tm
-                                           is_incoherent_var v = v `S.member` incoherents
-                                           is_coherent = all (not . is_incoherent_var) vs -- See Note [Desugaring incoherent evidence]
-                                     ; k (\e -> app_ev is_coherent e core_tm) }
+                                           is_unspecable_var v = v `S.member` unspecables
+                                           is_specable = not $ any (is_unspecable_var) vs -- See Note [Desugaring non-canonical evidence]
+                                     ; k (\e -> app_ev is_specable e core_tm) }
   -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 dsHsWrapper (WpMultCoercion co) k = do { unless (isReflexiveCo co) $
                                            diagnosticDs DsMultiplicityCoercionsNotSupported
                                        ; k $ \e -> e }
 
+-- We are about to construct an evidence application `f dict`.  If the dictionary is
+-- non-specialisable, instead construct
+--     nospec f dict
+-- See Note [nospecId magic] in GHC.Types.Id.Make for what `nospec` does.
 app_ev :: Bool -> CoreExpr -> CoreExpr -> CoreExpr
-app_ev is_coherent k core_tm
-    | is_coherent = k `App` core_tm
-    | otherwise   = Var nospecId `App` Type (exprType k) `App` k `App` core_tm
+app_ev is_specable k core_tm
+    | not is_specable
+    = Var nospecId `App` Type (exprType k) `App` k `App` core_tm
+
+    | otherwise
+    = k `App` core_tm
 
 dsHsWrappers :: [HsWrapper] -> ([CoreExpr -> CoreExpr] -> DsM a) -> DsM a
 dsHsWrappers (wp:wps) k = dsHsWrapper wp $ \wrap -> dsHsWrappers wps $ \wraps -> k (wrap:wraps)
@@ -1233,7 +1240,7 @@ dsTcEvBinds (EvBinds bs)   = dsEvBinds bs
 
 --   * Desugars the ev_binds, sorts them into dependency order, and
 --     passes the resulting [CoreBind] to thing_inside
---   * Extends the DsM (dsl_coherence field) with coherence information
+--   * Extends the DsM (dsl_unspecable field) with specialisability information
 --     for each binder in ev_binds, before invoking thing_inside
 dsEvBinds :: Bag EvBind -> ([CoreBind] -> DsM a) -> DsM a
 dsEvBinds ev_binds thing_inside
@@ -1241,53 +1248,50 @@ dsEvBinds ev_binds thing_inside
        ; let comps = sort_ev_binds ds_binds
        ; go comps thing_inside }
   where
-    go ::[SCC (Node EvVar (Coherence, CoreExpr))] -> ([CoreBind] -> DsM a) -> DsM a
+    go ::[SCC (Node EvVar (Canonical, CoreExpr))] -> ([CoreBind] -> DsM a) -> DsM a
     go (comp:comps) thing_inside
-      = do { incoherents <- getIncoherents
-           ; let (core_bind, new_incoherents) = ds_component incoherents comp
-           ; addIncoherents new_incoherents $ go comps $ \ core_binds -> thing_inside (core_bind:core_binds) }
+      = do { unspecables <- getUnspecables
+           ; let (core_bind, new_unspecables) = ds_component unspecables comp
+           ; addUnspecables new_unspecables $ go comps $ \ core_binds -> thing_inside (core_bind:core_binds) }
     go [] thing_inside = thing_inside []
 
-    is_coherent IsCoherent = True
-    is_coherent IsIncoherent = False
-
-    ds_component incoherents (AcyclicSCC node) = (NonRec v rhs, new_incoherents)
+    ds_component unspecables (AcyclicSCC node) = (NonRec v rhs, new_unspecables)
       where
-        ((v, rhs), (this_coherence, deps)) = unpack_node node
-        transitively_incoherent = not (is_coherent this_coherence) || any is_incoherent deps
-        is_incoherent dep = dep `S.member` incoherents
-        new_incoherents
-            | transitively_incoherent = S.singleton v
+        ((v, rhs), (this_canonical, deps)) = unpack_node node
+        transitively_unspecable = not this_canonical || any is_unspecable deps
+        is_unspecable dep = dep `S.member` unspecables
+        new_unspecables
+            | transitively_unspecable = S.singleton v
             | otherwise = mempty
-    ds_component incoherents (CyclicSCC nodes) = (Rec pairs, new_incoherents)
+    ds_component unspecables (CyclicSCC nodes) = (Rec pairs, new_unspecables)
       where
-        (pairs, direct_coherence) = unzip $ map unpack_node nodes
+        (pairs, direct_canonicity) = unzip $ map unpack_node nodes
 
-        is_incoherent_remote dep = dep `S.member` incoherents
-        transitively_incoherent = or [ not (is_coherent this_coherence) || any is_incoherent_remote deps | (this_coherence, deps) <- direct_coherence ]
-            -- Bindings from a given SCC are transitively coherent if
-            -- all are coherent and all their remote dependencies are
-            -- also coherent; see Note [Desugaring incoherent evidence]
+        is_unspecable_remote dep = dep `S.member` unspecables
+        transitively_unspecable = or [ not this_canonical || any is_unspecable_remote deps | (this_canonical, deps) <- direct_canonicity ]
+            -- Bindings from a given SCC are transitively specialisable if
+            -- all are specialisable and all their remote dependencies are
+            -- also specialisable; see Note [Desugaring non-canonical evidence]
 
-        new_incoherents
-            | transitively_incoherent = S.fromList [ v | (v, _) <- pairs]
+        new_unspecables
+            | transitively_unspecable = S.fromList [ v | (v, _) <- pairs]
             | otherwise = mempty
 
-    unpack_node DigraphNode { node_key = v, node_payload = (coherence, rhs), node_dependencies = deps } = ((v, rhs), (coherence, deps))
+    unpack_node DigraphNode { node_key = v, node_payload = (canonical, rhs), node_dependencies = deps } = ((v, rhs), (canonical, deps))
 
-sort_ev_binds :: Bag (Id, Coherence, CoreExpr) -> [SCC (Node EvVar (Coherence, CoreExpr))]
+sort_ev_binds :: Bag (Id, Canonical, CoreExpr) -> [SCC (Node EvVar (Canonical, CoreExpr))]
 -- We do SCC analysis of the evidence bindings, /after/ desugaring
 -- them. This is convenient: it means we can use the GHC.Core
 -- free-variable functions rather than having to do accurate free vars
 -- for EvTerm.
 sort_ev_binds ds_binds = stronglyConnCompFromEdgedVerticesUniqR edges
   where
-    edges :: [ Node EvVar (Coherence, CoreExpr) ]
+    edges :: [ Node EvVar (Canonical, CoreExpr) ]
     edges = foldr ((:) . mk_node) [] ds_binds
 
-    mk_node :: (Id, Coherence, CoreExpr) -> Node EvVar (Coherence, CoreExpr)
-    mk_node (var, coherence, rhs)
-      = DigraphNode { node_payload = (coherence, rhs)
+    mk_node :: (Id, Canonical, CoreExpr) -> Node EvVar (Canonical, CoreExpr)
+    mk_node (var, canonical, rhs)
+      = DigraphNode { node_payload = (canonical, rhs)
                     , node_key = var
                     , node_dependencies = nonDetEltsUniqSet $
                                           exprFreeVars rhs `unionVarSet`
@@ -1296,13 +1300,13 @@ sort_ev_binds ds_binds = stronglyConnCompFromEdgedVerticesUniqR edges
       -- is still deterministic even if the edges are in nondeterministic order
       -- as explained in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
-dsEvBind :: EvBind -> DsM (Id, Coherence, CoreExpr)
+dsEvBind :: EvBind -> DsM (Id, Canonical, CoreExpr)
 dsEvBind (EvBind { eb_lhs = v, eb_rhs = r, eb_info = info }) = do
     e <- dsEvTerm r
-    let coherence = case info of
-            EvBindGiven{} -> IsCoherent
-            EvBindWanted{ ebi_coherence = coherence } -> coherence
-    return (v, coherence, e)
+    let canonical = case info of
+            EvBindGiven{} -> True
+            EvBindWanted{ ebi_canonical = canonical } -> canonical
+    return (v, canonical, e)
 
 
 {-**********************************************************************

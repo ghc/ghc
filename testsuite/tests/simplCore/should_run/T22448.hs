@@ -1,4 +1,5 @@
 {-# LANGUAGE MonoLocalBinds #-}
+{-# OPTIONS_GHC -fno-specialise-incoherents #-}
 class C a where
   op :: a -> String
 

@@ -2081,6 +2081,11 @@ instance ExactPrint (LocatedP OverlapMode) where
     an1 <- markAnnCloseP an0
     return (L (SrcSpanAnn an1 l) (Incoherent src))
 
+  exact (L (SrcSpanAnn an l) (NonCanonical src)) = do
+    an0 <- markAnnOpenP an src "{-# INCOHERENT"
+    an1 <- markAnnCloseP an0
+    return (L (SrcSpanAnn an1 l) (Incoherent src))
+
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsBind GhcPs) where

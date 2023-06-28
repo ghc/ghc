@@ -11,7 +11,7 @@ The bits common to GHC.Tc.TyCl.Instance and GHC.Tc.Deriv.
 
 module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
-        Coherence(..), PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
+        Canonical, PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
         instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
@@ -122,10 +122,11 @@ fuzzyClsInstCmp x y =
     cmp (RM_KnownTc _, RM_WildCard)   = GT
     cmp (RM_KnownTc x, RM_KnownTc y) = stableNameCmp x y
 
-isOverlappable, isOverlapping, isIncoherent :: ClsInst -> Bool
+isOverlappable, isOverlapping, isIncoherent, isNonCanonical :: ClsInst -> Bool
 isOverlappable i = hasOverlappableFlag (overlapMode (is_flag i))
 isOverlapping  i = hasOverlappingFlag  (overlapMode (is_flag i))
 isIncoherent   i = hasIncoherentFlag   (overlapMode (is_flag i))
+isNonCanonical i = hasNonCanonicalFlag (overlapMode (is_flag i))
 
 {-
 Note [ClsInst laziness and the rough-match fields]
@@ -812,14 +813,49 @@ example
 
   Here both (I7) and (I8) match, GHC picks an arbitrary one.
 
-So INCOHERENT may break the Coherence Assumption.  To avoid this
-incoherence breaking the specialiser,
+So INCOHERENT may break the Coherence Assumption. But sometimes that
+is fine, because the programmer promises that it doesn't matter which
+one is chosen.  A good example is in the `optics` library:
 
-* We label as "incoherent" the dictionary constructed by a
-  (potentially) incoherent use of an instance declaration.
+  data IxEq i is js where { IxEq :: IxEq i is is }
 
-* We do not specialise a function if there is an incoherent dictionary
-  in the /transistive dependencies/ of its dictionary arguments.
+  class AppendIndices xs ys ks | xs ys -> ks where
+    appendIndices :: IxEq i (Curry xs (Curry ys i)) (Curry ks i)
+
+  instance {-# INCOHERENT #-} xs ~ zs => AppendIndices xs '[] zs where
+    appendIndices = IxEq
+
+  instance ys ~ zs => AppendIndices '[] ys zs where
+    appendIndices = IxEq
+
+Here `xs` and `ys` are type-level lists, and for type inference purposes we want to
+solve the `AppendIndices` constraint when /either/ of them are the empty list. The
+dictionaries are the same in both cases (indeed the dictionary type is a singleton!),
+so we really don't care which is used.  See #23287 for discussion.
+
+
+In short, sometimes we want to specialise on these incoherently-selected dictionaries,
+and sometimes we don't.  It would be best to have a per-instance pragma, but for now
+we have a global flag:
+
+* If an instance has an `{-# INCOHERENT #-}` pragma, we use its `OverlapFlag` to
+  label it as either
+  * `Incoherent`: meaning incoherent but still specialisable, or
+  * `NonCanonical`: meaning incoherent and not specialisable.
+
+The module-wide `-fspecialise-incoherents` flag determines which
+choice is made.  The rest of this note describes what happens for
+`NonCanonical` instances, i.e. with `-fno-specialise-incoherents`.
+
+To avoid this incoherence breaking the specialiser,
+
+* We label as "non-canonical" the dictionary constructed by a
+  (potentially) incoherent use of an instance declaration whose
+  `OverlapFlag` is `NonCanonical`.
+
+* We do not specialise a function if there is a non-canonical
+  dictionary in the /transistive dependencies/ of its dictionary
+  arguments.
 
 To see the transitive closure issue, consider
   deeplyRisky :: C b => b -> Int
@@ -850,7 +886,7 @@ Here are the moving parts:
 * `GHC.HsToCore.Binds.dsHsWrapper` desugars the evidence application (f d) into
   (nospec f d) if `d` is incoherent. It has to do a dependency analysis to
   determine transitive dependencies, but we need to do that anyway.
-  See Note [Desugaring incoherent evidence] in GHC.HsToCore.Binds.
+  See Note [Desugaring non-canonical evidence] in GHC.HsToCore.Binds.
 
   See also Note [nospecId magic] in GHC.Types.Id.Make.
 -}
@@ -955,10 +991,13 @@ data LookupInstanceErrReason =
   LookupInstErrNotFound
   deriving (Generic)
 
-data Coherence = IsCoherent | IsIncoherent
+type Canonical = Bool
 
 -- See Note [Recording coherence information in `PotentialUnifiers`]
-data PotentialUnifiers = NoUnifiers Coherence
+data PotentialUnifiers = NoUnifiers Canonical
+                       -- NoUnifiers True: We have a unique solution modulo canonicity
+                       -- NoUnifiers False: The solutions is not canonical, and thus
+                       --   we shouldn't specialise on it.
                        | OneOrMoreUnifiers (NonEmpty ClsInst)
                        -- This list is lazy as we only look at all the unifiers when
                        -- printing an error message. It can be expensive to compute all
@@ -967,33 +1006,28 @@ data PotentialUnifiers = NoUnifiers Coherence
 
 {- Note [Recording coherence information in `PotentialUnifiers`]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have any potential unifiers, then we go down the `NotSure` route
-in `matchInstEnv`.  According to Note [Rules for instance lookup]
-steps IL4 and IL6, we only care about non-`INCOHERENT` instances for
-this purpose.
 
-It is only when we don't have any potential unifiers (i.e. we know
-that we have a unique solution modulo `INCOHERENT` instances) that we
-care about that unique solution being coherent or not (see
-Note [Coherence and specialisation: overview] for why we care at all).
-So we only need the `Coherent` flag in the case where the set of
-potential unifiers is otherwise empty.
+When we find a matching instance, there might be other instances that
+could potentially unify with the goal. For `INCOHERENT` instances, we
+don't care (see steps IL4 and IL6 in Note [Rules for instance
+lookup]). But if we have potentially unifying coherent instance, we
+report these `OneOrMoreUnifiers` so that `matchInstEnv` can go down
+the `NotSure` route.
+
+If this hurdle is passed, i.e. we have a unique solution up to
+`INCOHERENT` instances, the specialiser needs to know if that unique
+solution is canonical or not (see Note [Coherence and specialisation:
+overview] for why we care at all). So when the set of potential
+unifiers is empty, we record in `NoUnifiers` if the one solution is
+`Canonical`.
 -}
 
-instance Outputable Coherence where
-  ppr IsCoherent = text "coherent"
-  ppr IsIncoherent = text "incoherent"
-
 instance Outputable PotentialUnifiers where
-  ppr (NoUnifiers c) = text "NoUnifiers" <+> ppr c
+  ppr (NoUnifiers c) = text "NoUnifiers" <+> if c then text "canonical" else text "non-canonical"
   ppr xs = ppr (getPotentialUnifiers xs)
 
-instance Semigroup Coherence where
-  IsCoherent <> IsCoherent = IsCoherent
-  _ <> _ = IsIncoherent
-
 instance Semigroup PotentialUnifiers where
-  NoUnifiers c1 <> NoUnifiers c2 = NoUnifiers (c1 <> c2)
+  NoUnifiers c1 <> NoUnifiers c2 = NoUnifiers (c1 && c2)
   NoUnifiers _ <> u = u
   OneOrMoreUnifiers (unifier :| unifiers) <> u = OneOrMoreUnifiers (unifier :| (unifiers <> getPotentialUnifiers u))
 
@@ -1039,22 +1073,24 @@ lookupInstEnv' (InstEnv rm) vis_mods cls tys
       = acc
 
 
-    incoherently_matched :: PotentialUnifiers -> PotentialUnifiers
-    incoherently_matched (NoUnifiers _) = NoUnifiers IsIncoherent
-    incoherently_matched u = u
+    noncanonically_matched :: PotentialUnifiers -> PotentialUnifiers
+    noncanonically_matched (NoUnifiers _) = NoUnifiers False
+    noncanonically_matched u = u
 
     check_unifier :: [ClsInst] -> PotentialUnifiers
-    check_unifier [] = NoUnifiers IsCoherent
+    check_unifier [] = NoUnifiers True
     check_unifier (item@ClsInst { is_tvs = tpl_tvs, is_tys = tpl_tys }:items)
       | not (instIsVisible vis_mods item)
       = check_unifier items  -- See Note [Instance lookup and orphan instances]
       | Just {} <- tcMatchTys tpl_tys tys = check_unifier items
         -- Does not match, so next check whether the things unify
         -- See Note [Overlapping instances]
+        -- Record that we encountered non-canonical instances: Note [Coherence and specialisation: overview]
+      | isNonCanonical item
+      = noncanonically_matched $ check_unifier items
         -- Ignore ones that are incoherent: Note [Incoherent instances]
-        -- Record that we encountered incoherent instances: Note [Coherence and specialisation: overview]
       | isIncoherent item
-      = incoherently_matched $ check_unifier items
+      = check_unifier items
 
       | otherwise
       = assertPpr (tys_tv_set `disjointVarSet` tpl_tv_set)
@@ -1111,7 +1147,7 @@ lookupInstEnv check_overlap_safe
 
     -- If the selected match is incoherent, discard all unifiers
     final_unifs = case final_matches of
-                    (m:_) | isIncoherent (fst m) -> NoUnifiers IsCoherent
+                    (m:_) | isIncoherent (fst m) -> NoUnifiers True
                     _                            -> all_unifs
 
     -- Note [Safe Haskell isSafeOverlap]
@@ -1289,7 +1325,7 @@ noMatches = InstMatches { instMatches = [], instGuards = [] }
 pruneOverlappedMatches :: [InstMatch] -> [InstMatch]
 -- ^ Remove from the argument list any InstMatches for which another
 -- element of the list is more specific, and overlaps it, using the
--- rules of Nove [Rules for instance lookup]
+-- rules of Note [Rules for instance lookup]
 pruneOverlappedMatches all_matches =
   instMatches $ foldr insert_overlapping noMatches all_matches
 
@@ -1446,33 +1482,8 @@ If the choice of instance *does* matter, all bets are still not off:
 users can consult the detailed specification of the instance selection
 algorithm in the GHC Users' Manual. However, this means we can end up
 with different instances at the same types at different parts of the
-program, and this difference has to be preserved. For example, if we
-have
-
-    class C a where
-      op :: a -> String
-
-    instance {-# OVERLAPPABLE #-} C a where ...
-    instance {-# INCOHERENT #-} C () where ...
-
-then depending on the circumstances (see #22448 for a full setup) some
-occurrences of `op :: () -> String` may be resolved to the generic
-instance, and other to the specific one; so we end up in the desugared
-code with occurrences of both
-
-    op @() ($dC_a @())
-
-and
-
-    op @() $dC_()
-
-In particular, the specialiser needs to ignore the incoherently
-selected instance in `op @() ($dC_a @())`. So during instance lookup,
-we record in `PotentialUnifiers` if a given solution was arrived at
-incoherently; we then use this information to inhibit specialisation
-a la Note [nospecId magic] in GHC.Types.Id.Make.
-
-
+program, and this difference has to be preserved. Note [Coherence and
+specialisation: overview] details how we achieve that.
 
 ************************************************************************
 *                                                                      *

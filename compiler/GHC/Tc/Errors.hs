@@ -1216,11 +1216,11 @@ addDeferredBinding ctxt err (EI { ei_evdest = Just dest, ei_pred = item_ty
 
        ; case dest of
            EvVarDest evar
-             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar IsCoherent err_tm
+             -> addTcEvBind ev_binds_var $ mkWantedEvBind evar True err_tm
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var IsCoherent err_tm
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var True err_tm
                    ; fillCoercionHole hole (mkCoVarCo co_var) } }
 addDeferredBinding _ _ _ = return ()    -- Do not set any evidence for Given
 

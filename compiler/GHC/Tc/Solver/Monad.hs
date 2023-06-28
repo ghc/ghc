@@ -1687,19 +1687,19 @@ setWantedEq (HoleDest hole) co
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq: EvVarDest" (ppr ev)
 
 -- | Good for both equalities and non-equalities
-setWantedEvTerm :: TcEvDest -> Coherence -> EvTerm -> TcS ()
-setWantedEvTerm (HoleDest hole) _coherence tm
+setWantedEvTerm :: TcEvDest -> Canonical -> EvTerm -> TcS ()
+setWantedEvTerm (HoleDest hole) _canonical tm
   | Just co <- evTermCoercion_maybe tm
   = do { useVars (coVarsOfCo co)
        ; fillCoercionHole hole co }
   | otherwise
   = -- See Note [Yukky eq_sel for a HoleDest]
     do { let co_var = coHoleCoVar hole
-       ; setEvBind (mkWantedEvBind co_var IsCoherent tm)
+       ; setEvBind (mkWantedEvBind co_var True tm)
        ; fillCoercionHole hole (mkCoVarCo co_var) }
 
-setWantedEvTerm (EvVarDest ev_id) coherence tm
-  = setEvBind (mkWantedEvBind ev_id coherence tm)
+setWantedEvTerm (EvVarDest ev_id) canonical tm
+  = setEvBind (mkWantedEvBind ev_id canonical tm)
 
 {- Note [Yukky eq_sel for a HoleDest]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1725,10 +1725,10 @@ fillCoercionHole hole co
   = do { wrapTcS $ TcM.fillCoercionHole hole co
        ; kickOutAfterFillingCoercionHole hole }
 
-setEvBindIfWanted :: CtEvidence -> Coherence -> EvTerm -> TcS ()
-setEvBindIfWanted ev coherence tm
+setEvBindIfWanted :: CtEvidence -> Canonical -> EvTerm -> TcS ()
+setEvBindIfWanted ev canonical tm
   = case ev of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest coherence tm
+      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest canonical tm
       _                             -> return ()
 
 newTcEvBinds :: TcS EvBindsVar

@@ -2628,6 +2628,7 @@ repOverlap mb =
         Overlapping _  -> just =<< dataCon overlappingDataConName
         Overlaps _     -> just =<< dataCon overlapsDataConName
         Incoherent _   -> just =<< dataCon incoherentDataConName
+        NonCanonical _ -> just =<< dataCon incoherentDataConName
   where
   nothing = coreNothing overlapTyConName
   just    = coreJust overlapTyConName
