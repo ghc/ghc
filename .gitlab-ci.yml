@@ -274,13 +274,10 @@ lint-ci-config:
     GIT_SUBMODULE_STRATEGY: none
   before_script:
     - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
-    - nix-channel --update
   script:
-    - .gitlab/generate_jobs
+    - nix run .gitlab/generate-ci#generate-jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
     - nix shell nixpkgs#git -c git diff --exit-code
-    # And run this to just make sure that works
-    - .gitlab/generate_job_metadata
   dependencies: []
 
 lint-submods:
@@ -1020,7 +1017,7 @@ project-version:
     - PipelineYear="$(date -d $CI_PIPELINE_CREATED_AT +%Y)"
     - nix shell nixpkgs#wget -c wget "https://ghc.gitlab.haskell.org/ghcup-metadata/ghcup-nightlies-$PipelineYear-0.0.7.yaml" -O ghcup-0.0.7.yaml
 
-    - .gitlab/generate_job_metadata
+    - nix run .gitlab/generate-ci#generate-job-metadata
 
   artifacts:
     paths:

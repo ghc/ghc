@@ -1,0 +1,15 @@
+cabal-version:      3.0
+name:               generate-ci
+version:            0.1.0.0
+license:            BSD-3-Clause
+license-file:       LICENSE
+build-type:         Simple
+
+executable generate-ci
+    main-is:          gen_ci.hs
+    ghc-options:      -Wall
+    build-depends:    base,
+                      containers,
+                      bytestring,
+                      aeson >= 1.8.1
+    default-language: Haskell2010

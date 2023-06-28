@@ -3,9 +3,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{- cabal:
-build-depends: base, aeson >= 1.8.1, containers, bytestring
--}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
