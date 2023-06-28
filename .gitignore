@@ -97,6 +97,7 @@ _darcs/
 # -----------------------------------------------------------------------------
 # specific generated files
 
+/.gitlab/jobs-metadata.json
 /bindist-list
 /bindist-list.uniq
 /bindistprep/

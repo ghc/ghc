@@ -1,5 +1,0 @@
-#! /usr/bin/env nix-shell
-#!nix-shell -i bash -p cabal-install "haskell.packages.ghc92.ghcWithPackages (pkgs: with pkgs; [aeson])" git jq
-
-cd "$(dirname "${BASH_SOURCE[0]}")"
-cabal run gen_ci -- metadata jobs-metadata.json
