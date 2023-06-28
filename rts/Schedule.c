@@ -2797,9 +2797,6 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
 
     shutdownCapabilities(task, wait_foreign);
 
-    // debugBelch("n_failed_trygrab_idles = %d, n_idle_caps = %d\n",
-    //            n_failed_trygrab_idles, n_idle_caps);
-
     exitMyTask();
 }
 

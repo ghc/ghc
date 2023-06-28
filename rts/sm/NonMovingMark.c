@@ -268,7 +268,7 @@ void nonmovingMarkInit() {
 #endif
 }
 
-#if defined(THREADED_RTS) && defined(DEBUG)
+#if defined(THREADED_RTS)
 static uint32_t markQueueLength(MarkQueue *q);
 #endif
 static void init_mark_queue_(MarkQueue *queue);
@@ -985,7 +985,7 @@ void freeMarkQueue (MarkQueue *queue)
     freeChain_lock(queue->blocks);
 }
 
-#if defined(THREADED_RTS) && defined(DEBUG)
+#if defined(THREADED_RTS)
 static uint32_t
 markQueueLength (MarkQueue *q)
 {
