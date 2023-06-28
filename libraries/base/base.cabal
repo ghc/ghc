@@ -223,6 +223,7 @@ Library
         GHC.GHCi
         GHC.GHCi.Helpers
         GHC.Generics
+        GHC.Generics.Internal
         GHC.InfoProv
         GHC.IO
         GHC.IO.Buffer
