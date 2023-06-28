@@ -268,6 +268,7 @@ data GeneralFlag
    | Opt_LiberateCase
    | Opt_SpecConstr
    | Opt_SpecConstrKeen
+   | Opt_SpecialiseIncoherents
    | Opt_DoLambdaEtaExpansion
    | Opt_IgnoreAsserts
    | Opt_DoEtaReduction

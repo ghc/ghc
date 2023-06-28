@@ -33,7 +33,6 @@ import GHC.Data.Bag
 import GHC.Core.Class
 import GHC.Core
 import GHC.Core.DataCon
-import GHC.Core.InstEnv ( Coherence(IsCoherent) )
 import GHC.Core.Make
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
@@ -612,7 +611,7 @@ solveImplicationUsingUnsatGiven
     go_simple ct = case ctEvidence ct of
       CtWanted { ctev_pred = pty, ctev_dest = dst }
         -> do { ev_expr <- unsatisfiableEvExpr unsat_given pty
-              ; setWantedEvTerm dst IsCoherent $ EvExpr ev_expr }
+              ; setWantedEvTerm dst True $ EvExpr ev_expr }
       _ -> return ()
 
 -- | Create an evidence expression for an arbitrary constraint using

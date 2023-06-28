@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts, RecursiveDo #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
@@ -840,16 +841,31 @@ getOverlapFlag :: Maybe OverlapMode -> TcM OverlapFlag
 --     set the OverlapMode to 'm'
 getOverlapFlag overlap_mode
   = do  { dflags <- getDynFlags
-        ; let overlap_ok    = xopt LangExt.OverlappingInstances dflags
-              incoherent_ok = xopt LangExt.IncoherentInstances  dflags
+        ; let overlap_ok               = xopt LangExt.OverlappingInstances dflags
+              incoherent_ok            = xopt LangExt.IncoherentInstances  dflags
+              noncanonical_incoherence = not $ gopt Opt_SpecialiseIncoherents dflags
+
               use x = OverlapFlag { isSafeOverlap = safeLanguageOn dflags
                                   , overlapMode   = x }
               default_oflag | incoherent_ok = use (Incoherent NoSourceText)
                             | overlap_ok    = use (Overlaps NoSourceText)
                             | otherwise     = use (NoOverlap NoSourceText)
 
-              final_oflag = setOverlapModeMaybe default_oflag overlap_mode
+              oflag = setOverlapModeMaybe default_oflag overlap_mode
+              final_oflag = effective_oflag noncanonical_incoherence oflag
         ; return final_oflag }
+  where
+    effective_oflag noncanonical_incoherence oflag@OverlapFlag{ overlapMode = overlap_mode }
+      = oflag { overlapMode = effective_overlap_mode noncanonical_incoherence overlap_mode }
+
+    -- The `-fspecialise-incoherents` flag controls the meaning of the
+    -- `Incoherent` overlap mode: as either an Incoherent overlap
+    -- flag, or a NonCanonical overlap flag. See Note [Coherence and specialisation: overview]
+    -- in GHC.Core.InstEnv for why we care about this distinction.
+    effective_overlap_mode noncanonical_incoherence = \case
+        Incoherent s | noncanonical_incoherence -> NonCanonical s
+        overlap_mode -> overlap_mode
+
 
 tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.

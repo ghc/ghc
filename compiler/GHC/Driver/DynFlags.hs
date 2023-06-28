@@ -1169,7 +1169,8 @@ defaultFlags settings
       Opt_CompactUnwind,
       Opt_ShowErrorContext,
       Opt_SuppressStgReps,
-      Opt_UnoptimizedCoreForInterpreter
+      Opt_UnoptimizedCoreForInterpreter,
+      Opt_SpecialiseIncoherents
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

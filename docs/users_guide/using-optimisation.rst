@@ -1144,6 +1144,25 @@ as such you shouldn't need to set any of them explicitly. A flag
     which returns a constrained type. For example, a type class where one
     of the methods implements a traversal.
 
+
+.. ghc-flag:: -fspecialise-incoherents
+    :shortdesc: Enable specialisation on incoherent instances
+    :type: dynamic
+    :reverse: -fno-specialise-incoherents
+    :category:
+
+    :default: on
+
+    Enable specialisation of overloaded functions in cases when the
+    selected instance is incoherent. This makes the choice of instance
+    non-deterministic, so it is only safe to do if there is no
+    observable runtime behaviour difference between potentially
+    unifying instances. Turning this flag off ensures the incoherent
+    instance selection adheres to the algorithm described in
+    :extension:`IncoherentInstances` at the cost of optimisation
+    opportunities arising from specialisation.
+
+
 .. ghc-flag:: -finline-generics
     :shortdesc: Annotate methods of derived Generic and Generic1 instances with
         INLINE[1] pragmas based on heuristics. Implied by :ghc-flag:`-O`.

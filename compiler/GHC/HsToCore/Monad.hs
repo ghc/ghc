@@ -37,7 +37,7 @@ module GHC.HsToCore.Monad (
         getPmNablas, updPmNablas,
 
         -- Tracking evidence variable coherence
-        addIncoherents, getIncoherents,
+        addUnspecables, getUnspecables,
 
         -- Get COMPLETE sets of a TyCon
         dsGetCompleteMatches,
@@ -373,7 +373,7 @@ mkDsEnvs unit_env mod rdr_env type_env fam_inst_env ptc msg_var cc_st_var
         lcl_env = DsLclEnv { dsl_meta        = emptyNameEnv
                            , dsl_loc         = real_span
                            , dsl_nablas      = initNablas
-                           , dsl_incoherents = mempty
+                           , dsl_unspecables = mempty
                            }
     in (gbl_env, lcl_env)
 
@@ -429,11 +429,11 @@ getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 updPmNablas :: Nablas -> DsM a -> DsM a
 updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
-addIncoherents :: S.Set EvId -> DsM a -> DsM a
-addIncoherents incoherents = updLclEnv (\env -> env{ dsl_incoherents = incoherents `mappend` dsl_incoherents env })
+addUnspecables :: S.Set EvId -> DsM a -> DsM a
+addUnspecables unspecables = updLclEnv (\env -> env{ dsl_unspecables = unspecables `mappend` dsl_unspecables env })
 
-getIncoherents :: DsM (S.Set EvId)
-getIncoherents = dsl_incoherents <$> getLclEnv
+getUnspecables :: DsM (S.Set EvId)
+getUnspecables = dsl_unspecables <$> getLclEnv
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

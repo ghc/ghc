@@ -28,7 +28,7 @@ import GHC.Hs.Type( HsIPName(..) )
 
 import GHC.Core
 import GHC.Core.Type
-import GHC.Core.InstEnv     ( DFunInstType, Coherence(..) )
+import GHC.Core.InstEnv     ( DFunInstType )
 import GHC.Core.Class
 import GHC.Core.Predicate
 import GHC.Core.Multiplicity ( scaledThing )
@@ -187,7 +187,7 @@ solveCallStack ev ev_cs
   -- `IP ip CallStack`. See Note [Overview of implicit CallStacks]
   = do { cs_tm <- evCallStack ev_cs
        ; let ev_tm = mkEvCast cs_tm (wrapIP (ctEvPred ev))
-       ; setEvBindIfWanted ev IsCoherent ev_tm }
+       ; setEvBindIfWanted ev True ev_tm }
 
 
 {- Note [Shadowing of implicit parameters]
@@ -397,7 +397,7 @@ solveEqualityDict ev cls tys
        ; (co, _, _) <- wrapUnifierTcS ev role $ \uenv ->
                        uType uenv t1 t2
          -- Set  d :: (t1~t2) = Eq# co
-       ; setWantedEvTerm dest IsCoherent $
+       ; setWantedEvTerm dest True $
          evDataConApp data_con tys [Coercion co]
        ; stopWith ev "Solved wanted lifted equality" }
 
@@ -718,10 +718,10 @@ try_inert_dicts inerts dict_w@(DictCt { di_ev = ev_w, di_cls = cls, di_tys = tys
          -- the inert from the work-item or vice-versa.
        ; case solveOneFromTheOther (CDictCan dict_i) (CDictCan dict_w) of
            KeepInert -> do { traceTcS "lookupInertDict:KeepInert" (ppr dict_w)
-                           ; setEvBindIfWanted ev_w IsCoherent (ctEvTerm ev_i)
+                           ; setEvBindIfWanted ev_w True (ctEvTerm ev_i)
                            ; return $ Stop ev_w (text "Dict equal" <+> ppr dict_w) }
            KeepWork  -> do { traceTcS "lookupInertDict:KeepWork" (ppr dict_w)
-                           ; setEvBindIfWanted ev_i IsCoherent (ctEvTerm ev_w)
+                           ; setEvBindIfWanted ev_i True (ctEvTerm ev_w)
                            ; updInertCans (updDicts $ delDict dict_w)
                            ; continueWith () } } }
 
@@ -789,7 +789,7 @@ shortCutSolver dflags ev_w ev_i
            ; case inst_res of
                OneInst { cir_new_theta   = preds
                        , cir_mk_ev       = mk_ev
-                       , cir_coherence   = coherence
+                       , cir_canonical   = canonical
                        , cir_what        = what }
                  | safeOverlap what
                  , all isTyFamFree preds  -- Note [Shortcut solving: type families]
@@ -809,7 +809,7 @@ shortCutSolver dflags ev_w ev_i
 
                        ; let ev_tm     = mk_ev (map getEvExpr evc_vs)
                              ev_binds' = extendEvBinds ev_binds $
-                                         mkWantedEvBind (ctEvEvId ev) coherence ev_tm
+                                         mkWantedEvBind (ctEvEvId ev) canonical ev_tm
 
                        ; foldlM try_solve_from_instance (ev_binds', solved_dicts') $
                          freshGoals evc_vs }
@@ -852,7 +852,7 @@ try_instances inerts work_item@(DictCt { di_ev = ev, di_cls = cls
      -- See Note [No Given/Given fundeps]
 
   | Just solved_ev <- lookupSolvedDict inerts dict_loc cls xis   -- Cached
-  = do { setEvBindIfWanted ev IsCoherent (ctEvTerm solved_ev)
+  = do { setEvBindIfWanted ev True (ctEvTerm solved_ev)
        ; stopWith ev "Dict/Top (cached)" }
 
   | otherwise  -- Wanted, but not cached
@@ -874,14 +874,14 @@ chooseInstance work_item
                (OneInst { cir_new_theta   = theta
                         , cir_what        = what
                         , cir_mk_ev       = mk_ev
-                        , cir_coherence   = coherence })
+                        , cir_canonical   = canonical })
   = do { traceTcS "doTopReact/found instance for" $ ppr work_item
        ; deeper_loc <- checkInstanceOK loc what pred
        ; checkReductionDepth deeper_loc pred
        ; assertPprM (getTcEvBindsVar >>= return . not . isCoEvBindsVar)
                     (ppr work_item)
        ; evc_vars <- mapM (newWanted deeper_loc (ctEvRewriters work_item)) theta
-       ; setEvBindIfWanted work_item coherence (mk_ev (map getEvExpr evc_vars))
+       ; setEvBindIfWanted work_item canonical (mk_ev (map getEvExpr evc_vars))
        ; emitWorkNC (freshGoals evc_vars)
        ; stopWith work_item "Dict/Top (solved wanted)" }
   where
@@ -1127,7 +1127,7 @@ matchLocalInst pred loc
             ->
             do { let result = OneInst { cir_new_theta   = theta
                                       , cir_mk_ev       = evDFunApp dfun_id tys
-                                      , cir_coherence   = IsCoherent
+                                      , cir_canonical   = True
                                       , cir_what        = LocalInstance }
                ; traceTcS "Best local instance found:" $
                   vcat [ text "pred:" <+> ppr pred
@@ -1374,7 +1374,7 @@ last_resort inerts (DictCt { di_ev = ev_w, di_cls = cls, di_tys = xis })
   , Just ct_i <- lookupInertDict inerts loc_w cls xis
   , let ev_i = dictCtEvidence ct_i
   , isGiven ev_i
-  = do { setEvBindIfWanted ev_w IsCoherent (ctEvTerm ev_i)
+  = do { setEvBindIfWanted ev_w True (ctEvTerm ev_i)
        ; ctLocWarnTcS loc_w $
          TcRnLoopySuperclassSolve loc_w (ctEvPred ev_w)
        ; return $ Stop ev_w (text "Loopy superclass") }
@@ -2215,4 +2215,3 @@ constraints.
 
 See also Note [Evidence for quantified constraints] in GHC.Core.Predicate.
 -}
-

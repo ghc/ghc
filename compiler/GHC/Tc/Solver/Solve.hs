@@ -20,7 +20,6 @@ import GHC.Tc.Types.Constraint
 import GHC.Tc.Solver.InertSet
 import GHC.Tc.Solver.Monad
 
-import GHC.Core.InstEnv     ( Coherence(..) )
 import GHC.Core.Predicate
 import GHC.Core.Reduction
 import GHC.Core.Coercion
@@ -427,7 +426,7 @@ solveForAll ev@(CtWanted { ctev_dest = dest, ctev_rewriters = rewriters, ctev_lo
 
       ; ev_binds <- emitImplicationTcS lvl skol_info_anon skol_tvs given_ev_vars wanteds
 
-      ; setWantedEvTerm dest IsCoherent $
+      ; setWantedEvTerm dest True $
         EvFun { et_tvs = skol_tvs, et_given = given_ev_vars
               , et_binds = ev_binds, et_body = w_id }
 
@@ -556,7 +555,7 @@ finish_rewrite ev@(CtWanted { ctev_dest = dest
                 (Reduction co new_pred) new_rewriters
   = do { mb_new_ev <- newWanted loc rewriters' new_pred
        ; massert (coercionRole co == ctEvRole ev)
-       ; setWantedEvTerm dest IsCoherent $
+       ; setWantedEvTerm dest True $
             mkEvCast (getEvExpr mb_new_ev)
                      (downgradeRole Representational (ctEvRole ev) (mkSymCo co))
        ; case mb_new_ev of
@@ -631,7 +630,7 @@ runTcPluginsWanted wc@(WC { wc_simple = simples1 })
   where
     setEv :: (EvTerm,Ct) -> TcS ()
     setEv (ev,ct) = case ctEvidence ct of
-      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest IsCoherent ev -- TODO: plugins should be able to signal non-coherence
+      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest True ev -- TODO: plugins should be able to signal non-canonicity
       _ -> panic "runTcPluginsWanted.setEv: attempt to solve non-wanted!"
 
 -- | A pair of (given, wanted) constraints to pass to plugins

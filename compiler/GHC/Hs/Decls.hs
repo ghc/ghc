@@ -935,6 +935,7 @@ ppOverlapPragma mb =
     Just (L _ (Overlapping s))  -> maybe_stext s "{-# OVERLAPPING #-}"
     Just (L _ (Overlaps s))     -> maybe_stext s "{-# OVERLAPS #-}"
     Just (L _ (Incoherent s))   -> maybe_stext s "{-# INCOHERENT #-}"
+    Just (L _ (NonCanonical s)) -> maybe_stext s "{-# INCOHERENT #-}" -- No surface syntax for NONCANONICAL yet
   where
     maybe_stext NoSourceText     alt = text alt
     maybe_stext (SourceText src) _   = ftext src <+> text "#-}"

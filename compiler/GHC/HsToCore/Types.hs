@@ -79,9 +79,9 @@ data DsLclEnv
   -- ^ See Note [Long-distance information] in "GHC.HsToCore.Pmc".
   -- The set of reaching values Nablas is augmented as we walk inwards, refined
   -- through each pattern match in turn
-  , dsl_incoherents :: S.Set EvVar
-  -- ^ See Note [Desugaring incoherent evidence]: this field collects
-  -- all incoherent evidence variables in scope.
+  , dsl_unspecables :: S.Set EvVar
+  -- ^ See Note [Desugaring non-canonical evidence]: this field collects
+  -- all un-specialisable evidence variables in scope.
   }
 
 -- Inside [| |] brackets, the desugarer looks

@@ -2514,6 +2514,7 @@ reifyClassInstance is_poly_tvs i
                   Overlapping _   -> Just TH.Overlapping
                   Overlaps _      -> Just TH.Overlaps
                   Incoherent _    -> Just TH.Incoherent
+                  NonCanonical _  -> Just TH.Incoherent
 
 ------------------------------
 reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]

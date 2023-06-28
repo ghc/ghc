@@ -44,7 +44,7 @@ module GHC.Types.Basic (
         TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
-        hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
+        hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag, hasNonCanonicalFlag,
 
         Boxity(..), isBoxed,
 
@@ -674,6 +674,7 @@ hasIncoherentFlag :: OverlapMode -> Bool
 hasIncoherentFlag mode =
   case mode of
     Incoherent   _ -> True
+    NonCanonical _ -> True
     _              -> False
 
 hasOverlappableFlag :: OverlapMode -> Bool
@@ -682,6 +683,7 @@ hasOverlappableFlag mode =
     Overlappable _ -> True
     Overlaps     _ -> True
     Incoherent   _ -> True
+    NonCanonical _ -> True
     _              -> False
 
 hasOverlappingFlag :: OverlapMode -> Bool
@@ -690,7 +692,13 @@ hasOverlappingFlag mode =
     Overlapping  _ -> True
     Overlaps     _ -> True
     Incoherent   _ -> True
+    NonCanonical _ -> True
     _              -> False
+
+hasNonCanonicalFlag :: OverlapMode -> Bool
+hasNonCanonicalFlag = \case
+  NonCanonical{} -> True
+  _              -> False
 
 data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
   = NoOverlap SourceText
@@ -746,6 +754,16 @@ data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
     -- instantiating 'b' would change which instance
     -- was chosen. See also Note [Incoherent instances] in "GHC.Core.InstEnv"
 
+  | NonCanonical SourceText
+    -- ^ Behave like Incoherent, but the instance choice is observable
+    -- by the program behaviour. See Note [Coherence and specialisation: overview].
+    --
+    -- We don't have surface syntax for the distinction between
+    -- Incoherent and NonCanonical instances; instead, the flag
+    -- `-f{no-}specialise-incoherents` (on by default) controls
+    -- whether `INCOHERENT` instances are regarded as Incoherent or
+    -- NonCanonical.
+
   deriving (Eq, Data)
 
 
@@ -758,6 +776,7 @@ instance Outputable OverlapMode where
    ppr (Overlapping  _) = text "[overlapping]"
    ppr (Overlaps     _) = text "[overlap ok]"
    ppr (Incoherent   _) = text "[incoherent]"
+   ppr (NonCanonical _) = text "[noncanonical]"
 
 instance Binary OverlapMode where
     put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
@@ -765,6 +784,7 @@ instance Binary OverlapMode where
     put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
     put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
     put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+    put_ bh (NonCanonical s) = putByte bh 5 >> put_ bh s
     get bh = do
         h <- getByte bh
         case h of
@@ -773,6 +793,7 @@ instance Binary OverlapMode where
             2 -> (get bh) >>= \s -> return $ Incoherent s
             3 -> (get bh) >>= \s -> return $ Overlapping s
             4 -> (get bh) >>= \s -> return $ Overlappable s
+            5 -> (get bh) >>= \s -> return $ NonCanonical s
             _ -> panic ("get OverlapMode" ++ show h)
 
 
