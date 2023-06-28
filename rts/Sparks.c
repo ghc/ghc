@@ -119,11 +119,10 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
 {
     SparkPool *pool;
     StgClosurePtr spark, tmp, *elements;
-    uint32_t n, pruned_sparks; // stats only
+    uint32_t pruned_sparks; // stats only
     StgInt botInd,oldBotInd,currInd; // indices in array (always < size)
     const StgInfoTable *info;
 
-    n = 0;
     pruned_sparks = 0;
 
     pool = cap->sparks;
@@ -216,7 +215,6 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
               if (closure_SHOULD_SPARK(tmp)) {
                   elements[botInd] = tmp; // keep entry (new address)
                   botInd++;
-                  n++;
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.fizzled++;
@@ -246,7 +244,6 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
                   if (closure_SHOULD_SPARK(spark)) {
                       elements[botInd] = spark; // keep entry (new address)
                       botInd++;
-                      n++;
                   } else {
                       pruned_sparks++; // discard spark
                       cap->spark_stats.fizzled++;
@@ -264,7 +261,6 @@ pruneSparkQueue (bool nonmovingMarkFinished, Capability *cap)
                   // isAlive() also ignores static closures (see GCAux.c)
                   elements[botInd] = spark; // keep entry (new address)
                   botInd++;
-                  n++;
               } else {
                   pruned_sparks++; // discard spark
                   cap->spark_stats.fizzled++;
