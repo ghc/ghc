@@ -48,7 +48,7 @@ static void debug(const char *s, ...)
     va_end(ap);
 }
 #else
-#define debug(...)
+static void debug(const char *s STG_UNUSED, ...) {}
 #endif
 
 // number of blocks allocated for one stack

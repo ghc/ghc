@@ -902,14 +902,12 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // updated their snapshot pointers and move them to the sweep list.
     for (int alloca_idx = 0; alloca_idx < NONMOVING_ALLOCA_CNT; ++alloca_idx) {
         struct NonmovingSegment *filled = nonmovingHeap.allocators[alloca_idx].saved_filled;
-        uint32_t n_filled = 0;
         if (filled) {
             struct NonmovingSegment *seg = filled;
             while (true) {
                 // Set snapshot
                 nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
                 SET_SEGMENT_STATE(seg, FILLED_SWEEPING);
-                n_filled++;
                 if (seg->link) {
                     seg = seg->link;
                 } else {
@@ -1162,24 +1160,20 @@ void assert_in_nonmoving_heap(StgPtr p)
         }
 
         // Search active segments
-        int seg_idx = 0;
         struct NonmovingSegment *seg = alloca->active;
         while (seg) {
             if (p >= (P_)seg && p < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 return;
             }
-            seg_idx++;
             seg = seg->link;
         }
 
         // Search filled segments
-        seg_idx = 0;
         seg = alloca->filled;
         while (seg) {
             if (p >= (P_)seg && p < (((P_)seg) + NONMOVING_SEGMENT_SIZE_W)) {
                 return;
             }
-            seg_idx++;
             seg = seg->link;
         }
     }
