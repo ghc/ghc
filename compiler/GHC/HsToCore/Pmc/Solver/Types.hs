@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | Domain types used in "GHC.HsToCore.Pmc.Solver".
 -- The ultimate goal is to define 'Nabla', which models normalised refinement
@@ -241,7 +242,7 @@ instance Outputable BotInfo where
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt _ dirty) = text "<e-graph>" $$ ppr dirty
+  ppr (TmSt eg dirty) = text (show eg) $$ ppr dirty
 
 -- | Not user-facing.
 instance Outputable VarInfo where
@@ -829,6 +830,9 @@ instance Outputable PmEquality where
 --
 
 type TmEGraph = EGraph VarInfo (DeBruijnF CoreExprF)
+-- TODO delete orphans for showing TmEGraph for debugging reasons
+instance Show VarInfo where
+  show = showPprUnsafe . ppr
 
 representId :: Id -> Nabla -> (ClassId, Nabla)
 -- Will need to justify this well
@@ -842,7 +846,7 @@ representIds xs nabla = swap $ mapAccumL (\acc x -> swap $ representId x acc) na
 -- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
 -- There ought to be a better way.
 instance Eq VarInfo where
-  (==) _ _ = False
+  (==) a b = vi_id a == vi_id b
 instance Analysis VarInfo (DeBruijnF CoreExprF) where
   {-# INLINE makeA #-}
   {-# INLINE joinA #-}
@@ -864,4 +868,5 @@ instance Analysis VarInfo (DeBruijnF CoreExprF) where
   -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
   -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble
   joinA _a b = b
+
 

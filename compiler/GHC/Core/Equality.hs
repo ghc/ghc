@@ -26,7 +26,7 @@ import qualified Data.Equality.Graph.Monad as EGM
 import Data.Equality.Utils (Fix(..))
 
 import GHC.Utils.Misc (all2)
-import GHC.Utils.Outputable (showPprUnsafe)
+import GHC.Utils.Outputable
 import GHC.Core.Coercion (coercionType)
 
 -- Important to note the binders are also represented by $a$
@@ -343,16 +343,37 @@ cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
             GT -> GT
     go l r = compare l r
 
--- ROMES:TODO: DEBRUIJN ORDERING ON TYPES!!!
 cmpDeBruijnType :: DeBruijn Type -> DeBruijn Type -> Ordering
 cmpDeBruijnType d1@(D _ t1) d2@(D _ t2)
   = if eqDeBruijnType d1 d2
        then EQ
+       -- ROMES:TODO: Is this OK?
        else compare (showPprUnsafe t1) (showPprUnsafe t2)
-       
 
--- ROMES:TODO: DEBRUIJN ORDERING ON COERCIONS!!!
 cmpDeBruijnCoercion :: DeBruijn Coercion -> DeBruijn Coercion -> Ordering
 cmpDeBruijnCoercion (D env1 co1) (D env2 co2)
   = cmpDeBruijnType (D env1 (coercionType co1)) (D env2 (coercionType co2))
+
+-- instances for debugging purposes
+instance Show a => Show (DeBruijnF CoreExprF a) where
+  show (DF (D _ (VarF id) )) = showPprUnsafe $ text "VarF"  <+> ppr id
+  show (DF (D _ (LitF lit))) = showPprUnsafe $ text "LitF" <+> ppr lit
+  show (DF (D _ (AppF a b))) = "AppF " ++ show a ++ " " ++ show b
+  show (DF (D _ (LamF b a))) = showPprUnsafe (text "LamF" <+> ppr b <+> text "") ++ show a
+  show (DF (D _ (LetF b a))) = "LetF " ++ show b ++ " " ++ show a
+  show (DF (D _ (CaseF a b t alts))) = "CaseF " ++ show a ++ showPprUnsafe (ppr b <+> ppr t) ++ show alts
+
+  show (DF (D _ (CastF _a _cor)   )) = "CastF"
+  show (DF (D _ (TickF _cotick _a))) = "Tick"
+  show (DF (D _ (TypeF t)       )) = "TypeF " ++ showPprUnsafe (ppr t)
+  show (DF (D _ (CoercionF co)  )) = "CoercionF " ++ showPprUnsafe co
+
+
+instance Show a => Show (BindF CoreBndr a) where
+  show (NonRecF b a) = "NonRecF " ++ showPprUnsafe b ++ show a
+  show (RecF bs) = "RecF " ++ unwords (map (\(a,b) -> showPprUnsafe a ++ show b) bs)
+
+instance Show a => Show (AltF CoreBndr a) where
+  show (AltF alt bs a) = "AltF " ++ showPprUnsafe (ppr alt <+> ppr bs) ++ show a
+
 
