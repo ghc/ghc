@@ -691,6 +691,7 @@ GarbageCollect (struct GcConfig config,
         }
         copied +=  mut_list_size;
 
+#if defined(DEBUG)
         debugTrace(DEBUG_gc,
                    "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d TVARs, %d TVAR_WATCH_QUEUEs, %d TREC_CHUNKs, %d TREC_HEADERs, %d others)",
                    (unsigned long)(mut_list_size * sizeof(W_)),
@@ -702,6 +703,7 @@ GarbageCollect (struct GcConfig config,
                    mutlist_scav_stats.n_TREC_CHUNK,
                    mutlist_scav_stats.n_TREC_HEADER,
                    mutlist_scav_stats.n_OTHERS);
+#endif
     }
 
     bdescr *next, *prev;
