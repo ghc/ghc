@@ -53,7 +53,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
 import GHC.Data.Bag
-import GHC.Types.Basic  ( TypeOrKind(..) )
+import GHC.Types.Basic  ( TypeOrKind(..), TyConFlavour(..), TypeOrData(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.DynFlags
@@ -61,8 +61,9 @@ import GHC.Utils.Misc   ( lengthExceeds, partitionWith )
 import GHC.Utils.Panic
 import GHC.Driver.Env ( HscEnv(..), hsc_home_unit)
 import GHC.Data.List.SetOps ( findDupsEq, removeDupsOn, equivClasses )
-import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
-                               , stronglyConnCompFromEdgedVerticesUniq )
+import GHC.Data.Graph.Directed ( SCC, flattenSCC, Node(..)
+                               , stronglyConnCompFromEdgedVerticesUniq
+                               , stronglyConnCompFromEdgedVerticesOrd )
 import GHC.Types.Unique.Set
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
@@ -71,9 +72,9 @@ import GHC.Core.DataCon ( isSrcStrict )
 import Control.Monad
 import Control.Arrow ( first )
 import Data.Foldable ( toList )
-import Data.List ( mapAccumL )
-import Data.List.NonEmpty ( NonEmpty(..), head )
-import Data.Maybe ( isNothing, fromMaybe, mapMaybe )
+import Data.List ( sortBy )
+import Data.List.NonEmpty ( NonEmpty(..), head, groupAllWith )
+import Data.Maybe ( isNothing, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import GHC.Types.GREInfo (ConInfo, mkConInfo, conInfoFields)
 
@@ -1423,78 +1424,14 @@ rnTyClDecls tycl_ds
        ; rdr_env <- getGlobalRdrEnv
        ; traceRn "rnTyClDecls SCC analysis" $
            vcat [ text "rdr_env:" <+> ppr rdr_env ]
-       ; let tycl_sccs = depAnalTyClDecls rdr_env kisig_fv_env tycls_w_fvs
-             role_annot_env = mkRoleAnnotEnv role_annots
-             (kisig_env, kisig_fv_env) = mkKindSig_fv_env kisigs_w_fvs
-
-             inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
-             (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
-
-             first_group
-               | null init_inst_ds = []
-               | otherwise = [TyClGroup { group_ext    = noExtField
-                                        , group_tyclds = []
-                                        , group_kisigs = []
-                                        , group_roles  = []
-                                        , group_instds = init_inst_ds }]
-
-             (final_inst_ds, groups)
-                = mapAccumL (mk_group role_annot_env kisig_env) rest_inst_ds tycl_sccs
-
-             all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
+       ; let all_fvs = foldr (plusFV . snd) emptyFVs tycls_w_fvs  `plusFV`
                        foldr (plusFV . snd) emptyFVs instds_w_fvs `plusFV`
                        foldr (plusFV . snd) emptyFVs kisigs_w_fvs
 
-             all_groups = first_group ++ groups
-
-       ; massertPpr (null final_inst_ds)
-                    (ppr instds_w_fvs
-                     $$ ppr inst_ds_map
-                     $$ ppr (flattenSCCs tycl_sccs)
-                     $$ ppr final_inst_ds)
+             all_groups = depAnalTyClDecls rdr_env role_annots kisigs_w_fvs tycls_w_fvs instds_w_fvs
 
        ; traceRn "rnTycl dependency analysis made groups" (ppr all_groups)
        ; return (all_groups, all_fvs) }
-  where
-    mk_group :: RoleAnnotEnv
-             -> KindSigEnv
-             -> InstDeclFreeVarsMap
-             -> SCC (LTyClDecl GhcRn)
-             -> (InstDeclFreeVarsMap, TyClGroup GhcRn)
-    mk_group role_env kisig_env inst_map scc
-      = (inst_map', group)
-      where
-        tycl_ds              = flattenSCC scc
-        bndrs                = map (tcdName . unLoc) tycl_ds
-        roles                = getRoleAnnots bndrs role_env
-        kisigs               = getKindSigs   bndrs kisig_env
-        (inst_ds, inst_map') = getInsts      bndrs inst_map
-        group = TyClGroup { group_ext    = noExtField
-                          , group_tyclds = tycl_ds
-                          , group_kisigs = kisigs
-                          , group_roles  = roles
-                          , group_instds = inst_ds }
-
--- | Free variables of standalone kind signatures.
-newtype KindSig_FV_Env = KindSig_FV_Env (NameEnv FreeVars)
-
-lookupKindSig_FV_Env :: KindSig_FV_Env -> Name -> FreeVars
-lookupKindSig_FV_Env (KindSig_FV_Env e) name
-  = fromMaybe emptyFVs (lookupNameEnv e name)
-
--- | Standalone kind signatures.
-type KindSigEnv = NameEnv (LStandaloneKindSig GhcRn)
-
-mkKindSig_fv_env :: [(LStandaloneKindSig GhcRn, FreeVars)] -> (KindSigEnv, KindSig_FV_Env)
-mkKindSig_fv_env kisigs_w_fvs = (kisig_env, kisig_fv_env)
-  where
-    kisig_env = mapNameEnv fst compound_env
-    kisig_fv_env = KindSig_FV_Env (mapNameEnv snd compound_env)
-    compound_env :: NameEnv (LStandaloneKindSig GhcRn, FreeVars)
-      = mkNameEnvWith (standaloneKindSigName . unLoc . fst) kisigs_w_fvs
-
-getKindSigs :: [Name] -> KindSigEnv -> [LStandaloneKindSig GhcRn]
-getKindSigs bndrs kisig_env = mapMaybe (lookupNameEnv kisig_env) bndrs
 
 rnStandaloneKindSignatures
   :: NameSet  -- names of types and classes in the current TyClGroup
@@ -1519,27 +1456,6 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
-
-depAnalTyClDecls :: GlobalRdrEnv
-                 -> KindSig_FV_Env
-                 -> [(LTyClDecl GhcRn, FreeVars)]
-                 -> [SCC (LTyClDecl GhcRn)]
--- See Note [Dependency analysis of type, class, and instance decls]
-depAnalTyClDecls rdr_env kisig_fv_env ds_w_fvs
-  = stronglyConnCompFromEdgedVerticesUniq edges
-  where
-    edges :: [ Node Name (LTyClDecl GhcRn) ]
-    edges = [ DigraphNode d name (map (getParent rdr_env) (nonDetEltsUniqSet deps))
-            | (d, fvs) <- ds_w_fvs,
-              let { name = tcdName (unLoc d)
-                  ; kisig_fvs = lookupKindSig_FV_Env kisig_fv_env name
-                  ; deps = fvs `plusFV` kisig_fvs
-                  }
-            ]
-            -- It's OK to use nonDetEltsUFM here as
-            -- stronglyConnCompFromEdgedVertices is still deterministic
-            -- even if the edges are in nondeterministic order as explained
-            -- in Note [Deterministic SCC] in GHC.Data.Graph.Directed.
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns
@@ -2705,3 +2621,229 @@ add_bind _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_bind"
 add_sig :: LSig (GhcPass a) -> HsValBinds (GhcPass a) -> HsValBinds (GhcPass a)
 add_sig s (ValBinds x bs sigs) = ValBinds x bs (s:sigs)
 add_sig _ (XValBindsLR {})     = panic "GHC.Rename.Module.add_sig"
+
+
+----------------------------------------------------
+depAnalTyClDecls
+                 :: GlobalRdrEnv
+                 -> [LRoleAnnotDecl GhcRn]
+                 -> [(LStandaloneKindSig GhcRn, FreeVars)]
+                 -> [(LTyClDecl GhcRn, FreeVars)]
+                 -> [(LInstDecl GhcRn, FreeVars)]
+                 -> [TyClGroup GhcRn]
+depAnalTyClDecls rdr_env role_annots kisigs_w_fvs tycls_w_fvs instds_w_fvs =
+  concatMap (nestedDepAnalTyClDecls rdr_env) (stronglyConnCompFromEdgedVerticesOrd nodes)
+  where
+    kisig_fv_env :: NameEnv (LStandaloneKindSig GhcRn, FreeVars)
+    kisig_fv_env = mkNameEnvWith (standaloneKindSigName . unLoc . fst) kisigs_w_fvs
+
+    role_annot_env :: RoleAnnotEnv
+    role_annot_env = mkRoleAnnotEnv role_annots
+
+    insts :: [DepAnalInst]
+    insts = zipWith mk_inst [0..] instds_w_fvs
+      where
+        mk_inst i (inst, fvs) =
+          Inst { inst_index = i
+               , inst_name  = name
+               , inst_inst  = inst
+               , inst_fvs   = fvs }
+          where name = get_inst_name inst
+
+    decls :: [DepAnalDecl]
+    decls = map mk_decl tycls_w_fvs
+      where
+        mk_decl (decl, fvs) =
+          Decl { decl_name  = name
+               , decl_roles = roles
+               , decl_kisig = kisig
+               , decl_decl  = decl
+               , decl_fvs   = fvs `plusFV` kisig_fvs
+               }
+          where name = get_decl_name decl
+                roles = lookupRoleAnnot role_annot_env name
+                (kisig, kisig_fvs) = lookupKiSigFVs kisig_fv_env name
+
+    nodes :: [Node DepAnalKey DepAnalPayload]
+    nodes =
+      map (mk_decl_node get_deps) decls ++
+      map (mk_inst_node get_deps) insts
+
+    get_deps :: FreeVars -> [DepAnalKey]
+    get_deps = concatMap get_dep . mapMaybe (lookupGRE_Name rdr_env) . nonDetEltsUniqSet
+
+    get_dep :: GlobalRdrElt -> [DepAnalKey]
+    get_dep GRE{gre_name = name, gre_info = info, gre_par = par} =
+      case info of
+        IAmTyCon (OpenFamilyFlavour IAmType m_assoc) ->
+          case m_assoc of
+            Nothing -> DeclKey name : instances_of name
+            Just cls -> DeclKey cls : instances_of cls
+        _ ->
+          case par of
+            NoParent -> [DeclKey name]
+            ParentIs p -> [DeclKey p]
+
+    instances_of :: Name -> [DepAnalKey]
+    instances_of name =
+      case lookupNameEnv inst_groups name of
+        Nothing        -> []
+        Just (k :| ks) -> k : ks
+
+    inst_groups :: NameEnv (NonEmpty DepAnalKey)
+    inst_groups = (mkNameEnv . map mk_inst_group . groupAllWith inst_name) insts
+      where
+        mk_inst_group insts = (inst_name (head insts), fmap inst_key insts)
+          where inst_key inst = InstKey (inst_name inst) (inst_index inst)
+
+mk_decl_node :: (FreeVars -> [DepAnalKey]) -> DepAnalDecl -> Node DepAnalKey DepAnalPayload
+mk_decl_node get_deps decl = DigraphNode payload key deps
+  where
+    payload = DeclPayload decl
+    key = DeclKey (decl_name decl)
+    deps = get_deps (decl_fvs decl)
+
+mk_inst_node :: (FreeVars -> [DepAnalKey]) -> DepAnalInst -> Node DepAnalKey DepAnalPayload
+mk_inst_node get_deps inst = DigraphNode payload key deps
+  where
+    payload = InstPayload inst
+    key = InstKey (inst_name inst) (inst_index inst)
+    deps = get_deps (inst_fvs inst)
+
+{- Note [Nested dependency analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first pass of dependency analysis overapproximates the amount of dependencies,
+producing SCCs that are too big. Now we break them into smaller subgroups.
+
+TODO (int-index): explain why this happens.
+-}
+
+
+-- See [Nested dependency analysis]
+nestedDepAnalTyClDecls :: GlobalRdrEnv -> SCC DepAnalPayload -> [TyClGroup GhcRn]
+nestedDepAnalTyClDecls rdr_env initial_scc = first_groups ++ groups
+  where
+    decl_sccs :: [SCC DepAnalDecl]
+    decl_sccs = nested_dep_anal rdr_env decls
+
+    insts :: [DepAnalInst]
+    insts = [ inst | InstPayload inst <- flattenSCC initial_scc ]
+
+    decls :: [DepAnalDecl]
+    decls = [ decl | DeclPayload decl <- flattenSCC initial_scc ]
+
+    tc_names :: NameSet
+    tc_names = mkNameSet [ name | Decl{decl_name = name} <- decls ]
+
+    instds_w_fvs :: [(LInstDecl GhcRn, FreeVars)]
+    instds_w_fvs = [ (inst, fvs) | Inst{inst_inst = inst, inst_fvs = fvs} <- insts ]
+
+    inst_ds_map = mkInstDeclFreeVarsMap rdr_env tc_names instds_w_fvs
+    (init_inst_ds, rest_inst_ds) = getInsts [] inst_ds_map
+
+    mk_groups :: InstDeclFreeVarsMap
+              -> [SCC DepAnalDecl]
+              -> [TyClGroup GhcRn]
+    mk_groups final_inst_ds [] =
+      assertPpr
+        (null final_inst_ds)
+        (vcat [ ppr instds_w_fvs
+              , ppr inst_ds_map
+              , ppr final_inst_ds ])
+        []
+    mk_groups inst_map (scc : sccs) =
+        mk_decl_groups ds ++
+        mk_inst_groups inst_ds ++
+        mk_groups inst_map' sccs
+      where
+        ds = flattenSCC scc
+        (inst_ds, inst_map') = getInsts (map decl_name ds) inst_map
+
+    groups = mk_groups rest_inst_ds decl_sccs
+    first_groups = mk_inst_groups init_inst_ds
+
+nested_dep_anal :: GlobalRdrEnv -> [DepAnalDecl] -> [SCC DepAnalDecl]
+nested_dep_anal rdr_env decls =
+  stronglyConnCompFromEdgedVerticesUniq
+    [ DigraphNode decl name (get_deps fvs)
+    | decl@Decl{decl_name = name, decl_fvs = fvs} <- decls ]
+  where
+    get_deps :: FreeVars -> [Name]
+    get_deps = map get_dep . mapMaybe (lookupGRE_Name rdr_env) . nonDetEltsUniqSet
+
+    get_dep :: GlobalRdrElt -> Name
+    get_dep GRE{gre_name = name, gre_par = par} =
+      case par of
+        NoParent -> name
+        ParentIs p -> p
+
+mk_decl_groups :: [DepAnalDecl] -> [TyClGroup GhcRn]
+mk_decl_groups [] = []
+mk_decl_groups ds =
+    [foldr add_decl_payload empty_group ds]
+  where
+    add_decl_payload :: DepAnalDecl -> TyClGroup GhcRn -> TyClGroup GhcRn
+    add_decl_payload decl g =
+      TyClGroup { group_ext    = group_ext g
+                , group_tyclds = decl_decl decl : group_tyclds g
+                , group_kisigs = maybe id (:) (decl_kisig decl) (group_kisigs g)
+                , group_roles  = maybe id (:) (decl_roles decl) (group_roles g)
+                , group_instds = group_instds g }
+    empty_group = TyClGroup noExtField [] [] [] []
+
+mk_inst_groups :: [LInstDecl GhcRn] -> [TyClGroup GhcRn]
+mk_inst_groups inst_ds =
+    [ empty_group { group_instds = [inst] }
+    | inst <- sortBy cmpBufSpanA inst_ds ]
+  where
+    empty_group = TyClGroup noExtField [] [] [] []
+
+lookupKiSigFVs :: NameEnv (LStandaloneKindSig GhcRn, FreeVars) -> Name -> (Maybe (LStandaloneKindSig GhcRn), FreeVars)
+lookupKiSigFVs env name =
+  case lookupNameEnv env name of
+    Nothing -> (Nothing, emptyFVs)
+    Just (kisig, fvs) -> (Just kisig, fvs)
+
+data DepAnalInst =
+  Inst { inst_index :: Int
+       , inst_name  :: Name
+       , inst_inst  :: LInstDecl GhcRn
+       , inst_fvs   :: FreeVars }
+
+data DepAnalDecl =
+  Decl { decl_name  :: Name
+       , decl_roles :: Maybe (LRoleAnnotDecl GhcRn)
+       , decl_kisig :: Maybe (LStandaloneKindSig GhcRn)
+       , decl_decl  :: LTyClDecl GhcRn
+       , decl_fvs   :: FreeVars }
+
+data DepAnalKey =
+    InstKey Name Int
+  | DeclKey Name
+  deriving (Eq, Ord)
+
+data DepAnalPayload = --  TyClGroupBuilder (TyClGroup GhcRn -> TyClGroup GhcRn)
+    InstPayload DepAnalInst
+  | DeclPayload DepAnalDecl
+
+cmpBufSpanA :: GenLocated (SrcSpanAnn' a1) a2 -> GenLocated (SrcSpanAnn' a3) a2 -> Ordering
+cmpBufSpanA (L la a) (L lb b) = cmpBufSpan (L (locA la) a) (L (locA lb) b)
+
+get_decl_name :: LTyClDecl GhcRn -> Name
+get_decl_name = tcdName . unLoc
+
+get_inst_name :: LInstDecl GhcRn -> Name
+get_inst_name (L _ inst) =
+  unLoc $ case inst of
+    ClsInstD { cid_inst = inst } ->
+        go ((unLoc . sig_body . unLoc . cid_poly_ty) inst)
+      where
+        go (HsTyVar _ _ name) = name
+        go (HsOpTy _ _ _ name _) = name
+        go HsQualTy{hst_body = L _ ty} = go ty
+        go (HsAppTy _ (L _ ty) _) = go ty
+        go (HsAppKindTy _ (L _ ty) _ _) = go ty
+        go (HsParTy _ (L _ ty)) = go ty
+        go _ = panic "get_inst_name: unsupported class instance head"
+    DataFamInstD { dfid_inst = inst } -> (feqn_tycon . dfid_eqn) inst
+    TyFamInstD { tfid_inst = inst } -> (feqn_tycon . tfid_eqn) inst

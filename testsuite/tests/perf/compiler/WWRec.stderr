@@ -1,0 +1,14 @@
+
+WWRec.hs:72:10: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Rule f A30’ matches
+        instance Rule f A1 => Rule f A30 -- Defined at WWRec.hs:73:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘Rule f A29’
+
+WWRec.hs:73:10: warning: [GHC-62412] [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘Rule f A1’ matches
+        instance Rule f A2 => Rule f A1 -- Defined at WWRec.hs:44:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the instance declaration for ‘Rule f A30’
