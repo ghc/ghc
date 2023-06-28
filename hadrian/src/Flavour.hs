@@ -127,9 +127,9 @@ werror =
     ( builder Ghc
         ? notStage0
         ? mconcat
-          [ arg "-Werror",
-            flag CrossCompiling
-              ? package unix
+          [ arg "-Werror"
+            -- unix has many unused imports
+          , package unix
               ? mconcat [arg "-Wwarn=unused-imports", arg "-Wwarn=unused-top-binds"]
           ]
     )
