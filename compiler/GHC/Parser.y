@@ -1026,14 +1026,14 @@ exportlist1 :: { OrdList (LIE GhcPs) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE GhcPs) }
-        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 (comb3 . reLoc) $1) (reLoc $2) $> }
+        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) (reLoc $2) $> }
                                                           ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ unitOL $ reLocA $ sL span $ impExp } }
-        | maybeexportwarning 'module' modid            {% do { let { span = (maybe comb2 (comb3 . reLoc) $1) $2 (reLoc $>)
+        | maybeexportwarning 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                    ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
                                                           ; locImpExp <- acs (\cs -> sL span (IEModuleContents ($1, EpAnn anchor [mj AnnModule $2] cs) $3))
                                                           ; return $ unitOL $ reLocA $ locImpExp } }
-        | maybeexportwarning 'pattern' qcon            { let span = (maybe comb2 (comb3 . reLoc) $1) $2 (reLoc $>)
+        | maybeexportwarning 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
                                                        in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 (reLocN $>) (IEPattern (glAA $2) $3)) }
 
 maybeexportwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
@@ -1371,7 +1371,7 @@ inst_decl :: { LInstDecl GhcPs }
                                      , cid_tyfam_insts = ats
                                      , cid_overlap_mode = $2
                                      , cid_datafam_insts = adts }
-             ; acsA (\cs -> L (comb3 $1 (reLoc $3) $4)
+             ; acsA (\cs -> L (comb3 $1 $3 $4)
                              (ClsInstD { cid_d_ext = noExtField, cid_inst = cid cs }))
                    } }
 
@@ -1498,7 +1498,7 @@ ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
 at_decl_cls :: { LHsDecl GhcPs }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_datafam_kind_sig
-                {% liftM mkTyClD (mkFamDecl (comb3 $1 (reLoc $3) $4) DataFamily NotTopLevel $3
+                {% liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily NotTopLevel $3
                                                   (snd $ unLoc $4) Nothing
                         (mj AnnData $1:$2++(fst $ unLoc $4))) }
 
@@ -1506,13 +1506,13 @@ at_decl_cls :: { LHsDecl GhcPs }
            -- (can't use opt_instance because you get shift/reduce errors
         | 'type' type opt_at_kind_inj_sig
                {% liftM mkTyClD
-                        (mkFamDecl (comb3 $1 (reLoc $2) $3) OpenTypeFamily NotTopLevel $2
+                        (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily NotTopLevel $2
                                    (fst . snd $ unLoc $3)
                                    (snd . snd $ unLoc $3)
                          (mj AnnType $1:(fst $ unLoc $3)) )}
         | 'type' 'family' type opt_at_kind_inj_sig
                {% liftM mkTyClD
-                        (mkFamDecl (comb3 $1 (reLoc $3) $4) OpenTypeFamily NotTopLevel $3
+                        (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily NotTopLevel $3
                                    (fst . snd $ unLoc $4)
                                    (snd . snd $ unLoc $4)
                          (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)))}
@@ -1651,7 +1651,7 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
 
 role_annot :: { LRoleAnnotDecl GhcPs }
 role_annot : 'type' 'role' oqtycon maybe_roles
-          {% mkRoleAnnotDecl (comb3N $1 $4 $3) $3 (reverse (unLoc $4))
+          {% mkRoleAnnotDecl (comb3 $1 $4 $3) $3 (reverse (unLoc $4))
                    [mj AnnType $1,mj AnnRole $2] }
 
 -- Reversed!
@@ -2594,7 +2594,7 @@ decl    :: { LHsDecl GhcPs }
 rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
         : '=' exp wherebinds    {% runPV (unECP $2) >>= \ $2 ->
                                   do { let L l (bs, csw) = adaptWhereBinds $3
-                                     ; let loc = (comb3 $1 (reLoc $2) (L l bs))
+                                     ; let loc = (comb3 $1 $2 (L l bs))
                                      ; acs (\cs ->
                                        sL loc (GRHSs csw (unguardedRHS (EpAnn (anc $ rs loc) (GrhsAnn Nothing (mj AnnEqual $1)) cs) loc $2)
                                                       bs)) } }
@@ -2907,7 +2907,7 @@ aexp    :: { ECP }
         | 'case' exp 'of' altslist(pats1) {% runPV (unECP $2) >>= \ ($2 :: LHsExpr GhcPs) ->
                                              return $ ECP $
                                                $4 >>= \ $4 ->
-                                               mkHsCasePV (comb3 $1 $3 (reLoc $4)) $2 $4
+                                               mkHsCasePV (comb3 $1 $3 $4) $2 $4
                                                     (EpAnnHsCase (glAA $1) (glAA $3) []) }
         -- QualifiedDo.
         | DO  stmtlist               {% do
@@ -4090,17 +4090,9 @@ stringLiteralToHsDocWst  = lexStringLiteral parseIdentifier
 comb2 :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 comb2 a b = a `seq` b `seq` combineHasLocs a b
 
-comb3 :: Located a -> Located b -> Located c -> SrcSpan
+comb3 :: (HasLoc a, HasLoc b, HasLoc c) => a -> b -> c -> SrcSpan
 comb3 a b c = a `seq` b `seq` c `seq`
-    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLoc c))
-
-comb3A :: Located a -> Located b -> LocatedAn t c -> SrcSpan
-comb3A a b c = a `seq` b `seq` c `seq`
-    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLocA c))
-
-comb3N :: Located a -> Located b -> LocatedN c -> SrcSpan
-comb3N a b c = a `seq` b `seq` c `seq`
-    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLocA c))
+    combineSrcSpans (getHasLoc a) (combineHasLocs b c)
 
 comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
