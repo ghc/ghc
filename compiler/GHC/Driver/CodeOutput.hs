@@ -281,7 +281,7 @@ outputForeignStubs logger tmpfs dflags unit_state mod location stubs
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
-              | platformMisc_libFFI $ platformMisc dflags = "#include <ffi.h>\n"
+              | platformMisc_libFFI $ platformMisc dflags = "#include \"rts/ghc_ffi.h\"\n"
               | otherwise = ""
 
         stub_h_file_exists

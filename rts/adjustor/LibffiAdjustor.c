@@ -11,7 +11,7 @@
 #include "Hash.h"
 #include "Adjustor.h"
 
-#include "ffi.h"
+#include "rts/ghc_ffi.h"
 #include <string.h>
 
 /* Maps AdjustorExecutable* to AdjustorWritable*. */

@@ -53,7 +53,7 @@
 
 #include <string.h>
 
-#include "ffi.h"
+#include "rts/ghc_ffi.h"
 
 /*
  * All these globals require sm_mutex to access in THREADED_RTS mode.
