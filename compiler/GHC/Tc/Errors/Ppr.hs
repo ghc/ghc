@@ -1099,8 +1099,11 @@ instance Diagnostic TcRnMessage where
           , pprWarningTxtForMsg pragma_warning_msg ]
           where
             impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
-            extra | maybe True (pragma_warning_import_mod ==) pragma_warning_defined_mod = empty
-                  | otherwise = text ", but defined in" <+> ppr pragma_warning_defined_mod
+            extra = case pragma_warning_defined_mod of
+                      Just def_mod
+                        | def_mod /= pragma_warning_import_mod
+                          -> text ", but defined in" <+> ppr def_mod
+                      _ -> empty
     TcRnDifferentExportWarnings name locs
       -> mkSimpleDecorated $ vcat [quotes (ppr name) <+> text "exported with different error messages",
                                    text "at" <+> vcat (map ppr $ sortBy leftmost_smallest $ NE.toList locs)]
