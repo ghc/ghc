@@ -235,26 +235,25 @@ void traceThreadLabel_(Capability *cap,
                        char       *label,
                        size_t      len);
 
+
+#if defined(DEBUG)
+#define DEBUG_RTS 1
+#else
+#define DEBUG_RTS 0
+#endif
+
 /*
  * Emit a debug message (only when DEBUG is defined)
  */
-#if defined(DEBUG)
 #define debugTrace(class, msg, ...)             \
-    if (RTS_UNLIKELY(class)) {                  \
+    if (DEBUG_RTS && RTS_UNLIKELY(class)) {     \
         trace_(msg, ##__VA_ARGS__);             \
     }
-#else
-#define debugTrace(class, str, ...) /* nothing */
-#endif
 
-#if defined(DEBUG)
-#define debugTraceCap(class, cap, msg, ...)      \
-    if (RTS_UNLIKELY(class)) {                  \
+#define debugTraceCap(class, cap, msg, ...)     \
+    if (DEBUG_RTS && RTS_UNLIKELY(class)) {     \
         traceCap_(cap, msg, ##__VA_ARGS__);     \
     }
-#else
-#define debugTraceCap(class, cap, str, ...) /* nothing */
-#endif
 
 /*
  * Emit a message/event describing the state of a thread
