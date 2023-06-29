@@ -251,7 +251,7 @@ Implementor's notes: DWARF annotations
    interpret the GHC-specific DWARF annotations contained in compiled binaries.
 
 When invoked with the ``-g`` flag GHC will produce standard `DWARF v4
-<http://dwarfstd.org/>`__ debugging information. This format is used by nearly
+<https://dwarfstd.org/>`__ debugging information. This format is used by nearly
 all POSIX-compliant targets and can be used by debugging and performance tools
 (e.g. ``gdb``, ``lldb``, and ``perf``) to understand the structure of
 GHC-compiled programs.
