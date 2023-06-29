@@ -315,11 +315,18 @@ test('T13379',
      compile,
      [''])
 
-# MultiLayerModules flip flops by 2.5%, depending on the
-# number of modules within GHC (#19293). Just widen the
-# acceptance window until we figured out how to fix it.
+# Note [Increased initial stack size for MultiLayerModules]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# The MultiLayerModules test, and a few other tests like it, had a
+# tendency to fluctuate wildly with the default initial stack size of
+# 1k (see #19293), presumably because it creates threads that happen
+# to need very close to 1k of peak stack space. Increasing the initial
+# stack size to 2k via the -ki RTS option seems to avoid this problem
+# (though the size of the fluctuations does perhaps suggest that it
+# would be valuable to solve the pathology in a more general way).
+
 test('MultiLayerModules',
-     [ collect_compiler_stats('bytes allocated',3),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
        compile_timeout_multiplier(5)
@@ -329,14 +336,12 @@ test('MultiLayerModules',
        # to complete successfully reliably everywhere.
      ],
      multimod_compile,
-     ['MultiLayerModules', '-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['MultiLayerModules', '-v0 +RTS -ki2k -kb2k -RTS'])
 
 
-# MultiLayerModules flip flops by 2.5%, depending on the
-# number of modules within GHC (#19293). Just widen the
-# acceptance window until we figured out how to fix it.
 test('MultiLayerModulesRecomp',
-     [ collect_compiler_stats('bytes allocated',3),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiModulesRecomp'),
        extra_files(['genMultiLayerModules']),
        compile_timeout_multiplier(5)
@@ -346,30 +351,33 @@ test('MultiLayerModulesRecomp',
        # to complete successfully reliably everywhere.
      ],
      multimod_compile,
-     ['MultiLayerModules', '-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['MultiLayerModules', '-v0 +RTS -ki2k -kb2k -RTS'])
 
 
 # A performance test for calculating link dependencies in --make mode.
 test('MultiLayerModulesTH_Make',
-     [ collect_compiler_stats('bytes allocated',3),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_Make_Prep'),
        extra_files(['genMultiLayerModulesTH']),
        unless(have_dynamic(),skip),
        compile_timeout_multiplier(5)
      ],
      multimod_compile_fail,
-     ['MultiLayerModules', '-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['MultiLayerModules', '-v0 +RTS -ki2k -kb2k -RTS'])
 
 # A performance test for calculating link dependencies in -c mode.
 test('MultiLayerModulesTH_OneShot',
-     [ collect_compiler_stats('bytes allocated',3),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('$MAKE -s --no-print-directory MultiLayerModulesTH_OneShot_Prep'),
        extra_files(['genMultiLayerModulesTH']),
        unless(have_dynamic(),skip),
        compile_timeout_multiplier(5)
      ],
      compile_fail,
-     ['-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['-v0 +RTS -ki2k -kb2k -RTS'])
 
 test('MultiLayerModulesDefsGhci',
      [ collect_compiler_residency(15),
@@ -466,7 +474,8 @@ test('T13701',
        # to complete successfully reliably everywhere.
      ],
      multimod_compile,
-     ['T13701', '-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['T13701', '-v0 +RTS -ki2k -kb2k -RTS'])
 
 test('T13719',
      [ collect_compiler_stats('bytes allocated',2),
@@ -492,7 +501,8 @@ test('T14697',
        extra_hc_opts('$(cat T14697-flags)'), # 10k -optP arguments
      ],
      multimod_compile,
-     ['T14697', '-v0'])
+     # see Note [Increased initial stack size for MultiLayerModules]
+     ['T14697', '-v0 +RTS -ki2k -kb2k -RTS'])
 
 test('T14683',
      [ collect_compiler_stats('bytes allocated',2),
@@ -680,4 +690,3 @@ test('T22744',
      ],
      multimod_compile,
      ['T22744', '-v0'])
-
