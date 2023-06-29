@@ -102,7 +102,6 @@ module GHC.Driver.Session (
         sPgm_a,
         sPgm_l,
         sPgm_lm,
-        sPgm_T,
         sPgm_windres,
         sPgm_ar,
         sPgm_ranlib,
@@ -136,7 +135,7 @@ module GHC.Driver.Session (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
-        pgm_T, pgm_windres, pgm_ar,
+        pgm_windres, pgm_ar,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_las, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
@@ -405,8 +404,6 @@ pgm_l                 :: DynFlags -> (String,[Option])
 pgm_l dflags = toolSettings_pgm_l $ toolSettings dflags
 pgm_lm                 :: DynFlags -> Maybe (String,[Option])
 pgm_lm dflags = toolSettings_pgm_lm $ toolSettings dflags
-pgm_T                 :: DynFlags -> String
-pgm_T dflags = toolSettings_pgm_T $ toolSettings dflags
 pgm_windres           :: DynFlags -> String
 pgm_windres dflags = toolSettings_pgm_windres $ toolSettings dflags
 pgm_ar                :: DynFlags -> String

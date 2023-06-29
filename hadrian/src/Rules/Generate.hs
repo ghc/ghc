@@ -392,7 +392,6 @@ generateSettings = do
         , ("ranlib command", queryTarget ranlibPath)
         , ("otool command", expr $ settingsFileSetting ToolchainSetting_OtoolCommand)
         , ("install_name_tool command", expr $ settingsFileSetting ToolchainSetting_InstallNameToolCommand)
-        , ("touch command", expr $ settingsFileSetting ToolchainSetting_TouchCommand)
         , ("windres command", queryTarget (maybe "/bin/false" prgPath . tgtWindres)) -- TODO: /bin/false is not available on many distributions by default, but we keep it as it were before the ghc-toolchain patch. Fix-me.
         , ("unlit command", ("$topdir/../bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)

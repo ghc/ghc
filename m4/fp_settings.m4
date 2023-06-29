@@ -74,12 +74,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsWindresCommand="$WindresCmd"
     fi
 
-    if test "$HostOS" = "mingw32"; then
-        SettingsTouchCommand='$$topdir/../bin/touchy.exe'
-    else
-        SettingsTouchCommand='touch'
-    fi
-
     if test "$EnableDistroToolchain" = "YES"; then
         # If the user specified --enable-distro-toolchain then we just use the
         # executable names, not paths.
@@ -109,7 +103,6 @@ AC_DEFUN([FP_SETTINGS],
         SUBST_TOOLDIR([SettingsArCommand])
         SUBST_TOOLDIR([SettingsRanlibCommand])
         SUBST_TOOLDIR([SettingsWindresCommand])
-        SettingsTouchCommand='$$topdir/../bin/touchy.exe'
     fi
 
     # LLVM backend tools
@@ -158,7 +151,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsOtoolCommand)
     AC_SUBST(SettingsInstallNameToolCommand)
     AC_SUBST(SettingsWindresCommand)
-    AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsLlvmAsCommand)
