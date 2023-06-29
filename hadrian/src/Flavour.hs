@@ -138,6 +138,8 @@ werror =
           [ arg "-optc-Werror"
             -- clang complains about #pragma GCC pragmas
           , arg "-optc-Wno-error=unknown-pragmas"
+            -- rejected inlinings are highly dependent upon toolchain and way
+          , arg "-optc-Wno-error=inline"
           ]
       -- N.B. We currently don't build the boot libraries' C sources with -Werror
       -- as this tends to be a portability nightmare.
