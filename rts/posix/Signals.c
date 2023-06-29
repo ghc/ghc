@@ -368,8 +368,10 @@ int
 stg_sig_install(int sig, int spi, void *mask)
 {
     sigset_t signals, osignals;
-    struct sigaction action;
     StgInt previous_spi;
+
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
 
     ACQUIRE_LOCK(&sig_mutex);
 
@@ -619,6 +621,7 @@ static void
 set_sigtstp_action (bool handle)
 {
     struct sigaction sa;
+    memset(&sa, 0, sizeof(struct sigaction));
     if (handle) {
         sa.sa_handler = sigtstp_handler;
     } else {
@@ -635,7 +638,8 @@ set_sigtstp_action (bool handle)
 void
 install_vtalrm_handler(int sig, TickProc handle_tick)
 {
-    struct sigaction action = {};
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
 
     action.sa_handler = handle_tick;
 
@@ -677,8 +681,11 @@ install_vtalrm_handler(int sig, TickProc handle_tick)
 void
 initDefaultHandlers(void)
 {
-    struct sigaction action = {};
-    struct sigaction oact = {};
+    // N.B. We can't use initializers here as CentOS's ancient toolchain throws
+    // spurious warnings. See #23577.
+    struct sigaction action, oact;
+    memset(&oact, 0, sizeof(struct sigaction));
+    memset(&action, 0, sizeof(struct sigaction));
 
     // install the SIGINT handler
     action.sa_handler = shutdown_handler;
