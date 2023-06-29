@@ -116,5 +116,6 @@ AC_DEFUN([FP_FIND_LIBZSTD],
   else
     AC_SUBST([UseLibZstd],[NO])
     AC_SUBST([CabalHaveLibZstd],[False])
+    AC_SUBST([CabalStaticLibZstd],[False])
   fi
 ])
