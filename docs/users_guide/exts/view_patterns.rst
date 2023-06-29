@@ -119,8 +119,8 @@ follows:
    into a single nested case expression, so that the view function is
    only applied once. Pattern compilation in GHC follows the matrix
    algorithm described in Chapter 4 of `The Implementation of Functional
-   Programming
-   Languages <https://research.microsoft.com/~simonpj/Papers/slpj-book-1987/>`__.
+   Programming Languages
+   <https://www.microsoft.com/en-us/research/wp-content/uploads/1987/01/slpj-book-1987-small.pdf>`__.
    When the top rows of the first column of a matrix are all view
    patterns with the "same" expression, these patterns are transformed
    into a single nested case. This includes, for example, adjacent view

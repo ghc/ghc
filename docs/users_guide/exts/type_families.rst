@@ -51,7 +51,7 @@ families <https://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
 
 .. [AssocDataTypes2005]
     “`Associated Types with Class
-    <http://www.cse.unsw.edu.au/~chak/papers/CKPM05.html>`__\ ”, M.
+    <https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/assoc.pdf>`__\ ”, M.
     Chakravarty, G. Keller, S. Peyton Jones,
     and S. Marlow. In Proceedings of “The 32nd Annual
     ACM SIGPLAN-SIGACT Symposium on Principles of
@@ -59,15 +59,15 @@ families <https://www.haskell.org/haskellwiki/GHC/Indexed_types>`__.
     Press, 2005.
 
 .. [AssocTypeSyn2005]
-    “`Type Associated Type
-    Synonyms <http://www.cse.unsw.edu.au/~chak/papers/CKP05.html>`__\ ”. M.
+    “`Associated Type Synonyms
+    <https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/at-syns.pdf>`__\ ”, M.
     Chakravarty, G. Keller, and S. Peyton Jones. In Proceedings of “The
     Tenth ACM SIGPLAN International Conference on Functional Programming”,
     ACM Press, pages 241-253, 2005.
 
 .. [TypeFamilies2008]
-    “\ `Type Checking with Open Type
-    Functions <http://www.cse.unsw.edu.au/~chak/papers/SPCS08.html>`__\ ”,
+    “\ `Type Checking with Open Type Functions
+    <https://www.microsoft.com/en-us/research/wp-content/uploads/2008/01/icfp2008.pdf>`__\ ”,
     T. Schrijvers, S. Peyton-Jones, M. Chakravarty, and M. Sulzmann, in
     Proceedings of “ICFP 2008: The 13th ACM SIGPLAN International Conference
     on Functional Programming”, ACM Press, pages 51-62, 2008.
@@ -548,8 +548,8 @@ Decidability of type synonym instances
 In order to guarantee that type inference in the presence of type
 families is decidable, we need to place a number of additional restrictions
 on the formation of type instance declarations (c.f., Definition 5
-(Relaxed Conditions) of “\ `Type Checking with Open Type
-Functions <http://www.cse.unsw.edu.au/~chak/papers/SPCS08.html>`__\ ”).
+(Relaxed Conditions) of “\ `Type Checking with Open Type Functions
+<https://www.microsoft.com/en-us/research/wp-content/uploads/2008/01/icfp2008.pdf>`__\ ”).
 Instance declarations have the general form ::
 
     type instance F t1 .. tn = t
@@ -1158,7 +1158,7 @@ will be possible to infer ``t`` at call sites from the type of the argument: ::
 Injective type families are enabled with ``-XTypeFamilyDependencies`` language
 extension.  This extension implies ``-XTypeFamilies``.
 
-For full details on injective type families refer to Haskell Symposium
+For full details on injective type families refer to the Haskell Symposium
 2015 paper `Injective type families for
 Haskell <https://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones_eisenberg_injectivity_extended.pdf>`__.
 
