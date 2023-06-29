@@ -28,6 +28,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Types.GREInfo
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
@@ -51,6 +52,11 @@ import GHC.Utils.Panic
 import Control.Monad ( liftM )
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+
+import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
+import Data.List ( intersect )
+
 
 {-
 Note [ATyCon for classes]
@@ -301,15 +307,24 @@ tyThingLocalGREs ty_thing =
                | dc <- dcs
                , let con_info = conLikeConInfo (RealDataCon dc) ]
     AConLike con ->
-      let par = case con of
-                  PatSynCon {} -> NoParent
-                  -- NoParent for local pattern synonyms as per
-                  -- Note [Parents] in GHC.Types.Name.Reader.
-                  RealDataCon dc -> ParentIs $ tyConName $ dataConTyCon dc
-      in
-        myself par :
-          mkLocalFieldGREs par
-            [(conLikeConLikeName con, conLikeConInfo con)]
+      let (par, cons_flds) = case con of
+            PatSynCon {} ->
+              (NoParent, [(conLikeConLikeName con, conLikeConInfo con)])
+              -- NB: NoParent for local pattern synonyms, as per
+              -- Note [Parents] in GHC.Types.Name.Reader.
+            RealDataCon dc1 ->
+              (ParentIs $ tyConName $ dataConTyCon dc1
+              , [ (DataConName $ dataConName $ dc, ConHasRecordFields (fld :| flds))
+                | dc <- tyConDataCons $ dataConTyCon dc1
+                -- Go through all the data constructors of the parent TyCon,
+                -- to ensure that all the record fields have the correct set
+                -- of parent data constructors. See #23546.
+                , let con_info = conLikeConInfo (RealDataCon dc)
+                , ConHasRecordFields flds0 <- [con_info]
+                , let flds1 = NE.toList flds0 `intersect` dataConFieldLabels dc
+                , fld:flds <- [flds1]
+                ])
+      in myself par : mkLocalFieldGREs par cons_flds
     AnId id
       | RecSelId { sel_tycon = RecSelData tc } <- idDetails id
       -> [ myself (ParentIs $ tyConName tc) ]
