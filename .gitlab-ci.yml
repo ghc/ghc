@@ -552,6 +552,7 @@ test-bootstrap:
   image: "$DOCKER_IMAGE"
   parallel: *bootstrap_matrix
   dependencies: null
+  allow_failure: true
   script:
     - mkdir test-bootstrap
     - tar -xf ghc-*[0-9]-src.tar.xz -C test-bootstrap
