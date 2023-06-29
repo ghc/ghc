@@ -117,7 +117,6 @@ stage0Packages = do
              ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
-          ++ [ touchy   | windowsHost                ]
 
 -- | Packages built in 'Stage1' by default. You can change this in "UserSettings".
 stage1Packages :: Action [Package]
@@ -170,9 +169,8 @@ stage1Packages = do
         , ghcToolchainBin
         ]
       , when (winTarget && not cross)
-        [ touchy
-         -- See Note [Hadrian's ghci-wrapper package]
-        , ghciWrapper
+        [ -- See Note [Hadrian's ghci-wrapper package]
+          ghciWrapper
         ]
       ]
 

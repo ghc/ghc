@@ -227,7 +227,6 @@ SettingsInstallNameToolCommand = @SettingsInstallNameToolCommand@
 SettingsRanlibCommand = @SettingsRanlibCommand@
 SettingsWindresCommand = @SettingsWindresCommand@
 SettingsLibtoolCommand = @SettingsLibtoolCommand@
-SettingsTouchCommand = @SettingsTouchCommand@
 SettingsLlcCommand = @SettingsLlcCommand@
 SettingsOptCommand = @SettingsOptCommand@
 SettingsLlvmAsCommand = @SettingsLlvmAsCommand@

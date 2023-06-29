@@ -317,6 +317,3 @@ runWindres logger dflags args = traceSystoolCommand logger "windres" $ do
   mb_env <- getGccEnv cc_args
   runSomethingFiltered logger id "Windres" windres (opts ++ args) Nothing mb_env
 
-touch :: Logger -> DynFlags -> String -> String -> IO ()
-touch logger dflags purpose arg = traceSystoolCommand logger "touch" $
-  runSomething logger purpose (pgm_T dflags) [FileOption "" arg]

@@ -933,6 +933,7 @@ Library
         GHC.Utils.Ppr
         GHC.Utils.Ppr.Colour
         GHC.Utils.TmpFs
+        GHC.Utils.Touch
         GHC.Utils.Trace
         GHC.Utils.Unique
         GHC.Utils.Word64

@@ -240,11 +240,9 @@ instance H.Builder Builder where
           pure []
         Ghc {} -> do
             root <- buildRoot
-            touchyPath <- programPath (vanillaContext (Stage0 InTreeLibs) touchy)
             unlitPath  <- builderPath Unlit
 
             return $ [ unlitPath ]
-                  ++ [ touchyPath          | windowsHost ]
                   ++ [ root -/- mingwStamp | windowsHost ]
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at

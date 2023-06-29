@@ -71,6 +71,7 @@ import System.IO
 import GHC.Linker.ExtraObj
 import GHC.Linker.Dynamic
 import GHC.Utils.Panic
+import GHC.Utils.Touch
 import GHC.Unit.Module.Env
 import GHC.Driver.Env.KnotVars
 import GHC.Driver.Config.Finder
@@ -376,14 +377,10 @@ runAsPhase =
 
 -- | Run the JS Backend postHsc phase.
 runJsPhase :: PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> IO FilePath
-runJsPhase _pipe_env hsc_env _location input_fn = do
-  let dflags     = hsc_dflags   hsc_env
-  let logger     = hsc_logger   hsc_env
-
+runJsPhase _pipe_env _hsc_env _location input_fn = do
   -- The object file is already generated. We only touch it to ensure the
   -- timestamp is refreshed, see Note [JS Backend .o file procedure].
-  touchObjectFile logger dflags input_fn
-
+  touchObjectFile input_fn
   return input_fn
 
 -- | Deal with foreign JS files (embed them into .o files)
@@ -551,7 +548,7 @@ runHscBackendPhase pipe_env hsc_env mod_name src_flavour location result = do
 
                    -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
-                   HsBootFile -> touchObjectFile logger dflags o_file
+                   HsBootFile -> touchObjectFile o_file
                    HsSrcFile -> panic "HscUpdate not relevant for HscSrcFile"
 
                  -- MP: I wonder if there are any lurking bugs here because we
@@ -1141,10 +1138,10 @@ linkDynLibCheck logger tmpfs dflags unit_env o_files dep_units = do
 
 
 
-touchObjectFile :: Logger -> DynFlags -> FilePath -> IO ()
-touchObjectFile logger dflags path = do
+touchObjectFile :: FilePath -> IO ()
+touchObjectFile path = do
   createDirectoryIfMissing True $ takeDirectory path
-  GHC.SysTools.touch logger dflags "Touching object file" path
+  GHC.Utils.Touch.touch path
 
 -- Note [-fPIC for assembler]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~

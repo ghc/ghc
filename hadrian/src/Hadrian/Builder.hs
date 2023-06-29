@@ -49,8 +49,8 @@ class ShakeValue b => Builder b where
     -- capture the @stdout@ result and return it.
     askBuilderWith :: b -> BuildInfo -> Action String
 
-    -- | Runtime dependencies of a builder. For example, on Windows GHC requires
-    -- the utility @touchy.exe@ to be available on a specific path.
+    -- | Runtime dependencies of a builder. For example, GHC requires the
+    -- utility @unlit@ to be available on a specific path.
     runtimeDependencies :: b -> Action [FilePath]
     runtimeDependencies _ = return []
 
