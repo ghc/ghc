@@ -7,29 +7,18 @@ For the full testsuite documentation, please see [here][1].
 
 Commands to run testsuite:
 
- * Full testsuite: `make`
- * Using more threads: `make THREADS=12`
- * Reduced (fast) testsuite: `make fast`
- * Run a specific test: `make TEST=tc054`
- * Test a specific 'way': `make WAY=optllvm`
- * Keeping the run directory after test run: `make CLEANUP=0`. You will find a
-   directory `{test_name}.run` in the test's source directory.
- * Test a specific stage of GHC: `make stage=1`
- * Skip performance tests: `make SKIP_PERF_TESTS=YES`
- * Set verbosity: `make VERBOSE=n`
+ * Full testsuite: `hadrian/build test`
+ * Using more threads: `hadrian/build test -j12`
+ * Reduced (fast) testsuite: `hadrian/build test --test-speed=fast`
+ * Run a specific test: `hadrian/build test --only="tc055 tc054"`
+ * Test a specific 'way': `hadrian/build test --test-way=optllvm`
+ * Skip performance tests: `hadrian/build test --skip-perf`
+ * Set verbosity: `hadrian/build test --test-verbose=<n>`
    where n=0: No per-test output, n=1: Only failures,
          n=2: Progress output, n=3: Include commands called (default),
          n=4: Include perf test results unconditionally,
          n=5: Echo commands in subsidiary make invocations
- * Pass in extra GHC options: `make EXTRA_HC_OPTS=-fvectorize`
 
-You can also change directory to a specific test folder to run that
-individual test or group of tests. For example:
-
-``` .sh
-$ cd tests/array
-$ make
-```
 
 ## Testsuite Ways
 
