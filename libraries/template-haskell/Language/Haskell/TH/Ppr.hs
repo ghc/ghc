@@ -302,27 +302,28 @@ pprLit _ (StringPrimL s) = pprString (bytesToString s) <> char '#'
 pprLit _ (BytesPrimL {}) = pprString "<binary data>"
 pprLit i (RationalL rat)
   | withoutFactor 2 (withoutFactor 5 $ denominator rat) /= 1
-  -- if the denominator has prime factors other than 2 and 5, show as fraction
+  -- if the denominator has prime factors other than 2 and 5
+  -- or can't be represented as Double, show as fraction
   = parensIf (i > noPrec) $
     integer (numerator rat) <+> char '/' <+> integer (denominator rat)
-  | rat /= 0 && (zeroes < -1 || zeroes > 7),
-    let (n, d) = properFraction (rat' / magnitude)
-        (rat', zeroes')
-          | abs rat < 1 = (10 * rat, zeroes - 1)
-          | otherwise = (rat, zeroes)
+  | rat /= 0 && (zeroes < -2 || zeroes > 6),
+    let (n, d) = properFraction (rat / magnitude)
   -- if < 0.01 or >= 100_000_000, use scientific notation
   = parensIf (i > noPrec && rat < 0)
              (integer n
               <> (if d == 0 then empty else char '.' <> decimals (abs d))
-              <> char 'e' <> integer zeroes')
+              <> char 'e' <> integer zeroes)
   | let (n, d) = properFraction rat
   = parensIf (i > noPrec && rat < 0)
              (integer n <> char '.'
               <> if d == 0 then char '0' else decimals (abs d))
   where zeroes :: Integer
-        zeroes = truncate (logBase 10 (abs (fromRational rat) :: Double)
-                           * (1 - epsilon))
-        epsilon = 0.0000001
+        zeroes = log10 (abs rat)
+        log10 :: Rational -> Integer
+        log10 x
+          | x >= 10 = 1 + log10 (x / 10)
+          | x < 1 = -1 + log10 (x * 10)
+          | otherwise = 0
         magnitude :: Rational
         magnitude = 10 ^^ zeroes
         withoutFactor :: Integer -> Integer -> Integer
