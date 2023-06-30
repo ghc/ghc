@@ -25,7 +25,7 @@
 
 #if defined(mingw32_HOST_OS)
 
-void reportMemoryMap() {
+void reportMemoryMap(void) {
     debugBelch("\nMemory map:\n");
     uint8_t *addr = NULL;
     while (true) {
@@ -74,7 +74,7 @@ void reportMemoryMap() {
 
 #elif defined(darwin_HOST_OS)
 
-void reportMemoryMap() {
+void reportMemoryMap(void) {
     // Inspired by MacFUSE /proc implementation
     debugBelch("\nMemory map:\n");
     while (true) {
@@ -112,7 +112,7 @@ void reportMemoryMap() {
 #else
 
 // Linux et al.
-void reportMemoryMap() {
+void reportMemoryMap(void) {
     debugBelch("\nMemory map:\n");
     FILE *f = fopen("/proc/self/maps", "r");
     if (f == NULL) {

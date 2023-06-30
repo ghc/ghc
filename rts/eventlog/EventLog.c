@@ -359,7 +359,7 @@ get_n_capabilities(void)
 }
 
 void
-initEventLogging()
+initEventLogging(void)
 {
     /*
      * Allocate buffer(s) to store events.
@@ -1561,7 +1561,7 @@ void flushLocalEventsBuf(Capability *cap)
 
 // Flush all capabilities' event buffers when we already hold all capabilities.
 // Used during forkProcess.
-void flushAllCapsEventsBufs()
+void flushAllCapsEventsBufs(void)
 {
     if (!event_log_writer) {
         return;

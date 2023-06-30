@@ -39,7 +39,7 @@ static int arm_atomic_spin_trylock (void)
     return -1;
 }
 
-void arm_atomic_spin_lock()
+void arm_atomic_spin_lock(void)
 {
   while (arm_atomic_spin_trylock())
 #if defined(HAVE_SCHED_H)
@@ -49,7 +49,7 @@ void arm_atomic_spin_lock()
 #endif
 }
 
-void arm_atomic_spin_unlock()
+void arm_atomic_spin_unlock(void)
 {
   atomic_spin = 0;
 }

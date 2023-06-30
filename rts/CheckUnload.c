@@ -186,12 +186,12 @@ static void freeOCSectionIndices(OCSectionIndices *s_indices)
     stgFree(s_indices);
 }
 
-void initUnloadCheck()
+void initUnloadCheck(void)
 {
     global_s_indices = createOCSectionIndices();
 }
 
-void exitUnloadCheck()
+void exitUnloadCheck(void)
 {
     freeOCSectionIndices(global_s_indices);
     global_s_indices = NULL;
@@ -436,7 +436,7 @@ void markObjectCode(const void *addr)
 
 // Returns whether or not the GC that follows needs to mark code for potential
 // unloading.
-bool prepareUnloadCheck()
+bool prepareUnloadCheck(void)
 {
     if (global_s_indices == NULL) {
         return false;
@@ -453,7 +453,7 @@ bool prepareUnloadCheck()
     return true;
 }
 
-void checkUnload()
+void checkUnload(void)
 {
     if (global_s_indices == NULL) {
         return;

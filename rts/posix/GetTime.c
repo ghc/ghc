@@ -45,7 +45,7 @@ static uint64_t timer_scaling_factor_numer = 0;
 static uint64_t timer_scaling_factor_denom = 0;
 #endif
 
-void initializeTimer()
+void initializeTimer(void)
 {
 #if defined(darwin_HOST_OS)
     mach_timebase_info_data_t info;

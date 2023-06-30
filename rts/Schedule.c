@@ -2388,7 +2388,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
  * ------------------------------------------------------------------------- */
 
 static void
-deleteAllThreads ()
+deleteAllThreads (void)
 {
     // NOTE: only safe to call if we own all capabilities.
 

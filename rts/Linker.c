@@ -1032,7 +1032,7 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
 }
 
 void
-printLoadedObjects() {
+printLoadedObjects(void) {
     ObjectCode* oc;
     for (oc = objects; oc; oc = oc->next) {
         if (oc->sections != NULL) {

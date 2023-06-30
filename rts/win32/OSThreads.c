@@ -28,14 +28,14 @@ static uint32_t* cpuGroupCumulativeCache = NULL;
 static uint8_t* cpuGroupDistCache = NULL;
 
 void
-yieldThread()
+yieldThread(void)
 {
   SwitchToThread();
   return;
 }
 
 void
-shutdownThread()
+shutdownThread(void)
 {
     ExitThread(0);
     barf("ExitThread() returned"); // avoid gcc warning
@@ -65,7 +65,7 @@ createOSThread (OSThreadId* pId, const char *name STG_UNUSED,
 }
 
 OSThreadId
-osThreadId()
+osThreadId(void)
 {
   return GetCurrentThreadId();
 }

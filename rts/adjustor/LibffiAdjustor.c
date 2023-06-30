@@ -31,7 +31,7 @@ static ffi_status ffi_alloc_prep_closure(ffi_closure **pclosure, ffi_cif *cif,
 /* Maps AdjustorExecutable* to AdjustorWritable*. */
 static HashTable* allocatedExecs;
 
-void initAdjustors() {
+void initAdjustors(void) {
     allocatedExecs = allocHashTable();
 }
 
