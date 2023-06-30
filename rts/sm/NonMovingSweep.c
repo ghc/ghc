@@ -74,7 +74,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
 
 #if defined(DEBUG)
 
-void nonmovingGcCafs()
+void nonmovingGcCafs(void)
 {
     uint32_t i = 0;
     StgIndStatic *next;
@@ -279,7 +279,7 @@ dirty_BLOCKING_QUEUE:
 }
 
 /* N.B. This happens during the pause so we own all capabilities. */
-void nonmovingSweepMutLists()
+void nonmovingSweepMutLists(void)
 {
     for (uint32_t n = 0; n < getNumCapabilities(); n++) {
         Capability *cap = getCapability(n);
@@ -324,7 +324,7 @@ static void freeChain_lock_max(bdescr *bd, int max_dur)
   RELEASE_SM_LOCK;
 }
 
-void nonmovingSweepLargeObjects()
+void nonmovingSweepLargeObjects(void)
 {
     freeChain_lock_max(nonmoving_large_objects, 10000);
     nonmoving_large_objects = nonmoving_marked_large_objects;
@@ -333,7 +333,7 @@ void nonmovingSweepLargeObjects()
     n_nonmoving_marked_large_blocks = 0;
 }
 
-void nonmovingSweepCompactObjects()
+void nonmovingSweepCompactObjects(void)
 {
     bdescr *next;
     ACQUIRE_SM_LOCK;
@@ -367,7 +367,7 @@ static bool is_alive(StgClosure *p)
     }
 }
 
-void nonmovingSweepStableNameTable()
+void nonmovingSweepStableNameTable(void)
 {
     // See comments in gcStableTables
 

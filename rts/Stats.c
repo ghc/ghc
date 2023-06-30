@@ -221,7 +221,7 @@ initStats1 (void)
 }
 
 void
-initGenerationStats()
+initGenerationStats(void)
 {
     for (uint32_t i = 0; i < RtsFlags.GcFlags.generations; i++) {
         GC_coll_cpu[i] = 0;
@@ -234,7 +234,7 @@ initGenerationStats()
    Reset stats of child process after fork()
    ------------------------------------------------------------------------ */
 
-void resetChildProcessStats()
+void resetChildProcessStats(void)
 {
     initStats0();
     initGenerationStats();
@@ -294,7 +294,7 @@ stat_startGCSync (gc_thread *gct)
 }
 
 void
-stat_startNonmovingGc ()
+stat_startNonmovingGc (void)
 {
     ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_cpu = getCurrentThreadCPUTime();
@@ -303,7 +303,7 @@ stat_startNonmovingGc ()
 }
 
 void
-stat_endNonmovingGc ()
+stat_endNonmovingGc (void)
 {
     Time cpu = getCurrentThreadCPUTime();
     Time elapsed = getProcessElapsedTime();
@@ -322,7 +322,7 @@ stat_endNonmovingGc ()
 }
 
 void
-stat_startNonmovingGcSync ()
+stat_startNonmovingGcSync (void)
 {
     ACQUIRE_LOCK(&stats_mutex);
     start_nonmoving_gc_sync_elapsed = getProcessElapsedTime();
@@ -331,7 +331,7 @@ stat_startNonmovingGcSync ()
 }
 
 void
-stat_endNonmovingGcSync ()
+stat_endNonmovingGcSync (void)
 {
     Time end_elapsed = getProcessElapsedTime();
     ACQUIRE_LOCK(&stats_mutex);
@@ -1467,7 +1467,7 @@ stat_exitReport (void)
     RELEASE_LOCK(&all_tasks_mutex);
 }
 
-void stat_exit()
+void stat_exit(void)
 {
 #if defined(THREADED_RTS)
         closeMutex(&stats_mutex);

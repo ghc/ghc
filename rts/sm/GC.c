@@ -184,7 +184,7 @@ uint32_t n_gc_threads;
 static uint32_t n_gc_idle_threads;
 bool work_stealing;
 
-static bool is_par_gc() {
+static bool is_par_gc(void) {
 #if defined(THREADED_RTS)
     if(n_gc_threads == 1) { return false; }
     ASSERT(n_gc_threads > n_gc_idle_threads);

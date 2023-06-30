@@ -68,7 +68,7 @@ static LARGE_INTEGER qpc_frequency = {.QuadPart = 0};
 // Initialize qpc_frequency. This function should be called before any call to
 // getMonotonicNSec.  If QPC is not supported on this system, qpc_frequency is
 // set to 0.
-void initializeTimer()
+void initializeTimer(void)
 {
     BOOL qpc_supported = QueryPerformanceFrequency(&qpc_frequency);
     if (!qpc_supported)
@@ -78,7 +78,7 @@ void initializeTimer()
 }
 
 HsWord64
-getMonotonicNSec()
+getMonotonicNSec(void)
 {
     if (qpc_frequency.QuadPart)
     {

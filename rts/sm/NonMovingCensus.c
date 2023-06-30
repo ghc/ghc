@@ -141,7 +141,7 @@ void nonmovingPrintAllocatorCensus(bool collect_live_words)
     }
 }
 
-void nonmovingTraceAllocatorCensus()
+void nonmovingTraceAllocatorCensus(void)
 {
 #if defined(TRACING)
     if (!RtsFlags.GcFlags.useNonmoving && !TRACE_nonmoving_gc)

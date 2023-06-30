@@ -332,7 +332,7 @@ rts_ConsoleHandlerDone (int ev USED_IF_NOT_THREADS)
  * up as part Ctrl-C delivery.
  */
 int
-rts_waitConsoleHandlerCompletion()
+rts_waitConsoleHandlerCompletion(void)
 {
     /* As long as the worker doesn't need to do a multiple wait,
      * let's keep this HANDLE private to this 'module'.

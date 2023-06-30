@@ -325,7 +325,7 @@ rtsDebugMsgFn(const char *s, va_list ap)
 void rtsBadAlignmentBarf(void) GNUC3_ATTRIBUTE(__noreturn__);
 
 void
-rtsBadAlignmentBarf()
+rtsBadAlignmentBarf(void)
 {
     barf("Encountered incorrectly aligned pointer. This can't be good.");
 }
@@ -334,7 +334,7 @@ rtsBadAlignmentBarf()
 void rtsOutOfBoundsAccess(void) GNUC3_ATTRIBUTE(__noreturn__);
 
 void
-rtsOutOfBoundsAccess()
+rtsOutOfBoundsAccess(void)
 {
     barf("Encountered out of bounds array access.");
 }

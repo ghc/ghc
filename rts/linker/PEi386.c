@@ -473,7 +473,7 @@ static void freeSectionList(struct SectionList *slist)
     }
 }
 
-void initLinker_PEi386()
+void initLinker_PEi386(void)
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
                                symhash, "__image_base__",
@@ -492,7 +492,7 @@ void initLinker_PEi386()
   atexit (exitLinker_PEi386);
 }
 
-void exitLinker_PEi386()
+void exitLinker_PEi386(void)
 {
 }
 

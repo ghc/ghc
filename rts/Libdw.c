@@ -75,7 +75,7 @@ void libdwFree(LibdwSession *session) {
 }
 
 // Create a libdw session with DWARF information for all loaded modules
-LibdwSession *libdwInit() {
+LibdwSession *libdwInit(void) {
     LibdwSession *session = stgCallocBytes(1, sizeof(LibdwSession),
                                            "libdwInit");
     // Initialize ELF library

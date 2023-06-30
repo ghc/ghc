@@ -17,7 +17,7 @@
 /* Maps AdjustorExecutable* to AdjustorWritable*. */
 static HashTable* allocatedExecs;
 
-void initAdjustors() {
+void initAdjustors(void) {
     allocatedExecs = allocHashTable();
 }
 

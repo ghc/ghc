@@ -697,7 +697,7 @@ void printStaticObjects( StgClosure *p )
     }
 }
 
-void printWeakLists()
+void printWeakLists(void)
 {
     debugBelch("======= WEAK LISTS =======\n");
 
@@ -724,7 +724,7 @@ void printWeakLists()
     debugBelch("=========================\n");
 }
 
-void printLargeAndPinnedObjects()
+void printLargeAndPinnedObjects(void)
 {
     debugBelch("====== PINNED OBJECTS ======\n");
 
