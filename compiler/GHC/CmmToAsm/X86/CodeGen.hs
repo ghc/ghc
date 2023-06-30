@@ -976,6 +976,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
          b_code <- getAnyReg b
          let
              shift_amt  = case rep of
+                           W16 -> 15
                            W32 -> 31
                            W64 -> 63
                            _ -> panic "shift_amt"
