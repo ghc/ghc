@@ -15,7 +15,7 @@
 #include <time.h>
 #include <sys/time.h>
 
-void initializeTimer()
+void initializeTimer(void)
 {
 }
 

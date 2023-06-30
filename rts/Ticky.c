@@ -403,14 +403,14 @@ printRegisteredCounterInfo (FILE *tf)
     }
 }
 
-void emitTickyCounterDefs()
+void emitTickyCounterDefs(void)
 {
 #if defined(TRACING)
     postTickyCounterDefs(ticky_entry_ctrs);
 #endif
 }
 
-void emitTickyCounterSamples()
+void emitTickyCounterSamples(void)
 {
 #if defined(TRACING)
     postTickyCounterSamples(ticky_entry_ctrs);

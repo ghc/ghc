@@ -260,7 +260,7 @@ StgWord nonmoving_write_barrier_enabled = false;
 MarkQueue *current_mark_queue = NULL;
 
 /* Initialise update remembered set data structures */
-void nonmovingMarkInit() {
+void nonmovingMarkInit(void) {
 #if defined(THREADED_RTS)
     initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
@@ -367,7 +367,7 @@ void nonmovingBeginFlush(Task *task)
 /* Wait until a capability has flushed its update remembered set. Returns true
  * if all capabilities have flushed.
  */
-bool nonmovingWaitForFlush()
+bool nonmovingWaitForFlush(void)
 {
     ACQUIRE_LOCK(&upd_rem_set_lock);
     debugTrace(DEBUG_nonmoving_gc, "Flush count %d", upd_rem_set_flush_count);
@@ -2062,7 +2062,7 @@ void nonmovingMarkDeadWeaks (struct MarkQueue_ *queue, StgWeak **dead_weaks)
 }
 
 // Non-moving heap variant of `tidyThreadList`
-void nonmovingTidyThreads ()
+void nonmovingTidyThreads (void)
 {
     StgTSO *next;
     StgTSO **prev = &nonmoving_old_threads;

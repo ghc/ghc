@@ -435,7 +435,7 @@ static void notifyScheduler(uint32_t num) {
     processRemoteCompletion queued.
     IO runner thread blocked until processRemoteCompletion has run.
     */
-bool queueIOThread()
+bool queueIOThread(void)
 {
   bool result = false;
 #if !defined(THREADED_RTS)

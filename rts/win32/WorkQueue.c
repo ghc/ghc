@@ -40,7 +40,7 @@ newSemaphore(int initCount, int max)
  *
  */
 WorkQueue*
-NewWorkQueue()
+NewWorkQueue(void)
 {
   WorkQueue* wq = (WorkQueue*)stgMallocBytes(sizeof(WorkQueue), "NewWorkQueue");
 

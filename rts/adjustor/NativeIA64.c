@@ -35,7 +35,7 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
     return(&(arr->payload));
 }
 
-void initAdjustors() { }
+void initAdjustors(void) { }
 
 void*
 createAdjustor(int cconv, StgStablePtr hptr,

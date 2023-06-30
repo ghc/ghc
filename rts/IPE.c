@@ -173,7 +173,7 @@ InfoProvEnt *lookupIPE(const StgInfoTable *info) {
     return lookupHashTable(ipeMap, (StgWord)info);
 }
 
-void updateIpeMap() {
+void updateIpeMap(void) {
     // Check if there's any work at all. If not so, we can circumvent locking,
     // which decreases performance.
     IpeBufferListNode *pending = xchg_ptr((void **) &ipeBufferList, NULL);

@@ -34,7 +34,7 @@ static struct AdjustorPool *complex_float_ccall_pool;
 DECLARE_ADJUSTOR_TEMPLATE(complex_nofloat_ccall);
 static struct AdjustorPool *complex_nofloat_ccall_pool;
 
-void initAdjustors()
+void initAdjustors(void)
 {
     simple_ccall_pool = new_adjustor_pool_from_template(&simple_ccall_adjustor_template);
     complex_float_ccall_pool = new_adjustor_pool_from_template(&complex_float_ccall_adjustor_template);

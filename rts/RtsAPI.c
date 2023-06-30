@@ -893,7 +893,7 @@ rts_resume (PauseToken *pauseToken STG_UNUSED)
     stg_exit(EXIT_FAILURE);
 }
 
-bool rts_isPaused()
+bool rts_isPaused(void)
 {
     errorBelch("Warning: Pausing/Resuming the RTS is only possible for "
                "multithreaded RTS.");

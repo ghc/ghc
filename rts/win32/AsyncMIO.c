@@ -150,7 +150,7 @@ addDoProcRequest(void* proc, void* param)
 
 
 int
-startupAsyncIO()
+startupAsyncIO(void)
 {
     if (!StartIOManager()) {
         return 0;
