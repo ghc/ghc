@@ -976,7 +976,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
                            W16 -> 15
                            W32 -> 31
                            W64 -> 63
-                           _ -> panic "shift_amt"
+                           w -> panic ("shift_amt: " ++ show w)
 
              format = intFormat rep
              code = a_code `appOL` b_code eax `appOL`
