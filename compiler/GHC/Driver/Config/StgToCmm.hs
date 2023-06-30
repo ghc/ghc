@@ -76,7 +76,8 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
         | otherwise
         -> const True
 
-  , stgToCmmAllowIntMul2Instr         = (ncg && x86ish) || llvm
+  , stgToCmmAllowIntMul2Instr         = (ncg && (x86ish || aarch64)) || llvm
+  , stgToCmmAllowWordMul2Instr        = (ncg && (x86ish || ppc || aarch64)) || llvm
   -- SIMD flags
   , stgToCmmVecInstrsErr  = vec_err
   , stgToCmmAvx           = isAvxEnabled                   dflags
@@ -92,6 +93,9 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
                           JSPrimitives      -> (False, False)
                           NcgPrimitives     -> (True, False)
                           LlvmPrimitives    -> (False, True)
+          aarch64 = case platformArch platform of
+                      ArchAArch64  -> True
+                      _            -> False
           x86ish  = case platformArch platform of
                       ArchX86    -> True
                       ArchX86_64 -> True

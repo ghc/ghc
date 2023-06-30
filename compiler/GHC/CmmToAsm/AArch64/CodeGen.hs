@@ -1556,7 +1556,7 @@ genCCall target dest_regs arg_regs bid = do
   -- pprTraceM "genCCall target" (ppr target)
   -- pprTraceM "genCCall formal" (ppr dest_regs)
   -- pprTraceM "genCCall actual" (ppr arg_regs)
-
+  platform <- getPlatform
   case target of
     -- The target :: ForeignTarget call can either
     -- be a foreign procedure with an address expr
@@ -1584,7 +1584,6 @@ genCCall target dest_regs arg_regs bid = do
       let (_res_hints, arg_hints) = foreignTargetHints target
           arg_regs'' = zipWith (\(r, f, c) h -> (r,f,h,c)) arg_regs' arg_hints
 
-      platform <- getPlatform
       let packStack = platformOS platform == OSDarwin
 
       (stackSpace', passRegs, passArgumentsCode) <- passArguments packStack allGpArgRegs allFpArgRegs arg_regs'' 0 [] nilOL
@@ -1624,6 +1623,139 @@ genCCall target dest_regs arg_regs bid = do
     PrimTarget MO_F64_Fabs
       | [arg_reg] <- arg_regs, [dest_reg] <- dest_regs ->
         unaryFloatOp W64 (\d x -> unitOL $ FABS d x) arg_reg dest_reg
+
+    PrimTarget (MO_S_Mul2 w)
+          -- Life is easier when we're working with word sized operands,
+          -- we can use SMULH to compute the high 64 bits, and dst_needed
+          -- checks if the high half's bits are all the same as the low half's
+          -- top bit.
+          | w == W64
+          , [src_a, src_b] <- arg_regs
+          -- dst_needed = did the result fit into just the low half
+          , [dst_needed, dst_hi, dst_lo] <- dest_regs
+            ->  do
+              (reg_a, _format_x, code_x) <- getSomeReg src_a
+              (reg_b, _format_y, code_y) <- getSomeReg src_b
+
+              let lo = getRegisterReg platform (CmmLocal dst_lo)
+                  hi = getRegisterReg platform (CmmLocal dst_hi)
+                  nd = getRegisterReg platform (CmmLocal dst_needed)
+              return (
+                  code_x `appOL`
+                  code_y `snocOL`
+                  MUL   (OpReg W64 lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
+                  SMULH (OpReg W64 hi) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
+                  -- Are all high bits equal to the sign bit of the low word?
+                  -- nd = (hi == ASR(lo,width-1)) ? 1 : 0
+                  CMP   (OpReg W64 hi) (OpRegShift W64 lo SASR (widthInBits w - 1)) `snocOL`
+                  CSET  (OpReg W64 nd) NE
+                  , Nothing)
+            -- For sizes < platform width, we can just perform a multiply and shift
+            -- using the normal 64 bit multiply. Calculating the dst_needed value is
+            -- complicated a little by the need to be careful when truncation happens.
+            -- Currently this case can't be generated since
+            -- timesInt2# :: Int# -> Int# -> (# Int#, Int#, Int# #)
+            -- TODO: Should this be removed or would other primops be useful?
+          | w < W64
+          , [src_a, src_b] <- arg_regs
+          , [dst_needed, dst_hi, dst_lo] <- dest_regs
+            ->  do
+              (reg_a', _format_x, code_a) <- getSomeReg src_a
+              (reg_b', _format_y, code_b) <- getSomeReg src_b
+
+              let lo = getRegisterReg platform (CmmLocal dst_lo)
+                  hi = getRegisterReg platform (CmmLocal dst_hi)
+                  nd = getRegisterReg platform (CmmLocal dst_needed)
+                  -- Do everything in a full 64 bit registers
+                  w' = platformWordWidth platform
+
+              (reg_a, code_a') <- signExtendReg w w' reg_a'
+              (reg_b, code_b') <- signExtendReg w w' reg_b'
+
+              return (
+                  code_a  `appOL`
+                  code_b  `appOL`
+                  code_a' `appOL`
+                  code_b' `snocOL`
+                  -- the low 2w' of lo contains the full multiplication;
+                  -- eg: int8 * int8 -> int16 result
+                  -- so lo is in the last w of the register, and hi is in the second w.
+                  SMULL (OpReg w' lo) (OpReg w' reg_a) (OpReg w' reg_b) `snocOL`
+                  -- Make sure we hold onto the sign bits for dst_needed
+                  ASR (OpReg w' hi) (OpReg w' lo)    (OpImm (ImmInt $ widthInBits w)) `appOL`
+                  -- lo can now be truncated so we can get at it's top bit easily.
+                  truncateReg w' w lo `snocOL`
+                  -- Note the use of CMN (compare negative), not CMP: we want to
+                  -- test if the top half is negative one and the top
+                  -- bit of the bottom half is positive one. eg:
+                  -- hi = 0b1111_1111  (actually 64 bits)
+                  -- lo = 0b1010_1111  (-81, so the result didn't need the top half)
+                  -- lo' = ASR(lo,7)   (second reg of SMN)
+                  --     = 0b0000_0001 (theeshift gives us 1 for negative,
+                  --                    and 0 for positive)
+                  -- hi == -lo'?
+                  -- 0b1111_1111 == 0b1111_1111 (yes, top half is just overflow)
+                  -- Another way to think of this is if hi + lo' == 0, which is what
+                  -- CMN really is under the hood.
+                  CMN   (OpReg w' hi) (OpRegShift w' lo SLSR (widthInBits w - 1)) `snocOL`
+                  -- Set dst_needed to 1 if hi and lo' were (negatively) equal
+                  CSET  (OpReg w' nd) EQ `appOL`
+                  -- Finally truncate hi to drop any extraneous sign bits.
+                  truncateReg w' w hi
+                  , Nothing)
+          -- Can't handle > 64 bit operands
+          | otherwise -> unsupported (MO_S_Mul2 w)
+    PrimTarget (MO_U_Mul2  w)
+          -- The unsigned case is much simpler than the signed, all we need to
+          -- do is the multiplication straight into the destination registers.
+          | w == W64
+          , [src_a, src_b] <- arg_regs
+          , [dst_hi, dst_lo] <- dest_regs
+            ->  do
+              (reg_a, _format_x, code_x) <- getSomeReg src_a
+              (reg_b, _format_y, code_y) <- getSomeReg src_b
+
+              let lo = getRegisterReg platform (CmmLocal dst_lo)
+                  hi = getRegisterReg platform (CmmLocal dst_hi)
+              return (
+                  code_x `appOL`
+                  code_y `snocOL`
+                  MUL   (OpReg W64 lo) (OpReg W64 reg_a) (OpReg W64 reg_b) `snocOL`
+                  UMULH (OpReg W64 hi) (OpReg W64 reg_a) (OpReg W64 reg_b)
+                  , Nothing)
+            -- For sizes < platform width, we can just perform a multiply and shift
+            -- Need to be careful to truncate the low half, but the upper half should be
+            -- be ok if the invariant in [Signed arithmetic on AArch64] is maintained.
+            -- Currently this case can't be produced by the compiler since
+            -- timesWord2# :: Word# -> Word# -> (# Word#, Word# #)
+            -- TODO: Remove? Or would the extra primop be useful for avoiding the extra
+            -- steps needed to do this in userland?
+          | w < W64
+          , [src_a, src_b] <- arg_regs
+          , [dst_hi, dst_lo] <- dest_regs
+            ->  do
+              (reg_a, _format_x, code_x) <- getSomeReg src_a
+              (reg_b, _format_y, code_y) <- getSomeReg src_b
+
+              let lo = getRegisterReg platform (CmmLocal dst_lo)
+                  hi = getRegisterReg platform (CmmLocal dst_hi)
+                  w' = opRegWidth w
+              return (
+                  code_x `appOL`
+                  code_y `snocOL`
+                  -- UMULL: Xd = Wa * Wb with 64 bit result
+                  -- W64 inputs should have been caught by case above
+                  UMULL (OpReg W64 lo) (OpReg w' reg_a) (OpReg w' reg_b) `snocOL`
+                  -- Extract and truncate high result
+                  -- hi[w:0] = lo[2w:w]
+                  UBFX (OpReg W64 hi) (OpReg W64 lo)
+                      (OpImm (ImmInt $ widthInBits w)) -- lsb
+                      (OpImm (ImmInt $ widthInBits w)) -- width to extract
+                      `appOL`
+                  truncateReg W64 w lo
+                  , Nothing)
+          | otherwise -> unsupported (MO_U_Mul2  w)
+
 
     -- or a possibly side-effecting machine operation
     -- mop :: CallishMachOp (see GHC.Cmm.MachOp)
@@ -1714,7 +1846,6 @@ genCCall target dest_regs arg_regs bid = do
 
         -- Arithmatic
         -- These are not supported on X86, so I doubt they are used much.
-        MO_S_Mul2     _w -> unsupported mop
         MO_S_QuotRem  _w -> unsupported mop
         MO_U_QuotRem  _w -> unsupported mop
         MO_U_QuotRem2 _w -> unsupported mop
@@ -1723,7 +1854,6 @@ genCCall target dest_regs arg_regs bid = do
         MO_SubWordC   _w -> unsupported mop
         MO_AddIntC    _w -> unsupported mop
         MO_SubIntC    _w -> unsupported mop
-        MO_U_Mul2     _w -> unsupported mop
 
         -- Memory Ordering
         MO_AcquireFence     ->  return (unitOL DMBISH, Nothing)

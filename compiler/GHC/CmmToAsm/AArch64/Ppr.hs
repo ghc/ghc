@@ -372,12 +372,15 @@ pprInstr platform instr = case instr of
   CMP  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfcmp") o1 o2
     | otherwise -> op2 (text "\tcmp") o1 o2
+  CMN  o1 o2       -> op2 (text "\tcmn") o1 o2
   MSUB o1 o2 o3 o4 -> op4 (text "\tmsub") o1 o2 o3 o4
   MUL  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfmul") o1 o2 o3
     | otherwise -> op3 (text "\tmul") o1 o2 o3
   SMULH o1 o2 o3 -> op3 (text "\tsmulh") o1 o2 o3
   SMULL o1 o2 o3 -> op3 (text "\tsmull") o1 o2 o3
+  UMULH o1 o2 o3 -> op3 (text "\tumulh") o1 o2 o3
+  UMULL o1 o2 o3 -> op3 (text "\tumull") o1 o2 o3
   NEG  o1 o2
     | isFloatOp o1 && isFloatOp o2 -> op2 (text "\tfneg") o1 o2
     | otherwise -> op2 (text "\tneg") o1 o2

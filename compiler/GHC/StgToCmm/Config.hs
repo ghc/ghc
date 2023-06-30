@@ -70,6 +70,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmAllowQuotRem2             :: !Bool   -- ^ Allowed to generate QuotRem
   , stgToCmmAllowExtendedAddSubInstrs :: !Bool   -- ^ Allowed to generate AddWordC, SubWordC, Add2, etc.
   , stgToCmmAllowIntMul2Instr         :: !Bool   -- ^ Allowed to generate IntMul2 instruction
+  , stgToCmmAllowWordMul2Instr        :: !Bool   -- ^ Allowed to generate WordMul2 instruction
   , stgToCmmAllowFMAInstr             :: FMASign -> Bool -- ^ Allowed to generate FMA instruction
   , stgToCmmTickyAP                   :: !Bool   -- ^ Disable use of precomputed standard thunks.
   ------------------------------ SIMD flags ------------------------------------

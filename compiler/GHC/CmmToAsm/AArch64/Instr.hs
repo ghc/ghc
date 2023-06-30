@@ -79,11 +79,14 @@ regUsageOfInstr platform instr = case instr of
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   CMP l r                  -> usage (regOp l ++ regOp r, [])
+  CMN l r                  -> usage (regOp l ++ regOp r, [])
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
   MUL dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   NEG dst src              -> usage (regOp src, regOp dst)
   SMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UMULH dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
+  UMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   SDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   UDIV dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -209,11 +212,14 @@ patchRegsOfInstr instr env = case instr of
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
     CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
+    CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
     MUL o1 o2 o3   -> MUL (patchOp o1) (patchOp o2) (patchOp o3)
     NEG o1 o2      -> NEG (patchOp o1) (patchOp o2)
     SMULH o1 o2 o3 -> SMULH (patchOp o1) (patchOp o2)  (patchOp o3)
     SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
+    UMULH o1 o2 o3 -> UMULH (patchOp o1) (patchOp o2)  (patchOp o3)
+    UMULL o1 o2 o3 -> UMULL (patchOp o1) (patchOp o2)  (patchOp o3)
     SDIV o1 o2 o3  -> SDIV (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
     UDIV o1 o2 o3  -> UDIV (patchOp o1) (patchOp o2) (patchOp o3)
@@ -546,6 +552,7 @@ data Instr
     -- | ADR ...
     -- | ADRP ...
     | CMP Operand Operand -- rd - op2
+    | CMN Operand Operand -- rd + op2
     -- | MADD ...
     -- | MNEG ...
     | MSUB Operand Operand Operand Operand -- rd = ra - rn × rm
@@ -568,8 +575,8 @@ data Instr
     -- | UMADDL ...  -- Xd = Xa + Wn × Wm
     -- | UMNEGL ... -- Xd = - Wn × Wm
     -- | UMSUBL ... -- Xd = Xa - Wn × Wm
-    -- | UMULH ... -- Xd = (Xn × Xm)_127:64
-    -- | UMULL ... -- Xd = Wn × Wm
+    | UMULH Operand Operand Operand -- Xd = (Xn × Xm)_127:64
+    | UMULL Operand Operand Operand -- Xd = Wn × Wm
 
     -- 2. Bit Manipulation Instructions ----------------------------------------
     | SBFM Operand Operand Operand Operand -- rd = rn[i,j]
@@ -650,12 +657,15 @@ instrCon i =
       POP_STACK_FRAME{} -> "POP_STACK_FRAME"
       ADD{} -> "ADD"
       CMP{} -> "CMP"
+      CMN{} -> "CMN"
       MSUB{} -> "MSUB"
       MUL{} -> "MUL"
       NEG{} -> "NEG"
       SDIV{} -> "SDIV"
       SMULH{} -> "SMULH"
       SMULL{} -> "SMULL"
+      UMULH{} -> "UMULH"
+      UMULL{} -> "UMULL"
       SUB{} -> "SUB"
       UDIV{} -> "UDIV"
       SBFM{} -> "SBFM"
