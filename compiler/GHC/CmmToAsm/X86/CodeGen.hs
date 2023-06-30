@@ -966,8 +966,29 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
 
         return (Fixed format eax code)
 
-
     imulMayOflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
+    imulMayOflo W8 a b = do
+         -- The general case (W16, W32, W64) doesn't work for W8 as its
+         -- multiplication doesn't use two registers.
+         --
+         -- The plan is:
+         -- 1. truncate and sign-extend a and b to 8bit width
+         -- 2. multiply a' = a * b in 32bit width
+         -- 3. copy and sign-extend 8bit from a' to c
+         -- 4. compare a' and c: they are equal if there was no overflow
+         (a_reg, a_code) <- getNonClobberedReg a
+         (b_reg, b_code) <- getNonClobberedReg b
+         let
+             code = a_code `appOL` b_code `appOL`
+                        toOL [
+                           MOVSxL II8 (OpReg a_reg) (OpReg a_reg),
+                           MOVSxL II8 (OpReg b_reg) (OpReg b_reg),
+                           IMUL II32 (OpReg b_reg) (OpReg a_reg),
+                           MOVSxL II8 (OpReg a_reg) (OpReg eax),
+                           CMP II16 (OpReg a_reg) (OpReg eax),
+                           SETCC NE (OpReg eax)
+                        ]
+         return (Fixed II8 eax code)
     imulMayOflo rep a b = do
          (a_reg, a_code) <- getNonClobberedReg a
          b_code <- getAnyReg b
