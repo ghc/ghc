@@ -112,8 +112,16 @@ ppFullQualName notation mdl name = wrapInfix notation (getOccName name) qname
     qname = toHtml $ moduleString mdl ++ '.' : getOccString name
 
 ppName :: Notation -> Name -> Html
-ppName notation name = wrapInfix notation (getOccName name) $ toHtml (getOccString name)
-
+ppName notation name =
+  case m_pun of
+    Just str -> toHtml (unpackFS str)       -- use the punned form
+    Nothing  -> wrapInfix notation (getOccName name) $
+                toHtml (getOccString name)  -- use the original identifier
+  where
+    m_pun = case notation of
+      Raw    -> namePun_maybe name
+      Prefix -> namePun_maybe name
+      Infix  -> Nothing
 
 ppBinder :: Bool -> OccName -> Html
 ppBinder = ppBinderWith Prefix
