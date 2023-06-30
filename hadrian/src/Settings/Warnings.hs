@@ -2,6 +2,7 @@ module Settings.Warnings (defaultGhcWarningsArgs, ghcWarningsArgs) where
 
 import Expression
 import Oracles.Flag
+import Oracles.Setting (isOsxTarget, isWinTarget)
 import Packages
 
 -- See @mk/warnings.mk@ for warning-related arguments in the Make build system.
@@ -12,7 +13,11 @@ defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
     , notM (flag CcLlvmBackend) ? arg "-optc-Wno-error=inline"
     , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas"
-    , arg "-optP-Wno-nonportable-include-path" -- #17798
+      -- Cabal can seemingly produce filepaths with incorrect case on filesystems
+      -- with case-insensitive names. Ignore such issues for now as they seem benign.
+      -- See #17798.
+    , isOsxTarget ? arg "-optP-Wno-nonportable-include-path"
+    , isWinTarget ? arg "-optP-Wno-nonportable-include-path"
     ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
