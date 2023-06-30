@@ -71,3 +71,4 @@ test('FMA_ConstantFold'
 
 test('T21624', normal, compile_and_run, [''])
 test('T23071', ignore_stdout, compile_and_run, [''])
+test('T22710', normal, compile_and_run, [''])

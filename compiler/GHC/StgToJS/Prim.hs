@@ -652,6 +652,7 @@ genPrim prof bound ty op = case op of
   ShrinkMutableByteArrayOp_Char     -> \[]    [a,n]      -> PrimInline $ appS "h$shrinkMutableByteArray" [a,n]
   ResizeMutableByteArrayOp_Char     -> \[r]   [a,n]      -> PrimInline $ r |= app "h$resizeMutableByteArray" [a,n]
   UnsafeFreezeByteArrayOp           -> \[a]   [b]        -> PrimInline $ a |= b
+  UnsafeThawByteArrayOp             -> \[a]   [b]        -> PrimInline $ a |= b
   SizeofByteArrayOp                 -> \[r]   [a]        -> PrimInline $ r |= a .^ "len"
   SizeofMutableByteArrayOp          -> \[r]   [a]        -> PrimInline $ r |= a .^ "len"
   GetSizeofMutableByteArrayOp       -> \[r]   [a]        -> PrimInline $ r |= a .^ "len"

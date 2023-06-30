@@ -1,3 +1,10 @@
+## 0.12.0
+
+- Shipped with GHC 9.10.1
+
+- The `unsafeThawByteArray#` primop was added, serving as a inverse to the existing
+  `unsafeFreezeByteArray#` primop (see #22710).
+
 ## 0.11.0
 
 - Shipped with GHC 9.8.1
