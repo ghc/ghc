@@ -1623,7 +1623,7 @@ emitPrimOp cfg primop =
     else Right genericIntSubCOp
 
   WordMul2Op -> \args -> opCallishHandledLater args $
-    if allowExtAdd
+    if allowWord2Mul
     then Left (MO_U_Mul2     (wordWidth platform))
     else Right genericWordMul2Op
 
@@ -1850,6 +1850,7 @@ emitPrimOp cfg primop =
   allowQuotRem2 = stgToCmmAllowQuotRem2             cfg
   allowExtAdd   = stgToCmmAllowExtendedAddSubInstrs cfg
   allowInt2Mul  = stgToCmmAllowIntMul2Instr         cfg
+  allowWord2Mul = stgToCmmAllowWordMul2Instr        cfg
 
   allowFMA = stgToCmmAllowFMAInstr cfg
 
