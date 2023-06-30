@@ -191,7 +191,7 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
     deb10 = mk(debian("x86_64", 10))
     deb11 = mk(debian("x86_64", 11))
     deb10_arm64 = mk(debian("aarch64", 10))
-    deb9_i386 = mk(debian("i386", 9))
+    deb10_i386 = mk(debian("i386", 10))
 
     source = mk_one_metadata(release_mode, version, job_map, source_artifact)
     test = mk_one_metadata(release_mode, version, job_map, test_artifact)
@@ -221,10 +221,10 @@ def mk_new_yaml(release_mode, version, date, pipeline_type, job_map):
 
           }
 
-    a32 = { "Linux_Debian": { "<10": deb9_i386, "unknown_versioning": deb9_i386 }
-          , "Linux_Ubuntu": { "unknown_versioning": deb9_i386 }
-          , "Linux_Mint" : { "unknown_versioning": deb9_i386 }
-          , "Linux_UnknownLinux" : { "unknown_versioning": deb9_i386 }
+    a32 = { "Linux_Debian": { "unknown_versioning": deb10_i386 }
+          , "Linux_Ubuntu": { "unknown_versioning": deb10_i386 }
+          , "Linux_Mint" : { "unknown_versioning": deb10_i386 }
+          , "Linux_UnknownLinux" : { "unknown_versioning": deb10_i386 }
           }
 
     arm64 = { "Linux_UnknownLinux": { "unknown_versioning": deb10_arm64 }
