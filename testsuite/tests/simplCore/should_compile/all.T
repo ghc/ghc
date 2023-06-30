@@ -472,3 +472,4 @@ test('T23307a', normal, compile, ['-O -ddump-simpl -dno-typeable-binds -dsuppres
 test('T23307b', normal, compile, ['-O'])
 test('T23307c', normal, compile, ['-O'])
 test('T23362', normal, compile, ['-O'])
+test('T23567', [extra_files(['T23567A.hs'])], multimod_compile, ['T23567', '-O -v0'])
