@@ -92,7 +92,7 @@ static void mk_stdcall_adjustor(uint8_t *code, const void *context, void *user_d
 static struct AdjustorPool *stdcall_pool;
 #endif
 
-void initAdjustors() {
+void initAdjustors(void) {
     ccall_pool = new_adjustor_pool(sizeof(struct CCallContext), CCALL_ADJUSTOR_LEN, mk_ccall_adjustor, NULL);
 #if !defined(darwin_HOST_OS)
     stdcall_pool = new_adjustor_pool(sizeof(struct AdjustorContext), STDCALL_ADJUSTOR_LEN, mk_stdcall_adjustor, NULL);

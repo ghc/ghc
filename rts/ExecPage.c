@@ -9,7 +9,7 @@
 #include "sm/OSMem.h"
 #include "linker/MMap.h"
 
-ExecPage *allocateExecPage() {
+ExecPage *allocateExecPage(void) {
     ExecPage *page = (ExecPage *) mmapAnonForLinker(getPageSize());
     return page;
 }

@@ -433,7 +433,7 @@ const int default_alignment = 8;
    the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
 const void* __rts_iob_func = (void*)&__acrt_iob_func;
 
-void initLinker_PEi386()
+void initLinker_PEi386(void)
 {
     if (!ghciInsertSymbolTable(WSTR("(GHCi/Ld special symbols)"),
                                symhash, "__image_base__",
@@ -452,7 +452,7 @@ void initLinker_PEi386()
   atexit (exitLinker_PEi386);
 }
 
-void exitLinker_PEi386()
+void exitLinker_PEi386(void)
 {
 }
 

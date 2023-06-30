@@ -83,7 +83,7 @@ void foreignExportsLoadingObject(ObjectCode *oc)
     loading_obj = oc;
 }
 
-void foreignExportsFinishedLoadingObject()
+void foreignExportsFinishedLoadingObject(void)
 {
     ASSERT(loading_obj != NULL);
     loading_obj = NULL;
@@ -92,7 +92,7 @@ void foreignExportsFinishedLoadingObject()
 
 /* Caller must own linker_mutex so that we can safely modify
  * oc->stable_ptrs. */
-void processForeignExports()
+void processForeignExports(void)
 {
     while (pending) {
         struct ForeignExportsList *cur = pending;

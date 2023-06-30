@@ -1138,14 +1138,14 @@ static void sortDeferredList(bdescr** head) {
     }
 }
 
-void deferMBlockFreeing() {
+void deferMBlockFreeing(void) {
     if(defer_mblock_frees) {
         barf("MBlock freeing is already deferred");
     }
     defer_mblock_frees = true;
 }
 
-void commitMBlockFreeing() {
+void commitMBlockFreeing(void) {
     if(! defer_mblock_frees) {
         barf("MBlock freeing was never deferred");
     }

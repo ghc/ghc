@@ -136,7 +136,7 @@ void resetTracing (void)
     restartEventLogging();
 }
 
-void flushTrace ()
+void flushTrace (void)
 {
     if (eventlog_enabled) {
         flushEventLog(NULL);
@@ -876,7 +876,7 @@ void traceThreadLabel_(Capability *cap,
     }
 }
 
-void traceConcMarkBegin()
+void traceConcMarkBegin(void)
 {
     if (eventlog_enabled)
         postEventNoCap(EVENT_CONC_MARK_BEGIN);
@@ -888,25 +888,25 @@ void traceConcMarkEnd(StgWord32 marked_obj_count)
         postConcMarkEnd(marked_obj_count);
 }
 
-void traceConcSyncBegin()
+void traceConcSyncBegin(void)
 {
     if (eventlog_enabled)
         postEventNoCap(EVENT_CONC_SYNC_BEGIN);
 }
 
-void traceConcSyncEnd()
+void traceConcSyncEnd(void)
 {
     if (eventlog_enabled)
         postEventNoCap(EVENT_CONC_SYNC_END);
 }
 
-void traceConcSweepBegin()
+void traceConcSweepBegin(void)
 {
     if (eventlog_enabled)
         postEventNoCap(EVENT_CONC_SWEEP_BEGIN);
 }
 
-void traceConcSweepEnd()
+void traceConcSweepEnd(void)
 {
     if (eventlog_enabled)
         postEventNoCap(EVENT_CONC_SWEEP_END);

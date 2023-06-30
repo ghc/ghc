@@ -325,7 +325,7 @@ rtsDebugMsgFn(const char *s, va_list ap)
 void rtsBadAlignmentBarf(void) STG_NORETURN;
 
 void
-rtsBadAlignmentBarf()
+rtsBadAlignmentBarf(void)
 {
     barf("Encountered incorrectly aligned pointer. This can't be good.");
 }
@@ -334,7 +334,7 @@ rtsBadAlignmentBarf()
 void rtsOutOfBoundsAccess(void) STG_NORETURN;
 
 void
-rtsOutOfBoundsAccess()
+rtsOutOfBoundsAccess(void)
 {
     barf("Encountered out of bounds array access.");
 }
@@ -343,7 +343,7 @@ rtsOutOfBoundsAccess()
 void rtsMemcpyRangeOverlap(void) STG_NORETURN;
 
 void
-rtsMemcpyRangeOverlap()
+rtsMemcpyRangeOverlap(void)
 {
     barf("Encountered overlapping source/destination ranges in a memcpy-using op.");
 }

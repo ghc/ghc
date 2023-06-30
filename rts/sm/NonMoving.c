@@ -1332,7 +1332,7 @@ void locate_object(P_ obj)
 #endif
 }
 
-void nonmovingPrintSweepList()
+void nonmovingPrintSweepList(void)
 {
     debugBelch("==== SWEEP LIST =====\n");
     int i = 0;
