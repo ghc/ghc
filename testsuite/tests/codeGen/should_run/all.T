@@ -225,3 +225,14 @@ test('T22296',[only_ways(llvm_ways)
               ,unless(arch('x86_64'), skip)],compile_and_run,[''])
 test('T22798', normal, compile_and_run, ['-fregs-graph'])
 test('CheckBoundsOK', normal, compile_and_run, ['-fcheck-prim-bounds'])
+
+# TODO: Enable more architectures here. N.B. some code generation backends are
+# not implemeted correctly (according to
+# Note [MO_S_MulMayOflo significant width]) and may require fixing/adjustment.
+test('MulMayOflo_full',
+     [ extra_files(['MulMayOflo.hs']),
+       when(unregisterised(), skip),
+       unless(arch('x86_64') or arch('i386'), skip),
+        ignore_stdout],
+     multi_compile_and_run,
+     ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
