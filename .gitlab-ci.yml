@@ -1049,7 +1049,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-x86_64-linux-deb9-validate
       artifacts: false
-    - job: nightly-i386-linux-deb9-validate
+    - job: nightly-i386-linux-deb10-validate
       artifacts: false
     - job: nightly-x86_64-linux-deb10-validate
       artifacts: false
