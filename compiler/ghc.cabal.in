@@ -95,7 +95,7 @@ Library
       CPP-Options: -DHAVE_LIBZSTD
 
     Build-Depends: base       >= 4.11 && < 4.19,
-                   deepseq    >= 1.4 && < 1.5,
+                   deepseq    >= 1.4 && < 1.6,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
                    bytestring >= 0.9 && < 0.12,
