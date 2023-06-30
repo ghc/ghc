@@ -1201,11 +1201,15 @@ data TcRnMessage where
   {-| TcRnIllegalClassInst is an error that occurs whenever a class instance is specified
       for a non-class.
 
+      This also includes derived instances. See the T23522 test case.
+
       Examples(s):
         type C1 a = (Show (a -> Bool))
         instance C1 Int where
 
-      Test cases: polykinds/T13267
+      Test cases:
+        polykinds/T13267
+        deriving/should_fail/T23522
   -}
   TcRnIllegalClassInst :: !(TyConFlavour TyCon) -> TcRnMessage
 

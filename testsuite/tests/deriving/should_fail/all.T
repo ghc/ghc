@@ -87,3 +87,4 @@ test('T21087b', [extra_files(['T21087b_aux.hs','T21087b_aux.hs-boot'])], multimo
 test('T21302', normal, compile_fail, [''])
 test('T21871', normal, compile_fail, [''])
 test('T22696b', normal, compile_fail, [''])
+test('T23522', normal, compile_fail, [''])

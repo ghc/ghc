@@ -1,0 +1,5 @@
+
+T23522.hs:5:42: [GHC-53946]
+     Illegal instance for a type synonym
+      A class instance must be for a class
+     In the data declaration for ‘Proposition’

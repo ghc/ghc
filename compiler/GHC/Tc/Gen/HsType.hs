@@ -99,7 +99,6 @@ import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBin
 import GHC.Tc.Zonk.TcType
 
 import GHC.Core.Type
-import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 
@@ -639,9 +638,15 @@ tcHsDeriv hs_ty
   = do { ty <- tcTopLHsType DerivClauseCtxt hs_ty
        ; let (tvs, pred)    = splitForAllTyCoVars ty
              (kind_args, _) = splitFunTys (typeKind pred)
-       ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
-           Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty }
+      -- Checking that `pred` a is type class application
+       ; case splitTyConApp_maybe pred of
+          Just (tyCon, tyConArgs) ->
+            case tyConClass_maybe tyCon of
+              Just clas ->
+                return (tvs, clas, tyConArgs, map scaledThing kind_args)
+              Nothing -> failWithTc $ TcRnIllegalClassInst (tyConFlavour tyCon)
+          Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty
+    }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
