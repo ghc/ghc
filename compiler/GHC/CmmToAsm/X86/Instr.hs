@@ -249,6 +249,8 @@ data Instr
         | SHL         Format Operand{-amount-} Operand
         | SAR         Format Operand{-amount-} Operand
         | SHR         Format Operand{-amount-} Operand
+        | SHRD        Format Operand{-amount-} Operand Operand
+        | SHLD        Format Operand{-amount-} Operand Operand
 
         | BT          Format Imm Operand
         | NOP
@@ -399,6 +401,8 @@ regUsageOfInstr platform instr
     SHL    _ imm dst    -> usageRM imm dst
     SAR    _ imm dst    -> usageRM imm dst
     SHR    _ imm dst    -> usageRM imm dst
+    SHLD   _ imm dst1 dst2 -> usageRMM imm dst1 dst2
+    SHRD   _ imm dst1 dst2 -> usageRMM imm dst1 dst2
     BT     _ _   src    -> mkRUR (use_R src [])
 
     PUSH   _ op         -> mkRUR (use_R op [])
@@ -568,6 +572,8 @@ patchRegsOfInstr instr env
     SHL  fmt imm dst     -> patch1 (SHL fmt imm) dst
     SAR  fmt imm dst     -> patch1 (SAR fmt imm) dst
     SHR  fmt imm dst     -> patch1 (SHR fmt imm) dst
+    SHLD fmt imm dst1 dst2 -> patch2 (SHLD fmt imm) dst1 dst2
+    SHRD fmt imm dst1 dst2 -> patch2 (SHRD fmt imm) dst1 dst2
     BT   fmt imm src     -> patch1 (BT  fmt imm) src
     TEST fmt src dst     -> patch2 (TEST fmt) src dst
     CMP  fmt src dst     -> patch2 (CMP  fmt) src dst

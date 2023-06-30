@@ -732,6 +732,12 @@ pprInstr platform i = case i of
    SHR format src dst
       -> pprShift (text "shr") format src dst
 
+   SHLD format src dst1 dst2
+      -> pprShift2 (text "shld") format src dst1 dst2
+
+   SHRD format src dst1 dst2
+      -> pprShift2 (text "shrd") format src dst1 dst2
+
    BT format imm src
       -> pprFormatImmOp (text "bt") format imm src
 
@@ -1068,6 +1074,17 @@ pprInstr platform i = case i of
            pprOperand platform II8 src,  -- src is 8-bit sized
            comma,
            pprOperand platform format dest
+       ]
+
+   pprShift2 :: Line doc -> Format -> Operand -> Operand -> Operand -> doc
+   pprShift2 name format src dest1 dest2
+     = line $ hcat [
+           pprMnemonic name format,
+           pprOperand platform II8 src,  -- src is 8-bit sized
+           comma,
+           pprOperand platform format dest1,
+           comma,
+           pprOperand platform format dest2
        ]
 
 

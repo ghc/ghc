@@ -65,6 +65,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmDoTagCheck     :: !Bool              -- ^ Verify tag inference predictions.
   ------------------------------ Backend Flags ----------------------------------
   , stgToCmmAllowBigArith             :: !Bool   -- ^ Allowed to emit larger than native size arithmetic (only LLVM and C backends)
+  , stgToCmmAllowBigQuot              :: !Bool   -- ^ Allowed to emit larger than native size division operations
   , stgToCmmAllowQuotRemInstr         :: !Bool   -- ^ Allowed to generate QuotRem instructions
   , stgToCmmAllowQuotRem2             :: !Bool   -- ^ Allowed to generate QuotRem
   , stgToCmmAllowExtendedAddSubInstrs :: !Bool   -- ^ Allowed to generate AddWordC, SubWordC, Add2, etc.

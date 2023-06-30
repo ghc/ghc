@@ -1682,6 +1682,13 @@ emitPrimOp cfg primop =
     let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
     emit stmt
 
+  isQuottishOp :: CallishMachOp -> Bool
+  isQuottishOp MO_I64_Quot = True
+  isQuottishOp MO_I64_Rem = True
+  isQuottishOp MO_W64_Quot = True
+  isQuottishOp MO_W64_Rem = True
+  isQuottishOp _ = False
+
   opTranslate64
     :: [CmmExpr]
     -> (Width -> MachOp)
@@ -1690,7 +1697,8 @@ emitPrimOp cfg primop =
   opTranslate64 args mkMop callish =
     case platformWordSize platform of
       -- LLVM and C `can handle larger than native size arithmetic natively.
-      _ | stgToCmmAllowBigArith cfg -> opTranslate args $ mkMop W64
+      _ | not (isQuottishOp callish), stgToCmmAllowBigArith cfg -> opTranslate args $ mkMop W64
+        | isQuottishOp callish, stgToCmmAllowBigQuot cfg -> opTranslate args $ mkMop W64
       PW4 -> opCallish args callish
       PW8 -> opTranslate args $ mkMop W64
 

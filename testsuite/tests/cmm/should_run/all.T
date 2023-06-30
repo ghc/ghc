@@ -27,7 +27,6 @@ test('ByteSwitch',
 test('T22871',
      [    extra_run_opts('"' + config.libdir + '"')
      ,    req_cmm
-     ,    when(arch('i386'), skip) # x86 NCG panics with "iselExpr64(i386)"
      ],
      multi_compile_and_run,
      ['T22871', [('T22871_cmm.cmm', '')], ''])

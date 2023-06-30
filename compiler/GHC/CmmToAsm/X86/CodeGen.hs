@@ -523,7 +523,6 @@ assignReg_I64Code (CmmLocal dst) valueTree = do
 assignReg_I64Code _ _
    = panic "assignReg_I64Code(i386): invalid lvalue"
 
-
 iselExpr64 :: HasDebugCallStack => CmmExpr -> NatM (RegCode64 InstrBlock)
 iselExpr64 (CmmLit (CmmInt i _)) = do
   Reg64 rhi rlo <- getNewReg64
@@ -550,7 +549,6 @@ iselExpr64 (CmmReg (CmmLocal local_reg)) = do
   let Reg64 hi lo = localReg64 local_reg
   return (RegCode64 nilOL hi lo)
 
--- we handle addition, but rather badly
 iselExpr64 (CmmMachOp (MO_Add _) [e1, CmmLit (CmmInt i _)]) = do
    RegCode64 code1 r1hi r1lo <- iselExpr64 e1
    Reg64 rhi rlo <- getNewReg64
@@ -590,11 +588,31 @@ iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
                        SBB II32 (OpReg r2hi) (OpReg rhi) ]
    return (RegCode64 code rhi rlo)
 
-iselExpr64 (CmmMachOp (MO_UU_Conv _ W64) [expr]) = do
+iselExpr64 (CmmMachOp (MO_UU_Conv W32 W64) [expr]) = do
      code <- getAnyReg expr
      Reg64 r_dst_hi r_dst_lo <- getNewReg64
      return $ RegCode64 (code r_dst_lo `snocOL`
-                          MOV II32 (OpImm (ImmInt 0)) (OpReg r_dst_hi))
+                          XOR II32 (OpReg r_dst_hi) (OpReg r_dst_hi))
+                          r_dst_hi
+                          r_dst_lo
+
+iselExpr64 (CmmMachOp (MO_UU_Conv W16 W64) [expr]) = do
+     (rsrc, code) <- getByteReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code `appOL` toOL [
+                          MOVZxL II16 (OpReg rsrc) (OpReg r_dst_lo),
+                          XOR    II32 (OpReg r_dst_hi) (OpReg r_dst_hi)
+                          ])
+                          r_dst_hi
+                          r_dst_lo
+
+iselExpr64 (CmmMachOp (MO_UU_Conv W8 W64) [expr]) = do
+     (rsrc, code) <- getByteReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code `appOL` toOL [
+                          MOVZxL II8 (OpReg rsrc) (OpReg r_dst_lo),
+                          XOR    II32 (OpReg r_dst_hi) (OpReg r_dst_hi)
+                          ])
                           r_dst_hi
                           r_dst_lo
 
@@ -609,11 +627,208 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
                           r_dst_hi
                           r_dst_lo
 
+iselExpr64 (CmmMachOp (MO_SS_Conv W16 W64) [expr]) = do
+     (r, code) <- getByteReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code `appOL` toOL [
+                          MOVSxL II16 (OpReg r) (OpReg eax),
+                          CLTD II32,
+                          MOV II32 (OpReg eax) (OpReg r_dst_lo),
+                          MOV II32 (OpReg edx) (OpReg r_dst_hi)])
+                          r_dst_hi
+                          r_dst_lo
+
+iselExpr64 (CmmMachOp (MO_SS_Conv W8 W64) [expr]) = do
+     (r, code) <- getByteReg expr
+     Reg64 r_dst_hi r_dst_lo <- getNewReg64
+     return $ RegCode64 (code `appOL` toOL [
+                          MOVSxL II8 (OpReg r) (OpReg eax),
+                          CLTD II32,
+                          MOV II32 (OpReg eax) (OpReg r_dst_lo),
+                          MOV II32 (OpReg edx) (OpReg r_dst_hi)])
+                          r_dst_hi
+                          r_dst_lo
+
+iselExpr64 (CmmMachOp (MO_S_Neg _) [expr]) = do
+   RegCode64 code rhi rlo <- iselExpr64 expr
+   Reg64 rohi rolo <- getNewReg64
+   let
+        ocode = code `appOL`
+                toOL [ MOV II32 (OpReg rlo) (OpReg rolo),
+                       XOR II32 (OpReg rohi) (OpReg rohi),
+                       NEGI II32 (OpReg rolo),
+                       SBB II32 (OpReg rhi) (OpReg rohi) ]
+   return (RegCode64 ocode rohi rolo)
+
+-- To multiply two 64-bit numbers we use the following decomposition (in C notation):
+--
+--     ((r1hi << 32) + r1lo) * ((r2hi << 32) + r2lo)
+--      = ((r2lo * r1hi) << 32)
+--      + ((r1lo * r2hi) << 32)
+--      + r1lo * r2lo
+--
+-- Note that @(r1hi * r2hi) << 64@ can be dropped because it overflows completely.
+
+iselExpr64 (CmmMachOp (MO_Mul _) [e1,e2]) = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
+   tmp <- getNewRegNat II32
+   let
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ MOV  II32 (OpReg r1lo) (OpReg eax),
+                       MOV  II32 (OpReg r2lo) (OpReg tmp),
+                       MOV  II32 (OpReg r1hi) (OpReg rhi),
+                       IMUL II32 (OpReg tmp) (OpReg rhi),
+                       MOV  II32 (OpReg r2hi) (OpReg rlo),
+                       IMUL II32 (OpReg eax) (OpReg rlo),
+                       ADD  II32 (OpReg rlo) (OpReg rhi),
+                       MUL2 II32 (OpReg tmp),
+                       ADD  II32 (OpReg edx) (OpReg rhi),
+                       MOV  II32 (OpReg eax) (OpReg rlo)
+                     ]
+   return (RegCode64 code rhi rlo)
+
+iselExpr64 (CmmMachOp (MO_S_MulMayOflo W64) _) = do
+   -- Performance sensitive users won't use 32 bit so let's keep it simple:
+   -- We always return a (usually false) positive.
+   Reg64 rhi rlo <- getNewReg64
+   let code = toOL   [
+                       MOV  II32 (OpImm (ImmInt 1)) (OpReg rhi),
+                       MOV  II32 (OpImm (ImmInt 1)) (OpReg rlo)
+                     ]
+   return (RegCode64 code rhi rlo)
+
+
+-- To shift a 64-bit number to the left we use the SHLD and SHL instructions.
+-- We use SHLD to shift the bits in @rhi@ to the left while copying
+-- high bits from @rlo@ to fill the new space in the low bits of @rhi@.
+-- That leaves @rlo@ unchanged, so we use SHL to shift the bits of @rlo@ left.
+-- However, both these instructions only use the lowest 5 bits from %cl to do
+-- their shifting. So if the sixth bit (0x32) is set then we additionally move
+-- the contents of @rlo@ to @rhi@ and clear @rlo@.
+
+iselExpr64 (CmmMachOp (MO_Shl _) [e1,e2]) = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   code2 <- getAnyReg e2
+   Reg64 rhi rlo <- getNewReg64
+   lbl1 <- newBlockId
+   lbl2 <- newBlockId
+   let
+        code =  code1 `appOL`
+                code2 ecx `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       SHLD II32 (OpReg ecx) (OpReg rlo) (OpReg rhi),
+                       SHL II32 (OpReg ecx) (OpReg rlo),
+                       TEST II32 (OpImm (ImmInt 32)) (OpReg ecx),
+                       JXX EQQ lbl2,
+                       JXX ALWAYS lbl1,
+                       NEWBLOCK lbl1,
+                       MOV II32 (OpReg rlo) (OpReg rhi),
+                       XOR II32 (OpReg rlo) (OpReg rlo),
+                       JXX ALWAYS lbl2,
+                       NEWBLOCK lbl2
+                     ]
+   return (RegCode64 code rhi rlo)
+
+-- Similar to above, however now we're shifting to the right
+-- and we're doing a signed shift which means that @rhi@ needs
+-- to be set to either 0 if @rhi@ is positive or 0xffffffff otherwise,
+-- and if the sixth bit of %cl is set (so the shift amount is more than 32).
+-- To accomplish that we shift @rhi@ by 31.
+
+iselExpr64 (CmmMachOp (MO_S_Shr _) [e1,e2]) = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   (r2, code2) <- getSomeReg e2
+   Reg64 rhi rlo <- getNewReg64
+   lbl1 <- newBlockId
+   lbl2 <- newBlockId
+   let
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       MOV II32 (OpReg r2) (OpReg ecx),
+                       SHRD II32 (OpReg ecx) (OpReg rhi) (OpReg rlo),
+                       SAR II32 (OpReg ecx) (OpReg rhi),
+                       TEST II32 (OpImm (ImmInt 32)) (OpReg ecx),
+                       JXX EQQ lbl2,
+                       JXX ALWAYS lbl1,
+                       NEWBLOCK lbl1,
+                       MOV II32 (OpReg rhi) (OpReg rlo),
+                       SAR II32 (OpImm (ImmInt 31)) (OpReg rhi),
+                       JXX ALWAYS lbl2,
+                       NEWBLOCK lbl2
+                     ]
+   return (RegCode64 code rhi rlo)
+
+-- Similar to the above.
+
+iselExpr64 (CmmMachOp (MO_U_Shr _) [e1,e2]) = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   (r2, code2) <- getSomeReg e2
+   Reg64 rhi rlo <- getNewReg64
+   lbl1 <- newBlockId
+   lbl2 <- newBlockId
+   let
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       MOV II32 (OpReg r2) (OpReg ecx),
+                       SHRD II32 (OpReg ecx) (OpReg rhi) (OpReg rlo),
+                       SHR II32 (OpReg ecx) (OpReg rhi),
+                       TEST II32 (OpImm (ImmInt 32)) (OpReg ecx),
+                       JXX EQQ lbl2,
+                       JXX ALWAYS lbl1,
+                       NEWBLOCK lbl1,
+                       MOV II32 (OpReg rhi) (OpReg rlo),
+                       XOR II32 (OpReg rhi) (OpReg rhi),
+                       JXX ALWAYS lbl2,
+                       NEWBLOCK lbl2
+                     ]
+   return (RegCode64 code rhi rlo)
+
+iselExpr64 (CmmMachOp (MO_And _) [e1,e2]) = iselExpr64ParallelBin AND e1 e2
+iselExpr64 (CmmMachOp (MO_Or  _) [e1,e2]) = iselExpr64ParallelBin OR  e1 e2
+iselExpr64 (CmmMachOp (MO_Xor _) [e1,e2]) = iselExpr64ParallelBin XOR e1 e2
+
+iselExpr64 (CmmMachOp (MO_Not _) [e1]) = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   Reg64 rhi rlo <- getNewReg64
+   let
+        code =  code1 `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       NOT II32 (OpReg rlo),
+                       NOT II32 (OpReg rhi)
+                     ]
+   return (RegCode64 code rhi rlo)
+
+iselExpr64 (CmmRegOff r i) = iselExpr64 (mangleIndexTree r i)
+
 iselExpr64 expr
    = do
       platform <- getPlatform
-      pprPanic "iselExpr64(i386)" (pdoc platform expr)
+      pprPanic "iselExpr64(i386)" (pdoc platform expr $+$ text (show expr))
 
+iselExpr64ParallelBin :: (Format -> Operand -> Operand -> Instr)
+                      -> CmmExpr -> CmmExpr -> NatM (RegCode64 (OrdList Instr))
+iselExpr64ParallelBin op e1 e2 = do
+   RegCode64 code1 r1hi r1lo <- iselExpr64 e1
+   RegCode64 code2 r2hi r2lo <- iselExpr64 e2
+   Reg64 rhi rlo <- getNewReg64
+   let
+        code =  code1 `appOL`
+                code2 `appOL`
+                toOL [ MOV II32 (OpReg r1lo) (OpReg rlo),
+                       MOV II32 (OpReg r1hi) (OpReg rhi),
+                       op  II32 (OpReg r2lo) (OpReg rlo),
+                       op  II32 (OpReg r2hi) (OpReg rhi)
+                     ]
+   return (RegCode64 code rhi rlo)
 
 --------------------------------------------------------------------------------
 getRegister :: CmmExpr -> NatM Register
@@ -674,6 +889,18 @@ getRegister' _ is32Bit (CmmMachOp (MO_SS_Conv W64 W32) [x])
  | is32Bit = do
   RegCode64 code _rhi rlo <- iselExpr64 x
   return $ Fixed II32 rlo code
+
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W8) [x])
+ | is32Bit = do
+  RegCode64 code _rhi rlo <- iselExpr64 x
+  ro <- getNewRegNat II8
+  return $ Fixed II8 ro (code `appOL` toOL [ MOVZxL II8 (OpReg rlo) (OpReg ro) ])
+
+getRegister' _ is32Bit (CmmMachOp (MO_UU_Conv W64 W16) [x])
+ | is32Bit = do
+  RegCode64 code _rhi rlo <- iselExpr64 x
+  ro <- getNewRegNat II16
+  return $ Fixed II16 ro (code `appOL` toOL [ MOVZxL II16 (OpReg rlo) (OpReg ro) ])
 
 getRegister' _ _ (CmmLit lit@(CmmFloat f w)) =
   float_const_sse2  where
@@ -1657,6 +1884,27 @@ machOpToCond mo = case mo of
   MO_U_Le _ -> LEU
   _other -> pprPanic "machOpToCond" (pprMachOp mo)
 
+{-  Note [64-bit integer comparisons on 32-bit]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    When doing these comparisons there are 2 kinds of
+    comparisons.
+
+    * Comparison for equality (or lack thereof)
+
+    We use xor to check if high/low bits are
+    equal. Then combine the results using or.
+
+    * Other comparisons:
+
+    We first compare the low registers
+    and use a subtraction with borrow to compare the high registers.
+
+    For signed numbers the condition is determined by
+    the sign and overflow flags agreeing or not
+    and for unsigned numbers the condition is the carry flag.
+
+-}
 
 -- @cond(Int|Flt)Code@: Turn a boolean expression into a condition, to be
 -- passed back up the tree.
@@ -1666,6 +1914,68 @@ condIntCode cond x y = do platform <- getPlatform
                           condIntCode' platform cond x y
 
 condIntCode' :: Platform -> Cond -> CmmExpr -> CmmExpr -> NatM CondCode
+
+-- 64-bit integer comparisons on 32-bit
+-- See Note [64-bit integer comparisons on 32-bit]
+condIntCode' platform cond x y
+  | target32Bit platform && isWord64 (cmmExprType platform x) = do
+
+  RegCode64 code1 r1hi r1lo <- iselExpr64 x
+  RegCode64 code2 r2hi r2lo <- iselExpr64 y
+
+  -- we mustn't clobber r1/r2 so we use temporaries
+  tmp1 <- getNewRegNat II32
+  tmp2 <- getNewRegNat II32
+
+  let (cond', cmpCode) = intComparison cond r1hi r1lo r2hi r2lo tmp1 tmp2
+  return $ CondCode False cond' (code1 `appOL` code2 `appOL` cmpCode)
+
+  where
+    intComparison cond r1_hi r1_lo r2_hi r2_lo tmp1 tmp2 =
+      case cond of
+        -- These don't occur as argument of condIntCode'
+        ALWAYS  -> panic "impossible"
+        NEG     -> panic "impossible"
+        POS     -> panic "impossible"
+        CARRY   -> panic "impossible"
+        OFLO    -> panic "impossible"
+        PARITY  -> panic "impossible"
+        NOTPARITY -> panic "impossible"
+        -- Special case #1 x == y and x != y
+        EQQ -> (EQQ, cmpExact)
+        NE  -> (NE, cmpExact)
+        -- [x >= y]
+        GE  -> (GE, cmpGE)
+        GEU -> (GEU, cmpGE)
+        -- [x >  y]
+        GTT -> (LTT, cmpLE)
+        GU  -> (LU, cmpLE)
+        -- [x <= y]
+        LE  -> (GE, cmpLE)
+        LEU -> (GEU, cmpLE)
+        -- [x <  y]
+        LTT -> (LTT, cmpGE)
+        LU  -> (LU, cmpGE)
+      where
+        cmpExact :: OrdList Instr
+        cmpExact =
+          toOL
+            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
+            , MOV II32 (OpReg r1_lo) (OpReg tmp2)
+            , XOR II32 (OpReg r2_hi) (OpReg tmp1)
+            , XOR II32 (OpReg r2_lo) (OpReg tmp2)
+            , OR  II32 (OpReg tmp1)  (OpReg tmp2)
+            ]
+        cmpGE = toOL
+            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
+            , CMP II32 (OpReg r2_lo) (OpReg r1_lo)
+            , SBB II32 (OpReg r2_hi) (OpReg tmp1)
+            ]
+        cmpLE = toOL
+            [ MOV II32 (OpReg r2_hi) (OpReg tmp1)
+            , CMP II32 (OpReg r1_lo) (OpReg r2_lo)
+            , SBB II32 (OpReg r1_hi) (OpReg tmp1)
+            ]
 
 -- memory vs immediate
 condIntCode' platform cond (CmmLoad x pk _) (CmmLit lit)
@@ -1881,36 +2191,6 @@ I386: First, we have to ensure that the condition
 codes are set according to the supplied comparison operation.
 -}
 
-{-  Note [64-bit integer comparisons on 32-bit]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    When doing these comparisons there are 2 kinds of
-    comparisons.
-
-    * Comparison for equality (or lack thereof)
-
-    We use xor to check if high/low bits are
-    equal. Then combine the results using or and
-    perform a single conditional jump based on the
-    result.
-
-    * Other comparisons:
-
-    We map all other comparisons to the >= operation.
-    Why? Because it's easy to encode it with a single
-    conditional jump.
-
-    We do this by first computing [r1_lo - r2_lo]
-    and use the carry flag to compute
-    [r1_high - r2_high - CF].
-
-    At which point if r1 >= r2 then the result will be
-    positive. Otherwise negative so we can branch on this
-    condition.
-
--}
-
-
 genCondBranch
     :: BlockId      -- the source of the jump
     -> BlockId      -- the true branch target
@@ -1925,67 +2205,6 @@ genCondBranch bid id false expr = do
 -- | We return the instructions generated.
 genCondBranch' :: Bool -> BlockId -> BlockId -> BlockId -> CmmExpr
                -> NatM InstrBlock
-
--- 64-bit integer comparisons on 32-bit
--- See Note [64-bit integer comparisons on 32-bit]
-genCondBranch' is32Bit _bid true false (CmmMachOp mop [e1,e2])
-  | is32Bit, Just W64 <- maybeIntComparison mop = do
-
-  RegCode64 code1 r1hi r1lo <- iselExpr64 e1
-  RegCode64 code2 r2hi r2lo <- iselExpr64 e2
-  let cond = machOpToCond mop :: Cond
-
-  -- we mustn't clobber r1/r2 so we use temporaries
-  tmp1 <- getNewRegNat II32
-  tmp2 <- getNewRegNat II32
-
-  let cmpCode = intComparison cond true false r1hi r1lo r2hi r2lo tmp1 tmp2
-  return $ code1 `appOL` code2 `appOL` cmpCode
-
-  where
-    intComparison cond true false r1_hi r1_lo r2_hi r2_lo tmp1 tmp2 =
-      case cond of
-        -- Impossible results of machOpToCond
-        ALWAYS  -> panic "impossible"
-        NEG     -> panic "impossible"
-        POS     -> panic "impossible"
-        CARRY   -> panic "impossible"
-        OFLO    -> panic "impossible"
-        PARITY  -> panic "impossible"
-        NOTPARITY -> panic "impossible"
-        -- Special case #1 x == y and x != y
-        EQQ -> cmpExact
-        NE  -> cmpExact
-        -- [x >= y]
-        GE  -> cmpGE
-        GEU -> cmpGE
-        -- [x >  y] <==> ![y >= x]
-        GTT -> intComparison GE  false true r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
-        GU  -> intComparison GEU false true r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
-        -- [x <= y] <==> [y >= x]
-        LE  -> intComparison GE  true false r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
-        LEU -> intComparison GEU true false r2_hi r2_lo r1_hi r1_lo tmp1 tmp2
-        -- [x <  y] <==> ![x >= x]
-        LTT -> intComparison GE  false true r1_hi r1_lo r2_hi r2_lo tmp1 tmp2
-        LU  -> intComparison GEU false true r1_hi r1_lo r2_hi r2_lo tmp1 tmp2
-      where
-        cmpExact :: OrdList Instr
-        cmpExact =
-          toOL
-            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
-            , MOV II32 (OpReg r1_lo) (OpReg tmp2)
-            , XOR II32 (OpReg r2_hi) (OpReg tmp1)
-            , XOR II32 (OpReg r2_lo) (OpReg tmp2)
-            , OR  II32 (OpReg tmp1)  (OpReg tmp2)
-            , JXX cond true
-            , JXX ALWAYS false
-            ]
-        cmpGE = toOL
-            [ MOV II32 (OpReg r1_hi) (OpReg tmp1)
-            , CMP II32 (OpReg r2_lo) (OpReg r1_lo)
-            , SBB II32 (OpReg r2_hi) (OpReg tmp1)
-            , JXX cond true
-            , JXX ALWAYS false ]
 
 genCondBranch' _ bid id false bool = do
   CondCode is_float cond cond_code <- getCondCode bool

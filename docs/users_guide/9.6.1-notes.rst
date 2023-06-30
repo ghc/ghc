@@ -122,7 +122,7 @@ Compiler
   that targets ``wasm32-wasi`` and compiles Haskell code to
   self-contained WebAssembly modules that can be executed on a variety
   of different runtimes. There are a few caveats to be aware of:
-  
+
   - To use the WebAssembly backend, one would need to follow the
     instructions on `ghc-wasm-meta
     <https://gitlab.haskell.org/ghc/ghc-wasm-meta>`_. The WebAssembly
@@ -148,6 +148,9 @@ Compiler
   (operators starting with ``:``).
 
 - The :ghc-flag:`-Wstar-is-type` warning is now enabled by default.
+
+- The 32bit x86 NCG backend will now generate inline assembly for most common 64bit
+  operations. This improves Int64/Word64 performance substantially on this platform.
 
 GHCi
 ~~~~
