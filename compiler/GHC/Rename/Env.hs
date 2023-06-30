@@ -1798,12 +1798,12 @@ warnIfDeclDeprecated gre@(GRE { gre_imp = iss })
          do { iface <- loadInterfaceForName doc name
             ; case lookupImpDeclDeprec iface gre of
                 Just deprText -> addDiagnostic $
-                  TcRnPragmaWarning {
-                    pragma_warning_occ = occ,
-                    pragma_warning_msg = deprText,
-                    pragma_warning_import_mod = importSpecModule imp_spec,
-                    pragma_warning_defined_mod = Just definedMod
-                  }
+                  TcRnPragmaWarning
+                      PragmaWarningName
+                        { pwarn_occname = occ
+                        , pwarn_impmod  = importSpecModule imp_spec
+                        , pwarn_declmod = definedMod }
+                      deprText
                 Nothing  -> return () } }
   | otherwise
   = return ()
@@ -1826,12 +1826,11 @@ warnIfExportDeprecated gre@(GRE { gre_imp = iss })
   = do { mod_warn_mbs <- mapBagM process_import_spec iss
        ; for_ (sequence mod_warn_mbs) $ mapM
            $ \(importing_mod, warn_txt) -> addDiagnostic $
-             TcRnPragmaWarning {
-               pragma_warning_occ = occ,
-               pragma_warning_msg = warn_txt,
-               pragma_warning_import_mod = importing_mod,
-               pragma_warning_defined_mod = Nothing
-             } }
+             TcRnPragmaWarning
+                PragmaWarningExport
+                  { pwarn_occname = occ
+                  , pwarn_impmod  = importing_mod }
+                warn_txt }
   where
     occ = greOccName gre
     name = greName gre

@@ -26,6 +26,7 @@ module GHC.Tc.Deriv.Utils (
 
 import GHC.Prelude
 
+import GHC.Hs.Extension
 import GHC.Data.Bag
 import GHC.Types.Basic
 
@@ -51,6 +52,7 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Driver.Session
 import GHC.Unit.Module (getModule)
+import GHC.Unit.Module.Warnings
 import GHC.Unit.Module.ModIface (mi_fix)
 
 import GHC.Types.Fixity.Env (lookupFixity)
@@ -144,6 +146,8 @@ data DerivEnv = DerivEnv
   , denv_strat        :: Maybe (DerivStrategy GhcTc)
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
+  , denv_warn         :: Maybe (WarningTxt GhcRn)
+    -- ^ A warning to emit whenever the derived instance is used
   }
 
 instance Outputable DerivEnv where
@@ -175,7 +179,8 @@ data DerivSpec theta = DS { ds_loc                 :: SrcSpan
                           , ds_standalone_wildcard :: Maybe SrcSpan
                               -- See Note [Inferring the instance context]
                               -- in GHC.Tc.Deriv.Infer
-                          , ds_mechanism           :: DerivSpecMechanism }
+                          , ds_mechanism           :: DerivSpecMechanism
+                          , ds_warn                :: Maybe (WarningTxt GhcRn)}
         -- This spec implies a dfun declaration of the form
         --       df :: forall tvs. theta => C tys
         -- The Name is the name for the DFun we'll build
@@ -1182,8 +1187,9 @@ non_coercible_class cls
 newDerivClsInst :: DerivSpec ThetaType -> TcM ClsInst
 newDerivClsInst (DS { ds_name = dfun_name, ds_overlap = overlap_mode
                     , ds_tvs = tvs, ds_theta = theta
-                    , ds_cls = clas, ds_tys = tys })
-  = newClsInst overlap_mode dfun_name tvs theta clas tys
+                    , ds_cls = clas, ds_tys = tys
+                    , ds_warn = warn })
+  = newClsInst overlap_mode dfun_name tvs theta clas tys warn
 
 extendLocalInstEnv :: [ClsInst] -> TcM a -> TcM a
 -- Add new locally-defined instances; don't bother to check

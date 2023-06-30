@@ -13,7 +13,7 @@ Main pass of renamer
 -}
 
 module GHC.Rename.Module (
-        rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt
+        rnSrcDecls, addTcgDUs, findSplice, rnWarningTxt, rnLWarningTxt
     ) where
 
 import GHC.Prelude hiding ( head )
@@ -309,6 +309,8 @@ rnWarningTxt (DeprecatedTxt st wst) = do
   wst' <- traverse (traverse rnHsDoc) wst
   pure (DeprecatedTxt st wst')
 
+rnLWarningTxt :: LWarningTxt GhcPs -> RnM (LWarningTxt GhcRn)
+rnLWarningTxt (L loc warn) = L loc <$> rnWarningTxt warn
 
 findDupRdrNames :: [LocatedN RdrName] -> [NonEmpty (LocatedN RdrName)]
 findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
@@ -558,7 +560,8 @@ checkCanonicalInstances cls poly_ty mbinds = do
       addDiagnostic (TcRnNonCanonicalDefinition reason poly_ty)
 
 rnClsInstDecl :: ClsInstDecl GhcPs -> RnM (ClsInstDecl GhcRn, FreeVars)
-rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
+rnClsInstDecl (ClsInstDecl { cid_ext = (inst_warn_ps, _, _)
+                           , cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
@@ -611,7 +614,8 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 
        ; let all_fvs = meth_fvs `plusFV` more_fvs
                                 `plusFV` inst_fvs
-       ; return (ClsInstDecl { cid_ext = noExtField
+       ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
+       ; return (ClsInstDecl { cid_ext = inst_warn_rn
                              , cid_poly_ty = inst_ty', cid_binds = mbinds'
                              , cid_sigs = uprags', cid_tyfam_insts = ats'
                              , cid_overlap_mode = oflag
@@ -1106,7 +1110,7 @@ simplistic solution above, as it fixes the egregious bug in #18470.
 -}
 
 rnSrcDerivDecl :: DerivDecl GhcPs -> RnM (DerivDecl GhcRn, FreeVars)
-rnSrcDerivDecl (DerivDecl _ ty mds overlap)
+rnSrcDerivDecl (DerivDecl (inst_warn_ps, ann) ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
        ; unless standalone_deriv_ok (addErr TcRnUnexpectedStandaloneDerivingDecl)
        ; checkInferredVars ctxt nowc_ty
@@ -1119,7 +1123,8 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
            NFC_StandaloneDerivedInstanceHead
            (getLHsInstDeclHead $ dropWildCards ty')
        ; warnNoDerivStrat mds' loc
-       ; return (DerivDecl noAnn ty' mds' overlap, fvs) }
+       ; inst_warn_rn <- mapM rnLWarningTxt inst_warn_ps
+       ; return (DerivDecl (inst_warn_rn, ann) ty' mds' overlap, fvs) }
   where
     ctxt    = DerivDeclCtx
     loc = getLocA nowc_ty

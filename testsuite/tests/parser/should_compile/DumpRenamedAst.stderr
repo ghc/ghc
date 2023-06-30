@@ -1310,7 +1310,7 @@
        (ClsInstD
         (NoExtField)
         (ClsInstDecl
-         (NoExtField)
+         (Nothing)
          (L
           (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:31:10-14 })
           (HsSig

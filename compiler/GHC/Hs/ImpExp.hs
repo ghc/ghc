@@ -38,7 +38,7 @@ import GHC.Hs.Extension
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
-import GHC.Unit.Module.Warnings (WarningTxt)
+import GHC.Unit.Module.Warnings
 
 import Data.Data
 import Data.Maybe
@@ -203,36 +203,36 @@ type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEVar       GhcPs = Maybe (LocatedP (WarningTxt GhcPs))
-type instance XIEVar       GhcRn = Maybe (LocatedP (WarningTxt GhcRn))
+type instance XIEVar       GhcPs = Maybe (LWarningTxt GhcPs)
+type instance XIEVar       GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEVar       GhcTc = NoExtField
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingAbs  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
-type instance XIEThingAbs  GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingAbs  GhcPs = (Maybe (LWarningTxt GhcPs), EpAnn [AddEpAnn])
+type instance XIEThingAbs  GhcRn = (Maybe (LWarningTxt GhcRn), EpAnn [AddEpAnn])
 type instance XIEThingAbs  GhcTc = EpAnn [AddEpAnn]
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingAll  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
-type instance XIEThingAll  GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingAll  GhcPs = (Maybe (LWarningTxt GhcPs), EpAnn [AddEpAnn])
+type instance XIEThingAll  GhcRn = (Maybe (LWarningTxt GhcRn), EpAnn [AddEpAnn])
 type instance XIEThingAll  GhcTc = EpAnn [AddEpAnn]
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEThingWith GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
-type instance XIEThingWith GhcRn = (Maybe (LocatedP (WarningTxt GhcRn)), EpAnn [AddEpAnn])
+type instance XIEThingWith GhcPs = (Maybe (LWarningTxt GhcPs), EpAnn [AddEpAnn])
+type instance XIEThingWith GhcRn = (Maybe (LWarningTxt GhcRn), EpAnn [AddEpAnn])
 type instance XIEThingWith GhcTc = EpAnn [AddEpAnn]
 
 -- The additional field of type 'Maybe (WarningTxt pass)' holds information
 -- about export deprecation annotations and is thus set to Nothing when `IE`
 -- is used in an import list (since export deprecation can only be used in exports)
-type instance XIEModuleContents  GhcPs = (Maybe (LocatedP (WarningTxt GhcPs)), EpAnn [AddEpAnn])
-type instance XIEModuleContents  GhcRn = Maybe (LocatedP (WarningTxt GhcRn))
+type instance XIEModuleContents  GhcPs = (Maybe (LWarningTxt GhcPs), EpAnn [AddEpAnn])
+type instance XIEModuleContents  GhcRn = Maybe (LWarningTxt GhcRn)
 type instance XIEModuleContents  GhcTc = NoExtField
 
 type instance XIEGroup           (GhcPass _) = NoExtField
@@ -264,7 +264,7 @@ ieNames (IEDocNamed       {})     = []
 ieDeprecation :: forall p. IsPass p => IE (GhcPass p) -> Maybe (WarningTxt (GhcPass p))
 ieDeprecation = fmap unLoc . ie_deprecation (ghcPass @p)
   where
-    ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+    ie_deprecation :: GhcPass p -> IE (GhcPass p) -> Maybe (LWarningTxt (GhcPass p))
     ie_deprecation GhcPs (IEVar xie _) = xie
     ie_deprecation GhcPs (IEThingAbs (xie, _) _) = xie
     ie_deprecation GhcPs (IEThingAll (xie, _) _) = xie

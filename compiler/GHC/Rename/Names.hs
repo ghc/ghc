@@ -1258,12 +1258,11 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               reason <- badImportItemErr iface decl_spec ie IsNotSubordinate all_avails
               pure (TcRnDodgyImports (DodgyImportsHiding reason))
             warning_msg (DeprecatedExport n w) =
-              pure (TcRnPragmaWarning {
-                      pragma_warning_occ = occName n
-                    , pragma_warning_msg = w
-                    , pragma_warning_import_mod = moduleName import_mod
-                    , pragma_warning_defined_mod = Nothing
-                    })
+              pure $ TcRnPragmaWarning
+                         PragmaWarningExport
+                           { pwarn_occname = occName n
+                           , pwarn_impmod  = moduleName import_mod }
+                         w
 
             run_lookup :: IELookupM a -> TcRn (Maybe a)
             run_lookup m = case m of

@@ -319,7 +319,7 @@ cvtDec (InstanceD o ctxt ty decs)
         ; let inst_ty' = L loc $ mkHsImplicitSigType $
                          mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustLA $ InstD noExtField $ ClsInstD noExtField $
-          ClsInstDecl { cid_ext = (noAnn, NoAnnSortKey), cid_poly_ty = inst_ty'
+          ClsInstDecl { cid_ext = (Nothing, noAnn, NoAnnSortKey), cid_poly_ty = inst_ty'
                       , cid_binds = binds'
                       , cid_sigs = Hs.mkClassOpSigs sigs'
                       , cid_tyfam_insts = ats', cid_datafam_insts = adts'
@@ -421,7 +421,7 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
        ; let inst_ty' = L loc $ mkHsImplicitSigType $
                         mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustLA $ DerivD noExtField $
-         DerivDecl { deriv_ext = noAnn
+         DerivDecl { deriv_ext = (Nothing, noAnn)
                    , deriv_strategy = ds'
                    , deriv_type = mkHsWildCardBndrs inst_ty'
                    , deriv_overlap_mode = Nothing } }

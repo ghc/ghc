@@ -2853,7 +2853,7 @@ data ImpExpQcSpec = ImpExpQcName (LocatedN RdrName)
                   | ImpExpQcType EpaLocation (LocatedN RdrName)
                   | ImpExpQcWildcard
 
-mkModuleImpExp :: Maybe (LocatedP (WarningTxt GhcPs)) -> [AddEpAnn] -> LocatedA ImpExpQcSpec
+mkModuleImpExp :: Maybe (LWarningTxt GhcPs) -> [AddEpAnn] -> LocatedA ImpExpQcSpec
                -> ImpExpSubSpec -> P (IE GhcPs)
 mkModuleImpExp warning anns (L l specname) subs = do
   cs <- getCommentsFor (locA l) -- AZ: IEVar can discard comments

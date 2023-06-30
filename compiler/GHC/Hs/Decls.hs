@@ -10,6 +10,7 @@
                                       -- in module Language.Haskell.Syntax.Extension
 
 {-# OPTIONS_GHC -Wno-orphans #-} -- Outputable
+{-# LANGUAGE InstanceSigs #-}
 
 {-
 (c) The University of Glasgow 2006
@@ -125,7 +126,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceText
 import GHC.Core.Type
 import GHC.Types.ForeignCall
-import GHC.Unit.Module.Warnings (WarningTxt(..))
+import GHC.Unit.Module.Warnings
 
 import GHC.Data.Bag
 import GHC.Data.Maybe
@@ -797,8 +798,17 @@ type instance Anno (FamEqn (GhcPass p) _) = SrcSpanAnnA
 
 ----------------- Class instances -------------
 
-type instance XCClsInstDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey) -- TODO:AZ:tidy up
-type instance XCClsInstDecl    GhcRn = NoExtField
+type instance XCClsInstDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
+                                             -- The warning of the deprecated instance
+                                             -- See Note [Implementation of deprecated instances]
+                                             -- in GHC.Tc.Solver.Dict
+                                       , EpAnn [AddEpAnn]
+                                       , AnnSortKey) -- For sorting the additional annotations
+                                        -- TODO:AZ:tidy up
+type instance XCClsInstDecl    GhcRn = Maybe (LWarningTxt GhcRn)
+                                           -- The warning of the deprecated instance
+                                           -- See Note [Implementation of deprecated instances]
+                                           -- in GHC.Tc.Solver.Dict
 type instance XCClsInstDecl    GhcTc = NoExtField
 
 type instance XXClsInstDecl    (GhcPass _) = DataConCantHappen
@@ -814,6 +824,19 @@ type instance XTyFamInstD   GhcRn = NoExtField
 type instance XTyFamInstD   GhcTc = NoExtField
 
 type instance XXInstDecl    (GhcPass _) = DataConCantHappen
+
+cidDeprecation :: forall p. IsPass p
+               => ClsInstDecl (GhcPass p)
+               -> Maybe (WarningTxt (GhcPass p))
+cidDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
+  where
+    decl_deprecation :: GhcPass p  -> ClsInstDecl (GhcPass p)
+                     -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+    decl_deprecation GhcPs (ClsInstDecl{ cid_ext = (depr, _, _) } )
+      = depr
+    decl_deprecation GhcRn (ClsInstDecl{ cid_ext = depr })
+      = depr
+    decl_deprecation _ _ = Nothing
 
 instance OutputableBndrId p
        => Outputable (TyFamInstDecl (GhcPass p)) where
@@ -878,10 +901,10 @@ pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
 
 instance OutputableBndrId p
        => Outputable (ClsInstDecl (GhcPass p)) where
-    ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
-                     , cid_sigs = sigs, cid_tyfam_insts = ats
-                     , cid_overlap_mode = mbOverlap
-                     , cid_datafam_insts = adts })
+    ppr (cid@ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
+                         , cid_sigs = sigs, cid_tyfam_insts = ats
+                         , cid_overlap_mode = mbOverlap
+                         , cid_datafam_insts = adts })
       | null sigs, null ats, null adts, isEmptyBag binds  -- No "where" part
       = top_matter
 
@@ -892,8 +915,9 @@ instance OutputableBndrId p
                map (pprDataFamInstDecl NotTopLevel . unLoc) adts ++
                pprLHsBindsForUser binds sigs ]
       where
-        top_matter = text "instance" <+> ppOverlapPragma mbOverlap
-                                             <+> ppr inst_ty
+        top_matter = text "instance" <+> maybe empty ppr (cidDeprecation cid)
+                                     <+> ppOverlapPragma mbOverlap
+                                     <+> ppr inst_ty
 
 ppDerivStrategy :: OutputableBndrId p
                 => Maybe (LDerivStrategy (GhcPass p)) -> SDoc
@@ -958,19 +982,43 @@ anyLConIsGadt xs = case toList xs of
 ************************************************************************
 -}
 
-type instance XCDerivDecl    (GhcPass _) = EpAnn [AddEpAnn]
+type instance XCDerivDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
+                                           -- The warning of the deprecated derivation
+                                           -- See Note [Implementation of deprecated instances]
+                                           -- in GHC.Tc.Solver.Dict
+                                     , EpAnn [AddEpAnn] )
+type instance XCDerivDecl    GhcRn = ( Maybe (LWarningTxt GhcRn)
+                                           -- The warning of the deprecated derivation
+                                           -- See Note [Implementation of deprecated instances]
+                                           -- in GHC.Tc.Solver.Dict
+                                     , EpAnn [AddEpAnn] )
+type instance XCDerivDecl    GhcTc = EpAnn [AddEpAnn]
 type instance XXDerivDecl    (GhcPass _) = DataConCantHappen
+
+derivDeprecation :: forall p. IsPass p
+               => DerivDecl (GhcPass p)
+               -> Maybe (WarningTxt (GhcPass p))
+derivDeprecation = fmap unLoc . decl_deprecation (ghcPass @p)
+  where
+    decl_deprecation :: GhcPass p  -> DerivDecl (GhcPass p)
+                     -> Maybe (LocatedP (WarningTxt (GhcPass p)))
+    decl_deprecation GhcPs (DerivDecl{ deriv_ext = (depr, _) })
+      = depr
+    decl_deprecation GhcRn (DerivDecl{ deriv_ext = (depr, _) })
+      = depr
+    decl_deprecation _ _ = Nothing
 
 type instance Anno OverlapMode = SrcSpanAnnP
 
 instance OutputableBndrId p
        => Outputable (DerivDecl (GhcPass p)) where
-    ppr (DerivDecl { deriv_type = ty
+    ppr (deriv@DerivDecl { deriv_type = ty
                    , deriv_strategy = ds
                    , deriv_overlap_mode = o })
         = hsep [ text "deriving"
                , ppDerivStrategy ds
                , text "instance"
+               , maybe empty ppr (derivDeprecation deriv)
                , ppOverlapPragma o
                , ppr ty ]
 

@@ -1067,20 +1067,29 @@ instance Diagnostic TcRnMessage where
       -> mkSimpleDecorated $
          text "You cannot SPECIALISE" <+> quotes (ppr name)
            <+> text "because its definition is not visible in this module"
-    TcRnPragmaWarning {pragma_warning_occ, pragma_warning_msg, pragma_warning_import_mod, pragma_warning_defined_mod}
+    TcRnPragmaWarning
+      { pragma_warning_info = PragmaWarningInstance{pwarn_dfunid, pwarn_ctorig}
+      , pragma_warning_msg }
+      -> mkSimpleDecorated $
+        sep [ hang (text "In the use of")
+                 2 (pprDFunId pwarn_dfunid)
+            , ppr pwarn_ctorig
+            , pprWarningTxtForMsg pragma_warning_msg
+         ]
+    TcRnPragmaWarning {pragma_warning_info, pragma_warning_msg}
       -> mkSimpleDecorated $
         sep [ sep [ text "In the use of"
-                <+> pprNonVarNameSpace (occNameSpace pragma_warning_occ)
-                <+> quotes (ppr pragma_warning_occ)
-                , parens impMsg <> colon ]
+                <+> pprNonVarNameSpace (occNameSpace occ_name)
+                <+> quotes (ppr occ_name)
+                , parens imp_msg <> colon ]
           , pprWarningTxtForMsg pragma_warning_msg ]
           where
-            impMsg  = text "imported from" <+> ppr pragma_warning_import_mod <> extra
-            extra = case pragma_warning_defined_mod of
-                      Just def_mod
-                        | def_mod /= pragma_warning_import_mod
-                          -> text ", but defined in" <+> ppr def_mod
-                      _ -> empty
+            occ_name = pwarn_occname pragma_warning_info
+            imp_mod = pwarn_impmod pragma_warning_info
+            imp_msg  = text "imported from" <+> ppr imp_mod <> extra
+            extra | PragmaWarningName {pwarn_declmod = decl_mod} <- pragma_warning_info
+                  , imp_mod /= decl_mod = text ", but defined in" <+> ppr decl_mod
+                  | otherwise = empty
     TcRnDifferentExportWarnings name locs
       -> mkSimpleDecorated $ vcat [quotes (ppr name) <+> text "exported with different error messages",
                                    text "at" <+> vcat (map ppr $ sortBy leftmost_smallest $ NE.toList locs)]

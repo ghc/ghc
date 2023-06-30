@@ -64,6 +64,7 @@ import GHC.Core.PatSyn
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Unit.Module
+import GHC.Unit.Module.Warnings
 import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
@@ -1518,7 +1519,10 @@ data InstanceWhat  -- How did we solve this constraint?
 
   | TopLevInstance       -- Solved by a top-level instance decl
       { iw_dfun_id   :: DFunId
-      , iw_safe_over :: SafeOverlapping }
+      , iw_safe_over :: SafeOverlapping
+      , iw_warn      :: Maybe (WarningTxt GhcRn) }
+            -- See Note [Implementation of deprecated instances]
+            -- in GHC.Tc.Solver.Dict
 
 instance Outputable InstanceWhat where
   ppr BuiltinInstance   = text "a built-in instance"

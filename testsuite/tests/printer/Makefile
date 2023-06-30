@@ -734,6 +734,11 @@ PprExportWarn:
 	$(CHECK_PPR)   $(LIBDIR) PprExportWarn.hs
 	$(CHECK_EXACT) $(LIBDIR) PprExportWarn.hs
 
+.PHONY: PprInstanceWarn
+PprInstanceWarn:
+	$(CHECK_PPR)   $(LIBDIR) PprInstanceWarn.hs
+	$(CHECK_EXACT) $(LIBDIR) PprInstanceWarn.hs
+
 .PHONY: Test20243
 Test20243:
 	$(CHECK_PPR)   $(LIBDIR) Test20243.hs

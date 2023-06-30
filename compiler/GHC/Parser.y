@@ -859,7 +859,7 @@ unitdecls :: { OrdList (LHsUnitDecl PackageName) }
         | unitdecl              { unitOL $1 }
 
 unitdecl :: { LHsUnitDecl PackageName }
-        : 'module' maybe_src modid maybemodwarning maybeexports 'where' body
+        : 'module' maybe_src modid maybe_warning_pragma maybeexports 'where' body
              -- XXX not accurate
              { sL1 $1 $ DeclD
                  (case snd $2 of
@@ -867,7 +867,7 @@ unitdecl :: { LHsUnitDecl PackageName }
                    IsBoot  -> HsBootFile)
                  (reLoc $3)
                  (sL1 $1 (HsModule (XModulePs noAnn (thdOf3 $7) $4 Nothing) (Just $3) $5 (fst $ sndOf3 $7) (snd $ sndOf3 $7))) }
-        | 'signature' modid maybemodwarning maybeexports 'where' body
+        | 'signature' modid maybe_warning_pragma maybeexports 'where' body
              { sL1 $1 $ DeclD
                  HsigFile
                  (reLoc $2)
@@ -892,7 +892,7 @@ unitdecl :: { LHsUnitDecl PackageName }
 -- know what they are doing. :-)
 
 signature :: { Located (HsModule GhcPs) }
-       : 'signature' modid maybemodwarning maybeexports 'where' body
+       : 'signature' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acs (\cs-> (L loc (HsModule (XModulePs
                                                (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnSignature $1, mj AnnWhere $5] (fstOf3 $6) Nothing) cs)
@@ -902,7 +902,7 @@ signature :: { Located (HsModule GhcPs) }
                     ) }
 
 module :: { Located (HsModule GhcPs) }
-       : 'module' modid maybemodwarning maybeexports 'where' body
+       : 'module' modid maybe_warning_pragma maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 acsFinal (\cs eof -> (L loc (HsModule (XModulePs
                                                      (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1, mj AnnWhere $5] (fstOf3 $6) eof) cs)
@@ -923,15 +923,6 @@ missing_module_keyword :: { () }
 
 implicit_top :: { () }
         : {- empty -}                           {% pushModuleContext }
-
-maybemodwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
-    : '{-# DEPRECATED' strings '#-}'
-                      {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
-                              (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
-    | '{-# WARNING' warning_category strings '#-}'
-                         {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
-                                 (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
-    |  {- empty -}                  { Nothing }
 
 body    :: { ([TrailingAnn]
              ,([LImportDecl GhcPs], [LHsDecl GhcPs])
@@ -959,14 +950,14 @@ top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
 -- Module declaration & imports only
 
 header  :: { Located (HsModule GhcPs) }
-        : 'module' modid maybemodwarning maybeexports 'where' header_body
+        : 'module' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
                                                    NoLayoutInfo $3 Nothing)
                                                 (Just $2) $4 $6 []
                           ))) }
-        | 'signature' modid maybemodwarning maybeexports 'where' header_body
+        | 'signature' modid maybe_warning_pragma maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    acs (\cs -> (L loc (HsModule (XModulePs
                                                    (EpAnn (spanAsAnchor loc) (AnnsModule [mj AnnModule $1,mj AnnWhere $5] [] Nothing) cs)
@@ -1026,24 +1017,15 @@ exportlist1 :: { OrdList (LIE GhcPs) }
    -- No longer allow things like [] and (,,,) to be exported
    -- They are built in syntax, always available
 export  :: { OrdList (LIE GhcPs) }
-        : maybeexportwarning qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
+        : maybe_warning_pragma qcname_ext export_subspec {% do { let { span = (maybe comb2 comb3 $1) $2 $> }
                                                           ; impExp <- mkModuleImpExp $1 (fst $ unLoc $3) $2 (snd $ unLoc $3)
                                                           ; return $ unitOL $ reLocA $ sL span $ impExp } }
-        | maybeexportwarning 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
+        | maybe_warning_pragma 'module' modid            {% do { let { span = (maybe comb2 comb3 $1) $2 $>
                                                                    ; anchor = (maybe glR (\loc -> spanAsAnchor . comb2 loc) $1) $2 }
                                                           ; locImpExp <- acs (\cs -> sL span (IEModuleContents ($1, EpAnn anchor [mj AnnModule $2] cs) $3))
                                                           ; return $ unitOL $ reLocA $ locImpExp } }
-        | maybeexportwarning 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
+        | maybe_warning_pragma 'pattern' qcon            { let span = (maybe comb2 comb3 $1) $2 $>
                                                        in unitOL $ reLocA $ sL span $ IEVar $1 (sLLa $2 $> (IEPattern (glAA $2) $3)) }
-
-maybeexportwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
-        : '{-# DEPRECATED' strings '#-}'
-                            {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
-                                (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
-        | '{-# WARNING' warning_category strings '#-}'
-                            {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
-                                (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
-        |  {- empty -}      { Nothing }
 
 export_subspec :: { Located ([AddEpAnn],ImpExpSubSpec) }
         : {- empty -}             { sL0 ([],ImpExpAbs) }
@@ -1361,17 +1343,17 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
   | oqtycon { sL1 $1 [$1] }
 
 inst_decl :: { LInstDecl GhcPs }
-        : 'instance' overlap_pragma inst_type where_inst
-       {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $4)
-             ; let anns = (mj AnnInstance $1 : (fst $ unLoc $4))
+        : 'instance' maybe_warning_pragma overlap_pragma inst_type where_inst
+       {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $5)
+             ; let anns = (mj AnnInstance $1 : (fst $ unLoc $5))
              ; let cid cs = ClsInstDecl
-                                     { cid_ext = (EpAnn (glR $1) anns cs, NoAnnSortKey)
-                                     , cid_poly_ty = $3, cid_binds = binds
+                                     { cid_ext = ($2, EpAnn (glR $1) anns cs, NoAnnSortKey)
+                                     , cid_poly_ty = $4, cid_binds = binds
                                      , cid_sigs = mkClassOpSigs sigs
                                      , cid_tyfam_insts = ats
-                                     , cid_overlap_mode = $2
+                                     , cid_overlap_mode = $3
                                      , cid_datafam_insts = adts }
-             ; acsA (\cs -> L (comb3 $1 $3 $4)
+             ; acsA (\cs -> L (comb3 $1 $4 $5)
                              (ClsInstD { cid_d_ext = noExtField, cid_inst = cid cs }))
                    } }
 
@@ -1640,11 +1622,11 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl GhcPs }
-  : 'deriving' deriv_standalone_strategy 'instance' overlap_pragma inst_type
+  : 'deriving' deriv_standalone_strategy 'instance' maybe_warning_pragma overlap_pragma inst_type
                 {% do { let { err = text "in the stand-alone deriving instance"
-                                    <> colon <+> quotes (ppr $5) }
+                                    <> colon <+> quotes (ppr $6) }
                       ; acsA (\cs -> sLL $1 $>
-                                 (DerivDecl (EpAnn (glR $1) [mj AnnDeriving $1, mj AnnInstance $3] cs) (mkHsWildCardBndrs $5) $2 $4)) }}
+                                 (DerivDecl ($4, EpAnn (glR $1) [mj AnnDeriving $1, mj AnnInstance $3] cs) (mkHsWildCardBndrs $6) $2 $5)) }}
 
 -----------------------------------------------------------------------------
 -- Role annotations
@@ -1985,6 +1967,15 @@ to varid (used for rule_vars), 'checkRuleTyVarBndrNames' must be updated.
 
 -----------------------------------------------------------------------------
 -- Warnings and deprecations (c.f. rules)
+
+maybe_warning_pragma :: { Maybe (LWarningTxt GhcPs) }
+        : '{-# DEPRECATED' strings '#-}'
+                            {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
+                                (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
+        | '{-# WARNING' warning_category strings '#-}'
+                            {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                                (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
+        |  {- empty -}      { Nothing }
 
 warning_category :: { Maybe (Located WarningCategory) }
         : 'in' STRING                  { Just (sL1 $2 (mkWarningCategory (getSTRING $2))) }

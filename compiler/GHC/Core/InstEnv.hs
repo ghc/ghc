@@ -13,8 +13,8 @@ module GHC.Core.InstEnv (
         DFunId, InstMatch, ClsInstLookupResult,
         Coherence(..), PotentialUnifiers(..), getPotentialUnifiers, nullUnifiers,
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
-        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprInstances,
-        instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
+        ClsInst(..), DFunInstType, pprInstance, pprInstanceHdr, pprDFunId, pprInstances,
+        instanceWarning, instanceHead, instanceSig, mkLocalClsInst, mkImportedClsInst,
         instanceDFunId, updateClsInstDFuns, updateClsInstDFun,
         fuzzyClsInstCmp, orphNamesOfClsInst,
 
@@ -42,8 +42,10 @@ import GHC.Core.RoughMap
 import GHC.Core.Class
 import GHC.Core.Unify
 import GHC.Core.FVs( orphNamesOfTypes, orphNamesOfType )
+import GHC.Hs.Extension
 
 import GHC.Unit.Module.Env
+import GHC.Unit.Module.Warnings
 import GHC.Unit.Types
 import GHC.Types.Var
 import GHC.Types.Unique.DSet
@@ -108,6 +110,10 @@ data ClsInst
              , is_flag :: OverlapFlag   -- See detailed comments with
                                         -- the decl of BasicTypes.OverlapFlag
              , is_orphan :: IsOrphan
+             , is_warn :: Maybe (WarningTxt GhcRn)
+                -- Warning emitted when the instance is used
+                -- See Note [Implementation of deprecated instances]
+                -- in GHC.Tc.Solver.Dict
     }
   deriving Data
 
@@ -217,6 +223,16 @@ instance NamedThing ClsInst where
 instance Outputable ClsInst where
    ppr = pprInstance
 
+pprDFunId :: DFunId -> SDoc
+-- Prints the analogous information to `pprInstance`
+-- but with just the DFunId
+pprDFunId dfun
+  = hang dfun_header
+       2 (vcat [ text "--" <+> pprDefinedAt (getName dfun)
+               , whenPprDebug (ppr dfun) ])
+  where
+    dfun_header = ppr_overlap_dfun_hdr empty dfun
+
 pprInstance :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstance ispec
@@ -228,10 +244,17 @@ pprInstance ispec
 pprInstanceHdr :: ClsInst -> SDoc
 -- Prints the ClsInst as an instance declaration
 pprInstanceHdr (ClsInst { is_flag = flag, is_dfun = dfun })
-  = text "instance" <+> ppr flag <+> pprSigmaType (idType dfun)
+  = ppr_overlap_dfun_hdr (ppr flag) dfun
+
+ppr_overlap_dfun_hdr :: SDoc -> DFunId -> SDoc
+ppr_overlap_dfun_hdr flag_sdoc dfun
+  = text "instance" <+> flag_sdoc <+> pprSigmaType (idType dfun)
 
 pprInstances :: [ClsInst] -> SDoc
 pprInstances ispecs = vcat (map pprInstance ispecs)
+
+instanceWarning :: ClsInst -> Maybe (WarningTxt GhcRn)
+instanceWarning = is_warn
 
 instanceHead :: ClsInst -> ([TyVar], Class, [Type])
 -- Returns the head, using the fresh tyvars from the ClsInst
@@ -260,17 +283,18 @@ instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 
 mkLocalClsInst :: DFunId -> OverlapFlag
                -> [TyVar] -> Class -> [Type]
+               -> Maybe (WarningTxt GhcRn)
                -> ClsInst
 -- Used for local instances, where we can safely pull on the DFunId.
 -- Consider using newClsInst instead; this will also warn if
 -- the instance is an orphan.
-mkLocalClsInst dfun oflag tvs cls tys
+mkLocalClsInst dfun oflag tvs cls tys warn
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs
             , is_dfun_name = dfun_name
             , is_cls = cls, is_cls_nm = cls_name
             , is_tys = tys, is_tcs = RM_KnownTc cls_name : roughMatchTcs tys
-            , is_orphan = orph
+            , is_orphan = orph, is_warn = warn
             }
   where
     cls_name = className cls
@@ -301,24 +325,26 @@ mkLocalClsInst dfun oflag tvs cls tys
 
     choose_one nss = chooseOrphanAnchor (unionNameSets nss)
 
-mkImportedClsInst :: Name           -- ^ the name of the class
-                  -> [RoughMatchTc] -- ^ the rough match signature of the instance
-                  -> Name           -- ^ the 'Name' of the dictionary binding
-                  -> DFunId         -- ^ the 'Id' of the dictionary.
-                  -> OverlapFlag    -- ^ may this instance overlap?
-                  -> IsOrphan       -- ^ is this instance an orphan?
+mkImportedClsInst :: Name                     -- ^ the name of the class
+                  -> [RoughMatchTc]           -- ^ the rough match signature of the instance
+                  -> Name                     -- ^ the 'Name' of the dictionary binding
+                  -> DFunId                   -- ^ the 'Id' of the dictionary.
+                  -> OverlapFlag              -- ^ may this instance overlap?
+                  -> IsOrphan                 -- ^ is this instance an orphan?
+                  -> Maybe (WarningTxt GhcRn) -- ^ warning emitted when solved
                   -> ClsInst
 -- Used for imported instances, where we get the rough-match stuff
 -- from the interface file
 -- The bound tyvars of the dfun are guaranteed fresh, because
 -- the dfun has been typechecked out of the same interface file
-mkImportedClsInst cls_nm mb_tcs dfun_name dfun oflag orphan
+mkImportedClsInst cls_nm mb_tcs dfun_name dfun oflag orphan warn
   = ClsInst { is_flag = oflag, is_dfun = dfun
             , is_tvs = tvs, is_tys = tys
             , is_dfun_name = dfun_name
             , is_cls_nm = cls_nm, is_cls = cls
             , is_tcs = RM_KnownTc cls_nm : mb_tcs
-            , is_orphan = orphan }
+            , is_orphan = orphan
+            , is_warn = warn }
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
 

@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Warnings for a module
 module GHC.Unit.Module.Warnings
@@ -25,6 +26,7 @@ module GHC.Unit.Module.Warnings
 
    , Warnings (..)
    , WarningTxt (..)
+   , LWarningTxt
    , DeclWarnOccNames
    , ExportWarnNames
    , warningTxtCategory
@@ -51,6 +53,8 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Hs.Doc
+import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
@@ -178,6 +182,7 @@ deleteWarningCategorySet :: WarningCategory -> WarningCategorySet -> WarningCate
 deleteWarningCategorySet c (FiniteWarningCategorySet   s) = FiniteWarningCategorySet   (delOneFromUniqSet s c)
 deleteWarningCategorySet c (CofiniteWarningCategorySet s) = CofiniteWarningCategorySet (addOneToUniqSet   s c)
 
+type LWarningTxt pass = XRec pass (WarningTxt pass)
 
 -- | Warning Text
 --
@@ -221,6 +226,7 @@ warningTxtSame w1 w2
 deriving instance Eq (IdP pass) => Eq (WarningTxt pass)
 deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
+type instance Anno (WarningTxt (GhcPass pass)) = SrcSpanAnnP
 instance Outputable (WarningTxt pass) where
     ppr (WarningTxt mcat lsrc ws)
       = case unLoc lsrc of

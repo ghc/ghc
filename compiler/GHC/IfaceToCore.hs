@@ -1228,11 +1228,12 @@ tcRoughTyCon Nothing   = RM_WildCard
 tcIfaceInst :: IfaceClsInst -> IfL ClsInst
 tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
-                          , ifInstOrph = orph })
+                          , ifInstOrph = orph, ifInstWarn = iface_warn })
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
                     fmap tyThingId (tcIfaceImplicit dfun_name)
        ; let mb_tcs' = map tcRoughTyCon mb_tcs
-       ; return (mkImportedClsInst cls mb_tcs' dfun_name dfun oflag orph) }
+             warn = fmap fromIfaceWarningTxt iface_warn
+       ; return (mkImportedClsInst cls mb_tcs' dfun_name dfun oflag orph warn) }
 
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs

@@ -34,6 +34,7 @@ import GHC.Core.Predicate
 import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Unify ( ruleMatchTyKiX )
 
+import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Types.Id( mkTemplateLocals )
@@ -46,6 +47,8 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 
+import GHC.Unit.Module
+
 import GHC.Data.Bag
 
 import GHC.Driver.DynFlags
@@ -57,7 +60,7 @@ import Data.Void( Void )
 
 import Control.Monad.Trans.Maybe( MaybeT, runMaybeT )
 import Control.Monad.Trans.Class( lift )
-import Control.Monad( mzero )
+import Control.Monad
 
 
 {- *********************************************************************
@@ -781,6 +784,8 @@ shortCutSolver dflags ev_w ev_i
       | let pred = ctEvPred ev
       , ClassPred cls tys <- classifyPredType pred
       = do { inst_res <- lift $ matchGlobalInst dflags True cls tys loc_w
+           ; lift $ warn_custom_warn_instance inst_res loc_w
+                 -- See Note [Implementation of deprecated instances]
            ; case inst_res of
                OneInst { cir_new_theta   = preds
                        , cir_mk_ev       = mk_ev
@@ -940,10 +945,62 @@ matchClassInst dflags inerts clas tys loc
 
            NoInstance  -- No local instances, so try global ones
               -> do { global_res <- matchGlobalInst dflags False clas tys loc
+                    ; warn_custom_warn_instance global_res loc
+                          -- See Note [Implementation of deprecated instances]
                     ; traceTcS "} matchClassInst global result" $ ppr global_res
                     ; return global_res } }
   where
     pred = mkClassPred clas tys
+
+{- Note [Implementation of deprecated instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This note describes the implementation of the deprecated instances GHC proposal
+  https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0575-deprecated-instances.rst
+
+In the parser, we parse deprecations/warnings attached to instances:
+
+  instance {-# DEPRECATED "msg" #-} Show X
+  deriving instance {-# WARNING "msg2" #-} Eq Y
+
+(Note that non-standalone deriving instance declarations do not support this mechanism.)
+(Note that the DEPRECATED and WARNING pragmas can be used here interchangeably.)
+
+We store the resulting warning message in the extension field of `ClsInstDecl`
+(respectively, `DerivDecl`; See Note [Trees That Grow]).
+
+In `GHC.Tc.TyCl.Instance.tcClsInstDecl` (respectively, `GHC.Tc.Deriv.Utils.newDerivClsInst`),
+we pass on that information to `ClsInst` (and eventually store it in `IfaceClsInst` too).
+
+Next, if we solve a constraint using such an instance, in
+`GHC.Tc.Instance.Class.matchInstEnv`, we pass it further into the
+`Ghc.Tc.Types.Origin.InstanceWhat`.
+
+Finally, if the instance solving function `GHC.Tc.Solver.Monad.matchGlobalInst` returns
+a `Ghc.Tc.Instance.Class.ClsInstResult` with `Ghc.Tc.Types.Origin.InstanceWhat` containing
+a warning, when called from either `matchClassInst` or `shortCutSolver`, we call
+`warn_custom_warn_instance` that ultimately emits the warning if needed.
+
+Note that we only emit a warning when the instance is used in a different module
+than it is defined, which keeps the behaviour in line with the deprecation of
+top-level identifiers.
+-}
+
+-- | Emits the custom warning for a deprecated instance
+--
+-- See Note [Implementation of deprecated instances]
+warn_custom_warn_instance :: ClsInstResult -> CtLoc -> TcS ()
+warn_custom_warn_instance (OneInst{ cir_what = what }) ct_loc
+  | TopLevInstance{ iw_dfun_id = dfun, iw_warn = Just warn } <- what = do
+      let mod = nameModule $ getName dfun
+      this_mod <- getModule
+      when (this_mod /= mod)
+          -- We don't emit warnings for usages inside of the same module
+          -- to prevent it being triggered for instance child declarations
+        $ ctLocWarnTcS ct_loc
+          $ TcRnPragmaWarning
+              { pragma_warning_info = PragmaWarningInstance dfun (ctl_origin ct_loc)
+              , pragma_warning_msg  = warn }
+warn_custom_warn_instance _ _ = return ()
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

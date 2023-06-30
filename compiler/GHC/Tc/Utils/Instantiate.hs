@@ -94,6 +94,7 @@ import GHC.Utils.Unique (sameUnique)
 
 import GHC.Unit.State
 import GHC.Unit.External
+import GHC.Unit.Module.Warnings
 
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
@@ -855,8 +856,8 @@ tcGetInsts :: TcM [ClsInst]
 tcGetInsts = fmap tcg_insts getGblEnv
 
 newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> ThetaType
-           -> Class -> [Type] -> TcM ClsInst
-newClsInst overlap_mode dfun_name tvs theta clas tys
+           -> Class -> [Type] -> Maybe (WarningTxt GhcRn) -> TcM ClsInst
+newClsInst overlap_mode dfun_name tvs theta clas tys warn
   = do { (subst, tvs') <- freshenTyVarBndrs tvs
              -- Be sure to freshen those type variables,
              -- so they are sure not to appear in any lookup
@@ -870,7 +871,7 @@ newClsInst overlap_mode dfun_name tvs theta clas tys
              --     helpful to use the same names
 
        ; oflag <- getOverlapFlag overlap_mode
-       ; let cls_inst = mkLocalClsInst dfun oflag tvs' clas tys'
+       ; let cls_inst = mkLocalClsInst dfun oflag tvs' clas tys' warn
 
        ; when (isOrphan (is_orphan cls_inst)) $
          addDiagnostic (TcRnOrphanInstance $ Left cls_inst)

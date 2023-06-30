@@ -14,6 +14,7 @@ module GHC.Iface.Make
    , mkFullIface
    , mkIfaceTc
    , mkIfaceExports
+   , toIfaceWarningTxt
    )
 where
 
@@ -367,7 +368,8 @@ instanceToIfaceInst :: ClsInst -> IfaceClsInst
 instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                              , is_cls_nm = cls_name, is_cls = cls
                              , is_tcs = rough_tcs
-                             , is_orphan = orph })
+                             , is_orphan = orph
+                             , is_warn = warn })
   = assert (cls_name == className cls) $
     IfaceClsInst { ifDFun     = idName dfun_id
                  , ifOFlag    = oflag
@@ -375,7 +377,8 @@ instanceToIfaceInst (ClsInst { is_dfun = dfun_id, is_flag = oflag
                  , ifInstTys  = ifaceRoughMatchTcs $ tail rough_tcs
                    -- N.B. Drop the class name from the rough match template
                    --      It is put back by GHC.Core.InstEnv.mkImportedClsInst
-                 , ifInstOrph = orph }
+                 , ifInstOrph = orph
+                 , ifInstWarn = fmap toIfaceWarningTxt warn }
 
 --------------------------
 famInstToIfaceFamInst :: FamInst -> IfaceFamInst

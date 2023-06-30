@@ -59,7 +59,7 @@ import GHC.Hs.Instances () -- For Data instances
 import GHC.Utils.Outputable
 import GHC.Types.Fixity         ( Fixity )
 import GHC.Types.SrcLoc
-import GHC.Unit.Module.Warnings ( WarningTxt )
+import GHC.Unit.Module.Warnings
 
 -- libraries:
 import Data.Data hiding ( Fixity )
@@ -71,7 +71,7 @@ data XModulePs
       hsmodLayout :: LayoutInfo GhcPs,
         -- ^ Layout info for the module.
         -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
-      hsmodDeprecMessage :: Maybe (LocatedP (WarningTxt GhcPs)),
+      hsmodDeprecMessage :: Maybe (LWarningTxt GhcPs),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'

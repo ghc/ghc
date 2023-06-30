@@ -141,52 +141,74 @@ There are three ways of using these pragmas.
    both are in scope. If both are in scope, there is currently no way to
    specify one without the other (c.f. fixities :ref:`infix-tycons`).
 
--  You can also attach a warning to an export field, be it a regular export: ::
+-  You can add a warning to an instance (including derived instances): ::
+
+          instance {-# DEPRECATED "Don't use" #-} Show T1 where { .. }
+          instance {-# WARNING "Don't use either" #-} Show G1 where { .. }
+
+          deriving instance {-# DEPRECATED "to be removed" #-} Eq T2
+          deriving instance {-# WARNING "to be removed as well" #-} Eq G2
+
+   Doing so will cause warnings to be emitted whenever such instances are used
+   to solve a constraint. For example: ::
+
+       foo = show (MkT1 :: T1) -- warning: uses "instance Show T1"
+
+       bar :: forall a. Eq a => a -> Bool
+       bar x = x == x
+       baz :: T2 -> Bool
+       baz = bar -- warning: uses "instance Eq T2"
+       quux :: Eq T2 => T2 -> Bool
+       quux = bar -- no warning: does not use "instance Eq T2"
+
+   As with other deprecation mechanisms, note that warnings will not be emitted
+   for the usages of those instances in the module in which they are defined.
+
+-  Finally, you can attach a warning to an export field, be it a regular export: ::
 
           module Wibble (
               {-# DEPRECATED "Do not use this type" #-} T,
               {-# WARNING "This is a hacky function" #-} f
             ) where
             ...
-    
-    Or a re-export of import from another module: ::
-          
+
+   Or a re-export of import from another module: ::
+
           module Wibble (
               {-# DEPRECATED "Import this function from A instead" #-} g
             ) where
           import A
-    
+
    Or a re-export of an entire module: ::
-        
+
           module Wibble (
-              {-# DEPRECATED "This declaration has been moved to B instead"
+              {-# DEPRECATED "This declaration has been moved to B instead" #-}
                 module B
             ) where
           import B
-   
+
    When you compile any module that imports and uses any of the
    specified entities, GHC will print the specified message.
 
    An entity will only be warned about if all of its exports are deprecated: ::
-          
+
           module Wibble (
               {-# WARNING "This would not be warned about" #-} g,
               module A
             )
           import A (g)
-   
-   If the :ghc-flag: `-Wincomplete-export-warnings` is on, 
+
+   If the :ghc-flag: `-Wincomplete-export-warnings` is on,
    such occurences are warned about.
 
-   Moreover, all warning declarations of a specific name have to 
+   Moreover, all warning declarations of a specific name have to
    be warned with the same pragma and message: ::
-          
+
           module Wibble (
               {-# WARNING "This would throw an error" #-} T(T1),
               {-# WARNING "Because the warning messages differ for T" #-} T,
           )
           ...
-
 
 Also note that the argument to ``DEPRECATED`` and ``WARNING`` can also be a list
 of strings, in which case the strings will be presented on separate lines in the
@@ -195,11 +217,11 @@ resulting warning message, ::
     {-# DEPRECATED foo, bar ["Don't use these", "Use gar instead"] #-}
 
 Warnings and deprecations are not reported for (a) uses within the
-defining module, (b) defining a method in a class instance, 
-(c) unqualified uses of an entity imported through different modules 
-when not all of them are warned about, and (d) uses in an 
-export list (except for export warnings). The latter reduces 
-spurious complaints within a library in which one module gathers together 
+defining module, (b) defining a method in a class instance,
+(c) unqualified uses of an entity imported through different modules
+when not all of them are warned about, and (d) uses in an
+export list (except for export warnings). The latter reduces
+spurious complaints within a library in which one module gathers together
 and re-exports the exports of several others.
 
 A ``WARNING`` pragma (but not a ``DEPRECATED`` pragma) may optionally specify a

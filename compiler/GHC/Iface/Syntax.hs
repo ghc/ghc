@@ -35,6 +35,7 @@ module GHC.Iface.Syntax (
         ifaceDeclFingerprints,
         fromIfaceBooleanFormula,
         fromIfaceWarnings,
+        fromIfaceWarningTxt,
 
         -- Free Names
         freeNamesIfDecl, freeNamesIfRule, freeNamesIfFamInst,
@@ -315,7 +316,11 @@ data IfaceClsInst
                    ifInstTys  :: [Maybe IfaceTyCon],       -- the defn of ClsInst
                    ifDFun     :: IfExtName,                -- The dfun
                    ifOFlag    :: OverlapFlag,              -- Overlap flag
-                   ifInstOrph :: IsOrphan }                -- See Note [Orphans] in GHC.Core.InstEnv
+                   ifInstOrph :: IsOrphan,                 -- See Note [Orphans] in GHC.Core.InstEnv
+                   ifInstWarn :: Maybe IfaceWarningTxt }
+                     -- Warning emitted when the instance is used
+                     -- See Note [Implementation of deprecated instances]
+                     -- in GHC.Tc.Solver.Dict
         -- There's always a separate IfaceDecl for the DFun, which gives
         -- its IdInfo with its full type and version number.
         -- The instance declarations taken together have a version number,
@@ -2269,19 +2274,21 @@ instance Binary IfaceSrcBang where
          return (IfSrcBang a1 a2)
 
 instance Binary IfaceClsInst where
-    put_ bh (IfaceClsInst cls tys dfun flag orph) = do
+    put_ bh (IfaceClsInst cls tys dfun flag orph warn) = do
         put_ bh cls
         put_ bh tys
         put_ bh dfun
         put_ bh flag
         put_ bh orph
+        put_ bh warn
     get bh = do
         cls  <- get bh
         tys  <- get bh
         dfun <- get bh
         flag <- get bh
         orph <- get bh
-        return (IfaceClsInst cls tys dfun flag orph)
+        warn <- get bh
+        return (IfaceClsInst cls tys dfun flag orph warn)
 
 instance Binary IfaceFamInst where
     put_ bh (IfaceFamInst fam tys name orph) = do
@@ -2886,8 +2893,8 @@ instance NFData IfaceFamInst where
     rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
 
 instance NFData IfaceClsInst where
-  rnf (IfaceClsInst f1 f2 f3 f4 f5) =
-    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` ()
+  rnf (IfaceClsInst f1 f2 f3 f4 f5 f6) =
+    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` rnf f6
 
 instance NFData IfaceWarnings where
   rnf = \case

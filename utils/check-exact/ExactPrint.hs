@@ -1642,15 +1642,17 @@ rendering the DataDefn are contained in the FamEqn, and are called
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (DerivDecl GhcPs) where
-  getAnnotationEntry (DerivDecl {deriv_ext = an} ) = fromAnn an
-  setAnnotationAnchor dd anc cs = dd { deriv_ext = setAnchorEpa (deriv_ext dd) anc cs }
-  exact (DerivDecl an typ ms mov) = do
+  getAnnotationEntry (DerivDecl {deriv_ext = (_, an)} ) = fromAnn an
+  setAnnotationAnchor (dd@DerivDecl {deriv_ext = (w, an)}) anc cs
+    = dd { deriv_ext = (w, setAnchorEpa an anc cs) }
+  exact (DerivDecl (mw, an) typ ms mov) = do
     an0 <- markEpAnnL an lidl AnnDeriving
     ms' <- mapM markAnnotated ms
     an1 <- markEpAnnL an0 lidl AnnInstance
+    mw' <- mapM markAnnotated mw
     mov' <- mapM markAnnotated mov
     typ' <- markAnnotated typ
-    return (DerivDecl an1 typ' ms' mov')
+    return (DerivDecl (mw', an1) typ' ms' mov')
 
 -- ---------------------------------------------------------------------
 
@@ -1993,17 +1995,17 @@ instance (ExactPrint tm, ExactPrint ty, Outputable tm, Outputable ty)
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (ClsInstDecl GhcPs) where
-  getAnnotationEntry cid = fromAnn (fst $ cid_ext cid)
-  setAnnotationAnchor cid anc cs
-    = cid { cid_ext = (setAnchorEpa (fst $ cid_ext cid) anc cs, (snd $ cid_ext cid)) }
+  getAnnotationEntry (ClsInstDecl { cid_ext = (_, an, _) }) = fromAnn an
+  setAnnotationAnchor (cid@ClsInstDecl { cid_ext = (mbWarn, an, sortKey) }) anc cs
+    = cid { cid_ext = (mbWarn, setAnchorEpa an anc cs, sortKey) }
 
-  exact (ClsInstDecl { cid_ext = (an, sortKey)
+  exact (ClsInstDecl { cid_ext = (mbWarn, an, sortKey)
                      , cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
                      , cid_datafam_insts = adts })
       = do
-          (an0, mbOverlap', inst_ty') <- top_matter
+          (mbWarn', an0, mbOverlap', inst_ty') <- top_matter
           an1 <- markEpAnnL an0 lidl AnnOpenC
           an2 <- markEpAnnAllL an1 lid AnnSemi
           ds <- withSortKey sortKey
@@ -2018,7 +2020,7 @@ instance ExactPrint (ClsInstDecl GhcPs) where
             adts'  = undynamic ds
             binds' = listToBag $ undynamic ds
             sigs'  = undynamic ds
-          return (ClsInstDecl { cid_ext = (an3, sortKey)
+          return (ClsInstDecl { cid_ext = (mbWarn', an3, sortKey)
                               , cid_poly_ty = inst_ty', cid_binds = binds'
                               , cid_sigs = sigs', cid_tyfam_insts = ats'
                               , cid_overlap_mode = mbOverlap'
@@ -2027,10 +2029,11 @@ instance ExactPrint (ClsInstDecl GhcPs) where
       where
         top_matter = do
           an0 <- markEpAnnL an lidl AnnInstance
+          mw <- mapM markAnnotated mbWarn
           mo <- mapM markAnnotated mbOverlap
           it <- markAnnotated inst_ty
           an1 <- markEpAnnL an0 lidl AnnWhere -- Optional
-          return (an1, mo,it)
+          return (mw, an1, mo,it)
 
 -- ---------------------------------------------------------------------
 

@@ -35,6 +35,7 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Gen.HsType
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Unit.Module.Warnings
 
 import GHC.Rename.Bind
 import GHC.Rename.Env
@@ -607,7 +608,7 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 --
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
-deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
+deriveStandalone (L loc (DerivDecl (warn, _) deriv_ty mb_lderiv_strat overlap_mode))
   = setSrcSpanA loc                       $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
@@ -680,7 +681,8 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                  return Nothing
          else Just <$> mkEqnHelp (fmap unLoc overlap_mode)
                                  tvs' cls inst_tys'
-                                 deriv_ctxt' mb_deriv_strat' }
+                                 deriv_ctxt' mb_deriv_strat'
+                                 (fmap unLoc warn) }
 
 -- Typecheck the type in a standalone deriving declaration.
 --
@@ -855,6 +857,7 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
 
         ; spec <- mkEqnHelp Nothing final_tkvs cls final_cls_args
                             (InferContext Nothing) final_mb_deriv_strat
+                            Nothing
         ; traceTc "deriveTyData 3" (ppr spec)
         ; return spec }
 
@@ -1134,13 +1137,14 @@ mkEqnHelp :: Maybe OverlapMode
                -- InferContext  => context inferred (deriving on data decl, or
                --                  standalone deriving decl with a wildcard)
           -> Maybe (DerivStrategy GhcTc)
+          -> Maybe (WarningTxt GhcRn)
           -> TcRn EarlyDerivSpec
 -- Make the EarlyDerivSpec for an instance
 --      forall tvs. theta => cls (tys ++ [ty])
 -- where the 'theta' is optional (that's the Maybe part)
 -- Assumes that this declaration is well-kinded
 
-mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
+mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat warn = do
   is_boot <- tcIsHsBootOrSig
   when is_boot $ bale_out DerivErrBootFileFound
 
@@ -1155,7 +1159,8 @@ mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
                     , denv_inst_tys     = cls_args'
                     , denv_ctxt         = deriv_ctxt
                     , denv_skol_info    = skol_info
-                    , denv_strat        = deriv_strat' }
+                    , denv_strat        = deriv_strat'
+                    , denv_warn         = warn }
   runReaderT mk_eqn deriv_env
   where
     skolemise_when_inferring_context ::
@@ -1341,7 +1346,8 @@ mk_eqn_from_mechanism mechanism
                 , denv_cls          = cls
                 , denv_inst_tys     = inst_tys
                 , denv_ctxt         = deriv_ctxt
-                , denv_skol_info    = skol_info } <- ask
+                , denv_skol_info    = skol_info
+                , denv_warn         = warn } <- ask
        user_ctxt <- askDerivUserTypeCtxt
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
@@ -1359,7 +1365,8 @@ mk_eqn_from_mechanism mechanism
                    , ds_user_ctxt = user_ctxt
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = wildcard
-                   , ds_mechanism = mechanism' } }
+                   , ds_mechanism = mechanism'
+                   , ds_warn = warn } }
 
         SupplyContext theta ->
             return $ GivenTheta $ DS
@@ -1371,7 +1378,8 @@ mk_eqn_from_mechanism mechanism
                    , ds_user_ctxt = user_ctxt
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = Nothing
-                   , ds_mechanism = mechanism }
+                   , ds_mechanism = mechanism
+                   , ds_warn = warn }
 
 mk_eqn_stock :: DerivInstTys -- Information about the arguments to the class
              -> DerivM EarlyDerivSpec

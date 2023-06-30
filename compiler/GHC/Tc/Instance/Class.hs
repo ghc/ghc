@@ -53,6 +53,10 @@ import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import GHC.Data.FastString
 
+import GHC.Unit.Module.Warnings
+
+import GHC.Hs.Extension
+
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
 import GHC.Types.Id.Info
 import GHC.Tc.Errors.Types
@@ -177,13 +181,14 @@ matchInstEnv dflags short_cut_solver clas tys
 
                 | otherwise
                 -> do { let dfun_id = instanceDFunId ispec
+                            warn    = instanceWarning ispec
                       ; traceTc "matchClass success" $
                         vcat [text "dict" <+> ppr pred,
                               ppr coherence,
                               text "witness" <+> ppr dfun_id
                                              <+> ppr (idType dfun_id) ]
                                 -- Record that this dfun is needed
-                      ; match_one (null unsafeOverlaps) coherence dfun_id inst_tys }
+                      ; match_one (null unsafeOverlaps) coherence dfun_id inst_tys warn }
 
             -- More than one matches (or Safe Haskell fail!). Defer any
             -- reactions of a multitude until we learn more about the reagent
@@ -194,9 +199,10 @@ matchInstEnv dflags short_cut_solver clas tys
    where
      pred = mkClassPred clas tys
 
-match_one :: SafeOverlapping -> Coherence -> DFunId -> [DFunInstType] -> TcM ClsInstResult
+match_one :: SafeOverlapping -> Coherence -> DFunId -> [DFunInstType]
+          -> Maybe (WarningTxt GhcRn) -> TcM ClsInstResult
              -- See Note [DFunInstType: instantiating types] in GHC.Core.InstEnv
-match_one so coherence dfun_id mb_inst_tys
+match_one so coherence dfun_id mb_inst_tys warn
   = do { traceTc "match_one" (ppr dfun_id $$ ppr mb_inst_tys)
        ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
        ; traceTc "match_one 2" (ppr dfun_id $$ ppr tys $$ ppr theta)
@@ -204,7 +210,8 @@ match_one so coherence dfun_id mb_inst_tys
                           , cir_mk_ev       = evDFunApp dfun_id tys
                           , cir_coherence   = coherence
                           , cir_what        = TopLevInstance { iw_dfun_id = dfun_id
-                                                             , iw_safe_over = so } } }
+                                                             , iw_safe_over = so
+                                                             , iw_warn = warn } } }
 
 
 {- Note [Shortcut solving: overlap]

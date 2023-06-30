@@ -523,9 +523,6 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     -------------
 
-    rn_warning_txt_loc :: LocatedP (WarningTxt GhcPs) -> RnM (LocatedP (WarningTxt GhcRn))
-    rn_warning_txt_loc (L loc warn_txt) = L loc <$> rnWarningTxt warn_txt
-
     -- Runs for every Name
     -- - If there is no new warning, flags that the old warning should not be
     --     included (since a warning should only be emitted if all
@@ -534,12 +531,12 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     process_warning :: ExportWarnSpanNames       -- Old aggregate data about warnins
                     -> DontWarnExportNames       -- Old names not to warn about
                     -> [Name]                              -- Names to warn about
-                    -> Maybe (LocatedP (WarningTxt GhcPs)) -- Warning
+                    -> Maybe (LWarningTxt GhcPs) -- Warning
                     -> SrcSpan                             -- Span of the export list item
                     -> RnM (ExportWarnSpanNames, -- Aggregate data about the warnings
                             DontWarnExportNames, -- Names not to warn about in the end
                                                  -- (when there was a non-warned export)
-                            Maybe (LocatedP (WarningTxt GhcRn))) -- Renamed warning
+                            Maybe (LWarningTxt GhcRn)) -- Renamed warning
     process_warning export_warn_spans
                     dont_warn_export
                     names Nothing loc
@@ -560,7 +557,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                     dont_warn_export
                     names (Just warn_txt_ps) loc
       = do
-          warn_txt_rn <- rn_warning_txt_loc warn_txt_ps
+          warn_txt_rn <- rnLWarningTxt warn_txt_ps
           let new_export_warn_spans = map (, unLoc warn_txt_rn, loc) names
           return ( new_export_warn_spans ++ export_warn_spans
                  , dont_warn_export

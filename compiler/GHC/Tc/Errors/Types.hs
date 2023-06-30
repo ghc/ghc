@@ -84,6 +84,7 @@ module GHC.Tc.Errors.Types (
   , ExpectedBackends
   , ArgOrResult(..)
   , MatchArgsContext(..), MatchArgBadMatches(..)
+  , PragmaWarningInfo(..)
   , EmptyStatementGroupErrReason(..)
   , UnexpectedStatement(..)
   , DeclSort(..)
@@ -2489,12 +2490,17 @@ data TcRnMessage where
       rn050
       rn066 (here is a warning, not deprecation)
       T3303
+      ExportWarnings1
+      ExportWarnings2
+      ExportWarnings3
+      ExportWarnings4
+      ExportWarnings5
+      ExportWarnings6
+      InstanceWarnings
   -}
   TcRnPragmaWarning :: {
-    pragma_warning_occ :: OccName,
-    pragma_warning_msg :: WarningTxt GhcRn,
-    pragma_warning_import_mod :: ModuleName,
-    pragma_warning_defined_mod :: Maybe ModuleName
+    pragma_warning_info :: PragmaWarningInfo,
+    pragma_warning_msg :: WarningTxt GhcRn
   } -> TcRnMessage
 
   {-| TcRnDifferentExportWarnings is an error that occurs when the
@@ -5694,6 +5700,16 @@ data MatchArgBadMatches where
     ::  { matchArgFirstMatch :: LocatedA (Match GhcRn body)
         , matchArgBadMatches :: NE.NonEmpty (LocatedA (Match GhcRn body)) }
     -> MatchArgBadMatches
+
+data PragmaWarningInfo
+  = PragmaWarningName { pwarn_occname :: OccName
+                      , pwarn_impmod :: ModuleName
+                      , pwarn_declmod :: ModuleName }
+  | PragmaWarningExport { pwarn_occname :: OccName
+                        , pwarn_impmod :: ModuleName }
+  | PragmaWarningInstance { pwarn_dfunid :: DFunId
+                          , pwarn_ctorig :: CtOrigin }
+
 
 -- | The context for an "empty statement group" error.
 data EmptyStatementGroupErrReason

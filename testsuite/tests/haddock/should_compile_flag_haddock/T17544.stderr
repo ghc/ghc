@@ -12,7 +12,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T17544.hs:3:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:3:15-19 }))]
-      []
+     []
      (Just
       ((,)
        { T17544.hs:57:1 }
@@ -746,7 +746,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:23:1-8 }
@@ -1023,7 +1024,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:29:1-8 }
@@ -1300,7 +1302,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:35:1-8 }
@@ -1577,7 +1580,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:41:1-8 }
@@ -1854,7 +1858,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:47:1-8 }
@@ -2131,7 +2136,8 @@
      (ClsInstD
       (NoExtField)
       (ClsInstDecl
-       ((,)
+       ((,,)
+        (Nothing)
         (EpAnn
          (Anchor
           { T17544.hs:53:1-8 }
