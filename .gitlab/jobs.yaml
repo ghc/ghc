@@ -126,7 +126,7 @@
       "TEST_ENV": "aarch64-linux-deb10-validate"
     }
   },
-  "i386-linux-deb9-validate": {
+  "i386-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -137,7 +137,7 @@
     "artifacts": {
       "expire_in": "2 weeks",
       "paths": [
-        "ghc-i386-linux-deb9-validate.tar.xz",
+        "ghc-i386-linux-deb10-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -147,14 +147,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "i386-linux-deb9-$CACHE_REV",
+      "key": "i386-linux-deb10-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb10:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -180,11 +180,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-deb9-validate"
+      "TEST_ENV": "i386-linux-deb10-validate"
     }
   },
   "nightly-aarch64-darwin-validate": {
@@ -377,7 +377,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "nightly-i386-linux-deb9-validate": {
+  "nightly-i386-linux-deb10-validate": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -388,7 +388,7 @@
     "artifacts": {
       "expire_in": "8 weeks",
       "paths": [
-        "ghc-i386-linux-deb9-validate.tar.xz",
+        "ghc-i386-linux-deb10-validate.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -398,14 +398,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "i386-linux-deb9-$CACHE_REV",
+      "key": "i386-linux-deb10-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb10:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -431,11 +431,11 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-i386-linux-deb9-validate",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb10-validate",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-deb9-validate",
+      "TEST_ENV": "i386-linux-deb10-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -2536,7 +2536,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-i386-linux-deb9-release+no_split_sections": {
+  "release-i386-linux-deb10-release+no_split_sections": {
     "after_script": [
       ".gitlab/ci.sh save_cache",
       ".gitlab/ci.sh save_test_output",
@@ -2547,7 +2547,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-i386-linux-deb9-release+no_split_sections.tar.xz",
+        "ghc-i386-linux-deb10-release+no_split_sections.tar.xz",
         "junit.xml",
         "unexpected-test-output.tar.gz"
       ],
@@ -2557,14 +2557,14 @@
       "when": "always"
     },
     "cache": {
-      "key": "i386-linux-deb9-$CACHE_REV",
+      "key": "i386-linux-deb10-$CACHE_REV",
       "paths": [
         "cabal-cache",
         "toolchain"
       ]
     },
     "dependencies": [],
-    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV",
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb10:$DOCKER_REV",
     "needs": [
       {
         "artifacts": false,
@@ -2590,13 +2590,13 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-i386-linux-deb9-release+no_split_sections",
+      "BIN_DIST_NAME": "ghc-i386-linux-deb10-release+no_split_sections",
       "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "",
       "HADRIAN_ARGS": "--hash-unit-ids",
       "IGNORE_PERF_FAILURES": "all",
       "RUNTEST_ARGS": "",
-      "TEST_ENV": "i386-linux-deb9-release+no_split_sections",
+      "TEST_ENV": "i386-linux-deb10-release+no_split_sections",
       "XZ_OPT": "-9"
     }
   },

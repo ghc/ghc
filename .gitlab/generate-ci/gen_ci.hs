@@ -928,7 +928,7 @@ job_groups =
      , standardBuilds AArch64 Darwin
      , standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla)
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
-     , standardBuildsWithConfig I386 (Linux Debian9) (splitSectionsBroken vanilla)
+     , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.
      , fullyStaticBrokenTests (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken static))
      -- Dynamically linked build, suitable for building your own static executables on alpine
