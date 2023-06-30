@@ -371,6 +371,10 @@ emitPrimOp cfg primop =
   UnsafeFreezeByteArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
     emitAssign (CmmLocal res) arg
 
+--  #define unsafeThawByteArrayzh(r,a)       r=(a)
+  UnsafeThawByteArrayOp -> \[arg] -> opIntoRegs $ \[res] ->
+    emitAssign (CmmLocal res) arg
+
 -- Reading/writing pointer arrays
 
   ReadArrayOp -> \[obj, ix] -> opIntoRegs $ \[res] ->

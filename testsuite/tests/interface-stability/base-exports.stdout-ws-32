@@ -4650,6 +4650,7 @@ module GHC.Base where
   unsafeFreezeSmallArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> State# d -> (# State# d, SmallArray# a #)
   unsafePtrEquality# :: forall (a :: UnliftedType) (b :: UnliftedType). a -> b -> Int#
   unsafeThawArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Array# a -> State# d -> (# State# d, MutableArray# d a #)
+  unsafeThawByteArray# :: forall d. ByteArray# -> State# d -> (# State# d, MutableByteArray# d #)
   unsafeThawSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. SmallArray# a -> State# d -> (# State# d, SmallMutableArray# d a #)
   until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
   vacuous :: forall (f :: * -> *) a. Functor f => f Void -> f a
@@ -6703,6 +6704,7 @@ module GHC.Exts where
   unsafeFreezeSmallArray# :: forall {l :: Levity} d (a :: TYPE (BoxedRep l)). SmallMutableArray# d a -> State# d -> (# State# d, SmallArray# a #)
   unsafePtrEquality# :: forall (a :: UnliftedType) (b :: UnliftedType). a -> b -> Int#
   unsafeThawArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. Array# a -> State# d -> (# State# d, MutableArray# d a #)
+  unsafeThawByteArray# :: forall d. ByteArray# -> State# d -> (# State# d, MutableByteArray# d #)
   unsafeThawSmallArray# :: forall {l :: Levity} (a :: TYPE (BoxedRep l)) d. SmallArray# a -> State# d -> (# State# d, SmallMutableArray# d a #)
   void# :: (# #)
   waitRead# :: forall d. Int# -> State# d -> State# d

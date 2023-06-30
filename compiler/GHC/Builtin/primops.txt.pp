@@ -1922,6 +1922,14 @@ primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    with
    has_side_effects = True
 
+primop  UnsafeThawByteArrayOp "unsafeThawByteArray#" GenPrimOp
+   ByteArray# -> State# s -> (# State# s, MutableByteArray# s #)
+   {Make an immutable byte array mutable, without copying.
+
+    @since 0.12.0.0}
+   with
+   has_side_effects = True
+
 primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
    ByteArray# -> Int#
    {Return the size of the array in bytes.}
