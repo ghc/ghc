@@ -1707,9 +1707,9 @@ cvars1 :: { [RecordPatSynField GhcPs] }
 
 where_decls :: { LocatedL (OrdList (LHsDecl GhcPs)) }
         : 'where' '{' decls '}'       {% amsrl (sLL $1 $> (snd $ unLoc $3))
-                                              (AnnList (Just $ glR $3) (Just $ moc $2) (Just $ mcc $4) [mj AnnWhere $1] (fst $ unLoc $3)) }
+                                              (AnnList (Just $ glR $3) (Just $ moc $2) (Just $ mcc $4) (mj AnnWhere $1: (fst $ unLoc $3)) []) }
         | 'where' vocurly decls close {% amsrl (sLL $1 $3 (snd $ unLoc $3))
-                                              (AnnList (Just $ glR $3) Nothing Nothing [mj AnnWhere $1] (fst $ unLoc $3))}
+                                              (AnnList (Just $ glR $3) Nothing Nothing (mj AnnWhere $1: (fst $ unLoc $3)) []) }
 
 pattern_synonym_sig :: { LSig GhcPs }
         : 'pattern' con_list '::' sigtype
@@ -1822,9 +1822,9 @@ where_inst :: { Located ([AddEpAnn]
 
 -- Declarations in binding groups other than classes and instances
 --
-decls   :: { Located ([TrailingAnn], OrdList (LHsDecl GhcPs)) }
+decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
         : decls ';' decl    {% if isNilOL (snd $ unLoc $1)
-                                 then return (sLL $1 $> ((fst $ unLoc $1) ++ (msemi $2)
+                                 then return (sLL $1 $> ((fst $ unLoc $1) ++ (msemiA $2)
                                                         , unitOL $3))
                                  else case (snd $ unLoc $1) of
                                    SnocOL hs t -> do
@@ -1835,7 +1835,7 @@ decls   :: { Located ([TrailingAnn], OrdList (LHsDecl GhcPs)) }
                                       return (rest `seq` this `seq` these `seq`
                                                  (sLL $1 $> (fst $ unLoc $1, these))) }
         | decls ';'          {% if isNilOL (snd $ unLoc $1)
-                                  then return (sLL $1 $> (((fst $ unLoc $1) ++ (msemi $2)
+                                  then return (sLL $1 $> (((fst $ unLoc $1) ++ (msemiA $2)
                                                           ,snd $ unLoc $1)))
                                   else case (snd $ unLoc $1) of
                                     SnocOL hs t -> do
@@ -1846,9 +1846,9 @@ decls   :: { Located ([TrailingAnn], OrdList (LHsDecl GhcPs)) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
-        : '{'            decls '}'     { sLL $1 $> (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3) [] (fst $ unLoc $2)
+        : '{'            decls '}'     { sLL $1 $> (AnnList (Just $ glR $2) (Just $ moc $1) (Just $ mcc $3)  (fst $ unLoc $2) []
                                                    ,sL1 $2 $ snd $ unLoc $2) }
-        |     vocurly    decls close   { L (gl $2) (AnnList (Just $ glR $2) Nothing Nothing [] (fst $ unLoc $2)
+        |     vocurly    decls close   { L (gl $2) (AnnList (Just $ glR $2) Nothing Nothing (fst $ unLoc $2) []
                                                    ,sL1 $2 $ snd $ unLoc $2) }
 
 -- Binding groups other than those of class and instance declarations
@@ -4281,6 +4281,9 @@ mz a l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn a (srcSpan2e $ gl l)]
 
 msemi :: Located e -> [TrailingAnn]
 msemi l = if isZeroWidthSpan (gl l) then [] else [AddSemiAnn (srcSpan2e $ gl l)]
+
+msemiA :: Located e -> [AddEpAnn]
+msemiA l = if isZeroWidthSpan (gl l) then [] else [AddEpAnn AnnSemi (srcSpan2e $ gl l)]
 
 msemim :: Located e -> Maybe EpaLocation
 msemim l = if isZeroWidthSpan (gl l) then Nothing else Just (srcSpan2e $ gl l)

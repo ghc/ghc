@@ -497,7 +497,7 @@ patch_anchor r1 (Anchor r0 op) = Anchor r op
 fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
 fixValbindsAnn EpAnnNotUsed = EpAnnNotUsed
 fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
-  = (EpAnn (widenAnchor anchor (map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
+  = (EpAnn (widenAnchor anchor (r ++ map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
 
 -- | The 'Anchor' for a stmtlist is based on either the location or
 -- the first semicolon annotion.

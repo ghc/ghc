@@ -1517,17 +1517,12 @@
                      (AddEpAnn AnnOpenC (EpaSpan { DumpSemis.hs:34:13 })))
                     (Just
                      (AddEpAnn AnnCloseC (EpaSpan { DumpSemis.hs:34:31 })))
-                    []
-                    [(AddSemiAnn
-                      (EpaSpan { DumpSemis.hs:34:14 }))
-                    ,(AddSemiAnn
-                      (EpaSpan { DumpSemis.hs:34:15 }))
-                    ,(AddSemiAnn
-                      (EpaSpan { DumpSemis.hs:34:16 }))
-                    ,(AddSemiAnn
-                      (EpaSpan { DumpSemis.hs:34:17 }))
-                    ,(AddSemiAnn
-                      (EpaSpan { DumpSemis.hs:34:18 }))])
+                    [(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:14 }))
+                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:15 }))
+                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:16 }))
+                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:17 }))
+                    ,(AddEpAnn AnnSemi (EpaSpan { DumpSemis.hs:34:18 }))]
+                    [])
                    (EpaComments
                     []))
                   (ValBinds

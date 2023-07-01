@@ -1176,32 +1176,27 @@ markKwT (AddVbarAnn ss)    = AddVbarAnn    <$> markKwA AnnVbar ss
 -- ---------------------------------------------------------------------
 
 markAnnList :: (Monad m, Monoid w)
-  => Bool -> EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
-markAnnList reallyTrail ann action = do
-  markAnnListA reallyTrail ann $ \a -> do
+  => EpAnn AnnList -> EP w m a -> EP w m (EpAnn AnnList, a)
+markAnnList ann action = do
+  markAnnListA ann $ \a -> do
     r <- action
     return (a,r)
 
 markAnnListA :: (Monad m, Monoid w)
-  => Bool -> EpAnn AnnList
+  => EpAnn AnnList
   -> (EpAnn AnnList -> EP w m (EpAnn AnnList, a))
   -> EP w m (EpAnn AnnList, a)
-markAnnListA _ EpAnnNotUsed action = do
+markAnnListA EpAnnNotUsed action = do
   action EpAnnNotUsed
-markAnnListA reallyTrail an action = do
+markAnnListA an action = do
   debugM $ "markAnnListA: an=" ++ showAst an
   an0 <- markLensMAA an lal_open
-  an1 <- if (not reallyTrail)
-           then markTrailingL an0 lal_trailing
-           else return an0
-  an2 <- markEpAnnAllL an1 lal_rest AnnSemi
-  (an3, r) <- action an2
-  an4 <- markLensMAA an3 lal_close
-  an5 <- if reallyTrail
-           then markTrailingL an4 lal_trailing
-           else return an4
-  debugM $ "markAnnListA: an5=" ++ showAst an
-  return (an5, r)
+  an1 <- markEpAnnAllL an0 lal_rest AnnSemi
+  (an2, r) <- action an1
+  an3 <- markLensMAA an2 lal_close
+  an4 <- markTrailingL an3 lal_trailing
+  debugM $ "markAnnListA: an4=" ++ showAst an
+  return (an4, r)
 
 -- ---------------------------------------------------------------------
 
@@ -2297,12 +2292,12 @@ instance ExactPrint (HsLocalBinds GhcPs) where
         when (not $ isEmptyValBinds valbinds) $ setExtraDP (Just anc)
       _ -> return ()
 
-    (an1, valbinds') <- markAnnList False an0 $ markAnnotatedWithLayout valbinds
+    (an1, valbinds') <- markAnnList an0 $ markAnnotatedWithLayout valbinds
     debugM $ "exact HsValBinds: an1=" ++ showAst an1
     return (HsValBinds an1 valbinds')
 
   exact (HsIPBinds an bs) = do
-    (as, ipb) <- markAnnList True an (markEpAnnL an lal_rest AnnWhere
+    (as, ipb) <- markAnnList an (markEpAnnL an lal_rest AnnWhere
                            >> markAnnotated bs
                            >>= \bs' -> return (HsIPBinds an bs'::HsLocalBinds GhcPs))
     case ipb of
@@ -2845,7 +2840,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
   exact (HsDo an do_or_list_comp stmts) = do
     debugM $ "HsDo"
-    (an',stmts') <- markAnnListA True an $ \a -> exactDo a do_or_list_comp stmts
+    (an',stmts') <- markAnnListA an $ \a -> exactDo a do_or_list_comp stmts
     return (HsDo an' do_or_list_comp stmts')
 
   exact (ExplicitList an es) = do
@@ -3379,7 +3374,7 @@ instance (
   exact (RecStmt an stmts a b c d e) = do
     debugM $ "RecStmt"
     an0 <- markEpAnnL an lal_rest AnnRec
-    (an1, stmts') <- markAnnList True an0 (markAnnotated stmts)
+    (an1, stmts') <- markAnnList an0 (markAnnotated stmts)
     return (RecStmt an1 stmts' a b c d e)
 
 -- ---------------------------------------------------------------------
@@ -4400,7 +4395,7 @@ instance ExactPrint (LocatedL [LocatedA (IE GhcPs)]) where
     an0 <- markEpAnnL an lal_rest AnnHiding
     p <- getPosP
     debugM $ "LocatedL [LIE:p=" ++ showPprUnsafe p
-    (an1, ies') <- markAnnList True an0 (markAnnotated ies)
+    (an1, ies') <- markAnnList an0 (markAnnotated ies)
     return (L (SrcSpanAnn an1 l) ies')
 
 instance (ExactPrint (Match GhcPs (LocatedA body)))
@@ -4423,7 +4418,7 @@ instance ExactPrint (LocatedL [LocatedA (StmtLR GhcPs GhcPs (LocatedA (HsExpr Gh
   setAnnotationAnchor = setAnchorAn
   exact (L (SrcSpanAnn an l) stmts) = do
     debugM $ "LocatedL [ExprLStmt"
-    (an'', stmts') <- markAnnList True an $ do
+    (an'', stmts') <- markAnnList an $ do
       case snocView stmts of
         Just (initStmts, ls@(L _ (LastStmt _ _body _ _))) -> do
           debugM $ "LocatedL [ExprLStmt: snocView"
@@ -4450,7 +4445,7 @@ instance ExactPrint (LocatedL [LocatedA (ConDeclField GhcPs)]) where
   setAnnotationAnchor = setAnchorAn
   exact (L (SrcSpanAnn an l) fs) = do
     debugM $ "LocatedL [LConDeclField"
-    (an', fs') <- markAnnList True an (markAnnotated fs)
+    (an', fs') <- markAnnList an (markAnnotated fs)
     return (L (SrcSpanAnn an' l) fs')
 
 instance ExactPrint (LocatedL (BF.BooleanFormula (LocatedN RdrName))) where
@@ -4458,7 +4453,7 @@ instance ExactPrint (LocatedL (BF.BooleanFormula (LocatedN RdrName))) where
   setAnnotationAnchor = setAnchorAn
   exact (L (SrcSpanAnn an l) bf) = do
     debugM $ "LocatedL [LBooleanFormula"
-    (an', bf') <- markAnnList True an (markAnnotated bf)
+    (an', bf') <- markAnnList an (markAnnotated bf)
     return (L (SrcSpanAnn an' l) bf')
 
 -- ---------------------------------------------------------------------
@@ -4616,7 +4611,7 @@ instance ExactPrint (Pat GhcPs) where
     return (BangPat an0 pat')
 
   exact (ListPat an pats) = do
-    (an', pats') <- markAnnList True an (markAnnotated pats)
+    (an', pats') <- markAnnList an (markAnnotated pats)
     return (ListPat an' pats')
 
   exact (TuplePat an pats boxity) = do
