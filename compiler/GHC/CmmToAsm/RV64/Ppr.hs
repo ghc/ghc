@@ -522,12 +522,17 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 && not (isFloatOp o2) && isDoubleOp o1 -> op2 (text "\tfmv.d.x") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isSingleOp o2 -> op2 (text "\tfmv.x.w") o1 o2
     | not (isFloatOp o1) && isFloatOp o2 && isDoubleOp o2 -> op2 (text "\tfmv.x.d") o1 o2
-    | isImmOp o2
-    , (OpImm (ImmInteger i)) <- o2
+    | (OpImm (ImmInteger i)) <- o2
     , fitsIn12bitImm i
           -> lines_ [ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2 ]
-    | isImmOp o2
-    , (OpImm (ImmInteger i)) <- o2
+    | (OpImm (ImmInt i)) <- o2
+    , fitsIn12bitImm i
+          -> lines_ [ text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform x0 <> comma <+> pprOp platform o2 ]
+    | (OpImm (ImmInteger i)) <- o2
+    , fitsIn32bits i
+        -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
+                                             , text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
+    | (OpImm (ImmInt i)) <- o2
     , fitsIn32bits i
         -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
                                              , text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
