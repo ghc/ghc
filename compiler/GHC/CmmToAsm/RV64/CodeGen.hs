@@ -504,26 +504,31 @@ getRegister' config plat expr =
     CmmLit lit ->
       case lit of
         CmmInt 0 w -> pure $ Fixed (intFormat w) zero_reg nilOL
-        CmmInt i w | isEncodeableInWidth w i -> do
-          pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) (OpImm (ImmInteger i)))))
+        CmmInt i w | isEncodeableInWidth w i ->
+                     -- narrowU is important: Negative immediates may be
+                     -- sign-extended on load!
+                     let imm = OpImm . ImmInteger $ narrowU w i
+                     in
+                        pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) imm)))
 
         -- i does not fit. Be careful to keep the sign.
-        CmmInt i w -> do
+        CmmInt i w ->
           let -- select all but the sign (most significant) bit
               mask = allOneMask (maxBitNo - 1)
               numBits = i .&. mask
               truncatedI = numBits .|. signBit i
-          pure
-            ( Any
-                (intFormat w)
-                ( \dst ->
-                    toOL
-                      [ annExpr
-                          expr
-                          (MOV (OpReg w dst) (OpImm (ImmInteger truncatedI)))
-                      ]
-                )
-            )
+              imm = OpImm . ImmInteger $ narrowU w truncatedI
+          in
+            pure $
+               Any
+                  (intFormat w)
+                  ( \dst ->
+                      toOL
+                        [ annExpr
+                            expr
+                            (MOV (OpReg w dst) imm)
+                        ]
+                  )
           where
             allOneMask :: Int -> Integer
             allOneMask 0 = bit 0
@@ -1744,8 +1749,17 @@ genCCall target dest_regs arg_regs bid = do
       --
     -- Still have GP regs, and we want to pass an GP argument.
 
-    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
-      platform <- getPlatform
+    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format , hint == NoHint = do
+      -- Do not sign-extend unsigned register values. Otherwise, unsigned
+      -- parameters (e.g. uint8_t) are messed up with sign bits.
+      let w = formatToWidth format
+          mov = MOV (OpReg w gpReg) (OpReg w r)
+          accumCode' = accumCode `appOL`
+                       code_r `snocOL`
+                       ann (text "Pass gp argument (NoHint): " <> ppr r) mov
+      passArguments pack gpRegs fpRegs args stackSpace (gpReg:accumRegs) accumCode'
+
+    passArguments pack (gpReg:gpRegs) fpRegs ((r, format, _hint, code_r):args) stackSpace accumRegs accumCode | isIntFormat format = do
     -- RISCV64 Integer Calling Convention: "When passed in registers or on the
     -- stack, integer scalars narrower than XLEN bits are widened according to
     -- the sign of their type up to 32 bits, then sign-extended to XLEN bits."
