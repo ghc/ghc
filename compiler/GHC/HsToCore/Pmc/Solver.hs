@@ -844,8 +844,17 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
   case equate env x y of
     -- Add the constraints we had for x to y
     -- See Note [Joining e-classes PMC] todo mention from joinA
-    (vi_x, env') -> do
-      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env'} }
+    -- Now, here's a really tricky bit (TODO Write note, is it the one above?)
+    -- Bc the joinA operation is unlawful, and because the makeA operation for
+    -- expressions is also unlawful (sets the type to ()::(), mostly out of
+    -- laziness, we could reconstruct the type if we wanted),
+    -- Then we must make sure that when we're "completing the joinA manually",
+    -- We *also update the type* (WTF1).
+    -- This is because every e-class should always have a match-var first, which will always have a type, and it should appear on "the left"
+    -- We also rebuild here, we did just merge two things. TODO: Where and when exactly should we merge?
+    (vi_x, EG.rebuild -> env') -> do
+      let env'' = env' & _class x . _data %~ (\i -> i{vi_id = vi_id vi_x}) -- (WTF1), we keep the id from the left of the merge (We could do this on the join operation really...) (We *should* have a lawful join operation. I think it would simplify things in the long run
+      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env''} }
       -- and then gradually merge every positive fact we have on x into y
       let add_pos nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
       nabla_pos <- foldlM add_pos nabla_equated (vi_pos vi_x)
