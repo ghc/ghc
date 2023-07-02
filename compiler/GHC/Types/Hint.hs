@@ -47,6 +47,12 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit, FastString)
 
 import Data.Typeable ( Typeable )
+import Language.Haskell.Syntax.Expr
+import GHC.Unit.Module.Imported (ImportedModsVal)
+import GHC.Data.FastString (fsLit)
+import Language.Haskell.Syntax (LPat, LIdP)
+  -- This {-# SOURCE #-} import should be removable once
+  -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
 -- | The bindings we have available in scope when
 -- suggesting an explicit type signature.

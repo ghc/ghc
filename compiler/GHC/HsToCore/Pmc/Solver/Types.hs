@@ -867,6 +867,47 @@ instance Analysis VarInfo (DeBruijnF CoreExprF) where
 
   -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
   -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble
-  joinA _a b = b
+  -- Hacks hacks hacks
+  -- Do some "obvious" things in this merge, despite keeping all the nuanced
+  -- joining operations in addVarCt. Some part of them will be redundant, but
+  -- if we don't do the simple things here we might end up losing information
+  -- when merging things through the e-graph outside of 'addVarCt'
 
+-- I think we really need effects, because the operation is only well-defined
+-- since it can fail when it is conflicting
+-- and that would allow us to do the merge procedure correcly here instead of in addVarCt
+-- we may be able to have Analysis (Effect VarInfo) (...)
+  joinA a b = b{ vi_id = if vi_id b == unitDataConId && vi_id a /= unitDataConId then vi_id a else vi_id b
+               , vi_pos = case (vi_pos a, vi_pos b) of
+                            ([], []) -> []
+                            ([], x) -> x
+                            (x, []) -> x
+                            (_x, y) -> y -- keep right
+               , vi_neg = foldr (flip extendPmAltConSet) (vi_neg b) (pmAltConSetElems $ vi_neg a)
+               , vi_bot = case (vi_bot a, vi_bot b) of
+                            (IsBot,IsBot) -> IsBot
+                            (IsBot,IsNotBot) -> IsNotBot -- keep b, achhhhh
+                            (IsBot,MaybeBot) -> IsBot
+                            (IsNotBot,IsBot) -> IsBot -- keep b, achhhhh
+                            (IsNotBot,IsNotBot) -> IsNotBot
+                            (IsNotBot,MaybeBot) -> IsNotBot
+                            (MaybeBot, IsBot) -> IsBot
+                            (MaybeBot, IsNotBot) -> IsNotBot
+                            (MaybeBot, MaybeBot) -> MaybeBot
+               , vi_rcm = case (vi_rcm a, vi_rcm b) of
+                            (RCM Nothing Nothing,RCM a b) -> RCM a b
+                            (RCM Nothing (Just a),RCM Nothing Nothing) -> RCM Nothing (Just a)
+                            (RCM Nothing (Just _a),RCM Nothing (Just b)) -> RCM Nothing (Just b) -- keep right
+                            (RCM Nothing (Just a),RCM (Just b) Nothing) -> RCM (Just b) (Just a)
+                            (RCM Nothing (Just _a),RCM (Just b) (Just c)) -> RCM (Just b) (Just c) -- keep right
+                            (RCM (Just a) Nothing,RCM Nothing Nothing) -> RCM (Just a) Nothing
+                            (RCM (Just a) Nothing,RCM Nothing (Just b)) -> RCM (Just a) (Just b)
+                            (RCM (Just _a) Nothing,RCM (Just b) Nothing) -> RCM (Just b) Nothing -- keep right
+                            (RCM (Just _a) Nothing,RCM (Just b) (Just c)) -> RCM (Just b) (Just c)
+                            (RCM (Just a) (Just b),RCM Nothing Nothing) -> RCM (Just a) (Just b)
+                            (RCM (Just a) (Just _b),RCM Nothing (Just c)) -> RCM (Just a) (Just c)
+                            (RCM (Just _a) (Just b),RCM (Just c) Nothing) -> RCM (Just c) (Just b)
+                            (RCM (Just _a) (Just _b),RCM (Just c) (Just d)) -> RCM (Just c) (Just d)
+                            -- we could also have _ _, (Just c) (Just d) -> (Just c, Just d)
+               }
 

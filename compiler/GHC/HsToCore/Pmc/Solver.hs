@@ -853,8 +853,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
     -- This is because every e-class should always have a match-var first, which will always have a type, and it should appear on "the left"
     -- We also rebuild here, we did just merge two things. TODO: Where and when exactly should we merge?
     (vi_x, EG.rebuild -> env') -> do
-      let env'' = env' & _class x . _data %~ (\i -> i{vi_id = vi_id vi_x}) -- (WTF1), we keep the id from the left of the merge (We could do this on the join operation really...) (We *should* have a lawful join operation. I think it would simplify things in the long run
-      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env''} }
+      let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env'} }
       -- and then gradually merge every positive fact we have on x into y
       let add_pos nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
       nabla_pos <- foldlM add_pos nabla_equated (vi_pos vi_x)
@@ -875,7 +874,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
     equate :: TmEGraph -> ClassId -> ClassId -> (VarInfo, TmEGraph)
     equate eg x y = let (_, eg')  = EG.merge x y eg
                      in (eg  ^. _class x ._data, eg')
-                    -- Note: lookup in @eg@, not @eg'@, because it's before the merge.
+                    -- Note: lookup in @eg@, not @eg'@, because we want to return x's data before the merge.
 
 
 -- | Inspects a 'PmCoreCt' @let x = e@ by recording constraints for @x@ based
@@ -1334,9 +1333,8 @@ traverseDirty f ts@TmSt{ts_facts = env, ts_dirty = dirty} =
   go (IS.elems dirty) env
   where
     go []     env  = pure ts{ts_facts=env}
-    go (x:xs) !_env = do
-      let vi = env ^._class x._data
-      vi' <- f x vi
+    go (x:xs) !env = do
+      vi' <- f x (lookupVarInfo ts x)
       go xs (env & _class x._data .~ vi') -- Use 'over' or so instead?
 
 traverseAll :: Monad m => (ClassId -> VarInfo -> m VarInfo) -> TmState -> m TmState
