@@ -307,10 +307,8 @@ instance HasTrailing EpAnnSumPat where
   setTrailing a _ = a
 
 instance HasTrailing AnnList where
-  -- markAnnList does some funky stuff, where they are not always
-  -- treated as trailing. So do not process them outside.
-  trailing _ = []
-  setTrailing a _ = a
+  trailing a = al_trailing a
+  setTrailing a ts = a { al_trailing = ts }
 
 instance HasTrailing AnnListItem where
   trailing a = lann_trailing a
@@ -1380,9 +1378,8 @@ markAnnListA an action = do
   an1 <- markEpAnnAllL an0 lal_rest AnnSemi
   (an2, r) <- action an1
   an3 <- markLensMAA an2 lal_close
-  an4 <- markTrailingL an3 lal_trailing
-  debugM $ "markAnnListA: an4=" ++ showAst an
-  return (an4, r)
+  debugM $ "markAnnListA: an3=" ++ showAst an
+  return (an3, r)
 
 -- ---------------------------------------------------------------------
 
@@ -1521,8 +1518,8 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
-    la' <- markALocatedA la
-    return (L la' a')
+    -- la' <- markALocatedA la
+    return (L la a')
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
   getAnnotationEntry = entryFromLocatedI
@@ -2412,7 +2409,8 @@ instance ExactPrint (Match GhcPs (LocatedA (HsExpr GhcPs))) where
 
 -- ---------------------------------------------------------------------
 
-exactMatch :: (Monad m, Monoid w) => (ExactPrint (GRHSs GhcPs body)) => (Match GhcPs body) -> EP w m (Match GhcPs body)
+exactMatch :: (Monad m, Monoid w, ExactPrint (GRHSs GhcPs body))
+           => (Match GhcPs body) -> EP w m (Match GhcPs body)
 exactMatch (Match an mctxt pats grhss) = do
 
   debugM $ "exact Match entered"

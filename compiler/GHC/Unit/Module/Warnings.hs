@@ -62,7 +62,6 @@ import Data.Data
 import Data.List (isPrefixOf)
 import GHC.Generics ( Generic )
 import Control.DeepSeq
-import GHC.Hs.Extension
 
 
 {-

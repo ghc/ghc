@@ -883,9 +883,8 @@ trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
 addTrailingAnnToL :: SrcSpan -> TrailingAnn -> EpAnnComments
                   -> EpAnn AnnList -> EpAnn AnnList
 addTrailingAnnToL s t cs EpAnnNotUsed
-  = EpAnn (spanAsAnchor s) (AnnList (Just $ (widenAnchorTA (spanAsAnchor s) t)) Nothing Nothing [] [t]) cs
-addTrailingAnnToL _ t cs n = n { entry = widenAnchorTA (entry n) t
-                               , anns = addTrailing (anns n)
+  = EpAnn (spanAsAnchor s) (AnnList (Just $ (spanAsAnchor s)) Nothing Nothing [] [t]) cs
+addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
                                , comments = comments n <> cs }
   where
     -- See Note [list append in addTrailing*]
@@ -896,7 +895,7 @@ addTrailingAnnToL _ t cs n = n { entry = widenAnchorTA (entry n) t
 addTrailingAnnToA :: TrailingAnn -> EpAnnComments
                   -> EpAnnS AnnListItem -> EpAnnS AnnListItem
 addTrailingAnnToA t cs (EpAnnS anc (AnnListItem ts) csa) =
-  EpAnnS (widenAnchorTA anc t) (AnnListItem (ts ++ [t])) (csa <> cs)
+  EpAnnS anc (AnnListItem (ts ++ [t])) (csa <> cs)
     -- See Note [list append in addTrailing*]
 
 -- | Helper function used in the parser to add a comma location to an
@@ -1108,13 +1107,15 @@ noAnn = EpAnnNotUsed
 addAnns :: EpAnn [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> EpAnn [AddEpAnn]
 addAnns (EpAnn l as1 cs) as2 cs2
   = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
+  -- = EpAnn l (as1 ++ as2) (cs <> cs2)
 addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
 addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
 addAnns EpAnnNotUsed as cs = EpAnn (widenAnchor noSpanAnchor as) as cs
+-- addAnns EpAnnNotUsed as cs = EpAnn noSpanAnchor as cs
 
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA
 addAnnsA (EpAnnS l as1 cs) as2 cs2
-  = (EpAnnS (widenAnchorTAs l as2) (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2))
+  = (EpAnnS l (AnnListItem (lann_trailing as1 ++ as2)) (cs <> cs2))
 
 -- | The annotations need to all come after the anchor.  Make sure
 -- this is the case.

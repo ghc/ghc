@@ -77,7 +77,7 @@ import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisForAllTyFlag )
 import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import GHC.Builtin.Types ( constraintKindTyConName )
 import GHC.Stg.InferTags.TagSig
-import GHC.Parser.Annotation (noLocA, noLocI)
+import GHC.Parser.Annotation (noLocI)
 import GHC.Hs.Extension ( GhcRn )
 import GHC.Hs.Doc ( WithHsDocIdentifiers(..) )
 
