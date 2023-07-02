@@ -12,7 +12,6 @@ import GHC.Prelude
 import GHC.Data.List.Infinite (Infinite (..))
 import qualified GHC.Data.List.Infinite as Inf
 import GHC.Types.Basic
-import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
@@ -41,7 +40,7 @@ import qualified Data.IntMap as IM
 --
 -- When the set of refutable shapes contains more than 3 elements, the
 -- additional elements are indicated by "...".
-pprUncovered :: Nabla -> [Id] -> SDoc
+pprUncovered :: Nabla -> [ClassId] -> SDoc
 pprUncovered nabla vas
   | IM.null refuts = fsep vec -- there are no refutations
   | otherwise      = hang (fsep vec) 4 $
@@ -52,10 +51,9 @@ pprUncovered nabla vas
       -- precedence
       | [_] <- vas   = topPrec
       | otherwise    = appPrec
-    (vas',nabla')    = representIds vas nabla
-    ppr_action       = mapM (pprPmVar init_prec) vas'
-    (vec, renamings) = runPmPpr nabla' ppr_action
-    refuts           = prettifyRefuts nabla' renamings
+    ppr_action       = mapM (pprPmVar init_prec) vas
+    (vec, renamings) = runPmPpr nabla ppr_action
+    refuts           = prettifyRefuts nabla renamings
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is

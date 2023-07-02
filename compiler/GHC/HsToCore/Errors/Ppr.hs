@@ -72,7 +72,8 @@ instance Diagnostic DsMessage where
              case vars of -- See #11245
                   [] -> text "Guards do not cover entire pattern space"
                   _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
-                            pp_tys = pprQuotedList $ map idType vars
+                            -- pp_tys = pprQuotedList $ map idType vars
+                            pp_tys = empty
                         in  hang
                               (text "Patterns of type" <+> pp_tys <+> text "not matched:")
                               4

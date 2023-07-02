@@ -328,7 +328,14 @@ desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
 -- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
 --
--- Returns a desugared guard tree of guard expressions.
+-- TODO: Would this be a good design?
+-- Returns a desugared guard tree of guard expressions /and/ an e-graph e-graph
+-- per tree branch.
+--
+-- These e-graphs have an equivalence class for each match-id in the guard
+-- expression, and are required in the subsequent passes of the PMC
+--
+-- Furthermore, the match-ids in the PmGrd expressions are e-class ids from said e-graph
 desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
                -> DsM (PmMatchGroup Pre)
 desugarMatches vars matches =

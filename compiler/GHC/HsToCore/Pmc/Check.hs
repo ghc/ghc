@@ -107,9 +107,10 @@ emptyRedSets :: RedSets
 emptyRedSets = RedSets mempty mempty mempty
 
 checkGrd :: PmGrd -> CheckAction RedSets
-checkGrd grd = CA $ \inc -> case grd of
+checkGrd grd = CA $ \inc0 -> case grd of
   -- let x = e: Refine with x ~ e
-  PmLet x e -> do
+  PmLet x0 e -> do
+    let (x, inc) = representId x0 inc0
     -- romes: we could potentially do update the trees to use e-class ids here,
     -- or in pmcMatches
     matched <- addPhiCtNablas inc (PhiCoreCt x e)
@@ -118,7 +119,8 @@ checkGrd grd = CA $ \inc -> case grd of
                      , cr_uncov = mempty
                      , cr_approx = Precise }
   -- Bang x _: Diverge on x ~ ⊥, refine with x ≁ ⊥
-  PmBang x mb_info -> do
+  PmBang x0 mb_info -> do
+    let (x, inc) = representId x0 inc0
     div <- addPhiCtNablas inc (PhiBotCt x)
     matched <- addPhiCtNablas inc (PhiNotBotCt x)
     -- See Note [Dead bang patterns]
@@ -137,7 +139,9 @@ checkGrd grd = CA $ \inc -> case grd of
                         , cr_uncov = mempty
                         , cr_approx = Precise }
   -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
-  PmCon x con tvs dicts args -> do
+  PmCon x0 con tvs dicts args0 -> do
+    let (x, inc1) = representId x0 inc0
+        (args, inc) = representIds args0 inc1
     !div <- if isPmAltConMatchStrict con
       then addPhiCtNablas inc (PhiBotCt x)
       else pure mempty
@@ -185,7 +189,8 @@ checkGRHS (PmGRHS { pg_grds = GrdVec grds, pg_rhs = rhs_info }) =
 checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
 -- See Note [Checking EmptyCase]
 checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
-  unc <- addPhiCtNablas inc (PhiNotBotCt var)
+  let (varid, inc') = representId var inc
+  unc <- addPhiCtNablas inc' (PhiNotBotCt varid)
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
 checkPatBind :: PmPatBind Pre -> CheckAction (PmPatBind Post)

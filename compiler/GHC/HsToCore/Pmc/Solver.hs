@@ -1,7 +1,9 @@
 {-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE MultiWayIf          #-}
+{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns        #-}
+{-# LANGUAGE RankNTypes, GADTs        #-}
 
 {-
 Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
@@ -103,8 +105,6 @@ import qualified Data.Equality.Graph as EG
 import Data.Bifunctor (second)
 import Data.Function ((&))
 import qualified Data.IntSet as IS
-import Data.Tuple (swap)
-import Data.Traversable (mapAccumL)
 
 --
 -- * Main exports
@@ -569,20 +569,20 @@ where you can find the solution in a perhaps more digestible format.
 data PhiCt
   = PhiTyCt !PredType
   -- ^ A type constraint "T ~ U".
-  | PhiCoreCt    !Id !CoreExpr
+  | PhiCoreCt    !ClassId !CoreExpr
   -- ^ @PhiCoreCt x e@ encodes "x ~ e", equating @x@ with the 'CoreExpr' @e@.
-  | PhiConCt     !Id !PmAltCon ![TyVar] ![PredType] ![Id]
+  | PhiConCt     !ClassId !PmAltCon ![TyVar] ![PredType] ![ClassId]
   -- ^ @PhiConCt x K tvs dicts ys@ encodes @K \@tvs dicts ys <- x@, matching @x@
   -- against the 'PmAltCon' application @K \@tvs dicts ys@, binding @tvs@,
   -- @dicts@ and possibly unlifted fields @ys@ in the process.
   -- See Note [Strict fields and variables of unlifted type].
-  | PhiNotConCt  !Id !PmAltCon
+  | PhiNotConCt  !ClassId !PmAltCon
   -- ^ @PhiNotConCt x K@ encodes "x ≁ K", asserting that @x@ can't be headed
   -- by @K@.
-  | PhiBotCt     !Id
+  | PhiBotCt     !ClassId
   -- ^ @PhiBotCt x@ encodes "x ~ ⊥", equating @x@ to ⊥.
   -- by @K@.
-  | PhiNotBotCt !Id
+  | PhiNotBotCt !ClassId
   -- ^ @PhiNotBotCt x y@ encodes "x ≁ ⊥", asserting that @x@ can't be ⊥.
 
 instance Outputable PhiCt where
@@ -672,31 +672,25 @@ nameTyCt pred_ty = do
 -- 'addTyCts' before, through 'addPhiCts'.
 addPhiTmCt :: Nabla -> PhiCt -> MaybeT DsM Nabla
 addPhiTmCt _     (PhiTyCt ct)              = pprPanic "addPhiCt:TyCt" (ppr ct) -- See the precondition
-addPhiTmCt nabla (PhiCoreCt x e)           = let (xid, nabla') = representId x nabla
-                                              in addCoreCt nabla' xid e
-addPhiTmCt nabla (PhiConCt x con tvs dicts args) = do
+addPhiTmCt nabla (PhiCoreCt x e)           = addCoreCt nabla x e
+addPhiTmCt nabla0 (PhiConCt x con tvs dicts args) = do
   -- Case (1) of Note [Strict fields and variables of unlifted type]
   -- PhiConCt correspond to the higher-level φ constraints from the paper with
   -- bindings semantics. It disperses into lower-level δ constraints that the
   -- 'add*Ct' functions correspond to.
-  nabla1 <- addTyCts nabla (listToBag dicts)
-  let (xid, nabla2) = representId x nabla1
-  let (args_ids, nabla3) = representIds args nabla2
+  nabla1 <- addTyCts nabla0 (listToBag dicts)
   -- romes: here we could have something like (merge (add K arg_ids) x)
   -- or actually that should be done by addConCt?
-  nabla4 <- addConCt nabla3 xid con tvs args_ids
-  foldlM addNotBotCt nabla4 (filterUnliftedFields con (zip args_ids args))
-addPhiTmCt nabla (PhiNotConCt x con)       = let (xid, nabla') = representId x nabla
-                                              in addNotConCt nabla' xid con
-addPhiTmCt nabla (PhiBotCt x)              = let (xid, nabla') = representId x nabla
-                                              in addBotCt nabla' xid
-addPhiTmCt nabla (PhiNotBotCt x)           = let (xid, nabla') = representId x nabla
-                                              in addNotBotCt nabla' xid
+  nabla2 <- addConCt nabla1 x con tvs args
+  foldlM addNotBotCt nabla2 (filterUnliftedFields nabla2 con args)
+addPhiTmCt nabla (PhiNotConCt x con)       = addNotConCt nabla x con
+addPhiTmCt nabla (PhiBotCt x)              = addBotCt nabla x
+addPhiTmCt nabla (PhiNotBotCt x)           = addNotBotCt nabla x
 
-filterUnliftedFields :: PmAltCon -> [(ClassId,Id)] -> [ClassId]
-filterUnliftedFields con args =
-  [ arg_id | ((arg_id,arg), bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
-           , isBanged bang || definitelyUnliftedType (idType arg) ]
+filterUnliftedFields :: Nabla -> PmAltCon -> [ClassId] -> [ClassId]
+filterUnliftedFields nabla con args =
+  [ arg_id | (arg_id, bang) <- zipEqual "addPhiCt" args (pmAltConImplBangs con)
+           , isBanged bang || definitelyUnliftedType (eclassType arg_id nabla) ]
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
 -- surely diverges. Quite similar to 'addConCt', only that it only cares about
@@ -843,7 +837,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
   -- equate should also update e-graph, basically re-implement "equateUSDFM" in terms of the e-graph, or inline it or so
   case equate env x y of
     -- Add the constraints we had for x to y
-    -- See Note [Joining e-classes PMC] todo mention from joinA
+    -- See Note (TODO) Joining e-classes PMC] todo mention from joinA
     -- Now, here's a really tricky bit (TODO Write note, is it the one above?)
     -- Bc the joinA operation is unlawful, and because the makeA operation for
     -- expressions is also unlawful (sets the type to ()::(), mostly out of
@@ -852,7 +846,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
     -- We *also update the type* (WTF1).
     -- This is because every e-class should always have a match-var first, which will always have a type, and it should appear on "the left"
     -- We also rebuild here, we did just merge two things. TODO: Where and when exactly should we merge?
-    (vi_x, EG.rebuild -> env') -> do
+    (vi_x, env') -> do
       let nabla_equated = nabla{ nabla_tm_st = ts{ts_facts = env'} }
       -- and then gradually merge every positive fact we have on x into y
       let add_pos nabla (PACA cl tvs args) = addConCt nabla y cl tvs args
@@ -873,7 +867,7 @@ addVarCt nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = env } } x y =
     -- >>> equate [({u1,u3}, Just ele1), ({u2}, Just ele2)] u3 u2 == (Just ele1, [({u2,u1,u3}, Just ele2)])
     equate :: TmEGraph -> ClassId -> ClassId -> (VarInfo, TmEGraph)
     equate eg x y = let (_, eg')  = EG.merge x y eg
-                     in (eg  ^. _class x ._data, eg')
+                     in (eg  ^. _class x ._data, EG.rebuild eg')
                     -- Note: lookup in @eg@, not @eg'@, because we want to return x's data before the merge.
 
 
@@ -898,6 +892,7 @@ addCoreCt nabla x e = do
   where
     -- Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.
+    -- ROMES:TODO: Consider CoreExprF instead of CoreExpr already here?
     core_expr :: ClassId -> CoreExpr -> StateT Nabla (MaybeT DsM) ()
     -- TODO: Handle newtypes properly, by wrapping the expression in a DataCon
     -- RM: Could this be done better with e-graphs? The whole newtype stuff
@@ -922,14 +917,16 @@ addCoreCt nabla x e = do
             <- exprIsConApp_maybe in_scope_env e
       = data_con_app x in_scope dc args
       | otherwise
-      = do
+      = do -- equate_with_similar_expr x e
         nabla' <- get
         if
           -- See Note [Detecting pattern synonym applications in expressions]
+          -- ROMES:TODO: Can we fix this more easily with e-graphs?
           | Var y <- e, Nothing <- isDataConId_maybe (eclassMatchId x nabla')
           -- We don't consider DataCons flexible variables
           -> modifyT (\nabla -> let (yid, nabla') = representId y nabla
                                 in addVarCt nabla' x yid)
+          -- -> modifyT (\nabla -> addVarCt nabla' x y)
           | otherwise
           -- Any other expression. Try to find other uses of a semantically
           -- equivalent expression and represent them by the same variable!
@@ -958,10 +955,9 @@ addCoreCt nabla x e = do
 
     bind_expr :: CoreExpr -> StateT Nabla (MaybeT DsM) ClassId
     bind_expr e = do
-      x <- lift (lift (mkPmId (exprType e)))
-      xid <- StateT $ \nabla -> pure $ representId x nabla
-      core_expr xid e
-      pure xid
+      x <- StateT $ \nabla -> lift (mkPmMatchId (exprType e) nabla)
+      core_expr x e
+      pure x
 
     -- Look at @let x = K taus theta es@ and generate the following
     -- constraints (assuming universals were dropped from @taus@ before):
@@ -1478,7 +1474,6 @@ instCompleteSet fuel nabla xid cs
   = {-# SCC "instCompleteSet" #-} go nabla (sorted_candidates cs)
   where
     vi = lookupVarInfo (nabla_tm_st nabla) xid
-    x = vi_id vi
 
     sorted_candidates :: CompleteMatch -> [ConLike]
     sorted_candidates cm
@@ -1502,8 +1497,8 @@ instCompleteSet fuel nabla xid cs
       let recur_not_con = do
             nabla' <- addNotConCt nabla xid (PmAltConLike con)
             go nabla' cons
-      (nabla <$ instCon fuel nabla x con) -- return the original nabla, not the
-                                                -- refined one!
+      (nabla <$ instCon fuel nabla xid con) -- return the original nabla, not the
+                                            -- refined one!
             <|> recur_not_con -- Assume that x can't be con. Encode that fact
                               -- with addNotConCt and recur.
 
@@ -1564,11 +1559,11 @@ compareConLikeTestability (RealDataCon a) (RealDataCon b) = mconcat
 -- adding the proper constructor constraint.
 --
 -- See Note [Instantiating a ConLike].
-instCon :: Int -> Nabla -> Id -> ConLike -> MaybeT DsM Nabla
-instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} MaybeT $ do
+instCon :: Int -> Nabla -> ClassId -> ConLike -> MaybeT DsM Nabla
+instCon fuel nabla0@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} MaybeT $ do
   let hdr what = "instCon " ++ show fuel ++ " " ++ what
   env <- dsGetFamInstEnvs
-  let match_ty = idType x
+  let match_ty = eclassType x nabla0
   tracePm (hdr "{") $
     ppr con <+> text "... <-" <+> ppr x <+> dcolon <+> ppr match_ty
   norm_match_ty <- normaliseSourceTypeWHNF ty_st match_ty
@@ -1586,24 +1581,23 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
       let gammas = substTheta sigma_ex (eqSpecPreds eq_spec ++ thetas)
       -- (4) Instantiate fresh term variables as arguments to the constructor
       let field_tys' = substTys sigma_ex $ map scaledThing field_tys
-      arg_ids <- mapM mkPmId field_tys'
-      let (nabla', arg_class_ids) = mapAccumL (\nab id -> swap $ representId id nab) nabla arg_ids
+      (arg_ids, nabla1) <- runStateT (mapM (StateT @Nabla . mkPmMatchId) field_tys') nabla0
       tracePm (hdr "(cts)") $ vcat
         [ ppr x <+> dcolon <+> ppr match_ty
         , text "In WHNF:" <+> ppr (isSourceTypeInWHNF match_ty) <+> ppr norm_match_ty
         , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
         , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
         , ppr gammas
-        , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
+        , ppr (map (\x -> ppr x <+> dcolon <+> ppr (eclassType x nabla1)) arg_ids)
         ]
       -- (5) Finally add the new constructor constraint
       runMaybeT $ do
         -- Case (2) of Note [Strict fields and variables of unlifted type]
         let alt = PmAltConLike con
-        let branching_factor = length $ filterUnliftedFields alt (zip arg_class_ids arg_ids)
+        let branching_factor = length $ filterUnliftedFields nabla1 alt arg_ids
         let ct = PhiConCt x alt ex_tvs gammas arg_ids
-        nabla1 <- traceWhenFailPm (hdr "(ct unsatisfiable) }") (ppr ct) $
-                  addPhiTmCt nabla' ct
+        nabla2 <- traceWhenFailPm (hdr "(ct unsatisfiable) }") (ppr ct) $
+                  addPhiTmCt nabla1 ct
         -- See Note [Fuel for the inhabitation test]
         let new_fuel
               | branching_factor <= 1 = fuel
@@ -1615,17 +1609,17 @@ instCon fuel nabla@MkNabla{nabla_ty_st = ty_st} x con = {-# SCC "instCon" #-} Ma
           , ppr con <+> dcolon <+> text "... ->" <+> ppr _con_res_ty
           , ppr (map (\tv -> ppr tv <+> char '↦' <+> ppr (substTyVar sigma_univ tv)) _univ_tvs)
           , ppr gammas
-          , ppr (map (\x -> ppr x <+> dcolon <+> ppr (idType x)) arg_ids)
+          , ppr (map (\x -> ppr x <+> dcolon <+> ppr (eclassType x nabla1)) arg_ids)
           , ppr branching_factor
           , ppr new_fuel
           ]
-        nabla2 <- traceWhenFailPm (hdr "(inh test failed) }") (ppr nabla1) $
-                  inhabitationTest new_fuel (nabla_ty_st nabla') nabla1
-        lift $ tracePm (hdr "(inh test succeeded) }") (ppr nabla2)
-        pure nabla2
+        nabla3 <- traceWhenFailPm (hdr "(inh test failed) }") (ppr nabla2) $
+                  inhabitationTest new_fuel (nabla_ty_st nabla1) nabla2
+        lift $ tracePm (hdr "(inh test succeeded) }") (ppr nabla3)
+        pure nabla3
     Nothing -> do
       tracePm (hdr "(match_ty not instance of res_ty) }") empty
-      pure (Just nabla) -- Matching against match_ty failed. Inhabited!
+      pure (Just nabla0) -- Matching against match_ty failed. Inhabited!
                          -- See Note [Instantiating a ConLike].
 
 -- | @matchConLikeResTy _ _ ty K@ tries to match @ty@ against the result
@@ -2034,12 +2028,11 @@ generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
     instantiate_newtype_chain :: ClassId -> Nabla -> [(Type, DataCon, Type)] -> MaybeT DsM (ClassId, Nabla)
     instantiate_newtype_chain x nabla []                      = pure (x, nabla)
     instantiate_newtype_chain x nabla ((_ty, dc, arg_ty):dcs) = do
-      y <- lift $ mkPmId arg_ty
-      let (yid,nabla') = representId y nabla
+      (y,nabla') <- lift $ mkPmMatchId arg_ty nabla
       -- Newtypes don't have existentials (yet?!), so passing an empty
       -- list as ex_tvs.
-      nabla'' <- addConCt nabla' x (PmAltConLike (RealDataCon dc)) [] [yid]
-      instantiate_newtype_chain yid nabla'' dcs
+      nabla'' <- addConCt nabla' x (PmAltConLike (RealDataCon dc)) [] [y]
+      instantiate_newtype_chain y nabla'' dcs
 
     instantiate_cons :: ClassId -> Type -> [ClassId] -> Int -> Nabla -> [ConLike] -> DsM [Nabla]
     instantiate_cons _ _  _  _ _     []       = pure []
@@ -2050,7 +2043,7 @@ generateInhabitingPatterns mode (x:xs) n nabla@MkNabla{nabla_tm_st=ts} = do
       = generateInhabitingPatterns mode xs n nabla
     instantiate_cons x ty xs n nabla (cl:cls) = do
       -- The following line is where we call out to the inhabitationTest!
-      mb_nabla <- runMaybeT $ instCon 4 nabla (eclassMatchId x nabla) cl
+      mb_nabla <- runMaybeT $ instCon 4 nabla x cl
       tracePm "instantiate_cons" (vcat [ ppr x <+> dcolon <+> ppr (eclassType x nabla)
                                        , ppr ty
                                        , ppr cl
@@ -2145,13 +2138,22 @@ the -XEmptyCase case in 'reportWarnings' by looking for 'ReportEmptyCase'.
 -- | Update the value of the analysis data of some e-class by its id.
 updateVarInfo :: Functor f => ClassId -> (VarInfo -> f VarInfo) -> Nabla -> f Nabla
 -- Update the data at class @xid@ using lenses and the monadic action @go@
-updateVarInfo xid f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=eg } } = (\eg' -> nabla{ nabla_tm_st = ts{ts_facts = eg'} }) <$> (_class xid . _data) f eg
+updateVarInfo xid f nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts=eg } }
+  = (\eg' -> nabla{ nabla_tm_st = ts{ts_facts = eg'} }) <$> (_class xid . _data) f eg
 
-eclassMatchId :: HasCallStack => ClassId -> Nabla -> Id
+eclassMatchId :: ClassId -> Nabla -> Id
 eclassMatchId cid = vi_id . (^. _class cid . _data) . (ts_facts . nabla_tm_st)
 
 eclassType :: ClassId -> Nabla -> Type
 eclassType cid = idType . eclassMatchId cid
 
-
 -- ROMES:TODO: When exactly to rebuild?
+
+-- | Generate a fresh class for matching, returning the class-id as the match-id
+mkPmMatchId :: Type -> Nabla -> DsM (ClassId, Nabla)
+mkPmMatchId ty (MkNabla tyst ts@TmSt{ts_facts = egr}) = do
+  x <- mkPmId ty -- romes:Todo: for now, we still use mkPmId to get an Id for emptyVarInfo, but we want to get rid of this too
+  let (xid, egr') = EG.newEClass (emptyVarInfo x) egr
+  return (xid, MkNabla tyst ts{ts_facts=egr'})
+{-# NOINLINE mkPmMatchId #-} -- We'll CPR deeply, that should be enough
+

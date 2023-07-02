@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE RankNTypes   #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -20,7 +21,7 @@ module GHC.HsToCore.Pmc.Solver.Types (
         lookupRefuts, lookupSolution,
 
         -- ** Looking up 'VarInfo'
-        lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo, representId, representIds,
+        lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo, representId, representIds, representIdNablas, representIdsNablas,
 
         -- ** Caching residual COMPLETE sets
         CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
@@ -69,6 +70,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Solver.InertSet (InertSet, emptyInert)
 import GHC.Tc.Utils.TcType (isStringTy)
+import GHC.Types.Var.Env
 import GHC.Types.CompleteMatch (CompleteMatch(..))
 import GHC.Types.SourceText (SourceText(..), mkFractionalLit, FractionalLit
                             , fractionalLitFromRational
@@ -79,8 +81,6 @@ import Data.Ratio
 import GHC.Real (Ratio(..))
 import qualified Data.Semigroup as Semi
 
-import Data.Tuple (swap)
-import Data.Traversable (mapAccumL)
 import Data.Functor.Compose
 import Data.Equality.Analysis (Analysis(..))
 import Data.Equality.Graph (EGraph, ClassId)
@@ -88,7 +88,8 @@ import Data.Equality.Graph.Lens
 import qualified Data.Equality.Graph as EG
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS (empty)
-import Data.Bifunctor (second)
+import Data.Bifunctor (second, bimap, first)
+import Control.Monad.Trans.State (runState, state, execState)
 
 -- import GHC.Driver.Ppr
 
@@ -155,6 +156,8 @@ data TmState
   = TmSt
   { ts_facts :: !TmEGraph
   -- ^ Facts about terms.
+  , ts_reps :: !(IdEnv ClassId)
+  -- ^ A mapping from match-id Ids to the class-id representing that match-id
 
   -- ROMES:TODO: ts_dirty looks a bit to me like the bookeeping needed to know
   -- which nodes to upward merge, perhaps we can get rid of it too.
@@ -242,7 +245,7 @@ instance Outputable BotInfo where
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt eg dirty) = text (show eg) $$ ppr dirty
+  ppr (TmSt eg idmp dirty) = text (show eg) $$ ppr idmp $$ ppr dirty
 
 -- | Not user-facing.
 instance Outputable VarInfo where
@@ -263,7 +266,7 @@ instance Outputable VarInfo where
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt EG.emptyEGraph IS.empty
+initTmState = TmSt EG.emptyEGraph mempty IS.empty
 
 -- | A data type that caches for the 'VarInfo' of @x@ the results of querying
 -- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
@@ -318,9 +321,8 @@ emptyVarInfo x
 -- | @lookupVarInfo tms x@ tells what we know about 'x'
 --- romes:TODO: This will have a different type. I don't know what yet.
 -- romes:TODO I don't think this is what we want any longer, more like represent Id and see if it was previously represented by some data or not?
--- romes:TodO should return VarInfo rather than Maybe VarInfo
 lookupVarInfo :: TmState -> ClassId -> VarInfo
-lookupVarInfo (TmSt eg _) x
+lookupVarInfo (TmSt eg _ _) x
 -- RM: Yea, I don't like the fact that currently all e-classes are created by Ids and have an Empty Var info, yet we must call "fromMaybe" here. Not good.
   = eg ^._class x._data
 
@@ -834,14 +836,23 @@ type TmEGraph = EGraph VarInfo (DeBruijnF CoreExprF)
 instance Show VarInfo where
   show = showPprUnsafe . ppr
 
+-- | Represents a match-id in 'Nablas'
+representIdNablas :: Id -> Nablas -> Nablas
+representIdNablas x (MkNablas nbs) = MkNablas $ mapBag (snd . representId x) nbs
+
+representIdsNablas :: [Id] -> Nablas -> Nablas
+representIdsNablas xs = execState (mapM (\x -> state (((),) . representIdNablas x)) xs)
+
+-- | Like 'representId' but for a single Nabla
 representId :: Id -> Nabla -> (ClassId, Nabla)
--- Will need to justify this well
-representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0})
-  = case EG.add (EG.Node (DF (deBruijnize (VarF x)))) eg0 of
-      (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=eg1})
+representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0, ts_reps=idmp})
+    = case lookupVarEnv idmp x of
+        Nothing -> case EG.newEClass (emptyVarInfo x) eg0 of
+          (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=eg1, ts_reps=extendVarEnv idmp x xid})
+        Just xid -> (xid, MkNabla tyst tmst)
 
 representIds :: [Id] -> Nabla -> ([ClassId], Nabla)
-representIds xs nabla = swap $ mapAccumL (\acc x -> swap $ representId x acc) nabla xs
+representIds xs = runState (mapM (state . representId) xs)
 
 -- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
 -- There ought to be a better way.

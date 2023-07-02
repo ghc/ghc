@@ -75,6 +75,8 @@ import qualified Data.List.NonEmpty as NE
 import Data.Coerce
 import GHC.Tc.Utils.Monad
 
+import Data.Equality.Graph (ClassId)
+
 --
 -- * Exported entry points to the checker
 --
@@ -104,12 +106,23 @@ pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
       !missing <- getLdiNablas
       pat_bind <- noCheckDs $ desugarPatBind loc var p
       tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
-      result <- unCA (checkPatBind pat_bind) missing
-      let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result
+      result0 <- unCA (checkPatBind pat_bind) missing
+      let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result0
       tracePm "pmcPatBind }: " $
         vcat [ text "cr_uncov:" <+> ppr (cr_uncov result)
              , text "ldi:" <+> ppr ldi ]
-      formatReportWarnings ReportPatBind ctxt [var] result
+      -- romes:todo: this seems redundant, hints that the right thing might be for desugar to return already the match variables already "represented" in the e-graph
+      -- doing this, however, wouuld require for desugar pat binds to care about/thread through nablas
+      -- DESIGN:TODO: However, if we represent the variables while desugaring, we
+      -- would no longer need representId to represent VarF in the e-class, and can
+      -- instead do newEClass. This would further reduce allocations.
+      -- The reason why we can't do that currently is that on checkPatBind we'll
+      -- representIds, and when we represent them again in the next line, we want
+      -- them to match the ones we represented during checkPatBind. If we made
+      -- empty-eclasses, the representId on the next line wouldn't match the match
+      -- ids we defined in checkPatBind.
+      let (varid, cr_uncov') = representId var (cr_uncov result0)
+      formatReportWarnings ReportPatBind ctxt [varid] result0{cr_uncov = cr_uncov'}
       return ldi
   where
     -- See Note [pmcPatBind doesn't warn on pattern guards]
@@ -180,18 +193,23 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
       let var = only vars
       empty_case <- noCheckDs $ desugarEmptyCase var
-      result <- unCA (checkEmptyCase empty_case) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      formatReportWarnings ReportEmptyCase ctxt vars result
+      result0 <- unCA (checkEmptyCase empty_case) missing
+      tracePm "}: " (ppr (cr_uncov result0))
+      let (varids, cr_uncov') = representIds vars (cr_uncov result0) -- romes:todo: this seems redundant, hints that the right thing might be for desugar to return already the match variables already "represented" in the e-graph
+      formatReportWarnings ReportEmptyCase ctxt varids result0{cr_uncov=cr_uncov'}
       return []
     Just matches -> do
       matches <- {-# SCC "desugarMatches" #-}
                  noCheckDs $ desugarMatches vars matches
-      result  <- {-# SCC "checkMatchGroup" #-}
+      result0 <- {-# SCC "checkMatchGroup" #-}
                  unCA (checkMatchGroup matches) missing
-      tracePm "}: " (ppr (cr_uncov result))
-      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
-      return (NE.toList (ldiMatchGroup (cr_ret result)))
+      tracePm "}: " (ppr (cr_uncov result0))
+      let (varids, cr_uncov') = representIds vars (cr_uncov result0)
+      -- romes:todo: this seems redundant, hints that the right thing might be
+      -- for desugar to return already the match variables already "represented"
+      -- in the e-graph
+      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt varids result0{cr_uncov=cr_uncov'}
+      return (NE.toList (ldiMatchGroup (cr_ret result0)))
 
 {-
 Note [Detecting incomplete record selectors]
@@ -445,7 +463,7 @@ collectInMode ReportEmptyCase  = cirbsEmptyCase
 
 -- | Given a 'FormatReportWarningsMode', this function will emit warnings
 -- for a 'CheckResult'.
-formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult ann -> DsM ()
+formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [ClassId] -> CheckResult ann -> DsM ()
 formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
   cov_info <- collectInMode report_mode ann
   dflags <- getDynFlags
@@ -453,7 +471,7 @@ formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
 
 -- | Issue all the warnings
 -- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
-reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
+reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [ClassId] -> CheckResult CIRB -> DsM ()
 reportWarnings dflags report_mode (DsMatchContext kind loc) vars
   CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
                                  , cirb_red   = redundant_rhss
@@ -492,14 +510,13 @@ reportWarnings dflags report_mode (DsMatchContext kind loc) vars
 
     maxPatterns = maxUncoveredPatterns dflags
 
-getNFirstUncovered :: GenerateInhabitingPatternsMode -> [Id] -> Int -> Nablas -> DsM [Nabla]
+getNFirstUncovered :: GenerateInhabitingPatternsMode -> [ClassId] -> Int -> Nablas -> DsM [Nabla]
 getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
   where
     go 0 _              = pure []
     go _ []             = pure []
     go n (nabla:nablas) = do
-      let (vars', nabla') = representIds vars nabla -- they're already there, we're just getting the e-class ids back
-      front <- generateInhabitingPatterns mode vars' n nabla'
+      front <- generateInhabitingPatterns mode vars n nabla
       back <- go (n - length front) nablas
       pure (front ++ back)
 
@@ -534,9 +551,10 @@ addTyCs origin ev_vars m = do
 -- to be added for multiple scrutinees rather than just one.
 addCoreScrutTmCs :: [CoreExpr] -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs []         _      k = k
-addCoreScrutTmCs (scr:scrs) (x:xs) k =
-  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas ->
-    addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
+addCoreScrutTmCs (scr:scrs) (x0:xs) k =
+  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas0 ->
+    let (x, nablas) = representId x0 nablas0
+     in addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
 -- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.

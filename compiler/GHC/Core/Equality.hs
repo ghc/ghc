@@ -7,6 +7,11 @@
 
 module GHC.Core.Equality where
 
+-- ROMES:TODO:
+-- I think, for the particular usages of Core e-graphs, we can do much better
+-- than this for equality.
+-- E.g. representation could transform the CoreExpr to an actual debruijnized one (with Ints for Vars)
+
 import GHC.Exts (dataToTag#, tagToEnum#, (>#), (<#))
 import GHC.Prelude
 
