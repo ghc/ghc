@@ -230,6 +230,40 @@ function h$base_lstat(file, file_off, stat, stat_off, c) {
 #endif
         h$unsupported(-1, c);
 }
+
+function h$lstat(file, file_off, stat, stat_off) {
+  TRACE_IO("lstat")
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      var fs = h$fs.lstatSync(h$decodeUtf8z(file, file_off));
+      h$base_fillStat(fs, stat, stat_off);
+      return 0;
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  } else
+#endif
+    h$unsupported(-1);
+}
+
+function h$rmdir(file, file_off) {
+  TRACE_IO("rmdir")
+#ifndef GHCJS_BROWSER
+  if(h$isNode()) {
+    try {
+      var fs = h$fs.rmdirSync(h$decodeUtf8z(file, file_off));
+      return 0;
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  } else
+#endif
+    h$unsupported(-1);
+}
+
 function h$base_open(file, file_off, how, mode, c) {
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
@@ -435,20 +469,26 @@ function h$base_waitpid(pid, stat, stat_off, options, c) {
 /** @const */ var h$base_o_nonblock = 0x00004;
 /** @const */ var h$base_o_binary   = 0x00000;
 
+function h$base_stat_check_mode(mode,p) {
+  // inspired by Node's checkModeProperty
+  var r = (mode & h$fs.constants.S_IFMT) === p;
+  return r ? 1 : 0;
+}
+
 function h$base_c_s_isreg(mode) {
-    return 1;
+  return h$base_stat_check_mode(mode,h$fs.constants.S_IFREG);
 }
 function h$base_c_s_ischr(mode) {
-    return 0;
+  return h$base_stat_check_mode(mode,h$fs.constants.S_IFCHR);
 }
 function h$base_c_s_isblk(mode) {
-    return 0;
+  return h$base_stat_check_mode(mode,h$fs.constants.S_IFBLK);
 }
 function h$base_c_s_isdir(mode) {
-    return 0; // fixme
+  return h$base_stat_check_mode(mode,h$fs.constants.S_IFDIR);
 }
 function h$base_c_s_isfifo(mode) {
-    return 0;
+  return h$base_stat_check_mode(mode,h$fs.constants.S_IFIFO);
 }
 function h$base_c_fcntl_read(fd,cmd) {
     return -1;
