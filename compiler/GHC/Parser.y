@@ -1481,7 +1481,7 @@ ty_fam_inst_eqn :: { LTyFamInstEqn GhcPs }
                     ; tvbs <- fromSpecTyVarBndrs $2
                     ; let loc = comb2 $1 $>
                     ; cs <- getCommentsFor loc
-                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (EpAnn (glEE $1 $>) (mu AnnForall $1, mj AnnDot $3) cs) tvbs) $4 $6 [mj AnnEqual $5] }}
+                    ; mkTyFamInstEqn loc (mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) cs) tvbs) $4 $6 [mj AnnEqual $5] }}
         | type '=' ktype
               {% mkTyFamInstEqn (comb2 $1 $>) mkHsOuterImplicit $1 $3 (mj AnnEqual $2:[]) }
               -- Note the use of type for the head; this allows
@@ -1612,13 +1612,13 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                                          >>= \tvbs ->
                                                              (acs (\cs -> (sLL $1 $>
                                                                                   (Just ( addTrailingDarrowC $4 $5 cs)
-                                                                                        , mkHsOuterExplicit (EpAnn (glEE $1 $>) (mu AnnForall $1, mj AnnDot $3) emptyComments) tvbs, $6))))
+                                                                                        , mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) emptyComments) tvbs, $6))))
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
                                              ; let loc = comb2 $1 $>
                                              ; cs <- getCommentsFor loc
-                                             ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $>) (mu AnnForall $1, mj AnnDot $3) cs) tvbs, $4))
+                                             ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glEE $1 $3) (mu AnnForall $1, mj AnnDot $3) cs) tvbs, $4))
                                        } }
         | context '=>' type         {% acs (\cs -> (sLL $1 $> (Just (addTrailingDarrowC $1 $2 cs), mkHsOuterImplicit, $3))) }
         | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
@@ -2129,7 +2129,7 @@ opt_tyconsig :: { ([AddEpAnn], Maybe (LocatedN RdrName)) }
 sigktype :: { LHsSigType GhcPs }
         : sigtype              { $1 }
         | ctype '::' kind      {% acsA (\cs -> sLL $1 $> $ mkHsImplicitSigType $
-                                               sLLa  (reLoc $1) (reLoc $>) $ HsKindSig (EpAnn (glAR $1) [mu AnnDcolon $2] cs) $1 $3) }
+                                               sLLa  (reLoc $1) (reLoc $>) $ HsKindSig (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs) $1 $3) }
 
 -- Like ctype, but for types that obey the forall-or-nothing rule.
 -- See Note [forall-or-nothing rule] in GHC.Hs.Type. To avoid duplicating the
@@ -2169,7 +2169,7 @@ forall_telescope :: { Located (HsForAllTelescope GhcPs) }
 -- A ktype is a ctype, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
         : ctype                { $1 }
-        | ctype '::' kind      {% acsA (\cs -> sLL $1 $> $ HsKindSig (EpAnn (glAR $1) [mu AnnDcolon $2] cs) $1 $3) }
+        | ctype '::' kind      {% acsA (\cs -> sLL $1 $> $ HsKindSig (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs) $1 $3) }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
@@ -2215,16 +2215,16 @@ type :: { LHsType GhcPs }
         -- See Note [%shift: type -> btype]
         : btype %shift                 { $1 }
         | btype '->' ctype             {% acsA (\cs -> sLL $1 $>
-                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
+                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsUnrestrictedArrow (hsUniTok $2)) $1 $3) }
 
         | btype mult '->' ctype        {% hintLinear (getLoc $2)
                                        >> let arr = (unLoc $2) (hsUniTok $3)
                                           in acsA (\cs -> sLL $1 $>
-                                           $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) arr $1 $4) }
+                                           $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) arr $1 $4) }
 
         | btype '->.' ctype            {% hintLinear (getLoc $2) >>
                                           acsA (\cs -> sLL $1 $>
-                                            $ HsFunTy (EpAnn (glAR $1) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
+                                            $ HsFunTy (EpAnn (glEE $1 $>) NoEpAnns cs) (HsLinearArrow (HsLolly (hsTok $2))) $1 $3) }
                                               -- [mu AnnLollyU $2] }
 
 mult :: { Located (LHsUniToken "->" "\8594" GhcPs -> HsArrow GhcPs) }
@@ -2510,7 +2510,7 @@ fielddecl :: { LConDeclField GhcPs }
         : sig_vars '::' ctype
             {% acsA (\cs -> L (comb2 $1 $3)
                       (ConDeclField (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs)
-                                    (reverse (map (\ln@(L l n) -> L (l2l l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
+                                    (reverse (map (\ln@(L l n) -> L ln $ FieldOcc noExtField (l2l l)) (unLoc $1))) $3 Nothing))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -2619,7 +2619,7 @@ sigdecl :: { LHsDecl GhcPs }
                         {% do { $1 <- runPV (unECP $1)
                               ; v <- checkValSigLhs $1
                               ; acsA (\cs -> (sLL $1 $> $ SigD noExtField $
-                                  TypeSig (EpAnn (glAR $1) (AnnSig (mu AnnDcolon $2) []) cs) [v] (mkHsWildCardBndrs $3)))} }
+                                  TypeSig (EpAnn (glEE $1 $>) (AnnSig (mu AnnDcolon $2) []) cs) [v] (mkHsWildCardBndrs $3)))} }
 
         | var ',' sig_vars '::' sigtype
            {% do { v <- addTrailingCommaN $1 (gl $2)
@@ -2719,22 +2719,22 @@ exp   :: { ECP }
         | infixexp '-<' exp     {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glAR $1) (mu Annlarrowtail $2) cs) $1 $3
+                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glEE $1 $>) (mu Annlarrowtail $2) cs) $1 $3
                                                         HsFirstOrderApp True) }
         | infixexp '>-' exp     {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glAR $1) (mu Annrarrowtail $2) cs) $3 $1
+                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glEE $1 $>) (mu Annrarrowtail $2) cs) $3 $1
                                                       HsFirstOrderApp False) }
         | infixexp '-<<' exp    {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glAR $1) (mu AnnLarrowtail $2) cs) $1 $3
+                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glEE $1 $>) (mu AnnLarrowtail $2) cs) $1 $3
                                                       HsHigherOrderApp True) }
         | infixexp '>>-' exp    {% runPV (unECP $1) >>= \ $1 ->
                                    runPV (unECP $3) >>= \ $3 ->
                                    fmap ecpFromCmd $
-                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glAR $1) (mu AnnRarrowtail $2) cs) $3 $1
+                                   acsA (\cs -> sLL $1 $> $ HsCmdArrApp (EpAnn (glEE $1 $>) (mu AnnRarrowtail $2) cs) $3 $1
                                                       HsHigherOrderApp False) }
         -- See Note [%shift: exp -> infixexp]
         | infixexp %shift       { $1 }
@@ -2949,7 +2949,7 @@ aexp1   :: { ECP }
             {% runPV (unECP $1) >>= \ $1 ->
                fmap ecpFromExp $ acsa (\cs ->
                  let fl = sLLi $2 (reLocN $>) (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
-                 mkRdrGetField (noAnnSrcSpan $ comb2 $1 $>) $1 fl (EpAnn (glAR $1) NoEpAnns cs))  }
+                 mkRdrGetField (noAnnSrcSpan $ comb2 $1 $>) $1 fl (EpAnn (glEE $1 $>) NoEpAnns cs))  }
 
 
         | aexp2                { $1 }
@@ -3444,7 +3444,7 @@ stmt  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
 qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
     : bindpat '<-' exp                   { unECP $3 >>= \ $3 ->
                                            acsA (\cs -> sLL $1 $>
-                                            $ mkPsBindStmt (EpAnn (glAR $1) [mu AnnLarrow $2] cs) $1 $3) }
+                                            $ mkPsBindStmt (EpAnn (glEE $1 $>) [mu AnnLarrow $2] cs) $1 $3) }
     | exp                                { unECP $1 >>= \ $1 ->
                                            return $ sL1a $1 $ mkBodyStmt $1 }
     | 'let' binds                        { acsA (\cs -> (sLL $1 $>
