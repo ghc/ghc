@@ -593,6 +593,12 @@ function h$base_stat_check_mode(mode,p) {
   return r ? 1 : 0;
 }
 
+function h$base_stat_check_mode(mode,p) {
+  // inspired by Node's checkModeProperty
+  var r = (mode & h$fs.constants.S_IFMT) === p;
+  return r ? 1 : 0;
+}
+
 function h$base_c_s_isreg(mode) {
   return h$base_stat_check_mode(mode,h$fs.constants.S_IFREG);
 }
