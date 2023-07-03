@@ -179,7 +179,6 @@ data EPState = EPState
                                           -- Annotation
              , uExtraDP :: !(Maybe Anchor) -- ^ Used to anchor a
                                              -- list
-
              , pAcceptSpan :: Bool -- ^ When we have processed an
                                    -- entry of EpaDelta, accept the
                                    -- next `EpaSpan` start as the
@@ -1351,6 +1350,8 @@ markKwT :: (Monad m, Monoid w) => TrailingAnn -> EP w m TrailingAnn
 markKwT (AddSemiAnn ss)    = AddSemiAnn    <$> markKwA AnnSemi ss
 markKwT (AddCommaAnn ss)   = AddCommaAnn   <$> markKwA AnnComma ss
 markKwT (AddVbarAnn ss)    = AddVbarAnn    <$> markKwA AnnVbar ss
+markKwT (AddDArrowAnn ss)  = AddDArrowAnn  <$> markKwA AnnDarrow ss
+markKwT (AddDArrowUAnn ss) = AddDArrowUAnn <$> markKwA AnnDarrowU ss
 
 -- ---------------------------------------------------------------------
 
@@ -1368,12 +1369,10 @@ markAnnListA :: (Monad m, Monoid w)
 markAnnListA EpAnnNotUsed action = do
   action EpAnnNotUsed
 markAnnListA an action = do
-  debugM $ "markAnnListA: an=" ++ showAst an
   an0 <- markLensMAA an lal_open
   an1 <- markEpAnnAllL an0 lal_rest AnnSemi
   (an2, r) <- action an1
   an3 <- markLensMAA an2 lal_close
-  debugM $ "markAnnListA: an3=" ++ showAst an
   return (an3, r)
 
 -- ---------------------------------------------------------------------
@@ -3268,7 +3267,7 @@ instance (ExactPrint body) => ExactPrint (HsRecFields GhcPs body) where
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint body)
-    => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (FieldOcc GhcPs)) body) where
+    => ExactPrint (HsFieldBind (LocatedA (FieldOcc GhcPs)) body) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
   setAnnotationAnchor (HsFieldBind an f arg isPun) anc ts cs = (HsFieldBind (setAnchorEpa an anc ts cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
@@ -3318,7 +3317,7 @@ instance (ExactPrint body)
 
 -- instance ExactPrint (HsRecUpdField GhcPs q) where
 instance (ExactPrint (LocatedA body))
-    => ExactPrint (HsFieldBind (LocatedAn NoEpAnns (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
+    => ExactPrint (HsFieldBind (LocatedA (AmbiguousFieldOcc GhcPs)) (LocatedA body)) where
   getAnnotationEntry x = fromAnn (hfbAnn x)
   setAnnotationAnchor (HsFieldBind an f arg isPun) anc ts cs = (HsFieldBind (setAnchorEpa an anc ts cs) f arg isPun)
   exact (HsFieldBind an f arg isPun) = do
@@ -4228,11 +4227,7 @@ instance (ExactPrint a) => ExactPrint (LocatedC a) where
     opens' <- mapM (markKwA AnnOpenP) opens
     a' <- markAnnotated a
     closes' <- mapM (markKwA AnnCloseP) closes
-    ma' <- case ma of
-      Just (UnicodeSyntax, r) -> Just . (UnicodeSyntax,) <$> markKwA AnnDarrowU r
-      Just (NormalSyntax,  r) -> Just . (NormalSyntax,) <$> markKwA AnnDarrow  r
-      Nothing -> pure Nothing
-    return (L (SrcSpanAnn (EpAnn anc (AnnContext ma' opens' closes') cs) l) a')
+    return (L (SrcSpanAnn (EpAnn anc (AnnContext ma opens' closes') cs) l) a')
 
 -- ---------------------------------------------------------------------
 

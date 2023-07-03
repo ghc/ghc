@@ -1200,7 +1200,7 @@ which we don't want.
 -}
 
 cvtFld :: (RdrName -> CvtM t) -> (TH.Name, TH.Exp)
-       -> CvtM (LHsFieldBind GhcPs (LocatedAn NoEpAnns t) (LHsExpr GhcPs))
+       -> CvtM (LHsFieldBind GhcPs (LocatedA t) (LHsExpr GhcPs))
 cvtFld f (v,e)
   = do  { v' <- vNameL v
         ; lhs' <- traverse f v'
