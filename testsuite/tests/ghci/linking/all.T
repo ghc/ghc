@@ -48,7 +48,7 @@ test('ghcilink006',
 test('T3333',
      [unless(doing_ghci, skip),
       when(unregisterised(), fragile(17018)),
-      js_broken(22359)],
+      req_c],
      makefile_test, ['T3333'])
 
 test('T11531',
@@ -69,7 +69,7 @@ test('T14708',
 test('T15729',
      [extra_files(['T15729.hs', 'T15729.c']),
       unless(doing_ghci, skip),
-      js_broken(22359)],
+      req_c],
      makefile_test, ['T15729'])
 
 test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
