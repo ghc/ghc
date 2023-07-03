@@ -2,76 +2,44 @@
 {-# LANGUAGE LambdaCase        #-}
 
 module GHC.StgToJS.Utils
-  ( assignToTypedExprs
-  , assignCoerce1
+  ( assignCoerce1
   , assignToExprCtx
-  -- * Core Utils
+  , fixedLayout
+  , assocIdExprs
+  -- * Unboxable datacon
   , isUnboxableCon
   , isUnboxable
-  , SlotCount(..)
+  , isBoolDataCon
+  -- * JsRep
   , slotCount
   , varSize
-  , varSlotCount
   , typeSize
   , isVoid
-  , isPtr
-  , isSingleVar
   , isMultiVar
-  , isMatchable
-  , tyConVt
   , idVt
   , typeVt
   , uTypeVt
   , primRepVt
-  , typePrimRep'
-  , tyConPrimRep'
-  , kindPrimRep'
-  , primTypeVt
-  , argVt
-  , dataConType
-  , isBoolDataCon
-  , fixedLayout
   , stackSlotType
-  , idPrimReps
-  , typePrimReps
   , primRepSize
-  , assocPrimReps
-  , assocIdPrimReps
-  , assocIdExprs
   , mkArityTag
-  , toTypeList
-  -- * Stg Utils
-  , bindingRefs
-  , rhsRefs
+  -- * References and Ids
   , exprRefs
-  , altRefs
-  , argRefs
   , hasExport
   , collectTopIds
   , collectIds
-  , removeTick
+  -- * Live variables
   , LiveVars
   , liveStatic
   , liveVars
-  , stgTopBindLive
-  , stgBindLive
-  , stgBindRhsLive
   , stgRhsLive
-  , stgArgLive
   , stgExprLive
-  , stgAltLive
-  , stgLetNoEscapeLive
-  , bindees
   , isUpdatableRhs
-  , stgLneLive
   , stgLneLive'
   , stgLneLiveExpr
   , isInlineExpr
-  , inspectInlineBinding
-  , inspectInlineRhs
-  , isInlineForeignCall
-  , isInlineApp
-  ) where
+  )
+where
 
 import GHC.Prelude
 
@@ -211,27 +179,11 @@ isVoid :: VarType -> Bool
 isVoid VoidV = True
 isVoid _     = False
 
-isPtr :: VarType -> Bool
-isPtr PtrV = True
-isPtr _    = False
-
-isSingleVar :: VarType -> Bool
-isSingleVar v = varSlotCount v == OneSlot
-
 isMultiVar :: VarType -> Bool
 isMultiVar v = case varSlotCount v of
   NoSlot   -> False
   OneSlot  -> False
   TwoSlots -> True
-
--- | can we pattern match on these values in a case?
-isMatchable :: [VarType] -> Bool
-isMatchable [DoubleV] = True
-isMatchable [IntV]    = True
-isMatchable _         = False
-
-tyConVt :: HasDebugCallStack => TyCon -> [VarType]
-tyConVt = typeVt . mkTyConTy
 
 idVt :: HasDebugCallStack => Id -> [VarType]
 idVt = typeVt . idType
@@ -275,13 +227,6 @@ primRepVt (VecRep{})  = error "uTypeVt: vector types are unsupported"
 
 typePrimRep' :: HasDebugCallStack => UnaryType -> [PrimRep]
 typePrimRep' ty = kindPrimRep' empty (typeKind ty)
-
--- | Find the primitive representation of a 'TyCon'. Defined here to
--- avoid module loops. Call this only on unlifted tycons.
-tyConPrimRep' :: HasDebugCallStack => TyCon -> [PrimRep]
-tyConPrimRep' tc = kindPrimRep' empty res_kind
-  where
-    res_kind = tyConResKind tc
 
 -- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
 -- of values of types of this kind.
@@ -339,9 +284,6 @@ primTypeVt t = case tyConAppTyCon_maybe (unwrapType t) of
     | tc == unboxedUnitTyCon           -> VoidV -- Void#
     | otherwise                        -> PtrV  -- anything else must be some boxed thing
 
-argVt :: StgArg -> VarType
-argVt a = uTypeVt . stgArgType $ a
-
 dataConType :: DataCon -> Type
 dataConType dc = idType (dataConWrapId dc)
 
@@ -392,9 +334,6 @@ assocIdExprs i es = fmap (uncurry TypedExpr) (assocIdPrimReps i es)
 
 mkArityTag :: Int -> Int -> Int
 mkArityTag arity registers = arity Bits..|. (registers `Bits.shiftL` 8)
-
-toTypeList :: [VarType] -> [Int]
-toTypeList = concatMap (\x -> replicate (varSize x) (fromEnum x))
 
 --------------------------------------------------------------------------------
 --                        Stg Utils
@@ -467,10 +406,6 @@ collectIds unfloated b =
       | Just m <- nameModule_maybe (getName i) = m == gHC_PRIM
       | otherwise = False
 
-removeTick :: CgStgExpr -> CgStgExpr
-removeTick (StgTick _ e) = e
-removeTick e             = e
-
 -----------------------------------------------------
 -- Live vars
 --
@@ -483,11 +418,6 @@ liveStatic = filterDVarSet isGlobalId
 
 liveVars :: LiveVars -> LiveVars
 liveVars = filterDVarSet (not . isGlobalId)
-
-stgTopBindLive :: CgStgTopBinding -> [(Id, LiveVars)]
-stgTopBindLive = \case
-  StgTopLifted b     -> stgBindLive b
-  StgTopStringLit {} -> []
 
 stgBindLive :: CgStgBinding -> [(Id, LiveVars)]
 stgBindLive = \case
@@ -528,9 +458,6 @@ stgExprLive includeLHS = \case
 stgAltLive :: CgStgAlt -> LiveVars
 stgAltLive alt =
   delDVarSetList (stgExprLive True (alt_rhs alt)) (alt_bndrs alt)
-
-stgLetNoEscapeLive :: Bool -> StgBinding -> StgExpr -> LiveVars
-stgLetNoEscapeLive _someBool _b _e = panic "stgLetNoEscapeLive"
 
 bindees :: CgStgBinding -> [Id]
 bindees = \case

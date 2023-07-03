@@ -77,8 +77,9 @@ setObjInfoL debug obj rs layout t n a
           CILayoutFixed sz _ -> sz
         field_types = case layout of
           CILayoutVariable     -> []
-          CILayoutUnknown size -> toTypeList (replicate size ObjV)
-          CILayoutFixed _ fs   -> toTypeList fs
+          CILayoutUnknown size -> to_type_list (replicate size ObjV)
+          CILayoutFixed _ fs   -> to_type_list fs
+        to_type_list = concatMap (\x -> replicate (varSize x) (fromEnum x))
 
 setObjInfo :: Bool        -- ^ debug: output all symbol names
            -> Ident       -- ^ the thing to modify
@@ -241,3 +242,4 @@ varName :: Int -> Ident
 varName i
   | i < 0 || i > jsClosureCount = TxtI $ mkFastString ('x' : show i)
   | otherwise                   = varCache ! i
+
