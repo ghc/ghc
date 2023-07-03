@@ -2510,7 +2510,8 @@ fielddecl :: { LConDeclField GhcPs }
         : sig_vars '::' ctype
             {% acsA (\cs -> L (comb2 $1 $3)
                       (ConDeclField (EpAnn (glEE $1 $>) [mu AnnDcolon $2] cs)
-                                    (reverse (map (\ln@(L l n) -> L (l2l l) $ FieldOcc noExtField ln) (unLoc $1))) $3 Nothing))}
+                                    (reverse (map (\ln@(L l n)
+                                               -> L (fromTrailingN l) $ FieldOcc noExtField (L (noTrailingN l) n)) (unLoc $1))) $3 Nothing))}
 
 -- Reversed!
 maybe_derivings :: { Located (HsDeriving GhcPs) }
@@ -4578,5 +4579,11 @@ adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
 
 combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
+
+noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
+noTrailingN s = s { s_anns = (s_anns s) { nann_trailing = [] } }
+
+fromTrailingN :: SrcSpanAnnN -> SrcSpanAnnA
+fromTrailingN (EpAnnS anc ann cs) = EpAnnS anc (AnnListItem (nann_trailing ann)) cs
 
 }
