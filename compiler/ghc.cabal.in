@@ -619,6 +619,7 @@ Library
         GHC.Prelude
         GHC.Prelude.Basic
         GHC.Rename.Bind
+        GHC.Rename.Cps
         GHC.Rename.Doc
         GHC.Rename.Env
         GHC.Rename.Expr
