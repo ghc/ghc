@@ -349,7 +349,7 @@ warnUnusedTopBinds gres
     = whenWOptM Opt_WarnUnusedTopBinds
     $ do env <- getGblEnv
          let isBoot = isHsBootFile $ tcg_src env
-         let noParent gre = case gre_par gre of
+         let noParent gre = case greParent gre of
                             NoParent -> True
                             _        -> False
              -- Don't warn about unused bindings with parents in

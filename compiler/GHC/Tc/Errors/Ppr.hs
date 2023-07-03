@@ -654,9 +654,9 @@ instance Diagnostic TcRnMessage where
           fld = quotes $ ppr (occNameFS $ greOccName gre1)
           pprSugg gre = vcat [ bullet <+> pprGRE gre <> comma
                              , nest 2 (pprNameProvenance gre) ]
-          pprGRE gre = case gre_info gre of
+          pprGRE gre = case greInfo gre of
             IAmRecField {}
-              -> let parent = par_is $ gre_par gre
+              -> let parent = par_is $ greParent gre
                  in text "record field" <+> fld <+> text "of" <+> quotes (ppr parent)
             _ -> text "variable" <+> fld
     TcRnAmbiguousRecordUpdate _rupd tc
@@ -3294,7 +3294,7 @@ dodgy_msg kind tc ie
   where
     rest :: [SDoc]
     rest =
-      case gre_info tc of
+      case greInfo tc of
         IAmTyCon ClassFlavour
           -> [ text "(in-scope) class methods or associated types" <> comma
              , text "but it has none" ]
@@ -5467,7 +5467,7 @@ pprUnusedName name reason =
 -- See #15487
 pprAmbiguousGreName :: GlobalRdrEnv -> GlobalRdrElt -> SDoc
 pprAmbiguousGreName gre_env gre
-  | IAmRecField fld_info <- gre_info gre
+  | IAmRecField fld_info <- greInfo gre
   = sep [ text "the field" <+> quotes (ppr occ) <+> parent_info fld_info <> comma
         , pprNameProvenance gre ]
   | otherwise
@@ -5480,13 +5480,13 @@ pprAmbiguousGreName gre_env gre
       case first_con of
         PatSynName  ps -> text "of pattern synonym" <+> quotes (ppr ps)
         DataConName {} ->
-          case gre_par gre of
+          case greParent gre of
             ParentIs par
               -- For a data family, only reporting the family TyCon can be
               -- unhelpful (see T23301). So we give a bit of additional
               -- info in that case.
               | Just par_gre <- lookupGRE_Name gre_env par
-              , IAmTyCon tc_flav <- gre_info par_gre
+              , IAmTyCon tc_flav <- greInfo par_gre
               , OpenFamilyFlavour IAmData _ <- tc_flav
               -> vcat [ ppr_cons
                       , text "in a data family instance of" <+> quotes (ppr par) ]

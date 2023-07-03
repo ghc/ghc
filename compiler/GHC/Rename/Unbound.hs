@@ -213,7 +213,7 @@ fieldSelectorSuggestions global_env tried_rdr_name
   where
     gres = filter isNoFieldSelectorGRE
          $ lookupGRE_RdrName (IncludeFields WantField False) global_env tried_rdr_name
-    parents = [ parent | ParentIs parent <- map gre_par gres ]
+    parents = [ parent | ParentIs parent <- map greParent gres ]
 
 similarNameSuggestions :: LookingFor -> DynFlags
                        -> GlobalRdrEnv -> LocalRdrEnv

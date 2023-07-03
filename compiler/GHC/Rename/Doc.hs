@@ -39,9 +39,8 @@ rnHsDocIdentifiers :: GlobalRdrEnv
                    -> [Located RdrName]
                    -> [Located Name]
 rnHsDocIdentifiers gre_env ns =
-  [ L l nm
+  [ L l $ greName gre
   | L l rdr_name <- ns
   , gre <- lookupGRE_RdrName AllNameSpaces gre_env rdr_name
-  , let nm = greName gre
-  , rdrRelevantNameSpace rdr_name (nameNameSpace nm)
+  , rdrRelevantNameSpace rdr_name $ greNameSpace gre
   ]

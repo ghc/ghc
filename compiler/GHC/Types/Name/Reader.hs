@@ -67,7 +67,8 @@ module GHC.Types.Name.Reader (
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrEltX(..), GlobalRdrElt, IfGlobalRdrElt, FieldGlobalRdrElt,
-        greName, forceGlobalRdrEnv, hydrateGlobalRdrEnv,
+        greName, greNameSpace, greParent, greInfo,
+        forceGlobalRdrEnv, hydrateGlobalRdrEnv,
         isLocalGRE, isImportedGRE, isRecFldGRE,
         fieldGREInfo,
         isDuplicateRecFldGRE, isNoFieldSelectorGRE, isFieldSelectorGRE,
@@ -596,6 +597,15 @@ type FieldGlobalRdrElt = GlobalRdrElt
 greName :: GlobalRdrEltX info -> Name
 greName = gre_name
 
+greNameSpace :: GlobalRdrEltX info -> NameSpace
+greNameSpace = nameNameSpace . greName
+
+greParent :: GlobalRdrEltX info -> Parent
+greParent = gre_par
+
+greInfo :: GlobalRdrElt -> GREInfo
+greInfo = gre_info
+
 instance NFData IfGlobalRdrElt where
   rnf !_ = ()
 
@@ -1023,7 +1033,7 @@ fieldGRELabel = recFieldLabel . fieldGREInfo
 fieldGREInfo :: HasDebugCallStack => FieldGlobalRdrElt -> RecFieldInfo
 fieldGREInfo gre
   = assertPpr (isRecFldGRE gre) (ppr gre) $
-    case gre_info gre of
+    case greInfo gre of
       IAmRecField info -> info
       info -> pprPanic "fieldGREInfo" $
         vcat [ text "gre_name:" <+> ppr (greName gre)
@@ -1031,13 +1041,13 @@ fieldGREInfo gre
 
 recFieldConLike_maybe :: HasDebugCallStack => GlobalRdrElt -> Maybe ConInfo
 recFieldConLike_maybe gre =
-  case gre_info gre of
+  case greInfo gre of
     IAmConLike info -> Just info
     _               -> Nothing
 
 recFieldInfo_maybe :: HasDebugCallStack => GlobalRdrElt -> Maybe RecFieldInfo
 recFieldInfo_maybe gre =
-  case gre_info gre of
+  case greInfo gre of
     IAmRecField info -> assertPpr (isRecFldGRE gre) (ppr gre) $ Just info
     _                -> Nothing
 
