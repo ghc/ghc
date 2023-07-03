@@ -730,7 +730,7 @@ extendGlobalRdrEnvRn new_gres new_fixities
       where
         -- See Note [Reporting duplicate local declarations]
         dups = filter isBadDupGRE
-             $ lookupGRE_OccName (AllNameSpaces WantBoth) env (greOccName gre)
+             $ lookupGRE_OccName (IncludeFields WantBoth True) env (greOccName gre)
         isBadDupGRE old_gre = isLocalGRE old_gre && greClashesWith gre old_gre
 
 {- Note [Fail fast on duplicate definitions]

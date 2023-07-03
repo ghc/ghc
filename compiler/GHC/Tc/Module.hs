@@ -958,7 +958,7 @@ checkHiBootIface'
               = Just (gre, Nothing)
             matching_flds
               | isVarOcc missing_occ -- (This only applies to variables.)
-              = lookupGRE_OccName (IncludeFields WantField) gre_env missing_occ
+              = lookupGRE_OccName (IncludeFields WantField False) gre_env missing_occ
               | otherwise
               = []
 

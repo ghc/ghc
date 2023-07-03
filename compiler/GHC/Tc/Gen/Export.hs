@@ -683,16 +683,6 @@ lookupChildrenExport :: Name -> [LIEWrappedName GhcPs]
                      -> RnM ([(LIEWrappedName GhcRn, GlobalRdrElt)])
 lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
     where
-        -- Pick out the possible namespaces in order of priority
-        -- This is a consequence of how the parser parses all
-        -- data constructors as type constructors.
-        choosePossibleNamespaces :: NameSpace -> [NameSpace]
-        choosePossibleNamespaces ns
-          | ns == varName = [varName, tcName]
-            -- NB: for varName, we will also end up looking in the
-            -- record field namespaces.
-          | ns == tcName  = [dataName, tcName]
-          | otherwise = [ns]
         -- Process an individual child
         doOne :: LIEWrappedName GhcPs
               -> RnM (LIEWrappedName GhcRn, GlobalRdrElt)
@@ -700,11 +690,8 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
 
           let bareName = (ieWrappedName . unLoc) n
                 -- Do not report export list declaration deprecations
-              lkup v = lookupSubBndrOcc_helper False ExportDeprecationWarnings
-                        spec_parent (setRdrNameSpace bareName v)
-
-          name <-  combineChildLookupResult $ map lkup $
-                   choosePossibleNamespaces (rdrNameSpace bareName)
+          name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
+                        spec_parent bareName (childrenNameSpaces $ rdrNameSpace bareName)
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error
           -- messages
@@ -717,7 +704,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
             NameNotFound ->
               do { ub <- reportUnboundName unboundName
                  ; let l = getLoc n
-                       gre = mkLocalVanillaGRE NoParent ub
+                       gre = mkLocalGRE UnboundGRE NoParent ub
                  ; return (L l (IEName noExtField (L (la2na l) ub)), gre)}
             FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
               do { checkPatSynParent spec_parent par child_nm

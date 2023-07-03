@@ -50,3 +50,5 @@ test('BootFldReexport'
 test('T23220'
     , [req_th, extra_files(['T23220_aux.hs'])]
     , multimod_compile, ['T23220_aux.hs T23220.hs', '-v0'])
+
+test('T23279', [extra_files(['T23279_aux.hs'])], multimod_compile, ['T23279', '-v0'])

@@ -4624,10 +4624,10 @@ pp_rdr_with_type occ hole_ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hol
 pprScopeError :: RdrName -> NotInScopeError -> SDoc
 pprScopeError rdr_name scope_err =
   case scope_err of
-    NotInScope {} ->
+    NotInScope ->
       hang (text "Not in scope:")
         2 (what <+> quotes (ppr rdr_name))
-    NotARecordField {} ->
+    NotARecordField ->
       hang (text "Not in scope:")
         2 (text "record field" <+> quotes (ppr rdr_name))
     NoExactName name ->
