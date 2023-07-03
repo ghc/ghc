@@ -1530,7 +1530,7 @@ to a list of items, rather than a single item.
 mkChildEnv :: [GlobalRdrElt] -> NameEnv [GlobalRdrElt]
 mkChildEnv gres = foldr add emptyNameEnv gres
   where
-    add gre env = case gre_par gre of
+    add gre env = case greParent gre of
         ParentIs  p -> extendNameEnv_Acc (:) Utils.singleton env p gre
         NoParent    -> env
 

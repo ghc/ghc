@@ -261,7 +261,7 @@ rnExpr (HsVar _ (L l v))
            Nothing -> rnUnboundVar v ;
            Just gre ->
     do { let nm   = greName gre
-             info = gre_info gre
+             info = greInfo gre
        ; if | IAmRecField fld_info <- info
             -- Since GHC 9.4, such occurrences of record fields must be
             -- unambiguous. For ambiguous occurrences, we arbitrarily pick one

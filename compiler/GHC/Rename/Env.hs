@@ -755,24 +755,18 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name ns_prio
           case original_gres of
             []  -> return NameNotFound
             [g] -> return $ IncorrectParent parent g
-                              [p | Just p <- [getParent g]]
+                              [p | ParentIs p <- [greParent g]]
             gss@(g:gss'@(_:_)) ->
               if all isRecFldGRE gss && dup_fields_ok
               then return $
                     IncorrectParent parent g
-                      [p | x <- gss, Just p <- [getParent x]]
+                      [p | x <- gss, ParentIs p <- [greParent x]]
               else mkNameClashErr $ g NE.:| gss'
 
         mkNameClashErr :: NE.NonEmpty GlobalRdrElt -> RnM ChildLookupResult
         mkNameClashErr gres = do
           addNameClashErrRn rdr_name gres
           return (FoundChild (NE.head gres))
-
-        getParent :: GlobalRdrElt -> Maybe Name
-        getParent (GRE { gre_par = p } ) =
-          case p of
-            ParentIs cur_parent -> Just cur_parent
-            NoParent -> Nothing
 
         picked_gres :: [GlobalRdrElt] -> DisambigInfo
         -- For Unqual, find GREs that are in scope qualified or unqualified
@@ -888,7 +882,7 @@ data ChildLookupResult
 
 instance Outputable ChildLookupResult where
   ppr NameNotFound = text "NameNotFound"
-  ppr (FoundChild n) = text "Found:" <+> ppr (gre_par n) <+> ppr n
+  ppr (FoundChild n) = text "Found:" <+> ppr (greParent n) <+> ppr n
   ppr (IncorrectParent p g ns)
     = text "IncorrectParent"
       <+> hsep [ppr p, ppr $ greName g, ppr ns]
@@ -1894,7 +1888,7 @@ lookupImpDeclDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
 lookupImpDeclDeprec iface gre
   -- Bleat if the thing, or its parent, is warn'd
   = mi_decl_warn_fn (mi_final_exts iface) (greOccName gre) `mplus`
-    case gre_par gre of
+    case greParent gre of
        ParentIs p -> mi_decl_warn_fn (mi_final_exts iface) (nameOccName p)
        NoParent   -> Nothing
 
@@ -2236,7 +2230,7 @@ lookupBindGroupOcc ctxt what rdr_name ok_ns
 
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
-           ; let all_gres = filter (ok_ns . nameNameSpace . greName)
+           ; let all_gres = filter (ok_ns . greNameSpace)
                           $ lookupGRE_OccName AllNameSpaces env (rdrNameOcc rdr_name)
                  names_in_scope = -- If rdr_name lacks a binding, only
                                   -- recommend alternatives from relevant
