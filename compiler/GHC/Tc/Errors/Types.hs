@@ -4983,14 +4983,6 @@ data TcSolverReportMsg
   -- See 'HoleError'.
   | ReportHoleError Hole HoleError
 
-  -- | Trying to unify an untouchable variable, e.g. a variable from an outer scope.
-  --
-  -- Test case: Simple14
-  | UntouchableVariable
-    { untouchableTyVar :: TyVar
-    , untouchableTyVarImplication :: Implication
-    }
-
   -- | Cannot unify a variable, because of a type mismatch.
   | CannotUnifyVariable
     { mismatchMsg         :: MismatchMsg

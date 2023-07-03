@@ -306,7 +306,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "UserTypeError"                                 = 64725
   GhcDiagnosticCode "UnsatisfiableError"                            = 22250
   GhcDiagnosticCode "ReportHoleError"                               = 88464
-  GhcDiagnosticCode "UntouchableVariable"                           = 34699
   GhcDiagnosticCode "FixedRuntimeRepError"                          = 55287
   GhcDiagnosticCode "BlockedEquality"                               = 06200
   GhcDiagnosticCode "ExpectingMoreArguments"                        = 81325
@@ -851,6 +850,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = 39180
   GhcDiagnosticCode "PsErrUnexpectedTypeAppInDecl"                  = 45054
   GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634
+  GhcDiagnosticCode "UntouchableVariable"                           = 34699
 
 {- *********************************************************************
 *                                                                      *

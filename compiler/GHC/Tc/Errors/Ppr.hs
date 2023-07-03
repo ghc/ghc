@@ -21,6 +21,7 @@ module GHC.Tc.Errors.Ppr
   , inHsDocContext
   , TcRnMessageOpts(..)
   , pprTyThingUsedWrong
+  , pprUntouchableVariable
 
   -- | Useful when overriding message printing.
   , messageWithInfoDiagnosticMessage
@@ -3723,13 +3724,6 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
           = quotes (text "Levity")
           | otherwise
           = text "type"
-pprTcSolverReportMsg _ (UntouchableVariable tv implic)
-  | Implic { ic_given = given, ic_info = skol_info } <- implic
-  = sep [ quotes (ppr tv) <+> text "is untouchable"
-        , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
-        , nest 2 $ text "bound by" <+> ppr skol_info
-        , nest 2 $ text "at" <+>
-          ppr (getCtLocEnvLoc (ic_env implic)) ]
 pprTcSolverReportMsg _ (BlockedEquality item) =
   vcat [ hang (text "Cannot use equality for substitution:")
            2 (ppr (errorItemPred item))
@@ -4000,6 +3994,13 @@ pprCannotUnifyVariableReason ctxt (DifferentTyVars tv_info)
 pprCannotUnifyVariableReason ctxt (RepresentationalEq tv_info mb_coercible_msg)
   = pprTyVarInfo ctxt tv_info
   $$ maybe empty pprCoercibleMsg mb_coercible_msg
+
+pprUntouchableVariable :: TcTyVar -> Implication -> SDoc
+pprUntouchableVariable tv (Implic { ic_given = given, ic_info = skol_info, ic_env = env })
+  = sep [ quotes (ppr tv) <+> text "is untouchable"
+        , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
+        , nest 2 $ text "bound by" <+> ppr skol_info
+        , nest 2 $ text "at" <+> ppr (getCtLocEnvLoc env) ]
 
 pprMismatchMsg :: SolverReportErrCtxt -> MismatchMsg -> SDoc
 pprMismatchMsg ctxt
@@ -4483,8 +4484,10 @@ pprWhenMatching ctxt (WhenMatching cty1 cty2 sub_o mb_sub_t_or_k) =
         Right msg  -> pprMismatchMsg ctxt msg
 
 pprTyVarInfo :: SolverReportErrCtxt -> TyVarInfo -> SDoc
-pprTyVarInfo ctxt (TyVarInfo { thisTyVar = tv1, otherTy = mb_tv2 }) =
-  mk_msg tv1 $$ case mb_tv2 of { Nothing -> empty; Just tv2 -> mk_msg tv2 }
+pprTyVarInfo ctxt (TyVarInfo { thisTyVar = tv1, otherTy = mb_tv2, thisTyVarIsUntouchable = mb_implic })
+  = vcat [ mk_msg tv1
+         , maybe empty (pprUntouchableVariable tv1) mb_implic
+         , case mb_tv2 of { Nothing -> empty; Just tv2 -> mk_msg tv2 } ]
   where
     mk_msg tv = case tcTyVarDetails tv of
       SkolemTv sk_info _ _ -> pprSkols ctxt [(getSkolemInfo sk_info, [tv])]
