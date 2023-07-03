@@ -304,7 +304,7 @@ genSetConInfo i d l {- srt -} = do
   emitClosureInfo $ ClosureInfo ei
                                 (CIRegs 0 [PtrV])
                                 (mkFastString $ renderWithContext defaultSDocContext (ppr d))
-                                (fixedLayout $ map uTypeVt fields)
+                                (fixedLayout $ map unaryTypeJSRep fields)
                                 (CICon $ dataConTag d)
                                 sr
   return (mkDataEntry ei)
@@ -350,8 +350,8 @@ genToplevelRhs i rhs = case rhs of
           r <- updateThunk
           pure (StaticThunk (Just (eidt, map StaticObjArg lidents')), CIRegs 0 [PtrV],r)
         else return (StaticFun eidt (map StaticObjArg lidents'),
-                    (if null lidents then CIRegs 1 (concatMap idVt args)
-                                     else CIRegs 0 (PtrV : concatMap idVt args))
+                    (if null lidents then CIRegs 1 (concatMap idJSRep args)
+                                     else CIRegs 0 (PtrV : concatMap idJSRep args))
                       , mempty)
     setcc <- ifProfiling $
                if et == CIThunk
@@ -360,7 +360,7 @@ genToplevelRhs i rhs = case rhs of
     emitClosureInfo (ClosureInfo eid
                                  regs
                                  idt
-                                 (fixedLayout $ map (uTypeVt . idType) lids)
+                                 (fixedLayout $ map (unaryTypeJSRep . idType) lids)
                                  et
                                  sr)
     ccId <- costCentreStackLbl cc

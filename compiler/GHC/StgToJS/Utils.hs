@@ -10,16 +10,16 @@ module GHC.StgToJS.Utils
   , isUnboxableCon
   , isUnboxable
   , isBoolDataCon
-  -- * JsRep
+  -- * JSRep
   , slotCount
   , varSize
   , typeSize
   , isVoid
   , isMultiVar
-  , idVt
-  , typeVt
-  , uTypeVt
-  , primRepVt
+  , idJSRep
+  , typeJSRep
+  , unaryTypeJSRep
+  , primRepToJSRep
   , stackSlotType
   , primRepSize
   , mkArityTag
@@ -131,7 +131,7 @@ assignCoerce p1 p2 = assignTypedExprs [p1] [p2]
 isUnboxableCon :: DataCon -> Bool
 isUnboxableCon dc
   | [t] <- dataConRepArgTys dc
-  , [t1] <- typeVt (scaledThing t)
+  , [t1] <- typeJSRep (scaledThing t)
   = isUnboxable t1 &&
     dataConTag dc == 1 &&
     length (tyConDataCons $ dataConTyCon dc) == 1
@@ -139,7 +139,7 @@ isUnboxableCon dc
 
 -- | one-constructor types with one primitive field represented as a JS Number
 -- can be unboxed
-isUnboxable :: VarType -> Bool
+isUnboxable :: JSRep -> Bool
 isUnboxable DoubleV = True
 isUnboxable IntV    = True -- includes Char#
 isUnboxable _       = False
@@ -162,68 +162,68 @@ slotCount = \case
   TwoSlots -> 2
 
 
--- | Number of slots occupied by a value with the given VarType
-varSize :: VarType -> Int
-varSize = slotCount . varSlotCount
+-- | Number of slots occupied by a value with the given JSRep
+varSize :: JSRep -> Int
+varSize = slotCount . jsRepSlots
 
-varSlotCount :: VarType -> SlotCount
-varSlotCount VoidV = NoSlot
-varSlotCount LongV = TwoSlots -- hi, low
-varSlotCount AddrV = TwoSlots -- obj/array, offset
-varSlotCount _     = OneSlot
+jsRepSlots :: JSRep -> SlotCount
+jsRepSlots VoidV = NoSlot
+jsRepSlots LongV = TwoSlots -- hi, low
+jsRepSlots AddrV = TwoSlots -- obj/array, offset
+jsRepSlots _     = OneSlot
 
 typeSize :: Type -> Int
-typeSize t = sum . map varSize . typeVt $ t
+typeSize t = sum . map varSize . typeJSRep $ t
 
-isVoid :: VarType -> Bool
+isVoid :: JSRep -> Bool
 isVoid VoidV = True
 isVoid _     = False
 
-isMultiVar :: VarType -> Bool
-isMultiVar v = case varSlotCount v of
+isMultiVar :: JSRep -> Bool
+isMultiVar v = case jsRepSlots v of
   NoSlot   -> False
   OneSlot  -> False
   TwoSlots -> True
 
-idVt :: HasDebugCallStack => Id -> [VarType]
-idVt = typeVt . idType
+idJSRep :: HasDebugCallStack => Id -> [JSRep]
+idJSRep = typeJSRep . idType
 
-typeVt :: HasDebugCallStack => Type -> [VarType]
-typeVt t | isRuntimeRepKindedTy t = []
-typeVt t = map primRepVt (typePrimRep t)-- map uTypeVt (repTypeArgs t)
+typeJSRep :: HasDebugCallStack => Type -> [JSRep]
+typeJSRep t | isRuntimeRepKindedTy t = []
+typeJSRep t = map primRepToJSRep (typePrimRep t)-- map unaryTypeJSRep (repTypeArgs t)
 
 -- only use if you know it's not an unboxed tuple
-uTypeVt :: HasDebugCallStack => UnaryType -> VarType
-uTypeVt ut
+unaryTypeJSRep :: HasDebugCallStack => UnaryType -> JSRep
+unaryTypeJSRep ut
   | isRuntimeRepKindedTy ut = VoidV
 --  | isRuntimeRepTy ut = VoidV
   -- GHC panics on this otherwise
   | Just (tc, ty_args) <- splitTyConApp_maybe ut
   , length ty_args /= tyConArity tc = PtrV
-  | isPrimitiveType ut = (primTypeVt ut)
+  | isPrimitiveType ut = (primTypeJSRep ut)
   | otherwise          =
     case typePrimRep' ut of
       []   -> VoidV
-      [pt] -> primRepVt pt
-      _    -> pprPanic "uTypeVt: not unary" (ppr ut)
+      [pt] -> primRepToJSRep pt
+      _    -> pprPanic "unaryTypeJSRep: not unary" (ppr ut)
 
-primRepVt :: HasDebugCallStack => PrimRep -> VarType
-primRepVt VoidRep     = VoidV
-primRepVt (BoxedRep _) = PtrV -- fixme does ByteArray# ever map to this?
-primRepVt IntRep      = IntV
-primRepVt Int8Rep     = IntV
-primRepVt Int16Rep    = IntV
-primRepVt Int32Rep    = IntV
-primRepVt WordRep     = IntV
-primRepVt Word8Rep    = IntV
-primRepVt Word16Rep   = IntV
-primRepVt Word32Rep   = IntV
-primRepVt Int64Rep    = LongV
-primRepVt Word64Rep   = LongV
-primRepVt AddrRep     = AddrV
-primRepVt FloatRep    = DoubleV
-primRepVt DoubleRep   = DoubleV
-primRepVt (VecRep{})  = error "uTypeVt: vector types are unsupported"
+primRepToJSRep :: HasDebugCallStack => PrimRep -> JSRep
+primRepToJSRep VoidRep      = VoidV
+primRepToJSRep (BoxedRep _) = PtrV
+primRepToJSRep IntRep       = IntV
+primRepToJSRep Int8Rep      = IntV
+primRepToJSRep Int16Rep     = IntV
+primRepToJSRep Int32Rep     = IntV
+primRepToJSRep WordRep      = IntV
+primRepToJSRep Word8Rep     = IntV
+primRepToJSRep Word16Rep    = IntV
+primRepToJSRep Word32Rep    = IntV
+primRepToJSRep Int64Rep     = LongV
+primRepToJSRep Word64Rep    = LongV
+primRepToJSRep AddrRep      = AddrV
+primRepToJSRep FloatRep     = DoubleV
+primRepToJSRep DoubleRep    = DoubleV
+primRepToJSRep (VecRep{})   = error "unaryTypeJSRep: vector types are unsupported"
 
 typePrimRep' :: HasDebugCallStack => UnaryType -> [PrimRep]
 typePrimRep' ty = kindPrimRep' empty (typeKind ty)
@@ -240,9 +240,9 @@ kindPrimRep' doc (TyConApp _typ [runtime_rep])
 kindPrimRep' doc ki
   = pprPanic "kindPrimRep'" (ppr ki $$ doc)
 
-primTypeVt :: HasDebugCallStack => Type -> VarType
-primTypeVt t = case tyConAppTyCon_maybe (unwrapType t) of
-  Nothing -> error "primTypeVt: not a TyCon"
+primTypeJSRep :: HasDebugCallStack => Type -> JSRep
+primTypeJSRep t = case tyConAppTyCon_maybe (unwrapType t) of
+  Nothing -> error "primTypeJSRep: not a TyCon"
   Just tc
     | tc == charPrimTyCon              -> IntV
     | tc == intPrimTyCon               -> IntV
@@ -292,16 +292,16 @@ isBoolDataCon dc = isBoolTy (dataConType dc)
 
 -- standard fixed layout: payload types
 -- payload starts at .d1 for heap objects, entry closest to Sp for stack frames
-fixedLayout :: [VarType] -> CILayout
+fixedLayout :: [JSRep] -> CILayout
 fixedLayout vts = CILayoutFixed (sum (map varSize vts)) vts
 
 -- 2-var values might have been moved around separately, use DoubleV as substitute
 -- ObjV is 1 var, so this is no problem for implicit metadata
-stackSlotType :: Id -> VarType
+stackSlotType :: Id -> JSRep
 stackSlotType i
-  | OneSlot <- varSlotCount otype = otype
-  | otherwise                     = DoubleV
-  where otype = uTypeVt (idType i)
+  | OneSlot <- jsRepSlots otype = otype
+  | otherwise                   = DoubleV
+  where otype = unaryTypeJSRep (idType i)
 
 idPrimReps :: Id -> [PrimRep]
 idPrimReps = typePrimReps . idType
@@ -310,7 +310,7 @@ typePrimReps :: Type -> [PrimRep]
 typePrimReps = typePrimRep . unwrapType
 
 primRepSize :: PrimRep -> SlotCount
-primRepSize p = varSlotCount (primRepVt p)
+primRepSize p = jsRepSlots (primRepToJSRep p)
 
 -- | Associate the given values to each RrimRep in the given order, taking into
 -- account the number of slots per PrimRep

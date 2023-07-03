@@ -110,7 +110,7 @@ data ClosureInfo = ClosureInfo
 data CIRegs
   = CIRegsUnknown                     -- ^ A value witnessing a state of unknown registers
   | CIRegs { ciRegsSkip  :: Int       -- ^ unused registers before actual args start
-           , ciRegsTypes :: [VarType] -- ^ args
+           , ciRegsTypes :: [JSRep]   -- ^ args
            }
   deriving stock (Eq, Ord, Show)
 
@@ -122,7 +122,7 @@ data CILayout
       }
   | CILayoutFixed               -- ^ whole layout known
       { layoutSize :: !Int      -- ^ closure size in array positions, including entry
-      , layout     :: [VarType] -- ^ The set of sized Types to layout
+      , layout     :: [JSRep]   -- ^ The list of JSReps to layout
       }
   deriving stock (Eq, Ord, Show)
 
@@ -149,8 +149,8 @@ instance ToJExpr CIStatic where
   toJExpr (CIStaticRefs [])  = null_ -- [je| null |]
   toJExpr (CIStaticRefs rs)  = toJExpr (map TxtI rs)
 
--- | Free variable types
-data VarType
+-- | JS primitive representations
+data JSRep
   = PtrV     -- ^ pointer = reference to heap object (closure object), lifted or not.
              -- Can also be some RTS object (e.g. TVar#, MVar#, MutVar#, Weak#)
   | VoidV    -- ^ no fields
@@ -162,7 +162,7 @@ data VarType
   | ArrV     -- ^ boxed array
   deriving stock (Eq, Ord, Enum, Bounded, Show)
 
-instance ToJExpr VarType where
+instance ToJExpr JSRep where
   toJExpr = toJExpr . fromEnum
 
 -- | The type of identifiers. These determine the suffix of generated functions

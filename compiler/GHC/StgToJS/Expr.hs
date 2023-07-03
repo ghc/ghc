@@ -241,7 +241,7 @@ genEntryLne ctx i rhs@(StgRhsClosure _ext _cc update args body typ) =
   let f = (bh <> lvs <> body)
   emitClosureInfo $
     ClosureInfo ei
-                (CIRegs 0 $ concatMap idVt args)
+                (CIRegs 0 $ concatMap idJSRep args)
                 (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
                 (fixedLayout . reverse $
                     map (stackSlotType . fst) (ctxLneFrameVars ctx))
@@ -275,9 +275,9 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) =
                else enterCostCentreFun cc
   sr <- genStaticRefsRhs rhs
   emitClosureInfo $ ClosureInfo ei
-                                (CIRegs 0 $ PtrV : concatMap idVt args)
+                                (CIRegs 0 $ PtrV : concatMap idJSRep args)
                                 (eii <> ", " <> mkFastString (renderWithContext defaultSDocContext (ppr i)))
-                                (fixedLayout $ map (uTypeVt . idType) live)
+                                (fixedLayout $ map (unaryTypeJSRep . idType) live)
                                 et
                                 sr
   emitToplevel (jFunction ei [] (mconcat [ll, llv, upd, setcc, body]))
@@ -373,7 +373,7 @@ verifyRuntimeReps xs = do
   where
     verifyRuntimeRep i = do
       i' <- varsForId i
-      pure $ go i' (idVt i)
+      pure $ go i' (idJSRep i)
     go js         (VoidV:vs) = go js vs
     go (j1:j2:js) (LongV:vs) = v "h$verify_rep_long" [j1,j2] <> go js vs
     go (j1:j2:js) (AddrV:vs) = v "h$verify_rep_addr" [j1,j2] <> go js vs
@@ -491,11 +491,11 @@ optimizeFree
                        -- -- Bool: True when the slot already contains a value
 optimizeFree offset ids = do
   -- this line goes wrong                               vvvvvvv
-  let -- ids' = concat $ map (\i -> map (i,) [1..varSize . uTypeVt . idType $ i]) ids
+  let -- ids' = concat $ map (\i -> map (i,) [1..varSize . unaryTypeJSRep . idType $ i]) ids
       idSize :: Id -> Int
-      idSize i = sum $ map varSize (typeVt . idType $ i)
+      idSize i = sum $ map varSize (typeJSRep . idType $ i)
       ids' = concatMap (\i -> map (i,) [1..idSize i]) ids
-      -- 1..varSize] . uTypeVt . idType $ i]) (typeVt ids)
+      -- 1..varSize] . unaryTypeJSRep . idType $ i]) (typeJSRep ids)
       l    = length ids'
   slots <- drop offset . take l . (++repeat SlotUnknown) <$> getSlots
   let slm                = M.fromList (zip slots [0..])
@@ -630,10 +630,10 @@ genRet ctx e at as l = freshIdent >>= f
       return (pushLne <> saveCCS <> pushRet)
     fst3 ~(x,_,_)  = x
 
-    altRegs :: HasDebugCallStack => [VarType]
+    altRegs :: HasDebugCallStack => [JSRep]
     altRegs = case at of
-      PrimAlt ptc    -> [primRepVt ptc]
-      MultiValAlt _n -> idVt e
+      PrimAlt ptc    -> [primRepToJSRep ptc]
+      MultiValAlt _n -> idJSRep e
       _              -> [PtrV]
 
     -- special case for popping CCS but preserving stack size
@@ -690,7 +690,7 @@ genAlts ctx e at me alts = do
       -> do
         ie <- varsForId e
         (r, bss) <- normalizeBranches ctx <$>
-           mapM (isolateSlots . mkPrimIfBranch ctx [primRepVt tc]) alts
+           mapM (isolateSlots . mkPrimIfBranch ctx [primRepToJSRep tc]) alts
         setSlots []
         return (mkSw ie bss, r)
 
@@ -877,7 +877,7 @@ mkAlgBranch top d alt
 
 -- | Generate a primitive If-expression
 mkPrimIfBranch :: ExprCtx
-               -> [VarType]
+               -> [JSRep]
                -> CgStgAlt
                -> G (Branch (Maybe [JExpr]))
 mkPrimIfBranch top _vt alt =

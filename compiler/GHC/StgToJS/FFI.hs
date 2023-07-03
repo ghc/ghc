@@ -175,7 +175,7 @@ genFFIArg isJavaScriptCc a@(StgVarArg i)
    where
      tycon  = tyConAppTyCon (unwrapType arg_ty)
      arg_ty = stgArgType a
-     r      = uTypeVt arg_ty
+     r      = unaryTypeJSRep arg_ty
 
 saturateFFI :: Int -> JStat -> Sat.JStat
 saturateFFI u = satJStat (Just . mkFastString $ "ghcjs_ffi_sat_" ++ show u)

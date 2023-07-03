@@ -509,7 +509,7 @@ instance Binary JSFFIType where
   put_ bh = putEnum bh
   get bh = getEnum bh
 
-instance Binary VarType where
+instance Binary JSRep where
   put_ bh = putEnum bh
   get bh = getEnum bh
 

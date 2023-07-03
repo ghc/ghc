@@ -153,7 +153,7 @@ genApp ctx i args
     --  object representation
     --  - returns the object directly, otherwise
     | [] <- args
-    , [vt] <- idVt i
+    , [vt] <- idJSRep i
     , isUnboxable vt
     , ctxIsEvaluated ctx i
     = do

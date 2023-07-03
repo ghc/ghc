@@ -118,7 +118,7 @@ genStaticArg a = case a of
       Nothing -> reg
       Just expr -> unfloated expr
      where
-       r = uTypeVt . stgArgType $ a
+       r = unaryTypeJSRep . stgArgType $ a
        reg
          | isVoid r            =
              return []
@@ -159,8 +159,8 @@ genArg a = case a of
 
    where
      -- if our argument is a joinid, it can be an unboxed tuple
-     r :: HasDebugCallStack => VarType
-     r = uTypeVt . stgArgType $ a
+     r :: HasDebugCallStack => JSRep
+     r = unaryTypeJSRep . stgArgType $ a
 
      unfloated :: HasDebugCallStack => CgStgExpr -> G [JExpr]
      unfloated = \case
@@ -187,7 +187,7 @@ genIdArgI i
   | isMultiVar r = mapM (identForIdN i) [1..varSize r]
   | otherwise    = (:[]) <$> identForId i
   where
-    r = uTypeVt . idType $ i
+    r = unaryTypeJSRep . idType $ i
 
 -- | Generate IDs for stack arguments. See 'StgToJS.Expr.loadRetArgs' for use case
 genIdStackArgI :: HasDebugCallStack => Id -> G [(Ident,StackSlot)]
