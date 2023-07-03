@@ -832,11 +832,18 @@ mkGadtDecl loc names dcol ty = do
 
   let an = EpAnn (spanAsAnchor loc) annsa (cs Semi.<> csa)
 
+  let bndrs_loc = case outer_bndrs of
+        HsOuterImplicit{} -> getLoc ty
+        HsOuterExplicit an _ ->
+          case an of
+            EpAnnNotUsed -> getLoc ty
+            an' -> SrcSpanAnn (EpAnn (entry an') mempty emptyComments) (spanFromAnchor (entry an'))
+
   pure $ L l ConDeclGADT
                      { con_g_ext  = an
                      , con_names  = names
                      , con_dcolon = dcol
-                     , con_bndrs  = L (getLoc ty) outer_bndrs
+                     , con_bndrs  = L bndrs_loc outer_bndrs
                      , con_mb_cxt = mcxt
                      , con_g_args = args
                      , con_res_ty = res_ty

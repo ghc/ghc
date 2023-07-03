@@ -19,7 +19,7 @@ module GHC.Parser.Annotation (
   DeltaPos(..), deltaPos, getDeltaLine,
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
-  spanAsAnchor, realSpanAsAnchor,
+  spanAsAnchor, realSpanAsAnchor, spanFromAnchor,
   noAnn,
 
   -- ** Comments in Annotations
@@ -548,6 +548,9 @@ spanAsAnchor s  = Anchor (realSrcSpan s) UnchangedAnchor
 
 realSpanAsAnchor :: RealSrcSpan -> Anchor
 realSpanAsAnchor s  = Anchor s UnchangedAnchor
+
+spanFromAnchor :: Anchor -> SrcSpan
+spanFromAnchor a = RealSrcSpan (anchor a) Strict.Nothing
 
 -- ---------------------------------------------------------------------
 
