@@ -517,7 +517,7 @@ foreign import javascript unsafe "h$base_isatty"
     c_isatty :: CInt -> IO CInt
 foreign import javascript interruptible "h$base_lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
-foreign import javascript interruptible "h$base_lstat" -- fixme wrong type
+foreign import javascript interruptible "h$base_lstat"
    lstat :: CFilePath -> Ptr CStat -> IO CInt
 foreign import javascript interruptible "h$base_open"
    c_open :: CFilePath -> CInt -> CMode -> IO CInt

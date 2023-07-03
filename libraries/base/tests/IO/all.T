@@ -12,8 +12,7 @@ test('hClose001', [], compile_and_run, [''])
 test('hClose002', [normalise_win32_io_errors, js_broken(22261)], compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002',
-     [omit_ghci, # different output
-      js_broken(22261)],
+     [omit_ghci], # different output
      compile_and_run, [''])
 test('hFlush001', [], compile_and_run, [''])
 
@@ -71,12 +70,12 @@ test('misc001', [extra_run_opts('misc001.hs misc001.out')], compile_and_run,
 
 test('openFile001',  normal, compile_and_run, [''])
 test('openFile002',  [exit_code(1), normalise_win32_io_errors], compile_and_run, [''])
-test('openFile003', [normalise_win32_io_errors, js_broken(22362)], compile_and_run, [''])
+test('openFile003', normalise_win32_io_errors, compile_and_run, [''])
 test('openFile004', [], compile_and_run, [''])
 test('openFile005', js_broken(22261), compile_and_run, [''])
 test('openFile006', [], compile_and_run, [''])
 test('openFile007', js_broken(22261), compile_and_run, [''])
-test('openFile008', [js_broken(22349), cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
+test('openFile008', [cmd_prefix('ulimit -n 1024; ')], compile_and_run, [''])
 test('openFile009', [when(arch('wasm32'), fragile(23284))], compile_and_run, [''])
 
 test('putStr001',    normal, compile_and_run, [''])
