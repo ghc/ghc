@@ -59,8 +59,6 @@ import GHC.Stg.Syntax
 
 import GHC.Tc.Utils.TcType
 
-import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 import GHC.Builtin.PrimOps (PrimOp(SeqOp), primOpIsReallyInline)
 
@@ -189,23 +187,11 @@ idJSRep :: HasDebugCallStack => Id -> [JSRep]
 idJSRep = typeJSRep . idType
 
 typeJSRep :: HasDebugCallStack => Type -> [JSRep]
-typeJSRep t | isRuntimeRepKindedTy t = []
-typeJSRep t = map primRepToJSRep (typePrimRep t)-- map unaryTypeJSRep (repTypeArgs t)
+typeJSRep t = map primRepToJSRep (typePrimRep t)
 
 -- only use if you know it's not an unboxed tuple
 unaryTypeJSRep :: HasDebugCallStack => UnaryType -> JSRep
-unaryTypeJSRep ut
-  | isRuntimeRepKindedTy ut = VoidV
---  | isRuntimeRepTy ut = VoidV
-  -- GHC panics on this otherwise
-  | Just (tc, ty_args) <- splitTyConApp_maybe ut
-  , length ty_args /= tyConArity tc = PtrV
-  | isPrimitiveType ut = (primTypeJSRep ut)
-  | otherwise          =
-    case typePrimRep' ut of
-      []   -> VoidV
-      [pt] -> primRepToJSRep pt
-      _    -> pprPanic "unaryTypeJSRep: not unary" (ppr ut)
+unaryTypeJSRep ut = primRepToJSRep (typePrimRep1 ut)
 
 primRepToJSRep :: HasDebugCallStack => PrimRep -> JSRep
 primRepToJSRep VoidRep      = VoidV
@@ -223,66 +209,7 @@ primRepToJSRep Word64Rep    = LongV
 primRepToJSRep AddrRep      = AddrV
 primRepToJSRep FloatRep     = DoubleV
 primRepToJSRep DoubleRep    = DoubleV
-primRepToJSRep (VecRep{})   = error "unaryTypeJSRep: vector types are unsupported"
-
-typePrimRep' :: HasDebugCallStack => UnaryType -> [PrimRep]
-typePrimRep' ty = kindPrimRep' empty (typeKind ty)
-
--- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
--- of values of types of this kind.
-kindPrimRep' :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
-kindPrimRep' doc ki
-  | Just ki' <- coreView ki
-  = kindPrimRep' doc ki'
-kindPrimRep' doc (TyConApp _typ [runtime_rep])
-  = -- ASSERT( typ `hasKey` tYPETyConKey )
-    runtimeRepPrimRep doc runtime_rep
-kindPrimRep' doc ki
-  = pprPanic "kindPrimRep'" (ppr ki $$ doc)
-
-primTypeJSRep :: HasDebugCallStack => Type -> JSRep
-primTypeJSRep t = case tyConAppTyCon_maybe (unwrapType t) of
-  Nothing -> error "primTypeJSRep: not a TyCon"
-  Just tc
-    | tc == charPrimTyCon              -> IntV
-    | tc == intPrimTyCon               -> IntV
-    | tc == wordPrimTyCon              -> IntV
-    | tc == floatPrimTyCon             -> DoubleV
-    | tc == doublePrimTyCon            -> DoubleV
-    | tc == int8PrimTyCon              -> IntV
-    | tc == word8PrimTyCon             -> IntV
-    | tc == int16PrimTyCon             -> IntV
-    | tc == word16PrimTyCon            -> IntV
-    | tc == int32PrimTyCon             -> IntV
-    | tc == word32PrimTyCon            -> IntV
-    | tc == int64PrimTyCon             -> LongV
-    | tc == word64PrimTyCon            -> LongV
-    | tc == addrPrimTyCon              -> AddrV
-    | tc == stablePtrPrimTyCon         -> AddrV
-    | tc == stableNamePrimTyCon        -> PtrV
-    | tc == statePrimTyCon             -> VoidV
-    | tc == proxyPrimTyCon             -> VoidV
-    | tc == realWorldTyCon             -> VoidV
-    | tc == threadIdPrimTyCon          -> PtrV
-    | tc == weakPrimTyCon              -> PtrV
-    | tc == arrayPrimTyCon             -> ArrV
-    | tc == smallArrayPrimTyCon        -> ArrV
-    | tc == byteArrayPrimTyCon         -> ObjV -- can contain any JS reference, used for JSVal
-    | tc == mutableArrayPrimTyCon      -> ArrV
-    | tc == smallMutableArrayPrimTyCon -> ArrV
-    | tc == mutableByteArrayPrimTyCon  -> ObjV -- can contain any JS reference, used for JSVal
-    | tc == mutVarPrimTyCon            -> PtrV
-    | tc == mVarPrimTyCon              -> PtrV
-    | tc == tVarPrimTyCon              -> PtrV
-    | tc == bcoPrimTyCon               -> PtrV -- unsupported?
-    | tc == stackSnapshotPrimTyCon     -> PtrV
-    | tc == ioPortPrimTyCon            -> PtrV -- unsupported?
-    | tc == anyTyCon                   -> PtrV
-    | tc == compactPrimTyCon           -> PtrV -- unsupported?
-    | tc == eqPrimTyCon                -> VoidV -- coercion token?
-    | tc == eqReprPrimTyCon            -> VoidV -- role
-    | tc == unboxedUnitTyCon           -> VoidV -- Void#
-    | otherwise                        -> PtrV  -- anything else must be some boxed thing
+primRepToJSRep (VecRep{})   = error "primRepToJSRep: vector types are unsupported"
 
 dataConType :: DataCon -> Type
 dataConType dc = idType (dataConWrapId dc)

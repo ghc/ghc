@@ -285,15 +285,12 @@ genEntry ctx i rhs@(StgRhsClosure _ext cc {-_bi live-} upd_flag args body typ) =
     entryCtx = ctxSetTarget [] (ctxClearLneFrame ctx)
 
 -- | Generate the entry function types for identifiers. Note that this only
--- returns either 'CIThunk' or 'CIFun'. Everything else (PAP Blackhole etc.) is
--- filtered as not a RuntimeRepKinded type.
+-- returns either 'CIThunk' or 'CIFun'.
 genEntryType :: HasDebugCallStack => [Id] -> G CIType
 genEntryType []   = return CIThunk
-genEntryType args0 = do
+genEntryType args = do
   args' <- mapM genIdArg args
   return $ CIFun (length args) (length $ concat args')
-  where
-    args = filter (not . isRuntimeRepKindedTy . idType) args0
 
 -- | Generate the body of an object
 genBody :: HasDebugCallStack
