@@ -1085,26 +1085,28 @@ data WhichGREs info where
   -- | Look for this specific 'OccName', with the exact same 'NameSpace',
   -- in the 'GlobalRdrEnv'.
   SameOccName :: WhichGREs info
-  -- | If the 'OccName' is a variable, also look up in the record field namespaces.
-  --
-  -- Used to look up variables which might refer to record fields.
+  -- | Look for variables in record field namespaces, and look for
+  -- record fields in variable namespaces, depending on the arguments.
   IncludeFields :: FieldsOrSelectors
-       -- ^ - Should we include record fields defined with @-XNoFieldSelectors@?
+       -- ^ How should we handle variables?
+       --
+       --   - Should we include record fields defined with @-XNoFieldSelectors@?
        --   - Should we include non-fields?
        --
        -- See Note [NoFieldSelectors].
+                -> Bool
+       -- ^ For fields, should we also look up variables?
                 -> WhichGREs GREInfo
-  -- | Like @'IncludeFields'@, but if the 'OccName' is a field,
-  -- also look up in the variable namespace.
-  --
-  -- Used to check if there are name clashes.
-  AllNameSpaces :: FieldsOrSelectors -> WhichGREs GREInfo
+  -- | Look up in all 'NameSpace's.
+  AllNameSpaces :: WhichGREs info
 
 -- | Look for this 'OccName' in the global environment.
 --
 -- The 'WhichGREs' argument specifies which 'GlobalRdrElt's we are interested in.
 lookupGRE_OccName :: WhichGREs info -> GlobalRdrEnvX info -> OccName -> [GlobalRdrEltX info]
 lookupGRE_OccName what env occ
+  | AllNameSpaces <- what
+  = concat $ lookupOccEnv_AllNameSpaces env occ
   -- If the 'RdrName' is a variable, we might also need
   -- to look up in the record field namespaces.
   | isVarOcc occ
@@ -1114,16 +1116,15 @@ lookupGRE_OccName what env occ
   -- the variable namespace too.
   | isFieldOcc occ
   , Just flds <- mb_flds
-  = flds ++ case what of { AllNameSpaces {} -> vars; _ -> [] }
+  = flds ++ case what of { IncludeFields _ True -> vars; _ -> [] }
   | otherwise
   = normal
 
   where
     mb_flds =
       case what of
-        IncludeFields fos -> Just $ filterFieldGREs fos $ concat $ lookupFieldsOccEnv env (occNameFS occ)
-        AllNameSpaces fos -> Just $ filterFieldGREs fos $ concat $ lookupFieldsOccEnv env (occNameFS occ)
-        SameOccName       -> Nothing
+        IncludeFields fos _ -> Just $ filterFieldGREs fos $ concat $ lookupFieldsOccEnv env (occNameFS occ)
+        _                   -> Nothing
 
     normal   = fromMaybe [] $ lookupOccEnv env occ
     vars     = fromMaybe [] $ lookupOccEnv env (recFieldToVarOcc occ)

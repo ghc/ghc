@@ -89,7 +89,8 @@ module GHC.Types.Name.Occurrence (
         OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv,
         mapOccEnv, strictMapOccEnv,
         mapMaybeOccEnv,
-        lookupOccEnv, lookupOccEnv_WithFields, lookupFieldsOccEnv,
+        lookupOccEnv, lookupOccEnv_AllNameSpaces,
+        lookupOccEnv_WithFields, lookupFieldsOccEnv,
         mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
         nonDetOccEnvElts, nonDetFoldOccEnv,
         plusOccEnv, plusOccEnv_C,
@@ -613,6 +614,13 @@ lookupOccEnv :: OccEnv a -> OccName -> Maybe a
 lookupOccEnv (MkOccEnv as) (OccName ns s)
   = do { m <- lookupFsEnv as s
        ; lookupUFM m ns }
+
+-- | Lookup an element in an 'OccEnv', ignoring 'NameSpace's entirely.
+lookupOccEnv_AllNameSpaces :: OccEnv a -> OccName -> [a]
+lookupOccEnv_AllNameSpaces (MkOccEnv as) (OccName _ s)
+  = case lookupFsEnv as s of
+      Nothing -> []
+      Just r  -> nonDetEltsUFM r
 
 -- | Lookup an element in an 'OccEnv', looking in the record field
 -- namespace for a variable.

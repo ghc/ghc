@@ -38,8 +38,10 @@ rnHsDoc (WithHsDocIdentifiers s ids) = do
 rnHsDocIdentifiers :: GlobalRdrEnv
                    -> [Located RdrName]
                    -> [Located Name]
-rnHsDocIdentifiers gre_env ns = concat
-  [ map (L l . greName) (lookupGRE_RdrName (IncludeFields WantNormal) gre_env c)
+rnHsDocIdentifiers gre_env ns =
+  [ L l nm
   | L l rdr_name <- ns
-  , c <- dataTcOccs rdr_name
+  , gre <- lookupGRE_RdrName AllNameSpaces gre_env rdr_name
+  , let nm = greName gre
+  , rdrRelevantNameSpace rdr_name (nameNameSpace nm)
   ]

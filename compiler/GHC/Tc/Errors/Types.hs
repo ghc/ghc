@@ -5284,10 +5284,9 @@ data NotInScopeError
   -- | A run-of-the-mill @"not in scope"@ error.
   = NotInScope
 
-  -- | Something used in record syntax, but it isn't a record field.
+  -- | Like 'NotInScope', but when we know we are looking for a
+  -- record field.
   | NotARecordField
-    -- TODO: this could be folded into NotInScope were there
-    -- a separate namespace for record fields.
 
   -- | An exact 'Name' was not in scope.
   --

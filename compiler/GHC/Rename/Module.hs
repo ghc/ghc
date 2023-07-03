@@ -287,7 +287,10 @@ rnSrcWarnDecls bndr_set decls'
      = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
                                 rdr_names
           ; txt' <- rnWarningTxt txt
-          ; return [(rdrNameOcc rdr, txt') | (rdr, _) <- names] }
+          ; return [(nameOccName nm, txt') | (_, nm) <- names] }
+  -- Use the OccName from the Name we looked up, rather than from the RdrName,
+  -- as we might hit multiple different NameSpaces when looking up
+  -- (e.g. deprecating both a variable and a record field).
 
    what = text "deprecation"
 

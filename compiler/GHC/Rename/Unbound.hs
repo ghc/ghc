@@ -105,10 +105,10 @@ mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
 mkUnboundGRE :: OccName -> GlobalRdrElt
-mkUnboundGRE occ = mkLocalVanillaGRE NoParent $ mkUnboundName occ
+mkUnboundGRE occ = mkLocalGRE UnboundGRE NoParent $ mkUnboundName occ
 
 mkUnboundGRERdr :: RdrName -> GlobalRdrElt
-mkUnboundGRERdr rdr = mkLocalVanillaGRE NoParent $ mkUnboundNameRdr rdr
+mkUnboundGRERdr rdr = mkLocalGRE UnboundGRE NoParent $ mkUnboundNameRdr rdr
 
 reportUnboundName' :: WhatLooking -> RdrName -> RnM Name
 reportUnboundName' what_look rdr = unboundName (LF what_look WL_Anywhere) rdr
@@ -212,7 +212,7 @@ fieldSelectorSuggestions global_env tried_rdr_name
   | otherwise = [RemindFieldSelectorSuppressed tried_rdr_name parents]
   where
     gres = filter isNoFieldSelectorGRE
-         $ lookupGRE_RdrName (IncludeFields WantField) global_env tried_rdr_name
+         $ lookupGRE_RdrName (IncludeFields WantField False) global_env tried_rdr_name
     parents = [ parent | ParentIs parent <- map gre_par gres ]
 
 similarNameSuggestions :: LookingFor -> DynFlags
@@ -355,7 +355,7 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
             = any (isGreOk looking_for) $
-              lookupGRE_OccName (AllNameSpaces WantNormal) (imv_all_exports imv) occ_name
+              lookupGRE_OccName (IncludeFields WantNormal True) (imv_all_exports imv) occ_name
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list

@@ -113,6 +113,8 @@ Search for references to this note in the code for illustration.
 data GREInfo
       -- | No particular information... e.g. a function
     = Vanilla
+      -- | An unbound GRE... could be anything
+    | UnboundGRE
       -- | 'TyCon'
     | IAmTyCon    !(TyConFlavour Name)
       -- | 'ConLike'
@@ -126,12 +128,14 @@ data GREInfo
 
 instance NFData GREInfo where
   rnf Vanilla = ()
+  rnf UnboundGRE = ()
   rnf (IAmTyCon tc) = rnf tc
   rnf (IAmConLike info) = rnf info
   rnf (IAmRecField info) = rnf info
 
 plusGREInfo :: GREInfo -> GREInfo -> GREInfo
 plusGREInfo Vanilla Vanilla = Vanilla
+plusGREInfo UnboundGRE UnboundGRE = UnboundGRE
 plusGREInfo (IAmTyCon {})    info2@(IAmTyCon {}) = info2
 plusGREInfo (IAmConLike {})  info2@(IAmConLike {}) = info2
 plusGREInfo (IAmRecField {}) info2@(IAmRecField {}) = info2
@@ -141,6 +145,7 @@ plusGREInfo info1 info2 = pprPanic "plusInfo" $
 
 instance Outputable GREInfo where
   ppr Vanilla = text "Vanilla"
+  ppr UnboundGRE = text "UnboundGRE"
   ppr (IAmTyCon flav)
     = text "TyCon" <+> ppr flav
   ppr (IAmConLike info)
