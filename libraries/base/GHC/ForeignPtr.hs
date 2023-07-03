@@ -228,7 +228,7 @@ instance Show (ForeignPtr a) where
 -- finalisation time, gets as an argument a plain pointer variant of the
 -- foreign pointer that the finalizer is associated with.
 --
--- Note that the foreign function /must/ use the @ccall@ calling convention.
+-- Note that the foreign function /must/ either use the @ccall@ or the @capi@ calling convention.
 --
 type FinalizerPtr a        = FunPtr (Ptr a -> IO ())
 type FinalizerEnvPtr env a = FunPtr (Ptr env -> Ptr a -> IO ())
