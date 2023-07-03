@@ -1096,7 +1096,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       HsUnboundVar _ _ -> []  -- there is an unbound name here, but that causes trouble
       HsRecSel _ fld ->
-        [ toHie $ RFC RecFieldOcc Nothing (L (l2l mspan:: SrcAnn NoEpAnns) fld)
+        [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
         ]
       HsOverLabel {} -> []
       HsIPVar _ _ -> []
@@ -1367,14 +1367,15 @@ instance ( ToHie (RFContext label)
       , toHie expr
       ]
 
-instance HiePass p => ToHie (RFContext (LocatedAn NoEpAnns (FieldOcc (GhcPass p)))) where
+instance HiePass p => ToHie (RFContext (LocatedA (FieldOcc (GhcPass p)))) where
   toHie (RFC c rhs (L nspan f)) = concatM $ case f of
     FieldOcc fld _ ->
       case hiePass @p of
         HieRn -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
         HieTc -> [toHie $ C (RecField c rhs) (L (locA nspan) fld)]
 
-instance HiePass p => ToHie (RFContext (LocatedAn NoEpAnns (AmbiguousFieldOcc (GhcPass p)))) where
+instance HiePass p => ToHie (RFContext (LocatedA (AmbiguousFieldOcc (GhcPass p)))) where
+
   toHie (RFC c rhs (L nspan afo)) = concatM $ case afo of
     Unambiguous fld _ ->
       case hiePass @p of

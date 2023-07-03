@@ -376,10 +376,13 @@ mkHsIsString src s  = OverLit noExtField (HsIsString   src s)
 mkHsDo     ctxt stmts      = HsDo noAnn ctxt stmts
 mkHsDoAnns ctxt stmts anns = HsDo anns  ctxt stmts
 mkHsComp ctxt stmts expr = mkHsCompAnns ctxt stmts expr noAnn
-mkHsCompAnns ctxt stmts expr anns = mkHsDoAnns ctxt (mkLocatedList (stmts ++ [last_stmt])) anns
+mkHsCompAnns ctxt stmts expr@(L l e) anns = mkHsDoAnns ctxt (L loc (stmts ++ [last_stmt])) anns
   where
-    -- Strip the annotations from the location, they are in the embedded expr
-    last_stmt = L (noAnnSrcSpan $ getLocA expr) $ mkLastStmt expr
+    -- Move the annotations to the top of the last_stmt
+    last = mkLastStmt (L (noAnnSrcSpan $ getLocA expr) e)
+    last_stmt = L l last
+    -- last_stmt actually comes first in a list comprehension, consider all spans
+    loc  = noAnnSrcSpan $ getHasLocList (last_stmt:stmts)
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn AnnsIf

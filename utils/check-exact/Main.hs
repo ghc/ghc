@@ -91,7 +91,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002a.hs" Nothing
- -- "../../testsuite/tests/printer/Ppr003.hs" Nothing
+ "../../testsuite/tests/printer/Ppr003.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr004.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr005.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr006.hs" Nothing
@@ -110,7 +110,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Ppr020.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr021.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr022.hs" Nothing
- "../../testsuite/tests/printer/Ppr023.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr023.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr024.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr025.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr026.hs" Nothing
