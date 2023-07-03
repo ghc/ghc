@@ -380,8 +380,7 @@ The splice will evaluate to (MkAge 3) and you can't add that to
 -- Code constructor
 #if __GLASGOW_HASKELL__ >= 909
 type Code :: (Kind.Type -> Kind.Type) -> forall r. TYPE r -> Kind.Type
-  -- The nested `forall` makes it possible to assign the arity of 0 to
-  --   type CodeQ = Code Q
+  -- See Note [Foralls to the right in Code]
 #else
 type Code :: (Kind.Type -> Kind.Type) -> TYPE r -> Kind.Type
 #endif
@@ -423,6 +422,23 @@ newtype Code m a = Code
 --       In the expression: [|| "foo" ||]
 --       In the Template Haskell splice $$([|| "foo" ||])
 
+
+{- Note [Foralls to the right in Code]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Code has the following type signature:
+   type Code :: (Kind.Type -> Kind.Type) -> forall r. TYPE r -> Kind.Type
+
+This allows us to write
+   data T (f :: forall r . (TYPE r) -> Type) = MkT (f Int) (f Int#)
+
+   tcodeq :: T (Code Q)
+   tcodeq = MkT [||5||] [||5#||]
+
+If we used the slightly more straightforward signature
+   type Code :: foral r. (Kind.Type -> Kind.Type) -> TYPE r -> Kind.Type
+
+then the example above would become ill-typed.  (See #23592 for some discussion.)
+-}
 
 -- | Unsafely convert an untyped code representation into a typed code
 -- representation.
