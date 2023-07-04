@@ -2,6 +2,9 @@
 -- Copyright: Edward Kmett, Oleg Grenrus
 -- License: BSD-3-Clause
 --
+-- A class of non-empty data structures that can be folded to a summary value.
+--
+-- @since 4.18.0.0
 
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -12,7 +15,6 @@
 {-# LANGUAGE Trustworthy                #-}
 {-# LANGUAGE TypeOperators              #-}
 
--- | A class of non-empty data structures that can be folded to a summary value.
 module Data.Foldable1 (
     Foldable1(..),
     foldr1, foldr1',
@@ -65,6 +67,8 @@ import Data.Coerce (Coercible, coerce)
 -------------------------------------------------------------------------------
 
 -- | Non-empty data structures that can be folded.
+--
+-- @since 4.18.0.0
 class Foldable t => Foldable1 t where
     {-# MINIMAL foldMap1 | foldrMap1 #-}
 
@@ -83,6 +87,7 @@ class Foldable t => Foldable1 t where
     --     foldrMap1 f g = foldrMap1 f g . toNonEmpty
 
     -- | Combine the elements of a structure using a semigroup.
+    -- @since 4.18.0.0
     fold1 :: Semigroup m => t m -> m
     fold1 = foldMap1 id
 
@@ -92,6 +97,7 @@ class Foldable t => Foldable1 t where
     -- >>> foldMap1 Sum (1 :| [2, 3, 4])
     -- Sum {getSum = 10}
     --
+    -- @since 4.18.0.0
     foldMap1 :: Semigroup m => (a -> m) -> t a -> m
     foldMap1 f = foldrMap1 f (\a m -> f a <> m)
 
@@ -100,6 +106,7 @@ class Foldable t => Foldable1 t where
     -- >>> foldMap1' Sum (1 :| [2, 3, 4])
     -- Sum {getSum = 10}
     --
+    -- @since 4.18.0.0
     foldMap1' :: Semigroup m => (a -> m) -> t a -> m
     foldMap1' f = foldlMap1' f (\m a -> m <> f a)
 
@@ -108,6 +115,7 @@ class Foldable t => Foldable1 t where
     -- >>> toNonEmpty (Identity 2)
     -- 2 :| []
     --
+    -- @since 4.18.0.0
     toNonEmpty :: t a -> NonEmpty a
     toNonEmpty = runNonEmptyDList . foldMap1 singleton
 
@@ -116,6 +124,7 @@ class Foldable t => Foldable1 t where
     -- >>> maximum (32 :| [64, 8, 128, 16])
     -- 128
     --
+    -- @since 4.18.0.0
     maximum :: Ord a => t a -> a
     maximum = getMax #. foldMap1' Max
 
@@ -124,6 +133,7 @@ class Foldable t => Foldable1 t where
     -- >>> minimum (32 :| [64, 8, 128, 16])
     -- 8
     --
+    -- @since 4.18.0.0
     minimum :: Ord a => t a -> a
     minimum = getMin #. foldMap1' Min
 
@@ -132,6 +142,7 @@ class Foldable t => Foldable1 t where
     -- >>> head (1 :| [2, 3, 4])
     -- 1
     --
+    -- @since 4.18.0.0
     head :: t a -> a
     head = getFirst #. foldMap1 First
 
@@ -140,10 +151,12 @@ class Foldable t => Foldable1 t where
     -- >>> last (1 :| [2, 3, 4])
     -- 4
     --
+    -- @since 4.18.0.0
     last :: t a -> a
     last = getLast #. foldMap1 Last
 
     -- | Generalized 'foldr1'.
+    -- @since 4.18.0.0
     foldrMap1 :: (a -> b) -> (a -> b -> b) -> t a -> b
     foldrMap1 f g xs =
         appFromMaybe (foldMap1 (FromMaybe #. h) xs) Nothing
@@ -152,6 +165,7 @@ class Foldable t => Foldable1 t where
         h a (Just b) = g a b
 
     -- | Generalized 'foldl1''.
+    -- @since 4.18.0.0
     foldlMap1' :: (a -> b) -> (b -> a -> b) -> t a -> b
     foldlMap1' f g xs =
         foldrMap1 f' g' xs SNothing
@@ -165,6 +179,7 @@ class Foldable t => Foldable1 t where
         g' a x (SJust b) = x $! SJust (g b a)
 
     -- | Generalized 'foldl1'.
+    -- @since 4.18.0.0
     foldlMap1 :: (a -> b) -> (b -> a -> b) -> t a -> b
     foldlMap1 f g xs =
         appFromMaybe (getDual (foldMap1 ((Dual . FromMaybe) #. h) xs)) Nothing
@@ -173,6 +188,7 @@ class Foldable t => Foldable1 t where
         h a (Just b) = g b a
 
     -- | Generalized 'foldr1''.
+    -- @since 4.18.0.0
     foldrMap1' :: (a -> b) -> (a -> b -> b) -> t a -> b
     foldrMap1' f g xs =
         foldlMap1 f' g' xs SNothing
@@ -204,6 +220,7 @@ class Foldable t => Foldable1 t where
 --
 -- @foldr1 f = foldr1 f . 'toNonEmpty'@
 --
+-- @since 4.18.0.0
 foldr1 :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldr1 = foldrMap1 id
 {-# INLINE foldr1 #-}
@@ -211,6 +228,7 @@ foldr1 = foldrMap1 id
 -- | Right-associative fold of a structure, but with strict application of
 -- the operator.
 --
+-- @since 4.18.0.0
 foldr1' :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldr1' = foldrMap1' id
 {-# INLINE foldr1' #-}
@@ -239,6 +257,7 @@ foldr1' = foldrMap1' id
 --
 -- @foldl1 f z = foldl1 f . 'toNonEmpty'@
 --
+-- @since 4.18.0.0
 foldl1 :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldl1 = foldlMap1 id
 {-# INLINE foldl1 #-}
@@ -256,6 +275,7 @@ foldl1 = foldlMap1 id
 --
 -- @foldl1' f z = foldl1 f . 'toNonEmpty'@
 --
+-- @since 4.18.0.0
 foldl1' :: Foldable1 t => (a -> a -> a) -> t a -> a
 foldl1' = foldlMap1' id
 {-# INLINE foldl1' #-}
@@ -271,6 +291,7 @@ foldl1' = foldlMap1' id
 -- >>> intercalate1 mempty $ "I" :| ["Am", "Fine", "You?"]
 -- "IAmFineYou?"
 --
+-- @since 4.18.0.0
 intercalate1 :: (Foldable1 t, Semigroup m) => m -> t m -> m
 intercalate1 = flip intercalateMap1 id
 
@@ -279,10 +300,14 @@ intercalateMap1 j f = flip joinee j . foldMap1 (JoinWith . const . f)
 
 -- | Monadic fold over the elements of a non-empty structure,
 -- associating to the right, i.e. from right to left.
+--
+-- @since 4.18.0.0
 foldrM1 :: (Foldable1 t, Monad m) => (a -> a -> m a) -> t a -> m a
 foldrM1 = foldrMapM1 return
 
 -- | Map variant of 'foldrM1'.
+--
+-- @since 4.18.0.0
 foldrMapM1 :: (Foldable1 t, Monad m) => (a -> m b) -> (a -> b -> m b) -> t a -> m b
 foldrMapM1 g f = go . toNonEmpty
   where
@@ -293,16 +318,22 @@ foldrMapM1 g f = go . toNonEmpty
 
 -- | Monadic fold over the elements of a non-empty structure,
 -- associating to the left, i.e. from left to right.
+--
+-- @since 4.18.0.0
 foldlM1 :: (Foldable1 t, Monad m) => (a -> a -> m a) -> t a -> m a
 foldlM1 = foldlMapM1 return
 
 -- | Map variant of 'foldlM1'.
+--
+-- @since 4.18.0.0
 foldlMapM1 :: (Foldable1 t, Monad m) => (a -> m b) -> (b -> a -> m b) -> t a -> m b
 foldlMapM1 g f t = g x >>= \y -> foldlM f y xs
   where x:|xs = toNonEmpty t
 
 -- | The largest element of a non-empty structure with respect to the
 -- given comparison function.
+--
+-- @since 4.18.0.0
 maximumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a
 maximumBy cmp = foldl1' max'
   where max' x y = case cmp x y of
@@ -311,6 +342,8 @@ maximumBy cmp = foldl1' max'
 
 -- | The least element of a non-empty structure with respect to the
 -- given comparison function.
+--
+-- @since 4.18.0.0
 minimumBy :: Foldable1 t => (a -> a -> Ordering) -> t a -> a
 minimumBy cmp = foldl1' min'
   where min' x y = case cmp x y of
@@ -356,6 +389,7 @@ instance Semigroup a => Semigroup (JoinWith a) where
 -- Instances for misc base types
 -------------------------------------------------------------------------------
 
+-- | @since 4.18.0.0
 instance Foldable1 NonEmpty where
     foldMap1 f (x :| xs) = go (f x) xs where
         go y [] = y
@@ -375,9 +409,11 @@ instance Foldable1 NonEmpty where
     head = NE.head
     last = NE.last
 
+-- | @since 4.18.0.0
 instance Foldable1 Down where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Complex where
     foldMap1 f (x :+ y) = f x <> f y
 
@@ -389,6 +425,7 @@ instance Foldable1 Complex where
 
 -- 3+ tuples are not Foldable/Traversable
 
+-- | @since 4.18.0.0
 instance Foldable1 Solo where
     foldMap1 f (MkSolo y) = f y
     toNonEmpty (MkSolo x) = x :| []
@@ -397,6 +434,7 @@ instance Foldable1 Solo where
     head (MkSolo x) = x
     last (MkSolo x) = x
 
+-- | @since 4.18.0.0
 instance Foldable1 ((,) a) where
     foldMap1 f (_, y) = f y
     toNonEmpty (_, x) = x :| []
@@ -409,52 +447,68 @@ instance Foldable1 ((,) a) where
 -- Monoid / Semigroup instances
 -------------------------------------------------------------------------------
 
+-- | @since 4.18.0.0
 instance Foldable1 Dual where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Sum where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Product where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Min where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Max where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 First where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 instance Foldable1 Last where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 deriving instance (Foldable1 f) => Foldable1 (Mon.Alt f)
 
+-- | @since 4.18.0.0
 deriving instance (Foldable1 f) => Foldable1 (Mon.Ap f)
 
 -------------------------------------------------------------------------------
 -- GHC.Generics instances
 -------------------------------------------------------------------------------
 
+-- | @since 4.18.0.0
 instance Foldable1 V1 where
     foldMap1 _ x = x `seq` error "foldMap1 @V1"
 
+-- | @since 4.18.0.0
 instance Foldable1 Par1 where
     foldMap1 = coerce
 
+-- | @since 4.18.0.0
 deriving instance Foldable1 f => Foldable1 (Rec1 f)
 
+-- | @since 4.18.0.0
 deriving instance Foldable1 f => Foldable1 (M1 i c f)
 
+-- | @since 4.18.0.0
 instance (Foldable1 f, Foldable1 g) => Foldable1 (f :+: g) where
     foldMap1 f (L1 x) = foldMap1 f x
     foldMap1 f (R1 y) = foldMap1 f y
 
+-- | @since 4.18.0.0
 instance (Foldable1 f, Foldable1 g) => Foldable1 (f :*: g) where
     foldMap1 f (x :*: y) = foldMap1 f x <> foldMap1 f y
 
+-- | @since 4.18.0.0
 instance (Foldable1 f, Foldable1 g) => Foldable1 (f :.: g) where
     foldMap1 f = foldMap1 (foldMap1 f) . unComp1
 
@@ -462,6 +516,7 @@ instance (Foldable1 f, Foldable1 g) => Foldable1 (f :.: g) where
 -- Extra instances
 -------------------------------------------------------------------------------
 
+-- | @since 4.18.0.0
 instance Foldable1 Identity where
     foldMap1      = coerce
 
@@ -486,6 +541,7 @@ instance (Foldable1 f, Foldable1 g) => Foldable1 (Functor.Product f g) where
     head (Functor.Pair x _) = head x
     last (Functor.Pair _ y) = last y
 
+-- | @since 4.18.0.0
 instance (Foldable1 f, Foldable1 g) => Foldable1 (Functor.Sum f g) where
     foldMap1 f (Functor.InL x) = foldMap1 f x
     foldMap1 f (Functor.InR y) = foldMap1 f y
@@ -506,6 +562,7 @@ instance (Foldable1 f, Foldable1 g) => Foldable1 (Functor.Sum f g) where
     maximum (Functor.InL x) = maximum x
     maximum (Functor.InR y) = maximum y
 
+-- | @since 4.18.0.0
 instance (Foldable1 f, Foldable1 g) => Foldable1 (Compose f g) where
     foldMap1 f = foldMap1 (foldMap1 f) . getCompose
 
