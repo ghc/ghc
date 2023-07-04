@@ -528,13 +528,6 @@ sUPPORTED_LLVM_VERSION_MAX=$(echo \($LlvmMaxVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MIN], ${sUPPORTED_LLVM_VERSION_MIN}, [The minimum supported LLVM version number])
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MAX], ${sUPPORTED_LLVM_VERSION_MAX}, [The maximum supported LLVM version number])
 
-dnl ** Which LLVM clang to use?
-dnl --------------------------------------------------------------
-AC_ARG_VAR(CLANG,[Use as the path to clang [default=autodetect]])
-AC_CHECK_TARGET_TOOL([CLANG], [clang])
-ClangCmd="$CLANG"
-AC_SUBST([ClangCmd])
-
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LLC,[Use as the path to LLVM's llc [default=autodetect]])
@@ -1269,7 +1262,6 @@ echo "\
       libdw   : $USING_LIBDW
 
    Using LLVM tools
-      clang : $ClangCmd
       llc   : $LlcCmd
       opt   : $OptCmd"
 

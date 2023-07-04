@@ -33,7 +33,6 @@ main = do
   getGhcFieldOrDefault fields "LeadingUnderscore" "Leading underscore" "NO"
   getGhcFieldOrDefault fields "GhcTablesNextToCode" "Tables next to code" "NO"
   getGhcFieldProgWithDefault fields "AR" "ar command" "ar"
-  getGhcFieldProgWithDefault fields "CLANG" "LLVM clang command" "clang"
   getGhcFieldProgWithDefault fields "LLC" "LLVM llc command" "llc"
   getGhcFieldProgWithDefault fields "TEST_CC" "C compiler command" "gcc"
   getGhcFieldProgWithDefault fields "TEST_CC_OPTS" "C compiler flags" ""

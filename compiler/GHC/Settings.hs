@@ -42,7 +42,6 @@ module GHC.Settings
   , sPgm_ranlib
   , sPgm_lo
   , sPgm_lc
-  , sPgm_lcc
   , sPgm_i
   , sOpt_L
   , sOpt_P
@@ -56,7 +55,6 @@ module GHC.Settings
   , sOpt_windres
   , sOpt_lo
   , sOpt_lc
-  , sOpt_lcc
   , sOpt_i
   , sExtraGccViaCFlags
   , sTargetPlatformString
@@ -121,8 +119,6 @@ data ToolSettings = ToolSettings
     toolSettings_pgm_lo      :: (String, [Option])
   , -- | LLVM: llc static compiler
     toolSettings_pgm_lc      :: (String, [Option])
-  , -- | LLVM: c compiler
-    toolSettings_pgm_lcc     :: (String, [Option])
   , toolSettings_pgm_i       :: String
 
   -- options for particular phases
@@ -142,8 +138,6 @@ data ToolSettings = ToolSettings
     toolSettings_opt_lo            :: [String]
   , -- | LLVM: llc static compiler
     toolSettings_opt_lc            :: [String]
-  , -- | LLVM: c compiler
-    toolSettings_opt_lcc           :: [String]
   , -- | iserv options
     toolSettings_opt_i             :: [String]
 
@@ -242,8 +236,6 @@ sPgm_lo :: Settings -> (String, [Option])
 sPgm_lo = toolSettings_pgm_lo . sToolSettings
 sPgm_lc :: Settings -> (String, [Option])
 sPgm_lc = toolSettings_pgm_lc . sToolSettings
-sPgm_lcc :: Settings -> (String, [Option])
-sPgm_lcc = toolSettings_pgm_lcc . sToolSettings
 sPgm_i :: Settings -> String
 sPgm_i = toolSettings_pgm_i . sToolSettings
 sOpt_L :: Settings -> [String]
@@ -270,8 +262,6 @@ sOpt_lo :: Settings -> [String]
 sOpt_lo = toolSettings_opt_lo . sToolSettings
 sOpt_lc :: Settings -> [String]
 sOpt_lc = toolSettings_opt_lc . sToolSettings
-sOpt_lcc :: Settings -> [String]
-sOpt_lcc = toolSettings_opt_lcc . sToolSettings
 sOpt_i :: Settings -> [String]
 sOpt_i = toolSettings_opt_i . sToolSettings
 
