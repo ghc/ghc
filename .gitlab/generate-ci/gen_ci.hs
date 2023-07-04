@@ -989,7 +989,7 @@ platform_mapping :: Map String (JobGroup BindistInfo)
 platform_mapping = Map.map go $
   Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ v j)), j) | j <- filter hasReleaseBuild job_groups ]
   where
-    whitelist = [ "x86_64-linux-alpine3_12-int_native-validate+fully_static"
+    whitelist = [ "x86_64-linux-alpine3_12-validate"
                 , "x86_64-linux-deb10-validate"
                 , "x86_64-linux-deb11-validate"
                 , "x86_64-linux-fedora33-release"
