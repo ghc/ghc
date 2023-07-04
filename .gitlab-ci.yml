@@ -1084,6 +1084,7 @@ ghcup-metadata-nightly-push:
     - git clone https://gitlab.haskell.org/ghc/ghcup-metadata.git
     - PipelineYear="$(date -d $CI_PIPELINE_CREATED_AT +%Y)"
     - cp metadata_test.yaml "ghcup-metadata/ghcup-nightlies-$PipelineYear-0.0.7.yaml"
+    - cp metadata_test.yaml "ghcup-metadata/ghcup-nightlies-0.0.7.yaml"
     - cd ghcup-metadata
     - git config user.email "ghc-ci@gitlab-haskell.org"
     - git config user.name "GHC GitLab CI"
