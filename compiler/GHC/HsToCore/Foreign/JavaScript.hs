@@ -471,10 +471,6 @@ unboxJsArg arg
     Just arg3_tycon                = maybe_arg3_tycon
 
 
-boxJsResult :: Type
-            -> DsM (Type, CoreExpr -> CoreExpr)
-boxJsResult result_ty
-  | isRuntimeRepKindedTy result_ty = panic "boxJsResult: runtime rep ty" -- fixme
 -- Takes the result of the user-level ccall:
 --      either (IO t),
 --      or maybe just t for an side-effect-free call
@@ -485,7 +481,7 @@ boxJsResult result_ty
 -- where t' is the unwrapped form of t.  If t is simply (), then
 -- the result type will be
 --      State# RealWorld -> (# State# RealWorld #)
-
+boxJsResult :: Type -> DsM (Type, CoreExpr -> CoreExpr)
 boxJsResult result_ty
   | Just (io_tycon, io_res_ty) <- tcSplitIOType_maybe result_ty
         -- isIOType_maybe handles the case where the type is a
@@ -585,7 +581,6 @@ jsResultWrapper
 -- E.g. foreign import foo :: Int -> IO T
 -- Then resultWrapper deals with marshalling the 'T' part
 jsResultWrapper result_ty
-  | isRuntimeRepKindedTy result_ty = return (Nothing, id) -- fixme this seems like a hack
   -- Base case 1a: unboxed tuples
   | Just (tc, args) <- splitTyConApp_maybe result_ty
   , isUnboxedTupleTyCon tc {- && False -} = do
