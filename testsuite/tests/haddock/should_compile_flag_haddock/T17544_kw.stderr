@@ -10,7 +10,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
-      []
+     []
      (Just
       ((,)
        { T17544_kw.hs:25:1 }
@@ -247,7 +247,7 @@
                  [])))
               (HsTupleTy
                (EpAnn
-                (EpaSpan { T17544_kw.hs:19:18 })
+                (EpaSpan { T17544_kw.hs:19:18-19 })
                 (AnnParen
                  (AnnParens)
                  (EpaSpan { T17544_kw.hs:19:18 })
@@ -359,7 +359,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544_kw.hs:24:5-13 })
+          (EpaSpan { T17544_kw.hs:24:5-18 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
            [])

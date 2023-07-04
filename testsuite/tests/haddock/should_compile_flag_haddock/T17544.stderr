@@ -10,7 +10,7 @@
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T17544.hs:3:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:3:15-19 }))]
-      []
+     []
      (Just
       ((,)
        { T17544.hs:57:1 }
@@ -99,7 +99,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544.hs:6:3-4 })
+          (EpaSpan { T17544.hs:6:3-16 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544.hs:6:6-7 }))
            [])
@@ -135,7 +135,7 @@
                [])))
             (HsFunTy
              (EpAnn
-              (EpaSpan { T17544.hs:6:9 })
+              (EpaSpan { T17544.hs:6:9-16 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -282,7 +282,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544.hs:10:3-4 })
+          (EpaSpan { T17544.hs:10:3-16 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544.hs:10:6-7 }))
            [])
@@ -318,7 +318,7 @@
                [])))
             (HsFunTy
              (EpAnn
-              (EpaSpan { T17544.hs:10:9 })
+              (EpaSpan { T17544.hs:10:9-16 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -463,7 +463,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544.hs:14:3-4 })
+          (EpaSpan { T17544.hs:14:3-16 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544.hs:14:6-7 }))
            [])
@@ -499,7 +499,7 @@
                [])))
             (HsFunTy
              (EpAnn
-              (EpaSpan { T17544.hs:14:9 })
+              (EpaSpan { T17544.hs:14:9-16 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -647,7 +647,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544.hs:18:3-4 })
+          (EpaSpan { T17544.hs:18:3-16 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544.hs:18:6-7 }))
            [])
@@ -683,7 +683,7 @@
                [])))
             (HsFunTy
              (EpAnn
-              (EpaSpan { T17544.hs:18:9 })
+              (EpaSpan { T17544.hs:18:9-16 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -747,7 +747,7 @@
            [])))
         (ClassOpSig
          (EpAnn
-          (EpaSpan { T17544.hs:20:3-4 })
+          (EpaSpan { T17544.hs:20:3-16 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544.hs:20:6-7 }))
            [])
@@ -783,7 +783,7 @@
                [])))
             (HsFunTy
              (EpAnn
-              (EpaSpan { T17544.hs:20:9 })
+              (EpaSpan { T17544.hs:20:9-16 })
               (NoEpAnns)
               (EpaComments
                []))
@@ -985,7 +985,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:23:1-8 })
+         (EpaSpan { T17544.hs:(23,1)-(25,18) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:23:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:23:17-21 }))]
          (EpaComments
@@ -1359,7 +1359,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:29:1-8 })
+         (EpaSpan { T17544.hs:(29,1)-(31,18) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:29:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:29:17-21 }))]
          (EpaComments
@@ -1733,7 +1733,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:35:1-8 })
+         (EpaSpan { T17544.hs:(35,1)-(37,18) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:35:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:35:17-21 }))]
          (EpaComments
@@ -2107,7 +2107,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:41:1-8 })
+         (EpaSpan { T17544.hs:(41,1)-(43,18) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:41:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:41:17-21 }))]
          (EpaComments
@@ -2481,7 +2481,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:47:1-8 })
+         (EpaSpan { T17544.hs:(47,1)-(49,18) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:47:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:47:17-21 }))]
          (EpaComments
@@ -2855,7 +2855,7 @@
       (ClsInstDecl
        ((,)
         (EpAnn
-         (EpaSpan { T17544.hs:53:1-8 })
+         (EpaSpan { T17544.hs:(53,1)-(55,20) })
          [(AddEpAnn AnnInstance (EpaSpan { T17544.hs:53:1-8 }))
          ,(AddEpAnn AnnWhere (EpaSpan { T17544.hs:53:18-22 }))]
          (EpaComments

@@ -121,14 +121,14 @@
             (HsNormalTok))
            (L
             ((EpAnnS
-              (EpaSpan { T15323.hs:6:20-54 })
+              (EpaSpan { T15323.hs:6:20-29 })
               (AnnListItem
                [])
               (EpaComments
                [])))
             (HsOuterExplicit
              (EpAnn
-              (EpaSpan { T15323.hs:6:20-25 })
+              (EpaSpan { T15323.hs:6:20-29 })
               ((,)
                (AddEpAnn AnnForall (EpaSpan { T15323.hs:6:20-25 }))
                (AddEpAnn AnnDot (EpaSpan { T15323.hs:6:29 })))
@@ -160,7 +160,7 @@
            (Just
             (L
              (SrcSpanAnn (EpAnn
-                          (EpaSpan { T15323.hs:6:31-36 })
+                          (EpaSpan { T15323.hs:6:31-39 })
                           (AnnContext
                            (Just
                             ((,)
@@ -169,7 +169,7 @@
                            []
                            [])
                           (EpaComments
-                           [])) { T15323.hs:6:31-36 })
+                           [])) { T15323.hs:6:31-39 })
              [(L
                ((EpAnnS
                  (EpaSpan { T15323.hs:6:31-36 })
@@ -179,7 +179,7 @@
                   [])))
                (HsParTy
                 (EpAnn
-                 (EpaSpan { T15323.hs:6:31 })
+                 (EpaSpan { T15323.hs:6:31-36 })
                  (AnnParen
                   (AnnParens)
                   (EpaSpan { T15323.hs:6:31 })

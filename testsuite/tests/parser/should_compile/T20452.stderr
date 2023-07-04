@@ -432,7 +432,7 @@
               [])))
            (HsListTy
             (EpAnn
-             (EpaSpan { T20452.hs:8:57 })
+             (EpaSpan { T20452.hs:8:57-74 })
              (AnnParen
               (AnnParensSquare)
               (EpaSpan { T20452.hs:8:57 })
@@ -448,7 +448,7 @@
                 [])))
              (HsTupleTy
               (EpAnn
-               (EpaSpan { T20452.hs:8:58 })
+               (EpaSpan { T20452.hs:8:58-73 })
                (AnnParen
                 (AnnParens)
                 (EpaSpan { T20452.hs:8:58 })
@@ -688,7 +688,7 @@
               [])))
            (HsListTy
             (EpAnn
-             (EpaSpan { T20452.hs:9:57 })
+             (EpaSpan { T20452.hs:9:57-74 })
              (AnnParen
               (AnnParensSquare)
               (EpaSpan { T20452.hs:9:57 })
@@ -704,7 +704,7 @@
                 [])))
              (HsTupleTy
               (EpAnn
-               (EpaSpan { T20452.hs:9:58 })
+               (EpaSpan { T20452.hs:9:58-73 })
                (AnnParen
                 (AnnParens)
                 (EpaSpan { T20452.hs:9:58 })
