@@ -159,7 +159,6 @@ settings-install_name_tool-command = @SettingsInstallNameToolCommand@
 settings-dll-wrap-command = @SettingsDllWrapCommand@
 settings-windres-command = @SettingsWindresCommand@
 settings-touch-command = @SettingsTouchCommand@
-settings-clang-command = @SettingsClangCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 settings-use-distro-mingw = @SettingsUseDistroMINGW@

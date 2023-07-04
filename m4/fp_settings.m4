@@ -75,12 +75,6 @@ AC_DEFUN([FP_SETTINGS],
         fi
     fi
 
-    # Platform-agnostic tools
-    if test -z "$ClangCmd"; then
-        ClangCmd="clang"
-    fi
-    SettingsClangCommand="$ClangCmd"
-
     # LLVM backend tools
     if test -z "$LlcCmd"; then
         LlcCmd="llc"
@@ -124,7 +118,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsTouchCommand)
-    AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
     AC_SUBST(SettingsUseDistroMINGW)

@@ -479,7 +479,6 @@ generateSettings = do
         , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
-        , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
         , ("Use inplace MinGW toolchain", expr $ settingsFileSetting SettingsFileSetting_DistroMinGW)
 
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)

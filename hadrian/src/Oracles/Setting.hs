@@ -126,7 +126,6 @@ data SettingsFileSetting
     | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
     | SettingsFileSetting_TouchCommand
-    | SettingsFileSetting_ClangCommand
     | SettingsFileSetting_LlcCommand
     | SettingsFileSetting_OptCommand
     | SettingsFileSetting_DistroMinGW
@@ -224,7 +223,6 @@ settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
     SettingsFileSetting_TouchCommand -> "settings-touch-command"
-    SettingsFileSetting_ClangCommand -> "settings-clang-command"
     SettingsFileSetting_LlcCommand -> "settings-llc-command"
     SettingsFileSetting_OptCommand -> "settings-opt-command"
     SettingsFileSetting_DistroMinGW -> "settings-use-distro-mingw"

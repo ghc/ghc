@@ -12,7 +12,6 @@ module GHC.SysTools.Tasks where
 import GHC.Prelude
 import GHC.Platform
 import GHC.ForeignSrcLang
-import GHC.IO (catchException)
 
 import GHC.CmmToLlvm.Config (LlvmVersion, llvmVersionStr, supportedLlvmVersionUpperBound, parseLlvmVersion, supportedLlvmVersionLowerBound)
 
@@ -216,28 +215,6 @@ runLlvmLlc logger dflags args = traceSystoolCommand logger "llc" $ do
   let (p,args0) = pgm_lc dflags
       args1 = map Option (getOpts dflags opt_lc)
   runSomething logger "LLVM Compiler" p (args0 ++ args1 ++ args)
-
--- | Run the clang compiler (used as an assembler for the LLVM
--- backend on OS X as LLVM doesn't support the OS X system
--- assembler)
-runClang :: Logger -> DynFlags -> [Option] -> IO ()
-runClang logger dflags args = traceSystoolCommand logger "clang" $ do
-  let (clang,_) = pgm_lcc dflags
-      -- be careful what options we call clang with
-      -- see #5903 and #7617 for bugs caused by this.
-      (_,args0) = pgm_a dflags
-      args1 = map Option (getOpts dflags opt_a)
-      args2 = args0 ++ args1 ++ args
-  mb_env <- getGccEnv args2
-  catchException
-    (runSomethingFiltered logger id "Clang (Assembler)" clang args2 Nothing mb_env)
-    (\(err :: SomeException) -> do
-        errorMsg logger $
-            text ("Error running clang! you need clang installed to use the" ++
-                  " LLVM backend") $+$
-            text "(or GHC tried to execute clang incorrectly)"
-        throwIO err
-    )
 
 runEmscripten :: Logger -> DynFlags -> [Option] -> IO ()
 runEmscripten logger dflags args = traceSystoolCommand logger "emcc" $ do

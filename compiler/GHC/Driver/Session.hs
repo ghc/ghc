@@ -108,7 +108,6 @@ module GHC.Driver.Session (
         sPgm_ranlib,
         sPgm_lo,
         sPgm_lc,
-        sPgm_lcc,
         sPgm_i,
         sOpt_L,
         sOpt_P,
@@ -122,7 +121,6 @@ module GHC.Driver.Session (
         sOpt_windres,
         sOpt_lo,
         sOpt_lc,
-        sOpt_lcc,
         sOpt_i,
         sExtraGccViaCFlags,
         sTargetPlatformString,
@@ -138,10 +136,10 @@ module GHC.Driver.Session (
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
         pgm_dll, pgm_T, pgm_windres, pgm_ar,
-        pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
+        pgm_ranlib, pgm_lo, pgm_lc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
-        opt_windres, opt_lo, opt_lc, opt_lcc,
+        opt_windres, opt_lo, opt_lc,
         updatePlatformConstants,
 
         -- ** Manipulating DynFlags
@@ -410,8 +408,6 @@ pgm_T                 :: DynFlags -> String
 pgm_T dflags = toolSettings_pgm_T $ toolSettings dflags
 pgm_windres           :: DynFlags -> String
 pgm_windres dflags = toolSettings_pgm_windres $ toolSettings dflags
-pgm_lcc               :: DynFlags -> (String,[Option])
-pgm_lcc dflags = toolSettings_pgm_lcc $ toolSettings dflags
 pgm_ar                :: DynFlags -> String
 pgm_ar dflags = toolSettings_pgm_ar $ toolSettings dflags
 pgm_ranlib            :: DynFlags -> String
@@ -452,8 +448,6 @@ opt_lm                :: DynFlags -> [String]
 opt_lm dflags= toolSettings_opt_lm $ toolSettings dflags
 opt_windres           :: DynFlags -> [String]
 opt_windres dflags= toolSettings_opt_windres $ toolSettings dflags
-opt_lcc                :: DynFlags -> [String]
-opt_lcc dflags= toolSettings_opt_lcc $ toolSettings dflags
 opt_lo                :: DynFlags -> [String]
 opt_lo dflags= toolSettings_opt_lo $ toolSettings dflags
 opt_lc                :: DynFlags -> [String]

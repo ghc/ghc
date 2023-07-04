@@ -37,7 +37,6 @@ data TestSetting = TestHostOS
                  | TestGhcDynamic
                  | TestGhcProfiled
                  | TestAR
-                 | TestCLANG
                  | TestLLC
                  | TestTEST_CC
                  | TestTEST_CC_OPTS
@@ -69,7 +68,6 @@ testSetting key = do
         TestGhcDynamic            -> "GhcDynamic"
         TestGhcProfiled           -> "GhcProfiled"
         TestAR                    -> "AR"
-        TestCLANG                 -> "CLANG"
         TestLLC                   -> "LLC"
         TestTEST_CC               -> "TEST_CC"
         TestTEST_CC_OPTS          -> "TEST_CC_OPTS"
