@@ -201,7 +201,7 @@
          (HsFunTy
           (EpAnn
            (Anchor
-            { DumpParsedAst.hs:9:16-18 }
+            { DumpParsedAst.hs:9:16-27 }
             (UnchangedAnchor))
            (NoEpAnns)
            (EpaComments
@@ -216,7 +216,7 @@
            (HsListTy
             (EpAnn
              (Anchor
-              { DumpParsedAst.hs:9:16 }
+              { DumpParsedAst.hs:9:16-18 }
               (UnchangedAnchor))
              (AnnParen
               (AnnParensSquare)
@@ -302,7 +302,7 @@
                (HsParTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:11:10 }
+                  { DumpParsedAst.hs:11:10-17 }
                   (UnchangedAnchor))
                  (AnnParen
                   (AnnParens)
@@ -374,7 +374,7 @@
                (HsParTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:11:26 }
+                  { DumpParsedAst.hs:11:26-36 }
                   (UnchangedAnchor))
                  (AnnParen
                   (AnnParens)
@@ -438,7 +438,7 @@
                (HsExplicitListTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:12:10 }
+                  { DumpParsedAst.hs:12:10-12 }
                   (UnchangedAnchor))
                  [(AddEpAnn AnnSimpleQuote (EpaSpan { DumpParsedAst.hs:12:10 }))
                  ,(AddEpAnn AnnOpenS (EpaSpan { DumpParsedAst.hs:12:11 }))
@@ -492,7 +492,7 @@
             (HsListTy
              (EpAnn
               (Anchor
-               { DumpParsedAst.hs:10:27 }
+               { DumpParsedAst.hs:10:27-29 }
                (UnchangedAnchor))
               (AnnParen
                (AnnParensSquare)
@@ -652,7 +652,7 @@
                (HsParTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:15:25 }
+                  { DumpParsedAst.hs:15:25-29 }
                   (UnchangedAnchor))
                  (AnnParen
                   (AnnParens)
@@ -731,7 +731,7 @@
          (HsFunTy
           (EpAnn
            (Anchor
-            { DumpParsedAst.hs:17:12 }
+            { DumpParsedAst.hs:17:12-35 }
             (UnchangedAnchor))
            (NoEpAnns)
            (EpaComments
@@ -761,7 +761,7 @@
            (HsFunTy
             (EpAnn
              (Anchor
-              { DumpParsedAst.hs:17:17-27 }
+              { DumpParsedAst.hs:17:17-35 }
               (UnchangedAnchor))
              (NoEpAnns)
              (EpaComments
@@ -776,7 +776,7 @@
              (HsParTy
               (EpAnn
                (Anchor
-                { DumpParsedAst.hs:17:17 }
+                { DumpParsedAst.hs:17:17-27 }
                 (UnchangedAnchor))
                (AnnParen
                 (AnnParens)
@@ -789,7 +789,7 @@
                (HsFunTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:17:18 }
+                  { DumpParsedAst.hs:17:18-26 }
                   (UnchangedAnchor))
                  (NoEpAnns)
                  (EpaComments
@@ -1076,7 +1076,7 @@
             (HsFunTy
              (EpAnn
               (Anchor
-               { DumpParsedAst.hs:18:31 }
+               { DumpParsedAst.hs:18:31-39 }
                (UnchangedAnchor))
               (NoEpAnns)
               (EpaComments
@@ -1183,7 +1183,7 @@
           (HsFunTy
            (EpAnn
             (Anchor
-             { DumpParsedAst.hs:21:20 }
+             { DumpParsedAst.hs:21:20-33 }
              (UnchangedAnchor))
             (NoEpAnns)
             (EpaComments
@@ -1213,7 +1213,7 @@
             (HsFunTy
              (EpAnn
               (Anchor
-               { DumpParsedAst.hs:21:25 }
+               { DumpParsedAst.hs:21:25-33 }
                (UnchangedAnchor))
               (NoEpAnns)
               (EpaComments
@@ -1291,7 +1291,7 @@
            (HsParTy
             (EpAnn
              (Anchor
-              { DumpParsedAst.hs:22:22 }
+              { DumpParsedAst.hs:22:22-37 }
               (UnchangedAnchor))
              (AnnParen
               (AnnParens)
@@ -1304,7 +1304,7 @@
              (HsKindSig
               (EpAnn
                (Anchor
-                { DumpParsedAst.hs:22:23 }
+                { DumpParsedAst.hs:22:23-36 }
                 (UnchangedAnchor))
                [(AddEpAnn AnnDcolon (EpaSpan { DumpParsedAst.hs:22:25-26 }))]
                (EpaComments
@@ -1329,7 +1329,7 @@
                (HsFunTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:22:28 }
+                  { DumpParsedAst.hs:22:28-36 }
                   (UnchangedAnchor))
                  (NoEpAnns)
                  (EpaComments
@@ -1380,7 +1380,7 @@
            (HsFunTy
             (EpAnn
              (Anchor
-              { DumpParsedAst.hs:22:42-52 }
+              { DumpParsedAst.hs:22:42-60 }
               (UnchangedAnchor))
              (NoEpAnns)
              (EpaComments
@@ -1395,7 +1395,7 @@
              (HsParTy
               (EpAnn
                (Anchor
-                { DumpParsedAst.hs:22:42 }
+                { DumpParsedAst.hs:22:42-52 }
                 (UnchangedAnchor))
                (AnnParen
                 (AnnParens)
@@ -1408,7 +1408,7 @@
                (HsFunTy
                 (EpAnn
                  (Anchor
-                  { DumpParsedAst.hs:22:43 }
+                  { DumpParsedAst.hs:22:43-51 }
                   (UnchangedAnchor))
                  (NoEpAnns)
                  (EpaComments
@@ -1508,7 +1508,7 @@
                 (HsParTy
                  (EpAnn
                   (Anchor
-                   { DumpParsedAst.hs:23:10 }
+                   { DumpParsedAst.hs:23:10-34 }
                    (UnchangedAnchor))
                   (AnnParen
                    (AnnParens)
@@ -1523,7 +1523,7 @@
                    (HsForAllInvis
                     (EpAnn
                      (Anchor
-                      { DumpParsedAst.hs:23:11-16 }
+                      { DumpParsedAst.hs:23:11-20 }
                       (UnchangedAnchor))
                      ((,)
                       (AddEpAnn AnnForall (EpaSpan { DumpParsedAst.hs:23:11-16 }))
@@ -1550,7 +1550,7 @@
                     (HsFunTy
                      (EpAnn
                       (Anchor
-                       { DumpParsedAst.hs:23:22-25 }
+                       { DumpParsedAst.hs:23:22-33 }
                        (UnchangedAnchor))
                       (NoEpAnns)
                       (EpaComments
@@ -1773,5 +1773,3 @@
                     {FastString: "hello"})))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
-
-

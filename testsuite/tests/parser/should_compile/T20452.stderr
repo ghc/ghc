@@ -334,7 +334,7 @@
            (HsListTy
             (EpAnn
              (Anchor
-              { T20452.hs:8:57 }
+              { T20452.hs:8:57-74 }
               (UnchangedAnchor))
              (AnnParen
               (AnnParensSquare)
@@ -347,7 +347,7 @@
              (HsTupleTy
               (EpAnn
                (Anchor
-                { T20452.hs:8:58 }
+                { T20452.hs:8:58-73 }
                 (UnchangedAnchor))
                (AnnParen
                 (AnnParens)
@@ -534,7 +534,7 @@
            (HsListTy
             (EpAnn
              (Anchor
-              { T20452.hs:9:57 }
+              { T20452.hs:9:57-74 }
               (UnchangedAnchor))
              (AnnParen
               (AnnParensSquare)
@@ -547,7 +547,7 @@
              (HsTupleTy
               (EpAnn
                (Anchor
-                { T20452.hs:9:58 }
+                { T20452.hs:9:58-73 }
                 (UnchangedAnchor))
                (AnnParen
                 (AnnParens)
@@ -602,5 +602,3 @@
       []
       []
       [])))]))
-
-

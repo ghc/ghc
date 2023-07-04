@@ -198,7 +198,7 @@
                  (HsParTy
                   (EpAnn
                    (Anchor
-                    { Test20239.hs:7:50 }
+                    { Test20239.hs:7:50-86 }
                     (UnchangedAnchor))
                    (AnnParen
                     (AnnParens)
@@ -211,7 +211,7 @@
                    (HsFunTy
                     (EpAnn
                      (Anchor
-                      { Test20239.hs:7:51-60 }
+                      { Test20239.hs:7:51-85 }
                       (UnchangedAnchor))
                      (NoEpAnns)
                      (EpaComments
@@ -260,7 +260,7 @@
                        (HsParTy
                         (EpAnn
                          (Anchor
-                          { Test20239.hs:7:68 }
+                          { Test20239.hs:7:68-85 }
                           (UnchangedAnchor))
                          (AnnParen
                           (AnnParens)
@@ -311,7 +311,7 @@
                            (HsTupleTy
                             (EpAnn
                              (Anchor
-                              { Test20239.hs:7:83 }
+                              { Test20239.hs:7:83-84 }
                               (UnchangedAnchor))
                              (AnnParen
                               (AnnParens)
