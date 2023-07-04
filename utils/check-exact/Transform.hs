@@ -585,7 +585,8 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   where
     simpleBreak (r,_) = r /= 0
     an1 = l
-    anc1 = addCommentOrigDeltas $ s_comments an1
+    -- anc1 = addCommentOrigDeltas $ s_comments an1
+    anc1 = s_comments an1
     cs1f = getFollowingComments anc1
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     move = map snd move'
@@ -605,7 +606,8 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
               -- ---------------------------------
 
               (EpAnn anc an lgc) = ag
-              lgc' = splitCommentsEnd (realSrcSpan "balanceCommentsMatch" $ locA lg) $ addCommentOrigDeltas lgc
+              -- lgc' = splitCommentsEnd (realSrcSpan "balanceCommentsMatch" $ locA lg) $ addCommentOrigDeltas lgc
+              lgc' = splitCommentsEnd (realSrcSpan "balanceCommentsMatch" $ locA lg) lgc
               ag' = if moved
                       then EpAnn anc an lgc'
                       else EpAnn anc an (lgc' <> (EpaCommentsBalanced [] move))
@@ -808,7 +810,8 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
       (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
         where
           an1 = la
-          anc1 = addCommentOrigDeltas $ s_comments an1
+          -- anc1 = addCommentOrigDeltas $ s_comments an1
+          anc1 = s_comments an1
           (EpAnn anc an _) = ga :: EpAnn GrhsAnn
           (csp,csf) = case anc1 of
             EpaComments cs -> ([],cs)
@@ -818,7 +821,8 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
           stay = map snd stay'
           cs1 = EpaCommentsBalanced csp stay
 
-          gac = addCommentOrigDeltas $ epAnnComments ga
+          -- gac = addCommentOrigDeltas $ epAnnComments ga
+          gac = epAnnComments ga
           gfc = getFollowingComments gac
           gac' = setFollowingComments gac (sortEpaComments $ gfc ++ move)
           ga' = (EpAnn anc an gac')
