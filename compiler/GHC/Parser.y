@@ -2415,7 +2415,7 @@ gadt_constrlist :: { Located ([AddEpAnn]
                           ,[LConDecl GhcPs]) } -- Returned in order
 
         : 'where' '{'        gadt_constrs '}'    {% checkEmptyGADTs $
-                                                      L (comb2 $1 $3)
+                                                      L (comb2 $1 $4)
                                                         ([mj AnnWhere $1
                                                          ,moc $2
                                                          ,mcc $4]

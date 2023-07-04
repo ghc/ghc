@@ -315,7 +315,7 @@
               (HsListTy
                (EpAnn
                 (Anchor
-                 { DumpRenamedAst.hs:12:27 }
+                 { DumpRenamedAst.hs:12:27-29 }
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParensSquare)
@@ -373,7 +373,7 @@
            (HsFunTy
             (EpAnn
              (Anchor
-              { DumpRenamedAst.hs:11:16-18 }
+              { DumpRenamedAst.hs:11:16-27 }
               (UnchangedAnchor))
              (NoEpAnns)
              (EpaComments
@@ -388,7 +388,7 @@
              (HsListTy
               (EpAnn
                (Anchor
-                { DumpRenamedAst.hs:11:16 }
+                { DumpRenamedAst.hs:11:16-18 }
                 (UnchangedAnchor))
                (AnnParen
                 (AnnParensSquare)
@@ -448,7 +448,7 @@
             (HsFunTy
              (EpAnn
               (Anchor
-               { DumpRenamedAst.hs:16:20 }
+               { DumpRenamedAst.hs:16:20-33 }
                (UnchangedAnchor))
               (NoEpAnns)
               (EpaComments
@@ -471,7 +471,7 @@
               (HsFunTy
                (EpAnn
                 (Anchor
-                 { DumpRenamedAst.hs:16:25 }
+                 { DumpRenamedAst.hs:16:25-33 }
                  (UnchangedAnchor))
                 (NoEpAnns)
                 (EpaComments
@@ -530,7 +530,7 @@
                (HsKindSig
                 (EpAnn
                  (Anchor
-                  { DumpRenamedAst.hs:19:23 }
+                  { DumpRenamedAst.hs:19:23-36 }
                   (UnchangedAnchor))
                  [(AddEpAnn AnnDcolon (EpaSpan { DumpRenamedAst.hs:19:25-26 }))]
                  (EpaComments
@@ -548,7 +548,7 @@
                  (HsFunTy
                   (EpAnn
                    (Anchor
-                    { DumpRenamedAst.hs:19:28 }
+                    { DumpRenamedAst.hs:19:28-36 }
                     (UnchangedAnchor))
                    (NoEpAnns)
                    (EpaComments
@@ -585,7 +585,7 @@
              (HsFunTy
               (EpAnn
                (Anchor
-                { DumpRenamedAst.hs:19:42-52 }
+                { DumpRenamedAst.hs:19:42-60 }
                 (UnchangedAnchor))
                (NoEpAnns)
                (EpaComments
@@ -604,7 +604,7 @@
                  (HsFunTy
                   (EpAnn
                    (Anchor
-                    { DumpRenamedAst.hs:19:43 }
+                    { DumpRenamedAst.hs:19:43-51 }
                     (UnchangedAnchor))
                    (NoEpAnns)
                    (EpaComments
@@ -701,7 +701,7 @@
                       (HsFunTy
                        (EpAnn
                         (Anchor
-                         { DumpRenamedAst.hs:20:22-25 }
+                         { DumpRenamedAst.hs:20:22-33 }
                          (UnchangedAnchor))
                         (NoEpAnns)
                         (EpaComments
@@ -1061,7 +1061,7 @@
               (HsFunTy
                (EpAnn
                 (Anchor
-                 { DumpRenamedAst.hs:25:31 }
+                 { DumpRenamedAst.hs:25:31-39 }
                  (UnchangedAnchor))
                 (NoEpAnns)
                 (EpaComments
@@ -1129,7 +1129,7 @@
            (HsFunTy
             (EpAnn
              (Anchor
-              { DumpRenamedAst.hs:24:12 }
+              { DumpRenamedAst.hs:24:12-35 }
               (UnchangedAnchor))
              (NoEpAnns)
              (EpaComments
@@ -1152,7 +1152,7 @@
              (HsFunTy
               (EpAnn
                (Anchor
-                { DumpRenamedAst.hs:24:17-27 }
+                { DumpRenamedAst.hs:24:17-35 }
                 (UnchangedAnchor))
                (NoEpAnns)
                (EpaComments
@@ -1171,7 +1171,7 @@
                  (HsFunTy
                   (EpAnn
                    (Anchor
-                    { DumpRenamedAst.hs:24:18 }
+                    { DumpRenamedAst.hs:24:18-26 }
                     (UnchangedAnchor))
                    (NoEpAnns)
                    (EpaComments
@@ -1334,7 +1334,7 @@
               (HsListTy
                (EpAnn
                 (Anchor
-                 { DumpRenamedAst.hs:31:12 }
+                 { DumpRenamedAst.hs:31:12-14 }
                  (UnchangedAnchor))
                 (AnnParen
                  (AnnParensSquare)
@@ -1376,7 +1376,7 @@
                 (HsListTy
                  (EpAnn
                   (Anchor
-                   { DumpRenamedAst.hs:32:10 }
+                   { DumpRenamedAst.hs:32:10-12 }
                    (UnchangedAnchor))
                   (AnnParen
                    (AnnParensSquare)
@@ -1548,5 +1548,3 @@
               {Name: GHC.Types.Type})))))])))))]
   (Nothing)
   (Nothing)))
-
-

@@ -114,7 +114,7 @@
               (L
                (SrcSpanAnn (EpAnn
                             (Anchor
-                             { T14189.hs:6:31 }
+                             { T14189.hs:6:31-42 }
                              (UnchangedAnchor))
                             (AnnList
                              (Just
@@ -232,5 +232,3 @@
        ,{Name: T14189.f}
        ,{Name: T14189.NT}])])])
   (Nothing)))
-
-
