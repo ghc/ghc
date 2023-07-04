@@ -1047,7 +1047,7 @@ ghcup-metadata-nightly:
       artifacts: false
     - job: nightly-x86_64-windows-validate
       artifacts: false
-    - job: nightly-x86_64-linux-alpine3_12-int_native-validate+fully_static
+    - job: nightly-x86_64-linux-alpine3_12-validate
       artifacts: false
     - job: nightly-x86_64-linux-deb9-validate
       artifacts: false
