@@ -59,21 +59,26 @@ rtsDependencies = do
     jsTarget <- expr isJsTarget
     useSystemFfi <- expr (flag UseSystemFfi)
 
-    let -- headers common to native and JS RTS
+    let in_include file = rtsPath -/- "include" -/- file
+
+        -- headers common to native and JS RTS
         common_headers =
+            map in_include
             [ "ghcautoconf.h", "ghcplatform.h"
             , "DerivedConstants.h"
             ]
         -- headers specific to the native RTS
         native_headers =
+            map in_include
             [ "rts" -/- "EventTypes.h"
             , "rts" -/- "EventLogConstants.h"
             ]
-            ++ (if useSystemFfi then [] else libffiHeaderFiles)
+            ++ (if useSystemFfi then [] else map in_include libffiHeaderFiles)
+            ++ [ in_include $ rtsPath -/- "LibgccSymbols.h" ]
         headers
           | jsTarget  = common_headers
           | otherwise = common_headers ++ native_headers
-    pure $ ((rtsPath -/- "include") -/-) <$> headers
+    pure headers
 
 genapplyDependencies :: Expr [FilePath]
 genapplyDependencies = do
@@ -166,7 +171,7 @@ generatePackageCode context@(Context stage pkg _ _) = do
               [accessOpsSource, "addr-access-ops", file]
               [] []
         root -/- primopsTxt stage %> \file -> do
-            need $ [primopsSource, ba_ops_txt, addr_ops_txt]
+            need [primopsSource, ba_ops_txt, addr_ops_txt]
             -- ba_ops_txt and addr_ops_txt get #include-d
             build $ target context HsCpp [primopsSource] [file]
 
@@ -180,13 +185,38 @@ generatePackageCode context@(Context stage pkg _ _) = do
         root -/- "**" -/- dir -/- "include/DerivedConstants.h" %> genPlatformConstantsHeader context
         root -/- "**" -/- dir -/- "include/rts/EventLogConstants.h" %> genEventTypes "--event-types-defines"
         root -/- "**" -/- dir -/- "include/rts/EventTypes.h" %> genEventTypes "--event-types-array"
+        root -/- "**" -/- dir -/- "LibgccSymbols.h" %> genLibgccSymbols context
+
+genLibgccSymbols :: Context -> FilePath -> Action ()
+genLibgccSymbols (Context stage _ _ _) outFile = do
+    libgcc <- getLibgccPath
+    need [script]
+    nmPath <- builderPath Nm
+    runBuilder Python [script, libgcc, "-o", outFile, "--nm", nmPath] [] []
+  where
+    script = "rts" -/- "gen_libgcc_symbols.py"
+
+    getLibgccPath :: Action FilePath
+    getLibgccPath = do
+      let builder = Cc CompileC stage
+      needBuilders [builder]
+      path <- builderPath builder
+      StdoutTrim libgcc <- quietly $ cmd [path] ["-print-libgcc-file-name"]
+
+      -- Annoyingly, Apple's toolchain returns the non-existent
+      -- libclang_rt.builtins-aarch64.a when asked to -print-libgcc-file-name.
+      -- However, the file is actually called libclang_rt.osx.a
+      osx <- isOsxTarget
+      pure $ if osx
+        then replaceFileName libgcc "libclang_rt.osx.a"
+        else libgcc
 
 genEventTypes :: String -> FilePath -> Action ()
 genEventTypes flag file = do
-    need ["rts" -/- "gen_event_types.py"]
-    runBuilder Python
-      ["rts" -/- "gen_event_types.py", flag, file]
-      [] []
+    need [script]
+    runBuilder Python [script, flag, file] [] []
+  where
+    script = "rts" -/- "gen_event_types.py"
 
 genPrimopCode :: Context -> FilePath -> Action ()
 genPrimopCode context@(Context stage _pkg _ _) file = do

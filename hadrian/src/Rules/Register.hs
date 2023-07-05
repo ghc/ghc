@@ -212,6 +212,7 @@ buildConfInplace rs context@Context {..} _conf = do
              , path -/- "include/ghcplatform.h"
              , path -/- "include/rts/EventLogConstants.h"
              , path -/- "include/rts/EventTypes.h"
+             , path -/- "LibgccSymbols.h"
              ]
 
     -- we need to generate this file for GMP
