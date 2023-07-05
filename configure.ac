@@ -1122,6 +1122,9 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 GHC_ADJUSTORS_METHOD([Target])
 AC_SUBST([UseLibffiForAdjustors])
 
+dnl ** ARM outline atomics
+dnl --------------------------------------------------------------
+FP_ARM_OUTLINE_ATOMICS
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
