@@ -1,4 +1,6 @@
-resolver: lts-19.8
+# GHC's configure script reports that GHC versions 9.2 and greater are required
+# to build GHC from source.
+resolver: lts-20.26 # GHC 9.2.8
 
 packages:
 - '.'
