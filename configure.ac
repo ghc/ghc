@@ -1128,6 +1128,7 @@ AC_SUBST([UseLibffiForAdjustors])
 dnl ** ARM outline atomics
 dnl --------------------------------------------------------------
 FP_ARM_OUTLINE_ATOMICS
+
 dnl ** Other RTS features
 dnl --------------------------------------------------------------
 FP_FIND_LIBDW
