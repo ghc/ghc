@@ -611,15 +611,16 @@ getRegister' config plat expr =
                                                                       signExtendAdjustPrecission W32 to dst dst) -- (float convert (-> zero) signed)
         MO_FS_Conv from to -> pure $ Any (intFormat to) (\dst -> code `snocOL` annExpr expr (FCVTZS (OpReg to dst) (OpReg from reg))) -- (float convert (-> zero) signed)
 
-        -- TODO this is very slow. We effectively use store + load (byte, half, word, double)
-        --      for this in memory.
-        MO_UU_Conv from to -> return $ Any (intFormat to) (\dst ->
-          code `appOL` toOL [ SUB sp sp (OpImm (ImmInt 8))
-                             , STR (intFormat from) (OpReg from reg) (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
-                             , LDR (intFormat to)   (OpReg to dst)   (OpAddr (AddrRegImm sp_reg (ImmInt 0)))
-                             , ADD sp sp (OpImm (ImmInt 8))
-                             ])
-        -- MO_UU_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` UBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
+        MO_UU_Conv from to | from <= to -> pure $ Any (intFormat to) (\dst ->
+                                                                          code `snocOL`
+                                                                          annExpr e (MOV (OpReg to dst) (OpReg from reg))
+                                                                       )
+
+        MO_UU_Conv from to -> pure $ Any (intFormat to) (\dst ->
+                                                            code `snocOL`
+                                                            annExpr e (MOV (OpReg from dst) (OpReg from reg)) `appOL`
+                                                            truncateReg from to dst
+                                                          )
         MO_SS_Conv from to -> ss_conv from to reg code
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
 
