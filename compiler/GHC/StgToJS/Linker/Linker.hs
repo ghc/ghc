@@ -327,7 +327,7 @@ computeLinkDependencies cfg unit_env link_spec finder_opts finder_cache = do
   let (rts_wired_units, rts_wired_functions) = rtsDeps units
 
   -- all the units we want to link together, without their dependencies
-  let root_units = filter (/= mainUnitId)
+  let root_units = filter (/= ue_currentUnit unit_env)
                    $ filter (/= interactiveUnitId)
                    $ nub
                    $ rts_wired_units ++ reverse obj_units ++ reverse units
