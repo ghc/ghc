@@ -1349,7 +1349,12 @@
                   { DumpSemis.hs:32:1-7 }
                   (UnchangedAnchor))
                  (AnnListItem
-                  [])
+                  [(AddSemiAnn
+                    (EpaSpan { DumpSemis.hs:33:1 }))
+                  ,(AddSemiAnn
+                    (EpaSpan { DumpSemis.hs:34:6 }))
+                  ,(AddSemiAnn
+                    (EpaSpan { DumpSemis.hs:34:7 }))])
                  (EpaComments
                   [])) { DumpSemis.hs:32:1-7 })
     (ValD
@@ -1370,12 +1375,7 @@
                         { DumpSemis.hs:32:1-7 }
                         (UnchangedAnchor))
                        (AnnListItem
-                        [(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:33:1 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:6 }))
-                        ,(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:34:7 }))])
+                        [])
                        (EpaComments
                         [])) { DumpSemis.hs:32:1-7 })
           (Match
@@ -1707,7 +1707,8 @@
                   { DumpSemis.hs:(36,1)-(44,4) }
                   (UnchangedAnchor))
                  (AnnListItem
-                  [])
+                  [(AddSemiAnn
+                    (EpaSpan { DumpSemis.hs:45:1 }))])
                  (EpaComments
                   [])) { DumpSemis.hs:(36,1)-(44,4) })
     (ValD
@@ -1728,8 +1729,7 @@
                         { DumpSemis.hs:(36,1)-(44,4) }
                         (UnchangedAnchor))
                        (AnnListItem
-                        [(AddSemiAnn
-                          (EpaSpan { DumpSemis.hs:45:1 }))])
+                        [])
                        (EpaComments
                         [])) { DumpSemis.hs:(36,1)-(44,4) })
           (Match
@@ -2100,5 +2100,3 @@
                         (NoExtField)))))]))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
-
-
