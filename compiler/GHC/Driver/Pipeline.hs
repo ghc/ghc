@@ -850,18 +850,18 @@ llvmManglePipeline pipe_env hsc_env location llc_fn = do
       else use (T_LlvmMangle pipe_env hsc_env llc_fn)
   asPipeline False pipe_env hsc_env location mangled_fn
 
-cmmCppPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m FilePath
+cmmCppPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
 cmmCppPipeline pipe_env hsc_env input_fn = do
   output_fn <- use (T_CmmCpp pipe_env hsc_env input_fn)
   cmmPipeline pipe_env hsc_env output_fn
 
-cmmPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m FilePath
+cmmPipeline :: P m => PipeEnv -> HscEnv -> FilePath -> m (Maybe FilePath)
 cmmPipeline pipe_env hsc_env input_fn = do
   (fos, output_fn) <- use (T_Cmm pipe_env hsc_env input_fn)
   mo_fn <- hscPostBackendPipeline pipe_env hsc_env HsSrcFile (backend (hsc_dflags hsc_env)) Nothing output_fn
   case mo_fn of
-    Nothing -> panic "CMM pipeline - produced no .o file"
-    Just mo_fn -> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
+    Nothing -> return Nothing
+    Just mo_fn -> Just <$> use (T_MergeForeign pipe_env hsc_env mo_fn fos)
 
 jsPipeline :: P m => PipeEnv -> HscEnv -> Maybe ModLocation -> FilePath -> m FilePath
 jsPipeline pipe_env hsc_env location input_fn = do
@@ -938,8 +938,8 @@ pipelineStart pipe_env hsc_env input_fn mb_phase =
    fromPhase LlvmLlc    = llvmLlcPipeline pipe_env hsc_env Nothing input_fn
    fromPhase LlvmMangle = llvmManglePipeline pipe_env hsc_env Nothing input_fn
    fromPhase StopLn     = return (Just input_fn)
-   fromPhase CmmCpp     = Just <$> cmmCppPipeline pipe_env hsc_env input_fn
-   fromPhase Cmm        = Just <$> cmmPipeline pipe_env hsc_env input_fn
+   fromPhase CmmCpp     = cmmCppPipeline pipe_env hsc_env input_fn
+   fromPhase Cmm        = cmmPipeline pipe_env hsc_env input_fn
    fromPhase Js         = Just <$> foreignJsPipeline pipe_env hsc_env Nothing input_fn
    fromPhase MergeForeign = panic "fromPhase: MergeForeign"
 
