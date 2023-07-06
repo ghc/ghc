@@ -13,3 +13,6 @@ T16930:
 	grep -rl "after setInfoTableStackMap" `ls T16930.*`
 	grep -rl "Layout Stack" `ls T16930.*`
 	grep -rl "Post switch plan" `ls T16930.*`
+
+T23610:
+	'$(TEST_HC)' $(TEST_HC_OPTS) T23610.cmm -S
