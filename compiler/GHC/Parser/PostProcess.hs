@@ -587,11 +587,14 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
                                MG { mg_alts = (L _ m1@[L _ mtchs1]) } }))
             binds
   | has_args m1
-  = go [L (removeCommentsA loc1) mtchs1] (commentsOnlyA loc1) binds []
+  = go [L loc1 mtchs1] (noAnnSrcSpan $ locA loc1) binds []
   where
-    go :: [LMatch GhcPs (LHsExpr GhcPs)] -> SrcSpanAnnA
-       -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
-       -> (LHsBind GhcPs,[LHsDecl GhcPs]) -- AZ
+    -- See Note [Exact Print Annotations for FunBind]
+    go :: [LMatch GhcPs (LHsExpr GhcPs)] -- accumulates matches for current fun
+       -> SrcSpanAnnA                    -- current top level loc
+       -> [LHsDecl GhcPs]                -- Any docbinds seen
+       -> [LHsDecl GhcPs]                -- rest of decls to be processed
+       -> (LHsBind GhcPs, [LHsDecl GhcPs]) -- FunBind, rest of decls
     go mtchs loc
        ((L loc2 (ValD _ (FunBind { fun_id = (L _ f2)
                                  , fun_matches =
@@ -605,12 +608,60 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
         = let doc_decls' = doc_decl : doc_decls
           in go mtchs (combineSrcSpansA loc loc2) binds doc_decls'
     go mtchs loc binds doc_decls
-        = ( L loc (makeFunBind fun_id1 (mkLocatedList $ reverse mtchs))
-          , (reverse doc_decls) ++ binds)
+        = let
+            L llm last_m = head mtchs -- Guaranteed at least one
+            (llm',loc') = transferAnnsOnlyA llm loc -- Keep comments, transfer trailing
+
+            matches' = reverse (L llm' last_m:tail mtchs)
+            L lfm first_m =  head matches'
+            (lfm', loc'') = transferCommentsOnlyA lfm loc'
+          in
+            ( L loc'' (makeFunBind fun_id1 (mkLocatedList $ (L lfm' first_m:tail matches')))
+              , (reverse doc_decls) ++ binds)
         -- Reverse the final matches, to get it back in the right order
         -- Do the same thing with the trailing doc comments
 
 getMonoBind bind binds = (bind, binds)
+
+{- Note [Exact Print Annotations for FunBind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An individual Match that ends up in a FunBind MatchGroup is initially
+parsed as a LHsDecl. This takes the form
+
+   L loc (ValD NoExtField (FunBind ... [L lm (Match ..)]))
+
+The loc contains the annotations, in particular comments, which are to
+precede the declaration when printed, and [TrailingAnn] which are to
+follow it. The [TrailingAnn] captures semicolons that may appear after
+it when using the braces and semis style of coding.
+
+The match location (lm) has only a location in it at this point, no
+annotations. Its location is the same as the top level location in
+loc.
+
+What getMonoBind does it to take a sequence of FunBind LHsDecls that
+belong to the same function and group them into a single function with
+the component declarations all combined into the single MatchGroup as
+[LMatch GhcPs].
+
+Given that when exact printing a FunBind the exact printer simply
+iterates over all the matches and prints each in turn, the simplest
+behaviour would be to simply take the top level annotations (loc) for
+each declaration, and use them for the individual component matches
+(lm).
+
+The problem is the exact printer first has to deal with the top level
+LHsDecl, which means annotations for the loc. This needs to be able to
+be exact printed in the context of surrounding declarations, and if
+some refactor decides to move the declaration elsewhere, the leading
+comments and trailing semicolons need to be handled at that level.
+
+So the solution is to combine all the matches into one, pushing the
+annotations into the LMatch's, and then at the end extract the
+comments from the first match and [TrailingAnn] from the last to go in
+the top level LHsDecl.
+-}
 
 -- Group together adjacent FunBinds for every function.
 getMonoBindAll :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
