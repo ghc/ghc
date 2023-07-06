@@ -423,8 +423,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     EpaDelta _ _ -> setAcceptSpan True
     EpaSpan _ -> return ()
   p <- getPosP
-  debugM $ "enterAnn:starting:(p,a) =" ++ show (p, astId a)
-  debugM $ "enterAnn:(anchor') =" ++ showGhc anchor'
+  pe0 <- getPriorEndD
+  debugM $ "enterAnn:starting:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p, pe0, astId a)
   prevAnchor <- getAnchorU
   let curAnchor = case anchor' of
         EpaSpan (RealSrcSpan r _) -> r
@@ -546,7 +546,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
 
   p1 <- getPosP
   pe1 <- getPriorEndD
-  debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, showAst anchor', astId a')
+  debugM $ "enterAnn:done:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p1, pe1, astId a')
 
   case anchor' of
     EpaDelta _ _ -> return ()
