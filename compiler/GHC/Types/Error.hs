@@ -103,15 +103,16 @@ import GHC.Data.StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import GHC.Utils.Json
 import GHC.Utils.Panic
 import GHC.Unit.Module.Warnings (WarningCategory)
-
 import Data.Bifunctor
-import Data.Foldable    ( fold )
+import Data.Foldable    ( fold, toList )
 import Data.List.NonEmpty ( NonEmpty (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.List ( intercalate )
 import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
+import GHC.Version (cProjectVersion)
+import GHC.Types.Hint.Ppr () -- Outputtable instance
 
 {- Note [Messages]
 ~~~~~~~~~~~~~~~~~~
@@ -165,6 +166,9 @@ instance Diagnostic e => Outputable (Messages e) where
         vcat [ text "Resolved:" <+> ppr (errMsgReason envelope),
                pprDiagnostic (errMsgDiagnostic envelope)
              ]
+
+instance Diagnostic e => ToJson (Messages e) where
+  json msgs =  JSArray . toList $ json <$> getMessages msgs
 
 {- Note [Discarding Messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -540,7 +544,9 @@ instance Outputable Severity where
     SevError   -> text "SevError"
 
 instance ToJson Severity where
-  json s = JSString (show s)
+  json SevIgnore = JSString "Ignore"
+  json SevWarning = JSString "Warning"
+  json SevError = JSString "Error"
 
 instance ToJson MessageClass where
   json MCOutput = JSString "MCOutput"
@@ -550,6 +556,45 @@ instance ToJson MessageClass where
   json MCInfo = JSString "MCInfo"
   json (MCDiagnostic sev reason code) =
     JSString $ renderWithContext defaultSDocContext (ppr $ text "MCDiagnostic" <+> ppr sev <+> ppr reason <+> ppr code)
+
+instance ToJson DiagnosticCode where
+  json c = JSInt (fromIntegral (diagnosticCodeNumber c))
+
+{- Note [Diagnostic Message JSON Schema]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The below instance of ToJson must conform to the JSON schema
+specified in docs/users_guide/diagnostics-as-json-schema-1_0.json.
+When the schema is altered, please bump the version.
+If the content is altered in a backwards compatible way,
+update the minor version (e.g. 1.3 ~> 1.4).
+If the content is breaking, update the major version (e.g. 1.3 ~> 2.3).
+When updating the schema, replace the above file and name it appropriately with
+the version appended, and change the documentation of the -fdiagnostics-as-json
+flag to reflect the new schema.
+To learn more about JSON schemas, check out the below link:
+https://json-schema.org
+-}
+
+schemaVersion :: String
+schemaVersion = "1.0"
+-- See Note [Diagnostic Message JSON Schema] before editing!
+instance Diagnostic e => ToJson (MsgEnvelope e) where
+  json m = JSObject [
+    ("version", JSString schemaVersion),
+    ("ghcVersion", JSString $ "ghc-" ++ cProjectVersion),
+    ("span", json $ errMsgSpan m),
+    ("severity", json $ errMsgSeverity m),
+    ("code", maybe JSNull json (diagnosticCode diag)),
+    ("message", JSArray $ map renderToJSString diagMsg),
+    ("hints", JSArray $ map (renderToJSString . ppr) (diagnosticHints diag) )
+    ]
+    where diag = errMsgDiagnostic m
+          opts = defaultDiagnosticOpts @e
+          style = mkErrStyle (errMsgContext m)
+          ctx = defaultSDocContext {sdocStyle = style }
+          diagMsg = filter (not . isEmpty ctx) (unDecorated (diagnosticMessage (opts) diag))
+          renderToJSString :: SDoc -> JsonDoc
+          renderToJSString = JSString . (renderWithContext ctx)
 
 instance Show (MsgEnvelope DiagnosticMessage) where
     show = showMsgEnvelope

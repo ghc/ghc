@@ -17,6 +17,7 @@ initLogFlags dflags = LogFlags
   , log_default_dump_context = initSDocContext dflags defaultDumpStyle
   , log_dump_flags           = dumpFlags dflags
   , log_show_caret           = gopt Opt_DiagnosticsShowCaret dflags
+  , log_diagnostics_as_json  = gopt Opt_DiagnosticsAsJSON dflags
   , log_show_warn_groups     = gopt Opt_ShowWarnGroups dflags
   , log_enable_timestamps    = not (gopt Opt_SuppressTimestamps dflags)
   , log_dump_to_file         = gopt Opt_DumpToFile dflags

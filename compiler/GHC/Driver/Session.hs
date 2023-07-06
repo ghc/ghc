@@ -1573,15 +1573,15 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
-  , make_ord_flag defGhcFlag "ddump-json"
-        (setDumpFlag Opt_D_dump_json )
+  , make_dep_flag defGhcFlag "ddump-json"
+        (setDumpFlag Opt_D_dump_json)
+        "Use `-fdiagnostics-as-json` instead"
   , make_ord_flag defGhcFlag "dppr-debug"
         (setDumpFlag Opt_D_ppr_debug)
   , make_ord_flag defGhcFlag "ddebug-output"
         (noArg (flip dopt_unset Opt_D_no_debug_output))
   , make_ord_flag defGhcFlag "dno-debug-output"
         (setDumpFlag Opt_D_no_debug_output)
-
   , make_ord_flag defGhcFlag "ddump-faststrings"
         (setDumpFlag Opt_D_dump_faststrings)
 
@@ -2354,6 +2354,7 @@ fFlagsDeps = [
   flagSpec "defer-typed-holes"                Opt_DeferTypedHoles,
   flagSpec "defer-out-of-scope-variables"     Opt_DeferOutOfScopeVariables,
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
+  flagSpec "diagnostics-as-json"              Opt_DiagnosticsAsJSON,
   -- With-ways needs to be reversible hence why its made via flagSpec unlike
   -- other debugging flags.
   flagSpec "dump-with-ways"                   Opt_DumpWithWays,

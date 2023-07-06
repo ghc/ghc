@@ -412,6 +412,7 @@ data GeneralFlag
    | Opt_ErrorSpans -- Include full span info in error messages,
                     -- instead of just the start position.
    | Opt_DeferDiagnostics
+   | Opt_DiagnosticsAsJSON  -- ^ Dump diagnostics as JSON
    | Opt_DiagnosticsShowCaret -- Show snippets of offending code
    | Opt_PprCaseAsLet
    | Opt_PprShowTicks

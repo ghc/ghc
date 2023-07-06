@@ -1403,6 +1403,19 @@ messages and in GHCi:
     find the relevant errors or likely to ignore the warnings when they are
     mixed with many other messages.
 
+.. ghc-flag:: -fdiagnostics-as-json
+    :shortdesc: Output diagnostics in Json format specified by JSON schema
+    :type: dynamic
+    :category: verbosity
+
+    Causes GHC to emit diagnostic messages in a standardized JSON format,
+    and output them directly to ``stderr``. The format follows the `JSON Lines <https://jsonlines.org>`_
+    convention, where each diagnostic is its own JSON object separated by
+    a new line.
+
+    The structure of the output is described by a `JSON Schema <https://json-schema.org/>`_.
+    The schema can be downloaded :download:`here <diagnostics-as-json-schema-1_0.json>`.
+    
 .. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
     :shortdesc: Use colors in error messages
     :type: dynamic

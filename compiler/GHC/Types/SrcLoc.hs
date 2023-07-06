@@ -426,12 +426,14 @@ instance ToJson SrcSpan where
   json (RealSrcSpan rss _) = json rss
 
 instance ToJson RealSrcSpan where
-  json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile))
-                                     , ("startLine", JSInt srcSpanSLine)
-                                     , ("startCol", JSInt srcSpanSCol)
-                                     , ("endLine", JSInt srcSpanELine)
-                                     , ("endCol", JSInt srcSpanECol)
+  json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile)),
+                                       ("start", start),
+                                       ("end", end)
                                      ]
+    where start = JSObject [ ("line", JSInt srcSpanSLine),
+                             ("column", JSInt srcSpanSCol) ]
+          end = JSObject [ ("line", JSInt srcSpanELine),
+                           ("column", JSInt srcSpanECol) ]
 
 instance NFData SrcSpan where
   rnf x = x `seq` ()

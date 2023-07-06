@@ -1,6 +1,9 @@
+{-# LANGUAGE NoEmptyCase #-}
 module Foo where
 
 import Data.List
 
-id1 :: a -> a
-id1 = 5
+f1 :: a -> a
+f1 x = 5
+
+f2 x = do case () of

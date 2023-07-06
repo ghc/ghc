@@ -273,13 +273,11 @@ test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 test('T12955', normal, makefile_test, [])
 
 test('T12971', [when(opsys('mingw32'), fragile(17945)), ignore_stdout], makefile_test, [])
-test('json', normal, compile_fail, ['-ddump-json'])
-
-# json2 test is sensitive to the LLVM not supported ouput from GHC. ANd the error
-# won't tell.  It looks unrelated and is annoying to debug. Hence we disable the
-# warning to prevent spurious errors.
+test('json_dump', normal, compile_fail, ['-ddump-json'])
+test('json', normalise_version('ghc'), compile_fail, ['-fdiagnostics-as-json'])
+test('json_warn', normalise_version('ghc'), compile, ['-fdiagnostics-as-json -Wunused-matches'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json -Wno-unsupported-llvm-version'])
-test('T16167', [req_interp,exit_code(1)], run_command,
+test('T16167', [normalise_version('ghc'),req_interp,exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a',

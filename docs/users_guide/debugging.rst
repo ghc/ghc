@@ -56,12 +56,11 @@ Dumping out compiler intermediate structures
     output of one way with the output of another.
 
 .. ghc-flag:: -ddump-json
-    :shortdesc: Dump error messages as JSON documents
+    :shortdesc: *(deprecated)* Use :ghc-flag:`-fdiagnostics-as-json` instead
     :type: dynamic
 
-    Dump error messages as JSON documents. This is intended to be consumed
-    by external tooling. A good way to use it is in conjunction with
-    :ghc-flag:`-ddump-to-file`.
+    This flag was previously used to generated JSON formatted GHC diagnostics,
+    but has been deprecated. Instead, use :ghc-flag:`-fdiagnostics-as-json`.
 
 .. ghc-flag:: -dshow-passes
     :shortdesc: Print out each pass name as it happens

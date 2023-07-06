@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JSON Diagnostic Schema",
+  "description": "A Schema for specifying GHC diagnostics output as JSON",
+  "type": "object",
+  "properties": {
+    "version": {
+      "description": "The current JSON schema version this object conforms to",
+      "type": "string"
+    },
+    "ghcVersion": {
+      "description": "The GHC version",
+      "type": "string"
+    },
+    "span": {
+      "$ref": "#/$defs/span"
+    },
+    "severity": {
+      "description": "The diagnostic severity",
+      "type": "string",
+      "enum": [
+        "Warning",
+        "Error"
+      ]
+    },
+    "code": {
+      "description": "The diagnostic code (if it exists)",
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "message": {
+      "description": "The string output of the diagnostic message by GHC",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "hints": {
+      "description": "The suggested fixes",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "version",
+    "ghcVersion",
+    "span",
+    "severity",
+    "code",
+    "message",
+    "hints"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "span": {
+      "description": "The span of the diagnostic",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "The file in which the diagnostic occurs",
+          "type": "string"
+        },
+        "start": {
+          "description": "The start location of the diagnostic",
+          "$ref": "#/$defs/location"
+        },
+        "end": {
+          "description": "The end location of the diagnostic",
+          "$ref": "#/$defs/location"
+        }
+      },
+      "required": [
+        "file",
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "location": {
+      "description": "A location in a text file",
+      "type": "object",
+      "properties": {
+        "line": {
+          "description": "The line number",
+          "type": "integer"
+        },
+        "column": {
+          "description": "The column number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line",
+        "column"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
