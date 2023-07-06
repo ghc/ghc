@@ -223,7 +223,7 @@
                     [])))
                  (HsParTy
                   (EpAnn
-                   (EpaSpan { Test20239.hs:7:50 })
+                   (EpaSpan { Test20239.hs:7:50-86 })
                    (AnnParen
                     (AnnParens)
                     (EpaSpan { Test20239.hs:7:50 })
@@ -239,7 +239,7 @@
                       [])))
                    (HsFunTy
                     (EpAnn
-                     (EpaSpan { Test20239.hs:7:51-60 })
+                     (EpaSpan { Test20239.hs:7:51-85 })
                      (NoEpAnns)
                      (EpaComments
                       []))
@@ -312,7 +312,7 @@
                           [])))
                        (HsParTy
                         (EpAnn
-                         (EpaSpan { Test20239.hs:7:68 })
+                         (EpaSpan { Test20239.hs:7:68-85 })
                          (AnnParen
                           (AnnParens)
                           (EpaSpan { Test20239.hs:7:68 })
@@ -392,7 +392,7 @@
                               [])))
                            (HsTupleTy
                             (EpAnn
-                             (EpaSpan { Test20239.hs:7:83 })
+                             (EpaSpan { Test20239.hs:7:83-84 })
                              (AnnParen
                               (AnnParens)
                               (EpaSpan { Test20239.hs:7:83 })

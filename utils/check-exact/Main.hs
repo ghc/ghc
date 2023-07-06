@@ -99,7 +99,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr007.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr008.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr009.hs" Nothing
- "../../testsuite/tests/printer/Ppr011.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr011.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr012.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr013.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr014.hs" Nothing
@@ -134,7 +134,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr043.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr044.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr045.hs" Nothing
- -- "../../testsuite/tests/printer/Ppr046.hs" Nothing
+ "../../testsuite/tests/printer/Ppr046.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr048.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr049.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr050.hs" Nothing
@@ -211,7 +211,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Test20297.hs" Nothing
  -- "../../testsuite/tests/overloadedlists/should_fail/overloadedlistsfail01.hs" Nothing
  -- "../../testsuite/tests/typecheck/should_fail/tcfail181.hs" Nothing
--- cloneT does not need a test, function can be retired
+ -- "../../testsuite/tests/printer/PprBracesSemiDataDecl.hs" Nothing
 
 
 -- exact = ppr
@@ -593,8 +593,9 @@ changeWhereIn3b _libdir (L l p) = do
       de1' = setEntryDP de1 (DifferentLine 2 0)
       d2' = setEntryDP d2 (DifferentLine 2 0)
       decls' = d2':de1':de0':tdecls
+      -- decls' = de1':de0:tdecls
       -- decls' = decls
-  debugM $ unlines w
+  -- debugM $ unlines w
   -- debugM $ "changeWhereIn3b:de1':" ++ showAst de1'
   let p2 = p { hsmodDecls = decls'}
   return (L l p2)
@@ -610,6 +611,7 @@ addLocaLDecl1 libdir top = do
         let lp = top
         (de1:d2:d3:_) <- hsDecls lp
         (de1'',d2') <- balanceComments de1 d2
+        -- let (de1'',d2') = (de1, d2)
         (de1',_) <- modifyValD (getLocA de1'') de1'' $ \_m d -> do
           return ((wrapDecl decl' : d),Nothing)
         replaceDecls lp [de1', d2', d3]

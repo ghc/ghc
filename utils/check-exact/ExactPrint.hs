@@ -425,7 +425,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     -- EpaSpan _ -> setAcceptSpan False
   p <- getPosP
   pe0 <- getPriorEndD
-  debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, eloc2str anchor', astId a)
+  debugM $ "enterAnn:starting:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p, pe0, astId a)
   debugM $ "enterAnn:anchor_op=" ++ showGhc (anchor_op anchor')
   prevAnchor <- getAnchorU
   let curAnchor = case anchor' of
@@ -559,7 +559,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   -- Deal with exit from the current anchor
   p1 <- getPosP
   pe1 <- getPriorEndD
-  debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, eloc2str anchor', astId a')
+  debugM $ "enterAnn:done:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p1, pe1, astId a')
 
   case anchor' of
     -- EpaDelta _ _ -> setPriorEndD p1
