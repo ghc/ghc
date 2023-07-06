@@ -504,41 +504,12 @@ getRegister' config plat expr =
     CmmLit lit ->
       case lit of
         CmmInt 0 w -> pure $ Fixed (intFormat w) zero_reg nilOL
-        CmmInt i w | isEncodeableInWidth w i ->
+        CmmInt i w ->
                      -- narrowU is important: Negative immediates may be
                      -- sign-extended on load!
                      let imm = OpImm . ImmInteger $ narrowU w i
                      in
                         pure (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg w dst) imm)))
-
-        -- i does not fit. Be careful to keep the sign.
-        CmmInt i w ->
-          let -- select all but the sign (most significant) bit
-              mask = allOneMask (maxBitNo - 1)
-              numBits = i .&. mask
-              truncatedI = numBits .|. signBit i
-              imm = OpImm . ImmInteger $ narrowU w truncatedI
-          in
-            pure $
-               Any
-                  (intFormat w)
-                  ( \dst ->
-                      toOL
-                        [ annExpr
-                            expr
-                            (MOV (OpReg w dst) imm)
-                        ]
-                  )
-          where
-            allOneMask :: Int -> Integer
-            allOneMask 0 = bit 0
-            allOneMask n = bit n .|. allOneMask (n - 1)
-
-            signBit :: Integer -> Integer
-            signBit i | signum i < 0 = bit maxBitNo
-            signBit _i = 0
-
-            maxBitNo = widthInBits w - 1
 
         -- floatToBytes (fromRational f)
         CmmFloat 0 w   -> do
