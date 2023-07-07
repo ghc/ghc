@@ -27,6 +27,9 @@ source-repository head
 custom-setup
     setup-depends: base >= 4 && < 5, process, filepath, directory, Cabal >= 1.23 && < 3.9
 
+flag need-atomic
+  default: @CabalNeedLibatomic@
+
 Library
     default-language: Haskell2010
     other-extensions:
@@ -80,6 +83,10 @@ Library
         -- we need libm, but for musl and other's we might need libc, as libm
         -- is just an empty shell.
         extra-libraries: c, m
+
+    if flag(need-atomic)
+        -- for 64-bit atomic ops on armel (#20549)
+        extra-libraries: atomic
 
     if !os(ghcjs)
       c-sources:

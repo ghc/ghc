@@ -327,6 +327,9 @@ rtsCabalFlags = mconcat
   where
     flag = interpolateCabalFlag
 
+ghcPrimCabalFlags :: Interpolations
+ghcPrimCabalFlags = interpolateCabalFlag "CabalNeedLibatomic" NeedLibatomic
+
 packageVersions :: Interpolations
 packageVersions = foldMap f [ base, ghcPrim, compiler, ghc, cabal, templateHaskell, ghcCompact, array ]
   where
@@ -346,6 +349,7 @@ templateRules :: Rules ()
 templateRules = do
   templateRule "compiler/ghc.cabal" $ projectVersion
   templateRule "rts/rts.cabal" $ rtsCabalFlags
+  templateRule "libraries/ghc-prim/ghc-prim.cabal" $ ghcPrimCabalFlags
   templateRule "driver/ghci/ghci-wrapper.cabal" $ projectVersion
   templateRule "ghc/ghc-bin.cabal" $ projectVersion
   templateRule "utils/iserv/iserv.cabal" $ projectVersion
