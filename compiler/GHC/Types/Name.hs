@@ -143,12 +143,19 @@ data Name = Name
 -- See Note [About the NameSorts]
 data NameSort
   = External Module
+        -- Either an import from another module
+        -- or a top-level name (the latter can
+        -- change to internal if not exported)
+        -- See Note [About the NameSorts] for more details
 
   | WiredIn Module TyThing BuiltInSyntax
         -- A variant of External, for wired-in things
 
-  | Internal            -- A user-defined Id or TyVar
+  | Internal            -- A user-defined local Id or TyVar
                         -- defined in the module being compiled
+                        -- Can change to external if e.g.
+                        -- floated up by the Simplifier
+                        -- See Note [About the NameSorts]
 
   | System              -- A system-defined Id or TyVar.  Typically the
                         -- OccName is very uninformative (like 's')

@@ -8,7 +8,34 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
--- | Tidying up Core
+{-| Tidying up Core
+
+This module is for the purpose of determining and fixing up
+what `Name`s should ultimately be internal and external in the
+interface files.
+
+For example:
+        module M where
+          f x = x + y
+            where y = factorial 4
+could be optimized by the Simplifier to:
+        module M where
+          y = factorial 4
+          f x = x + y
+in which case the `Name` `y` would be changed from internal to external.
+Another example (compiled without optimizations):
+        module M(f) where
+          y = factorial 4
+          f x = y + x
+in this case we will not want to expose `y` in the interface file or the
+object file, so it will be changed from external to internal.
+
+Note that when the `Name` is changed from internal to external
+it gets a new Unique and all its occurences are changed to the new `Name`.
+See Note [About the NameSorts] in GHC.Types.Name for what `Name`s
+such changes can potentially happen to (i.e. which ones start as
+internal and which ones as external).
+-}
 module GHC.Iface.Tidy
   ( TidyOpts (..)
   , UnfoldingExposure (..)
