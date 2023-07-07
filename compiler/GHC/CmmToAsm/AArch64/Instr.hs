@@ -110,6 +110,7 @@ regUsageOfInstr platform instr = case instr of
   LSR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   MOV dst src              -> usage (regOp src, regOp dst)
   MOVK dst src             -> usage (regOp src, regOp dst)
+  MOVZ dst src             -> usage (regOp src, regOp dst)
   MVN dst src              -> usage (regOp src, regOp dst)
   ORR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -251,6 +252,7 @@ patchRegsOfInstr instr env = case instr of
     LSR o1 o2 o3   -> LSR  (patchOp o1) (patchOp o2) (patchOp o3)
     MOV o1 o2      -> MOV  (patchOp o1) (patchOp o2)
     MOVK o1 o2     -> MOVK (patchOp o1) (patchOp o2)
+    MOVZ o1 o2     -> MOVZ (patchOp o1) (patchOp o2)
     MVN o1 o2      -> MVN  (patchOp o1) (patchOp o2)
     ORR o1 o2 o3   -> ORR  (patchOp o1) (patchOp o2) (patchOp o3)
     ROR o1 o2 o3   -> ROR  (patchOp o1) (patchOp o2) (patchOp o3)
@@ -381,9 +383,8 @@ mkSpillInstr config reg delta slot =
     where
         a .&~. b = a .&. (complement b)
 
-        fmt = case reg of
-            RegReal (RealRegSingle n) | n < 32 -> II64
-            _                                  -> FF64
+        fmt = fmtOfRealReg (case reg of { RegReal r -> r; _ -> panic "Expected real reg"})
+
         mkIp0SpillAddr imm = ANN (text "Spill: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
         mkStrSp imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
         mkStrIp0 imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 16) (ImmInt imm)))
@@ -408,9 +409,7 @@ mkLoadInstr config reg delta slot =
     where
         a .&~. b = a .&. (complement b)
 
-        fmt = case reg of
-            RegReal (RealRegSingle n) | n < 32 -> II64
-            _                                  -> FF64
+        fmt = fmtOfRealReg (case reg of { RegReal r -> r; _ -> panic "Expected real reg"})
 
         mkIp0SpillAddr imm = ANN (text "Reload: IP0 <- SP + " <> int imm) $ ADD ip0 sp (OpImm (ImmInt imm))
         mkLdrSp imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
@@ -619,7 +618,7 @@ data Instr
     | MOV Operand Operand -- rd = rn  or  rd = #i
     | MOVK Operand Operand
     -- | MOVN Operand Operand
-    -- | MOVZ Operand Operand
+    | MOVZ Operand Operand
     | MVN Operand Operand -- rd = ~rn
     | ORN Operand Operand Operand -- rd = rn | ~op2
     | ORR Operand Operand Operand -- rd = rn | op2
@@ -708,6 +707,7 @@ instrCon i =
       LSR{} -> "LSR"
       MOV{} -> "MOV"
       MOVK{} -> "MOVK"
+      MOVZ{} -> "MOVZ"
       MVN{} -> "MVN"
       ORN{} -> "ORN"
       ORR{} -> "ORR"
@@ -781,6 +781,9 @@ xzr = OpReg W64 (RegReal (RealRegSingle (-1)))
 wzr = OpReg W32 (RegReal (RealRegSingle (-1)))
 sp  = OpReg W64 (RegReal (RealRegSingle 31))
 ip0 = OpReg W64 (RegReal (RealRegSingle 16))
+
+reg_zero :: Reg
+reg_zero = RegReal (RealRegSingle (-1))
 
 _x :: Int -> Operand
 _x i = OpReg W64 (RegReal (RealRegSingle i))
