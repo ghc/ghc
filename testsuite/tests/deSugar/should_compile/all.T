@@ -113,3 +113,4 @@ test('T18112', [grep_errmsg('cast')], compile, ['-ddump-ds'])
 test('T19969', [grep_errmsg('LoopBreaker')], compile, ['-ddump-simpl -dsuppress-uniques']) # f should become loopbreaker
 test('T19883', normal, compile, [''])
 test('T22719', normal, compile, ['-ddump-simpl -dsuppress-uniques -dno-typeable-binds'])
+test('T23550', normal, compile, [''])
