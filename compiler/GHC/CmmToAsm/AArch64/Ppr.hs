@@ -418,6 +418,7 @@ pprInstr platform instr = case instr of
     | isFloatOp o1 || isFloatOp o2 -> op2 (text "\tfmov") o1 o2
     | otherwise                    -> op2 (text "\tmov") o1 o2
   MOVK o1 o2    -> op2 (text "\tmovk") o1 o2
+  MOVZ o1 o2    -> op2 (text "\tmovz") o1 o2
   MVN o1 o2     -> op2 (text "\tmvn") o1 o2
   ORN o1 o2 o3  -> op3 (text "\torn") o1 o2 o3
   ORR o1 o2 o3  -> op3 (text "\torr") o1 o2 o3
