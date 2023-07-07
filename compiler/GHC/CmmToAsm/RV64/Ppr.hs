@@ -638,6 +638,7 @@ pprInstr platform instr = case instr of
     -- op_add o1 (text "%pcrel_lo(" <> pprAsmLabel platform lbl <> text ")")
     line $ text "\tla" <+> pprOp platform o1 <> comma <+> pprAsmLabel platform lbl
 
+  -- TODO: Are these two special cases really needed?
   LDR _f o1@(OpReg W8 reg) o2 | isIntRealReg reg ->
     op2 (text "\tlb") o1 o2
   LDR _f o1@(OpReg W16 reg) o2 | isIntRealReg reg ->
@@ -649,6 +650,13 @@ pprInstr platform instr = case instr of
   LDR II64 o1 o2 -> op2 (text "\tld") o1 o2
   LDR FF32 o1 o2 -> op2 (text "\tflw") o1 o2
   LDR FF64 o1 o2 -> op2 (text "\tfld") o1 o2
+
+  LDRU II8  o1 o2 -> op2 (text "\tlbu") o1 o2
+  LDRU II16 o1 o2 -> op2 (text "\tlhu") o1 o2
+  LDRU II32 o1 o2 -> op2 (text "\tlwu") o1 o2
+  -- double words (64bit) cannot be sign extended by definition
+  LDRU II64 o1 o2 -> op2 (text "\tld") o1 o2
+  LDRU f o1 o2 -> pprPanic "Unsupported unsigned load" ((text.show) f <+> pprOp platform o1 <+> pprOp platform o2)
   -- LDAR _f o1 o2 -> op2 (text "\tldar") o1 o2
 
   -- STP _f o1 o2 o3 -> op3 (text "\tstp") o1 o2 o3

@@ -559,9 +559,16 @@ getRegister' config plat expr =
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (pdoc plat expr)
     CmmLoad mem rep _ -> do
-      Amode addr addr_code <- getAmode plat (typeWidth rep) mem
       let format = cmmTypeFormat rep
-      return (Any format (\dst -> addr_code `snocOL` LDR format (OpReg (formatToWidth format) dst) (OpAddr addr)))
+          width = typeWidth rep
+      Amode addr addr_code <- getAmode plat width mem
+      case width of
+        w | w <= W64 ->
+            -- Load without sign-extension. See Note [Signed arithmetic on RISCV64]
+            pure (Any format (\dst -> addr_code `snocOL` LDRU format (OpReg width dst) (OpAddr addr)))
+        _ ->
+          pprPanic ("Width too big! Cannot load: " ++ show width) (pdoc plat expr)
+
     CmmStackSlot _ _
       -> pprPanic "getRegister' (CmmStackSlot): " (pdoc plat expr)
     CmmReg reg

@@ -126,6 +126,7 @@ regUsageOfInstr platform instr = case instr of
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   -- STLR _ src dst      L     -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
+  LDRU _ dst src           -> usage (regOp src, regOp dst)
   -- LDAR _ dst src           -> usage (regOp src, regOp dst)
   -- TODO is this right? see STR, which I'm only partial about being right?
   -- STP _ src1 src2 dst      -> usage (regOp src1 ++ regOp src2 ++ regOp dst, [])
@@ -263,6 +264,7 @@ patchRegsOfInstr instr env = case instr of
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
     -- STLR f o1 o2   -> STLR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
+    LDRU f o1 o2    -> LDRU f (patchOp o1) (patchOp o2)
     -- LDAR f o1 o2   -> LDAR f (patchOp o1) (patchOp o2)
     -- STP f o1 o2 o3 -> STP f (patchOp o1) (patchOp o2) (patchOp o3)
     -- LDP f o1 o2 o3 -> LDP f (patchOp o1) (patchOp o2) (patchOp o3)
@@ -577,7 +579,8 @@ data Instr
     -- We do however have {L,S}{B,H,W,D}[U] instructions for Load/Store, Byte, Half, Word, Double, (Unsigned).
     -- Reusing the arm logic with the _format_ specifier will hopefully work.
     | STR Format Operand Operand -- str Xn, address-mode // Xn -> *addr
-    | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr
+    | LDR Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr (sign-extended)
+    | LDRU Format Operand Operand -- ldr Xn, address-mode // Xn <- *addr (unsigned)
 
     -- 3. Control Flow ---------------------------------------------------------
     -- B{EQ,GE,GEU,LT,LTU}, these are effectively BCOND from AArch64;
@@ -710,6 +713,7 @@ instrCon i =
       STR{} -> "STR"
       -- STLR{} -> "STLR"
       LDR{} -> "LDR"
+      LDRU{} -> "LDRU"
       -- LDAR{} -> "LDAR"
       -- STP{} -> "STP"
       -- LDP{} -> "LDP"
