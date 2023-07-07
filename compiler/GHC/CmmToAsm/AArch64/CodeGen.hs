@@ -372,6 +372,97 @@ getSomeReg expr = do
     Fixed rep reg code ->
         return (reg, rep, code)
 
+{- Note [Aarch64 immediates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Aarch64 with it's fixed width instruction encoding uses leftover space for
+immediates.
+If you want the full rundown consult the arch reference document:
+"Arm® Architecture Reference Manual" - "C3.4 Data processing - immediate"
+
+The gist of it is that different instructions allow for different immediate encodings.
+The ones we care about for better code generation are:
+
+* Simple but potentially repeated bit-patterns for logic instructions.
+* 16bit numbers shifted by multiples of 16.
+* 12 bit numbers optionally shifted by 12 bits.
+
+It might seem like the ISA allows for 64bit immediates but this isn't the case.
+Rather there are some instruction aliases which allow for large unencoded immediates
+which will then be transalted to one of the immediate encodings implicitly.
+
+For example mov x1, #0x10000 is allowed but will be assembled to movz x1, #0x1, lsl #16
+-}
+
+-- | Move (wide immediate)
+-- Allows for 16bit immediate which can be shifted by 0/16/32/48 bits.
+-- Used with MOVZ,MOVN, MOVK
+-- See Note [Aarch64 immediates]
+getMovWideImm :: Integer -> Width -> Maybe Operand
+getMovWideImm n w
+  -- TODO: Handle sign extension/negatives
+  | n <= 0
+  = Nothing
+  -- Fits in 16 bits
+  | sized_n < 2^(16 :: Int)
+  = Just $ OpImm (ImmInteger truncated)
+
+  -- 0x0000 0000 xxxx 0000
+  | trailing_zeros >= 16 && sized_n < 2^(32 :: Int)
+  = Just $ OpImmShift (ImmInteger $ truncated `shiftR` 16) SLSL 16
+
+  -- 0x 0000 xxxx 0000 0000
+  | trailing_zeros >= 32 && sized_n < 2^(48 :: Int)
+  = Just $ OpImmShift (ImmInteger $ truncated `shiftR` 32) SLSL 32
+
+  -- 0x xxxx 0000 0000 0000
+  | trailing_zeros >= 48
+  = Just $ OpImmShift (ImmInteger $ truncated `shiftR` 48) SLSL 48
+
+  | otherwise
+  = Nothing
+  where
+    truncated = narrowU w n
+    sized_n = fromIntegral truncated :: Word64
+    trailing_zeros = countTrailingZeros sized_n
+
+-- | Arithmetic(immediate)
+--  Allows for 12bit immediates which can be shifted by 0 or 12 bits.
+-- Used with ADD, ADDS, SUB, SUBS, CMP, CMN
+-- See Note [Aarch64 immediates]
+getArithImm :: Integer -> Width -> Maybe Operand
+getArithImm n w
+  -- TODO: Handle sign extension
+  | n <= 0
+  = Nothing
+  -- Fits in 16 bits
+  -- Fits in 12 bits
+  | sized_n < 2^(12::Int)
+  = Just $ OpImm (ImmInteger truncated)
+
+  -- 12 bits shifted by 12 places.
+  | trailing_zeros >= 12 && sized_n < 2^(24::Int)
+  = Just $ OpImmShift (ImmInteger $ truncated `shiftR` 12) SLSL 12
+
+  | otherwise
+  = Nothing
+  where
+    sized_n = fromIntegral truncated :: Word64
+    truncated = narrowU w n
+    trailing_zeros = countTrailingZeros sized_n
+
+-- |  Logical (immediate)
+-- Allows encoding of some repeated bitpatterns
+-- Used with AND, ANDS, EOR, ORR, TST
+-- and their aliases which includes at least MOV (bitmask immediate)
+-- See Note [Aarch64 immediates]
+getBitmaskImm :: Integer -> Width -> Maybe Operand
+getBitmaskImm n w
+  | isAArch64Bitmask truncated = Just $ OpImm (ImmInteger truncated)
+  | otherwise = Nothing
+  where
+    truncated = narrowU w n
+
+
 -- TODO OPT: we might be able give getRegister
 --          a hint, what kind of register we want.
 getFloatReg :: HasCallStack => CmmExpr -> NatM (Reg, Format, InstrBlock)
@@ -494,8 +585,14 @@ getRegister' config plat expr
     CmmLit lit
       -> case lit of
 
-        -- TODO handle CmmInt 0 specially, use wzr or xzr.
-
+        -- Use wzr xzr for CmmInt 0 if the width matches up, otherwise do a move.
+        -- TODO: Reenable after https://gitlab.haskell.org/ghc/ghc/-/issues/23632 is fixed.
+        -- CmmInt 0 W32 -> do
+        --   let format = intFormat W32
+        --   return (Fixed format reg_zero (unitOL $ (COMMENT ((text . show $ expr))) ))
+        -- CmmInt 0 W64 -> do
+        --   let format = intFormat W64
+        --   return (Fixed format reg_zero (unitOL $ (COMMENT ((text . show $ expr))) ))
         CmmInt i W8 | i >= 0 -> do
           return (Any (intFormat W8) (\dst -> unitOL $ annExpr expr (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowU W8 i))))))
         CmmInt i W16 | i >= 0 -> do
@@ -510,8 +607,13 @@ getRegister' config plat expr
         -- Those need the upper bits set. We'd either have to explicitly sign
         -- or figure out something smarter. Lowered to
         -- `MOV dst XZR`
+        CmmInt i w | i >= 0
+                   , Just imm_op <- getMovWideImm i w -> do
+          return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOVZ (OpReg w dst) imm_op)))
+
         CmmInt i w | isNbitEncodeable 16 i, i >= 0 -> do
           return (Any (intFormat w) (\dst -> unitOL $ annExpr expr (MOV (OpReg W16 dst) (OpImm (ImmInteger i)))))
+
         CmmInt i w | isNbitEncodeable 32 i, i >= 0 -> do
           let  half0 = fromIntegral (fromIntegral i :: Word16)
                half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
@@ -586,7 +688,6 @@ getRegister' config plat expr
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-              -- width = typeWidth rep
           return (Any format (\dst -> imm_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op))
 
         CmmLabelOff lbl off -> do
@@ -791,17 +892,51 @@ getRegister' config plat expr
           -- withTempFloatReg w op = OpReg w <$> getNewRegNat (floatFormat w) >>= op
 
           -- A "plain" operation.
-          bitOp w op = do
+          bitOpImm w op encode_imm = do
             -- compute x<m> <- x
             -- compute x<o> <- y
             -- <OP> x<n>, x<m>, x<o>
             (reg_x, format_x, code_x) <- getSomeReg x
-            (reg_y, format_y, code_y) <- getSomeReg y
-            massertPpr (isIntFormat format_x == isIntFormat format_y) $ text "bitOp: incompatible"
+            (op_y, format_y, code_y) <- case y of
+              CmmLit (CmmInt n w)
+                | Just imm_operand_y <- encode_imm n w
+                -> return (imm_operand_y, intFormat w, nilOL)
+              _ -> do
+                  (reg_y, format_y, code_y) <- getSomeReg y
+                  return (OpReg w reg_y, format_y, code_y)
+            massertPpr (isIntFormat format_x == isIntFormat format_y) $ text "bitOpImm: incompatible"
             return $ Any (intFormat w) (\dst ->
                 code_x `appOL`
                 code_y `appOL`
-                op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y))
+                op (OpReg w dst) (OpReg w reg_x) op_y)
+
+          -- A (potentially signed) integer operation.
+          -- In the case of 8- and 16-bit signed arithmetic we must first
+          -- sign-extend both arguments to 32-bits.
+          -- See Note [Signed arithmetic on AArch64].
+          intOpImm :: Bool -> Width -> (Operand -> Operand -> Operand -> OrdList Instr) -> (Integer -> Width -> Maybe Operand) -> NatM (Register)
+          intOpImm {- is signed -} True w op _encode_imm = intOp True w op
+          intOpImm False w op encode_imm = do
+              -- compute x<m> <- x
+              -- compute x<o> <- y
+              -- <OP> x<n>, x<m>, x<o>
+              (reg_x, format_x, code_x) <- getSomeReg x
+              (op_y, format_y, code_y) <- case y of
+                CmmLit (CmmInt n w)
+                  | Just imm_operand_y <- encode_imm n w
+                  -> return (imm_operand_y, intFormat w, nilOL)
+                _ -> do
+                    (reg_y, format_y, code_y) <- getSomeReg y
+                    return (OpReg w reg_y, format_y, code_y)
+              massertPpr (isIntFormat format_x && isIntFormat format_y) $ text "intOp: non-int"
+              -- This is the width of the registers on which the operation
+              -- should be performed.
+              let w' = opRegWidth w
+              return $ Any (intFormat w) $ \dst ->
+                  code_x `appOL`
+                  code_y `appOL`
+                  op (OpReg w' dst) (OpReg w' reg_x) (op_y) `appOL`
+                  truncateReg w' w dst -- truncate back to the operand's original width
 
           -- A (potentially signed) integer operation.
           -- In the case of 8- and 16-bit signed arithmetic we must first
@@ -847,9 +982,9 @@ getRegister' config plat expr
       case op of
         -- Integer operations
         -- Add/Sub should only be Integer Options.
-        MO_Add w -> intOp False w (\d x y -> unitOL $ annExpr expr (ADD d x y))
+        MO_Add w -> intOpImm False w (\d x y -> unitOL $ annExpr expr (ADD d x y)) getArithImm
         -- TODO: Handle sub-word case
-        MO_Sub w -> intOp False w (\d x y -> unitOL $ annExpr expr (SUB d x y))
+        MO_Sub w -> intOpImm False w (\d x y -> unitOL $ annExpr expr (SUB d x y)) getArithImm
 
         -- Note [CSET]
         -- ~~~~~~~~~~~
@@ -891,8 +1026,8 @@ getRegister' config plat expr
 
         -- N.B. We needn't sign-extend sub-word size (in)equality comparisons
         -- since we don't care about ordering.
-        MO_Eq w     -> bitOp w (\d x y -> toOL [ CMP x y, CSET d EQ ])
-        MO_Ne w     -> bitOp w (\d x y -> toOL [ CMP x y, CSET d NE ])
+        MO_Eq w     -> bitOpImm w (\d x y -> toOL [ CMP x y, CSET d EQ ]) getArithImm
+        MO_Ne w     -> bitOpImm w (\d x y -> toOL [ CMP x y, CSET d NE ]) getArithImm
 
         -- Signed multiply/divide
         MO_Mul w          -> intOp True w (\d x y -> unitOL $ MUL d x y)
@@ -921,10 +1056,10 @@ getRegister' config plat expr
         MO_S_Lt w     -> intOp True  w (\d x y -> toOL [ CMP x y, CSET d SLT ])
 
         -- Unsigned comparisons
-        MO_U_Ge w     -> intOp False w (\d x y -> toOL [ CMP x y, CSET d UGE ])
-        MO_U_Le w     -> intOp False w (\d x y -> toOL [ CMP x y, CSET d ULE ])
-        MO_U_Gt w     -> intOp False w (\d x y -> toOL [ CMP x y, CSET d UGT ])
-        MO_U_Lt w     -> intOp False w (\d x y -> toOL [ CMP x y, CSET d ULT ])
+        MO_U_Ge w     -> intOpImm False w (\d x y -> toOL [ CMP x y, CSET d UGE ]) getArithImm
+        MO_U_Le w     -> intOpImm False w (\d x y -> toOL [ CMP x y, CSET d ULE ]) getArithImm
+        MO_U_Gt w     -> intOpImm False w (\d x y -> toOL [ CMP x y, CSET d UGT ]) getArithImm
+        MO_U_Lt w     -> intOpImm False w (\d x y -> toOL [ CMP x y, CSET d ULT ]) getArithImm
 
         -- Floating point arithmetic
         MO_F_Add w   -> floatOp w (\d x y -> unitOL $ ADD d x y)
@@ -947,9 +1082,9 @@ getRegister' config plat expr
         MO_F_Lt w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OLT ]) -- x < y <=> y >= x
 
         -- Bitwise operations
-        MO_And   w -> bitOp w (\d x y -> unitOL $ AND d x y)
-        MO_Or    w -> bitOp w (\d x y -> unitOL $ ORR d x y)
-        MO_Xor   w -> bitOp w (\d x y -> unitOL $ EOR d x y)
+        MO_And   w -> bitOpImm w (\d x y -> unitOL $ AND d x y) getBitmaskImm
+        MO_Or    w -> bitOpImm w (\d x y -> unitOL $ ORR d x y) getBitmaskImm
+        MO_Xor   w -> bitOpImm w (\d x y -> unitOL $ EOR d x y) getBitmaskImm
         MO_Shl   w -> intOp False w (\d x y -> unitOL $ LSL d x y)
         MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
         MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ ASR d x y)
@@ -999,7 +1134,7 @@ getRegister' config plat expr
 
   where
     isNbitEncodeable :: Int -> Integer -> Bool
-    isNbitEncodeable n i = let shift = n - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
+    isNbitEncodeable n_bits i = let shift = n_bits - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
 
     -- N.B. MUL does not set the overflow flag.
     do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
