@@ -730,37 +730,155 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# (word64ToWord# x#))
         | otherwise     = fromEnumError "Word64" x
-#if WORD_SIZE_IN_BITS < 64
+
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFrom #-}
-    enumFrom            = integralEnumFrom
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThen #-}
-    enumFromThen        = integralEnumFromThen
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromTo #-}
-    enumFromTo          = integralEnumFromTo
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThenTo #-}
-    enumFromThenTo      = integralEnumFromThenTo
-#else
-    -- use Word's Enum as it has better support for fusion. We can't use
-    -- `boundedEnumFrom` and `boundedEnumFromThen` -- which use Int's Enum
-    -- instance -- because Word64 isn't compatible with Int/Int64's domain.
-    --
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFrom #-}
-    enumFrom x          = map fromIntegral (enumFrom (fromIntegral x :: Word))
-    -- See Note [Stable Unfolding for list producers] in GHC.Enum
-    {-# INLINE enumFromThen #-}
-    enumFromThen x y    = map fromIntegral (enumFromThen (fromIntegral x :: Word) (fromIntegral y))
+    enumFrom (W64# x#)      = eftWord64 x# maxWord#
+        where !(W64# maxWord#) = maxBound
+        -- Blarg: technically I guess enumFrom isn't strict!
+
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFromTo #-}
-    enumFromTo x y      = map fromIntegral (enumFromTo (fromIntegral x :: Word) (fromIntegral y))
+    enumFromTo (W64# x) (W64# y) = eftWord64 x y
+
+    -- See Note [Stable Unfolding for list producers] in GHC.Enum
+    {-# INLINE enumFromThen #-}
+    enumFromThen (W64# x1) (W64# x2) = efdWord64 x1 x2
+
     -- See Note [Stable Unfolding for list producers] in GHC.Enum
     {-# INLINE enumFromThenTo #-}
-    enumFromThenTo x y z = map fromIntegral (enumFromThenTo (fromIntegral x :: Word) (fromIntegral y) (fromIntegral z))
-#endif
+    enumFromThenTo (W64# x1) (W64# x2) (W64# y) = efdtWord64 x1 x2 y
+
+
+-----------------------------------------------------
+-- eftWord64 and eftWord64FB deal with [a..b], which is the
+-- most common form, so we take a lot of care
+-- In particular, we have rules for deforestation
+
+{-# RULES
+"eftWord64"        [~1] forall x y. eftWord64 x y = build (\ c n -> eftWord64FB c n x y)
+"eftWord64List"    [1] eftWord64FB  (:) [] = eftWord64
+ #-}
+
+-- The Enum rules for Word64 work much the same way that they do for Int.
+-- See Note [How the Enum rules work].
+
+{-# NOINLINE [1] eftWord64 #-}
+eftWord64 :: Word64# -> Word64# -> [Word64]
+-- [x1..x2]
+eftWord64 x0 y | isTrue# (x0 `gtWord64#` y) = []
+               | otherwise                = go x0
+                  where
+                    go x = W64# x : if isTrue# (x `eqWord64#` y)
+                                    then []
+                                    else go (x `plusWord64#` (wordToWord64# 1##))
+
+{-# INLINE [0] eftWord64FB #-} -- See Note [Inline FB functions] in GHC.List
+eftWord64FB :: (Word64 -> r -> r) -> r -> Word64# -> Word64# -> r
+eftWord64FB c n x0 y | isTrue# (x0 `gtWord64#` y) = n
+                     | otherwise                = go x0
+                    where
+                      go x = W64# x `c` if isTrue# (x `eqWord64#` y)
+                                        then n
+                                        else go (x `plusWord64#` (wordToWord64# 1##))
+                            -- Watch out for y=maxBound; hence ==, not >
+        -- Be very careful not to have more than one "c"
+        -- so that when eftInfFB is inlined we can inline
+        -- whatever is bound to "c"
+
+
+-----------------------------------------------------
+-- efdWord64 and efdtWord64 deal with [a,b..] and [a,b..c].
+-- The code is more complicated because of worries about Word64 overflow.
+
+-- See Note [How the Enum rules work]
+{-# RULES
+"efdtWord64"       [~1] forall x1 x2 y.
+                     efdtWord64 x1 x2 y = build (\ c n -> efdtWord64FB c n x1 x2 y)
+"efdtWord64UpList" [1]  efdtWord64FB (:) [] = efdtWord64
+ #-}
+
+efdWord64 :: Word64# -> Word64# -> [Word64]
+-- [x1,x2..maxWord64]
+efdWord64 x1 x2
+ | isTrue# (x2 `geWord64#` x1) = case maxBound of W64# y -> efdtWord64Up x1 x2 y
+ | otherwise                   = case minBound of W64# y -> efdtWord64Dn x1 x2 y
+
+{-# NOINLINE [1] efdtWord64 #-}
+efdtWord64 :: Word64# -> Word64# -> Word64# -> [Word64]
+-- [x1,x2..y]
+efdtWord64 x1 x2 y
+ | isTrue# (x2 `geWord64#` x1) = efdtWord64Up x1 x2 y
+ | otherwise                   = efdtWord64Dn x1 x2 y
+
+{-# INLINE [0] efdtWord64FB #-} -- See Note [Inline FB functions] in GHC.List
+efdtWord64FB :: (Word64 -> r -> r) -> r -> Word64# -> Word64# -> Word64# -> r
+efdtWord64FB c n x1 x2 y
+ | isTrue# (x2 `geWord64#` x1) = efdtWord64UpFB c n x1 x2 y
+ | otherwise                   = efdtWord64DnFB c n x1 x2 y
+
+-- Requires x2 >= x1
+efdtWord64Up :: Word64# -> Word64# -> Word64# -> [Word64]
+efdtWord64Up x1 x2 y    -- Be careful about overflow!
+ | isTrue# (y `ltWord64#` x2) = if isTrue# (y `ltWord64#` x1) then [] else [W64# x1]
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let !delta = x2 `subWord64#` x1 -- >= 0
+                   !y' = y `subWord64#` delta  -- x1 <= y' <= y; hence y' is representable
+
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | isTrue# (x `gtWord64#` y') = [W64# x]
+                           | otherwise                  = W64# x : go_up (x `plusWord64#` delta)
+               in W64# x1 : go_up x2
+
+-- Requires x2 >= x1
+{-# INLINE [0] efdtWord64UpFB #-} -- See Note [Inline FB functions] in GHC.List
+efdtWord64UpFB :: (Word64 -> r -> r) -> r -> Word64# -> Word64# -> Word64# -> r
+efdtWord64UpFB c n x1 x2 y    -- Be careful about overflow!
+ | isTrue# (y `ltWord64#` x2) = if isTrue# (y `ltWord64#` x1) then n else W64# x1 `c` n
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let !delta = x2 `subWord64#` x1 -- >= 0
+                   !y' = y `subWord64#` delta  -- x1 <= y' <= y; hence y' is representable
+
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | isTrue# (x `gtWord64#` y') = W64# x `c` n
+                           | otherwise                  = W64# x `c` go_up (x `plusWord64#` delta)
+               in W64# x1 `c` go_up x2
+
+-- Requires x2 <= x1
+efdtWord64Dn :: Word64# -> Word64# -> Word64# -> [Word64]
+efdtWord64Dn x1 x2 y    -- Be careful about underflow!
+ | isTrue# (y `gtWord64#` x2) = if isTrue# (y `gtWord64#` x1) then [] else [W64# x1]
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let !delta = x2 `subWord64#` x1 -- <= 0
+                   !y' = y `subWord64#` delta  -- y <= y' <= x1; hence y' is representable
+
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | isTrue# (x `ltWord64#` y') = [W64# x]
+                           | otherwise                  = W64# x : go_dn (x `plusWord64#` delta)
+   in W64# x1 : go_dn x2
+
+-- Requires x2 <= x1
+{-# INLINE [0] efdtWord64DnFB #-} -- See Note [Inline FB functions] in GHC.List
+efdtWord64DnFB :: (Word64 -> r -> r) -> r -> Word64# -> Word64# -> Word64# -> r
+efdtWord64DnFB c n x1 x2 y    -- Be careful about underflow!
+ | isTrue# (y `gtWord64#` x2) = if isTrue# (y `gtWord64#` x1) then n else W64# x1 `c` n
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let !delta = x2 `subWord64#` x1 -- <= 0
+                   !y' = y `subWord64#` delta  -- y <= y' <= x1; hence y' is representable
+
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | isTrue# (x `ltWord64#` y') = W64# x `c` n
+                           | otherwise                  = W64# x `c` go_dn (x `plusWord64#` delta)
+               in W64# x1 `c` go_dn x2
+
 
 -- | @since 2.01
 instance Integral Word64 where
