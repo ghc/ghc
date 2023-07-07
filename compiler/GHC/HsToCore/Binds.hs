@@ -117,10 +117,54 @@ dsTopLHsBinds binds
     top_level_err bindsType (L loc bind)
       = putSrcSpanDs (locA loc) $
         diagnosticDs (DsTopLevelBindsNotAllowed bindsType bind)
+{-
+Note [Return non-recursive bindings in dependency order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For recursive bindings, the desugarer has no choice: it returns a single big
+Rec{...} group.
 
+But for /non-recursive/ bindings, the desugarer guarantees to desugar them to
+a sequence of non-recurive Core bindings, in dependency order.
+
+Why is this important?  Partly it saves a bit of work in the first run of the
+ocurrence analyser. But more importantly, for linear types, non-recursive lets
+can be linear whereas recursive-let can't. Since we check the output of the
+desugarer for linearity (see also Note [Linting linearity]), desugaring
+non-recursive lets to recursive lets would break linearity checks. An
+alternative is to refine the typing rule for recursive lets so that we don't
+have to care (see in particular #23218 and #18694), but the outcome of this line
+of work is still unclear. In the meantime, being a little precise in the
+desugarer is cheap. (paragraph written on 2023-06-09)
+
+In dsLHSBinds (and dependencies), a single binding can be desugared to multiple
+bindings. For instance because the source binding has the {-# SPECIALIZE #-}
+pragma. In:
+
+f _ = …
+ where
+  {-# SPECIALIZE g :: F Int -> F Int #-}
+  g :: C a => F a -> F a
+  g _ = …
+
+The g binding desugars to
+
+let {
+  $sg = … } in
+
+  g
+  [RULES: "SPEC g" g @Int $dC = $sg]
+  g = …
+
+In order to avoid generating a letrec that will immediately be reordered, we
+make sure to return the binding in dependency order [$sg, g].
+
+-}
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
 -- later be forced in the binding group body, see Note [Desugar Strict binds]
+--
+-- Invariant: the desugared bindings are returned in dependency order,
+-- see Note [Return non-recursive bindings in dependency order]
 dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
   = do { ds_bs <- mapBagM dsLHsBind binds
@@ -134,6 +178,9 @@ dsLHsBind (L loc bind) = do dflags <- getDynFlags
                             putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
+--
+-- Invariant: the desugared bindings are returned in dependency order,
+-- see Note [Return non-recursive bindings in dependency order]
 dsHsBind :: DynFlags
          -> HsBind GhcTc
          -> DsM ([Id], [(Id,CoreExpr)])
@@ -214,7 +261,7 @@ dsHsBind
        ; dsTcEvBinds_s ev_binds $ \ds_ev_binds -> do
 
        -- dsAbsBinds does the hard work
-       { dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig } }
+       { dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds (isSingletonBag binds) has_sig } }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 
@@ -223,11 +270,12 @@ dsAbsBinds :: DynFlags
            -> [TyVar] -> [EvVar] -> [ABExport]
            -> [CoreBind]                -- Desugared evidence bindings
            -> ([Id], [(Id,CoreExpr)])   -- Desugared value bindings
+           -> Bool                      -- Single source binding
            -> Bool                      -- Single binding with signature
            -> DsM ([Id], [(Id,CoreExpr)])
 
 dsAbsBinds dflags tyvars dicts exports
-           ds_ev_binds (force_vars, bind_prs) has_sig
+           ds_ev_binds (force_vars, bind_prs) is_singleton has_sig
 
     -- A very important common case: one exported variable
     -- Non-recursive bindings come through this way
@@ -263,14 +311,20 @@ dsAbsBinds dflags tyvars dicts exports
                                        (isDefaultMethod prags)
                                        (dictArity dicts) rhs
 
-       ; return (force_vars', main_bind : fromOL spec_binds) } }
+       ; return (force_vars', fromOL spec_binds ++ [main_bind]) } }
 
     -- Another common case: no tyvars, no dicts
     -- In this case we can have a much simpler desugaring
     --    lcl_id{inl-prag} = rhs  -- Auxiliary binds
     --    gbl_id = lcl_id |> co   -- Main binds
+    --
+    -- See Note [The no-tyvar no-dict case]
   | null tyvars, null dicts
-  = do { let mk_main :: ABExport -> DsM (Id, CoreExpr)
+  = do { let wrap_first_bind f ((main, main_rhs):other_binds) =
+               ((main, f main_rhs):other_binds)
+             wrap_first_bind _ [] = panic "dsAbsBinds received an empty binding list"
+
+             mk_main :: ABExport -> DsM (Id, CoreExpr)
              mk_main (ABE { abe_poly = gbl_id, abe_mono = lcl_id
                           , abe_wrap = wrap })
                      -- No SpecPrags (no dicts)
@@ -278,15 +332,19 @@ dsAbsBinds dflags tyvars dicts exports
                = do { dsHsWrapper wrap $ \core_wrap -> do
                     { return ( gbl_id `setInlinePragma` defaultInlinePragma
                              , core_wrap (Var lcl_id)) } }
-
        ; main_prs <- mapM mk_main exports
-       ; return (force_vars, flattenBinds ds_ev_binds
-                              ++ mk_aux_binds bind_prs ++ main_prs ) }
+       ; let bind_prs' = map mk_aux_bind bind_prs
+             -- When there's a single source binding, we wrap the evidence binding in a
+             -- separate let-rec (DSB1) inside the first desugared binding (DSB2).
+             -- See Note [The no-tyvar no-dict case].
+             final_prs | is_singleton = wrap_first_bind (mkCoreLets ds_ev_binds) bind_prs'
+                       | otherwise = flattenBinds ds_ev_binds ++ bind_prs'
+       ; return (force_vars, final_prs ++ main_prs ) }
 
     -- The general case
     -- See Note [Desugaring AbsBinds]
   | otherwise
-  = do { let aux_binds = Rec (mk_aux_binds bind_prs)
+  = do { let aux_binds = Rec (map mk_aux_bind bind_prs)
                 -- Monomorphic recursion possible, hence Rec
 
              new_force_vars = get_new_force_vars force_vars
@@ -322,7 +380,7 @@ dsAbsBinds dflags tyvars dicts exports
                            -- Kill the INLINE pragma because it applies to
                            -- the user written (local) function.  The global
                            -- Id is just the selector.  Hmm.
-                     ; return ((global', rhs) : fromOL spec_binds) } }
+                     ; return (fromOL spec_binds ++ [(global', rhs)]) } }
 
        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
@@ -330,11 +388,11 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
-    mk_aux_binds :: [(Id,CoreExpr)] -> [(Id,CoreExpr)]
-    mk_aux_binds bind_prs = [ makeCorePair dflags lcl_w_inline False 0 rhs
-                            | (lcl_id, rhs) <- bind_prs
-                            , let lcl_w_inline = lookupVarEnv inline_env lcl_id
-                                                 `orElse` lcl_id ]
+    mk_aux_bind :: (Id,CoreExpr) -> (Id,CoreExpr)
+    mk_aux_bind (lcl_id, rhs) = let lcl_w_inline = lookupVarEnv inline_env lcl_id
+                                                   `orElse` lcl_id
+                                 in
+                                 makeCorePair dflags lcl_w_inline False 0 rhs
 
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
                            -- the inline pragma from the source
@@ -473,47 +531,70 @@ So the overloading is in the nested AbsBinds. A good example is in GHC.Float:
 The top-level AbsBinds for $cround has no tyvars or dicts (because the
 instance does not).  But the method is locally overloaded!
 
-Note [Abstracting over tyvars only]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When abstracting over type variable only (not dictionaries), we don't really need to
-built a tuple and select from it, as we do in the general case. Instead we can take
+Note [The no-tyvar no-dict case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are desugaring
+    AbsBinds { tyvars   = []
+             , dicts    = []
+             , exports  = [ ABE f fm, ABE g gm ]
+             , binds    = B
+             , ev_binds = EB }
+That is: no type variables or dictionary abstractions.  Here, `f` and `fm` are
+the polymorphic and monomorphic versions of `f`; in this special case they will
+both have the same type.
 
-        AbsBinds [a,b] [ ([a,b], fg, fl, _),
-                         ([b],   gg, gl, _) ]
-                { fl = e1
-                  gl = e2
-                   h = e3 }
+Specialising Note [Desugaring AbsBinds] for this case gives the desugaring
 
-and desugar it to
+    tup = letrec EB' in letrec B' in (fm,gm)
+    f = case tup of { (fm,gm) -> fm }
+    g = case tup of { (fm,gm) -> fm }
 
-        fg = /\ab. let B in e1
-        gg = /\b. let a = () in let B in S(e2)
-        h  = /\ab. let B in e3
+where B' is the result of desugaring B. This desugaring is a little silly: we
+don't need the intermediate tuple (contrast with the general case where fm and f
+have different types). So instead, in this case, we desugar to
 
-where B is the *non-recursive* binding
-        fl = fg a b
-        gl = gg b
-        h  = h a b    -- See (b); note shadowing!
+    EB'; B'; f=fm; g=gm
 
-Notice (a) g has a different number of type variables to f, so we must
-             use the mkArbitraryType thing to fill in the gaps.
-             We use a type-let to do that.
+This is done in the `null tyvars, null dicts` case of `dsAbsBinds`.
 
-         (b) The local variable h isn't in the exports, and rather than
-             clone a fresh copy we simply replace h by (h a b), where
-             the two h's have different types!  Shadowing happens here,
-             which looks confusing but works fine.
+But there is a wrinkle (DSB1).  If the original binding group was
+/non-recursive/, we want to return a bunch of non-recursive bindings in
+dependency order: see Note [Return non-recursive bindings in dependency order].
 
-         (c) The result is *still* quadratic-sized if there are a lot of
-             small bindings.  So if there are more than some small
-             number (10), we filter the binding set B by the free
-             variables of the particular RHS.  Tiresome.
+But there is no guarantee that EB', the desugared evidence bindings, will be
+non-recursive.  Happily, in the non-recursive case, B will have just a single
+binding (f = rhs), so we can wrap EB' around its RHS, thus:
+
+   fm = letrec EB' in rhs; f = fm
+
+There is a sub-wrinkle (DSB2).  If B is a /pattern/ bindings, it will desugar to
+a "main" binding followed by a bunch of selectors. The main binding always
+comes first, so we can pick it out and wrap EB' around its RHS.  For example
+
+    AbsBinds { tyvars   = []
+             , dicts    = []
+             , exports  = [ ABE p pm, ABE q qm ]
+             , binds    = PatBind (pm, Just qm) rhs
+             , ev_binds = EB }
+
+can desguar to
+
+   pt = let EB' in
+        case rhs of
+          (pm,Just qm) -> (pm,qm)
+   pm = case pt of (pm,qm) -> pm
+   qm = case pt of (pm,qm) -> qm
+
+   p = pm
+   q = qm
+
+The first three bindings come from desugaring the PatBind, and subsequently
+wrapping the RHS of the main binding in EB'.
 
 Why got to this trouble?  It's a common case, and it removes the
 quadratic-sized tuple desugaring.  Less clutter, hopefully faster
 compilation, especially in a case where there are a *lot* of
 bindings.
-
 
 Note [Eta-expanding INLINE things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
