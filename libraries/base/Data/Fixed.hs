@@ -13,10 +13,19 @@
 -- Stability   :  stable
 -- Portability :  portable
 --
--- This module defines a \"Fixed\" type for fixed-precision arithmetic.
--- The parameter to 'Fixed' is any type that's an instance of 'HasResolution'.
--- 'HasResolution' has a single method that gives the resolution of the 'Fixed'
--- type.
+-- This module defines a 'Fixed' type for working with fixed-point arithmetic.
+-- Fixed-point arithmetic represents fractional numbers with a fixed number of
+-- digits for their fractional part. This is different to the behaviour of the floating-point
+-- number types 'Float' and 'Double', because the number of digits of the
+-- fractional part of 'Float' and 'Double' numbers depends on the size of the number.
+-- Fixed point arithmetic is frequently used in financial mathematics, where they
+-- are used for representing decimal currencies.
+--
+-- The type 'Fixed' is used for fixed-point fractional numbers, which are internally
+-- represented as an 'Integer'. The type 'Fixed' takes one parameter, which should implement
+-- the typeclass 'HasResolution', to specify the number of digits of the fractional part.
+-- This module provides instances of the `HasResolution` typeclass for arbitrary typelevel
+-- natural numbers, and for some canonical important fixed-point representations.
 --
 -- This module also contains generalisations of 'div', 'mod', and 'divMod' to
 -- work with any 'Real' instance.
@@ -31,18 +40,49 @@
 -----------------------------------------------------------------------------
 
 module Data.Fixed
-(
-    div',mod',divMod',
-
+(   -- * The Fixed Type
     Fixed(..), HasResolution(..),
     showFixed,
+    -- * Resolution \/ Scaling Factors
+    -- | The resolution or scaling factor determines the number of digits in the fractional part.
+    --
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | Resolution | Scaling Factor       | Synonym for \"Fixed EX\" | show (12345 :: Fixed EX) |
+    -- +============+======================+==========================+==========================+
+    -- | E0         | 1\/1                 | Uni                      | 12345.0                  |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E1         | 1\/10                | Deci                     | 1234.5                   |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E2         | 1\/100               | Centi                    | 123.45                   |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E3         | 1\/1 000             | Milli                    | 12.345                   |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E6         | 1\/1 000 000         | Micro                    | 0.012345                 |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E9         | 1\/1 000 000 000     | Nano                     | 0.000012345              |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    -- | E12        | 1\/1 000 000 000 000 | Pico                     | 0.000000012345           |
+    -- +------------+----------------------+--------------------------+--------------------------+
+    --
+
+    -- ** 1\/1
     E0,Uni,
+    -- ** 1\/10
     E1,Deci,
+    -- ** 1\/100
     E2,Centi,
+    -- ** 1\/1 000
     E3,Milli,
+    -- ** 1\/1 000 000
     E6,Micro,
+    -- ** 1\/1 000 000 000
     E9,Nano,
-    E12,Pico
+    -- ** 1\/1 000 000 000 000
+    E12,Pico,
+    -- * Generalized Functions on Real's
+    div',
+    mod',
+    divMod'
 ) where
 
 import Data.Data
@@ -67,7 +107,14 @@ mod' :: (Real a) => a -> a -> a
 mod' n d = n - (fromInteger f) * d where
     f = div' n d
 
--- | The type parameter should be an instance of 'HasResolution'.
+-- | The type of fixed-point fractional numbers.
+--   The type parameter specifies the number of digits of the fractional part and should be an instance of the 'HasResolution' typeclass.
+--
+-- === __Examples__
+--
+-- @
+--  MkFixed 12345 :: Fixed E3
+-- @
 newtype Fixed (a :: k) = MkFixed Integer
         deriving ( Eq  -- ^ @since 2.01
                  , Ord -- ^ @since 2.01
@@ -77,6 +124,7 @@ newtype Fixed (a :: k) = MkFixed Integer
 -- Our manual instance has the more general (Typeable a) context.
 tyFixed :: DataType
 tyFixed = mkDataType "Data.Fixed.Fixed" [conMkFixed]
+
 conMkFixed :: Constr
 conMkFixed = mkConstr tyFixed "MkFixed" [] Prefix
 
@@ -87,7 +135,9 @@ instance (Typeable k,Typeable a) => Data (Fixed (a :: k)) where
     dataTypeOf _ = tyFixed
     toConstr _ = conMkFixed
 
+-- | Types which can be used as a resolution argument to the 'Fixed' type constructor must implement the 'HasResolution'  typeclass.
 class HasResolution (a :: k) where
+    -- | Provide the resolution for a fixed-point fractional number.
     resolution :: p a -> Integer
 
 -- | For example, @Fixed 1000@ will give you a 'Fixed' with a resolution of 1000.
@@ -109,33 +159,26 @@ withResolution foo = withType (foo . resolution)
 -- resolution of the 'Fixed' value. For example, when enumerating values of
 -- resolution @10^-3@ of @type Milli = Fixed E3@,
 --
--- @
---   succ (0.000 :: Milli) == 0.001
--- @
---
+-- >>> succ (0.000 :: Milli)
+-- 0.001
 --
 -- and likewise
 --
--- @
---   pred (0.000 :: Milli) == -0.001
--- @
---
+-- >>> pred (0.000 :: Milli)
+-- -0.001
 --
 -- In other words, 'succ' and 'pred' increment and decrement a fixed-precision
 -- value by the least amount such that the value's resolution is unchanged.
 -- For example, @10^-12@ is the smallest (positive) amount that can be added to
 -- a value of @type Pico = Fixed E12@ without changing its resolution, and so
 --
--- @
---   succ (0.000000000000 :: Pico) == 0.000000000001
--- @
---
+-- >>> succ (0.000000000000 :: Pico)
+-- 0.000000000001
 --
 -- and similarly
 --
--- @
---   pred (0.000000000000 :: Pico) == -0.000000000001
--- @
+-- >>> pred (0.000000000000 :: Pico)
+-- -0.000000000001
 --
 --
 -- This is worth bearing in mind when defining 'Fixed' arithmetic sequences. In
@@ -175,6 +218,7 @@ instance Enum (Fixed a) where
 --
 -- >>> (0.2 * 0.6 :: Deci) * 0.9 == 0.2 * (0.6 * 0.9)
 -- False
+--
 -- >>> (0.1 + 0.1 :: Deci) * 0.5 == 0.1 * 0.5 + 0.1 * 0.5
 -- False
 instance (HasResolution a) => Num (Fixed a) where
@@ -223,6 +267,15 @@ withDot "" = ""
 withDot s = '.':s
 
 -- | First arg is whether to chop off trailing zeros
+--
+-- === __Examples__
+--
+-- >>> showFixed True  (MkFixed 10000 :: Fixed E3)
+-- "10"
+--
+-- >>> showFixed False (MkFixed 10000 :: Fixed E3)
+-- "10.000"
+--
 showFixed :: (HasResolution a) => Bool -> Fixed a -> String
 showFixed chopTrailingZeros fa@(MkFixed a) | a < 0 = "-" ++ (showFixed chopTrailingZeros (asTypeOf (MkFixed (negate a)) fa))
 showFixed chopTrailingZeros fa@(MkFixed a) = (show i) ++ (withDot (showIntegerZeros chopTrailingZeros digits fracNum)) where
@@ -256,58 +309,135 @@ convertFixed (Number n)
           e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
+-- | Resolution of 1, this works the same as Integer.
 data E0
 
 -- | @since 4.1.0.0
 instance HasResolution E0 where
     resolution _ = 1
--- | resolution of 1, this works the same as Integer
+
+-- | Resolution of 1, this works the same as Integer.
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E0)
+-- "12345.0"
+--
+-- >>> show (MkFixed 12345 :: Uni)
+-- "12345.0"
+--
 type Uni = Fixed E0
 
+-- | Resolution of 10^-1 = .1
 data E1
 
 -- | @since 4.1.0.0
 instance HasResolution E1 where
     resolution _ = 10
--- | resolution of 10^-1 = .1
+
+-- | Resolution of 10^-1 = .1
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E1)
+-- "1234.5"
+--
+-- >>> show (MkFixed 12345 :: Deci)
+-- "1234.5"
+--
 type Deci = Fixed E1
 
+-- | Resolution of 10^-2 = .01, useful for many monetary currencies
 data E2
 
 -- | @since 4.1.0.0
 instance HasResolution E2 where
     resolution _ = 100
--- | resolution of 10^-2 = .01, useful for many monetary currencies
+
+-- | Resolution of 10^-2 = .01, useful for many monetary currencies
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E2)
+-- "123.45"
+--
+-- >>> show (MkFixed 12345 :: Centi)
+-- "123.45"
+--
 type Centi = Fixed E2
 
+-- | Resolution of 10^-3 = .001
 data E3
 
 -- | @since 4.1.0.0
 instance HasResolution E3 where
     resolution _ = 1000
--- | resolution of 10^-3 = .001
+
+-- | Resolution of 10^-3 = .001
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E3)
+-- "12.345"
+--
+-- >>> show (MkFixed 12345 :: Milli)
+-- "12.345"
+--
 type Milli = Fixed E3
 
+-- | Resolution of 10^-6 = .000001
 data E6
 
 -- | @since 2.01
 instance HasResolution E6 where
     resolution _ = 1000000
--- | resolution of 10^-6 = .000001
+
+-- | Resolution of 10^-6 = .000001
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E6)
+-- "0.012345"
+--
+-- >>> show (MkFixed 12345 :: Micro)
+-- "0.012345"
+--
 type Micro = Fixed E6
 
+-- | Resolution of 10^-9 = .000000001
 data E9
 
 -- | @since 4.1.0.0
 instance HasResolution E9 where
     resolution _ = 1000000000
--- | resolution of 10^-9 = .000000001
+
+-- | Resolution of 10^-9 = .000000001
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E9)
+-- "0.000012345"
+--
+-- >>> show (MkFixed 12345 :: Nano)
+-- "0.000012345"
+--
 type Nano = Fixed E9
 
+-- | Resolution of 10^-12 = .000000000001
 data E12
 
 -- | @since 2.01
 instance HasResolution E12 where
     resolution _ = 1000000000000
--- | resolution of 10^-12 = .000000000001
+
+-- | Resolution of 10^-12 = .000000000001
+--
+-- === __Examples__
+--
+-- >>> show (MkFixed 12345 :: Fixed E12)
+-- "0.000000012345"
+--
+-- >>> show (MkFixed 12345 :: Pico)
+-- "0.000000012345"
+--
 type Pico = Fixed E12
