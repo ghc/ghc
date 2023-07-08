@@ -212,7 +212,7 @@ denominator (_ :% y)    =  y
 -- 'Foreign.C.Types.CDouble', etc., because these types contain non-finite values,
 -- which cannot be roundtripped through 'Rational'.
 class  (Num a, Ord a) => Real a  where
-    -- | the rational equivalent of its real argument with full precision
+    -- | Rational equivalent of its real argument with full precision.
     toRational          ::  a -> Rational
 
 -- | Integral numbers, supporting integer division.
@@ -233,41 +233,41 @@ class  (Num a, Ord a) => Real a  where
 -- In addition, 'toInteger` should be total, and 'fromInteger' should be a left
 -- inverse for it, i.e. @fromInteger (toInteger i) = i@.
 class  (Real a, Enum a) => Integral a  where
-    -- | integer division truncated toward zero
+    -- | Integer division truncated toward zero.
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     quot                :: a -> a -> a
-    -- | integer remainder, satisfying
+    -- | Integer remainder, satisfying
     --
     -- > (x `quot` y)*y + (x `rem` y) == x
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     rem                 :: a -> a -> a
-    -- | integer division truncated toward negative infinity
+    -- | Integer division truncated toward negative infinity.
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     div                 :: a -> a -> a
-    -- | integer modulus, satisfying
+    -- | Integer modulus, satisfying
     --
     -- > (x `div` y)*y + (x `mod` y) == x
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     mod                 :: a -> a -> a
-    -- | simultaneous 'quot' and 'rem'
+    -- | Simultaneous 'quot' and 'rem'.
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     quotRem             :: a -> a -> (a,a)
-    -- | simultaneous 'div' and 'mod'
+    -- | simultaneous 'div' and 'mod'.
     --
     -- WARNING: This function is partial (because it throws when 0 is passed as
     -- the divisor) for all the integer types in @base@.
     divMod              :: a -> a -> (a,a)
-    -- | conversion to 'Integer'
+    -- | Conversion to 'Integer'.
     toInteger           :: a -> Integer
 
     {-# INLINE quot #-}
