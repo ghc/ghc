@@ -167,11 +167,11 @@ default ()
 -- Integers are stored in a kind of sign-magnitude form, hence do not expect
 -- two's complement form when using bit operations.
 --
--- If the value is small (fit into an 'Int'), 'IS' constructor is used.
--- Otherwise 'IP' and 'IN' constructors are used to store a 'BigNat'
--- representing respectively the positive or the negative value magnitude.
+-- If the value is small (i.e., fits into an 'Int'), the 'IS' constructor is
+-- used. Otherwise 'IP' and 'IN' constructors are used to store a 'BigNat'
+-- representing the positive or the negative value magnitude, respectively.
 --
--- Invariant: 'IP' and 'IN' are used iff value doesn't fit in 'IS'
+-- Invariant: 'IP' and 'IN' are used iff the value does not fit in 'IS'.
 data Integer
    = IS !Int#    -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
    | IP !BigNat# -- ^ iff value in @]maxBound::'Int', +inf[@ range
