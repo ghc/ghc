@@ -1617,10 +1617,42 @@ otherwise               =  True
 -- Type Char and String
 ----------------------------------------------
 
--- | A 'String' is a list of characters.  String constants in Haskell are values
--- of type 'String'.
+-- | 'String' is an alias for a list of characters.
 --
--- See "Data.List" for operations on lists.
+-- String constants in Haskell are values of type 'String'.
+-- That means if you write a string literal like @"hello world"@,
+-- it will have the type @[Char]@, which is the same as @String@.
+--
+-- __Note:__ You can ask the compiler to automatically infer different types
+-- with the @-XOverloadedStrings@ language extension, for example
+--  @"hello world" :: Text@. See t'Data.String.IsString' for more information.
+--
+-- Because @String@ is just a list of characters, you can use normal list functions
+-- to do basic string manipulation. See "Data.List" for operations on lists.
+--
+-- === __Performance considerations__
+--
+-- @[Char]@ is a relatively memory-inefficient type.
+-- It is a linked list of boxed word-size characters, internally it looks something like:
+--
+-- > ╭─────┬───┬──╮  ╭─────┬───┬──╮  ╭─────┬───┬──╮  ╭────╮
+-- > │ (:) │   │ ─┼─>│ (:) │   │ ─┼─>│ (:) │   │ ─┼─>│ [] │
+-- > ╰─────┴─┼─┴──╯  ╰─────┴─┼─┴──╯  ╰─────┴─┼─┴──╯  ╰────╯
+-- >         v               v               v
+-- >        'a'             'b'             'c'
+--
+-- The @String@ "abc" will use @5*3+1 = 16@ (in general @5n+1@)
+-- words of space in memory.
+--
+-- Furthermore, operations like '(++)' (string concatenation) are @O(n)@
+-- (in the left argument).
+--
+-- For historical reasons, the @base@ library uses @String@ in a lot of places
+-- for the conceptual simplicity, but library code dealing with user-data
+-- should use the [text](https://hackage.haskell.org/package/text)
+-- package for Unicode text, or the the
+-- [bytestring](https://hackage.haskell.org/package/bytestring) package
+-- for binary data.
 type String = [Char]
 
 unsafeChr :: Int -> Char
