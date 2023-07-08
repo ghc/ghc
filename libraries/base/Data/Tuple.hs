@@ -41,7 +41,7 @@ fst (x,_)               =  x
 snd                     :: (a,b) -> b
 snd (_,y)               =  y
 
--- | 'curry' converts an uncurried function to a curried function.
+-- | Convert an uncurried function to a curried function.
 --
 -- ==== __Examples__
 --

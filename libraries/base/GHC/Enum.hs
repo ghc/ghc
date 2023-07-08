@@ -82,9 +82,9 @@ class  Bounded a  where
 -- >              | otherwise                = minBound
 --
 class  Enum a   where
-    -- | the successor of a value.  For numeric types, 'succ' adds 1.
+    -- | Successor of a value. For numeric types, 'succ' adds 1.
     succ                :: a -> a
-    -- | the predecessor of a value.  For numeric types, 'pred' subtracts 1.
+    -- | Predecessor of a value. For numeric types, 'pred' subtracts 1.
     pred                :: a -> a
     -- | Convert from an 'Int'.
     toEnum              :: Int -> a
@@ -92,11 +92,10 @@ class  Enum a   where
     -- It is implementation-dependent what 'fromEnum' returns when
     -- applied to a value that is too large to fit in an 'Int'.
     fromEnum            :: a -> Int
-
     -- | Used in Haskell's translation of @[n..]@ with @[n..] = enumFrom n@,
     --   a possible implementation being @enumFrom n = n : enumFrom (succ n)@.
-    --   For example:
     --
+    --   ==== __Examples__
     --     * @enumFrom 4 :: [Integer] = [4,5,6,7,...]@
     --     * @enumFrom 6 :: [Int] = [6,7,8,9,...,maxBound :: Int]@
     enumFrom            :: a -> [a]
@@ -104,22 +103,28 @@ class  Enum a   where
     --   with @[n,n'..] = enumFromThen n n'@, a possible implementation being
     --   @enumFromThen n n' = n : n' : worker (f x) (f x n')@,
     --   @worker s v = v : worker s (s v)@, @x = fromEnum n' - fromEnum n@ and
-    --   @f n y
+    --
+    --   @
+    --   f n y
     --     | n > 0 = f (n - 1) (succ y)
     --     | n < 0 = f (n + 1) (pred y)
-    --     | otherwise = y@
-    --   For example:
+    --     | otherwise = y
+    --   @
     --
+    --   ==== __Examples__
     --     * @enumFromThen 4 6 :: [Integer] = [4,6,8,10...]@
     --     * @enumFromThen 6 2 :: [Int] = [6,2,-2,-6,...,minBound :: Int]@
     enumFromThen        :: a -> a -> [a]
     -- | Used in Haskell's translation of @[n..m]@ with
     --   @[n..m] = enumFromTo n m@, a possible implementation being
-    --   @enumFromTo n m
-    --      | n <= m = n : enumFromTo (succ n) m
-    --      | otherwise = []@.
-    --   For example:
     --
+    --   @
+    --   enumFromTo n m
+    --      | n <= m = n : enumFromTo (succ n) m
+    --      | otherwise = []
+    --   @
+    --
+    --   ==== __Examples__
     --     * @enumFromTo 6 10 :: [Int] = [6,7,8,9,10]@
     --     * @enumFromTo 42 1 :: [Integer] = []@
     enumFromTo          :: a -> a -> [a]
@@ -127,15 +132,23 @@ class  Enum a   where
     --   @[n,n'..m] = enumFromThenTo n n' m@, a possible implementation
     --   being @enumFromThenTo n n' m = worker (f x) (c x) n m@,
     --   @x = fromEnum n' - fromEnum n@, @c x = bool (>=) (<=) (x > 0)@
-    --   @f n y
+    --
+    --   @
+    --   f n y
     --      | n > 0 = f (n - 1) (succ y)
     --      | n < 0 = f (n + 1) (pred y)
-    --      | otherwise = y@ and
-    --   @worker s c v m
-    --      | c v m = v : worker s c (s v) m
-    --      | otherwise = []@
-    --   For example:
+    --      | otherwise = y
+    --   @
     --
+    --   and
+    --
+    --   @
+    --   worker s c v m
+    --      | c v m = v : worker s c (s v) m
+    --      | otherwise = []
+    --   @
+    --
+    --   ==== __Examples__
     --     * @enumFromThenTo 4 2 -6 :: [Integer] = [4,2,0,-2,-4,-6]@
     --     * @enumFromThenTo 6 8 2 :: [Int] = []@
     enumFromThenTo      :: a -> a -> a -> [a]
