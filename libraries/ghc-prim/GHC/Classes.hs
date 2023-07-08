@@ -141,9 +141,6 @@ and @('>=')@ for the types in "GHC.Word" and "GHC.Int".
 -- [__Extensionality__]: if @x == y@ = 'True' and @f@ is a function
 -- whose return type is an instance of 'Eq', then @f x == f y@ = 'True'
 -- [__Negation__]: @x /= y@ = @not (x == y)@
---
--- Minimal complete definition: either '==' or '/='.
---
 class  Eq a  where
     (==), (/=)           :: a -> a -> Bool
 
