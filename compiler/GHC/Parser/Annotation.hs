@@ -46,6 +46,7 @@ module GHC.Parser.Annotation (
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -65,6 +66,7 @@ module GHC.Parser.Annotation (
   epAnnAnns, epAnnAnnsL,
   annParen2AddEpAnn,
   epAnnComments,
+  s_comments, s_entry,
 
   -- ** Working with locations of annotations
   sortLocatedA,
@@ -880,6 +882,14 @@ addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
     addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn l]}
 
+noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
+noTrailingN (SrcSpanAnn EpAnnNotUsed l) = SrcSpanAnn EpAnnNotUsed l
+noTrailingN (SrcSpanAnn s l)
+    = SrcSpanAnn (s { anns = (anns s) { nann_trailing = [] } }) l
+
+-- noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
+-- noTrailingN s = s { s_anns = (s_anns s) { nann_trailing = [] } }
+
 {-
 Note [list append in addTrailing*]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1082,6 +1092,13 @@ annParen2AddEpAnn (EpAnn _ (AnnParen pt o c) _)
 epAnnComments :: EpAnn an -> EpAnnComments
 epAnnComments EpAnnNotUsed = EpaComments []
 epAnnComments (EpAnn _ _ cs) = cs
+
+-- Forward compatibility
+s_comments :: SrcAnn ann -> EpAnnComments
+s_comments (SrcSpanAnn an _) = epAnnComments an
+
+s_entry :: SrcAnn ann -> EpaLocation
+s_entry = epaLocationFromSrcAnn
 
 -- ---------------------------------------------------------------------
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]
