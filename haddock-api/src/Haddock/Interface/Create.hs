@@ -118,11 +118,8 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
 
     -- See Note [Exporting built-in items]
     special_exports
-      | mdl == gHC_TYPES  = listAvail <> eqAvail
       | mdl == gHC_PRIM   = funAvail
-      | mdl == pRELUDE    = listAvail <> funAvail
-      | mdl == dataTupleModule = tupsAvail
-      | mdl == dataListModule  = listAvail
+      | mdl == pRELUDE    = funAvail
       | otherwise         = []
     !exportedNames = concatMap availNames
                                (special_exports <> mi_exports mod_iface)
@@ -178,12 +175,9 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   -- See Note [Exporting built-in items]
   let builtinTys = DsiSectionHeading 1 (WithHsDocIdentifiers (mkGeneratedHsDocString "Builtin syntax") [])
       bonus_ds mods
-        | mdl == gHC_TYPES  = [ DsiExports (listAvail <> eqAvail) ] <> mods
         | mdl == gHC_PRIM   = [ builtinTys, DsiExports funAvail ] <> mods
         | mdl == pRELUDE    = let (hs, rest) = splitAt 2 mods
-                              in hs <> [ DsiExports (listAvail <> funAvail) ] <> rest
-        | mdl == dataTupleModule = mods <> [ DsiExports tupsAvail ]
-        | mdl == dataListModule  = [ DsiExports listAvail ] <> mods
+                              in hs <> [ DsiExports funAvail ] <> rest
         | otherwise         = mods
 
   let
@@ -248,27 +242,12 @@ createInterface1 flags unit_state mod_sum mod_iface ifaces inst_ifaces (instance
   where
     -- Note [Exporting built-in items]
     --
-    -- Some items do not show up in their modules exports simply because Haskell
+    -- @(->)@ does not show up in module exports simply because Haskell
     -- lacks the concrete syntax to represent such an export. We'd still like
-    -- these to show up in docs, so we manually patch on some extra exports for a
-    -- small number of modules:
+    -- it to show up in docs, so we manually patch "GHC.Prim" and "Prelude"
+    -- to have an extra exports for @(->)@
     --
-    --   * "GHC.Prim" should export @(->)@
-    --   * "GHC.Types" should export @[]([], (:))@ and @(~)@
-    --   * "Prelude" should export @(->)@ and @[]([], (:))@
-    --   * "Data.Tuple" should export tuples up to arity 15 (that is the number
-    --     that Haskell98 guarantees exist and that is also the point at which
-    --     GHC stops providing instances)
-    --
-    listAvail = [ AvailTC listTyConName
-                          [listTyConName, nilDataConName, consDataConName] ]
     funAvail  = [ AvailTC fUNTyConName [fUNTyConName] ]
-    eqAvail   = [ AvailTC eqTyConName [eqTyConName] ]
-    tupsAvail = [ AvailTC tyName [tyName, datName]
-                | i<-[0..15]
-                , let tyName = tupleTyConName BoxedTuple i
-                , let datName = getName $ tupleDataCon Boxed i
-                ]
 
 -------------------------------------------------------------------------------
 -- Warnings
