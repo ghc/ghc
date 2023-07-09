@@ -1953,7 +1953,9 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
     specified ranges, but this is not checked.  Returns an 'Int#'
     less than, equal to, or greater than zero if the range is found,
     respectively, to be byte-wise lexicographically less than, to
-    match, or be greater than the second range.}
+    match, or be greater than the second range.
+
+    @since 0.5.2.0}
    with
    can_fail = True
 
