@@ -420,9 +420,7 @@ distroVariables Alpine = mconcat
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
     -- encoding004: due to lack of locale support
     -- T10458, ghcilink002: due to #17869
-    -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
-    -- (see Note [Object unloading]).
-  , "BROKEN_TESTS" =: "encoding004 T10458 linker_unload_native"
+  , "BROKEN_TESTS" =: "encoding004 T10458"
   ]
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
@@ -909,7 +907,10 @@ job_groups =
   where
 
     -- ghcilink002 broken due to #17869
-    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 ")
+    --
+    -- linker_unload_native: due to musl not supporting any means of probing dynlib dependencies
+    -- (see Note [Object unloading]).
+    fullyStaticBrokenTests = modifyJobs (addVariable "BROKEN_TESTS" "ghcilink002 linker_unload_native")
 
     hackage_doc_job = rename (<> "-hackage") . modifyJobs (addVariable "HADRIAN_ARGS" "--haddock-base-url")
 
