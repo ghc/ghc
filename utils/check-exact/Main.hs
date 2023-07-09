@@ -69,7 +69,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
- -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
+ "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
@@ -134,7 +134,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr043.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr044.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr045.hs" Nothing
- "../../testsuite/tests/printer/Ppr046.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr046.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr048.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr049.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr050.hs" Nothing
@@ -539,6 +539,7 @@ changeLocalDecls libdir (L l p) = do
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
         return (L lm (Match an mln pats (GRHSs emptyComments rhs binds')))
+                   `debug` ("oldDecls=" ++ showAst oldDecls)
       replaceLocalBinds x = return x
   return (L l p')
 
@@ -738,8 +739,10 @@ rmDecl1 _libdir top = do
          -- let lp = makeDeltaAst top
          let lp = top
          tlDecs0 <- hsDecls lp
-         tlDecs <- balanceCommentsList $ captureLineSpacing tlDecs0
+         tlDecs' <- balanceCommentsList tlDecs0
+         let tlDecs = captureLineSpacing tlDecs'
          let (de1:_s1:_d2:d3:ds) = tlDecs
+         -- let d3' = setEntryDPDecl d3 (DifferentLine 2 0)
          let d3' = setEntryDP d3 (DifferentLine 2 0)
 
          replaceDecls lp (de1:d3':ds)
@@ -840,7 +843,8 @@ rmDecl6 _libdir lp = do
          [de1] <- hsDecls lp
 
          (de1',_) <- modifyValD (getLocA de1) de1 $ \_m subDecs -> do
-           let (ss1:_sd1:sd2:sds) = subDecs
+           let subDecs' = captureLineSpacing subDecs
+           let (ss1:_sd1:sd2:sds) = subDecs'
            sd2' <- transferEntryDP' ss1 sd2
 
            return (sd2':sds,Nothing)
@@ -879,8 +883,8 @@ rmTypeSig1 _libdir lp = do
          let (s0:de1:d2) = tlDecs
              s1 = captureTypeSigSpacing s0
              (L l (SigD x1 (TypeSig x2 [n1,n2] typ))) = s1
-         n2' <- transferEntryDP n1 n2
-         let s1' = (L l (SigD x1 (TypeSig x2 [n2'] typ)))
+         L ln n2' <- transferEntryDP n1 n2
+         let s1' = (L l (SigD x1 (TypeSig x2 [L (noTrailingN ln) n2'] typ)))
          replaceDecls lp (s1':de1:d2)
 
   let (lp',_,_w) = runTransform doRmDecl
@@ -896,8 +900,9 @@ rmTypeSig2 _libdir lp = do
          let [de1] = tlDecs
 
          (de1',_) <- modifyValD (getLocA de1) de1 $ \_m [s,d] -> do
-           d' <- transferEntryDP s d
-           return ([d'],Nothing)
+           d' <- transferEntryDP' s d
+           return $ ([d'],Nothing)
+                  `debug` ("rmTypeSig2:(d,d')" ++ showAst (d,d'))
          replaceDecls lp [de1']
 
   let (lp',_,_w) = runTransform doRmDecl

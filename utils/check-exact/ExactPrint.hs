@@ -528,12 +528,14 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   mflush
 
   -- end of sub-Anchor processing, start of tail end processing
-  postCs <- cua canUpdateAnchor takeAppliedCommentsPop
-  when (flush == NoFlushComments) $ do
-    when ((getFollowingComments cs) /= []) $ do
-      debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
-      mapM_ printOneComment (map tokComment $ getFollowingComments cs)
-      debugM $ "ending trailing comments"
+  -- postCs <- cua canUpdateAnchor takeAppliedCommentsPop
+  -- when (flush == NoFlushComments) $ do
+  --   when ((getFollowingComments cs) /= []) $ do
+
+  --     debugM $ "enterAnn:in:(anchor') =" ++ show (eloc2str anchor')
+  --     debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+  --     mapM_ printOneComment (map tokComment $ getFollowingComments cs)
+  --     debugM $ "ending trailing comments"
 
   eof <- getEofPos
   case eof of
@@ -560,6 +562,14 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     EpaSpan _ -> return ()
 
   -- Outside the anchor, mark any trailing
+  postCs <- cua canUpdateAnchor takeAppliedCommentsPop
+  when (flush == NoFlushComments) $ do
+    when ((getFollowingComments cs) /= []) $ do
+
+      debugM $ "enterAnn:in:(anchor') =" ++ show (eloc2str anchor')
+      debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+      mapM_ printOneComment (map tokComment $ getFollowingComments cs)
+      debugM $ "ending trailing comments"
   trailing' <- markTrailing trailing_anns
 
   -- Update original anchor, comments based on the printing process
