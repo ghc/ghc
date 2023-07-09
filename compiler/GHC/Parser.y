@@ -4580,9 +4580,6 @@ adaptWhereBinds (Just (L l (b, mc))) = L l (b, maybe emptyComments id mc)
 combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
 
-noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
-noTrailingN s = s { s_anns = (s_anns s) { nann_trailing = [] } }
-
 fromTrailingN :: SrcSpanAnnN -> SrcSpanAnnA
 fromTrailingN (EpAnnS anc ann cs) = EpAnnS anc (AnnListItem (nann_trailing ann)) cs
 

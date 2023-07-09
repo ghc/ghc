@@ -52,6 +52,7 @@ module GHC.Parser.Annotation (
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
   addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  noTrailingN,
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
@@ -911,6 +912,9 @@ addTrailingCommaToN n l = n { s_anns = addTrailing (s_anns n) l }
     -- See Note [list append in addTrailing*]
     addTrailing :: NameAnn -> EpaLocation -> NameAnn
     addTrailing n l = n { nann_trailing = nann_trailing n ++ [AddCommaAnn l]}
+
+noTrailingN :: SrcSpanAnnN -> SrcSpanAnnN
+noTrailingN s = s { s_anns = (s_anns s) { nann_trailing = [] } }
 
 {-
 Note [list append in addTrailing*]
