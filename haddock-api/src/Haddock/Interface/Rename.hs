@@ -28,7 +28,7 @@ import GHC.Data.Bag (emptyBag)
 import GHC hiding (NoLink)
 import GHC.Types.Name
 import GHC.Types.Name.Reader (RdrName(Exact))
-import GHC.Builtin.Types (eqTyCon_RDR)
+import GHC.Builtin.Types (eqTyCon_RDR, tupleTyConName, tupleDataConName)
 
 import Control.Applicative
 import Control.DeepSeq (force)
@@ -39,7 +39,7 @@ import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Prelude hiding (mapM)
-import GHC.Types.Basic ( TopLevelFlag(..) )
+import GHC.Types.Basic ( TopLevelFlag(..), TupleSort(..), Boxity(..) )
 
 -- | Traverse docstrings and ASTs in the Haddock interface, renaming 'Name' to
 -- 'DocName'.
@@ -377,6 +377,13 @@ renameType t = case t of
   HsListTy _ ty -> return . (HsListTy noAnn) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noAnn n) (renameLType ty)
 
+  -- Special-case unary boxed tuples so that they are pretty-printed as
+  -- `Solo x`, not `(x)`
+  HsTupleTy _ HsBoxedOrConstraintTuple [ty] -> do
+    name <- renameName (tupleTyConName BoxedTuple 1)
+    let lhs = noLocA $ HsTyVar noAnn NotPromoted (noLocA name)
+    rhs <- renameLType ty
+    return (HsAppTy noAnn lhs rhs)
   HsTupleTy _ b ts -> return . HsTupleTy noAnn b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy noAnn <$> mapM renameLType ts
 
@@ -403,7 +410,16 @@ renameType t = case t of
   HsRecTy _ a               -> HsRecTy noAnn <$> mapM renameConDeclFieldField a
   XHsType a                 -> pure (XHsType a)
   HsExplicitListTy _ a b  -> HsExplicitListTy noAnn a <$> mapM renameLType b
+
+  -- Special-case unary boxed tuples so that they are pretty-printed as
+  -- `'MkSolo x`, not `'(x)`
+  HsExplicitTupleTy _ [ty] -> do
+    name <- renameName (tupleDataConName Boxed 1)
+    let lhs = noLocA $ HsTyVar noAnn IsPromoted (noLocA name)
+    rhs <- renameLType ty
+    return (HsAppTy noAnn lhs rhs)
   HsExplicitTupleTy _ b   -> HsExplicitTupleTy noAnn <$> mapM renameLType b
+
   HsSpliceTy (HsUntypedSpliceTop _ st)  _ -> renameType (unLoc st)
   HsSpliceTy (HsUntypedSpliceNested _) _ -> error "renameType: not an top level type splice"
   HsWildCardTy _          -> pure (HsWildCardTy noAnn)
