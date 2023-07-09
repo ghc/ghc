@@ -184,6 +184,8 @@ type family Any :: k where { }
 -- >>> ['h','e','l','l','o'] == "hello"
 -- True
 --
+-- @since 0.10.0
+--
 data List a = [] | a : List a
 
 

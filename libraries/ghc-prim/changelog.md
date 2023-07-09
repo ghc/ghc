@@ -41,6 +41,9 @@
   Warning: on unsupported architectures, the software emulation provided by
   the fallback to the C standard library is not guaranteed to be IEEE-compliant.
 
+- `Unit`, `Tuple0`, `Tuple1`, `Tuple2`, `Tuple3` and so on (up to `Tuple64`)
+  are now exported from `GHC.Tuple.Prim` and reexported from `GHC.Tuple`.
+
 ## 0.10.0
 
 - Shipped with GHC 9.6.1
@@ -70,6 +73,8 @@
   with compact regions.
   We are working on ways to allow users and library authors to get back the
   performance benefits of the old behaviour where possible.
+
+- `List` is now exported from `GHC.Types`.
 
 ## 0.9.0 *August 2022*
 

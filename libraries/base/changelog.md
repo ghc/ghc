@@ -113,6 +113,8 @@
   * Add functions `traceWith`, `traceShowWith`, `traceEventWith` to
     `Debug.Trace`, per
     [CLC proposal #36](https://github.com/haskell/core-libraries-committee/issues/36).
+  * Export `List` from `GHC.List`
+    ([CLC proposal #186](https://github.com/haskell/core-libraries-committee/issues/186)).
 
 ## 4.17.0.0 *August 2022*
 
