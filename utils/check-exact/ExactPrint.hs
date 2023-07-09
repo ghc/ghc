@@ -68,7 +68,7 @@ import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
 import Orphans ()
-import qualified Orphans as Orphans
+-- import qualified Orphans as Orphans
 
 import Lookup
 import Utils
@@ -519,14 +519,6 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   a' <- exact a
   mflush
 
-  -- end of sub-Anchor processing, start of tail end processing
-  postCs <- cua canUpdateAnchor takeAppliedCommentsPop
-  when (flush == NoFlushComments) $ do
-    when ((getFollowingComments cs) /= []) $ do
-      debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
-      mapM_ printOneComment (map tokComment $ getFollowingComments cs)
-      debugM $ "ending trailing comments"
-
   eof <- getEofPos
   case eof of
     Nothing -> return ()
@@ -553,6 +545,14 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
       setPriorEndD (snd $ rs2range rss)
 
   -- Outside the anchor, mark any trailing
+  postCs <- cua canUpdateAnchor takeAppliedCommentsPop
+  when (flush == NoFlushComments) $ do
+    when ((getFollowingComments cs) /= []) $ do
+
+      -- debugM $ "enterAnn:in:(anchor') =" ++ show (eloc2str anchor')
+      debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
+      mapM_ printOneComment (map tokComment $ getFollowingComments cs)
+      debugM $ "ending trailing comments"
   trailing' <- markTrailing trailing_anns
 
   -- Update original anchor, comments based on the printing process
@@ -5074,8 +5074,8 @@ getPriorEndD = gets dPriorEndPosition
 getAnchorU :: (Monad m, Monoid w) => EP w m RealSrcSpan
 getAnchorU = gets uAnchorSpan
 
-getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
-getAcceptSpan = gets pAcceptSpan
+-- getAcceptSpan ::(Monad m, Monoid w) => EP w m Bool
+-- getAcceptSpan = gets pAcceptSpan
 
 setAcceptSpan ::(Monad m, Monoid w) => Bool -> EP w m ()
 setAcceptSpan f =
