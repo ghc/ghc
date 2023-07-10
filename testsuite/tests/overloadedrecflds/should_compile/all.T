@@ -50,9 +50,9 @@ test('BootFldReexport'
 test('T23220'
     , [req_th, extra_files(['T23220_aux.hs'])]
     , multimod_compile, ['T23220_aux.hs T23220.hs', '-v0'])
-
 test('T22106_A', [extra_files(['T22106_aux.hs'])], multimod_compile, ['T22106_A', '-v0'])
 test('T22106_B', [extra_files(['T22106_aux.hs'])], multimod_compile, ['T22106_B', '-v0'])
 test('T22106_C', [extra_files(['T22106_aux.hs'])], multimod_compile_fail, ['T22106_C', '-v0'])
 test('T22106_D', [extra_files(['T22106_aux.hs'])], multimod_compile, ['T22106_D', '-v0'])
 test('T23279', [extra_files(['T23279_aux.hs'])], multimod_compile, ['T23279', '-v0'])
+test('T23557', [extra_files(['T23557_aux.hs'])], multimod_compile, ['T23557', '-v0'])

@@ -1313,19 +1313,19 @@ lookupGRE env = \case
 --
 -- This allows us to first look in e.g. the data 'NameSpace', and then fall back
 -- to the type/class 'NameSpace'.
-highestPriorityGREs :: forall info prio
+highestPriorityGREs :: forall gre prio
                     .  Ord prio
-                    => (GlobalRdrEltX info -> Maybe prio)
+                    => (gre -> Maybe prio)
                       -- ^ priority function
                       -- lower value <=> higher priority
-                    -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+                    -> [gre] -> [gre]
 highestPriorityGREs priority gres =
   take_highest_prio $ NE.group $ sort
     [ S.Arg prio gre
     | gre <- gres
     , prio <- maybeToList $ priority gre ]
   where
-    take_highest_prio :: [NE.NonEmpty (S.Arg prio (GlobalRdrEltX info))] -> [GlobalRdrEltX info]
+    take_highest_prio :: [NE.NonEmpty (S.Arg prio gre)] -> [gre]
     take_highest_prio [] = []
     take_highest_prio (fs:_) = map (\ (S.Arg _ gre) -> gre) $ NE.toList fs
 {-# INLINEABLE highestPriorityGREs #-}

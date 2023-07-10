@@ -62,9 +62,11 @@ import GHC.Driver.Backend
 import GHC.Hs
 
 import GHC.Tc.Errors.Types
+import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Rank (Rank(..))
+import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType
 
 import GHC.Types.Error
@@ -116,8 +118,6 @@ import Data.List ( groupBy, sortBy, tails
                  , partition, unfoldr )
 import Data.Ord ( comparing )
 import Data.Bifunctor
-import GHC.Tc.Types.TH
-import GHC.Tc.Types.BasicTypes
 
 
 defaultTcRnMessageOpts :: TcRnMessageOpts
