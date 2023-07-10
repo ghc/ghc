@@ -38,6 +38,8 @@ import GHC.Driver.Ppr
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils ( warnUnusedTopBinds )
+import GHC.Rename.Unbound
+import qualified GHC.Rename.Unbound as Unbound
 
 import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Env
@@ -67,6 +69,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Types.Avail
 import GHC.Types.FieldLabel
+import GHC.Types.Hint
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..) )
@@ -1228,7 +1231,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
        = failLookupWith (QualImportError rdr)
        | otherwise
        = case lookups of
-           []         -> failLookupWith (BadImport ie BadImportIsParent)
+           []         -> failLookupWith (BadImport ie IsNotSubordinate)
            item:items -> return $ item :| items
       where
         lookups = concatMap nonDetNameEnvElts
@@ -1252,7 +1255,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
               -- 'BadImportW' is only constructed below in 'handle_bad_import', in
               -- the 'EverythingBut' case, so that's what we pass to
               -- 'badImportItemErr'.
-              reason <- badImportItemErr iface decl_spec ie BadImportIsParent all_avails
+              reason <- badImportItemErr iface decl_spec ie IsNotSubordinate all_avails
               pure (TcRnDodgyImports (DodgyImportsHiding reason))
             warning_msg (DeprecatedExport n w) =
               pure (TcRnPragmaWarning {
@@ -1338,7 +1341,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
                    dc_name = lookup_parent ie (setRdrNameSpace tc srcDataName)
                in
                case catIELookupM [ tc_name, dc_name ] of
-                 []    -> failLookupWith (BadImport ie BadImportIsParent)
+                 []    -> failLookupWith (BadImport ie IsNotSubordinate)
                  names -> return ( [mkIEThingAbs tc' l (imp_item name) | name <- names], [])
             | otherwise
             -> do ImpOccItem { imp_item = gre } <- lookup_parent ie (ieWrappedName tc')
@@ -1354,7 +1357,8 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            -- See Note [Importing DuplicateRecordFields]
            case lookupChildren subnames rdr_ns of
 
-             Failed rdrs -> failLookupWith (BadImport (IEThingWith (deprecation, ann) ltc wc rdrs ) BadImportIsSubordinate)
+             Failed rdrs -> failLookupWith $
+                            BadImport (IEThingWith (deprecation, ann) ltc wc rdrs) IsSubordinate
                                 -- We are trying to import T( a,b,c,d ), and failed
                                 -- to find 'b' and 'd'.  So we make up an import item
                                 -- to report as failing, namely T( b, d ).
@@ -1382,7 +1386,9 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
           where n = greName gre
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
-          BadImport ie _ | want_hiding == EverythingBut -> return ([], [BadImportW ie])
+          BadImport ie _
+            | want_hiding == EverythingBut
+            -> return ([], [BadImportW ie])
           _ -> failLookupWith err
 
         mk_depr_export_warning gre
@@ -1398,11 +1404,13 @@ data IELookupWarning
   | DodgyImport GlobalRdrElt
   | DeprecatedExport Name (WarningTxt GhcRn)
 
-data BadImportIsSubordinate = BadImportIsParent | BadImportIsSubordinate
+-- | Is this import/export item a subordinate or not?
+data IsSubordinate
+  = IsSubordinate | IsNotSubordinate
 
 data IELookupError
   = QualImportError RdrName
-  | BadImport (IE GhcPs) BadImportIsSubordinate
+  | BadImport (IE GhcPs) IsSubordinate
   | IllegalImport
 
 failLookupWith :: IELookupError -> IELookupM a
@@ -2151,20 +2159,41 @@ DRFPatSynExport for a test of this.
 -}
 
 badImportItemErr
-  :: ModIface -> ImpDeclSpec -> IE GhcPs -> BadImportIsSubordinate
+  :: ModIface -> ImpDeclSpec -> IE GhcPs -> IsSubordinate
   -> [AvailInfo]
   -> TcRn ImportLookupReason
 badImportItemErr iface decl_spec ie sub avails = do
   patsyns_enabled <- xoptM LangExt.PatternSynonyms
-  pure (ImportLookupBad importErrorKind iface decl_spec ie patsyns_enabled)
+  dflags <- getDynFlags
+  hsc_env <- getTopEnv
+  let rdr_env = mkGlobalRdrEnv
+              $ gresFromAvails hsc_env (Just imp_spec) all_avails
+  pure (ImportLookupBad (importErrorKind dflags rdr_env) iface decl_spec ie patsyns_enabled)
   where
-    importErrorKind
+    importErrorKind dflags rdr_env
       | any checkIfTyCon avails = case sub of
-          BadImportIsParent -> BadImportAvailTyCon
-          BadImportIsSubordinate -> BadImportNotExportedSubordinates unavailableChildren
+          IsNotSubordinate -> BadImportAvailTyCon
+          IsSubordinate -> BadImportNotExportedSubordinates unavailableChildren
       | any checkIfVarName avails = BadImportAvailVar
       | Just con <- find checkIfDataCon avails = BadImportAvailDataCon (availOccName con)
-      | otherwise = BadImportNotExported
+      | otherwise = BadImportNotExported suggs
+        where
+          suggs = similar_suggs ++ fieldSelectorSuggestions rdr_env rdr
+          similar_names =
+            similarNameSuggestions (Unbound.LF WL_Anything WL_Global)
+              dflags rdr_env emptyLocalRdrEnv rdr
+          similar_suggs =
+            case NE.nonEmpty $ mapMaybe imported_item $ similar_names of
+              Just similar -> [ SuggestSimilarNames rdr similar ]
+              Nothing      -> [ ]
+
+          -- Only keep imported items, and set the "HowInScope" to
+          -- "Nothing" to avoid printing "imported from..." in the suggestion
+          -- error message.
+          imported_item (SimilarRdrName rdr_name (Just (ImportedBy {})))
+            = Just (SimilarRdrName rdr_name Nothing)
+          imported_item _ = Nothing
+
     checkIfDataCon = checkIfAvailMatches isDataConName
     checkIfTyCon = checkIfAvailMatches isTyConName
     checkIfVarName =
@@ -2180,9 +2209,12 @@ badImportItemErr iface decl_spec ie sub avails = do
             Nothing -> False
         Avail{} -> False
     availOccName = occName . availName
-    importedFS = occNameFS . rdrNameOcc $ ieName ie
-    unavailableChildren = map (rdrNameOcc) $ case ie of
-      IEThingWith _ _ _ ns -> map (ieWrappedName  . unLoc) ns
+    rdr = ieName ie
+    importedFS = occNameFS $ rdrNameOcc rdr
+    imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
+    all_avails = mi_exports iface
+    unavailableChildren = case ie of
+      IEThingWith _ _ _ ns -> map (rdrNameOcc . ieWrappedName  . unLoc) ns
       _ -> panic "importedChildren failed pattern match: no children"
 
 addDupDeclErr :: NonEmpty GlobalRdrElt -> TcRn ()

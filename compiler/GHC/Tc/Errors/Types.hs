@@ -5259,7 +5259,7 @@ data WhenMatching
 
 data BadImportKind
   -- | Module does not export...
-  = BadImportNotExported
+  = BadImportNotExported [GhcHint] -- ^ suggestions for what might have been meant
   -- | Missing @type@ keyword when importing a type.
   | BadImportAvailTyCon
   -- | Trying to import a data constructor directly, e.g.

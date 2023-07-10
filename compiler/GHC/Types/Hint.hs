@@ -515,7 +515,7 @@ data HowInScope
 
 data SimilarName
   = SimilarName Name
-  | SimilarRdrName RdrName HowInScope
+  | SimilarRdrName RdrName (Maybe HowInScope)
 
 -- | Something is promoted to the type-level without a promotion tick.
 data UntickedPromotedThing
