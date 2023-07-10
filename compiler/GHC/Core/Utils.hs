@@ -2335,11 +2335,19 @@ exprIsTopLevelBindable expr ty
     -- consequently we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
     -- as the latter would panic.
   || exprIsTickedString expr
+  || exprIsTrivialConApp expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
 -- string.
 exprIsTickedString :: CoreExpr -> Bool
 exprIsTickedString = isJust . exprIsTickedString_maybe
+
+-- | Check if the expression is an constructor possibly applied to trivial arguments.
+exprIsTrivialConApp :: CoreExpr -> Bool
+exprIsTrivialConApp x
+  | (Var v, xs) <- collectArgs x
+  = isDataConWorkId v && all exprIsTrivial xs
+exprIsTrivialConApp _ = False
 
 -- | Extract a literal string from an expression that is zero or more Ticks
 -- wrapped around a literal string. Returns Nothing if the expression has a

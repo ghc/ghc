@@ -160,6 +160,7 @@ data IdDetails
 
   | DataConWorkId DataCon       -- ^ The 'Id' is for a data constructor /worker/
   | DataConWrapId DataCon       -- ^ The 'Id' is for a data constructor /wrapper/
+                                -- See Note [Data constructor workers and wrappers] in GHC.Core.DataCon
 
                                 -- [the only reasons we need to know is so that
                                 --  a) to support isImplicitId
