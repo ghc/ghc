@@ -308,7 +308,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 --
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
-rnImportDecl  :: Module -> (LImportDecl GhcPs, SDoc)
+rnImportDecl :: Module -> (LImportDecl GhcPs, SDoc)
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
@@ -1232,7 +1232,7 @@ filterImports hsc_env iface decl_spec (Just (want_hiding, L l import_items))
            item:items -> return $ item :| items
       where
         lookups = concatMap nonDetNameEnvElts
-                $ lookupOccEnv_WithFields imp_occ_env (rdrNameOcc rdr)
+                $ lookupImpOccEnv (RelevantGREsFOS WantNormal) imp_occ_env (rdrNameOcc rdr)
 
     lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, [GlobalRdrElt])]
     lookup_lie (L loc ieRdr)
@@ -1485,6 +1485,23 @@ mkImportOccEnv hsc_env decl_spec all_avails =
         then item2
         else item1
       -- Discard standalone pattern P in favour of T(P).
+
+-- | Essentially like @lookupGRE env (LookupOccName occ which_gres)@,
+-- but working with 'ImpOccItem's instead of 'GlobalRdrElt's.
+lookupImpOccEnv :: WhichGREs GREInfo
+                -> OccEnv (NameEnv ImpOccItem) -> OccName -> [NameEnv ImpOccItem]
+lookupImpOccEnv which_gres env occ =
+  mapMaybe relevant_items $ lookupOccEnv_AllNameSpaces env occ
+  where
+    is_relevant :: ImpOccItem -> Bool
+    is_relevant (ImpOccItem { imp_item = gre }) =
+      greIsRelevant which_gres (occNameSpace occ) gre
+    relevant_items :: NameEnv ImpOccItem -> Maybe (NameEnv ImpOccItem)
+    relevant_items nms
+      | let nms' = filterNameEnv is_relevant nms
+      = if isEmptyNameEnv nms'
+        then Nothing
+        else Just nms'
 
 {-
 ************************************************************************

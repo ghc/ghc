@@ -52,3 +52,4 @@ test('T23220'
     , multimod_compile, ['T23220_aux.hs T23220.hs', '-v0'])
 
 test('T23279', [extra_files(['T23279_aux.hs'])], multimod_compile, ['T23279', '-v0'])
+test('T23557', [extra_files(['T23557_aux.hs'])], multimod_compile, ['T23557', '-v0'])
