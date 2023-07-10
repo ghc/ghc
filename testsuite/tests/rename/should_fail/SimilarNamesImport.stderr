@@ -1,0 +1,16 @@
+
+SimilarNamesImport.hs:3:33: error: [GHC-61689]
+    Module ‘SimilarNamesImport_aux’ does not export ‘dyzzy’.
+    Suggested fix:
+      Perhaps use one of these: record field of MkD ‘dizzy’, ‘xyzzy’
+
+SimilarNamesImport.hs:3:40: error: [GHC-61689]
+    Module ‘SimilarNamesImport_aux’ does not export ‘Wabble’.
+    Suggested fix: Perhaps use ‘Wibble’
+
+SimilarNamesImport.hs:3:48: error: [GHC-61689]
+    Module ‘SimilarNamesImport_aux’ does not export ‘wabble’.
+
+SimilarNamesImport.hs:3:56: error: [GHC-61689]
+    Module ‘SimilarNamesImport_aux’ does not export ‘Trizzle’.
+    Suggested fix: Perhaps use one of these: ‘Drizzle’, ‘Frizzle’

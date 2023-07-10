@@ -3085,12 +3085,12 @@ instance Diagnostic TcRnMessage where
       let mod_name = moduleName $ is_mod is
           occ = rdrNameOcc $ ieName ie
       in case k of
-        BadImportAvailVar         -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
-        BadImportNotExported      -> noHints
-        BadImportAvailTyCon ex_ns ->
+        BadImportAvailVar          -> [ImportSuggestion occ $ CouldRemoveTypeKeyword mod_name]
+        BadImportNotExported suggs -> suggs
+        BadImportAvailTyCon ex_ns  ->
           [useExtensionInOrderTo empty LangExt.ExplicitNamespaces | not ex_ns]
           ++ [ImportSuggestion occ $ CouldAddTypeKeyword mod_name]
-        BadImportAvailDataCon par -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
+        BadImportAvailDataCon par  -> [ImportSuggestion occ $ ImportDataCon (Just (mod_name, patsyns_enabled)) par]
         BadImportNotExportedSubordinates{} -> noHints
     TcRnImportLookup{}
       -> noHints
@@ -5343,7 +5343,7 @@ pprImportLookup = \case
         hang (text "In the import of" <+> pprImpDeclSpec iface decl_spec <> colon)
           2 (vcat msgs)
     in case k of
-      BadImportNotExported ->
+      BadImportNotExported _ ->
         vcat
           [ text "Module" <+> pprImpDeclSpec iface decl_spec <+>
             text "does not export" <+> quotes (ppr ie) <> dot

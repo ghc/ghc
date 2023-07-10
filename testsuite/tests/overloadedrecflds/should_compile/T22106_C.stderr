@@ -1,6 +1,6 @@
 
-T22106_C.hs:5:9: error: [GHC-88464]
-    Variable not in scope: bar
+T22106_C.hs:3:21: error: [GHC-61689]
+    Module ‘T22106_aux’ does not export ‘bar’.
     Suggested fix:
       Notice that ‘bar’ is a field selector belonging to the type ‘T22106_aux.T’
       that has been suppressed by NoFieldSelectors.

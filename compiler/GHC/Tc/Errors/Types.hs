@@ -5250,7 +5250,7 @@ data WhenMatching
 
 data BadImportKind
   -- | Module does not export...
-  = BadImportNotExported
+  = BadImportNotExported [GhcHint] -- ^ suggestions for what might have been meant
   -- | Missing @type@ keyword when importing a type.
   -- e.g.  `import TypeLits( (+) )`, where TypeLits exports a /type/ (+), not a /term/ (+)
   -- Then we want to suggest using `import TypeLits( type (+) )`

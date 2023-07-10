@@ -15,6 +15,8 @@ module GHC.Rename.Unbound
    , reportUnboundName
    , reportUnboundName'
    , unknownNameSuggestions
+   , similarNameSuggestions
+   , fieldSelectorSuggestions
    , WhatLooking(..)
    , WhereLooking(..)
    , LookingFor(..)
@@ -225,7 +227,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
     all_possibilities :: [(String, SimilarName)]
     all_possibilities = case what_look of
       WL_None -> []
-      _ -> [ (showPpr dflags r, SimilarRdrName r (LocallyBoundAt loc))
+      _ -> [ (showPpr dflags r, SimilarRdrName r (Just $ LocallyBoundAt loc))
            | (r,loc) <- local_possibilities local_env ]
         ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
@@ -256,7 +258,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
 
     global_possibilities :: GlobalRdrEnv -> [(RdrName, SimilarName)]
     global_possibilities global_env
-      | tried_is_qual = [ (rdr_qual, SimilarRdrName rdr_qual how)
+      | tried_is_qual = [ (rdr_qual, SimilarRdrName rdr_qual (Just how))
                         | gre <- globalRdrEnvElts global_env
                         , isGreOk looking_for gre
                         , let occ = greOccName gre
@@ -271,7 +273,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
                           rdr_unqual = mkRdrUnqual occ
                     , correct_name_space occ
                     , sim <- case (unquals_in_scope gre, quals_only gre) of
-                                (how:_, _)    -> [ SimilarRdrName rdr_unqual how ]
+                                (how:_, _)    -> [ SimilarRdrName rdr_unqual (Just how) ]
                                 ([],    pr:_) -> [ pr ]  -- See Note [Only-quals]
                                 ([],    [])   -> [] ]
 
@@ -299,7 +301,7 @@ similarNameSuggestions looking_for@(LF what_look where_look) dflags global_env
     quals_only :: GlobalRdrElt -> [SimilarName]
     -- Ones for which *only* the qualified version is in scope
     quals_only (gre@GRE { gre_imp = is })
-      = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (ImportedBy ispec))
+      = [ (SimilarRdrName (mkRdrQual (is_as ispec) (greOccName gre)) (Just $ ImportedBy ispec))
         | i <- bagToList is, let ispec = is_decl i, is_qual ispec ]
 
 
