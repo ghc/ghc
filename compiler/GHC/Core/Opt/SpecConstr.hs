@@ -1543,9 +1543,9 @@ scExpr' env (Case scrut b ty alts)
 -- 'GHC.Opt.Specialise.specTickish'.
 scTickish :: ScEnv -> CoreTickish -> UniqSM (ScUsage, CoreTickish)
 scTickish env = \case
-  Breakpoint ext i fv modl -> do
+  Breakpoint ext i fv -> do
     (usg, fv') <- unzip <$> mapM (\ v -> scExpr env (Var v)) fv
-    pure (combineUsages usg, Breakpoint ext i [v | Var v <- fv'] modl)
+    pure (combineUsages usg, Breakpoint ext i [v | Var v <- fv'])
   t@ProfNote {} -> pure (nullUsage, t)
   t@HpcTick {} -> pure (nullUsage, t)
   t@SourceNote {} -> pure (nullUsage, t)
