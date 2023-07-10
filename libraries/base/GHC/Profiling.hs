@@ -27,6 +27,7 @@ foreign import ccall startProfTimer :: IO ()
 
 -- | Request a heap census on the next context switch. The census can be
 -- requested whether or not the heap profiling timer is running.
+--
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
@@ -34,7 +35,8 @@ foreign import ccall startProfTimer :: IO ()
 foreign import ccall requestHeapCensus :: IO ()
 
 -- | Start heap profiling. This is called normally by the RTS on start-up,
--- but can be disabled using the rts flag `--no-automatic-heap-samples`
+-- but can be disabled using the rts flag @--no-automatic-heap-samples@.
+--
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
@@ -42,6 +44,7 @@ foreign import ccall requestHeapCensus :: IO ()
 foreign import ccall startHeapProfTimer :: IO ()
 
 -- | Stop heap profiling.
+--
 -- Note: This won't do anything unless you also specify a profiling mode on the
 -- command line using the normal RTS options.
 --
