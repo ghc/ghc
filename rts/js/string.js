@@ -628,7 +628,7 @@ function h$fromHsString(str) {
     var xs = '';
     while(IS_CONS(str)) {
 	var h = CONS_HEAD(str);
-	xs += String.fromCharCode(UNWRAP_NUMBER(h));
+	xs += String.fromCodePoint(UNWRAP_NUMBER(h));
         str = CONS_TAIL(str);
     }
     return xs;
