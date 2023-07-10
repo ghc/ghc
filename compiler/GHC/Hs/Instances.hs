@@ -206,11 +206,6 @@ deriving instance Data (ClsInstDecl GhcPs)
 deriving instance Data (ClsInstDecl GhcRn)
 deriving instance Data (ClsInstDecl GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (InstDecl p)
-deriving instance Data (InstDecl GhcPs)
-deriving instance Data (InstDecl GhcRn)
-deriving instance Data (InstDecl GhcTc)
-
 -- deriving instance (DataIdLR p p) => Data (DerivDecl p)
 deriving instance Data (DerivDecl GhcPs)
 deriving instance Data (DerivDecl GhcRn)
@@ -220,6 +215,11 @@ deriving instance Data (DerivDecl GhcTc)
 deriving instance Data (DerivStrategy GhcPs)
 deriving instance Data (DerivStrategy GhcRn)
 deriving instance Data (DerivStrategy GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (InstDecl p)
+deriving instance Data (InstDecl GhcPs)
+deriving instance Data (InstDecl GhcRn)
+deriving instance Data (InstDecl GhcTc)
 
 -- deriving instance (DataIdLR p p) => Data (DefaultDecl p)
 deriving instance Data (DefaultDecl GhcPs)

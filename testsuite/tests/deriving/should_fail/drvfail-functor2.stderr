@@ -21,11 +21,3 @@ drvfail-functor2.hs:21:14: error: [GHC-16588]
     • Can't make a derived instance of ‘Functor StupidConstraint’:
         Data type ‘StupidConstraint’ must not have a class context: Eq a
     • In the data declaration for ‘StupidConstraint’
-
-drvfail-functor2.hs:27:14: error: [GHC-39999]
-    • No instance for ‘Functor NoFunctor’
-        arising from the first field of ‘UseNoFunctor’ (type ‘NoFunctor a’)
-      Possible fix:
-        use a standalone 'deriving instance' declaration,
-          so you can specify the instance context yourself
-    • When deriving the instance for (Functor UseNoFunctor)

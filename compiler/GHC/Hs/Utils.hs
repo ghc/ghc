@@ -1503,6 +1503,7 @@ hsLInstDeclBinders (L _ (ClsInstD
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = lconsWithFieldsBinders $ hsDataFamInstBinders fi
 hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
+hsLInstDeclBinders (L _ (DerivInstD {})) = mempty
 
 -------------------
 -- | the 'SrcLoc' returned are for the whole declarations, not just the names

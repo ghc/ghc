@@ -14,7 +14,7 @@
 
 -- | Typecheck type and class declarations
 module GHC.Tc.TyCl (
-        tcTyAndClassDecls,
+        tcTyClGroups,
 
         -- Functions used by GHC.Tc.TyCl.Instance to check
         -- data/type family instance declarations
@@ -47,8 +47,9 @@ import GHC.Tc.Zonk.Type
 import GHC.Tc.Zonk.TcType
 import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
-import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
-import GHC.Tc.Deriv (DerivInfo(..))
+import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1, tcInstDeclsDeriv )
+import GHC.Tc.Deriv ( DerivInfo(..), EarlyDerivSpec
+                    , makeDerivSpecs, tcDerivingFamInsts )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -119,7 +120,7 @@ import Data.Tuple( swap )
 
 Note [Grouping of type and class declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-tcTyAndClassDecls is called on a list of `TyClGroup`s. Each group is a strongly
+tcTyClGroups is called on a list of `TyClGroup`s. Each group is a strongly
 connected component of mutually dependent types and classes. We kind check and
 type check each group separately to enhance kind polymorphism. Take the
 following example:
@@ -146,44 +147,61 @@ Thus, we take two passes over the resulting tycons, first checking for general
 validity and then checking for valid role annotations.
 -}
 
-tcTyAndClassDecls :: [TyClGroup GhcRn]      -- Mutually-recursive groups in
-                                            -- dependency order
-                  -> TcM ( TcGblEnv         -- Input env extended by types and
-                                            -- classes
-                                            -- and their implicit Ids,DataCons
-                         , [InstInfo GhcRn] -- Source-code instance decls info
-                         , [DerivInfo]      -- Deriving info
-                         , ThBindEnv        -- TH binding levels
-                         )
--- Fails if there are any errors
-tcTyAndClassDecls tyclds_s
-  -- The code recovers internally, but if anything gave rise to
-  -- an error we'd better stop now, to avoid a cascade
-  -- Type check each group in dependency order folding the global env
-  = checkNoErrs $ fold_env [] [] emptyNameEnv tyclds_s
+tcTyClGroups :: [TyClGroup GhcRn] -- Mutually-recursive groups in
+                                  -- dependency order
+             -> [(RecFlag, LHsBinds GhcRn)]
+             -> TcM (TcGblEnv,            -- The full inst env
+                     [InstInfo GhcRn],    -- Source-code instance decls to
+                                          -- process; contains all dfuns for
+                                          -- this module
+                      ThBindEnv,          -- TH binding levels
+                      HsValBinds GhcRn)   -- Supporting bindings for derived
+                                          -- instances
+tcTyClGroups tycl_decls binds
+ = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
+   tcAddPatSynPlaceholders (getPatSynBinds binds) $
+   do { (tcg_env, inst_info, early_specs, th_bndrs)
+          -- The code recovers internally, but if anything gave rise to
+          -- an error we'd better stop now, to avoid a cascade
+          -- Type check each group in dependency order folding the global env
+          <- checkNoErrs $ fold_env [] [] emptyNameEnv tycl_decls
+      ; setGblEnv tcg_env $ do {
+          -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
+          -- process the deriving clauses, including data family deriving
+          -- clauses discovered in @tcTyClGroups@.
+          --
+          -- Careful to quit now in case there were instance errors, so that
+          -- the deriving errors don't pile up as well.
+          ; failIfErrsM
+          ; (tcg_env', inst_info', val_binds)
+              <- tcInstDeclsDeriv early_specs
+          ; setGblEnv tcg_env' $ do {
+                failIfErrsM
+              ; pure ( tcg_env', inst_info' ++ inst_info, th_bndrs, val_binds )
+      }}}
   where
     fold_env :: [InstInfo GhcRn]
-             -> [DerivInfo]
+             -> [EarlyDerivSpec]
              -> ThBindEnv
              -> [TyClGroup GhcRn]
-             -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
-    fold_env inst_info deriv_info th_bndrs []
+             -> TcM (TcGblEnv, [InstInfo GhcRn], [EarlyDerivSpec], ThBindEnv)
+    fold_env inst_info early_specs th_bndrs []
       = do { gbl_env <- getGblEnv
-           ; return (gbl_env, inst_info, deriv_info, th_bndrs) }
-    fold_env inst_info deriv_info th_bndrs (tyclds:tyclds_s)
-      = do { (tcg_env, inst_info', deriv_info', th_bndrs')
+           ; return (gbl_env, inst_info, early_specs, th_bndrs) }
+    fold_env inst_info early_specs th_bndrs (tyclds:tyclds_s)
+      = do { (tcg_env, inst_info', early_specs', th_bndrs')
                <- tcTyClGroup tyclds
            ; setGblEnv tcg_env $
                -- remaining groups are typechecked in the extended global env.
              fold_env (inst_info' ++ inst_info)
-                      (deriv_info' ++ deriv_info)
+                      (early_specs' ++ early_specs)
                       (th_bndrs' `plusNameEnv` th_bndrs)
                       tyclds_s }
 
 tcTyClGroup :: TyClGroup GhcRn
-            -> TcM (TcGblEnv, [InstInfo GhcRn], [DerivInfo], ThBindEnv)
+            -> TcM (TcGblEnv, [InstInfo GhcRn], [EarlyDerivSpec], ThBindEnv)
 -- Typecheck one strongly-connected component of type, class, and instance decls
--- See Note [TyClGroups and dependency analysis] in GHC.Hs.Decls
+-- See Note [TyClGroups and dependency analysis] in Language.Haskell.Syntax.Decls
 tcTyClGroup (TyClGroup { group_tyclds = tyclds
                        , group_roles  = roles
                        , group_kisigs = kisigs
@@ -222,15 +240,18 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
        ; (gbl_env, th_bndrs) <- addTyConsToGblEnv tyclss
 
            -- Step 4: check instance declarations
-       ; (gbl_env', inst_info, datafam_deriv_info, th_bndrs') <-
+       ; (gbl_env', inst_info, datafam_deriv_info, deriv_decls, th_bndrs') <-
          setGblEnv gbl_env $
          tcInstDecls1 instds
 
        ; let deriv_info = datafam_deriv_info ++ data_deriv_info
        ; let gbl_env'' = gbl_env'
                 { tcg_ksigs = tcg_ksigs gbl_env' `unionNameSet` kindless }
-       ; return (gbl_env'', inst_info, deriv_info,
-                 th_bndrs' `plusNameEnv` th_bndrs) }
+       ; setGblEnv gbl_env'' $
+    do { early_specs <- makeDerivSpecs deriv_info deriv_decls
+       ; gbl_env''' <- tcDerivingFamInsts early_specs
+       ; return (gbl_env''', inst_info, early_specs,
+                 th_bndrs' `plusNameEnv` th_bndrs) } }
 
 -- Gives the kind for every TyCon that has a standalone kind signature
 type KindSigEnv = NameEnv Kind

@@ -389,7 +389,6 @@ processGrp grp = concatM
       [ toHie $ fmap (RS ModuleScope ) hs_valds grp
       , toHie $ hs_splcds grp
       , toHie $ hs_tyclds grp
-      , toHie $ hs_derivds grp
       , toHie $ hs_fixds grp
       , toHie $ hs_defds grp
       , toHie $ hs_fords grp
@@ -1947,6 +1946,9 @@ instance ToHie (LocatedA (InstDecl GhcRn)) where
         [ toHie $ L span d
         ]
       TyFamInstD _ d ->
+        [ toHie $ L span d
+        ]
+      DerivInstD _ d ->
         [ toHie $ L span d
         ]
 

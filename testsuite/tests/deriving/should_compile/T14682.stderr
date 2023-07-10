@@ -80,8 +80,6 @@ Derived class instances:
   $tFoo = Data.Data.mkDataType "T14682.Foo" [$cFoo]
   $cFoo = Data.Data.mkConstrTag $tFoo "Foo" 1 [] Data.Data.Prefix
 
-Derived type family instances:
-
 
 
 ==================== Filling in method body ====================

@@ -36,6 +36,8 @@
 -- If these derived instances were put in the same module as the definitions,
 -- then GHC's dependency analysis might typecheck a derived instance /before/ it
 -- typechecks the definitions that it depends on, which would be disastrous.
+-- See @Note [Tension between deriving and SCC analysis]@ in @GHC.Tc.Deriv@ in
+-- the GHC source code for more on this point.
 
 module GHC.Generics.Internal  (
 -- * Introduction

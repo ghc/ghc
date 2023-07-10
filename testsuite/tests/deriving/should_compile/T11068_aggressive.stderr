@@ -1,81 +1,5 @@
 
 ==================== Derived instances ====================
-Derived class instances:
-  instance GHC.Generics.Internal.Generic T11068_aggressive.X where
-    {-# INLINE [1] GHC.Generics.Internal.from #-}
-    {-# INLINE [1] GHC.Generics.Internal.to #-}
-    GHC.Generics.Internal.from x
-      = GHC.Generics.Internal.M1
-          (case x of
-             T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
-               -> GHC.Generics.Internal.L1
-                    (GHC.Generics.Internal.M1
-                       ((GHC.Generics.Internal.:*:)
-                          ((GHC.Generics.Internal.:*:)
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
-                                ((GHC.Generics.Internal.:*:)
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
-                          ((GHC.Generics.Internal.:*:)
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
-                                ((GHC.Generics.Internal.:*:)
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10)))))))
-             T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
-               -> GHC.Generics.Internal.R1
-                    (GHC.Generics.Internal.M1
-                       ((GHC.Generics.Internal.:*:)
-                          ((GHC.Generics.Internal.:*:)
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
-                                ((GHC.Generics.Internal.:*:)
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
-                          ((GHC.Generics.Internal.:*:)
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
-                             ((GHC.Generics.Internal.:*:)
-                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
-                                ((GHC.Generics.Internal.:*:)
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
-                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
-    GHC.Generics.Internal.to (GHC.Generics.Internal.M1 x)
-      = case x of
-          (GHC.Generics.Internal.L1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
-                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
-                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
-                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
-                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
-                                                                                           ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
-                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
-                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
-                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
-                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
-            -> T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
-          (GHC.Generics.Internal.R1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
-                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
-                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
-                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
-                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
-                                                                                           ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
-                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
-                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
-                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
-                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
-            -> T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
-  
 
 Derived type family instances:
   type GHC.Generics.Internal.Rep
@@ -249,5 +173,85 @@ Derived type family instances:
                                                                                                                                                                                'GHC.Generics.Internal.DecidedLazy)
                                                                                                                                                                             (GHC.Generics.Internal.Rec0
                                                                                                                                                                                GHC.Types.Int))))))
+
+
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Generics.Internal.Generic T11068_aggressive.X where
+    {-# INLINE [1] GHC.Generics.Internal.from #-}
+    {-# INLINE [1] GHC.Generics.Internal.to #-}
+    GHC.Generics.Internal.from x
+      = GHC.Generics.Internal.M1
+          (case x of
+             T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+               -> GHC.Generics.Internal.L1
+                    (GHC.Generics.Internal.M1
+                       ((GHC.Generics.Internal.:*:)
+                          ((GHC.Generics.Internal.:*:)
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
+                                ((GHC.Generics.Internal.:*:)
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
+                          ((GHC.Generics.Internal.:*:)
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
+                                ((GHC.Generics.Internal.:*:)
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10)))))))
+             T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+               -> GHC.Generics.Internal.R1
+                    (GHC.Generics.Internal.M1
+                       ((GHC.Generics.Internal.:*:)
+                          ((GHC.Generics.Internal.:*:)
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
+                                ((GHC.Generics.Internal.:*:)
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
+                          ((GHC.Generics.Internal.:*:)
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
+                             ((GHC.Generics.Internal.:*:)
+                                (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
+                                ((GHC.Generics.Internal.:*:)
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
+                                   (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
+    GHC.Generics.Internal.to (GHC.Generics.Internal.M1 x)
+      = case x of
+          (GHC.Generics.Internal.L1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
+                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
+                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
+                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
+                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
+                                                                                           ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
+                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
+                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
+                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
+                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
+            -> T11068_aggressive.X1 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+          (GHC.Generics.Internal.R1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g1))
+                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g2)))
+                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g3))
+                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g4))
+                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g5)))))
+                                                                                           ((GHC.Generics.Internal.:*:) ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g6))
+                                                                                                                                                     (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g7)))
+                                                                                                                        ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g8))
+                                                                                                                                                     ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g9))
+                                                                                                                                                                                  (GHC.Generics.Internal.M1 (GHC.Generics.Internal.K1 g10))))))))
+            -> T11068_aggressive.X2 g1 g2 g3 g4 g5 g6 g7 g8 g9 g10
+  
 
 

@@ -99,7 +99,6 @@ rnSrcDecls :: HsGroup GhcPs -> RnM (TcGblEnv, HsGroup GhcRn)
 rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                             hs_splcds  = splice_decls,
                             hs_tyclds  = tycl_decls,
-                            hs_derivds = deriv_decls,
                             hs_fixds   = fix_decls,
                             hs_warnds  = warn_decls,
                             hs_annds   = ann_decls,
@@ -205,8 +204,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_foreign_decls, src_fvs3) <- rnList rnHsForeignDecl foreign_decls ;
    (rn_ann_decls,     src_fvs4) <- rnList rnAnnDecl       ann_decls ;
    (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
-   (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
-   (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
+   (rn_splice_decls,  src_fvs6) <- rnList rnSpliceDecl    splice_decls ;
    rn_docs <- traverse rnLDocDecl docs ;
 
    last_tcg_env <- getGblEnv ;
@@ -215,7 +213,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                              hs_valds   = rn_val_decls,
                              hs_splcds  = rn_splice_decls,
                              hs_tyclds  = rn_tycl_decls,
-                             hs_derivds = rn_deriv_decls,
                              hs_fixds   = rn_fix_decls,
                              hs_warnds  = [], -- warns are returned in the tcg_env
                                              -- (see below) not in the HsGroup
@@ -228,7 +225,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_foreign_decls ;
         other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
         other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
-                              src_fvs5, src_fvs6, src_fvs7] ;
+                              src_fvs5, src_fvs6] ;
                 -- It is tiresome to gather the binders from type and class decls
 
         src_dus = unitOL other_def `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
@@ -440,6 +437,10 @@ rnSrcInstDecl (ClsInstD { cid_inst = cid })
        ; (cid', fvs) <- rnClsInstDecl cid
        ; traceRn "rnSrcIstDecl end }" empty
        ; return (ClsInstD { cid_d_ext = noExtField, cid_inst = cid' }, fvs) }
+
+rnSrcInstDecl (DerivInstD { did_inst = did })
+  = do { (did', fvs) <- rnSrcDerivDecl did
+       ; return (DerivInstD { did_ext = noExtField, did_inst = did' }, fvs) }
 
 -- | Warn about non-canonical typeclass instance declarations
 --
@@ -1369,7 +1370,7 @@ Why do the instance declarations participate?  At least two reasons
 
   To accommodate for these situations, we ensure that an instance is checked
   before every @TyClDecl@ on which it does not depend. That's to say, instances
-  are checked as early as possible in @tcTyAndClassDecls@.
+  are checked as early as possible in @tcTyClGroups@.
 
 ------------------------------------
 So much for WHY.  What about HOW?  It's pretty easy:
@@ -2649,8 +2650,6 @@ add gp@(HsGroup {hs_tyclds = ts})  l (InstD _ d) ds
   = addl (gp { hs_tyclds = add_instd (L l d) ts }) ds
 
 -- The rest are routine
-add gp@(HsGroup {hs_derivds = ts})  l (DerivD _ d) ds
-  = addl (gp { hs_derivds = L l d : ts }) ds
 add gp@(HsGroup {hs_defds  = ts})  l (DefD _ d) ds
   = addl (gp { hs_defds = L l d : ts }) ds
 add gp@(HsGroup {hs_fords  = ts}) l (ForD _ d) ds

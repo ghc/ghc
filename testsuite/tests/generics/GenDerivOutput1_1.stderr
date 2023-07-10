@@ -1,5 +1,265 @@
 
 ==================== Derived instances ====================
+
+Derived type family instances:
+  type GHC.Generics.Internal.Rep
+         (CanDoRep1_1.Da a) = GHC.Generics.Internal.D1
+                                ('GHC.Generics.Internal.MetaData
+                                   "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                (GHC.Generics.Internal.C1
+                                   ('GHC.Generics.Internal.MetaCons
+                                      "D0" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                                   GHC.Generics.Internal.U1
+                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                             ('GHC.Generics.Internal.MetaCons
+                                                                "D1"
+                                                                'GHC.Generics.Internal.PrefixI
+                                                                'GHC.Types.True)
+                                                             (GHC.Generics.Internal.S1
+                                                                ('GHC.Generics.Internal.MetaSel
+                                                                   ('GHC.Maybe.Just "d11a")
+                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                   'GHC.Generics.Internal.NoSourceStrictness
+                                                                   'GHC.Generics.Internal.DecidedLazy)
+                                                                (GHC.Generics.Internal.Rec0 a)
+                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                          ('GHC.Generics.Internal.MetaSel
+                                                                                             ('GHC.Maybe.Just
+                                                                                                "d12a")
+                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                             'GHC.Generics.Internal.NoSourceStrictness
+                                                                                             'GHC.Generics.Internal.DecidedLazy)
+                                                                                          (GHC.Generics.Internal.Rec0
+                                                                                             (CanDoRep1_1.Da
+                                                                                                a))))
+  type GHC.Generics.Internal.Rep1
+         CanDoRep1_1.Da = GHC.Generics.Internal.D1
+                            ('GHC.Generics.Internal.MetaData
+                               "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
+                            (GHC.Generics.Internal.C1
+                               ('GHC.Generics.Internal.MetaCons
+                                  "D0" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                               GHC.Generics.Internal.U1
+                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                         ('GHC.Generics.Internal.MetaCons
+                                                            "D1"
+                                                            'GHC.Generics.Internal.PrefixI
+                                                            'GHC.Types.True)
+                                                         (GHC.Generics.Internal.S1
+                                                            ('GHC.Generics.Internal.MetaSel
+                                                               ('GHC.Maybe.Just "d11a")
+                                                               'GHC.Generics.Internal.NoSourceUnpackedness
+                                                               'GHC.Generics.Internal.NoSourceStrictness
+                                                               'GHC.Generics.Internal.DecidedLazy)
+                                                            GHC.Generics.Internal.Par1
+                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                      ('GHC.Generics.Internal.MetaSel
+                                                                                         ('GHC.Maybe.Just
+                                                                                            "d12a")
+                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                         'GHC.Generics.Internal.NoSourceStrictness
+                                                                                         'GHC.Generics.Internal.DecidedLazy)
+                                                                                      (GHC.Generics.Internal.Rec1
+                                                                                         CanDoRep1_1.Da)))
+
+
+
+==================== Derived instances ====================
+
+Derived type family instances:
+  type GHC.Generics.Internal.Rep
+         (CanDoRep1_1.Db a) = GHC.Generics.Internal.D1
+                                ('GHC.Generics.Internal.MetaData
+                                   "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                (GHC.Generics.Internal.C1
+                                   ('GHC.Generics.Internal.MetaCons
+                                      "D0b" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                                   GHC.Generics.Internal.U1
+                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                             ('GHC.Generics.Internal.MetaCons
+                                                                "D1b"
+                                                                'GHC.Generics.Internal.PrefixI
+                                                                'GHC.Types.True)
+                                                             (GHC.Generics.Internal.S1
+                                                                ('GHC.Generics.Internal.MetaSel
+                                                                   ('GHC.Maybe.Just "d11b")
+                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                   'GHC.Generics.Internal.NoSourceStrictness
+                                                                   'GHC.Generics.Internal.DecidedLazy)
+                                                                (GHC.Generics.Internal.Rec0 a)
+                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                          ('GHC.Generics.Internal.MetaSel
+                                                                                             ('GHC.Maybe.Just
+                                                                                                "d12b")
+                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                             'GHC.Generics.Internal.NoSourceStrictness
+                                                                                             'GHC.Generics.Internal.DecidedLazy)
+                                                                                          (GHC.Generics.Internal.Rec0
+                                                                                             (CanDoRep1_1.Db
+                                                                                                a))))
+  type GHC.Generics.Internal.Rep1
+         CanDoRep1_1.Db = GHC.Generics.Internal.D1
+                            ('GHC.Generics.Internal.MetaData
+                               "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
+                            (GHC.Generics.Internal.C1
+                               ('GHC.Generics.Internal.MetaCons
+                                  "D0b" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                               GHC.Generics.Internal.U1
+                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                         ('GHC.Generics.Internal.MetaCons
+                                                            "D1b"
+                                                            'GHC.Generics.Internal.PrefixI
+                                                            'GHC.Types.True)
+                                                         (GHC.Generics.Internal.S1
+                                                            ('GHC.Generics.Internal.MetaSel
+                                                               ('GHC.Maybe.Just "d11b")
+                                                               'GHC.Generics.Internal.NoSourceUnpackedness
+                                                               'GHC.Generics.Internal.NoSourceStrictness
+                                                               'GHC.Generics.Internal.DecidedLazy)
+                                                            GHC.Generics.Internal.Par1
+                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                      ('GHC.Generics.Internal.MetaSel
+                                                                                         ('GHC.Maybe.Just
+                                                                                            "d12b")
+                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                         'GHC.Generics.Internal.NoSourceStrictness
+                                                                                         'GHC.Generics.Internal.DecidedLazy)
+                                                                                      (GHC.Generics.Internal.Rec1
+                                                                                         CanDoRep1_1.Db)))
+
+
+
+==================== Derived instances ====================
+
+Derived type family instances:
+  type GHC.Generics.Internal.Rep1
+         CanDoRep1_1.Dc = GHC.Generics.Internal.D1
+                            ('GHC.Generics.Internal.MetaData
+                               "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
+                            (GHC.Generics.Internal.C1
+                               ('GHC.Generics.Internal.MetaCons
+                                  "D0c" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                               GHC.Generics.Internal.U1
+                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                         ('GHC.Generics.Internal.MetaCons
+                                                            "D1c"
+                                                            'GHC.Generics.Internal.PrefixI
+                                                            'GHC.Types.True)
+                                                         (GHC.Generics.Internal.S1
+                                                            ('GHC.Generics.Internal.MetaSel
+                                                               ('GHC.Maybe.Just "d11c")
+                                                               'GHC.Generics.Internal.NoSourceUnpackedness
+                                                               'GHC.Generics.Internal.NoSourceStrictness
+                                                               'GHC.Generics.Internal.DecidedLazy)
+                                                            GHC.Generics.Internal.Par1
+                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                      ('GHC.Generics.Internal.MetaSel
+                                                                                         ('GHC.Maybe.Just
+                                                                                            "d12c")
+                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                         'GHC.Generics.Internal.NoSourceStrictness
+                                                                                         'GHC.Generics.Internal.DecidedLazy)
+                                                                                      (GHC.Generics.Internal.Rec1
+                                                                                         CanDoRep1_1.Dc)))
+  type GHC.Generics.Internal.Rep
+         (CanDoRep1_1.Dc a) = GHC.Generics.Internal.D1
+                                ('GHC.Generics.Internal.MetaData
+                                   "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                (GHC.Generics.Internal.C1
+                                   ('GHC.Generics.Internal.MetaCons
+                                      "D0c" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                                   GHC.Generics.Internal.U1
+                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                             ('GHC.Generics.Internal.MetaCons
+                                                                "D1c"
+                                                                'GHC.Generics.Internal.PrefixI
+                                                                'GHC.Types.True)
+                                                             (GHC.Generics.Internal.S1
+                                                                ('GHC.Generics.Internal.MetaSel
+                                                                   ('GHC.Maybe.Just "d11c")
+                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                   'GHC.Generics.Internal.NoSourceStrictness
+                                                                   'GHC.Generics.Internal.DecidedLazy)
+                                                                (GHC.Generics.Internal.Rec0 a)
+                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                          ('GHC.Generics.Internal.MetaSel
+                                                                                             ('GHC.Maybe.Just
+                                                                                                "d12c")
+                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                             'GHC.Generics.Internal.NoSourceStrictness
+                                                                                             'GHC.Generics.Internal.DecidedLazy)
+                                                                                          (GHC.Generics.Internal.Rec0
+                                                                                             (CanDoRep1_1.Dc
+                                                                                                a))))
+
+
+
+==================== Derived instances ====================
+
+Derived type family instances:
+  type GHC.Generics.Internal.Rep1
+         CanDoRep1_1.Dd = GHC.Generics.Internal.D1
+                            ('GHC.Generics.Internal.MetaData
+                               "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
+                            (GHC.Generics.Internal.C1
+                               ('GHC.Generics.Internal.MetaCons
+                                  "D0d" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                               GHC.Generics.Internal.U1
+                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                         ('GHC.Generics.Internal.MetaCons
+                                                            "D1d"
+                                                            'GHC.Generics.Internal.PrefixI
+                                                            'GHC.Types.True)
+                                                         (GHC.Generics.Internal.S1
+                                                            ('GHC.Generics.Internal.MetaSel
+                                                               ('GHC.Maybe.Just "d11d")
+                                                               'GHC.Generics.Internal.NoSourceUnpackedness
+                                                               'GHC.Generics.Internal.NoSourceStrictness
+                                                               'GHC.Generics.Internal.DecidedLazy)
+                                                            GHC.Generics.Internal.Par1
+                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                      ('GHC.Generics.Internal.MetaSel
+                                                                                         ('GHC.Maybe.Just
+                                                                                            "d12d")
+                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                         'GHC.Generics.Internal.NoSourceStrictness
+                                                                                         'GHC.Generics.Internal.DecidedLazy)
+                                                                                      (GHC.Generics.Internal.Rec1
+                                                                                         CanDoRep1_1.Dd)))
+  type GHC.Generics.Internal.Rep
+         (CanDoRep1_1.Dd a) = GHC.Generics.Internal.D1
+                                ('GHC.Generics.Internal.MetaData
+                                   "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
+                                (GHC.Generics.Internal.C1
+                                   ('GHC.Generics.Internal.MetaCons
+                                      "D0d" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
+                                   GHC.Generics.Internal.U1
+                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
+                                                             ('GHC.Generics.Internal.MetaCons
+                                                                "D1d"
+                                                                'GHC.Generics.Internal.PrefixI
+                                                                'GHC.Types.True)
+                                                             (GHC.Generics.Internal.S1
+                                                                ('GHC.Generics.Internal.MetaSel
+                                                                   ('GHC.Maybe.Just "d11d")
+                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                   'GHC.Generics.Internal.NoSourceStrictness
+                                                                   'GHC.Generics.Internal.DecidedLazy)
+                                                                (GHC.Generics.Internal.Rec0 a)
+                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
+                                                                                          ('GHC.Generics.Internal.MetaSel
+                                                                                             ('GHC.Maybe.Just
+                                                                                                "d12d")
+                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
+                                                                                             'GHC.Generics.Internal.NoSourceStrictness
+                                                                                             'GHC.Generics.Internal.DecidedLazy)
+                                                                                          (GHC.Generics.Internal.Rec0
+                                                                                             (CanDoRep1_1.Dd
+                                                                                                a))))
+
+
+
+==================== Derived instances ====================
 Derived class instances:
   instance GHC.Generics.Internal.Generic1 CanDoRep1_1.Dd where
     GHC.Generics.Internal.from1 x
@@ -173,243 +433,5 @@ Derived class instances:
             -> CanDoRep1_1.D1
                  (GHC.Generics.Internal.unPar1 g1) (GHC.Generics.Internal.unRec1 g2)
   
-
-Derived type family instances:
-  type GHC.Generics.Internal.Rep1
-         CanDoRep1_1.Dd = GHC.Generics.Internal.D1
-                            ('GHC.Generics.Internal.MetaData
-                               "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
-                            (GHC.Generics.Internal.C1
-                               ('GHC.Generics.Internal.MetaCons
-                                  "D0d" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                               GHC.Generics.Internal.U1
-                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                         ('GHC.Generics.Internal.MetaCons
-                                                            "D1d"
-                                                            'GHC.Generics.Internal.PrefixI
-                                                            'GHC.Types.True)
-                                                         (GHC.Generics.Internal.S1
-                                                            ('GHC.Generics.Internal.MetaSel
-                                                               ('GHC.Maybe.Just "d11d")
-                                                               'GHC.Generics.Internal.NoSourceUnpackedness
-                                                               'GHC.Generics.Internal.NoSourceStrictness
-                                                               'GHC.Generics.Internal.DecidedLazy)
-                                                            GHC.Generics.Internal.Par1
-                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                      ('GHC.Generics.Internal.MetaSel
-                                                                                         ('GHC.Maybe.Just
-                                                                                            "d12d")
-                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                         'GHC.Generics.Internal.NoSourceStrictness
-                                                                                         'GHC.Generics.Internal.DecidedLazy)
-                                                                                      (GHC.Generics.Internal.Rec1
-                                                                                         CanDoRep1_1.Dd)))
-  type GHC.Generics.Internal.Rep
-         (CanDoRep1_1.Dd a) = GHC.Generics.Internal.D1
-                                ('GHC.Generics.Internal.MetaData
-                                   "Dd" "CanDoRep1_1" "main" 'GHC.Types.False)
-                                (GHC.Generics.Internal.C1
-                                   ('GHC.Generics.Internal.MetaCons
-                                      "D0d" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                                   GHC.Generics.Internal.U1
-                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                             ('GHC.Generics.Internal.MetaCons
-                                                                "D1d"
-                                                                'GHC.Generics.Internal.PrefixI
-                                                                'GHC.Types.True)
-                                                             (GHC.Generics.Internal.S1
-                                                                ('GHC.Generics.Internal.MetaSel
-                                                                   ('GHC.Maybe.Just "d11d")
-                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                   'GHC.Generics.Internal.NoSourceStrictness
-                                                                   'GHC.Generics.Internal.DecidedLazy)
-                                                                (GHC.Generics.Internal.Rec0 a)
-                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                          ('GHC.Generics.Internal.MetaSel
-                                                                                             ('GHC.Maybe.Just
-                                                                                                "d12d")
-                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                             'GHC.Generics.Internal.NoSourceStrictness
-                                                                                             'GHC.Generics.Internal.DecidedLazy)
-                                                                                          (GHC.Generics.Internal.Rec0
-                                                                                             (CanDoRep1_1.Dd
-                                                                                                a))))
-  type GHC.Generics.Internal.Rep
-         (CanDoRep1_1.Dc a) = GHC.Generics.Internal.D1
-                                ('GHC.Generics.Internal.MetaData
-                                   "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
-                                (GHC.Generics.Internal.C1
-                                   ('GHC.Generics.Internal.MetaCons
-                                      "D0c" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                                   GHC.Generics.Internal.U1
-                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                             ('GHC.Generics.Internal.MetaCons
-                                                                "D1c"
-                                                                'GHC.Generics.Internal.PrefixI
-                                                                'GHC.Types.True)
-                                                             (GHC.Generics.Internal.S1
-                                                                ('GHC.Generics.Internal.MetaSel
-                                                                   ('GHC.Maybe.Just "d11c")
-                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                   'GHC.Generics.Internal.NoSourceStrictness
-                                                                   'GHC.Generics.Internal.DecidedLazy)
-                                                                (GHC.Generics.Internal.Rec0 a)
-                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                          ('GHC.Generics.Internal.MetaSel
-                                                                                             ('GHC.Maybe.Just
-                                                                                                "d12c")
-                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                             'GHC.Generics.Internal.NoSourceStrictness
-                                                                                             'GHC.Generics.Internal.DecidedLazy)
-                                                                                          (GHC.Generics.Internal.Rec0
-                                                                                             (CanDoRep1_1.Dc
-                                                                                                a))))
-  type GHC.Generics.Internal.Rep1
-         CanDoRep1_1.Db = GHC.Generics.Internal.D1
-                            ('GHC.Generics.Internal.MetaData
-                               "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
-                            (GHC.Generics.Internal.C1
-                               ('GHC.Generics.Internal.MetaCons
-                                  "D0b" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                               GHC.Generics.Internal.U1
-                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                         ('GHC.Generics.Internal.MetaCons
-                                                            "D1b"
-                                                            'GHC.Generics.Internal.PrefixI
-                                                            'GHC.Types.True)
-                                                         (GHC.Generics.Internal.S1
-                                                            ('GHC.Generics.Internal.MetaSel
-                                                               ('GHC.Maybe.Just "d11b")
-                                                               'GHC.Generics.Internal.NoSourceUnpackedness
-                                                               'GHC.Generics.Internal.NoSourceStrictness
-                                                               'GHC.Generics.Internal.DecidedLazy)
-                                                            GHC.Generics.Internal.Par1
-                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                      ('GHC.Generics.Internal.MetaSel
-                                                                                         ('GHC.Maybe.Just
-                                                                                            "d12b")
-                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                         'GHC.Generics.Internal.NoSourceStrictness
-                                                                                         'GHC.Generics.Internal.DecidedLazy)
-                                                                                      (GHC.Generics.Internal.Rec1
-                                                                                         CanDoRep1_1.Db)))
-  type GHC.Generics.Internal.Rep1
-         CanDoRep1_1.Dc = GHC.Generics.Internal.D1
-                            ('GHC.Generics.Internal.MetaData
-                               "Dc" "CanDoRep1_1" "main" 'GHC.Types.False)
-                            (GHC.Generics.Internal.C1
-                               ('GHC.Generics.Internal.MetaCons
-                                  "D0c" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                               GHC.Generics.Internal.U1
-                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                         ('GHC.Generics.Internal.MetaCons
-                                                            "D1c"
-                                                            'GHC.Generics.Internal.PrefixI
-                                                            'GHC.Types.True)
-                                                         (GHC.Generics.Internal.S1
-                                                            ('GHC.Generics.Internal.MetaSel
-                                                               ('GHC.Maybe.Just "d11c")
-                                                               'GHC.Generics.Internal.NoSourceUnpackedness
-                                                               'GHC.Generics.Internal.NoSourceStrictness
-                                                               'GHC.Generics.Internal.DecidedLazy)
-                                                            GHC.Generics.Internal.Par1
-                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                      ('GHC.Generics.Internal.MetaSel
-                                                                                         ('GHC.Maybe.Just
-                                                                                            "d12c")
-                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                         'GHC.Generics.Internal.NoSourceStrictness
-                                                                                         'GHC.Generics.Internal.DecidedLazy)
-                                                                                      (GHC.Generics.Internal.Rec1
-                                                                                         CanDoRep1_1.Dc)))
-  type GHC.Generics.Internal.Rep
-         (CanDoRep1_1.Db a) = GHC.Generics.Internal.D1
-                                ('GHC.Generics.Internal.MetaData
-                                   "Db" "CanDoRep1_1" "main" 'GHC.Types.False)
-                                (GHC.Generics.Internal.C1
-                                   ('GHC.Generics.Internal.MetaCons
-                                      "D0b" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                                   GHC.Generics.Internal.U1
-                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                             ('GHC.Generics.Internal.MetaCons
-                                                                "D1b"
-                                                                'GHC.Generics.Internal.PrefixI
-                                                                'GHC.Types.True)
-                                                             (GHC.Generics.Internal.S1
-                                                                ('GHC.Generics.Internal.MetaSel
-                                                                   ('GHC.Maybe.Just "d11b")
-                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                   'GHC.Generics.Internal.NoSourceStrictness
-                                                                   'GHC.Generics.Internal.DecidedLazy)
-                                                                (GHC.Generics.Internal.Rec0 a)
-                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                          ('GHC.Generics.Internal.MetaSel
-                                                                                             ('GHC.Maybe.Just
-                                                                                                "d12b")
-                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                             'GHC.Generics.Internal.NoSourceStrictness
-                                                                                             'GHC.Generics.Internal.DecidedLazy)
-                                                                                          (GHC.Generics.Internal.Rec0
-                                                                                             (CanDoRep1_1.Db
-                                                                                                a))))
-  type GHC.Generics.Internal.Rep
-         (CanDoRep1_1.Da a) = GHC.Generics.Internal.D1
-                                ('GHC.Generics.Internal.MetaData
-                                   "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
-                                (GHC.Generics.Internal.C1
-                                   ('GHC.Generics.Internal.MetaCons
-                                      "D0" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                                   GHC.Generics.Internal.U1
-                                 GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                             ('GHC.Generics.Internal.MetaCons
-                                                                "D1"
-                                                                'GHC.Generics.Internal.PrefixI
-                                                                'GHC.Types.True)
-                                                             (GHC.Generics.Internal.S1
-                                                                ('GHC.Generics.Internal.MetaSel
-                                                                   ('GHC.Maybe.Just "d11a")
-                                                                   'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                   'GHC.Generics.Internal.NoSourceStrictness
-                                                                   'GHC.Generics.Internal.DecidedLazy)
-                                                                (GHC.Generics.Internal.Rec0 a)
-                                                              GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                          ('GHC.Generics.Internal.MetaSel
-                                                                                             ('GHC.Maybe.Just
-                                                                                                "d12a")
-                                                                                             'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                             'GHC.Generics.Internal.NoSourceStrictness
-                                                                                             'GHC.Generics.Internal.DecidedLazy)
-                                                                                          (GHC.Generics.Internal.Rec0
-                                                                                             (CanDoRep1_1.Da
-                                                                                                a))))
-  type GHC.Generics.Internal.Rep1
-         CanDoRep1_1.Da = GHC.Generics.Internal.D1
-                            ('GHC.Generics.Internal.MetaData
-                               "Da" "CanDoRep1_1" "main" 'GHC.Types.False)
-                            (GHC.Generics.Internal.C1
-                               ('GHC.Generics.Internal.MetaCons
-                                  "D0" 'GHC.Generics.Internal.PrefixI 'GHC.Types.False)
-                               GHC.Generics.Internal.U1
-                             GHC.Generics.Internal.:+: GHC.Generics.Internal.C1
-                                                         ('GHC.Generics.Internal.MetaCons
-                                                            "D1"
-                                                            'GHC.Generics.Internal.PrefixI
-                                                            'GHC.Types.True)
-                                                         (GHC.Generics.Internal.S1
-                                                            ('GHC.Generics.Internal.MetaSel
-                                                               ('GHC.Maybe.Just "d11a")
-                                                               'GHC.Generics.Internal.NoSourceUnpackedness
-                                                               'GHC.Generics.Internal.NoSourceStrictness
-                                                               'GHC.Generics.Internal.DecidedLazy)
-                                                            GHC.Generics.Internal.Par1
-                                                          GHC.Generics.Internal.:*: GHC.Generics.Internal.S1
-                                                                                      ('GHC.Generics.Internal.MetaSel
-                                                                                         ('GHC.Maybe.Just
-                                                                                            "d12a")
-                                                                                         'GHC.Generics.Internal.NoSourceUnpackedness
-                                                                                         'GHC.Generics.Internal.NoSourceStrictness
-                                                                                         'GHC.Generics.Internal.DecidedLazy)
-                                                                                      (GHC.Generics.Internal.Rec1
-                                                                                         CanDoRep1_1.Da)))
 
 

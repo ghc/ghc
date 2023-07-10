@@ -36,6 +36,4 @@ Derived class instances:
           ((GHC.Classes./=) @(GHC.Maybe.Maybe a))
   
 
-Derived type family instances:
-
 

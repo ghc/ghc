@@ -1519,7 +1519,6 @@ instance ExactPrint a => ExactPrint (WithHsDocIdentifiers a GhcPs) where
 instance ExactPrint (HsDecl GhcPs) where
   getAnnotationEntry (TyClD      _ _) = NoEntryVal
   getAnnotationEntry (InstD      _ _) = NoEntryVal
-  getAnnotationEntry (DerivD     _ _) = NoEntryVal
   getAnnotationEntry (ValD       _ _) = NoEntryVal
   getAnnotationEntry (SigD       _ _) = NoEntryVal
   getAnnotationEntry (KindSigD   _ _) = NoEntryVal
@@ -1538,7 +1537,6 @@ instance ExactPrint (HsDecl GhcPs) where
 
   exact (TyClD       x d) = TyClD       x <$> markAnnotated d
   exact (InstD       x d) = InstD       x <$> markAnnotated d
-  exact (DerivD      x d) = DerivD      x <$> markAnnotated d
   exact (ValD        x d) = ValD        x <$> markAnnotated d
   exact (SigD        x d) = SigD        x <$> markAnnotated d
   exact (KindSigD    x d) = KindSigD    x <$> markAnnotated d
@@ -1557,6 +1555,7 @@ instance ExactPrint (InstDecl GhcPs) where
   getAnnotationEntry (ClsInstD     _ _) = NoEntryVal
   getAnnotationEntry (DataFamInstD _ _) = NoEntryVal
   getAnnotationEntry (TyFamInstD   _ _) = NoEntryVal
+  getAnnotationEntry (DerivInstD   _ _) = NoEntryVal
 
   setAnnotationAnchor d _ _ = d
 
@@ -1570,6 +1569,9 @@ instance ExactPrint (InstDecl GhcPs) where
   exact (TyFamInstD a eqn) = do
     eqn' <- markAnnotated eqn
     return (TyFamInstD a eqn')
+  exact (DerivInstD a did) = do
+    did' <- markAnnotated did
+    return (DerivInstD a did')
 
 -- ---------------------------------------------------------------------
 

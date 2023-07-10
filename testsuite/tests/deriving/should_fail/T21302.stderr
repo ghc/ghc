@@ -1,10 +1,4 @@
 
-T21302.hs:6:13: error: [GHC-05617]
-    • Could not solve: ‘c0 Eq Int’
-        arising from the first field of ‘BoxAssocDouble’
-          (type ‘BoxAssoc Int’)
-    • When deriving the instance for (Eq BoxAssocDouble)
-
 T21302.hs:12:19: error: [GHC-05617]
     • Could not deduce ‘c0 Eq a’
       from the context: c Eq a

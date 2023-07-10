@@ -1442,7 +1442,6 @@
    []
    []
    []
-   []
    [])
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:4:8-21 })

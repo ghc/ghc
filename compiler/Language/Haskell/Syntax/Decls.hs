@@ -51,9 +51,9 @@ module Language.Haskell.Syntax.Decls (
   DataFamInstDecl(..), LDataFamInstDecl,
   FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsFamEqnPats,
   LClsInstDecl, ClsInstDecl(..),
-
-  -- ** Standalone deriving declarations
+  -- *** Standalone @deriving@ declarations
   DerivDecl(..), LDerivDecl,
+
   -- ** Deriving strategies
   DerivStrategy(..), LDerivStrategy,
   -- ** @RULE@ declarations
@@ -145,7 +145,6 @@ type LHsDecl p = XRec p (HsDecl p)
 data HsDecl p
   = TyClD      (XTyClD p)      (TyClDecl p)      -- ^ Type or Class Declaration
   | InstD      (XInstD p)      (InstDecl  p)     -- ^ Instance declaration
-  | DerivD     (XDerivD p)     (DerivDecl p)     -- ^ Deriving declaration
   | ValD       (XValD p)       (HsBind p)        -- ^ Value declaration
   | SigD       (XSigD p)       (Sig p)           -- ^ Signature declaration
   | KindSigD   (XKindSigD p)   (StandaloneKindSig p) -- ^ Standalone kind signature
@@ -220,8 +219,6 @@ data HsGroup p
                 -- This includes `InstDecl`s as well;
                 -- Parser generates a singleton list;
                 -- renamer does dependency analysis
-
-        hs_derivds :: [LDerivDecl p],
 
         hs_fixds  :: [LFixitySig p],
                 -- A list of fixity signatures defined for top-level
@@ -1416,24 +1413,6 @@ data ClsInstDecl pass
       }
   | XClsInstDecl !(XXClsInstDecl pass)
 
------------------ Instances of all kinds -------------
-
--- | Located Instance Declaration
-type LInstDecl pass = XRec pass (InstDecl pass)
-
--- | Instance Declaration
-data InstDecl pass  -- Both class and family instances
-  = ClsInstD
-      { cid_d_ext :: XClsInstD pass
-      , cid_inst  :: ClsInstDecl pass }
-  | DataFamInstD              -- data family instance
-      { dfid_ext  :: XDataFamInstD pass
-      , dfid_inst :: DataFamInstDecl pass }
-  | TyFamInstD              -- type family instance
-      { tfid_ext  :: XTyFamInstD pass
-      , tfid_inst :: TyFamInstDecl pass }
-  | XInstDecl !(XXInstDecl pass)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1496,6 +1475,26 @@ data DerivStrategy pass
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
 
+----------------- Instances of all kinds -------------
+
+-- | Located Instance Declaration
+type LInstDecl pass = XRec pass (InstDecl pass)
+
+-- | Instance Declaration
+data InstDecl pass  -- Both class and family instances
+  = ClsInstD
+      { cid_d_ext :: XClsInstD pass
+      , cid_inst  :: ClsInstDecl pass }
+  | DataFamInstD              -- data family instance
+      { dfid_ext  :: XDataFamInstD pass
+      , dfid_inst :: DataFamInstDecl pass }
+  | TyFamInstD              -- type family instance
+      { tfid_ext  :: XTyFamInstD pass
+      , tfid_inst :: TyFamInstDecl pass }
+  | DerivInstD -- standalone `deriving` instance declaration
+      { did_ext   :: XDerivInstD pass
+      , did_inst  :: DerivDecl pass }
+  | XInstDecl !(XXInstDecl pass)
 
 {-
 ************************************************************************

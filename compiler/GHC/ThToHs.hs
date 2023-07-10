@@ -420,11 +420,14 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
        ; (L loc ty') <- cvtType ty
        ; let inst_ty' = L loc $ mkHsImplicitSigType $
                         mkHsQualTy cxt loc cxt' $ L loc ty'
-       ; returnJustLA $ DerivD noExtField $
-         DerivDecl { deriv_ext = (Nothing, noAnn)
+       ; returnJustLA $ InstD noExtField $ DerivInstD
+           { did_ext = noExtField
+           , did_inst =
+               DerivDecl
+                   { deriv_ext = (Nothing, noAnn)
                    , deriv_strategy = ds'
                    , deriv_type = mkHsWildCardBndrs inst_ty'
-                   , deriv_overlap_mode = Nothing } }
+                   , deriv_overlap_mode = Nothing } } }
 
 cvtDec (TH.DefaultSigD nm typ)
   = do { nm' <- vNameN nm

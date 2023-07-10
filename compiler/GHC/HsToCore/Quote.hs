@@ -276,7 +276,6 @@ repTopDs :: HsGroup GhcRn -> MetaM (Core (M [TH.Dec]))
 repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_splcds  = splcds
                         , hs_tyclds  = tyclds
-                        , hs_derivds = derivds
                         , hs_fixds   = fixds
                         , hs_defds   = defds
                         , hs_fords   = fords
@@ -304,7 +303,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
                      ; kisig_ds <- mapM repKiSigD (concatMap group_kisigs tyclds)
                      ; inst_ds  <- mapM repInstD instds
-                     ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repLFixD fixds
                      ; def_ds   <- mapM repDefD defds
                      ; for_ds   <- mapM repForD fords
@@ -322,7 +320,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                                        ++ (concat fix_ds)
                                        ++ def_ds
                                        ++ inst_ds ++ rule_ds ++ for_ds
-                                       ++ ann_ds ++ deriv_ds) }) ;
+                                       ++ ann_ds) }) ;
 
         core_list <- repListM decTyConName return decls ;
 
@@ -637,6 +635,9 @@ repInstD (L loc (DataFamInstD { dfid_inst = fi_decl }))
 repInstD (L loc (ClsInstD { cid_inst = cls_decl }))
   = do { dec <- repClsInstD cls_decl
        ; return (locA loc, dec) }
+repInstD (L loc (DerivInstD { did_inst = did_decl }))
+  = do { dec <- repStandaloneDerivD did_decl
+       ; return (locA loc, dec) }
 
 repClsInstD :: ClsInstDecl GhcRn -> MetaM (Core (M TH.Dec))
 repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
@@ -667,15 +668,13 @@ repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
  where
    (tvs, cxt, inst_ty) = splitLHsInstDeclTy ty
 
-repStandaloneDerivD :: LDerivDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
-repStandaloneDerivD (L loc (DerivDecl { deriv_strategy = strat
-                                       , deriv_type     = ty }))
-  = do { dec <- repDerivStrategy strat  $ \strat' ->
-                addSimpleTyVarBinds FreshNamesOnly tvs $
-                do { cxt'     <- repLContext cxt
-                   ; inst_ty' <- repLTy inst_ty
-                   ; repDeriv strat' cxt' inst_ty' }
-       ; return (locA loc, dec) }
+repStandaloneDerivD :: DerivDecl GhcRn -> MetaM (Core (M TH.Dec))
+repStandaloneDerivD (DerivDecl { deriv_strategy = strat, deriv_type = ty })
+  = repDerivStrategy strat  $ \strat' ->
+    addSimpleTyVarBinds FreshNamesOnly tvs $
+    do { cxt'     <- repLContext cxt
+       ; inst_ty' <- repLTy inst_ty
+       ; repDeriv strat' cxt' inst_ty' }
   where
     (tvs, cxt, inst_ty) = splitLHsInstDeclTy (dropWildCards ty)
 

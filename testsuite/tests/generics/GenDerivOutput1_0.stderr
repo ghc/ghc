@@ -1,29 +1,5 @@
 
 ==================== Derived instances ====================
-Derived class instances:
-  instance GHC.Generics.Internal.Generic1
-             GenDerivOutput1_0.List where
-    GHC.Generics.Internal.from1 x
-      = GHC.Generics.Internal.M1
-          (case x of
-             GenDerivOutput1_0.Nil
-               -> GHC.Generics.Internal.L1
-                    (GHC.Generics.Internal.M1 GHC.Generics.Internal.U1)
-             GenDerivOutput1_0.Cons g1 g2
-               -> GHC.Generics.Internal.R1
-                    (GHC.Generics.Internal.M1
-                       ((GHC.Generics.Internal.:*:)
-                          (GHC.Generics.Internal.M1 (GHC.Generics.Internal.Par1 g1))
-                          (GHC.Generics.Internal.M1 (GHC.Generics.Internal.Rec1 g2)))))
-    GHC.Generics.Internal.to1 (GHC.Generics.Internal.M1 x)
-      = case x of
-          (GHC.Generics.Internal.L1 (GHC.Generics.Internal.M1 GHC.Generics.Internal.U1))
-            -> GenDerivOutput1_0.Nil
-          (GHC.Generics.Internal.R1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 g1)
-                                                                                           (GHC.Generics.Internal.M1 g2))))
-            -> GenDerivOutput1_0.Cons
-                 (GHC.Generics.Internal.unPar1 g1) (GHC.Generics.Internal.unRec1 g2)
-  
 
 Derived type family instances:
   type GHC.Generics.Internal.Rep1
@@ -55,5 +31,33 @@ Derived type family instances:
                                                                                                  'GHC.Generics.Internal.DecidedLazy)
                                                                                               (GHC.Generics.Internal.Rec1
                                                                                                  GenDerivOutput1_0.List)))
+
+
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Generics.Internal.Generic1
+             GenDerivOutput1_0.List where
+    GHC.Generics.Internal.from1 x
+      = GHC.Generics.Internal.M1
+          (case x of
+             GenDerivOutput1_0.Nil
+               -> GHC.Generics.Internal.L1
+                    (GHC.Generics.Internal.M1 GHC.Generics.Internal.U1)
+             GenDerivOutput1_0.Cons g1 g2
+               -> GHC.Generics.Internal.R1
+                    (GHC.Generics.Internal.M1
+                       ((GHC.Generics.Internal.:*:)
+                          (GHC.Generics.Internal.M1 (GHC.Generics.Internal.Par1 g1))
+                          (GHC.Generics.Internal.M1 (GHC.Generics.Internal.Rec1 g2)))))
+    GHC.Generics.Internal.to1 (GHC.Generics.Internal.M1 x)
+      = case x of
+          (GHC.Generics.Internal.L1 (GHC.Generics.Internal.M1 GHC.Generics.Internal.U1))
+            -> GenDerivOutput1_0.Nil
+          (GHC.Generics.Internal.R1 (GHC.Generics.Internal.M1 ((GHC.Generics.Internal.:*:) (GHC.Generics.Internal.M1 g1)
+                                                                                           (GHC.Generics.Internal.M1 g2))))
+            -> GenDerivOutput1_0.Cons
+                 (GHC.Generics.Internal.unPar1 g1) (GHC.Generics.Internal.unRec1 g2)
+  
 
 

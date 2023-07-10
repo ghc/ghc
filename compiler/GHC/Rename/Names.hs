@@ -909,6 +909,8 @@ getLocalNonValBinders fixity_env
               -> RnM [GlobalRdrElt]
     new_assoc _ _ (L _ (TyFamInstD {})) = return []
       -- type instances don't bind new names
+    new_assoc _ _ (L _ (DerivInstD {})) = return []
+      -- neither do standalone `deriving` declarations
 
     new_assoc dup_fields_ok has_sel (L _ (DataFamInstD _ d))
       = new_di dup_fields_ok has_sel Nothing d

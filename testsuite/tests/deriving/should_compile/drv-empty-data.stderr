@@ -1,5 +1,21 @@
 
 ==================== Derived instances ====================
+
+Derived type family instances:
+  type GHC.Generics.Internal.Rep
+         (DrvEmptyData.Void a) = GHC.Generics.Internal.D1
+                                   ('GHC.Generics.Internal.MetaData
+                                      "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                                   GHC.Generics.Internal.V1
+  type GHC.Generics.Internal.Rep1
+         DrvEmptyData.Void = GHC.Generics.Internal.D1
+                               ('GHC.Generics.Internal.MetaData
+                                  "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                               GHC.Generics.Internal.V1
+
+
+
+==================== Derived instances ====================
 Derived class instances:
   instance GHC.Read.Read (DrvEmptyData.Void a) where
     GHC.Read.readPrec = Text.ParserCombinators.ReadPrec.pfail
@@ -54,18 +70,6 @@ Derived class instances:
   
   $tVoid :: Data.Data.DataType
   $tVoid = Data.Data.mkDataType "DrvEmptyData.Void" []
-
-Derived type family instances:
-  type GHC.Generics.Internal.Rep
-         (DrvEmptyData.Void a) = GHC.Generics.Internal.D1
-                                   ('GHC.Generics.Internal.MetaData
-                                      "Void" "DrvEmptyData" "main" 'GHC.Types.False)
-                                   GHC.Generics.Internal.V1
-  type GHC.Generics.Internal.Rep1
-         DrvEmptyData.Void = GHC.Generics.Internal.D1
-                               ('GHC.Generics.Internal.MetaData
-                                  "Void" "DrvEmptyData" "main" 'GHC.Types.False)
-                               GHC.Generics.Internal.V1
 
 
 

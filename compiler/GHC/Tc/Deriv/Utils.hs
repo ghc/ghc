@@ -546,7 +546,7 @@ data StockGenFns = StockGenFns
     -- Generating type family instances is done separately from
     -- 'stock_gen_binds' since the type family instances must be generated
     -- before the instance bindings can be typechecked. See
-    -- @Note [Staging of tcDeriving]@ in "GHC.Tc.Deriv".
+    -- @Note [Staging of deriving]@ in "GHC.Tc.Deriv".
   }
 
 -- A stock class is one either defined in the Haskell report or for which GHC

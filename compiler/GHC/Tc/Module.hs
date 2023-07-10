@@ -257,7 +257,7 @@ tcRnModuleTcRnM hsc_env mod_sum
             ; hsc_src          = ms_hsc_src mod_sum }
       ; -- Load the hi-boot interface for this module, if any
         -- We do this now so that the boot_names can be passed
-        -- to tcTyAndClassDecls, because the boot_names are
+        -- to tcTyClGroups, because the boot_names are
         -- automatically considered to be loop breakers
         tcg_env <- getGblEnv
       ; boot_info <- tcHiBootIface hsc_src this_mod
@@ -691,7 +691,6 @@ tcRnHsBootDecls boot_or_sig decls
 
                 -- Rename the declarations
         ; (tcg_env, HsGroup { hs_tyclds = tycl_decls
-                            , hs_derivds = deriv_decls
                             , hs_fords  = for_decls
                             , hs_defds  = def_decls
                             , hs_ruleds = rule_decls
@@ -714,7 +713,7 @@ tcRnHsBootDecls boot_or_sig decls
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
         ; (tcg_env, inst_infos, _deriv_binds, _th_bndrs)
-             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds
+             <- tcTyClGroups tycl_decls val_binds
         ; setGblEnv tcg_env     $ do {
 
         -- Emit Typeable bindings
@@ -1605,7 +1604,6 @@ rnTopSrcDecls group
 
 tcTopSrcDecls :: HsGroup GhcRn -> TcM (TcGblEnv, TcLclEnv)
 tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
-                         hs_derivds = deriv_decls,
                          hs_fords  = foreign_decls,
                          hs_defds  = default_decls,
                          hs_annds  = annotation_decls,
@@ -1621,7 +1619,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
         traceTc "Tc3" empty ;
         (tcg_env, inst_infos, th_bndrs,
          XValBindsLR (NValBinds deriv_binds deriv_sigs))
-            <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
+            <- tcTyClGroups tycl_decls val_binds ;
 
         updLclCtxt (\tcl_env -> tcl_env { tcl_th_bndrs = th_bndrs `plusNameEnv` tcl_th_bndrs tcl_env }) $
         setGblEnv tcg_env       $ do {
@@ -1698,38 +1696,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
     }}}}}}
 
 tcTopSrcDecls _ = panic "tcTopSrcDecls: ValBindsIn"
-
----------------------------
-tcTyClsInstDecls :: [TyClGroup GhcRn]
-                 -> [LDerivDecl GhcRn]
-                 -> [(RecFlag, LHsBinds GhcRn)]
-                 -> TcM (TcGblEnv,            -- The full inst env
-                         [InstInfo GhcRn],    -- Source-code instance decls to
-                                              -- process; contains all dfuns for
-                                              -- this module
-                          ThBindEnv,          -- TH binding levels
-                          HsValBinds GhcRn)   -- Supporting bindings for derived
-                                              -- instances
-
-tcTyClsInstDecls tycl_decls deriv_decls binds
- = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
-   tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, deriv_info, th_bndrs)
-          <- tcTyAndClassDecls tycl_decls ;
-      ; setGblEnv tcg_env $ do {
-          -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
-          -- process the deriving clauses, including data family deriving
-          -- clauses discovered in @tcTyAndClassDecls@.
-          --
-          -- Careful to quit now in case there were instance errors, so that
-          -- the deriving errors don't pile up as well.
-          ; failIfErrsM
-          ; (tcg_env', inst_info', val_binds)
-              <- tcInstDeclsDeriv deriv_info deriv_decls
-          ; setGblEnv tcg_env' $ do {
-                failIfErrsM
-              ; pure ( tcg_env', inst_info' ++ inst_info, th_bndrs, val_binds )
-      }}}
 
 {- *********************************************************************
 *                                                                      *

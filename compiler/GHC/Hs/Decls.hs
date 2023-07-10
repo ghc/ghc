@@ -203,7 +203,6 @@ emptyRnGroup  = emptyGroup { hs_valds = emptyValBindsOut }
 
 emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_tyclds = [],
-                       hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
                        hs_fords = [], hs_warnds = [], hs_ruleds = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
@@ -229,7 +228,6 @@ appendGroups
         hs_valds  = val_groups1,
         hs_splcds = spliceds1,
         hs_tyclds = tyclds1,
-        hs_derivds = derivds1,
         hs_fixds  = fixds1,
         hs_defds  = defds1,
         hs_annds  = annds1,
@@ -241,7 +239,6 @@ appendGroups
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
         hs_tyclds = tyclds2,
-        hs_derivds = derivds2,
         hs_fixds  = fixds2,
         hs_defds  = defds2,
         hs_annds  = annds2,
@@ -255,7 +252,6 @@ appendGroups
         hs_valds  = val_groups1 `plusHsValBinds` val_groups2,
         hs_splcds = spliceds1 ++ spliceds2,
         hs_tyclds = tyclds1 ++ tyclds2,
-        hs_derivds = derivds1 ++ derivds2,
         hs_fixds  = fixds1 ++ fixds2,
         hs_annds  = annds1 ++ annds2,
         hs_defds  = defds1 ++ defds2,
@@ -269,7 +265,6 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
     ppr (ValD _ binds)            = ppr binds
     ppr (DefD _ def)              = ppr def
     ppr (InstD _ inst)            = ppr inst
-    ppr (DerivD _ deriv)          = ppr deriv
     ppr (ForD _ fd)               = ppr fd
     ppr (SigD _ sd)               = ppr sd
     ppr (KindSigD _ ksd)          = ppr ksd
@@ -283,7 +278,6 @@ instance (OutputableBndrId p) => Outputable (HsDecl (GhcPass p)) where
 instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
-                   hs_derivds = deriv_decls,
                    hs_fixds  = fix_decls,
                    hs_warnds = deprec_decls,
                    hs_annds  = ann_decls,
@@ -301,7 +295,6 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
              ppr_ds (tyClGroupKindSigs  tycl_decls),
              ppr_ds (tyClGroupTyClDecls tycl_decls),
              ppr_ds (tyClGroupInstDecls tycl_decls),
-             ppr_ds deriv_decls,
              ppr_ds foreign_decls]
         where
           ppr_ds :: Outputable a => [a] -> Maybe SDoc
@@ -823,6 +816,8 @@ type instance XTyFamInstD   GhcPs = NoExtField
 type instance XTyFamInstD   GhcRn = NoExtField
 type instance XTyFamInstD   GhcTc = NoExtField
 
+type instance XDerivInstD   (GhcPass _) = NoExtField
+
 type instance XXInstDecl    (GhcPass _) = DataConCantHappen
 
 cidDeprecation :: forall p. IsPass p
@@ -944,6 +939,7 @@ instance (OutputableBndrId p) => Outputable (InstDecl (GhcPass p)) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
+    ppr (DerivInstD   { did_inst  = decl }) = ppr decl
 
 -- Extract the declarations of associated data types from an instance
 
@@ -956,6 +952,7 @@ instDeclDataFamInsts inst_decls
       = map unLoc fam_insts
     do_one (L _ (DataFamInstD { dfid_inst = fam_inst }))      = [fam_inst]
     do_one (L _ (TyFamInstD {}))                              = []
+    do_one (L _ (DerivInstD {}))                              = []
 
 -- | Convert a 'NewOrData' to a 'TyConFlavour'
 newOrDataToFlavour :: NewOrData -> TyConFlavour tc

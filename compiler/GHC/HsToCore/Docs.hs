@@ -276,17 +276,16 @@ mkMaps env instances decls =
 
     names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
     names _ (InstD _ d) = maybeToList $ lookupSrcSpan (getInstLoc d) instanceMap
-    names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
+      -- See Note [1].
     names _ decl = getMainDeclBinder env decl
 
 {-
 Note [1]
 ~~~~~~~~
-We relate ClsInsts to InstDecls and DerivDecls using the SrcSpans buried
-inside them. That should work for normal user-written instances (from
-looking at GHC sources). We can assume that commented instances are
-user-written. This lets us relate Names (from ClsInsts) to comments
-(associated with InstDecls and DerivDecls).
+We relate ClsInsts to InstDecls using the SrcSpans buried inside them. That
+should work for normal user-written instances (from looking at GHC sources). We
+can assume that commented instances are user-written. This lets us relate Names
+(from ClsInsts) to comments (associated with InstDecls).
 -}
 
 getMainDeclBinder
@@ -339,6 +338,7 @@ getInstLoc = \case
   -- equation. This does not happen for data family instances, for some reason.
   TyFamInstD _ (TyFamInstDecl
     { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> locA l
+  DerivInstD _ (DerivDecl { deriv_type = ty }) -> getLocA (dropWildCards ty)
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -489,7 +489,6 @@ topDecls = filterClasses . filterDecls . collectDocs . sortLocatedA . ungroup
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
   mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
-  mkDecls hs_derivds             (DerivD noExtField) group_ ++
   mkDecls hs_defds               (DefD noExtField)   group_ ++
   mkDecls hs_fords               (ForD noExtField)   group_ ++
   mkDecls hs_docs                (DocD noExtField)   group_ ++
@@ -531,7 +530,6 @@ filterDecls = filter (isHandled . unXRec @p . fst)
     isHandled (ForD _ (ForeignImport {})) = True
     isHandled (TyClD {})  = True
     isHandled (InstD {})  = True
-    isHandled (DerivD {}) = True
     isHandled (SigD _ d)  = isUserSig d
     isHandled (ValD {})   = True
     -- we keep doc declarations to be able to get at named docs

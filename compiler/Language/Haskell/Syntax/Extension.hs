@@ -327,6 +327,7 @@ type family XXClsInstDecl      x
 type family XClsInstD      x
 type family XDataFamInstD  x
 type family XTyFamInstD    x
+type family XDerivInstD    x
 type family XXInstDecl     x
 
 -- -------------------------------------

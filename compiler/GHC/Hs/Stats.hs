@@ -163,6 +163,9 @@ ppSourceStats short (L _ (HsModule{ hsmodExports = exports, hsmodImports = impor
                    ss, is, length ats, length adts)
       where
         methods = map unLoc $ bagToList inst_meths
+    -- We do not currently count standalone `deriving` declarations. We count
+    -- `deriving` /clauses/ elsewhere (in `data_info`).
+    inst_info (DerivInstD {}) = (0,0,0,0,0)
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

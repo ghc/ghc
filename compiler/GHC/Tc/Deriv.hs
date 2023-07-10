@@ -12,7 +12,13 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Handles @deriving@ clauses on @data@ declarations.
-module GHC.Tc.Deriv ( tcDeriving, DerivInfo(..) ) where
+module GHC.Tc.Deriv
+  ( tcDerivingFamInsts
+  , tcDerivingInstBinds
+  , makeDerivSpecs
+  , DerivInfo(..)
+  , EarlyDerivSpec(..)
+  ) where
 
 import GHC.Prelude
 
@@ -90,18 +96,20 @@ Overall plan
 3.  Add the derived bindings, generating InstInfos
 -}
 
-data EarlyDerivSpec = InferTheta (DerivSpec ThetaSpec)
-                    | GivenTheta (DerivSpec ThetaType)
-        -- InferTheta ds => the context for the instance should be inferred
-        --      In this case ds_theta is the list of all the sets of
-        --      constraints needed, such as (Eq [a], Eq a), together with a
-        --      suitable CtLoc to get good error messages.
-        --      The inference process is to reduce this to a
-        --      simpler form (e.g. Eq a)
-        --
-        -- GivenTheta ds => the exact context for the instance is supplied
-        --                  by the programmer; it is ds_theta
-        -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer
+-- | This data type distinguishes whether a 'DerivSpec' needs to have its
+-- generated instance context be inferred or not.
+-- See @Note [Inferring the instance context]@ in "GHC.Tc.Deriv.Infer".
+data EarlyDerivSpec
+  = -- | The context for the instance should be inferred. In this case,
+    -- 'ds_theta' is the list of all the sets of constraints needed, such as
+    -- @(Eq [a], Eq a)@, together with a suitable 'CtLoc' to get good error
+    -- messages. The inference process is to reduce this to a simpler form,
+    -- (e.g., @Eq a@).
+    InferTheta (DerivSpec ThetaSpec)
+
+    -- | The exact context for the instance is supplied by the programmer; it is
+    -- 'ds_theta'.
+  | GivenTheta (DerivSpec ThetaType)
 
 splitEarlyDerivSpec :: [EarlyDerivSpec]
                     -> ([DerivSpec ThetaSpec], [DerivSpec ThetaType])
@@ -187,36 +195,74 @@ Top-level function for \tr{derivings}
 ************************************************************************
 -}
 
-tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
-            -> [LDerivDecl GhcRn] -- All stand-alone deriving declarations
-            -> TcM (TcGblEnv, Bag (InstInfo GhcRn), HsValBinds GhcRn)
-tcDeriving deriv_infos deriv_decls
-  = recoverM (do { g <- getGblEnv
-                 ; return (g, emptyBag, emptyValBindsOut)}) $
+-- | Typecheck the associated type family instances for each 'EarlyDerivSpec'
+-- and return the current 'TcGblEnv', but extended with the family instances.
+-- This is done /before/ generating the instance bindings for each
+-- 'EarlyDerivSpec'. See @Note [Staging of deriving]@.
+tcDerivingFamInsts ::
+     [EarlyDerivSpec]
+     -- ^ @deriving@ clauses and standalone @deriving@ declarations
+  -> TcM TcGblEnv
+tcDerivingFamInsts early_specs
+  = recoverM getGblEnv $
     do  { -- Fish the "deriving"-related information out of the GHC.Tc.Utils.Env
           -- And make the necessary "equations".
-          early_specs <- makeDerivSpecs deriv_infos deriv_decls
-        ; traceTc "tcDeriving" (ppr early_specs)
+        ; traceTc "tcDerivingFamInsts" (ppr early_specs)
 
-        ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
-        ; famInsts1 <- concatMapM genFamInsts given_specs
-        ; famInsts2 <- concatMapM genFamInsts infer_specs
-        ; let famInsts = famInsts1 ++ famInsts2
-
+        ; famInsts <- concatMapM genFamInsts early_specs
         ; logger <- getLogger
+        ; unless (null famInsts) $
+             liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Derived instances"
+                        FormatHaskell
+                        (ddump_deriving_fam_insts famInsts))
 
           -- We must put all the derived type family instances (from both
           -- infer_specs and given_specs) in the local instance environment
           -- before proceeding, or else simplifyInstanceContexts might
           -- get stuck if it has to reason about any of those family instances.
-          -- See Note [Staging of tcDeriving]
-        ; tcExtendLocalFamInstEnv famInsts $
+          -- See Note [Staging of deriving]
+          --
           -- NB: only call tcExtendLocalFamInstEnv once, as it performs
           -- validity checking for all of the family instances you give it.
           -- If the family instances have errors, calling it twice will result
           -- in duplicate error messages!
+        ; tcExtendLocalFamInstEnv famInsts getGblEnv }
+  where
+    ddump_deriving_fam_insts :: [FamInst] -> SDoc
+    ddump_deriving_fam_insts famInsts
+      = hangP (text "Derived type family instances:")
+              (vcat (map pprRepTy famInsts))
 
-     do { given_inst_binds <- mapM genInstBinds given_specs
+    hangP s x = text "" $$ hang s 2 x
+
+-- | Generate instance bindings for each 'EarlyDerivSpec' and return a triple
+-- containing:
+--
+-- * The current 'TcGblEnv', but extended with def-use information computing
+--   while renaming the generated instance bindings.
+--
+-- * The generated instance bindings ('InstInfo'), which have been renamed
+--   ('GhcRn').
+--
+-- * Any auxiliary bindings ('HsValBinds') used by the generated instances.
+--
+-- This is done /after/ typechecking the associated type family instances for
+-- each 'EarlyDerivSpec'. See @Note [Staging of deriving]@.
+tcDerivingInstBinds ::
+     [EarlyDerivSpec]
+     -- ^ @deriving@ clauses and standalone @deriving@ declarations
+  -> TcM (TcGblEnv, Bag (InstInfo GhcRn), HsValBinds GhcRn)
+tcDerivingInstBinds early_specs
+  = recoverM (do { g <- getGblEnv
+                 ; return (g, emptyBag, emptyValBindsOut)}) $
+    do  { -- Fish the "deriving"-related information out of the GHC.Tc.Utils.Env
+          -- And make the necessary "equations".
+        ; traceTc "tcDerivingInstBinds" (ppr early_specs)
+
+        ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
+        ; logger <- getLogger
+
+        ; given_inst_binds <- mapM genInstBinds given_specs
 
         ; let given_inst_infos = map fstOf3 given_inst_binds
 
@@ -240,24 +286,18 @@ tcDeriving deriv_infos deriv_decls
         ; unless (isEmptyBag inst_info) $
              liftIO (putDumpFileMaybe logger Opt_D_dump_deriv "Derived instances"
                         FormatHaskell
-                        (ddump_deriving inst_info rn_aux_binds famInsts))
+                        (ddump_deriving inst_info rn_aux_binds))
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
                                           getGblEnv
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
-        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_aux_binds) } }
+        ; return (addTcgDUs gbl_env all_dus, inst_info, rn_aux_binds) }
   where
-    ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
-                   -> [FamInst]               -- Associated type family instances
-                   -> SDoc
-    ddump_deriving inst_infos extra_binds famInsts
-      =    hang (text "Derived class instances:")
-              2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
-                 $$ ppr extra_binds)
-        $$ hangP (text "Derived type family instances:")
-             (vcat (map pprRepTy famInsts))
-
-    hangP s x = text "" $$ hang s 2 x
+    ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn -> SDoc
+    ddump_deriving inst_infos extra_binds
+      = hang (text "Derived class instances:")
+           2 (vcat (map (\i -> pprInstInfoDetails i $$ text "") (bagToList inst_infos))
+              $$ ppr extra_binds)
 
 -- Prints the representable type family instance
 pprRepTy :: FamInst -> SDoc
@@ -322,9 +362,72 @@ renameDeriv inst_infos bagBinds
               ; return (inst_info { iBinds = binds' }, fvs) }
 
 {-
-Note [Staging of tcDeriving]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here's a tricky corner case for deriving (adapted from #2721):
+Note [Staging of deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We typecheck `deriving` clauses and standalone `deriving` declarations in a
+very particular order:
+
+1. In the GHC.Tc.TyCl.tcTyClGroup function, for a single `TyClGroup` (see
+   Note [TyClGroups and dependency analysis] in Language.Haskell.Syntax.Decls),
+   we typecheck the:
+
+   * data type and type synonym declarations
+   * class declarations
+   * type and data family instance declarations
+   * type class instance declarations
+
+   but /not/ the:
+
+   * `deriving` clauses attached to the data type declarations
+   * standalone `deriving` declarations
+
+2. Still in `tyClGroup`, we typecheck the associated type family instances
+   generated from each `deriving` clause and declaration in the TyClGroup. (See
+   the GHC.Tc.Deriv.tcDerivingFamInsts function.) These family instances are
+   then added to the FamInstEnv, which is used to typecheck the next TyClGroup.
+   We also kind-check the `deriving`-related information from `deriving` clauses
+   and standalone `deriving` declarations to produce a collection of
+   `EarlyDerivSpec`s, to be handled later in step (4).
+
+3. In the GHC.Tc.TyCl.tcTyClGroups function, steps (1) and (2) are repeated (by
+   calling `tcTyClGroup`) until all `TyClGroup`s have been processed.
+
+4. After all of this, we take the `EarlyDerivSpec`s from all of the `TyClGroup`s
+   and generate the appropriate derived type-class instance bindings. (Remember,
+   each `EarlyDerivSpec` comes from a `deriving` clause or standalone `deriving`
+   declaration.) This step concerns only the type-class instance bindings; any
+   family instances were dealt with in step (2). (See the
+   GHC.Tc.Deriv.tcDerivingInstBinds function, which generates the bindings that
+   are typechecked later in the pipeline.)
+
+This order is perhaps somewhat unintuitive, so here are explanations for how we
+arrived at this order, along with motivating examples:
+
+* Why does (1) occur before (2)? That is, why not typecheck the associated
+  type family instances from `deriving` clauses/declarations at the same time
+  as all of the other instances in a TyClGroup? This is important in case we
+  are deriving something for a data family instance, e.g.,
+
+    data family D a
+    data instance D Int = MkD deriving Generic
+
+  We cannot typecheck the generated `Rep` family instance (which is associated
+  with the derived `Generic` class instance) until we have added the `D Int`
+  data instance to the FamInstEnv. This means that we must typecheck the `D Int`
+  instance /before/ we typecheck the generated `Rep` instance.
+
+* Why does (2) occur before (4); and why is (4) done per-module rather than
+  per-TyClGroup? That is, why not typecheck the `deriving`-related type-class
+  instance bindings at the same time as the `deriving`-related associated type
+  family instances?
+
+  This is done for three reasons.
+
+  -----
+
+  First, note that we absolutely must typecheck the associated type family
+  instances /before/ the instance bindings. To see why, consider the T2721.hs
+  test case (inspired by #2721):
 
     class C a where
       type T a
@@ -334,39 +437,244 @@ Here's a tricky corner case for deriving (adapted from #2721):
       type T Int = Int
       foo = id
 
-    newtype N = N Int deriving C
+    newtype N = N Int
+      deriving newtype C
 
-This will produce an instance something like this:
+  The `deriving newtype C` clause will produce an instance something like this:
 
-    instance C N where
+    instance ??? => C N where
       type T N = T Int
       foo = coerce (foo :: Int -> T Int) :: N -> T N
 
-We must be careful in order to typecheck this code. When determining the
-context for the instance (in simplifyInstanceContexts), we need to determine
-that T N and T Int have the same representation, but to do that, the T N
-instance must be in the local family instance environment. Otherwise, GHC
-would be unable to conclude that T Int is representationally equivalent to
-T Int, and simplifyInstanceContexts would get stuck.
+  When determining the ??? context for the instance (in
+  GHC.Tc.Deriv.Infer.simplifyInstanceContexts, see also Note [Inferring the
+  instance context] in GHC.Tc.Deriv.Infer.), we need to determine that T N and
+  T Int have the same representation, but to do that, the T N instance must be
+  in the local family instance environment. Otherwise, GHC would be unable to
+  conclude that T Int is representationally equivalent to T Int, and
+  simplifyInstanceContexts would get stuck.
 
-Previously, tcDeriving would defer adding any derived type family instances to
-the instance environment until the very end, which meant that
-simplifyInstanceContexts would get called without all the type family instances
-it needed in the environment in order to properly simplify instance like
-the C N instance above.
+  -----
 
-To avoid this scenario, we generate things in tcDeriving in a specific order:
+  Second, note that we absolutely must handle `deriving`-related associated
+  type family instances when typechecking TyClGroups. This is because these
+  associated type family instances may be important for typechecking other
+  hand-written instances in the same TyClGroup. Here is an example adapted from
+  the T23496a test case (inspired by #23496):
 
-1. First, we generate all of the associated type family instances for derived
-   instances (using `genFamInsts`).
-2. Next, we extend the local instance environment with these type family
-   instances.
-3. Then, we generate the instance bindings for derived instances
-   (using `genInstBinds`).
-4. Finally, for instances generated with `deriving` clauses, we infer the
-   instance contexts (using `simplifyInstanceContexts`). At this point, we
-   already have the necessary type family instances in scope (from step (2)),
-   so this is safe to do.
+    class C a where
+      type T a
+
+    instance C Int where
+      type T Int = Bool
+
+    newtype N = MkN Int
+      deriving newtype C
+
+    type F :: T a -> Type
+    type family F a where
+      F @Int True  = Float
+      F @N   False = Double
+
+  Note that `F`'s second equation relies on `T N` reducing to `Bool` in order to
+  kind-check. GHC's typechecker can only do this if it has first type-checked
+  the `T N` instance associated with the derived `C` instance, which lives in a
+  TyClGroup before F's TyClGroup. As such, the only reliable way to ensure that
+  these get typechecked in the correct order is to typecheck `deriving`-related
+  associated type family instances as part of the tcTyClGroup loop in
+  tcTyClGroups.
+
+  -----
+
+  Finally, note that we must typecheck the `deriving`-related instance bindings
+  (in step (4)) /after/ we have processed all of the TyClGroups (in step (3)).
+  As a result, we do not typecheck the `deriving`-related instance bindings as
+  part of tcTyClGroup. To see why, consider the drv003 test case:
+
+    data T a b
+      = C1 (Foo a) (Bar b)
+      | C2 Int (T b a)
+      | C3 (T a a)
+      deriving stock Eq
+
+    data Foo a = MkFoo Double a
+    instance Eq a => Eq (Foo a)
+
+    data Bar a = MkBar Int Int
+    instance Ping b => Eq (Bar b)
+
+    class Ping a
+
+  After SCC analysis, we end up with the following TyClGroups:
+
+  1. Foo, instance Eq (Foo a)
+  2. Bar,
+  3. T, deriving stock Eq
+  4. Ping, instance Ping b => Eq (Bar b)
+
+  Here, group (4) follows group (3) rather arbitrarily, as group (4) does not
+  syntactically mention anything from group (3). But in fact, there /is/ an
+  implicit dependency between T's `deriving stock Eq` clause and the
+  `Eq (Bar b)` instance in group (4)! This is because the `deriving stock Eq`
+  clause will generate the following instance:
+
+    instance ??? => Eq (T a b) where ...
+
+  And in order to determine the context ???, simplifyInstanceContexts will
+  first start with the following set of constraints:
+
+    (Eq (Foo a), Eq (Bar b), Eq Int, Eq (T b a), Eq (T a a))
+
+  It will then simplify the constraints until it reaches a fixpoint (in this
+  case, that fixpoint is (Eq a, Eq b, Ping b, Ping a)). In order to do this,
+  however, the `Eq (Bar b)` instance must be in the family instance environment,
+  and this can only happen after typechecking group (4).
+
+  We could try to improve GHC's SCC analysis such that the `deriving stock Eq`
+  clause is put in a TyClGroup after the one that the `Eq (Bar b)` instance
+  appears in. But this would be tricky to accomplish in the renamer (where SCC
+  analysis is performed), as there is no obvious way to learn this dependency
+  with a purely syntactic analysis—you would have to perform typechecking to
+  discover the dependency. Rather than do this, we opt to just typecheck the
+  `deriving`-related instance bindings all at once, right after processing all
+  of the TyClGroups. Blunt, but effective.
+
+  Note that this limitation really only applies to `deriving` clauses and
+  standalone `deriving` declarations of the form
+  `deriving instance _ => C (Foo a)`, where we must infer the instance context.
+  Standalone `deriving` declarations of the form `deriving C a => C (Foo a)`,
+  on the other hand, mention their instance context syntactically. If we wanted
+  to, we could typecheck the instance bindings for the latter sort of standalone
+  `deriving` declarations as part of tcTyClGroup, as the SCC analysis would work
+  the way you would expect. But since we already carve out a special case for
+  typechecking other forms of `deriving`-related instance bindings, it would be
+  strange to carve out an even more special sub-case for standalone
+  `deriving`-related instance bindings, so we choose not to do this.
+
+This typechecking order has a number of knock-on effects:
+
+* If an error occurs in an earlier step, GHC will likely abort before proceeding
+  to later steps. Practically speaking, this means that you might see error
+  messages involving derived associated family instances (step (2)), and only
+  after fixing those errors would you see any errors involving derived instance
+  bindings (step (4)).
+
+* In order to make `GHC.Generics` typecheck, we have to split it up into two
+  modules:
+
+  1. A `GHC.Generics.Internal` module that contains `Generic`-related
+     definitions, but no derived `Generic` instances themselves, and
+
+  2. A `GHC.Generics` module that re-exports `GHC.Generics.Internal` and also
+     derives `Generic` instances.
+
+  See Note [Tension between deriving and SCC analysis] for the full story.
+
+Note [Tension between deriving and SCC analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If a derived associated family instance were to mention any identifiers that
+are not syntactically mentioned in the `deriving` clause or declaration, then
+that could interact poorly with SCC analysis. (See Note [Staging of deriving]
+for the full details of how `deriving` interacts with SCC analysis.)
+Thankfully, this sort of bad interaction doesn't happen for most deriving
+strategies:
+
+- `newtype` strategy: If you were to write:
+
+    class C a where
+      type T a
+
+    newtype Age = MkAge Int
+      deriving newtype C
+
+  Then the generated `T` instance:
+
+    class C Age where
+      type T Age = T Int
+
+  Would mention `Age` and `Int`, both of which are mentioned syntactically in
+  the `Age` declaration.  All of these belong to the same TyClGroup, so all is
+  well.
+
+  Similar reasoning would apply if you had written the example like so:
+
+    newtype Age = MkAge Int
+    deriving newtype instance C Age
+
+  The only difference is that the `C Age` instance (and therefore the `T Age`
+  instance) would be put in a later TyClGroup, which still works out.
+
+- `via` strategy: The same reasoning as in the `newtype` strategy applies here,
+  except that there is an extra type (the type mentioned after the `via`
+  keyword) involved. Because the `via` type is mentioned syntactically,
+  everything works out.
+
+- `anyclass` strategy: If you were to write:
+
+    class C a where
+      type T a
+      type T a = a
+
+    data D
+      deriving anyclass C
+
+  Then the generated `T` instance:
+
+    class C D where
+      type T D = D
+
+  Would mention `D`. Again, that works out for the same reasons as the
+  `newtype` strategy.
+
+The one exception to the rule is the `stock` strategy. In particular,
+`stock`-derived instances can interact badly with SCC analysis if the following
+two conditions are met:
+
+1. A module defines a class with an associated type family that can be
+   `stock`-derived.
+
+2. Derived instances of the class generate associated type family instances
+   that mention types from elsewhere in the same module.
+
+Condition (1) means that such programs could only ever arise in
+`base`/`ghc-prim`, as those are the only libraries that define
+`stock`-derivable classes. And the only `stock`-derivable classes in with
+associated type families at the moment are `Generic` and `Generic1`, which have
+associated `Rep` and `Rep1` type families, respectively. Therefore,
+GHC.Generics (which defines these classes) is the one and only spot where any
+difficulties might arise.
+
+As it turns out, difficulties _did_ arise in an earlier version of GHC.Generics
+that attempted to derive `Generic(1)` instances alongside all of the other
+definitions in GHC.Generics. To see why, note that `stock`-derived `Generic(1)`
+instances generate associated `Rep(1)` instances.  An instance such as
+
+  data D = MkD
+    deriving stock Generic
+
+will generate a `Rep` instance that mentions identifiers such as `U1`, `(:+:)`,
+`(:*:)`, etc. on the right-hand side, none of which are mentioned syntactically
+in the original code.
+
+For the vast majority of `Generic(1)` instances, this is not a problem, since
+they will already be importing these external identifiers from GHC.Generics.
+The issue arises when deriving `Generic(1)` instances in GHC.Generics itself.
+Indeed, GHC.Generics won't compile if you try to derive `Generic` instances for
+`U1`, `(:+:)`, `(:*:)`, etc. in the same module that they are defined due to
+the SCC issues mentioned in Note [Staging of deriving]. For this reason, we use
+the following trick:
+
+- Put `U1`, `(:+:)`, `(:*:)`, etc. in GHC.Generics.Internal (which is not
+  exposed to users), and do /not/ derive any `Generic(1)` instances in this
+  module.
+
+- Re-export everything from GHC.Generics.Internal in a GHC.Generics module,
+  which also derives orphan `Generic(1)` instances for everything in
+  GHC.Generics.Internal.  Because GHC.Generics.Internal is not exposed, it
+  isn't possible to observe that these instances are orphans.
+
+This is a bit icky, but then again, this is the one and only place where we
+have to resort to such tricks.
 
 Note [Why we don't pass rep_tc into deriveTyData]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -416,6 +724,10 @@ in derived code.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 -}
 
+-- | Take a list of @deriving@ clauses and standalone @deriving@ declarations
+-- and compute their 'EarlyDerivSpec's. This lives in 'TcM' as it performs a
+-- modest amount of validity checking and unification. See @deriveClause@ and
+-- @deriveStandalone@, where most of the action happens, for more.
 makeDerivSpecs :: [DerivInfo]
                -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
@@ -1927,9 +2239,13 @@ genInstBinds spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
       return (binds, sigs, emptyBag, [])
 
 -- | Generate the associated type family instances for a derived instance.
-genFamInsts :: DerivSpec theta -> TcM [FamInst]
-genFamInsts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
-                     , ds_tys = inst_tys, ds_cls = clas, ds_loc = loc })
+genFamInsts :: EarlyDerivSpec -> TcM [FamInst]
+genFamInsts (InferTheta ds) = gen_fam_insts ds
+genFamInsts (GivenTheta ds) = gen_fam_insts ds
+
+gen_fam_insts :: DerivSpec theta -> TcM [FamInst]
+gen_fam_insts spec@(DS { ds_tvs = tyvars, ds_mechanism = mechanism
+                       , ds_tys = inst_tys, ds_cls = clas, ds_loc = loc })
   = set_spec_span_and_ctxt spec $
     case mechanism of
       -- See Note [GND and associated type families]

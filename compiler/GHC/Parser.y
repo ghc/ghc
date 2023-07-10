@@ -1252,7 +1252,6 @@ topdecl :: { LHsDecl GhcPs }
         | ty_decl                               { sL1a $1 (TyClD noExtField (unLoc $1)) }
         | standalone_kind_sig                   { sL1a $1 (KindSigD noExtField (unLoc $1)) }
         | inst_decl                             { sL1a $1 (InstD noExtField (unLoc $1)) }
-        | stand_alone_deriving                  { sL1a $1 (DerivD noExtField (unLoc $1)) }
         | role_annot                            { sL1a $1 (RoleAnnotD noExtField (unLoc $1)) }
         | 'default' '(' comma_types0 ')'        {% acsA (\cs -> sLL $1 $>
                                                     (DefD noExtField (DefaultDecl (EpAnn (glR $1) [mj AnnDefault $1,mop $2,mcp $4] cs) $3))) }
@@ -1380,6 +1379,18 @@ inst_decl :: { LInstDecl GhcPs }
                                    (fmap reverse $7)
                      ((fst $ unLoc $1):mj AnnInstance $2
                        :(fst $ unLoc $5)++(fst $ unLoc $6)) }
+
+          -- standalone deriving declarations
+        | 'deriving' deriv_standalone_strategy 'instance' maybe_warning_pragma overlap_pragma inst_type
+            {% do { let did cs =
+                          DerivDecl
+                            ($4, EpAnn (glR $1) [mj AnnDeriving $1, mj AnnInstance $3] cs)
+                            (mkHsWildCardBndrs $6)
+                            $2
+                            $5
+                  ; acsA (\cs -> sLL $1 $>
+                             (DerivInstD { did_ext = noExtField, did_inst = did cs }))
+                  } }
 
 overlap_pragma :: { Maybe (LocatedP OverlapMode) }
   : '{-# OVERLAPPABLE'    '#-}' {% fmap Just $ amsrp (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
@@ -1617,17 +1628,6 @@ capi_ctype : '{-# CTYPE' STRING STRING '#-}'
                               (AnnPragma (mo $1) (mc $3) [mj AnnVal $2]) }
 
            |           { Nothing }
-
------------------------------------------------------------------------------
--- Stand-alone deriving
-
--- Glasgow extension: stand-alone deriving declarations
-stand_alone_deriving :: { LDerivDecl GhcPs }
-  : 'deriving' deriv_standalone_strategy 'instance' maybe_warning_pragma overlap_pragma inst_type
-                {% do { let { err = text "in the stand-alone deriving instance"
-                                    <> colon <+> quotes (ppr $6) }
-                      ; acsA (\cs -> sLL $1 $>
-                                 (DerivDecl ($4, EpAnn (glR $1) [mj AnnDeriving $1, mj AnnInstance $3] cs) (mkHsWildCardBndrs $6) $2 $5)) }}
 
 -----------------------------------------------------------------------------
 -- Role annotations

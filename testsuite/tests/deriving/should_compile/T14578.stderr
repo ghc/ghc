@@ -92,8 +92,6 @@ Derived class instances:
           ((GHC.Base.<*) @f)
   
 
-Derived type family instances:
-
 
 
 ==================== Filling in method body ====================

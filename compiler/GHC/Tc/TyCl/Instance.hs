@@ -92,7 +92,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Tuple
 import GHC.Data.Maybe
-import Data.List( mapAccumL )
+import Data.List( mapAccumL, unzip4 )
 
 
 {-
@@ -393,13 +393,18 @@ tcInstDecls1    -- Deal with both source-code and imported instance decls
            [InstInfo GhcRn],    -- Source-code instance decls to process;
                                 -- contains all dfuns for this module
            [DerivInfo],         -- From data family instances
+           [LDerivDecl GhcRn],  -- Standalone @deriving@ declarations. The
+                                -- instance bindings for these will be generated
+                                -- later in tcInstDeclsDeriv. (See
+                                -- Note [Staging of deriving] in GHC.Tc.Deriv.)
            ThBindEnv)           -- TH binding levels
 
 tcInstDecls1 inst_decls
   = do {    -- Do class and family instance declarations
        ; stuff <- mapAndRecoverM tcLocalInstDecl inst_decls
 
-       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos) = unzip3 stuff
+       ; let (local_infos_s, fam_insts_s, datafam_deriv_infos, deriv_decls)
+                         = unzip4 stuff
              fam_insts   = concat fam_insts_s
              local_infos = concat local_infos_s
 
@@ -410,21 +415,20 @@ tcInstDecls1 inst_decls
        ; return ( gbl_env
                 , local_infos
                 , concat datafam_deriv_infos
+                , concat deriv_decls
                 , th_bndrs ) }
 
--- | Use DerivInfo for data family instances (produced by tcInstDecls1),
---   datatype declarations (TyClDecl), and standalone deriving declarations
---   (DerivDecl) to check and process all derived class instances.
+-- | Given a list of 'EarlyDerivSpec's for derived instances, generate all of
+-- the instances' bindings. See @Note [Staging of deriving]@ in "GHC.Tc.Deriv".
 tcInstDeclsDeriv
-  :: [DerivInfo]
-  -> [LDerivDecl GhcRn]
+  :: [EarlyDerivSpec]
   -> TcM (TcGblEnv, [InstInfo GhcRn], HsValBinds GhcRn)
-tcInstDeclsDeriv deriv_infos derivds
+tcInstDeclsDeriv early_specs
   = do th_stage <- getStage -- See Note [Deriving inside TH brackets]
        if isBrackStage th_stage
        then do { gbl_env <- getGblEnv
                ; return (gbl_env, bagToList emptyBag, emptyValBindsOut) }
-       else do { (tcg_env, info_bag, valbinds) <- tcDeriving deriv_infos derivds
+       else do { (tcg_env, info_bag, valbinds) <- tcDerivingInstBinds early_specs
                ; return (tcg_env, bagToList info_bag, valbinds) }
 
 addClsInsts :: [InstInfo GhcRn] -> TcM a -> TcM a
@@ -467,22 +471,29 @@ the brutal solution will do.
 -}
 
 tcLocalInstDecl :: LInstDecl GhcRn
-                -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
+                -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo], [LDerivDecl GhcRn])
         -- A source-file instance declaration
         -- Type-check all the stuff before the "where"
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
   = do { fam_inst <- tcTyFamInstDecl NotAssociated (L loc decl)
-       ; return ([], [fam_inst], []) }
+       ; return ([], [fam_inst], [], []) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
   = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated emptyVarEnv (L loc decl)
-       ; return ([], [fam_inst], maybeToList m_deriv_info) }
+       ; return ([], [fam_inst], maybeToList m_deriv_info, []) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
-       ; return (insts, fam_insts, deriv_infos) }
+       ; return (insts, fam_insts, deriv_infos, []) }
+
+-- Note that we simply return the standalone `deriving` declaration without
+-- doing any typechecking. This declaration will be typechecked later; see
+-- Note [Staging of deriving] in GHC.Tc.Deriv (in particular,
+-- steps (2) and (4)).
+tcLocalInstDecl (L loc (DerivInstD { did_inst = did }))
+  = return ([], [], [], [L loc did])
 
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
@@ -508,7 +519,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_ext = lwarn
                            fst $ splitForAllForAllTyBinders dfun_ty
               visible_skol_tvs = drop n_inferred skol_tvs
 
-        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
+        ; traceTc "tcClsInstDecl" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
 
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)

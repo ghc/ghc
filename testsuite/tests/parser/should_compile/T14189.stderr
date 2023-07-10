@@ -163,7 +163,6 @@
    []
    []
    []
-   []
    [])
   [(L
     (SrcSpanAnn (EpAnnNotUsed) { T14189.hs:1:8-13 })
