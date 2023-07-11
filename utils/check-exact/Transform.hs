@@ -358,15 +358,15 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                (EpAnn (Anchor r (MovedAnchor edp)) an cs'')
                l) a
               where
-                -- cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
-                -- lc = last $ (L ca c:cs')
-                -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
-                cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
-                lc = head $ reverse $ (L ca c:cs')
-                delta = case getLoc lc of
-                          EpaSpan (RealSrcSpan rr _) -> tweakDelta $ ss2delta (ss2pos rr) r
-                          EpaSpan _ -> tweakDelta (SameLine 0)
-                          EpaDelta dp _ -> tweakDelta dp
+                cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
+                lc = last $ (L ca c:cs')
+                delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
+                -- lc = head $ reverse $ (L ca c:cs')
+                -- delta = case getLoc lc of
+                --           EpaSpan rr _ -> tweakDelta $ ss2delta (ss2pos rr) r
+                --           -- EpaSpan _ -> tweakDelta (SameLine 0)
+                --           EpaDelta dp _ -> tweakDelta dp
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
@@ -1352,8 +1352,8 @@ modifyDeclsT action t = do
   decls' <- action decls
   liftT $ replaceDecls t decls'
 
-s_comments :: SrcAnn ann -> EpAnnComments
-s_comments (SrcSpanAnn an _) = epAnnComments an
+-- s_comments :: SrcAnn ann -> EpAnnComments
+-- s_comments (SrcSpanAnn an _) = epAnnComments an
 
-s_entry :: SrcAnn ann -> EpaLocation
-s_entry = epaLocationFromSrcAnn
+-- s_entry :: SrcAnn ann -> EpaLocation
+-- s_entry = epaLocationFromSrcAnn
