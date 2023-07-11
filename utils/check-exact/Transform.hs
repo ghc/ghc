@@ -330,7 +330,7 @@ setEntryDP (L (EpAnnS (EpaSpan (RealSrcSpan r _)) an cs) a) dp
                 csd = L (EpaDelta dp []) c:cs'
                 lc = head $ reverse $ (L ca c:cs')
                 delta = case getLoc lc of
-                          EpaSpan (RealSrcSpan rr _) -> tweakDelta $ ss2delta (ss2pos rr) r
+                          EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
                           _ -> DifferentLine 1 0
                 line = getDeltaLine delta
                 col = deltaColumn delta
@@ -383,9 +383,9 @@ setEntryDPI (L (SrcSpanAnn (EpAnn (EpaSpan (RealSrcSpan r _)) an cs) l) a) dp
                 cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
                 lc = head $ reverse $ (L ca c:cs')
                 delta = case getLoc lc of
-                          EpaSpan (RealSrcSpan rr _) -> tweakDelta $ ss2delta (ss2pos rr) r
-                          EpaSpan _ -> tweakDelta (SameLine 0)
-                          EpaDelta dp _ -> tweakDelta dp
+                          EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
+                          EpaSpan _ -> (SameLine 0)
+                          EpaDelta dp _ -> dp
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
@@ -1192,28 +1192,6 @@ unpackFunDecl (L l (ValD x b)) = L l' (ValD x b')
   where
     L l' b' = unpackFunBind (L l b)
 
--- TODO: Move to Annotation.hs
-
-transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
-transferPriorCommentsA (EpAnnS a1 an1 cs1) (EpAnnS a2 an2 cs2)
-  = (EpAnnS a1 an1 cs1', EpAnnS a2 an2 cs2')
-      `debug` ("transferPriorCommentsA: ((cs1, cs2), (cs1', cs2'))=" ++ showAst ((cs1, cs2), (cs1', cs2')))
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setFollowingComments emptyComments fc
-    cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
-
-transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
-transferFollowingA (EpAnnS a1 an1 cs1) (EpAnnS a2 an2 cs2)
-  = (EpAnnS a1 mempty cs1', EpAnnS a2 (an1 <> an2) cs2')
-      `debug` ("transferFollowingA: (pc,fc,cs1', cs2')=" ++ showAst (pc,fc,cs1', cs2'))
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setPriorComments emptyComments pc
-    cs2' = setFollowingComments cs2 fc
-
 -- ---------------------------------------------------------------------
 
 -- |Look up the annotated order and sort the decls accordingly
@@ -1329,8 +1307,8 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
 
 newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
-  let anc  = EpaDelta (DifferentLine 1 2) []
-  let anc2 = EpaDelta (DifferentLine 1 4) []
+  let anc  = EpaDelta (DifferentLine 1 3) []
+  let anc2 = EpaDelta (DifferentLine 1 5) []
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []

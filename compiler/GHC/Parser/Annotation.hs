@@ -96,7 +96,9 @@ module GHC.Parser.Annotation (
   setCommentsSrcAnn, setCommentsEpAnnS,
   addCommentsToEpAnnS,
   addCommentsToEpAnn, setCommentsEpAnn,
-  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA, commentsOnlyA, commentsOnlyI,
+  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA,
+  transferPriorCommentsA, transferFollowingA,
+  commentsOnlyA, commentsOnlyI,
   removeCommentsA, removeCommentsI,
 
   placeholderRealSpan,
@@ -1404,6 +1406,17 @@ transferAnnsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferAnnsA (EpAnnS a an cs) (EpAnnS a' an' cs')
   = (EpAnnS a mempty emptyComments, EpAnnS a' (an' <> an) (cs' <> cs))
 
+-- | Transfer trailing items but not comments from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferFollowingA (EpAnnS a1 an1 cs1) (EpAnnS a2 an2 cs2)
+  = (EpAnnS a1 mempty cs1', EpAnnS a2 (an1 <> an2) cs2')
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setPriorComments emptyComments pc
+    cs2' = setFollowingComments cs2 fc
+
 -- | Transfer trailing items from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
 transferAnnsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
@@ -1415,6 +1428,18 @@ transferAnnsOnlyA (EpAnnS a an cs) (EpAnnS a' an' cs')
 transferCommentsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferCommentsOnlyA (EpAnnS a an cs) (EpAnnS a' an' cs')
   = (EpAnnS a an emptyComments, EpAnnS a' an' (cs <> cs'))
+
+-- | Transfer prior comments only from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferPriorCommentsA (EpAnnS a1 an1 cs1) (EpAnnS a2 an2 cs2)
+  = (EpAnnS a1 an1 cs1', EpAnnS a2 an2 cs2')
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setFollowingComments emptyComments fc
+    cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
+
 
 -- | Remove the exact print annotations payload, leaving only the
 -- anchor and comments.

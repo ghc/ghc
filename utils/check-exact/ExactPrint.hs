@@ -109,9 +109,9 @@ runEP epReader action = do
 defaultEPState :: EPState
 defaultEPState = EPState
              { epPos      = (1,1)
-             , dLHS       = 1
+             , dLHS       = 0
              , pMarkLayout = False
-             , pLHS = 1
+             , pLHS = 0
              , dMarkLayout = False
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
@@ -519,23 +519,12 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   -- -------------------------------------------------------------------
   -- start of print phase processing
 
-  let mflush = when (flush == FlushComments) $ do
-        debugM $ "flushing comments in enterAnn:" ++ showAst cs
-        flushComments (getFollowingComments cs)
-
   advance edp
   a' <- exact a
-  mflush
-
-  -- end of sub-Anchor processing, start of tail end processing
-  -- postCs <- cua canUpdateAnchor takeAppliedCommentsPop
-  -- when (flush == NoFlushComments) $ do
-  --   when ((getFollowingComments cs) /= []) $ do
-
-  --     debugM $ "enterAnn:in:(anchor') =" ++ show (eloc2str anchor')
-  --     debugM $ "starting trailing comments:" ++ showAst (getFollowingComments cs)
-  --     mapM_ printOneComment (map tokComment $ getFollowingComments cs)
-  --     debugM $ "ending trailing comments"
+  when (flush == FlushComments) $ do
+    debugM $ "flushing comments in enterAnn:" ++ showAst cs
+    flushComments (getFollowingComments cs)
+    debugM $ "flushing comments in enterAnn done"
 
   eof <- getEofPos
   case eof of
@@ -544,19 +533,19 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
        let dp = if pos == prior
              then (DifferentLine 1 0)
              else origDelta pos prior
-       debugM $ "EOF:(pos,prior,dp) =" ++ showGhc (ss2pos pos, ss2pos prior, dp)
+       debugM $ "EOF:(pos,posEnd,prior,dp) =" ++ showGhc (ss2pos pos, ss2posEnd pos, ss2pos prior, dp)
        printStringAtLsDelta dp ""
        setEofPos Nothing -- Only do this once
 
   -- Deal with exit from the current anchor
-  printCommentsIn curAnchor -- Make sure all comments in the span are printed
+  when (flush == NoFlushComments) $ do
+    printCommentsIn curAnchor -- Make sure all comments in the span are printed
 
   p1 <- getPosP
   pe1 <- getPriorEndD
   debugM $ "enterAnn:done:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p1, pe1, astId a')
 
   case anchor' of
-    -- EpaDelta _ _ -> setPriorEndD p1
     EpaDelta _ _ -> return ()
     EpaSpan (RealSrcSpan rss _) -> do
       setAcceptSpan False
@@ -623,6 +612,7 @@ flushComments trailing_anns = do
     -- AZ:TODO: is the sort still needed?
     then mapM_ printOneComment (sortComments cs)
     else mapM_ (printOneComment . commentOrigDelta') cs
+  putUnallocatedComments []
   debugM $ "flushing comments done"
 
 -- ---------------------------------------------------------------------
@@ -1429,15 +1419,12 @@ printOneComment c@(Comment _str loc _r _mo) = do
   dp' <- case mep of
     Just (EpaDelta edp _) -> do
       debugM $ "printOneComment:edp=" ++ show edp
-      ddd <- fmap unTweakDelta $ adjustDeltaForOffsetM edp
-      debugM $ "printOneComment:ddd=" ++ show ddd
-      fmap unTweakDelta $ adjustDeltaForOffsetM edp
+      adjustDeltaForOffsetM edp
     _ -> return dp
   -- Start of debug printing
   LayoutStartCol dOff <- getLayoutOffsetD
   debugM $ "printOneComment:(dp,dp',dOff,loc)=" ++ showGhc (dp,dp',dOff,loc)
   -- End of debug printing
-  -- setPriorEndD (ss2posEnd (anchor loc))
   updateAndApplyComment c dp'
 
   printQueuedComment c dp'
@@ -1451,18 +1438,11 @@ unTweakDelta (DifferentLine l d) = DifferentLine l (d+1)
 
 updateAndApplyComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
 updateAndApplyComment (Comment str anc pp mo) dp = do
-  -- debugM $ "updateAndApplyComment: (dp,anc',co)=" ++ showAst (dp,anc',co)
   applyComment (Comment str anc' pp mo)
   where
-    -- anc' = anc { anchor_op = op}
     anc' = op
 
     (r,c) = ss2posEnd pp
-    -- la = anchor anc
-    -- dp'' = if r == 0
-    --        then (ss2delta (r,c+0) la)
-    --        else (ss2delta (r,c)   la)
-    -- la = anchor anc
     dp'' = case anc of
       EpaDelta dp1 _ -> dp1
       EpaSpan (RealSrcSpan la _) ->
@@ -1551,7 +1531,6 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
-    -- la' <- markALocatedA la
     return (L la a')
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
@@ -1638,8 +1617,6 @@ instance ExactPrint (HsModule GhcPs) where
       Just (pos, prior) -> do
         debugM $ "am_eof:" ++ showGhc (pos, prior)
         setEofPos (Just (pos, prior))
-        -- let dp = origDelta pos prior
-        -- printStringAtLsDelta dp ""
 
     let anf = an0 { anns = (anns an0) { am_decls = am_decls' }}
     debugM $ "HsModule, anf=" ++ showAst anf
@@ -2567,13 +2544,6 @@ instance ExactPrint (HsValBindsLR GhcPs GhcPs) where
   setAnnotationAnchor a _ _ _ = a
 
   exact (ValBinds sortKey binds sigs) = do
-    -- ds <- setLayoutBoth $ withSortKeyBind sortKey
-    --    (prepareListAnnotationA (bagToList binds)
-    --  ++ prepareListAnnotationA sigs
-    --    )
-    -- let
-    --   binds' = listToBag $ undynamic ds
-    --   sigs'  = undynamic ds
     setLayoutBoth $ mapM markAnnotated $ hsDeclsValBinds (ValBinds sortKey binds sigs)
     let
       binds' = binds
@@ -2632,28 +2602,12 @@ prepareListAnnotationA ls = map (\b -> (realSrcSpan "aa5" $ getLocA b,go b)) ls
       b' <- markAnnotated b
       return (toDyn b')
 
--- withSortKeyBind :: (Monad m, Monoid w)
---   => AnnSortKey [(DeclTag, Int)] -> [(RealSrcSpan, EP w m Dynamic)] -> EP w m [Dynamic]
--- withSortKeyBind annSortKey xs = do
---   debugM $ "withSortKey:annSortKey=" ++ showAst annSortKey
---   let ordered = case annSortKey of
---                   NoAnnSortKey -> sortBy orderByFst xs
---                   -- Just keys -> error $ "withSortKey: keys" ++ show keys
---                   AnnSortKey keys -> orderByKey xs keys
---                                 -- `debug` ("withSortKey:" ++
---                                 --          showPprUnsafe (map fst (sortBy (comparing (flip elemIndex keys . fst)) xs),
---                                 --                  map fst xs,
---                                 --                  keys)
---                                 --          )
---   mapM snd ordered
-
 withSortKey :: (Monad m, Monoid w)
   => AnnSortKey [RealSrcSpan] -> [(RealSrcSpan, EP w m Dynamic)] -> EP w m [Dynamic]
 withSortKey annSortKey xs = do
   debugM $ "withSortKey:annSortKey=" ++ showAst annSortKey
   let ordered = case annSortKey of
                   NoAnnSortKey -> sortBy orderByFst xs
-                  -- Just keys -> error $ "withSortKey: keys" ++ show keys
                   AnnSortKey keys -> orderByKey xs keys
                                 -- `debug` ("withSortKey:" ++
                                 --          showPprUnsafe (map fst (sortBy (comparing (flip elemIndex keys . fst)) xs),
@@ -5134,7 +5088,7 @@ setLayoutTopLevelP k = do
   debugM $ "setLayoutTopLevelP entered"
   oldAnchorOffset <- getLayoutOffsetP
   modify (\a -> a { pMarkLayout = False
-                  , pLHS = 1} )
+                  , pLHS = 0} )
   r <- k
   debugM $ "setLayoutTopLevelP:resetting"
   setLayoutOffsetP oldAnchorOffset
