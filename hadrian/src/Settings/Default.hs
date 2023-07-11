@@ -7,7 +7,7 @@ module Settings.Default (
 
     -- * Default command line arguments for various builders
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
-    defaultExtraArgs,
+    defaultExtraArgs, defaultHaddockExtraArgs,
 
     -- * Default build flavour and BigNum backend
     defaultFlavour, defaultBignumBackend
@@ -218,7 +218,13 @@ sourceArgs SourceArgs {..} = builder Ghc ? mconcat
 
 -- | All default command line arguments.
 defaultExtraArgs :: Args
-defaultExtraArgs = sourceArgs defaultSourceArgs
+defaultExtraArgs =
+  mconcat [ sourceArgs defaultSourceArgs, defaultHaddockExtraArgs ]
+
+defaultHaddockExtraArgs :: Args
+defaultHaddockExtraArgs = builder (Haddock BuildPackage) ?
+  mconcat [ arg "--hyperlinked-source", arg "--hoogle", arg "--quickjump" ]
+
 
 -- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs

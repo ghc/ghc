@@ -12,7 +12,7 @@ import {-# SOURCE #-} Settings.Default
 validateFlavour :: Flavour
 validateFlavour = enableLinting $ werror $ defaultFlavour
     { name = "validate"
-    , extraArgs = validateArgs
+    , extraArgs = validateArgs <> defaultHaddockExtraArgs
     , libraryWays = Set.fromList <$>
                     mconcat [ pure [vanilla]
                             , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
