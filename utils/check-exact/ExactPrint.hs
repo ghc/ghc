@@ -441,7 +441,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
       --     mapM_ printOneComment (map tokComment $ pc)
       --     addCommentsA fc
   debugM $ "enterAnn:Added comments"
-  printComments curAnchor
+  printCommentsBefore curAnchor
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
   case anchor' of
@@ -549,6 +549,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
        setEofPos Nothing -- Only do this once
 
   -- Deal with exit from the current anchor
+  printCommentsIn curAnchor -- Make sure all comments in the span are printed
+
   p1 <- getPosP
   pe1 <- getPriorEndD
   debugM $ "enterAnn:done:(anchor',p,pe,a) =" ++ show (eloc2str anchor', p1, pe1, astId a')
@@ -685,7 +687,7 @@ printStringAtRsC :: (Monad m, Monoid w)
   => CaptureComments -> RealSrcSpan -> String -> EP w m EpaLocation
 printStringAtRsC capture pa str = do
   debugM $ "printStringAtRsC: pa=" ++ showAst pa
-  printComments pa
+  printCommentsBefore pa
   pe <- getPriorEndD
   debugM $ "printStringAtRsC:pe=" ++ show pe
   let p = ss2delta pe pa
@@ -1391,12 +1393,20 @@ markAnnListA an action = do
 
 -- ---------------------------------------------------------------------
 
-printComments :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
-printComments ss = do
-  cs <- commentAllocation ss
-  debugM $ "printComments: (ss): " ++ showPprUnsafe (rs2range ss)
+printCommentsBefore :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
+printCommentsBefore ss = do
+  cs <- commentAllocationBefore ss
+  debugM $ "printCommentsBefore: (ss): " ++ showPprUnsafe (rs2range ss)
   -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
   mapM_ printOneComment cs
+
+printCommentsIn :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
+printCommentsIn ss = do
+  cs <- commentAllocationIn ss
+  debugM $ "printCommentsIn: (ss): " ++ showPprUnsafe (rs2range ss)
+  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
+  mapM_ printOneComment cs
+  debugM $ "printCommentsIn:done"
 
 -- ---------------------------------------------------------------------
 
@@ -1477,8 +1487,8 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
 
 -- ---------------------------------------------------------------------
 
-commentAllocation :: (Monad m, Monoid w) => RealSrcSpan -> EP w m [Comment]
-commentAllocation ss = do
+commentAllocationBefore :: (Monad m, Monoid w) => RealSrcSpan -> EP w m [Comment]
+commentAllocationBefore ss = do
   cs <- getUnallocatedComments
   -- Note: The CPP comment injection may change the file name in the
   -- RealSrcSpan, which affects comparison, as the Ord instance for
@@ -1493,6 +1503,21 @@ commentAllocation ss = do
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
 
+commentAllocationIn :: (Monad m, Monoid w) => RealSrcSpan -> EP w m [Comment]
+commentAllocationIn ss = do
+  cs <- getUnallocatedComments
+  -- Note: The CPP comment injection may change the file name in the
+  -- RealSrcSpan, which affects comparison, as the Ord instance for
+  -- RealSrcSpan compares the file first. So we sort via ss2pos
+  -- TODO: this is inefficient, use Pos all the way through
+  let (earlier,later) = partition (\(Comment _str loc _r _mo) ->
+                                     case loc of
+                                       EpaSpan (RealSrcSpan  r _) -> (ss2posEnd r) <= (ss2posEnd ss)
+                                       _ -> True -- Choose one
+                                  ) cs
+  putUnallocatedComments later
+  -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
+  return earlier
 -- ---------------------------------------------------------------------
 
 markAnnotatedWithLayout :: (Monad m, Monoid w) => ExactPrint ast => ast -> EP w m ast
