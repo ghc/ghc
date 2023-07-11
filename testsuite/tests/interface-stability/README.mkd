@@ -5,7 +5,31 @@ core libraries do not inadvertently change. They use the `utils/dump-decls`
 utility to dump all exported declarations of all exposed modules for the
 following packages:
 
-  * base
+  * `base`
 
 These are compared against the expected exports in the test's corresponding
 `.stdout` file.
+
+
+## Updating expected output
+
+The `base-exports` test in particular has rather platform-dependent output.
+Consequently, updating its output can be a bit tricky. There are two ways by
+which one can do this:
+
+ * Extrapolation: The various platforms' `base-exports.stdout` files are
+   similar enough that one can often apply the same patch of one file to the
+   others.  For instance:
+   ```
+   for f in testsuite/tests/interface-stability/base-exports.stdout-*; do
+     git show | sed -e "s/base-exports.stdout/$(basename $f)/" | patch -p1
+   done
+   ```
+   In the case of conflicts, increasing the fuzz factor (using `-F`) can be
+   quite effective.
+
+ * Using CI: Each CI job produces a tarball, `unexpected-test-output.tar.gz`,
+   which contains the output produced by the job's failing tests. Simply
+   download this tarball and extracting the appropriate `base-exports.stdout-*`
+   files into this directory.
+
