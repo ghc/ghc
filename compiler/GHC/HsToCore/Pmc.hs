@@ -36,7 +36,7 @@
 module GHC.HsToCore.Pmc (
         -- Checking and printing
         pmcPatBind, pmcMatches, pmcGRHSs,
-        isMatchContextPmChecked,
+        isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
 
         -- See Note [Long-distance information]
         addTyCs, addCoreScrutTmCs, addHsScrutTmCs, getLdiNablas

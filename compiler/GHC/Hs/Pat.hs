@@ -43,7 +43,7 @@ module GHC.Hs.Pat (
         looksLazyPatBind,
         isBangedLPat,
         gParPat, patNeedsParens, parenthesizePat,
-        isIrrefutableHsPat,
+        isIrrefutableHsPat, isBoringHsPat,
 
         collectEvVarsPat, collectEvVarsPats,
 
@@ -609,6 +609,55 @@ isSimplePat p = case unLoc p of
   VarPat _ x -> Just (unLoc x)
   _ -> Nothing
 
+-- | Is this pattern boring from the perspective of pattern-match checking,
+-- i.e. introduces no new pieces of long-dinstance information
+-- which could influence pattern-match checking?
+--
+-- See Note [Boring patterns].
+isBoringHsPat :: forall p. OutputableBndrId p => LPat (GhcPass p) -> Bool
+-- NB: it's always safe to return 'False' in this function; that just means
+-- performing potentially-redundant pattern-match checking.
+isBoringHsPat = goL
+  where
+    goL :: forall p. OutputableBndrId p => LPat (GhcPass p) -> Bool
+    goL = go . unLoc
+
+    go :: forall p. OutputableBndrId p => Pat (GhcPass p) -> Bool
+    go = \case
+      WildPat {} -> True
+      VarPat  {} -> True
+      LazyPat {} -> True
+      BangPat _ pat     -> goL pat
+      ParPat _ _ pat _  -> goL pat
+      AsPat {} -> False -- the pattern x@y links x and y together,
+                        -- which is a nontrivial piece of information
+      ViewPat _ _ pat   -> goL pat
+      SigPat _ pat _    -> goL pat
+      TuplePat _ pats _ -> all goL pats
+      SumPat  _ pat _ _ -> goL pat
+      ListPat _ pats    -> all goL pats
+      ConPat { pat_con = con, pat_args = details }
+        -> case ghcPass @p of
+            GhcPs -> False -- conservative
+            GhcRn -> False -- conservative
+            GhcTc
+              | isVanillaConLike (unLoc con)
+              -> all goL (hsConPatArgs details)
+              | otherwise
+              -- A pattern match on a GADT constructor can introduce
+              -- type-level information (for example, T18572).
+              -> False
+      LitPat {}     -> True
+      NPat {}       -> True
+      NPlusKPat {}  -> True
+      SplicePat {}  -> False
+      XPat ext ->
+        case ghcPass @p of
+         GhcRn -> case ext of
+           HsPatExpanded _ pat -> go pat
+         GhcTc -> case ext of
+           CoPat _ pat _      -> go pat
+           ExpansionPat _ pat -> go pat
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -630,6 +679,58 @@ minimum unboxed sum arity is 2.
 Failing to mark unboxed sum patterns as non-irrefutable would cause the Just'
 case in foo to be unreachable, as GHC would mistakenly believe that Nothing'
 is the only thing that could possibly be matched!
+
+Note [Boring patterns]
+~~~~~~~~~~~~~~~~~~~~~~
+A pattern is called boring when no new information is gained upon successfully
+matching on the pattern.
+
+Some examples of boring patterns:
+
+  - x, for a variable x. We learn nothing about x upon matching this pattern.
+  - Just y. This pattern can fail, but if it matches, we don't learn anything
+    about y.
+
+Some examples of non-boring patterns:
+
+  - x@(Just y). A match on this pattern introduces the fact that x is headed
+    by the constructor Just, which means that a subsequent pattern match such as
+
+      case x of { Just z -> ... }
+
+    should not be marked as incomplete.
+  - a@b. Matching on this pattern introduces a relation between 'a' and 'b',
+    which means that we shouldn't emit any warnings in code of the form
+
+      case a of
+        True -> case b of { True -> .. } -- no warning here!
+        False -> ...
+  - GADT patterns. For example, with the GADT
+
+      data G i where { MkGInt :: G Int }
+
+    a match on the pattern 'MkGInt' introduces type-level information:
+
+      foo :: G i -> i
+      foo MkGInt = 3
+
+    Here we learn that i ~ Int after matching on 'MkGInt', so this pattern
+    is not boring.
+
+When a pattern is boring, and we are only interested in additional long-distance
+information (not whether the pattern itself is fallible), we can skip pattern-match
+checking entirely. Doing this saves about 10% allocations in test T11195.
+
+This happens when we are checking pattern-matches in do-notation, for example:
+
+  do { x@(Just y) <- z
+     ; ...
+     ; return $ case x of { Just w -> ... } }
+
+Here we *do not* want to emit a pattern-match warning on the first line for the
+incomplete pattern-match, as incompleteness inside do-notation is handled
+using MonadFail. However, we still want to propagate the fact that x is headed
+by the 'Just' constructor, to avoid a pattern-match warning on the last line.
 -}
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
