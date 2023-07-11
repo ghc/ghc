@@ -123,7 +123,6 @@ data SettingsFileSetting
     | SettingsFileSetting_RanlibCommand
     | SettingsFileSetting_OtoolCommand
     | SettingsFileSetting_InstallNameToolCommand
-    | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
     | SettingsFileSetting_TouchCommand
     | SettingsFileSetting_LlcCommand
@@ -220,7 +219,6 @@ settingsFileSetting key = lookupSystemConfig $ case key of
     SettingsFileSetting_RanlibCommand -> "settings-ranlib-command"
     SettingsFileSetting_OtoolCommand -> "settings-otool-command"
     SettingsFileSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
-    SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
     SettingsFileSetting_TouchCommand -> "settings-touch-command"
     SettingsFileSetting_LlcCommand -> "settings-llc-command"

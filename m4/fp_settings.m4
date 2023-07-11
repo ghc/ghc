@@ -23,7 +23,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsMergeObjectsFlags=""
         SettingsArCommand="${mingw_bin_prefix}llvm-ar.exe"
         SettingsRanlibCommand="${mingw_bin_prefix}llvm-ranlib.exe"
-        SettingsDllWrapCommand="${mingw_bin_prefix}llvm-dllwrap.exe"
         SettingsWindresCommand="${mingw_bin_prefix}llvm-windres.exe"
         SettingsTouchCommand='$$topdir/bin/touchy.exe'
 
@@ -45,11 +44,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsMergeObjectsCommand="$MergeObjsCmd"
         SettingsMergeObjectsFlags="$MergeObjsArgs"
 
-        if test -z "$DllWrapCmd"; then
-            SettingsDllWrapCommand="/bin/false"
-        else
-            SettingsDllWrapCommand="$DllWrapCmd"
-        fi
         if test -z "$WindresCmd"; then
             SettingsWindresCommand="/bin/false"
         else
@@ -70,7 +64,6 @@ AC_DEFUN([FP_SETTINGS],
             SettingsLdCommand="$(basename $SettingsLdCommand)"
             SettingsMergeObjectsCommand="$(basename $SettingsMergeObjectsCommand)"
             SettingsArCommand="$(basename $SettingsArCommand)"
-            SettingsDllWrapCommand="$(basename $SettingsDllWrapCommand)"
             SettingsWindresCommand="$(basename $SettingsWindresCommand)"
         fi
     fi
@@ -115,7 +108,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsOtoolCommand)
     AC_SUBST(SettingsInstallNameToolCommand)
-    AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsTouchCommand)
     AC_SUBST(SettingsLlcCommand)
