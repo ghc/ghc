@@ -362,11 +362,12 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                 -- lc = last $ (L ca c:cs')
                 -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
                 cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
-                -- lc = head $ reverse $ (L ca c:cs')
                 lc = case reverse $ (L ca c:cs') of
                        ll:_ -> ll
                        _ -> error "setEntryDP"
                 delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
+                -- lc = head $ reverse $ (L ca c:cs')
                 -- delta = case getLoc lc of
                 --           EpaSpan rr _ -> tweakDelta $ ss2delta (ss2pos rr) r
                 --           EpaSpan _ _  -> tweakDelta (SameLine 0)
