@@ -1442,16 +1442,19 @@ validHoleFits :: SolverReportErrCtxt    -- ^ The context we're in, i.e. the
                 -- the valid hole fits.
 validHoleFits ctxt@(CEC { cec_encl = implics
                         , cec_tidy = lcl_env}) simps hole
-  = do { (tidy_env, fits) <- findValidHoleFits lcl_env implics (map mk_wanted simps) hole
+  = do { (tidy_env, fits) <- findValidHoleFits lcl_env implics (mapMaybe mk_wanted simps) hole
        ; return (ctxt {cec_tidy = tidy_env}, fits) }
   where
-    mk_wanted :: ErrorItem -> CtEvidence
-    mk_wanted (EI { ei_pred = pred, ei_evdest = Just dest, ei_loc = loc })
-         = CtWanted { ctev_pred      = pred
-                    , ctev_dest      = dest
-                    , ctev_loc       = loc
-                    , ctev_rewriters = emptyRewriterSet }
-    mk_wanted item = pprPanic "validHoleFits no evdest" (ppr item)
+    mk_wanted :: ErrorItem -> Maybe CtEvidence
+    mk_wanted (EI { ei_pred = pred, ei_evdest = m_dest, ei_loc = loc })
+      | Just dest <- m_dest
+      = Just (CtWanted { ctev_pred      = pred
+                       , ctev_dest      = dest
+                       , ctev_loc       = loc
+                       , ctev_rewriters = emptyRewriterSet })
+      | otherwise
+      = Nothing   -- The ErrorItem was a Given
+
 
 -- See Note [Constraints include ...]
 givenConstraints :: SolverReportErrCtxt -> [(Type, RealSrcSpan)]
