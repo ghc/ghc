@@ -196,17 +196,19 @@ captureMatchLineSpacing d = d
 captureLineSpacing :: [LocatedA e] -> [LocatedA e]
 captureLineSpacing [] = []
 captureLineSpacing [d] = [d]
-captureLineSpacing ds = map snd $ go (map to ds)
+captureLineSpacing ds = map (\(_,_,x) -> x) $ go (map to ds)
   where
-    to :: LocatedA e -> (Int, LocatedA e)
-    to d = (fst $ ss2pos $ rs $ getHasLoc d,d)
+    to :: LocatedA e -> (Int, Int, LocatedA e)
+    to d = (fst $ ss2pos rss, fst $ ss2posEnd rss,d)
+      where
+        rss = rs $ getHasLoc d
 
-    go :: [(Int, LocatedA e)] -> [(Int, LocatedA e)]
+    go :: [(Int, Int, LocatedA e)] -> [(Int, Int, LocatedA e)]
     go [] = []
     go [d] = [d]
-    go ((l1,de1):(l2,d2):ds) = (l1,de1):go ((l2,d2'):ds)
+    go ((ls1,le1,de1):(ls2,le2,d2):ds) = (ls1,le1,de1):go ((ls2,le2,d2'):ds)
       where
-        d2' = setEntryDP d2 (deltaPos (l2-l1) 0)
+        d2' = setEntryDP d2 (deltaPos (ls2-le1) 0)
 
 -- ---------------------------------------------------------------------
 
@@ -284,16 +286,24 @@ setEntryDPDecl d dp = setEntryDP d dp
 --         in
 --           (dp0, c':t++csd, EpaCommentsBalanced [] ts)
 --       EpaCommentsBalanced [] ts ->
---           (d, csd, EpaCommentsBalanced [] ts)
+--            case csd of
+--              [] -> (d, csd, EpaCommentsBalanced [] ts)
+--              (h:t) ->
+--                 let
+--                   (dp0,c') = go h
+--                 in
+--                   (dp0, c':t, EpaCommentsBalanced [] ts)
 --     go (L (EpaDelta ma c0) c) = (d,  L (EpaDelta ma c0) c)
 --     go (L (EpaSpan _)      c) = (d,  L (EpaDelta dp []) c)
+
+--     -- go (L (EpaDelta _ c0) c) = (d,  L (EpaDelta dp c0) c)
+--     -- go (L (EpaSpan _)     c) = (d,  L (EpaDelta dp []) c)
 -- setEntryDP (L (EpAnnS (EpaSpan (RealSrcSpan r _)) an cs) a) dp
 --   = case sortEpaComments (priorComments cs) of
 --       [] -> L (EpAnnS (EpaDelta dp []) an cs) a
 --       (L ca c:cs') ->
 --         L (EpAnnS (EpaDelta edp csd) an cs'') a
 --               where
---                 -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
 --                 cs'' = setPriorComments cs []
 --                 csd = L (EpaDelta dp []) c:cs'
 --                 lc = head $ reverse $ (L ca c:cs')
@@ -304,7 +314,7 @@ setEntryDPDecl d dp = setEntryDP d dp
 --                 col = deltaColumn delta
 --                 edp' = if line == 0 then SameLine col
 --                                     else DifferentLine line col
---                 edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (getLoc lc), r))
+--                 edp = edp'
 
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
@@ -348,9 +358,15 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                (EpAnn (Anchor r (MovedAnchor edp)) an cs'')
                l) a
               where
-                cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
-                lc = last $ (L ca c:cs')
-                delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                -- cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
+                -- lc = last $ (L ca c:cs')
+                -- delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
+                lc = head $ reverse $ (L ca c:cs')
+                delta = case getLoc lc of
+                          EpaSpan (RealSrcSpan rr _) -> tweakDelta $ ss2delta (ss2pos rr) r
+                          EpaSpan _ -> tweakDelta (SameLine 0)
+                          EpaDelta dp _ -> tweakDelta dp
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
