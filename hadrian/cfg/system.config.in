@@ -38,6 +38,7 @@ cc-llvm-backend           = @CcLlvmBackend@
 #===============
 
 ghc-source-path      = @hardtop@
+use-ghc-toolchain    = @EnableGhcToolchain@
 
 # Information about build, host and target systems:
 #==================================================
