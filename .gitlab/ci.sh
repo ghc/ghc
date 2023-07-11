@@ -75,16 +75,6 @@ Environment variables affecting both build systems:
                     (either "x86-64-darwin" or "aarch-darwin")
   NO_BOOT           Whether to run ./boot or not, used when testing the source dist
 
-Environment variables determining build configuration of Make system:
-
-  BUILD_FLAVOUR     Which flavour to build.
-  BUILD_SPHINX_HTML Whether to build Sphinx HTML documentation.
-  BUILD_SPHINX_PDF  Whether to build Sphinx PDF documentation.
-  INTEGER_LIBRARY   Which integer library to use (integer-simple or integer-gmp).
-  HADDOCK_HYPERLINKED_SOURCES
-                    Whether to build hyperlinked Haddock sources.
-  TEST_TYPE         Which test rule to run.
-
 Environment variables determining build configuration of Hadrian system:
 
   BUILD_FLAVOUR     Which flavour to build.
@@ -388,26 +378,6 @@ function cleanup_submodules() {
     info "Not cleaning submodules, not in a git repo"
   fi;
   end_section "clean submodules"
-}
-
-function prepare_build_mk() {
-  if [[ -z "$BUILD_FLAVOUR" ]]; then fail "BUILD_FLAVOUR is not set"; fi
-  if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
-  if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
-
-  cat > mk/build.mk <<EOF
-BIGNUM_BACKEND=${BIGNUM_BACKEND}
-include mk/flavours/${BUILD_FLAVOUR}.mk
-GhcLibHcOpts+=-haddock
-EOF
-
-  if [ -n "${HADDOCK_HYPERLINKED_SOURCES:-}" ]; then
-    echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
-  fi
-
-
-  info "build.mk is:"
-  cat mk/build.mk
 }
 
 function configure() {
