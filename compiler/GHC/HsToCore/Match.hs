@@ -953,10 +953,9 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
        -- See Note [Long-distance information in matchWrapper] and
        -- Note [Long-distance information in do notation] in GHC.HsToCore.Expr.
        ; ldi_nablas <-
-         if isMatchContextPmChecked dflags FromSource ctx
-         then
-           addCoreScrutTmCs (maybeToList mb_scrut) [var] $
-           pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
+         if  isMatchContextPmChecked_SinglePat dflags FromSource ctx pat
+         then addCoreScrutTmCs (maybeToList mb_scrut) [var] $
+              pmcPatBind (DsMatchContext ctx locn) var (unLoc pat)
          else getLdiNablas
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]

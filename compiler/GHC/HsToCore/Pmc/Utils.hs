@@ -8,7 +8,8 @@ module GHC.HsToCore.Pmc.Utils (
         tracePm, traceWhenFailPm, mkPmId,
         allPmCheckWarnings, overlapping, exhaustive, redundantBang,
         exhaustiveWarningFlag,
-        isMatchContextPmChecked, needToRunPmCheck
+        isMatchContextPmChecked, isMatchContextPmChecked_SinglePat,
+        needToRunPmCheck
 
     ) where
 
@@ -25,7 +26,6 @@ import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Types.SrcLoc
-import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Logger
 import GHC.HsToCore.Monad
@@ -108,16 +108,31 @@ arrowMatchContextExhaustiveWarningFlag = \ case
 -- 'HsMatchContext' (does not matter whether it is the redundancy check or the
 -- exhaustiveness check).
 isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
-isMatchContextPmChecked dflags origin kind
+isMatchContextPmChecked dflags origin ctxt
   =  requiresPMC origin
-  && (overlapping dflags kind || exhaustive dflags kind)
+  && (overlapping dflags ctxt || exhaustive dflags ctxt)
+
+-- | Check whether exhaustivity checks are enabled for this 'HsMatchContext',
+-- when dealing with a single pattern (using the 'matchSinglePatVar' function).
+isMatchContextPmChecked_SinglePat :: DynFlags -> Origin -> HsMatchContext id -> LPat GhcTc -> Bool
+isMatchContextPmChecked_SinglePat dflags origin ctxt pat
+  | not (needToRunPmCheck dflags origin)
+  = False
+  | StmtCtxt {} <- ctxt
+  -- For @StmtCtxt@, we are interested in propagating pattern-match information
+  -- but not in the actual outcome of pattern-match checking, so we skip
+  -- if the pattern is "boring" (gives rise to no long-distance information).
+  -- (This is done purely for runtime performance.)
+  = not (isBoringHsPat pat) -- See Note [Boring patterns] in GHC.Hs.Pat.
+  | otherwise
+  = overlapping dflags ctxt || exhaustive dflags ctxt
 
 -- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
 -- are enabled, in which case we need to run the pattern match checker.
 needToRunPmCheck :: DynFlags -> Origin -> Bool
 needToRunPmCheck dflags origin
   =  requiresPMC origin
-  && notNull (filter (`wopt` dflags) allPmCheckWarnings)
+  && any (`wopt` dflags) allPmCheckWarnings
 
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
