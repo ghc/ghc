@@ -2345,8 +2345,10 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 -- | Check if the expression is an constructor possibly applied to trivial arguments.
 exprIsTrivialConApp :: CoreExpr -> Bool
 exprIsTrivialConApp x
+  | exprIsTrivial x
+  = True
   | (Var v, xs) <- collectArgs x
-  = isDataConWorkId v && all exprIsTrivial xs
+  = isDataConWorkId v && all exprIsTrivialConApp xs
 exprIsTrivialConApp _ = False
 
 -- | Extract a literal string from an expression that is zero or more Ticks
