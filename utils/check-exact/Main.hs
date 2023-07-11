@@ -59,7 +59,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
- -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
+ "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3a.hs" (Just changeWhereIn3a)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" Nothing
@@ -69,7 +69,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
+ -- "../../testsuite/tests/ghc-api/exactprint/RmDecl1.hs" (Just rmDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl2.hs" (Just rmDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl3.hs" (Just rmDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/RmDecl4.hs" (Just rmDecl4)
@@ -100,6 +100,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr008.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr009.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr011.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr011a.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr012.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr013.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr014.hs" Nothing
@@ -148,6 +149,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs" Nothing
+ -- "../../testsuite/tests/printer/PprUnicodeSyntax.hs" Nothing
  -- "../../testsuite/tests/printer/StarBinderAnns.hs" Nothing
  -- "../../testsuite/tests/printer/T13050p.hs" Nothing
  -- "../../testsuite/tests/printer/T13199.hs" Nothing
@@ -534,7 +536,7 @@ changeLocalDecls libdir (L l p) = do
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 4) [])) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -558,8 +560,8 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
-        let anc = (EpaDelta (DifferentLine 1 2) [])
-        let anc2 = (EpaDelta (DifferentLine 1 4) [])
+        let anc = (EpaDelta (DifferentLine 1 3) [])
+        let anc2 = (EpaDelta (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
