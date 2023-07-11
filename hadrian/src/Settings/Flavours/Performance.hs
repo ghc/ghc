@@ -8,7 +8,7 @@ import {-# SOURCE #-} Settings.Default
 performanceFlavour :: Flavour
 performanceFlavour = splitSections $ defaultFlavour
     { name = "perf"
-    , extraArgs = performanceArgs }
+    , extraArgs = performanceArgs <> defaultHaddockExtraArgs }
 
 performanceArgs :: Args
 performanceArgs = sourceArgs SourceArgs

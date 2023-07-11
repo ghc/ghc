@@ -50,6 +50,10 @@ haddockBuilderArgs = mconcat
         baseUrlTemplate <- expr (docsBaseUrl <$> userSetting defaultDocArgs)
         let baseUrl p = substituteTemplate baseUrlTemplate p
         ghcOpts  <- haddockGhcArgs
+        -- These are the options which are necessary to perform the build. Additional
+        -- options such as `--hyperlinked-source`, `--hoogle`, `--quickjump` are
+        -- added by the `extraArgs` field in the flavour. The defaults are provided
+        -- by `defaultHaddockExtraArgs`.
         mconcat
             [ arg "--verbosity=0"
             , arg $ "-B" ++ root -/- stageString Stage1 -/- "lib"
@@ -57,9 +61,6 @@ haddockBuilderArgs = mconcat
             , arg $ "--odir=" ++ takeDirectory output
             , arg $ "--dump-interface=" ++ output
             , arg "--html"
-            , arg "--hyperlinked-source"
-            , arg "--hoogle"
-            , arg "--quickjump"
             , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version
                     ++ ": " ++ synopsis
             , arg $ "--prologue=" ++ takeDirectory output -/- "haddock-prologue.txt"
