@@ -2342,8 +2342,8 @@ exprIsTopLevelBindable expr ty
 exprIsTickedString :: CoreExpr -> Bool
 exprIsTickedString = isJust . exprIsTickedString_maybe
 
--- | Check if the expression is trivial or a constructor application and
--- continue checking all arguments of that constructor recursively.
+-- | Check if the expression is a constructor worker application to arguments
+-- which are either trivial or themselves constructor worker applications, etc.
 exprIsNestedTrivialConApp :: CoreExpr -> Bool
 exprIsNestedTrivialConApp x
   | (Var v, xs) <- collectArgs x
