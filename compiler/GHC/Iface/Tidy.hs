@@ -10,7 +10,7 @@
 
 {-| Tidying up Core
 
-This module is for the purpose of determining and fixing up
+This module's main purposeis to determine and fix up
 what `Name`s should ultimately be internal and external in the
 interface files.
 
@@ -35,6 +35,15 @@ it gets a new Unique and all its occurences are changed to the new `Name`.
 See Note [About the NameSorts] in GHC.Types.Name for what `Name`s
 such changes can potentially happen to (i.e. which ones start as
 internal and which ones as external).
+
+The module also makes sure to change the `OccNames` to be unique.
+For exmaple (assuming `x_123` is a `Name` `x` with a `Unique` of `123`)
+        f x_12 x_423 = x_12
+gets changed to:
+        f x_12 x1_423 = x_12
+so that it can be included in the interface file
+without the unique as:
+        f x x1 = x
 -}
 module GHC.Iface.Tidy
   ( TidyOpts (..)

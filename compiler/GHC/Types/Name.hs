@@ -144,17 +144,14 @@ data Name = Name
 data NameSort
   = External Module
         -- Either an import from another module
-        -- or a top-level name (the latter can
-        -- change to internal if not exported)
-        -- See Note [About the NameSorts] for more details
+        -- or a top-level name
+        -- See Note [About the NameSorts]
 
   | WiredIn Module TyThing BuiltInSyntax
         -- A variant of External, for wired-in things
 
   | Internal            -- A user-defined local Id or TyVar
                         -- defined in the module being compiled
-                        -- Can change to external if e.g.
-                        -- floated up by the Simplifier
                         -- See Note [About the NameSorts]
 
   | System              -- A system-defined Id or TyVar.  Typically the
@@ -220,21 +217,32 @@ TL;DR: we make the `n_occ` field lazy.
 {-
 Note [About the NameSorts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
+1.  Initially:
+    * All types, classes, data constructors get Extenal Names
+    * Top-level Ids (including locally-defined ones) get External Names,
+    * All other local (non-top-level) Ids get Internal names
 
-1.  Initially, top-level Ids (including locally-defined ones) get External names,
-    and all other local Ids get Internal names
+2.  In the Tidy phase (GHC.Iface.Tidy):
+      * An Id that is "externally-visible" is given an External Name,
+        even if the name was Internal up to that point
+      * An Id that is not externally visible is given an Internal Name.
+        even if the name was External up to that point
+    See GHC.Iface.Tidy.tidyTopName
 
-2.  In any invocation of GHC, an External Name for "M.x" has one and only one
+    An Id is externally visible if it is mentioned in the interface file; e.g.
+        - it is exported
+        - it is mentioned in an unfolding
+    See GHC.Iface.Tidy.chooseExternalIds
+
+3.  In any invocation of GHC, an External Name for "M.x" has one and only one
     unique.  This unique association is ensured via the Name Cache;
     see Note [The Name Cache] in GHC.Iface.Env.
 
-3.  Things with a External name are given C static labels, so they finally
-    appear in the .o file's symbol table.  They appear in the symbol table
-    in the form M.n.  If originally-local things have this property they
-    must be made @External@ first.
+4.  In code generation, things with a External name are given C static
+    labels, so they finally appear in the .o file's symbol table.  They
+    appear in the symbol table in the form M.n. That is why
+    externally-visible things are made External (see (2) above).
 
-4.  In the tidy-core phase, a External that is not visible to an importer
-    is changed to Internal, and a Internal that is visible is changed to External
 
 5.  A System Name differs in the following ways:
         a) has unique attached when printing dumps
@@ -246,13 +254,13 @@ Note [About the NameSorts]
     If any desugarer sys-locals have survived that far, they get changed to
     "ds1", "ds2", etc.
 
-Built-in syntax => It's a syntactic form, not "in scope" (e.g. [])
+6. A WiredIn Name is used for things (Id, TyCon) that are fully known to the compiler,
+   not read from an interface file. E.g. Bool, True, Int, Float, and many others.
 
-Wired-in thing  => The thing (Id, TyCon) is fully known to the compiler,
-                   not read from an interface file.
-                   E.g. Bool, True, Int, Float, and many others
+   A WiredIn Name contains contains a TyThing, so we don't have to look it up.
 
-All built-in syntax is for wired-in things.
+   The BuiltInSyntax flag => It's a syntactic form, not "in scope" (e.g. [])
+   All built-in syntax thigs are WiredIn.
 -}
 
 instance HasOccName Name where
