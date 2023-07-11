@@ -38,6 +38,7 @@ data Flag = CrossCompiling
           | UseLibbfd
           | UseLibpthread
           | NeedLibatomic
+          | UseGhcToolchain
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
@@ -61,6 +62,7 @@ flag f = do
             UseLibbfd            -> "use-lib-bfd"
             UseLibpthread        -> "use-lib-pthread"
             NeedLibatomic        -> "need-libatomic"
+            UseGhcToolchain      -> "use-ghc-toolchain"
     value <- lookupSystemConfig key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
