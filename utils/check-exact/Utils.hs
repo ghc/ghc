@@ -110,6 +110,7 @@ pos2delta (refl,refc) (l,c) = deltaPos lo co
     lo = l - refl
     co = if lo == 0 then c - refc
                     else c
+                    -- else c - 1
 
 -- | Apply the delta to the current position, taking into account the
 -- current column offset if advancing to a new line
@@ -181,21 +182,7 @@ isPointSrcSpan ss = spanLength ss == 0
 -- ---------------------------------------------------------------------
 
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
-origDelta pos pp = op
-  where
-    (r,c) = ss2posEnd pp
-
-    op = if r == 0
-           then (             ss2delta (r,c+1) pos)
-           else (tweakDelta $ ss2delta (r,c  ) pos)
-
--- ---------------------------------------------------------------------
-
--- | For comment-related deltas starting on a new line we have an
--- off-by-one problem. Adjust
-tweakDelta :: DeltaPos  -> DeltaPos
-tweakDelta (SameLine d) = SameLine d
-tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
+origDelta pos pp = ss2delta (ss2posEnd pp) pos
 
 -- ---------------------------------------------------------------------
 

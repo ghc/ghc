@@ -110,9 +110,9 @@ runEP epReader action = do
 defaultEPState :: EPState
 defaultEPState = EPState
              { epPos      = (1,1)
-             , dLHS       = 1
+             , dLHS       = 0
              , pMarkLayout = False
-             , pLHS = 1
+             , pLHS = 0
              , dMarkLayout = False
              , dPriorEndPosition = (1,1)
              , uAnchorSpan = badRealSrcSpan
@@ -514,13 +514,12 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   -- -------------------------------------------------------------------
   -- start of print phase processing
 
-  let mflush = when (flush == FlushComments) $ do
-        debugM $ "flushing comments in enterAnn:" ++ showAst cs
-        flushComments (getFollowingComments cs)
-
   advance edp
   a' <- exact a
-  mflush
+  when (flush == FlushComments) $ do
+    debugM $ "flushing comments in enterAnn:" ++ showAst cs
+    flushComments (getFollowingComments cs)
+    debugM $ "flushing comments in enterAnn done"
 
   eof <- getEofPos
   case eof of
@@ -529,12 +528,13 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
        let dp = if pos == prior
              then (DifferentLine 1 0)
              else origDelta pos prior
-       debugM $ "EOF:(pos,prior,dp) =" ++ showGhc (ss2pos pos, ss2pos prior, dp)
+       debugM $ "EOF:(pos,posEnd,prior,dp) =" ++ showGhc (ss2pos pos, ss2posEnd pos, ss2pos prior, dp)
        printStringAtLsDelta dp ""
        setEofPos Nothing -- Only do this once
 
   -- Deal with exit from the current anchor
-  printCommentsIn curAnchor -- Make sure all comments in the span are printed
+  when (flush == NoFlushComments) $ do
+    printCommentsIn curAnchor -- Make sure all comments in the span are printed
 
   p1 <- getPosP
   pe1 <- getPriorEndD
@@ -606,7 +606,12 @@ flushComments trailing_anns = do
   addCommentsA trailing_anns
   cs <- getUnallocatedComments
   debugM $ "flushing comments starting"
-  mapM_ printOneComment (sortComments cs)
+  if False
+    -- AZ:TODO: is the sort still needed?
+    then mapM_ printOneComment (sortComments cs)
+    -- else mapM_ (printOneComment . commentOrigDelta') cs
+    else mapM_ printOneComment (sortComments cs)
+  putUnallocatedComments []
   debugM $ "flushing comments done"
 
 -- ---------------------------------------------------------------------
@@ -1410,15 +1415,12 @@ printOneComment c@(Comment _str loc _r _mo) = do
   dp' <- case mep of
     Just (Anchor _ (MovedAnchor edp)) -> do
       debugM $ "printOneComment:edp=" ++ show edp
-      ddd <- fmap unTweakDelta $ adjustDeltaForOffsetM edp
-      debugM $ "printOneComment:ddd=" ++ show ddd
-      fmap unTweakDelta $ adjustDeltaForOffsetM edp
+      adjustDeltaForOffsetM edp
     _ -> return dp
   -- Start of debug printing
   -- LayoutStartCol dOff <- getLayoutOffsetD
   -- debugM $ "printOneComment:(dp,dp',dOff)=" ++ showGhc (dp,dp',dOff)
   -- End of debug printing
-  -- setPriorEndD (ss2posEnd (anchor loc))
   updateAndApplyComment c dp'
   printQueuedComment (anchor loc) c dp'
 
@@ -1431,19 +1433,31 @@ unTweakDelta (DifferentLine l d) = DifferentLine l (d+1)
 
 updateAndApplyComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
 updateAndApplyComment (Comment str anc pp mo) dp = do
-  -- debugM $ "updateAndApplyComment: (dp,anc',co)=" ++ showAst (dp,anc',co)
   applyComment (Comment str anc' pp mo)
   where
     anc' = anc { anchor_op = op}
 
     (r,c) = ss2posEnd pp
-    la = anchor anc
-    dp'' = if r == 0
-           then (ss2delta (r,c+0) la)
-           else (ss2delta (r,c)   la)
-    dp' = if pp == anchor anc
-             then dp
-             else dp''
+    -- la = anchor anc
+    -- dp'' = if r == 0
+    --        then (ss2delta (r,c+0) la)
+    --        else (ss2delta (r,c)   la)
+    -- dp' = if pp == anchor anc
+    --          then dp
+    --          else dp''
+    dp'' = case anc of
+      Anchor _ (MovedAnchor dp1) -> dp1
+      Anchor la _ ->
+           if r == 0
+             then (ss2delta (r,c+0) la)
+             else (ss2delta (r,c)   la)
+      ss -> error ("updateAndApplyComment:ss=" ++ showGhc ss)
+    dp' = case anc of
+      Anchor r1 UnchangedAnchor ->
+          if pp == r1
+                 then dp
+                 else dp''
+      _ -> dp''
     op' = case dp' of
             SameLine n -> if n >= 0
                             then MovedAnchor dp'
@@ -5066,7 +5080,7 @@ setLayoutTopLevelP k = do
   debugM $ "setLayoutTopLevelP entered"
   oldAnchorOffset <- getLayoutOffsetP
   modify (\a -> a { pMarkLayout = False
-                  , pLHS = 1} )
+                  , pLHS = 0} )
   r <- k
   debugM $ "setLayoutTopLevelP:resetting"
   setLayoutOffsetP oldAnchorOffset

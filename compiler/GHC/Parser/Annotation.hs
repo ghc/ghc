@@ -85,8 +85,9 @@ module GHC.Parser.Annotation (
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
   addCommentsToEpAnn, setCommentsEpAnn,
-  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA, commentsOnlyA,
-  removeCommentsA,
+  transferAnnsA, transferAnnsOnlyA, transferCommentsOnlyA,
+  transferPriorCommentsA, transferFollowingA,
+  commentsOnlyA, removeCommentsA,
 
   placeholderRealSpan,
   ) where
@@ -1215,6 +1216,26 @@ transferAnnsA (SrcSpanAnn (EpAnn a an cs) l) to
       (SrcSpanAnn (EpAnn a an' cs') loc)
         -> SrcSpanAnn (EpAnn a (an' <> an) (cs' <> cs)) loc
 
+-- | Transfer trailing items but not comments from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+  = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
+transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) an1 cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setPriorComments emptyComments pc
+    cs2' = setFollowingComments emptyComments fc
+transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setPriorComments emptyComments pc
+    cs2' = setFollowingComments cs2 fc
+
 -- | Transfer trailing items from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
 transferAnnsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
@@ -1234,6 +1255,27 @@ transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l'
   = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') mempty cs) l')
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
   = (SrcSpanAnn (EpAnn a an emptyComments) l, SrcSpanAnn (EpAnn a' an' (cs <> cs')) l')
+
+-- | Transfer prior comments only from the annotations in the
+-- first 'SrcSpanAnnA' argument to those in the second.
+transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+  = (SrcSpanAnn EpAnnNotUsed l1,  SrcSpanAnn ann2 l2)
+transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setFollowingComments emptyComments fc
+    cs2' = setPriorComments emptyComments pc
+transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn a2 an2 cs2') l2)
+  where
+    pc = priorComments cs1
+    fc = getFollowingComments cs1
+    cs1' = setFollowingComments emptyComments fc
+    cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
+
 
 -- | Remove the exact print annotations payload, leaving only the
 -- anchor and comments.

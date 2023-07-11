@@ -285,37 +285,32 @@ setEntryDPDecl d dp = setEntryDP d dp
 --           (dp0,c') = go h
 --         in
 --           (dp0, c':t++csd, EpaCommentsBalanced [] ts)
---       EpaCommentsBalanced [] ts ->
---            case csd of
---              [] -> (d, csd, EpaCommentsBalanced [] ts)
---              (h:t) ->
---                 let
---                   (dp0,c') = go h
---                 in
---                   (dp0, c':t, EpaCommentsBalanced [] ts)
+--       -- _ -> (dp, cs)
 --     go (L (EpaDelta ma c0) c) = (d,  L (EpaDelta ma c0) c)
 --     go (L (EpaSpan _)      c) = (d,  L (EpaDelta dp []) c)
-
---     -- go (L (EpaDelta _ c0) c) = (d,  L (EpaDelta dp c0) c)
---     -- go (L (EpaSpan _)     c) = (d,  L (EpaDelta dp []) c)
 -- setEntryDP (L (EpAnnS (EpaSpan (RealSrcSpan r _)) an cs) a) dp
 --   = case sortEpaComments (priorComments cs) of
 --       [] -> L (EpAnnS (EpaDelta dp []) an cs) a
 --       (L ca c:cs') ->
 --         L (EpAnnS (EpaDelta edp csd) an cs'') a
 --               where
+--                 -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
 --                 cs'' = setPriorComments cs []
 --                 csd = L (EpaDelta dp []) c:cs'
 --                 lc = head $ reverse $ (L ca c:cs')
 --                 delta = case getLoc lc of
---                           EpaSpan (RealSrcSpan rr _) -> tweakDelta $ ss2delta (ss2pos rr) r
+--                           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
 --                           _ -> DifferentLine 1 0
 --                 line = getDeltaLine delta
 --                 col = deltaColumn delta
 --                 edp' = if line == 0 then SameLine col
 --                                     else DifferentLine line col
---                 edp = edp'
+--                 edp = edp' `debug` ("setEntryDP :" ++ showGhc (edp', (getLoc lc), r))
 
+
+
+-- |Set the true entry 'DeltaPos' from the annotation for a given AST
+-- element. This is the 'DeltaPos' ignoring any comments.
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
@@ -360,13 +355,13 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
               where
                 cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp)) c:cs')
                 lc = last $ (L ca c:cs')
-                delta = tweakDelta $ ss2delta (ss2pos $ anchor $ getLoc lc) r
+                delta = ss2delta (ss2pos $ anchor $ getLoc lc) r
                 -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
                 -- lc = head $ reverse $ (L ca c:cs')
                 -- delta = case getLoc lc of
-                --           EpaSpan rr _ -> tweakDelta $ ss2delta (ss2pos rr) r
-                --           -- EpaSpan _ -> tweakDelta (SameLine 0)
-                --           EpaDelta dp _ -> tweakDelta dp
+                --           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
+                --           EpaSpan _ -> (SameLine 0)
+                --           EpaDelta dp _ -> dp
                 line = getDeltaLine delta
                 col = deltaColumn delta
                 edp' = if line == 0 then SameLine col
@@ -766,7 +761,7 @@ commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
                then MovedAnchor (ss2delta (r,c+1) la)
                -- then MovedAnchor (ss2delta (r,c+0) la)
                -- else MovedAnchor (ss2delta (r,c)   la)
-               else MovedAnchor (tweakDelta $ ss2delta (r,c)   la)
+               else MovedAnchor (ss2delta (r,c)   la)
         op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0)
                then MovedAnchor (DifferentLine 1 0)
                else op'
@@ -1175,43 +1170,43 @@ unpackFunDecl (L l (ValD x b)) = L l' (ValD x b')
 
 -- TODO: Move to Annotation.hs
 
-transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
-transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
-  = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
-transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
-  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setFollowingComments emptyComments fc
-    cs2' = setPriorComments emptyComments pc
-transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
-  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn a2 an2 cs2') l2)
-      `debug` ("transferPriorCommentsA: ((cs1, cs2), (cs1', cs2'))=" ++ showAst ((cs1, cs2), (cs1', cs2')))
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setFollowingComments emptyComments fc
-    cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
+-- transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+-- transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+--   = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
+-- transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+--   = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
+--   where
+--     pc = priorComments cs1
+--     fc = getFollowingComments cs1
+--     cs1' = setFollowingComments emptyComments fc
+--     cs2' = setPriorComments emptyComments pc
+-- transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+--   = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn a2 an2 cs2') l2)
+--       `debug` ("transferPriorCommentsA: ((cs1, cs2), (cs1', cs2'))=" ++ showAst ((cs1, cs2), (cs1', cs2')))
+--   where
+--     pc = priorComments cs1
+--     fc = getFollowingComments cs1
+--     cs1' = setFollowingComments emptyComments fc
+--     cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
 
-transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
-transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
-  = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
-transferFollowingA (SrcSpanAnn (EpAnn a1 _ cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
-  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setPriorComments emptyComments pc
-    cs2' = setFollowingComments emptyComments fc
-transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
-  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
-      `debug` ("transferFollowingA: (pc,fc,cs1', cs2')=" ++ showAst (pc,fc,cs1', cs2'))
-  where
-    pc = priorComments cs1
-    fc = getFollowingComments cs1
-    cs1' = setPriorComments emptyComments pc
-    cs2' = setFollowingComments cs2 fc
+-- transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
+-- transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
+--   = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
+-- transferFollowingA (SrcSpanAnn (EpAnn a1 _ cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
+--   = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
+--   where
+--     pc = priorComments cs1
+--     fc = getFollowingComments cs1
+--     cs1' = setPriorComments emptyComments pc
+--     cs2' = setFollowingComments emptyComments fc
+-- transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
+--   = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
+--       `debug` ("transferFollowingA: (pc,fc,cs1', cs2')=" ++ showAst (pc,fc,cs1', cs2'))
+--   where
+--     pc = priorComments cs1
+--     fc = getFollowingComments cs1
+--     cs1' = setPriorComments emptyComments pc
+--     cs2' = setFollowingComments cs2 fc
 
 -- ---------------------------------------------------------------------
 
@@ -1284,8 +1279,10 @@ oldWhereAnnotation (EpAnn anc an cs) ww _oldSpan = do
 newWhereAnnotation :: (Monad m) => WithWhere -> TransformT m (EpAnn AnnList)
 newWhereAnnotation ww = do
   newSpan <- uniqueSrcSpanT
-  let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2))
-  let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4))
+  let anc  = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3))
+  let anc2 = Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5))
+  -- let anc  = EpaDelta (DifferentLine 1 3) []
+  -- let anc2 = EpaDelta (DifferentLine 1 5) []
   let w = case ww of
         WithWhere -> [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])]
         WithoutWhere -> []
