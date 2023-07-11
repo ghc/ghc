@@ -328,14 +328,12 @@ else
     AC_PATH_TOOL([AR],[ar])
     AC_PATH_TOOL([RANLIB],[ranlib])
     AC_PATH_TOOL([OBJDUMP],[objdump])
-    AC_PATH_TOOL([DllWrap],[dllwrap])
     AC_PATH_TOOL([Windres],[windres])
     AC_PATH_TOOL([Genlib],[genlib])
 
     HAVE_GENLIB=False
     if test "$HostOS" = "mingw32"; then
         AC_CHECK_TARGET_TOOL([Windres],[windres])
-        AC_CHECK_TARGET_TOOL([DllWrap],[dllwrap])
         AC_CHECK_TARGET_TOOL([OBJDUMP],[objdump])
 
         if test "$Genlib" != ""; then
@@ -346,9 +344,7 @@ else
 fi
 
 if test "$HostOS" = "mingw32"; then
-    DllWrapCmd="$DllWrap"
     WindresCmd="$Windres"
-    AC_SUBST([DllWrapCmd])
     AC_SUBST([WindresCmd])
     AC_SUBST([GenlibCmd])
     AC_SUBST([HAVE_GENLIB])
@@ -1238,7 +1234,6 @@ echo "\
    otool        : $OtoolCmd
    install_name_tool : $InstallNameToolCmd
    windres      : $WindresCmd
-   dllwrap      : $DllWrapCmd
    genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)

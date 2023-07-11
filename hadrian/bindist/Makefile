@@ -103,7 +103,6 @@ lib/settings : config.mk
 	@echo ',("otool command", "$(SettingsOtoolCommand)")' >> $@
 	@echo ',("install_name_tool command", "$(SettingsInstallNameToolCommand)")' >> $@
 	@echo ',("touch command", "$(SettingsTouchCommand)")' >> $@
-	@echo ',("dllwrap command", "$(SettingsDllWrapCommand)")' >> $@
 	@echo ',("windres command", "$(SettingsWindresCommand)")' >> $@
 	@echo ',("unlit command", "$$topdir/bin/$(CrossCompilePrefix)unlit")' >> $@
 	@echo ',("cross compiling", "$(CrossCompiling)")' >> $@

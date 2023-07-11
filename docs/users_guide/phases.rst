@@ -88,13 +88,6 @@ given compilation phase:
     Use ⟨cmd⟩ as the linker when merging object files (e.g. when generating
     joined objects for loading into GHCi).
 
-.. ghc-flag:: -pgmdll ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the DLL generator
-    :type: dynamic
-    :category: phase-programs
-
-    Use ⟨cmd⟩ as the DLL generator.
-
 .. ghc-flag:: -pgmF ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only)
     :type: dynamic

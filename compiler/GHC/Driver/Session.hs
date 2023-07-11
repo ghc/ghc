@@ -102,7 +102,6 @@ module GHC.Driver.Session (
         sPgm_a,
         sPgm_l,
         sPgm_lm,
-        sPgm_dll,
         sPgm_T,
         sPgm_windres,
         sPgm_ar,
@@ -136,7 +135,7 @@ module GHC.Driver.Session (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_cxx, pgm_cpp, pgm_a, pgm_l, pgm_lm,
-        pgm_dll, pgm_T, pgm_windres, pgm_ar,
+        pgm_T, pgm_windres, pgm_ar,
         pgm_ranlib, pgm_lo, pgm_lc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
@@ -404,8 +403,6 @@ pgm_l                 :: DynFlags -> (String,[Option])
 pgm_l dflags = toolSettings_pgm_l $ toolSettings dflags
 pgm_lm                 :: DynFlags -> Maybe (String,[Option])
 pgm_lm dflags = toolSettings_pgm_lm $ toolSettings dflags
-pgm_dll               :: DynFlags -> (String,[Option])
-pgm_dll dflags = toolSettings_pgm_dll $ toolSettings dflags
 pgm_T                 :: DynFlags -> String
 pgm_T dflags = toolSettings_pgm_T $ toolSettings dflags
 pgm_windres           :: DynFlags -> String
@@ -1080,8 +1077,6 @@ dynamic_flags_deps = [
          }
   , make_ord_flag defFlag "pgml-supports-no-pie"
       $ noArg $ alterToolSettings $ \s -> s { toolSettings_ccSupportsNoPie = True }
-  , make_ord_flag defFlag "pgmdll"
-      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_dll = (f,[]) }
   , make_ord_flag defFlag "pgmwindres"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_windres = f }
   , make_ord_flag defFlag "pgmar"

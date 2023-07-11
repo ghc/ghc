@@ -271,7 +271,6 @@ SettingsArCommand = @SettingsArCommand@
 SettingsOtoolCommand = @SettingsOtoolCommand@
 SettingsInstallNameToolCommand = @SettingsInstallNameToolCommand@
 SettingsRanlibCommand = @SettingsRanlibCommand@
-SettingsDllWrapCommand = @SettingsDllWrapCommand@
 SettingsWindresCommand = @SettingsWindresCommand@
 SettingsLibtoolCommand = @SettingsLibtoolCommand@
 SettingsTouchCommand = @SettingsTouchCommand@

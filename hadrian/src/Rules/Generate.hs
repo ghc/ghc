@@ -462,7 +462,6 @@ generateSettings = do
         , ("otool command", expr $ settingsFileSetting SettingsFileSetting_OtoolCommand)
         , ("install_name_tool command", expr $ settingsFileSetting SettingsFileSetting_InstallNameToolCommand)
         , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
-        , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
         , ("cross compiling", expr $ yesNo <$> flag CrossCompiling)
