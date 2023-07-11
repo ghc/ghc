@@ -10,40 +10,31 @@
 
 {-| Tidying up Core
 
-This module's main purposeis to determine and fix up
-what `Name`s should ultimately be internal and external in the
-interface files.
+This module's purpose is to prepare the Core program for two distinct purposes:
+* To be serialised into the module's interface file
+* To feed to the code generator
 
-For example:
-        module M where
-          f x = x + y
-            where y = factorial 4
-could be optimized by the Simplifier to:
-        module M where
-          y = factorial 4
-          f x = x + y
-in which case the `Name` `y` would be changed from internal to external.
-Another example (compiled without optimizations):
-        module M(f) where
-          y = factorial 4
-          f x = y + x
-in this case we will not want to expose `y` in the interface file or the
-object file, so it will be changed from external to internal.
+The most important tasks are:
+* Determine which `Name`s should ultimately be `Internal` and `External`
+  (which may differ to whether they were originally `Internal` or `External`).
+  See `Note [About the NameSorts]` in GHC.Types.Name.
+  For example, in:
+          module M where
+            f x = x + y
+              where y = factorial 4
+  could be optimized during the Core pass to:
+          module M where
+            y = factorial 4
+            f x = x + y
+  in which case `y` would be changed from `Internal` to `External`.
 
-Note that when the `Name` is changed from internal to external
-it gets a new Unique and all its occurences are changed to the new `Name`.
-See Note [About the NameSorts] in GHC.Types.Name for what `Name`s
-such changes can potentially happen to (i.e. which ones start as
-internal and which ones as external).
+* Rename local identifiers to avoid name clashes, so that unfoldings etc can
+  be serialialised using the OccName, without Uniques.
 
-The module also makes sure to change the `OccNames` to be unique.
-For exmaple (assuming `x_123` is a `Name` `x` with a `Unique` of `123`)
-        f x_12 x_423 = x_12
-gets changed to:
-        f x_12 x1_423 = x_12
-so that it can be included in the interface file
-without the unique as:
-        f x x1 = x
+  For example (`x_5` means `x` with a `Unique` of `5`):
+          f x_12 x_23 = x_12
+  would be changed to:
+          f x_12 x1_23 = x_12
 -}
 module GHC.Iface.Tidy
   ( TidyOpts (..)
