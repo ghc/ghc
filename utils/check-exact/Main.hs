@@ -99,6 +99,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Ppr008.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr009.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr011.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr011a.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr012.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr013.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr014.hs" Nothing
@@ -147,6 +148,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/PprRecordDotSyntax3.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntax4.hs" Nothing
  -- "../../testsuite/tests/printer/PprRecordDotSyntaxA.hs" Nothing
+ -- "../../testsuite/tests/printer/PprUnicodeSyntax.hs" Nothing
  -- "../../testsuite/tests/printer/StarBinderAnns.hs" Nothing
  -- "../../testsuite/tests/printer/T13050p.hs" Nothing
  -- "../../testsuite/tests/printer/T13199.hs" Nothing
@@ -522,7 +524,9 @@ changeLocalDecls libdir (L l p) = do
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 4)))) a b c dd) cs)
+        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 5)))) a b c dd) cs)
+        -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
+        -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -547,8 +551,10 @@ changeLocalDecls2 libdir (L l p) = do
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
         newSpan <- uniqueSrcSpanT
-        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 2)))
-        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 4)))
+        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3)))
+        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5)))
+        -- let anc = (EpaDelta (DifferentLine 1 3) [])
+        -- let anc2 = (EpaDelta (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
