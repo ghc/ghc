@@ -4863,7 +4863,9 @@ data ErrorItem
   = EI { ei_pred     :: PredType         -- report about this
          -- The ei_pred field will never be an unboxed equality with
          -- a (casted) tyvar on the right; this is guaranteed by the solver
-       , ei_evdest   :: Maybe TcEvDest   -- for Wanteds, where to put evidence
+       , ei_evdest   :: Maybe TcEvDest
+         -- ^ for Wanteds, where to put the evidence
+         --   for Givens, Nothing
        , ei_flavour  :: CtFlavour
        , ei_loc      :: CtLoc
        , ei_m_reason :: Maybe CtIrredReason  -- if this ErrorItem was made from a
