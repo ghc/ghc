@@ -846,8 +846,8 @@ rns :: { OrdList LRenaming }
         | rn         { unitOL $1 }
 
 rn :: { LRenaming }
-        : modid 'as' modid { sLL $1 $>      $ Renaming (reLoc $1) (Just (reLoc $3)) }
-        | modid            { sL1 (reLoc $1) $ Renaming (reLoc $1) Nothing }
+        : modid 'as' modid { sLL $1 $> $ Renaming (reLoc $1) (Just (reLoc $3)) }
+        | modid            { sL1 $1    $ Renaming (reLoc $1) Nothing }
 
 unitbody :: { OrdList (LHsUnitDecl PackageName) }
         : '{'     unitdecls '}'   { $2 }
@@ -1073,11 +1073,11 @@ qcnames1 :: { ([AddEpAnn], [LocatedA ImpExpQcSpec]) }     -- A reversed list
 -- Variable, data constructor or wildcard
 -- or tagged type constructor
 qcname_ext_w_wildcard :: { Located ([AddEpAnn], LocatedA ImpExpQcSpec) }
-        :  qcname_ext               { sL1A $1 ([],$1) }
-        |  '..'                     { sL1  $1 ([mj AnnDotdot $1], sL1a $1 ImpExpQcWildcard)  }
+        :  qcname_ext               { sL1 $1 ([],$1) }
+        |  '..'                     { sL1 $1 ([mj AnnDotdot $1], sL1a $1 ImpExpQcWildcard)  }
 
 qcname_ext :: { LocatedA ImpExpQcSpec }
-        :  qcname                   { reLocA $ sL1N $1 (ImpExpQcName $1) }
+        :  qcname                   { sL1a $1 (ImpExpQcName $1) }
         |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
                                           ; return $ sLLa $1 (reLocN $>) (ImpExpQcType (glAA $1) n) }}
 
@@ -1231,7 +1231,7 @@ ops     :: { Located (OrdList (LocatedN RdrName)) }
                                 SnocOL hs t -> do
                                   t' <- addTrailingCommaN t (gl $2)
                                   return (sLL $1 $> (snocOL hs t' `appOL` unitOL $3)) }
-        | op               { sL1N $1 (unitOL $1) }
+        | op               { sL1 $1 (unitOL $1) }
 
 -----------------------------------------------------------------------------
 -- Top-Level Declarations
@@ -1265,12 +1265,12 @@ topdecl_cs : topdecl {% commentsPA $1 }
 
 -----------------------------------------------------------------------------
 topdecl :: { LHsDecl GhcPs }
-        : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
-        | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
-        | standalone_kind_sig                   { sL1 $1 (KindSigD noExtField (unLoc $1)) }
-        | inst_decl                             { sL1 $1 (InstD noExtField (unLoc $1)) }
-        | stand_alone_deriving                  { sL1 $1 (DerivD noExtField (unLoc $1)) }
-        | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
+        : cl_decl                               { sL1a $1 (TyClD noExtField (unLoc $1)) }
+        | ty_decl                               { sL1a $1 (TyClD noExtField (unLoc $1)) }
+        | standalone_kind_sig                   { sL1a $1 (KindSigD noExtField (unLoc $1)) }
+        | inst_decl                             { sL1a $1 (InstD noExtField (unLoc $1)) }
+        | stand_alone_deriving                  { sL1a $1 (DerivD noExtField (unLoc $1)) }
+        | role_annot                            { sL1a $1 (RoleAnnotD noExtField (unLoc $1)) }
         | 'default' '(' comma_types0 ')'        {% acsA (\cs -> sLL $1 $>
                                                     (DefD noExtField (DefaultDecl (EpAnn (glR $1) [mj AnnDefault $1,mop $2,mcp $4] cs) $3))) }
         | 'foreign' fdecl                       {% acsA (\cs -> sLL $1 $> ((snd $ unLoc $2) (EpAnn (glR $1) (mj AnnForeign $1:(fst $ unLoc $2)) cs))) }
@@ -1358,7 +1358,7 @@ sks_vars :: { Located [LocatedN RdrName] }  -- Returned in reverse order
            (h:t) -> do
              h' <- addTrailingCommaN h (gl $2)
              return (sLL $1 $> ($3 : h' : t)) }
-  | oqtycon { sL1N $1 [$1] }
+  | oqtycon { sL1 $1 [$1] }
 
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst
@@ -1438,7 +1438,7 @@ injectivity_cond :: { LInjectivityAnn GhcPs }
 
 inj_varids :: { Located [LocatedN RdrName] }
         : inj_varids tyvarid  { sLL $1 $> ($2 : unLoc $1) }
-        | tyvarid             { sL1N  $1 [$1]               }
+        | tyvarid             { sL1  $1 [$1]               }
 
 -- Closed type families
 
@@ -1588,7 +1588,7 @@ opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
                                             , Maybe (LInjectivityAnn GhcPs)))}
         :            { noLoc ([], (noLocA (NoSig noExtField), Nothing)) }
         | '::' kind  { sLL $1 $> ( [mu AnnDcolon $1]
-                                 , (sL1a (reLoc $>) (KindSig noExtField $2), Nothing)) }
+                                 , (sL1a $> (KindSig noExtField $2), Nothing)) }
         | '='  tv_bndr_no_braces '|' injectivity_cond
                 {% do { tvb <- fromSpecTyVarBndr $2
                       ; return $ sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
@@ -1603,7 +1603,7 @@ opt_at_kind_inj_sig :: { Located ([AddEpAnn], ( LFamilyResultSig GhcPs
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
         : context '=>' type         {% acs (\cs -> (sLL $1 $> (Just (addTrailingDarrowC $1 $2 cs), $3))) }
-        | type                      { sL1A $1 (Nothing, $1) }
+        | type                      { sL1 $1 (Nothing, $1) }
 
 datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs, LHsType GhcPs) }
         : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall $1
@@ -1620,7 +1620,7 @@ datafam_inst_hdr :: { Located (Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs
                                              ; return (sL loc (Nothing, mkHsOuterExplicit (EpAnn (glR $1) (mu AnnForall $1, mj AnnDot $3) cs) tvbs, $4))
                                        } }
         | context '=>' type         {% acs (\cs -> (sLL $1 $>(Just (addTrailingDarrowC $1 $2 cs), mkHsOuterImplicit, $3))) }
-        | type                      { sL1A $1 (Nothing, mkHsOuterImplicit, $1) }
+        | type                      { sL1 $1 (Nothing, mkHsOuterImplicit, $1) }
 
 
 capi_ctype :: { Maybe (LocatedP CType) }
@@ -1755,7 +1755,7 @@ decls_cls :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
                                                   t' <- addTrailingSemiA t (gl $2)
                                                   return (sLL $1 $> (fst $ unLoc $1
                                                                  , snocOL hs t')) }
-          | decl_cls                    { sL1A $1 ([], unitOL $1) }
+          | decl_cls                    { sL1 $1 ([], unitOL $1) }
           | {- empty -}                 { noLoc ([],nilOL) }
 
 decllist_cls
@@ -1781,8 +1781,8 @@ where_cls :: { Located ([AddEpAnn]
 -- Declarations in instance bodies
 --
 decl_inst  :: { Located (OrdList (LHsDecl GhcPs)) }
-decl_inst  : at_decl_inst               { sL1A $1 (unitOL (sL1 $1 (InstD noExtField (unLoc $1)))) }
-           | decl                       { sL1A $1 (unitOL $1) }
+decl_inst  : at_decl_inst               { sL1 $1 (unitOL (sL1a $1 (InstD noExtField (unLoc $1)))) }
+           | decl                       { sL1 $1 (unitOL $1) }
 
 decls_inst :: { Located ([AddEpAnn],OrdList (LHsDecl GhcPs)) }   -- Reversed
            : decls_inst ';' decl_inst   {% if isNilOL (snd $ unLoc $1)
@@ -1842,7 +1842,7 @@ decls   :: { Located ([AddEpAnn], OrdList (LHsDecl GhcPs)) }
                                        t' <- addTrailingSemiA t (gl $2)
                                        return (sLL $1 $> (fst $ unLoc $1
                                                       , snocOL hs t')) }
-        | decl                          { sL1A $1 ([], unitOL $1) }
+        | decl                          { sL1 $1 ([], unitOL $1) }
         | {- empty -}                   { noLoc ([],nilOL) }
 
 decllist :: { Located (AnnList,Located (OrdList (LHsDecl GhcPs))) }
@@ -1957,7 +1957,7 @@ rule_vars :: { [LRuleTyTmVar] }
         | {- empty -}                           { [] }
 
 rule_var :: { LRuleTyTmVar }
-        : varid                         { sL1l $1 (RuleTyTmVar noAnn $1 Nothing) }
+        : varid                         { sL1a $1 (RuleTyTmVar noAnn $1 Nothing) }
         | '(' varid '::' ctype ')'      {% acsA (\cs -> sLL $1 $> (RuleTyTmVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3,mcp $5] cs) $2 (Just $4))) }
 
 {- Note [Parsing explicit foralls in Rules]
@@ -2143,7 +2143,7 @@ sig_vars :: { Located [LocatedN RdrName] }    -- Returned in reversed order
                                            (h:t) -> do
                                              h' <- addTrailingCommaN h (gl $2)
                                              return (sLL $1 $> ($3 : h' : t)) }
-         | var                        { sL1N $1 [$1] }
+         | var                        { sL1 $1 [$1] }
 
 sigtypes1 :: { OrdList (LHsSigType GhcPs) }
    : sigtype                 { unitOL $1 }
@@ -2266,11 +2266,11 @@ tyop :: { (LocatedN RdrName, PromotionFlag) }
                                               ; return (op, IsPromoted) } }
 
 atype :: { LHsType GhcPs }
-        : ntgtycon                       {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
+        : ntgtycon                       {% acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
         -- See Note [%shift: atype -> tyvar]
-        | tyvar %shift                   {% acsa (\cs -> sL1a (reLocN $1) (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- (See Note [Unit tuples])
+        | tyvar %shift                   {% acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glNR $1) [] cs) NotPromoted $1)) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
-                                               ; return $ reLocA $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
+                                               ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_TILDE atype             {% acsA (\cs -> sLL $1 $> (mkBangTy (EpAnn (glR $1) [mj AnnTilde $1] cs) SrcLazy $2)) }
@@ -2354,7 +2354,7 @@ tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         | '{' tyvar '::' kind '}'       {% acsA (\cs -> sLL $1 $> (KindedTyVar (EpAnn (glR $1) [moc $1,mu AnnDcolon $3 ,mcc $5] cs) InferredSpec $2 $4)) }
 
 tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
-        : tyvar                         {% acsA (\cs -> (sL1 (reLocN $1) (UserTyVar (EpAnn (glNR $1) [] cs) SpecifiedSpec $1))) }
+        : tyvar                         {% acsA (\cs -> (sL1 $1 (UserTyVar (EpAnn (glNR $1) [] cs) SpecifiedSpec $1))) }
         | '(' tyvar '::' kind ')'       {% acsA (\cs -> (sLL $1 $> (KindedTyVar (EpAnn (glR $1) [mop $1,mu AnnDcolon $3 ,mcp $5] cs) SpecifiedSpec $2 $4))) }
 
 fds :: { Located ([AddEpAnn],[LHsFunDep GhcPs]) }
@@ -2367,7 +2367,7 @@ fds1 :: { Located [LHsFunDep GhcPs] }
                            do { let (h:t) = unLoc $1 -- Safe from fds1 rules
                               ; h' <- addTrailingCommaA h (gl $2)
                               ; return (sLL $1 $> ($3 : h' : t)) }}
-        | fd            { sL1A $1 [$1] }
+        | fd            { sL1 $1 [$1] }
 
 fd :: { LHsFunDep GhcPs }
         : varids0 '->' varids0  {% acsA (\cs -> L (comb3 $1 $2 $3)
@@ -2465,7 +2465,7 @@ constrs1 :: { Located [LConDecl GhcPs] }
             {% do { let (h:t) = unLoc $1
                   ; h' <- addTrailingVbarA h (gl $2)
                   ; return (sLL $1 $> ($3 : h' : t)) }}
-        | constr                         { sL1A $1 [$1] }
+        | constr                         { sL1 $1 [$1] }
 
 constr :: { LConDecl GhcPs }
         : forall context '=>' constr_stuff
@@ -2519,7 +2519,7 @@ maybe_derivings :: { Located (HsDeriving GhcPs) }
 -- A list of one or more deriving clauses at the end of a datatype
 derivings :: { Located (HsDeriving GhcPs) }
         : derivings deriving      { sLL $1 $> ($2 : unLoc $1) } -- AZ: order?
-        | deriving                { sL1 (reLoc $>) [$1] }
+        | deriving                { sL1 $> [$1] }
 
 -- The outer Located is just to allow the caller to
 -- know the rightmost extremity of the 'deriving' clause
@@ -2537,9 +2537,9 @@ deriving :: { LHsDerivingClause GhcPs }
                  in acsA (\cs -> L full_loc $ HsDerivingClause (EpAnn (glR $1) [mj AnnDeriving $1] cs) (Just $3) $2) }
 
 deriv_clause_types :: { LDerivClauseTys GhcPs }
-        : qtycon              { let { tc = sL1 (reLocL $1) $ mkHsImplicitSigType $
-                                           sL1 (reLocL $1) $ HsTyVar noAnn NotPromoted $1 } in
-                                sL1 (reLocC $1) (DctSingle noExtField tc) }
+        : qtycon              { let { tc = sL1a $1 $ mkHsImplicitSigType $
+                                           sL1a $1 $ HsTyVar noAnn NotPromoted $1 } in
+                                sL1a $1 (DctSingle noExtField tc) }
         | '(' ')'             {% amsrc (sLL $1 $> (DctMulti noExtField []))
                                        (AnnContext Nothing [glAA $1] [glAA $2]) }
         | '(' deriv_types ')' {% amsrc (sLL $1 $> (DctMulti noExtField $2))
@@ -2604,7 +2604,7 @@ rhs     :: { Located (GRHSs GhcPs (LHsExpr GhcPs)) }
 
 gdrhs :: { Located [LGRHS GhcPs (LHsExpr GhcPs)] }
         : gdrhs gdrh            { sLL $1 $> ($2 : unLoc $1) }
-        | gdrh                  { sL1 (reLoc $1) [$1] }
+        | gdrh                  { sL1 $1 [$1] }
 
 gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
         : '|' guardquals '=' exp  {% runPV (unECP $4) >>= \ $4 ->
@@ -2639,7 +2639,7 @@ sigdecl :: { LHsDecl GhcPs }
                                     (Fixity fixText fixPrec (unLoc $1)))))
                    }}
 
-        | pattern_synonym_sig   { sL1 $1 . SigD noExtField . unLoc $ $1 }
+        | pattern_synonym_sig   { sL1a $1 . SigD noExtField . unLoc $ $1 }
 
         | '{-# COMPLETE' qcon_list opt_tyconsig  '#-}'
                 {% let (dcolon, tc) = $3
@@ -3236,7 +3236,7 @@ squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, becau
                     return (sLL $1 $> ($3 : (h':t))) }
     | transformqual        {% return (sLL $1 $> [L (getLocAnn $1) ((unLoc $1) (glRR $1) [])]) }
     | qual                               {% runPV $1 >>= \ $1 ->
-                                            return $ sL1A $1 [$1] }
+                                            return $ sL1 $1 [$1] }
 --  | transformquals1 ',' '{|' pquals '|}'   { sLL $1 $> ($4 : unLoc $1) }
 --  | '{|' pquals '|}'                       { sL1 $1 [$2] }
 
@@ -3283,7 +3283,7 @@ guardquals1 :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }
                                    h' <- addTrailingCommaA h (gl $2)
                                    return (sLL $1 $> ($3 : (h':t))) }
     | qual                  {% runPV $1 >>= \ $1 ->
-                               return $ sL1A $1 [$1] }
+                               return $ sL1 $1 [$1] }
 
 -----------------------------------------------------------------------------
 -- Case alternatives
@@ -3321,7 +3321,7 @@ alts1(PATS) :: { forall b. DisambECP b => PV (Located ([AddEpAnn],[LMatch GhcPs 
                                            (h:t) -> do
                                              h' <- addTrailingSemiA h (gl $2)
                                              return (sLL $1 $> (fst $ unLoc $1, h' : t)) }
-        | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 (reLoc $1) ([],[$1]) }
+        | alt(PATS)                 { $1 >>= \ $1 -> return $ sL1 $1 ([],[$1]) }
 
 alt(PATS) :: { forall b. DisambECP b => PV (LMatch GhcPs (LocatedA b)) }
         : PATS alt_rhs { $2 >>= \ $2 ->
@@ -3346,7 +3346,7 @@ gdpats :: { forall b. DisambECP b => PV (Located [LGRHS GhcPs (LocatedA b)]) }
         : gdpats gdpat { $1 >>= \gdpats ->
                          $2 >>= \gdpat ->
                          return $ sLL gdpats (reLoc gdpat) (gdpat : unLoc gdpats) }
-        | gdpat        { $1 >>= \gdpat -> return $ sL1A gdpat [gdpat] }
+        | gdpat        { $1 >>= \gdpat -> return $ sL1 gdpat [gdpat] }
 
 -- layout for MultiWayIf doesn't begin with an open brace, because it's hard to
 -- generate the open brace in addition to the vertical bar in the lexer, and
@@ -3418,7 +3418,7 @@ stmts :: { forall b. DisambECP b => PV (Located (OrdList AddEpAnn,[LStmt GhcPs (
                                { h' <- addTrailingSemiA h (gl $2)
                                ; return $ sL1 $1 (fst $ unLoc $1,h':t) }}
         | stmt                   { $1 >>= \ $1 ->
-                                   return $ sL1A $1 (nilOL,[$1]) }
+                                   return $ sL1 $1 (nilOL,[$1]) }
         | {- empty -}            { return $ noLoc (nilOL,[]) }
 
 
@@ -3444,7 +3444,7 @@ qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (LocatedA b)) }
                                            acsA (\cs -> sLL $1 $>
                                             $ mkPsBindStmt (EpAnn (glAR $1) [mu AnnLarrow $2] cs) $1 $3) }
     | exp                                { unECP $1 >>= \ $1 ->
-                                           return $ sL1 $1 $ mkBodyStmt $1 }
+                                           return $ sL1a $1 $ mkBodyStmt $1 }
     | 'let' binds                        { acsA (\cs -> (sLL $1 $>
                                                 $ mkLetStmt (EpAnn (glR $1) [mj AnnLet $1] cs) (unLoc $2))) }
 
@@ -3467,13 +3467,13 @@ fbinds1 :: { forall b. DisambECP b => PV ([Fbind b], Maybe SrcSpan) }
 
 fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         : qvar '=' texp  { unECP $3 >>= \ $3 ->
-                           fmap Left $ acsA (\cs -> sLL $1 $> $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1l $1 $ mkFieldOcc $1) $3 False) }
+                           fmap Left $ acsA (\cs -> sLL $1 $> $ HsFieldBind (EpAnn (glNR $1) [mj AnnEqual $2] cs) (sL1a $1 $ mkFieldOcc $1) $3 False) }
                         -- RHS is a 'texp', allowing view patterns (#6038)
                         -- and, incidentally, sections.  Eg
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Left $ acsa (\cs -> sL1a (reLocN $1) $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1l $1 $ mkFieldOcc $1) rhs True) }
+                          fmap Left $ acsa (\cs -> sL1a $1 $ HsFieldBind (EpAnn (glNR $1) [] cs) (sL1a $1 $ mkFieldOcc $1) rhs True) }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 
@@ -3481,7 +3481,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate '=' texp
                         { do
-                            let top = sL1 (la2la $1) $ DotFieldOcc noAnn $1
+                            let top = sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
@@ -3497,7 +3497,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
         -- AZ: need to pull out the let block into a helper
         | field TIGHT_INFIX_PROJ fieldToUpdate
                         { do
-                            let top =  sL1 (la2la $1) $ DotFieldOcc noAnn $1
+                            let top =  sL1a $1 $ DotFieldOcc noAnn $1
                                 ((L lf (DotFieldOcc _ f)):t) = reverse (unLoc $3)
                                 lf' = comb2 $2 (L lf ())
                                 fields = top : L (noAnnSrcSpan lf') (DotFieldOcc (EpAnn (spanAsAnchor lf') (AnnFieldLabel (Just $ glAA $2)) emptyComments) f) : t
@@ -3514,7 +3514,7 @@ fieldToUpdate
         : fieldToUpdate TIGHT_INFIX_PROJ field   {% getCommentsFor (getLocA $3) >>= \cs ->
                                                      return (sLL $1 $> ((sLLa $2 (reLoc $>) (DotFieldOcc (EpAnn (glR $2) (AnnFieldLabel $ Just $ glAA $2) cs) $3)) : unLoc $1)) }
         | field       {% getCommentsFor (getLocA $1) >>= \cs ->
-                        return (sL1 (reLoc $1) [sL1a (reLoc $1) (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
+                        return (sL1 $1 [sL1a $1 (DotFieldOcc (EpAnn (glNR $1) (AnnFieldLabel Nothing) cs) $1)]) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
@@ -3530,7 +3530,7 @@ dbinds  :: { Located [LIPBind GhcPs] } -- reversed
                            (h:t) -> do
                              h' <- addTrailingSemiA h (gl $2)
                              return (sLL $1 $> (h':t)) }
-        | dbind                        { let this = $1 in this `seq` (sL1 (reLoc $1) [this]) }
+        | dbind                        { let this = $1 in this `seq` (sL1 $1 [this]) }
 --      | {- empty -}                  { [] }
 
 dbind   :: { LIPBind GhcPs }
@@ -3572,10 +3572,10 @@ name_boolformula_and_list :: { [LBooleanFormula (LocatedN RdrName)] }
 name_boolformula_atom :: { LBooleanFormula (LocatedN RdrName) }
         : '(' name_boolformula ')'  {% amsrl (sLL $1 $> (Parens $2))
                                       (AnnList Nothing (Just (mop $1)) (Just (mcp $3)) [] []) }
-        | name_var                  { reLocA $ sL1N $1 (Var $1) }
+        | name_var                  { sL1a $1 (Var $1) }
 
 namelist :: { Located [LocatedN RdrName] }
-namelist : name_var              { sL1N $1 [$1] }
+namelist : name_var              { sL1 $1 [$1] }
          | name_var ',' namelist {% do { h <- addTrailingCommaN $1 (gl $2)
                                        ; return (sLL $1 $> (h : unLoc $3)) }}
 
@@ -3608,11 +3608,11 @@ con     :: { LocatedN RdrName }
         | sysdcon               { L (getLoc $1) $ nameRdrName (dataConName (unLoc $1)) }
 
 con_list :: { Located (NonEmpty (LocatedN RdrName)) }
-con_list : con                  { sL1N $1 (pure $1) }
+con_list : con                  { sL1 $1 (pure $1) }
          | con ',' con_list     {% sLL $1 $> . (:| toList (unLoc $3)) <\$> addTrailingCommaN $1 (gl $2) }
 
 qcon_list :: { Located [LocatedN RdrName] }
-qcon_list : qcon                  { sL1N $1 [$1] }
+qcon_list : qcon                  { sL1 $1 [$1] }
           | qcon ',' qcon_list    {% do { h <- addTrailingCommaN $1 (gl $2)
                                         ; return (sLL $1 $> (h : unLoc $3)) }}
 
@@ -4117,28 +4117,16 @@ sL0 :: a -> Located a
 sL0 = L noSrcSpan       -- #define L0   L noSrcSpan
 
 {-# INLINE sL1 #-}
-sL1 :: GenLocated l a -> b -> GenLocated l b
-sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
-
-{-# INLINE sL1A #-}
-sL1A :: LocatedAn t a -> b -> Located b
-sL1A x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
-
-{-# INLINE sL1N #-}
-sL1N :: LocatedN a -> b -> Located b
-sL1N x = sL (getLocA x)   -- #define sL1   sL (getLoc $1)
+sL1 :: HasLoc a => a -> b -> Located b
+sL1 x = sL (getHasLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1a #-}
-sL1a :: Located a -> b -> LocatedAn t b
-sL1a x = sL (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
-
-{-# INLINE sL1l #-}
-sL1l :: LocatedAn t a -> b -> LocatedAn u b
-sL1l x = sL (l2l $ getLoc x)   -- #define sL1   sL (getLoc $1)
+sL1a :: HasLoc a =>  a -> b -> LocatedAn t b
+sL1a x = sL (noAnnSrcSpan $ getHasLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1n #-}
-sL1n :: Located a -> b -> LocatedN b
-sL1n x = L (noAnnSrcSpan $ getLoc x)   -- #define sL1   sL (getLoc $1)
+sL1n :: HasLoc a => a -> b -> LocatedN b
+sL1n x = L (noAnnSrcSpan $ getHasLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sLL #-}
 sLL :: (HasLoc a, HasLoc b) => a -> b -> c -> Located c
