@@ -1143,7 +1143,7 @@ warn_term_var_capture lVar = do
     case demoteRdrNameTv $ unLoc lVar of
       Nothing           -> return ()
       Just demoted_name -> do
-        let global_vars = lookupGRE_RdrName SameOccName gbl_env demoted_name
+        let global_vars = lookupGRE gbl_env (LookupRdrName demoted_name SameNameSpace)
         let mlocal_var  = lookupLocalRdrEnv local_env demoted_name
         case mlocal_var of
           Just name -> warnCapturedTerm lVar (Right name)

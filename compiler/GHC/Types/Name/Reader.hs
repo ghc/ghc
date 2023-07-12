@@ -7,6 +7,8 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- |
 -- #name_types#
@@ -53,7 +55,13 @@ module GHC.Types.Name.Reader (
 
         -- ** Looking up 'GlobalRdrElt's
         FieldsOrSelectors(..), filterFieldGREs, allowGRE,
-        WhichGREs(..), lookupGRE_OccName, lookupGRE_RdrName, lookupGRE_Name,
+
+        LookupGRE(..), lookupGRE,
+        WhichGREs(.., AllRelevantGREs, RelevantGREsFOS),
+        greIsRelevant,
+        LookupChild(..),
+
+        lookupGRE_Name,
         lookupGRE_FieldLabel,
         getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp,
@@ -127,6 +135,7 @@ import GHC.Utils.Panic
 import Control.DeepSeq
 import Control.Monad ( guard )
 import Data.Data
+import Data.List ( sort )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as Map
 import qualified Data.Semigroup as S
@@ -584,8 +593,8 @@ absence of the 'GREInfo' field.
 
 This parametrisation also helps ensure that we don't accidentally force the
 GREInfo field (which can cause unnecessary loading of interface files).
-In particular, the 'lookupGRE_OccName' is statically guaranteed to not consult
-the 'GREInfo' field when its first argument is 'SameOccName', which is important
+In particular, the 'lookupGRE' function is statically guaranteed to not consult
+the 'GREInfo' field when using 'SameNameSpace', which is important
 as we sometimes need to use this function with an 'IfaceGlobalRdrEnv' in which
 the 'GREInfo' fields have been stripped.
 -}
@@ -1061,7 +1070,7 @@ data FieldsOrSelectors
                  -- they have selectors).
     | WantField  -- ^ Include only fields, with or without selectors, ignoring
                  -- any non-fields in scope.
-  deriving Eq
+  deriving (Eq, Show)
 
 filterFieldGREs :: FieldsOrSelectors -> [GlobalRdrElt] -> [GlobalRdrElt]
 filterFieldGREs WantBoth = id
@@ -1082,7 +1091,7 @@ allowGRE WantNormal gre
 allowGRE WantField gre
   = isRecFldGRE gre
 
--- | How should we look up in a 'GlobalRdrEnv'? Should we only look up
+-- | What should we look up in a 'GlobalRdrEnv'? Should we only look up
 -- names with the exact same 'OccName', or do we allow different 'NameSpace's?
 --
 -- Depending on the answer, we might need more or less information from the
@@ -1091,72 +1100,245 @@ allowGRE WantField gre
 -- we need to consult the 'GREInfo'. This is why this datatype is a GADT.
 --
 -- See Note [IfGlobalRdrEnv].
-data WhichGREs info where
+data LookupGRE info where
   -- | Look for this specific 'OccName', with the exact same 'NameSpace',
   -- in the 'GlobalRdrEnv'.
-  SameOccName :: WhichGREs info
-  -- | Look for variables in record field namespaces, and look for
-  -- record fields in variable namespaces, depending on the arguments.
-  IncludeFields :: FieldsOrSelectors
-       -- ^ How should we handle variables?
-       --
-       --   - Should we include record fields defined with @-XNoFieldSelectors@?
-       --   - Should we include non-fields?
-       --
-       -- See Note [NoFieldSelectors].
-                -> Bool
-       -- ^ For fields, should we also look up variables?
-                -> WhichGREs GREInfo
-  -- | Look up in all 'NameSpace's.
-  AllNameSpaces :: WhichGREs info
+  LookupOccName :: OccName -- ^ the 'OccName' to look up
+                -> WhichGREs info
+                    -- ^ information about other relevant 'NameSpace's
+                -> LookupGRE info
 
--- | Look for this 'OccName' in the global environment.
---
--- The 'WhichGREs' argument specifies which 'GlobalRdrElt's we are interested in.
-lookupGRE_OccName :: WhichGREs info -> GlobalRdrEnvX info -> OccName -> [GlobalRdrEltX info]
-lookupGRE_OccName what env occ
-  | AllNameSpaces <- what
-  = concat $ lookupOccEnv_AllNameSpaces env occ
-  -- If the 'RdrName' is a variable, we might also need
-  -- to look up in the record field namespaces.
-  | isVarOcc occ
-  , Just flds <- mb_flds
-  = normal ++ flds
-  -- If the 'RdrName' is a record field, we might want to check
-  -- the variable namespace too.
-  | isFieldOcc occ
-  , Just flds <- mb_flds
-  = flds ++ case what of { IncludeFields _ True -> vars; _ -> [] }
+  -- | Look up the 'OccName' of this 'RdrName' in the 'GlobalRdrEnv',
+  -- filtering out those whose qualification matches that of the 'RdrName'.
+  --
+  -- Lookup returns an empty result for 'Exact' or 'Orig' 'RdrName's.
+  LookupRdrName :: RdrName -- ^ the 'RdrName' to look up
+                -> WhichGREs info
+                    -- ^ information about other relevant 'NameSpace's
+                -> LookupGRE info
+
+  -- | Look for 'GRE's with the same unique as the given 'Name'
+  -- in the 'GlobalRdrEnv'.
+  LookupExactName
+    :: { lookupExactName :: Name
+          -- ^ the 'Name' to look up
+       , lookInAllNameSpaces :: Bool
+          -- ^ whether to look in *all* 'NameSpace's, or just
+          -- in the 'NameSpace' of the 'Name'
+          -- See Note [Template Haskell ambiguity]
+       }
+    -> LookupGRE info
+
+  -- | Look up children 'GlobalRdrElt's with a given 'Parent'.
+  LookupChildren
+    :: OccName  -- ^ the 'OccName' to look up
+    -> LookupChild
+         -- ^ information to decide which 'GlobalRdrElt's
+         -- are valid children after looking up
+    -> LookupGRE info
+
+-- | How should we look up in a 'GlobalRdrEnv'?
+-- Which 'NameSpace's are considered relevant for a given lookup?
+data WhichGREs info where
+  -- | Only consider 'GlobalRdrElt's with the exact 'NameSpace' we look up.
+  SameNameSpace :: WhichGREs info
+  -- | Allow 'GlobalRdrElt's with different 'NameSpace's, e.g. allow looking up
+  -- record fields from the variable 'NameSpace', or looking up a 'TyCon' from
+  -- the data constructor 'NameSpace'.
+  RelevantGREs
+    :: { includeFieldSelectors :: !FieldsOrSelectors
+        -- ^ how should we handle looking up variables?
+        --
+        --   - should we include record fields defined with @-XNoFieldSelectors@?
+        --   - should we include non-fields?
+        --
+        -- See Note [NoFieldSelectors].
+       , lookupVariablesForFields :: !Bool
+          -- ^ when looking up a record field, should we also look up plain variables?
+       , lookupTyConsAsWell :: !Bool
+          -- ^ when looking up a variable, field or data constructor, should we
+          -- also try the type constructor 'NameSpace'?
+       }
+    -> WhichGREs GREInfo
+
+-- | Look up as many possibly relevant 'GlobalRdrElt's as possible.
+pattern AllRelevantGREs :: WhichGREs GREInfo
+pattern AllRelevantGREs =
+  RelevantGREs { includeFieldSelectors = WantBoth
+               , lookupVariablesForFields = True
+               , lookupTyConsAsWell = True }
+
+-- | Look up relevant GREs, taking into account the interaction between the
+-- variable and field 'NameSpace's as determined by the 'FieldsOrSelector'
+-- argument.
+pattern RelevantGREsFOS :: FieldsOrSelectors -> WhichGREs GREInfo
+pattern RelevantGREsFOS fos <- RelevantGREs { includeFieldSelectors = fos }
+  where
+    RelevantGREsFOS fos =
+      RelevantGREs { includeFieldSelectors = fos
+                   , lookupVariablesForFields = fos == WantBoth
+                   , lookupTyConsAsWell = False }
+
+data LookupChild
+  = LookupChild
+  { wantedParent :: Name
+     -- ^ the parent we are looking up children of
+  , lookupDataConFirst :: Bool
+     -- ^ for type constructors, should we look in the data constructor
+     -- namespace first?
+  }
+
+-- | After looking up something with the given 'NameSpace', is the resulting
+-- 'GlobalRdrElt' we have obtained relevant, according to the 'RelevantGREs'
+-- specification of which 'NameSpace's are relevant?
+greIsRelevant :: WhichGREs GREInfo -- ^ specification of which 'GlobalRdrElt's to consider relevant
+              -> NameSpace    -- ^ the 'NameSpace' of the thing we are looking up
+              -> GlobalRdrElt -- ^ the 'GlobalRdrElt' we have looked up, in a
+                              -- potentially different 'NameSpace' than we wanted
+              -> Bool
+greIsRelevant which_gres ns gre
+  | ns == other_ns
+  = True
   | otherwise
-  = normal
+  = case which_gres of
+      SameNameSpace -> False
+      RelevantGREs { includeFieldSelectors = fos
+                   , lookupVariablesForFields = vars_for_flds
+                   , lookupTyConsAsWell = tycons_too }
+        | ns == varName
+        -> (isFieldNameSpace other_ns && allowGRE fos gre) || tc_too
+        | isFieldNameSpace ns
+        -> vars_for_flds &&
+          (  other_ns == varName
+          || (isFieldNameSpace other_ns && allowGRE fos gre)
+          || tc_too )
+        | isDataConNameSpace ns
+        -> tc_too
+        | otherwise
+        -> False
+        where
+          tc_too = tycons_too && isTcClsNameSpace other_ns
+  where
+    other_ns = greNameSpace gre
+
+-- | Scoring priority function for looking up children 'GlobalRdrElt'.
+--
+-- First we score by 'NameSpace', with higher-priority 'NameSpace's having a
+-- lower number. Then we break ties by checking if the 'Parent' is correct.
+--
+-- This complicated scoring function is determined by the behaviour required by
+-- 'lookupChildrenExport', which requires us to look in the data constructor
+-- 'NameSpace' first, for things in the type constructor 'NameSpace'.
+childGREPriority :: LookupChild -- ^ what kind of child do we want,
+                                -- e.g. what should its parent be?
+                 -> NameSpace   -- ^ what 'NameSpace' are we originally looking in?
+                 -> GlobalRdrEltX info
+                                -- ^ the result of looking up; it might be in a different
+                                -- 'NameSpace', which is used to determine the score
+                                -- (in the first component)
+                 -> Maybe (Int, Int)
+childGREPriority (LookupChild { wantedParent = wanted_parent, lookupDataConFirst = try_dc_first })
+  ns gre =
+  case child_ns_prio $ greNameSpace gre of
+    Nothing -> Nothing
+    Just np -> Just (np, parent_prio $ greParent gre)
+      -- Prioritise GREs first on NameSpace, and then on Parent.
+      -- See T11970.
 
   where
-    mb_flds =
-      case what of
-        IncludeFields fos _ -> Just $ filterFieldGREs fos $ concat $ lookupFieldsOccEnv env (occNameFS occ)
-        _                   -> Nothing
+      -- Pick out the possible 'NameSpace's in order of priority.
+      child_ns_prio :: (NameSpace -> Maybe Int)
+      child_ns_prio other_ns
+        | other_ns == ns
+        = Just 0
+        | isTermVarOrFieldNameSpace ns
+        , isTermVarOrFieldNameSpace other_ns
+        = Just 0
+        | ns == varName
+        , other_ns == tcName
+        -- When looking up children, we sometimes want to a symbolic variable
+        -- name to resolve to a type constructor, e.g. for an infix declaration
+        -- "infix +!" we want to take into account both class methods and associated
+        -- types. See test T10816.
+        = Just 1
+        | ns == tcName
+        , other_ns == dataName
+        , try_dc_first -- try data namespace before type/class namespace?
+        = Just (-1)
+        | otherwise
+        = Nothing
 
-    normal   = fromMaybe [] $ lookupOccEnv env occ
-    vars     = fromMaybe [] $ lookupOccEnv env (recFieldToVarOcc occ)
+      parent_prio :: Parent -> Int
+      parent_prio (ParentIs other_parent)
+        | other_parent == wanted_parent = 0
+        | otherwise                     = 1
+      parent_prio NoParent              = 0
 
--- | Like 'lookupGRE_OccName', but for a 'RdrName'.
-lookupGRE_RdrName :: WhichGREs info -> GlobalRdrEnvX info -> RdrName -> [GlobalRdrEltX info]
-lookupGRE_RdrName what env rdr =
-  pickGREs rdr $ lookupGRE_OccName what env (rdrNameOcc rdr)
+-- | Look something up in the Global Reader Environment.
+--
+-- The 'LookupGRE' argument specifies what to look up, and in particular
+-- whether there should there be any lee-way if the 'NameSpace's don't
+-- exactly match.
+lookupGRE :: GlobalRdrEnvX info -> LookupGRE info -> [GlobalRdrEltX info]
+lookupGRE env = \case
+  LookupOccName occ which_gres ->
+    case which_gres of
+      SameNameSpace ->
+        concat $ lookupOccEnv env occ
+      rel@(RelevantGREs{}) ->
+        filter (greIsRelevant rel (occNameSpace occ)) $
+          concat $ lookupOccEnv_AllNameSpaces env occ
+  LookupRdrName rdr rel ->
+    pickGREs rdr $ lookupGRE env (LookupOccName (rdrNameOcc rdr) rel)
+  LookupExactName { lookupExactName = nm
+                  , lookInAllNameSpaces = all_ns } ->
+      [ gre | gre <- lkup, greName gre == nm ]
+    where
+      occ = nameOccName nm
+      lkup | all_ns    = concat $ lookupOccEnv_AllNameSpaces env occ
+           | otherwise = fromMaybe [] $ lookupOccEnv env occ
+  LookupChildren occ which_child ->
+    highestPriorityGREs (childGREPriority which_child ns) $
+      concat $ lookupOccEnv_AllNameSpaces env occ
+    where
+      ns :: NameSpace
+      ns = occNameSpace occ
 
--- | Look for precisely this 'Name' in the environment.
+-- | Collect the 'GlobalRdrElt's with the highest priority according
+-- to the given function (lower value <=> higher priority).
+--
+-- This allows us to first look in e.g. the data 'NameSpace', and then fall back
+-- to the type/class 'NameSpace'.
+highestPriorityGREs :: forall info prio
+                    .  Ord prio
+                    => (GlobalRdrEltX info -> Maybe prio)
+                      -- ^ priority function
+                      -- lower value <=> higher priority
+                    -> [GlobalRdrEltX info] -> [GlobalRdrEltX info]
+highestPriorityGREs priority gres =
+  take_highest_prio $ NE.group $ sort
+    [ S.Arg prio gre
+    | gre <- gres
+    , prio <- maybeToList $ priority gre ]
+  where
+    take_highest_prio :: [NE.NonEmpty (S.Arg prio (GlobalRdrEltX info))] -> [GlobalRdrEltX info]
+    take_highest_prio [] = []
+    take_highest_prio (fs:_) = map (\ (S.Arg _ gre) -> gre) $ NE.toList fs
+{-# INLINEABLE highestPriorityGREs #-}
+
+-- | Look for precisely this 'Name' in the environment,
+-- in the __same 'NameSpace'__ as the 'Name'.
 --
 -- This tests whether it is in scope, ignoring anything
 -- else that might be in scope which doesn't have the same 'Unique'.
 lookupGRE_Name :: Outputable info => GlobalRdrEnvX info -> Name -> Maybe (GlobalRdrEltX info)
 lookupGRE_Name env name =
-  let occ = nameOccName name
-  in case [ gre | gre <- lookupGRE_OccName SameOccName env occ
-                , gre_name gre == name ] of
+  case lookupGRE env (LookupExactName { lookupExactName = name
+                                      , lookInAllNameSpaces = False }) of
       []    -> Nothing
       [gre] -> Just gre
       gres  -> pprPanic "lookupGRE_Name"
-                        (ppr name $$ ppr occ $$ ppr gres)
+                        (ppr name $$ ppr (nameOccName name) $$ ppr gres)
                -- See INVARIANT 1 on GlobalRdrEnv
 
 -- | Look for a particular record field selector in the environment.
@@ -1542,16 +1724,17 @@ greIsShadowed old_gre shadowed =
 -- | Whether a 'GlobalRdrElt' is definitely shadowed, definitely not shadowed,
 -- or conditionally shadowed based on more information beyond the 'NameSpace'.
 data IsShadowed
+  -- | The GRE is not shadowed.
   = IsNotShadowed
+  -- | The GRE is shadowed.
   | IsShadowed
+  -- | The GRE is shadowed iff it is a record field GRE
+  -- which defines a field selector (i.e. FieldSelectors is enabled in its
+  -- defining module).
   | IsShadowedIfFieldSelector
 
 -- | Internal function: is a 'GlobalRdrElt' with the 'NameSpace' with given
 -- 'Unique' shadowed by the specified 'ShadowedGREs'?
---
---   - @Just b@ means: definitely @b@.
---   - @Nothing@ means: the GRE is shadowed iff it is a record field GRE
---     with FieldSelectors enabled.
 namespace_is_shadowed :: Unique -> ShadowedGREs -> IsShadowed
 namespace_is_shadowed old_ns (ShadowedGREs shadowed_nonflds shadowed_flds)
   | isFldNSUnique old_ns

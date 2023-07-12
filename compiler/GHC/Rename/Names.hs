@@ -730,7 +730,7 @@ extendGlobalRdrEnvRn new_gres new_fixities
       where
         -- See Note [Reporting duplicate local declarations]
         dups = filter isBadDupGRE
-             $ lookupGRE_OccName (IncludeFields WantBoth True) env (greOccName gre)
+             $ lookupGRE env (LookupOccName (greOccName gre) (RelevantGREsFOS WantBoth))
         isBadDupGRE old_gre = isLocalGRE old_gre && greClashesWith gre old_gre
 
 {- Note [Fail fast on duplicate definitions]
@@ -927,7 +927,7 @@ getLocalNonValBinders fixity_env
              -- See (1) above
              L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
              -- See (2) above
-             MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe SameOccName cls_rdr
+             MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe SameNameSpace cls_rdr
            -- Assuming the previous step succeeded, process any associated data
            -- family instances. If the previous step failed, bail out.
            case mb_cls_gre of

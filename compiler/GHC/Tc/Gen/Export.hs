@@ -689,9 +689,13 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
         doOne n = do
 
           let bareName = (ieWrappedName . unLoc) n
+              what_lkup :: LookupChild
+              what_lkup = LookupChild { wantedParent       = spec_parent
+                                      , lookupDataConFirst = True }
+
                 -- Do not report export list declaration deprecations
           name <-  lookupSubBndrOcc_helper False ExportDeprecationWarnings
-                        spec_parent bareName (childrenNameSpaces $ rdrNameSpace bareName)
+                        spec_parent bareName what_lkup
           traceRn "lookupChildrenExport" (ppr name)
           -- Default to data constructors for slightly better error
           -- messages

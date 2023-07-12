@@ -33,7 +33,6 @@ module GHC.Rename.Env (
 
         ChildLookupResult(..),
         lookupSubBndrOcc_helper,
-        childrenNameSpaces, -- Called by lookupChildrenExport
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn, lookupSigOccRnN,
         lookupSigCtxtOccRn,
@@ -58,7 +57,6 @@ module GHC.Rename.Env (
         addUsedGRE, addUsedGREs, addUsedDataCons,
 
         dataTcOccs, --TODO: Move this somewhere, into utils?
-        rdrRelevantNameSpace,
 
     ) where
 
@@ -115,7 +113,7 @@ import Control.Arrow    ( first )
 import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
-import Data.List        ( find, partition, groupBy, sort, sortBy )
+import Data.List        ( find, partition, groupBy, sortBy )
 import Data.Foldable    ( for_ )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semi
@@ -298,7 +296,7 @@ lookupTopBndrRn which_suggest rdr_name =
                (do { op_ok <- xoptM LangExt.TypeOperators
                    ; unless op_ok (addErr (TcRnIllegalTypeOperatorDecl rdr_name)) })
         ; env <- getGlobalRdrEnv
-        ; case filter isLocalGRE (lookupGRE_RdrName (IncludeFields WantNormal False) env rdr_name) of
+        ; case filter isLocalGRE (lookupGRE env $ LookupRdrName rdr_name $ RelevantGREsFOS WantNormal) of
             [gre] -> return (greName gre)
             _     -> do -- Ambiguous (can't happen) or unbound
                         traceRn "lookupTopBndrRN fail" (ppr rdr_name)
@@ -357,14 +355,14 @@ lookupExternalExactName name
 lookupLocalExactGRE :: Name -> RnM (Either NotInScopeError GlobalRdrElt)
 lookupLocalExactGRE name
   = do { env <- getGlobalRdrEnv
-       ; let occ = nameOccName name
-             gres = [ gre | gre <- lookupGRE_OccName AllNameSpaces env occ
-                            -- We're filtering by an exact 'Name' match,
-                            -- so we should look up as many potential matches as possible.
-                            -- See Note [rdrRelevantNameSpace and Exact Names]
-                            -- and test cases T9066, T11809.
-                          , greName gre == name ]
-       ; case gres of
+       ; let lk = LookupExactName { lookupExactName = name
+                                  , lookInAllNameSpaces = True }
+             -- We want to check for clashes where the same Unique
+             -- occurs in two different NameSpaces, as per
+             -- Note [Template Haskell ambiguity]. So we
+             -- check ALL namespaces, not just the NameSpace of the Name.
+             -- See test cases T9066, T11809.
+       ; case lookupGRE env lk of
            [gre] -> return (Right gre)
 
            []    -> -- See Note [Splicing Exact names]
@@ -562,7 +560,7 @@ lookupRecFieldOcc mb_con rdr_name
           ; Just nm -> return nm } }
 
   | otherwise  -- Can't use the data constructor to disambiguate
-  = lookupGlobalOccRn' (IncludeFields WantField False) rdr_name
+  = lookupGlobalOccRn' (RelevantGREsFOS WantField) rdr_name
     -- This use of Global is right as we are looking up a selector,
     -- which can only be defined at the top level.
 
@@ -683,38 +681,20 @@ lookupGlobalOccRn will find it.
 -}
 
 -- | Used in export lists to lookup the children.
-lookupSubBndrOcc_helper :: forall ns_prio
-                        .  Ord ns_prio
-                        => Bool -> DeprecationWarnings
+lookupSubBndrOcc_helper :: Bool -> DeprecationWarnings
                         -> Name
                         -> RdrName -- ^ thing we are looking up
-                        -> (NameSpace -> Maybe ns_prio)
+                        -> LookupChild -- ^ how to look it up (e.g. which
+                                       -- 'NameSpace's to look in)
                         -> RnM ChildLookupResult
-lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name ns_prio
+lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name how_lkup
   | isUnboundName parent
     -- Avoid an error cascade
   = return (FoundChild (mkUnboundGRERdr rdr_name))
 
   | otherwise = do
   gre_env <- getGlobalRdrEnv
-
-  let gre_prio :: GlobalRdrElt -> Maybe (ns_prio, Int)
-      gre_prio gre = case ns_prio $ greNameSpace gre of
-        Nothing -> Nothing
-        Just np -> Just (np, case right_parent gre of { NoOccurrence -> 1 ; _ -> 0 })
-          -- Prioritise GREs first on NameSpace, and then on Parent.
-          -- See T11970.
-      original_gres =
-          highestPriority gre_prio
-        $ lookupGRE_OccName AllNameSpaces gre_env (rdrNameOcc rdr_name)
-  -- Look in all NameSpaces:
-  --
-  --   - we want to include fields defined with no field selectors,
-  --     as we can export those as children. See test NFSExport.
-  --   - for a variable, we might also need to look in the type/class namespace
-  --     see e.g. test T10816.
-
-  -- Disambiguate the lookup based on the parent information.
+  let original_gres = lookupGRE gre_env (LookupChildren (rdrNameOcc rdr_name) how_lkup)
   -- The remaining GREs are things that we *could* export here, note that
   -- this includes things which have `NoParent`. Those are sorted in
   -- `checkPatSynParent`.
@@ -785,46 +765,6 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name ns_prio
                  | otherwise            -> NoOccurrence
               NoParent                  -> UniqueOccurrence p
 {-# INLINEABLE lookupSubBndrOcc_helper #-}
-
--- | Collect the 'GlobalRdrElt's with the highest priority 'NameSpace' according
--- to the given function (lower value <=> higher priority).
---
--- This allows us to first look in e.g. the data 'NameSpace', and then fall back
--- to the type/class 'NameSpace'.
-highestPriority :: Ord prio
-                => (GlobalRdrElt -> Maybe prio)
-                  -- ^ priority function
-                  -- lower value <=> higher priority
-                -> [GlobalRdrElt] -> [GlobalRdrElt]
-highestPriority priority gres =
-  take_highest_prio $ NE.group $ sort
-    [ Semi.Arg prio gre
-    | gre <- gres
-    , prio <- maybeToList $ priority gre ]
-  where
-    take_highest_prio :: [NE.NonEmpty (Semi.Arg prio GlobalRdrElt)] -> [GlobalRdrElt]
-    take_highest_prio [] = []
-    take_highest_prio (fs:_) = map (\ (Semi.Arg _ gre) -> gre) $ NE.toList fs
-{-# INLINEABLE highestPriority #-}
-
--- | Pick out the possible 'NameSpace's in order of priority.
--- This is a consequence of how the parser parses all
--- data constructors as type constructors.
-childrenNameSpaces :: NameSpace -> (NameSpace -> Maybe Int)
-childrenNameSpaces ns other_ns
-  | other_ns == ns
-  = Just 0
-  | isTermVarOrFieldNameSpace ns
-  , isTermVarOrFieldNameSpace other_ns
-  = Just 0
-  | ns == varName
-  , other_ns == tcName
-  = Just 1
-  | ns == tcName
-  , other_ns == dataName
-  = Just (-1) -- try data namespace before type/class namespace
-  | otherwise
-  = Nothing
 
 -- This domain specific datatype is used to record why we decided it was
 -- possible that a GRE could be exported with a parent.
@@ -897,7 +837,7 @@ lookupSubBndrOcc :: DeprecationWarnings
 lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
   lookupExactOrOrig rdr_name (Right . greName) $
     -- This happens for built-in classes, see mod052 for example
-    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name relevant_ns
+    do { child <- lookupSubBndrOcc_helper True warn_if_deprec the_parent rdr_name what_lkup
        ; return $ case child of
            FoundChild g       -> Right (greName g)
            NameNotFound       -> Left (UnknownSubordinate doc)
@@ -905,22 +845,8 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
   where
-    -- We already mostly know the exact NameSpace we want. The only exception
-    -- is that sometimes we are looking up a symbolic variable name and might
-    -- want the symbolic type constructor, e.g. for an infix declaration
-    -- "infix +!" we want to take into account both class methods and associated
-    -- types. See test T10816.
-    relevant_ns :: NameSpace -> Maybe Int
-    relevant_ns other_ns
-      | ns == other_ns
-      = Just 0
-      | isVarNameSpace ns
-      , isTcClsNameSpace other_ns
-      = Just 1
-      | otherwise
-      = Nothing
-    ns = rdrNameSpace rdr_name
-
+    what_lkup = LookupChild { wantedParent       = the_parent
+                            , lookupDataConFirst = False }
 {-
 Note [Family instance binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1195,7 +1121,7 @@ lookup_demoted rdr_name
 --             ^^^^^^^^^^^
 report_qualified_term_in_types :: RdrName -> RdrName -> RnM Name
 report_qualified_term_in_types rdr_name demoted_rdr_name =
-  do { mName <- lookupGlobalOccRn_maybe (IncludeFields WantNormal False) demoted_rdr_name
+  do { mName <- lookupGlobalOccRn_maybe (RelevantGREsFOS WantNormal) demoted_rdr_name
      ; case mName of
          (Just _) -> termNameInType looking_for rdr_name demoted_rdr_name []
          Nothing -> unboundTermNameInTypes looking_for rdr_name demoted_rdr_name }
@@ -1307,14 +1233,14 @@ lookupOccRnX_maybe globalLookup wrapper rdr_name
 lookupOccRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 lookupOccRn_maybe =
   lookupOccRnX_maybe
-    (lookupGlobalOccRn_maybe $ IncludeFields WantNormal False)
+    (lookupGlobalOccRn_maybe $ RelevantGREsFOS WantNormal)
     return
 
 -- Used outside this module only by TH name reification (lookupName, lookupThName_maybe)
 lookupSameOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupSameOccRn_maybe =
   lookupOccRnX_maybe
-    (get_name <$> lookupGlobalOccRn_maybe SameOccName)
+    (get_name <$> lookupGlobalOccRn_maybe SameNameSpace)
     (return . greName)
   where
     get_name :: RnM (Maybe GlobalRdrElt) -> RnM (Maybe Name)
@@ -1364,7 +1290,7 @@ lookupGlobalOccRn :: RdrName -> RnM Name
 -- environment.
 --
 -- Used by exports_from_avail
-lookupGlobalOccRn = lookupGlobalOccRn' (IncludeFields WantNormal False)
+lookupGlobalOccRn = lookupGlobalOccRn' (RelevantGREsFOS WantNormal)
 
 lookupGlobalOccRn' :: WhichGREs GREInfo -> RdrName -> RnM Name
 lookupGlobalOccRn' which_gres rdr_name =
@@ -1374,10 +1300,10 @@ lookupGlobalOccRn' which_gres rdr_name =
       Just gre -> return (greName gre)
       Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
                     ; unboundName (LF which_suggest WL_Global) rdr_name }
-        where which_suggest = case which_gres of
-                IncludeFields WantBoth  _ -> WL_RecField
-                IncludeFields WantField _ -> WL_RecField
-                _                         -> WL_Anything
+        where which_suggest = case includeFieldSelectors which_gres of
+                WantBoth   -> WL_RecField
+                WantField  -> WL_RecField
+                WantNormal -> WL_Anything
 
 -- Looks up a RdrName occurrence in the GlobalRdrEnv and with
 -- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
@@ -1392,9 +1318,10 @@ lookupGlobalOccRn_base which_gres rdr_name =
                       -- and only happens for failed lookups
   where
     fos = case which_gres of
-      IncludeFields f_or_s _ -> f_or_s
-      AllNameSpaces          -> WantBoth
-      _                      -> WantNormal
+      RelevantGREs { includeFieldSelectors = sel } -> sel
+      _ -> if isFieldOcc (rdrNameOcc rdr_name)
+           then WantField
+           else WantNormal
 
 -- | Lookup a 'Name' in the 'GlobalRdrEnv', falling back to looking up
 -- in the type environment it if fails.
@@ -1420,7 +1347,7 @@ lookupInfoOccRn :: RdrName -> RnM [Name]
 lookupInfoOccRn rdr_name =
   lookupExactOrOrig rdr_name (\ gre -> [greName gre]) $
     do { rdr_env <- getGlobalRdrEnv
-       ; let nms = map greName $ lookupGRE_RdrName (IncludeFields WantBoth False) rdr_env rdr_name
+       ; let nms = map greName $ lookupGRE rdr_env (LookupRdrName rdr_name (RelevantGREsFOS WantBoth))
        ; qual_nms <- map greName <$> lookupQualifiedNameGHCi WantBoth rdr_name
        ; return $ nms ++ (qual_nms `minusList` nms) }
 
@@ -1437,7 +1364,7 @@ lookupFieldGREs env (L loc rdr)
   $ do { res <- lookupExactOrOrig rdr (\ gre -> maybeToList $ fieldGRE_maybe gre) $
            do { let (env_fld_gres, env_var_gres) =
                       partition isRecFldGRE $
-                      lookupGRE_RdrName (IncludeFields WantBoth False) env rdr
+                      lookupGRE env (LookupRdrName rdr (RelevantGREsFOS WantBoth))
 
               -- Handle implicit qualified imports in GHCi. See T10439.
               ; ghci_gres <- lookupQualifiedNameGHCi WantBoth rdr
@@ -1474,7 +1401,7 @@ lookupFieldGREs env (L loc rdr)
 lookupGlobalOccRn_overloaded :: RdrName -> RnM (Maybe GlobalRdrElt)
 lookupGlobalOccRn_overloaded rdr_name =
   lookupExactOrOrig_maybe rdr_name id $
-    do { res <- lookupGreRn_helper (IncludeFields WantNormal False) rdr_name AllDeprecationWarnings
+    do { res <- lookupGreRn_helper (RelevantGREsFOS WantNormal) rdr_name AllDeprecationWarnings
        ; case res of
            GreNotFound        -> lookupOneQualifiedNameGHCi WantNormal rdr_name
            OneNameMatch gre   -> return $ Just gre
@@ -1733,7 +1660,7 @@ is enabled then we defer the selection until the typechecker.
 lookupGreRn_helper :: WhichGREs GREInfo -> RdrName -> DeprecationWarnings -> RnM GreLookupResult
 lookupGreRn_helper which_gres rdr_name warn_if_deprec
   = do  { env <- getGlobalRdrEnv
-        ; case lookupGRE_RdrName which_gres env rdr_name of
+        ; case lookupGRE env (LookupRdrName rdr_name which_gres) of
             []    -> return GreNotFound
             [gre] -> do { addUsedGRE warn_if_deprec gre
                         ; return (OneNameMatch gre) }
@@ -1747,7 +1674,7 @@ lookupGreAvailRn :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Uses addUsedRdrName to record use and deprecations
 lookupGreAvailRn rdr_name
   = do
-      mb_gre <- lookupGreRn_helper (IncludeFields WantNormal False) rdr_name ExportDeprecationWarnings
+      mb_gre <- lookupGreRn_helper (RelevantGREsFOS WantNormal) rdr_name ExportDeprecationWarnings
       case mb_gre of
         GreNotFound ->
           do
@@ -1992,10 +1919,7 @@ lookupOneQualifiedNameGHCi fos rdr_name = do
 -- | Look up *all* the names to which the 'RdrName' may refer in GHCi (using
 -- @-fimplicit-import-qualified@).  This will normally be zero or one, but may
 -- be more in the presence of @DuplicateRecordFields@.
-lookupQualifiedNameGHCi :: HasDebugCallStack
-                        => FieldsOrSelectors
-                        -> RdrName -- ^ the 'RdrName' to look up
-                        -> RnM [GlobalRdrElt]
+lookupQualifiedNameGHCi :: HasDebugCallStack => FieldsOrSelectors -> RdrName -> RnM [GlobalRdrElt]
 lookupQualifiedNameGHCi fos rdr_name
   = -- We want to behave as we would for a source file import here,
     -- and respect hiddenness of modules/packages, hence loadSrcInterface.
@@ -2165,14 +2089,8 @@ lookupSigCtxtOccRn :: HsSigCtxt
                    -> RnM (GenLocated (SrcSpanAnn' ann) Name)
 lookupSigCtxtOccRn ctxt what
   = wrapLocMA $ \ rdr_name ->
-    do { let ns = rdrNameSpace rdr_name
-             -- For a term variable, also look in record field NameSpaces.
-             relevant_ns
-              | isTermVarOrFieldNameSpace ns
-              = isTermVarOrFieldNameSpace
-              | otherwise
-              = (== ns)
-       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name relevant_ns
+    do { let also_try_tycons = False
+       ; mb_names <- lookupBindGroupOcc ctxt what rdr_name also_try_tycons
        ; case mb_names of
            Right name NE.:| rest ->
              do { massertPpr (null rest) $
@@ -2185,25 +2103,27 @@ lookupSigCtxtOccRn ctxt what
 
 lookupBindGroupOcc :: HsSigCtxt
                    -> SDoc
-                   -> RdrName
-                   -> (NameSpace -> Bool)
+                   -> RdrName -- ^ what to look up
+                   -> Bool -- ^ if the 'RdrName' we are looking up is in
+                           -- a value 'NameSpace', should we also look up
+                           -- in the type constructor 'NameSpace'?
                    -> RnM (NE.NonEmpty (Either NotInScopeError Name))
--- Looks up the RdrName, expecting it to resolve to one of the
--- bound names passed in.  If not, return an appropriate error message
+-- ^ Looks up the 'RdrName', expecting it to resolve to one of the
+-- bound names currently in scope. If not, return an appropriate error message.
 --
--- See Note [Looking up signature names]
-lookupBindGroupOcc ctxt what rdr_name ok_ns
+-- See Note [Looking up signature names].
+lookupBindGroupOcc ctxt what rdr_name also_try_tycon_ns
   | Just n <- isExact_maybe rdr_name
-  = do { mb_nm <- fmap greName <$> lookupExactOcc_either n
-       ; return $ case mb_nm of
-          Left err -> NE.singleton $ Left err
-          Right n' -> finish (NoExactName n') n' }
+  = do { mb_gre <- lookupExactOcc_either n
+       ; return $ case mb_gre of
+          Left err  -> NE.singleton $ Left err
+          Right gre -> finish (NoExactName $ greName gre) gre }
       -- Maybe we should check the side conditions
       -- but it's a pain, and Exact things only show
       -- up when you know what you are doing
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = do { finish NotInScope <$> lookupOrig rdr_mod rdr_occ }
+  = do { NE.singleton . Right <$> lookupOrig rdr_mod rdr_occ }
 
   | otherwise
   = case ctxt of
@@ -2217,9 +2137,18 @@ lookupBindGroupOcc ctxt what rdr_name ok_ns
                           else lookup_top (`elemNameSet` ns)
   where
 
-    finish err n
-      | ok_ns (nameNameSpace n)
-      = NE.singleton (Right n)
+    ns = occNameSpace occ
+    occ = rdrNameOcc rdr_name
+    relevant_gres =
+      RelevantGREs
+        { includeFieldSelectors = WantBoth
+        , lookupVariablesForFields = True
+        , lookupTyConsAsWell = also_try_tycon_ns }
+    ok_gre = greIsRelevant relevant_gres ns
+
+    finish err gre
+      | ok_gre gre
+      = NE.singleton (Right $ greName gre)
       | otherwise
       = NE.singleton (Left err)
 
@@ -2230,14 +2159,13 @@ lookupBindGroupOcc ctxt what rdr_name ok_ns
 
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
-           ; let all_gres = filter (ok_ns . greNameSpace)
-                          $ lookupGRE_OccName AllNameSpaces env (rdrNameOcc rdr_name)
+           ; let occ = rdrNameOcc rdr_name
+                 all_gres = lookupGRE env (LookupOccName occ relevant_gres)
                  names_in_scope = -- If rdr_name lacks a binding, only
                                   -- recommend alternatives from relevant
                                   -- namespaces. See #17593.
-                                  filter (ok_ns . nameNameSpace)
-                                $ map greName
-                                $ filter isLocalGRE
+                                  map greName
+                                $ filter (ok_gre <&&> isLocalGRE)
                                 $ globalRdrEnvElts env
                  candidates_msg = candidates names_in_scope
            ; case filter (keep_me . greName) all_gres of
@@ -2269,8 +2197,8 @@ lookupBindGroupOcc ctxt what rdr_name ok_ns
       where
         similar_names
           = fuzzyLookup (unpackFS $ occNameFS $ rdrNameOcc rdr_name)
-                        $ map (\x -> ((unpackFS $ occNameFS $ nameOccName x), x))
-                              names_in_scope
+          $ map (\x -> ((unpackFS $ occNameFS $ nameOccName x), x))
+                names_in_scope
 
 
 ---------------
@@ -2281,8 +2209,9 @@ lookupLocalTcNames :: HsSigCtxt -> SDoc -> RdrName -> RnM [(RdrName, Name)]
 -- See Note [Fixity signature lookup]
 lookupLocalTcNames ctxt what rdr
   = do { this_mod <- getModule
+       ; let also_try_tycon_ns = True
        ; nms_eithers <- fmap (guard_builtin_syntax this_mod rdr) <$>
-                          lookupBindGroupOcc ctxt what rdr (rdrRelevantNameSpace rdr)
+                        lookupBindGroupOcc ctxt what rdr also_try_tycon_ns
        ; let (errs, names) = partitionEithers (NE.toList nms_eithers)
        ; when (null names) $
           addErr (head errs) -- Bleat about one only
@@ -2301,7 +2230,7 @@ lookupLocalTcNames ctxt what rdr
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName
 -- namespace.  This is useful when we aren't sure which we are looking at.
--- See also Note [rdrRelevantNameSpace and Exact Names]
+-- See also Note [dataTcOccs and Exact Names]
 dataTcOccs rdr_name
   | isDataOcc occ || isVarOcc occ
   = [rdr_name, rdr_name_tc]
@@ -2311,31 +2240,8 @@ dataTcOccs rdr_name
     occ = rdrNameOcc rdr_name
     rdr_name_tc = setRdrNameSpace rdr_name tcName
 
--- | Which 'NameSpace's should we consult when looking up this 'RdrName'?
---
--- For data constructor and term variable 'NameSpace's, also look in the TyCon
--- 'NameSpace', as explained in Note [rdrRelevantNameSpace and Exact Names].
---
--- For term variables, also look in the record field 'NameSpace's.
-rdrRelevantNameSpace :: RdrName -> NameSpace -> Bool
--- Return both the given name and the same name promoted to the TcClsName
--- namespace.  This is useful when we aren't sure which we are looking at.
--- See also Note [rdrRelevantNameSpace and Exact Names]
-rdrRelevantNameSpace rdr_name
-  | isDataOcc occ
-  = isDataConNameSpace <||> isTcClsNameSpace
-  | isVarOcc occ
-  = isTermVarOrFieldNameSpace <||> isTcClsNameSpace
-  | isFieldOcc occ
-  = isVarNameSpace <||> (== ns)
-  | otherwise
-  = (== ns)
-  where
-    occ = rdrNameOcc rdr_name
-    ns = occNameSpace occ
-
-{- Note [rdrRelevantNameSpace and Exact Names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [dataTcOccs and Exact Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Exact RdrNames can occur in code generated by Template Haskell, and generally
 those references are, well, exact. However, the TH `Name` type isn't expressive
 enough to always track the correct namespace information, so we sometimes get
@@ -2346,6 +2252,9 @@ There is also an awkward situation for built-in syntax. Example in GHCi
    :info []
 This parses as the Exact RdrName for nilDataCon, but we also want
 the list type constructor.
+
+Note that setRdrNameSpace on an Exact name requires the Name to be External,
+which it always is for built in syntax.
 -}
 
 {-

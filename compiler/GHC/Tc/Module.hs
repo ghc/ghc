@@ -958,9 +958,10 @@ checkHiBootIface'
               = Just (gre, Nothing)
             matching_flds
               | isVarOcc missing_occ -- (This only applies to variables.)
-              = lookupGRE_OccName (IncludeFields WantField False) gre_env missing_occ
+              = lookupGRE gre_env $
+                LookupOccName missing_occ (RelevantGREsFOS WantField)
               | otherwise
-              = []
+              = [] -- BootFldReexport T18999_NoDisambiguateRecordFields T16745A
 
         in case mapMaybe mb_ok $ matching_flds of
 
@@ -1750,7 +1751,7 @@ checkMainType tcg_env
     do { rdr_env <- getGlobalRdrEnv
        ; let dflags    = hsc_dflags hsc_env
              main_occ  = getMainOcc dflags
-             main_gres = lookupGRE_OccName SameOccName rdr_env main_occ
+             main_gres = lookupGRE rdr_env (LookupOccName main_occ SameNameSpace)
        ; case filter isLocalGRE main_gres of {
             []         -> return emptyWC ;
             (_:_:_)    -> return emptyWC ;

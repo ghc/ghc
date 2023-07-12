@@ -362,7 +362,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv
                             $ gresFromAvails hsc_env (Just imp_spec) (mi_exports iface)
-                    case lookupGRE_RdrName (IncludeFields WantNormal False) env rdr_name of
+                    case lookupGRE env (LookupRdrName rdr_name (RelevantGREsFOS WantNormal)) of
                         [gre] -> return (Just (greName gre, iface))
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"

@@ -97,7 +97,8 @@ mkQualName env = qual_name where
         = NameQual (greQualModName gre)
 
         | null qual_gres
-        = if null (lookupGRE_RdrName SameOccName env (mkRdrQual (moduleName mod) occ))
+        = if null $ lookupGRE env $
+               LookupRdrName (mkRdrQual (moduleName mod) occ) SameNameSpace
           then NameNotInScope1
           else NameNotInScope2
 
@@ -127,8 +128,8 @@ mkQualName env = qual_name where
 
         right_name gre = greDefinitionModule gre == Just mod
 
-        unqual_gres = lookupGRE_RdrName SameOccName env (mkRdrUnqual occ)
-        qual_gres   = filter right_name (lookupGRE_OccName SameOccName env occ)
+        unqual_gres = lookupGRE env (LookupRdrName (mkRdrUnqual occ) SameNameSpace)
+        qual_gres   = filter right_name (lookupGRE env (LookupOccName occ SameNameSpace))
 
     -- we can mention a module P:M without the P: qualifier iff
     -- "import M" would resolve unambiguously to P:M.  (if P is the
@@ -150,7 +151,7 @@ mkPromTick ptc env
       = ptcListTuplePuns ptc
 
       | Just occ' <- promoteOccName occ
-      , [] <- lookupGRE_RdrName SameOccName env (mkRdrUnqual occ')
+      , [] <- lookupGRE env (LookupRdrName (mkRdrUnqual occ') SameNameSpace)
       = -- Could not find a corresponding type name in the environment,
         -- so the data name is unambiguous. Promotion tick not needed.
         False
