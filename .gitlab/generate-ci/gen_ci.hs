@@ -228,16 +228,6 @@ debug = vanilla { buildFlavour = SlowValidate
                 , withNuma = True
                 }
 
-jsDebug :: BuildConfig -> BuildConfig
-jsDebug c = c { bignumBackend = Native
-              -- make the job a debug job
-              , buildFlavour   = SlowValidate
-              , withAssertions = True
-              }
-
-jsPerf :: BuildConfig -> BuildConfig
-jsPerf c = c { bignumBackend = Native }
-
 zstdIpe :: BuildConfig
 zstdIpe = vanilla { withZstd = True }
 
@@ -935,8 +925,10 @@ job_groups =
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Alpine) (splitSectionsBroken vanilla))
      , fullyStaticBrokenTests (disableValidate (allowFailureGroup (standardBuildsWithConfig Amd64 (Linux Alpine) staticNativeInt)))
      , validateBuilds Amd64 (Linux Debian11) (crossConfig "aarch64-linux-gnu" (Emulator "qemu-aarch64 -L /usr/aarch64-linux-gnu") Nothing)
-     , standardBuildsWithConfig Amd64 (Linux Debian11) (jsPerf $ crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
-     , validateBuilds Amd64 (Linux Debian11) (jsDebug $ crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure"))
+     , validateBuilds Amd64 (Linux Debian11) (crossConfig "javascript-unknown-ghcjs" (Emulator "js-emulator") (Just "emconfigure")
+        )
+        { bignumBackend = Native
+        }
      , make_wasm_jobs wasm_build_config
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {bignumBackend = Native}
@@ -1011,7 +1003,7 @@ platform_mapping = Map.map go $
     hasReleaseBuild (StandardTriple{}) = True
     hasReleaseBuild (ValidateOnly{}) = False
 
-data BindistInfo = BindistInfo { _bindistName :: String }
+data BindistInfo = BindistInfo { bindistName :: String }
 
 instance ToJSON BindistInfo where
   toJSON (BindistInfo n) = object [ "bindistName" A..= n ]
@@ -1026,7 +1018,6 @@ main = do
     ("metadata":as) -> write_result as platform_mapping
     _ -> error "gen_ci.hs <gitlab|metadata> [file.json]"
 
-write_result :: ToJSON a => [FilePath] -> a -> IO ()
 write_result as obj =
   (case as of
     [] -> B.putStrLn
