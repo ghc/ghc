@@ -2384,7 +2384,7 @@ mk_dict_err ctxt (item, (matches, unifiers, unsafe_overlapped)) = case (NE.nonEm
        | otherwise = []
 
     occ_name_in_scope glb_env lcl_env occ_name = not $
-      null (lookupGRE_OccName (IncludeFields WantNormal False) glb_env occ_name) &&
+      null (lookupGRE glb_env (LookupOccName occ_name (RelevantGREsFOS WantNormal))) &&
       isNothing (lookupLocalRdrOcc lcl_env occ_name)
 
     record_field = case orig of

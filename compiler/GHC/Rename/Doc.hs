@@ -8,7 +8,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.SrcLoc
 import GHC.Tc.Utils.Monad (getGblEnv)
-import GHC.Rename.Env
 
 rnLHsDoc :: LHsDoc GhcPs -> RnM (LHsDoc GhcRn)
 rnLHsDoc = traverse rnHsDoc
@@ -41,6 +40,5 @@ rnHsDocIdentifiers :: GlobalRdrEnv
 rnHsDocIdentifiers gre_env ns =
   [ L l $ greName gre
   | L l rdr_name <- ns
-  , gre <- lookupGRE_RdrName AllNameSpaces gre_env rdr_name
-  , rdrRelevantNameSpace rdr_name $ greNameSpace gre
+  , gre <- lookupGRE gre_env (LookupOccName (rdrNameOcc rdr_name) AllRelevantGREs)
   ]

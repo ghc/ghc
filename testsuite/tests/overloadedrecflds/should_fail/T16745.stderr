@@ -6,9 +6,9 @@
 T16745A.hs:8:9: error: [GHC-87543]
     Ambiguous occurrence ‘field’.
     It could refer to
-       either ‘T16745B.field’,
+       either the field ‘field’ of record ‘T16745B.R’,
               imported from ‘T16745B’ at T16745A.hs:3:24-28
-              (and originally defined in ‘T16745C’ at T16745C.hs:2:1-5),
-           or the field ‘field’ of record ‘T16745B.R’,
+              (and originally defined at T16745B.hs:11:14-18),
+           or ‘T16745B.field’,
               imported from ‘T16745B’ at T16745A.hs:3:24-28
-              (and originally defined at T16745B.hs:11:14-18).
+              (and originally defined in ‘T16745C’ at T16745C.hs:2:1-5).

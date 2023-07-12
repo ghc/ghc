@@ -212,7 +212,7 @@ fieldSelectorSuggestions global_env tried_rdr_name
   | otherwise = [RemindFieldSelectorSuppressed tried_rdr_name parents]
   where
     gres = filter isNoFieldSelectorGRE
-         $ lookupGRE_RdrName (IncludeFields WantField False) global_env tried_rdr_name
+         $ lookupGRE global_env (LookupRdrName tried_rdr_name AllRelevantGREs)
     parents = [ parent | ParentIs parent <- map greParent gres ]
 
 similarNameSuggestions :: LookingFor -> DynFlags
@@ -355,7 +355,8 @@ importSuggestions looking_for global_env hpt currMod imports rdr_name
   helpful_imports = filter helpful interesting_imports
     where helpful (_,imv)
             = any (isGreOk looking_for) $
-              lookupGRE_OccName (IncludeFields WantNormal True) (imv_all_exports imv) occ_name
+              lookupGRE (imv_all_exports imv)
+                (LookupOccName occ_name $ RelevantGREsFOS WantNormal)
 
   -- Which of these do that because of an explicit hiding list resp. an
   -- explicit import list

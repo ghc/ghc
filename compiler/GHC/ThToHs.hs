@@ -31,7 +31,6 @@ where
 import GHC.Prelude hiding (init, last, tail)
 
 import GHC.Hs as Hs
-import GHC.Builtin.Names
 import GHC.Tc.Errors.Types
 import GHC.Types.Name.Reader
 import qualified GHC.Types.Name as Name

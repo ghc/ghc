@@ -419,7 +419,8 @@ prototyping safe newtype-coercions: GHC.NT.Type.NT was imported, but could not
 be looked up /by the plugin/.
 
    let rdrName = mkModuleName "GHC.NT.Type" `mkRdrQual` mkTcOcc "NT"
-   putMsgS $ showSDoc dflags $ ppr $ lookupGRE_RdrName rdrName $ mg_rdr_env guts
+   putMsgS $ showSDoc dflags $ ppr $
+     lookupGRE (mg_rdr_env guts) (LookupRdrName rdrName AllRelevantGREs)
 
 `mkTcOcc` involves the lookup (or creation) of a FastString.  Since the
 plugin's FastString.string_table is empty, constructing the RdrName also

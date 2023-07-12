@@ -160,7 +160,7 @@ checkHsigIface tcg_env gre_env sig_iface
       -- The hsig did NOT define this function; that means it must
       -- be a reexport.  In this case, make sure the 'Name' of the
       -- reexport matches the 'Name' exported here.
-      | [gre] <- lookupGRE_OccName (IncludeFields WantNormal True) gre_env (nameOccName name) = do
+      | [gre] <- lookupGRE gre_env (LookupOccName (nameOccName name) SameNameSpace) = do
         let name' = greName gre
         when (name /= name') $ do
             -- See Note [Error reporting bad reexport]
@@ -741,7 +741,7 @@ mergeSignatures
     -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
     let fix_env = mkNameEnv [ (greName rdr_elt, FixItem occ f)
                             | (occ, f) <- concatMap mi_fixities ifaces
-                            , rdr_elt <- lookupGRE_OccName (IncludeFields WantBoth True) rdr_env occ ]
+                            , rdr_elt <- lookupGRE rdr_env (LookupOccName occ AllRelevantGREs) ]
 
     -- STEP 5: Typecheck the interfaces
     let type_env_var = tcg_type_env_var tcg_env
@@ -955,7 +955,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (greName rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
-                            , rdr_elt <- lookupGRE_OccName (IncludeFields WantBoth True) impl_gr occ ]
+                            , rdr_elt <- lookupGRE impl_gr (LookupOccName occ AllRelevantGREs) ]
     updGblEnv (\tcg_env -> tcg_env {
         -- Setting tcg_rdr_env to treat all exported entities from
         -- the implementing module as in scope improves error messages,
@@ -989,7 +989,7 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
-        case lookupGRE_OccName SameOccName impl_gr occ of
+        case lookupGRE impl_gr (LookupOccName occ SameNameSpace) of
             [] -> addErr $ TcRnHsigMissingModuleExport occ unit_state impl_mod
             _ -> return ()
     failIfErrsM
