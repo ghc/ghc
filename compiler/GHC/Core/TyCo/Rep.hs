@@ -969,9 +969,15 @@ instance Outputable Coercion where
   ppr = pprCo
 
 instance Outputable CoSel where
-  ppr (SelTyCon n _r) = text "Tc" <> parens (int n)
-  ppr SelForAll       = text "All"
-  ppr (SelFun fs)     = text "Fun" <> parens (ppr fs)
+  ppr (SelTyCon n r) = text "Tc" <> parens (int n <> comma <> pprOneCharRole r)
+  ppr SelForAll      = text "All"
+  ppr (SelFun fs)    = text "Fun" <> parens (ppr fs)
+
+
+pprOneCharRole :: Role -> SDoc
+pprOneCharRole Nominal          = char 'N'
+pprOneCharRole Representational = char 'R'
+pprOneCharRole Phantom          = char 'P'
 
 instance Outputable FunSel where
   ppr SelMult = text "mult"
@@ -1085,7 +1091,7 @@ SelTyCon, SelForAll, and SelFun.
       r = tyConRole tc r0 i
       i < n    (i is zero-indexed)
       ----------------------------------
-      SelCo (SelTyCon i r) : si ~r ti
+      SelCo (SelTyCon i r) co : si ~r ti
 
   "Not a newtype": see Note [SelCo and newtypes]
   "Not an arrow type": see SelFun below
@@ -1095,7 +1101,7 @@ SelTyCon, SelForAll, and SelFun.
 * SelForAll:
       co : forall (a:k1).t1 ~r0 forall (a:k2).t2
       ----------------------------------
-      SelCo SelForAll : k1 ~N k2
+      SelCo SelForAll co : k1 ~N k2
 
   NB: SelForAll always gives a Nominal coercion.
 
@@ -1105,17 +1111,17 @@ SelTyCon, SelForAll, and SelFun.
       co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
       r = funRole r0 SelMult
       ----------------------------------
-      SelCo (SelFun SelMult) : m1 ~r m2
+      SelCo (SelFun SelMult) co : m1 ~r m2
 
       co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
       r = funRole r0 SelArg
       ----------------------------------
-      SelCo (SelFun SelArg) : s1 ~r s2
+      SelCo (SelFun SelArg) co : s1 ~r s2
 
       co : (s1 %{m1}-> t1) ~r0 (s2 %{m2}-> t2)
       r = funRole r0 SelRes
       ----------------------------------
-      SelCo (SelFun SelRes) : t1 ~r t2
+      SelCo (SelFun SelRes) co : t1 ~r t2
 
 Note [FunCo]
 ~~~~~~~~~~~~

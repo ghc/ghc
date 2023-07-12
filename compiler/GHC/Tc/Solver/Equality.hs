@@ -49,7 +49,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad
-import GHC.Utils.Constants( debugIsOn )
 
 import GHC.Data.Pair
 import GHC.Data.Bag
@@ -104,12 +103,7 @@ solveEquality :: CtEvidence -> EqRel -> Type -> Type
               -> SolverStage Void
 solveEquality ev eq_rel ty1 ty2
   = do { Pair ty1' ty2' <- zonkEqTypes ev eq_rel ty1 ty2
-       ; let ev' | debugIsOn = setCtEvPredType ev $
-                               mkPrimEqPredRole (eqRelRole eq_rel) ty1' ty2'
-                 | otherwise = ev
-                   -- ev': satisfy the precondition of can_eq_nc
-
-       ; mb_canon <- canonicaliseEquality ev' eq_rel ty1' ty2'
+       ; mb_canon <- canonicaliseEquality ev eq_rel ty1' ty2'
 
        ; case mb_canon of {
 
@@ -289,10 +283,10 @@ canonicaliseEquality
    :: CtEvidence -> EqRel
    -> Type -> Type     -- LHS and RHS
    -> SolverStage (Either IrredCt EqCt)
--- Precondition: in DEBUG mode, the `ctev_pred` of `ev` is (ps_ty1 ~# ps_ty2),
---               without zonking
--- This precondition is needed (only in DEBUG) to satisfy the assertions
---   in mkSelCo, called in canDecomposableTyConAppOK and canDecomposableFunTy
+-- Nota Bene: `ty1` and `ty2` may be more-zonked than `ev`
+-- This matters when calling mkSelCo, in canDecomposableTyConAppOK and
+--   canDecomposableFunTy, when we need the precondition of mkSelCo to
+--   hold.
 
 canonicaliseEquality ev eq_rel ty1 ty2
   = Stage $ do { traceTcS "canonicaliseEquality" $
@@ -362,10 +356,10 @@ can_eq_nc _rewritten _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel
-           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
-           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
+           ty1@(FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _ps_ty1
+           ty2@(FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _ps_ty2
   | af1 == af2  -- See Note [Decomposing FunTy]
-  = canDecomposableFunTy ev eq_rel af1 (am1,ty1a,ty1b) (am2,ty2a,ty2b)
+  = canDecomposableFunTy ev eq_rel af1 (ty1,am1,ty1a,ty1b) (ty2,am2,ty2a,ty2b)
 
 -- Decompose type constructor applications
 -- NB: we have expanded type synonyms already
@@ -384,7 +378,7 @@ can_eq_nc rewritten _rdr_env _envs ev eq_rel ty1 _ ty2 _
   , let role            = eqRelRole eq_rel
         both_generative = isGenerativeTyCon tc1 role && isGenerativeTyCon tc2 role
   , rewritten || both_generative
-  = canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
+  = canTyConApp ev eq_rel both_generative (ty1,tc1,tys1) (ty2,tc2,tys2)
 
 can_eq_nc _rewritten _rdr_env _envs ev eq_rel
            s1@ForAllTy{} _
@@ -822,19 +816,19 @@ canEqCast rewritten rdr_env envs ev eq_rel swapped ty1 co1 ty2 ps_ty2
 
 ------------------------
 canTyConApp :: CtEvidence -> EqRel
-            -> Bool  -- Both TyCons are generative
-            -> TyCon -> [TcType]
-            -> TyCon -> [TcType]
+            -> Bool  -- True <=> both TyCons are generative
+            -> (Type,TyCon,[TcType])
+            -> (Type,TyCon,[TcType])
             -> TcS (StopOrContinue (Either IrredCt EqCt))
 -- See Note [Decomposing TyConApp equalities]
 -- Neither tc1 nor tc2 is a saturated funTyCon, nor a type family
 -- But they can be data families.
-canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
+canTyConApp ev eq_rel both_generative (ty1,tc1,tys1) (ty2,tc2,tys2)
   | tc1 == tc2
   , tys1 `equalLength` tys2
   = do { inerts <- getInertSet
        ; if can_decompose inerts
-         then canDecomposableTyConAppOK ev eq_rel tc1 tys1 tys2
+         then canDecomposableTyConAppOK ev eq_rel tc1 (ty1,tys1) (ty2,tys2)
          else canEqSoftFailure ev eq_rel ty1 ty2 }
 
   -- See Note [Skolem abstract data] in GHC.Core.Tycon
@@ -848,13 +842,6 @@ canTyConApp ev eq_rel both_generative tc1 tys1 tc2 tys2
     then canEqHardFailure ev ty1 ty2
     else canEqSoftFailure ev eq_rel ty1 ty2
   where
-    -- Reconstruct the types for error messages. This would do
-    -- the wrong thing (from a pretty printing point of view)
-    -- for functions, because we've lost the FunTyFlag; but
-    -- in fact we never call canTyConApp on a saturated FunTyCon
-    ty1 = mkTyConApp tc1 tys1
-    ty2 = mkTyConApp tc2 tys2
-
      -- See Note [Decomposing TyConApp equalities]
      -- and Note [Decomposing newtype equalities]
     can_decompose inerts
@@ -1307,10 +1294,11 @@ Extra points
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
-                          -> TyCon -> [TcType] -> [TcType]
+                          -> TyCon
+                          -> (Type,[TcType]) -> (Type,[TcType])
                           -> TcS (StopOrContinue a)
 -- Precondition: tys1 and tys2 are the same finite length, hence "OK"
-canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
+canDecomposableTyConAppOK ev eq_rel tc (ty1,tys1) (ty2,tys2)
   = assert (tys1 `equalLength` tys2) $
     do { traceTcS "canDecomposableTyConAppOK"
                   (ppr ev $$ ppr eq_rel $$ ppr tc $$ ppr tys1 $$ ppr tys2)
@@ -1327,7 +1315,11 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                    ; setWantedEq dest co }
 
            CtGiven { ctev_evar = evar }
-             | let ev_co = mkCoVarCo evar
+             | let pred_ty = mkPrimEqPredRole (eqRelRole eq_rel) ty1 ty2
+                   ev_co   = mkCoVarCo (setVarType evar pred_ty)
+                   -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
+                   -- Remember: ty1/ty2 may be more fully zonked than evar
+                   --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
                        [ (r, ty1, ty2, mkSelCo (SelTyCon i r) ev_co)
                        | (r, ty1, ty2, i) <- zip4 tc_roles tys1 tys2 [0..]
@@ -1363,10 +1355,10 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
                ++ repeat loc
 
 canDecomposableFunTy :: CtEvidence -> EqRel -> FunTyFlag
-                     -> (Type,Type,Type)   -- (multiplicity,arg,res)
-                     -> (Type,Type,Type)   -- (multiplicity,arg,res)
+                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
+                     -> (Type,Type,Type,Type)   -- (fun_ty,multiplicity,arg,res)
                      -> TcS (StopOrContinue a)
-canDecomposableFunTy ev eq_rel af f1@(m1,a1,r1) f2@(m2,a2,r2)
+canDecomposableFunTy ev eq_rel af f1@(ty1,m1,a1,r1) f2@(ty2,m2,a2,r2)
   = do { traceTcS "canDecomposableFunTy"
                   (ppr ev $$ ppr eq_rel $$ ppr f1 $$ ppr f2)
        ; case ev of
@@ -1381,7 +1373,11 @@ canDecomposableFunTy ev eq_rel af f1@(m1,a1,r1) f2@(m2,a2,r2)
                    ; setWantedEq dest co }
 
            CtGiven { ctev_evar = evar }
-             | let ev_co = mkCoVarCo evar
+             | let pred_ty = mkPrimEqPredRole (eqRelRole eq_rel) ty1 ty2
+                   ev_co   = mkCoVarCo (setVarType evar pred_ty)
+                   -- setVarType: satisfy Note [mkSelCo precondition] in Coercion.hs
+                   -- Remember: ty1/ty2 may be more fully zonked than evar
+                   --           See the call to canonicaliseEquality in solveEquality.
              -> emitNewGivens loc
                        [ (funRole role fs, ty1, ty2, mkSelCo (SelFun fs) ev_co)
                        | (fs, ty1, ty2) <- [ (SelMult, m1, m2)

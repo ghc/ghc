@@ -37,7 +37,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkSelCo, getNthFun, getNthFromType, mkLRCo,
+        mkSelCo, mkSelCoResRole, getNthFun, selectFromType, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo,
         mkFunCo, mkFunCo2, mkFunCoNoFTF, mkFunResCo,
         mkNakedFunCo,
@@ -555,6 +555,10 @@ splitForAllCo_maybe :: Coercion -> Maybe (TyCoVar, ForAllTyFlag, ForAllTyFlag, C
 splitForAllCo_maybe (ForAllCo { fco_tcv = tv, fco_visL = vL, fco_visR = vR
                               , fco_kind = k_co, fco_body = co })
   = Just (tv, vL, vR, k_co, co)
+splitForAllCo_maybe co
+  | Just (ty, r)        <- isReflCo_maybe co
+  , Just (Bndr tcv vis, body_ty) <- splitForAllForAllTyBinder_maybe ty
+  = Just (tcv, vis, vis, mkNomReflCo (varType tcv), mkReflCo r body_ty)
 splitForAllCo_maybe _ = Nothing
 
 -- | Like 'splitForAllCo_maybe', but only returns Just for tyvar binder
@@ -572,7 +576,6 @@ splitForAllCo_co_maybe co
   , isCoVar cv
   = Just stuff
 splitForAllCo_co_maybe _ = Nothing
-
 
 -------------------------------------------------------
 -- and some coercion kind stuff
@@ -1114,12 +1117,18 @@ mkUnivCo prov role ty1 ty2
 --   a kind of @t1 ~ t2@ becomes the kind @t2 ~ t1@.
 mkSymCo :: Coercion -> Coercion
 
--- Do a few simple optimizations, but don't bother pushing occurrences
--- of symmetry to the leaves; the optimizer will take care of that.
-mkSymCo co | isReflCo co          = co
-mkSymCo    (SymCo co)             = co
-mkSymCo    (SubCo (SymCo co))     = SubCo co
-mkSymCo co                        = SymCo co
+-- Do a few simple optimizations, mainly to expose the underlying
+-- constructors to other 'mk' functions.  E.g.
+--   mkInstCo (mkSymCo (ForAllCo ...)) ty
+-- We want to push the SymCo inside the ForallCo, so that we can instantiate
+-- This can make a big difference.  E.g without coercion optimisation, GHC.Read
+-- totally explodes; but when we push Sym inside ForAll, it's fine.
+mkSymCo co | isReflCo co   = co
+mkSymCo (SymCo co)         = co
+mkSymCo (SubCo (SymCo co)) = SubCo co
+mkSymCo co@(ForAllCo { fco_kind = kco, fco_body = body_co })
+  | isReflCo kco           = co { fco_body = mkSymCo body_co }
+mkSymCo co                 = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
@@ -1130,30 +1139,32 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCo co1 co2                = TransCo co1 co2
 
+--------------------
+{- Note [mkSelCo precondition]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To satisfy the Purely Kinded Type Invariant (PKTI), we require that
+  in any call (mkSelCo cs co)
+  * selectFromType cs (coercionLKind co) works
+  * selectFromType cs (coercionRKind co) works
+  * and hence coercionKind (SelCo cs co) works (PKTI)
+-}
+
 mkSelCo :: HasDebugCallStack
         => CoSel
         -> Coercion
         -> Coercion
+-- See Note [mkSelCo precondition]
 mkSelCo n co = mkSelCo_maybe n co `orElse` SelCo n co
 
 mkSelCo_maybe :: HasDebugCallStack
         => CoSel
         -> Coercion
         -> Maybe Coercion
--- mkSelCo_maybe tries to optimise call to mkSelCo
+-- Note [mkSelCo precondition]
 mkSelCo_maybe cs co
   = assertPpr (good_call cs) bad_call_msg $
     go cs co
   where
-    Pair ty1 ty2 = coercionKind co
-
-    go cs co
-      | Just (ty, _co_role) <- isReflCo_maybe co
-      = let new_role = coercionRole (SelCo cs co)
-        in Just (mkReflCo new_role (getNthFromType cs ty))
-        -- The role of the result (new_role) does not have to
-        -- be equal to _co_role, the role of co, per Note [SelCo].
-        -- This was revealed by #23938.
 
     go SelForAll (ForAllCo { fco_kind = kind_co })
       = Just kind_co
@@ -1173,9 +1184,30 @@ mkSelCo_maybe cs co
     go cs (SymCo co)  -- Recurse, hoping to get to a TyConAppCo or FunCo
       = do { co' <- go cs co; return (mkSymCo co') }
 
-    go _ _ = Nothing
+    go cs co
+      | Just (ty, co_role) <- isReflCo_maybe co
+      = Just (mkReflCo (mkSelCoResRole cs co_role) (selectFromType cs ty))
+        -- mkSelCoreResRole: The role of the result may not be
+        -- be equal to co_role, the role of co, per Note [SelCo].
+        -- This was revealed by #23938.
 
-    -- Assertion checking
+      | Pair ty1 ty2 <- coercionKind co
+      , let sty1    = selectFromType cs ty1
+            sty2    = selectFromType cs ty2
+            co_role = coercionRole co
+      , sty1 `eqType` sty2
+      = Just (mkReflCo (mkSelCoResRole cs co_role) sty1)
+            -- Checking for fully reflexive-ness (by seeing if sty1=sty2)
+            -- is worthwhile, because a non-Refl coercion `co` may well have a
+            -- reflexive (SelCo cs co).
+            -- E.g. co :: Either a b ~ Either a c
+            --      Then (SubCo (SelTyCon 0) co) is reflexive
+
+      | otherwise = Nothing
+
+    ----------- Assertion checking --------------
+    -- NB: using coercionKind requires Note [mkSelCo precondition]
+    Pair ty1 ty2 = coercionKind co
     bad_call_msg = vcat [ text "Coercion =" <+> ppr co
                         , text "LHS ty =" <+> ppr ty1
                         , text "RHS ty =" <+> ppr ty2
@@ -1204,6 +1236,14 @@ mkSelCo_maybe cs co
 
     good_call _ = False
 
+mkSelCoResRole :: CoSel -> Role -> Role
+-- What is the role of (SelCo cs co), if co has role 'r'?
+-- It is not just 'r'!
+-- c.f. the SelCo case of coercionRole
+mkSelCoResRole SelForAll       _ = Nominal
+mkSelCoResRole (SelTyCon _ r') _ = r'
+mkSelCoResRole (SelFun fs)     r = funRole r fs
+
 -- | Extract the nth field of a FunCo
 getNthFun :: FunSel
           -> a    -- ^ multiplicity
@@ -1214,6 +1254,24 @@ getNthFun SelMult mult _   _   = mult
 getNthFun SelArg _     arg _   = arg
 getNthFun SelRes _     _   res = res
 
+selectFromType :: HasDebugCallStack => CoSel -> Type -> Type
+selectFromType (SelFun fs) ty
+  | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
+  = getNthFun fs mult arg res
+
+selectFromType (SelTyCon n _) ty
+  | Just args <- tyConAppArgs_maybe ty
+  = assertPpr (args `lengthExceeds` n) (ppr n $$ ppr ty) $
+    args `getNth` n
+
+selectFromType SelForAll ty       -- Works for both tyvar and covar
+  | Just (tv,_) <- splitForAllTyCoVar_maybe ty
+  = tyVarKind tv
+
+selectFromType cs ty
+  = pprPanic "selectFromType" (ppr cs $$ ppr ty)
+
+--------------------
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr co
   | Just (ty, eq) <- isReflCo_maybe co
@@ -1222,11 +1280,14 @@ mkLRCo lr co
   = LRCo lr co
 
 -- | Instantiates a 'Coercion'.
+-- Works for both tyvar and covar
 mkInstCo :: Coercion -> CoercionN -> Coercion
-mkInstCo (ForAllCo { fco_tcv = tcv, fco_body = body_co }) co
-  | Just (arg, _) <- isReflCo_maybe co
-      -- works for both tyvar and covar
-  = substCoUnchecked (zipTCvSubst [tcv] [arg]) body_co
+mkInstCo co_fun co_arg
+  | Just (tcv, _, _, kind_co, body_co) <- splitForAllCo_maybe co_fun
+  , Just (arg, _) <- isReflCo_maybe co_arg
+  = assertPpr (isReflexiveCo kind_co) (ppr co_fun $$ ppr co_arg) $
+       -- If the arg is Refl, then kind_co must be reflexive too
+    substCoUnchecked (zipTCvSubst [tcv] [arg]) body_co
 mkInstCo co arg = InstCo co arg
 
 -- | Given @ty :: k1@, @co :: k1 ~ k2@,
@@ -2412,7 +2473,7 @@ coercionLKind co
     go (InstCo aco arg)          = go_app aco [go arg]
     go (KindCo co)               = typeKind (go co)
     go (SubCo co)                = go co
-    go (SelCo d co)              = getNthFromType d (go co)
+    go (SelCo d co)              = selectFromType d (go co)
     go (AxiomInstCo ax ind cos)  = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)      = pFst $ expectJust "coercionKind" $
                                    coaxrProves ax $ map coercionKind cos
@@ -2435,23 +2496,6 @@ coercionLKind co
     go_app (InstCo co arg) args = go_app co (go arg:args)
     go_app co              args = piResultTys (go co) args
 
-getNthFromType :: HasDebugCallStack => CoSel -> Type -> Type
-getNthFromType (SelFun fs) ty
-  | Just (_af, mult, arg, res) <- splitFunTy_maybe ty
-  = getNthFun fs mult arg res
-
-getNthFromType (SelTyCon n _) ty
-  | Just args <- tyConAppArgs_maybe ty
-  = assertPpr (args `lengthExceeds` n) (ppr n $$ ppr ty) $
-    args `getNth` n
-
-getNthFromType SelForAll ty       -- Works for both tyvar and covar
-  | Just (tv,_) <- splitForAllTyCoVar_maybe ty
-  = tyVarKind tv
-
-getNthFromType cs ty
-  = pprPanic "getNthFromType" (ppr cs $$ ppr ty)
-
 coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
@@ -2473,7 +2517,7 @@ coercionRKind co
     go (InstCo aco arg)          = go_app aco [go arg]
     go (KindCo co)               = typeKind (go co)
     go (SubCo co)                = go co
-    go (SelCo d co)              = getNthFromType d (go co)
+    go (SelCo d co)              = selectFromType d (go co)
     go (AxiomInstCo ax ind cos)  = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)      = pSnd $ expectJust "coercionKind" $
                                    coaxrProves ax $ map coercionKind cos
@@ -2579,9 +2623,7 @@ coercionRole = go
     go (UnivCo _ r _ _)             = r
     go (SymCo co)                   = go co
     go (TransCo co1 _co2)           = go co1
-    go (SelCo SelForAll      _co)   = Nominal
-    go (SelCo (SelTyCon _ r) _co)   = r
-    go (SelCo (SelFun fs)     co)   = funRole (coercionRole co) fs
+    go (SelCo cs co)                = mkSelCoResRole cs (coercionRole co)
     go (LRCo {})                    = Nominal
     go (InstCo co _)                = go co
     go (KindCo {})                  = Nominal

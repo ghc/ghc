@@ -266,41 +266,28 @@ mkPiMCo v (MCo co) = MCo (mkPiCo Representational v co)
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: HasDebugCallStack => CoreExpr -> CoercionR -> CoreExpr
-mkCast e co
-  | assertPpr (coercionRole co == Representational)
-              (text "coercion" <+> ppr co <+> text "passed to mkCast"
-               <+> ppr e <+> text "has wrong role" <+> ppr (coercionRole co)) $
-    isReflCo co
-  = e
-
-mkCast (Coercion e_co) co
-  | isCoVarType (coercionRKind co)
-       -- The guard here checks that g has a (~#) on both sides,
-       -- otherwise decomposeCo fails.  Can in principle happen
-       -- with unsafeCoerce
-  = Coercion (mkCoCast e_co co)
-
-mkCast (Cast expr co2) co
-  = warnPprTrace (let { from_ty = coercionLKind co;
-                        to_ty2  = coercionRKind co2 } in
-                     not (from_ty `eqType` to_ty2))
-             "mkCast"
-             (vcat ([ text "expr:" <+> ppr expr
-                   , text "co2:" <+> ppr co2
-                   , text "co:" <+> ppr co ])) $
-    mkCast expr (mkTransCo co2 co)
-
-mkCast (Tick t expr) co
-   = Tick t (mkCast expr co)
 
 mkCast expr co
-  = let from_ty = coercionLKind co in
-    warnPprTrace (not (from_ty `eqType` exprType expr))
+  = assertPpr (coercionRole co == Representational)
+              (text "coercion" <+> ppr co <+> text "passed to mkCast"
+               <+> ppr expr <+> text "has wrong role" <+> ppr (coercionRole co)) $
+    warnPprTrace (not (coercionLKind co `eqType` exprType expr))
           "Trying to coerce" (text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
           $$ ppr co $$ ppr (coercionType co)
           $$ callStackDoc) $
-    (Cast expr co)
+    case expr of
+      Cast expr co2 -> mkCast expr (mkTransCo co2 co)
+      Tick t expr   -> Tick t (mkCast expr co)
+
+      Coercion e_co | isCoVarType (coercionRKind co)
+         -- The guard here checks that g has a (~#) on both sides,
+         -- otherwise decomposeCo fails.  Can in principle happen
+         -- with unsafeCoerce
+                      -> Coercion (mkCoCast e_co co)
+
+      _ | isReflCo co -> expr
+        | otherwise   -> Cast expr co
 
 
 {- *********************************************************************
