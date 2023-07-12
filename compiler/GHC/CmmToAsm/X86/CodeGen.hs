@@ -972,21 +972,20 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = -- dyadic MachOps
          -- multiplication doesn't use two registers.
          --
          -- The plan is:
-         -- 1. truncate and sign-extend a and b to 8bit width
-         -- 2. multiply a' = a * b in 32bit width
-         -- 3. copy and sign-extend 8bit from a' to c
-         -- 4. compare a' and c: they are equal if there was no overflow
+         -- 1. multiply b1 = a * b where b1 has 16bit width
+         -- 2. subtract b2 = b1 - (-128)
+         -- (this has shorter machine code than b1 + 128)
+         -- 3. compare b2 > 255 unsigned
+         -- This is equivalent to checking b1 < -128 || 127 < b1
          (a_reg, a_code) <- getNonClobberedReg a
-         (b_reg, b_code) <- getNonClobberedReg b
+         b_code <- getAnyReg b
          let
-             code = a_code `appOL` b_code `appOL`
+             code = a_code `appOL` b_code eax `appOL`
                         toOL [
-                           MOVSxL II8 (OpReg a_reg) (OpReg a_reg),
-                           MOVSxL II8 (OpReg b_reg) (OpReg b_reg),
-                           IMUL II32 (OpReg b_reg) (OpReg a_reg),
-                           MOVSxL II8 (OpReg a_reg) (OpReg eax),
-                           CMP II16 (OpReg a_reg) (OpReg eax),
-                           SETCC NE (OpReg eax)
+                           IMUL2 II8 (OpReg a_reg),   -- result in %ax
+                           SUB II16 (OpImm (ImmInt (-128))) (OpReg eax),
+                           CMP II16 (OpImm (ImmInt 255)) (OpReg eax),
+                           SETCC GU (OpReg eax)
                         ]
          return (Fixed II8 eax code)
     imulMayOflo rep a b = do

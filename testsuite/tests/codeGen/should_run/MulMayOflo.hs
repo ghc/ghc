@@ -23,4 +23,4 @@ import GHC.Exts
 foreign import prim "runCmmzh" runCmmzh# :: Word# -> Word#
 
 main :: IO ()
-main = print . show $ W# (runCmmzh# 42##)
+main = W# (runCmmzh# 42##) `seq` pure ()
