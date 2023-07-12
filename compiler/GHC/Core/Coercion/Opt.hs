@@ -24,10 +24,8 @@ import GHC.Core.Unify
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Types.Unique.Set
 
 import GHC.Data.Pair
-import GHC.Data.List.SetOps ( getNth )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Constants (debugIsOn)
@@ -132,17 +130,19 @@ optCoercion :: OptCoercionOpts -> Subst -> Coercion -> NormalCo
 optCoercion opts env co
   | optCoercionEnabled opts
   = optCoercion' env co
+
 {-
-  = pprTrace "optCoercion {" (text "Co:" <+> ppr co) $
+  = pprTrace "optCoercion {" (text "Co:" <> ppr (coercionSize co)) $
     let result = optCoercion' env co in
-    pprTrace "optCoercion }" (vcat [ text "Co:" <+> ppr co
-                                   , text "Optco:" <+> ppr result ]) $
+    pprTrace "optCoercion }"
+       (vcat [ text "Co:"    <+> ppr (coercionSize co)
+             , text "Optco:" <+> ppWhen (isReflCo result) (text "(refl)")
+                             <+> ppr (coercionSize result) ]) $
     result
 -}
 
   | otherwise
   = substCo env co
-
 
 optCoercion' :: Subst -> Coercion -> NormalCo
 optCoercion' env co
@@ -150,27 +150,30 @@ optCoercion' env co
   = let out_co = opt_co1 lc False co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
         (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
+
+        details = vcat [ text "in_co:" <+> ppr co
+                       , text "in_ty1:" <+> ppr in_ty1
+                       , text "in_ty2:" <+> ppr in_ty2
+                       , text "out_co:" <+> ppr out_co
+                       , text "out_ty1:" <+> ppr out_ty1
+                       , text "out_ty2:" <+> ppr out_ty2
+                       , text "in_role:" <+> ppr in_role
+                       , text "out_role:" <+> ppr out_role
+                       ]
     in
+    warnPprTrace (not (isReflCo out_co) && isReflexiveCo out_co)
+                 "optCoercion: reflexive but not refl" details $
     assertPpr (substTyUnchecked env in_ty1 `eqType` out_ty1 &&
                substTyUnchecked env in_ty2 `eqType` out_ty2 &&
                in_role == out_role)
-              (hang (text "optCoercion changed types!")
-                  2 (vcat [ text "in_co:" <+> ppr co
-                          , text "in_ty1:" <+> ppr in_ty1
-                          , text "in_ty2:" <+> ppr in_ty2
-                          , text "out_co:" <+> ppr out_co
-                          , text "out_ty1:" <+> ppr out_ty1
-                          , text "out_ty2:" <+> ppr out_ty2
-                          , text "in_role:" <+> ppr in_role
-                          , text "out_role:" <+> ppr out_role
-                          , vcat $ map ppr_one $ nonDetEltsUniqSet $ coVarsOfCo co
-                          , text "subst:" <+> ppr env ]))
-               out_co
+              (hang (text "optCoercion changed types!") 2 details) $
+    out_co
 
-  | otherwise         = opt_co1 lc False co
+  | otherwise
+  = opt_co1 lc False co
   where
     lc = mkSubstLiftingContext env
-    ppr_one cv = ppr cv <+> dcolon <+> ppr (coVarKind cv)
+--    ppr_one cv = ppr cv <+> dcolon <+> ppr (coVarKind cv)
 
 
 type NormalCo    = Coercion
@@ -201,10 +204,11 @@ opt_co2 :: LiftingContext
         -> Role   -- ^ The role of the input coercion
         -> Coercion -> NormalCo
 opt_co2 env sym Phantom co = opt_phantom env sym co
-opt_co2 env sym r       co = opt_co3 env sym Nothing r co
+opt_co2 env sym r       co = opt_co4_wrap env sym False r co
 
 -- See Note [Optimising coercion optimisation]
--- | Optimize a coercion, knowing the coercion's non-Phantom role.
+-- | Optimize a coercion, knowing the coercion's non-Phantom role,
+--   and with an optional downgrade
 opt_co3 :: LiftingContext -> SymFlag -> Maybe Role -> Role -> Coercion -> NormalCo
 opt_co3 env sym (Just Phantom)          _ co = opt_phantom env sym co
 opt_co3 env sym (Just Representational) r co = opt_co4_wrap env sym True  r co
@@ -215,23 +219,38 @@ opt_co3 env sym _                       r co = opt_co4_wrap env sym False r co
 -- | Optimize a non-phantom coercion.
 opt_co4, opt_co4_wrap :: LiftingContext -> SymFlag -> ReprFlag
                       -> Role -> Coercion -> NormalCo
--- Precondition: In every call (opt_co4 lc sym rep role co)
---               we should have role = coercionRole co
+-- Precondition:  In every call (opt_co4 lc sym rep role co)
+--                we should have role = coercionRole co
+-- Precondition:  role is not Phantom
+-- Postcondition: The resulting coercion is equivalant to
+--                     wrapsub (wrapsym (mksub co)
+--                 where wrapsym is SymCo if sym=True
+--                       wrapsub is SubCo if rep=True
+
+-- opt_co4_wrap is there just to support tracing, when debugging
+-- Usually it just goes straight to opt_co4
 opt_co4_wrap = opt_co4
 
 {-
 opt_co4_wrap env sym rep r co
   = pprTrace "opt_co4_wrap {"
-    ( vcat [ text "Sym:" <+> ppr sym
-           , text "Rep:" <+> ppr rep
-           , text "Role:" <+> ppr r
-           , text "Co:" <+> ppr co ]) $
-    assert (r == coercionRole co )    $
-    let result = opt_co4 env sym rep r co in
-    pprTrace "opt_co4_wrap }" (ppr co $$ text "---" $$ ppr result) $
-    result
--}
+   ( vcat [ text "Sym:" <+> ppr sym
+          , text "Rep:" <+> ppr rep
+          , text "Role:" <+> ppr r
+          , text "Co:" <+> ppr co ]) $
+   assert (r == coercionRole co )    $
+   let result = opt_co4 env sym rep r co in
+   pprTrace "opt_co4_wrap }" (ppr co $$ text "---" $$ ppr result) $
+   assertPpr (res_role == coercionRole result)
+             (vcat [ text "Role:" <+> ppr r
+                   , text "Result: " <+>  ppr result
+                   , text "Result type:" <+> ppr (coercionType result) ]) $
+   result
 
+  where
+    res_role | rep       = Representational
+             | otherwise = r
+-}
 
 opt_co4 env _   rep r (Refl ty)
   = assertPpr (r == Nominal)
@@ -364,39 +383,15 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
-opt_co4 env _sym rep r (SelCo n co)
-  | Just (ty, _co_role) <- isReflCo_maybe co
-  = liftCoSubst (chooseRole rep r) env (getNthFromType n ty)
-    -- NB: it is /not/ true that r = _co_role
-    --     Rather, r = coercionRole (SelCo n co)
+opt_co4 env sym rep r (SelCo cs co)
+  -- Historical note 1: we used to check `co` for Refl, TyConAppCo etc
+  -- before optimising `co`; but actually the SelCo will have been built
+  -- with mkSelCo, so these tests always fail.
 
-opt_co4 env sym rep r (SelCo (SelTyCon n r1) (TyConAppCo _ _ cos))
-  = assert (r == r1 )
-    opt_co4_wrap env sym rep r (cos `getNth` n)
-
--- see the definition of GHC.Builtin.Types.Prim.funTyCon
-opt_co4 env sym rep r (SelCo (SelFun fs) (FunCo _r2 _afl _afr w co1 co2))
-  = opt_co4_wrap env sym rep r (getNthFun fs w co1 co2)
-
-opt_co4 env sym rep _ (SelCo SelForAll (ForAllCo { fco_kind = eta }))
-      -- works for both tyvar and covar
-  = opt_co4_wrap env sym rep Nominal eta
-
-opt_co4 env sym rep r (SelCo n co)
-  | Just nth_co <- case (co', n) of
-      (TyConAppCo _ _ cos, SelTyCon n _) -> Just (cos `getNth` n)
-      (FunCo _ _ _ w co1 co2, SelFun fs) -> Just (getNthFun fs w co1 co2)
-      (ForAllCo { fco_kind = eta }, SelForAll) -> Just eta
-      _                  -> Nothing
-  = if rep && (r == Nominal)
-      -- keep propagating the SubCo
-    then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
-    else nth_co
-
-  | otherwise
-  = wrapRole rep r $ SelCo n co'
-  where
-    co' = opt_co1 env sym co
+  -- Historical note 2: if rep=True and r=Nominal, we used to recursively
+  -- call opt_co4 to re-optimse the result. But (a) that is inefficient
+  -- and (b) wrapRole uses mkSubCo which does much the same job
+  = wrapRole rep r $ mkSelCo cs $ opt_co1 env sym co
 
 opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
@@ -648,8 +643,25 @@ opt_transList :: HasDebugCallStack => InScopeSet -> [NormalCo] -> [NormalCo] -> 
 opt_transList is = zipWithEqual "opt_transList" (opt_trans is)
   -- The input lists must have identical length.
 
-opt_trans :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
+opt_trans, opt_trans' :: InScopeSet -> NormalCo -> NormalCo -> NormalCo
+
+-- opt_trans just allows us to add some debug tracing
+-- Usually it just goes to opt_trans'
+opt_trans is co1 co2 = opt_trans' is co1 co2
+
+{-
 opt_trans is co1 co2
+  = assertPpr (r1==r2) (vcat [ ppr r1 <+> ppr co1, ppr r2 <+> ppr co2]) $
+    assertPpr (rres == r1) (vcat [ ppr r1 <+> ppr co1, ppr r2 <+> ppr co2, text "res" <+> ppr rres <+> ppr res ]) $
+    res
+  where
+    res = opt_trans' is co1 co2
+    rres = coercionRole res
+    r1 = coercionRole co1
+    r2 = coercionRole co1
+-}
+
+opt_trans' is co1 co2
   | isReflCo co1 = co2
     -- optimize when co1 is a Refl Co
   | otherwise    = opt_trans1 is co1 co2
@@ -823,50 +835,24 @@ opt_trans_rule is co1 co2
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
 
-  -- See Note [Push transitivity inside axioms] and
-  -- Note [Push transitivity inside newtype axioms only]
-  -- TrPushSymAxR
-  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
-  , isNewTyCon (coAxiomTyCon con)
-  , True <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
-  = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
-
-  -- TrPushAxR
-  | Just (sym, con, ind, cos1) <- co1_is_axiom_maybe
-  , isNewTyCon (coAxiomTyCon con)
-  , False <- sym
-  , Just cos2 <- matchAxiom sym con ind co2
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  = fireTransRule "TrPushAxR" co1 co2 newAxInst
-
-  -- TrPushSymAxL
-  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
-  , isNewTyCon (coAxiomTyCon con)
-  , True <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
-  = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
-
-  -- TrPushAxL
-  | Just (sym, con, ind, cos2) <- co2_is_axiom_maybe
-  , isNewTyCon (coAxiomTyCon con)
-  , False <- sym
-  , Just cos1 <- matchAxiom (not sym) con ind co1
-  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
-  = fireTransRule "TrPushAxL" co1 co2 newAxInst
-
   -- TrPushAxSym/TrPushSymAx
-  | Just (sym1, con1, ind1, cos1) <- co1_is_axiom_maybe
-  , Just (sym2, con2, ind2, cos2) <- co2_is_axiom_maybe
-  , con1 == con2
+  -- Put this first!  Otherwise (#23619) we get
+  --    newtype N a = MkN a
+  --    axN :: forall a. N a ~ a
+  -- Now consider (axN ty ; sym (axN ty))
+  -- If we put TrPushSymAxR first, we'll get
+  --    (axN ty ; sym (axN ty)) :: N ty ~ N ty -- Obviously Refl
+  --    --> axN (sym (axN ty))  :: N ty ~ N ty -- Very stupid
+  | Just (sym1, ax1, ind1, cos1) <- isAxiom_maybe co1
+  , Just (sym2, ax2, ind2, cos2) <- isAxiom_maybe co2
+  , ax1 == ax2
   , ind1 == ind2
   , sym1 == not sym2
-  , let branch = coAxiomNthBranch con1 ind1
-        qtvs = coAxBranchTyVars branch ++ coAxBranchCoVars branch
-        lhs  = coAxNthLHS con1 ind1
-        rhs  = coAxBranchRHS branch
+  , let branch = coAxiomNthBranch ax1 ind1
+        role   = coAxiomRole ax1
+        qtvs   = coAxBranchTyVars branch ++ coAxBranchCoVars branch
+        lhs    = coAxNthLHS ax1 ind1
+        rhs    = coAxBranchRHS branch
         pivot_tvs = exactTyCoVarsOfType (if sym2 then rhs else lhs)
   , all (`elemVarSet` pivot_tvs) qtvs
   = fireTransRule "TrPushAxSym" co1 co2 $
@@ -875,10 +861,41 @@ opt_trans_rule is co1 co2
     then liftCoSubstWith role qtvs (opt_transList is cos1 (map mkSymCo cos2)) lhs
        -- TrPushSymAx
     else liftCoSubstWith role qtvs (opt_transList is (map mkSymCo cos1) cos2) rhs
-  where
-    co1_is_axiom_maybe = isAxiom_maybe co1
-    co2_is_axiom_maybe = isAxiom_maybe co2
-    role = coercionRole co1 -- should be the same as coercionRole co2!
+
+  -- See Note [Push transitivity inside axioms] and
+  -- Note [Push transitivity inside newtype axioms only]
+  -- TrPushSymAxR
+  | Just (sym, con, ind, cos1) <- isAxiom_maybe co1
+  , isNewTyCon (coAxiomTyCon con)
+  , True <- sym
+  , Just cos2 <- matchAxiom sym con ind co2
+  , let newAxInst = AxiomInstCo con ind (opt_transList is (map mkSymCo cos2) cos1)
+  = fireTransRule "TrPushSymAxR" co1 co2 $ SymCo newAxInst
+
+  -- TrPushAxR
+  | Just (sym, con, ind, cos1) <- isAxiom_maybe co1
+  , isNewTyCon (coAxiomTyCon con)
+  , False <- sym
+  , Just cos2 <- matchAxiom sym con ind co2
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  = fireTransRule "TrPushAxR" co1 co2 newAxInst
+
+  -- TrPushSymAxL
+  | Just (sym, con, ind, cos2) <- isAxiom_maybe co2
+  , isNewTyCon (coAxiomTyCon con)
+  , True <- sym
+  , Just cos1 <- matchAxiom (not sym) con ind co1
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos2 (map mkSymCo cos1))
+  = fireTransRule "TrPushSymAxL" co1 co2 $ SymCo newAxInst
+
+  -- TrPushAxL
+  | Just (sym, con, ind, cos2) <- isAxiom_maybe co2
+  , isNewTyCon (coAxiomTyCon con)
+  , False <- sym
+  , Just cos1 <- matchAxiom (not sym) con ind co1
+  , let newAxInst = AxiomInstCo con ind (opt_transList is cos1 cos2)
+  = fireTransRule "TrPushAxL" co1 co2 newAxInst
+
 
 opt_trans_rule _ co1 co2        -- Identity rule
   | let ty1 = coercionLKind co1
@@ -1132,11 +1149,13 @@ chooseRole _    r = r
 
 -----------
 isAxiom_maybe :: Coercion -> Maybe (Bool, CoAxiom Branched, Int, [Coercion])
-isAxiom_maybe (SymCo co)
-  | Just (sym, con, ind, cos) <- isAxiom_maybe co
-  = Just (not sym, con, ind, cos)
-isAxiom_maybe (AxiomInstCo con ind cos)
-  = Just (False, con, ind, cos)
+-- We don't expect to see nested SymCo; and that lets us write a simple,
+-- non-recursive function. (If we see a nested SymCo we'll just fail,
+-- which is ok.)
+isAxiom_maybe (SymCo (AxiomInstCo ax ind cos))
+  = Just (True, ax, ind, cos)
+isAxiom_maybe (AxiomInstCo ax ind cos)
+  = Just (False, ax, ind, cos)
 isAxiom_maybe _ = Nothing
 
 matchAxiom :: Bool -- True = match LHS, False = match RHS

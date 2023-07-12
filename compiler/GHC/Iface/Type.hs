@@ -1968,8 +1968,8 @@ ppr_co _ (IfaceUnivCo prov role ty1 ty2)
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
   = maybeParen ctxt_prec appPrec $
-    text "Inst" <+> pprParendIfaceCoercion co
-                        <+> pprParendIfaceCoercion ty
+    text "Inst" <+> sep [ pprParendIfaceCoercion co
+                        , pprParendIfaceCoercion ty ]
 
 ppr_co ctxt_prec (IfaceAxiomRuleCo tc cos)
   = maybeParen ctxt_prec appPrec $ ppr tc <+> parens (interpp'SP cos)
