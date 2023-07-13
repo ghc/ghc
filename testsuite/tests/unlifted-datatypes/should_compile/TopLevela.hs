@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -ddump-simpl -ddump-simpl -dsuppress-all -dno-typeable-binds -dsuppress-uniques #-}
 {-# LANGUAGE UnliftedDatatypes #-}
 module TopLevela where
 
