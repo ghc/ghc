@@ -820,6 +820,63 @@ release-hackage-lint:
     EXTRA_HC_OPTS: "-dlint"
 
 ############################################################
+# Testing via test-primops
+############################################################
+
+# Triggering jobs in the ghc/test-primops project
+
+.test-primops:
+  stage: testing
+  variables:
+    UPSTREAM_PROJECT_PATH: "$CI_PROJECT_PATH"
+    UPSTREAM_PROJECT_ID: "$CI_PROJECT_ID"
+    UPSTREAM_PIPELINE_ID: "$CI_PIPELINE_ID"
+  trigger:
+    project: "ghc/test-primops"
+    branch: "upstream-testing"
+    strategy: "depend"
+
+.test-primops-validate-template:
+  needs:
+    - job: x86_64-linux-deb10-validate+debug_info
+      artifacts: false
+    - job: aarch64-linux-deb10-validate
+      artifacts: false
+    - job: aarch64-darwin-validate
+      artifacts: false
+    - job: x86_64-darwin-validate
+      artifacts: false
+  extends: .test-primops
+
+test-primops-validate:
+  extends: .test-primops-validate-template
+  when: manual
+
+test-primops-label:
+  extends: .test-primops-validate-template
+  rules:
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-primops.*/'
+
+test-primops-nightly:
+  extends: .test-primops
+  needs:
+    - job: nightly-x86_64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-aarch64-linux-deb10-validate
+      artifacts: false
+    - job: nightly-aarch64-darwin-validate
+      artifacts: false
+    - job: nightly-x86_64-darwin-validate
+      artifacts: false
+  rules:
+    - if: $NIGHTLY
+
+test-primops-release:
+  extends: .test-primops
+  rules:
+    - if: '$RELEASE_JOB == "yes"'
+
+############################################################
 # Nofib testing
 # (Disabled: See #21859)
 ############################################################
