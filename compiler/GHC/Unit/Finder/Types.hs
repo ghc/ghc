@@ -1,6 +1,7 @@
 module GHC.Unit.Finder.Types
    ( FinderCache (..)
    , FinderCacheState
+   , FileCacheState
    , FindResult (..)
    , InstalledFindResult (..)
    , FinderOpts(..)
@@ -13,8 +14,8 @@ import GHC.Data.OsPath
 import qualified Data.Map as M
 import GHC.Fingerprint
 import GHC.Platform.Ways
+import GHC.Unit.Env
 
-import Data.IORef
 import GHC.Data.FastString
 import qualified Data.Set as Set
 
@@ -25,8 +26,17 @@ import qualified Data.Set as Set
 --
 type FinderCacheState = InstalledModuleEnv InstalledFindResult
 type FileCacheState   = M.Map FilePath Fingerprint
-data FinderCache = FinderCache { fcModuleCache :: (IORef FinderCacheState)
-                               , fcFileCache   :: (IORef FileCacheState)
+data FinderCache = FinderCache { flushFinderCaches :: UnitEnv -> IO ()
+                               -- ^ remove all the home modules from the cache; package modules are
+                               -- assumed to not move around during a session; also flush the file hash
+                               -- cache.
+                               , addToFinderCache  :: InstalledModule -> InstalledFindResult -> IO ()
+                               -- ^ Add a found location to the cache for the module.
+                               , lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
+                               -- ^ Look for a location in the cache.
+                               , lookupFileCache   :: FilePath -> IO Fingerprint
+                               -- ^ Look for the hash of a file in the cache. This should add it to the
+                               -- cache. If the file doesn't exist, raise an IOException.
                                }
 
 data InstalledFindResult
