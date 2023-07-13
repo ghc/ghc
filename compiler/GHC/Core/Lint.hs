@@ -591,13 +591,15 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; checkL (not (isCoVar binder) || isCoArg rhs)
                 (mkLetErr binder rhs)
 
-        -- Check the let-can-float invariant
+        -- Check the let-can-float and letrec invariants
         -- See Note [Core let-can-float invariant] in GHC.Core
+        -- See Note [Core letrec invariant] in GHC.Core
        ; checkL ( isJoinId binder
                || mightBeLiftedType binder_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
                || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
-               || exprIsTickedString rhs)
+               || exprIsTickedString rhs
+               || isTopLevel top_lvl && isBoxedType rhs_ty && isJust (do (Var v, xs) <- pure (collectArgs rhs); pure (isDataConWorkId v && all exprIsTrivial xs)))
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is at the top level and has type Addr#,
