@@ -5,15 +5,15 @@
 
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards  #-}
 
 -- | Module finder
 module GHC.Unit.Finder (
     FindResult(..),
     InstalledFindResult(..),
     FinderOpts(..),
-    FinderCache,
+    FinderCache(..),
     initFinderCache,
-    flushFinderCaches,
     findImportedModule,
     findPluginModule,
     findExactModule,
@@ -26,14 +26,10 @@ module GHC.Unit.Finder (
     mkObjPath,
     addModuleToFinder,
     addHomeModuleToFinder,
-    uncacheModule,
     mkStubPaths,
 
     findObjectLinkableMaybe,
     findObjectLinkable,
-
-    -- Hash cache
-    lookupFileCache
   ) where
 
 import GHC.Prelude
@@ -103,46 +99,35 @@ InstalledNotFound.
 -}
 
 initFinderCache :: IO FinderCache
-initFinderCache = FinderCache <$> newIORef emptyInstalledModuleEnv
-                              <*> newIORef M.empty
+initFinderCache = do
+  mod_cache <- newIORef emptyInstalledModuleEnv
+  file_cache <- newIORef M.empty
+  let flushFinderCaches :: UnitEnv -> IO ()
+      flushFinderCaches ue = do
+        atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
+        atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
+       where
+        is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
 
--- remove all the home modules from the cache; package modules are
--- assumed to not move around during a session; also flush the file hash
--- cache
-flushFinderCaches :: FinderCache -> UnitEnv -> IO ()
-flushFinderCaches (FinderCache mod_cache file_cache) ue = do
-  atomicModifyIORef' mod_cache $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
-  atomicModifyIORef' file_cache $ \_ -> (M.empty, ())
- where
-  is_ext mod _ = not (isUnitEnvInstalledModule ue mod)
+      addToFinderCache :: InstalledModule -> InstalledFindResult -> IO ()
+      addToFinderCache key val =
+        atomicModifyIORef' mod_cache $ \c -> (extendInstalledModuleEnv c key val, ())
 
-addToFinderCache :: FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
-addToFinderCache (FinderCache mod_cache _) key val =
-  atomicModifyIORef' mod_cache $ \c ->
-    case (lookupInstalledModuleEnv c key, val) of
-      -- Don't overwrite an InstalledFound with an InstalledNotFound
-      -- See [Note Monotonic addToFinderCache]
-      (Just InstalledFound{}, InstalledNotFound{}) -> (c, ())
-      _ -> (extendInstalledModuleEnv c key val, ())
+      lookupFinderCache :: InstalledModule -> IO (Maybe InstalledFindResult)
+      lookupFinderCache key = do
+         c <- readIORef mod_cache
+         return $! lookupInstalledModuleEnv c key
 
-lookupFinderCache :: FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
-lookupFinderCache (FinderCache mod_cache _) key = do
-   c <- readIORef mod_cache
-   return $! lookupInstalledModuleEnv c key
-
-removeFromFinderCache :: FinderCache -> InstalledModule -> IO ()
-removeFromFinderCache (FinderCache ref _) key =
-  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
-
-lookupFileCache :: FinderCache -> FilePath -> IO Fingerprint
-lookupFileCache (FinderCache _ file_cache) key = do
-   c <- readIORef file_cache
-   case M.lookup key c of
-     Nothing -> do
-       hash <- getFileHash key
-       atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
-       return hash
-     Just fp -> return fp
+      lookupFileCache :: FilePath -> IO Fingerprint
+      lookupFileCache key = do
+         c <- readIORef file_cache
+         case M.lookup key c of
+           Nothing -> do
+             hash <- getFileHash key
+             atomicModifyIORef' file_cache $ \c -> (M.insert key hash c, ())
+             return hash
+           Just fp -> return fp
+  return FinderCache{..}
 
 -- -----------------------------------------------------------------------------
 -- The three external entry points
@@ -359,11 +344,6 @@ addHomeModuleToFinder fc home_unit mod_name loc = do
   let mod = mkHomeInstalledModule home_unit mod_name
   addToFinderCache fc mod (InstalledFound loc mod)
   return (mkHomeModule home_unit mod_name)
-
-uncacheModule :: FinderCache -> HomeUnit -> ModuleName -> IO ()
-uncacheModule fc home_unit mod_name = do
-  let mod = mkHomeInstalledModule home_unit mod_name
-  removeFromFinderCache fc mod
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
