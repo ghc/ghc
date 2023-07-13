@@ -103,6 +103,17 @@ AC_ARG_ENABLE(distro-toolchain,
   [EnableDistroToolchain=@SettingsUseDistroMINGW@]
 )
 
+if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
+  FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/mingw/], [\$\$topdir/../mingw/])
+fi
+
+if test "$HostOS" = "mingw32"; then
+    WindresCmd="$Windres"
+    AC_SUBST([WindresCmd])
+    AC_SUBST([GenlibCmd])
+    AC_SUBST([HAVE_GENLIB])
+fi
+
 dnl ** Which gcc to use?
 dnl --------------------------------------------------------------
 AC_PROG_CC([gcc clang])
@@ -287,6 +298,7 @@ if test "x$UseLibdw" = "xYES" ; then
   )
 fi
 AC_SUBST(UseLibdw)
+
 
 FP_SETTINGS
 

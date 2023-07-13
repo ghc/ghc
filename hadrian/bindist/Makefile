@@ -62,20 +62,29 @@ show:
 
 .PHONY: install
 
-ifeq "$(TargetOS_CPP)" "mingw32"
-install_bin: install_mingw install_bin_direct
+ifeq "$(EnableDistroToolchain)" "NO"
+install_extra: install_mingw
+else
+install_extra:
+endif
+
+ifeq "$(RelocatableBuild)" "YES"
+install_bin: install_bin_direct
 else
 install_bin: install_bin_libdir install_wrappers
 endif
 
-install: install_bin install_lib
+
+
+install: install_bin install_lib install_extra
 install: install_man install_docs update_package_db
 
-ActualBinsDir=${ghclibdir}/bin
 ifeq "$(RelocatableBuild)" "YES"
 ActualLibsDir=${ghclibdir}
+ActualBinsDir=${bindir}
 else
 ActualLibsDir=${ghclibdir}/lib
+ActualBinsDir=${ghclibdir}/bin
 endif
 WrapperBinsDir=${bindir}
 
