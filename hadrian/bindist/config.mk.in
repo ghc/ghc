@@ -67,6 +67,13 @@ $(eval $(call set_default,dvidir,$${docdir}))
 $(eval $(call set_default,pdfdir,$${docdir}))
 $(eval $(call set_default,psdir,$${docdir}))
 
+# On Windows we can only make a relocatable bindist because the normal install
+# script creates wrapper scripts which do not work on windows. Therefore we force
+# RelocatableBuild = YES here until/if that is ever fixed.
+ifeq "$(Windows_Host)" "YES"
+RelocatableBuild = YES
+endif
+
 ifeq "$(RelocatableBuild)" "YES"
 
 # Hack: our directory layouts tend to be different on Windows, so
@@ -151,14 +158,6 @@ ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else
 GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
-endif
-
-# On Windows we normally want to make a relocatable bindist, to we
-# ignore flags like libdir
-ifeq "$(Windows_Host)" "YES"
-RelocatableBuild = YES
-else
-RelocatableBuild = NO
 endif
 
 
