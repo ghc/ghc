@@ -1,5 +1,4 @@
-nix build nixpkgs.jq.bin -o jq
-PATH+=:$PWD/jq-bin/bin
+#!/usr/bin/env bash
 
 ghcs_nix="https://gitlab.haskell.org/bgamari/ghcs-nix/-/archive/master/ghcs-nix-master.tar.gz"
 
@@ -12,18 +11,22 @@ run() {
   nix build -f "$ghcs_nix" $drv
   (cd ../; rm -r dist-newstyle; cabal build --dry-run hadrian -w bootstrap/result/bin/ghc)
   cp ../dist-newstyle/cache/plan.json "plan-$ver.json"
-  cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | jq --sort-keys | tee "plan-bootstrap-$ver.json"
+  cabal run --with-ghc-pkg "$PWD/boot_ghc/bin/ghc-pkg" -w "$PWD/boot_ghc/bin/ghc" -v0 hadrian-bootstrap-gen -- "plan-$ver.json" \
+      | nix run "nixpkgs#jq" -- --sort-keys \
+      | tee "plan-bootstrap-$ver.json"
 }
 
-run "9_2_1"
-run "9_2_2"
-run "9_2_3"
-run "9_2_4"
-run "9_2_5"
-run "9_2_6"
-run "9_2_7"
-run "9_4_1"
-run "9_4_2"
-run "9_4_3"
-run "9_4_4"
-run "9_6_1"
+run_all() {
+    run "9_4_1"
+    run "9_4_2"
+    run "9_4_3"
+    run "9_4_4"
+    run "9_6_1"
+    run "9_6_2"
+}
+
+if (( $# == 0 )); then
+    run_all
+else
+    run "$1"
+fi
