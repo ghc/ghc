@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE TupleSections       #-}
 {-# LANGUAGE RankNTypes   #-}
@@ -21,7 +22,10 @@ module GHC.HsToCore.Pmc.Solver.Types (
         lookupRefuts, lookupSolution,
 
         -- ** Looking up 'VarInfo'
-        lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo, representId, representIds, representIdNablas, representIdsNablas,
+        lookupVarInfo, lookupVarInfoNT, trvVarInfo, emptyVarInfo,
+
+        representId, representIds, representIdNablas, representIdsNablas,
+        lookupMatchIdMap,
 
         -- ** Caching residual COMPLETE sets
         CompleteMatch, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
@@ -88,7 +92,7 @@ import Data.Equality.Graph.Lens
 import qualified Data.Equality.Graph as EG
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS (empty)
-import Data.Bifunctor (second, bimap, first)
+import Data.Bifunctor (second)
 import Control.Monad.Trans.State (runState, state, execState)
 
 -- import GHC.Driver.Ppr
@@ -166,6 +170,9 @@ data TmState
   -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
 
+lookupMatchIdMap :: Id -> Nabla -> Maybe ClassId
+lookupMatchIdMap id (MkNabla _ TmSt{ts_reps}) = lookupVarEnv ts_reps id
+
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
 -- Also caches the type ('vi_ty'), the 'ResidualCompleteMatches' of a COMPLETE set
@@ -242,6 +249,9 @@ instance Outputable BotInfo where
   ppr MaybeBot = underscore
   ppr IsBot    = text "~⊥"
   ppr IsNotBot = text "≁⊥"
+
+instance Outputable IntSet where
+  ppr = text . show
 
 -- | Not user-facing.
 instance Outputable TmState where
@@ -843,11 +853,17 @@ representIdNablas x (MkNablas nbs) = MkNablas $ mapBag (snd . representId x) nbs
 representIdsNablas :: [Id] -> Nablas -> Nablas
 representIdsNablas xs = execState (mapM (\x -> state (((),) . representIdNablas x)) xs)
 
+-- Are these even used? don't we always use the ones above?
 -- | Like 'representId' but for a single Nabla
 representId :: Id -> Nabla -> (ClassId, Nabla)
 representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0, ts_reps=idmp})
     = case lookupVarEnv idmp x of
-        Nothing -> case EG.newEClass (emptyVarInfo x) eg0 of
+        -- The reason why we can't use an empty new class is that we don't account for the IdMap in the 'representDBCoreExpr'
+        -- In particular, if we represent "reverse @a xs" in the e-graph, the
+        -- node in which "xs" will be represented won't match the e-class id
+        -- representing "xs", because that class doesn't contain "VarF xs"
+        -- Nothing -> case EG.newEClass (emptyVarInfo x) eg0 of
+        Nothing -> case EG.add (EG.Node (DF (deBruijnize (VarF x)))) eg0 of
           (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=eg1, ts_reps=extendVarEnv idmp x xid})
         Just xid -> (xid, MkNabla tyst tmst)
 

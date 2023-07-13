@@ -21,8 +21,6 @@ import GHC.Types.Id
 import GHC.Types.Name (Name)
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.Equality.Graph (ClassId)
-
 import GHC.Generics (Generic)
 
 newtype MinBound = MinBound Integer
@@ -102,7 +100,7 @@ data DsMessage
   | DsNonExhaustivePatterns !(HsMatchContext GhcTc)
                             !ExhaustivityCheckType
                             !MaxUncoveredPatterns
-                            [ClassId]
+                            [Id] -- ^ The MatchIds, see Note (TODO) [The MatchIds for error reporting]
                             [Nabla]
 
   | DsTopLevelBindsNotAllowed !BindsType !(HsBindLR GhcTc GhcTc)

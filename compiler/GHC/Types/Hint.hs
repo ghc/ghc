@@ -21,7 +21,6 @@ module GHC.Types.Hint (
   , noStarIsTypeHints
   ) where
 
-import Language.Haskell.Syntax.Expr (LHsExpr)
 import Language.Haskell.Syntax (LPat, LIdP)
 
 import GHC.Prelude
@@ -48,9 +47,6 @@ import GHC.Data.FastString (fsLit, FastString)
 
 import Data.Typeable ( Typeable )
 import Language.Haskell.Syntax.Expr
-import GHC.Unit.Module.Imported (ImportedModsVal)
-import GHC.Data.FastString (fsLit)
-import Language.Haskell.Syntax (LPat, LIdP)
   -- This {-# SOURCE #-} import should be removable once
   -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 

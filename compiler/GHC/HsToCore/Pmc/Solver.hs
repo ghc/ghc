@@ -29,6 +29,9 @@ module GHC.HsToCore.Pmc.Solver (
         PhiCt(..), PhiCts,
         addPhiCtNablas,
         addPhiCtsNablas,
+        addPhiCtNablasWithRep, addPhiCtNablasWithReps,
+        liftNablasM,
+        addPhiCts,
 
         isInhabited,
         generateInhabitingPatterns, GenerateInhabitingPatternsMode(..)
@@ -118,6 +121,16 @@ addPhiCtsNablas nablas cts = liftNablasM (\d -> addPhiCts d cts) nablas
 -- | 'addPmCtsNablas' for a single 'PmCt'.
 addPhiCtNablas :: Nablas -> PhiCt -> DsM Nablas
 addPhiCtNablas nablas ct = addPhiCtsNablas nablas (unitBag ct)
+
+-- | 'addPmCtsNablas' for a single 'PmCt', but first represent the Id in each Nabla.
+addPhiCtNablasWithRep :: Nablas -> Id -> (ClassId -> PhiCt) -> DsM Nablas
+addPhiCtNablasWithRep nablas x ctf
+  = liftNablasM (\d -> let (xi, d') = representId x d in addPhiCts d' (unitBag (ctf xi))) nablas
+
+-- | Represent all Id in each Nabla.
+addPhiCtNablasWithReps :: Nablas -> [Id] -> ([ClassId] -> PhiCt) -> DsM Nablas
+addPhiCtNablasWithReps nablas xs ctf
+  = liftNablasM (\d -> let (xsi, d') = representIds xs d in addPhiCts d' (unitBag (ctf xsi))) nablas
 
 liftNablasM :: Monad m => (Nabla -> m (Maybe Nabla)) -> Nablas -> m Nablas
 liftNablasM f (MkNablas ds) = MkNablas . catBagMaybes <$> (traverse f ds)
@@ -887,7 +900,7 @@ addCoreCt :: Nabla -> ClassId -> CoreExpr -> MaybeT DsM Nabla
 addCoreCt nabla x e = do
   simpl_opts <- initSimpleOpts <$> getDynFlags
   let e' = simpleOptExpr simpl_opts e
-  -- lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
+  lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (eclassType x nabla) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') nabla
   where
     -- Takes apart a 'CoreExpr' and tries to extract as much information about
@@ -917,7 +930,7 @@ addCoreCt nabla x e = do
             <- exprIsConApp_maybe in_scope_env e
       = data_con_app x in_scope dc args
       | otherwise
-      = do -- equate_with_similar_expr x e
+      = do
         nabla' <- get
         if
           -- See Note [Detecting pattern synonym applications in expressions]
@@ -925,8 +938,7 @@ addCoreCt nabla x e = do
           | Var y <- e, Nothing <- isDataConId_maybe (eclassMatchId x nabla')
           -- We don't consider DataCons flexible variables
           -> modifyT (\nabla -> let (yid, nabla') = representId y nabla
-                                in addVarCt nabla' x yid)
-          -- -> modifyT (\nabla -> addVarCt nabla' x y)
+                                in lift (tracePm "foundIdVar:" (ppr y <+> text "->>>" <+> ppr yid)) >> addVarCt nabla' x yid)
           | otherwise
           -- Any other expression. Try to find other uses of a semantically
           -- equivalent expression and represent them by the same variable!

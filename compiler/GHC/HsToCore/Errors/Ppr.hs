@@ -22,6 +22,8 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.HsToCore.Pmc.Ppr
+import GHC.HsToCore.Pmc.Solver.Types (lookupMatchIdMap)
+import Data.Maybe (fromJust)
 
 
 instance Diagnostic DsMessage where
@@ -71,9 +73,9 @@ instance Diagnostic DsMessage where
            pprContext False kind (text "are non-exhaustive") $ \_ ->
              case vars of -- See #11245
                   [] -> text "Guards do not cover entire pattern space"
-                  _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
-                            -- pp_tys = pprQuotedList $ map idType vars
-                            pp_tys = empty
+                  -- See Note (TODO) [The MatchIds for error reporting] (and possibly factor this map lookupMatchIdMap outside)
+                  _  -> let us = map (\nabla -> pprUncovered nabla (map (fromJust . (`lookupMatchIdMap` nabla)) vars)) nablas
+                            pp_tys = pprQuotedList $ map idType vars
                         in  hang
                               (text "Patterns of type" <+> pp_tys <+> text "not matched:")
                               4

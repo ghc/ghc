@@ -75,7 +75,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Coerce
 import GHC.Tc.Utils.Monad
 
-import Data.Equality.Graph (ClassId)
+import Data.Maybe (fromJust)
 
 --
 -- * Exported entry points to the checker
@@ -104,25 +104,18 @@ pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM Nablas
 pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
   = mb_discard_warnings $ do
       !missing <- getLdiNablas
+
+      -- See Note (TODO) [Represent the MatchIds before the CheckAction]
+      let missing' = representIdNablas var missing
+
       pat_bind <- noCheckDs $ desugarPatBind loc var p
-      tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
-      result0 <- unCA (checkPatBind pat_bind) missing
-      let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result0
+      tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing'])
+      result <- unCA (checkPatBind pat_bind) missing'
+      let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result
       tracePm "pmcPatBind }: " $
         vcat [ text "cr_uncov:" <+> ppr (cr_uncov result)
              , text "ldi:" <+> ppr ldi ]
-      -- romes:todo: this seems redundant, hints that the right thing might be for desugar to return already the match variables already "represented" in the e-graph
-      -- doing this, however, wouuld require for desugar pat binds to care about/thread through nablas
-      -- DESIGN:TODO: However, if we represent the variables while desugaring, we
-      -- would no longer need representId to represent VarF in the e-class, and can
-      -- instead do newEClass. This would further reduce allocations.
-      -- The reason why we can't do that currently is that on checkPatBind we'll
-      -- representIds, and when we represent them again in the next line, we want
-      -- them to match the ones we represented during checkPatBind. If we made
-      -- empty-eclasses, the representId on the next line wouldn't match the match
-      -- ids we defined in checkPatBind.
-      let (varid, cr_uncov') = representId var (cr_uncov result0)
-      formatReportWarnings ReportPatBind ctxt [varid] result0{cr_uncov = cr_uncov'}
+      formatReportWarnings ReportPatBind ctxt [var] result{cr_uncov = cr_uncov'}
       return ldi
   where
     -- See Note [pmcPatBind doesn't warn on pattern guards]
@@ -188,28 +181,27 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
           hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
                2
                (vcat (map ppr matches) $$ ppr missing)
+
+  -- See Note (TODO) [Represent the MatchIds before the CheckAction]
+  let missing' = representIdsNablas vars missing
+
   case NE.nonEmpty matches of
     Nothing -> do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
       let var = only vars
       empty_case <- noCheckDs $ desugarEmptyCase var
-      result0 <- unCA (checkEmptyCase empty_case) missing
-      tracePm "}: " (ppr (cr_uncov result0))
-      let (varids, cr_uncov') = representIds vars (cr_uncov result0) -- romes:todo: this seems redundant, hints that the right thing might be for desugar to return already the match variables already "represented" in the e-graph
-      formatReportWarnings ReportEmptyCase ctxt varids result0{cr_uncov=cr_uncov'}
+      result <- unCA (checkEmptyCase empty_case) missing'
+      tracePm "}: " (ppr (cr_uncov result))
+      formatReportWarnings ReportEmptyCase ctxt vars result
       return []
     Just matches -> do
       matches <- {-# SCC "desugarMatches" #-}
                  noCheckDs $ desugarMatches vars matches
-      result0 <- {-# SCC "checkMatchGroup" #-}
-                 unCA (checkMatchGroup matches) missing
-      tracePm "}: " (ppr (cr_uncov result0))
-      let (varids, cr_uncov') = representIds vars (cr_uncov result0)
-      -- romes:todo: this seems redundant, hints that the right thing might be
-      -- for desugar to return already the match variables already "represented"
-      -- in the e-graph
-      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt varids result0{cr_uncov=cr_uncov'}
-      return (NE.toList (ldiMatchGroup (cr_ret result0)))
+      result  <- {-# SCC "checkMatchGroup" #-}
+                 unCA (checkMatchGroup matches) missing'
+      tracePm "}: " (ppr (cr_uncov result))
+      {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
+      return (NE.toList (ldiMatchGroup (cr_ret result)))
 
 {-
 Note [Detecting incomplete record selectors]
@@ -463,7 +455,11 @@ collectInMode ReportEmptyCase  = cirbsEmptyCase
 
 -- | Given a 'FormatReportWarningsMode', this function will emit warnings
 -- for a 'CheckResult'.
-formatReportWarnings :: FormatReportWarningsMode ann -> DsMatchContext -> [ClassId] -> CheckResult ann -> DsM ()
+formatReportWarnings :: FormatReportWarningsMode ann
+                     -> DsMatchContext
+                     -> [Id]              -- ^ The MatchIds, see Note (TODO) [The MatchIds for error reporting]
+                     -> CheckResult ann
+                     -> DsM ()
 formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
   cov_info <- collectInMode report_mode ann
   dflags <- getDynFlags
@@ -471,7 +467,7 @@ formatReportWarnings report_mode ctx vars cr@CheckResult { cr_ret = ann } = do
 
 -- | Issue all the warnings
 -- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
-reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [ClassId] -> CheckResult CIRB -> DsM ()
+reportWarnings :: DynFlags -> FormatReportWarningsMode ann -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
 reportWarnings dflags report_mode (DsMatchContext kind loc) vars
   CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
                                  , cirb_red   = redundant_rhss
@@ -510,13 +506,16 @@ reportWarnings dflags report_mode (DsMatchContext kind loc) vars
 
     maxPatterns = maxUncoveredPatterns dflags
 
-getNFirstUncovered :: GenerateInhabitingPatternsMode -> [ClassId] -> Int -> Nablas -> DsM [Nabla]
+getNFirstUncovered :: GenerateInhabitingPatternsMode
+                   -> [Id] -- ^ The MatchIds, see Note (TODO) [The MatchIds for error reporting]
+                   -> Int -> Nablas -> DsM [Nabla]
 getNFirstUncovered mode vars n (MkNablas nablas) = go n (bagToList nablas)
   where
     go 0 _              = pure []
     go _ []             = pure []
     go n (nabla:nablas) = do
-      front <- generateInhabitingPatterns mode vars n nabla
+      -- See Note (TODO) [The MatchIds for error reporting] (and possibly factor this map lookupMatchIdMap to an independent function since its used twice, here and in the call of pprUncovered)
+      front <- generateInhabitingPatterns mode (map (fromJust . (`lookupMatchIdMap` nabla)) vars) n nabla
       back <- go (n - length front) nablas
       pure (front ++ back)
 
@@ -553,8 +552,9 @@ addCoreScrutTmCs :: [CoreExpr] -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs []         _      k = k
 addCoreScrutTmCs (scr:scrs) (x0:xs) k =
   flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas0 ->
-    let (x, nablas) = representId x0 nablas0
-     in addPhiCtsNablas nablas (unitBag (PhiCoreCt x scr))
+     liftNablasM (\d ->
+       let (x, d') = representId x0 d
+        in addPhiCts d' (unitBag (PhiCoreCt x scr))) nablas0
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
 -- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.
@@ -605,4 +605,18 @@ unreachable.
 We make sure to always start from an inhabited 'Nablas' by calling
 'getLdiNablas', which falls back to the trivially inhabited 'Nablas' if the
 long-distance info returned by 'GHC.HsToCore.Monad.getPmNablas' is empty.
+
+Note [The MatchId for error reporting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Something sometihng, when we're talking about MatchIds that might occur in
+Nablas (rather than just in a Nabla), we have to refer to them by Id, rather
+than by e-class-id.
+
+This is because e-class-ids will vary between Nabla, but each Nabla maps Ids to e-class-ids.
+So an Id is the only identifier that identifies the same match-id across Nablas.
+
+We can safely query each Nabla for the MatchIds because we make sure to
+represent the MatchIds in the Nablas as soon as possible (in pmcMatches and
+friends)
+
 -}

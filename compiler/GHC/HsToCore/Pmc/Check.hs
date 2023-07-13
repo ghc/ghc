@@ -1,4 +1,5 @@
 
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs             #-}
@@ -107,22 +108,18 @@ emptyRedSets :: RedSets
 emptyRedSets = RedSets mempty mempty mempty
 
 checkGrd :: PmGrd -> CheckAction RedSets
-checkGrd grd = CA $ \inc0 -> case grd of
+checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
-  PmLet x0 e -> do
-    let (x, inc) = representId x0 inc0
-    -- romes: we could potentially do update the trees to use e-class ids here,
-    -- or in pmcMatches
-    matched <- addPhiCtNablas inc (PhiCoreCt x e)
+  PmLet x e -> do
+    matched <- addPhiCtNablasWithRep inc x (`PhiCoreCt` e)
     tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
   -- Bang x _: Diverge on x ~ ⊥, refine with x ≁ ⊥
-  PmBang x0 mb_info -> do
-    let (x, inc) = representId x0 inc0
-    div <- addPhiCtNablas inc (PhiBotCt x)
-    matched <- addPhiCtNablas inc (PhiNotBotCt x)
+  PmBang x mb_info -> do
+    div <- addPhiCtNablasWithRep inc x PhiBotCt
+    matched <- addPhiCtNablasWithRep inc x PhiNotBotCt -- it will do a redundant lookup to represent x again... we would like @inc@ to have the rep already for both
     -- See Note [Dead bang patterns]
     -- mb_info = Just info <==> PmBang originates from bang pattern in source
     let bangs | Just info <- mb_info = unitOL (div, info)
@@ -139,14 +136,13 @@ checkGrd grd = CA $ \inc0 -> case grd of
                         , cr_uncov = mempty
                         , cr_approx = Precise }
   -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
-  PmCon x0 con tvs dicts args0 -> do
-    let (x, inc1) = representId x0 inc0
-        (args, inc) = representIds args0 inc1
+  PmCon x con tvs dicts args -> do
+    -- romes: for now we do the redundant representation of vars, but whatever
     !div <- if isPmAltConMatchStrict con
-      then addPhiCtNablas inc (PhiBotCt x)
+      then addPhiCtNablasWithRep inc x PhiBotCt
       else pure mempty
-    !matched <- addPhiCtNablas inc (PhiConCt x con tvs (map evVarPred dicts) args)
-    !uncov   <- addPhiCtNablas inc (PhiNotConCt x con)
+    !matched <- addPhiCtNablasWithReps inc (x:args) (\case (xi:argsi) -> PhiConCt xi con tvs (map evVarPred dicts) argsi; _ -> error "impossible")
+    !uncov   <- addPhiCtNablasWithRep inc x (`PhiNotConCt` con)
     tracePm "check:Con" $ vcat
       [ ppr grd
       , ppr inc
@@ -189,8 +185,7 @@ checkGRHS (PmGRHS { pg_grds = GrdVec grds, pg_rhs = rhs_info }) =
 checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
 -- See Note [Checking EmptyCase]
 checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
-  let (varid, inc') = representId var inc
-  unc <- addPhiCtNablas inc' (PhiNotBotCt varid)
+  unc <- addPhiCtNablasWithRep inc var PhiNotBotCt
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
 checkPatBind :: PmPatBind Pre -> CheckAction (PmPatBind Post)

@@ -338,7 +338,7 @@ instance Ord a => Ord (DeBruijn (CoreAltF a)) where
 
 cmpDeBruijnTickish :: DeBruijn CoreTickish -> DeBruijn CoreTickish -> Ordering
 cmpDeBruijnTickish (D env1 t1) (D env2 t2) = go t1 t2 where
-    go (Breakpoint lext lid lids) (Breakpoint rext rid rids)
+    go (Breakpoint lext lid lids _) (Breakpoint rext rid rids _)
         = case compare lid rid of
             LT -> LT
             EQ -> case compare (D env1 lids) (D env2 rids) of
