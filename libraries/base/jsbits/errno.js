@@ -59,7 +59,7 @@ function h$setErrno(e) {
 }
 
 var h$errorStrs =  { CONST_E2BIG:   "Argument list too long"
-                   , CONST_EACCESS: "Permission denied"
+                   , CONST_EACCES:  "Permission denied"
                    , CONST_EINVAL:  "Invalid argument"
                    , CONST_EBADF:   "Bad file descriptor"
                    , CONST_ENOTDIR: "Not a directory"

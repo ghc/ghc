@@ -177,7 +177,7 @@ function h$base_lseek(fd, pos_h, pos_l, whence, c) {
         var p = CLOSEST_FLOAT_NUMBER(pos_h,pos_l);
         var o = h$base_fds[fd];
         if(!o) {
-            h$errno = CONST_BADF;
+            h$errno = CONST_EBADF;
             c(-1,-1);
         } else {
             switch(whence) {
