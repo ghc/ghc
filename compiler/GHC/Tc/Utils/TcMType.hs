@@ -1001,16 +1001,7 @@ new_meta_tv_x info subst tv
         ; let subst1 = extendTvSubstWithClone subst tv new_tv
         ; return (subst1, new_tv) }
   where
-    substd_kind = substTyUnchecked subst (tyVarKind tv)
-      -- NOTE: #12549 is fixed so we could use
-      -- substTy here, but the tc_infer_args problem
-      -- is not yet fixed so leaving as unchecked for now.
-      -- OLD NOTE:
-      -- Unchecked because we call newMetaTyVarX from
-      -- tcInstTyBinder, which is called from tcInferTyApps
-      -- which does not yet take enough trouble to ensure
-      -- the in-scope set is right; e.g. #12785 trips
-      -- if we use substTy here
+    substd_kind = substTy subst (tyVarKind tv)
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
