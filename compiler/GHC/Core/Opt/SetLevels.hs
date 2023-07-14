@@ -44,13 +44,33 @@
         case x of wild { p -> ...wild... }
    we substitute x for wild in the RHS of the case alternatives:
         case x of wild { p -> ...x... }
-   This means that a sub-expression involving x is not "trapped" inside the RHS.
+   This means that a sub-expression involving x is not "trapped" inside the RHS
+   (i.e. it can now be floated out, whereas if it mentioned wild it could not).
    And it's not inconvenient because we already have a substitution.
 
-  Note that this is EXACTLY BACKWARDS from the what the simplifier does.
-  The simplifier tries to get rid of occurrences of x, in favour of wild,
-  in the hope that there will only be one remaining occurrence of x, namely
-  the scrutinee of the case, and we can inline it.
+   For example, consider:
+
+      f x = letrec go y = case x of z { (a,b) -> ...(expensive z)... }
+              in ...
+
+   If we do the reverse binder-swap we get
+
+      f x = letrec go y = case x of z { (a,b) -> ...(expensive x)... }
+              in ...
+
+   and now we can float out:
+
+      f x = let t = expensive x
+              in letrec go y = case x of z { (a,b) -> ...(t)... }
+              in ...
+
+   Now (expensive x) is computed once, rather than once each time around the 'go' loop.
+
+   Note that this is EXACTLY BACKWARDS from the what the simplifier does.
+   The simplifier tries to get rid of occurrences of x, in favour of wild,
+   in the hope that there will only be one remaining occurrence of x, namely
+   the scrutinee of the case, and we can inline it.
+
 -}
 
 module GHC.Core.Opt.SetLevels (
