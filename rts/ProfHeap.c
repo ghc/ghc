@@ -1252,6 +1252,116 @@ heapCensusBlock(Census *census, bdescr *bd)
     }
 }
 
+// determine whether a closure should be assigned to the PRIM cost-centre.
+static bool
+closureIsPrim (StgPtr p)
+{
+  bool prim = false;
+  const StgInfoTable *info = get_itbl((const StgClosure *)p);
+  switch (info->type) {
+    case THUNK:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_SELECTOR:
+    case FUN:
+    case BLACKHOLE:
+    case BLOCKING_QUEUE:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
+    case CONSTR:
+    case CONSTR_NOCAF:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
+    case IND:
+    case AP:
+    case PAP:
+    case AP_STACK:
+    case CONTINUATION:
+        prim = false;
+        break;
+
+    case BCO:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+    case WEAK:
+    case PRIM:
+    case MUT_PRIM:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case ARR_WORDS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    case TSO:
+    case STACK:
+    case TREC_CHUNK:
+        prim = true;
+        break;
+
+    case COMPACT_NFDATA:
+        barf("heapCensus, found compact object in the wrong list");
+        break;
+
+    default:
+        barf("heapCensus, unknown object: %d", info->type);
+  }
+  return prim;
+}
+
+static void
+heapCensusSegment (Census* census, struct NonmovingSegment* seg )
+{
+  unsigned int block_size = nonmovingSegmentBlockSize(seg);
+  unsigned int block_count = nonmovingSegmentBlockCount(seg);
+
+  for (unsigned int b = 0; b < block_count; b++) {
+    StgPtr p = nonmovingSegmentGetBlock(seg, b);
+    // ignore unmarked heap objects
+    if (!nonmovingClosureMarkedThisCycle(p)) continue;
+    // NB: We round up the size of objects to the segment block size.
+    // This aligns with live bytes accounting for the nonmoving collector.
+    heapProfObject(census, (StgClosure*)p, block_size / sizeof(W_), closureIsPrim(p));
+  }
+}
+
+/* Note [Non-concurrent nonmoving collector heap census]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When using the nonmoving collector, we currently disable concurrent collection
+ * to simplify heap census accounting.
+ *
+ * Without concurrent allocation, marked objects on the nonmoving heap are exactly
+ * the live objects.
+ *
+ * We disable concurrent collection both for GCs that lead to a heap census and not.
+ * This is because a concurrent collection can overlap with a GC that is meant
+ * to perform a heap census. Alternatively we could better handle the case where
+ * a non-concurrent collection is triggered while a non-concurrent collection
+ * is running.
+ */
+
+static void
+heapCensusSegmentList (Census* census, struct NonmovingSegment* seg )
+{
+  for (; seg; seg = seg->link) {
+    heapCensusSegment(census, seg);
+  }
+}
+
 /* -----------------------------------------------------------------------------
  * Code to perform a heap census.
  * -------------------------------------------------------------------------- */
@@ -1320,6 +1430,24 @@ void heapCensus (Time t)
           heapCensusChain(census, ws->part_list);
           heapCensusChain(census, ws->scavd_list);
       }
+  }
+
+  if (RtsFlags.GcFlags.useNonmoving) {
+    for (unsigned int i = 0; i < nonmoving_alloca_cnt; i++) {
+      heapCensusSegmentList(census, nonmovingHeap.allocators[i].filled);
+      heapCensusSegmentList(census, nonmovingHeap.allocators[i].saved_filled);
+      heapCensusSegmentList(census, nonmovingHeap.allocators[i].active);
+
+      heapCensusChain(census, nonmoving_large_objects);
+      heapCensusCompactList(census, nonmoving_compact_objects);
+
+      // segments living on capabilities
+      for (unsigned int j = 0; j < getNumCapabilities(); j++) {
+        Capability* cap = getCapability(j);
+        heapCensusSegment(census, cap->current_segments[i]);
+      }
+    }
+
   }
 
   // dump out the census info
