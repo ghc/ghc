@@ -668,7 +668,7 @@ getRegister' config plat expr =
             code
               `appOL` toOL
                 [ ann
-                    (text "narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
+                    (text "MO_SS_Conv: narrow register signed" <+> ppr reg <+> ppr from <> text "->" <> ppr to)
                     (LSL (OpReg to dst) (OpReg from reg) (OpImm (ImmInt shift))),
                   -- signed right shift
                   ASR (OpReg to dst) (OpReg to dst) (OpImm (ImmInt shift))
@@ -873,64 +873,64 @@ getRegister' config plat expr =
 
         -- N.B. We needn't sign-extend sub-word size (in)equality comparisons
         -- since we don't care about ordering.
-        MO_Eq w     -> bitOp w (\d x y -> toOL [ CSET d x y EQ ])
-        MO_Ne w     -> bitOp w (\d x y -> toOL [ CSET d x y NE ])
+        MO_Eq w     -> bitOp w (\d x y -> unitOL $ annExpr expr (CSET d x y EQ))
+        MO_Ne w     -> bitOp w (\d x y -> unitOL $ annExpr expr (CSET d x y NE))
 
         -- Signed multiply/divide
-        MO_Mul w          -> intOp True w (\d x y -> unitOL $ MUL d x y)
+        MO_Mul w          -> intOp True w (\d x y -> unitOL $ annExpr expr (MUL d x y))
         MO_S_MulMayOflo w -> do_mul_may_oflo w x y
-        MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ DIV d x y)
+        MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ annExpr expr (DIV d x y))
 
         -- Note the swap in Rx and Ry.
-        MO_S_Rem w -> intOp True w (\d x y -> unitOL $ REM d x y)
+        MO_S_Rem w -> intOp True w (\d x y -> unitOL $ annExpr expr (REM d x y))
 
         -- Unsigned multiply/divide
-        MO_U_Quot w -> intOp False w (\d x y -> unitOL $ DIVU d x y)
-        MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ REM d x y)
+        MO_U_Quot w -> intOp False w (\d x y -> unitOL $ annExpr expr (DIVU d x y))
+        MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ annExpr expr (REM d x y))
 
-        -- Signed comparisons -- see Note [CSET]
-        MO_S_Ge w     -> intOp True  w (\d x y -> toOL [ CSET d x y SGE ])
-        MO_S_Le w     -> intOp True  w (\d x y -> toOL [ CSET d x y SLE ])
-        MO_S_Gt w     -> intOp True  w (\d x y -> toOL [ CSET d x y SGT ])
-        MO_S_Lt w     -> intOp True  w (\d x y -> toOL [ CSET d x y SLT ])
+        -- Signed comparisons -- see Note [CSET)
+        MO_S_Ge w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SGE))
+        MO_S_Le w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SLE))
+        MO_S_Gt w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SGT))
+        MO_S_Lt w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SLT))
 
         -- Unsigned comparisons
-        MO_U_Ge w     -> intOp False w (\d x y -> toOL [ CSET d x y UGE ])
-        MO_U_Le w     -> intOp False w (\d x y -> toOL [ CSET d x y ULE ])
-        MO_U_Gt w     -> intOp False w (\d x y -> toOL [ CSET d x y UGT ])
-        MO_U_Lt w     -> intOp False w (\d x y -> toOL [ CSET d x y ULT ])
+        MO_U_Ge w     -> intOp False w (\d x y -> unitOL $ annExpr expr (CSET d x y UGE))
+        MO_U_Le w     -> intOp False w (\d x y -> unitOL $ annExpr expr (CSET d x y ULE))
+        MO_U_Gt w     -> intOp False w (\d x y -> unitOL $ annExpr expr (CSET d x y UGT))
+        MO_U_Lt w     -> intOp False w (\d x y -> unitOL $ annExpr expr (CSET d x y ULT))
 
         -- Floating point arithmetic
-        MO_F_Add w   -> floatOp w (\d x y -> unitOL $ ADD d x y)
-        MO_F_Sub w   -> floatOp w (\d x y -> unitOL $ SUB d x y)
-        MO_F_Mul w   -> floatOp w (\d x y -> unitOL $ MUL d x y)
-        MO_F_Quot w  -> floatOp w (\d x y -> unitOL $ DIV d x y)
+        MO_F_Add w   -> floatOp w (\d x y -> unitOL $ annExpr expr (ADD d x y))
+        MO_F_Sub w   -> floatOp w (\d x y -> unitOL $ annExpr expr (SUB d x y))
+        MO_F_Mul w   -> floatOp w (\d x y -> unitOL $ annExpr expr (MUL d x y))
+        MO_F_Quot w  -> floatOp w (\d x y -> unitOL $ annExpr expr (DIV d x y))
 
         -- Floating point comparison
-        MO_F_Eq w    -> floatCond w (\d x y -> toOL [ CSET d x y EQ ])
-        MO_F_Ne w    -> floatCond w (\d x y -> toOL [ CSET d x y NE ])
+        MO_F_Eq w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y EQ))
+        MO_F_Ne w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y NE))
 
         -- careful with the floating point operations.
         -- SLE is effectively LE or unordered (NaN)
         -- SLT is the same. ULE, and ULT will not return true for NaN.
         -- This is a bit counter-intuitive. Don't let yourself be fooled by
         -- the S/U prefix for floats, it's only meaningful for integers.
-        MO_F_Ge w    -> floatCond w (\d x y -> toOL [ CSET d x y OGE ])
-        MO_F_Le w    -> floatCond w (\d x y -> toOL [ CSET d x y OLE ]) -- x <= y <=> y > x
-        MO_F_Gt w    -> floatCond w (\d x y -> toOL [ CSET d x y OGT ])
-        MO_F_Lt w    -> floatCond w (\d x y -> toOL [ CSET d x y OLT ]) -- x < y <=> y >= x
+        MO_F_Ge w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OGE))
+        MO_F_Le w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OLE)) -- x <= y <=> y > x
+        MO_F_Gt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OGT))
+        MO_F_Lt w    -> floatCond w (\d x y -> unitOL $ annExpr expr (CSET d x y OLT)) -- x < y <=> y >= x
 
         -- Bitwise operations
-        MO_And   w -> bitOp w (\d x y -> unitOL $ AND d x y)
-        MO_Or    w -> bitOp w (\d x y -> unitOL $ OR d x y)
-        MO_Xor   w -> bitOp w (\d x y -> unitOL $ XOR d x y)
-        MO_Shl   w -> intOp False w (\d x y -> unitOL $ LSL d x y)
-        MO_U_Shr w -> intOp False w (\d x y -> unitOL $ LSR d x y)
-        MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ ASR d x y)
+        MO_And   w -> bitOp w (\d x y -> unitOL $ annExpr expr (AND d x y))
+        MO_Or    w -> bitOp w (\d x y -> unitOL $ annExpr expr (OR d x y))
+        MO_Xor   w -> bitOp w (\d x y -> unitOL $ annExpr expr (XOR d x y))
+        MO_Shl   w -> intOp False w (\d x y -> unitOL $ annExpr expr (LSL d x y))
+        MO_U_Shr w -> intOp False w (\d x y -> unitOL $ annExpr expr (LSR d x y))
+        MO_S_Shr w -> intOp True  w (\d x y -> unitOL $ annExpr expr (ASR d x y))
 
         -- TODO
 
-        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ (pprMachOp op) <+> text "in" <+> (pdoc plat expr)
+        op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ pprMachOp op <+> text "in" <+> (pdoc plat expr)
     CmmMachOp _op _xs
       -> pprPanic "getRegister' (variadic CmmMachOp): " (pdoc plat expr)
 
