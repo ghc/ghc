@@ -12,9 +12,9 @@ test('T11489', [req_profiling], makefile_test, ['T11489'])
 
 test('dynamic-prof', [], compile_and_run, [''])
 
-test('dynamic-prof2', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
+test('dynamic-prof2', [only_ways(['normal', 'nonmoving_thr']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
 
-test('dynamic-prof3', [only_ways(['normal']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
+test('dynamic-prof3', [only_ways(['normal', 'nonmoving_thr']), extra_run_opts('+RTS -hT --no-automatic-heap-samples')], compile_and_run, [''])
 
 # Remove the ipName field as it's volatile (depends on e.g. architecture and may change with every new GHC version)
 def normalise_InfoProv_ipName(str):
@@ -33,9 +33,7 @@ test('staticcallstack002',
      ['-O0 -g3 -fdistinct-constructor-tables -finfo-table-map'])
 
 test('T21455',
-     [extra_run_opts('+RTS -hT -postem'),
-      # Nonmoving collector doesn't support -hT
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_sanity'])],
+     [extra_run_opts('+RTS -hT -postem')],
      compile_and_run,
      [''])
 

@@ -1940,11 +1940,6 @@ static void normaliseRtsOpts (void)
     }
 #endif
 
-    if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
-            RtsFlags.GcFlags.useNonmoving) {
-        barf("The non-moving collector doesn't support profiling");
-    }
-
     if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
         errorBelch("The non-moving collector cannot be used in conjunction with\n"
                    "the compacting collector.");

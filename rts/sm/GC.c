@@ -875,7 +875,9 @@ GarbageCollect (struct GcConfig config,
       ASSERT(oldest_gen->old_weak_ptr_list == NULL);
 
 #if defined(THREADED_RTS)
-      concurrent = !config.nonconcurrent;
+      // Concurrent collection is currently incompatible with heap profiling.
+      // See Note [Non-concurrent nonmoving collector heap census]
+      concurrent = !config.nonconcurrent && !RtsFlags.ProfFlags.doHeapProfile;
 #else
       // In the non-threaded runtime this is the only time we push to the
       // upd_rem_set
