@@ -278,6 +278,13 @@ lint-ci-config:
     - nix run .gitlab/generate-ci#generate-jobs
     # 1 if .gitlab/generate_jobs changed the output of the generated config
     - nix shell nixpkgs#git -c git diff --exit-code
+    # And run this to generate the .gitlab/jobs-metadata.json
+    - nix run .gitlab/generate-ci#generate-job-metadata
+  artifacts:
+    when: always
+    paths:
+      - .gitlab/jobs-metadata.json
+      - .gitlab/jobs.yaml
   dependencies: []
 
 lint-submods:
