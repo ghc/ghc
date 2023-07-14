@@ -716,10 +716,18 @@ getRegister' config plat expr =
     -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+      return $ Any (intFormat w) (\dst ->
+                                    code_x `snocOL`
+                                    annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))) `appOL`
+                                    truncateReg w w dst
+                                 )
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
-      return $ Any (intFormat w) (\dst -> code_x `snocOL` annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+      return $ Any (intFormat w) (\dst ->
+                                    code_x `snocOL`
+                                    annExpr expr (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))) `appOL`
+                                    truncateReg w w dst
+                                 )
 
     CmmMachOp (MO_S_Shr w) [x, (CmmLit (CmmInt n _))] | fitsIn12bitImm n -> do
       (reg_x, format_x, code_x) <- getSomeReg x
