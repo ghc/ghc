@@ -60,11 +60,11 @@ function h$hs_minusWord64(h1,l1,h2,l2) {
 }
 
 function h$hs_plusWord64(h1,l1,h2,l2) {
-  var a = W64(h1,l1);
-  var b = W64(h2,l2);
-  var r = BigInt.asUintN(64, a + b);
-  TRACE_ARITH("Word64: " + a + " + " + b + " ==> " + r)
-  RETURN_W64(r);
+  var l  = l1+l2;
+  var rl = l>>>0;
+  var rh = (h1+h2+(l!=rl?1:0))>>>0;
+  TRACE_ARITH("Word64: " + (h1,l1) + " + " + (h2,l2) + " ==> " + (rh,rl))
+  RETURN_UBX_TUP2(rh,rl);
 }
 
 function h$hs_timesInt64(h1,l1,h2,l2) {
