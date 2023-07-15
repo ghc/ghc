@@ -675,8 +675,7 @@ getRegister' config plat expr =
                 ]
               `appOL` truncateReg from to dst
                   where
-                    -- Why -1? We need to shift out one more bit for the sign.
-                    shift = 64 - (widthInBits from - widthInBits to - 1)
+                    shift = 64 - (widthInBits from - widthInBits to)
 
     -- Dyadic machops:
     --
