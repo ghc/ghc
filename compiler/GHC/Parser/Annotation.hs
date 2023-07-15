@@ -692,12 +692,16 @@ data TrailingAnn
   = AddSemiAnn { ta_location :: EpaLocation }    -- ^ Trailing ';'
   | AddCommaAnn { ta_location :: EpaLocation }   -- ^ Trailing ','
   | AddVbarAnn { ta_location :: EpaLocation }    -- ^ Trailing '|'
+  | AddDArrowAnn { ta_location :: EpaLocation }    -- ^ Trailing '=>'
+  | AddDArrowUAnn { ta_location :: EpaLocation }    -- ^ Trailing  "⇒"
   deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
   ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
   ppr (AddCommaAnn ss)   = text "AddCommaAnn"   <+> ppr ss
   ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
+  ppr (AddDArrowAnn ss)  = text "AddDArrowAnn"  <+> ppr ss
+  ppr (AddDArrowUAnn ss) = text "AddDArrowUAnn" <+> ppr ss
 
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.

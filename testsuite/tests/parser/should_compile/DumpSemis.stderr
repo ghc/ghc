@@ -1503,7 +1503,7 @@
            (NoExtField)
            (L
             (SrcSpanAnn (EpAnn
-                         (EpaSpan { DumpSemis.hs:31:6-23 })
+                         (EpaSpan { DumpSemis.hs:31:6-20 })
                          (AnnContext
                           (Just
                            ((,)
@@ -1514,7 +1514,7 @@
                           [(EpaSpan { DumpSemis.hs:31:19 })
                           ,(EpaSpan { DumpSemis.hs:31:20 })])
                          (EpaComments
-                          [])) { DumpSemis.hs:31:6-23 })
+                          [])) { DumpSemis.hs:31:6-20 })
             [(L
               ((EpAnnS
                 (EpaSpan { DumpSemis.hs:31:8-11 })

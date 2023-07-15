@@ -319,8 +319,17 @@ instance HasTrailing AnnPragma where
   setTrailing a _ = a
 
 instance HasTrailing AnnContext where
-  trailing _ = []
-  setTrailing a _ = a
+  trailing (AnnContext ma opens closes)
+    = case ma of
+      Just (UnicodeSyntax, r) -> [AddDArrowUAnn r]
+      Just (NormalSyntax,  r) -> [AddDArrowAnn r]
+      Nothing -> []
+
+  setTrailing a [AddDArrowUAnn r] = a {ac_darrow = Just (UnicodeSyntax, r)}
+  setTrailing a [AddDArrowAnn r] = a{ac_darrow = Just (NormalSyntax, r)}
+  setTrailing a [] = a{ac_darrow = Nothing}
+  setTrailing a ts = error $ "Cannot setTrailing " ++ showAst ts ++ " for " ++ showAst a
+
 
 instance HasTrailing AnnParen where
   trailing _ = []
@@ -1358,6 +1367,8 @@ markKwT :: (Monad m, Monoid w) => TrailingAnn -> EP w m TrailingAnn
 markKwT (AddSemiAnn ss)    = AddSemiAnn    <$> markKwA AnnSemi ss
 markKwT (AddCommaAnn ss)   = AddCommaAnn   <$> markKwA AnnComma ss
 markKwT (AddVbarAnn ss)    = AddVbarAnn    <$> markKwA AnnVbar ss
+markKwT (AddDArrowUAnn ss) = AddDArrowUAnn <$> markKwA AnnDarrowU ss
+markKwT (AddDArrowAnn ss)  = AddDArrowAnn  <$> markKwA AnnDarrow ss
 
 -- ---------------------------------------------------------------------
 
@@ -4284,11 +4295,7 @@ instance (ExactPrint a) => ExactPrint (LocatedC a) where
     opens' <- mapM (markKwA AnnOpenP) opens
     a' <- markAnnotated a
     closes' <- mapM (markKwA AnnCloseP) closes
-    ma' <- case ma of
-      Just (UnicodeSyntax, r) -> Just . (UnicodeSyntax,) <$> markKwA AnnDarrowU r
-      Just (NormalSyntax,  r) -> Just . (NormalSyntax,) <$> markKwA AnnDarrow  r
-      Nothing -> pure Nothing
-    return (L (SrcSpanAnn (EpAnn anc (AnnContext ma' opens' closes') cs) l) a')
+    return (L (SrcSpanAnn (EpAnn anc (AnnContext ma opens' closes') cs) l) a')
 
 -- ---------------------------------------------------------------------
 
