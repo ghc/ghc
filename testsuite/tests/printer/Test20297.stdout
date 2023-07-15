@@ -93,13 +93,13 @@
              [])
             [(L
               (EpAnnS
-               (EpaSpan { Test20297.hs:(5,5)-(7,7) })
+               (EpaSpan { Test20297.hs:5:5-7 })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.hs:(5,5)-(7,7) })
+                (EpaSpan { Test20297.hs:5:5-7 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:5:5 })))
@@ -205,13 +205,13 @@
              [])
             [(L
               (EpAnnS
-               (EpaSpan { Test20297.hs:(9,5)-(11,26) })
+               (EpaSpan { Test20297.hs:9:5-7 })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.hs:(9,5)-(11,26) })
+                (EpaSpan { Test20297.hs:9:5-7 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:9:5 })))
@@ -484,13 +484,13 @@
              [])
             [(L
               (EpAnnS
-               (EpaSpan { Test20297.ppr.hs:(4,3)-(5,7) })
+               (EpaSpan { Test20297.ppr.hs:4:3-5 })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.ppr.hs:(4,3)-(5,7) })
+                (EpaSpan { Test20297.ppr.hs:4:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:4:3 })))
@@ -586,13 +586,13 @@
              [])
             [(L
               (EpAnnS
-               (EpaSpan { Test20297.ppr.hs:(7,3)-(9,24) })
+               (EpaSpan { Test20297.ppr.hs:7:3-5 })
                (NoEpAnns)
                (EpaComments
                 []))
               (GRHS
                (EpAnn
-                (EpaSpan { Test20297.ppr.hs:(7,3)-(9,24) })
+                (EpaSpan { Test20297.ppr.hs:7:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:7:3 })))

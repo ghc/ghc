@@ -1,17 +1,1851 @@
-(EpaSpan { T15242.hs:6:5-41 })
-(EpaSpan { T15242.hs:6:6-40 })
-(EpaSpan { T15242.hs:6:7-39 })
-(EpaSpan { T15242.hs:6:8-35 })
-(EpaSpan { T15242.hs:6:9-34 })
-(EpaSpan { T15242.hs:6:10-33 })
-(EpaSpan { T15242.hs:6:11-29 })
-(EpaSpan { T15242.hs:6:12-25 })
-(EpaSpan { T15242.hs:6:13-21 })
-(EpaSpan { T15242.hs:6:14-20 })
-(EpaSpan { T15242.hs:5:5-17 })
-(EpaSpan { T15242.hs:5:6-16 })
-[]))
-(EpaSpan { T15242.hs:5:19-37 })
-(EpaSpan { T15242.hs:5:20-32 })
-(EpaSpan { T15242.hs:5:21-31 })
-[]))
+
+==================== Typechecker AST ====================
+
+{Bag(LocatedA (HsBind Var)):
+ [(L
+   ((EpAnnS
+     (EpaSpan { <no location info> })
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
+   (VarBind
+    (NoExtField)
+    {Var: T15242.$trModule}
+    (L
+     ((EpAnnS
+       (EpaSpan { <no location info> })
+       (AnnListItem
+        [])
+       (EpaComments
+        [])))
+     (HsApp
+      (EpAnn
+       (EpaDelta (SameLine 0) [])
+       (NoEpAnns)
+       (EpaComments
+        []))
+      (L
+       ((EpAnnS
+         (EpaSpan { <no location info> })
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
+       (HsApp
+        (EpAnn
+         (EpaDelta (SameLine 0) [])
+         (NoEpAnns)
+         (EpaComments
+          []))
+        (L
+         ((EpAnnS
+           (EpaSpan { <no location info> })
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
+         (XExpr
+          (ConLikeTc
+           ({abstract:ConLike})
+           []
+           [])))
+        (L
+         ((EpAnnS
+           (EpaSpan { <no location info> })
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
+         (HsPar
+          (EpAnnNotUsed)
+          (L
+           (NoTokenLoc)
+           (HsTok))
+          (L
+           ((EpAnnS
+             (EpaSpan { <no location info> })
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
+           (HsApp
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
+            (L
+             ((EpAnnS
+               (EpaSpan { <no location info> })
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
+             (XExpr
+              (ConLikeTc
+               ({abstract:ConLike})
+               []
+               [])))
+            (L
+             ((EpAnnS
+               (EpaSpan { <no location info> })
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
+             (HsLit
+              (EpAnn
+               (EpaDelta (SameLine 0) [])
+               (NoEpAnns)
+               (EpaComments
+                []))
+              (HsStringPrim
+               (NoSourceText)
+               "main")))))
+          (L
+           (NoTokenLoc)
+           (HsTok))))))
+      (L
+       ((EpAnnS
+         (EpaSpan { <no location info> })
+         (AnnListItem
+          [])
+         (EpaComments
+          [])))
+       (HsPar
+        (EpAnnNotUsed)
+        (L
+         (NoTokenLoc)
+         (HsTok))
+        (L
+         ((EpAnnS
+           (EpaSpan { <no location info> })
+           (AnnListItem
+            [])
+           (EpaComments
+            [])))
+         (HsApp
+          (EpAnn
+           (EpaDelta (SameLine 0) [])
+           (NoEpAnns)
+           (EpaComments
+            []))
+          (L
+           ((EpAnnS
+             (EpaSpan { <no location info> })
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
+           (XExpr
+            (ConLikeTc
+             ({abstract:ConLike})
+             []
+             [])))
+          (L
+           ((EpAnnS
+             (EpaSpan { <no location info> })
+             (AnnListItem
+              [])
+             (EpaComments
+              [])))
+           (HsLit
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
+            (HsStringPrim
+             (NoSourceText)
+             "T15242")))))
+        (L
+         (NoTokenLoc)
+         (HsTok))))))))
+ ,(L
+   ((EpAnnS
+     (EpaSpan { T15242.hs:6:1-44 })
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
+   (XHsBindsLR
+    (AbsBinds
+     [{Var: a_awV}]
+     []
+     [(ABE
+       {Var: g}
+       {Var: g_awX}
+       (WpHole)
+       (SpecPrags
+        []))]
+     [({abstract:TcEvBinds})]
+     {Bag(LocatedA (HsBind Var)):
+      [(L
+        ((EpAnnS
+          (EpaSpan { T15242.hs:6:1-44 })
+          (AnnListItem
+           [])
+          (EpaComments
+           [])))
+        (FunBind
+         ((,)
+          (WpHole)
+          [])
+         (L
+          ((EpAnnS
+            (EpaSpan { T15242.hs:6:1 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             [])))
+          {Var: g_awX})
+         (MG
+          (MatchGroupTc
+           []
+           (FunTy
+            (FTF_T_T)
+            (TyConApp
+             ({abstract:TyCon})
+             [])
+            (TyVarTy
+             {Var: a_awV})
+            (TyVarTy
+             {Var: a_awV}))
+           (FromSource))
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { T15242.hs:6:1-44 })
+           [(L
+             ((EpAnnS
+               (EpaSpan { T15242.hs:6:1-44 })
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
+             (Match
+              (EpAnnNotUsed)
+              (FunRhs
+               (L
+                ((EpAnnS
+                  (EpaSpan { T15242.hs:6:1 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   [])))
+                {Name: g})
+               (Prefix)
+               (NoSrcStrict))
+              []
+              (GRHSs
+               (EpaComments
+                [])
+               [(L
+                 (EpAnnS
+                  (EpaSpan { T15242.hs:6:3-44 })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (GRHS
+                  (EpAnnNotUsed)
+                  []
+                  (L
+                   ((EpAnnS
+                     (EpaSpan { T15242.hs:6:5-44 })
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])))
+                   (HsApp
+                    (EpAnnNotUsed)
+                    (L
+                     ((EpAnnS
+                       (EpaSpan { T15242.hs:6:5-41 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
+                     (HsPar
+                      (EpAnnNotUsed)
+                      (L
+                       (NoTokenLoc)
+                       (HsTok))
+                      (L
+                       ((EpAnnS
+                         (EpaSpan { T15242.hs:6:6-40 })
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])))
+                       (HsPar
+                        (EpAnnNotUsed)
+                        (L
+                         (NoTokenLoc)
+                         (HsTok))
+                        (L
+                         ((EpAnnS
+                           (EpaSpan { T15242.hs:6:7-39 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            [])))
+                         (HsPar
+                          (EpAnnNotUsed)
+                          (L
+                           (NoTokenLoc)
+                           (HsTok))
+                          (L
+                           ((EpAnnS
+                             (EpaSpan { T15242.hs:6:8-38 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])))
+                           (HsApp
+                            (EpAnnNotUsed)
+                            (L
+                             ((EpAnnS
+                               (EpaSpan { T15242.hs:6:8-35 })
+                               (AnnListItem
+                                [])
+                               (EpaComments
+                                [])))
+                             (HsPar
+                              (EpAnnNotUsed)
+                              (L
+                               (NoTokenLoc)
+                               (HsTok))
+                              (L
+                               ((EpAnnS
+                                 (EpaSpan { T15242.hs:6:9-34 })
+                                 (AnnListItem
+                                  [])
+                                 (EpaComments
+                                  [])))
+                               (HsPar
+                                (EpAnnNotUsed)
+                                (L
+                                 (NoTokenLoc)
+                                 (HsTok))
+                                (L
+                                 ((EpAnnS
+                                   (EpaSpan { T15242.hs:6:10-33 })
+                                   (AnnListItem
+                                    [])
+                                   (EpaComments
+                                    [])))
+                                 (HsPar
+                                  (EpAnnNotUsed)
+                                  (L
+                                   (NoTokenLoc)
+                                   (HsTok))
+                                  (L
+                                   ((EpAnnS
+                                     (EpaSpan { T15242.hs:6:11-32 })
+                                     (AnnListItem
+                                      [])
+                                     (EpaComments
+                                      [])))
+                                   (HsApp
+                                    (EpAnnNotUsed)
+                                    (L
+                                     ((EpAnnS
+                                       (EpaSpan { T15242.hs:6:11-29 })
+                                       (AnnListItem
+                                        [])
+                                       (EpaComments
+                                        [])))
+                                     (HsPar
+                                      (EpAnnNotUsed)
+                                      (L
+                                       (NoTokenLoc)
+                                       (HsTok))
+                                      (L
+                                       ((EpAnnS
+                                         (EpaSpan { T15242.hs:6:12-28 })
+                                         (AnnListItem
+                                          [])
+                                         (EpaComments
+                                          [])))
+                                       (HsApp
+                                        (EpAnnNotUsed)
+                                        (L
+                                         ((EpAnnS
+                                           (EpaSpan { T15242.hs:6:12-25 })
+                                           (AnnListItem
+                                            [])
+                                           (EpaComments
+                                            [])))
+                                         (HsPar
+                                          (EpAnnNotUsed)
+                                          (L
+                                           (NoTokenLoc)
+                                           (HsTok))
+                                          (L
+                                           ((EpAnnS
+                                             (EpaSpan { T15242.hs:6:13-24 })
+                                             (AnnListItem
+                                              [])
+                                             (EpaComments
+                                              [])))
+                                           (HsApp
+                                            (EpAnnNotUsed)
+                                            (L
+                                             ((EpAnnS
+                                               (EpaSpan { T15242.hs:6:13-21 })
+                                               (AnnListItem
+                                                [])
+                                               (EpaComments
+                                                [])))
+                                             (HsPar
+                                              (EpAnnNotUsed)
+                                              (L
+                                               (NoTokenLoc)
+                                               (HsTok))
+                                              (L
+                                               ((EpAnnS
+                                                 (EpaSpan { T15242.hs:6:14-20 })
+                                                 (AnnListItem
+                                                  [])
+                                                 (EpaComments
+                                                  [])))
+                                               (HsPar
+                                                (EpAnnNotUsed)
+                                                (L
+                                                 (NoTokenLoc)
+                                                 (HsTok))
+                                                (L
+                                                 ((EpAnnS
+                                                   (EpaSpan { T15242.hs:6:15-19 })
+                                                   (AnnListItem
+                                                    [])
+                                                   (EpaComments
+                                                    [])))
+                                                 (HsApp
+                                                  (EpAnnNotUsed)
+                                                  (L
+                                                   ((EpAnnS
+                                                     (EpaSpan { T15242.hs:6:15-16 })
+                                                     (AnnListItem
+                                                      [])
+                                                     (EpaComments
+                                                      [])))
+                                                   (XExpr
+                                                    (WrapExpr
+                                                     (HsWrap
+                                                      (WpTyApp
+                                                       (FunTy
+                                                        (FTF_T_T)
+                                                        (TyConApp
+                                                         ({abstract:TyCon})
+                                                         [])
+                                                        (FunTy
+                                                         (FTF_T_T)
+                                                         (TyConApp
+                                                          ({abstract:TyCon})
+                                                          [])
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))))
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))))
+                                                        (FunTy
+                                                         (FTF_T_T)
+                                                         (TyConApp
+                                                          ({abstract:TyCon})
+                                                          [])
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))))
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV})))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))
+                                                            (FunTy
+                                                             (FTF_T_T)
+                                                             (TyConApp
+                                                              ({abstract:TyCon})
+                                                              [])
+                                                             (TyVarTy
+                                                              {Var: a_awV})
+                                                             (TyVarTy
+                                                              {Var: a_awV}))))))))
+                                                      (HsVar
+                                                       (NoExtField)
+                                                       (L
+                                                        ((EpAnnS
+                                                          (EpaSpan { <no location info> })
+                                                          (NameAnnTrailing
+                                                           [])
+                                                          (EpaComments
+                                                           [])))
+                                                        {Var: id}))))))
+                                                  (L
+                                                   ((EpAnnS
+                                                     (EpaSpan { T15242.hs:6:18-19 })
+                                                     (AnnListItem
+                                                      [])
+                                                     (EpaComments
+                                                      [])))
+                                                   (XExpr
+                                                    (WrapExpr
+                                                     (HsWrap
+                                                      (WpTyApp
+                                                       (FunTy
+                                                        (FTF_T_T)
+                                                        (TyConApp
+                                                         ({abstract:TyCon})
+                                                         [])
+                                                        (FunTy
+                                                         (FTF_T_T)
+                                                         (TyConApp
+                                                          ({abstract:TyCon})
+                                                          [])
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))))
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))))
+                                                        (FunTy
+                                                         (FTF_T_T)
+                                                         (TyConApp
+                                                          ({abstract:TyCon})
+                                                          [])
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))))
+                                                         (FunTy
+                                                          (FTF_T_T)
+                                                          (TyConApp
+                                                           ({abstract:TyCon})
+                                                           [])
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))
+                                                          (FunTy
+                                                           (FTF_T_T)
+                                                           (TyConApp
+                                                            ({abstract:TyCon})
+                                                            [])
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV}))
+                                                           (FunTy
+                                                            (FTF_T_T)
+                                                            (TyConApp
+                                                             ({abstract:TyCon})
+                                                             [])
+                                                            (TyVarTy
+                                                             {Var: a_awV})
+                                                            (TyVarTy
+                                                             {Var: a_awV})))))))
+                                                      (HsVar
+                                                       (NoExtField)
+                                                       (L
+                                                        ((EpAnnS
+                                                          (EpaSpan { <no location info> })
+                                                          (NameAnnTrailing
+                                                           [])
+                                                          (EpaComments
+                                                           [])))
+                                                        {Var: id}))))))))
+                                                (L
+                                                 (NoTokenLoc)
+                                                 (HsTok))))
+                                              (L
+                                               (NoTokenLoc)
+                                               (HsTok))))
+                                            (L
+                                             ((EpAnnS
+                                               (EpaSpan { T15242.hs:6:23-24 })
+                                               (AnnListItem
+                                                [])
+                                               (EpaComments
+                                                [])))
+                                             (XExpr
+                                              (WrapExpr
+                                               (HsWrap
+                                                (WpTyApp
+                                                 (FunTy
+                                                  (FTF_T_T)
+                                                  (TyConApp
+                                                   ({abstract:TyCon})
+                                                   [])
+                                                  (FunTy
+                                                   (FTF_T_T)
+                                                   (TyConApp
+                                                    ({abstract:TyCon})
+                                                    [])
+                                                   (FunTy
+                                                    (FTF_T_T)
+                                                    (TyConApp
+                                                     ({abstract:TyCon})
+                                                     [])
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV})))
+                                                   (FunTy
+                                                    (FTF_T_T)
+                                                    (TyConApp
+                                                     ({abstract:TyCon})
+                                                     [])
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))))
+                                                  (FunTy
+                                                   (FTF_T_T)
+                                                   (TyConApp
+                                                    ({abstract:TyCon})
+                                                    [])
+                                                   (FunTy
+                                                    (FTF_T_T)
+                                                    (TyConApp
+                                                     ({abstract:TyCon})
+                                                     [])
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV})))
+                                                   (FunTy
+                                                    (FTF_T_T)
+                                                    (TyConApp
+                                                     ({abstract:TyCon})
+                                                     [])
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))
+                                                    (FunTy
+                                                     (FTF_T_T)
+                                                     (TyConApp
+                                                      ({abstract:TyCon})
+                                                      [])
+                                                     (TyVarTy
+                                                      {Var: a_awV})
+                                                     (TyVarTy
+                                                      {Var: a_awV}))))))
+                                                (HsVar
+                                                 (NoExtField)
+                                                 (L
+                                                  ((EpAnnS
+                                                    (EpaSpan { <no location info> })
+                                                    (NameAnnTrailing
+                                                     [])
+                                                    (EpaComments
+                                                     [])))
+                                                  {Var: id}))))))))
+                                          (L
+                                           (NoTokenLoc)
+                                           (HsTok))))
+                                        (L
+                                         ((EpAnnS
+                                           (EpaSpan { T15242.hs:6:27-28 })
+                                           (AnnListItem
+                                            [])
+                                           (EpaComments
+                                            [])))
+                                         (XExpr
+                                          (WrapExpr
+                                           (HsWrap
+                                            (WpTyApp
+                                             (FunTy
+                                              (FTF_T_T)
+                                              (TyConApp
+                                               ({abstract:TyCon})
+                                               [])
+                                              (FunTy
+                                               (FTF_T_T)
+                                               (TyConApp
+                                                ({abstract:TyCon})
+                                                [])
+                                               (FunTy
+                                                (FTF_T_T)
+                                                (TyConApp
+                                                 ({abstract:TyCon})
+                                                 [])
+                                                (TyVarTy
+                                                 {Var: a_awV})
+                                                (TyVarTy
+                                                 {Var: a_awV}))
+                                               (FunTy
+                                                (FTF_T_T)
+                                                (TyConApp
+                                                 ({abstract:TyCon})
+                                                 [])
+                                                (TyVarTy
+                                                 {Var: a_awV})
+                                                (TyVarTy
+                                                 {Var: a_awV})))
+                                              (FunTy
+                                               (FTF_T_T)
+                                               (TyConApp
+                                                ({abstract:TyCon})
+                                                [])
+                                               (FunTy
+                                                (FTF_T_T)
+                                                (TyConApp
+                                                 ({abstract:TyCon})
+                                                 [])
+                                                (TyVarTy
+                                                 {Var: a_awV})
+                                                (TyVarTy
+                                                 {Var: a_awV}))
+                                               (FunTy
+                                                (FTF_T_T)
+                                                (TyConApp
+                                                 ({abstract:TyCon})
+                                                 [])
+                                                (TyVarTy
+                                                 {Var: a_awV})
+                                                (TyVarTy
+                                                 {Var: a_awV})))))
+                                            (HsVar
+                                             (NoExtField)
+                                             (L
+                                              ((EpAnnS
+                                                (EpaSpan { <no location info> })
+                                                (NameAnnTrailing
+                                                 [])
+                                                (EpaComments
+                                                 [])))
+                                              {Var: id}))))))))
+                                      (L
+                                       (NoTokenLoc)
+                                       (HsTok))))
+                                    (L
+                                     ((EpAnnS
+                                       (EpaSpan { T15242.hs:6:31-32 })
+                                       (AnnListItem
+                                        [])
+                                       (EpaComments
+                                        [])))
+                                     (XExpr
+                                      (WrapExpr
+                                       (HsWrap
+                                        (WpTyApp
+                                         (FunTy
+                                          (FTF_T_T)
+                                          (TyConApp
+                                           ({abstract:TyCon})
+                                           [])
+                                          (FunTy
+                                           (FTF_T_T)
+                                           (TyConApp
+                                            ({abstract:TyCon})
+                                            [])
+                                           (TyVarTy
+                                            {Var: a_awV})
+                                           (TyVarTy
+                                            {Var: a_awV}))
+                                          (FunTy
+                                           (FTF_T_T)
+                                           (TyConApp
+                                            ({abstract:TyCon})
+                                            [])
+                                           (TyVarTy
+                                            {Var: a_awV})
+                                           (TyVarTy
+                                            {Var: a_awV}))))
+                                        (HsVar
+                                         (NoExtField)
+                                         (L
+                                          ((EpAnnS
+                                            (EpaSpan { <no location info> })
+                                            (NameAnnTrailing
+                                             [])
+                                            (EpaComments
+                                             [])))
+                                          {Var: id}))))))))
+                                  (L
+                                   (NoTokenLoc)
+                                   (HsTok))))
+                                (L
+                                 (NoTokenLoc)
+                                 (HsTok))))
+                              (L
+                               (NoTokenLoc)
+                               (HsTok))))
+                            (L
+                             ((EpAnnS
+                               (EpaSpan { T15242.hs:6:37-38 })
+                               (AnnListItem
+                                [])
+                               (EpaComments
+                                [])))
+                             (XExpr
+                              (WrapExpr
+                               (HsWrap
+                                (WpTyApp
+                                 (FunTy
+                                  (FTF_T_T)
+                                  (TyConApp
+                                   ({abstract:TyCon})
+                                   [])
+                                  (TyVarTy
+                                   {Var: a_awV})
+                                  (TyVarTy
+                                   {Var: a_awV})))
+                                (HsVar
+                                 (NoExtField)
+                                 (L
+                                  ((EpAnnS
+                                    (EpaSpan { <no location info> })
+                                    (NameAnnTrailing
+                                     [])
+                                    (EpaComments
+                                     [])))
+                                  {Var: id}))))))))
+                          (L
+                           (NoTokenLoc)
+                           (HsTok))))
+                        (L
+                         (NoTokenLoc)
+                         (HsTok))))
+                      (L
+                       (NoTokenLoc)
+                       (HsTok))))
+                    (L
+                     ((EpAnnS
+                       (EpaSpan { T15242.hs:6:43-44 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
+                     (XExpr
+                      (WrapExpr
+                       (HsWrap
+                        (WpTyApp
+                         (TyVarTy
+                          {Var: a_awV}))
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          ((EpAnnS
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])))
+                          {Var: id}))))))))))]
+               (EmptyLocalBinds
+                (NoExtField)))))]))))]}
+     (False))))
+ ,(L
+   ((EpAnnS
+     (EpaSpan { T15242.hs:5:1-37 })
+     (AnnListItem
+      [])
+     (EpaComments
+      [])))
+   (XHsBindsLR
+    (AbsBinds
+     []
+     []
+     [(ABE
+       {Var: f}
+       {Var: f_aAD}
+       (WpHole)
+       (SpecPrags
+        []))]
+     [({abstract:TcEvBinds})]
+     {Bag(LocatedA (HsBind Var)):
+      [(L
+        ((EpAnnS
+          (EpaSpan { T15242.hs:5:1-37 })
+          (AnnListItem
+           [])
+          (EpaComments
+           [])))
+        (FunBind
+         ((,)
+          (WpHole)
+          [])
+         (L
+          ((EpAnnS
+            (EpaSpan { T15242.hs:5:1 })
+            (NameAnnTrailing
+             [])
+            (EpaComments
+             [])))
+          {Var: f_aAD})
+         (MG
+          (MatchGroupTc
+           []
+           (TyConApp
+            ({abstract:TyCon})
+            [])
+           (FromSource))
+          (L
+           (SrcSpanAnn (EpAnnNotUsed) { T15242.hs:5:1-37 })
+           [(L
+             ((EpAnnS
+               (EpaSpan { T15242.hs:5:1-37 })
+               (AnnListItem
+                [])
+               (EpaComments
+                [])))
+             (Match
+              (EpAnnNotUsed)
+              (FunRhs
+               (L
+                ((EpAnnS
+                  (EpaSpan { T15242.hs:5:1 })
+                  (NameAnnTrailing
+                   [])
+                  (EpaComments
+                   [])))
+                {Name: f})
+               (Prefix)
+               (NoSrcStrict))
+              []
+              (GRHSs
+               (EpaComments
+                [])
+               [(L
+                 (EpAnnS
+                  (EpaSpan { T15242.hs:5:3-37 })
+                  (NoEpAnns)
+                  (EpaComments
+                   []))
+                 (GRHS
+                  (EpAnnNotUsed)
+                  []
+                  (L
+                   ((EpAnnS
+                     (EpaSpan { T15242.hs:5:5-37 })
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])))
+                   (HsApp
+                    (EpAnnNotUsed)
+                    (L
+                     ((EpAnnS
+                       (EpaSpan { T15242.hs:5:5-17 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
+                     (HsPar
+                      (EpAnnNotUsed)
+                      (L
+                       (NoTokenLoc)
+                       (HsTok))
+                      (L
+                       ((EpAnnS
+                         (EpaSpan { T15242.hs:5:6-16 })
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])))
+                       (HsPar
+                        (EpAnnNotUsed)
+                        (L
+                         (NoTokenLoc)
+                         (HsTok))
+                        (L
+                         ((EpAnnS
+                           (EpaSpan { T15242.hs:5:7-15 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            [])))
+                         (HsApp
+                          (EpAnnNotUsed)
+                          (L
+                           ((EpAnnS
+                             (EpaSpan { T15242.hs:5:7-13 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])))
+                           (XExpr
+                            (WrapExpr
+                             (HsWrap
+                              (WpCompose
+                               (WpTyApp
+                                (TyConApp
+                                 ({abstract:TyCon})
+                                 []))
+                               (WpTyApp
+                                (TyConApp
+                                 ({abstract:TyCon})
+                                 [])))
+                              (HsPar
+                               (EpAnnNotUsed)
+                               (L
+                                (NoTokenLoc)
+                                (HsTok))
+                               (L
+                                ((EpAnnS
+                                  (EpaSpan { T15242.hs:5:8-12 })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])))
+                                (HsVar
+                                 (NoExtField)
+                                 (L
+                                  ((EpAnnS
+                                    (EpaSpan { <no location info> })
+                                    (NameAnnTrailing
+                                     [])
+                                    (EpaComments
+                                     [])))
+                                  {Var: const})))
+                               (L
+                                (NoTokenLoc)
+                                (HsTok)))))))
+                          (L
+                           ((EpAnnS
+                             (EpaSpan { T15242.hs:5:15 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])))
+                           (HsOverLit
+                            (EpAnnNotUsed)
+                            (OverLit
+                             (OverLitTc
+                              (False)
+                              (HsApp
+                               (EpAnnNotUsed)
+                               (L
+                                ((EpAnnS
+                                  (EpaSpan { <no location info> })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])))
+                                (XExpr
+                                 (WrapExpr
+                                  (HsWrap
+                                   (WpCompose
+                                    (WpEvApp
+                                     (EvExpr
+                                      (Var
+                                       {Var: $dNum_aAx})))
+                                    (WpTyApp
+                                     (TyConApp
+                                      ({abstract:TyCon})
+                                      [])))
+                                   (HsVar
+                                    (NoExtField)
+                                    (L
+                                     ((EpAnnS
+                                       (EpaSpan { <no location info> })
+                                       (NameAnnTrailing
+                                        [])
+                                       (EpaComments
+                                        [])))
+                                     {Var: fromInteger}))))))
+                               (L
+                                ((EpAnnS
+                                  (EpaSpan { <no location info> })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])))
+                                (HsLit
+                                 (EpAnnNotUsed)
+                                 (HsInteger
+                                  (SourceText 3)
+                                  (3)
+                                  (TyConApp
+                                   ({abstract:TyCon})
+                                   [])))))
+                              (TyConApp
+                               ({abstract:TyCon})
+                               []))
+                             (HsIntegral
+                              (IL
+                               (SourceText 3)
+                               (False)
+                               (3))))))))
+                        (L
+                         (NoTokenLoc)
+                         (HsTok))))
+                      (L
+                       (NoTokenLoc)
+                       (HsTok))))
+                    (L
+                     ((EpAnnS
+                       (EpaSpan { T15242.hs:5:19-37 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])))
+                     (HsPar
+                      (EpAnn
+                       (EpaSpan { T15242.hs:5:19-37 })
+                       (NoEpAnns)
+                       (EpaComments
+                        []))
+                      (L
+                       (TokenLoc
+                        (EpaSpan { T15242.hs:5:19 }))
+                       (HsTok))
+                      (L
+                       ((EpAnnS
+                         (EpaSpan { T15242.hs:5:20-36 })
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])))
+                       (HsApp
+                        (EpAnnNotUsed)
+                        (L
+                         ((EpAnnS
+                           (EpaSpan { T15242.hs:5:20-32 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            [])))
+                         (HsPar
+                          (EpAnnNotUsed)
+                          (L
+                           (NoTokenLoc)
+                           (HsTok))
+                          (L
+                           ((EpAnnS
+                             (EpaSpan { T15242.hs:5:21-31 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])))
+                           (HsPar
+                            (EpAnnNotUsed)
+                            (L
+                             (NoTokenLoc)
+                             (HsTok))
+                            (L
+                             ((EpAnnS
+                               (EpaSpan { T15242.hs:5:22-30 })
+                               (AnnListItem
+                                [])
+                               (EpaComments
+                                [])))
+                             (HsApp
+                              (EpAnnNotUsed)
+                              (L
+                               ((EpAnnS
+                                 (EpaSpan { T15242.hs:5:22-26 })
+                                 (AnnListItem
+                                  [])
+                                 (EpaComments
+                                  [])))
+                               (XExpr
+                                (WrapExpr
+                                 (HsWrap
+                                  (WpCompose
+                                   (WpTyApp
+                                    (TyConApp
+                                     ({abstract:TyCon})
+                                     []))
+                                   (WpTyApp
+                                    (TyConApp
+                                     ({abstract:TyCon})
+                                     [])))
+                                  (HsPar
+                                   (EpAnnNotUsed)
+                                   (L
+                                    (NoTokenLoc)
+                                    (HsTok))
+                                   (L
+                                    ((EpAnnS
+                                      (EpaSpan { T15242.hs:5:23-25 })
+                                      (AnnListItem
+                                       [])
+                                      (EpaComments
+                                       [])))
+                                    (XExpr
+                                     (WrapExpr
+                                      (HsWrap
+                                       (WpTyApp
+                                        (TyConApp
+                                         ({abstract:TyCon})
+                                         []))
+                                       (HsVar
+                                        (NoExtField)
+                                        (L
+                                         ((EpAnnS
+                                           (EpaSpan { <no location info> })
+                                           (NameAnnTrailing
+                                            [])
+                                           (EpaComments
+                                            [])))
+                                         {Var: seq}))))))
+                                   (L
+                                    (NoTokenLoc)
+                                    (HsTok)))))))
+                              (L
+                               ((EpAnnS
+                                 (EpaSpan { T15242.hs:5:28-30 })
+                                 (AnnListItem
+                                  [])
+                                 (EpaComments
+                                  [])))
+                               (HsLit
+                                (EpAnn
+                                 (EpaSpan { T15242.hs:5:28-30 })
+                                 (NoEpAnns)
+                                 (EpaComments
+                                  []))
+                                (HsChar
+                                 (SourceText 'a')
+                                 ('a'))))))
+                            (L
+                             (NoTokenLoc)
+                             (HsTok))))
+                          (L
+                           (NoTokenLoc)
+                           (HsTok))))
+                        (L
+                         ((EpAnnS
+                           (EpaSpan { T15242.hs:5:34-36 })
+                           (AnnListItem
+                            [])
+                           (EpaComments
+                            [])))
+                         (HsLit
+                          (EpAnn
+                           (EpaSpan { T15242.hs:5:34-36 })
+                           (NoEpAnns)
+                           (EpaComments
+                            []))
+                          (HsChar
+                           (SourceText 'b')
+                           ('b'))))))
+                      (L
+                       (TokenLoc
+                        (EpaSpan { T15242.hs:5:37 }))
+                       (HsTok))))))))]
+               (EmptyLocalBinds
+                (NoExtField)))))]))))]}
+     (False))))]}

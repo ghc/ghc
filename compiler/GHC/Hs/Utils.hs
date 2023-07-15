@@ -394,7 +394,7 @@ mkHsCompAnns ctxt stmts expr@(L l e) anns = mkHsDoAnns ctxt (L loc (stmts ++ [la
     last = mkLastStmt (L (noAnnSrcSpan $ getLocA expr) e)
     last_stmt = L l last
     -- last_stmt actually comes first in a list comprehension, consider all spans
-    loc  = noAnnSrcSpanI $ getHasLocList (last_stmt:stmts)
+    loc  = noAnnSrcSpan $ getHasLocList (last_stmt:stmts)
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> EpAnn AnnsIf

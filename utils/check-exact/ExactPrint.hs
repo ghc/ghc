@@ -1543,8 +1543,8 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
-    la' <- markALocatedA la
-    return (L la' a')
+    -- la' <- markALocatedA la
+    return (L la a')
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
   getAnnotationEntry = entryFromLocatedI
@@ -4929,7 +4929,7 @@ instance ExactPrint (HsPatSigType GhcPs) where
 
 instance ExactPrint (HsTyPat GhcPs) where
   getAnnotationEntry = const NoEntryVal
-  setAnnotationAnchor a _ _ = a
+  setAnnotationAnchor a _ _ _ = a
 
   exact (HsTP an ty) = do
     ty' <- markAnnotated ty

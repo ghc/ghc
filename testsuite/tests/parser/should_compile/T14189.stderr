@@ -142,7 +142,7 @@
              (RecCon
               (L
                (SrcSpanAnn (EpAnn
-                            (EpaSpan { T14189.hs:6:31 })
+                            (EpaSpan { T14189.hs:6:31-42 })
                             (AnnList
                              (Just
                               (EpaSpan { T14189.hs:6:33-40 }))
@@ -164,11 +164,12 @@
                  (ConDeclField
                   (EpAnnNotUsed)
                   [(L
-                    (EpAnnS
-                     (EpaSpan { T14189.hs:6:33 })
-                     (NoEpAnns)
-                     (EpaComments
-                      []))
+                    ((EpAnnS
+                      (EpaSpan { T14189.hs:6:33 })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])))
                     (FieldOcc
                      {Name: T14189.f}
                      (L
@@ -248,12 +249,14 @@
         (EpaComments
          [])))
       (IEThingWith
-       (EpAnn
-        (EpaSpan { T14189.hs:3:3-8 })
-        [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
-        ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
-        (EpaComments
-         []))
+       ((,)
+        (Nothing)
+        (EpAnn
+         (EpaSpan { T14189.hs:3:3-8 })
+         [(AddEpAnn AnnOpenP (EpaSpan { T14189.hs:3:10 }))
+         ,(AddEpAnn AnnCloseP (EpaSpan { T14189.hs:3:15 }))]
+         (EpaComments
+          [])))
        (L
         ((EpAnnS
           (EpaSpan { T14189.hs:3:3-8 })
