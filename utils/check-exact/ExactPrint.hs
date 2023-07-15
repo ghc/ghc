@@ -1526,8 +1526,6 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
-    -- let ann' = ann la
-    -- return (L (la { ann = ann'}) a')
     -- la' <- markALocatedA la
     return (L la a')
 

@@ -1260,7 +1260,7 @@ commentsOnlyA (EpAnnS a _ cs) = (EpAnnS a mempty cs)
 -- first 'SrcSpanAnnA' argument to those in the second.
 transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferPriorCommentsA (EpAnnS a1 an1 cs1) (EpAnnS a2 an2 cs2)
-  = (EpAnnS a1 an1 cs1',  EpAnnS a2 an2 cs2')
+  = (EpAnnS a1 an1 cs1', EpAnnS a2 an2 cs2')
   where
     pc = priorComments cs1
     fc = getFollowingComments cs1
