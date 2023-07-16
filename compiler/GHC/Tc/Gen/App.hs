@@ -720,7 +720,7 @@ tcVTA fun_ty hs_ty
              kind = tyVarKind tv
        ; ty_arg <- tcHsTypeApp hs_ty kind
 
-       ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
+       ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [inner_ty, ty_arg])
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
                          --     substitution is kind-respecting
