@@ -925,8 +925,8 @@ class HasLoc a where
 instance HasLoc (Located a) where
   getHasLoc (L l _) = l
 
-instance HasLoc (LocatedAn t a) where
-  getHasLoc (L la _) = locA la
+instance HasLoc (GenLocated (SrcSpanAnn' a) e) where
+  getHasLoc (L (SrcSpanAnn _ l) _) = l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
@@ -962,9 +962,8 @@ reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
 
-
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
-getLocA (L (SrcSpanAnn _ l) _) = l
+getLocA = getHasLoc
 
 noLocA :: a -> LocatedAn an a
 noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
