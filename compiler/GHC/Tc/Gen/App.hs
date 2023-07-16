@@ -720,9 +720,6 @@ tcVTA fun_ty hs_ty
              kind = tyVarKind tv
        ; ty_arg <- tcHsTypeApp hs_ty kind
 
-       ; inner_ty <- liftZonkM $ zonkTcType inner_ty
-             -- See Note [Visible type application zonk]
-
        ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
                          -- NB: tv and ty_arg have the same kind, so this
