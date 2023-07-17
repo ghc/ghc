@@ -1,18 +1,20 @@
 
 RepPolyMagic.hs:12:7: error: [GHC-55287]
-    • Unsaturated use of a representation-polymorphic primitive function.
-      The second argument of ‘seq’
+    • The second argument of ‘seq’
       does not have a fixed runtime representation.
       Its type is:
-        b :: TYPE r
+        b0 :: TYPE r0
+      Cannot unify ‘r’ with the type variable ‘r0’
+      because the former is not a concrete ‘RuntimeRep’.
     • In the expression: seq
       In an equation for ‘foo’: foo = seq
 
 RepPolyMagic.hs:15:7: error: [GHC-55287]
-    • Unsaturated use of a representation-polymorphic primitive function.
-      The second argument of ‘oneShot’
+    • The second argument of ‘oneShot’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE r
+        a0 :: TYPE q0
+      Cannot unify ‘r’ with the type variable ‘q0’
+      because the former is not a concrete ‘RuntimeRep’.
     • In the expression: oneShot
       In an equation for ‘bar’: bar = oneShot

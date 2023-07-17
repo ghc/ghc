@@ -23,7 +23,7 @@ import GHC.Builtin.Types
   , liftedDataConTy, liftedRepTy
   )
 import GHC.Builtin.PrimOps
-  ( PrimOp(RaiseOp) )
+  ( PrimOp(CatchOp, RaiseOp) )
 import GHC.Builtin.PrimOps.Ids
   ( primOpId )
 import GHC.Builtin.Types.Prim
@@ -57,18 +57,23 @@ import GHC.Utils.Outputable
 
 test_exprs :: [ ( String, CoreExpr ) ]
 test_exprs  =
+  -- coerce :: forall {r1} {r2} (a :: TYPE r1) (b :: TYPE r2)
+  --        .  Coercible a b => a -> b
   [ ("coerce OK", ) $
       -- coerce @LiftedRep
       mkApps (Var coerceId)
         [ Type liftedRepTy ]
   , ("coerce BAD 1", ) $
       -- coerce
-      mkApps (Var coerceId) []
+      Var coerceId
   , ("coerce BAD 2", ) $
       -- coerce @r
       mkApps (Var coerceId)
         [ Type runtimeRep1Ty ]
-  , ("raise# OK", ) $
+
+  -- raise#
+  --   :: forall {l} {r} (a :: TYPE (BoxedRep l)) (b :: TYPE r). a -> b
+  , ("raise# OK 1", ) $
       -- raise# @Lifted @LiftedRep @Int @(z -> z), where z :: TYPE r
       mkApps (Var $ primOpId RaiseOp)
         [ Type liftedDataConTy
@@ -76,6 +81,28 @@ test_exprs  =
         , Type intTy
         , Type $ mkVisFunTyMany openAlphaTy openAlphaTy
         ]
+  , ("raise# OK 2", ) $
+      -- raise# @Lifted @r
+      mkApps (Var $ primOpId RaiseOp)
+        [ Type liftedDataConTy
+        , Type runtimeRep1Ty
+        ]
+
+  -- catch# :: forall {q} {k} (a :: TYPE q) (b :: TYPE (BoxedRep k)). IO# a -> (b -> IO# a) -> IO# a,
+  -- where IO# a is shorthand for  State# RealWorld -> (# State# RealWorld, a #)
+  , ("catch# BAD 1", ) $
+      -- catch#
+      (Var $ primOpId CatchOp)
+  , ("catch# BAD 2", ) $
+      -- catch# @r @Lifted
+      mkApps (Var $ primOpId CatchOp)
+        [ Type runtimeRep1Ty
+        , Type liftedDataConTy ]
+  , ("catch# OK", ) $
+      -- catch# @LiftedRep @Lifted
+      mkApps (Var $ primOpId CatchOp)
+        [ Type liftedRepTy
+        , Type liftedDataConTy ]
   ]
 
 -- These will be considered in-scope by the Core Lint checks.

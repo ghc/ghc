@@ -64,7 +64,7 @@ import GHC.Hs
 import GHC.Tc.Errors.Types
 import GHC.Tc.Types.BasicTypes
 import GHC.Tc.Types.Constraint
-import GHC.Tc.Types.Origin
+import GHC.Tc.Types.Origin hiding ( Position(..) )
 import GHC.Tc.Types.Rank (Rank(..))
 import GHC.Tc.Types.TH
 import GHC.Tc.Utils.TcType
@@ -3697,7 +3697,7 @@ pprTcSolverReportMsg _ (FixedRuntimeRepError frr_origs) =
     unsolved_concrete_eq_explanation tv not_conc =
           text "Cannot unify" <+> quotes (ppr not_conc)
       <+> text "with the type variable" <+> quotes (ppr tv)
-      $$  text "because it is not a concrete" <+> what <> dot
+      $$  text "because the former is not a concrete" <+> what <> dot
       where
         ki = tyVarKind tv
         what :: SDoc

@@ -712,7 +712,9 @@ nonDepTyVarBinder bndr
 -- This assumes that such a re-ordering makes sense: the kinds of the inferred
 -- type variables may not depend on any of the other type variables.
 ppTyVarBinders :: [TyVar] -> ([TyVarBinder], [TyVarBinder])
-ppTyVarBinders names = case go names of { (infs, bndrs) -> (nub infs, nub bndrs) }
+ppTyVarBinders names =
+  case go names of
+    { (infs, bndrs) -> (nub infs, nub bndrs) }
   where
      go [] = ([], [])
      go (tv:tvs)
@@ -728,21 +730,24 @@ ppTyVar "a" = nonDepTyVarBinder "alphaTyVarSpec"
 ppTyVar "b" = nonDepTyVarBinder "betaTyVarSpec"
 ppTyVar "c" = nonDepTyVarBinder "gammaTyVarSpec"
 ppTyVar "s" = nonDepTyVarBinder "deltaTyVarSpec"
-ppTyVar "o" = PrimOpTyVarBinder
-              { inferredTyVarBinders = ["runtimeRep1TyVarInf"]
-              , primOpTyVarBinder    = "openAlphaTyVarSpec" }
-ppTyVar "p" = PrimOpTyVarBinder
-              { inferredTyVarBinders = ["runtimeRep2TyVarInf"]
-              , primOpTyVarBinder    = "openBetaTyVarSpec" }
-ppTyVar "v" = PrimOpTyVarBinder
-              { inferredTyVarBinders = ["levity1TyVarInf"]
-              , primOpTyVarBinder    = "levPolyAlphaTyVarSpec" }
-ppTyVar "w" = PrimOpTyVarBinder
-              { inferredTyVarBinders = ["levity2TyVarInf"]
-              , primOpTyVarBinder    = "levPolyBetaTyVarSpec" }
-ppTyVar _   = error "Unknown type var"
--- o, p, v and w have a special meaning. See primops.txt.pp
--- Note [Levity and representation polymorphic primops]
+-- See Note [Levity and representation polymorphic primops] in primops.txt.pp
+ppTyVar "a_reppoly"
+  = PrimOpTyVarBinder
+  { inferredTyVarBinders = ["runtimeRep1TyVarInf"]
+  , primOpTyVarBinder    = "openAlphaTyVarSpec" }
+ppTyVar "b_reppoly"
+  = PrimOpTyVarBinder
+  { inferredTyVarBinders = ["runtimeRep2TyVarInf"]
+  , primOpTyVarBinder    = "openBetaTyVarSpec" }
+ppTyVar "a_levpoly"
+  = PrimOpTyVarBinder
+  { inferredTyVarBinders = ["levity1TyVarInf"]
+  , primOpTyVarBinder    = "levPolyAlphaTyVarSpec" }
+ppTyVar "b_levpoly"
+  = PrimOpTyVarBinder
+  { inferredTyVarBinders = ["levity2TyVarInf"]
+  , primOpTyVarBinder    = "levPolyBetaTyVarSpec" }
+ppTyVar var = error $ "Unknown type variable name '" ++ var ++ "'"
 
 ppType :: Ty -> String
 ppType (TyApp (TyCon "Any")         []) = "anyTy"
@@ -775,12 +780,11 @@ ppType (TyVar "a")                      = "alphaTy"
 ppType (TyVar "b")                      = "betaTy"
 ppType (TyVar "c")                      = "gammaTy"
 ppType (TyVar "s")                      = "deltaTy"
-ppType (TyVar "o")                      = "openAlphaTy"
-ppType (TyVar "p")                      = "openBetaTy"
-ppType (TyVar "v")                      = "levPolyAlphaTy"
-ppType (TyVar "w")                      = "levPolyBetaTy"
--- o, p, v and w have a special meaning. See primops.txt.pp
--- Note [Levity and representation polymorphic primops]
+-- See Note [Levity and representation polymorphic primops] in primops.txt.pp
+ppType (TyVar "a_reppoly")              = "openAlphaTy"
+ppType (TyVar "b_reppoly")              = "openBetaTy"
+ppType (TyVar "a_levpoly")              = "levPolyAlphaTy"
+ppType (TyVar "b_levpoly")              = "levPolyBetaTy"
 
 ppType (TyApp (TyCon "State#") [x])             = "mkStatePrimTy " ++ ppType x
 ppType (TyApp (TyCon "MutVar#") [x,y])          = "mkMutVarPrimTy " ++ ppType x

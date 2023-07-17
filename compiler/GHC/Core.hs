@@ -644,13 +644,6 @@ The paper "Levity Polymorphism" [PLDI'17] states the first two invariants:
       (except for join points: See Note [Invariants on join points])
   I2. The type of a function argument must have a fixed runtime representation.
 
-On top of these two invariants, GHC's internal eta-expansion mechanism also requires:
-
-  I3. In any partial application `f e_1 .. e_n`, where `f` is `hasNoBinding`,
-      it must be the case that the application can be eta-expanded to match
-      the arity of `f`.
-      See Note [checkCanEtaExpand] in GHC.Core.Lint for more details.
-
 Example of I1:
 
   \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
@@ -665,25 +658,25 @@ Example of I2:
     This contravenes I2: we are applying the function `f` to a value
     with an unknown runtime representation.
 
-Examples of I3:
+Note that these two invariants require us to check other types than just the
+types of bound variables and types of function arguments, due to transformations
+that GHC performs. For example, the definition
 
-  myUnsafeCoerce# :: forall {r1} (a :: TYPE r1) {r2} (b :: TYPE r2). a -> b
-  myUnsafeCoerce# = unsafeCoerce#
+  myCoerce :: forall {r1 r2} (a :: TYPE r1) (b :: TYPE r2). Coercible a b => a -> b
+  myCoerce = coerce
 
-    This contravenes I3: we are instantiating `unsafeCoerce#` without any
-    value arguments, and with a remaining argument type, `a`, which does not
-    have a fixed runtime representation.
-    But `unsafeCorce#` has no binding (see Note [Wiring in unsafeCoerce#]
-    in GHC.HsToCore).  So before code-generation we must saturate it
-    by eta-expansion (see GHC.CoreToStg.Prep.maybeSaturate), thus
-       myUnsafeCoerce# = \x. unsafeCoerce# x
-    But we can't do that because now the \x binding would violate I1.
+is invalid, because `coerce` has no binding (see GHC.Types.Id.Make.coerceId).
+So, before code-generation, GHC saturates the RHS of 'myCoerce' by performing
+an eta-expansion (see GHC.CoreToStg.Prep.maybeSaturate):
 
-  bar :: forall (a :: TYPE) r (b :: TYPE r). a -> b
-  bar = unsafeCoerce#
+  myCoerce = \ (x :: TYPE r1) -> coerce x
 
-    OK: eta expand to `\ (x :: Type) -> unsafeCoerce# x`,
-    and `x` has a fixed RuntimeRep.
+However, this transformation would be invalid, because now the binding of x
+in the lambda abstraction would violate I1.
+
+See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head
+and Note [Linting representation-polymorphic builtins] in GHC.Core.Lint for
+more details.
 
 Note that we currently require something slightly stronger than a fixed runtime
 representation: we check whether bound variables and function arguments have a

@@ -185,7 +185,9 @@ buildDataCon fam_envs dc_bang_opts src_name declared_infix prom_info src_bangs
               -- See Note [Constructor tag allocation], fixes #14657
               data_con = mkDataCon src_name declared_infix prom_info
                                    src_bangs field_lbls
-                                   univ_tvs ex_tvs user_tvbs eq_spec ctxt
+                                   univ_tvs ex_tvs
+                                   noConcreteTyVars
+                                   user_tvbs eq_spec ctxt
                                    arg_tys res_ty NoPromInfo rep_tycon tag
                                    stupid_ctxt dc_wrk dc_rep
               dc_wrk = mkDataConWorkId work_name data_con

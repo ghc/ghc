@@ -18,8 +18,13 @@ type family F a where
 type C :: Type -> Constraint
 class C a where {}
 
-type N :: forall (a :: Type) -> TYPE (R a)
-newtype C a => N a = MkN (F a)
+type D :: Type -> Constraint
+class D a where
+  data family N a :: TYPE (R a)
+
+--type N :: forall (a :: Type) -> TYPE (R a)
+instance D a where
+  newtype instance C a => N a = MkN (F a)
 
 foo1 :: C Float => F Float -> N Float
 foo1 = MkN

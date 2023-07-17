@@ -174,12 +174,11 @@ matchActualFunTySigma herald mb_thing err_info fun_ty
 
     ------------
     defer fun_ty
-      = do { arg_ty <- newOpenFlexiTyVarTy
+      = do { arg_ty <- newOpenFlexiFRRTyVarTy (FRRExpectedFunTy herald 1)
            ; res_ty <- newOpenFlexiTyVarTy
            ; mult <- newFlexiTyVarTy multiplicityTy
            ; let unif_fun_ty = tcMkVisFunTy mult arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; hasFixedRuntimeRep_syntactic (FRRExpectedFunTy herald 1) arg_ty
            ; return (mkWpCastN co, Scaled mult arg_ty, res_ty) }
 
     ------------

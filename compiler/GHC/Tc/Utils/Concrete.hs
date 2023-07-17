@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ParallelListComp #-}
 
 -- | Checking for representation-polymorphism using the Concrete mechanism.
 --
@@ -8,38 +9,41 @@ module GHC.Tc.Utils.Concrete
   ( -- * Ensuring that a type has a fixed runtime representation
     hasFixedRuntimeRep
   , hasFixedRuntimeRep_syntactic
+
+  , unifyConcrete
+
+  , idConcreteTvs
   )
  where
 
 import GHC.Prelude
 
+import GHC.Builtin.Names       ( unsafeCoercePrimName )
 import GHC.Builtin.Types       ( liftedTypeKindTyCon, unliftedTypeKindTyCon )
 
 import GHC.Core.Coercion       ( coToMCo, mkCastTyMCo
                                , mkGReflRightMCo, mkNomReflCo )
 import GHC.Core.TyCo.Rep       ( Type(..), MCoercion(..) )
 import GHC.Core.TyCon          ( isConcreteTyCon )
-import GHC.Core.Type           ( isConcreteType, typeKind, tyVarKind, coreView
-                               , mkTyVarTy, mkTyConApp, mkFunTy, mkAppTy )
+import GHC.Core.Type           ( isConcreteType, typeKind, mkFunTy)
 
-import GHC.Tc.Types            ( TcM, ThStage(..), PendingStuff(..) )
 import GHC.Tc.Types.Constraint ( NotConcreteError(..), NotConcreteReason(..) )
 import GHC.Tc.Types.Evidence   ( Role(..), TcCoercionN, TcMCoercionN )
-import GHC.Tc.Types.Origin     ( CtOrigin(..), FixedRuntimeRepContext, FixedRuntimeRepOrigin(..) )
-import GHC.Tc.Utils.Monad      ( emitNotConcreteError, setTcLevel, getCtLocM, getStage, traceTc
-                               , liftZonkM )
-import GHC.Tc.Utils.TcType     ( TcType, TcKind, TcTypeFRR
-                               , MetaInfo(..), ConcreteTvOrigin(..)
-                               , isMetaTyVar, metaTyVarInfo, tcTyVarLevel )
-import GHC.Tc.Utils.TcMType    ( newConcreteTyVar, isFilledMetaTyVar_maybe, writeMetaTyVar
-                               , emitWantedEq )
+import GHC.Tc.Types.Origin
+import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.TcMType
 
-import GHC.Types.Basic         ( TypeOrKind(..) )
-import GHC.Types.Name          ( getOccName )
-import GHC.Types.Name.Occurrence( occNameFS )
+import GHC.Types.Basic         ( TypeOrKind(KindLevel) )
+import GHC.Types.Id
+import GHC.Types.Id.Info
+import GHC.Types.Name
+import GHC.Types.Name.Env
+import GHC.Types.Var           ( tyVarKind, tyVarName )
+
 import GHC.Utils.Misc          ( HasDebugCallStack )
 import GHC.Utils.Outputable
-import GHC.Data.FastString     ( fsLit )
+import GHC.Data.FastString     ( FastString, fsLit )
 
 
 import Control.Monad      ( void )
@@ -400,7 +404,8 @@ hasFixedRuntimeRep :: HasDebugCallStack
                         -- @ki@ is concrete, and @co :: ty ~# ty'@.
                         -- That is, @ty'@ has a syntactically fixed RuntimeRep
                         -- in the sense of Note [Fixed RuntimeRep].
-hasFixedRuntimeRep frr_ctxt ty = checkFRR_with unifyConcrete frr_ctxt ty
+hasFixedRuntimeRep frr_ctxt ty =
+  checkFRR_with (unifyConcrete (fsLit "cx") . ConcreteFRR) frr_ctxt ty
 
 -- | Like 'hasFixedRuntimeRep', but we perform an eager syntactic check.
 --
@@ -485,9 +490,9 @@ checkFRR_with check_kind frr_ctxt ty
 -- We assume the provided type is already at the kind-level
 -- (this only matters for error messages).
 unifyConcrete :: HasDebugCallStack
-              => FixedRuntimeRepOrigin -> TcType -> TcM TcMCoercionN
-unifyConcrete frr_orig ty
-  = do { (ty, errs) <- makeTypeConcrete (ConcreteFRR frr_orig) ty
+              => FastString -> ConcreteTvOrigin -> TcType -> TcM TcMCoercionN
+unifyConcrete occ_fs conc_orig ty
+  = do { (ty, errs) <- makeTypeConcrete conc_orig ty
        ; case errs of
            -- We were able to make the type fully concrete.
          { [] -> return MRefl
@@ -497,14 +502,15 @@ unifyConcrete frr_orig ty
            -- Create a new ConcreteTv metavariable @concrete_tv@
            -- and unify @ty ~# concrete_tv@.
          ; _  ->
-    do { conc_tv <- newConcreteTyVar (ConcreteFRR frr_orig) (fsLit "cx") ki
+    do { conc_tv <- newConcreteTyVar conc_orig occ_fs ki
            -- NB: newConcreteTyVar asserts that 'ki' is concrete.
        ; coToMCo <$> emitWantedEq orig KindLevel Nominal ty (mkTyVarTy conc_tv) } } }
   where
     ki :: TcKind
     ki = typeKind ty
     orig :: CtOrigin
-    orig = FRROrigin frr_orig
+    orig = case conc_orig of
+      ConcreteFRR frr_orig -> FRROrigin frr_orig
 
 -- | Ensure that the given type is concrete.
 --
@@ -686,3 +692,36 @@ makeTypeConcrete conc_orig ty =
 
     bale_out :: TcType -> NotConcreteReason -> WriterT [NotConcreteReason] TcM TcType
     bale_out ty reason = do { tell [reason]; return ty }
+
+{-***********************************************************************
+%*                                                                      *
+                   Concrete type variables of Ids
+%*                                                                      *
+%**********************************************************************-}
+
+-- | Which type variables of this 'Id' must be concrete when instantiated?
+--
+-- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+idConcreteTvs :: TcId -> ConcreteTyVars
+idConcreteTvs id
+
+  -- HACK for unsafeCoerce#: because of the way it is not quite wired in,
+  -- as described in Note [Wiring in unsafeCoerce#] in GHC.HsToCore, we don't
+  -- have access to the correct IdDetails in the typechecker (as we only patch
+  -- in the correct information in the desugarer).
+  -- So, for the time being, we manually inspect the type of the original,
+  -- unpatched Id to retrieve which of its outer forall-d tyvars should be concrete.
+  | idName id == unsafeCoercePrimName
+  , (a_rep:_b_rep:a:_b:_, _) <- tcSplitForAllTyVars $ idType id
+  -- NB: only check the argument representation, not the result representation.
+  -- This is because the following is OK:
+  --
+  --   unsafeCoerceWordRep :: forall {r2} (b :: TYPE r2). Word# -> b
+  --   unsafeCoerceWordRep = unsafeCoerce#
+  = mkNameEnv
+    [(tyVarName a_rep, ConcreteFRR $ FixedRuntimeRepOrigin (mkTyVarTy a)
+                                   $ FRRRepPolyId unsafeCoercePrimName RepPolyFunction
+                                   $ Argument 1 Top)]
+
+  | otherwise
+  = idDetailsConcreteTvs $ idDetails id

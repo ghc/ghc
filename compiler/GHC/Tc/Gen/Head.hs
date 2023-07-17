@@ -20,8 +20,7 @@ module GHC.Tc.Gen.Head
        , AppCtxt(..), appCtxtLoc, insideExpansion
        , splitHsApps, rebuildHsApps
        , addArgWrap, isHsValArg
-       , countLeadingValArgs, isVisibleArg, pprHsExprArgTc
-       , countVisAndInvisValArgs, countHsWrapperInvisArgs
+       , leadingValArgs, isVisibleArg, pprHsExprArgTc
 
        , tcInferAppHead, tcInferAppHead_maybe
        , tcInferId, tcCheckId
@@ -67,7 +66,6 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 
-import GHC.Types.Var( isInvisibleFunArg )
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
@@ -84,7 +82,6 @@ import GHC.Driver.Env
 import GHC.Driver.DynFlags
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 
 import GHC.Data.Maybe
@@ -275,7 +272,7 @@ mkETypeArg ctxt at hs_ty =
            , eva_at = at, eva_hs_ty = hs_ty
            , eva_ty = noExtField }
 
-addArgWrap :: HsWrapper -> [HsExprArg 'TcpInst] -> [HsExprArg 'TcpInst]
+addArgWrap :: HsWrapper -> [HsExprArg p] -> [HsExprArg p]
 addArgWrap wrap args
  | isIdHsWrapper wrap = args
  | otherwise          = EWrap (EHsWrap wrap) : args
@@ -334,10 +331,10 @@ splitHsApps e = go e (top_ctxt 0 e) []
 -- expression together with arguments in the form of typechecked 'HsExprArg's
 -- and returns a typechecked application of the head to the arguments.
 --
--- This performs a representation-polymorphism check to ensure that the
--- remaining value arguments in an application have a fixed RuntimeRep.
+-- This performs a representation-polymorphism check to ensure that
+-- representation-polymorphic unlifted newtypes have been eta-expanded.
 --
--- See Note [Checking for representation-polymorphic built-ins].
+-- See Note [Eta-expanding rep-poly unlifted newtypes].
 rebuildHsApps :: HsExpr GhcTc
                       -- ^ the function being applied
               -> AppCtxt
@@ -347,7 +344,7 @@ rebuildHsApps :: HsExpr GhcTc
                       -- ^ result type of the application
               -> TcM (HsExpr GhcTc)
 rebuildHsApps fun ctxt args app_res_rho
-  = do { tcRemainingValArgs args app_res_rho fun
+  = do { rejectRepPolyNewtypes args app_res_rho fun
        ; return $ rebuild_hs_apps fun ctxt args }
 
 -- | The worker function for 'rebuildHsApps': simply rebuilds
@@ -377,29 +374,31 @@ rebuild_hs_apps fun ctxt (arg : args)
   where
     lfun = L (noAnnSrcSpan $ appCtxtLoc ctxt) fun
 
-{- Note [Checking for representation-polymorphic built-ins]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Representation-polymorphic Ids with no binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have representation-polymorphic or levity-polymorphic
 function arguments. See Note [Representation polymorphism invariants]
-in GHC.Core.  That is checked by the calls to `hasFixedRuntimeRep` in
-`tcEValArg`.
+in GHC.Core.  That is checked in 'GHC.Tc.Gen.App.tcInstFun', see the call
+to 'matchActualFunTySigma', which performs the representation-polymorphism
+check.
 
-But some /built-in/ functions have representation-polymorphic argument
-types. Users can't define such Ids; they are all GHC built-ins or data
-constructors.  Specifically they are:
+However, some special Ids have representation-polymorphic argument
+types. These are all GHC built-ins or data constructors. They have no binding;
+instead they have compulsory unfoldings. Specifically, these Ids are:
 
-1. A few wired-in Ids such as coerce and unsafeCoerce#,
-2. Primops, such as raise#.
-3. Newtype constructors with `UnliftedNewtypes` which have
-   a representation-polymorphic argument.
-4. Representation-polymorphic data constructors: unboxed tuples
+1. Some wired-in Ids, such as coerce, oneShot and unsafeCoerce# (which is only
+   partly wired-in),
+2. Representation-polymorphic primops, such as raise#.
+3. Representation-polymorphic data constructors: unboxed tuples
    and unboxed sums.
+4. Newtype constructors with `UnliftedNewtypes` which have
+   a representation-polymorphic argument.
 
 For (1) consider
   badId :: forall r (a :: TYPE r). a -> a
   badId = unsafeCoerce# @r @r @a @a
 
-The wired-in function
+The (partly) wired-in function
   unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                    (a :: TYPE r1) (b :: TYPE r2).
                    a -> b
@@ -419,13 +418,16 @@ is representation-monomorphic.
 
 Test cases: T14561, RepPolyWrappedVar2.
 
-For primops (2) the situation is similar; they are eta-expanded in
-CorePrep to be saturated, and that eta-expansion must not add a
-representation-polymorphic lambda.
+For primops (2) and unboxed tuples/sums (3), the situation is similar;
+they are eta-expanded in CorePrep to be saturated, and that eta-expansion
+must not add a representation-polymorphic lambda.
 
 Test cases: T14561b, RepPolyWrappedVar, UnliftedNewtypesCoerceFail.
 
-For (3), consider a representation-polymorphic newtype with
+The Note [Representation-polymorphism checking built-ins] explains how we handle
+cases (1) (2) and (3).
+
+For (4), consider a representation-polymorphic newtype with
 UnliftedNewtypes:
 
   type Id :: forall r. TYPE r -> TYPE r
@@ -439,217 +441,269 @@ UnliftedNewtypes:
 
 Test cases: T18481, UnliftedNewtypesLevityBinder
 
-So these cases need special treatment. We add a special case
-in tcApp to check whether an application of an Id has any remaining
-representation-polymorphic arguments, after instantiation and application
-of previous arguments.  This is achieved by the tcRemainingValArgs
-function, which computes the types of the remaining value arguments, and checks
-that each of these have a fixed runtime representation.
+(4) is handled differently than (1) (2) and (3);
+see Note [Eta-expanding rep-poly unlifted newtypes].
 
-Note that this function also ensures that data constructors always
-appear saturated, by performing eta-expansion if necessary.
-See Note [Typechecking data constructors].
+Note [Representation-polymorphism checking built-ins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Some primops and wired-in functions are representation-polymorphic, but must
+only be instantiated at particular, concrete representations.
+There are three cases, all for `hasNoBinding` Ids:
 
-Wrinkle [Arity]
+* Wired-in Ids.  For example, `seq`
+  is a wired-in Id, defined in GHC.Types.Id.Make.seqId, with this type:
 
-  We don't want to check for arguments past the arity of the function.
+  seq :: forall {r} a (b :: TYPE r). a -> b -> b
 
-  For example
+  It is more like a macro than a regular Id: it has /compulsory/ unfolding, so
+  we inline it at every call site.  At those call sites we should instantiate
+  `r` with a concrete RuntimeRep, so that the lambda has a concrete representation.
+  So somehow the type checker has to ensure that `seq` is called with a concrete
+  instantiation for `r`.
 
-      raise# :: forall {r :: RuntimeRep} (a :: Type) (b :: TYPE r). a -> b
+  NB: unsafeCoerce# is not quite wired-in (see Note [Wiring in unsafeCoerce#] in GHC.HsToCore),
+  but it gets a similar treatment.
 
-  has arity 1, so an instantiation such as:
+* PrimOps. Some representation-polymorphic primops must be called at a concrete
+  type.  For example:
 
-      foo :: forall w r (z :: TYPE r). w -> z -> z
-      foo = raise# @w @(z -> z)
+  catch# :: forall {r} {l} (k :: TYPE r) (w :: TYPE (BoxedRep l)).
+              (State# RealWorld -> (# State# RealWorld, k #) )
+           -> (w -> State# RealWorld -> (# State# RealWorld, k #) )
+           -> State# RealWorld -> (# State# RealWorld, k #)
 
-  is unproblematic.  This means we must take care not to perform a
-  representation-polymorphism check on `z`.
+  This primop pushes a "catch frame" on the stack, which must "know"
+  the return convention of `k`.  So `k` must be concrete, so we know
+  what kind of catch-frame to push. (See #21868 for more details.
 
-  To achieve this, we consult the arity of the 'Id' which is the head
-  of the application (or just use 1 for a newtype constructor),
-  and keep track of how many value-level arguments we have seen,
-  to ensure we stop checking once we reach the arity.
-  This is slightly complicated by the need to include both visible
-  and invisible arguments, as the arity counts both:
-  see GHC.Tc.Gen.Head.countVisAndInvisValArgs.
+  So again we want to ensure that `r` is instantiated with a concrete RuntimeRep.
 
-  Test cases: T20330{a,b}
+* Unboxed-tuple data constructors.  Consider the unboxed pair data constructor:
 
-Wrinkle [Syntactic check]
+  (#,#) :: forall {r1} {r2} (a :: TYPE r1) (b :: TYPE r2). a -> b -> (# a, b #)
 
-  We only perform a syntactic check in tcRemainingValArgs. That is,
-  we will reject partial applications such as:
+  Again, we need concrete `r1` and `r2`. For example, we want to reject
 
-    type RR :: RuntimeREp
-    type family RR where { RR = IntRep }
-    type T :: TYPE RR
-    type family T where { T = Int# }
+    f :: forall r (a :: TYPE r). a -> (# Int, a #)
+    f = (#,#) 3
 
-    (# , #) @LiftedRep @RR e1
+As pointed out in #21906; we see here that it is not enough to simply check
+the representation of the argument types, as for example "k :: TYPE r" in the
+type of catch# occurs in negative position but not directly as the type of
+an argument.
 
-  Why do we reject? Wee would need to elaborate this partial application
-  of (# , #) as follows:
+NB: we specifically *DO NOT* handle representation-polymorphic unlifted newtypes
+with this mechanism. See Note [Eta-expanding rep-poly unlifted newtypes] for an
+overview of representation-polymorphism checks for those.
 
-    let x1 = e1
-    in
-      ( \ @(ty2 :: TYPE RR) (x2 :: ty2 |> TYPE RR[0])
-      -> ( ( (# , #) @LiftedRep @RR @Char @ty2 x1 ) |> co1 )
-           x2
-      ) |> co2
+To achieve this goal, for these these three kinds of `hasNoBinding` functions:
 
-  That is, we need to cast the partial application
+* We identify the quantified variable `r` as a "concrete quantifier"
 
-    (# , #) @LiftedRep @RR @Char @ty2 x1
+* When instantiating a concrete quantifier, such as `r`, at a call site, we
+  instantiate with a ConcreteTv meta-tyvar, `r0[conc]`.
+  See Note [ConcreteTv] in GHC.Tc.Utils.Concrete.
 
-  so that the next argument we provide to it has a fixed RuntimeRep,
-  and then eta-expand it. This is quite tricky, and other parts
-  of the compiler aren't set up to handle this mix of applications
-  and casts (e.g. checkCanEtaExpand in GHC.Core.Lint).
+Now the type checker will ensure that `r0` is instantiated with a concrete
+RuntimeRep.
 
-  So we refrain from doing so, and instead limit ourselves to a simple syntactic
-  check. See the wiki page https://gitlab.haskell.org/ghc/ghc/-/wikis/Remaining-ValArgs
-  for a more in-depth discussion.
+Here are the moving parts:
+
+* In the IdDetails of an Id, we record a mapping from type variable name
+  to concreteness information, in the form of a ConcreteTvOrigin.
+  See 'idDetailsConcreteTvs'.
+
+  The ConcreteTvOrigin is used to determine which error message to show
+  to the user if the type variable gets instantiated to a non-concrete type;
+  this is slightly more granular than simply storing a set of type variable names.
+
+* The domain of this NameEnv is the outer forall'd TyVars of that
+  Id's type.  (A bit yukky because it means that alpha-renaming that type
+  would be invalid.  But we never do that.)  So `seq` has
+    Type:       forall {r} a (b :: TYPE r). a -> b -> b
+    IdDetails:  RepPolyId [ r :-> ConcreteFRR (FixedRuntimeRepOrigin b (..)) ]
+
+* When instantiating the type of an Id at a call site, at the call to
+  GHC.Tc.Utils.Instantiate.instantiateSigma in GHC.Tc.Gen.App.tcInstFun,
+  create ConcreteTv metavariables (instead of TauTvs) based on the
+  ConcreteTyVars stored in the IdDetails of the Id.
+
+Note that the /only/ place that one of these restricted rep-poly Ids can enter
+typechecking is in `tcInferId`, and all the interesting cases then land
+in `tcInstFun` where we take care to instantantiate those concrete
+type variables correctly.
+
+  Design alternative: in some ways, it would be more kosher for the concrete-ness
+  to be stored in the /type/, thus  forall (r[conc] :: RuntimeRep). ty.
+  But that pollutes Type for a very narrow use-case; so instead we adopt the
+  more ad-hoc solution described above.
+
+Examples:
+
+  ok :: forall (a :: Type) (b :: Type). a -> b -> b
+  ok = seq
+
+  bad :: forall s (b :: TYPE s). Int -> b -> b
+  bad x = seq x
+
+    Here we will instantiate the RuntimeRep skolem variable r from the type
+    of seq to a concrete metavariable rr[conc].
+    For 'ok' we will unify rr := LiftedRep, and for 'bad' we will fail to
+    solve rr[conc] ~# s[sk] and report a representation-polymorphism error to
+    the user.
+
+  type RR :: RuntimeRep
+  type family RR where { RR = IntRep }
+
+  tricky1, tricky2 :: forall (b :: TYPE RR). Int -> b -> b
+  tricky1 = seq
+  tricky2 = seq @RR
+
+    'tricky1' proceeds as above: we instantiate r |-> rr[conc], get a Wanted
+    rr[conc] ~# RR, which we solve by rewriting the type family.
+
+    For 'tricky2', we again create a fresh ConcreteTv metavariable rr[conc],
+    and we then proceed as if the user had written "seq @rr", but adding an
+    additional [W] rr ~ RR to the constraint solving context.
+
+[Wrinkle: VTA]
+
+  We must also handle the case when the user has instantiated the type variables
+  themselves, with a visible type application. We do this in GHC.Tc.Gen.App.tcVTA.
+
+  For example:
+
+    type F :: Type -> RuntimeRep
+    type family F a where { F Bool = IntRep }
+
+    foo = (# , #) @(F Bool) @FloatRep
+
+  We want to accept "foo" even though "F Bool" is not a concrete RuntimeRep.
+  We proceed as follows (see tcVTA):
+
+    - create a fresh concrete metavariable kappa,
+    - emit [W] F Bool ~ kappa[conc]
+    - pretend the user wrote (#,#) @kappa.
+
+  The solver will then unify kappa := IntRep, after rewriting the type family
+  application on the LHS of the Wanted.
+
+  Note that this is a bit of a corner case: only a few built-ins, such as
+  unsafeCoerce# and unboxed tuples, have specified (not inferred) RuntimeRep
+  quantified variables which can be instantiated by the user with a
+  visible type application.
+  For example,
+
+    coerce :: forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r)
+           .  Coercible a b => a -> b
+
+  does not allow the RuntimeRep argument to be specified by a visible type
+  application.
+
+Note [Eta-expanding rep-poly unlifted newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Any occurrence of a newtype constructor must appear at a known representation.
+If the newtype is applied to an argument, then we are done: by (I2) in
+Note [Representation polymorphism invariants], the argument has a known
+representation, and we are done. So we are left with the situation of an
+unapplied newtype constructor. For example:
+
+  type N :: TYPE r -> TYPE r
+  newtype N a = MkN a
+
+  ok :: N Int# -> N Int#
+  ok = MkN
+
+  bad :: forall r (a :: TYPE r). N (# Int, r #) -> N (# Int, r #)
+  bad = MkN
+
+The difficulty is that, unlike the situation described in
+Note [Representation-polymorphism checking built-ins],
+it is not necessarily the case that we simply need to check the instantiation
+of a single variable. Consider for example:
+
+  type RR :: Type -> Type -> RuntimeRep
+  type family RR a b where ...
+
+  type T :: forall a -> forall b -> TYPE (RR a b)
+  type family T a b where ...
+
+  type M :: forall a -> forall b -> TYPE (RR a b)
+  newtype M a b = MkM (T a b)
+
+Now, suppose we instantiate MkM, say with two types X, Y from the environment:
+
+  foo :: T X Y -> M X Y
+  foo = MkM @X @Y
+
+we need to check that we can eta-expand MkM, for which we need to know the
+representation of its argument, which is "RR X Y".
+
+To do this, in "rejectRepPolyNewtypes", we perform a syntactic representation-
+polymorphism check on the instantiated argument of the newtype, and reject
+the definition if the representation isn't concrete (in the sense of Note [Concrete types]
+in GHC.Tc.Utils.Concrete).
+
+For example, we would accept "ok" above, as "IntRep" is a concrete RuntimeRep.
+However, we would reject "foo", because "RR X Y" is not a concrete RuntimeRep.
+If we wanted to accept "foo" (performing a PHASE 2 check (in the sense of
+Note [The Concrete mechanism] in GHC.Tc.Utils.Concrete), we would have to
+significantly re-engineer unlifted newtypes in GHC. Currently, "MkM" has type:
+
+  MkM :: forall a b. T a b %1 -> M a b
+
+However, we should only be able to use MkM when we know the representation of
+T a b (which is RR a b). This means that MkM should instead have type:
+
+  MkM :: forall {must_be_conc} a b (co :: RR a b ~# must_be_conc)
+      .  T a b |> GRefl Nominal (TYPE co) %1 -> M a b
+
+where "must_be_conc" is a skolem type variable that must be instantiated to
+a concrete type, just as in Note [Representation-polymorphism checking built-ins].
+This means that any instantiation of "MkM", such as "MkM @X @Y" from "foo",
+would create a fresh concrete metavariable "gamma[conc]" and emit a Wanted constraint
+
+  [W] co :: RR X Y ~# gamma[conc]
+
+However, this all seems like a lot of work for a feature that no one is asking for,
+so we decided to keep the much simpler syntactic check. Note that one possible
+advantage of this approach is that we should be able to stop skipping
+representation-polymorphism checks in the output of the desugarer; see (C) in
+Wrinkle [Representation-polymorphic lambdas] in Note [Typechecking data constructors].
 -}
 
--- | Typecheck the remaining value arguments in a partial application,
--- ensuring they have a fixed RuntimeRep in the sense of Note [Fixed RuntimeRep]
--- in GHC.Tc.Utils.Concrete.
+-- | Reject any unsaturated use of an unlifted newtype constructor
+-- if the representation of its argument isn't known.
 --
--- Example:
---
--- > repPolyId :: forall r (a :: TYPE r). a -> a
--- > repPolyId = coerce
---
--- This is an invalid instantiation of 'coerce', as we can't eta expand it
--- to
---
--- > \@r \@(a :: TYPE r) (x :: a) -> coerce @r @a @a x
---
--- because the binder `x` does not have a fixed runtime representation.
-tcRemainingValArgs :: HasDebugCallStack
-                   => [HsExprArg 'TcpTc]
-                   -> TcRhoType
-                   -> HsExpr GhcTc
-                   -> TcM ()
-tcRemainingValArgs applied_args app_res_rho fun = case fun of
-
-  HsVar _ (L _ fun_id)
-
-    -- (1): unsafeCoerce#
-    -- 'unsafeCoerce#' is peculiar: it is patched in manually as per
-    -- Note [Wiring in unsafeCoerce#] in GHC.HsToCore.
-    -- Unfortunately, even though its arity is set to 1 in GHC.HsToCore.mkUnsafeCoercePrimPair,
-    -- at this stage, if we query idArity, we get 0. This is because
-    -- we end up looking at the non-patched version of unsafeCoerce#
-    -- defined in Unsafe.Coerce, and that one indeed has arity 0.
-    --
-    -- We thus manually specify the correct arity of 1 here.
-    | idName fun_id == unsafeCoercePrimName
-    -> tc_remaining_args 1 (RepPolyWiredIn fun_id)
-
-    -- (2): primops and other wired-in representation-polymorphic functions,
-    -- such as 'rightSection', 'oneShot', etc; see bindings with Compulsory unfoldings
-    -- in GHC.Types.Id.Make
-    | isWiredInName (idName fun_id) && hasNoBinding fun_id
-    -> tc_remaining_args (idArity fun_id) (RepPolyWiredIn fun_id)
-       -- NB: idArity consults the IdInfo of the Id. This can be a problem
-       -- in the presence of hs-boot files, as we might not have finished
-       -- typechecking; inspecting the IdInfo at this point can cause
-       -- strange Core Lint errors (see #20447).
-       -- We avoid this entirely by only checking wired-in names,
-       -- as those are the only ones this check is applicable to anyway.
+-- See Note [Eta-expanding rep-poly unlifted newtypes].
+rejectRepPolyNewtypes :: [HsExprArg 'TcpTc]
+                      -> TcRhoType
+                      -> HsExpr GhcTc
+                      -> TcM ()
+rejectRepPolyNewtypes _applied_args app_res_rho fun = case fun of
 
   XExpr (ConLikeTc (RealDataCon con) _ _)
-    -- (3): Representation-polymorphic newtype constructors.
+    -- Check that this is an unsaturated occurrence of a
+    -- representation-polymorphic newtype constructor.
     | isNewDataCon con
-    -- (4): Unboxed tuples and unboxed sums
-    || isUnboxedTupleDataCon con
-    || isUnboxedSumDataCon con
-    -> tc_remaining_args (dc_val_arity con) (RepPolyDataCon con)
+    , not $ tcHasFixedRuntimeRep $ dataConTyCon con
+    , Just (_rem_arg_af, _rem_arg_mult, rem_arg_ty, _nt_res_ty)
+        <- splitFunTy_maybe app_res_rho
+    -> do { let frr_ctxt = FRRRepPolyUnliftedNewtype con
+          ; hasFixedRuntimeRep_syntactic frr_ctxt rem_arg_ty }
 
   _ -> return ()
-
-  where
-
-    dc_val_arity :: DataCon -> Arity
-    dc_val_arity con = count (not . isEqPrimPred) (dataConTheta con)
-                     + length (dataConStupidTheta con)
-                     + dataConSourceArity con
-      -- Count how many value-level arguments this data constructor expects:
-      --    - dictionary arguments from the context (including the stupid context),
-      --    - source value arguments.
-      -- Tests: EtaExpandDataCon, EtaExpandStupid{1,2}.
-
-    nb_applied_vis_val_args :: Int
-    nb_applied_vis_val_args = count isHsValArg applied_args
-
-    nb_applied_val_args :: Int
-    nb_applied_val_args = countVisAndInvisValArgs applied_args
-
-    tc_remaining_args :: Arity -> RepPolyFun -> TcM ()
-    tc_remaining_args arity rep_poly_fun =
-      tc_rem_args
-        (nb_applied_vis_val_args + 1)
-        (nb_applied_val_args + 1)
-        rem_arg_tys
-
-      where
-
-      rem_arg_tys :: [(Scaled Type, FunTyFlag)]
-      rem_arg_tys = getRuntimeArgTys app_res_rho
-        -- We do not need to zonk app_res_rho first, because the number of arrows
-        -- in the (possibly instantiated) inferred type of the function will
-        -- be at least the arity of the function.
-
-      -- The following function is essentially "mapM hasFixedRuntimeRep rem_arg_tys",
-      -- but we need to keep track of indices for error messages, hence the manual recursion.
-      tc_rem_args :: Int
-                     -- visible value argument index, starting from 1
-                     -- (only used to report the argument position in error messages)
-                  -> Int
-                     -- value argument index, starting from 1
-                     -- used to count up to the arity to ensure that
-                     -- we don't check too many argument types
-                  -> [(Scaled Type, FunTyFlag)]
-                     -- run-time argument types
-                  -> TcM ()
-      tc_rem_args _ i_val _
-        | i_val > arity
-        = return ()
-      tc_rem_args _ _ []
-        -- Should never happen: it would mean that the arity is higher
-        -- than the number of arguments apparent from the type.
-        = pprPanic "tcRemainingValArgs" debug_msg
-      tc_rem_args i_visval !i_val ((Scaled _ arg_ty, af) : tys)
-        = do { let (i_visval', arg_pos)
-                     | isInvisibleFunArg af = ( i_visval    , ArgPosInvis )
-                     | otherwise            = ( i_visval + 1, ArgPosVis i_visval )
-                   frr_ctxt = FRRNoBindingResArg rep_poly_fun arg_pos
-             ; hasFixedRuntimeRep_syntactic frr_ctxt arg_ty
-                 -- Why is this a syntactic check? See Wrinkle [Syntactic check] in
-                 -- Note [Checking for representation-polymorphic built-ins].
-             ; tc_rem_args i_visval' (i_val + 1) tys }
-
-      debug_msg :: SDoc
-      debug_msg =
-        vcat
-          [ text "app_head =" <+> ppr fun
-          , text "arity =" <+> ppr arity
-          , text "applied_args =" <+> ppr applied_args
-          , text "nb_applied_val_args =" <+> ppr nb_applied_val_args ]
-
 
 isHsValArg :: HsExprArg id -> Bool
 isHsValArg (EValArg {}) = True
 isHsValArg _            = False
 
-countLeadingValArgs :: [HsExprArg id] -> Int
-countLeadingValArgs []                   = 0
-countLeadingValArgs (EValArg {}  : args) = 1 + countLeadingValArgs args
-countLeadingValArgs (EWrap {}    : args) = countLeadingValArgs args
-countLeadingValArgs (EPrag {}    : args) = countLeadingValArgs args
-countLeadingValArgs (ETypeArg {} : _)    = 0
+leadingValArgs :: [HsExprArg id] -> [EValArg id]
+leadingValArgs []                        = []
+leadingValArgs (arg@(EValArg {}) : args) = eva_arg arg : leadingValArgs args
+leadingValArgs (EWrap {}    : args)      = leadingValArgs args
+leadingValArgs (EPrag {}    : args)      = leadingValArgs args
+leadingValArgs (ETypeArg {} : _)         = []
 
 isValArg :: HsExprArg id -> Bool
 isValArg (EValArg {}) = True
@@ -659,36 +713,6 @@ isVisibleArg :: HsExprArg id -> Bool
 isVisibleArg (EValArg {})  = True
 isVisibleArg (ETypeArg {}) = True
 isVisibleArg _             = False
-
--- | Count visible and invisible value arguments in a list
--- of 'HsExprArg' arguments.
-countVisAndInvisValArgs :: [HsExprArg id] -> Arity
-countVisAndInvisValArgs []                  = 0
-countVisAndInvisValArgs (EValArg {} : args) = 1 + countVisAndInvisValArgs args
-countVisAndInvisValArgs (EWrap wrap : args) =
-  case wrap of { EHsWrap hsWrap            -> countHsWrapperInvisArgs hsWrap + countVisAndInvisValArgs args
-               ; EPar   {}                 -> countVisAndInvisValArgs args
-               ; EExpand {}                -> countVisAndInvisValArgs args }
-countVisAndInvisValArgs (EPrag {}   : args) = countVisAndInvisValArgs args
-countVisAndInvisValArgs (ETypeArg {}: args) = countVisAndInvisValArgs args
-
--- | Counts the number of invisible term-level arguments applied by an 'HsWrapper'.
--- Precondition: this wrapper contains no abstractions.
-countHsWrapperInvisArgs :: HsWrapper -> Arity
-countHsWrapperInvisArgs = go
-  where
-    go WpHole = 0
-    go (WpCompose wrap1 wrap2) = go wrap1 + go wrap2
-    go fun@(WpFun {}) = nope fun
-    go (WpCast {}) = 0
-    go evLam@(WpEvLam {}) = nope evLam
-    go (WpEvApp _) = 1
-    go tyLam@(WpTyLam {}) = nope tyLam
-    go (WpTyApp _) = 0
-    go (WpLet _) = 0
-    go (WpMultCoercion {}) = 0
-
-    nope x = pprPanic "countHsWrapperInvisApps" (ppr x)
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg
@@ -1229,11 +1253,13 @@ Wrinkles
          'matchActualFunTySigma'.
 
       B. If there are fewer arguments than there are bound term variables,
-         hasFixedRuntimeRep_remainingValArgs will ensure that we are still
-         instantiating at a representation-monomorphic type, e.g.
+         we will ensure that the appropriate type arguments are instantiated
+         concretely, such as 'r' in
 
          ( /\r (a :: TYPE r). \ (x %p :: a). K @r @a x) @IntRep @Int#
            :: Int# -> T IntRep Int#
+
+         See Note [Representation-polymorphic Ids with no binding] in GHC.Tc.Gen.Head.
 
       C. In the output of the desugarer in (4) above, we have a representation
          polymorphic lambda, which Lint would normally reject. So for that one

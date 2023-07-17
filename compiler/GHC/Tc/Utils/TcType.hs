@@ -49,6 +49,7 @@ module GHC.Tc.Utils.TcType (
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   ConcreteTvOrigin(..), isConcreteTyVar_maybe, isConcreteTyVar,
   isConcreteTyVarTy, isConcreteTyVarTy_maybe, isConcreteInfo,
+  ConcreteTyVars, noConcreteTyVars,
   isAmbiguousTyVar, isCycleBreakerTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
@@ -220,6 +221,7 @@ import {-# SOURCE #-} GHC.Tc.Types.Origin
 import GHC.Types.Name as Name
             -- We use this to make dictionaries for type literals.
             -- Perhaps there's a better way to do this?
+import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
@@ -235,7 +237,6 @@ import GHC.Utils.Panic.Plain
 import Data.IORef ( IORef )
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.List ( partition, nub, (\\) )
-
 
 {-
 ************************************************************************
@@ -643,6 +644,16 @@ data ConcreteTvOrigin
    --
    -- See 'FixedRuntimeRepOrigin' for more information.
   = ConcreteFRR FixedRuntimeRepOrigin
+
+-- | A mapping from skolem type variable 'Name' to concreteness information,
+--
+-- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+type ConcreteTyVars = NameEnv ConcreteTvOrigin
+
+-- | The 'Id' has no outer forall'd type variables which must be instantiated
+-- to concrete types.
+noConcreteTyVars :: ConcreteTyVars
+noConcreteTyVars = emptyNameEnv
 
 {- *********************************************************************
 *                                                                      *

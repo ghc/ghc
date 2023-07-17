@@ -41,6 +41,7 @@ import GHC.HsToCore.Coverage
 import GHC.HsToCore.Docs
 
 import GHC.Tc.Types
+import GHC.Tc.Types.Origin ( Position(..) )
 import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances, initIfaceLoad )
 import GHC.Tc.Module ( runTcInteractive )
 
@@ -77,6 +78,7 @@ import GHC.Utils.Logger
 
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Id.Make ( mkRepPolyIdConcreteTyVars )
 import GHC.Types.ForeignStubs
 import GHC.Types.Avail
 import GHC.Types.Basic
@@ -795,5 +797,9 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              arity = 1
 
-             id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
+             concs = mkRepPolyIdConcreteTyVars
+                     [((mkTyVarTy openAlphaTyVar, Argument 1 Top), runtimeRep1TyVar)]
+                     unsafeCoercePrimName
+
+             id   = mkExportedLocalId (RepPolyId concs) unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }

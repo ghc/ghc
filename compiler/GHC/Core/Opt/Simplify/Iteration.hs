@@ -1152,7 +1152,8 @@ simplExprF !env e !cont -- See Note [Bangs in the Simplifier]
       ]) $ -}
     simplExprF1 env e cont
 
-simplExprF1 :: SimplEnv -> InExpr -> SimplCont
+simplExprF1 :: HasDebugCallStack
+            => SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
 simplExprF1 _ (Type ty) cont
@@ -1716,7 +1717,8 @@ simplLam :: SimplEnv -> InExpr -> SimplCont
 simplLam env (Lam bndr body) cont = simpl_lam env bndr body cont
 simplLam env expr            cont = simplExprF env expr cont
 
-simpl_lam :: SimplEnv -> InBndr -> InExpr -> SimplCont
+simpl_lam :: HasDebugCallStack
+          => SimplEnv -> InBndr -> InExpr -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 
 -- Type beta-reduction
@@ -1774,7 +1776,8 @@ simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 ------------------
-simplNonRecE :: SimplEnv
+simplNonRecE :: HasDebugCallStack
+             => SimplEnv
              -> FromWhat
              -> InId                    -- The binder, always an Id
                                         -- Never a join point

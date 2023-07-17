@@ -1,30 +1,34 @@
 
 T13233.hs:14:11: error: [GHC-55287]
-    • • Unsaturated use of a representation-polymorphic data constructor.
-        The second argument of ‘(#,#)’
+    • • The first component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
-          a :: TYPE rep
-      • Unsaturated use of a representation-polymorphic data constructor.
-        The first argument of ‘(#,#)’
+          a1 :: TYPE k2
+        Cannot unify ‘rep’ with the type variable ‘k2’
+        because the former is not a concrete ‘RuntimeRep’.
+      • The second component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
-          a :: TYPE rep
+          b1 :: TYPE k1
+        Cannot unify ‘rep’ with the type variable ‘k1’
+        because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘bar’, namely ‘(#,#)’
       In the expression: bar (#,#)
       In an equation for ‘baz’: baz = bar (#,#)
 
 T13233.hs:22:16: error: [GHC-55287]
-    • • Unsaturated use of a representation-polymorphic data constructor.
-        The second argument of ‘(#,#)’
+    • • The first component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
-          b :: TYPE rep2
-      • Unsaturated use of a representation-polymorphic data constructor.
-        The first argument of ‘(#,#)’
+          a0 :: TYPE k00
+        Cannot unify ‘rep1’ with the type variable ‘k00’
+        because the former is not a concrete ‘RuntimeRep’.
+      • The second component of the unboxed tuple
         does not have a fixed runtime representation.
         Its type is:
-          a :: TYPE rep1
+          b0 :: TYPE k10
+        Cannot unify ‘rep2’ with the type variable ‘k10’
+        because the former is not a concrete ‘RuntimeRep’.
     • In the first argument of ‘obscure’, namely ‘(#,#)’
       In the expression: obscure (#,#)
       In an equation for ‘quux’: quux = obscure (#,#)

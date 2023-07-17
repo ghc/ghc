@@ -1,9 +1,11 @@
 
-RepPolyWrappedVar.hs:15:10: error: [GHC-55287]
-    • Unsaturated use of a representation-polymorphic primitive function.
-      The first argument of ‘mkWeak#’
+RepPolyWrappedVar.hs:15:19: error: [GHC-55287]
+    • The first argument of the primop ‘mkWeak#’
       does not have a fixed runtime representation.
       Its type is:
-        a :: TYPE (BoxedRep l)
-    • In the expression: mkWeak# @a @Int @Bool
+        a1 :: TYPE (BoxedRep l0)
+      Cannot unify ‘l’ with the type variable ‘l0’
+      because the former is not a concrete ‘Levity’.
+    • In the type ‘a’
+      In the expression: mkWeak# @a @Int @Bool
       In an equation for ‘primop’: primop = mkWeak# @a @Int @Bool

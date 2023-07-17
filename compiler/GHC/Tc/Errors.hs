@@ -1,6 +1,7 @@
 
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE NamedFieldPuns      #-}
 {-# LANGUAGE ParallelListComp    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -1621,9 +1622,16 @@ fixedRuntimeRepOrigin_maybe item
   | FRROrigin frr_orig <- errorItemOrigin item
   = Just $ FRR_Info { frr_info_origin = frr_orig
                     , frr_info_not_concrete = Nothing }
-  -- Unsolved nominal equalities involving a concrete type variable,
+  -- A nominal equality involving a concrete type variable,
   -- such as @alpha[conc] ~# rr[sk]@ or @beta[conc] ~# RR@ for a
-  -- type family application @RR@, are handled by 'mkTyVarEqErr''.
+  -- type family application @RR@.
+  | EqPred NomEq ty1 ty2 <- classifyPredType (errorItemPred item)
+  = if | Just (tv1, ConcreteFRR frr1) <- isConcreteTyVarTy_maybe ty1
+       -> Just $ FRR_Info frr1 (Just (tv1, ty2))
+       | Just (tv2, ConcreteFRR frr2) <- isConcreteTyVarTy_maybe ty2
+       -> Just $ FRR_Info frr2 (Just (tv2, ty1))
+       | otherwise
+       -> Nothing
   | otherwise
   = Nothing
 

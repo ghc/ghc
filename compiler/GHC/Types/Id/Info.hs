@@ -12,6 +12,7 @@ Haskell. [WDP 94/11])
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -21,6 +22,7 @@ module GHC.Types.Id.Info (
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
         JoinArity, isJoinIdDetails_maybe,
         RecSelParent(..), recSelParentName, recSelFirstConName,
+        idDetailsConcreteTvs,
 
         -- * The IdInfo type
         IdInfo,         -- Abstract
@@ -103,6 +105,7 @@ import GHC.Types.ForeignCall
 import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars, noConcreteTyVars )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -163,10 +166,27 @@ data IdDetails
                                 --   and Note [exprOkForSpeculation and type classes]
                                 --       in GHC.Core.Utils
 
-  | PrimOpId PrimOp Bool        -- ^ The 'Id' is for a primitive operator
-                                -- True <=> is representation-polymorphic,
-                                --          and hence has no binding
-                                -- This lev-poly flag is used only in GHC.Types.Id.hasNoBinding
+  -- | A representation-polymorphic pseudo-op.
+  | RepPolyId
+      { id_concrete_tvs :: ConcreteTyVars }
+        -- ^ Which type variables of this representation-polymorphic 'Id
+        -- should be instantiated to concrete type variables?
+        --
+        -- See Note [Representation-polymorphism checking built-ins]
+        -- in GHC.Tc.Gen.Head.
+
+  -- | The 'Id' is for a primitive operator.
+  | PrimOpId
+     { id_primop :: PrimOp
+     , id_concrete_tvs :: ConcreteTyVars }
+        -- ^ Which type variables of this primop should be instantiated
+        -- to concrete type variables?
+        --
+        -- Only ever non-empty when the PrimOp has representation-polymorphic
+        -- type variables.
+        --
+        -- See Note [Representation-polymorphism checking built-ins]
+        -- in GHC.Tc.Gen.Head.
 
   | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
                                 -- Type will be simple: no type families, newtypes, etc
@@ -196,6 +216,15 @@ data IdDetails
         -- See Note [Tag Inference]
         -- The [CbvMark] is always empty (and ignored) until after Tidy for ids from the current
         -- module.
+
+idDetailsConcreteTvs :: IdDetails -> ConcreteTyVars
+idDetailsConcreteTvs = \ case
+    PrimOpId _ conc_tvs -> conc_tvs
+    RepPolyId  conc_tvs -> conc_tvs
+    DataConWorkId dc    -> dataConConcreteTyVars dc
+    DataConWrapId dc    -> dataConConcreteTyVars dc
+    _                   -> noConcreteTyVars
+
 
 {- Note [CBV Function Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -339,6 +368,7 @@ pprIdDetails other     = brackets (pp other)
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"
+   pp (RepPolyId {})          = text "RepPolyId"
    pp (PrimOpId {})           = text "PrimOp"
    pp (FCallId _)             = text "ForeignCall"
    pp (TickBoxOpId _)         = text "TickBoxOp"

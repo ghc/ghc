@@ -33,7 +33,11 @@ import GHC.Prelude
 
 import GHC.Driver.DynFlags
 
-import GHC.Tc.Utils.TcType ( isFloatingPrimTy, isTyFamFree )
+import GHC.Tc.Utils.TcType
+  ( ConcreteTvOrigin(..), ConcreteTyVars
+  , isFloatingPrimTy, isTyFamFree )
+import GHC.Tc.Types.Origin
+  ( FixedRuntimeRepOrigin(..) )
 import GHC.Unit.Module.ModGuts
 import GHC.Platform
 
@@ -70,6 +74,7 @@ import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.SrcLoc
 import GHC.Types.Tickish
+import GHC.Types.Unique.FM ( isNullUFM, sizeUFM )
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Types.Demand      ( splitDmdSig, isDeadEndDiv )
@@ -95,6 +100,8 @@ import Data.Foldable      ( for_, toList )
 import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
+import Data.IntMap.Strict ( IntMap )
+import qualified Data.IntMap.Strict as IntMap ( lookup, keys, empty, fromList )
 import GHC.Data.Pair
 import GHC.Base (oneShot)
 import GHC.Data.Unboxed
@@ -777,7 +784,7 @@ lf_check_inline_loop_breakers in GHC.Core.Lint.
 
 
 Note [Checking for representation polymorphism]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We ordinarily want to check for bad representation polymorphism. See
 Note [Representation polymorphism invariants] in GHC.Core. However, we do *not*
 want to do this in a compulsory unfolding. Compulsory unfoldings arise
@@ -856,7 +863,8 @@ lintCoreExpr :: CoreExpr -> LintM (LintedType, UsageEnv)
 lintCoreExpr (Var var)
   = do
       var_pair@(var_ty, _) <- lintIdOcc var 0
-      checkCanEtaExpand (Var var) [] var_ty
+      -- See Note [Linting representation-polymorphic builtins]
+      checkRepPolyBuiltin (Var var) [] var_ty
       return var_pair
 
 lintCoreExpr (Lit lit)
@@ -950,7 +958,10 @@ lintCoreExpr e@(App _ _)
   | otherwise
   = do { fun_pair <- lintCoreFun fun (length args)
        ; app_pair@(app_ty, _) <- lintCoreArgs fun_pair args
-       ; checkCanEtaExpand fun args app_ty
+
+       -- See Note [Linting representation-polymorphic builtins]
+       ; checkRepPolyBuiltin fun args app_ty
+
        ; return app_pair}
   where
     skipTick t = case collectFunSimple e of
@@ -989,7 +1000,7 @@ lintCoreExpr (Coercion co)
 
 ----------------------
 lintIdOcc :: Var -> Int -- Number of arguments (type or value) being passed
-           -> LintM (LintedType, UsageEnv) -- returns type of the *variable*
+          -> LintM (LintedType, UsageEnv) -- returns type of the *variable*
 lintIdOcc var nargs
   = addLoc (OccOf var) $
     do  { checkL (isNonCoVarId var)
@@ -1118,78 +1129,147 @@ checkTypeDataConOcc what dc
   = checkL (not (isTypeDataTyCon (dataConTyCon dc))) $
     (text "type data constructor found in a" <+> text what <> colon <+> ppr dc)
 
--- | This function checks that we are able to perform eta expansion for
--- functions with no binding, in order to satisfy invariant I3
--- from Note [Representation polymorphism invariants] in GHC.Core.
-checkCanEtaExpand :: CoreExpr   -- ^ the function (head of the application) we are checking
-                  -> [CoreArg]  -- ^ the arguments to the application
-                  -> LintedType -- ^ the instantiated type of the overall application
-                  -> LintM ()
-checkCanEtaExpand (Var fun_id) args app_ty
+-- | Check representation-polymorphic invariants in an application of a
+-- built-in function or newtype constructor.
+--
+-- See Note [Linting representation-polymorphic builtins].
+checkRepPolyBuiltin :: CoreExpr   -- ^ the function (head of the application) we are checking
+                    -> [CoreArg]  -- ^ the arguments to the application
+                    -> LintedType -- ^ the instantiated type of the overall application
+                    -> LintM ()
+checkRepPolyBuiltin (Var fun_id) args app_ty
   = do { do_rep_poly_checks <- lf_check_fixed_rep <$> getLintFlags
        ; when (do_rep_poly_checks && hasNoBinding fun_id) $
-           checkL (null bad_arg_tys) err_msg }
-    where
-      arity :: Arity
-      arity = idArity fun_id
+           if
+             -- (2) representation-polymorphic unlifted newtypes
+             | Just dc <- isDataConId_maybe fun_id
+             , isNewDataCon dc
+             -> if tcHasFixedRuntimeRep $ dataConTyCon dc
+                then return ()
+                else checkRepPolyNewtypeApp dc args app_ty
 
-      nb_val_args :: Int
-      nb_val_args = count isValArg args
+             -- (1) representation-polymorphic builtins
+             | otherwise
+             -> checkRepPolyBuiltinApp fun_id args
+       }
+checkRepPolyBuiltin _ _ _ = return ()
 
-      -- Check the remaining argument types, past the
-      -- given arguments and up to the arity of the 'Id'.
-      -- Returns the types that couldn't be determined to have
-      -- a fixed RuntimeRep.
-      check_args :: [Type] -> [Type]
-      check_args = go (nb_val_args + 1)
-        where
-          go :: Int    -- index of the argument (starting from 1)
-             -> [Type] -- arguments
-             -> [Type] -- value argument types that could not be
-                       -- determined to have a fixed runtime representation
-          go i _
-            | i > arity
-            = []
-          go _ []
-            -- The Arity of an Id should never exceed the number of value arguments
-            -- that can be read off from the Id's type.
-            -- See Note [Arity and function types] in GHC.Types.Id.Info.
-            = pprPanic "checkCanEtaExpand: arity larger than number of value arguments apparent in type"
-                $ vcat
-                  [ text "fun_id =" <+> ppr fun_id
-                  , text "arity =" <+> ppr arity
-                  , text "app_ty =" <+> ppr app_ty
-                  , text "args = " <+> ppr args
-                  , text "nb_val_args =" <+> ppr nb_val_args ]
-          go i (ty : bndrs)
-            | typeHasFixedRuntimeRep ty
-            = go (i+1) bndrs
-            | otherwise
-            = ty : go (i+1) bndrs
+checkRepPolyNewtypeApp :: DataCon -> [CoreArg] -> LintedType -> LintM ()
+checkRepPolyNewtypeApp nt args app_ty
+  -- If the newtype is saturated, we're OK.
+  | any isValArg args
+  = return ()
+  -- Otherwise, check we can eta-expand.
+  | otherwise
+  = case getRuntimeArgTys app_ty of
+      (Scaled _ first_val_arg_ty, _):_
+        | not $ typeHasFixedRuntimeRep first_val_arg_ty
+        -> failWithL (err_msg first_val_arg_ty)
+      _ -> return ()
 
-      bad_arg_tys :: [Type]
-      bad_arg_tys = check_args . map (scaledThing . fst) $ getRuntimeArgTys app_ty
-        -- We use 'getRuntimeArgTys' to find all the argument types,
-        -- including those hidden under newtypes. For example,
-        -- if `FunNT a b` is a newtype around `a -> b`, then
-        -- when checking
-        --
-        -- foo :: forall r (a :: TYPE r) (b :: TYPE r) c. a -> FunNT b c
-        --
-        -- we should check that the instantiations of BOTH `a` AND `b`
-        -- have a fixed runtime representation.
+  where
 
-      err_msg :: SDoc
-      err_msg
-        = vcat [ text "Cannot eta expand" <+> quotes (ppr fun_id)
-               , text "The following type" <> plural bad_arg_tys
-                 <+> doOrDoes bad_arg_tys <+> text "not have a fixed runtime representation:"
-               , nest 2 $ vcat $ map ppr_ty_ki bad_arg_tys ]
+      err_msg :: Type -> SDoc
+      err_msg bad_arg_ty
+        = vcat [ text "Cannot eta expand unlifted newtype constructor" <+> quotes (ppr nt) <> dot
+               , text "Its argument type does not have a fixed runtime representation:"
+               , nest 2 $ ppr_ty_ki bad_arg_ty ]
 
       ppr_ty_ki :: Type -> SDoc
       ppr_ty_ki ty = bullet <+> ppr ty <+> dcolon <+> ppr (typeKind ty)
-checkCanEtaExpand _ _ _
-  = return ()
+
+checkRepPolyBuiltinApp :: Id -> [CoreArg] -> LintM ()
+checkRepPolyBuiltinApp fun_id args = checkL (null not_concs) err_msg
+  where
+
+    conc_binder_positions :: IntMap ConcreteTvOrigin
+    conc_binder_positions
+      = concreteTyVarPositions fun_id
+      $ idDetailsConcreteTvs
+      $ idDetails fun_id
+
+    max_pos :: Int
+    max_pos =
+      case IntMap.keys conc_binder_positions of
+        [] -> 0
+        positions -> maximum positions
+
+    not_concs :: [(SDoc, ConcreteTvOrigin)]
+    not_concs =
+      mapMaybe is_bad (zip [1..max_pos] (map Just args ++ repeat Nothing))
+        -- NB: 1-indexed
+
+    is_bad :: (Int, Maybe CoreArg) -> Maybe (SDoc, ConcreteTvOrigin)
+    is_bad (pos, mb_arg)
+      | Just conc_reason <- IntMap.lookup pos conc_binder_positions
+      , Just bad_ty <- case mb_arg of
+          Just (Type ki)
+            | isConcreteType ki
+            -> Nothing
+            | otherwise
+            -- Here we handle the situation in which a "must be concrete" TyVar
+            -- has been instantiated with a type that is not concrete.
+            -> Just $ quotes (ppr ki) <+> text "is not concrete."
+          -- We expected a type argument in this position, and got something else: panic!
+          Just arg ->
+            pprPanic "checkRepPolyBuiltinApp: expected a type in this position" $
+              vcat [ text "fun_id:" <+> ppr fun_id <+> dcolon <+> ppr (idType fun_id)
+                   , text "pos:" <+> ppr pos
+                   , text "arg:" <+> ppr arg ]
+          Nothing ->
+            -- Here we handle the situation in which a "must be concrete" TyVar
+            -- has not been instantiated at all.
+            case conc_reason of
+              ConcreteFRR frr_orig ->
+                let ty = frr_type frr_orig
+                in  Just $ ppr ty <+> dcolon <+> ppr (typeKind ty)
+      = Just (bad_ty, conc_reason)
+      | otherwise
+      = Nothing
+
+    err_msg :: SDoc
+    err_msg
+      = vcat $ map ((bullet <+>) . ppr_not_conc) not_concs
+
+    ppr_not_conc :: (SDoc, ConcreteTvOrigin) -> SDoc
+    ppr_not_conc (bad_ty, conc) =
+      vcat
+       [ ppr_conc_orig conc
+       , nest 2 bad_ty ]
+
+    ppr_conc_orig :: ConcreteTvOrigin -> SDoc
+    ppr_conc_orig (ConcreteFRR frr_orig) =
+      case frr_orig of
+        FixedRuntimeRepOrigin { frr_context = ctxt } ->
+          hsep [ ppr ctxt, text "does not have a fixed runtime representation:" ]
+
+-- | Compute the 1-indexed positions in the outer forall'd quantified type variables
+-- of the type in which the concrete type variables occur.
+--
+-- See Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head.
+concreteTyVarPositions :: Id -> ConcreteTyVars -> IntMap ConcreteTvOrigin
+concreteTyVarPositions fun_id conc_tvs
+  | isNullUFM conc_tvs
+  = IntMap.empty
+  | otherwise
+  = case splitForAllTyCoVars (idType fun_id) of
+    ([], _)  -> IntMap.empty
+    (tvs, _) ->
+      let positions =
+            IntMap.fromList
+              [ (pos, conc_orig)
+              | (tv, pos) <- zip tvs [1..]
+              , conc_orig <- maybeToList $ lookupNameEnv conc_tvs (tyVarName tv)
+              ]
+         -- Assert that we have as many positions as concrete type variables,
+         -- i.e. we are not missing any concreteness information.
+      in assertPpr (sizeUFM conc_tvs == length positions)
+           (vcat [ text "concreteTyVarPositions: missing concreteness information"
+                 , text "fun_id:" <+> ppr fun_id
+                 , text "tvs:" <+> ppr tvs
+                 , text "Expected # of concrete tvs:" <+> ppr (sizeUFM conc_tvs)
+                 , text "  Actual # of concrete tvs:" <+> ppr (length positions) ])
+           positions
 
 -- Check that the usage of var is consistent with var itself, and pop the var
 -- from the usage environment (this is important because of shadowing).
@@ -3016,43 +3096,56 @@ linearity after each pass is to prove this statement.
 
 There is a useful discussion at https://gitlab.haskell.org/ghc/ghc/-/issues/22123
 
-Note [checkCanEtaExpand]
-~~~~~~~~~~~~~~~~~~~~~~~~
-The checkCanEtaExpand function is responsible for enforcing invariant I3
-from Note [Representation polymorphism invariants] in GHC.Core: in any
-partial application `f e_1 .. e_n`, if `f` has no binding, we must be able to
-eta expand `f` to match the declared arity of `f`.
+Note [Linting representation-polymorphic builtins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As described in Note [Representation-polymorphism checking built-ins], on
+top of the two main representation-polymorphism invariants described in the
+Note [Representation polymorphism invariants], we must perform additional
+representation-polymorphism checks on builtin functions which don't have a
+binding, for example to ensure that we don't run afoul of the
+representation-polymorphism invariants when eta-expanding.
 
-Wrinkle 1: eta-expansion and newtypes
+There are two situations:
 
-  Most of the time, when we have a partial application `f e_1 .. e_n`
-  in which `f` is `hasNoBinding`, we eta-expand it up to its arity
-  as follows:
+  1. Builtins which have skolem type variables which must be instantiated to
+     concrete types, such as the RuntimeRep type argument r to the catch# primop.
 
-    \ x_{n+1} ... x_arity -> f e_1 .. e_n x_{n+1} ... x_arity
+  2. Representation-polymorphic unlifted newtypes, which must always be instantiated
+     at a fixed runtime representation.
 
-  However, we might need to insert casts if some of the arguments
-  that `f` takes are under a newtype.
-  For example, suppose `f` `hasNoBinding`, has arity 1 and type
+For 1, consider for example 'coerce':
 
-    f :: forall r (a :: TYPE r). Identity (a -> a)
+  coerce :: forall {r} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b
 
-  then we eta-expand the nullary application `f` to
+We store in the IdDetails of the coerce Id that the first binder, r, must always
+be instantiated to a concrete type. We thus check this in Core Lint: whenever we
+see an application of the form
 
-    ( \ x -> f x ) |> co
+  coerce @{rep1} ...
 
-  where
+we ensure that 'rep1' is concrete. This is done in the function "checkRepPolyBuiltinApp".
+Moreover, not instantiating these type variables at all is also an error, as
+we would again not be able to perform eta-expansion. (This is a bit more theoretical,
+as in user programs the typechecker will insert these type applications when
+instantiating, but it can still arise when constructing Core expressions).
 
-    co :: ( forall r (a :: TYPE r). a -> a ) ~# ( forall r (a :: TYPE r). Identity (a -> a) )
+For 2, whenever we have an unlifted newtype such as
 
-  In this case we would have to perform a representation-polymorphism check on the instantiation
-  of `a`.
+  type RR :: Type -> RuntimeRep
+  type family RR a
 
-Wrinkle 2: 'hasNoBinding' and laziness
+  type F :: forall (a :: Type) -> TYPE (RR a)
+  type family F a
 
-  It's important that we able to compute 'hasNoBinding' for an 'Id' without ever forcing
-  the unfolding of the 'Id'. Otherwise, we could end up with a loop, as outlined in
-    Note [Lazily checking Unfoldings] in GHC.IfaceToCore.
+  type N :: forall (a :: Type) -> TYPE (RR a)
+  newtype N a = MkN (F a)
+
+and an unsaturated occurrence
+
+  MkN @ty -- NB: no value argument!
+
+we check that the (instantiated) argument type has a fixed runtime representation.
+This is done in the function "checkRepPolyNewtypeApp".
 -}
 
 instance Applicative LintM where

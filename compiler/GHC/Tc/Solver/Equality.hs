@@ -2048,7 +2048,7 @@ Wrinkles:
      This is done in canEqCanLHSHetero.
 
 (EIK2) Suppose we have [W] (a::Type) ~ (b::Type->Type). The above rewrite will produce
-        [W] w   : a ~ (b |> kw)
+        [W] w  : a ~ (b |> kw)
         [W] kw : Type ~ (Type->Type)
 
      But we do /not/ want to regard `w` as canonical, and use it for rewriting
@@ -2058,7 +2058,7 @@ Wrinkles:
      messages.  (In particular, if 'a' is a unification variable, we might
      unify, losing the tracking info that it depends on solving `kw`.)
 
-     Conclusion: if a RHS contains a corecion hole arising from fixing a hetero-kinded
+     Conclusion: if a RHS contains a coercion hole arising from fixing a hetero-kinded
      equality, treat the equality (`w` in this case) as non-canonical, so that
        * It will not be used for unification
        * It will not be used for rewriting

@@ -623,7 +623,7 @@ substTyWithUnchecked tvs tys
 -- Pre-condition: the 'in_scope' set should satisfy Note [The substitution
 -- invariant]; specifically it should include the free vars of 'tys',
 -- and of 'ty' minus the domain of the subst.
-substTyWithInScope :: InScopeSet -> [TyVar] -> [Type] -> Type -> Type
+substTyWithInScope :: HasDebugCallStack => InScopeSet -> [TyVar] -> [Type] -> Type -> Type
 substTyWithInScope in_scope tvs tys ty =
   assert (tvs `equalLength` tys )
   substTy (mkTvSubst in_scope tenv) ty
@@ -651,12 +651,12 @@ substTyWithCoVars :: [CoVar] -> [Coercion] -> Type -> Type
 substTyWithCoVars cvs cos = substTy (zipCvSubst cvs cos)
 
 -- | Type substitution, see 'zipTvSubst'
-substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
+substTysWith :: HasDebugCallStack => [TyVar] -> [Type] -> [Type] -> [Type]
 substTysWith tvs tys = assert (tvs `equalLength` tys )
                        substTys (zipTvSubst tvs tys)
 
 -- | Type substitution, see 'zipTvSubst'
-substTysWithCoVars :: [CoVar] -> [Coercion] -> [Type] -> [Type]
+substTysWithCoVars :: HasDebugCallStack => [CoVar] -> [Coercion] -> [Type] -> [Type]
 substTysWithCoVars cvs cos = assert (cvs `equalLength` cos )
                              substTys (zipCvSubst cvs cos)
 
@@ -664,7 +664,7 @@ substTysWithCoVars cvs cos = assert (cvs `equalLength` cos )
 -- to the in-scope set. This is useful for the case when the free variables
 -- aren't already in the in-scope set or easily available.
 -- See also Note [The substitution invariant].
-substTyAddInScope :: Subst -> Type -> Type
+substTyAddInScope :: HasDebugCallStack => Subst -> Type -> Type
 substTyAddInScope subst ty =
   substTy (extendSubstInScopeSet subst $ tyCoVarsOfType ty) ty
 
@@ -716,7 +716,7 @@ checkValidSubst subst@(Subst in_scope _ tenv cenv) tys cos a
 -- Note [The substitution invariant].
 substTy :: HasDebugCallStack => Subst -> Type  -> Type
 substTy subst ty
-  | isEmptyTCvSubst    subst = ty
+  | isEmptyTCvSubst subst = ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
@@ -727,8 +727,8 @@ substTy subst ty
 -- substTy and remove this function. Please don't use in new code.
 substTyUnchecked :: Subst -> Type -> Type
 substTyUnchecked subst ty
-                 | isEmptyTCvSubst subst    = ty
-                 | otherwise             = subst_ty subst ty
+  | isEmptyTCvSubst subst = ty
+  | otherwise             = subst_ty subst ty
 
 substScaledTy :: HasDebugCallStack => Subst -> Scaled Type -> Scaled Type
 substScaledTy subst scaled_ty = mapScaledType (substTy subst) scaled_ty
@@ -821,7 +821,7 @@ substTyVar (Subst _ _ tenv _) tv
       Nothing -> TyVarTy tv
 
 substTyVarToTyVar :: HasDebugCallStack => Subst -> TyVar -> TyVar
--- Apply the substitution, expecing the result to be a TyVarTy
+-- Apply the substitution, expecting the result to be a TyVarTy
 substTyVarToTyVar (Subst _ _ tenv _) tv
   = assert (isTyVar tv) $
     case lookupVarEnv tenv tv of

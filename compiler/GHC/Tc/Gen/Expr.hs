@@ -74,7 +74,7 @@ import GHC.Types.Name.Reader
 import GHC.Core.Class(classTyCon)
 import GHC.Core.TyCon
 import GHC.Core.Type
-import GHC.Core.Coercion( mkSymCo )
+import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence
 import GHC.Builtin.Types
 import GHC.Builtin.Names
@@ -311,19 +311,12 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                            -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
        ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
                                        Boxed   -> arg_tys
-       ; tup_args1 <- tcTupArgs tup_args arg_tys'
+       ; tup_args1 <- tcCheckExplicitTuple tup_args arg_tys'
        ; return $ mkHsWrapCo coi (ExplicitTuple x tup_args1 boxity) }
 
   | otherwise
-  = -- The tup_args are a mixture of Present and Missing (for tuple sections)
-    do { let arity = length tup_args
-
-       ; arg_tys <- case boxity of
-           { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
-           ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
-
-       -- Handle tuple sections where
-       ; tup_args1 <- tcTupArgs tup_args arg_tys
+  = -- The tup_args are a mixture of Present and Missing (for tuple sections).
+    do { (tup_args1, arg_tys) <- tcInferTupArgs boxity tup_args
 
        ; let expr'       = ExplicitTuple x tup_args1 boxity
              missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
@@ -351,7 +344,7 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        -- This should cause an error, even though (17# :: Int#)
        -- is not representation-polymorphic: we don't know how
        -- wide the concrete representation of the sum type will be.
-       ; hasFixedRuntimeRep_syntactic FRRUnboxedSum res_ty
+       ; hasFixedRuntimeRep_syntactic (FRRUnboxedSum Nothing) res_ty
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
 
@@ -663,26 +656,56 @@ arithSeqEltType (Just fl) res_ty
        ; return (idHsWrapper, elt_mult, elt_ty, Just fl') }
 
 ----------------
-tcTupArgs :: [HsTupArg GhcRn]
-          -> [TcSigmaType]
-              -- ^ Argument types.
-              -- This function ensures they all have
-              -- a fixed runtime representation.
-          -> TcM [HsTupArg GhcTc]
-tcTupArgs args tys
+
+-- | Typecheck an explicit tuple @(a,b,c)@ or @(\#a,b,c\#)@.
+--
+-- Does not handle tuple sections.
+tcCheckExplicitTuple :: [HsTupArg GhcRn]
+                     -> [TcSigmaType]
+                          -- ^ Argument types.
+                          -- This function ensures they all have
+                          -- a fixed runtime representation.
+                     -> TcM [HsTupArg GhcTc]
+tcCheckExplicitTuple args tys
   = do massert (equalLength args tys)
        checkTupSize (length args)
        zipWith3M go [1,2..] args tys
   where
     go :: Int -> HsTupArg GhcRn -> TcType -> TcM (HsTupArg GhcTc)
     go i (Missing {})     arg_ty
-      = do { mult <- newFlexiTyVarTy multiplicityTy
-           ; hasFixedRuntimeRep_syntactic (FRRTupleSection i) arg_ty
-           ; return (Missing (Scaled mult arg_ty)) }
+      = pprPanic "tcCheckExplicitTuple: tuple sections not handled here"
+          (ppr i $$ ppr arg_ty)
     go i (Present x expr) arg_ty
       = do { expr' <- tcCheckPolyExpr expr arg_ty
-           ; hasFixedRuntimeRep_syntactic (FRRTupleArg i) arg_ty
-           ; return (Present x expr') }
+           ; (co, _) <- hasFixedRuntimeRep (FRRUnboxedTuple i) arg_ty
+           ; return (Present x (mkLHsWrap (mkWpCastN co) expr')) }
+
+-- | Typecheck an explicit tuple or tuple section by performing type inference.
+tcInferTupArgs :: Boxity
+               -> [HsTupArg GhcRn] -- ^ argument types
+               -> TcM ([HsTupArg GhcTc], [TcSigmaTypeFRR])
+tcInferTupArgs boxity args
+  = do { checkTupSize (length args)
+       ; zipWithAndUnzipM tc_infer_tup_arg [1,2..] args }
+ where
+  tc_infer_tup_arg :: Int -> HsTupArg GhcRn -> TcM (HsTupArg GhcTc, TcSigmaTypeFRR)
+  tc_infer_tup_arg i (Missing {})
+    = do { mult <- newFlexiTyVarTy multiplicityTy
+         ; arg_ty <- new_arg_ty i
+         ; return (Missing (Scaled mult arg_ty), arg_ty) }
+  tc_infer_tup_arg i (Present x lexpr@(L l expr))
+    = do { (expr', arg_ty) <- case boxity of
+             Unboxed -> tcInferFRR (FRRUnboxedTuple i) (tcPolyExpr expr)
+             Boxed   -> do { arg_ty <- newFlexiTyVarTy liftedTypeKind
+                           ; L _ expr' <- tcCheckPolyExpr lexpr arg_ty
+                           ; return (expr', arg_ty) }
+         ; return (Present x (L l expr'), arg_ty) }
+
+  new_arg_ty :: Int -> TcM TcTypeFRR
+  new_arg_ty i =
+    case boxity of
+      Unboxed -> newOpenFlexiFRRTyVarTy (FRRUnboxedTupleSection i)
+      Boxed   -> newFlexiTyVarTy liftedTypeKind
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary

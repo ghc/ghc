@@ -154,7 +154,7 @@ module GHC.Core.Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, typeHasFixedRuntimeRep, argsHaveFixedRuntimeRep,
+        typeKind, typeHasFixedRuntimeRep,
         tcIsLiftedTypeKind,
         isConstraintKind, isConstraintLikeKind, returnsConstraintKind,
         tcIsBoxedTypeKind, isTypeLikeKind,
@@ -2800,19 +2800,6 @@ typeHasFixedRuntimeRep = go
     go (LitTy {})               = True
     go (ForAllTy _ ty)          = go ty
     go ty                       = isFixedRuntimeRepKind (typeKind ty)
-
-argsHaveFixedRuntimeRep :: Type -> Bool
--- ^ True if the argument types of this function type
--- all have a fixed-runtime-rep
-argsHaveFixedRuntimeRep ty
-  = all ok bndrs
-  where
-    ok :: PiTyBinder -> Bool
-    ok (Anon ty _) = typeHasFixedRuntimeRep (scaledThing ty)
-    ok _           = True
-
-    bndrs :: [PiTyBinder]
-    (bndrs, _) = splitPiTys ty
 
 -- | Checks that a kind of the form 'Type', 'Constraint'
 -- or @'TYPE r@ is concrete. See 'isConcreteType'.

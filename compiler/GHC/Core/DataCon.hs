@@ -35,6 +35,7 @@ module GHC.Core.DataCon (
         dataConNonlinearType,
         dataConDisplayType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
+        dataConConcreteTyVars,
         dataConUserTyVars, dataConUserTyVarBinders,
         dataConTheta,
         dataConStupidTheta,
@@ -69,6 +70,7 @@ module GHC.Core.DataCon (
 import GHC.Prelude
 
 import Language.Haskell.Syntax.Basic
+import Language.Haskell.Syntax.Module.Name
 
 import {-# SOURCE #-} GHC.Types.Id.Make ( DataConBoxer )
 import GHC.Core.Type as Type
@@ -96,6 +98,8 @@ import GHC.Types.Unique.Set
 import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 import GHC.Data.Graph.UnVar  -- UnVarSet and operations
 
+import {-# SOURCE #-} GHC.Tc.Utils.TcType ( ConcreteTyVars )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Utils.Panic
@@ -107,8 +111,6 @@ import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
 import Data.List( find )
-
-import Language.Haskell.Syntax.Module.Name
 
 {-
 Note [Data constructor representation]
@@ -449,6 +451,14 @@ data DataCon
 
         -- INVARIANT: the UnivTyVars and ExTyCoVars all have distinct OccNames
         -- Reason: less confusing, and easier to generate Iface syntax
+
+        -- The type variables of this data constructor that must be
+        -- instantiated to concrete types. For example: the RuntimeRep
+        -- variables of unboxed tuples and unboxed sums.
+        --
+        -- See Note [Representation-polymorphism checking built-ins]
+        -- in GHC.Tc.Gen.Head.
+        dcConcreteTyVars :: ConcreteTyVars,
 
         -- The type/coercion vars in the order the user wrote them [c,y,x,b]
         -- INVARIANT(dataConTyVars): the set of tyvars in dcUserTyVarBinders is
@@ -1135,6 +1145,9 @@ mkDataCon :: Name
                             -- if it is a record, otherwise empty
           -> [TyVar]        -- ^ Universals.
           -> [TyCoVar]      -- ^ Existentials.
+          -> ConcreteTyVars
+                                -- ^ TyVars which must be instantiated with
+                                -- concrete types
           -> [InvisTVBinder]    -- ^ User-written 'TyVarBinder's.
                                 --   These must be Inferred/Specified.
                                 --   See @Note [TyVarBinders in DataCons]@
@@ -1155,7 +1168,7 @@ mkDataCon :: Name
 mkDataCon name declared_infix prom_info
           arg_stricts   -- Must match orig_arg_tys 1-1
           fields
-          univ_tvs ex_tvs user_tvbs
+          univ_tvs ex_tvs conc_tvs user_tvbs
           eq_spec theta
           orig_arg_tys orig_res_ty rep_info rep_tycon tag
           stupid_theta work_id rep
@@ -1175,6 +1188,7 @@ mkDataCon name declared_infix prom_info
                   dcVanilla = is_vanilla, dcInfix = declared_infix,
                   dcUnivTyVars = univ_tvs,
                   dcExTyCoVars = ex_tvs,
+                  dcConcreteTyVars = conc_tvs,
                   dcUserTyVarBinders = user_tvbs,
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
@@ -1292,6 +1306,15 @@ dataConExTyCoVars (MkData { dcExTyCoVars = tvbs }) = tvbs
 dataConUnivAndExTyCoVars :: DataCon -> [TyCoVar]
 dataConUnivAndExTyCoVars (MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs })
   = univ_tvs ++ ex_tvs
+
+-- | Which type variables of this data constructor that must be
+-- instantiated to concrete types?
+-- For example: the RuntimeRep variables of unboxed tuples and unboxed sums.
+--
+-- See Note [Representation-polymorphism checking built-ins]
+-- in GHC.Tc.Gen.Head.
+dataConConcreteTyVars :: DataCon -> ConcreteTyVars
+dataConConcreteTyVars (MkData { dcConcreteTyVars = concs }) = concs
 
 -- See Note [DataCon user type variable binders]
 -- | The type variables of the constructor, in the order the user wrote them

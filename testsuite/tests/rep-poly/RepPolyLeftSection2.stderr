@@ -5,8 +5,6 @@ RepPolyLeftSection2.hs:14:11: error: [GHC-55287]
       Its type is:
         a0 :: TYPE r0
       Cannot unify ‘r’ with the type variable ‘r0’
-      because it is not a concrete ‘RuntimeRep’.
+      because the former is not a concrete ‘RuntimeRep’.
     • In the expression: undefined `f`
       In an equation for ‘test1’: test1 = (undefined `f`)
-    • Relevant bindings include
-        test1 :: a -> a (bound at RepPolyLeftSection2.hs:14:1)

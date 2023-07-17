@@ -29,8 +29,13 @@ test('T20423b', normal, compile_fail, [''])
 test('T20426', normal, compile_fail, [''])
 test('T21239', normal, compile, [''])
 test('T21544', normal, compile, ['-Wno-deprecated-flags'])
+test('T21906', normal, compile_fail, [''])
 test('T22291', normal, compile, [''])
 test('T22291b', normal, compile, [''])
+test('T23051', normal, compile_fail, [''])
+test('T23153', normal, compile_fail, [''])
+test('T23154', normal, compile_fail, [''])
+test('T23176', normal, compile_fail, ['-XPartialTypeSignatures -fdefer-out-of-scope-variables'])
 
 test('EtaExpandDataCon', normal, compile, ['-O'])
 test('EtaExpandStupid1', normal, compile, ['-Wno-deprecated-flags'])
@@ -79,12 +84,14 @@ test('RepPolyRule1', normal, compile_fail, [''])
 test('RepPolyRule2', normal, compile_fail, [''])
 test('RepPolySum', normal, compile_fail, [''])
 test('RepPolyTuple', normal, compile_fail, [''])
+test('RepPolyTuple4', normal, compile_fail, [''])
 test('RepPolyTupleSection', normal, compile_fail, [''])
 test('RepPolyUnboxedPatterns', normal, compile_fail, [''])
 test('RepPolyUnliftedDatatype', normal, compile, [''])
 test('RepPolyUnliftedDatatype2', normal, compile, ['-O'])
 test('RepPolyUnliftedNewtype', normal, compile,
      ['-fno-warn-partial-type-signatures -fno-warn-deprecated-flags'])
+test('RepPolyUnsafeCoerce1', normal, compile, [''])
 test('RepPolyWildcardPattern', normal, compile_fail, [''])
 test('RepPolyWrappedVar', normal, compile_fail, [''])
 test('RepPolyWrappedVar2', normal, compile, [''])
@@ -99,6 +106,11 @@ test('UnliftedNewtypesLevityBinder', normal, compile_fail, [''])
                                                                              ##
 test('T13105', js_broken(22364), compile, [''])                              ##
 test('T17536b', normal, compile, [''])                                       ##
+test('RepPolyArgument2', normal, compile, [''])                              ##
+test('RepPolyTuple2', normal, compile_and_run, [''])                         ##
+test('RepPolyTuple2b', normal, compile_and_run, [''])                        ##
+test('RepPolyTuple3', normal, compile_fail, [''])                            ##
+test('RepPolyUnsafeCoerce2', normal, compile, [''])                          ##
                                                                              ##
 ## These don't!                                                              ##
 ## For the moment, we check that we get the expected error message,          ##
@@ -111,13 +123,6 @@ test('T20363_show_co', normal, compile_fail, ['-fprint-explicit-coercions']) ##
 test('T20363b', normal, compile_fail, [''])                                  ##
 test('RepPolyCase2', normal, compile_fail, [''])                             ##
 test('RepPolyRule3', normal, compile_fail, [''])                             ##
-test('RepPolyTuple2', normal, compile_fail, ['']) ## see #21683              ##
 test('T21650_a', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 test('T21650_b', normal, compile_fail, ['-Wno-deprecated-flags'])            ##
 ###############################################################################
-
-
-test('T23051', normal, compile_fail, [''])
-test('T23153', normal, compile_fail, [''])
-test('T23154', normal, compile_fail, [''])
-test('T23176', normal, compile_fail, ['-XPartialTypeSignatures -fdefer-out-of-scope-variables'])

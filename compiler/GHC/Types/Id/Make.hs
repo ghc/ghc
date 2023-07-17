@@ -12,9 +12,8 @@ have a standard form, namely:
 - primitive operations
 -}
 
-
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE DataKinds #-}
 
 module GHC.Types.Id.Make (
         mkDictFunId, mkDictSelId, mkDictSelRhs,
@@ -38,6 +37,9 @@ module GHC.Types.Id.Make (
         noinlineId, noinlineIdName,
         noinlineConstraintId, noinlineConstraintIdName,
         coerceName, leftSectionName, rightSectionName,
+        pcRepPolyId,
+
+        mkRepPolyIdConcreteTyVars,
     ) where
 
 import GHC.Prelude
@@ -68,6 +70,7 @@ import GHC.Types.SourceText
 import GHC.Types.RepType ( countFunRepArgs )
 import GHC.Types.Name.Set
 import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -75,8 +78,9 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
-import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike)
+import GHC.Types.Var (VarBndr(Bndr), visArgConstraintLike, tyVarName)
 
+import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 
 import GHC.Utils.Misc
@@ -379,7 +383,7 @@ argument is not representation-polymorphic (which it can't be, according to
 Note [Representation polymorphism invariants] in GHC.Core), and it's saturated,
 no representation-polymorphic code ends up in the code generator.
 The saturation condition is effectively checked in
-GHC.Tc.Gen.App.hasFixedRuntimeRep_remainingValArgs.
+GHC.Tc.Gen.Head.rejectRepPolyNewtypes.
 
 However, if we make a *wrapper* for a newtype, we get into trouble.
 In that case, we generate a forbidden representation-polymorphic
@@ -1805,6 +1809,7 @@ which is not supposed to be used in expressions (GHC throws an assertion
 failure when trying.)
 -}
 
+
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    coerceName, proxyName,
@@ -1852,7 +1857,7 @@ nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
 
 ------------------------------------------------
 seqId :: Id     -- See Note [seqId magic]
-seqId = pcMiscPrelId seqName ty info
+seqId = pcRepPolyId seqName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
@@ -1875,6 +1880,9 @@ seqId = pcMiscPrelId seqName ty info
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
     rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
           Case (Var x) x openBetaTy [Alt DEFAULT [] (Var y)]
+
+    concs = mkRepPolyIdConcreteTyVars
+        [ ((openBetaTy, Argument 2 Top), runtimeRep2TyVar)]
 
     arity = 2
 
@@ -1914,11 +1922,12 @@ nospecId = pcMiscPrelId nospecIdName ty info
     ty  = mkSpecForAllTys [alphaTyVar] (mkVisFunTyMany alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
-oneShotId = pcMiscPrelId oneShotName ty info
+oneShotId = pcRepPolyId oneShotName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
                        `setArityInfo`      arity
+    -- oneShot :: forall {r1 r2} (a :: TYPE r1) (b :: TYPE r2). (a -> b) -> (a -> b)
     ty  = mkInfForAllTys  [ runtimeRep1TyVar, runtimeRep2TyVar ] $
           mkSpecForAllTys [ openAlphaTyVar, openBetaTyVar ]      $
           mkVisFunTyMany fun_ty fun_ty
@@ -1930,6 +1939,9 @@ oneShotId = pcMiscPrelId oneShotName ty info
                  , body, x'] $
           Var body `App` Var x'
     arity = 2
+
+    concs = mkRepPolyIdConcreteTyVars
+        [((openAlphaTy, Argument 2 Top), runtimeRep1TyVar)]
 
 ----------------------------------------------------------------------
 {- Note [Wired-in Ids for rebindable syntax]
@@ -1955,7 +1967,7 @@ does not linger for long.
 --   is () and not undefined
 -- Important that is is multiplicity-polymorphic (test linear/should_compile/OldList)
 leftSectionId :: Id
-leftSectionId = pcMiscPrelId leftSectionName ty info
+leftSectionId = pcRepPolyId leftSectionName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
@@ -1973,6 +1985,9 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
     body = mkLams [f,xmult] $ App (Var f) (Var xmult)
     arity = 2
 
+    concs = mkRepPolyIdConcreteTyVars
+            [((openAlphaTy, Argument 2 Top), runtimeRep1TyVar)]
+
 -- See Note [Left and right sections] in GHC.Rename.Expr
 -- See Note [Wired-in Ids for rebindable syntax]
 --   rightSection :: forall r1 r2 r3 n1 n2 (a::TYPE r1) (b::TYPE r2) (c::TYPE r3).
@@ -1980,7 +1995,7 @@ leftSectionId = pcMiscPrelId leftSectionName ty info
 --   rightSection f y x = f x y
 -- Again, multiplicity polymorphism is important
 rightSectionId :: Id
-rightSectionId = pcMiscPrelId rightSectionName ty info
+rightSectionId = pcRepPolyId rightSectionName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
@@ -2003,10 +2018,15 @@ rightSectionId = pcMiscPrelId rightSectionName ty info
     body = mkLams [f,ymult,xmult] $ mkVarApps (Var f) [xmult,ymult]
     arity = 3
 
+    concs =
+      mkRepPolyIdConcreteTyVars
+        [ ((openAlphaTy, Argument 3 Top), runtimeRep1TyVar)
+        , ((openBetaTy , Argument 2 Top), runtimeRep2TyVar)]
+
 --------------------------------------------------------------------------------
 
 coerceId :: Id
-coerceId = pcMiscPrelId coerceName ty info
+coerceId = pcRepPolyId coerceName ty concs info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
@@ -2029,6 +2049,9 @@ coerceId = pcMiscPrelId coerceName ty info
     rhs = mkLams (bndrs ++ [eqR, x]) $
           mkWildCase (Var eqR) (unrestricted eqRTy) b $
           [Alt (DataAlt coercibleDataCon) [eq] (Cast (Var x) (mkCoVarCo eq))]
+
+    concs = mkRepPolyIdConcreteTyVars
+            [((mkTyVarTy av, Argument 1 Top), rv)]
 
 {-
 Note [seqId magic]
@@ -2279,3 +2302,28 @@ coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
   = mkVanillaGlobalWithInfo name ty info
+
+pcRepPolyId :: Name -> Type -> (Name -> ConcreteTyVars) -> IdInfo -> Id
+pcRepPolyId name ty conc_tvs info =
+  mkGlobalId (RepPolyId $ conc_tvs name) name ty info
+
+-- | Directly specify which outer forall'd type variables of a
+-- representation-polymorphic 'Id' such become concrete metavariables when
+-- instantiated.
+mkRepPolyIdConcreteTyVars :: [((Type, Position Neg), TyVar)]
+                               -- ^ ((ty, pos), tv)
+                               -- 'ty' is the type on which the representation-polymorphism
+                               -- check is done
+                               -- 'tv' is the type variable we are checking for concreteness
+                               -- (usually the kind of 'ty')
+                               -- 'pos' is the position of 'ty' in the
+                               -- type of the 'Id'
+                          -> Name -- ^ 'Name' of the rep-poly 'Id'
+                          -> ConcreteTyVars
+mkRepPolyIdConcreteTyVars vars nm =
+  mkNameEnv [ (tyVarName tv, mk_conc_frr ty pos)
+            | ((ty,pos), tv) <- vars ]
+  where
+    mk_conc_frr ty pos =
+      ConcreteFRR $ FixedRuntimeRepOrigin ty
+                  $ FRRRepPolyId nm RepPolyFunction pos

@@ -5,6 +5,7 @@ Wired-in knowledge about {\em non-primitive} types
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ParallelListComp #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -183,15 +184,19 @@ import qualified GHC.Core.TyCo.Rep as TyCoRep (Type(TyConApp))
 
 import GHC.Types.TyThing
 import GHC.Types.SourceText
-import GHC.Types.Var ( VarBndr (Bndr) )
+import GHC.Types.Var ( VarBndr (Bndr), tyVarName )
 import GHC.Types.RepType
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
-import GHC.Types.Name.Env ( lookupNameEnv_NF )
+import GHC.Types.Name.Env ( lookupNameEnv_NF, mkNameEnv )
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Unique.Set
 
+import {-# SOURCE #-} GHC.Tc.Types.Origin
+  ( FixedRuntimeRepOrigin(..), mkFRRUnboxedTuple, mkFRRUnboxedSum )
+import {-# SOURCE #-} GHC.Tc.Utils.TcType
+  ( ConcreteTvOrigin(..), ConcreteTyVars, noConcreteTyVars )
 
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
@@ -552,33 +557,44 @@ pcTyCon name cType tyvars cons
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataCon n univs tys
-  = pcDataConWithFixity False n univs
-                      []    -- no ex_tvs
-                      univs -- the univs are precisely the user-written tyvars
-                      []    -- No theta
-                      (map linear tys)
+  = pcRepPolyDataCon n univs noConcreteTyVars tys
+
+pcRepPolyDataCon :: Name -> [TyVar] -> ConcreteTyVars
+                 -> [Type] -> TyCon -> DataCon
+pcRepPolyDataCon n univs conc_tvs tys
+  = pcDataConWithFixity False n
+      univs
+      []    -- no ex_tvs
+      conc_tvs
+      univs -- the univs are precisely the user-written tyvars
+      []    -- No theta
+      (map linear tys)
 
 pcDataConConstraint :: Name -> [TyVar] -> ThetaType -> TyCon -> DataCon
 -- Used for data constructors whose arguments are all constraints.
 -- Notably constraint tuples, Eq# etc.
 pcDataConConstraint n univs theta
-  = pcDataConWithFixity False n univs
-                      []    -- No ex_tvs
-                      univs -- The univs are precisely the user-written tyvars
-                      theta -- All constraint arguments
-                      []    -- No value arguments
+  = pcDataConWithFixity False n
+      univs
+      []           -- No ex_tvs
+      noConcreteTyVars
+      univs        -- The univs are precisely the user-written tyvars
+      theta        -- All constraint arguments
+      []           -- No value arguments
 
 -- Used for RuntimeRep and friends; things with PromDataConInfo
 pcSpecialDataCon :: Name -> [Type] -> TyCon -> PromDataConInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
   = pcDataConWithFixity' False dc_name
                          (dataConWorkerUnique (nameUnique dc_name)) rri
-                         [] [] [] [] (map linear arg_tys) tycon
+                         [] [] noConcreteTyVars [] [] (map linear arg_tys) tycon
 
 pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> Name      -- ^ datacon name
                     -> [TyVar]   -- ^ univ tyvars
                     -> [TyCoVar] -- ^ ex tycovars
+                    -> ConcreteTyVars
+                                 -- ^ concrete tyvars
                     -> [TyCoVar] -- ^ user-written tycovars
                     -> ThetaType
                     -> [Scaled Type]    -- ^ args
@@ -594,7 +610,9 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n
 -- one DataCon unique per pair of Ints.
 
 pcDataConWithFixity' :: Bool -> Name -> Unique -> PromDataConInfo
-                     -> [TyVar] -> [TyCoVar] -> [TyCoVar]
+                     -> [TyVar] -> [TyCoVar]
+                     -> ConcreteTyVars
+                     -> [TyCoVar]
                      -> ThetaType -> [Scaled Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
@@ -607,7 +625,7 @@ pcDataConWithFixity' :: Bool -> Name -> Unique -> PromDataConInfo
 --    to regret doing so (we do).
 
 pcDataConWithFixity' declared_infix dc_name wrk_key rri
-                     tyvars ex_tyvars user_tyvars theta arg_tys tycon
+                     tyvars ex_tyvars conc_tyvars user_tyvars theta arg_tys tycon
   = data_con
   where
     tag_map = mkTyConTagMap tycon
@@ -621,6 +639,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
+                conc_tyvars
                 (mkTyVarBinders SpecifiedSpec user_tyvars)
                 []      -- No equality spec
                 theta
@@ -1126,8 +1145,16 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     flavour     = VanillaAlgTyCon (mkPrelTyConRepName tc_name)
 
     dc_tvs               = binderVars tc_binders
-    (rr_tys, dc_arg_tys) = splitAt arity (mkTyVarTys dc_tvs)
-    tuple_con            = pcDataCon dc_name dc_tvs dc_arg_tys tycon
+    (rr_tvs, dc_arg_tvs) = splitAt arity dc_tvs
+    rr_tys               = mkTyVarTys rr_tvs
+    dc_arg_tys           = mkTyVarTys dc_arg_tvs
+    tuple_con            = pcRepPolyDataCon dc_name dc_tvs conc_tvs dc_arg_tys tycon
+    conc_tvs =
+      mkNameEnv
+        [ (tyVarName rr_tv, ConcreteFRR $ FixedRuntimeRepOrigin ty $ mkFRRUnboxedTuple pos)
+        | rr_tv <- rr_tvs
+        | ty <- dc_arg_tys
+        | pos <- [1..arity] ]
 
     boxity  = Unboxed
     modu    = gHC_PRIM
@@ -1291,23 +1318,34 @@ mk_sum arity = (tycon, sum_cons)
 
     tc_res_kind = unboxedSumKind rr_tys
 
-    (rr_tys, tyvar_tys) = splitAt arity (mkTyVarTys tyvars)
+    (rr_tvs, dc_arg_tvs) = splitAt arity tyvars
+    rr_tys               = mkTyVarTys rr_tvs
+    dc_arg_tys           = mkTyVarTys dc_arg_tvs
+
+    conc_tvs =
+      mkNameEnv
+        [ (tyVarName rr_tv, ConcreteFRR $ FixedRuntimeRepOrigin ty $ mkFRRUnboxedSum (Just pos))
+        | rr_tv <- rr_tvs
+        | ty <- dc_arg_tys
+        | pos <- [1..arity] ]
 
     tc_name = mkWiredInName gHC_PRIM (mkSumTyConOcc arity) tc_uniq
                             (ATyCon tycon) BuiltInSyntax
 
     sum_cons = listArray (0,arity-1) [sum_con i | i <- [0..arity-1]]
-    sum_con i = let dc = pcDataCon dc_name
-                                   tyvars -- univ tyvars
-                                   [tyvar_tys !! i] -- arg types
-                                   tycon
+    sum_con i =
+      let dc = pcRepPolyDataCon dc_name
+                  tyvars -- univ tyvars
+                  conc_tvs
+                  [dc_arg_tys !! i] -- arg types
+                  tycon
 
-                    dc_name = mkWiredInName gHC_PRIM
-                                            (mkSumDataConOcc i arity)
-                                            (dc_uniq i)
-                                            (AConLike (RealDataCon dc))
-                                            BuiltInSyntax
-                in dc
+          dc_name = mkWiredInName gHC_PRIM
+                      (mkSumDataConOcc i arity)
+                      (dc_uniq i)
+                      (AConLike (RealDataCon dc))
+                      BuiltInSyntax
+      in dc
 
     tc_uniq   = mkSumTyConUnique   arity
     dc_uniq i = mkSumDataConUnique i arity
@@ -2184,7 +2222,7 @@ nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
                consDataConName
-               alpha_tyvar [] alpha_tyvar []
+               alpha_tyvar [] noConcreteTyVars alpha_tyvar []
                (map linear [alphaTy, mkTyConApp listTyCon alpha_ty])
                listTyCon
 

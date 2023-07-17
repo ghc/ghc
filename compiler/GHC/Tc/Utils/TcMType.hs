@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase      #-}
 {-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE RecursiveDo     #-}
 {-# LANGUAGE TupleSections   #-}
@@ -23,9 +24,10 @@ module GHC.Tc.Utils.TcMType (
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
+  newOpenFlexiFRRTyVar, newOpenFlexiFRRTyVarTy,
   newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars,
-  newMetaTyVarTyAtLevel, newConcreteTyVarTyAtLevel,
+  newMetaTyVarTyAtLevel, newConcreteTyVarTyAtLevel, substConcreteTvOrigin,
   newAnonMetaTyVar, newConcreteTyVar,
   cloneMetaTyVar, cloneMetaTyVarWithInfo,
   newCycleBreakerTyVar,
@@ -56,6 +58,7 @@ module GHC.Tc.Utils.TcMType (
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
+  newConcreteTyVarX,
   newPatTyVar, newSkolemTyVar, newWildCardX,
 
   --------------------------------
@@ -362,8 +365,8 @@ newCoercionHole :: CtLoc -> TcPredType -> TcM CoercionHole
 newCoercionHole loc = newCoercionHoleO (ctLocOrigin loc)
 
 newCoercionHoleO :: CtOrigin -> TcPredType -> TcM CoercionHole
-newCoercionHoleO (KindEqOrigin {}) = new_coercion_hole True
-newCoercionHoleO _                 = new_coercion_hole False
+newCoercionHoleO (KindEqOrigin {}) pty = new_coercion_hole True pty
+newCoercionHoleO _ pty                 = new_coercion_hole False pty
 
 new_coercion_hole :: Bool -> TcPredType -> TcM CoercionHole
 new_coercion_hole hetero_kind pred_ty
@@ -795,7 +798,15 @@ newConcreteTyVar :: HasDebugCallStack => ConcreteTvOrigin
                  -> FastString -> TcKind -> TcM TcTyVar
 newConcreteTyVar reason fs kind
   = assertPpr (isConcreteType kind) assert_msg $
-    newNamedAnonMetaTyVar fs (ConcreteTv reason) kind
+  do { th_stage <- getStage
+     ; if
+        -- See [Wrinkle: Typed Template Haskell]
+        -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+        | Brack _ (TcPending {}) <- th_stage
+        -> newNamedAnonMetaTyVar fs TauTv kind
+
+        | otherwise
+        -> newNamedAnonMetaTyVar fs (ConcreteTv reason) kind }
   where
     assert_msg = text "newConcreteTyVar: non-concrete kind" <+> ppr kind
 
@@ -953,7 +964,11 @@ newOpenTypeKind
        ; return (mkTYPEapp rr) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
--- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
+-- Returns @alpha :: TYPE kappa@, where both @alpha@ and @kappa@ are fresh.
+--
+-- Note: you should use 'newOpenFlexiFRRTyVarTy' if you also need to ensure
+-- that the representation is concrete, in the sense of Note [Concrete types]
+-- in GHC.Tc.Utils.Concrete.
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
   = do { tv <- newOpenFlexiTyVar
@@ -963,6 +978,30 @@ newOpenFlexiTyVar :: TcM TcTyVar
 newOpenFlexiTyVar
   = do { kind <- newOpenTypeKind
        ; newFlexiTyVar kind }
+
+-- | Like 'newOpenFlexiTyVar', but ensures the type variable has a
+-- syntactically fixed RuntimeRep in the sense of Note [Fixed RuntimeRep]
+-- in GHC.Tc.Utils.Concrete.
+newOpenFlexiFRRTyVar :: FixedRuntimeRepContext -> TcM TcTyVar
+newOpenFlexiFRRTyVar frr_ctxt
+  = do { th_stage <- getStage
+       ; case th_stage of
+          { Brack _ (TcPending {}) -- See [Wrinkle: Typed Template Haskell]
+              -> newOpenFlexiTyVar -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+          ; _ ->
+   mdo { let conc_orig = ConcreteFRR $
+                          FixedRuntimeRepOrigin
+                            { frr_context = frr_ctxt
+                            , frr_type    = mkTyVarTy tv }
+        ; rr <- mkTyVarTy <$> newConcreteTyVar conc_orig (fsLit "cx") runtimeRepTy
+        ; tv <- newFlexiTyVar (mkTYPEapp rr)
+        ; return tv } } }
+
+-- | See 'newOpenFlexiFRRTyVar'.
+newOpenFlexiFRRTyVarTy :: FixedRuntimeRepContext -> TcM TcType
+newOpenFlexiFRRTyVarTy frr_ctxt
+  = do { tv <- newOpenFlexiFRRTyVar frr_ctxt
+       ; return (mkTyVarTy tv) }
 
 newOpenBoxedTypeKind :: TcM TcKind
 newOpenBoxedTypeKind
@@ -989,9 +1028,21 @@ newMetaTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX = new_meta_tv_x TauTv
 
+-- | Like 'newMetaTyVarX', but for concrete type variables.
+newConcreteTyVarX :: ConcreteTvOrigin -> Subst -> TyVar -> TcM (Subst, TcTyVar)
+newConcreteTyVarX conc subst tv
+  = do { th_stage <- getStage
+       ; if
+          -- See [Wrinkle: Typed Template Haskell]
+          -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+          | Brack _ (TcPending {}) <- th_stage
+          -> new_meta_tv_x TauTv subst tv
+          | otherwise
+          -> new_meta_tv_x (ConcreteTv conc) subst tv }
+
 newMetaTyVarTyVarX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv
-newMetaTyVarTyVarX = new_meta_tv_x TyVarTv
+newMetaTyVarTyVarX subst tv = new_meta_tv_x TyVarTv subst tv
 
 newWildCardX :: Subst -> TyVar -> TcM (Subst, TcTyVar)
 newWildCardX subst tv
@@ -1017,6 +1068,91 @@ newConcreteTyVarTyAtLevel conc_orig tc_lvl kind
   = do  { details <- newConcreteTvDetailsAtLevel conc_orig tc_lvl
         ; name    <- newMetaTyVarName (fsLit "c")
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
+
+{- Note [substConcreteTvOrigin]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To report helpful representation-polymorphism errors to the users, we want to
+indicate which type caused the error, instead of simply printing kinds.
+For example, in
+
+  coerce :: forall {r} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b
+
+  bad :: forall {s} (z :: TYPE s). z -> z
+  bad = coerce
+
+we want the error message to say (with additional debug info on type variables
+for clarity of this explanation):
+
+  The first argument of 'coerce' does not have a fixed runtime representation.
+  Its type is:
+    a0[tau] :: TYPE r0[conc]
+  Could not unify s[sk] with r0[conc] because the former is not a concrete
+  RuntimeRep.
+
+This is more informative than just saying that we could not unify s[sk] with
+r0[conc]; it's helpful to users to phrase it in terms of types rather than kinds
+whenever possible (especially as the kind variables often have inferred Specificity).
+
+To achieve this, we store the type on which the representation-polymorphism
+check is being performed, in the field frr_type of FixedRuntimeRepOrigin.
+This is all described in Note [Reporting representation-polymorphism errors] in
+GHC.Tc.Types.Origin.
+
+However, we have to be careful in the example above, in which we are
+instantiating a built-in representation-polymorphic 'Id'. As described in the
+Note [Representation-polymorphism checking built-ins] in GHC.Tc.Gen.Head, in such
+cases we end up storing types appearing in the original type of the primop,
+which means for the situation above with 'coerce' we end up with a ConcreteTvOrigin
+which includes type variables bound in the original type of 'coerce':
+
+  FixedRuntimeRepOrigin
+    { frr_type = a[tv] :: TYPE r[tv]
+    , frr_context = "first argument of coerce" }
+
+When we instantiate 'coerce' in the previous example, we obtain a substitution
+
+  [ r[tv] |-> r0[conc], a |-> a0 :: TYPE r0[conc] ]
+
+which we need to apply to the 'frr_type' field in order for the type variables
+in the error message to match up.
+This is done by the call to 'substConcreteTvOrigin' in 'instantiateSigma'.
+
+Wrinkle [Extending the substitution]
+
+  In certain cases, we need to extend the substitution we get from 'instantiateSigma'.
+  For example, suppose we have:
+
+    bad2 :: forall {s} (z :: TYPE s). z -> z
+    bad2 = coerce @z
+
+  Then 'instantiateSigma' will only instantiate the inferred type variable 'r'
+  of 'coerce', as it needs to leave 'a' un-instantiated so that the visible
+  type application '@z' makes sense. In this case, we end up with a substitution
+
+    subst:                   [ r[tv] |-> r0[conc] ]
+    body_ty:                forall (a :: TYPE r[tv]) (b :: TYPE r[tv]). ...
+    substTy subst body_ty:  forall (a' :: TYPE r0[conc]) (b' :: TYPE r0[conc]). ...
+
+  Now, we still want a substitution that maps (a :: TYPE r[tv]) to
+  (a' :: TYPE r0[conc]) in order to apply it to the 'frr_type', so that we don't
+  mention the un-substed (a :: TYPE r[tv]) in the error message.
+  To achieve this, we extend the substitution with the outermost quantified type
+  variables in the leftover (partially-instantiated) type using 'substTyVarBndrs'
+  to get the full substitution which we use in 'substConcreteTvOrigin'.
+-}
+
+substConcreteTvOrigin :: Subst -> Type -> ConcreteTvOrigin -> ConcreteTvOrigin
+substConcreteTvOrigin subst body_ty (ConcreteFRR frr_orig)
+  -- See Note [substConcreteTvOrigin], Wrinkle [Extending the substitution]
+  -- for the justification of this extra complication.
+  = let subst' = case splitForAllTyCoVars body_ty of
+                   ([], _) -> subst
+                   (bndrs, _) -> fst $ substTyVarBndrs subst bndrs
+    in ConcreteFRR $ substFRROrigin subst' frr_orig
+
+substFRROrigin :: Subst -> FixedRuntimeRepOrigin -> FixedRuntimeRepOrigin
+substFRROrigin subst orig@(FixedRuntimeRepOrigin { frr_type = ty })
+  = orig { frr_type = substTy subst ty }
 
 {- *********************************************************************
 *                                                                      *

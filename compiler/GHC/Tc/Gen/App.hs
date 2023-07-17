@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GADTs               #-}
+{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
@@ -29,22 +30,27 @@ import GHC.Tc.Utils.Unify
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family ( tcGetFamInstEnvs, tcLookupDataFamInst_maybe )
 import GHC.Tc.Gen.HsType
+import GHC.Tc.Utils.Concrete  ( unifyConcrete, idConcreteTvs )
 import GHC.Tc.Utils.TcMType
+import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType as TcType
 import GHC.Tc.Zonk.TcType
+import GHC.Core.ConLike (ConLike(..))
+import GHC.Core.DataCon (dataConConcreteTyVars)
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
-import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
+import GHC.Core.TyCo.FVs
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 import GHC.Driver.DynFlags
+import GHC.Types.Name
+import GHC.Types.Name.Env
 import GHC.Types.SrcLoc
 import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 import GHC.Data.Maybe
@@ -136,12 +142,12 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 -- True  <=> instantiate -- return a rho-type
 -- False <=> don't instantiate -- return a sigma-type
 tcInferSigma inst (L loc rn_expr)
-  | (fun@(rn_fun,_), rn_args) <- splitHsApps rn_expr
+  | (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
     do { do_ql <- wantQuickLook rn_fun
-       ; (_tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
-       ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst fun fun_sigma rn_args
+       ; (tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
+       ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
        ; _tc_args <- tcValArgs do_ql inst_args
        ; return app_res_sigma }
 
@@ -332,7 +338,7 @@ tcApp rn_expr exp_res_ty
 
        -- Instantiate
        ; do_ql <- wantQuickLook rn_fun
-       ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
+       ; (delta, inst_args, app_res_rho) <- tcInstFun do_ql True (tc_fun, fun_ctxt) fun_sigma rn_args
 
        -- Quick look at result
        ; app_res_rho <- if do_ql
@@ -516,7 +522,9 @@ tcInstFun :: Bool   -- True  <=> Do quick-look
                     --    in tcInferSigma, which is used only to implement :type
                     -- Otherwise we do eager instantiation; in Fig 5 of the paper
                     --    |-inst returns a rho-type
-          -> (HsExpr GhcRn, AppCtxt)        -- Error messages only
+          -> (HsExpr GhcTc, AppCtxt)
+                -- ^ For error messages and to retrieve concreteness information
+                -- of the function
           -> TcSigmaType -> [HsExprArg 'TcpRn]
           -> TcM ( Delta
                  , [HsExprArg 'TcpInst]
@@ -524,8 +532,8 @@ tcInstFun :: Bool   -- True  <=> Do quick-look
 -- This function implements the |-inst judgement in Fig 4, plus the
 -- modification in Fig 5, of the QL paper:
 -- "A quick look at impredicativity" (ICFP'20).
-tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
-  = do { traceTc "tcInstFun" (vcat [ ppr rn_fun, ppr fun_sigma
+tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
+  = do { traceTc "tcInstFun" (vcat [ ppr tc_fun, ppr fun_sigma
                                    , text "args:" <+> ppr rn_args
                                    , text "do_ql" <+> ppr do_ql ])
        ; go emptyVarSet [] [] fun_sigma rn_args }
@@ -534,13 +542,26 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
                                VAExpansion e _ -> e
                                VACall e _ _    -> e)
 
+    -- These are the type variables which must be instantiated to concrete
+    -- types. See Note [Representation-polymorphic Ids with no binding]
+    -- in GHC.Tc.Gen.Head.
+    fun_conc_tvs
+      | HsVar _ (L _ fun_id) <- tc_fun
+      = idConcreteTvs fun_id
+      -- Recall that DataCons are represented using ConLikeTc at GhcTc stage,
+      -- see Note [Typechecking data constructors] in GHC.Tc.Gen.Head.
+      | XExpr (ConLikeTc (RealDataCon dc) _ _) <- tc_fun
+      = dataConConcreteTyVars dc
+      | otherwise
+      = noConcreteTyVars
+
     -- Count value args only when complaining about a function
     -- applied to too many value args
     -- See Note [Herald for matchExpectedFunTys] in GHC.Tc.Utils.Unify.
     n_val_args = count isHsValArg rn_args
 
     fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
-      = case rn_fun of
+      = case tc_fun of
           HsUnboundVar {} -> True
           _               -> False
 
@@ -587,10 +608,23 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
         -- E.g. #22908: f :: Foo => blah
         -- No foralls!  But if inst_final=False, don't instantiate
       , not (null tvs && null theta)
-      = do { (inst_tvs, wrap, fun_rho) <- addHeadCtxt fun_ctxt $
-                                          instantiateSigma fun_orig tvs theta body2
-                 -- addHeadCtxt: important for the class constraints
-                 -- that may be emitted from instantiating fun_sigma
+      = do { (inst_tvs, wrap, fun_rho) <-
+                -- addHeadCtxt: important for the class constraints
+                -- that may be emitted from instantiating fun_sigma
+                addHeadCtxt fun_ctxt $
+                instantiateSigma fun_orig fun_conc_tvs tvs theta body2
+                  -- See Note [Representation-polymorphism checking built-ins]
+                  -- in GHC.Tc.Gen.Head.
+                  -- NB: we are doing this even when "acc" is not empty,
+                  -- to handle e.g.
+                  --
+                  --   badTup :: forall r (a :: TYPE r). a -> (# Int, a #)
+                  --   badTup = (# , #) @LiftedRep
+                  --
+                  -- in which we already have instantiated the first RuntimeRep
+                  -- argument of (#,#) to @LiftedRep, but want to rule out the
+                  -- second instantiation @r.
+
            ; go (delta `extendVarSetList` inst_tvs)
                 (addArgWrap wrap acc) so_far fun_rho args }
                 -- Going around again means we deal easily with
@@ -614,7 +648,7 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
       = go delta acc so_far fun_ty rest_args
 
       | otherwise
-      = do { (ty_arg, inst_ty) <- tcVTA fun_ty hs_ty
+      = do { (ty_arg, inst_ty) <- tcVTA fun_conc_tvs fun_ty hs_ty
            ; let arg' = ETypeArg { eva_ctxt = ctxt, eva_at = at, eva_hs_ty = hs_ty, eva_ty = ty_arg }
            ; go delta (arg' : acc) so_far inst_ty rest_args }
 
@@ -637,11 +671,24 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
         --   - We need the freshly allocated unification variables, to extend
         --     delta with.
         -- It's easier just to do the job directly here.
-        do { let valArgsCount = countLeadingValArgs args
-           ; arg_nus <- replicateM valArgsCount newOpenFlexiTyVar
+        do { let val_args       = leadingValArgs args
+                 val_args_count = length val_args
+
+            -- Create metavariables for the arguments. Following matchActualFunTySigma,
+            -- we create nu_i :: TYPE kappa_i[conc], ensuring that the arguments
+            -- have concrete runtime representations.
+            -- When we come to unify the nus (in qlUnify), we will call
+            -- unifyKind on the kinds. This will do the right thing, even though
+            -- we are manually filling in the nu metavariables.
+                 new_arg_tv (ValArg (L _ arg)) i =
+                   newOpenFlexiFRRTyVar $
+                   FRRExpectedFunTy (ExpectedFunTyArg (HsExprTcThing tc_fun) arg) i
+           ; arg_nus <- zipWithM new_arg_tv
+                          val_args
+                          [length so_far + 1 ..]
              -- We need variables for multiplicity (#18731)
              -- Otherwise, 'undefined x' wouldn't be linear in x
-           ; mults   <- replicateM valArgsCount (newFlexiTyVarTy multiplicityTy)
+           ; mults   <- replicateM val_args_count (newFlexiTyVarTy multiplicityTy)
            ; res_nu  <- newOpenFlexiTyVar
            ; kind_co <- unifyKind Nothing liftedTypeKind (tyVarKind kappa)
            ; let delta'  = delta `extendVarSetList` (res_nu:arg_nus)
@@ -661,9 +708,14 @@ tcInstFun do_ql inst_final (rn_fun, fun_ctxt) fun_sigma rn_args
     go1 delta acc so_far fun_ty
         (eva@(EValArg { eva_arg = ValArg arg, eva_ctxt = ctxt }) : rest_args)
       = do { (wrap, arg_ty, res_ty) <-
+                -- NB: matchActualFunTySigma does the rep-poly check.
+                -- For example, suppose we have f :: forall r (a::TYPE r). a -> Int
+                -- In an application (f x), we need 'x' to have a fixed runtime
+                -- representation; matchActualFunTySigma checks that when
+                -- taking apart the arrow type (a -> Int).
                 matchActualFunTySigma
-                  (ExpectedFunTyArg (HsExprRnThing rn_fun) (unLoc arg))
-                  (Just $ HsExprRnThing rn_fun)
+                  (ExpectedFunTyArg (HsExprTcThing tc_fun) (unLoc arg))
+                  (Just $ HsExprTcThing tc_fun)
                   (n_val_args, so_far) fun_ty
           ; (delta', arg') <- if do_ql
                               then addArgCtxt ctxt arg $
@@ -705,12 +757,17 @@ addArgCtxt ctxt (L arg_loc arg) thing_inside
 *                                                                      *
 ********************************************************************* -}
 
-tcVTA :: TcType            -- Function type
-      -> LHsWcType GhcRn   -- Argument type
+tcVTA :: ConcreteTyVars
+         -- ^ Type variables that must be instantiated to concrete types.
+         --
+         -- See Note [Representation-polymorphism checking built-ins]
+         -- in GHC.Tc.Gen.Head.
+      -> TcType            -- ^ Function type
+      -> LHsWcType GhcRn   -- ^ Argument type
       -> TcM (TcType, TcType)
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
-tcVTA fun_ty hs_ty
+tcVTA conc_tvs fun_ty hs_ty
   | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , binderFlag tvb == Specified
     -- It really can't be Inferred, because we've just
@@ -718,7 +775,32 @@ tcVTA fun_ty hs_ty
     -- See Note [Required quantifiers in the type of a term]
   = do { let tv   = binderVar tvb
              kind = tyVarKind tv
-       ; ty_arg <- tcHsTypeApp hs_ty kind
+             tv_nm   = tyVarName tv
+             mb_conc = lookupNameEnv conc_tvs tv_nm
+       ; ty_arg0 <- tcHsTypeApp hs_ty kind
+
+       -- Is this type variable required to be instantiated to a concrete type?
+       -- If so, ensure that that is the case.
+       --
+       -- See [Wrinkle: VTA] in Note [Representation-polymorphism checking built-ins]
+       -- in GHC.Tc.Gen.Head.
+       ; th_stage <- getStage
+       ; ty_arg <- case mb_conc of
+           Nothing   -> return ty_arg0
+           Just conc
+             -- See [Wrinkle: Typed Template Haskell]
+             -- in Note [hasFixedRuntimeRep] in GHC.Tc.Utils.Concrete.
+             | Brack _ (TcPending {}) <- th_stage
+             -> return ty_arg0
+             | otherwise
+             ->
+             -- Example: user wrote e.g. (#,#) @(F Bool) for a type family F.
+             -- Emit [W] F Bool ~ kappa[conc] and pretend the user wrote (#,#) @kappa.
+             do { mco <- unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
+                ; let ty_arg = case mco of { MRefl -> ty_arg0; MCo co -> coercionRKind co }
+                ; liftZonkM $ zonkTcType ty_arg }
+                -- (zonk here to match the zonk below, because unifyConcrete can
+                -- perform unification)
 
        ; inner_ty <- liftZonkM $ zonkTcType inner_ty
              -- See Note [Visible type application zonk]
@@ -892,7 +974,7 @@ isGuardedTy ty
 quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaTypeFRR
               -> TcM (Delta, EValArg 'TcpInst)
 quickLookArg1 guarded delta larg@(L _ arg) arg_ty
-  = do { let (fun@(rn_fun, fun_ctxt), rn_args) = splitHsApps arg
+  = do { let ((rn_fun, fun_ctxt), rn_args) = splitHsApps arg
        ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args
        ; traceTc "quickLookArg 1" $
          vcat [ text "arg:" <+> ppr arg
@@ -914,7 +996,7 @@ quickLookArg1 guarded delta larg@(L _ arg) arg_ty
          then skipQuickLook delta larg
          else
     do { do_ql <- wantQuickLook rn_fun
-       ; (delta_app, inst_args, app_res_rho) <- tcInstFun do_ql True fun fun_sigma rn_args
+       ; (delta_app, inst_args, app_res_rho) <- tcInstFun do_ql True (tc_fun, fun_ctxt) fun_sigma rn_args
        ; traceTc "quickLookArg 3" $
          vcat [ text "arg:" <+> ppr arg
               , text "delta:" <+> ppr delta

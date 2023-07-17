@@ -5,7 +5,6 @@ T12973.hs:13:7: error: [GHC-55287]
       Its type is:
         a0 :: TYPE r0
       Cannot unify ‘r’ with the type variable ‘r0’
-      because it is not a concrete ‘RuntimeRep’.
+      because the former is not a concrete ‘RuntimeRep’.
     • In the expression: 3 + 4
       In an equation for ‘foo’: foo = 3 + 4
-    • Relevant bindings include foo :: a (bound at T12973.hs:13:1)

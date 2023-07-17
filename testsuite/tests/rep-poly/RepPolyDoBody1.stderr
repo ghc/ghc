@@ -6,7 +6,7 @@ RepPolyDoBody1.hs:24:3: error: [GHC-55287]
       Its type is:
         ma0 :: TYPE rep0
       Cannot unify ‘rep’ with the type variable ‘rep0’
-      because it is not a concrete ‘RuntimeRep’.
+      because the former is not a concrete ‘RuntimeRep’.
     • In a stmt of a 'do' block: undefined :: ma
       In the expression:
         do undefined :: ma
@@ -15,5 +15,3 @@ RepPolyDoBody1.hs:24:3: error: [GHC-55287]
           foo _
             = do undefined :: ma
                return ()
-    • Relevant bindings include
-        foo :: () -> ma (bound at RepPolyDoBody1.hs:23:1)

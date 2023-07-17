@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- | Describes the provenance of types as they flow through the type-checker.
 -- The datatypes here are mainly used for error message generation.
@@ -20,23 +22,30 @@ module GHC.Tc.Types.Origin (
   isVisibleOrigin, toInvisibleOrigin,
   pprCtOrigin, isGivenOrigin, isWantedWantedFunDepOrigin,
   isWantedSuperclassOrigin,
+  ClsInstOrQC(..), NakedScFlag(..),
 
   TypedThing(..), TyVarBndrs(..),
 
-  -- * CtOrigin and CallStack
+  -- * CallStack
   isPushCallStackOrigin, callStackOriginFS,
-  ClsInstOrQC(..), NakedScFlag(..),
 
   -- * FixedRuntimeRep origin
-  FixedRuntimeRepOrigin(..), FixedRuntimeRepContext(..),
+  FixedRuntimeRepOrigin(..),
+  FixedRuntimeRepContext(..),
   pprFixedRuntimeRepContext,
-  StmtOrigin(..), RepPolyFun(..), ArgPos(..),
+  StmtOrigin(..), ArgPos(..),
+  mkFRRUnboxedTuple, mkFRRUnboxedSum,
 
-  -- * Arrow command origin
+  -- ** FixedRuntimeRep origin for rep-poly 'Id's
+  RepPolyId(..), Polarity(..), Position(..),
+
+  -- ** Arrow command FixedRuntimeRep origin
   FRRArrowContext(..), pprFRRArrowContext,
+
+  -- ** ExpectedFunTy FixedRuntimeRepOrigin
   ExpectedFunTyOrigin(..), pprExpectedFunTyOrigin, pprExpectedFunTyHerald,
 
-  -- InstanceWhat
+  -- * InstanceWhat
   InstanceWhat(..), SafeOverlapping
   ) where
 
@@ -71,6 +80,8 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
 import Language.Haskell.Syntax.Basic (FieldLabelString(..))
+
+import qualified Data.Kind as Hs
 
 {- *********************************************************************
 *                                                                      *
@@ -447,6 +458,7 @@ data TypedThing
   = HsTypeRnThing (HsType GhcRn)
   | TypeThing Type
   | HsExprRnThing (HsExpr GhcRn)
+  | HsExprTcThing (HsExpr GhcTc)
   | NameThing Name
 
 -- | Some kind of type variable binder.
@@ -460,6 +472,7 @@ instance Outputable TypedThing where
   ppr (HsTypeRnThing ty) = ppr ty
   ppr (TypeThing ty) = ppr ty
   ppr (HsExprRnThing expr) = ppr expr
+  ppr (HsExprTcThing expr) = ppr expr
   ppr (NameThing name) = ppr name
 
 instance Outputable TyVarBndrs where
@@ -1002,7 +1015,7 @@ data FixedRuntimeRepOrigin
   = FixedRuntimeRepOrigin
     { frr_type    :: Type
        -- ^ What type are we checking?
-       -- For example, `a[tau]` in `a[tau] :: TYPE rr[tau]`.
+       -- For example, @a[tau]@ in @a[tau] :: TYPE rr[tau]@.
 
     , frr_context :: FixedRuntimeRepContext
       -- ^ What context requires a fixed runtime representation?
@@ -1033,6 +1046,32 @@ data FixedRuntimeRepContext
   -- Test cases: LevPolyLet, RepPolyPatBind.
   | FRRBinder !Name
 
+  -- | Types appearing in negative position in the type of a
+  -- representation-polymorphic 'Id' must have a fixed runtime representation.
+  --
+  -- This includes:
+  --
+  --  - arguments,
+  --
+  --    Test cases: RepPolyMagic, RepPolyRightSection, RepPolyWrappedVar,
+  --                T14561b, T17817.
+  --
+  --  - continuation result types, such as in 'catch#', 'keepAlive#'
+  --    and 'control0#'.
+  --
+  --    Test case: T21906.
+  | FRRRepPolyId
+      !Name
+      !RepPolyId
+      !(Position Neg)
+
+  -- | A partial application of the constructor of a representation-polymorphic
+  -- unlifted newtype in which the argument type does not have a fixed
+  -- runtime representation.
+  --
+  -- Test cases: UnliftedNewtypesLevityBinder, UnliftedNewtypesCoerceFail.
+  | FRRRepPolyUnliftedNewtype !DataCon
+
   -- | Pattern binds must have a fixed runtime representation.
   --
   -- Test case: RepPolyInferPatBind.
@@ -1055,26 +1094,20 @@ data FixedRuntimeRepContext
   -- Test case: T20363.
   | FRRDataConPatArg !DataCon !Int
 
-  -- | An instantiation of a function with no binding (e.g. `coerce`, `unsafeCoerce#`, an unboxed tuple 'DataCon')
-  -- in which one of the remaining arguments types does not have a fixed runtime representation.
-  --
-  -- Test cases: RepPolyWrappedVar, T14561, UnliftedNewtypesLevityBinder, UnliftedNewtypesCoerceFail.
-  | FRRNoBindingResArg !RepPolyFun !ArgPos
-
-  -- | Arguments to unboxed tuples must have fixed runtime representations.
+  -- | The 'RuntimeRep' arguments to unboxed tuples must be concrete 'RuntimeRep's.
   --
   -- Test case: RepPolyTuple.
-  | FRRTupleArg !Int
+  | FRRUnboxedTuple !Int
 
   -- | Tuple sections must have a fixed runtime representation.
   --
   -- Test case: RepPolyTupleSection.
-  | FRRTupleSection !Int
+  | FRRUnboxedTupleSection !Int
 
-  -- | Unboxed sums must have a fixed runtime representation.
+  -- | The 'RuntimeRep' arguments to unboxed sums must be concrete 'RuntimeRep's.
   --
   -- Test cases: RepPolySum.
-  | FRRUnboxedSum
+  | FRRUnboxedSum !(Maybe Int)
 
   -- | The body of a @do@ expression or a monad comprehension must
   -- have a fixed runtime representation.
@@ -1113,6 +1146,28 @@ data FixedRuntimeRepContext
       !Int
         -- ^ argument position (1-indexed)
 
+-- | The description of a representation-polymorphic 'Id'.
+data RepPolyId
+  -- | A representation-polymorphic 'PrimOp'.
+  = RepPolyPrimOp
+  -- | An unboxed tuple constructor.
+  | RepPolyTuple
+  -- | An unboxed sum constructor.
+  | RepPolySum
+  -- | An unspecified representation-polymorphic function,
+  -- e.g. a pseudo-op such as 'coerce'.
+  | RepPolyFunction
+
+-- | A synonym for 'FRRUnboxedTuple' exposed in the hs-boot file
+-- for "GHC.Tc.Types.Origin".
+mkFRRUnboxedTuple :: Int -> FixedRuntimeRepContext
+mkFRRUnboxedTuple = FRRUnboxedTuple
+
+-- | A synonym for 'FRRUnboxedSum' exposed in the hs-boot file
+-- for "GHC.Tc.Types.Origin".
+mkFRRUnboxedSum :: Maybe Int -> FixedRuntimeRepContext
+mkFRRUnboxedSum = FRRUnboxedSum
+
 -- | Print the context for a @FixedRuntimeRep@ representation-polymorphism check.
 --
 -- Note that this function does not include the specific 'RuntimeRep'
@@ -1128,6 +1183,8 @@ pprFixedRuntimeRepContext (FRRRecordUpdate lbl _arg)
 pprFixedRuntimeRepContext (FRRBinder binder)
   = sep [ text "The binder"
         , quotes (ppr binder) ]
+pprFixedRuntimeRepContext (FRRRepPolyId nm id what)
+  = pprFRRRepPolyId id nm what
 pprFixedRuntimeRepContext FRRPatBind
   = text "The pattern binding"
 pprFixedRuntimeRepContext FRRPatSynArg
@@ -1143,30 +1200,17 @@ pprFixedRuntimeRepContext (FRRDataConPatArg con i)
       = text "newtype constructor pattern"
       | otherwise
       = text "data constructor pattern in" <+> speakNth i <+> text "position"
-pprFixedRuntimeRepContext (FRRNoBindingResArg fn arg_pos)
-  = vcat [ text "Unsaturated use of a representation-polymorphic" <+> what_fun <> dot
-         , what_arg <+> text "argument of" <+> quotes (ppr fn) ]
-  where
-    what_fun, what_arg :: SDoc
-    what_fun = case fn of
-      RepPolyWiredIn {} -> text "primitive function"
-      RepPolyDataCon dc -> what_con <+> text "constructor"
-        where
-          what_con :: SDoc
-          what_con
-            | isNewDataCon dc
-            = text "newtype"
-            | otherwise
-            = text "data"
-    what_arg = case arg_pos of
-      ArgPosInvis -> text "An invisible"
-      ArgPosVis i -> text "The" <+> speakNth i
-pprFixedRuntimeRepContext (FRRTupleArg i)
-  = text "The tuple argument in" <+> speakNth i <+> text "position"
-pprFixedRuntimeRepContext (FRRTupleSection i)
-  = text "The" <+> speakNth i <+> text "component of the tuple section"
-pprFixedRuntimeRepContext FRRUnboxedSum
+pprFixedRuntimeRepContext (FRRRepPolyUnliftedNewtype dc)
+  = vcat [ text "Unsaturated use of a representation-polymorphic unlifted newtype."
+         , text "The argument of the newtype constructor" <+> quotes (ppr dc) ]
+pprFixedRuntimeRepContext (FRRUnboxedTuple i)
+  = text "The" <+> speakNth i <+> text "component of the unboxed tuple"
+pprFixedRuntimeRepContext (FRRUnboxedTupleSection i)
+  = text "The" <+> speakNth i <+> text "component of the unboxed tuple section"
+pprFixedRuntimeRepContext (FRRUnboxedSum Nothing)
   = text "The unboxed sum"
+pprFixedRuntimeRepContext (FRRUnboxedSum (Just i))
+  = text "The" <+> speakNth i <+> text "component of the unboxed sum"
 pprFixedRuntimeRepContext (FRRBodyStmt stmtOrig i)
   = vcat [ text "The" <+> speakNth i <+> text "argument to (>>)" <> comma
          , text "arising from the" <+> ppr stmtOrig <> comma ]
@@ -1197,29 +1241,56 @@ instance Outputable StmtOrigin where
   ppr MonadComprehension = text "monad comprehension"
   ppr DoNotation         = quotes ( text "do" ) <+> text "statement"
 
--- | A function with representation-polymorphic arguments,
--- such as @coerce@ or @(#, #)@.
---
--- Used for reporting partial applications of representation-polymorphic
--- functions in error messages.
-data RepPolyFun
-  = RepPolyWiredIn !Id
-    -- ^ A wired-in function with representation-polymorphic
-    -- arguments, such as 'coerce'.
-  | RepPolyDataCon !DataCon
-    -- ^ A data constructor with representation-polymorphic arguments,
-    -- such as an unboxed tuple or a newtype constructor with @-XUnliftedNewtypes@.
-
-instance Outputable RepPolyFun where
-  ppr (RepPolyWiredIn id) = ppr id
-  ppr (RepPolyDataCon dc) = ppr dc
-
 -- | The position of an argument (to be reported in an error message).
 data ArgPos
   = ArgPosInvis
     -- ^ Invisible argument: don't report its position to the user.
   | ArgPosVis !Int
     -- ^ Visible argument in i-th position.
+
+{- *********************************************************************
+*                                                                      *
+            FixedRuntimeRep: representation-polymorphic Ids
+*                                                                      *
+********************************************************************* -}
+
+data Polarity = Pos | Neg
+
+type FlipPolarity :: Polarity -> Polarity
+type family FlipPolarity p where
+  FlipPolarity Pos = Neg
+  FlipPolarity Neg = Pos
+
+-- | A position in which a type variable appears in a type;
+-- in particular, whether it appears in a positive or a negative position.
+type Position :: Polarity -> Hs.Type
+data Position p where
+  -- | In the @i@-th argument of a function arrow
+  Argument :: Int -> Position (FlipPolarity p) -> Position p
+  -- | In the result of a function arrow
+  Result   :: Position p -> Position p
+  -- | At the top level of a type
+  Top      :: Position Pos
+
+pprFRRRepPolyId :: RepPolyId -> Name -> Position Neg -> SDoc
+pprFRRRepPolyId id nm (Argument i pos) =
+  text "The" <+> what <+> speakNth i <+> text "argument of" <+> pprRepPolyId id nm
+  where
+    what = case pos of
+      Top       -> empty
+      Result {} -> text "return type of the"
+      _         -> text "nested return type inside the"
+pprFRRRepPolyId id nm (Result {}) =
+  text "The result of" <+> pprRepPolyId id nm
+
+pprRepPolyId :: RepPolyId -> Name -> SDoc
+pprRepPolyId id nm = id_desc <+> quotes (ppr nm)
+  where
+    id_desc = case id of
+      RepPolyPrimOp   {} -> text "the primop"
+      RepPolySum      {} -> text "the unboxed sum constructor"
+      RepPolyTuple    {} -> text "the unboxed tuple constructor"
+      RepPolyFunction {} -> empty
 
 {- *********************************************************************
 *                                                                      *

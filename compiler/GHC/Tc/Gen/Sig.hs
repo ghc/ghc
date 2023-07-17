@@ -54,7 +54,6 @@ import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep( mkNakedFunTy )
 
-import GHC.Types.Error
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars, invisArgTypeLike )
 import GHC.Types.Id  ( Id, idName, idType, setInlinePragma
                      , mkLocalId, realIdUnfolding )

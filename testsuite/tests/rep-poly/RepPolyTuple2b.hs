@@ -19,7 +19,8 @@ expensive :: Float -> Float
 expensive x = cos x ** 0.5
 
 {-# NOINLINE tup #-}
-tup x = (# , #) @LiftedRep @RR (expensive x)
+tup :: Float -> F -> (# Float, F #)
+tup x = (# , #) @LiftedRep (expensive x)
 
 showTup (# x, y #) = show x ++ " " ++ show (F# y)
 
