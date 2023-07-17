@@ -561,7 +561,7 @@ foreign import javascript unsafe "h$base_tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 foreign import javascript unsafe "h$base_tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
-foreign import javascript unsafe "h$base_utime" -- should this be async?
+foreign import javascript interruptible "h$base_utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CInt
 foreign import javascript interruptible "h$base_waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
@@ -594,7 +594,7 @@ s_isdir cm = c_s_isdir cm /= 0
 s_isfifo :: CMode -> Bool
 s_isfifo cm = c_s_isfifo cm /= 0
 
-foreign import javascript unsafe "(() => { return h$base_sizeof_stat; })" sizeof_stat :: Int
+foreign import javascript unsafe "h$base_sizeof_stat" sizeof_stat :: Int
 foreign import javascript unsafe "h$base_st_mtime"    st_mtime :: Ptr CStat -> IO CTime
 foreign import javascript unsafe "h$base_st_size"     st_size :: Ptr CStat -> IO Int64
 foreign import javascript unsafe "h$base_st_mode"     st_mode :: Ptr CStat -> IO CMode

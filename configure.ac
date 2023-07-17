@@ -475,6 +475,10 @@ FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
+dnl ** Do we have a compatible emsdk version?
+dnl --------------------------------------------------------------
+EMSDK_VERSION("3.1.20", "", "")
+
 dnl ** Which ld to use
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LD,[Use as the path to ld. See also --disable-ld-override.])
@@ -554,6 +558,9 @@ AC_ARG_VAR(CLANG,[Use as the path to clang [default=autodetect]])
 AC_CHECK_TARGET_TOOL([CLANG], [clang])
 ClangCmd="$CLANG"
 AC_SUBST([ClangCmd])
+
+ConfiguredEmsdkVersion="${EmsdkVersion}"
+AC_SUBST([ConfiguredEmsdkVersion])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------

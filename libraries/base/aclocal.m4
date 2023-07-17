@@ -14,6 +14,32 @@ AC_DEFUN([FP_COMPUTE_INT],
 ])# FP_COMPUTE_INT
 
 
+# FP_COMPUTE_OFFSET(VARIABLE, TYPE, MEMBER, INCLUDES)
+# ---------------------------------------------------
+# Assign VARIABLE the offset of MEMBER in struct TYPE using INCLUDES
+# for compilation. If compilation fails, VARIABLE is set to -1. Works for
+# cross-compilation, too.
+AC_DEFUN([FP_COMPUTE_OFFSET],
+[AC_MSG_CHECKING([offset of [$2].[$3]])
+FP_COMPUTE_INT([$1], [(offsetof(struct [$2], [$3]))], [$4
+#include <stddef.h>], AC_MSG_ERROR([could not determine offset of $2.$3]))
+AC_MSG_RESULT($[$1])
+AC_DEFINE_UNQUOTED([$1], $[$1], [Offset of $2.$3])
+]) # FP_COMPUTE_OFFSET
+
+# FP_COMPUTE_SIZE(VARIABLE, TYPE, MEMBER, INCLUDES)
+# ---------------------------------------------------
+# Assign VARIABLE the offset of MEMBER in struct TYPE using INCLUDES
+# for compilation. If compilation fails, VARIABLE is set to -1. Works for
+# cross-compilation, too.
+AC_DEFUN([FP_COMPUTE_SIZE],
+[AC_MSG_CHECKING([size of [$2].[$3]])
+FP_COMPUTE_INT([$1], [(sizeof(((struct [$2] *)0)->[$3]))], [$4
+#include <stddef.h>], AC_MSG_ERROR([could not determine size of $2.$3]))
+AC_MSG_RESULT($[$1])
+AC_DEFINE_UNQUOTED([$1], $[$1], [Size of $2.$3])
+]) # FP_COMPUTE_SIZE
+
 # FP_CHECK_CONST(EXPRESSION, [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
 # -------------------------------------------------------------------------------
 # Defines CONST_EXPRESSION to the value of the compile-time EXPRESSION, using
