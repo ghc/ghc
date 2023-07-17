@@ -886,9 +886,6 @@ So we must add the template vars to the in-scope set before starting;
 see `init_menv` in `matchN`.
 -}
 
-rvInScopeEnv :: RuleMatchEnv -> InScopeEnv
-rvInScopeEnv renv = ISE (rnInScopeSet (rv_lcl renv)) (rv_unf renv)
-
 -- * The domain of the TvSubstEnv and IdSubstEnv are the template
 --   variables passed into the match.
 --
@@ -1105,7 +1102,16 @@ match renv subst e1 (Let bind e2) mco
 
 ------------------------  Lambdas ---------------------
 match renv subst (Lam x1 e1) e2 mco
-  | Just (x2, e2', ts) <- exprIsLambda_maybe (rvInScopeEnv renv) (mkCastMCo e2 mco)
+  | let casted_e2 = mkCastMCo e2 mco
+        in_scope = extendInScopeSetSet (rnInScopeSet (rv_lcl renv))
+                                       (exprFreeVars casted_e2)
+        in_scope_env = ISE in_scope (rv_unf renv)
+        -- extendInScopeSetSet: The InScopeSet of rn_env is not necessarily
+        -- a superset of the free vars of e2; it is only guaranteed a superset of
+        -- applyng the (rnEnvR rn_env) substitution to e2. But exprIsLambda_maybe
+        -- wants an in-scope set that includes all the free vars of its argument.
+        -- Hence adding adding (exprFreeVars casted_e2) to the in-scope set (#23630)
+  , Just (x2, e2', ts) <- exprIsLambda_maybe in_scope_env casted_e2
     -- See Note [Lambdas in the template]
   = let renv'  = rnMatchBndr2 renv x1 x2
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
