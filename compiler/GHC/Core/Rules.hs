@@ -1105,7 +1105,12 @@ match renv subst e1 (Let bind e2) mco
 
 ------------------------  Lambdas ---------------------
 match renv subst (Lam x1 e1) e2 mco
-  | Just (x2, e2', ts) <- exprIsLambda_maybe (rvInScopeEnv renv) (mkCastMCo e2 mco)
+  | let casted_e2 = mkCastMCo e2 mco
+        in_scope = rnInScopeSet (rv_lcl renv)
+        -- See #23630 for why the free variables from e2 are added here.
+        env' = ISE (mkInScopeSet (exprFreeVars casted_e2)
+                    `unionInScope` in_scope) (rv_unf renv)
+  , Just (x2, e2', ts) <- exprIsLambda_maybe env' casted_e2
     -- See Note [Lambdas in the template]
   = let renv'  = rnMatchBndr2 renv x1 x2
         subst' = subst { rs_binds = rs_binds subst . flip (foldr mkTick) ts }
