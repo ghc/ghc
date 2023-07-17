@@ -371,6 +371,9 @@ hadrian-ghc-in-ghci:
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
+    # Enable -Werror when building hadrian
+    - "echo 'package hadrian'  > hadrian/cabal.project.local"
+    - "echo '  ghc-options: -Werror'  >> hadrian/cabal.project.local"
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   after_script:
