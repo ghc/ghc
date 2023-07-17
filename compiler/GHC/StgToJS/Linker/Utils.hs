@@ -47,6 +47,14 @@ import System.IO
 import Data.Char (isSpace)
 import qualified Control.Exception as Exception
 
+import GHC.Builtin.Types
+import Language.Haskell.Syntax.Basic
+import GHC.Types.Name
+import GHC.StgToJS.Ids
+import GHC.Core.DataCon
+import GHC.JS.Unsat.Syntax
+import GHC.Data.FastString
+
 -- | Retrieve library directories provided by the @UnitId@ in @UnitState@
 getInstalledPackageLibDirs :: UnitState -> UnitId -> [ShortText]
 getInstalledPackageLibDirs us = maybe mempty unitLibraryDirs . lookupUnitId us
@@ -71,6 +79,26 @@ commonCppDefs_vanilla, commonCppDefs_profiled :: ByteString
 commonCppDefs_vanilla  = genCommonCppDefs False
 commonCppDefs_profiled = genCommonCppDefs True
 
+-- | Generate macros MK_TUP* for tuples sized 2+.
+genMkTup :: Bool -> Int -> ByteString
+genMkTup profiling n = mconcat
+  [ "#define MK_TUP", sn                                                          -- #define MK_TUPn
+  , "(", B.intercalate "," xs, ")"                                                -- (x1,x2,...)
+  , "(h$c", sn, "("                                                               -- (h$cn(
+  , bytesFS symbol, ","                                                           -- h$ghczmprimZCGHCziTupleziPrimziZnT_con_e,                                                                        -- ,
+  , B.intercalate "," $ map (\x -> "(" <> x <> ")") xs                            -- (x1),(x2),(...)
+  , if profiling then ",h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM" else "" -- ,h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM
+  , "))\n"                                                                        -- ))\n
+  ]
+  where
+    xs = take n $ map (("x" <>) . Char8.pack . show) ([1..] :: [Int])
+    sn = Char8.pack $ show n
+    TxtI symbol = makeIdentForId (dataConWorkId $ tupleDataCon Boxed n) Nothing IdConEntry mod
+    name = tupleDataConName Boxed n
+    mod = case nameModule_maybe name of
+      Just m -> m
+      Nothing -> error "Tuple constructor is missing a module"
+
 -- | Generate CPP Definitions depending on a profiled or normal build. This
 -- occurs at link time.
 genCommonCppDefs :: Bool -> ByteString
@@ -87,29 +115,7 @@ genCommonCppDefs profiling = mconcat
     in mconcat (closure_defs ++ thread_defs)
 
   -- low-level heap object manipulation macros
-  , if profiling
-      then mconcat
-        [ "#define MK_TUP2(x1,x2)                           (h$c2(h$ghczmprimZCGHCziTupleziPrimziZLz2cUZR_con_e,(x1),(x2),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP3(x1,x2,x3)                        (h$c3(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUZR_con_e,(x1),(x2),(x3),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP4(x1,x2,x3,x4)                     (h$c4(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP5(x1,x2,x3,x4,x5)                  (h$c5(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP6(x1,x2,x3,x4,x5,x6)               (h$c6(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP7(x1,x2,x3,x4,x5,x6,x7)            (h$c7(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP8(x1,x2,x3,x4,x5,x6,x7,x8)         (h$c8(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP9(x1,x2,x3,x4,x5,x6,x7,x8,x9)      (h$c9(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8),(x9),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        , "#define MK_TUP10(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) (h$c10(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8),(x9),(x10),h$currentThread?h$currentThread.ccs:h$CCS_SYSTEM))\n"
-        ]
-      else mconcat
-        [ "#define MK_TUP2(x1,x2)                           (h$c2(h$ghczmprimZCGHCziTupleziPrimziZLz2cUZR_con_e,(x1),(x2)))\n"
-        , "#define MK_TUP3(x1,x2,x3)                        (h$c3(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUZR_con_e,(x1),(x2),(x3)))\n"
-        , "#define MK_TUP4(x1,x2,x3,x4)                     (h$c4(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4)))\n"
-        , "#define MK_TUP5(x1,x2,x3,x4,x5)                  (h$c5(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5)))\n"
-        , "#define MK_TUP6(x1,x2,x3,x4,x5,x6)               (h$c6(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6)))\n"
-        , "#define MK_TUP7(x1,x2,x3,x4,x5,x6,x7)            (h$c7(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7)))\n"
-        , "#define MK_TUP8(x1,x2,x3,x4,x5,x6,x7,x8)         (h$c8(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8)))\n"
-        , "#define MK_TUP9(x1,x2,x3,x4,x5,x6,x7,x8,x9)      (h$c9(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8),(x9)))\n"
-        , "#define MK_TUP10(x1,x2,x3,x4,x5,x6,x7,x8,x9,x10) (h$c10(h$ghczmprimZCGHCziTupleziPrimziZLz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUz2cUZR_con_e,(x1),(x2),(x3),(x4),(x5),(x6),(x7),(x8),(x9),(x10)))\n"
-        ]
+  , mconcat (map (genMkTup profiling) [2..10])
 
   , "#define TUP2_1(x) ((x).d1)\n"
   , "#define TUP2_2(x) ((x).d2)\n"
