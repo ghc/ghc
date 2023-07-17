@@ -16,6 +16,8 @@ test('js-callback03', normal, compile_and_run, [''])
 test('js-callback04', js_skip, compile_and_run, [''])
 test('js-callback05', js_skip, compile_and_run, [''])
 
+test('js-mk_tup', extra_files(['test-mk_tup.js']), compile_and_run, ['test-mk_tup.js'])
+
 test('T23346', normal, compile_and_run, [''])
 test('T22455', normal, compile_and_run, ['-ddisable-js-minifier'])
 test('T23565', normal, compile_and_run, [''])

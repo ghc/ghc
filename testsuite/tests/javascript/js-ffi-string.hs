@@ -17,33 +17,38 @@ foreign import javascript "(() => { return 'abc' + String.fromCodePoint(128522);
 hsString :: String
 hsString = "abc" ++ "\128522"
 
+emptyHsString :: String
+emptyHsString = drop (length hsString) hsString
+
 main :: IO ()
 main = do
-  putStrLn "Does JS `String.fromCodePoint` decode to the expected UTF-16 values? "
+  putStr "Does JS `String.fromCodePoint` decode to the expected UTF-16 values? "
   print (eq_JSVal js_utf16_string js_codepoint_string)
   hFlush stdout
   log_js_string js_utf16_string
   log_js_string js_codepoint_string
 
-  putStrLn "\nDoes `GHC.JS.fromJSString` convert the JavaScript literal string correctly? "
+  putStr "\nDoes `GHC.JS.fromJSString` convert the JavaScript literal string correctly? "
   print (hsString == fromJSString js_utf16_string)
   putStrLn hsString
   putStrLn (fromJSString js_utf16_string)
 
-  putStrLn "\nDoes `GHC.JS.toJSString` convert the Haskell-defined string correctly? "
+  putStr "\nDoes `GHC.JS.toJSString` convert the Haskell-defined string correctly? "
   print (eq_JSVal js_utf16_string (toJSString hsString))
   hFlush stdout
   log_js_string js_utf16_string
   log_js_string (toJSString hsString)
 
-  putStrLn "\nDo values survive the Haskell -> JavaScript -> Haskell round-trip? "
+  putStr "\nDo values survive the Haskell -> JavaScript -> Haskell round-trip? "
   print (hsString == fromJSString (toJSString hsString))
   putStrLn hsString
   putStrLn (fromJSString js_utf16_string)
 
-  putStrLn "\nDo values survive the JavaScript -> Haskell -> JavaScript round-trip? "
+  putStr "\nDo values survive the JavaScript -> Haskell -> JavaScript round-trip? "
   print (eq_JSVal js_utf16_string (toJSString $ fromJSString js_utf16_string))
   hFlush stdout
   log_js_string js_utf16_string
   log_js_string (toJSString $ fromJSString js_utf16_string)
 
+  putStr "\nDoes the empty string survive the Haskell -> JavaScript -> Haskell round-trip? "
+  print (emptyHsString == fromJSString (toJSString emptyHsString))
