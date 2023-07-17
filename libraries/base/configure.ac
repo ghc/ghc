@@ -126,6 +126,45 @@ AC_ARG_WITH([iconv-libraries],
 AC_SUBST(ICONV_INCLUDE_DIRS)
 AC_SUBST(ICONV_LIB_DIRS)
 
+
+# Compute offsets/sizes used by jsbits/base.js
+if test "$host" = "javascript-ghcjs"
+then
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_MODE],    [stat], [st_mode],    [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_DEV],     [stat], [st_dev],     [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_UID],     [stat], [st_uid],     [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_GID],     [stat], [st_gid],     [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_NLINK],   [stat], [st_nlink],   [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_RDEV],    [stat], [st_rdev],    [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_SIZE],    [stat], [st_size],    [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_BLKSIZE], [stat], [st_blksize], [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_BLOCKS],  [stat], [st_blocks],  [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_INO],     [stat], [st_ino],     [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_ATIME],   [stat], [st_atime],   [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_MTIME],   [stat], [st_mtime],   [#include <sys/stat.h>])
+  FP_COMPUTE_OFFSET([OFFSET_STAT_ST_CTIME],   [stat], [st_ctime],   [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_MODE],    [stat], [st_mode],    [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_DEV],     [stat], [st_dev],     [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_UID],     [stat], [st_uid],     [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_GID],     [stat], [st_gid],     [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_NLINK],   [stat], [st_nlink],   [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_RDEV],    [stat], [st_rdev],    [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_SIZE],    [stat], [st_size],    [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_BLKSIZE], [stat], [st_blksize], [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_BLOCKS],  [stat], [st_blocks],  [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_INO],     [stat], [st_ino],     [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_ATIME],   [stat], [st_atime],   [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_MTIME],   [stat], [st_mtime],   [#include <sys/stat.h>])
+  FP_COMPUTE_SIZE([SIZEOF_STAT_ST_CTIME],   [stat], [st_ctime],   [#include <sys/stat.h>])
+  AC_CHECK_SIZEOF([struct stat], [], [#include <sys/stat.h>])
+
+  FP_COMPUTE_OFFSET([OFFSET_UTIMBUF_ACTIME],  [utimbuf], [actime],  [#include <utime.h>])
+  FP_COMPUTE_OFFSET([OFFSET_UTIMBUF_MODTIME], [utimbuf], [modtime], [#include <utime.h>])
+  FP_COMPUTE_SIZE([SIZEOF_UTIMBUF_ACTIME],  [utimbuf], [actime],  [#include <utime.h>])
+  FP_COMPUTE_SIZE([SIZEOF_UTIMBUF_MODTIME], [utimbuf], [modtime], [#include <utime.h>])
+  AC_CHECK_SIZEOF([struct utimbuf], [], [#include <utime.h>])
+fi
+
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)
 FPTOOLS_CHECK_HTYPE(signed char)

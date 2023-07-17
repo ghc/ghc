@@ -461,6 +461,10 @@ FP_SET_CFLAGS_C99([CC_STAGE0],[CONF_CC_OPTS_STAGE0],[CONF_CPP_OPTS_STAGE0])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE1],[CONF_CPP_OPTS_STAGE1])
 FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
+dnl ** Do we have a compatible emsdk version?
+dnl --------------------------------------------------------------
+EMSDK_VERSION("3.1.20", "", "")
+
 dnl ** Which ld to use
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LD,[Use as the path to ld. See also --disable-ld-override.])
@@ -530,6 +534,9 @@ sUPPORTED_LLVM_VERSION_MIN=$(echo \($LlvmMinVersion\) | sed 's/\./,/')
 sUPPORTED_LLVM_VERSION_MAX=$(echo \($LlvmMaxVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MIN], ${sUPPORTED_LLVM_VERSION_MIN}, [The minimum supported LLVM version number])
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION_MAX], ${sUPPORTED_LLVM_VERSION_MAX}, [The maximum supported LLVM version number])
+
+ConfiguredEmsdkVersion="${EmsdkVersion}"
+AC_SUBST([ConfiguredEmsdkVersion])
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------

@@ -435,18 +435,8 @@ function h$base_utime(file, file_off, timbuf, timbuf_off, c) {
             if(err) {
                 h$handleErrnoC(err, 0, -1, c); // fixme
             } else {
-                h$long_from_number(fs.atime.getTime(), (h,l) => {
-                    timbuf.i3[0] = h;
-                    timbuf.i3[1] = l;
-                  });
-                h$long_from_number(fs.mtime.getTime(), (h,l) => {
-                    timbuf.i3[2] = h;
-                    timbuf.i3[3] = l;
-                  });
-                h$long_from_number(fs.ctime.getTime(), (h,l) => {
-                    timbuf.i3[4] = h;
-                    timbuf.i3[5] = l;
-                  });
+                h$base_store_field_number(timbuf, timbuf_off, OFFSET_UTIMBUF_ACTIME, SIZEOF_UTIMBUF_ACTIME, fs.atime.getTime());
+                h$base_store_field_number(timbuf, timbuf_off, OFFSET_UTIMBUF_MODTIME, SIZEOF_UTIMBUF_MODTIME, fs.mtime.getTime());
                 c(0);
             }
         });
@@ -507,85 +497,96 @@ function h$base_c_fcntl_lock(fd,cmd,ptr,ptr_o) {
 // memory locations of structs directly. For more information see:
 // https://gitlab.haskell.org/ghc/ghc/-/issues/22573
 function h$base_fillStat(fs, b, off) {
-    if(off%4) throw "h$base_fillStat: not aligned";
+    if(off%4) throw new Error("h$base_fillStat: not aligned");
     var o = off>>2;
 
-    b.i3[o+0] = fs.dev;
-    b.i3[o+1] = 0; // __st_dev_padding;
-    b.i3[o+2] = 0; // __st_ino_truncated;
-    b.i3[o+3] = fs.mode;
-    h$long_from_number(fs.nlink, (h,l) => {
-      b.i3[o+4] = h;
-      b.i3[o+5] = l;
-    });
-    b.i3[o+6] = fs.uid;
-    b.i3[o+7] = fs.gid;
-    b.i3[o+8] = fs.rdev;
-    b.i3[o+9] = 0; // __st_rdev_padding;
-    h$long_from_number(fs.size, (h,l) => {
-      b.i3[o+10] = h;
-      b.i3[o+11] = l;
-    });
-    b.i3[o+12] = fs.blksize;
-    b.i3[o+13] = fs.blocks;
-    atimeS = Math.floor(fs.atimeMs/1000);
-    h$long_from_number(atimeS, (h,l) => {
-      b.i3[o+14] = h;
-      b.i3[o+15] = l;
-    });
-    atimeNs = (fs.atimeMs/1000 - atimeS) * 1000000000;
-    h$long_from_number(atimeNs, (h,l) => {
-      b.i3[o+16] = h;
-      b.i3[o+17] = l;
-    });
-    mtimeS = Math.floor(fs.mtimeMs/1000);
-    h$long_from_number(mtimeS, (h,l) => {
-      b.i3[o+18] = h;
-      b.i3[o+19] = l;
-    });
-    mtimeNs = (fs.mtimeMs/1000 - mtimeS) * 1000000000;
-    h$long_from_number(mtimeNs, (h,l) => {
-      b.i3[o+20] = h;
-      b.i3[o+21] = l;
-    });
-    ctimeS = Math.floor(fs.ctimeMs/1000);
-    h$long_from_number(ctimeS, (h,l) => {
-      b.i3[o+22] = h;
-      b.i3[o+23] = l;
-    });
-    ctimeNs = (fs.ctimeMs/1000 - ctimeS) * 1000000000;
-    h$long_from_number(ctimeNs, (h,l) => {
-      b.i3[o+24] = h;
-      b.i3[o+25] = l;
-    });
-    h$long_from_number(fs.ino, (h,l) => {
-      b.i3[o+26] = h;
-      b.i3[o+27] = l;
-    });
+    // clear memory
+    for(var i=0;i<(SIZEOF_STRUCT_STAT>>2);i++) {
+        b.i3[o+i] = 0;
+    }
+
+    // fill struct
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_DEV,     SIZEOF_STAT_ST_DEV,     fs.dev);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_MODE,    SIZEOF_STAT_ST_MODE,    fs.mode);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_NLINK,   SIZEOF_STAT_ST_NLINK,   fs.nlink);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_UID,     SIZEOF_STAT_ST_UID,     fs.uid);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_GID,     SIZEOF_STAT_ST_GID,     fs.gid);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_RDEV,    SIZEOF_STAT_ST_RDEV,    fs.rdev);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_SIZE,    SIZEOF_STAT_ST_SIZE,    fs.size);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_BLKSIZE, SIZEOF_STAT_ST_BLKSIZE, fs.blksize);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_BLOCKS,  SIZEOF_STAT_ST_BLOCKS,  fs.blocks);
+    h$base_store_field_number(b, off, OFFSET_STAT_ST_INO,     SIZEOF_STAT_ST_INO,     fs.ino);
+
+    var atimeS = Math.floor(fs.atimeMs/1000);
+    var atimeNs = (fs.atimeMs/1000 - atimeS) * 1000000000;
+    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_ATIME, SIZEOF_STAT_ST_ATIME,  atimeS, atimeNs);
+    var mtimeS = Math.floor(fs.mtimeMs/1000);
+    var mtimeNs = (fs.mtimeMs/1000 - mtimeS) * 1000000000;
+    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_MTIME, SIZEOF_STAT_ST_MTIME,  mtimeS, mtimeNs);
+    var ctimeS = Math.floor(fs.ctimeMs/1000);
+    var ctimeNs = (fs.ctimeMs/1000 - ctimeS) * 1000000000;
+    h$base_store_field_number_2(b, off, OFFSET_STAT_ST_CTIME, SIZEOF_STAT_ST_CTIME,  ctimeS, ctimeNs);
 }
 #endif
 
-// [mode,size1,size2,mtime1,mtime2,dev,ino1,ino2,uid,gid] all 32 bit
-/** @const */ var h$base_sizeof_stat = 112;
+function h$base_store_field_number(ptr, ptr_off, field_off, field_size, val) {
+    if(ptr_off%4) throw new Error("ptr not aligned");
+    if(field_off%4) throw new Error("field not aligned");
+    if(typeof val !== 'number') throw new Error("not a number: " + val);
+    if(field_size === 4) {
+        ptr.i3[(ptr_off>>2)+(field_off>>2)] = val;
+    } else if(field_size === 8) {
+        h$long_from_number(val, (h,l) => {
+            ptr.i3[(ptr_off>>2)+(field_off>>2)] = h;
+            ptr.i3[(ptr_off>>2)+(field_off>>2)+1] = l;
+        });
+    } else {
+        throw new Error("unsupported field size: " + field_size);
+    }
+}
+
+function h$base_store_field_number_2(ptr, ptr_off, field_off, field_size, val1, val2) {
+    if(field_size%2) throw new Error("unsupported field size: " + field_size);
+    var half_field_size = field_size>>1;
+    h$base_store_field_number(ptr, ptr_off, field_off, half_field_size, val1);
+    h$base_store_field_number(ptr, ptr_off, field_off+half_field_size, half_field_size, val2);
+}
+
+function h$base_return_field(ptr, ptr_off, field_off, field_size) {
+    if(ptr_off%4) throw new Error("ptr not aligned");
+    if(field_off%4) throw new Error("field not aligned");
+    if(field_size === 4) {
+        return ptr.i3[(ptr_off>>2) + (field_off>>2)];
+    } else if(field_size === 8) {
+        RETURN_UBX_TUP2(ptr.i3[(ptr_off>>2) + (field_off>>2)], ptr.i3[(ptr_off>>2) + (field_off>>2)+1]);
+    } else {
+        throw new Error("unsupported field size: " + field_size);
+    }
+}
+
+function h$base_sizeof_stat() {
+    return SIZEOF_STRUCT_STAT;
+}
 
 function h$base_st_mtime(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+18], stat.i3[(stat_off>>2)+19]);
+    // XXX should we use the nanoseconds?
+    return h$base_return_field(stat, stat_off, OFFSET_STAT_ST_MTIME, SIZEOF_STAT_ST_MTIME);
 }
 
 function h$base_st_size(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+10], stat.i3[(stat_off>>2)+11]);
+    return h$base_return_field(stat, stat_off, OFFSET_STAT_ST_SIZE, SIZEOF_STAT_ST_SIZE);
 }
 
 function h$base_st_mode(stat, stat_off) {
-    return stat.i3[(stat_off>>2)+3];
+    return h$base_return_field(stat, stat_off, OFFSET_STAT_ST_MODE, SIZEOF_STAT_ST_MODE);
 }
 
 function h$base_st_dev(stat, stat_off) {
-    return stat.i3[(stat_off>>2)+0];
+    return h$base_return_field(stat, stat_off, OFFSET_STAT_ST_DEV, SIZEOF_STAT_ST_DEV);
 }
 
 function h$base_st_ino(stat, stat_off) {
-    RETURN_UBX_TUP2(stat.i3[(stat_off>>2)+26], stat.i3[(stat_off>>2)+27]);
+    return h$base_return_field(stat, stat_off, OFFSET_STAT_ST_INO, SIZEOF_STAT_ST_INO);
 }
 
 /** @const */ var h$base_echo            = 1;
