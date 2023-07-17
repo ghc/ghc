@@ -845,8 +845,10 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name =
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
   where
-    what_lkup = LookupChild { wantedParent       = the_parent
-                            , lookupDataConFirst = False }
+    what_lkup = LookupChild { wantedParent        = the_parent
+                            , lookupDataConFirst  = False
+                            , prioritiseParent    = True -- See T23664.
+                            }
 {-
 Note [Family instance binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

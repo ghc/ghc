@@ -1186,6 +1186,13 @@ data LookupChild
   , lookupDataConFirst :: Bool
      -- ^ for type constructors, should we look in the data constructor
      -- namespace first?
+  , prioritiseParent :: Bool
+    -- ^ should we prioritise getting the right 'Parent'?
+    --
+    --  - @True@: prioritise getting the right 'Parent'
+    --  - @False@: prioritise getting the right 'NameSpace'
+    --
+    -- See Note [childGREPriority].
   }
 
 -- | After looking up something with the given 'NameSpace', is the resulting
@@ -1221,14 +1228,52 @@ greIsRelevant which_gres ns gre
   where
     other_ns = greNameSpace gre
 
+{- Note [childGREPriority]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are currently two places in the compiler where we look up GlobalRdrElts
+which have a given Parent. These are the two calls to lookupSubBndrOcc_helper:
+
+  A. Looking up children in an export item, e.g.
+
+       module M ( T(MkT, D) ) where { data T = MkT; data D = D }
+
+  B. Looking up binders in a class or instance declaration, e.g.
+     the operator +++ in the fixity declaration:
+
+       class C a where { type (+++) :: a -> a ->; infixl 6 +++ }
+       (+++) :: Int -> Int -> Int; (+++) = (+)
+
+In these two situations, there are two competing metrics for finding the "best"
+'GlobalRdrElt' that a particular 'OccName' resolves to:
+
+  - does the resolved 'GlobalRdrElt' have the correct parent?
+  - does the resolved 'GlobalRdrElt' have the same 'NameSpace' as the 'OccName'?
+
+(A) and (B) have competing requirements.
+
+For the example of (A) above, we know that the child 'D' of 'T' must live
+in the data namespace, so we look up the OccName 'OccName DataName "D"' and
+prioritise the lookup results based on the 'NameSpace'.
+This means we get an error message of the form:
+
+  The type constructor 'T' is not the parent of the data constructor 'D'.
+
+as opposed to the rather unhelpful and confusing:
+
+  The type constructor 'T' is not the parent of the type constructor 'D'.
+
+See test case T11970.
+
+For the example of (B) above, the fixity declaration for +++ lies inside the
+class, so we should prioritise looking up 'GlobalRdrElt's whose parent is 'C'.
+Not doing so led to #23664.
+-}
+
 -- | Scoring priority function for looking up children 'GlobalRdrElt'.
 --
--- First we score by 'NameSpace', with higher-priority 'NameSpace's having a
--- lower number. Then we break ties by checking if the 'Parent' is correct.
---
--- This complicated scoring function is determined by the behaviour required by
--- 'lookupChildrenExport', which requires us to look in the data constructor
--- 'NameSpace' first, for things in the type constructor 'NameSpace'.
+-- We score by 'Parent' and 'NameSpace', with higher priorities having lower
+-- numbers. Which lexicographic order we use ('Parent' or 'NameSpace' first)
+-- is determined by the first argument; see Note [childGREPriority].
 childGREPriority :: LookupChild -- ^ what kind of child do we want,
                                 -- e.g. what should its parent be?
                  -> NameSpace   -- ^ what 'NameSpace' are we originally looking in?
@@ -1237,13 +1282,18 @@ childGREPriority :: LookupChild -- ^ what kind of child do we want,
                                 -- 'NameSpace', which is used to determine the score
                                 -- (in the first component)
                  -> Maybe (Int, Int)
-childGREPriority (LookupChild { wantedParent = wanted_parent, lookupDataConFirst = try_dc_first })
+childGREPriority (LookupChild { wantedParent = wanted_parent
+                              , lookupDataConFirst = try_dc_first
+                              , prioritiseParent = par_first })
   ns gre =
-  case child_ns_prio $ greNameSpace gre of
-    Nothing -> Nothing
-    Just np -> Just (np, parent_prio $ greParent gre)
-      -- Prioritise GREs first on NameSpace, and then on Parent.
-      -- See T11970.
+    case child_ns_prio $ greNameSpace gre of
+      Nothing -> Nothing
+      Just ns_prio ->
+        let par_prio = parent_prio $ greParent gre
+        in Just $ if par_first
+                  then (par_prio, ns_prio)
+                  else (ns_prio, par_prio)
+          -- See Note [childGREPriority].
 
   where
       -- Pick out the possible 'NameSpace's in order of priority.
@@ -1298,11 +1348,9 @@ lookupGRE env = \case
       lkup | all_ns    = concat $ lookupOccEnv_AllNameSpaces env occ
            | otherwise = fromMaybe [] $ lookupOccEnv env occ
   LookupChildren occ which_child ->
-    highestPriorityGREs (childGREPriority which_child ns) $
-      concat $ lookupOccEnv_AllNameSpaces env occ
-    where
-      ns :: NameSpace
-      ns = occNameSpace occ
+    let ns = occNameSpace occ
+        all_gres = concat $ lookupOccEnv_AllNameSpaces env occ
+    in highestPriorityGREs (childGREPriority which_child ns) all_gres
 
 -- | Collect the 'GlobalRdrElt's with the highest priority according
 -- to the given function (lower value <=> higher priority).
