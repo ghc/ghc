@@ -405,13 +405,13 @@ for the meaning of "lifted" vs. "unlifted".
 For the non-top-level, non-recursive case see
 Note [Core let-can-float invariant].
 
-At top level, however, there are two exceptions to this rule:
+At top level, however, there are three exceptions to this rule:
 
 (TL1) A top-level binding is allowed to bind primitive string literal,
       (which is unlifted).  See Note [Core top-level string literals].
 
 (TL2) In Core, we generate a top-level binding for every non-newtype data
-constructor worker or wrapper
+      constructor worker or wrapper
       e.g.   data T = MkT Int
       we generate
              MkT :: Int -> T
@@ -426,6 +426,12 @@ constructor worker or wrapper
              S1 :: S   -- A top-level unlifted binding
              S1 = S1
       We allow this top-level unlifted binding to exist.
+
+(TL3) A boxed top-level binding is allowed to bind the application of a data
+      constructor worker to trivial arguments. These bindings are guaranteed
+      to not require any evaluation and can thus be compiled to static data.
+      Unboxed top-level bindings are still not allowed because references
+      to them might have to be pointers.
 
 Note [Core let-can-float invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
