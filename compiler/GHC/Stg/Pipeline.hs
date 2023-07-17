@@ -74,6 +74,7 @@ stg2stg :: Logger
         -> IO ([(CgStgTopBinding,IdSet)], StgCgInfos) -- output program
 stg2stg logger extra_vars opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
+        ; stg_linter False "StgFromCore" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
@@ -92,10 +93,12 @@ stg2stg logger extra_vars opts this_mod binds
         ; let (binds_sorted_with_fvs, imp_fvs) = unzip (depSortWithAnnotStgPgm this_mod binds')
         -- See Note [Tag inference for interactive contexts]
         ; (cg_binds, cg_infos) <- inferTags (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
+        ; stg_linter False "StgCodeGen" cg_binds
         ; pure (zip cg_binds imp_fvs, cg_infos)
    }
 
   where
+    stg_linter :: (BinderP a ~ Id, OutputablePass a) => Bool -> String -> [GenStgTopBinding a] -> IO ()
     stg_linter unarised
       | Just diag_opts <- stgPipeline_lint opts
       = lintStgTopBindings
