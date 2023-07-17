@@ -314,6 +314,7 @@ testEnv arch opsys bc = intercalate "-" $
                         ++ ["int_" ++ bignumString (bignumBackend bc) | bignumBackend bc /= Gmp]
                         ++ ["unreg" | unregisterised bc ]
                         ++ ["numa"  | withNuma bc ]
+                        ++ ["zstd"  | withZstd bc ]
                         ++ ["no_tntc"  | not (tablesNextToCode bc) ]
                         ++ ["cross_"++triple  | Just triple <- pure $ crossTarget bc ]
                         ++ [flavourString (mkJobFlavour bc)]
