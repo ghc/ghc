@@ -21,6 +21,7 @@ module GHC.Types.Hint (
   , noStarIsTypeHints
   ) where
 
+import Language.Haskell.Syntax.Expr (LHsExpr)
 import Language.Haskell.Syntax (LPat, LIdP)
 
 import GHC.Prelude
@@ -46,9 +47,6 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString (fsLit, FastString)
 
 import Data.Typeable ( Typeable )
-import Language.Haskell.Syntax.Expr
-  -- This {-# SOURCE #-} import should be removable once
-  -- 'Language.Haskell.Syntax.Bind' no longer depends on 'GHC.Tc.Types.Evidence'.
 
 -- | The bindings we have available in scope when
 -- suggesting an explicit type signature.

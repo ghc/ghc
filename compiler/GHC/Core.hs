@@ -294,6 +294,7 @@ data AltCon
 -- The instance adheres to the order described in Note [Case expression invariants]
 instance Ord AltCon where
   compare (DataAlt con1) (DataAlt con2) =
+    -- ROMES:TODO: Couldn't simply do this right by comparing the dataConName of the cons?
     assert (dataConTyCon con1 == dataConTyCon con2) $
     compare (dataConTag con1) (dataConTag con2)
   compare (DataAlt _) _ = GT

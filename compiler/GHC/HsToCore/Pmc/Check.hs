@@ -198,10 +198,12 @@ checkRecSel pr@(PmRecSel { pr_arg = arg, pr_cons = cons }) = CA $ \inc -> do
            Var arg_id -> return arg_id
            _ -> mkPmId $ exprType arg
 
-  let con_cts = map (PhiNotConCt arg_id . PmAltConLike) cons
-      arg_ct  = PhiCoreCt arg_id arg
-      phi_cts = listToBag (arg_ct : con_cts)
-  unc <- addPhiCtsNablas inc phi_cts
+  unc <- liftNablasM (\d ->
+    let (arg_id', d') = representId arg_id d
+        con_cts = map (PhiNotConCt arg_id' . PmAltConLike) cons
+        arg_ct  = PhiCoreCt arg_id' arg
+        phi_cts = listToBag (arg_ct : con_cts)
+     in addPhiCts d' phi_cts) inc
   pure CheckResult { cr_ret = pr{ pr_arg_var = arg_id }, cr_uncov = unc, cr_approx = mempty }
 
 

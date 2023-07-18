@@ -103,19 +103,19 @@ noCheckDs = updTopFlags (\dflags -> foldl' wopt_unset dflags allPmCheckWarnings)
 pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM Nablas
 pmcPatBind ctxt@(DsMatchContext match_ctxt loc) var p
   = mb_discard_warnings $ do
-      !missing <- getLdiNablas
+      !missing0 <- getLdiNablas
 
       -- See Note (TODO) [Represent the MatchIds before the CheckAction]
-      let missing' = representIdNablas var missing
+      let missing = representIdNablas var missing0
 
       pat_bind <- noCheckDs $ desugarPatBind loc var p
-      tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing'])
-      result <- unCA (checkPatBind pat_bind) missing'
+      tracePm "pmcPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
+      result <- unCA (checkPatBind pat_bind) missing
       let ldi = ldiGRHS $ ( \ pb -> case pb of PmPatBind grhs -> grhs) $ cr_ret result
       tracePm "pmcPatBind }: " $
         vcat [ text "cr_uncov:" <+> ppr (cr_uncov result)
              , text "ldi:" <+> ppr ldi ]
-      formatReportWarnings ReportPatBind ctxt [var] result{cr_uncov = cr_uncov'}
+      formatReportWarnings ReportPatBind ctxt [var] result
       return ldi
   where
     -- See Note [pmcPatBind doesn't warn on pattern guards]
@@ -176,21 +176,22 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
   -- should be strict in @missing@ anyway!
-  !missing <- getLdiNablas
+  !missing0 <- getLdiNablas
+
+  -- See Note (TODO) [Represent the MatchIds before the CheckAction]
+  let missing = representIdsNablas vars missing0
+
   tracePm "pmcMatches {" $
           hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
                2
                (vcat (map ppr matches) $$ ppr missing)
-
-  -- See Note (TODO) [Represent the MatchIds before the CheckAction]
-  let missing' = representIdsNablas vars missing
 
   case NE.nonEmpty matches of
     Nothing -> do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
       let var = only vars
       empty_case <- noCheckDs $ desugarEmptyCase var
-      result <- unCA (checkEmptyCase empty_case) missing'
+      result <- unCA (checkEmptyCase empty_case) missing
       tracePm "}: " (ppr (cr_uncov result))
       formatReportWarnings ReportEmptyCase ctxt vars result
       return []
@@ -198,7 +199,7 @@ pmcMatches ctxt vars matches = {-# SCC "pmcMatches" #-} do
       matches <- {-# SCC "desugarMatches" #-}
                  noCheckDs $ desugarMatches vars matches
       result  <- {-# SCC "checkMatchGroup" #-}
-                 unCA (checkMatchGroup matches) missing'
+                 unCA (checkMatchGroup matches) missing
       tracePm "}: " (ppr (cr_uncov result))
       {-# SCC "formatReportWarnings" #-} formatReportWarnings ReportMatchGroup ctxt vars result
       return (NE.toList (ldiMatchGroup (cr_ret result)))
@@ -262,7 +263,10 @@ pmcRecSel :: Id       -- ^ Id of the selector
           -> DsM ()
 pmcRecSel sel_id arg
   | RecSelId{ sel_cons = (cons_w_field, _ : _) } <- idDetails sel_id = do
-      !missing <- getLdiNablas
+      !missing0 <- getLdiNablas
+
+      -- See Note (TODO) [Represent the MatchIds before the CheckAction]
+      let missing = representIdNablas sel_id missing0
 
       tracePm "pmcRecSel {" (ppr sel_id)
       CheckResult{ cr_ret = PmRecSel{ pr_arg_var = arg_id }, cr_uncov = uncov_nablas }
@@ -278,7 +282,8 @@ pmcRecSel sel_id arg
             let maxConstructors = maxUncoveredPatterns dflags
             unc_examples <- getNFirstUncovered MinimalCover [arg_id] (maxConstructors + 1) uncov_nablas
             let cons = [con | unc_example <- unc_examples
-                      , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example arg_id]]
+                                                                                          -- we've represented this Id above, see Note...
+                      , Just (PACA (PmAltConLike con) _ _) <- [lookupSolution unc_example (fromJust (arg_id `lookupMatchIdMap` unc_example))]]
                 not_full_examples = length cons == (maxConstructors + 1)
                 cons' = take maxConstructors cons
             diagnosticDs $ DsIncompleteRecordSelector sel_name cons' not_full_examples
@@ -288,7 +293,6 @@ pmcRecSel _ _ = return ()
 {- Note [pmcPatBind doesn't warn on pattern guards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @pmcPatBind@'s main purpose is to check vanilla pattern bindings, like
->>>>>>> 8760510af3 (This MR is an implementation of the proposal #516.)
 @x :: Int; Just x = e@, which is in a @PatBindRhs@ context.
 But its caller is also called for individual pattern guards in a @StmtCtxt@.
 For example, both pattern guards in @f x y | True <- x, False <- y = ...@ will
@@ -550,11 +554,9 @@ addTyCs origin ev_vars m = do
 -- to be added for multiple scrutinees rather than just one.
 addCoreScrutTmCs :: [CoreExpr] -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs []         _      k = k
-addCoreScrutTmCs (scr:scrs) (x0:xs) k =
-  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas0 ->
-     liftNablasM (\d ->
-       let (x, d') = representId x0 d
-        in addPhiCts d' (unitBag (PhiCoreCt x scr))) nablas0
+addCoreScrutTmCs (scr:scrs) (x:xs) k =
+  flip locallyExtendPmNablas (addCoreScrutTmCs scrs xs k) $ \nablas ->
+    addPhiCtNablasWithRep nablas x (`PhiCoreCt` scr)
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: numbers of scrutinees and match ids differ"
 
 -- | 'addCoreScrutTmCs', but desugars the 'LHsExpr's first.

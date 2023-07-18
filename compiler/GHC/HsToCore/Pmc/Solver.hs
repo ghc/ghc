@@ -63,7 +63,6 @@ import GHC.Types.Unique.Supply
 import GHC.Core
 import GHC.Core.FVs         (exprFreeVars)
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.Map.Type
 import GHC.Core.Equality
 import GHC.Core.Predicate (typeDeterminesValue)
 import GHC.Core.SimpleOpt (simpleOptExpr, exprIsConApp_maybe)
@@ -1020,7 +1019,7 @@ modifyT f = StateT $ fmap ((,) ()) . f
 -- there weren't any such constraints.
 representCoreExpr :: Nabla -> CoreExpr -> (ClassId, Nabla)
 representCoreExpr nabla@MkNabla{ nabla_tm_st = ts@TmSt{ ts_facts = egraph } } e =
-  second (\g -> nabla{nabla_tm_st = ts{ts_facts = g}}) $ representDBCoreExpr (deBruijnize (makeDictsCoherent e)) egraph
+  second (\g -> nabla{nabla_tm_st = ts{ts_facts = EG.rebuild g}}) $ representCoreExprEgr (makeDictsCoherent e) egraph
   -- Use a key in which dictionaries for the same type become equal.
   -- See Note [Unique dictionaries in the TmOracle CoreMap]
 

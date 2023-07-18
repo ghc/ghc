@@ -67,7 +67,6 @@ import GHC.Core.TyCon
 import GHC.Types.Literal
 import GHC.Core
 import GHC.Core.TyCo.Compare( eqType )
-import GHC.Core.Map.Type
 import GHC.Core.Utils (exprType)
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -173,7 +172,7 @@ data TmState
 lookupMatchIdMap :: Id -> Nabla -> Maybe ClassId
 lookupMatchIdMap id (MkNabla _ TmSt{ts_reps}) = lookupVarEnv ts_reps id
 
--- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
+-- | Information about a match id. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
 -- Also caches the type ('vi_ty'), the 'ResidualCompleteMatches' of a COMPLETE set
 -- ('vi_rcm').
@@ -186,6 +185,9 @@ data VarInfo
   -- this 'VarInfo' when we don't easily have the 'Id' available.
   -- ROMES:TODO: What is the Id in question when we might have multiple Ids in the same equivalence class?
   -- It seems currenlty this is the representative of the e-class, so we could probably drop it, in favour of Type or so (since sometimes we need to know the type, and that's also reasonable data for the e-class to have)
+
+  -- , vi_ty  :: !Type
+  -- The type of the match-id
 
   , vi_pos :: ![PmAltConApp]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
@@ -333,6 +335,7 @@ emptyVarInfo x
 -- romes:TODO I don't think this is what we want any longer, more like represent Id and see if it was previously represented by some data or not?
 lookupVarInfo :: TmState -> ClassId -> VarInfo
 lookupVarInfo (TmSt eg _ _) x
+-- We used to only create an emptyVarInfo when we looked up that id. Now we do it always, even if we never query the Id back T_T
 -- RM: Yea, I don't like the fact that currently all e-classes are created by Ids and have an Empty Var info, yet we must call "fromMaybe" here. Not good.
   = eg ^._class x._data
 
@@ -841,7 +844,7 @@ instance Outputable PmEquality where
 -- * E-graphs to represent normalised refinment types
 --
 
-type TmEGraph = EGraph VarInfo (DeBruijnF CoreExprF)
+type TmEGraph = EGraph VarInfo CoreExprF
 -- TODO delete orphans for showing TmEGraph for debugging reasons
 instance Show VarInfo where
   show = showPprUnsafe . ppr
@@ -858,13 +861,14 @@ representIdsNablas xs = execState (mapM (\x -> state (((),) . representIdNablas 
 representId :: Id -> Nabla -> (ClassId, Nabla)
 representId x (MkNabla tyst tmst@TmSt{ts_facts=eg0, ts_reps=idmp})
     = case lookupVarEnv idmp x of
-        -- The reason why we can't use an empty new class is that we don't account for the IdMap in the 'representDBCoreExpr'
+        -- The reason why we can't use an empty new class is that we don't account for the IdMap in the 'representCoreExprEgr'
         -- In particular, if we represent "reverse @a xs" in the e-graph, the
         -- node in which "xs" will be represented won't match the e-class id
         -- representing "xs", because that class doesn't contain "VarF xs"
+        -- (but at least we can still mkMatchIds without storing the VarF for that one)
         -- Nothing -> case EG.newEClass (emptyVarInfo x) eg0 of
-        Nothing -> case EG.add (EG.Node (DF (deBruijnize (VarF x)))) eg0 of
-          (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=eg1, ts_reps=extendVarEnv idmp x xid})
+        Nothing -> case EG.add (EG.Node (FreeVarF x)) eg0 of
+          (xid, eg1) -> (xid, MkNabla tyst tmst{ts_facts=EG.rebuild eg1, ts_reps=extendVarEnv idmp x xid})
         Just xid -> (xid, MkNabla tyst tmst)
 
 representIds :: [Id] -> Nabla -> ([ClassId], Nabla)
@@ -872,9 +876,10 @@ representIds xs = runState (mapM (state . representId) xs)
 
 -- | This instance is seriously wrong for general purpose, it's just required for instancing Analysis.
 -- There ought to be a better way.
+-- ROMES:TODO:
 instance Eq VarInfo where
   (==) a b = vi_id a == vi_id b
-instance Analysis VarInfo (DeBruijnF CoreExprF) where
+instance Analysis VarInfo CoreExprF where
   {-# INLINE makeA #-}
   {-# INLINE joinA #-}
 
@@ -886,11 +891,10 @@ instance Analysis VarInfo (DeBruijnF CoreExprF) where
   -- Also, the Eq instance for DeBruijn Vars will ensure that two free
   -- variables with the same Id are equal and so they will be represented in
   -- the same e-class
-  makeA (DF (D _ (VarF x))) = emptyVarInfo x
-  makeA _ = emptyVarInfo unitDataConId -- ROMES:TODO: this is dummy information which should never be used, this is quite wrong :)
-                                       -- I think the reason we end up in this
-                                       -- situation is bc we first represent an expression and only then merge it with some Id.
-                                       -- we'd need a way to represent directly into an e-class then, to not trigger the new e-class.
+  makeA (FreeVarF x) = emptyVarInfo x
+  makeA _ = emptyVarInfo unitDataConId
+  -- makeA _ = Nothing
+    -- Always start with Nothing, and add things as we go?
 
   -- romes: so currently, variables are joined in 'addVarCt' manually by getting the old value of $x$ and assuming the value of $y$ was chosen.
   -- That's obviously bad now, it'd be much more clearer to do it here. It's just the nabla threading that's more trouble
@@ -904,7 +908,12 @@ instance Analysis VarInfo (DeBruijnF CoreExprF) where
 -- since it can fail when it is conflicting
 -- and that would allow us to do the merge procedure correcly here instead of in addVarCt
 -- we may be able to have Analysis (Effect VarInfo) (...)
-  joinA a b = b{ vi_id = if vi_id b == unitDataConId && vi_id a /= unitDataConId then vi_id a else vi_id b
+  -- joinA Nothing Nothing  = Nothing
+  -- joinA Nothing (Just b) = Just b
+  -- joinA (Just a) Nothing = Just a
+  -- joinA (Just a) (Just b)
+  joinA a b
+       = b{ vi_id = if vi_id b == unitDataConId && vi_id a /= unitDataConId then vi_id a else vi_id b
                , vi_pos = case (vi_pos a, vi_pos b) of
                             ([], []) -> []
                             ([], x) -> x
