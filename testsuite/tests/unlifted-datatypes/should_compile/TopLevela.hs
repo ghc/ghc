@@ -11,4 +11,4 @@ data UNat = UZero | USucc UNat
 type Box :: UnliftedType -> Type
 data Box a = Box a
 
-x = Box (USucc (USucc (USucc UZero)))
+x = Box (USucc (USucc (USucc (USucc (USucc UZero)))))

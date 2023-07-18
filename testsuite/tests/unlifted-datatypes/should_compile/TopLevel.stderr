@@ -1,18 +1,16 @@
-[1 of 3] Compiling TopLevela        ( TopLevela.hs, TopLevela.o )
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 12, types: 6, coercions: 0, joins: 0/0}
+  = {terms: 18, types: 8, coercions: 0, joins: 0/0}
 
-x3 = USucc UZero
+x5 = USucc UZero
+
+x4 = USucc x5
+
+x3 = USucc x4
 
 x2 = USucc x3
 
 x1 = USucc x2
 
 x = Box x1
-
-
-
-[2 of 3] Compiling Main             ( TopLevel.hs, TopLevel.o )
-[3 of 3] Linking TopLevel
