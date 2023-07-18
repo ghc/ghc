@@ -79,7 +79,9 @@ readIOManagerEvent (void)
             }
         }
     } else {
-        res = 0;
+        // Making it here means that we have hit ioManagerDie, which
+        // closed our event object.
+        res = IO_MANAGER_DIE;
     }
 
     OS_RELEASE_LOCK(&event_buf_mutex);
