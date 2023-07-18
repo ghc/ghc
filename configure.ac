@@ -1177,7 +1177,7 @@ checkMake380 gmake
 
 # Toolchain target files
 PREP_TARGET_FILE
-FIND_GHC_TOOLCHAIN([hadrian/cfg])
+FIND_GHC_TOOLCHAIN([hadrian/cfg],[NO])
 
 AC_CONFIG_FILES(
 [ mk/project.mk
