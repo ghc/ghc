@@ -49,6 +49,7 @@ module GHC.Conc.POSIX
 
 import Data.Bits (shiftR)
 import GHC.Base
+import GHC.Clock
 import GHC.Conc.Sync
 import GHC.Conc.POSIX.Const
 import GHC.Event.Windows.ConsoleEvent
@@ -209,13 +210,9 @@ delayTime (Delay t _) = t
 delayTime (DelaySTM t _) = t
 
 type USecs = Word64
-type NSecs = Word64
-
-foreign import ccall unsafe "getMonotonicNSec"
-  getMonotonicNSec :: IO NSecs
 
 getMonotonicUSec :: IO USecs
-getMonotonicUSec = fmap (`div` 1000) getMonotonicNSec
+getMonotonicUSec = fmap (`div` 1000) getMonotonicTimeNSec
 
 {-# NOINLINE prodding #-}
 prodding :: IORef Bool
