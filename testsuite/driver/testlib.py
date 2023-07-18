@@ -364,6 +364,23 @@ def req_host_target_ghc( name, opts ):
     if isCross() and not js_arch():
         opts.skip = True
 
+has_ls_files = None
+
+# Check that ls-files works and returns files from the source tree.
+# We just check that "hie.yaml" is there because it's top-level (don't have to deal with
+# path differences) and quite unique to GHC.
+def req_ls_files(name, opts):
+    global has_ls_files
+    if has_ls_files is None:
+        try:
+            files = subprocess.check_output(['git', 'ls-files']).splitlines()
+            has_ls_files = b"hie.yaml" in files
+        except subprocess.CalledProcessError:
+            has_ls_files = False
+
+    if not has_ls_files:
+        skip(name, opts)
+
 def ignore_stdout(name, opts):
     opts.ignore_stdout = True
 
@@ -2944,16 +2961,12 @@ def findTFiles(roots: List[str]) -> Iterator[str]:
 # -----------------------------------------------------------------------------
 # Output a test summary to the specified file object
 
-def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
+def summary(t: TestRun, file: TextIO, color=False) -> None:
 
     file.write('\n')
     printUnexpectedTests(file,
         [t.unexpected_passes, t.unexpected_failures,
          t.unexpected_stat_failures, t.framework_failures])
-
-    if short:
-        # Only print the list of unexpected tests above.
-        return
 
     if len(t.unexpected_failures) > 0 or \
         len(t.unexpected_stat_failures) > 0 or \

@@ -645,7 +645,7 @@ def main() -> None:
     group.add_argument("--metric",
                        help="Test metric (one of " + str(testing_metrics()) + ").")
     group.add_argument("--way",
-                       help="Test way (one of " + str(testing_metrics()) + ").")
+                       help="Test way (for example, optasm).")
 
     group = parser.add_argument_group(title='Plotting', description="Plot historical performance metrics")
     group.add_argument("--chart", nargs='?', default=None, action='store', const='./PerformanceChart.html',
