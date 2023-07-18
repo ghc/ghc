@@ -1,7 +1,14 @@
-import TopLevela
+{-# OPTIONS_GHC -ddump-simpl -ddump-simpl -dsuppress-all -dno-typeable-binds -dsuppress-uniques #-}
+{-# LANGUAGE UnliftedDatatypes #-}
+module TopLevel where
 
-toInt UZero = 0
-toInt (USucc x) = 1 + toInt x
+import GHC.Exts (UnliftedType)
+import Data.Kind (Type)
 
-main = case x of
-  Box y -> print (toInt y)
+type UNat :: UnliftedType
+data UNat = UZero | USucc UNat
+
+type Box :: UnliftedType -> Type
+data Box a = Box a
+
+x = Box (USucc (USucc (USucc (USucc (USucc UZero)))))

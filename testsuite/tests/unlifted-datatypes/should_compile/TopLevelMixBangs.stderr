@@ -1,0 +1,28 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 33, types: 15, coercions: 0, joins: 0/0}
+
+$WUSucc
+  = \ conrep -> case conrep of conrep1 { __DEFAULT -> USucc conrep1 }
+
+xd = LZero
+
+xc1 = USucc LZero
+
+xc = LSucc xc1
+
+xb1 = USucc xc
+
+xb = LSucc xb1
+
+xa1 = USucc xb
+
+xa = LSucc xa1
+
+x1 = USucc xa
+
+x = Box x1
+
+
+
