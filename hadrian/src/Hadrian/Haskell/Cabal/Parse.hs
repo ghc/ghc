@@ -104,12 +104,15 @@ parsePackageData pkg = do
 parseCabalPkgId :: FilePath -> IO String
 parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent file
 
-biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe [C.ModuleName], Maybe (C.ModuleName, String))
-biModules pd = go [ comp | comp@(bi,_,_,_) <-
-                             (map libBiModules . maybeToList $ C.library pd) ++
-                             (map exeBiModules               $ C.executables pd)
-                         , C.buildable bi ]
+biModules :: Package -> C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe [C.ModuleName], Maybe (C.ModuleName, String))
+biModules pkg pd =
+    go [ comp | comp@(bi,_,_,_) <- candidateComponents
+       , C.buildable bi ]
   where
+    candidateComponents
+      | isLibrary pkg = map libBiModules . maybeToList $ C.library pd
+      | otherwise     = map exeBiModules               $ C.executables pd
+
     libBiModules lib = (C.libBuildInfo lib, C.explicitLibModules lib, Just (map C.moduleReexportName (C.reexportedModules lib)),  Nothing)
     exeBiModules exe = (C.buildInfo exe,
                        -- If "main-is: ..." is not a .hs or .lhs file, do not
@@ -246,7 +249,8 @@ resolveContextData context@Context {..} = do
             -- @library-dirs@ here.
             _ -> error "No (or multiple) GHC rts package is registered!"
 
-        (buildInfo, modules, rexport_modules, mainIs) = biModules (C.localPkgDescr lbi')
+        (buildInfo, modules, rexport_modules, mainIs) =
+          biModules package (C.localPkgDescr lbi')
 
         classifyMain :: FilePath -> MainSourceType
         classifyMain fp
