@@ -76,6 +76,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     # the usual system locations, including the PATH, we are just explicit when
     # calling it through configure.
     rm -f acargs
+
     echo "--triple=$target" >> acargs
     echo "--output=$1/default.target.ghc-toolchain" >> acargs
     echo "--llvm-triple=$LlvmTarget" >> acargs
@@ -90,9 +91,20 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     echo "--merge-objs=$MergeObjsCmd" >> acargs
     echo "--readelf=$READELF" >> acargs
     echo "--windres=$WindresCmd" >> acargs
+
     ENABLE_GHC_TOOLCHAIN_NOT_ARG([locally-executable], [$CrossCompiling])
     ENABLE_GHC_TOOLCHAIN_ARG([unregisterised], [$Unregisterised])
     ENABLE_GHC_TOOLCHAIN_ARG([tables-next-to-code], [$TablesNextToCode])
+    ENABLE_GHC_TOOLCHAIN_ARG([ld-override], [$enable_ld_override])
+    ENABLE_GHC_TOOLCHAIN_ARG([libffi-adjustors], [$UseLibffiForAdjustors])
+
+    dnl We store USER_* variants of all user-specified flags to pass them over to ghc-toolchain.
+    ADD_GHC_TOOLCHAIN_ARG([cc-opt], [$USER_CFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG([cc-link-opt], [$USER_LDFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG([cc-link-opt], [$USER_LIBS])
+    ADD_GHC_TOOLCHAIN_ARG([cxx-opt], [$USER_CXXFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG([cpp-opt], [$USER_CPP_ARGS])
+    ADD_GHC_TOOLCHAIN_ARG([hs-cpp-opt], [$USER_HS_CPP_ARGS])
 
     INVOKE_GHC_TOOLCHAIN()
 

@@ -37,21 +37,7 @@ findCc :: String -- ^ The llvm target to use if Cc supports --target
 findCc llvmTarget progOpt = checking "for C compiler" $ do
     -- TODO: We keep the candidate order we had in configure, but perhaps
     -- there's a more optimal one
-    ccProgram' <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
-
-    -- FIXME: This is a dreadful hack!
-    -- In reality, configure should pass these options to ghc-toolchain when
-    -- using the bundled windows toolchain, and ghc-toolchain should drop this around.
-    -- See #23678
-    let ccProgram = if "mingw32" `isInfixOf` llvmTarget && takeBaseName (prgPath ccProgram') == "clang"
-                    -- we inline the is-windows check here because we need Cc to call parseTriple
-         then
-           -- Signal that we are linking against UCRT with the _UCRT macro. This is
-           -- necessary on windows clang to ensure correct behavior when
-           -- MinGW-w64 headers are in the header include path (#22159).
-           ccProgram' & _prgFlags %++ "--rtlib=compiler-rt -D_UCRT"
-         else
-           ccProgram'
+    ccProgram <- findProgram "C compiler" progOpt ["gcc", "clang", "cc"]
 
     cc' <- ignoreUnusedArgs $ Cc {ccProgram}
     cc  <- ccSupportsTarget llvmTarget cc'
