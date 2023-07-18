@@ -73,7 +73,6 @@ parser.add_argument("--metrics-file", help="file in which to save (append) the p
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--unexpected-output-dir", help="directory in which to place unexpected output")
 parser.add_argument("--target-wrapper", help="wrapper executable to use when executing binaries compiled for the target")
-parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
 parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
@@ -119,7 +118,6 @@ if args.rootdir:
 config.metrics_file = args.metrics_file
 hasMetricsFile = config.metrics_file is not None
 config.summary_file = args.summary_file
-config.no_print_summary = args.no_print_summary
 config.baseline_commit = args.perf_baseline
 config.target_wrapper = args.target_wrapper
 
@@ -587,7 +585,7 @@ else:
         print(Perf.allow_changes_string([(m.change, m.stat) for m in t.metrics]))
         print('-' * 25)
 
-    summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
+    summary(t, sys.stdout, color=config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
     stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]

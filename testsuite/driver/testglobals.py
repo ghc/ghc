@@ -70,15 +70,6 @@ class TestConfig:
         # Was the compiler compiled with LLVM?
         self.ghc_built_by_llvm = False
 
-        # Should we print the summary?
-        # Disabling this is useful for Phabricator/Harbormaster
-        # logfiles, which are truncated to 30 lines. TODO. Revise if
-        # this is still true.
-        # Note that we have a separate flag for this, instead of
-        # overloading --verbose, as you might want to see the summary
-        # with --verbose=0.
-        self.no_print_summary = False
-
         # What platform are we running on?
         self.platform = ''
         self.os = ''

@@ -287,10 +287,6 @@ ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
 	--summary-file "$(SUMMARY_FILE)"
 endif
-ifeq "$(NO_PRINT_SUMMARY)" "YES"
-RUNTEST_OPTS +=  \
-	--no-print-summary
-endif
 
 ifneq "$(PERF_BASELINE_COMMIT)" ""
 RUNTEST_OPTS +=  \
