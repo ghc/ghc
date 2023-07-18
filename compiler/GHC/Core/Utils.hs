@@ -2348,15 +2348,15 @@ exprIsNestedTrivialConApp :: CoreExpr -> Bool
 exprIsNestedTrivialConApp x
   | (Var v, xs) <- collectArgs x
   , Just dc <- isDataConWorkId_maybe v
-  = and (zipWith f (map isBanged (dataConImplBangs dc)) xs)
+  = and (zipWith field_ok (map isMarkedStrict (dataConRepStrictness dc)) xs)
   where
-    f bang x
-      | not bang
+    field_ok strict x
+      | not strict
       , exprIsTrivial x
       = True
       | (Var v, xs) <- collectArgs x
       , Just dc <- isDataConWorkId_maybe v
-      = and (zipWith f (map isBanged (dataConImplBangs dc)) xs)
+      = and (zipWith field_ok (map isMarkedStrict (dataConRepStrictness dc)) xs)
       | otherwise
       = False
 exprIsNestedTrivialConApp _ = False
