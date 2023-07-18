@@ -39,6 +39,7 @@ AC_ARG_WITH(hs-cpp-flags,
           AC_MSG_WARN([Request to use $withval will be ignored])
       else
           HS_CPP_ARGS=$withval
+          USER_HS_CPP_ARGS=$withval
       fi
   ],
 [

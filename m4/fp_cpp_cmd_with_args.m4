@@ -45,6 +45,7 @@ AC_ARG_WITH(cpp-flags,
       # Use whatever flags were manually set, ignoring previously configured
       # flags; and add CPP_ARGS (which will be -E if CPP_CMD was not specified)
       CPP_ARGS="$CPP_ARGS $withval"
+      USER_CPP_ARGS="$withval"
   fi
 ],
 [
