@@ -2347,13 +2347,16 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 exprIsNestedTrivialConApp :: CoreExpr -> Bool
 exprIsNestedTrivialConApp x
   | (Var v, xs) <- collectArgs x
-  = isDataConWorkId v && all go xs
+  , Just dc <- isDataConWorkId_maybe v
+  = and (zipWith f (map isBanged (dataConImplBangs dc)) xs)
   where
-    go x
-      | exprIsTrivial x
+    f bang x
+      | not bang
+      , exprIsTrivial x
       = True
       | (Var v, xs) <- collectArgs x
-      = isDataConWorkId v && all go xs
+      , Just dc <- isDataConWorkId_maybe v
+      = and (zipWith f (map isBanged (dataConImplBangs dc)) xs) 
       | otherwise
       = False
 exprIsNestedTrivialConApp _ = False
