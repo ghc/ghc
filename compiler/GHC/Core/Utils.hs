@@ -2356,7 +2356,7 @@ exprIsNestedTrivialConApp x
       = True
       | (Var v, xs) <- collectArgs x
       , Just dc <- isDataConWorkId_maybe v
-      = and (zipWith f (map isBanged (dataConImplBangs dc)) xs) 
+      = and (zipWith f (map isBanged (dataConImplBangs dc)) xs)
       | otherwise
       = False
 exprIsNestedTrivialConApp _ = False
