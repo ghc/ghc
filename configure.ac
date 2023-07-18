@@ -176,7 +176,7 @@ AC_ARG_ENABLE(ghc-toolchain,
 [AS_HELP_STRING([--enable-ghc-toolchain],
                 [Whether to use the newer ghc-toolchain tool to configure ghc targets])],
   [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableGhcToolchain])],
-  [EnableGhcToolchain=NO]
+  [EnableGhcToolchain=YES]
 )
 AC_SUBST([EnableGhcToolchain])
 
