@@ -127,4 +127,13 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     MergeObjsCmd=""
     MergeObjsArgs=""
     AC_PATH_PROG([Genlib],[genlib])
+
+
+    dnl We override the USER_* flags here since the user delegated
+    dnl configuration to the bundled windows toolchain, and these are the
+    dnl options required by the bundled windows toolchain.
+    USER_CFLAGS="$CFLAGS"
+    USER_CXXFLAGS="$CXXFLAGS"
+    USER_HS_CPP_ARGS="$HaskellCPPArgs"
+    USER_LDFLAGS="$CONF_GCC_LINKER_OPTS_STAGE2"
 ])
