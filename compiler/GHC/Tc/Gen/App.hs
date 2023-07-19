@@ -142,11 +142,11 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 -- True  <=> instantiate -- return a rho-type
 -- False <=> don't instantiate -- return a sigma-type
 tcInferSigma inst (L loc rn_expr)
-  | (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
     setSrcSpanA loc     $
-    do { do_ql <- wantQuickLook rn_fun
-       ; (tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
+    do { (fun@(rn_fun,fun_ctxt), rn_args) <- splitHsApps rn_expr
+       ; do_ql <- wantQuickLook rn_fun
+       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
        ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst (tc_fun, fun_ctxt) fun_sigma rn_args
        ; _tc_args <- tcValArgs do_ql inst_args
        ; return app_res_sigma }
@@ -174,7 +174,6 @@ head ::= f                -- HsVar:    variables
       |  fld              -- HsRecSel: record field selectors
       |  (expr :: ty)     -- ExprWithTySig: expr with user type sig
       |  lit              -- HsOverLit: overloaded literals
-      |  $([| head |])    -- HsSpliceE+HsSpliced+HsSplicedExpr: untyped TH expression splices
       |  other_expr       -- Other expressions
 
 When tcExpr sees something that starts an application chain (namely,
@@ -203,16 +202,6 @@ dealt with by tcApp, even when it is not applied to anything. Consider
 Clearly this should work!  But it will /only/ work because if we
 instantiate that (forall b. b) impredicatively!  And that only happens
 in tcApp.
-
-We also wish to typecheck application chains with untyped Template Haskell
-splices in the head, such as this example from #21038:
-    data Foo = MkFoo (forall a. a -> a)
-    f = $([| MkFoo |]) $ \x -> x
-This should typecheck just as if the TH splice was never in the way—that is,
-just as if the user had written `MkFoo $ \x -> x`. We could conceivably have
-a case for typed TH expression splices too, but it wouldn't be useful in
-practice, since the types of typed TH expressions aren't allowed to have
-polymorphic types, such as the type of MkFoo.
 
 Note [tcApp: typechecking applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -329,12 +318,12 @@ before tcValArgs.
 tcApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 -- See Note [tcApp: typechecking applications]
 tcApp rn_expr exp_res_ty
-  | (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
-  = do { traceTc "tcApp {" $
+  = do { (fun@(rn_fun, fun_ctxt), rn_args) <- splitHsApps rn_expr
+       ; traceTc "tcApp {" $
            vcat [ text "rn_fun:" <+> ppr rn_fun
                 , text "rn_args:" <+> ppr rn_args ]
 
-       ; (tc_fun, fun_sigma) <- tcInferAppHead fun rn_args
+       ; (tc_fun, fun_sigma) <- tcInferAppHead fun
 
        -- Instantiate
        ; do_ql <- wantQuickLook rn_fun
@@ -1253,8 +1242,8 @@ isGuardedTy ty
 quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaTypeFRR
               -> TcM (Delta, EValArg 'TcpInst)
 quickLookArg1 guarded delta larg@(L _ arg) arg_ty
-  = do { let ((rn_fun, fun_ctxt), rn_args) = splitHsApps arg
-       ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args
+  = do { ((rn_fun, fun_ctxt), rn_args) <- splitHsApps arg
+       ; mb_fun_ty <- tcInferAppHead_maybe rn_fun
        ; traceTc "quickLookArg 1" $
          vcat [ text "arg:" <+> ppr arg
               , text "head:" <+> ppr rn_fun <+> dcolon <+> ppr mb_fun_ty

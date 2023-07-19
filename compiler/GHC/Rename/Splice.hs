@@ -475,18 +475,26 @@ rnUntypedSpliceExpr splice
     pend_expr_splice name rn_splice
         = (makePending UntypedExpSplice name rn_splice, HsUntypedSplice (HsUntypedSpliceNested name) rn_splice)
 
-    run_expr_splice :: HsUntypedSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
       = do { traceRn "rnUntypedSpliceExpr: untyped expression splice" empty
-             -- Run it here, see Note [Running splices in the Renamer]
-           ; (rn_expr, mod_finalizers) <-
-                runRnSplice UntypedExpSplice runMetaE ppr rn_splice
-           ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
-             -- See Note [Delaying modFinalizers in untyped splices].
-           ; let e =  flip HsUntypedSplice rn_splice
-                    . HsUntypedSpliceTop (ThModFinalizers mod_finalizers)
-                        <$> lexpr3
-           ; return (gHsPar e, fvs)
+
+           -- Run the splice here, see Note [Running splices in the Renamer]
+           ; (expr_ps, mod_finalizers)
+                <- runRnSplice UntypedExpSplice runMetaE ppr rn_splice
+                -- mod_finalizers: See Note [Delaying modFinalizers in untyped splices].
+
+           -- Rename the expanded expression
+           ; (L l expr_rn, fvs) <- checkNoErrs (rnLExpr expr_ps)
+
+           -- rn_splice :: HsUntypedSplice GhcRn is the original TH expression,
+           --                                       before expansion
+           -- expr_ps   :: LHsExpr GhcPs is the result of running the splice
+           -- expr_rn   :: HsExpr GhcRn is the result of renaming ps_expr
+           ; let res :: HsUntypedSpliceResult (HsExpr GhcRn)
+                 res  = HsUntypedSpliceTop
+                          { utsplice_result_finalizers = ThModFinalizers mod_finalizers
+                          , utsplice_result            = expr_rn }
+           ; return (gHsPar (L l (HsUntypedSplice res rn_splice)), fvs)
            }
 
 thSyntaxError :: THSyntaxError -> TcRnMessage
