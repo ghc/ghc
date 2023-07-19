@@ -7,3 +7,4 @@ def check_package(pkg_name):
          [f'exports_{pkg_name}'])
 
 check_package('base')
+check_package('ghc-experimental')

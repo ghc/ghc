@@ -5,7 +5,7 @@ module Packages (
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
-    ghcCompact, ghcConfig, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
+    ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim,
     ghcToolchain, ghcToolchainBin, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
@@ -38,7 +38,7 @@ ghcPackages =
     [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform
-    , ghcCompact, ghcConfig, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
+    , ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghcInternal, ghci, ghciWrapper, ghcPkg, ghcPrim
     , ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
@@ -55,7 +55,7 @@ isGhcPackage = (`elem` ghcPackages)
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
-  ghcCompact, ghcConfig, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
+  ghcCompact, ghcConfig, ghcExperimental, ghcHeap, ghci, ghcInternal, ghciWrapper, ghcPkg, ghcPrim,
   ghcToolchain, ghcToolchainBin, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
   parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
@@ -90,6 +90,7 @@ ghcBootTh           = lib  "ghc-boot-th"
 ghcPlatform         = lib  "ghc-platform"
 ghcCompact          = lib  "ghc-compact"
 ghcConfig           = prg  "ghc-config"      `setPath` "testsuite/ghc-config"
+ghcExperimental     = lib  "ghc-experimental"
 ghcHeap             = lib  "ghc-heap"
 ghcInternal         = lib  "ghc-internal"
 ghci                = lib  "ghci"
