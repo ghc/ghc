@@ -1195,9 +1195,8 @@ markAnnListA an action = do
   an1 <- markEpAnnAllL an0 lal_rest AnnSemi
   (an2, r) <- action an1
   an3 <- markLensMAA an2 lal_close
-  an4 <- markTrailingL an3 lal_trailing
-  debugM $ "markAnnListA: an4=" ++ showAst an
-  return (an4, r)
+  debugM $ "markAnnListA: an3=" ++ showAst an
+  return (an3, r)
 
 -- ---------------------------------------------------------------------
 
@@ -1316,8 +1315,12 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
+-- start of variant A
     ann' <- markALocatedA (ann la)
     return (L (la { ann = ann'}) a')
+-- start of variant B
+    -- return (L la a')
+-- end of variants
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
   getAnnotationEntry = entryFromLocatedA
@@ -2197,7 +2200,8 @@ instance ExactPrint (Match GhcPs (LocatedA (HsExpr GhcPs))) where
 
 -- ---------------------------------------------------------------------
 
-exactMatch :: (Monad m, Monoid w) => (ExactPrint (GRHSs GhcPs body)) => (Match GhcPs body) -> EP w m (Match GhcPs body)
+exactMatch :: (Monad m, Monoid w, ExactPrint (GRHSs GhcPs body))
+           => (Match GhcPs body) -> EP w m (Match GhcPs body)
 exactMatch (Match an mctxt pats grhss) = do
 
   debugM $ "exact Match entered"

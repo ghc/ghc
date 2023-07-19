@@ -1097,9 +1097,11 @@ instance NoAnn (EpAnn a) where
 addAnns :: EpAnn [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> EpAnn [AddEpAnn]
 addAnns (EpAnn l as1 cs) as2 cs2
   = EpAnn (widenAnchor l (as1 ++ as2)) (as1 ++ as2) (cs <> cs2)
+  -- = EpAnn l (as1 ++ as2) (cs <> cs2)
 addAnns EpAnnNotUsed [] (EpaComments []) = EpAnnNotUsed
 addAnns EpAnnNotUsed [] (EpaCommentsBalanced [] []) = EpAnnNotUsed
 addAnns EpAnnNotUsed as cs = EpAnn (Anchor placeholderRealSpan UnchangedAnchor) as cs
+-- addAnns EpAnnNotUsed as cs = EpAnn (widenAnchor noSpanAnchor as) as cs
 
 -- AZ:TODO use widenSpan here too
 addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> EpAnnComments -> SrcSpanAnnA

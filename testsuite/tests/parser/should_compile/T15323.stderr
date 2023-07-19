@@ -111,7 +111,7 @@
             (HsOuterExplicit
              (EpAnn
               (Anchor
-               { T15323.hs:6:20-25 }
+               { T15323.hs:6:20-29 }
                (UnchangedAnchor))
               ((,)
                (AddEpAnn AnnForall (EpaSpan { T15323.hs:6:20-25 }))
@@ -153,7 +153,7 @@
                (HsParTy
                 (EpAnn
                  (Anchor
-                  { T15323.hs:6:31 }
+                  { T15323.hs:6:31-36 }
                   (UnchangedAnchor))
                  (AnnParen
                   (AnnParens)
