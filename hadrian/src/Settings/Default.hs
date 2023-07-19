@@ -144,6 +144,7 @@ stage1Packages = do
         , ghc
         , ghcBignum
         , ghcCompact
+        , ghcInternal
         , ghcPkg
         , ghcPrim
         , haskeline
