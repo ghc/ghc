@@ -51,6 +51,7 @@ function h$setErrno(e) {
       if(es.indexOf('ESPIPE') !== -1)       return CONST_ESPIPE;
       if(es.indexOf('EBADF') !== -1)        return CONST_EBADF;
       if(es.indexOf('ENOSPC') !== -1)       return CONST_ENOSPC;
+      if(es.indexOf('EACCES') !== -1)       return CONST_EACCES;
       if(es.indexOf('Bad argument') !== -1) return CONST_ENOENT; // fixme?
       throw ("setErrno not yet implemented for: " + e);
 
