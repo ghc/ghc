@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ViewPatterns #-}
 
 import Data.Aeson as A
 import qualified Data.Map as Map
@@ -10,10 +11,10 @@ import Data.Map (Map)
 import Data.Maybe
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as B
-import Data.List (intercalate)
 import Data.Set (Set)
 import qualified Data.Set as S
 import System.Environment
+import Data.List
 
 {-
 Note [Generating the CI pipeline]
@@ -741,11 +742,11 @@ modifyJobs = fmap
 
 -- | Modify just the validate jobs in a 'JobGroup'
 modifyValidateJobs :: (a -> a) -> JobGroup a -> JobGroup a
-modifyValidateJobs f jg = jg { v = f <$> v jg }
+modifyValidateJobs f jg = jg { v = fmap f <$> v jg }
 
 -- | Modify just the nightly jobs in a 'JobGroup'
 modifyNightlyJobs :: (a -> a) -> JobGroup a -> JobGroup a
-modifyNightlyJobs f jg = jg { n = f <$> n jg }
+modifyNightlyJobs f jg = jg { n = fmap f <$> n jg }
 
 -- Generic helpers
 
@@ -830,9 +831,9 @@ addValidateRule t = modifyValidateJobs (addJobRule t)
 -- | Don't run the validate job, normally used to alleviate CI load by marking
 -- jobs which are unlikely to fail (ie different linux distros)
 disableValidate :: JobGroup Job -> JobGroup Job
-disableValidate = addValidateRule Disable
+disableValidate st = st { v = Nothing }
 
-data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving Functor
+data NamedJob a = NamedJob { name :: String, jobInfo :: a } deriving (Show, Functor)
 
 renameJob :: (String -> String) -> NamedJob a -> NamedJob a
 renameJob f (NamedJob n i) = NamedJob (f n) i
@@ -842,31 +843,32 @@ instance ToJSON a => ToJSON (NamedJob a) where
     [ "name" A..= name nj
     , "jobInfo" A..= jobInfo nj ]
 
+
+--data NamedJobGroup a = NamedJobGroup { platform :: String, jg :: JobGroup a }
+
 -- Jobs are grouped into either triples or pairs depending on whether the
 -- job is just validate and nightly, or also release.
-data JobGroup a = StandardTriple { v :: NamedJob a
-                                 , n :: NamedJob a
-                                 , r :: NamedJob a }
-                | ValidateOnly   { v :: NamedJob a
-                                 , n :: NamedJob a } deriving Functor
+data JobGroup a = StandardTriple { v :: Maybe (NamedJob a)
+                                 , n :: Maybe (NamedJob a)
+                                 , r :: Maybe (NamedJob a) } deriving (Functor, Show)
 
 instance ToJSON a => ToJSON (JobGroup a) where
-  toJSON jg = object
-    [ "n" A..= n jg
-    , "r" A..= r jg
+  toJSON StandardTriple{..} = object
+    [ "v" A..= v
+    , "n" A..= n
+    , "r" A..= r
     ]
 
 rename :: (String -> String) -> JobGroup a -> JobGroup a
-rename f (StandardTriple nv nn nr) = StandardTriple (renameJob f nv) (renameJob f nn) (renameJob f nr)
-rename f (ValidateOnly nv nn) = ValidateOnly (renameJob f nv) (renameJob f nn)
+rename f (StandardTriple nv nn nr) = StandardTriple (renameJob f <$> nv) (renameJob f <$> nn) (renameJob f <$> nr)
 
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release build with
 -- a specific config.
 standardBuildsWithConfig :: Arch -> Opsys -> BuildConfig -> JobGroup Job
 standardBuildsWithConfig a op bc =
-  StandardTriple (validate a op bc)
-                 (nightly a op bc)
-                 (release a op bc)
+  StandardTriple (Just (validate a op bc))
+                 (Just (nightly a op bc))
+                 (Just (release a op bc))
 
 -- | Construct a 'JobGroup' which consists of a validate, nightly and release builds with
 -- the 'vanilla' config.
@@ -876,11 +878,12 @@ standardBuilds a op = standardBuildsWithConfig a op vanilla
 -- | Construct a 'JobGroup' which just consists of a validate and nightly build. We don't
 -- produce releases for these jobs.
 validateBuilds :: Arch -> Opsys -> BuildConfig -> JobGroup Job
-validateBuilds a op bc = ValidateOnly (validate a op bc) (nightly a op bc)
+validateBuilds a op bc = StandardTriple { v = Just (validate a op bc)
+                                        , n = Just (nightly a op bc)
+                                        , r = Nothing }
 
 flattenJobGroup :: JobGroup a -> [(String, a)]
-flattenJobGroup (StandardTriple a b c) = map flattenNamedJob [a,b,c]
-flattenJobGroup (ValidateOnly a b) = map flattenNamedJob [a, b]
+flattenJobGroup (StandardTriple a b c) = map flattenNamedJob (catMaybes [a,b,c])
 
 flattenNamedJob :: NamedJob a -> (String, a)
 flattenNamedJob (NamedJob n i) = (n, i)
@@ -995,27 +998,51 @@ mkPlatform arch opsys = archName arch <> "-" <> opsysName opsys
 --  * Prefer jobs which have a corresponding release pipeline
 --  * Explicitly require tie-breaking for other cases.
 platform_mapping :: Map String (JobGroup BindistInfo)
-platform_mapping = Map.map go $
-  Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ v j)), j) | j <- filter hasReleaseBuild job_groups ]
+platform_mapping = Map.map go combined_result
   where
     whitelist = [ "x86_64-linux-alpine3_12-validate"
-                , "x86_64-linux-deb10-validate"
                 , "x86_64-linux-deb11-validate"
+                , "x86_64-linux-deb10-validate+debug_info"
                 , "x86_64-linux-fedora33-release"
+                , "x86_64-linux-deb11-cross_aarch64-linux-gnu-validate"
                 , "x86_64-windows-validate"
+                , "nightly-x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
+                , "nightly-x86_64-linux-deb11-validate"
+                , "x86_64-linux-alpine3_17-wasm-cross_wasm32-wasi-release+fully_static"
+                , "nightly-aarch64-linux-deb10-validate"
+                , "nightly-x86_64-linux-alpine3_12-validate"
+                , "nightly-x86_64-linux-deb10-validate"
+                , "nightly-x86_64-linux-fedora33-release"
+                , "nightly-x86_64-windows-validate"
+                , "release-x86_64-linux-alpine3_12-release+no_split_sections"
+                , "release-x86_64-linux-deb10-release"
+                , "release-x86_64-linux-deb11-release"
+                , "release-x86_64-linux-fedora33-release"
+                , "release-x86_64-windows-release+no_split_sections"
                 ]
 
+    process sel = Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ j)), j) | (sel -> Just j) <- job_groups  ]
+
+    vs = process v
+    ns = process n
+    rs = process r
+
+    all_platforms = Map.keysSet vs <> Map.keysSet ns <> Map.keysSet rs
+
+    combined_result = Map.fromList [ (p, StandardTriple { v = Map.lookup p vs
+                                                        , n = Map.lookup p ns
+                                                        , r = Map.lookup p rs })
+                                   | p <- S.toList all_platforms ]
+
     combine a b
-      | name (v a) `elem` whitelist = a -- Explicitly selected
-      | name (v b) `elem` whitelist = b
-      | otherwise = error (show (name (v a)) ++ show (name (v b)))
+      | name a `elem` whitelist = a -- Explicitly selected
+      | name b `elem` whitelist = b
+      | otherwise = error (show (name a) ++ show (name b))
 
     go = fmap (BindistInfo . unwords . fromJust . mmlookup "BIN_DIST_NAME" . jobVariables)
 
-    hasReleaseBuild (StandardTriple{}) = True
-    hasReleaseBuild (ValidateOnly{}) = False
 
-data BindistInfo = BindistInfo { bindistName :: String }
+data BindistInfo = BindistInfo { bindistName :: String } deriving Show
 
 instance ToJSON BindistInfo where
   toJSON (BindistInfo n) = object [ "bindistName" A..= n ]
