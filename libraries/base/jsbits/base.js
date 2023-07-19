@@ -39,7 +39,13 @@ function h$base_chmod(file, file_off, mode, c) {
 }
 
 function h$base_close(fd, c) {
-    TRACE_IO("base_close fd: " + fd)
+  TRACE_IO("base_close fd: " + fd)
+  return h$close(fd,c);
+}
+
+function h$close(fd,c) {
+  if (c) {
+    //asynchronous
     var fdo = h$base_fds[fd];
     if(fdo) {
         delete h$base_fds[fd];
@@ -59,6 +65,16 @@ function h$base_close(fd, c) {
         h$errno = CONST_EINVAL;
         c(-1);
     }
+  } else {
+    //synchronous
+    try {
+      h$fs.closeSync(fd);
+      return 0;
+    } catch(err) {
+      h$setErrno(err);
+      return (-1);
+    }
+  }
 }
 
 function h$base_dup(fd, c) {
@@ -265,11 +281,25 @@ function h$rmdir(file, file_off) {
 }
 
 function h$base_open(file, file_off, how, mode, c) {
+  return h$open(file,file_off,how,mode,c);
+}
+
+function h$openat(dirfd, file, file_off, how, mode) {
+  if (dirfd != h$base_at_fdcwd) {
+    // we only support AT_FDWCD (open) until NodeJS provides "openat"
+    return h$unsupported(-1);
+  }
+  else {
+    return h$open(file,file_off,how,mode,undefined);
+  }
+}
+
+function h$open(file, file_off, how, mode,c) {
 #ifndef GHCJS_BROWSER
     if(h$isNode()) {
         var flags, off;
         var fp   = h$decodeUtf8z(file, file_off);
-        TRACE_IO("base_open: " + fp)
+        TRACE_IO("open: " + fp)
         var acc  = how & h$base_o_accmode;
         // passing a number lets node.js use it directly as the flags (undocumented)
         if(acc === h$base_o_rdonly) {
@@ -284,34 +314,64 @@ function h$base_open(file, file_off, how, mode, c) {
                       | ((how & h$base_o_creat)  ? h$processConstants['fs']['O_CREAT']  : 0)
                       | ((how & h$base_o_excl)   ? h$processConstants['fs']['O_EXCL']   : 0)
                       | ((how & h$base_o_append) ? h$processConstants['fs']['O_APPEND'] : 0);
-        h$fs.open(fp, flags, mode, function(err, fd) {
-            if(err) {
-                h$handleErrnoC(err, -1, 0, c);
+        if (c) {
+          // asynchronous
+          h$fs.open(fp, flags, mode, function(err, fd) {
+              if(err) {
+                  h$handleErrnoC(err, -1, 0, c);
+              } else {
+                  var f = function(p) {
+                      h$base_fds[fd] = { read:  h$base_readFile
+                                       , write: h$base_writeFile
+                                       , close: h$base_closeFile
+                                       , fd:    fd
+                                       , pos:   p
+                                       , refs:  1
+                                       };
+                      TRACE_IO("base_open: " + fp + " -> " + fd)
+                      c(fd);
+                  }
+                  if(off === -1) {
+                      h$fs.stat(fp, function(err, fs) {
+                          if(err) h$handleErrnoC(err, -1, 0, c); else f(fs.size);
+                      });
+                  } else {
+                      f(0);
+                  }
+              }
+          });
+        }
+        else {
+          // synchronous
+          try {
+            var fd = h$fs.openSync(fp, flags, mode);
+            var f = function(p) {
+                      h$base_fds[fd] = { read:  h$base_readFile
+                                       , write: h$base_writeFile
+                                       , close: h$base_closeFile
+                                       , fd:    fd
+                                       , pos:   p
+                                       , refs:  1
+                                       };
+                      TRACE_IO("open: " + fp + " -> " + fd)
+                  }
+            if(off === -1) {
+              var fs = h$fs.statSync(fp);
+              f(fs.size);
             } else {
-                var f = function(p) {
-                    h$base_fds[fd] = { read:  h$base_readFile
-                                     , write: h$base_writeFile
-                                     , close: h$base_closeFile
-                                     , fd:    fd
-                                     , pos:   p
-                                     , refs:  1
-                                     };
-                    TRACE_IO("base_open: " + fp + " -> " + fd)
-                    c(fd);
-                }
-                if(off === -1) {
-                    h$fs.stat(fp, function(err, fs) {
-                        if(err) h$handleErrnoC(err, -1, 0, c); else f(fs.size);
-                    });
-                } else {
-                    f(0);
-                }
+              f(0);
             }
-        });
+            return fd;
+          } catch(err) {
+            h$setErrno(err);
+            return -1;
+          }
+        }
     } else
 #endif
-        h$unsupported(-1, c);
+        return h$unsupported(-1,c);
 }
+
 function h$base_read(fd, buf, buf_off, n, c) {
     TRACE_IO("base_read: " + fd)
     var fdo = h$base_fds[fd];
@@ -353,16 +413,30 @@ function h$base_write(fd, buf, buf_off, n, c) {
 // buf_off: offset in the buffer
 // n: number of bytes to write
 // c: continuation
-    TRACE_IO("base_write: " + fd)
+  TRACE_IO("base_write: " + fd)
+  return h$write(fd,buf,buf_off,n,c);
+}
 
-    var fdo = h$base_fds[fd];
+function h$write(fd, buf, buf_off, n, c) {
 
-    if(fdo && fdo.write) {
-        fdo.write(fd, fdo, buf, buf_off, n, c);
+    if (c) {
+      var fdo = h$base_fds[fd];
+      // asynchronous
+      if(fdo && fdo.write) {
+          fdo.write(fd, fdo, buf, buf_off, n, c);
+      } else {
+          h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
+              h$handleErrnoC(err, -1, bytesWritten, c);
+          });
+      }
     } else {
-        h$fs.write(fd, buf.u8, buf_off, n, function(err, bytesWritten, buf0) {
-            h$handleErrnoC(err, -1, bytesWritten, c);
-        });
+      //synchronous
+      try {
+        return h$fs.writeSync(fd, buf.u8, buf_off, n);
+      } catch(err) {
+        h$setErrno(err);
+        return (-1);
+      }
     }
 }
 
@@ -447,17 +521,19 @@ function h$base_utime(file, file_off, timbuf, timbuf_off, c) {
 function h$base_waitpid(pid, stat, stat_off, options, c) {
     throw "h$base_waitpid";
 }
-/** @const */ var h$base_o_rdonly   = 0x00000;
-/** @const */ var h$base_o_wronly   = 0x00001;
-/** @const */ var h$base_o_rdwr     = 0x00002;
-/** @const */ var h$base_o_accmode  = 0x00003;
-/** @const */ var h$base_o_append   = 0x00008;
-/** @const */ var h$base_o_creat    = 0x00200;
-/** @const */ var h$base_o_trunc    = 0x00400;
-/** @const */ var h$base_o_excl     = 0x00800;
-/** @const */ var h$base_o_noctty   = 0x20000;
-/** @const */ var h$base_o_nonblock = 0x00004;
-/** @const */ var h$base_o_binary   = 0x00000;
+const h$base_o_rdonly   = 0x00000;
+const h$base_o_wronly   = 0x00001;
+const h$base_o_rdwr     = 0x00002;
+const h$base_o_accmode  = 0x00003;
+const h$base_o_append   = 0x00008;
+const h$base_o_creat    = 0x00200;
+const h$base_o_trunc    = 0x00400;
+const h$base_o_excl     = 0x00800;
+const h$base_o_noctty   = 0x20000;
+const h$base_o_nonblock = 0x00004;
+const h$base_o_binary   = 0x00000;
+const h$base_at_fdcwd   = -100;
+
 
 function h$base_stat_check_mode(mode,p) {
   // inspired by Node's checkModeProperty

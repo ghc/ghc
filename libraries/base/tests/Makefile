@@ -5,3 +5,9 @@
 TOP=../../../testsuite
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
+
+.PHONY: T23697
+T23697:
+	'$(HSC2HS)' T23697.hsc
+	'$(TEST_HC)' $(TEST_HC_OPTS) $(WAY_FLAGS) -v0 T23697.hs
+	./T23697
