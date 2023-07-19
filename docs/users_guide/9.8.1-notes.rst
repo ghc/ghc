@@ -3,21 +3,16 @@
 Version 9.8.1
 =============
 
-Language
-~~~~~~~~
+The significant changes to the various parts of the compiler are listed in the
+following sections. See the `migration guide
+<https://gitlab.haskell.org/ghc/ghc/-/wikis/migration/9.8>`_ on the GHC Wiki
+for specific guidance on migrating programs to this release.
 
-- There is a new extension :extension:`ExtendedLiterals`, which enables
-  sized primitive literals, e.g. ``123#Int8`` is a literal of type ``Int8#``.
-  See the GHC proposal `#451 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0451-sized-literals.rst>`_.
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+11, 12, 13, 14 or 15.
 
-- GHC Proposal `#425
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
-  has been partially implemented. Namely, the ``@k``-binders in type declarations are now permitted::
-
-    type T :: forall k. k -> forall j. j -> Type
-    data T @k (a :: k) @(j :: Type) (b :: j)
-
-  This feature is guarded behind :extension:`TypeAbstractions`.
+Breaking changes
+~~~~~~~~~~~~~~~~
 
 - In accordance with GHC proposal `#425
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
@@ -34,60 +29,6 @@ Language
   Or::
 
     type instance forall j . F1 Int = Any :: j -> j
-
-Compiler
-~~~~~~~~
-
-- Added a new warning :ghc-flag:`-Wterm-variable-capture` that helps to make code compatible with
-  the future extension ``RequiredTypeArguments``.
-
-- Rewrite rules now support a limited form of higher order matching when a
-  pattern variable is applied to distinct locally bound variables. For example: ::
-
-      forall f. foo (\x -> f x)
-
-  Now matches: ::
-
-      foo (\x -> x*2 + x)
-
-- GHC Proposal `#496
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0496-empty-record-wildcards.rst>`_
-  has been implemented, allowing ``{..}`` syntax for constructors without fields, for consistency.
-  This is convenient for TH code generation, as you can now uniformly use record wildcards
-  regardless of number of fields.
-
-- Incoherent instance applications are no longer specialised. The previous implementation of
-  specialisation resulted in nondeterministic instance resolution in certain cases, breaking
-  the specification described in the documentation of the `INCOHERENT` pragma. See :ghc-ticket:`22448` for further details.
-
-- Fix a bug in TH causing excessive calls to ``setNumCapabilities`` when ``-j`` is greater than ``-N``.
-  See :ghc-ticket:`23049`.
-
-- The ``-Wno-⟨wflag⟩``, ``-Werror=⟨wflag⟩`` and ``-Wwarn=⟨wflag⟩`` options are
-  now defined systematically for all warning groups (for example,
-  ``-Wno-default``, ``-Werror=unused-binds`` and ``-Wwarn=all`` are now
-  accepted). See :ref:`options-sanity`.
-
-- ``WARNING`` pragmas may now be annotated with a category, following
-  `GHC proposal #541 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0541-warning-pragmas-with-categories.rst>`_, in which case they are controlled with new
-  ``-Wx-⟨category⟩`` flags rather than :ghc-flag:`-Wdeprecations`.
-  A new warning group :ghc-flag:`-Wextended-warnings` includes all such warnings
-  regardless of category.  See :ref:`warning-deprecated-pragma`.
-
-- GHC is now better at disambiguating record updates in the presence of duplicate
-  record fields. The following program is now accepted ::
-
-     {-# LANGUAGE DuplicateRecordFields #-}
-
-     data R = MkR1 { foo :: Int }
-            | MkR2 { bar :: Int }
-
-     data S = MkS { foo :: Int, bar :: Int }
-
-     blah x = x { foo = 5, bar = 6 }
-
-  The point is that only the type S has a constructor with both fields "foo"
-  and "bar", so this record update is unambiguous.
 
 - Data types with ``deriving`` clauses now reject inferred instance contexts
   that mention ``TypeError`` constraints (see :ref:`custom-errors`), such as
@@ -115,16 +56,89 @@ Compiler
 
       deriving instance TypeError (Text "Boo") => Bar Baz
 
-- GHC Proposal `#540 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst`_ has been implemented.
-  This adds the `-jsem`:ghc-flag: flag, which instructs GHC to act as a jobserver client.
+
+Language
+~~~~~~~~
+
+- There is a new extension :extension:`ExtendedLiterals`, which enables
+  sized primitive numeric literals, e.g. ``123#Int8`` is a literal of type ``Int8#``.
+  See the GHC proposal `#451 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0451-sized-literals.rst>`_.
+
+- GHC Proposal `#425
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0425-decl-invis-binders.rst>`_
+  has been partially implemented. Namely, the ``@k``-binders in type declarations are now permitted::
+
+    type T :: forall k. k -> forall j. j -> Type
+    data T @k (a :: k) @(j :: Type) (b :: j)
+
+  This feature is guarded behind :extension:`TypeAbstractions`.
+
+Compiler
+~~~~~~~~
+
+- Added a new warning :ghc-flag:`-Wterm-variable-capture` that helps to make code compatible with
+  the future extension ``RequiredTypeArguments``.
+
+- Rewrite rules now support a limited form of higher order matching when a
+  pattern variable is applied to distinct locally bound variables. For example: ::
+
+      forall f. foo (\x -> f x)
+
+  Now matches: ::
+
+      foo (\x -> x*2 + x)
+
+- GHC Proposal `#496
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0496-empty-record-wildcards.rst>`_
+  has been implemented, allowing ``{..}`` syntax for constructors without fields, for consistency.
+  This is convenient for TH code generation, as you can now uniformly use record wildcards
+  regardless of number of fields.
+
+- Incoherent instance applications are no longer specialised. The previous implementation of
+  specialisation resulted in nondeterministic instance resolution in certain cases, breaking
+  the specification described in the documentation of the :pragma:`INCOHERENT` pragma. See :ghc-ticket:`22448` for further details.
+
+- Fix a bug in TemplateHaskell evaluation causing excessive calls to ``setNumCapabilities`` when :ghc-flag:`-j[⟨n⟩]` is greater than :rts-flag:`-N`.
+  See :ghc-ticket:`23049`.
+
+- The ``-Wno-⟨wflag⟩``, ``-Werror=⟨wflag⟩`` and ``-Wwarn=⟨wflag⟩`` options are
+  now defined systematically for all warning groups (for example,
+  ``-Wno-default``, ``-Werror=unused-binds`` and ``-Wwarn=all`` are now
+  accepted). See :ref:`options-sanity`.
+
+- ``WARNING`` pragmas may now be annotated with a category, following
+  `GHC proposal #541 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0541-warning-pragmas-with-categories.rst>`_, in which case they are controlled with new
+  ``-Wx-⟨category⟩`` flags rather than :ghc-flag:`-Wdeprecations`.
+  A new warning group :ghc-flag:`-Wextended-warnings` includes all such warnings
+  regardless of category.  See :ref:`warning-deprecated-pragma`.
+
+- GHC is now better at disambiguating record updates in the presence of duplicate
+  record fields. The following program is now accepted ::
+
+     {-# LANGUAGE DuplicateRecordFields #-}
+
+     data R = MkR1 { foo :: Int }
+            | MkR2 { bar :: Int }
+
+     data S = MkS { foo :: Int, bar :: Int }
+
+     blah x = x { foo = 5, bar = 6 }
+
+  The point is that only the type S has a constructor with both fields ``foo``
+  and ``bar``, so this record update is unambiguous.
+
+- GHC Proposal `#540 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst>`_ has been implemented.
+  This adds the :ghc-flag:`-jsem` flag, which instructs GHC to act as a jobserver client.
   This enables multiple GHC processes running at once to share system resources
   with each other, communicating via the system semaphore specified by
   the flag argument.
 
+  Complementary support for this feature in ``cabal-install`` will come soon.
+
 - GHC Proposal `#433
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0433-unsatisfiable.rst>`_
   has been implemented. This adds the class ``Unsatisfiable :: ErrorMessage -> Constraint``
-  to the ``GHC.TypeError`` module. Constraints of the form ``Unsatisfiable msg``
+  to the :base-ref:`GHC.TypeError` module. Constraints of the form ``Unsatisfiable msg``
   provide a mechanism for custom type errors that reports the errors in a more
   predictable behaviour than ``TypeError``, as these constraints are
   handled purely during constraint solving.
@@ -137,27 +151,31 @@ Compiler
   This allows errors to be reported when users use the instance, even when
   type errors are being deferred.
 
-- GHC is now deals "insoluble Givens" in a consistent way. For example: ::
+- GHC now deals with "insoluble Givens" in a consistent way. For example: ::
 
         k :: (Int ~ Bool) => Int -> Bool
         k x = x
 
-  GHC used to accept the contradictory ``Int~Bool`` in the type signature, but reject the ``Int~Bool`` constraint that arises from typechecking the definition itself.  Now it accepts both.  More details in `GHC ticket #23413 <https://gitlab.haskell.org/ghc/ghc/-/issues/23413>`_, which gives examples of the previous inconsistency.  GHC now implements the "PermissivePlan" described in that ticket.
+  GHC used to accept the contradictory ``Int~Bool`` in the type signature, but
+  reject the ``Int~Bool`` constraint that arises from typechecking the
+  definition itself.  Now it accepts both.  More details in
+  :ghc-ticket:`23413`, which gives examples of the previous inconsistency.  GHC
+  now implements the "PermissivePlan" described in that ticket.
 
-- The `-ddump-spec` flag has been split into `-ddump-spec` and
-  `-ddump-spec-constr`, allowing only output from the typeclass specialiser or
-  `SpecConstr` to be seen if desired.
+- The :ghc-flag:`-ddump-spec` flag has been split into :ghc-flag:`-ddump-spec` and
+  :ghc-flag:`-ddump-spec-constr`, allowing only output from the typeclass specialiser or
+  data-constructor specialiser to be dumped if desired.
 
 - The compiler may now be configured to compress the debugging information
   included in :ghc-flag:`-finfo-table-map` enabled binaries. To do so, one must
   build GHC from source (see
-  `here<https://gitlab.haskell.org/ghc/ghc/-/wikis/building>` for directions)
+  `here <https://gitlab.haskell.org/ghc/ghc/-/wikis/building>`_ for directions)
   and supply the ``--enable-ipe-data-compression`` flag to the ``configure``
   script. **Note**: This feature requires that the machine building GHC has
   `libzstd <https://github.com/facebook/zstd/>`_ version 1.4.0 or greater
   installed. The compression library `libzstd` may optionally be statically
   linked in the resulting compiler (on non-darwin machines) using the
-  `--enable-static-libzstd` configure flag.
+  ``--enable-static-libzstd`` configure flag.
 
   In a test compiling GHC itself, the size of the :ghc-flag:`-finfo-table-map`
   enabled build results was reduced by over 20% when compression was enabled.
@@ -169,11 +187,11 @@ Compiler
 
   For example ::
 
-      module X (
-          {-# WARNING "do not use that constructor" D(D1),
-          D(D2)
-        )
-        D = D1 | D2
+      module X
+          ( {-# DEPRECATE D(D1) "D1 will not be exposed in a version 0.2 and later" #-}
+            D(D1, D2)
+          ) where
+      data D = D1 | D2
       
   This allows for changing the structure of a library without immediately breaking user code,
   but instead being able to warn the user that a change in the library interface
@@ -182,7 +200,10 @@ Compiler
 GHCi
 ~~~~
 
-- The deprecated `:ctags` and `:etags` GHCi commands have been removed. See this `wiki page <https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/GHCi/Tags>`_ if you want to add a macro to recover similar functionality.
+- The deprecated ``:ctags`` and ``:etags`` GHCi commands have been removed. See
+  this `wiki page
+  <https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/GHCi/Tags>`_ if you
+  want to add a macro to recover similar functionality.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -193,7 +214,7 @@ Runtime system
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
-- ``Data.Tuple`` now exports ``getSolo :: Solo a -> a``.
+- :base-ref:`Data.Tuple` now exports ``getSolo :: Solo a -> a``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
@@ -211,7 +232,7 @@ Runtime system
 
 - New primops for fused multiply-add operations. These primops combine a
   multiplication and an addition, compiling to a single instruction when
-  the ``-mfma`` flag is enabled and the architecture supports it.
+  the :ghc-flag:`-mfma` flag is enabled and the architecture supports it.
 
   The new primops are ``fmaddFloat#, fmsubFloat#, fnmaddFloat#, fnmsubFloat# :: Float# -> Float# -> Float# -> Float#``
   and ``fmaddDouble#, fmsubDouble#, fnmaddDouble#, fnmsubDouble# :: Double# -> Double# -> Double# -> Double#``.
@@ -243,21 +264,18 @@ Runtime system
 - The extensions fields of constructors of ``IE`` now take ``Maybe (WarningTxt p)``
   in ``GhcPs`` and ``GhcRn`` variants of the Syntax Tree. 
   This represents the warning assigned to a certain export item, 
-  which is used for :ref:`deprecated-exports`.
-
-``ghc-heap`` library
-~~~~~~~~~~~~~~~~~~~~
+  which is used for :pragma:`deprecated exports <DEPRECATED>`.
 
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Record fields now belong to separate ``NameSpace``s, keyed by the parent of
+- Record fields now belong to separate ``NameSpace``\ s, keyed by the parent of
   the record field. This is the name of the first constructor of the parent type,
   even if this constructor does not have the field in question.
-  This change enables TemplateHaskell support for ``DuplicateRecordFields``.
+  This change enables :extension:`TemplateHaskell` support for :extension:`DuplicateRecordFields`.
 
 Included libraries
-------------------
+~~~~~~~~~~~~~~~~~~
 
 The package database provided with this distribution also contains a number of
 packages other than GHC itself. See the changelogs provided with these packages
@@ -290,6 +308,7 @@ for further change information.
     libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
     libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
     libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/semaphore-compat/semaphore-compat.cabal: Dependency of ``ghc`` library
     libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
     libraries/template-haskell/template-haskell.cabal: Core library
     libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
