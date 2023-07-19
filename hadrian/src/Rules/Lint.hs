@@ -11,6 +11,7 @@ lintRules :: Rules ()
 lintRules = do
   "lint:base" ~> lint base
   "lint:ghc-internal" ~> lint ghcInternal
+  "lint:ghc-experimental" ~> lint ghcExperimental
   "lint:compiler" ~> lint compiler
 
   -- Ensure that autoconf scripts, which are usually run by Cabal, are run to
@@ -75,6 +76,11 @@ ghcInternal :: Action ()
 ghcInternal = do
   let includeDirs = []
   runHLint includeDirs [] "libraries/ghc-internal"
+
+ghcExperimental :: Action ()
+ghcExperimental = do
+  let includeDirs = []
+  runHLint includeDirs [] "libraries/ghc-experimental"
 
 compiler :: Action ()
 compiler = do

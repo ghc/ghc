@@ -69,6 +69,12 @@ Runtime system
 ``ghc-heap`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+``ghc-experimental`` library
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Introduced per the `base library split proposal
+  <https://github.com/Ericson2314/tech-proposals/blob/ghc-base-libraries/proposals/accepted/051-ghc-base-libraries.rst>`_
+
 ``template-haskell`` library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
