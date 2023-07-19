@@ -1039,8 +1039,8 @@ getRegister' config plat expr
             code_x `appOL`
             code_y `snocOL`
             mul (OpReg tmp_w tmp) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
-            CMP (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) `snocOL`
-            CSET (OpReg w dst) NE)
+            CMP (OpReg tmp_w tmp) (OpRegExt W32 tmp ext_mode 0) `snocOL`
+            CSET (OpReg W32 dst) NE)
 
 -- | Is a given number encodable as a bitmask immediate?
 --
