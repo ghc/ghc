@@ -350,6 +350,7 @@ lint-submods-branch:
   script:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
+    - .gitlab/ci.sh run_hadrian lint:ghc-internal
     - .gitlab/ci.sh run_hadrian lint:base
     - .gitlab/ci.sh run_hadrian lint:compiler
 

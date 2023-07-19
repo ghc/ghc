@@ -1,0 +1,33 @@
+cabal-version:      3.0
+name:               ghc-internal
+version:            0.1.0.0
+synopsis:
+    Internal implementation of the Glasgow Haskell Compiler's standard library
+description:
+    This is an internal package containing the implementation of the Glasgow
+    Haskell Compiler's standard library. End users should not depend upon this
+    package directly but rather use either @base@ or the @ghc-experimental@
+    packages.
+homepage:           https://www.haskell.org/ghc/
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             The GHC Team
+maintainer:         ghc-devs@haskell.org
+copyright:          (c) 2023 The GHC Team
+category:           Development
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:
+    other-modules:    Dummy
+    other-extensions:
+    build-depends:    rts == 1.0.*,
+                      ghc-prim >= 0.5.1.0 && < 0.11,
+                      ghc-bignum >= 1.0 && < 2.0
+    hs-source-dirs:   src
+    default-language: Haskell2010

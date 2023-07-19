@@ -10,6 +10,7 @@ import System.Exit (exitFailure)
 lintRules :: Rules ()
 lintRules = do
   "lint:base" ~> lint base
+  "lint:ghc-internal" ~> lint ghcInternal
   "lint:compiler" ~> lint compiler
 
   -- Ensure that autoconf scripts, which are usually run by Cabal, are run to
@@ -69,6 +70,11 @@ base = do
         , stage1RtsInc
         ]
   runHLint includeDirs [] "libraries/base"
+
+ghcInternal :: Action ()
+ghcInternal = do
+  let includeDirs = []
+  runHLint includeDirs [] "libraries/ghc-internal"
 
 compiler :: Action ()
 compiler = do
