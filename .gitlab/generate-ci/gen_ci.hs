@@ -556,7 +556,8 @@ instance ToJSON OnOffRules where
 
 -- | A Rule corresponds to some condition which must be satisifed in order to
 -- run the job.
-data Rule = FastCI       -- ^ Run this job when the fast-ci label is set
+data Rule = FastCI       -- ^ Run this job on all validate pipelines, all pipelines are enabled
+                         -- by the "full-ci" label.
           | ReleaseOnly  -- ^ Only run this job in a release pipeline
           | Nightly      -- ^ Only run this job in the nightly pipeline
           | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
@@ -578,7 +579,7 @@ false = "\"disabled\" != \"disabled\""
 -- Convert the state of the rule into a string that gitlab understand.
 ruleString :: OnOff -> Rule -> String
 ruleString On FastCI = true
-ruleString Off FastCI = "$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/"
+ruleString Off FastCI = "($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)"
 ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
 ruleString Off LLVMBackend = true
 ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
@@ -767,17 +768,25 @@ delVariable k j = j { jobVariables = MonoidalMap $ Map.delete k $ unMonoidalMap 
 validate :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 validate = job
 
+-- Nightly and release apply the FastCI configuration to all jobs so that they all run in
+-- the pipeline (not conditional on the full-ci label)
+nightlyRule :: Job -> Job
+nightlyRule = addJobRule FastCI . addJobRule Nightly
+
+releaseRule :: Job -> Job
+releaseRule = addJobRule FastCI . addJobRule ReleaseOnly
+
 -- | Make a normal nightly CI job
 nightly :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 nightly arch opsys bc =
   let NamedJob n j = job arch opsys bc
-  in NamedJob { name = "nightly-" ++ n, jobInfo = addJobRule Nightly . keepArtifacts "8 weeks" . highCompression $ j}
+  in NamedJob { name = "nightly-" ++ n, jobInfo = nightlyRule . keepArtifacts "8 weeks" . highCompression $ j}
 
 -- | Make a normal release CI job
 release :: Arch -> Opsys -> BuildConfig -> NamedJob Job
 release arch opsys bc =
   let NamedJob n j = job arch opsys (bc { buildFlavour = Release })
-  in NamedJob { name = "release-" ++ n, jobInfo = addJobRule ReleaseOnly . keepArtifacts "1 year" . ignorePerfFailures . useHashUnitIds . highCompression $ j}
+  in NamedJob { name = "release-" ++ n, jobInfo = releaseRule . keepArtifacts "1 year" . ignorePerfFailures . useHashUnitIds . highCompression $ j}
 
 -- Specific job modification functions
 
@@ -806,6 +815,7 @@ useHashUnitIds :: Job -> Job
 useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 
 -- | Mark the validate job to run in fast-ci mode
+-- This is default way, to enable all jobs you have to apply the `full-ci` label.
 fastCI :: JobGroup Job -> JobGroup Job
 fastCI = modifyValidateJobs (addJobRule FastCI)
 
@@ -888,7 +898,7 @@ job_groups =
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
      , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
      , validateBuilds Amd64 (Linux Debian10) nativeInt
-     , fastCI (validateBuilds Amd64 (Linux Debian10) unreg)
+     , validateBuilds Amd64 (Linux Debian10) unreg
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
      , -- Nightly allowed to fail: #22520
        modifyNightlyJobs allowFailure
@@ -907,7 +917,7 @@ job_groups =
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Centos7) (splitSectionsBroken vanilla))
      -- Fedora33 job is always built with perf so there's one job in the normal
      -- validate pipeline which is built with perf.
-     , standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig
+     , fastCI (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig)
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
@@ -915,8 +925,8 @@ job_groups =
      , disableValidate (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken nativeInt))
      , standardBuilds Amd64 Darwin
      , allowFailureGroup (addValidateRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
-     , standardBuilds AArch64 Darwin
-     , standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla)
+     , fastCI (standardBuilds AArch64 Darwin)
+     , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
      , standardBuildsWithConfig I386 (Linux Debian10) (splitSectionsBroken vanilla)
      -- Fully static build, in theory usable on any linux distribution.

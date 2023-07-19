@@ -432,7 +432,7 @@ hadrian-multi:
     paths:
       - cabal-cache
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
 
 ############################################################
 # stack-hadrian-build
@@ -830,7 +830,7 @@ perf-nofib:
     - if: $CI_MERGE_REQUEST_ID
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
   tags:
     - x86_64-linux
   before_script:
@@ -897,7 +897,7 @@ perf:
     paths:
       - out
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
 
 ############################################################
 # ABI testing
@@ -937,7 +937,7 @@ abi-test:
     paths:
       - out
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS !~ /.*fast-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
 
 
 ############################################################
