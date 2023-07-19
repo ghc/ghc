@@ -47,7 +47,7 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
         -ilibraries/ghc-platform/src -iutils/ghc-toolchain/src \
         -XNoImplicitPrelude \
         -odir actmp-ghc-toolchain -hidir actmp-ghc-toolchain \
-        utils/ghc-toolchain/Main.hs -o acghc-toolchain
+        utils/ghc-toolchain/exe/Main.hs -o acghc-toolchain
 
     # (1) Configure a toolchain for the build and host platform (we require that BUILD=HOST, so one toolchain suffices)
     rm -f acargs
