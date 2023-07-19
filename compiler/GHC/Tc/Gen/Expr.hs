@@ -187,16 +187,17 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
 -- Use tcApp to typecheck applications, which are treated specially
 -- by Quick Look.  Specifically:
---   - HsVar         lone variables, to ensure that they can get an
+--   - HsVar           lone variables, to ensure that they can get an
 --                     impredicative instantiation (via Quick Look
 --                     driven by res_ty (in checking mode)).
---   - HsApp         value applications
---   - HsAppType     type applications
---   - ExprWithTySig (e :: type)
---   - HsRecSel      overloaded record fields
---   - HsExpanded    renamer expansions
---   - HsOpApp       operator applications
---   - HsOverLit     overloaded literals
+--   - HsApp           value applications
+--   - HsAppType       type applications
+--   - ExprWithTySig   (e :: type)
+--   - HsRecSel        overloaded record fields
+--   - HsExpanded      renamer expansions
+--   - HsUntypedSplice untyped Template Haskell splices
+--   - HsOpApp         operator applications
+--   - HsOverLit       overloaded literals
 -- These constructors are the union of
 --   - ones taken apart by GHC.Tc.Gen.Head.splitHsApps
 --   - ones understood by GHC.Tc.Gen.Head.tcInferAppHead_maybe
@@ -208,6 +209,7 @@ tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
 tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
+tcExpr e@(HsUntypedSplice {})    res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
@@ -577,12 +579,6 @@ tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
 tcExpr e@(HsTypedBracket _ body)    res_ty = tcTypedBracket e body res_ty
 
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
-tcExpr (HsUntypedSplice splice _)   res_ty
-  = case splice of
-      HsUntypedSpliceTop mod_finalizers expr
-        -> do { addModFinalizersWithLclEnv mod_finalizers
-              ; tcExpr expr res_ty }
-      HsUntypedSpliceNested {} -> panic "tcExpr: invalid nested splice"
 
 {-
 ************************************************************************
@@ -735,7 +731,7 @@ tcSyntaxOpGen :: CtOrigin
               -> ([TcSigmaTypeFRR] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExprTc)
 tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan) []
+  = do { (expr, sigma) <- tcInferAppHead (op, VACall op 0 noSrcSpan)
              -- Ugh!! But all this code is scheduled for demolition anyway
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)

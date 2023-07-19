@@ -278,9 +278,13 @@ addArgWrap wrap args
  | otherwise          = EWrap (EHsWrap wrap) : args
 
 splitHsApps :: HsExpr GhcRn
-            -> ( (HsExpr GhcRn, AppCtxt)  -- Head
-               , [HsExprArg 'TcpRn])      -- Args
--- See Note [splitHsApps]
+            -> TcM ( (HsExpr GhcRn, AppCtxt)  -- Head
+                   , [HsExprArg 'TcpRn])      -- Args
+-- See Note [splitHsApps].
+--
+-- This uses the TcM monad solely because we must run modFinalizers when looking
+-- through HsUntypedSplices
+-- (see Note [Looking through Template Haskell splices in splitHsApps]).
 splitHsApps e = go e (top_ctxt 0 e) []
   where
     top_ctxt :: Int -> HsExpr GhcRn -> AppCtxt
@@ -297,7 +301,7 @@ splitHsApps e = go e (top_ctxt 0 e) []
     top_lctxt n (L _ fun) = top_ctxt n fun
 
     go :: HsExpr GhcRn -> AppCtxt -> [HsExprArg 'TcpRn]
-       -> ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
+       -> TcM ((HsExpr GhcRn, AppCtxt), [HsExprArg 'TcpRn])
     -- Modify the AppCtxt as we walk inwards, so it describes the next argument
     go (HsPar _ _ (L l fun) _)       ctxt args = go fun (set l ctxt) (EWrap (EPar ctxt)     : args)
     go (HsPragE _ p (L l fun))       ctxt args = go fun (set l ctxt) (EPrag      ctxt p     : args)
@@ -309,21 +313,35 @@ splitHsApps e = go e (top_ctxt 0 e) []
       = go fun (VAExpansion orig (appCtxtLoc ctxt))
                (EWrap (EExpand orig) : args)
 
+    -- See Note [Looking through Template Haskell splices in splitHsApps]
+    go e@(HsUntypedSplice splice_res splice) ctxt args
+      = case splice_res of
+          HsUntypedSpliceTop mod_finalizers fun
+            -> do addModFinalizersWithLclEnv mod_finalizers
+                  go fun ctxt' (EWrap (EExpand e) : args)
+          HsUntypedSpliceNested {} -> panic "splitHsApps: invalid nested splice"
+      where
+        ctxt' :: AppCtxt
+        ctxt' =
+          case splice of
+            HsUntypedSpliceExpr _ (L l _) -> set l ctxt -- l :: SrcAnn AnnListItem
+            HsQuasiQuote _ _ (L l _)      -> set l ctxt -- l :: SrcAnn NoEpAnns
+
     -- See Note [Desugar OpApp in the typechecker]
     go e@(OpApp _ arg1 (L l op) arg2) _ args
-      = ( (op, VACall op 0 (locA l))
-        ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
-          : mkEValArg (VACall op 2 generatedSrcSpan) arg2
-          : EWrap (EExpand e)
-          : args )
+      = pure ( (op, VACall op 0 (locA l))
+             ,   mkEValArg (VACall op 1 generatedSrcSpan) arg1
+               : mkEValArg (VACall op 2 generatedSrcSpan) arg2
+               : EWrap (EExpand e)
+               : args )
 
-    go e ctxt args = ((e,ctxt), args)
+    go e ctxt args = pure ((e,ctxt), args)
 
-    set :: SrcSpanAnnA -> AppCtxt -> AppCtxt
+    set :: SrcAnn ann -> AppCtxt -> AppCtxt
     set l (VACall f n _)        = VACall f n (locA l)
     set _ ctxt@(VAExpansion {}) = ctxt
 
-    dec :: SrcSpanAnnA -> AppCtxt -> AppCtxt
+    dec :: SrcAnn ann -> AppCtxt -> AppCtxt
     dec l (VACall f n _)        = VACall f (n-1) (locA l)
     dec _ ctxt@(VAExpansion {}) = ctxt
 
@@ -756,6 +774,39 @@ as a single application chain `f e1 e2 e3`.  Otherwise stuff like overloaded
 labels (#19154) won't work.
 
 It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
+
+Note [Looking through Template Haskell splices in splitHsApps]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When typechecking an application, we must look through untyped TH splices in
+order to typecheck examples like the one in #21077:
+
+  data Foo = MkFoo () (forall a. a -> a)
+
+  foo :: Foo
+  foo = $([| MkFoo () |]) $ \x -> x
+
+In principle, this is straightforward to accomplish. By the time we typecheck
+`foo`, the renamer will have already run the splice, so all we have to do is
+look at the expanded version of the splice in `splitHsApps`. See the
+`HsUntypedSplice` case in `splitHsApps` for how this is accomplished.
+
+There is one slight complication in that untyped TH splices also include
+modFinalizers (see Note [Delaying modFinalizers in untyped splices] in
+GHC.Rename.Splice), which must be run during typechecking. splitHsApps is a
+convenient place to run the modFinalizers, so we do so there. This is the only
+reason that `splitHsApps` uses the TcM monad.
+
+`HsUntypedSplice` covers both ordinary TH splices, such as the example above,
+as well as quasiquotes (see Note [Quasi-quote overview] in
+Language.Haskell.Syntax.Expr). The `splitHsApps` case for `HsUntypedSplice`
+handles both of these. This is easy to accomplish, since all the real work in
+handling splices and quasiquotes has already been performed by the renamer by
+the time we get to `splitHsApps`.
+
+`tcExpr`, which typechecks expressions, handles `HsUntypedSplice` by simply
+delegating to `tcApp`, which in turn calls `splitHsApps`.  This means that
+`splitHsApps` is the unique part of the code that runs an `HsUntypedSplice`'s
+modFinalizers.
 -}
 
 {- *********************************************************************
@@ -765,7 +816,6 @@ It's easy to achieve this: `splitHsApps` unwraps `HsExpanded`.
 ********************************************************************* -}
 
 tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
-               -> [HsExprArg 'TcpRn]
                -> TcM (HsExpr GhcTc, TcSigmaType)
 -- Infer type of the head of an application
 --   i.e. the 'f' in (f e1 ... en)
@@ -776,11 +826,6 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --   * An expression with a type signature (e :: ty)
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 --
--- Why do we need the arguments to infer the type of the head of the
--- application? Simply to inform add_head_ctxt about whether or not
--- to put push a new "In the expression..." context. (We don't push a
--- new one if there are no arguments, because we already have.)
---
 -- Note that [] and (,,) are both HsVar:
 --   see Note [Empty lists] and [ExplicitTuple] in GHC.Hs.Expr
 --
@@ -788,26 +833,23 @@ tcInferAppHead :: (HsExpr GhcRn, AppCtxt)
 --     cases are dealt with by splitHsApps.
 --
 -- See Note [tcApp: typechecking applications] in GHC.Tc.Gen.App
-tcInferAppHead (fun,ctxt) args
+tcInferAppHead (fun,ctxt)
   = addHeadCtxt ctxt $
-    do { mb_tc_fun <- tcInferAppHead_maybe fun args
+    do { mb_tc_fun <- tcInferAppHead_maybe fun
        ; case mb_tc_fun of
             Just (fun', fun_sigma) -> return (fun', fun_sigma)
             Nothing -> tcInfer (tcExpr fun) }
 
 tcInferAppHead_maybe :: HsExpr GhcRn
-                     -> [HsExprArg 'TcpRn]
                      -> TcM (Maybe (HsExpr GhcTc, TcSigmaType))
 -- See Note [Application chains and heads] in GHC.Tc.Gen.App
 -- Returns Nothing for a complicated head
-tcInferAppHead_maybe fun args
+tcInferAppHead_maybe fun
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
       HsRecSel _ f              -> Just <$> tcInferRecSelId f
       ExprWithTySig _ e hs_ty   -> Just <$> tcExprWithSig e hs_ty
       HsOverLit _ lit           -> Just <$> tcInferOverLit lit
-      HsUntypedSplice (HsUntypedSpliceTop _ e) _
-                                -> tcInferAppHead_maybe e args
       _                         -> return Nothing
 
 addHeadCtxt :: AppCtxt -> TcM a -> TcM a

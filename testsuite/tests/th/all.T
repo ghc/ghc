@@ -559,6 +559,7 @@ test('T15433a', [extra_files(['T15433_aux.hs'])], multimod_compile_fail, ['T1543
 test('T15433b', [extra_files(['T15433_aux.hs'])], multimod_compile, ['T15433b', '-v0'])
 test('T20711', normal, compile_and_run, [''])
 test('T20868', normal, compile_and_run, [''])
+test('T21077', [extra_files(['T21077_Lib.hs'])], multimod_compile, ['T21077', '-v0'])
 test('Lift_ByteArray', normal, compile_and_run, [''])
 test('T21920', normal, compile_and_run, [''])
 test('T21723', normal, compile_and_run, [''])
