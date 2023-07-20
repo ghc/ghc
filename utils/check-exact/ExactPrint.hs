@@ -280,8 +280,110 @@ instance (HasTrailing a) => HasEntry (EpAnn a) where
   fromAnn (EpAnn anc a cs) = mkEntry anc (trailing a) cs
   fromAnn EpAnnNotUsed = NoEntryVal
 
-instance HasEntry (EpAnnS a) where
-  fromAnn (EpAnnS anc a cs) = mkEntry anc cs
+instance (HasTrailing a) => HasEntry (EpAnnS a) where
+  fromAnn (EpAnnS anc a cs) = mkEntry anc (trailing a) cs
+
+instance HasTrailing NoEpAnns where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing EpaLocation where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AddEpAnn where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing [AddEpAnn] where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing (AddEpAnn, AddEpAnn) where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing EpAnnSumPat where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnList where
+  trailing a = al_trailing a
+  setTrailing a ts = a { al_trailing = ts }
+
+instance HasTrailing AnnListItem where
+  trailing a = lann_trailing a
+  setTrailing a ts = a { lann_trailing = ts }
+
+instance HasTrailing AnnPragma where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnContext where
+  trailing (AnnContext ma opens closes)
+    = case ma of
+      Just (UnicodeSyntax, r) -> [AddDArrowUAnn r]
+      Just (NormalSyntax,  r) -> [AddDArrowAnn r]
+      Nothing -> []
+
+  setTrailing a [AddDArrowUAnn r] = a {ac_darrow = Just (UnicodeSyntax, r)}
+  setTrailing a [AddDArrowAnn r] = a{ac_darrow = Just (NormalSyntax, r)}
+  setTrailing a [] = a{ac_darrow = Nothing}
+  setTrailing a ts = error $ "Cannot setTrailing " ++ showAst ts ++ " for " ++ showAst a
+
+
+instance HasTrailing AnnParen where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnsIf where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing EpAnnHsCase where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnFieldLabel where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnProjection where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnExplicitSum where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing EpAnnUnboundVar where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing GrhsAnn where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnSig where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing HsRuleAnn where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing EpAnnImportDecl where
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing AnnsModule where
+  -- Report none, as all are used internally
+  trailing _ = []
+  setTrailing a _ = a
+
+instance HasTrailing NameAnn where
+  trailing a = nann_trailing a
+  setTrailing a ts = a { nann_trailing = ts }
 
 -- ---------------------------------------------------------------------
 
@@ -1425,15 +1527,8 @@ instance (ExactPrint a) => ExactPrint (LocatedA a) where
   exact (L la a) = do
     debugM $ "LocatedA a:la loc=" ++ show (ss2range $ locA la)
     a' <- markAnnotated a
--- -- start of variant A
---     ann' <- markALocatedA (ann la)
---     return (L (la { ann = ann'}) a')
--- -- start of variant B
---     -- return (L la a')
--- -- end of variants
     la' <- markALocatedA la
     return (L la' a')
---- end end
 
 instance (ExactPrint a) => ExactPrint (LocatedAn NoEpAnns a) where
   getAnnotationEntry = entryFromLocatedI
