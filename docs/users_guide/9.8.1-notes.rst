@@ -119,7 +119,7 @@ Compiler
 
       deriving instance TypeError (Text "Boo") => Bar Baz
 
-- GHC Proposal `#540 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst`_ has been implemented.
+- GHC Proposal `#540 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0540-jsem.rst>`_ has been implemented.
   This adds the `-jsem`:ghc-flag: flag, which instructs GHC to act as a jobserver client.
   This enables multiple GHC processes running at once to share system resources
   with each other, communicating via the system semaphore specified by
@@ -161,7 +161,7 @@ Compiler
   `libzstd <https://github.com/facebook/zstd/>`_ version 1.4.0 or greater
   installed. The compression library `libzstd` may optionally be statically
   linked in the resulting compiler (on non-darwin machines) using the
-  `--enable-static-libzstd` configure flag.
+  ``--enable-static-libzstd`` configure flag.
 
   In a test compiling GHC itself, the size of the :ghc-flag:`-finfo-table-map`
   enabled build results was reduced by over 20% when compression was enabled.

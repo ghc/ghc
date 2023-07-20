@@ -1,15 +1,18 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE TupleSections #-}
 
 module GHC.Driver.GenerateCgIPEStub (generateCgIPEStub) where
 
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (mapMaybe, listToMaybe)
+import Data.Semigroup ((<>))
 import GHC.Cmm
 import GHC.Cmm.CLabel (CLabel)
 import GHC.Cmm.Dataflow (Block, C, O)
 import GHC.Cmm.Dataflow.Block (blockSplit, blockToList)
-import GHC.Cmm.Dataflow.Collections (mapToList)
-import GHC.Cmm.Dataflow.Label (Label)
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label (Label, LabelMap)
 import GHC.Cmm.Info.Build (emptySRT)
 import GHC.Cmm.Pipeline (cmmPipeline)
 import GHC.Data.Maybe (firstJusts)
@@ -17,7 +20,7 @@ import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
-import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap), DumpFlag(Opt_D_ipe_stats))
+import GHC.Driver.Flags (GeneralFlag (..), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.DynFlags (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Config.Cmm
@@ -27,14 +30,14 @@ import GHC.Settings (Platform, platformTablesNextToCode)
 import GHC.StgToCmm.Monad (getCmm, initC, runC, initFCodeState)
 import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
+import GHC.StgToCmm.Utils
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module, moduleName)
 import GHC.Unit.Module (moduleNameString)
-import GHC.Utils.Misc
 import qualified GHC.Utils.Logger as Logger
-import GHC.Utils.Outputable
+import GHC.Utils.Outputable (ppr)
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -190,60 +193,107 @@ generateCgIPEStub hsc_env this_mod denv s = do
       cmm_cfg  = initCmmConfig dflags
   cgState <- liftIO initC
 
-  -- Collect info tables, but only if -finfo-table-map is enabled, otherwise labeledInfoTablesWithTickishes is empty.
-  let collectFun = if gopt Opt_InfoTableMap dflags then collect platform else collectNothing
-  (labeledInfoTablesWithTickishes, (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ collectFun [] s
+  -- Collect info tables from the Cmm if -finfo-table-map is enabled. If
+  -- -finfo-table-map is not enabled, infoTablesWithTickishes will be empty. If
+  -- -finfo-table-map-with-stack is enabled, any STACK info tables will be
+  -- mapped to their source locations (See Note [Stacktraces from Info Table
+  -- Provenance Entries (IPE based stack unwinding)]). If
+  -- -finfo-table-map-with-stack is not enabled, we need to track how many STACK
+  -- info tables we have skipped (in case -dipe-stats is enabled). Note that
+  -- this is the only stats tracking we do at this stage, so initStats here
+  -- should only ever contain stats about skipped STACK info tables.
+  let
+    collectFun =
+      if gopt Opt_InfoTableMap dflags then
+        collect platform
+      else
+        collectNothing platform
+
+  ((infoTablesWithTickishes, initStats), (nonCaffySet, moduleLFInfos)) <- Stream.mapAccumL_ collectFun (mempty, mempty) s
 
   -- Yield Cmm for Info Table Provenance Entries (IPEs)
-  let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
-      ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOf3 labeledInfoTablesWithTickishes) denv')
+  let denv' = denv {provInfoTables = Map.mapKeys cit_lbl infoTablesWithTickishes}
+      ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv initStats (Map.keys infoTablesWithTickishes) denv')
 
   (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
 
-  ipeStub <- case mIpeStub of
-                Just (stats, stub) -> do
-                  -- Print ipe stats if requested
-                  liftIO $
-                    Logger.putDumpFileMaybe logger
-                      Opt_D_ipe_stats
-                      ("IPE Stats for module " ++ (moduleNameString $ moduleName this_mod))
-                      Logger.FormatText
-                      (ppr stats)
-                  return stub
-                Nothing -> return mempty
+  ipeStub <-
+    case mIpeStub of
+      Just (stats, stub) -> do
+        -- Print ipe stats if requested
+        liftIO $
+          Logger.putDumpFileMaybe logger
+            Opt_D_ipe_stats
+            ("IPE Stats for module " ++ (moduleNameString $ moduleName this_mod))
+            Logger.FormatText
+            (ppr stats)
+        return stub
+      Nothing -> return mempty
 
   return CmmCgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
   where
-    collect :: Platform -> [(Label, CmmInfoTable, Maybe IpeSourceLocation)] -> CmmGroupSRTs -> IO ([(Label, CmmInfoTable, Maybe IpeSourceLocation)], CmmGroupSRTs)
-    collect platform acc cmmGroupSRTs = do
-      let labelsToInfoTables = collectInfoTables cmmGroupSRTs
-          labelsToInfoTablesToTickishes = map (\(l, i) -> (l, i, lookupEstimatedTick platform cmmGroupSRTs l i)) labelsToInfoTables
-      return (acc ++ labelsToInfoTablesToTickishes, cmmGroupSRTs)
+    -- These functions are applied to the elements of the stream of
+    -- CmmGroupSRTs. 'collect' populates a map from info table to potential
+    -- source location, and is used when -finfo-table-map is supplied.
+    -- 'collectNothing' does nothing and just throws out the stream elements.
+    collect, collectNothing
+      :: Platform
+      -> (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
+      -> CmmGroupSRTs
+      -> IO ((Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats), CmmGroupSRTs)
+    collect platform (!acc, !stats) cmmGroupSRTs = do
+      let
+        blocks = concatMap toBlockList (graphs cmmGroupSRTs)
+        labelsToInfoTables = collectInfoTables cmmGroupSRTs
+        (tablesToTickishes, stats') = mapFoldlWithKey (lookupEstimatedTick platform blocks) (acc, stats) labelsToInfoTables
+      return ((tablesToTickishes, stats'), cmmGroupSRTs)
+    collectNothing _ _ cmmGroupSRTs = pure ((Map.empty, mempty), cmmGroupSRTs)
 
-    collectNothing :: [a] -> CmmGroupSRTs -> IO ([a], CmmGroupSRTs)
-    collectNothing _ cmmGroupSRTs = pure ([], cmmGroupSRTs)
+    collectInfoTables :: CmmGroupSRTs -> LabelMap CmmInfoTable
+    collectInfoTables cmmGroup = foldl' extractInfoTables mapEmpty cmmGroup
 
-    collectInfoTables :: CmmGroupSRTs -> [(Label, CmmInfoTable)]
-    collectInfoTables cmmGroup = concat $ mapMaybe extractInfoTables cmmGroup
+    extractInfoTables :: LabelMap CmmInfoTable -> GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> LabelMap CmmInfoTable
+    extractInfoTables acc (CmmProc h _ _ _) = acc `mapUnion` info_tbls h
+    extractInfoTables acc _ = acc
 
-    extractInfoTables :: GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph -> Maybe [(Label, CmmInfoTable)]
-    extractInfoTables (CmmProc h _ _ _) = Just $ mapToList (info_tbls h)
-    extractInfoTables _ = Nothing
-
-    lookupEstimatedTick :: Platform -> CmmGroupSRTs -> Label -> CmmInfoTable -> Maybe IpeSourceLocation
-    lookupEstimatedTick platform cmmGroup infoTableLabel infoTable = do
+    lookupEstimatedTick
+      :: Platform
+      -> [CmmBlock]
+      -> (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
+      -> Label
+      -> CmmInfoTable
+      -> (Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
+    lookupEstimatedTick platform blocks (!acc, !stats) infoTableLabel infoTable = do
       -- All return frame info tables are stack represented, though not all stack represented info
       -- tables have to be return frames.
-      if (isStackRep . cit_rep) infoTable
-        then do
-          let findFun =
-                if platformTablesNextToCode platform
-                  then findCmmTickishWithTNTC infoTableLabel
-                  else findCmmTickishSansTNTC (cit_lbl infoTable)
-              blocks = concatMap toBlockList (graphs cmmGroup)
-          firstJusts $ map findFun blocks
-        else Nothing
+      if (isStackRep . cit_rep) infoTable then
+        if gopt Opt_InfoTableMapWithStack (hsc_dflags hsc_env) then
+          -- This is a STACK info table and we DO want to put it in the info
+          -- table map
+          let
+            findFun =
+              if platformTablesNextToCode platform
+                then findCmmTickishWithTNTC infoTableLabel
+                else findCmmTickishSansTNTC (cit_lbl infoTable)
+            -- Avoid retaining the blocks
+            !srcloc =
+              case firstJusts $ map findFun blocks of
+                Just !srcloc -> Just srcloc
+                Nothing -> Nothing
+          in
+            (Map.insert infoTable srcloc acc, stats)
+        else
+          -- This is a STACK info table but we DO NOT want to put it in the info
+          -- table map (-fno-info-table-map-with-stack was given), track it as
+          -- skipped
+            (acc, stats <> skippedIpeStats)
+
+      else
+        -- This is not a STACK info table, so put it in the map with no source
+        -- location (for now)
+        (Map.insert infoTable Nothing acc, stats)
+
     graphs :: CmmGroupSRTs -> [CmmGraph]
     graphs = foldl' go []
       where
