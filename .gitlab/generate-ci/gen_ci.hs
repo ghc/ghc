@@ -595,6 +595,7 @@ data ValidateRule =
           | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
           | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
           | IpeData      -- ^ Run this job when the "IPE" label is set
+          | TestPrimops  -- ^ Run this job when "test-primops" label is set
           deriving (Show, Enum, Bounded, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
@@ -639,6 +640,7 @@ validateRuleString LLVMBackend = labelString "LLVM backend"
 validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc = labelString "non-moving GC"
 validateRuleString IpeData = labelString "IPE"
+validateRuleString TestPrimops = labelString "test-primops"
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -953,7 +955,7 @@ jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
 job_groups :: [JobGroup Job]
 job_groups =
      [ disableValidate (standardBuilds Amd64 (Linux Debian10))
-     , standardBuildsWithConfig Amd64 (Linux Debian10) dwarf
+     , addValidateRule TestPrimops (standardBuildsWithConfig Amd64 (Linux Debian10) dwarf)
      , validateBuilds Amd64 (Linux Debian10) nativeInt
      , validateBuilds Amd64 (Linux Debian10) unreg
      , fastCI (validateBuilds Amd64 (Linux Debian10) debug)
@@ -980,7 +982,7 @@ job_groups =
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
      , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
-     , standardBuilds Amd64 Darwin
+     , addValidateRule TestPrimops (standardBuilds Amd64 Darwin)
      , allowFailureGroup (onlyRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
      , fastCI (standardBuilds AArch64 Darwin)
      , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
