@@ -7,6 +7,7 @@
 -- (c) The University of Glasgow 2004-2006
 --
 -----------------------------------------------------------------------------
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.StgToCmm.Utils (
         emitDataLits, emitRODataLits,
@@ -43,7 +44,7 @@ module GHC.StgToCmm.Utils (
         emitUpdRemSetPush,
         emitUpdRemSetPushThunk,
 
-        convertInfoProvMap, cmmInfoTableToInfoProvEnt
+        convertInfoProvMap, cmmInfoTableToInfoProvEnt, IPEStats(..)
   ) where
 
 import GHC.Prelude hiding ( head, init, last, tail )
@@ -90,6 +91,8 @@ import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import Control.Monad
 import qualified Data.Map.Strict as Map
+import qualified Data.IntMap.Strict as I
+import qualified Data.Semigroup (Semigroup(..))
 
 --------------------------------------------------------------------------
 --
@@ -607,20 +610,44 @@ cmmInfoTableToInfoProvEnt this_mod cmit =
         cn  = rtsClosureType (cit_rep cmit)
     in InfoProvEnt cl cn "" this_mod Nothing
 
+data IPEStats = IPEStats { ipe_total :: !Int
+                         , ipe_closure_types :: !(I.IntMap Int)
+                         , ipe_default :: !Int }
+
+instance Semigroup IPEStats where
+  (IPEStats a1 a2 a3) <> (IPEStats b1 b2 b3) = IPEStats (a1 + b1) (I.unionWith (+) a2 b2) (a3 + b3)
+
+instance Monoid IPEStats where
+  mempty = IPEStats 0 I.empty 0
+
+defaultIpeStats :: IPEStats
+defaultIpeStats = IPEStats { ipe_total = 0, ipe_closure_types = I.empty, ipe_default = 1}
+closureIpeStats :: Int -> IPEStats
+closureIpeStats t = IPEStats { ipe_total = 1, ipe_closure_types = I.singleton t 1, ipe_default = 0}
+
+instance Outputable IPEStats where
+  ppr = pprIPEStats
+
+pprIPEStats :: IPEStats -> SDoc
+pprIPEStats (IPEStats{..}) =
+  vcat $ [ text "Tables with info:" <+> ppr ipe_total
+         , text "Tables with fallback:" <+> ppr ipe_default
+         ] ++ [ text "Info(" <> ppr k <> text "):" <+> ppr n | (k, n) <- I.assocs ipe_closure_types ]
+
 -- | Convert source information collected about identifiers in 'GHC.STG.Debug'
 -- to entries suitable for placing into the info table provenance table.
-convertInfoProvMap :: [CmmInfoTable] -> Module -> InfoTableProvMap -> [InfoProvEnt]
+convertInfoProvMap :: [CmmInfoTable] -> Module -> InfoTableProvMap -> (IPEStats, [InfoProvEnt])
 convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTableToSourceLocationMap) =
-  map (\cmit ->
+  traverse (\cmit ->
     let cl = cit_lbl cmit
         cn  = rtsClosureType (cit_rep cmit)
 
         tyString :: Outputable a => a -> String
         tyString = renderWithContext defaultSDocContext . ppr
 
-        lookupClosureMap :: Maybe InfoProvEnt
+        lookupClosureMap :: Maybe (IPEStats, InfoProvEnt)
         lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
-                                Just (ty, mbspan) -> Just (InfoProvEnt cl cn (tyString ty) this_mod mbspan)
+                                Just (ty, mbspan) -> Just (closureIpeStats cn, (InfoProvEnt cl cn (tyString ty) this_mod mbspan))
                                 Nothing -> Nothing
 
         lookupDataConMap = do
@@ -628,15 +655,15 @@ convertInfoProvMap defns this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTab
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique
             -- Lookup is linear but lists will be small (< 100)
-            return $ InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns))
+            return $ (closureIpeStats cn, InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns)))
 
         lookupInfoTableToSourceLocation = do
             sourceNote <- Map.lookup (cit_lbl cmit) infoTableToSourceLocationMap
-            return $ InfoProvEnt cl cn "" this_mod sourceNote
+            return $ (closureIpeStats cn, InfoProvEnt cl cn "" this_mod sourceNote)
 
         -- This catches things like prim closure types and anything else which doesn't have a
         -- source location
-        simpleFallback = cmmInfoTableToInfoProvEnt this_mod cmit
+        simpleFallback = (defaultIpeStats, cmmInfoTableToInfoProvEnt this_mod cmit)
 
   in
     if (isStackRep . cit_rep) cmit then

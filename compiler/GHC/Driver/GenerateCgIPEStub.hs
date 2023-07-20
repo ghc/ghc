@@ -17,7 +17,7 @@ import GHC.Data.Stream (Stream, liftIO)
 import qualified GHC.Data.Stream as Stream
 import GHC.Driver.Env (hsc_dflags, hsc_logger)
 import GHC.Driver.Env.Types (HscEnv)
-import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap))
+import GHC.Driver.Flags (GeneralFlag (Opt_InfoTableMap), DumpFlag(Opt_D_ipe_stats))
 import GHC.Driver.DynFlags (gopt, targetPlatform)
 import GHC.Driver.Config.StgToCmm
 import GHC.Driver.Config.Cmm
@@ -30,8 +30,11 @@ import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
 import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
-import GHC.Unit.Types (Module)
+import GHC.Unit.Types (Module, moduleName)
+import GHC.Unit.Module (moduleNameString)
 import GHC.Utils.Misc
+import qualified GHC.Utils.Logger as Logger
+import GHC.Utils.Outputable
 
 {-
 Note [Stacktraces from Info Table Provenance Entries (IPE based stack unwinding)]
@@ -193,10 +196,22 @@ generateCgIPEStub hsc_env this_mod denv s = do
 
   -- Yield Cmm for Info Table Provenance Entries (IPEs)
   let denv' = denv {provInfoTables = Map.fromList (map (\(_, i, t) -> (cit_lbl i, t)) labeledInfoTablesWithTickishes)}
-      ((ipeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOf3 labeledInfoTablesWithTickishes) denv')
+      ((mIpeStub, ipeCmmGroup), _) = runC (initStgToCmmConfig dflags this_mod) fstate cgState $ getCmm (initInfoTableProv (map sndOf3 labeledInfoTablesWithTickishes) denv')
 
   (_, ipeCmmGroupSRTs) <- liftIO $ cmmPipeline logger cmm_cfg (emptySRT this_mod) ipeCmmGroup
   Stream.yield ipeCmmGroupSRTs
+
+  ipeStub <- case mIpeStub of
+                Just (stats, stub) -> do
+                  -- Print ipe stats if requested
+                  liftIO $
+                    Logger.putDumpFileMaybe logger
+                      Opt_D_ipe_stats
+                      ("IPE Stats for module " ++ (moduleNameString $ moduleName this_mod))
+                      Logger.FormatText
+                      (ppr stats)
+                  return stub
+                Nothing -> return mempty
 
   return CmmCgInfos {cgNonCafs = nonCaffySet, cgLFInfos = moduleLFInfos, cgIPEStub = ipeStub}
   where
