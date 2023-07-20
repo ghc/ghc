@@ -53,8 +53,6 @@ import GHC.Core.TyCo.Ppr
 import GHC.Core.FamInstEnv ( isDominatedBy, injectiveBranches
                            , InjectivityCheckResult(..) )
 
-import GHC.Iface.Type    ( pprIfaceType, pprIfaceTypeApp )
-import GHC.CoreToIface   ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
 import GHC.Hs
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
@@ -64,7 +62,7 @@ import GHC.Types.Basic   ( UnboxedTupleOrSum(..), unboxedTupleOrSumExtension )
 import GHC.Types.Name
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
-import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar )
+import GHC.Types.Var     ( VarBndr(..), isInvisibleFunArg, mkTyVar, tyVarName )
 import GHC.Types.SourceFile
 import GHC.Types.SrcLoc
 import GHC.Types.TyThing ( TyThing(..) )
@@ -84,7 +82,6 @@ import Control.Monad
 import Data.Foldable
 import Data.Function
 import Data.List        ( (\\) )
-import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -1454,7 +1451,8 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   -- Abstract classes cannot have instances, except in hs-boot or signature files.
   | isAbstractClass clas
   , hs_src == HsSrcFile
-  = failWithTc (TcRnAbstractClassInst clas)
+  = fail_with_inst_err $ IllegalInstanceHead
+                       $ InstHeadAbstractClass clas
 
   -- Complain about hand-written instances of built-in classes
   -- Typeable, KnownNat, KnownSymbol, Coercible, HasField.
@@ -1466,7 +1464,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   , not (hs_src == HsigFile)
     -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
-  = failWithTc $ TcRnSpecialClassInst clas False
+  = fail_with_inst_err $ IllegalSpecialClassInstance clas False
 
   -- Handwritten instances of KnownNat/KnownChar/KnownSymbol
   -- are forbidden outside of signature files (#12837).
@@ -1474,7 +1472,7 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName, knownCharClassName ]
   , (not (hs_src == HsigFile) && hand_written_bindings) || derived_instance
     -- Note [Instances of built-in classes in signature files]
-  = failWithTc $ TcRnSpecialClassInst clas False
+  = fail_with_inst_err $ IllegalSpecialClassInstance clas False
 
   -- For the most part we don't allow
   -- instances for (~), (~~), or Coercible;
@@ -1484,12 +1482,13 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
     [ heqTyConName, eqTyConName, coercibleTyConName
     , withDictClassName, unsatisfiableClassName ]
   , not quantified_constraint
-  = failWithTc $ TcRnSpecialClassInst clas False
+  = fail_with_inst_err $ IllegalSpecialClassInstance clas False
 
   -- Check for hand-written Generic instances (disallowed in Safe Haskell)
   | clas_nm `elem` genericClassNames
   , hand_written_bindings
-  =  do { failIfTc (safeLanguageOn dflags) (TcRnSpecialClassInst clas True)
+  =  do { when (safeLanguageOn dflags) $
+           fail_with_inst_err $ IllegalSpecialClassInstance clas True
         ; when (safeInferOn dflags) (recordUnsafeInfer emptyMessages) }
 
   | clas_nm == hasFieldClassName
@@ -1504,12 +1503,19 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
 
   -- Check language restrictions on the args to the class
   | check_h98_arg_shape
-  , Just illegalType <- mb_ty_args_type
-  = failWithTc (TcRnIllegalInstanceDecl clas cls_args illegalType)
+  , Just illegal_head <- mb_ty_args_type
+  = fail_with_inst_err $ IllegalInstanceHead illegal_head
 
   | otherwise
   = pure ()
   where
+
+    fail_with_inst_err err =
+      failWithTc $ TcRnIllegalInstance
+                 $ IllegalClassInstance
+                    (TypeThing $ mkClassPred clas cls_args)
+                 $ err
+
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
 
@@ -1546,16 +1552,16 @@ check_special_inst_head dflags hs_src ctxt clas cls_args
     mb_ty_args_type
       | not (xopt LangExt.TypeSynonymInstances dflags)
       , not (all tcInstHeadTyNotSynonym ty_args)
-      = Just IllegalInstanceHeadTypeSynonym
+      = Just InstHeadTySynArgs
 
       | not (xopt LangExt.FlexibleInstances dflags)
       , not (all tcInstHeadTyAppAllTyVars ty_args)
-      = Just IllegalInstanceHeadNonTyVarArgs
+      = Just InstHeadNonTyVarArgs
 
       | length ty_args /= 1
       , not (xopt LangExt.MultiParamTypeClasses dflags)
       , not (xopt LangExt.NullaryTypeClasses dflags && null ty_args)
-      = Just IllegalMultiParamInstance
+      = Just InstHeadMultiParam
 
       | otherwise
       = Nothing
@@ -1639,7 +1645,9 @@ checkHasFieldInst cls tys@[_k_ty, lbl_ty, r_ty, _a_ty] =
          | otherwise
          -> add_err $ IllegalHasFieldInstanceTyConHasFields tc lbl_ty
   where
-    add_err err = addErrTc $ TcRnIllegalInstanceDecl cls tys
+    add_err err = addErrTc $ TcRnIllegalInstance
+                           $ IllegalClassInstance
+                               (TypeThing $ mkClassPred cls tys)
                            $ IllegalHasFieldInstance err
 
 checkHasFieldInst _ tys = pprPanic "checkHasFieldInst" (ppr tys)
@@ -1946,9 +1954,9 @@ if we find a constraint tuple.
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty = case tau of
   -- See Note [Instances and constraint synonyms]
-  TyConApp tc inst_tys -> case tyConClass_maybe tc of
-    Nothing -> failWithTc (TcRnIllegalClassInst (tyConFlavour tc))
-    Just clas -> do
+  TyConApp tc inst_tys
+    | Just clas <- tyConClass_maybe tc
+    -> do
         { setSrcSpanA head_loc $
           checkValidInstHead ctxt clas inst_tys
 
@@ -1979,15 +1987,20 @@ checkValidInstance ctxt hs_type ty = case tau of
             IsValid
               -> return ()   -- Check succeeded
             NotValid coverageInstErr
-              -> addErrTc $ TcRnIllegalInstanceDecl clas inst_tys
-                          $ IllegalInstanceFailsCoverageCondition coverageInstErr
+              -> addErrTc $ mk_err
+                          $ IllegalInstanceFailsCoverageCondition clas coverageInstErr
 
-        ; traceTc "End checkValidInstance }" empty
-
-        ; return () }
-  _ -> failWithTc (TcRnNoClassInstHead tau)
+        ; traceTc "End checkValidInstance }" empty }
+    | otherwise
+    -> failWithTc $ mk_err $ IllegalInstanceHead
+                           $ InstHeadNonClass (Just tc)
+  _ -> failWithTc $ mk_err $ IllegalInstanceHead
+                           $ InstHeadNonClass Nothing
   where
     (theta, tau) = splitInstTyForValidity ty
+
+    mk_err err = TcRnIllegalInstance
+               $ IllegalClassInstance (TypeThing tau) err
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
@@ -2222,10 +2235,11 @@ checkValidAssocTyFamDeflt fam_tc pats =
     extract_tv pat pat_vis =
       case getTyVar_maybe pat of
         Just tv -> pure tv
-        Nothing -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-          pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
-          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
-             2 (vcat [ppr_eqn, suggestion])
+        Nothing -> failWithTc $ TcRnIllegalInstance
+                              $ IllegalFamilyInstance
+                              $ InvalidAssoc $ InvalidAssocDefault
+                              $ AssocDefaultBadArgs fam_tc pats
+                              $ AssocDefaultNonTyVarArg (pat, pat_vis)
 
     -- Checks that no type variables in an associated default declaration are
     -- duplicated. If that is the case, throw an error.
@@ -2239,22 +2253,12 @@ checkValidAssocTyFamDeflt fam_tc pats =
     check_all_distinct_tvs cpt_tvs_vis =
       let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
-        (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
-               mkTcRnUnknownMessage $ mkPlainError noHints $
-               pprWithExplicitKindsWhen (isInvisibleForAllTyFlag pat_vis) $
-               hang (text "Illegal duplicate variable"
-                       <+> quotes (ppr pat_tv) <+> text "in:")
-                  2 (vcat [ppr_eqn, suggestion]))
+        (\d -> failWithTc $ TcRnIllegalInstance
+                          $ IllegalFamilyInstance
+                          $ InvalidAssoc $ InvalidAssocDefault
+                          $ AssocDefaultBadArgs fam_tc pats
+                          $ AssocDefaultDuplicateTyVars d)
         dups
-
-    ppr_eqn :: SDoc
-    ppr_eqn =
-      quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
-                <+> equals <+> text "...")
-
-    suggestion :: SDoc
-    suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
-             <+> text "must all be distinct type variables"
 
 checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
@@ -2300,15 +2304,14 @@ checkFamPatBinders fam_tc qtvs pats rhs
          -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
          -- We catch the former in kcDeclHeader, and the latter right here
          -- See Note [Check type-family instance binders]
-       ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
-                               (text "bound on the LHS of")
+       ; check_tvs (FamInstRHSOutOfScopeTyVars (Just (fam_tc, pats, dodgy_tvs)))
+                   bad_rhs_tvs
 
          -- Check for explicitly forall'd variable that is not bound on LHS
          --    data instance forall a.  T Int = MkT Int
          -- See Note [Unused explicitly bound variables in a family pattern]
          -- See Note [Check type-family instance binders]
-       ; check_tvs bad_qtvs (text "bound by a forall")
-                            (text "used in")
+       ; check_tvs FamInstLHSUnusedBoundTyVars bad_qtvs
        }
   where
     cpt_tvs     = tyCoVarsOfTypes pats
@@ -2329,20 +2332,10 @@ checkFamPatBinders fam_tc qtvs pats rhs
                   -- Used on RHS but not bound on LHS
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
-    check_tvs tvs what what2
-      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $ mkTcRnUnknownMessage $ mkPlainError noHints $
-        hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
-              <+> isOrAre tvs <+> what <> comma)
-           2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
-                   , mk_extra tvs ])
-
-    -- mk_extra: #7536: give a decent error message for
-    --         type T a = Int
-    --         type instance F (T a) = a
-    mk_extra tvs = ppWhen (any (`elemVarSet` dodgy_tvs) tvs) $
-                   hang (text "The real LHS (expanding synonyms) is:")
-                      2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
-
+    check_tvs mk_err tvs
+      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
+        TcRnIllegalInstance $ IllegalFamilyInstance $
+        mk_err (map tyVarName tvs)
 
 -- | Checks that a list of type patterns is valid in a matching (LHS)
 -- position of a class instances or type/data family instance.
@@ -2361,18 +2354,12 @@ checkValidTypePats tc pat_ty_args
        -- Ensure that no type family applications occur a type pattern
        ; case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
             [] -> pure ()
-            ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $ mkTcRnUnknownMessage $ mkPlainError noHints $
-               ty_fam_inst_illegal_err tf_is_invis_arg
-                                       (mkTyConApp tf_tc tf_args) }
+            ((tf_is_invis_arg, tf_tc, tf_args):_) ->
+              failWithTc $ TcRnIllegalInstance $
+                IllegalFamilyApplicationInInstance inst_ty
+                  tf_is_invis_arg tf_tc tf_args }
   where
     inst_ty = mkTyConApp tc pat_ty_args
-
-    ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
-    ty_fam_inst_illegal_err invis_arg ty
-      = pprWithExplicitKindsWhen invis_arg $
-        hang (text "Illegal type synonym family application"
-                <+> quotes (ppr ty) <+> text "in instance" <> colon)
-           2 (ppr inst_ty)
 
 -------------------------
 checkConsistentFamInst :: AssocInstInfo
@@ -2397,8 +2384,10 @@ checkConsistentFamInst (InClsInst { ai_class = clas
        -- Check that the associated type indeed comes from this class
        -- See [Mismatched class methods and associated type families]
        -- in TcInstDecls.
-       ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
-                 (TcRnBadAssociatedType (className clas) (tyConName fam_tc))
+       ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc) $
+          TcRnIllegalInstance $ IllegalFamilyInstance $
+            InvalidAssoc $ InvalidAssocInstance $
+            AssocNotInThisClass clas fam_tc
 
        ; check_match arg_triples
        }
@@ -2413,28 +2402,11 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                                ax_arg_tys
                   , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
-    pp_wrong_at_arg vis
-      = pprWithExplicitKindsWhen (isInvisibleForAllTyFlag vis) $
-        vcat [ text "Type indexes must match class instance head"
-             , text "Expected:" <+> pp_expected_ty
-             , text "  Actual:" <+> pp_actual_ty ]
-
     -- Fiddling around to arrange that wildcards unconditionally print as "_"
     -- We only need to print the LHS, not the RHS at all
     -- See Note [Printing conflicts with class header]
     (tidy_env1, _) = tidyVarBndrs emptyTidyEnv inst_tvs
     (tidy_env2, _) = tidyCoAxBndrsForUser tidy_env1 (ax_tvs \\ inst_tvs)
-
-    pp_expected_ty = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc) $
-                     toIfaceTcArgs fam_tc $
-                     [ case lookupVarEnv mini_env at_tv of
-                         Just cls_arg_ty -> tidyType tidy_env2 cls_arg_ty
-                         Nothing         -> mk_wildcard at_tv
-                     | at_tv <- tyConTyVars fam_tc ]
-
-    pp_actual_ty = pprIfaceTypeApp topPrec (toIfaceTyCon fam_tc) $
-                   toIfaceTcArgs fam_tc $
-                   tidyTypes tidy_env2 ax_arg_tys
 
     mk_wildcard at_tv = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
     tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOccFS (fsLit "_")) noSrcSpan
@@ -2450,7 +2422,17 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
       = go lr_subst1 rl_subst1 triples
       | otherwise
-      = addErrTc (mkTcRnUnknownMessage $ mkPlainError noHints $ pp_wrong_at_arg vis)
+      = addErrTc $ TcRnIllegalInstance $ IllegalFamilyInstance
+                 $ InvalidAssoc $ InvalidAssocInstance
+                 $ AssocTyVarsDontMatch vis fam_tc exp_tys act_tys
+
+    -- Expected/actual family argument types (for error messages)
+    exp_tys =
+      [ case lookupVarEnv mini_env at_tv of
+          Just cls_arg_ty -> tidyType tidy_env2 cls_arg_ty
+          Nothing         -> mk_wildcard at_tv
+      | at_tv <- tyConTyVars fam_tc ]
+    act_tys = tidyTypes tidy_env2 ax_arg_tys
 
     -- The /scoped/ type variables from the class-instance header
     -- should not be alpha-renamed.  Inferred ones can be.
@@ -2878,19 +2860,12 @@ checkTyConTelescope :: TyCon -> TcM ()
 checkTyConTelescope tc
   | bad_scope
   = -- See "Ill-scoped binders" in Note [Bad TyCon telescopes]
-    addErr $ mkTcRnUnknownMessage $ mkPlainError noHints $
-    vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
-              2 pp_tc_kind
-         , extra
-         , hang (text "Perhaps try this order instead:")
-              2 (pprTyVars sorted_tvs) ]
+    addErr $ TcRnBadTyConTelescope tc
 
   | otherwise
   = return ()
   where
     tcbs = tyConBinders tc
-    tvs  = binderVars tcbs
-    sorted_tvs = scopedSort tvs
 
     (_, bad_scope) = foldl add_one (emptyVarSet, False) tcbs
 
@@ -2901,34 +2876,3 @@ checkTyConTelescope tc
       where
         tv = binderVar tcb
         fkvs = tyCoVarsOfType (tyVarKind tv)
-
-    inferred_tvs  = [ binderVar tcb
-                    | tcb <- tcbs, Inferred == tyConBinderForAllTyFlag tcb ]
-    specified_tvs = [ binderVar tcb
-                    | tcb <- tcbs, Specified == tyConBinderForAllTyFlag tcb ]
-
-    pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
-    pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
-
-    pp_tc_kind = text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc)
-    ppr_untidy ty = pprIfaceType (toIfaceType ty)
-      -- We need ppr_untidy here because pprType will tidy the type, which
-      -- will turn the bogus kind we are trying to report
-      --     T :: forall (a::k) k (b::k) -> blah
-      -- into a misleadingly sanitised version
-      --     T :: forall (a::k) k1 (b::k1) -> blah
-
-    extra
-      | null inferred_tvs && null specified_tvs
-      = empty
-      | null inferred_tvs
-      = hang (text "NB: Specified variables")
-           2 (sep [pp_spec, text "always come first"])
-      | null specified_tvs
-      = hang (text "NB: Inferred variables")
-           2 (sep [pp_inf, text "always come first"])
-      | otherwise
-      = hang (text "NB: Inferred variables")
-           2 (vcat [ sep [ pp_inf, text "always come first"]
-                   , sep [text "then Specified variables", pp_spec]])
-

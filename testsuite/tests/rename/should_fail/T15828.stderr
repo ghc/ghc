@@ -1,5 +1,5 @@
 
-T15828.hs:9:3: error:
+T15828.hs:9:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: T (Maybe a) _
         Actual: T (Maybe a1) b

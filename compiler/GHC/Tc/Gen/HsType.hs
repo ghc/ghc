@@ -644,7 +644,11 @@ tcHsDeriv hs_ty
             case tyConClass_maybe tyCon of
               Just clas ->
                 return (tvs, clas, tyConArgs, map scaledThing kind_args)
-              Nothing -> failWithTc $ TcRnIllegalClassInst (tyConFlavour tyCon)
+              Nothing -> failWithTc $ TcRnIllegalInstance
+                                    $ IllegalClassInstance
+                                        (TypeThing ty)
+                                    $ IllegalInstanceHead
+                                    $ InstHeadNonClass (Just tyCon)
           Nothing -> failWithTc $ TcRnIllegalDerivingItem hs_ty
     }
 

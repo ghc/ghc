@@ -594,11 +594,15 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
-       ; tcFamInstDeclChecks mb_clsinfo fam_tc
+       ; tcFamInstDeclChecks mb_clsinfo IAmType fam_tc
 
          -- (0) Check it's an open type family
-       ; checkTc (isTypeFamilyTyCon fam_tc)     (TcRnFamilyCategoryMismatch fam_tc)
-       ; checkTc (isOpenTypeFamilyTyCon fam_tc) (TcRnNotOpenFamily fam_tc)
+       ; checkTc (isTypeFamilyTyCon fam_tc) $
+           TcRnIllegalInstance $ IllegalFamilyInstance $
+             FamilyCategoryMismatch fam_tc
+       ; checkTc (isOpenTypeFamilyTyCon fam_tc) $
+           TcRnIllegalInstance $ IllegalFamilyInstance $
+             NotAnOpenFamilyTyCon fam_tc
 
          -- (1) do the work of verifying the synonym group
          -- For some reason we don't have a location for the equation
@@ -617,9 +621,9 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
 
 
 ---------------------
-tcFamInstDeclChecks :: AssocInstInfo -> TyCon -> TcM ()
+tcFamInstDeclChecks :: AssocInstInfo -> TypeOrData -> TyCon -> TcM ()
 -- Used for both type and data families
-tcFamInstDeclChecks mb_clsinfo fam_tc
+tcFamInstDeclChecks mb_clsinfo ty_or_data fam_tc
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc)
@@ -632,13 +636,17 @@ tcFamInstDeclChecks mb_clsinfo fam_tc
            HsSrcFile               ->
              return ()
 
-       -- Check that it is a family TyCon, and that
-       -- oplevel type instances are not for associated types.
-       ; checkTc (isFamilyTyCon fam_tc) (TcRnIllegalFamilyInstance fam_tc)
+       -- Check that it is a family TyCon
+       ; checkTc (isFamilyTyCon fam_tc) $
+          TcRnIllegalInstance $ IllegalFamilyInstance $
+            NotAFamilyTyCon ty_or_data fam_tc
 
+       -- Check that top-level type instances are not for associated types.
        ; when (isNotAssociated mb_clsinfo &&   -- Not in a class decl
-               isTyConAssoc fam_tc)            -- but an associated type
-              (addErr $ TcRnMissingClassAssoc fam_tc)
+               isTyConAssoc fam_tc) $          -- but an associated type
+          addErr $ TcRnIllegalInstance $ IllegalFamilyInstance
+                 $ InvalidAssoc $ InvalidAssocInstance
+                 $ AssocInstanceNotInAClass fam_tc
        }
 
 {- Note [Associated type instances]
@@ -693,10 +701,12 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
 
-       ; tcFamInstDeclChecks mb_clsinfo fam_tc
+       ; tcFamInstDeclChecks mb_clsinfo IAmData fam_tc
 
        -- Check that the family declaration is for the right kind
-       ; checkTc (isDataFamilyTyCon fam_tc) (TcRnFamilyCategoryMismatch fam_tc)
+       ; checkTc (isDataFamilyTyCon fam_tc) $
+          TcRnIllegalInstance $ IllegalFamilyInstance $
+            FamilyCategoryMismatch fam_tc
        ; gadt_syntax <- dataDeclChecks fam_name hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv

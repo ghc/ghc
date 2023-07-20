@@ -238,6 +238,12 @@ instance Outputable GhcHint where
       -> text "Enable Safe Haskell through either Safe, Trustworthy or Unsafe."
     SuggestRemoveRecordWildcard
       -> text "Omit the" <+> quotes (text "..")
+    SuggestIncreaseReductionDepth ->
+      vcat
+        [ text "Use -freduction-depth=0 to disable this check"
+        , text "(any upper bound you could choose might fail unpredictably with"
+        , text " minor updates to GHC, so disabling the check is recommended if"
+        , text " you're sure that type checking should terminate)" ]
     SuggestMoveNonCanonicalDefinition lhs rhs refURL ->
       text "Move definition from" <+>
       quotes (pprPrefixUnqual rhs) <+>

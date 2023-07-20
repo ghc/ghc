@@ -1,8 +1,8 @@
 
 T18021.hs:12:3: error: [GHC-53634]
-    The RHS of an associated type declaration mentions out-of-scope variable ‘a’
-      All such variables must be bound on the LHS
+    Out of scope type variable ‘a’ in the RHS of a family instance.
+      All such variables must be bound on the LHS.
 
 T18021.hs:17:3: error: [GHC-53634]
-    The RHS of an associated type declaration mentions out-of-scope variable ‘a’
-      All such variables must be bound on the LHS
+    Out of scope type variable ‘a’ in the RHS of a family instance.
+      All such variables must be bound on the LHS.

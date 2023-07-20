@@ -1,11 +1,7 @@
 
-T17458.hs:32:32: error:
+T17458.hs:32:32: error: [GHC-40404]
     • Reduction stack overflow; size = 201
       When simplifying the following type: Typeable Void
-      Use -freduction-depth=0 to disable this check
-      (any upper bound you could choose might fail unpredictably with
-       minor updates to GHC, so disabling the check is recommended if
-       you're sure that type checking should terminate)
     • In the expression: eqT
       In the expression:
         case eqT of
@@ -16,3 +12,8 @@ T17458.hs:32:32: error:
             = case eqT of
                 Nothing -> False
                 Just (Refl :: a :~: Void) -> True
+    Suggested fix:
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)

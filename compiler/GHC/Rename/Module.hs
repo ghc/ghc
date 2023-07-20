@@ -39,6 +39,7 @@ import GHC.Rename.Names
 import GHC.Tc.Errors.Types
 import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Types.Origin ( TypedThing(..) )
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
 import GHC.Unit
@@ -574,10 +575,13 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              -- class type constructor...
              eith_cls = case hsTyGetAppHead_maybe head_ty' of
                Just (L _ cls) -> Right cls
-               Nothing        -> Left
-                 ( getLocA head_ty'
-                 , TcRnIllegalInstanceHeadDecl head_ty'
-                 )
+               Nothing        ->
+                  Left
+                   ( getLocA head_ty'
+                   , TcRnIllegalInstance $
+                       IllegalClassInstance (HsTypeRnThing $ unLoc head_ty') $
+                       IllegalInstanceHead $ InstHeadNonClass Nothing
+                   )
          -- ...finally, attempt to retrieve the class type constructor, failing
          -- with an error message if there isn't one. To avoid excessive
          -- amounts of error messages, we will only report one of the errors
@@ -721,7 +725,9 @@ rnFamEqn doc atfi
                && not (cls_tkv `elemNameSet` pat_fvs)
                     -- ...but not bound on the LHS.
              bad_tvs = filter improperly_scoped inst_head_tvs
-       ; unless (null bad_tvs) (addErr (TcRnBadAssocRhs bad_tvs))
+       ; unless (null bad_tvs) $ addErr $
+           TcRnIllegalInstance $ IllegalFamilyInstance $
+             FamInstRHSOutOfScopeTyVars Nothing bad_tvs
 
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
              -- See Note [Type family equations and occurrences]

@@ -1,5 +1,5 @@
 
-SimpleFail2a.hs:11:3: error:
+SimpleFail2a.hs:11:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: Sd Int
         Actual: Sd a

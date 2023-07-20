@@ -1,5 +1,5 @@
 
-T9160.hs:19:3: error:
+T9160.hs:19:3: error: [GHC-95424]
     • Type indexes must match class instance head
       Expected: F @(*)
         Actual: F @(* -> *)
