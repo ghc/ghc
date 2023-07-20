@@ -37,7 +37,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -102,7 +102,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -163,7 +163,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -224,7 +224,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -290,7 +290,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -352,7 +352,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -414,7 +414,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -476,7 +476,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -545,7 +545,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -609,7 +609,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -674,7 +674,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -739,7 +739,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -804,7 +804,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -868,7 +868,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -932,7 +932,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -996,7 +996,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1059,7 +1059,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1121,7 +1121,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1183,7 +1183,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1246,7 +1246,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1308,7 +1308,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1370,7 +1370,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1432,7 +1432,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1494,7 +1494,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1518,6 +1518,68 @@
       "RUNTEST_ARGS": "",
       "TEST_ENV": "x86_64-linux-deb10-validate+thread_sanitizer",
       "TSAN_OPTIONS": "suppressions=$CI_PROJECT_DIR/rts/.tsan-suppressions",
+      "XZ_OPT": "-9"
+    }
+  },
+  "nightly-x86_64-linux-deb10-zstd-validate": {
+    "after_script": [
+      ".gitlab/ci.sh save_cache",
+      ".gitlab/ci.sh save_test_output",
+      ".gitlab/ci.sh clean",
+      "cat ci_timings"
+    ],
+    "allow_failure": false,
+    "artifacts": {
+      "expire_in": "8 weeks",
+      "paths": [
+        "ghc-x86_64-linux-deb10-zstd-validate.tar.xz",
+        "junit.xml",
+        "unexpected-test-output.tar.gz"
+      ],
+      "reports": {
+        "junit": "junit.xml"
+      },
+      "when": "always"
+    },
+    "cache": {
+      "key": "x86_64-linux-deb10-$CACHE_REV",
+      "paths": [
+        "cabal-cache",
+        "toolchain"
+      ]
+    },
+    "dependencies": [],
+    "image": "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV",
+    "needs": [
+      {
+        "artifacts": false,
+        "job": "hadrian-ghc-in-ghci"
+      }
+    ],
+    "rules": [
+      {
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
+        "when": "on_success"
+      }
+    ],
+    "script": [
+      "sudo chown ghc:ghc -R .",
+      ".gitlab/ci.sh setup",
+      ".gitlab/ci.sh configure",
+      ".gitlab/ci.sh build_hadrian",
+      ".gitlab/ci.sh test_hadrian"
+    ],
+    "stage": "full-build",
+    "tags": [
+      "x86_64-linux"
+    ],
+    "variables": {
+      "BIGNUM_BACKEND": "gmp",
+      "BIN_DIST_NAME": "ghc-x86_64-linux-deb10-zstd-validate",
+      "BUILD_FLAVOUR": "validate",
+      "CONFIGURE_ARGS": "--enable-ipe-data-compression",
+      "RUNTEST_ARGS": "",
+      "TEST_ENV": "x86_64-linux-deb10-zstd-validate",
       "XZ_OPT": "-9"
     }
   },
@@ -1558,7 +1620,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1622,7 +1684,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1687,7 +1749,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1749,7 +1811,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1811,7 +1873,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1873,7 +1935,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -1937,7 +1999,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2002,7 +2064,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2066,7 +2128,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2129,7 +2191,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2191,7 +2253,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2249,7 +2311,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2311,7 +2373,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY)",
         "when": "on_success"
       }
     ],
@@ -2377,7 +2439,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2444,7 +2506,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2508,7 +2570,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2572,7 +2634,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2642,7 +2704,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2708,7 +2770,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2774,7 +2836,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2840,7 +2902,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2904,7 +2966,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -2968,7 +3030,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3032,7 +3094,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3096,7 +3158,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3160,7 +3222,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3224,7 +3286,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3290,7 +3352,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3356,7 +3418,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3422,7 +3484,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3486,7 +3548,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3550,7 +3612,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3610,7 +3672,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3673,7 +3735,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB == \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3740,7 +3802,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3808,7 +3870,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3871,7 +3933,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3935,7 +3997,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -3999,7 +4061,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
@@ -4063,7 +4125,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
@@ -4126,7 +4188,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4188,7 +4250,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
@@ -4249,7 +4311,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4311,7 +4373,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4372,7 +4434,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4433,7 +4495,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && ($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4495,7 +4557,7 @@
     "rules": [
       {
         "allow_failure": true,
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "manual"
       }
     ],
@@ -4558,7 +4620,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/) && (\"true\" == \"true\")",
+        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4619,7 +4681,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4682,7 +4744,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "((($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/))) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4746,7 +4808,7 @@
     ],
     "rules": [
       {
-        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && ($CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/) && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(($CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/)) && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4807,7 +4869,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
@@ -4866,7 +4928,7 @@
     ],
     "rules": [
       {
-        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null) && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\") && (\"true\" == \"true\")",
+        "if": "(\"true\" == \"true\") && ($RELEASE_JOB != \"yes\") && ($NIGHTLY == null)",
         "when": "on_success"
       }
     ],
