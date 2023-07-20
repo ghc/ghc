@@ -274,24 +274,23 @@ sizeof_ccs_words platform
   where
    (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
--- | Emit info-table provenance declarations
-initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> FCode CStub
+-- | Emit info-table provenance declarations and track IPE stats
+initInfoTableProv ::  [CmmInfoTable] -> InfoTableProvMap -> FCode (Maybe (IPEStats, CStub))
 initInfoTableProv infos itmap
   = do
        cfg <- getStgToCmmConfig
-       let ents       = convertInfoProvMap infos this_mod itmap
-           info_table = stgToCmmInfoTableMap cfg
-           platform   = stgToCmmPlatform     cfg
-           this_mod   = stgToCmmThisModule   cfg
-
+       let (stats, ents) = convertInfoProvMap infos this_mod itmap
+           info_table    = stgToCmmInfoTableMap cfg
+           platform      = stgToCmmPlatform     cfg
+           this_mod      = stgToCmmThisModule   cfg
        case ents of
-         [] -> return mempty
+         [] -> return Nothing
          _  -> do
            -- Emit IPE buffer
            emitIpeBufferListNode this_mod ents
 
            -- Create the C stub which initialises the IPE map
-           return (ipInitCode info_table platform this_mod)
+           return (Just (stats, ipInitCode info_table platform this_mod))
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
