@@ -229,16 +229,15 @@ data CmmInfoTable
         -- place to convey this information from the code generator to
         -- where we build the static closures in
         -- GHC.Cmm.Info.Build.doSRTs.
-    } deriving Eq
+    } deriving (Eq, Ord)
 
 instance OutputableP Platform CmmInfoTable where
     pdoc = pprInfoTable
 
-
 data ProfilingInfo
   = NoProfilingInfo
   | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
-  deriving Eq
+  deriving (Eq, Ord)
 -----------------------------------------------------------------------------
 --              Static Data
 -----------------------------------------------------------------------------

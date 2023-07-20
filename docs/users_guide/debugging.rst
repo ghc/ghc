@@ -83,7 +83,8 @@ Dumping out compiler intermediate structures
 
     For each module, show some simple statistics about which info tables have
     IPE information, and how many info tables with IPE information each closure
-    type has.
+    type has. This is useful, for example, for verifying that ``STACK`` info
+    tables are being appropriately omitted or included from the info table map.
 
 .. ghc-flag:: -dfaststring-stats
     :shortdesc: Show statistics for fast string usage when finished

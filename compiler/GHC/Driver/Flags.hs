@@ -224,6 +224,8 @@ data GeneralFlag
 
    | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
+   | Opt_InfoTableMapWithFallback
+   | Opt_InfoTableMapWithStack
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
@@ -578,6 +580,8 @@ codeGenFlags = EnumSet.fromList
      -- Flags that affect debugging information
    , Opt_DistinctConstructorTables
    , Opt_InfoTableMap
+   , Opt_InfoTableMapWithStack
+   , Opt_InfoTableMapWithFallback
    ]
 
 data WarningFlag =
