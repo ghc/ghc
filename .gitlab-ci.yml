@@ -511,7 +511,7 @@ doc-tarball:
       optional: true
     - job: nightly-x86_64-windows-validate
       optional: true
-    - job: release-x86_64-windows-release+no_split_sections
+    - job: release-x86_64-windows-release
       optional: true
 
   tags:
@@ -535,7 +535,7 @@ doc-tarball:
         || mv "ghc-x86_64-linux-deb10-release.tar.xz" "$LINUX_BINDIST" \
         || true
       mv "ghc-x86_64-windows-validate.tar.xz" "$WINDOWS_BINDIST" \
-        || mv "ghc-x86_64-windows-release+no_split_sections.tar.xz" "$WINDOWS_BINDIST" \
+        || mv "ghc-x86_64-windows-release.tar.xz" "$WINDOWS_BINDIST" \
         || true
       if [ ! -f "$LINUX_BINDIST" ]; then
         echo "Error: $LINUX_BINDIST does not exist. Did the Debian 9 job fail?"
