@@ -921,8 +921,8 @@ job_groups =
      -- This job is only for generating head.hackage docs
      , hackage_doc_job (disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) releaseConfig))
      , disableValidate (standardBuildsWithConfig Amd64 (Linux Fedora33) dwarf)
-     , fastCI (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken vanilla))
-     , disableValidate (standardBuildsWithConfig Amd64 Windows (splitSectionsBroken nativeInt))
+     , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
+     , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
      , allowFailureGroup (addValidateRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
      , fastCI (standardBuilds AArch64 Darwin)
