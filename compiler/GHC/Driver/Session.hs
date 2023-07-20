@@ -2883,10 +2883,6 @@ dynamic_flags_deps = [
         -- Caller-CC
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
-  , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
-      (NoArg (setGeneralFlag Opt_DistinctConstructorTables))
-  , make_ord_flag defGhcFlag "finfo-table-map"
-      (NoArg (setGeneralFlag Opt_InfoTableMap))
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))
@@ -3515,7 +3511,11 @@ fFlagsDeps = [
         return dflags)),
   flagSpec "show-error-context"               Opt_ShowErrorContext,
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
-  flagSpec "split-sections"                   Opt_SplitSections
+  flagSpec "split-sections"                   Opt_SplitSections,
+  flagSpec "distinct-constructor-tables"      Opt_DistinctConstructorTables,
+  flagSpec "info-table-map"                   Opt_InfoTableMap,
+  flagSpec "info-table-map-with-stack"        Opt_InfoTableMapWithStack,
+  flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback
   ]
   ++ fHoleFlags
 
@@ -3885,6 +3885,8 @@ impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
                 ,(Opt_WriteIfSimplifiedCore, turnOn, Opt_WriteInterface)
                 ,(Opt_ByteCodeAndObjectCode, turnOn, Opt_WriteIfSimplifiedCore)
+                ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithStack)
+                ,(Opt_InfoTableMap, turnOn, Opt_InfoTableMapWithFallback)
                 ] ++ validHoleFitsImpliedGFlags
 
 -- General flags that are switched on/off when other general flags are switched

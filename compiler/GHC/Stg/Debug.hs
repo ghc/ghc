@@ -210,7 +210,7 @@ is collected in the `InfoTableProvMap` which provides a mapping from:
 1. Data constructors to a list of where they are used.
 2. `Name`s and where they originate from.
 3. Stack represented info tables (return frames) to an approximated source location
-   of the call that pushed a contiunation on the stacks.
+   of the call that pushed a continuation on the stacks.
 
 During the CoreToStg phase, this map is populated whenever something is turned into
 a StgRhsClosure or an StgConApp. The current source position is recorded
@@ -253,7 +253,7 @@ Note [Distinct Info Tables for Constructors]
 
 In the old times, each usage of a data constructor used the same info table.
 This made it impossible to distinguish which actual usage of a data constructor was
-contributing primarily to the allocation in a program. Using the `-fdistinct-info-tables` flag you
+contributing primarily to the allocation in a program. Using the `-fdistinct-constructor-tables` flag you
 can cause code generation to generate a distinct info table for each usage of
 a constructor. Then, when inspecting the heap you can see precisely which usage of a constructor
 was responsible for each allocation.
