@@ -3217,7 +3217,7 @@
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-int_native-release+no_split_sections": {
+  "release-x86_64-windows-int_native-release": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh clean"
@@ -3226,7 +3226,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-int_native-release+no_split_sections.tar.xz",
+        "ghc-x86_64-windows-int_native-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -3264,8 +3264,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "native",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-release+no_split_sections",
-      "BUILD_FLAVOUR": "release+no_split_sections",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-int_native-release",
+      "BUILD_FLAVOUR": "release",
       "CABAL_INSTALL_VERSION": "3.8.1.0",
       "CONFIGURE_ARGS": "",
       "GHC_VERSION": "9.4.3",
@@ -3273,11 +3273,11 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "TEST_ENV": "x86_64-windows-int_native-release+no_split_sections",
+      "TEST_ENV": "x86_64-windows-int_native-release",
       "XZ_OPT": "-9"
     }
   },
-  "release-x86_64-windows-release+no_split_sections": {
+  "release-x86_64-windows-release": {
     "after_script": [
       "bash .gitlab/ci.sh save_cache",
       "bash .gitlab/ci.sh clean"
@@ -3286,7 +3286,7 @@
     "artifacts": {
       "expire_in": "1 year",
       "paths": [
-        "ghc-x86_64-windows-release+no_split_sections.tar.xz",
+        "ghc-x86_64-windows-release.tar.xz",
         "junit.xml"
       ],
       "reports": {
@@ -3324,8 +3324,8 @@
     ],
     "variables": {
       "BIGNUM_BACKEND": "gmp",
-      "BIN_DIST_NAME": "ghc-x86_64-windows-release+no_split_sections",
-      "BUILD_FLAVOUR": "release+no_split_sections",
+      "BIN_DIST_NAME": "ghc-x86_64-windows-release",
+      "BUILD_FLAVOUR": "release",
       "CABAL_INSTALL_VERSION": "3.8.1.0",
       "CONFIGURE_ARGS": "",
       "GHC_VERSION": "9.4.3",
@@ -3333,7 +3333,7 @@
       "IGNORE_PERF_FAILURES": "all",
       "LANG": "en_US.UTF-8",
       "MSYSTEM": "MINGW64",
-      "TEST_ENV": "x86_64-windows-release+no_split_sections",
+      "TEST_ENV": "x86_64-windows-release",
       "XZ_OPT": "-9"
     }
   },
