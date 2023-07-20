@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.20.0.0 *TBA*
+  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+
 ## 4.19.0.0 *TBA*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.
@@ -34,7 +37,6 @@
   * Change codebuffers to use an unboxed implementation, while providing a compatibility layer using pattern synonyms. ([CLC proposal #134](https://github.com/haskell/core-libraries-committee/issues/134))
   * Add nominal role annotations to SNat/SSymbol/SChar ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
   * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
-  * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
