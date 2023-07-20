@@ -77,6 +77,14 @@ Dumping out compiler intermediate structures
     ``!!!`` mark the end of a pass and are accompanied by allocation and
     runtime statistics.
 
+.. ghc-flag:: -dipe-stats
+    :shortdesc: Show statistics about IPE information
+    :type: dynamic
+
+    For each module, show some simple statistics about which info tables have
+    IPE information, and how many info tables with IPE information each closure
+    type has.
+
 .. ghc-flag:: -dfaststring-stats
     :shortdesc: Show statistics for fast string usage when finished
     :type: dynamic
@@ -1202,7 +1210,7 @@ Other
     if things go wrong. Which would otherwise be quite difficult.
 
 .. ghc-flag:: -funoptimized-core-for-interpreter
-    :shortdesc: Disable optimizations with the interpreter 
+    :shortdesc: Disable optimizations with the interpreter
     :reverse: -fno-unoptimized-core-for-interpreter
     :type: dynamic
 
