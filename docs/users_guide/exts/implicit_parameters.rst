@@ -181,7 +181,7 @@ Adding a type signature dramatically changes the result! This is a
 rather counter-intuitive phenomenon, worth watching out for.
 
 Implicit parameters scoping guarantees
--------------------------------------
+--------------------------------------
 
 GHC always takes the most nested implicit parameter binding from the
 context to find the value. Consider the following code::

@@ -51,8 +51,9 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmSCCProfiling   :: !Bool              -- ^ Check if cost-centre profiling is enabled
   , stgToCmmEagerBlackHole :: !Bool              -- ^
   , stgToCmmOrigThunkInfo  :: !Bool              -- ^ Push @stg_orig_thunk_info@ frames during thunk update.
-  , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See note [Mapping
-                                                 -- Info Tables to Source Positions]
+  , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See Note [Mapping Info Tables to Source Positions]
+  , stgToCmmInfoTableMapWithFallback :: !Bool    -- ^ Include info tables with fallback source locations in the info table map
+  , stgToCmmInfoTableMapWithStack :: !Bool       -- ^ Include info tables for STACK closures in the info table map
   , stgToCmmOmitYields     :: !Bool              -- ^ true means omit heap checks when no allocation is performed
   , stgToCmmOmitIfPragmas  :: !Bool              -- ^ true means don't generate interface programs (implied by -O0)
   , stgToCmmPIC            :: !Bool              -- ^ true if @-fPIC@

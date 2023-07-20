@@ -36,6 +36,18 @@ Compiler
   definition sites, so it is useful in cases when the library does intend for incomplete record selectors to be
   used but only in specific circumstances (e.g. when other cases are handled by previous pattern matches).
 
+- The :ghc-flag:`-finfo-table-map-with-stack` and
+  :ghc-flag:`-finfo-table-map-with-fallback` flags have been introduced. These
+  flags include ``STACK`` info tables and info tables with default source
+  location information in the info table map, respectively. They are implied by
+  the :ghc-flag:`-finfo-table-map` flag. The corresponding negative flags
+  (:ghc-flag:`-fno-info-table-map-with-stack`,
+  :ghc-flag:`-fno-info-table-map-with-fallback`) are useful for omitting these
+  info tables from the info table map and reducing the size of executables
+  containing info table profiling information. In a test on the `Agda codebase
+  <https://github.com/agda/agda>`_, the size of the build results was reduced by
+  about 10% when these info tables were omitted.
+
 GHCi
 ~~~~
 
