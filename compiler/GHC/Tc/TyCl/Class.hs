@@ -601,6 +601,8 @@ warnMissingAT name
        -- hs-boot and signatures never need to provide complete "definitions"
        -- of any sort, as they aren't really defining anything, but just
        -- constraining items which are defined elsewhere.
-       ; let dia = TcRnNoExplicitAssocTypeOrDefaultDeclaration name
-       ; diagnosticTc  (warn && hsc_src == HsSrcFile) dia
+       ; let diag = TcRnIllegalInstance $ IllegalFamilyInstance
+                  $ InvalidAssoc $ InvalidAssocInstance
+                  $ AssocInstanceMissing name
+       ; diagnosticTc  (warn && hsc_src == HsSrcFile) diag
                        }

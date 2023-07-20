@@ -329,6 +329,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "RepresentationalEq"                            = 10283
 
   -- Typechecker/renamer diagnostic codes
+  GhcDiagnosticCode "TcRnSolverDepthError"                          = 40404
   GhcDiagnosticCode "TcRnRedundantConstraints"                      = 30606
   GhcDiagnosticCode "TcRnInaccessibleCode"                          = 40564
   GhcDiagnosticCode "TcRnInaccessibleCoAxBranch"                    = 28129
@@ -371,8 +372,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPolymorphicBinderMissingSig"               = 64414
   GhcDiagnosticCode "TcRnOverloadedSig"                             = 16675
   GhcDiagnosticCode "TcRnTupleConstraintInst"                       = 69012
-  GhcDiagnosticCode "TcRnAbstractClassInst"                         = 51758
-  GhcDiagnosticCode "TcRnNoClassInstHead"                           = 56538
   GhcDiagnosticCode "TcRnUserTypeError"                             = 47403
   GhcDiagnosticCode "TcRnConstraintInKind"                          = 01259
   GhcDiagnosticCode "TcRnUnboxedTupleOrSumTypeFuncArg"              = 19590
@@ -384,9 +383,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnNonTypeVarArgInConstraint"                 = 80003
   GhcDiagnosticCode "TcRnIllegalImplicitParam"                      = 75863
   GhcDiagnosticCode "TcRnIllegalConstraintSynonymOfKind"            = 75844
-  GhcDiagnosticCode "TcRnIllegalClassInst"                          = 53946
   GhcDiagnosticCode "TcRnOversaturatedVisibleKindArg"               = 45474
-  GhcDiagnosticCode "TcRnBadAssociatedType"                         = 38351
   GhcDiagnosticCode "TcRnForAllRankErr"                             = 91510
   GhcDiagnosticCode "TcRnMonomorphicBindings"                       = 55524
   GhcDiagnosticCode "TcRnOrphanInstance"                            = 90177
@@ -422,7 +419,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPartialTypeSignatures"                     = 60661
   GhcDiagnosticCode "TcRnLazyGADTPattern"                           = 87005
   GhcDiagnosticCode "TcRnArrowProcGADTPattern"                      = 64525
-  GhcDiagnosticCode "TcRnSpecialClassInst"                          = 97044
   GhcDiagnosticCode "TcRnForallIdentifier"                          = 64088
   GhcDiagnosticCode "TcRnTypeEqualityOutOfScope"                    = 12003
   GhcDiagnosticCode "TcRnTypeEqualityRequiresOperators"             = 58520
@@ -491,15 +487,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnDefaultMethodForPragmaLacksBinding"        = 28587
   GhcDiagnosticCode "TcRnIgnoreSpecialisePragmaOnDefMethod"         = 72520
   GhcDiagnosticCode "TcRnBadMethodErr"                              = 46284
-  GhcDiagnosticCode "TcRnNoExplicitAssocTypeOrDefaultDeclaration"   = 08585
   GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
   GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
   GhcDiagnosticCode "TcRnUnsatisfiedMinimalDef"                     = 06201
   GhcDiagnosticCode "TcRnMisplacedInstSig"                          = 06202
-  GhcDiagnosticCode "TcRnIllegalFamilyInstance"                     = 06204
-  GhcDiagnosticCode "TcRnMissingClassAssoc"                         = 06205
-  GhcDiagnosticCode "TcRnNotOpenFamily"                             = 06207
   GhcDiagnosticCode "TcRnCapturedTermName"                          = 54201
   GhcDiagnosticCode "TcRnBindingOfExistingName"                     = 58805
   GhcDiagnosticCode "TcRnMultipleFixityDecls"                       = 50419
@@ -513,12 +505,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedDefaultSig"                      = 40700
   GhcDiagnosticCode "TcRnDuplicateMinimalSig"                       = 85346
   GhcDiagnosticCode "TcRnLoopySuperclassSolve"                      = 36038
-  GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = 12222
   GhcDiagnosticCode "TcRnUnexpectedStandaloneDerivingDecl"          = 95159
   GhcDiagnosticCode "TcRnUnusedVariableInRuleDecl"                  = 65669
   GhcDiagnosticCode "TcRnUnexpectedStandaloneKindSig"               = 45906
   GhcDiagnosticCode "TcRnIllegalRuleLhs"                            = 63294
-  GhcDiagnosticCode "TcRnBadAssocRhs"                               = 53634
   GhcDiagnosticCode "TcRnDuplicateRoleAnnot"                        = 97170
   GhcDiagnosticCode "TcRnDuplicateKindSig"                          = 43371
   GhcDiagnosticCode "TcRnIllegalDerivStrategy"                      = 87139
@@ -537,7 +527,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPatSynEscapedCoercion"                     = 88986
   GhcDiagnosticCode "TcRnPatSynExistentialInResult"                 = 33973
   GhcDiagnosticCode "TcRnPatSynArityMismatch"                       = 18365
-  GhcDiagnosticCode "TcRnMultiAssocTyFamDefaults"                   = 59128
   GhcDiagnosticCode "TcRnTyFamDepsDisabled"                         = 43991
   GhcDiagnosticCode "TcRnAbstractClosedTyFamDecl"                   = 60012
   GhcDiagnosticCode "TcRnPartialFieldSelector"                      = 82712
@@ -546,7 +535,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnTyFamResultDisabled"                       = 44012
   GhcDiagnosticCode "TcRnCommonFieldResultTypeMismatch"             = 31004
   GhcDiagnosticCode "TcRnCommonFieldTypeMismatch"                   = 91827
-  GhcDiagnosticCode "TcRnAssocNoClassTyVar"                         = 55912
   GhcDiagnosticCode "TcRnDataConParentTypeMismatch"                 = 45219
   GhcDiagnosticCode "TcRnGADTsDisabled"                             = 23894
   GhcDiagnosticCode "TcRnExistentialQuantificationDisabled"         = 25709
@@ -554,14 +542,11 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnMultipleConForNewtype"                     = 16409
   GhcDiagnosticCode "TcRnKindSignaturesDisabled"                    = 49378
   GhcDiagnosticCode "TcRnEmptyDataDeclsDisabled"                    = 32478
-  GhcDiagnosticCode "TcRnFamilyCategoryMismatch"                    = 52347
-  GhcDiagnosticCode "TcRnFamilyArityMismatch"                       = 12985
   GhcDiagnosticCode "TcRnRoleMismatch"                              = 29178
   GhcDiagnosticCode "TcRnRoleCountMismatch"                         = 54298
   GhcDiagnosticCode "TcRnIllegalRoleAnnotation"                     = 77192
   GhcDiagnosticCode "TcRnRoleAnnotationsDisabled"                   = 17779
   GhcDiagnosticCode "TcRnIncoherentRoles"                           = 18273
-  GhcDiagnosticCode "TcRnTyFamNameMismatch"                         = 88221
   GhcDiagnosticCode "TcRnTypeSynonymCycle"                          = 97522
   GhcDiagnosticCode "TcRnSelfImport"                                = 43281
   GhcDiagnosticCode "TcRnNoExplicitImportList"                      = 16029
@@ -593,6 +578,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnSimplifiableConstraint"                    = 62412
   GhcDiagnosticCode "TcRnIllegalQuasiQuotes"                        = 77343
   GhcDiagnosticCode "TcRnImplicitRhsQuantification"                 = 16382
+  GhcDiagnosticCode "TcRnBadTyConTelescope"                         = 87279
   GhcDiagnosticCode "TcRnPatersonCondFailure"                       = 22979
 
   -- TcRnTypeApplicationsDisabled
@@ -693,17 +679,49 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "UnusedImportNone"                              = 66111
   GhcDiagnosticCode "UnusedImportSome"                              = 38856
 
-  -- TcRnIllegalInstanceDecl
-  GhcDiagnosticCode "IllegalInstanceHeadTypeSynonym"                = 93557
-  GhcDiagnosticCode "IllegalInstanceHeadNonTyVarArgs"               = 48406
-  GhcDiagnosticCode "IllegalMultiParamInstance"                     = 91901
+  -- TcRnIllegalInstance
+  GhcDiagnosticCode "IllegalFamilyApplicationInInstance"            = 73138
+
+  -- TcRnIllegalClassInstance/IllegalClassInstanceReason
+  GhcDiagnosticCode "IllegalSpecialClassInstance"                   = 97044
   GhcDiagnosticCode "IllegalInstanceFailsCoverageCondition"         = 21572
 
-  -- TcRnIllegalHasFieldInstance
+    -- IllegalInstanceHead
+  GhcDiagnosticCode "InstHeadAbstractClass"                         = 51758
+  GhcDiagnosticCode "InstHeadNonClass"                              = 53946
+  GhcDiagnosticCode "InstHeadTySynArgs"                             = 93557
+  GhcDiagnosticCode "InstHeadNonTyVarArgs"                          = 48406
+  GhcDiagnosticCode "InstHeadMultiParam"                            = 91901
+
+    -- IllegalHasFieldInstance
   GhcDiagnosticCode "IllegalHasFieldInstanceNotATyCon"              = 88994
   GhcDiagnosticCode "IllegalHasFieldInstanceFamilyTyCon"            = 70743
   GhcDiagnosticCode "IllegalHasFieldInstanceTyConHasFields"         = 43406
   GhcDiagnosticCode "IllegalHasFieldInstanceTyConHasField"          = 30836
+
+  -- TcRnIllegalFamilyInstance/IllegalFamilyInstanceReason
+  GhcDiagnosticCode "NotAFamilyTyCon"                               = 06204
+  GhcDiagnosticCode "NotAnOpenFamilyTyCon"                          = 06207
+  GhcDiagnosticCode "FamilyCategoryMismatch"                        = 52347
+  GhcDiagnosticCode "FamilyArityMismatch"                           = 12985
+  GhcDiagnosticCode "TyFamNameMismatch"                             = 88221
+  GhcDiagnosticCode "FamInstRHSOutOfScopeTyVars"                    = 53634
+  GhcDiagnosticCode "FamInstLHSUnusedBoundTyVars"                   = 30337
+
+    -- InvalidAssocInstance
+  GhcDiagnosticCode "AssocInstanceMissing"                          = 08585
+  GhcDiagnosticCode "AssocInstanceNotInAClass"                      = 06205
+  GhcDiagnosticCode "AssocNotInThisClass"                           = 38351
+  GhcDiagnosticCode "AssocNoClassTyVar"                             = 55912
+  GhcDiagnosticCode "AssocTyVarsDontMatch"                          = 95424
+
+    -- InvalidAssocDefault
+  GhcDiagnosticCode "AssocDefaultNotAssoc"                          = 78822
+  GhcDiagnosticCode "AssocMultipleDefaults"                         = 59128
+
+    -- AssocDefaultBadArgs
+  GhcDiagnosticCode "AssocDefaultNonTyVarArg"                       = 41522
+  GhcDiagnosticCode "AssocDefaultDuplicateTyVars"                   = 48178
 
   -- Diagnostic codes for the foreign function interface
   GhcDiagnosticCode "NotADataType"                                  = 31136
@@ -842,6 +860,10 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- and this includes outdated diagnostic codes for errors that GHC
   -- no longer reports. These are collected below.
 
+  GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = 12222
+  GhcDiagnosticCode "TcRnNoClassInstHead"                           = 56538
+    -- The above two are subsumed by InstHeadNonClass [GHC-53946]
+
   GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
   GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
   GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
@@ -927,12 +949,24 @@ type family ConRecursInto con where
   ConRecursInto "TcRnImportLookup"         = 'Just ImportLookupReason
   ConRecursInto "TcRnUnusedImport"         = 'Just UnusedImportReason
   ConRecursInto "TcRnNonCanonicalDefinition" = 'Just NonCanonicalDefinition
-  ConRecursInto "TcRnIllegalInstanceDecl"    = 'Just IllegalInstanceReason
+  ConRecursInto "TcRnIllegalInstance"        = 'Just IllegalInstanceReason
   ConRecursInto "TcRnTypeApplicationsDisabled" = 'Just TypeApplication
 
     -- Illegal instance reasons
+  ConRecursInto "IllegalClassInstance"        = 'Just IllegalClassInstanceReason
+  ConRecursInto "IllegalFamilyInstance"       = 'Just IllegalFamilyInstanceReason
 
-  ConRecursInto "IllegalHasFieldInstance" = 'Just IllegalHasFieldInstance
+      -- Illegal class instance reasons
+
+  ConRecursInto "IllegalInstanceHead"         = 'Just IllegalInstanceHeadReason
+  ConRecursInto "IllegalHasFieldInstance"     = 'Just IllegalHasFieldInstance
+
+      -- Illegal family instance reasons
+
+  ConRecursInto "InvalidAssoc"                = 'Just InvalidAssoc
+  ConRecursInto "InvalidAssocInstance"        = 'Just InvalidAssocInstance
+  ConRecursInto "InvalidAssocDefault"         = 'Just InvalidAssocDefault
+  ConRecursInto "AssocDefaultBadArgs"         = 'Just AssocDefaultBadArgs
 
     --
     -- TH errors

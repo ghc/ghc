@@ -48,16 +48,17 @@ TcCoercibleFail.hs:30:9: error: [GHC-18872]
     • In the expression: coerce :: (VoidBad ()) -> ()
       In an equation for ‘foo5'’: foo5' = coerce :: (VoidBad ()) -> ()
 
-TcCoercibleFail.hs:35:8: error:
+TcCoercibleFail.hs:35:8: error: [GHC-40404]
     • Reduction stack overflow; size = 201
       When simplifying the following type: Fix (Either Age)
+    • In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
+      In an equation for ‘foo6’:
+          foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
+    Suggested fix:
       Use -freduction-depth=0 to disable this check
       (any upper bound you could choose might fail unpredictably with
        minor updates to GHC, so disabling the check is recommended if
        you're sure that type checking should terminate)
-    • In the expression: coerce :: Fix (Either Int) -> Fix (Either Age)
-      In an equation for ‘foo6’:
-          foo6 = coerce :: Fix (Either Int) -> Fix (Either Age)
 
 TcCoercibleFail.hs:36:8: error: [GHC-18872]
     • Couldn't match representation of type ‘Either

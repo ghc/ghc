@@ -250,7 +250,6 @@ data GhcHint
     -}
   | SuggestAddToHSigExportList !Name !(Maybe Module)
     {-| Suggests increasing the limit for the number of iterations in the simplifier.
-
     -}
   | SuggestIncreaseSimplifierIterations
     {-| Suggests to explicitly import 'Type' from the 'Data.Kind' module, because
@@ -454,6 +453,9 @@ data GhcHint
     Name -- ^ move the implementation from this method
     Name -- ^ ... to this method
     String -- ^ Documentation URL
+
+    {-| Suggest to increase the solver maximum reduction depth -}
+  | SuggestIncreaseReductionDepth
 
     {-| Suggest removing a method implementation when a superclass defines the
       canonical version of that method.

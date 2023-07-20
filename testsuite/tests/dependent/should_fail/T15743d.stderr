@@ -1,5 +1,5 @@
 
-T15743d.hs:10:1: error:
+T15743d.hs:10:1: error: [GHC-87279]
     • The kind of ‘T2’ is ill-scoped
         Inferred kind: T2 :: forall (d :: k).
                              forall k (c :: k) (a :: Proxy c) (b :: Proxy d) ->

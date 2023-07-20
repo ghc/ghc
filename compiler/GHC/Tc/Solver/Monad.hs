@@ -169,7 +169,6 @@ import GHC.Core.Reduction
 import GHC.Core.Class
 import GHC.Core.TyCon
 
-import GHC.Types.Error ( mkPlainError, noHints )
 import GHC.Types.Name
 import GHC.Types.TyThing
 import GHC.Types.Name.Reader
@@ -1886,19 +1885,10 @@ solverDepthError loc ty
               ; return (ty, env0) }
        ; let tidy_env     = tidyFreeTyCoVars env0 (tyCoVarsOfTypeList ty)
              tidy_ty      = tidyType tidy_env ty
-             msg = mkTcRnUnknownMessage $ mkPlainError noHints $
-               vcat [ text "Reduction stack overflow; size =" <+> ppr depth
-                      , hang (text "When simplifying the following type:")
-                           2 (ppr tidy_ty)
-                      , note ]
+             msg = TcRnSolverDepthError tidy_ty depth
        ; TcM.failWithTcM (tidy_env, msg) }
   where
     depth = ctLocDepth loc
-    note = vcat
-      [ text "Use -freduction-depth=0 to disable this check"
-      , text "(any upper bound you could choose might fail unpredictably with"
-      , text " minor updates to GHC, so disabling the check is recommended if"
-      , text " you're sure that type checking should terminate)" ]
 
 {-
 ************************************************************************

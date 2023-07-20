@@ -34,13 +34,7 @@ import GHC.Driver.Config.HsToCore
 
 import GHC.Hs
 
-import GHC.Tc.Errors.Types ( TcRnMessage(..), FixedRuntimeRepProvenance(..)
-                           , IllegalNewtypeReason (..)
-                           , UninferrableTyVarCtx (..)
-                           , BadFieldAnnotationReason (..)
-                           , RoleValidationFailedReason (..)
-                           , DisabledClassExtension (..)
-                           , TyFamsDisabledReason (..) )
+import GHC.Tc.Errors.Types
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
                     , reportUnsolvedEqualities )
@@ -2690,7 +2684,10 @@ tcClassATs :: Name                    -- The class name (not knot-tied)
            -> TcM [ClassATItem]
 tcClassATs class_name cls ats at_defs
   = do {  -- Complain about associated type defaults for non associated-types
-         sequence_ [ failWithTc (TcRnBadAssociatedType class_name n)
+         sequence_ [ failWithTc $ TcRnIllegalInstance
+                                $ IllegalFamilyInstance $ InvalidAssoc
+                                $ InvalidAssocDefault
+                                $ AssocDefaultNotAssoc class_name n
                    | n <- map at_def_tycon at_defs
                    , not (n `elemNameSet` at_names) ]
        ; mapM tc_at ats }
@@ -2724,7 +2721,9 @@ tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
 tcDefaultAssocDecl _ (d1:_:_)
-  = failWithTc (TcRnMultiAssocTyFamDefaults (tyFamInstDeclName (unLoc d1)))
+  = failWithTc $ TcRnIllegalInstance $ IllegalFamilyInstance
+               $ InvalidAssoc $ InvalidAssocDefault $
+      AssocMultipleDefaults (tyFamInstDeclName (unLoc d1))
 
 tcDefaultAssocDecl fam_tc
   [L loc (TyFamInstDecl { tfid_eqn =
@@ -2742,11 +2741,14 @@ tcDefaultAssocDecl fam_tc
 
        -- Kind of family check
        ; assert (fam_tc_name == tc_name) $
-         checkTc (isTypeFamilyTyCon fam_tc) (TcRnFamilyCategoryMismatch fam_tc)
+         checkTc (isTypeFamilyTyCon fam_tc) $
+         TcRnIllegalInstance $ IllegalFamilyInstance $
+           FamilyCategoryMismatch fam_tc
 
        -- Arity check
-       ; checkTc (vis_pats == vis_arity)
-                 (TcRnFamilyArityMismatch fam_tc vis_arity)
+       ; checkTc (vis_pats == vis_arity) $
+         TcRnIllegalInstance $ IllegalFamilyInstance $
+           FamilyArityMismatch fam_tc vis_arity
 
        -- Typecheck RHS
        --
@@ -3215,7 +3217,8 @@ checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =
        --    type family F a where { G Int = Bool }
        let tc_fam_tc_name = getName tc_fam_tc
      ; checkTc (tc_fam_tc_name == eqn_tc_name) $
-               TcRnTyFamNameMismatch tc_fam_tc_name eqn_tc_name
+               TcRnIllegalInstance $ IllegalFamilyInstance $
+               TyFamNameMismatch tc_fam_tc_name eqn_tc_name
 
        -- Check the arity of visible arguments
        -- If we wait until validity checking, we'll get kind errors
@@ -3223,7 +3226,8 @@ checkTyFamInstEqn tc_fam_tc eqn_tc_name hs_pats =
      ; let vis_arity = length (tyConVisibleTyVars tc_fam_tc)
            vis_pats  = numVisibleArgs hs_pats
      ; checkTc (vis_pats == vis_arity) $
-               TcRnFamilyArityMismatch tc_fam_tc vis_arity
+        TcRnIllegalInstance $ IllegalFamilyInstance $
+        FamilyArityMismatch tc_fam_tc vis_arity
      }
 
 {- Note [Instantiating a family tycon]
@@ -4823,8 +4827,10 @@ checkValidClass cls
 
     check_at (ATI fam_tc m_dflt_rhs)
       = do { traceTc "ati" (ppr fam_tc $$ ppr tyvars $$ ppr fam_tvs)
-           ; checkTc (cls_arity == 0 || any (`elemVarSet` cls_tv_set) fam_tvs)
-                     (TcRnAssocNoClassTyVar cls fam_tc)
+           ; checkTc (cls_arity == 0 || any (`elemVarSet` cls_tv_set) fam_tvs) $
+              TcRnIllegalInstance $ IllegalFamilyInstance $
+                InvalidAssoc $ InvalidAssocInstance $
+                AssocNoClassTyVar cls fam_tc
                         -- Check that the associated type mentions at least
                         -- one of the class type variables
                         -- The check is disabled for nullary type classes,
