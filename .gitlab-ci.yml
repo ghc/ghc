@@ -433,6 +433,7 @@ hadrian-multi:
       - cabal-cache
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 ############################################################
 # stack-hadrian-build
@@ -831,6 +832,7 @@ perf-nofib:
     - if: '$CI_COMMIT_BRANCH == "master"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
   tags:
     - x86_64-linux
   before_script:
@@ -898,6 +900,7 @@ perf:
       - out
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 ############################################################
 # ABI testing
@@ -938,6 +941,7 @@ abi-test:
       - out
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 
 ############################################################
