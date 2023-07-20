@@ -11,7 +11,6 @@ import Data.Map (Map)
 import Data.Maybe
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as B
-import Data.Set (Set)
 import qualified Data.Set as S
 import System.Environment
 import Data.List
@@ -503,21 +502,34 @@ instance ToJSON ArtifactsWhen where
 -----------------------------------------------------------------------------
 
 -- Data structure which records the condition when a job is run.
-data OnOffRules = OnOffRules { rule_set :: Set Rule -- ^ The set of enabled rules
+data OnOffRules = OnOffRules { rule_set :: Rule -- ^ The enabled rules
                              , when :: ManualFlag   -- ^ The additional condition about when to run this job.
                              }
 
--- The initial set of rules where all rules are disabled and the job is always run.
+-- The initial set of rules, which assumes a Validate pipeline which is run with FullCI.
 emptyRules :: OnOffRules
-emptyRules = OnOffRules S.empty OnSuccess
+emptyRules = OnOffRules (ValidateOnly (S.singleton FullCI)) OnSuccess
 
 -- When to run the job
 data ManualFlag = Manual -- ^ Only run the job when explicitly triggered by a user
                 | OnSuccess -- ^ Always run it, if the rules pass (the default)
                 deriving Eq
 
-enableRule :: Rule -> OnOffRules -> OnOffRules
-enableRule r (OnOffRules o m) = OnOffRules (S.insert r o) m
+setRule :: Rule -> OnOffRules -> OnOffRules
+setRule r (OnOffRules _ m) = OnOffRules r m
+
+enableValidateRule :: ValidateRule -> OnOffRules -> OnOffRules
+enableValidateRule r = modifyValidateRules (S.insert r)
+
+onlyValidateRule :: ValidateRule -> OnOffRules -> OnOffRules
+onlyValidateRule r  = modifyValidateRules (const (S.singleton r))
+
+removeValidateRule :: ValidateRule -> OnOffRules -> OnOffRules
+removeValidateRule r = modifyValidateRules (S.delete r)
+
+modifyValidateRules :: (S.Set ValidateRule -> S.Set ValidateRule) -> OnOffRules -> OnOffRules
+modifyValidateRules f (OnOffRules (ValidateOnly rs) m) = OnOffRules (ValidateOnly (f rs)) m
+modifyValidateRules _ r = error $ "Applying validate rule to nightly/release job:" ++ show (rule_set r)
 
 manualRule :: OnOffRules -> OnOffRules
 manualRule rules = rules { when = Manual }
@@ -526,10 +538,19 @@ manualRule rules = rules { when = Manual }
 -- For example, even if you don't explicitly disable a rule it will end up in the
 -- rule list with the OFF state.
 enumRules :: OnOffRules -> [OnOffRule]
-enumRules o = map lkup rulesList
+enumRules (OnOffRules r _) = rulesList
   where
-    enabled_rules = rule_set o
-    lkup r = OnOffRule (if S.member r enabled_rules then On else Off) r
+    rulesList = case r of
+                  ValidateOnly rs -> [OnOffRule On (ValidateOnly rs)
+                                    , OnOffRule Off ReleaseOnly
+                                    , OnOffRule Off Nightly ]
+                  Nightly -> [ OnOffRule Off (ValidateOnly S.empty)
+                             , OnOffRule Off ReleaseOnly
+                             , OnOffRule On Nightly ]
+                  ReleaseOnly -> [ OnOffRule Off (ValidateOnly S.empty)
+                                 , OnOffRule On ReleaseOnly
+                                 , OnOffRule Off Nightly ]
+
 
 
 data OnOffRule = OnOffRule OnOff Rule
@@ -551,21 +572,29 @@ instance ToJSON OnOffRules where
 
     where
       one_rule (OnOffRule onoff r) = ruleString onoff r
-      parens s = "(" ++ s ++ ")"
-      and_all rs = intercalate " && " (map parens rs)
+
+
+parens :: [Char] -> [Char]
+parens s = "(" ++ s ++ ")"
+and_all :: [[Char]] -> [Char]
+and_all rs = intercalate " && " (map parens rs)
+or_all :: [[Char]] -> [Char]
+or_all rs = intercalate " || " (map parens rs)
 
 -- | A Rule corresponds to some condition which must be satisifed in order to
 -- run the job.
-data Rule = FastCI       -- ^ Run this job on all validate pipelines, all pipelines are enabled
-                         -- by the "full-ci" label.
-          | ReleaseOnly  -- ^ Only run this job in a release pipeline
+data Rule = ReleaseOnly  -- ^ Only run this job in a release pipeline
           | Nightly      -- ^ Only run this job in the nightly pipeline
-          | LLVMBackend  -- ^ Only run this job when the "LLVM backend" label is present
-          | FreeBSDLabel -- ^ Only run this job when the "FreeBSD" label is set.
-          | NonmovingGc  -- ^ Only run this job when the "non-moving GC" label is set.
-          | IpeData      -- ^ Only run this job when the "IPE" label is set
-          | Disable      -- ^ Don't run this job.
-          deriving (Bounded, Enum, Ord, Eq)
+          | ValidateOnly (S.Set ValidateRule) -- ^ Only run this job in a validate pipeline, when any of these rules are enabled.
+          deriving (Show, Ord, Eq)
+
+data ValidateRule =
+            FullCI       -- ^ Run this job when the "full-ci" label is present.
+          | LLVMBackend  -- ^ Run this job when the "LLVM backend" label is present
+          | FreeBSDLabel -- ^ Run this job when the "FreeBSD" label is set.
+          | NonmovingGc  -- ^ Run this job when the "non-moving GC" label is set.
+          | IpeData      -- ^ Run this job when the "IPE" label is set
+          deriving (Show, Enum, Bounded, Ord, Eq)
 
 -- A constant evaluating to True because gitlab doesn't support "true" in the
 -- expression language.
@@ -573,31 +602,30 @@ true :: String
 true =  "\"true\" == \"true\""
 -- A constant evaluating to False because gitlab doesn't support "true" in the
 -- expression language.
-false :: String
-false = "\"disabled\" != \"disabled\""
+_false :: String
+_false = "\"disabled\" != \"disabled\""
 
 -- Convert the state of the rule into a string that gitlab understand.
 ruleString :: OnOff -> Rule -> String
-ruleString On FastCI = true
-ruleString Off FastCI = "($CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/) || ($CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/)"
-ruleString On LLVMBackend = "$CI_MERGE_REQUEST_LABELS =~ /.*LLVM backend.*/"
-ruleString Off LLVMBackend = true
-ruleString On FreeBSDLabel = "$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/"
-ruleString Off FreeBSDLabel = true
-ruleString On NonmovingGc = "$CI_MERGE_REQUEST_LABELS =~ /.*non-moving GC.*/"
-ruleString Off NonmovingGc = true
+ruleString On (ValidateOnly vs) =
+  case S.toList vs of
+    [] -> true
+    conds -> or_all (map validateRuleString conds)
+ruleString Off (ValidateOnly {}) = true
 ruleString On ReleaseOnly = "$RELEASE_JOB == \"yes\""
 ruleString Off ReleaseOnly = "$RELEASE_JOB != \"yes\""
 ruleString On Nightly = "$NIGHTLY"
 ruleString Off Nightly = "$NIGHTLY == null"
-ruleString On IpeData = "$CI_MERGE_REQUEST_LABELS =~ /.*IPE.*/"
-ruleString Off IpeData = true
-ruleString On Disable = false
-ruleString Off Disable = true
 
--- Enumeration of all the rules
-rulesList :: [Rule]
-rulesList = [minBound .. maxBound]
+labelString :: String -> String
+labelString s =  "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
+
+validateRuleString :: ValidateRule -> String
+validateRuleString FullCI = or_all ([labelString "full-ci", labelString "marge_bot_batch_merge_job"])
+validateRuleString LLVMBackend = labelString "LLVM backend"
+validateRuleString FreeBSDLabel = labelString "FreeBSD"
+validateRuleString NonmovingGc = labelString "non-moving GC"
+validateRuleString IpeData = labelString "IPE"
 
 -- | A 'Job' is the description of a single job in a gitlab pipeline. The
 -- job contains all the information about how to do the build but can be further
@@ -750,8 +778,20 @@ modifyNightlyJobs f jg = jg { n = fmap f <$> n jg }
 
 -- Generic helpers
 
-addJobRule :: Rule -> Job -> Job
-addJobRule r j = j { jobRules = enableRule r (jobRules j) }
+setJobRule :: Rule -> Job -> Job
+setJobRule r j = j { jobRules = setRule r (jobRules j) }
+
+addValidateJobRule :: ValidateRule -> Job -> Job
+addValidateJobRule r = modifyValidateJobRule (enableValidateRule r)
+
+onlyValidateJobRule :: ValidateRule -> Job -> Job
+onlyValidateJobRule r = modifyValidateJobRule (onlyValidateRule r)
+
+removeValidateJobRule :: ValidateRule -> Job -> Job
+removeValidateJobRule r = modifyValidateJobRule (removeValidateRule r)
+
+modifyValidateJobRule :: (OnOffRules -> OnOffRules) -> Job -> Job
+modifyValidateJobRule f j = j { jobRules = f (jobRules j) }
 
 addVariable :: String -> String -> Job -> Job
 addVariable k v j = j { jobVariables = mminsertWith (++) k [v] (jobVariables j) }
@@ -771,10 +811,10 @@ validate = job
 -- Nightly and release apply the FastCI configuration to all jobs so that they all run in
 -- the pipeline (not conditional on the full-ci label)
 nightlyRule :: Job -> Job
-nightlyRule = addJobRule FastCI . addJobRule Nightly
+nightlyRule = setJobRule Nightly
 
 releaseRule :: Job -> Job
-releaseRule = addJobRule FastCI . addJobRule ReleaseOnly
+releaseRule = setJobRule ReleaseOnly
 
 -- | Make a normal nightly CI job
 nightly :: Arch -> Opsys -> BuildConfig -> NamedJob Job
@@ -817,7 +857,7 @@ useHashUnitIds = addVariable "HADRIAN_ARGS" "--hash-unit-ids"
 -- | Mark the validate job to run in fast-ci mode
 -- This is default way, to enable all jobs you have to apply the `full-ci` label.
 fastCI :: JobGroup Job -> JobGroup Job
-fastCI = modifyValidateJobs (addJobRule FastCI)
+fastCI = modifyValidateJobs (removeValidateJobRule FullCI)
 
 -- | Mark a group of jobs as allowed to fail.
 allowFailureGroup :: JobGroup Job -> JobGroup Job
@@ -825,8 +865,12 @@ allowFailureGroup = modifyJobs allowFailure
 
 -- | Add a 'Rule' to just the validate job, for example, only run a job if a certain
 -- label is set.
-addValidateRule :: Rule -> JobGroup Job -> JobGroup Job
-addValidateRule t = modifyValidateJobs (addJobRule t)
+addValidateRule :: ValidateRule -> JobGroup Job -> JobGroup Job
+addValidateRule t = modifyValidateJobs (addValidateJobRule t)
+
+-- | Only run a validate job if a certain rule is enabled
+onlyRule :: ValidateRule -> JobGroup Job -> JobGroup Job
+onlyRule t = modifyValidateJobs (onlyValidateJobRule t)
 
 -- | Don't run the validate job, normally used to alleviate CI load by marking
 -- jobs which are unlikely to fail (ie different linux distros)
@@ -891,9 +935,7 @@ flattenNamedJob (NamedJob n i) = (n, i)
 
 -- | Specification for all the jobs we want to build.
 jobs :: Map String Job
-jobs = Map.fromList $ concatMap (filter is_enabled_job . flattenJobGroup) job_groups
-  where
-    is_enabled_job (_, Job {jobRules = OnOffRules {..}}) = not $ Disable `S.member` rule_set
+jobs = Map.fromList $ concatMap (flattenJobGroup) job_groups
 
 job_groups :: [JobGroup Job]
 job_groups =
@@ -908,7 +950,7 @@ job_groups =
      , -- Nightly allowed to fail: #22343
        modifyNightlyJobs allowFailure
         (modifyValidateJobs manual (validateBuilds Amd64 (Linux Debian10) noTntc))
-     , addValidateRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
+     , onlyRule LLVMBackend (validateBuilds Amd64 (Linux Debian10) llvm)
      , disableValidate (standardBuilds Amd64 (Linux Debian11))
      -- We still build Deb9 bindists for now due to Ubuntu 18 and Linux Mint 19
      -- not being at EOL until April 2023 and they still need tinfo5.
@@ -926,7 +968,7 @@ job_groups =
      , fastCI (standardBuildsWithConfig Amd64 Windows vanilla)
      , disableValidate (standardBuildsWithConfig Amd64 Windows nativeInt)
      , standardBuilds Amd64 Darwin
-     , allowFailureGroup (addValidateRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
+     , allowFailureGroup (onlyRule FreeBSDLabel (validateBuilds Amd64 FreeBSD13 vanilla))
      , fastCI (standardBuilds AArch64 Darwin)
      , fastCI (standardBuildsWithConfig AArch64 (Linux Debian10) (splitSectionsBroken vanilla))
      , disableValidate (validateBuilds AArch64 (Linux Debian10) llvm)
@@ -946,9 +988,8 @@ job_groups =
          make_wasm_jobs wasm_build_config {bignumBackend = Native}
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {unregisterised = True}
-     , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
-     , modifyNightlyJobs (addJobRule Disable) $
-         addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
+     , onlyRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+     , onlyRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      ]
 
   where
@@ -1057,6 +1098,7 @@ main = do
     ("metadata":as) -> write_result as platform_mapping
     _ -> error "gen_ci.hs <gitlab|metadata> [file.json]"
 
+write_result :: ToJSON a => [FilePath] -> a -> IO ()
 write_result as obj =
   (case as of
     [] -> B.putStrLn
