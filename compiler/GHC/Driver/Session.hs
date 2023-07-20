@@ -1566,6 +1566,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_DoTagInferenceChecks))
   , make_ord_flag defGhcFlag "dshow-passes"
         (NoArg $ forceRecompile >> (setVerbosity $ Just 2))
+  , make_ord_flag defGhcFlag "dipe-stats"
+        (setDumpFlag Opt_D_ipe_stats)
   , make_ord_flag defGhcFlag "dfaststring-stats"
         (setDumpFlag Opt_D_faststring_stats)
   , make_ord_flag defGhcFlag "dno-llvm-mangler"

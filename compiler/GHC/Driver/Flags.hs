@@ -161,6 +161,7 @@ data DumpFlag
    | Opt_D_no_debug_output
    | Opt_D_dump_faststrings
    | Opt_D_faststring_stats
+   | Opt_D_ipe_stats
    deriving (Eq, Show, Enum)
 
 -- | Helper function to query whether a given `DumpFlag` is enabled or not.
