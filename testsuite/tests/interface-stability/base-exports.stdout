@@ -234,7 +234,7 @@ module Control.Exception where
   type ErrorCall :: *
   data ErrorCall = ErrorCallWithLocation GHC.Base.String GHC.Base.String
   type Exception :: * -> Constraint
-  class (base-4.18.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
+  class (base-4.19.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Maybe.Maybe e
     displayException :: e -> GHC.Base.String
@@ -318,7 +318,7 @@ module Control.Exception.Base where
   type ErrorCall :: *
   data ErrorCall = ErrorCallWithLocation GHC.Base.String GHC.Base.String
   type Exception :: * -> Constraint
-  class (base-4.18.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
+  class (base-4.19.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Maybe.Maybe e
     displayException :: e -> GHC.Base.String
@@ -518,8 +518,8 @@ module Control.Monad.ST.Lazy.Safe where
 
 module Control.Monad.ST.Lazy.Unsafe where
   -- Safety: Unsafe
-  unsafeIOToST :: forall a s. GHC.Types.IO a -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s a
-  unsafeInterleaveST :: forall s a. base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s a -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s a
+  unsafeIOToST :: forall a s. GHC.Types.IO a -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s a
+  unsafeInterleaveST :: forall s a. base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s a -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s a
 
 module Control.Monad.ST.Safe where
   -- Safety: Trustworthy
@@ -810,11 +810,11 @@ module Data.Data where
   type TyCon :: *
   data TyCon = ...
   type TypeRep :: *
-  type TypeRep = base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep
+  type TypeRep = base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL base-4.18.0.0:Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL base-4.19.0.0:Data.Typeable.Internal.typeRep# #-}
   cast :: forall a b. (Typeable a, Typeable b) => a -> GHC.Maybe.Maybe b
   constrFields :: Constr -> [GHC.Base.String]
   constrFixity :: Constr -> Fixity
@@ -857,7 +857,7 @@ module Data.Data where
   showConstr :: Constr -> GHC.Base.String
   showsTypeRep :: TypeRep -> GHC.Show.ShowS
   splitTyConApp :: TypeRep -> (TyCon, [TypeRep])
-  trLiftedRep :: base-4.18.0.0:Data.Typeable.Internal.TypeRep GHC.Types.LiftedRep
+  trLiftedRep :: base-4.19.0.0:Data.Typeable.Internal.TypeRep GHC.Types.LiftedRep
   tyConFingerprint :: TyCon -> GHC.Fingerprint.Type.Fingerprint
   tyConModule :: TyCon -> GHC.Base.String
   tyConName :: TyCon -> GHC.Base.String
@@ -881,14 +881,14 @@ module Data.Dynamic where
   -- Safety: Trustworthy
   type Dynamic :: *
   data Dynamic where
-    Dynamic :: forall a. base-4.18.0.0:Data.Typeable.Internal.TypeRep a -> a -> Dynamic
+    Dynamic :: forall a. base-4.19.0.0:Data.Typeable.Internal.TypeRep a -> a -> Dynamic
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL base-4.18.0.0:Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL base-4.19.0.0:Data.Typeable.Internal.typeRep# #-}
   dynApp :: Dynamic -> Dynamic -> Dynamic
   dynApply :: Dynamic -> Dynamic -> GHC.Maybe.Maybe Dynamic
-  dynTypeRep :: Dynamic -> base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep
+  dynTypeRep :: Dynamic -> base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep
   fromDyn :: forall a. Typeable a => Dynamic -> a -> a
   fromDynamic :: forall a. Typeable a => Dynamic -> GHC.Maybe.Maybe a
   toDyn :: forall a. Typeable a => a -> Dynamic
@@ -1520,10 +1520,10 @@ module Data.STRef.Lazy where
   type role STRef nominal representational
   type STRef :: * -> * -> *
   data STRef s a = ...
-  modifySTRef :: forall s a. STRef s a -> (a -> a) -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s ()
-  newSTRef :: forall a s. a -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s (STRef s a)
-  readSTRef :: forall s a. STRef s a -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s a
-  writeSTRef :: forall s a. STRef s a -> a -> base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s ()
+  modifySTRef :: forall s a. STRef s a -> (a -> a) -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s ()
+  newSTRef :: forall a s. a -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s (STRef s a)
+  readSTRef :: forall s a. STRef s a -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s a
+  writeSTRef :: forall s a. STRef s a -> a -> base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s ()
 
 module Data.STRef.Strict where
   -- Safety: Safe
@@ -1747,11 +1747,11 @@ module Data.Typeable where
   type TyCon :: *
   data TyCon = ...
   type TypeRep :: *
-  type TypeRep = base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep
+  type TypeRep = base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL base-4.18.0.0:Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL base-4.19.0.0:Data.Typeable.Internal.typeRep# #-}
   cast :: forall a b. (Typeable a, Typeable b) => a -> GHC.Maybe.Maybe b
   decT :: forall {k} (a :: k) (b :: k). (Typeable a, Typeable b) => Data.Either.Either ((a :~: b) -> GHC.Base.Void) (a :~: b)
   eqT :: forall {k} (a :: k) (b :: k). (Typeable a, Typeable b) => GHC.Maybe.Maybe (a :~: b)
@@ -1766,7 +1766,7 @@ module Data.Typeable where
   rnfTypeRep :: TypeRep -> ()
   showsTypeRep :: TypeRep -> GHC.Show.ShowS
   splitTyConApp :: TypeRep -> (TyCon, [TypeRep])
-  trLiftedRep :: base-4.18.0.0:Data.Typeable.Internal.TypeRep GHC.Types.LiftedRep
+  trLiftedRep :: base-4.19.0.0:Data.Typeable.Internal.TypeRep GHC.Types.LiftedRep
   tyConFingerprint :: TyCon -> GHC.Fingerprint.Type.Fingerprint
   tyConModule :: TyCon -> GHC.Base.String
   tyConName :: TyCon -> GHC.Base.String
@@ -5139,7 +5139,7 @@ module GHC.Event where
   data EventManager = ...
   type FdKey :: *
   data FdKey
-    = base-4.18.0.0:GHC.Event.Manager.FdKey {keyFd :: ! {-# UNPACK #-}(System.Posix.Types.N:Fd[0]
+    = base-4.19.0.0:GHC.Event.Manager.FdKey {keyFd :: ! {-# UNPACK #-}(System.Posix.Types.N:Fd[0]
                                                                        ; Foreign.C.Types.N:CInt[0])System.Posix.Types.Fd,
                                              ...}
   type IOCallback :: *
@@ -5172,9 +5172,9 @@ module GHC.Event.TimeOut where
   type TimeoutEdit :: *
   type TimeoutEdit = TimeoutQueue -> TimeoutQueue
   type TimeoutKey :: *
-  newtype TimeoutKey = TK base-4.18.0.0:GHC.Event.Unique.Unique
+  newtype TimeoutKey = TK base-4.19.0.0:GHC.Event.Unique.Unique
   type TimeoutQueue :: *
-  type TimeoutQueue = base-4.18.0.0:GHC.Event.PSQ.PSQ TimeoutCallback
+  type TimeoutQueue = base-4.19.0.0:GHC.Event.PSQ.PSQ TimeoutCallback
 
 module GHC.Exception where
   -- Safety: Trustworthy
@@ -5186,7 +5186,7 @@ module GHC.Exception where
   type ErrorCall :: *
   data ErrorCall = ErrorCallWithLocation GHC.Base.String GHC.Base.String
   type Exception :: * -> Constraint
-  class (base-4.18.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
+  class (base-4.19.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Maybe.Maybe e
     displayException :: e -> GHC.Base.String
@@ -5214,7 +5214,7 @@ module GHC.Exception.Type where
   type ArithException :: *
   data ArithException = Overflow | Underflow | LossOfPrecision | DivideByZero | Denormal | RatioZeroDenominator
   type Exception :: * -> Constraint
-  class (base-4.18.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
+  class (base-4.19.0.0:Data.Typeable.Internal.Typeable e, GHC.Show.Show e) => Exception e where
     toException :: e -> SomeException
     fromException :: SomeException -> GHC.Maybe.Maybe e
     displayException :: e -> GHC.Base.String
@@ -7714,8 +7714,8 @@ module GHC.IO.Handle where
   hTryLock :: Handle -> LockMode -> GHC.Types.IO GHC.Types.Bool
   hWaitForInput :: Handle -> GHC.Types.Int -> GHC.Types.IO GHC.Types.Bool
   isEOF :: GHC.Types.IO GHC.Types.Bool
-  mkDuplexHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Types.IO Handle
-  mkFileHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Types.IO Handle
+  mkDuplexHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Types.IO Handle
+  mkFileHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> NewlineMode -> GHC.Types.IO Handle
   nativeNewline :: Newline
   nativeNewlineMode :: NewlineMode
   noNewlineTranslation :: NewlineMode
@@ -7765,11 +7765,11 @@ module GHC.IO.Handle.Internals where
   ioe_notReadable :: forall a. GHC.Types.IO a
   ioe_notWritable :: forall a. GHC.Types.IO a
   ioe_semiclosedHandle :: forall a. GHC.Types.IO a
-  mkDuplexHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
-  mkDuplexHandleNoFinalizer :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
-  mkFileHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
-  mkFileHandleNoFinalizer :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
-  mkHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.Handle.Types.HandleType -> GHC.Types.Bool -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Maybe.Maybe HandleFinalizer -> GHC.Maybe.Maybe (GHC.MVar.MVar GHC.IO.Handle.Types.Handle__) -> GHC.Types.IO GHC.IO.Handle.Types.Handle
+  mkDuplexHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
+  mkDuplexHandleNoFinalizer :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
+  mkFileHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
+  mkFileHandleNoFinalizer :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.IOMode.IOMode -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Types.IO GHC.IO.Handle.Types.Handle
+  mkHandle :: forall dev. (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) => dev -> GHC.IO.FilePath -> GHC.IO.Handle.Types.HandleType -> GHC.Types.Bool -> GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.NewlineMode -> GHC.Maybe.Maybe HandleFinalizer -> GHC.Maybe.Maybe (GHC.MVar.MVar GHC.IO.Handle.Types.Handle__) -> GHC.Types.IO GHC.IO.Handle.Types.Handle
   openTextEncoding :: forall a. GHC.Maybe.Maybe GHC.IO.Encoding.Types.TextEncoding -> GHC.IO.Handle.Types.HandleType -> (forall es ds. GHC.Maybe.Maybe (GHC.IO.Encoding.Types.TextEncoder es) -> GHC.Maybe.Maybe (GHC.IO.Encoding.Types.TextDecoder ds) -> GHC.Types.IO a) -> GHC.Types.IO a
   readTextDevice :: GHC.IO.Handle.Types.Handle__ -> GHC.IO.Buffer.CharBuffer -> GHC.Types.IO GHC.IO.Buffer.CharBuffer
   readTextDeviceNonBlocking :: GHC.IO.Handle.Types.Handle__ -> GHC.IO.Buffer.CharBuffer -> GHC.Types.IO GHC.IO.Buffer.CharBuffer
@@ -7833,7 +7833,7 @@ module GHC.IO.Handle.Types where
   type Handle__ :: *
   data Handle__
     = forall dev enc_state dec_state.
-      (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.18.0.0:Data.Typeable.Internal.Typeable dev) =>
+      (GHC.IO.Device.RawIO dev, GHC.IO.Device.IODevice dev, GHC.IO.BufferedIO.BufferedIO dev, base-4.19.0.0:Data.Typeable.Internal.Typeable dev) =>
       Handle__ {haDevice :: !dev,
                 haType :: HandleType,
                 haByteBuffer :: ! {-# UNPACK #-}(GHC.IORef.N:IORef[0] <GHC.IO.Buffer.Buffer GHC.Word.Word8>_N)(GHC.IORef.IORef (GHC.IO.Buffer.Buffer GHC.Word.Word8)),
@@ -9165,9 +9165,9 @@ module GHC.Stack where
   type SrcLoc :: *
   data SrcLoc = SrcLoc {srcLocPackage :: [GHC.Types.Char], srcLocModule :: [GHC.Types.Char], srcLocFile :: [GHC.Types.Char], srcLocStartLine :: GHC.Types.Int, srcLocStartCol :: GHC.Types.Int, srcLocEndLine :: GHC.Types.Int, srcLocEndCol :: GHC.Types.Int}
   callStack :: HasCallStack => CallStack
-  ccLabel :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
-  ccModule :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
-  ccSrcSpan :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
+  ccLabel :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
+  ccModule :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
+  ccSrcSpan :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
   ccsCC :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Ptr.Ptr CostCentre)
   ccsParent :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Ptr.Ptr CostCentreStack)
   ccsToStrings :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO [GHC.Base.String]
@@ -9194,9 +9194,9 @@ module GHC.Stack.CCS where
   data CostCentre
   type CostCentreStack :: *
   data CostCentreStack
-  ccLabel :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
-  ccModule :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
-  ccSrcSpan :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
+  ccLabel :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
+  ccModule :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
+  ccSrcSpan :: GHC.Ptr.Ptr CostCentre -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
   ccsCC :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Ptr.Ptr CostCentre)
   ccsParent :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO (GHC.Ptr.Ptr CostCentreStack)
   ccsToStrings :: GHC.Ptr.Ptr CostCentreStack -> GHC.Types.IO [GHC.Base.String]
@@ -9235,7 +9235,7 @@ module GHC.StaticPtr where
   -- Safety: None
   type IsStatic :: (* -> *) -> Constraint
   class IsStatic p where
-    fromStaticPtr :: forall a. base-4.18.0.0:Data.Typeable.Internal.Typeable a => StaticPtr a -> p a
+    fromStaticPtr :: forall a. base-4.19.0.0:Data.Typeable.Internal.Typeable a => StaticPtr a -> p a
     {-# MINIMAL fromStaticPtr #-}
   type StaticKey :: *
   type StaticKey = GHC.Fingerprint.Type.Fingerprint
@@ -10280,7 +10280,7 @@ module System.Posix.Internals where
   type CFLock :: *
   data CFLock
   type CFilePath :: *
-  type CFilePath = base-4.18.0.0:GHC.Foreign.Internal.CString
+  type CFilePath = base-4.19.0.0:GHC.Foreign.Internal.CString
   type CGroup :: *
   data CGroup
   type CLconv :: *
@@ -10305,10 +10305,10 @@ module System.Posix.Internals where
   data CUtsname
   type FD :: *
   type FD = Foreign.C.Types.CInt
-  c_access :: base-4.18.0.0:GHC.Foreign.Internal.CString -> Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
-  c_chmod :: base-4.18.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
+  c_access :: base-4.19.0.0:GHC.Foreign.Internal.CString -> Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
+  c_chmod :: base-4.19.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
   c_close :: Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
-  c_creat :: base-4.18.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
+  c_creat :: base-4.19.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
   c_dup :: Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
   c_dup2 :: Foreign.C.Types.CInt -> Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
   c_fcntl_lock :: Foreign.C.Types.CInt -> Foreign.C.Types.CInt -> GHC.Ptr.Ptr CFLock -> GHC.Types.IO Foreign.C.Types.CInt
@@ -10322,9 +10322,9 @@ module System.Posix.Internals where
   c_interruptible_open_ :: CFilePath -> Foreign.C.Types.CInt -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
   c_isatty :: Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
   c_lflag :: GHC.Ptr.Ptr CTermios -> GHC.Types.IO System.Posix.Types.CTcflag
-  c_link :: base-4.18.0.0:GHC.Foreign.Internal.CString -> base-4.18.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO Foreign.C.Types.CInt
+  c_link :: base-4.19.0.0:GHC.Foreign.Internal.CString -> base-4.19.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO Foreign.C.Types.CInt
   c_lseek :: Foreign.C.Types.CInt -> System.Posix.Types.COff -> Foreign.C.Types.CInt -> GHC.Types.IO System.Posix.Types.COff
-  c_mkfifo :: base-4.18.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
+  c_mkfifo :: base-4.19.0.0:GHC.Foreign.Internal.CString -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
   c_open :: CFilePath -> Foreign.C.Types.CInt -> System.Posix.Types.CMode -> GHC.Types.IO Foreign.C.Types.CInt
   c_pipe :: GHC.Ptr.Ptr Foreign.C.Types.CInt -> GHC.Types.IO Foreign.C.Types.CInt
   c_read :: Foreign.C.Types.CInt -> GHC.Ptr.Ptr GHC.Word.Word8 -> Foreign.C.Types.CSize -> GHC.Types.IO System.Posix.Types.CSsize
@@ -10345,11 +10345,11 @@ module System.Posix.Internals where
   c_tcgetattr :: Foreign.C.Types.CInt -> GHC.Ptr.Ptr CTermios -> GHC.Types.IO Foreign.C.Types.CInt
   c_tcsetattr :: Foreign.C.Types.CInt -> Foreign.C.Types.CInt -> GHC.Ptr.Ptr CTermios -> GHC.Types.IO Foreign.C.Types.CInt
   c_umask :: System.Posix.Types.CMode -> GHC.Types.IO System.Posix.Types.CMode
-  c_unlink :: base-4.18.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO Foreign.C.Types.CInt
-  c_utime :: base-4.18.0.0:GHC.Foreign.Internal.CString -> GHC.Ptr.Ptr CUtimbuf -> GHC.Types.IO Foreign.C.Types.CInt
+  c_unlink :: base-4.19.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO Foreign.C.Types.CInt
+  c_utime :: base-4.19.0.0:GHC.Foreign.Internal.CString -> GHC.Ptr.Ptr CUtimbuf -> GHC.Types.IO Foreign.C.Types.CInt
   c_waitpid :: System.Posix.Types.CPid -> GHC.Ptr.Ptr Foreign.C.Types.CInt -> Foreign.C.Types.CInt -> GHC.Types.IO System.Posix.Types.CPid
   c_write :: Foreign.C.Types.CInt -> GHC.Ptr.Ptr GHC.Word.Word8 -> Foreign.C.Types.CSize -> GHC.Types.IO System.Posix.Types.CSsize
-  checkForInteriorNuls :: GHC.IO.FilePath -> base-4.18.0.0:GHC.Foreign.Internal.CStringLen -> GHC.Types.IO ()
+  checkForInteriorNuls :: GHC.IO.FilePath -> base-4.19.0.0:GHC.Foreign.Internal.CStringLen -> GHC.Types.IO ()
   const_echo :: Foreign.C.Types.CInt
   const_f_getfl :: Foreign.C.Types.CInt
   const_f_setfd :: Foreign.C.Types.CInt
@@ -10373,7 +10373,7 @@ module System.Posix.Internals where
   hostIsThreaded :: GHC.Types.Bool
   ioe_unknownfiletype :: GHC.IO.Exception.IOException
   lstat :: CFilePath -> GHC.Ptr.Ptr CStat -> GHC.Types.IO Foreign.C.Types.CInt
-  newFilePath :: GHC.IO.FilePath -> GHC.Types.IO base-4.18.0.0:GHC.Foreign.Internal.CString
+  newFilePath :: GHC.IO.FilePath -> GHC.Types.IO base-4.19.0.0:GHC.Foreign.Internal.CString
   o_APPEND :: Foreign.C.Types.CInt
   o_BINARY :: Foreign.C.Types.CInt
   o_CREAT :: Foreign.C.Types.CInt
@@ -10384,8 +10384,8 @@ module System.Posix.Internals where
   o_RDWR :: Foreign.C.Types.CInt
   o_TRUNC :: Foreign.C.Types.CInt
   o_WRONLY :: Foreign.C.Types.CInt
-  peekFilePath :: base-4.18.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO GHC.IO.FilePath
-  peekFilePathLen :: base-4.18.0.0:GHC.Foreign.Internal.CStringLen -> GHC.Types.IO GHC.IO.FilePath
+  peekFilePath :: base-4.19.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO GHC.IO.FilePath
+  peekFilePathLen :: base-4.19.0.0:GHC.Foreign.Internal.CStringLen -> GHC.Types.IO GHC.IO.FilePath
   poke_c_lflag :: GHC.Ptr.Ptr CTermios -> System.Posix.Types.CTcflag -> GHC.Types.IO ()
   ptr_c_cc :: GHC.Ptr.Ptr CTermios -> GHC.Types.IO (GHC.Ptr.Ptr GHC.Word.Word8)
   puts :: GHC.Base.String -> GHC.Types.IO ()
@@ -10415,7 +10415,7 @@ module System.Posix.Internals where
   statGetType :: GHC.Ptr.Ptr CStat -> GHC.Types.IO GHC.IO.Device.IODeviceType
   tcSetAttr :: forall a. FD -> (GHC.Ptr.Ptr CTermios -> GHC.Types.IO a) -> GHC.Types.IO a
   throwInternalNulError :: forall a. GHC.IO.FilePath -> GHC.Types.IO a
-  withFilePath :: forall a. GHC.IO.FilePath -> (base-4.18.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO a) -> GHC.Types.IO a
+  withFilePath :: forall a. GHC.IO.FilePath -> (base-4.19.0.0:GHC.Foreign.Internal.CString -> GHC.Types.IO a) -> GHC.Types.IO a
 
 module System.Posix.Types where
 
@@ -10630,8 +10630,8 @@ module Type.Reflection where
   data (:~~:) a b where
     HRefl :: forall {k1} (a :: k1). (:~~:) a a
   pattern App :: forall k2 (t :: k2). () => forall k1 (a :: k1 -> k2) (b :: k1). (t ~ a b) => TypeRep a -> TypeRep b -> TypeRep t
-  pattern Con :: forall k (a :: k). () => base-4.18.0.0:Data.Typeable.Internal.NotApplication a => TyCon -> TypeRep a
-  pattern Con' :: forall k (a :: k). () => base-4.18.0.0:Data.Typeable.Internal.NotApplication a => TyCon -> [SomeTypeRep] -> TypeRep a
+  pattern Con :: forall k (a :: k). () => base-4.19.0.0:Data.Typeable.Internal.NotApplication a => TyCon -> TypeRep a
+  pattern Con' :: forall k (a :: k). () => base-4.19.0.0:Data.Typeable.Internal.NotApplication a => TyCon -> [SomeTypeRep] -> TypeRep a
   pattern Fun :: forall k (fun :: k). () => forall (r1 :: GHC.Types.RuntimeRep) (r2 :: GHC.Types.RuntimeRep) (arg :: TYPE r1) (res :: TYPE r2). (k ~ *, fun ~~ (arg -> res)) => TypeRep arg -> TypeRep res -> TypeRep fun
   type Module :: *
   data Module = ...
@@ -10648,7 +10648,7 @@ module Type.Reflection where
   type Typeable :: forall k. k -> Constraint
   class Typeable a where
     ...
-    {-# MINIMAL base-4.18.0.0:Data.Typeable.Internal.typeRep# #-}
+    {-# MINIMAL base-4.19.0.0:Data.Typeable.Internal.typeRep# #-}
   decTypeRep :: forall k1 k2 (a :: k1) (b :: k2). TypeRep a -> TypeRep b -> Data.Either.Either ((a :~~: b) -> GHC.Base.Void) (a :~~: b)
   eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2). TypeRep a -> TypeRep b -> GHC.Maybe.Maybe (a :~~: b)
   moduleName :: Module -> GHC.Base.String
@@ -10683,9 +10683,9 @@ module Type.Reflection.Unsafe where
   data TypeRep a where
     ...
   mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1). TypeRep a -> TypeRep b -> TypeRep (a b)
-  mkTrCon :: forall k (a :: k). TyCon -> [base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep] -> TypeRep a
+  mkTrCon :: forall k (a :: k). TyCon -> [base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep] -> TypeRep a
   mkTyCon :: GHC.Base.String -> GHC.Base.String -> GHC.Base.String -> GHC.Types.Int -> KindRep -> TyCon
-  someTypeRepFingerprint :: base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep -> GHC.Fingerprint.Type.Fingerprint
+  someTypeRepFingerprint :: base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep -> GHC.Fingerprint.Type.Fingerprint
   tyConFingerprint :: TyCon -> GHC.Fingerprint.Type.Fingerprint
   tyConKindArgs :: TyCon -> GHC.Types.Int
   tyConKindRep :: TyCon -> KindRep
@@ -10721,7 +10721,7 @@ instance Control.Monad.Fail.MonadFail Text.ParserCombinators.ReadP.P -- Defined 
 instance Control.Monad.Fail.MonadFail Text.ParserCombinators.ReadP.ReadP -- Defined in ‘Text.ParserCombinators.ReadP’
 instance Control.Monad.Fail.MonadFail Text.ParserCombinators.ReadPrec.ReadPrec -- Defined in ‘Text.ParserCombinators.ReadPrec’
 instance Control.Monad.Fix.MonadFix Data.Ord.Down -- Defined in ‘Control.Monad.Fix’
-instance Control.Monad.Fix.MonadFix base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Fix’
+instance Control.Monad.Fix.MonadFix base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Fix’
 instance forall e. Control.Monad.Fix.MonadFix (Data.Either.Either e) -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix Data.Monoid.First -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Types.IO -- Defined in ‘Control.Monad.Fix’
@@ -10730,11 +10730,11 @@ instance Control.Monad.Fix.MonadFix [] -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Maybe.Maybe -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Base.NonEmpty -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix GHC.Generics.Par1 -- Defined in ‘Control.Monad.Fix’
-instance Control.Monad.Fix.MonadFix base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Fix’
+instance Control.Monad.Fix.MonadFix base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Fix’
 instance forall s. Control.Monad.Fix.MonadFix (GHC.ST.ST s) -- Defined in ‘Control.Monad.Fix’
 instance Control.Monad.Fix.MonadFix Solo -- Defined in ‘Control.Monad.Fix’
-instance Control.Monad.Fix.MonadFix base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Fix’
-instance forall s. Control.Monad.Fix.MonadFix (base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.18.0.0:Control.Monad.ST.Lazy.Imp’
+instance Control.Monad.Fix.MonadFix base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Fix’
+instance forall s. Control.Monad.Fix.MonadFix (base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.19.0.0:Control.Monad.ST.Lazy.Imp’
 instance Control.Monad.Fix.MonadFix Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance Control.Monad.Fix.MonadFix Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Identity’
 instance Control.Monad.Fix.MonadFix Data.Semigroup.First -- Defined in ‘Data.Semigroup’
@@ -10743,7 +10743,7 @@ instance Control.Monad.Fix.MonadFix Data.Semigroup.Max -- Defined in ‘Data.Sem
 instance Control.Monad.Fix.MonadFix Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance [safe] Control.Monad.IO.Class.MonadIO GHC.Types.IO -- Defined in ‘Control.Monad.IO.Class’
 instance [safe] Control.Monad.Zip.MonadZip Data.Ord.Down -- Defined in ‘Control.Monad.Zip’
-instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip Data.Monoid.First -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip Data.Functor.Identity.Identity -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip Data.Monoid.Last -- Defined in ‘Control.Monad.Zip’
@@ -10751,9 +10751,9 @@ instance [safe] Control.Monad.Zip.MonadZip [] -- Defined in ‘Control.Monad.Zip
 instance [safe] Control.Monad.Zip.MonadZip GHC.Maybe.Maybe -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Base.NonEmpty -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip GHC.Generics.Par1 -- Defined in ‘Control.Monad.Zip’
-instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Control.Monad.Zip’
 instance [safe] Control.Monad.Zip.MonadZip Solo -- Defined in ‘Control.Monad.Zip’
-instance [safe] Control.Monad.Zip.MonadZip base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Zip’
+instance [safe] Control.Monad.Zip.MonadZip base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Control.Monad.Zip’
 instance Control.Monad.Zip.MonadZip Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance [safe] Data.Bifoldable.Bifoldable Data.Either.Either -- Defined in ‘Data.Bifoldable’
 instance [safe] Data.Bifoldable.Bifoldable (,) -- Defined in ‘Data.Bifoldable’
@@ -10786,21 +10786,21 @@ instance forall x y z w. Data.Bitraversable.Bitraversable ((,,,,,) x y z w) -- D
 instance forall x y z w v. Data.Bitraversable.Bitraversable ((,,,,,,) x y z w v) -- Defined in ‘Data.Bitraversable’
 instance Data.Bitraversable.Bitraversable Data.Semigroup.Arg -- Defined in ‘Data.Semigroup’
 instance Data.Data.Data Data.Array.Byte.ByteArray -- Defined in ‘Data.Array.Byte’
-instance forall s. base-4.18.0.0:Data.Typeable.Internal.Typeable s => Data.Data.Data (Data.Array.Byte.MutableByteArray s) -- Defined in ‘Data.Array.Byte’
+instance forall s. base-4.19.0.0:Data.Typeable.Internal.Typeable s => Data.Data.Data (Data.Array.Byte.MutableByteArray s) -- Defined in ‘Data.Array.Byte’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
-instance forall i j (a :: i) (b :: j). (base-4.18.0.0:Data.Typeable.Internal.Typeable i, base-4.18.0.0:Data.Typeable.Internal.Typeable j, base-4.18.0.0:Data.Typeable.Internal.Typeable a, base-4.18.0.0:Data.Typeable.Internal.Typeable b, a ~~ b) => Data.Data.Data (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Data’
-instance Data.Data.Data base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘Data.Data’
-instance Data.Data.Data base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘Data.Data’
+instance forall i j (a :: i) (b :: j). (base-4.19.0.0:Data.Typeable.Internal.Typeable i, base-4.19.0.0:Data.Typeable.Internal.Typeable j, base-4.19.0.0:Data.Typeable.Internal.Typeable a, base-4.19.0.0:Data.Typeable.Internal.Typeable b, a ~~ b) => Data.Data.Data (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘Data.Data’
+instance Data.Data.Data base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b, GHC.Ix.Ix a) => Data.Data.Data (GHC.Arr.Array a b) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Generics.Associativity -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Bool -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Char -- Defined in ‘Data.Data’
-instance forall k a (b :: k). (base-4.18.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data a, base-4.18.0.0:Data.Typeable.Internal.Typeable b) => Data.Data.Data (Data.Functor.Const.Const a b) -- Defined in ‘Data.Data’
+instance forall k a (b :: k). (base-4.19.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data a, base-4.19.0.0:Data.Typeable.Internal.Typeable b) => Data.Data.Data (Data.Functor.Const.Const a b) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Generics.DecidedStrictness -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Double -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Ord.Down a) -- Defined in ‘Data.Data’
-instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘Data.Data’
+instance forall a. Data.Data.Data a => Data.Data.Data (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b) => Data.Data.Data (Data.Either.Either a b) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Monoid.First a) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Generics.Fixity -- Defined in ‘Data.Data’
@@ -10821,13 +10821,13 @@ instance Data.Data.Data GHC.Num.Natural.Natural -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (GHC.Base.NonEmpty a) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Types.Ordering -- Defined in ‘Data.Data’
 instance forall p. Data.Data.Data p => Data.Data.Data (GHC.Generics.Par1 p) -- Defined in ‘Data.Data’
-instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘Data.Data’
+instance forall a. Data.Data.Data a => Data.Data.Data (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (GHC.Ptr.Ptr a) -- Defined in ‘Data.Data’
 instance forall a. (Data.Data.Data a, GHC.Real.Integral a) => Data.Data.Data (GHC.Real.Ratio a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Solo a) -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Generics.SourceStrictness -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Generics.SourceUnpackedness -- Defined in ‘Data.Data’
-instance forall a. Data.Data.Data a => Data.Data.Data (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘Data.Data’
+instance forall a. Data.Data.Data a => Data.Data.Data (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘Data.Data’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b) => Data.Data.Data (a, b) -- Defined in ‘Data.Data’
 instance forall a b c. (Data.Data.Data a, Data.Data.Data b, Data.Data.Data c) => Data.Data.Data (a, b, c) -- Defined in ‘Data.Data’
 instance forall a b c d. (Data.Data.Data a, Data.Data.Data b, Data.Data.Data c, Data.Data.Data d) => Data.Data.Data (a, b, c, d) -- Defined in ‘Data.Data’
@@ -10843,13 +10843,13 @@ instance Data.Data.Data GHC.Word.Word32 -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Word.Word64 -- Defined in ‘Data.Data’
 instance Data.Data.Data GHC.Word.Word8 -- Defined in ‘Data.Data’
 instance Data.Data.Data Foreign.Ptr.WordPtr -- Defined in ‘Data.Data’
-instance forall (a :: * -> * -> *) b c. (base-4.18.0.0:Data.Typeable.Internal.Typeable a, base-4.18.0.0:Data.Typeable.Internal.Typeable b, base-4.18.0.0:Data.Typeable.Internal.Typeable c, Data.Data.Data (a b c)) => Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Data.Data’
-instance forall (m :: * -> *) a. (base-4.18.0.0:Data.Typeable.Internal.Typeable m, base-4.18.0.0:Data.Typeable.Internal.Typeable a, Data.Data.Data (m a)) => Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Data.Data’
+instance forall (a :: * -> * -> *) b c. (base-4.19.0.0:Data.Typeable.Internal.Typeable a, base-4.19.0.0:Data.Typeable.Internal.Typeable b, base-4.19.0.0:Data.Typeable.Internal.Typeable c, Data.Data.Data (a b c)) => Data.Data.Data (Control.Applicative.WrappedArrow a b c) -- Defined in ‘Data.Data’
+instance forall (m :: * -> *) a. (base-4.19.0.0:Data.Typeable.Internal.Typeable m, base-4.19.0.0:Data.Typeable.Internal.Typeable a, Data.Data.Data (m a)) => Data.Data.Data (Control.Applicative.WrappedMonad m a) -- Defined in ‘Data.Data’
 instance forall a. Data.Data.Data a => Data.Data.Data (Control.Applicative.ZipList a) -- Defined in ‘Data.Data’
-instance forall k (a :: k). (base-4.18.0.0:Data.Typeable.Internal.Typeable k, base-4.18.0.0:Data.Typeable.Internal.Typeable a) => Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
-instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). (base-4.18.0.0:Data.Typeable.Internal.Typeable a, base-4.18.0.0:Data.Typeable.Internal.Typeable f, base-4.18.0.0:Data.Typeable.Internal.Typeable g, base-4.18.0.0:Data.Typeable.Internal.Typeable k1, base-4.18.0.0:Data.Typeable.Internal.Typeable k2, Data.Data.Data (f (g a))) => Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (base-4.18.0.0:Data.Typeable.Internal.Typeable a, base-4.18.0.0:Data.Typeable.Internal.Typeable f, base-4.18.0.0:Data.Typeable.Internal.Typeable g, base-4.18.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data (f a), Data.Data.Data (g a)) => Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
-instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (base-4.18.0.0:Data.Typeable.Internal.Typeable a, base-4.18.0.0:Data.Typeable.Internal.Typeable f, base-4.18.0.0:Data.Typeable.Internal.Typeable g, base-4.18.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data (f a), Data.Data.Data (g a)) => Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
+instance forall k (a :: k). (base-4.19.0.0:Data.Typeable.Internal.Typeable k, base-4.19.0.0:Data.Typeable.Internal.Typeable a) => Data.Data.Data (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
+instance forall k1 (f :: k1 -> *) k2 (g :: k2 -> k1) (a :: k2). (base-4.19.0.0:Data.Typeable.Internal.Typeable a, base-4.19.0.0:Data.Typeable.Internal.Typeable f, base-4.19.0.0:Data.Typeable.Internal.Typeable g, base-4.19.0.0:Data.Typeable.Internal.Typeable k1, base-4.19.0.0:Data.Typeable.Internal.Typeable k2, Data.Data.Data (f (g a))) => Data.Data.Data (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (base-4.19.0.0:Data.Typeable.Internal.Typeable a, base-4.19.0.0:Data.Typeable.Internal.Typeable f, base-4.19.0.0:Data.Typeable.Internal.Typeable g, base-4.19.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data (f a), Data.Data.Data (g a)) => Data.Data.Data (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
+instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). (base-4.19.0.0:Data.Typeable.Internal.Typeable a, base-4.19.0.0:Data.Typeable.Internal.Typeable f, base-4.19.0.0:Data.Typeable.Internal.Typeable g, base-4.19.0.0:Data.Typeable.Internal.Typeable k, Data.Data.Data (f a), Data.Data.Data (g a)) => Data.Data.Data (Data.Functor.Sum.Sum f g a) -- Defined in ‘Data.Functor.Sum’
 instance forall a b. (Data.Data.Data a, Data.Data.Data b) => Data.Data.Data (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. Data.Data.Data a => Data.Data.Data (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -10861,7 +10861,7 @@ instance forall (n :: GHC.TypeNats.Nat). GHC.TypeNats.KnownNat n => Data.Fixed.H
 instance Data.Foldable.Foldable Control.Applicative.ZipList -- Defined in ‘Control.Applicative’
 instance forall i. Data.Foldable.Foldable (GHC.Arr.Array i) -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Data.Ord.Down -- Defined in ‘Data.Foldable’
-instance Data.Foldable.Foldable base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Foldable’
+instance Data.Foldable.Foldable base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Foldable’
 instance forall a. Data.Foldable.Foldable (Data.Either.Either a) -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Data.Monoid.First -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Data.Monoid.Last -- Defined in ‘Data.Foldable’
@@ -10869,9 +10869,9 @@ instance Data.Foldable.Foldable [] -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable GHC.Maybe.Maybe -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable GHC.Base.NonEmpty -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable GHC.Generics.Par1 -- Defined in ‘Data.Foldable’
-instance Data.Foldable.Foldable base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable’
+instance Data.Foldable.Foldable base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Solo -- Defined in ‘Data.Foldable’
-instance Data.Foldable.Foldable base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable’
+instance Data.Foldable.Foldable base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable’
 instance forall a. Data.Foldable.Foldable ((,) a) -- Defined in ‘Data.Foldable’
 instance Data.Foldable.Foldable Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance Data.Foldable.Foldable Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Identity’
@@ -10882,7 +10882,7 @@ instance Data.Foldable.Foldable Data.Semigroup.Max -- Defined in ‘Data.Semigro
 instance Data.Foldable.Foldable Data.Semigroup.Min -- Defined in ‘Data.Semigroup’
 instance Data.Foldable1.Foldable1 Data.Complex.Complex -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Ord.Down -- Defined in ‘Data.Foldable1’
-instance Data.Foldable1.Foldable1 base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Foldable1’
+instance Data.Foldable1.Foldable1 base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Semigroup.First -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Functor.Identity.Identity -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Data.Semigroup.Last -- Defined in ‘Data.Foldable1’
@@ -10890,9 +10890,9 @@ instance Data.Foldable1.Foldable1 Data.Semigroup.Max -- Defined in ‘Data.Folda
 instance Data.Foldable1.Foldable1 Data.Semigroup.Min -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Base.NonEmpty -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 GHC.Generics.Par1 -- Defined in ‘Data.Foldable1’
-instance Data.Foldable1.Foldable1 base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable1’
+instance Data.Foldable1.Foldable1 base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Foldable1’
 instance Data.Foldable1.Foldable1 Solo -- Defined in ‘Data.Foldable1’
-instance Data.Foldable1.Foldable1 base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable1’
+instance Data.Foldable1.Foldable1 base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Foldable1’
 instance forall a. Data.Foldable1.Foldable1 ((,) a) -- Defined in ‘Data.Foldable1’
 instance [safe] Data.Functor.Classes.Eq1 Data.Complex.Complex -- Defined in ‘Data.Functor.Classes’
 instance [safe] Data.Functor.Classes.Eq1 Data.Ord.Down -- Defined in ‘Data.Functor.Classes’
@@ -10962,7 +10962,7 @@ instance forall a. Data.String.IsString a => Data.String.IsString (Data.Functor.
 instance forall a. (a ~ GHC.Types.Char) => Data.String.IsString [a] -- Defined in ‘Data.String’
 instance forall i. GHC.Ix.Ix i => Data.Traversable.Traversable (GHC.Arr.Array i) -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Data.Ord.Down -- Defined in ‘Data.Traversable’
-instance Data.Traversable.Traversable base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Traversable’
+instance Data.Traversable.Traversable base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘Data.Traversable’
 instance forall a. Data.Traversable.Traversable (Data.Either.Either a) -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Data.Monoid.First -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Data.Functor.Identity.Identity -- Defined in ‘Data.Traversable’
@@ -10971,9 +10971,9 @@ instance Data.Traversable.Traversable [] -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable GHC.Maybe.Maybe -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable GHC.Base.NonEmpty -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable GHC.Generics.Par1 -- Defined in ‘Data.Traversable’
-instance Data.Traversable.Traversable base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Traversable’
+instance Data.Traversable.Traversable base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Solo -- Defined in ‘Data.Traversable’
-instance Data.Traversable.Traversable base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Traversable’
+instance Data.Traversable.Traversable base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘Data.Traversable’
 instance forall a. Data.Traversable.Traversable ((,) a) -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Control.Applicative.ZipList -- Defined in ‘Data.Traversable’
 instance Data.Traversable.Traversable Data.Complex.Complex -- Defined in ‘Data.Complex’
@@ -10993,7 +10993,7 @@ instance Data.Type.Equality.TestEquality GHC.TypeLits.SSymbol -- Defined in ‘G
 instance Data.Type.Equality.TestEquality GHC.TypeNats.SNat -- Defined in ‘GHC.TypeNats’
 instance forall k (a :: k). Data.Type.Equality.TestEquality ((Data.Type.Equality.:~:) a) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k (a :: k1). Data.Type.Equality.TestEquality ((Data.Type.Equality.:~~:) a) -- Defined in ‘Data.Type.Equality’
-instance forall k. Data.Type.Equality.TestEquality base-4.18.0.0:Data.Typeable.Internal.TypeRep -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
+instance forall k. Data.Type.Equality.TestEquality base-4.19.0.0:Data.Typeable.Internal.TypeRep -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1). Data.Type.Equality.TestEquality f => Data.Type.Equality.TestEquality (Data.Functor.Compose.Compose f g) -- Defined in ‘Data.Functor.Compose’
 instance forall a k (b :: k). Foreign.Storable.Storable a => Foreign.Storable.Storable (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
 instance forall a. Foreign.Storable.Storable a => Foreign.Storable.Storable (Data.Complex.Complex a) -- Defined in ‘Data.Complex’
@@ -11050,15 +11050,15 @@ instance forall (a :: * -> * -> *). Control.Arrow.Arrow a => GHC.Base.Applicativ
 instance forall (m :: * -> *) a. GHC.Base.Applicative m => GHC.Base.Applicative (Control.Arrow.Kleisli m a) -- Defined in ‘Control.Arrow’
 instance GHC.Base.Applicative GHC.Conc.Sync.STM -- Defined in ‘GHC.Conc.Sync’
 instance forall s. GHC.Base.Applicative (GHC.ST.ST s) -- Defined in ‘GHC.ST’
-instance forall s. GHC.Base.Applicative (base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.18.0.0:Control.Monad.ST.Lazy.Imp’
+instance forall s. GHC.Base.Applicative (base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.19.0.0:Control.Monad.ST.Lazy.Imp’
 instance GHC.Base.Applicative Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall e. GHC.Base.Applicative (Data.Either.Either e) -- Defined in ‘Data.Either’
 instance GHC.Base.Applicative Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Identity’
 instance GHC.Base.Applicative Data.Monoid.First -- Defined in ‘Data.Monoid’
 instance GHC.Base.Applicative Data.Monoid.Last -- Defined in ‘Data.Monoid’
-instance GHC.Base.Applicative base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Applicative base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Applicative base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Applicative base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Applicative base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Applicative base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance GHC.Base.Applicative Data.Ord.Down -- Defined in ‘Data.Ord’
 instance GHC.Base.Applicative Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Applicative Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
@@ -11088,15 +11088,15 @@ instance forall (m :: * -> *) a. GHC.Base.Functor m => GHC.Base.Functor (Control
 instance GHC.Base.Functor GHC.Conc.Sync.STM -- Defined in ‘GHC.Conc.Sync’
 instance GHC.Base.Functor Control.Exception.Handler -- Defined in ‘Control.Exception’
 instance forall s. GHC.Base.Functor (GHC.ST.ST s) -- Defined in ‘GHC.ST’
-instance forall s. GHC.Base.Functor (base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.18.0.0:Control.Monad.ST.Lazy.Imp’
+instance forall s. GHC.Base.Functor (base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.19.0.0:Control.Monad.ST.Lazy.Imp’
 instance GHC.Base.Functor Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall a. GHC.Base.Functor (Data.Either.Either a) -- Defined in ‘Data.Either’
 instance GHC.Base.Functor Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Identity’
 instance GHC.Base.Functor Data.Monoid.First -- Defined in ‘Data.Monoid’
 instance GHC.Base.Functor Data.Monoid.Last -- Defined in ‘Data.Monoid’
-instance GHC.Base.Functor base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Functor base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Functor base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Functor base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Functor base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Functor base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance GHC.Base.Functor Data.Ord.Down -- Defined in ‘Data.Ord’
 instance forall a. GHC.Base.Functor (Data.Semigroup.Arg a) -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Functor Data.Semigroup.First -- Defined in ‘Data.Semigroup’
@@ -11125,15 +11125,15 @@ instance forall (a :: * -> * -> *). Control.Arrow.ArrowApply a => GHC.Base.Monad
 instance forall (m :: * -> *) a. GHC.Base.Monad m => GHC.Base.Monad (Control.Arrow.Kleisli m a) -- Defined in ‘Control.Arrow’
 instance GHC.Base.Monad GHC.Conc.Sync.STM -- Defined in ‘GHC.Conc.Sync’
 instance forall s. GHC.Base.Monad (GHC.ST.ST s) -- Defined in ‘GHC.ST’
-instance forall s. GHC.Base.Monad (base-4.18.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.18.0.0:Control.Monad.ST.Lazy.Imp’
+instance forall s. GHC.Base.Monad (base-4.19.0.0:Control.Monad.ST.Lazy.Imp.ST s) -- Defined in ‘base-4.19.0.0:Control.Monad.ST.Lazy.Imp’
 instance GHC.Base.Monad Data.Complex.Complex -- Defined in ‘Data.Complex’
 instance forall e. GHC.Base.Monad (Data.Either.Either e) -- Defined in ‘Data.Either’
 instance GHC.Base.Monad Data.Functor.Identity.Identity -- Defined in ‘Data.Functor.Identity’
 instance GHC.Base.Monad Data.Monoid.First -- Defined in ‘Data.Monoid’
 instance GHC.Base.Monad Data.Monoid.Last -- Defined in ‘Data.Monoid’
-instance GHC.Base.Monad base-4.18.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Monad base-4.18.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Monad base-4.18.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Monad base-4.19.0.0:Data.Semigroup.Internal.Dual -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Monad base-4.19.0.0:Data.Semigroup.Internal.Product -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Monad base-4.19.0.0:Data.Semigroup.Internal.Sum -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance GHC.Base.Monad Data.Ord.Down -- Defined in ‘Data.Ord’
 instance GHC.Base.Monad Data.Semigroup.First -- Defined in ‘Data.Semigroup’
 instance GHC.Base.Monad Data.Semigroup.Last -- Defined in ‘Data.Semigroup’
@@ -11181,19 +11181,19 @@ instance forall a. GHC.Base.Monoid a => GHC.Base.Monoid (Data.Functor.Identity.I
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Base.Monoid (f a), GHC.Base.Monoid (g a)) => GHC.Base.Monoid (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
 instance forall a. GHC.Base.Monoid (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Base.Monoid (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Base.Monoid base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Monoid base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Base.Monoid a => GHC.Base.Monoid (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Base.Monoid (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Base.Monoid (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Base.Monoid (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Monoid base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Monoid base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Base.Monoid a => GHC.Base.Monoid (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Base.Monoid (base-4.19.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Base.Monoid (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Base.Monoid (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Base.Monoid a => GHC.Base.Monoid (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. (GHC.Classes.Ord a, GHC.Enum.Bounded a) => GHC.Base.Monoid (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. (GHC.Classes.Ord a, GHC.Enum.Bounded a) => GHC.Base.Monoid (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Base.Monoid m => GHC.Base.Monoid (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
-instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Base.Monoid base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Monoid base-4.19.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Monoid base-4.19.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Monoid base-4.19.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
 instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Monoid (f p), GHC.Base.Monoid (g p)) => GHC.Base.Monoid ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Monoid (f (g p)) => GHC.Base.Monoid ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
 instance forall a. (GHC.Generics.Generic a, GHC.Base.Monoid (GHC.Generics.Rep a ())) => GHC.Base.Monoid (GHC.Generics.Generically a) -- Defined in ‘GHC.Generics’
@@ -11236,21 +11236,21 @@ instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Functor.Iden
 instance [safe] forall k (f :: k -> *) (a :: k) (g :: k -> *). (GHC.Base.Semigroup (f a), GHC.Base.Semigroup (g a)) => GHC.Base.Semigroup (Data.Functor.Product.Product f g a) -- Defined in ‘Data.Functor.Product’
 instance forall a. GHC.Base.Semigroup (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Base.Semigroup (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Base.Semigroup base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Base.Semigroup base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Base.Semigroup (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Base.Semigroup (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Base.Semigroup (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Semigroup base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Base.Semigroup base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Base.Semigroup (base-4.19.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Base.Semigroup (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Base.Semigroup (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Base.Semigroup a => GHC.Base.Semigroup (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Base.Semigroup (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Base.Semigroup (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Classes.Ord a => GHC.Base.Semigroup (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Classes.Ord a => GHC.Base.Semigroup (Data.Semigroup.Min a) -- Defined in ‘Data.Semigroup’
 instance forall m. GHC.Base.Monoid m => GHC.Base.Semigroup (Data.Semigroup.WrappedMonoid m) -- Defined in ‘Data.Semigroup’
-instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Base.Semigroup base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Semigroup base-4.19.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Semigroup base-4.19.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Base.Semigroup base-4.19.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
 instance forall k (f :: k -> *) (p :: k) (g :: k -> *). (GHC.Base.Semigroup (f p), GHC.Base.Semigroup (g p)) => GHC.Base.Semigroup ((GHC.Generics.:*:) f g p) -- Defined in ‘GHC.Generics’
 instance forall k2 k1 (f :: k2 -> *) (g :: k1 -> k2) (p :: k1). GHC.Base.Semigroup (f (g p)) => GHC.Base.Semigroup ((GHC.Generics.:.:) f g p) -- Defined in ‘GHC.Generics’
 instance forall a. (GHC.Generics.Generic a, GHC.Base.Semigroup (GHC.Generics.Rep a ())) => GHC.Base.Semigroup (GHC.Generics.Generically a) -- Defined in ‘GHC.Generics’
@@ -11317,11 +11317,11 @@ instance GHC.Enum.Bounded GHC.Int.Int16 -- Defined in ‘GHC.Int’
 instance GHC.Enum.Bounded GHC.Int.Int32 -- Defined in ‘GHC.Int’
 instance GHC.Enum.Bounded GHC.Int.Int64 -- Defined in ‘GHC.Int’
 instance GHC.Enum.Bounded GHC.Int.Int8 -- Defined in ‘GHC.Int’
-instance GHC.Enum.Bounded base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Enum.Bounded base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Enum.Bounded base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Enum.Bounded base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Enum.Bounded a => GHC.Enum.Bounded (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -11381,7 +11381,7 @@ instance GHC.Enum.Enum GHC.Int.Int32 -- Defined in ‘GHC.Int’
 instance GHC.Enum.Enum GHC.Int.Int64 -- Defined in ‘GHC.Int’
 instance GHC.Enum.Enum GHC.Int.Int8 -- Defined in ‘GHC.Int’
 instance forall k (f :: k -> *) (a :: k). GHC.Enum.Enum (f a) => GHC.Enum.Enum (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
-instance forall k (f :: k -> *) (a :: k). GHC.Enum.Enum (f a) => GHC.Enum.Enum (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Enum.Enum (f a) => GHC.Enum.Enum (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. (GHC.Enum.Enum a, GHC.Enum.Bounded a, GHC.Classes.Eq a) => GHC.Enum.Enum (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Real.Integral a => GHC.Enum.Enum (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
 instance forall a. GHC.Enum.Enum a => GHC.Enum.Enum (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
@@ -11448,7 +11448,7 @@ instance GHC.Exception.Type.Exception Control.Exception.Base.RecSelError -- Defi
 instance GHC.Exception.Type.Exception Control.Exception.Base.RecUpdError -- Defined in ‘Control.Exception.Base’
 instance GHC.Exception.Type.Exception Control.Exception.Base.TypeError -- Defined in ‘Control.Exception.Base’
 instance GHC.Exception.Type.Exception Data.Dynamic.Dynamic -- Defined in ‘Data.Dynamic’
-instance [safe] GHC.Exception.Type.Exception base-4.18.0.0:GHC.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘base-4.18.0.0:GHC.IO.Handle.Lock.Common’
+instance [safe] GHC.Exception.Type.Exception base-4.19.0.0:GHC.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘base-4.19.0.0:GHC.IO.Handle.Lock.Common’
 instance GHC.Exception.Type.Exception GHC.IOPort.IOPortException -- Defined in ‘GHC.IOPort’
 instance [safe] GHC.Exception.Type.Exception System.Timeout.Timeout -- Defined in ‘System.Timeout’
 instance forall a k (b :: k). GHC.Float.Floating a => GHC.Float.Floating (Data.Functor.Const.Const a b) -- Defined in ‘Data.Functor.Const’
@@ -11481,13 +11481,13 @@ instance [safe] forall k (f :: k -> *) (g :: k -> *) (a :: k). GHC.Generics.Gene
 instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Generics.Generic (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Generics.Generic (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Generics.Generic base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Generics.Generic (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Generics.Generic base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Generics.Generic (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Generics.Generic base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Generics.Generic (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Generics.Generic (base-4.19.0.0:Data.Semigroup.Internal.Endo a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Generics.Generic (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Generics.Generic (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a b. GHC.Generics.Generic (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Generics.Generic (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Generics.Generic (Data.Semigroup.Last a) -- Defined in ‘Data.Semigroup’
@@ -11564,7 +11564,7 @@ instance forall k a. GHC.Generics.Generic1 (Data.Functor.Const.Const a) -- Defin
 instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Product.Product f g) -- Defined in ‘Data.Functor.Product’
 instance [safe] forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (Data.Functor.Sum.Sum f g) -- Defined in ‘Data.Functor.Sum’
 instance forall k (f :: k -> *). GHC.Generics.Generic1 (Data.Monoid.Ap f) -- Defined in ‘Data.Monoid’
-instance forall k (f :: k -> *). GHC.Generics.Generic1 (base-4.18.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *). GHC.Generics.Generic1 (base-4.19.0.0:Data.Semigroup.Internal.Alt f) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:*: g) -- Defined in ‘GHC.Generics’
 instance forall k (f :: k -> *) (g :: k -> *). GHC.Generics.Generic1 (f GHC.Generics.:+: g) -- Defined in ‘GHC.Generics’
 instance forall k i c. GHC.Generics.Generic1 (GHC.Generics.K1 i c) -- Defined in ‘GHC.Generics’
@@ -11671,9 +11671,9 @@ instance GHC.Num.Num GHC.Int.Int16 -- Defined in ‘GHC.Int’
 instance GHC.Num.Num GHC.Int.Int32 -- Defined in ‘GHC.Int’
 instance GHC.Num.Num GHC.Int.Int64 -- Defined in ‘GHC.Int’
 instance GHC.Num.Num GHC.Int.Int8 -- Defined in ‘GHC.Int’
-instance forall k (f :: k -> *) (a :: k). GHC.Num.Num (f a) => GHC.Num.Num (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Num.Num (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Num.Num a => GHC.Num.Num (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Num.Num (f a) => GHC.Num.Num (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Num.Num (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Num.Num a => GHC.Num.Num (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Num.Num a => GHC.Num.Num (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Real.Integral a => GHC.Num.Num (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
 instance forall a. GHC.Num.Num a => GHC.Num.Num (Data.Semigroup.Max a) -- Defined in ‘Data.Semigroup’
@@ -11751,12 +11751,12 @@ instance GHC.Read.Read GHC.Int.Int8 -- Defined in ‘GHC.Int’
 instance forall k (f :: k -> *) (a :: k). GHC.Read.Read (f a) => GHC.Read.Read (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Read.Read base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Read.Read (f a) => GHC.Read.Read (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Read.Read base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Read.Read base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Read.Read (f a) => GHC.Read.Read (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Read.Read base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Read.Read a => GHC.Read.Read (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a b. (GHC.Read.Read a, GHC.Read.Read b) => GHC.Read.Read (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
 instance forall a. GHC.Read.Read a => GHC.Read.Read (Data.Semigroup.First a) -- Defined in ‘Data.Semigroup’
@@ -11933,8 +11933,8 @@ instance GHC.Show.Show Data.Data.Fixity -- Defined in ‘Data.Data’
 instance forall k (a :: k) (b :: k). GHC.Show.Show (a Data.Type.Equality.:~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). GHC.Show.Show (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (s :: k). GHC.Show.Show (Data.Proxy.Proxy s) -- Defined in ‘Data.Proxy’
-instance GHC.Show.Show base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Show.Show (base-4.18.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
+instance GHC.Show.Show base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Show.Show (base-4.19.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
 instance GHC.Show.Show Data.Dynamic.Dynamic -- Defined in ‘Data.Dynamic’
 instance forall a b. (GHC.Show.Show a, GHC.Show.Show b) => GHC.Show.Show (Data.Either.Either a b) -- Defined in ‘Data.Either’
 instance forall k (a :: k). Data.Fixed.HasResolution a => GHC.Show.Show (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
@@ -11949,12 +11949,12 @@ instance GHC.Show.Show GHC.Int.Int8 -- Defined in ‘GHC.Int’
 instance forall k (f :: k -> *) (a :: k). GHC.Show.Show (f a) => GHC.Show.Show (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Show.Show a => GHC.Show.Show (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Show.Show a => GHC.Show.Show (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Show.Show base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Show.Show (f a) => GHC.Show.Show (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Show.Show base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Show.Show base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Show.Show (f a) => GHC.Show.Show (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Show.Show base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Show.Show a => GHC.Show.Show (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Show.Show a => GHC.Show.Show (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance GHC.Show.Show GHC.Real.FractionalExponentBase -- Defined in ‘GHC.Real’
 instance forall a. GHC.Show.Show a => GHC.Show.Show (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
@@ -11979,13 +11979,13 @@ instance GHC.Show.Show Foreign.Ptr.WordPtr -- Defined in ‘Foreign.Ptr’
 instance forall a. GHC.Show.Show (Foreign.C.ConstPtr.ConstPtr a) -- Defined in ‘Foreign.C.ConstPtr’
 instance forall a b. (GHC.Ix.Ix a, GHC.Show.Show a, GHC.Show.Show b) => GHC.Show.Show (GHC.Arr.Array a b) -- Defined in ‘GHC.Arr’
 instance [safe] GHC.Show.Show GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Internal.Types.Timeout -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Manager.FdKey -- Defined in ‘base-4.18.0.0:GHC.Event.Manager’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.Manager.State -- Defined in ‘base-4.18.0.0:GHC.Event.Manager’
-instance GHC.Show.Show base-4.18.0.0:GHC.Event.TimerManager.State -- Defined in ‘base-4.18.0.0:GHC.Event.TimerManager’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Internal.Types.Timeout -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Manager.FdKey -- Defined in ‘base-4.19.0.0:GHC.Event.Manager’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.Manager.State -- Defined in ‘base-4.19.0.0:GHC.Event.Manager’
+instance GHC.Show.Show base-4.19.0.0:GHC.Event.TimerManager.State -- Defined in ‘base-4.19.0.0:GHC.Event.TimerManager’
 instance GHC.Show.Show GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
 instance GHC.Show.Show GHC.Types.Double -- Defined in ‘GHC.Float’
 instance GHC.Show.Show GHC.Types.Float -- Defined in ‘GHC.Float’
@@ -12019,7 +12019,7 @@ instance GHC.Show.Show GHC.IO.Handle.Types.Handle -- Defined in ‘GHC.IO.Handle
 instance GHC.Show.Show GHC.IO.Handle.Types.HandleType -- Defined in ‘GHC.IO.Handle.Types’
 instance GHC.Show.Show GHC.IO.Handle.Types.Newline -- Defined in ‘GHC.IO.Handle.Types’
 instance GHC.Show.Show GHC.IO.Handle.Types.NewlineMode -- Defined in ‘GHC.IO.Handle.Types’
-instance [safe] GHC.Show.Show base-4.18.0.0:GHC.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘base-4.18.0.0:GHC.IO.Handle.Lock.Common’
+instance [safe] GHC.Show.Show base-4.19.0.0:GHC.IO.Handle.Lock.Common.FileLockingNotSupported -- Defined in ‘base-4.19.0.0:GHC.IO.Handle.Lock.Common’
 instance GHC.Show.Show GHC.IO.IOMode.IOMode -- Defined in ‘GHC.IO.IOMode’
 instance GHC.Show.Show GHC.RTS.Flags.CCFlags -- Defined in ‘GHC.RTS.Flags’
 instance GHC.Show.Show GHC.RTS.Flags.ConcFlags -- Defined in ‘GHC.RTS.Flags’
@@ -12132,8 +12132,8 @@ instance GHC.Classes.Eq Data.Data.Fixity -- Defined in ‘Data.Data’
 instance forall k (a :: k) (b :: k). GHC.Classes.Eq (a Data.Type.Equality.:~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). GHC.Classes.Eq (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (s :: k). GHC.Classes.Eq (Data.Proxy.Proxy s) -- Defined in ‘Data.Proxy’
-instance GHC.Classes.Eq base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Classes.Eq (base-4.18.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
+instance GHC.Classes.Eq base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Classes.Eq (base-4.19.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
 instance forall a b. (GHC.Classes.Eq a, GHC.Classes.Eq b) => GHC.Classes.Eq (Data.Either.Either a b) -- Defined in ‘Data.Either’
 instance forall k (a :: k). GHC.Classes.Eq (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Classes.Eq (f (g a)) => GHC.Classes.Eq (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -12149,12 +12149,12 @@ instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Maybe.Maybe a) -- Def
 instance forall k (f :: k -> *) (a :: k). GHC.Classes.Eq (f a) => GHC.Classes.Eq (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Classes.Eq base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Classes.Eq (f a) => GHC.Classes.Eq (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Classes.Eq base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Classes.Eq base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Classes.Eq (f a) => GHC.Classes.Eq (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Classes.Eq base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Classes.Eq a => GHC.Classes.Eq (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
 instance forall s a. GHC.Classes.Eq (GHC.STRef.STRef s a) -- Defined in ‘GHC.STRef’
@@ -12183,13 +12183,13 @@ instance forall a. GHC.Classes.Eq (Foreign.C.ConstPtr.ConstPtr a) -- Defined in 
 instance forall i e. (GHC.Ix.Ix i, GHC.Classes.Eq e) => GHC.Classes.Eq (GHC.Arr.Array i e) -- Defined in ‘GHC.Arr’
 instance forall s i e. GHC.Classes.Eq (GHC.Arr.STArray s i e) -- Defined in ‘GHC.Arr’
 instance [safe] GHC.Classes.Eq GHC.ByteOrder.ByteOrder -- Defined in ‘GHC.ByteOrder’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.18.0.0:GHC.Event.Internal.Types’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Manager.FdKey -- Defined in ‘base-4.18.0.0:GHC.Event.Manager’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.Manager.State -- Defined in ‘base-4.18.0.0:GHC.Event.Manager’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.Internal.Types.Event -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.Internal.Types.EventLifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.Internal.Types.Lifetime -- Defined in ‘base-4.19.0.0:GHC.Event.Internal.Types’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.Manager.FdKey -- Defined in ‘base-4.19.0.0:GHC.Event.Manager’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.Manager.State -- Defined in ‘base-4.19.0.0:GHC.Event.Manager’
 instance GHC.Classes.Eq GHC.Event.TimeOut.TimeoutKey -- Defined in ‘GHC.Event.TimeOut’
-instance GHC.Classes.Eq base-4.18.0.0:GHC.Event.TimerManager.State -- Defined in ‘base-4.18.0.0:GHC.Event.TimerManager’
+instance GHC.Classes.Eq base-4.19.0.0:GHC.Event.TimerManager.State -- Defined in ‘base-4.19.0.0:GHC.Event.TimerManager’
 instance GHC.Classes.Eq GHC.Stack.Types.SrcLoc -- Defined in ‘GHC.Stack.Types’
 instance GHC.Classes.Eq GHC.Exts.SpecConstrAnnotation -- Defined in ‘GHC.Exts’
 instance GHC.Classes.Eq GHC.Fingerprint.Type.Fingerprint -- Defined in ‘GHC.Fingerprint.Type’
@@ -12284,8 +12284,8 @@ instance GHC.Classes.Ord GHC.Unicode.GeneralCategory -- Defined in ‘GHC.Unicod
 instance forall k (a :: k) (b :: k). GHC.Classes.Ord (a Data.Type.Equality.:~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k1 k2 (a :: k1) (b :: k2). GHC.Classes.Ord (a Data.Type.Equality.:~~: b) -- Defined in ‘Data.Type.Equality’
 instance forall k (s :: k). GHC.Classes.Ord (Data.Proxy.Proxy s) -- Defined in ‘Data.Proxy’
-instance GHC.Classes.Ord base-4.18.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
-instance forall k (a :: k). GHC.Classes.Ord (base-4.18.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.18.0.0:Data.Typeable.Internal’
+instance GHC.Classes.Ord base-4.19.0.0:Data.Typeable.Internal.SomeTypeRep -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
+instance forall k (a :: k). GHC.Classes.Ord (base-4.19.0.0:Data.Typeable.Internal.TypeRep a) -- Defined in ‘base-4.19.0.0:Data.Typeable.Internal’
 instance forall a b. (GHC.Classes.Ord a, GHC.Classes.Ord b) => GHC.Classes.Ord (Data.Either.Either a b) -- Defined in ‘Data.Either’
 instance forall k (a :: k). GHC.Classes.Ord (Data.Fixed.Fixed a) -- Defined in ‘Data.Fixed’
 instance forall k1 k2 (f :: k1 -> *) (g :: k2 -> k1) (a :: k2). GHC.Classes.Ord (f (g a)) => GHC.Classes.Ord (Data.Functor.Compose.Compose f g a) -- Defined in ‘Data.Functor.Compose’
@@ -12300,12 +12300,12 @@ instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (GHC.Maybe.Maybe a) -- D
 instance forall k (f :: k -> *) (a :: k). GHC.Classes.Ord (f a) => GHC.Classes.Ord (Data.Monoid.Ap f a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (Data.Monoid.First a) -- Defined in ‘Data.Monoid’
 instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (Data.Monoid.Last a) -- Defined in ‘Data.Monoid’
-instance GHC.Classes.Ord base-4.18.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall k (f :: k -> *) (a :: k). GHC.Classes.Ord (f a) => GHC.Classes.Ord (base-4.18.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance GHC.Classes.Ord base-4.18.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.18.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.18.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
-instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.18.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.18.0.0:Data.Semigroup.Internal’
+instance GHC.Classes.Ord base-4.19.0.0:Data.Semigroup.Internal.All -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall k (f :: k -> *) (a :: k). GHC.Classes.Ord (f a) => GHC.Classes.Ord (base-4.19.0.0:Data.Semigroup.Internal.Alt f a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance GHC.Classes.Ord base-4.19.0.0:Data.Semigroup.Internal.Any -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.19.0.0:Data.Semigroup.Internal.Dual a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.19.0.0:Data.Semigroup.Internal.Product a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
+instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (base-4.19.0.0:Data.Semigroup.Internal.Sum a) -- Defined in ‘base-4.19.0.0:Data.Semigroup.Internal’
 instance forall a. GHC.Classes.Ord a => GHC.Classes.Ord (Data.Ord.Down a) -- Defined in ‘Data.Ord’
 instance forall a. GHC.Real.Integral a => GHC.Classes.Ord (GHC.Real.Ratio a) -- Defined in ‘GHC.Real’
 instance forall a b. GHC.Classes.Ord a => GHC.Classes.Ord (Data.Semigroup.Arg a b) -- Defined in ‘Data.Semigroup’
