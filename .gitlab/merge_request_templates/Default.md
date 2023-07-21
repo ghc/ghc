@@ -25,6 +25,10 @@ If you have any questions don't hesitate to open your merge request and inquire
 in a comment. If your patch isn't quite done yet please do add prefix your MR
 title with `WIP:`.
 
+By default a minimal validation pipeline is run on each merge request, the ~full-ci
+label can be applied to perform additional validation checks if your MR affects a more
+unusual configuration.
+
 Once your change is ready please remove the `WIP:` tag and wait for review. If
 no one has offerred review in a few days then please leave a comment mentioning
 @triagers and apply the ~"Blocked on Review" label.
