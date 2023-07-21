@@ -58,7 +58,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Names
 
 import GHC.Data.FastString
-import GHC.Data.Pair
 import GHC.Data.Maybe
 
 import GHC.Utils.Outputable
@@ -83,7 +82,7 @@ dsJsFExport
 
 dsJsFExport fn_id co ext_name cconv isDyn = do
     let
-       ty                              = pSnd $ coercionKind co
+       ty                              = coercionRKind co
        (_tvs,sans_foralls)             = tcSplitForAllTyVars ty
        (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
        -- We must use tcSplits here, because we want to see
@@ -242,7 +241,7 @@ dsJsImport
   -> Maybe Header
   -> DsM ([Binding], CHeader, CStub)
 dsJsImport id co (CLabel cid) cconv _ _ = do
-   let ty = pFst $ coercionKind co
+   let ty = coercionLKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
@@ -272,7 +271,7 @@ dsJsFExportDynamic :: Id
                  -> DsM ([Binding], CHeader, CStub)
 dsJsFExportDynamic id co0 cconv = do
     let
-      ty                            = pFst (coercionKind co0)
+      ty                            = coercionLKind co0
       (tvs,sans_foralls)            = tcSplitForAllTyVars ty
       ([Scaled arg_mult arg_ty], fn_res_ty)  = tcSplitFunTys sans_foralls
       (io_tc, res_ty)               = expectJust "dsJsFExportDynamic: IO type expected"
@@ -342,7 +341,7 @@ dsJsCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], CHeader, CStub)
 dsJsCall fn_id co (CCall (CCallSpec target cconv safety)) _mDeclHeader = do
     let
-        ty                   = pFst $ coercionKind co
+        ty                   = coercionLKind co
         (tv_bndrs, rho)      = tcSplitForAllTyVarBinders ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 

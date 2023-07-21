@@ -451,7 +451,7 @@ TL;DR: we relaxed the let/app invariant to become the let-can-float invariant.
 Note [Core top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As an exception to the usual rule that top-level binders must be lifted,
-we allow binding primitive string literals (of type Addr#) of type Addr# at the
+we allow binding primitive string literals (of type Addr#) at the
 top level. This allows us to share string literals earlier in the pipeline and
 crucially allows other optimizations in the Core2Core pipeline to fire.
 Consider,
@@ -629,7 +629,7 @@ Note [Representation polymorphism invariants]
 GHC allows us to abstract over calling conventions using **representation polymorphism**.
 For example, we have:
 
-  ($) :: forall (r :: RuntimeRep) (a :: Type) (b :: TYPE r). a -> b -> b
+  ($) :: forall (r :: RuntimeRep) (a :: Type) (b :: TYPE r). (a -> b) -> a -> b
 
 In this example, the type `b` is representation-polymorphic: it has kind `TYPE r`,
 where the type variable `r :: RuntimeRep` abstracts over the runtime representation
@@ -662,14 +662,14 @@ Note that these two invariants require us to check other types than just the
 types of bound variables and types of function arguments, due to transformations
 that GHC performs. For example, the definition
 
-  myCoerce :: forall {r1 r2} (a :: TYPE r1) (b :: TYPE r2). Coercible a b => a -> b
+  myCoerce :: forall {r} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b
   myCoerce = coerce
 
 is invalid, because `coerce` has no binding (see GHC.Types.Id.Make.coerceId).
 So, before code-generation, GHC saturates the RHS of 'myCoerce' by performing
 an eta-expansion (see GHC.CoreToStg.Prep.maybeSaturate):
 
-  myCoerce = \ (x :: TYPE r1) -> coerce x
+  myCoerce = \ (x :: TYPE r) -> coerce x
 
 However, this transformation would be invalid, because now the binding of x
 in the lambda abstraction would violate I1.

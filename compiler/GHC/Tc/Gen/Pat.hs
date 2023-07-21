@@ -1058,7 +1058,7 @@ tcPatSynPat (L con_span con_name) pat_syn pat_ty penv arg_pats thing_inside
           -- 'tcDataConPat'.)
         ; let
             bad_arg_tys :: [(Int, Scaled Type)]
-            bad_arg_tys = filter (\ (_, Scaled _ arg_ty) -> typeLevity_maybe arg_ty == Nothing)
+            bad_arg_tys = filter (\ (_, Scaled _ arg_ty) -> not (typeHasFixedRuntimeRep arg_ty))
                         $ zip [0..] arg_tys'
         ; massertPpr (null bad_arg_tys) $
             vcat [ text "tcPatSynPat: pattern arguments do not have a fixed RuntimeRep"

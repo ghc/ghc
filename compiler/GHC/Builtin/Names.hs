@@ -716,14 +716,6 @@ ltTag_RDR               = nameRdrName  ordLTDataConName
 eqTag_RDR               = nameRdrName  ordEQDataConName
 gtTag_RDR               = nameRdrName  ordGTDataConName
 
-eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
-    :: RdrName
-eqClass_RDR             = nameRdrName eqClassName
-numClass_RDR            = nameRdrName numClassName
-ordClass_RDR            = nameRdrName ordClassName
-enumClass_RDR           = nameRdrName enumClassName
-monadClass_RDR          = nameRdrName monadClassName
-
 map_RDR, append_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
 append_RDR              = nameRdrName appendName
@@ -750,40 +742,9 @@ enumFromTo_RDR          = nameRdrName enumFromToName
 enumFromThen_RDR        = nameRdrName enumFromThenName
 enumFromThenTo_RDR      = nameRdrName enumFromThenToName
 
-ratioDataCon_RDR, integerAdd_RDR, integerMul_RDR :: RdrName
-ratioDataCon_RDR        = nameRdrName ratioDataConName
-integerAdd_RDR          = nameRdrName integerAddName
-integerMul_RDR          = nameRdrName integerMulName
-
-ioDataCon_RDR :: RdrName
-ioDataCon_RDR           = nameRdrName ioDataConName
-
-newStablePtr_RDR :: RdrName
-newStablePtr_RDR        = nameRdrName newStablePtrName
-
-bindIO_RDR, returnIO_RDR :: RdrName
-bindIO_RDR              = nameRdrName bindIOName
-returnIO_RDR            = nameRdrName returnIOName
-
-fromInteger_RDR, fromRational_RDR, minus_RDR, times_RDR, plus_RDR :: RdrName
-fromInteger_RDR         = nameRdrName fromIntegerName
-fromRational_RDR        = nameRdrName fromRationalName
-minus_RDR               = nameRdrName minusName
+times_RDR, plus_RDR :: RdrName
 times_RDR               = varQual_RDR  gHC_NUM (fsLit "*")
 plus_RDR                = varQual_RDR gHC_NUM (fsLit "+")
-
-toInteger_RDR, toRational_RDR, fromIntegral_RDR :: RdrName
-toInteger_RDR           = nameRdrName toIntegerName
-toRational_RDR          = nameRdrName toRationalName
-fromIntegral_RDR        = nameRdrName fromIntegralName
-
-fromString_RDR :: RdrName
-fromString_RDR          = nameRdrName fromStringName
-
-fromList_RDR, fromListN_RDR, toList_RDR :: RdrName
-fromList_RDR = nameRdrName fromListName
-fromListN_RDR = nameRdrName fromListNName
-toList_RDR = nameRdrName toListName
 
 compose_RDR :: RdrName
 compose_RDR             = varQual_RDR gHC_BASE (fsLit ".")

@@ -34,7 +34,7 @@ module GHC.Tc.Deriv.Generate (
         gen_Newtype_fam_insts,
         mkCoerceClassMethEqn,
         genAuxBinds,
-        ordOpTbl, boxConTbl, litConTbl,
+        ordOpTbl, boxConTbl,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
         getPossibleDataCons,
@@ -2363,7 +2363,7 @@ box ::         String           -- The class involved
             -> Type             -- The argument type
             -> LHsExpr GhcPs    -- Boxed version of the arg
 -- See Note [Deriving and unboxed types] in GHC.Tc.Deriv.Infer
-box cls_str arg arg_ty = assoc_ty_id cls_str boxConTbl arg_ty arg
+box cls_str arg arg_ty = nlHsApp (assoc_ty_id cls_str boxConTbl arg_ty) arg
 
 ---------------------
 primOrdOps :: String    -- The class involved
@@ -2403,23 +2403,22 @@ ordOpTbl
     ,(doublePrimTy, (ltDouble_RDR, leDouble_RDR
      , eqDouble_RDR, geDouble_RDR, gtDouble_RDR)) ]
 
--- A mapping from a primitive type to a function that constructs its boxed
--- version.
-boxConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]
+-- A mapping from a primitive type to a DataCon of its boxed version.
+boxConTbl :: [(Type, LHsExpr GhcPs)]
 boxConTbl =
-    [ (charPrimTy  , nlHsApp (nlHsVar $ getRdrName charDataCon))
-    , (intPrimTy   , nlHsApp (nlHsVar $ getRdrName intDataCon))
-    , (wordPrimTy  , nlHsApp (nlHsVar $ getRdrName wordDataCon ))
-    , (floatPrimTy , nlHsApp (nlHsVar $ getRdrName floatDataCon ))
-    , (doublePrimTy, nlHsApp (nlHsVar $ getRdrName doubleDataCon))
-    , (int8PrimTy,   nlHsApp (nlHsVar int8DataCon_RDR))
-    , (word8PrimTy,  nlHsApp (nlHsVar word8DataCon_RDR))
-    , (int16PrimTy,  nlHsApp (nlHsVar int16DataCon_RDR))
-    , (word16PrimTy, nlHsApp (nlHsVar word16DataCon_RDR))
-    , (int32PrimTy,  nlHsApp (nlHsVar int32DataCon_RDR))
-    , (word32PrimTy, nlHsApp (nlHsVar word32DataCon_RDR))
-    , (int64PrimTy,  nlHsApp (nlHsVar int64DataCon_RDR))
-    , (word64PrimTy, nlHsApp (nlHsVar word64DataCon_RDR))
+    [ (charPrimTy  , nlHsVar $ getRdrName charDataCon)
+    , (intPrimTy   , nlHsVar $ getRdrName intDataCon)
+    , (wordPrimTy  , nlHsVar $ getRdrName wordDataCon)
+    , (floatPrimTy , nlHsVar $ getRdrName floatDataCon)
+    , (doublePrimTy, nlHsVar $ getRdrName doubleDataCon)
+    , (int8PrimTy,   nlHsVar int8DataCon_RDR)
+    , (word8PrimTy,  nlHsVar word8DataCon_RDR)
+    , (int16PrimTy,  nlHsVar int16DataCon_RDR)
+    , (word16PrimTy, nlHsVar word16DataCon_RDR)
+    , (int32PrimTy,  nlHsVar int32DataCon_RDR)
+    , (word32PrimTy, nlHsVar word32DataCon_RDR)
+    , (int64PrimTy,  nlHsVar int64DataCon_RDR)
+    , (word64PrimTy, nlHsVar word64DataCon_RDR)
     ]
 
 
@@ -2441,26 +2440,6 @@ postfixModTbl
     ,(word32PrimTy, "#Word32")
     ,(int64PrimTy , "#Int64")
     ,(word64PrimTy, "#Word64")
-    ]
-
-litConTbl :: [(Type, LHsExpr GhcPs -> LHsExpr GhcPs)]
-litConTbl
-  = [(charPrimTy  , nlHsApp (nlHsVar charPrimL_RDR))
-    ,(intPrimTy   , nlHsApp (nlHsVar intPrimL_RDR)
-                      . nlHsApp (nlHsVar toInteger_RDR))
-    ,(wordPrimTy  , nlHsApp (nlHsVar wordPrimL_RDR)
-                      . nlHsApp (nlHsVar toInteger_RDR))
-    ,(addrPrimTy  , nlHsApp (nlHsVar stringPrimL_RDR)
-                      . nlHsApp (nlHsApp
-                          (nlHsVar map_RDR)
-                          (compose_RDR `nlHsApps`
-                            [ nlHsVar fromIntegral_RDR
-                            , nlHsVar fromEnum_RDR
-                            ])))
-    ,(floatPrimTy , nlHsApp (nlHsVar floatPrimL_RDR)
-                      . nlHsApp (nlHsVar toRational_RDR))
-    ,(doublePrimTy, nlHsApp (nlHsVar doublePrimL_RDR)
-                      . nlHsApp (nlHsVar toRational_RDR))
     ]
 
 -- | Lookup `Type` in an association list.

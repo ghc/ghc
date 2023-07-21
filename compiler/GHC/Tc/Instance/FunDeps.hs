@@ -527,7 +527,7 @@ also know `t2` and the other way.
 closeWrtFunDeps is used
  - when checking the coverage condition for an instance declaration
  - when determining which tyvars are unquantifiable during generalization, in
-   GHC.Tc.Solver.decideMonoTyVars.
+   GHC.Tc.Solver.decidePromotedTyVars.
 
 Note [Equality superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
