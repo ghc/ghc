@@ -1,2 +1,2 @@
 $$[||'z'||]
-$$(GHC.Base.id [||'z'||])
+$$(GHC.Base.FunOps.id [||'z'||])

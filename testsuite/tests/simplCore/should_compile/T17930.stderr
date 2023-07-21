@@ -1,2 +1,99 @@
+
+==================== Specialise ====================
+Result size of Specialise
+  = {terms: 88, types: 75, coercions: 10, joins: 0/0}
+
+-- RHS size: {terms: 30, types: 23, coercions: 3, joins: 0/0}
 $sfoo :: (?b::Bool) => String -> [Char]
 $sfoo
+  = \ ($dIP :: ?b::Bool) (x :: String) ->
+      case $dIP
+           `cast` (GHC.Classes.N:IP[0] <"b">_N <Bool>_N
+                   :: (?b::Bool) ~R# Bool)
+      of {
+        False ->
+          GHC.Base.List.build
+            @Char
+            (\ (@b) (c :: Char -> b -> b) (n :: b) ->
+               GHC.Base.List.foldr
+                 @Char
+                 @b
+                 c
+                 (GHC.CString.unpackFoldrCString# @b "."# c n)
+                 (GHC.Show.$fShowList_$s$cshow1 x));
+        True ->
+          GHC.Base.List.build
+            @Char
+            (\ (@b) (c :: Char -> b -> b) (n :: b) ->
+               GHC.Base.List.foldr
+                 @Char
+                 @b
+                 c
+                 (GHC.CString.unpackFoldrCString# @b "!"# c n)
+                 (GHC.Show.$fShowList_$s$cshow1 x))
+      }
+
+-- RHS size: {terms: 34, types: 28, coercions: 3, joins: 0/0}
+foo :: forall a. (?b::Bool, Show a) => a -> String
+foo
+  = \ (@a) ($dIP :: ?b::Bool) ($dShow :: Show a) (x :: a) ->
+      case $dIP
+           `cast` (GHC.Classes.N:IP[0] <"b">_N <Bool>_N
+                   :: (?b::Bool) ~R# Bool)
+      of {
+        False ->
+          GHC.Base.List.build
+            @Char
+            (\ (@b) (c :: Char -> b -> b) (n :: b) ->
+               GHC.Base.List.foldr
+                 @Char
+                 @b
+                 c
+                 (GHC.CString.unpackFoldrCString# @b "."# c n)
+                 (show @a $dShow x));
+        True ->
+          GHC.Base.List.build
+            @Char
+            (\ (@b) (c :: Char -> b -> b) (n :: b) ->
+               GHC.Base.List.foldr
+                 @Char
+                 @b
+                 c
+                 (GHC.CString.unpackFoldrCString# @b "!"# c n)
+                 (show @a $dShow x))
+      }
+
+-- RHS size: {terms: 7, types: 4, coercions: 4, joins: 0/0}
+str :: String
+str
+  = foo
+      @String
+      (GHC.Types.True
+       `cast` (Sym (GHC.Classes.N:IP[0] <"b">_N <Bool>_N)
+               :: Bool ~R# (?b::Bool)))
+      GHC.Show.$fShowList_$s$fShowList1
+      (GHC.Base.List.build
+         @Char (\ (@b) -> GHC.CString.unpackFoldrCString# @b "Hello"#))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+$trModule = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Prim.Addr#
+$trModule = "T17930"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule :: GHC.Types.TrName
+$trModule = GHC.Types.TrNameS $trModule
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T17930.$trModule :: GHC.Types.Module
+T17930.$trModule = GHC.Types.Module $trModule $trModule
+
+
+

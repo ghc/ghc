@@ -31,10 +31,16 @@ where
 
 #include "MachDeps.h"
 
+-- ghc-prim
+import GHC.Prim
+import GHC.Classes
+import GHC.Types (Bool(..), Word(..), Int(..))
+
+-- ghc-bignum
 import qualified GHC.Natural
 import qualified GHC.Integer
 
-import GHC.Base
+-- base
 import GHC.Num.Integer
 import GHC.Num.Natural
 
@@ -106,11 +112,11 @@ instance Num Int where
     I# x - I# y = I# (x -# y)
     negate (I# x) = I# (negateInt# x)
     I# x * I# y = I# (x *# y)
-    abs n  = if n `geInt` 0 then n else negate n
+    abs n  = if n > 0 then n else negate n
 
-    signum n | n `ltInt` 0 = negate 1
-             | n `eqInt` 0 = 0
-             | otherwise   = 1
+    signum n | n < 0  = negate 1
+             | n == 0 = 0
+             | True   = 1
 
     fromInteger i = I# (integerToInt# i)
 
@@ -146,7 +152,7 @@ instance Num Natural where
     (*)         = naturalMul
     negate      = naturalNegate
     fromInteger i = integerToNaturalThrow i
-    abs         = id
+    abs n       = n
     signum      = naturalSignum
 
 {-# DEPRECATED quotRemInteger "Use integerQuotRem# instead" #-}

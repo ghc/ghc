@@ -4,31 +4,31 @@ Result size of Tidy Core = {terms: 52, types: 86, coercions: 0, joins: 0/0}
 
 Rec {
 -- RHS size: {terms: 18, types: 24, coercions: 0, joins: 0/0}
-T18401.$w$spoly_$wgo1 :: forall a. a -> [a] -> (# [a] #)
-T18401.$w$spoly_$wgo1
-  = \ (@a_s1cL) (sc_s1cM :: a_s1cL) (sc1_s1cN :: [a_s1cL]) ->
-      case sc1_s1cN of {
-        [] -> (# GHC.Types.[] @a_s1cL #);
-        : y_a1bH ys_a1bI -> (# GHC.Types.: @a_s1cL sc_s1cM (case T18401.$w$spoly_$wgo1 @a_s1cL y_a1bH ys_a1bI of { (# ww_s1cR #) -> ww_s1cR }) #)
+T18401.$w$spoly_$wgo :: forall a. a -> [a] -> (# [a] #)
+T18401.$w$spoly_$wgo
+  = \ (@a_s18L) (sc_s18M :: a_s18L) (sc1_s18N :: [a_s18L]) ->
+      case sc1_s18N of {
+        [] -> (# GHC.Types.[] @a_s18L #);
+        : y_a17H ys_a17I -> (# GHC.Types.: @a_s18L sc_s18M (case T18401.$w$spoly_$wgo @a_s18L y_a17H ys_a17I of { (# ww_s18S #) -> ww_s18S }) #)
       }
 end Rec }
 
 -- RHS size: {terms: 17, types: 22, coercions: 0, joins: 0/0}
 si :: forall a. [a] -> (Bool, [a])
 si
-  = \ (@a_s1bR) (xs0_s1bS :: [a_s1bR]) ->
-      case xs0_s1bS of {
-        [] -> (GHC.Types.False, GHC.Types.[] @a_s1bR);
-        : y_a1bH ys_a1bI -> (GHC.Types.True, case T18401.$w$spoly_$wgo1 @a_s1bR y_a1bH ys_a1bI of { (# ww_s1cR #) -> ww_s1cR })
+  = \ (@a_s17R) (xs0_s17S :: [a_s17R]) ->
+      case xs0_s17S of {
+        [] -> (GHC.Types.False, GHC.Types.[] @a_s17R);
+        : y_a17H ys_a17I -> (GHC.Types.True, case T18401.$w$spoly_$wgo @a_s17R y_a17H ys_a17I of { (# ww_s18S #) -> ww_s18S })
       }
 
 -- RHS size: {terms: 14, types: 19, coercions: 0, joins: 0/0}
 safeInit :: forall a. [a] -> Maybe [a]
 safeInit
-  = \ (@a_aQu) (xs_awN :: [a_aQu]) ->
-      case xs_awN of {
-        [] -> GHC.Maybe.Nothing @[a_aQu];
-        : y_a1bH ys_a1bI -> GHC.Maybe.Just @[a_aQu] (case T18401.$w$spoly_$wgo1 @a_aQu y_a1bH ys_a1bI of { (# ww_s1cR #) -> ww_s1cR })
+  = \ (@a_aJw) (xs_ap5 :: [a_aJw]) ->
+      case xs_ap5 of {
+        [] -> GHC.Maybe.Nothing @[a_aJw];
+        : y_a17H ys_a17I -> GHC.Maybe.Just @[a_aJw] (case T18401.$w$spoly_$wgo @a_aJw y_a17H ys_a17I of { (# ww_s18S #) -> ww_s18S })
       }
 
 

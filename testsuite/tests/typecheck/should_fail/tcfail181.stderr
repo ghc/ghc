@@ -7,8 +7,8 @@ tcfail181.hs:17:9: error: [GHC-39999]
         at tcfail181.hs:17:1-30
       The type variable ‘m0’ is ambiguous
       Potentially matching instances:
-        instance Monad IO -- Defined in ‘GHC.Base’
-        instance Monad Maybe -- Defined in ‘GHC.Base’
+        instance Monad IO -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+        instance Monad Maybe -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
         ...plus six others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)

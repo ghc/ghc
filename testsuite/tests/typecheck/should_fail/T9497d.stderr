@@ -13,4 +13,4 @@ T9497d.hs:2:8: error: [GHC-88464]
         mempty :: forall a. Monoid a => a
           with mempty @(IO ())
           (imported from ‘Prelude’ at T9497d.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Semigroup’))

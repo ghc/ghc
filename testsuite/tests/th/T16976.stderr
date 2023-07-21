@@ -1,11 +1,11 @@
 T16976.aNumber :: forall {a_0 :: *} . GHC.Num.Num a_0 => a_0
-T16976.aString :: GHC.Base.String
+T16976.aString :: GHC.Base.String.String
 T16976.MkT1 :: forall (s_0 :: *) . T16976.T s_0
 T16976.MkT2 :: forall (s_0 :: *) . T16976.T s_0
 T16976.T :: * -> *
 T16976.P :: forall {s_0 :: *} . T16976.T s_0
 GHC.Classes.not :: GHC.Types.Bool -> GHC.Types.Bool
-GHC.Base.id :: forall (a_0 :: *) . a_0 -> a_0
+GHC.Base.FunOps.id :: forall (a_0 :: *) . a_0 -> a_0
 GHC.Maybe.Nothing :: forall (a_0 :: *) . GHC.Maybe.Maybe a_0
 GHC.Maybe.Maybe :: * -> *
-GHC.Base.Functor :: (* -> *) -> Constraint
+GHC.Base.Functor.Functor :: (* -> *) -> Constraint

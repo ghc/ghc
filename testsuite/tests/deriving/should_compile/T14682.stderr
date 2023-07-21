@@ -5,11 +5,12 @@ Derived class instances:
     GHC.Show.showsPrec a (T14682.Foo b1 b2)
       = GHC.Show.showParen
           (a GHC.Classes.>= 11)
-          ((GHC.Base..)
+          ((GHC.Base.FunOps..)
              (GHC.Show.showString "Foo ")
-             ((GHC.Base..)
+             ((GHC.Base.FunOps..)
                 (GHC.Show.showsPrec 11 b1)
-                ((GHC.Base..) GHC.Show.showSpace (GHC.Show.showsPrec 11 b2))))
+                ((GHC.Base.FunOps..)
+                   GHC.Show.showSpace (GHC.Show.showsPrec 11 b2))))
   
   instance Language.Haskell.TH.Syntax.Lift T14682.Foo where
     Language.Haskell.TH.Syntax.lift (T14682.Foo a1 a2)

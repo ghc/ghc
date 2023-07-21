@@ -1,5 +1,6 @@
 
 T16895a.hs:7:15: error: [GHC-99831]
     • Non-variable expression is not allowed in an infix expression
-      When splicing a TH expression: 1 `GHC.Base.id GHC.Base.id` 2
+      When splicing a TH expression:
+        1 `GHC.Base.FunOps.id GHC.Base.FunOps.id` 2
     • In the untyped splice: $(uInfixE [| 1 |] [| id id |] [| 2 |])

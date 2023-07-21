@@ -15,28 +15,34 @@ type Functor :: (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   ...
-  	-- Defined in ‘GHC.Base’
+  	-- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 Functor ∷ (★ → ★) → Constraint
 type Functor :: (★ → ★) → Constraint
 class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   (<$) ∷ ∀ a b. a → f b → f a
   {-# MINIMAL fmap #-}
-  	-- Defined in ‘GHC.Base’
-instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
-instance Functor IO -- Defined in ‘GHC.Base’
-instance Functor [] -- Defined in ‘GHC.Base’
-instance Functor Maybe -- Defined in ‘GHC.Base’
-instance Functor Solo -- Defined in ‘GHC.Base’
-instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Base’
-instance ∀ a b. Functor ((,,) a b) -- Defined in ‘GHC.Base’
-instance ∀ a b c. Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+  	-- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance ∀ r. Functor ((->) r)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor IO -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor [] -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor Maybe
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor Solo
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance ∀ a. Functor ((,) a)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance ∀ a b. Functor ((,,) a b)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance ∀ a b c. Functor ((,,,) a b c)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 instance ∀ a b c d. Functor ((,,,,) a b c d)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 instance ∀ a b c d e. Functor ((,,,,,) a b c d e)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 instance ∀ a b c d e f. Functor ((,,,,,,) a b c d e f)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 instance ∀ a. Functor (Either a) -- Defined in ‘Data.Either’
 instance ∀ (f ∷ ★ → ★) (g ∷ ★ → ★).
          (Functor f, Functor g) ⇒

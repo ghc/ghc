@@ -26,8 +26,9 @@ type Unit :: *
 data Unit = ()
   	-- Defined in ‘GHC.Tuple.Prim’
 instance [safe] C () -- Defined at T4175.hs:22:10
-instance Monoid () -- Defined in ‘GHC.Base’
-instance Semigroup () -- Defined in ‘GHC.Base’
+instance Monoid () -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
+instance Semigroup ()
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
 instance Bounded () -- Defined in ‘GHC.Enum’
 instance Enum () -- Defined in ‘GHC.Enum’
 instance Ord () -- Defined in ‘GHC.Classes’
@@ -43,12 +44,15 @@ data Maybe a = Nothing | Just a
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
 instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’
-instance Applicative Maybe -- Defined in ‘GHC.Base’
-instance Functor Maybe -- Defined in ‘GHC.Base’
-instance Monad Maybe -- Defined in ‘GHC.Base’
-instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+instance Applicative Maybe
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor Maybe
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Monad Maybe -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Semigroup a => Monoid (Maybe a)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
 instance Semigroup a => Semigroup (Maybe a)
-  -- Defined in ‘GHC.Base’
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
 instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Maybe’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
 instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’

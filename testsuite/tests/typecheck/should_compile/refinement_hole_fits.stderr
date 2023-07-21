@@ -64,7 +64,7 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
           with const @Integer @[Integer]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
           with ($) @GHC.Types.LiftedRep
@@ -72,22 +72,22 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
                    @[Integer]
                    @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         ($!) (_ :: [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
           with ($!) @GHC.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         return (_ :: Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) [Integer]) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure (_ :: Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) [Integer]) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         j (_ :: [Integer] -> Integer)
           where j :: forall a. a -> a
           with j @([Integer] -> Integer)
@@ -96,7 +96,7 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where id :: forall a. a -> a
           with id @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         head (_ :: [[Integer] -> Integer])
           where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with head @([Integer] -> Integer)
@@ -111,7 +111,7 @@ refinement_hole_fits.hs:4:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where asTypeOf :: forall a. a -> a -> a
           with asTypeOf @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         (!!) (_ :: [[Integer] -> Integer]) (_ :: Int)
           where (!!) :: forall a.
                         GHC.Stack.Types.HasCallStack =>
@@ -130,15 +130,15 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         const :: forall a b. a -> b -> a
           with const @Integer @[Integer]
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) [Integer]) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) [Integer]) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
       Valid refinement hole fits include
         foldl (_ :: Integer -> Integer -> Integer)
           where foldl :: forall (t :: * -> *) b a.
@@ -163,12 +163,12 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
           with flip @[Integer] @Integer @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         const (_ :: [Integer] -> Integer)
           where const :: forall a b. a -> b -> a
           with const @([Integer] -> Integer) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
           with ($) @GHC.Types.LiftedRep
@@ -176,22 +176,22 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
                    @Integer
                    @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         ($!) (_ :: Integer -> [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
           with ($!) @GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         return (_ :: [Integer] -> Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Integer) @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure (_ :: [Integer] -> Integer)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Integer) @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         j (_ :: Integer -> [Integer] -> Integer)
           where j :: forall a. a -> a
           with j @(Integer -> [Integer] -> Integer)
@@ -200,7 +200,7 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where id :: forall a. a -> a
           with id @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         head (_ :: [Integer -> [Integer] -> Integer])
           where head :: forall a. GHC.Stack.Types.HasCallStack => [a] -> a
           with head @(Integer -> [Integer] -> Integer)
@@ -216,7 +216,7 @@ refinement_hole_fits.hs:7:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
           where asTypeOf :: forall a. a -> a -> a
           with asTypeOf @(Integer -> [Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         (!!) (_ :: [Integer -> [Integer] -> Integer]) (_ :: Int)
           where (!!) :: forall a.
                         GHC.Stack.Types.HasCallStack =>

@@ -7,7 +7,7 @@ foreign import stdcall safe "bay" bay :: (GHC.Types.Int ->
                                           GHC.Types.Bool) ->
                                          GHC.Types.IO GHC.Types.Int
 foreign import javascript unsafe "bax" bax :: GHC.Ptr.Ptr GHC.Types.Int ->
-                                              GHC.Types.IO GHC.Base.String
+                                              GHC.Types.IO GHC.Base.String.String
 TH_foreignCallingConventions.hs:(16,2)-(27,2): Splicing declarations
     do let fi cconv safety lbl name ty
              = ForeignD (ImportF cconv safety lbl name ty)

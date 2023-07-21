@@ -1,14 +1,15 @@
 
 ==================== Derived instances ====================
 Derived class instances:
-  instance GHC.Base.Functor DrvPhantom.NotAList where
-    GHC.Base.fmap _ = GHC.Prim.coerce
+  instance GHC.Base.Functor.Functor DrvPhantom.NotAList where
+    GHC.Base.Functor.fmap _ = GHC.Prim.coerce
   
   instance Data.Foldable.Foldable DrvPhantom.NotAList where
-    Data.Foldable.foldMap _ _ = GHC.Base.mempty
+    Data.Foldable.foldMap _ _ = GHC.Base.Semigroup.mempty
   
   instance Data.Traversable.Traversable DrvPhantom.NotAList where
-    Data.Traversable.traverse _ z = GHC.Base.pure (GHC.Prim.coerce z)
+    Data.Traversable.traverse _ z
+      = GHC.Base.Functor.pure (GHC.Prim.coerce z)
   
 
 Derived type family instances:
@@ -16,3 +17,134 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
+GHC.Base.Functor.Functor [DrvPhantom.NotAList]
+  GHC.Base.Functor.<$ = GHC.Base.Functor.$dm<$ @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.fold = Data.Foldable.$dmfold @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldMap' = Data.Foldable.$dmfoldMap'
+                             @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldr = Data.Foldable.$dmfoldr @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldr' = Data.Foldable.$dmfoldr'
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldl = Data.Foldable.$dmfoldl @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldl' = Data.Foldable.$dmfoldl'
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldr1 = Data.Foldable.$dmfoldr1
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.foldl1 = Data.Foldable.$dmfoldl1
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.toList = Data.Foldable.$dmtoList
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.null = Data.Foldable.$dmnull @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.length = Data.Foldable.$dmlength
+                           @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.elem = Data.Foldable.$dmelem @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.maximum = Data.Foldable.$dmmaximum
+                            @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.minimum = Data.Foldable.$dmminimum
+                            @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.sum = Data.Foldable.$dmsum @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvPhantom.NotAList]
+  Data.Foldable.product = Data.Foldable.$dmproduct
+                            @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvPhantom.NotAList]
+  Data.Traversable.sequenceA = Data.Traversable.$dmsequenceA
+                                 @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvPhantom.NotAList]
+  Data.Traversable.mapM = Data.Traversable.$dmmapM
+                            @(DrvPhantom.NotAList)
+
+
+
+==================== Filling in method body ====================
+Data.Traversable.Traversable [DrvPhantom.NotAList]
+  Data.Traversable.sequence = Data.Traversable.$dmsequence
+                                @(DrvPhantom.NotAList)
+
+

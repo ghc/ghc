@@ -42,31 +42,31 @@ main :: IO ()
 main
   = >>
       @IO
-      GHC.Base.$fMonadIO
+      base:GHC.Base.Functor.$fMonadIO
       @()
       @()
       (putStrLn (unpackCString# "c"#))
       (>>
          @IO
-         GHC.Base.$fMonadIO
+         base:GHC.Base.Functor.$fMonadIO
          @()
          @()
          (putStrLn (unpackCString# "x"#))
          (>>
             @IO
-            GHC.Base.$fMonadIO
+            base:GHC.Base.Functor.$fMonadIO
             @()
             @()
             (putStrLn (unpackCString# "z"#))
             (>>
                @IO
-               GHC.Base.$fMonadIO
+               base:GHC.Base.Functor.$fMonadIO
                @()
                @()
                (putStrLn (unpackCString# "efg"#))
                (>>
                   @IO
-                  GHC.Base.$fMonadIO
+                  base:GHC.Base.Functor.$fMonadIO
                   @()
                   @()
                   (case Control.Exception.Base.patError
@@ -74,7 +74,7 @@ main
                    of {})
                   (>>
                      @IO
-                     GHC.Base.$fMonadIO
+                     base:GHC.Base.Functor.$fMonadIO
                      @()
                      @()
                      (putStrLn (unpackCStringUtf8# "abc"#))

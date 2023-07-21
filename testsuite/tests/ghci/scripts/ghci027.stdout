@@ -1,10 +1,14 @@
-type GHC.Base.MonadPlus :: (* -> *) -> Constraint
-class (GHC.Base.Alternative m, GHC.Base.Monad m) =>
-      GHC.Base.MonadPlus m where
+type base-4.18.0.0:GHC.Base.Functor.MonadPlus :: (* -> *)
+                                                 -> Constraint
+class (base-4.18.0.0:GHC.Base.Functor.Alternative m,
+       base-4.18.0.0:GHC.Base.Functor.Monad m) =>
+      base-4.18.0.0:GHC.Base.Functor.MonadPlus m where
   ...
   mplus :: m a -> m a -> m a
-type GHC.Base.MonadPlus :: (* -> *) -> Constraint
-class (GHC.Base.Alternative m, GHC.Base.Monad m) =>
-      GHC.Base.MonadPlus m where
+type base-4.18.0.0:GHC.Base.Functor.MonadPlus :: (* -> *)
+                                                 -> Constraint
+class (base-4.18.0.0:GHC.Base.Functor.Alternative m,
+       base-4.18.0.0:GHC.Base.Functor.Monad m) =>
+      base-4.18.0.0:GHC.Base.Functor.MonadPlus m where
   ...
   Control.Monad.mplus :: m a -> m a -> m a

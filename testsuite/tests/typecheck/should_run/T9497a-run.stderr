@@ -1,4 +1,4 @@
-T9497a-run.exe: T9497a-run.hs:2:8: error: [GHC-88464]
+T9497a-run: T9497a-run.hs:2:8: error: [GHC-88464]
     • Found hole: _main :: IO ()
       Or perhaps ‘_main’ is mis-spelled, or not in scope
     • In an equation for ‘main’: main = _main
@@ -13,5 +13,5 @@ T9497a-run.exe: T9497a-run.hs:2:8: error: [GHC-88464]
         mempty :: forall a. Monoid a => a
           with mempty @(IO ())
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Semigroup’))
 (deferred type error)

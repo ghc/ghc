@@ -20,11 +20,11 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         const :: forall a b. a -> b -> a
           with const @Int @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         subtract :: forall a. Num a => a -> a -> a
           with subtract @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -80,11 +80,11 @@ T14590.hs:4:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
 
 T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
@@ -108,11 +108,11 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         const :: forall a b. a -> b -> a
           with const @Int @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         subtract :: forall a. Num a => a -> a -> a
           with subtract @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -168,11 +168,11 @@ T14590.hs:5:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
 
 T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
@@ -194,11 +194,11 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         const :: forall a b. a -> b -> a
           with const @Int @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         subtract :: forall a. Num a => a -> a -> a
           with subtract @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -254,11 +254,11 @@ T14590.hs:6:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
 
 T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Int -> Int -> Int
@@ -281,11 +281,11 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         asTypeOf :: forall a. a -> a -> a
           with asTypeOf @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         const :: forall a b. a -> b -> a
           with const @Int @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
         subtract :: forall a. Num a => a -> a -> a
           with subtract @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -341,8 +341,8 @@ T14590.hs:7:11: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))

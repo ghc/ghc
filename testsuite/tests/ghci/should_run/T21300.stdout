@@ -2,5 +2,5 @@ Bound Ids interactive:Ghci2.it
 Typechecked expr do let it
                           = (proc 'a' -> (| id \ 'b' 'c' -> returnA -< 'c' |) 'b' 'c') 'a'
                     print it
-                    GHC.Base.returnIO [Unsafe.Coerce.unsafeCoerce# it]
+                    base:GHC.Base.Functor.returnIO [Unsafe.Coerce.unsafeCoerce# it]
 'c'

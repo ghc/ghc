@@ -53,14 +53,14 @@ GHC.TypeLits.decideChar ::
   proxy1 a
   -> proxy2 b
   -> Either
-       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       ((a Data.Type.Equality.:~: b) -> base-4.18.0.0:GHC.Base.Void.Void)
        (a Data.Type.Equality.:~: b)
 GHC.TypeLits.decideSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   proxy1 a
   -> proxy2 b
   -> Either
-       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       ((a Data.Type.Equality.:~: b) -> base-4.18.0.0:GHC.Base.Void.Void)
        (a Data.Type.Equality.:~: b)
 GHC.TypeLits.fromSChar :: GHC.TypeLits.SChar c -> Char
 GHC.TypeLits.fromSNat :: GHC.TypeNats.SNat n -> Integer
@@ -191,7 +191,7 @@ GHC.TypeNats.decideNat ::
   proxy1 a
   -> proxy2 b
   -> Either
-       ((a Data.Type.Equality.:~: b) -> GHC.Base.Void)
+       ((a Data.Type.Equality.:~: b) -> base-4.18.0.0:GHC.Base.Void.Void)
        (a Data.Type.Equality.:~: b)
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>

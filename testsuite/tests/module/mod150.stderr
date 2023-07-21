@@ -3,5 +3,5 @@ mod150.hs:2:20: error: [GHC-69158]
     Conflicting exports for ‘id’:
        ‘module Prelude’ exports ‘Prelude.id’
          imported from ‘Prelude’ at mod150.hs:2:8
-         (and originally defined in ‘GHC.Base’)
+         (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’)
        ‘module M’ exports ‘M.id’ defined at mod150.hs:2:42

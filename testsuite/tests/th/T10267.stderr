@@ -16,7 +16,7 @@ T10267.hs:8:1: error: [GHC-88464]
         id :: forall a. a -> a
           with id @a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.FunOps’))
 
 T10267.hs:8:1: error: [GHC-88464]
     • Found hole: _ :: a

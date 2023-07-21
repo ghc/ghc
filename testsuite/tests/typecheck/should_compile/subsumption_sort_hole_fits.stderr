@@ -8,10 +8,10 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
       Valid hole fits include
         lines :: String -> [String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘base-4.17.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.18.0.0:Data.OldList’))
         words :: String -> [String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘base-4.17.0.0:Data.OldList’))
+           (and originally defined in ‘base-4.18.0.0:Data.OldList’))
         read :: forall a. Read a => String -> a
           with read @[String]
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
@@ -23,7 +23,7 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
         mempty :: forall a. Monoid a => a
           with mempty @(String -> [String])
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Semigroup’))
         fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
           with fail @[] @String
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
@@ -31,8 +31,8 @@ subsumption_sort_hole_fits.hs:2:5: warning: [GHC-88464] [-Wtyped-holes (in -Wdef
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @[] @String
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))
         pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @[] @String
           (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Functor’))

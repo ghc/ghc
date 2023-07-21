@@ -2,11 +2,16 @@ type (->) :: * -> * -> *
 type (->) = FUN Many :: * -> * -> *
   	-- Defined in ‘GHC.Types’
 infixr -1 ->
-instance Monoid b => Monoid (a -> b) -- Defined in ‘GHC.Base’
-instance Semigroup b => Semigroup (a -> b) -- Defined in ‘GHC.Base’
-instance Applicative ((->) r) -- Defined in ‘GHC.Base’
-instance Functor ((->) r) -- Defined in ‘GHC.Base’
-instance Monad ((->) r) -- Defined in ‘GHC.Base’
+instance Monoid b => Monoid (a -> b)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
+instance Semigroup b => Semigroup (a -> b)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Semigroup’
+instance Applicative ((->) r)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Functor ((->) r)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+instance Monad ((->) r)
+  -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
 type (~) :: forall k. k -> k -> Constraint
 class (a ~ b) => (~) a b
   	-- Defined in ‘GHC.Types’

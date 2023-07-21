@@ -378,7 +378,7 @@ coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "coercible_sel") coercib
 charTyConName, charDataConName, intTyConName, intDataConName, stringTyConName :: Name
 charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char")   charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#")     charDataConKey charDataCon
-stringTyConName   = mkWiredInTyConName   UserSyntax gHC_BASE  (fsLit "String") stringTyConKey stringTyCon
+stringTyConName   = mkWiredInTyConName   UserSyntax gHC_BASE_STRING (fsLit "String") stringTyConKey stringTyCon
 intTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int")    intTyConKey   intTyCon
 intDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#")     intDataConKey  intDataCon
 

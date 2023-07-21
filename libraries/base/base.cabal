@@ -338,6 +338,13 @@ Library
         Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
+        GHC.Base.FunOps
+        GHC.Base.Functor
+        GHC.Base.List
+        GHC.Base.NonEmpty
+        GHC.Base.Semigroup
+        GHC.Base.String
+        GHC.Base.Void
         GHC.IO.Handle.Lock.Common
         GHC.IO.Handle.Lock.Flock
         GHC.IO.Handle.Lock.LinuxOFD

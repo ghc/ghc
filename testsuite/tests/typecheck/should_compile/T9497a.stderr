@@ -13,4 +13,4 @@ T9497a.hs:2:8: warning: [GHC-88464] [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           with mempty @(IO ())
           (imported from ‘Prelude’ at T9497a.hs:1:1
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘base-4.18.0.0:GHC.Base.Semigroup’))

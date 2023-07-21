@@ -6,8 +6,8 @@ T13292a.hs:4:12: warning: [GHC-39999] [-Wdeferred-type-errors (in -Wdefault)]
         someFunc :: m0 () (bound at T13292a.hs:4:1)
       Probable fix: use a type annotation to specify what ‘m0’ should be.
       Potentially matching instances:
-        instance Monad IO -- Defined in ‘GHC.Base’
-        instance Monad Maybe -- Defined in ‘GHC.Base’
+        instance Monad IO -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
+        instance Monad Maybe -- Defined in ‘base-4.18.0.0:GHC.Base.Functor’
         ...plus six others
         ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)

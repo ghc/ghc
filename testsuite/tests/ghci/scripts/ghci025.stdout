@@ -15,7 +15,8 @@ c3 :: C a b => a1 -> b
 c4 :: C a b => a1 -> b
 -- imported via Control.Monad
 type MonadPlus :: (* -> *) -> Constraint
-class (GHC.Base.Alternative m, Monad m) => MonadPlus m
+class (base-4.18.0.0:GHC.Base.Functor.Alternative m, Monad m) =>
+      MonadPlus m
   ...
 mplus :: MonadPlus m => m a -> m a -> m a
 mzero :: MonadPlus m => m a
@@ -25,7 +26,7 @@ mzero :: MonadPlus m => m a
 return :: Monad m => a -> m a
 -- imported via Control.Monad, Prelude, T
 type Monad :: (* -> *) -> Constraint
-class GHC.Base.Applicative m => Monad m
+class base-4.18.0.0:GHC.Base.Functor.Applicative m => Monad m
   ...
 -- imported via Data.Maybe
 catMaybes :: [Maybe a] -> [a]
