@@ -47,7 +47,7 @@ import GHC.Unicode
 import GHC.Real( Rational, (%), fromIntegral, Integral,
                  toInteger, (^), quot, even )
 import GHC.List
-import GHC.Enum( minBound, maxBound )
+import GHC.Enum( maxBound )
 import Data.Maybe
 
 -- local copy to break import-cycle
@@ -121,12 +121,9 @@ numberToFixed _ _ = Nothing
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
 numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
-    -- if exp is out of integer bounds,
-    -- then the number is definitely out of range
-    | exp > fromIntegral (maxBound :: Int) ||
-      exp < fromIntegral (minBound :: Int)
-    = Nothing
-    | otherwise
+    -- Calculate amount to increase/decrease the exponent, based on (non
+    -- leading zero) places in the iPart, or leading zeros in the fPart.
+    -- If iPart and fPart are all zeros, return Nothing.
     = let mFirstDigit = case dropWhile (0 ==) iPart of
                         iPart'@(_ : _) -> Just (length iPart')
                         [] -> case mFPart of
@@ -139,10 +136,11 @@ numberToRangedRational (neg, pos) n@(MkDecimal iPart mFPart (Just exp))
       in case mFirstDigit of
          Nothing -> Just 0
          Just firstDigit ->
-             let firstDigit' = firstDigit + fromInteger exp
-             in if firstDigit' > (pos + 3)
+             -- compare exp to bounds as Integer to avoid over/underflow
+             let firstDigit' = toInteger firstDigit + exp
+             in if firstDigit' > toInteger (pos + 3)
                 then Nothing
-                else if firstDigit' < (neg - 3)
+                else if firstDigit' < toInteger (neg - 3)
                 then Just 0
                 else Just (numberToRational n)
 numberToRangedRational _ n = Just (numberToRational n)

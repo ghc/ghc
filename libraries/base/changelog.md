@@ -38,6 +38,7 @@
   * Add nominal role annotations to SNat/SSymbol/SChar ([CLC proposal #170](https://github.com/haskell/core-libraries-committee/issues/170))
   * Make `Semigroup`'s `stimes` specializable. ([CLC proposal #8](https://github.com/haskell/core-libraries-committee/issues/8))
   * Deprecate `Data.List.NonEmpty.unzip` ([CLC proposal #86](https://github.com/haskell/core-libraries-committee/issues/86))
+  * Fixed exponent overflow/underflow bugs in the `Read` instances for `Float` and `Double` ([CLC proposal #192](https://github.com/haskell/core-libraries-committee/issues/192))
 
 ## 4.18.0.0 *March 2023*
   * Shipped with GHC 9.6.1
