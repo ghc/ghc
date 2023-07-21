@@ -1,5 +1,7 @@
 [84,86]
 CallStack (from -prof):
+  GHC.Internal.Num.$fNumInt_$c* (libraries/ghc-internal/src/GHC/Internal/Num.hs:108:10)
+  GHC.Internal.Num.* (libraries/ghc-internal/src/GHC/Internal/Num.hs:70:5-38)
   Main.f (callstack002.hs:10:38-42)
   Main.f (callstack002.hs:10:7-43)
   Main.map.go (callstack002.hs:15:21-23)
