@@ -3552,7 +3552,7 @@ filterConstrainedCandidates
   -> TcM CandidatesQTvs
 -- filterConstrainedCandidates removes any candidates that are free in
 -- 'wanted'; instead, it promotes them.  This bit is very much like
--- decideMonoTyVars in GHC.Tc.Solver, but constraints are so much
+-- decidePromotedTyVars in GHC.Tc.Solver, but constraints are so much
 -- simpler in kinds, it is much easier here. (In particular, we never
 -- quantify over a constraint in a type.)
 filterConstrainedCandidates wanted dvs

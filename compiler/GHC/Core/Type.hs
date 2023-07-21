@@ -828,7 +828,7 @@ runtimeRepLevity_maybe rep
 --  Splitting Levity
 --------------------------------------------
 
--- | `levity_maybe` takes a Type of kind Levity, and returns its levity
+-- | `levityType_maybe` takes a Type of kind Levity, and returns its levity
 -- May not be possible for a type variable or type family application
 levityType_maybe :: LevityType -> Maybe Levity
 levityType_maybe lev

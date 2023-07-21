@@ -2001,8 +2001,8 @@ being the )
 -}
 
 tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type)
--- (tcSplitIOType_maybe t) returns Just (IO,t',co)
---              if co : t ~ IO t'
+-- (tcSplitIOType_maybe t) returns Just (IO,t')
+--              if t = IO t'
 --              returns Nothing otherwise
 tcSplitIOType_maybe ty
   = case tcSplitTyConApp_maybe ty of

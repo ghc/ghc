@@ -1147,29 +1147,7 @@ bndrInvisKey = mkPreludeMiscIdUnique 801
 ************************************************************************
 -}
 
-lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, mkNameG_fldRDR,
-  unsafeCodeCoerce_RDR :: RdrName
+lift_RDR, liftTyped_RDR, unsafeCodeCoerce_RDR :: RdrName
 lift_RDR     = nameRdrName liftName
 liftTyped_RDR = nameRdrName liftTypedName
 unsafeCodeCoerce_RDR = nameRdrName unsafeCodeCoerceName
-mkNameG_dRDR = nameRdrName mkNameG_dName
-mkNameG_vRDR = nameRdrName mkNameG_vName
-mkNameG_fldRDR = nameRdrName mkNameG_fldName
-
--- data Exp = ...
-conE_RDR, litE_RDR, appE_RDR, infixApp_RDR :: RdrName
-conE_RDR     = nameRdrName conEName
-litE_RDR     = nameRdrName litEName
-appE_RDR     = nameRdrName appEName
-infixApp_RDR = nameRdrName infixAppName
-
--- data Lit = ...
-stringL_RDR, intPrimL_RDR, wordPrimL_RDR, floatPrimL_RDR,
-    doublePrimL_RDR, stringPrimL_RDR, charPrimL_RDR :: RdrName
-stringL_RDR     = nameRdrName stringLName
-intPrimL_RDR    = nameRdrName intPrimLName
-wordPrimL_RDR   = nameRdrName wordPrimLName
-floatPrimL_RDR  = nameRdrName floatPrimLName
-doublePrimL_RDR = nameRdrName doublePrimLName
-stringPrimL_RDR = nameRdrName stringPrimLName
-charPrimL_RDR   = nameRdrName charPrimLName
