@@ -930,7 +930,7 @@ job_groups =
          make_wasm_jobs wasm_build_config {bignumBackend = Native}
      , modifyValidateJobs manual $
          make_wasm_jobs wasm_build_config {unregisterised = True}
-     , addValidateRule NonmovingGc (standardBuildsWithConfig Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
+     , addValidateRule NonmovingGc (validateBuilds Amd64 (Linux Debian11) vanilla {validateNonmovingGc = True})
      , modifyNightlyJobs (addJobRule Disable) $
          addValidateRule IpeData (validateBuilds Amd64 (Linux Debian10) zstdIpe)
      ]
