@@ -1,4 +1,3 @@
-
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -1536,7 +1535,7 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 -- "GHC.Types.RepType" and Note [VoidRep] in "GHC.Types.RepType".
 data PrimRep
   = VoidRep
-  | BoxedRep {-# UNPACK #-} !(Maybe Levity) -- ^ Boxed, heap value
+  | BoxedRep !(Maybe Levity) -- ^ Boxed, heap value
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
   | Int32Rep      -- ^ Signed, 32-bit value
