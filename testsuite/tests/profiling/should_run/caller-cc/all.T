@@ -7,6 +7,7 @@ setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
 setTestOpts(only_ways(prof_ways))
 setTestOpts(extra_files(['Main.hs']))
 setTestOpts(extra_run_opts('7'))
+setTestOpts(grep_prof("Main.hs"))
 
 # N.B. Main.hs is stolen from heapprof001.
 

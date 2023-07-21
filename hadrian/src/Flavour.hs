@@ -7,6 +7,7 @@ module Flavour
   , addArgs
   , splitSections
   , enableThreadSanitizer
+  , enableLateCCS
   , enableDebugInfo, enableTickyGhc
   , viaLlvmBackend
   , enableProfiledGhc

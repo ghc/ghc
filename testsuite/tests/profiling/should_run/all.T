@@ -1,7 +1,13 @@
 setTestOpts(js_skip) # JS backend doesn't support profiling yet
 
-# Test for #1227, #1418
+prun_ways = (['prof'] if have_profiling() else []) + (['profdyn'] if have_dynamic_prof() else [])
 
+print(prun_ways)
+# Options to use when comparing .prof files
+test_opts_dot_prof = [ only_ways(['prof', 'profdyn'])
+            , extra_ways(prun_ways) if prun_ways else skip]
+
+# Test for #1227, #1418
 test('heapprof002',
      [extra_files(['heapprof001.hs']),
       when(not(wasm_arch()),ignore_extension),
@@ -75,31 +81,31 @@ test('T3001-2',
 # For profasm/profthreaded, the answer is correct but the ordering of some
 # lines in the output happen to be different, so we just skip them.
 test('scc001',
-     omit_ways(['profasm', 'profthreaded']),
+     [grep_prof("scc001.hs"), omit_ways(['profasm', 'profthreaded'])],
      compile_and_run,
      ['-fno-state-hack -fno-full-laziness']) # Note [consistent stacks]
 
-test('scc002', [], compile_and_run, [''])
+test('scc002', [grep_prof("scc002.hs"), test_opts_dot_prof], compile_and_run, [''])
 
-test('scc003', [], compile_and_run,
+test('scc003', [grep_prof("scc003.hs"), test_opts_dot_prof], compile_and_run,
      ['-fno-state-hack']) # Note [consistent stacks]
 
-test('T5654-O0', [only_ways(['prof'])], compile_and_run, [''])
+test('T5654-O0', [only_ways(['prof']), grep_prof("T5654-O0.hs")], compile_and_run, [''])
 
-test('T5654-O1', [only_ways(['profasm'])], compile_and_run, [''])
+test('T5654-O1', [only_ways(['profasm']), grep_prof("T5654-O1.hs")], compile_and_run, [''])
 
-test('T5654b-O0', [only_ways(['prof'])], compile_and_run, [''])
+test('T5654b-O0', [only_ways(['prof']), grep_prof("T5654b-O0.hs")], compile_and_run, [''])
 
-test('T5654b-O1', [only_ways(['profasm'])], compile_and_run, [''])
+test('T5654b-O1', [only_ways(['profasm']), grep_prof("T5654b-O1.hs")], compile_and_run, [''])
 
-test('scc005', [], compile_and_run, ['-fno-worker-wrapper'])
+test('scc005', [grep_prof("scc005.hs"), test_opts_dot_prof], compile_and_run, ['-fno-worker-wrapper'])
 
 test('T5314', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
-test('T680', [], compile_and_run,
+test('T680', [test_opts_dot_prof, grep_prof("T680.hs")], compile_and_run,
      ['-fno-full-laziness']) # Note [consistent stacks]
 
-test('T2552', [], compile_and_run, [''])
+test('T2552', [test_opts_dot_prof, grep_prof("T2552.hs")], compile_and_run, [''])
 
 test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 
@@ -109,6 +115,8 @@ test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 test('ioprof',
      [normal,
       exit_code(1),
+      test_opts_dot_prof,
+      grep_prof("ioprof.hs"),
       omit_ways(['ghci-ext-prof']), # doesn't work with exit_code(1)
       ignore_stderr
      ],
@@ -117,14 +125,14 @@ test('ioprof',
 
 # These two examples are from the User's Guide:
 
-test('prof-doc-fib', [], compile_and_run, [''])
+test('prof-doc-fib', [grep_prof("prof-doc-fib.hs"), test_opts_dot_prof], compile_and_run, [''])
 
-test('prof-doc-last', [], compile_and_run, ['-fno-full-laziness'])
+test('prof-doc-last', [grep_prof("prof-doc-last.hs"), test_opts_dot_prof], compile_and_run, ['-fno-full-laziness'])
 
 # unicode in cost centre names
-test('T5559', fragile(16350), compile_and_run, [''])
+test('T5559', [test_opts_dot_prof, fragile(16350), grep_prof("T5559.hs")], compile_and_run, [''])
 
-test('T7275', normal, makefile_test, [])
+test('T7275', test_opts_dot_prof, makefile_test, [])
 
 # Note [consistent stacks]
 # ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,12 +145,12 @@ test('T7275', normal, makefile_test, [])
 
 test('callstack001',
      # unoptimised results are different w.r.t. CAF attribution
-     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     [test_opts_dot_prof # produces a different stack
      ], compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 test('callstack002',
-     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     [ test_opts_dot_prof # produces a different stack
      ],
      compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
@@ -150,7 +158,7 @@ test('callstack002',
 # Should not stack overflow with -prof -fprof-auto
 test('T5363', [], compile_and_run, [''])
 
-test('profinline001', [], compile_and_run, [''])
+test('profinline001', [grep_prof("profinline001.hs"), test_opts_dot_prof], compile_and_run, [''])
 
 test('T11627a', [ extra_ways(extra_prof_ways),
                   # Slow bignum implementations timeout
@@ -173,11 +181,11 @@ test('T11978a',
      compile_and_run, [''])
 
 test('toplevel_scc_1',
-     [extra_ways(['prof_no_auto']), only_ways(['prof_no_auto'])],
+     [grep_prof("toplevel_scc_1.hs"), extra_ways(['prof_no_auto']), only_ways(['prof_no_auto'])],
      compile_and_run,
      [''])
 
-test('T12962', [], compile_and_run, [''])
+test('T12962', [test_opts_dot_prof, grep_prof("T12962.hs")], compile_and_run, [''])
 
 test('T14257', [], makefile_test, ['T14257'])
 
@@ -192,33 +200,33 @@ test('T17572', [when(arch('wasm32'), run_timeout_multiplier(5))], compile_and_ru
 test('TraverseHeapTest', [only_ways(['prof'])], compile_and_run, ['-debug'])
 
 # Check if -fno-prof-manual results in the manual cost center being ignored.
-test('ignore_scc', [], compile_and_run,
+test('ignore_scc', [grep_prof("ignore_scc.hs"), test_opts_dot_prof], compile_and_run,
      ['-fno-prof-manual'])
 
 test('T21446', [], makefile_test, ['T21446'])
 
 
 test('scc-prof-overloaded001',
-     [],
+     [grep_prof("scc-prof-overloaded001.hs"), test_opts_dot_prof],
      compile_and_run,
      ['-fno-prof-auto -fno-full-laziness -fprof-late-overloaded'] # See Note [consistent stacks]
 )
 
 test('scc-prof-overloaded002',
-     [],
+     [grep_prof("scc-prof-overloaded002.hs"), test_opts_dot_prof],
      compile_and_run,
      ['-fno-prof-auto -fno-full-laziness -fprof-late-overloaded'] # See Note [consistent stacks]
 )
 
 test('scc-prof-overloaded-calls001',
-     [],
+     [grep_prof("scc-prof-overloaded-calls001.hs"), test_opts_dot_prof],
      compile_and_run,
      # Need optimizations to get rid of unwanted overloaded calls
      ['-O -fno-prof-auto -fno-full-laziness -fprof-late-overloaded-calls'] # See Note [consistent stacks]
 )
 
 test('scc-prof-overloaded-calls002',
-     [],
+     [grep_prof("scc-prof-overloaded-calls002.hs"), test_opts_dot_prof],
      compile_and_run,
      # Need optimizations to get rid of unwanted overloaded calls
      ['-O -fno-prof-auto -fprof-late-overloaded-calls']

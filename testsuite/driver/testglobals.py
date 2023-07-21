@@ -449,6 +449,9 @@ class TestOptions:
        # Extra normalisation for compiler error messages
        self.extra_errmsg_normaliser = lambda x: x
 
+       # Extra normalisation for .prof files
+       self.extra_prof_normaliser = lambda x: x
+
        # Keep profiling callstacks.
        self.keep_prof_callstacks = False
 

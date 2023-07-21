@@ -1,30 +1,79 @@
-	Thu Jul  9 17:12 2020 Time and Allocation Profiling Report  (Final)
+	Fri Aug 23 15:30 2024 Time and Allocation Profiling Report  (Final)
 
 	   T5654b-O1 +RTS -hc -p -RTS
 
 	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
-	total alloc =      38,728 bytes  (excludes profiling overheads)
+	total alloc =      38,920 bytes  (excludes profiling overheads)
 
-COST CENTRE MODULE           SRC              %time %alloc
+COST CENTRE      MODULE                           SRC                                                             %time %alloc
 
-MAIN        MAIN             <built-in>         0.0    1.7
-CAF         GHC.IO.Handle.FD <entire-module>    0.0   89.5
-CAF         GHC.IO.Encoding  <entire-module>    0.0    6.3
-CAF         GHC.Conc.Signal  <entire-module>    0.0    1.7
+unpackCString#   GHC.CString                      libraries/ghc-prim/GHC/CString.hs:181:1-14                        0.0    4.6
+$wmkHandleMVar   GHC.Internal.IO.Handle.Internals <no location info>                                                0.0   45.6
+$fBufferedIOFD15 GHC.Internal.IO.FD               <no location info>                                                0.0   42.8
+signal_handlers  GHC.Internal.Conc.Signal         libraries/ghc-internal/src/GHC/Internal/Conc/Signal.hs:43:1-15    0.0    1.6
 
 
-                                                                           individual      inherited
-COST CENTRE  MODULE                SRC                  no.     entries  %time %alloc   %time %alloc
+                                                                                                                                                                                                              individual      inherited
+COST CENTRE                MODULE                                                       SRC                                                                                                no.     entries  %time %alloc   %time %alloc
 
-MAIN         MAIN                  <built-in>           121           0    0.0    1.7     0.0  100.0
- CAF         Main                  <entire-module>      241           0    0.0    0.0     0.0    0.3
-  f          Main                  T5654b-O1.hs:12:1-7  243           1    0.0    0.1     0.0    0.1
-  g          Main                  T5654b-O1.hs:16:1-7  244           1    0.0    0.0     0.0    0.0
-  main       Main                  T5654b-O1.hs:22:1-21 242           1    0.0    0.1     0.0    0.1
-   f         Main                  T5654b-O1.hs:12:1-7  245           0    0.0    0.0     0.0    0.0
-    g        Main                  T5654b-O1.hs:16:1-7  246           0    0.0    0.0     0.0    0.0
-     h       Main                  T5654b-O1.hs:20:1-19 247           1    0.0    0.0     0.0    0.0
- CAF         GHC.Conc.Signal       <entire-module>      236           0    0.0    1.7     0.0    1.7
- CAF         GHC.IO.Encoding       <entire-module>      227           0    0.0    6.3     0.0    6.3
- CAF         GHC.IO.Encoding.Iconv <entire-module>      225           0    0.0    0.5     0.0    0.5
- CAF         GHC.IO.Handle.FD      <entire-module>      217           0    0.0   89.5     0.0   89.5
+MAIN                       MAIN                                                         <built-in>                                                                                         137           0    0.0    0.0     0.0  100.0
+ flushStdHandles           GHC.Internal.TopHandler                                      libraries/ghc-internal/src/GHC/Internal/TopHandler.hs:254:1-15                                     284           1    0.0    0.0     0.0    0.9
+  flushStdHandles1         GHC.Internal.TopHandler                                      <no location info>                                                                                 285           1    0.0    0.0     0.0    0.9
+   flushStdHandles2        GHC.Internal.TopHandler                                      <no location info>                                                                                 321           1    0.0    0.0     0.0    0.5
+    hFlush1                GHC.Internal.IO.Handle                                       <no location info>                                                                                 322           1    0.0    0.0     0.0    0.5
+     $wwantWritableHandle' GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 332           1    0.0    0.1     0.0    0.4
+      $wdo_operation       GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 333           1    0.0    0.3     0.0    0.3
+       flushWriteBuffer1   GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 334           1    0.0    0.0     0.0    0.0
+        $wflushWriteBuffer GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 335           1    0.0    0.0     0.0    0.0
+   flushStdHandles5        GHC.Internal.TopHandler                                      <no location info>                                                                                 286           1    0.0    0.0     0.0    0.5
+    hFlush1                GHC.Internal.IO.Handle                                       <no location info>                                                                                 287           1    0.0    0.0     0.0    0.5
+     $wwantWritableHandle' GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 317           1    0.0    0.1     0.0    0.4
+      $wdo_operation       GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 318           1    0.0    0.3     0.0    0.3
+       flushWriteBuffer1   GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 319           1    0.0    0.0     0.0    0.0
+        $wflushWriteBuffer GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 320           1    0.0    0.0     0.0    0.0
+ runMainIO1                GHC.Internal.TopHandler                                      <no location info>                                                                                 274           1    0.0    0.5     0.0    0.8
+  setHandler1              GHC.Internal.Conc.Signal                                     <no location info>                                                                                 275           1    0.0    0.3     0.0    0.3
+ CAF                       GHC.Internal.Conc.Signal                                     <entire-module>                                                                                    260           0    0.0    0.0     0.0    1.6
+  signal_handlers          GHC.Internal.Conc.Signal                                     libraries/ghc-internal/src/GHC/Internal/Conc/Signal.hs:43:1-15                                     276           1    0.0    1.6     0.0    1.6
+ CAF                       GHC.Internal.IO.Encoding                                     <entire-module>                                                                                    206           0    0.0    0.0     0.0    6.3
+  unpackCString#           GHC.CString                                                  libraries/ghc-prim/GHC/CString.hs:181:1-14                                                         302          29    0.0    4.6     0.0    4.6
+  ds2                      GHC.Internal.IO.Encoding                                     <no location info>                                                                                 290           1    0.0    0.0     0.0    0.2
+   mkGlobal                GHC.Internal.IO.Encoding                                     libraries/ghc-internal/src/GHC/Internal/IO/Encoding.hs:178:1-8                                     291           1    0.0    0.2     0.0    0.2
+  getLocaleEncoding        GHC.Internal.IO.Encoding                                     libraries/ghc-internal/src/GHC/Internal/IO/Encoding.hs:173:2-18                                    289           1    0.0    0.0     0.0    0.0
+  initLocaleEncoding       GHC.Internal.IO.Encoding                                     libraries/ghc-internal/src/GHC/Internal/IO/Encoding.hs:204:1-18                                    296           1    0.0    0.0     0.0    1.5
+   mkTextEncoding9         GHC.Internal.IO.Encoding                                     <no location info>                                                                                 297           1    0.0    0.2     0.0    1.5
+    eqString               GHC.Internal.Base                                            libraries/ghc-internal/src/GHC/Internal/Base.hs:2056:1-8                                           300          29    0.0    0.3     0.0    0.3
+    go1                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 298           6    0.0    0.9     0.0    0.9
+     $wtoSimpleUpperCase   GHC.Internal.Unicode.Char.UnicodeData.SimpleUpperCaseMapping libraries/ghc-internal/src/GHC/Internal/Unicode/Char/UnicodeData/SimpleUpperCaseMapping.hs:23:1-17 303           4    0.0    0.0     0.0    0.0
+    mkUTF8                 GHC.Internal.IO.Encoding.UTF8                                libraries/ghc-internal/src/GHC/Internal/IO/Encoding/UTF8.hs:53:1-6                                 310           1    0.0    0.0     0.0    0.0
+  lvl46                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 309           1    0.0    0.0     0.0    0.0
+  lvl48                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 308           1    0.0    0.0     0.0    0.0
+  lvl50                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 307           1    0.0    0.0     0.0    0.0
+  lvl52                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 306           1    0.0    0.0     0.0    0.0
+  lvl54                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 305           1    0.0    0.0     0.0    0.0
+  lvl56                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 304           1    0.0    0.0     0.0    0.0
+  lvl58                    GHC.Internal.IO.Encoding                                     <no location info>                                                                                 301           1    0.0    0.0     0.0    0.0
+ CAF                       GHC.Internal.IO.Encoding.Iconv                               <entire-module>                                                                                    204           0    0.0    0.0     0.0    0.5
+  localeEncodingName       GHC.Internal.IO.Encoding.Iconv                               libraries/ghc-internal/src/GHC/Internal/IO/Encoding/Iconv.hs:75:1-18                               299           1    0.0    0.5     0.0    0.5
+ CAF                       GHC.Internal.IO.Handle.FD                                    <entire-module>                                                                                    195           0    0.0    0.0     0.0   89.6
+  stderr                   GHC.Internal.IO.Handle.FD                                    libraries/ghc-internal/src/GHC/Internal/IO/Handle/FD.hs:79:1-6                                     323           1    0.0    0.3     0.0   44.7
+   $wmkHandleMVar          GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 327           1    0.0   22.7     0.0   44.4
+    newBuffer              GHC.Internal.IO.BufferedIO                                   libraries/ghc-internal/src/GHC/Internal/IO/BufferedIO.hs:42:3-62                                   330           1    0.0    0.0     0.0   21.4
+     $fBufferedIOFD15      GHC.Internal.IO.FD                                           <no location info>                                                                                 331           1    0.0   21.4     0.0   21.4
+    initLocaleEncoding     GHC.Internal.IO.Encoding                                     libraries/ghc-internal/src/GHC/Internal/IO/Encoding.hs:204:1-18                                    328           0    0.0    0.0     0.0    0.3
+     mkTextEncoding9       GHC.Internal.IO.Encoding                                     <no location info>                                                                                 329           0    0.0    0.3     0.0    0.3
+  stdout                   GHC.Internal.IO.Handle.FD                                    libraries/ghc-internal/src/GHC/Internal/IO/Handle/FD.hs:68:1-6                                     288           1    0.0    0.3     0.0   44.9
+   $wmkHandleMVar          GHC.Internal.IO.Handle.Internals                             <no location info>                                                                                 295           1    0.0   22.9     0.0   44.6
+    isTerminal             GHC.Internal.IO.Device                                       libraries/ghc-internal/src/GHC/Internal/IO/Device.hs:81:3-28                                       315           1    0.0    0.0     0.0    0.0
+     $fIODeviceFD23        GHC.Internal.IO.FD                                           <no location info>                                                                                 316           1    0.0    0.0     0.0    0.0
+    newBuffer              GHC.Internal.IO.BufferedIO                                   libraries/ghc-internal/src/GHC/Internal/IO/BufferedIO.hs:42:3-62                                   313           1    0.0    0.0     0.0   21.4
+     $fBufferedIOFD15      GHC.Internal.IO.FD                                           <no location info>                                                                                 314           1    0.0   21.4     0.0   21.4
+    initLocaleEncoding     GHC.Internal.IO.Encoding                                     libraries/ghc-internal/src/GHC/Internal/IO/Encoding.hs:204:1-18                                    311           0    0.0    0.0     0.0    0.3
+     mkTextEncoding9       GHC.Internal.IO.Encoding                                     <no location info>                                                                                 312           0    0.0    0.3     0.0    0.3
+ CAF                       Main                                                         <entire-module>                                                                                    144           0    0.0    0.0     0.0    0.3
+  f                        Main                                                         T5654b-O1.hs:12:1-7                                                                                278           1    0.0    0.1     0.0    0.1
+  g                        Main                                                         T5654b-O1.hs:16:1-7                                                                                279           1    0.0    0.0     0.0    0.0
+  main                     Main                                                         T5654b-O1.hs:22:1-21                                                                               277           1    0.0    0.1     0.0    0.1
+   f                       Main                                                         T5654b-O1.hs:12:1-7                                                                                280           0    0.0    0.0     0.0    0.0
+    g                      Main                                                         T5654b-O1.hs:16:1-7                                                                                281           0    0.0    0.0     0.0    0.0
+     h                     Main                                                         T5654b-O1.hs:20:1-19                                                                               282           1    0.0    0.0     0.0    0.0

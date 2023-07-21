@@ -1239,6 +1239,17 @@ def no_check_hp(name, opts):
 
 # ----
 
+def grep_prof ( needle : str, groups = None ):
+    return normalise_prof_fun(grep_errmsg_norm(needle, groups))
+
+
+def normalise_prof_fun ( *fs):
+    return lambda name, opts: _normalise_prof_fun(name, opts, fs)
+
+def _normalise_prof_fun ( name, opts, *fs):
+    opts.extra_prof_normaliser = join_normalisers(opts.extra_prof_normaliser, fs)
+
+
 def filter_stdout_lines( regex ):
     """ Filter lines of stdout with the given regular expression """
     def f( name, opts ):
@@ -1274,7 +1285,7 @@ def check_errmsg(needle):
 # grep_errmsg(regex,[groups])
 # If groups are given, return only the matched groups
 # that matches the regex.
-def grep_errmsg(needle:str, groups = None):
+def grep_errmsg_norm(needle:str, groups = None):
 
     def get_match(str:str):
         m = re.search(needle,str)
@@ -1291,7 +1302,10 @@ def grep_errmsg(needle:str, groups = None):
             matches = [get_match(x) for x in str.splitlines(True)]
             res = "\n".join([x for x in matches if x])
             return res
-    return normalise_errmsg_fun(norm)
+    return norm
+
+def grep_errmsg(needle: str, groups = None):
+    return normalise_errmsg_fun(grep_errmsg_norm(needle, groups))
 
 def multiline_grep_errmsg(needle):
     def norm(s):
@@ -2955,6 +2969,7 @@ def normalise_errmsg(s: str) -> str:
 # a sample.  This doesn't compare any of the actual profiling data,
 # only the shape of the profile and the number of entries.
 def normalise_prof (s: str) -> str:
+
     # sip everything up to the line beginning "COST CENTRE"
     s = re.sub('^(.*\n)*COST CENTRE[^\n]*\n','',s)
 
@@ -2969,14 +2984,12 @@ def normalise_prof (s: str) -> str:
     # when the src = <no location info>
     s = re.sub('no location info','no-location-info', s)
 
-    # Source locations from internal libraries, remove the source location,
-    # double colon variant.
+    # Source locations from internal libraries, remove the source location
     # > libraries/ghc-internal/src/path/Foo.hs:204:1-18
     # => ghc-internal/src/path/Foo.hs
     s = re.sub('\slibraries/(\S+)(:\S+){2}\s',' \\1 ', s)
 
-    # Source locations from internal libraries, remove the source location,
-    # single colon variant
+    # Source locations from internal libraries, remove the source location
     # > libraries/ghc-internal/src/path/Foo.hs::(2,1)-(5,38)
     # => ghc-internal/src/path/Foo.hs
     s = re.sub('\slibraries/(\S+)(:\S+){1}\s',' \\1 ', s)
@@ -3008,6 +3021,11 @@ def normalise_prof (s: str) -> str:
     # showsPrec Main Main_1.hs:4:19-22  2
     # readPrec  Main Main_1.hs:7:13-16  0
     # readPrec  Main Main_1.hs:4:13-16  0
+
+    # Apply final normaliser, usually used to restrict profile to cost centres from
+    # the module being tested to avoid being polluted with cost centres from base.
+    final_norm = getTestOpts().extra_prof_normaliser
+    s = final_norm(s)
 
     # Split 9 whitespace-separated groups, take columns 1 (cost-centre), 2
     # (module), 3 (src), and 5 (entries). SCC names can't have whitespace, so

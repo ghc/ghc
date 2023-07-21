@@ -107,7 +107,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O2</td>
   </tr>
   <tr>
-    <th>release (same as perf with -haddock)</td>
+    <th>release (same as perf with -haddock and +late-ccs)</td>
     <td></td>
     <td>-O<br>-H64m</td>
     <td>-O<br>-H64m</td>
