@@ -110,6 +110,7 @@ module GHC.Data.Word64Map.Internal (
     , updateWithKey
     , updateLookupWithKey
     , alter
+    , alterLookupWithKey
     , alterF
 
     -- * Combine
@@ -999,6 +1000,39 @@ alter f k t@(Tip ky y)
 alter f k Nil     = case f Nothing of
                       Just x -> Tip k x
                       Nothing -> Nil
+
+-- | \(O(\min(n,W))\). The expression (@'alterLookupWithKey' f k map@) alters
+-- the value @x@ at @k@, or absence thereof, and returns the result of the
+-- alteration. 'alterLookupWithKey' can be used to insert, delete, or update a
+-- value in a 'Word64Map'.
+--
+-- Note that the behavior of this function differs from 'updateLookupWithKey',
+-- and instead matches the behavior of 'Data.Map.updateLookupWithKey'.
+alterLookupWithKey :: (Maybe a -> Maybe a) -> Key -> Word64Map a -> (Maybe a, Word64Map a)
+alterLookupWithKey f !k t@(Bin p m l r)
+  | nomatch k p m =
+      case f Nothing of
+        Nothing -> (Nothing, t)
+        Just x -> (Just x, link k (Tip k x) p t)
+  | zero k m =
+      let !(res, l') = alterLookupWithKey f k l
+      in (res, binCheckLeft p m l' r)
+  | otherwise =
+      let !(res, r') = alterLookupWithKey f k r
+      in (res, binCheckRight p m l r')
+alterLookupWithKey f k t@(Tip ky y)
+  | k==ky =
+      case f (Just y) of
+        Just x -> (Just x, Tip ky x)
+        Nothing -> (Nothing, Nil)
+  | otherwise =
+      case f Nothing of
+        Just x -> (Just x, link k (Tip k x) ky t)
+        Nothing -> (Nothing, Tip ky y)
+alterLookupWithKey f k Nil =
+  case f Nothing of
+    Just x -> (Just x, Tip k x)
+    Nothing -> (Nothing, Nil)
 
 -- | \(O(\min(n,W))\). The expression (@'alterF' f k map@) alters the value @x@ at
 -- @k@, or absence thereof.  'alterF' can be used to inspect, insert, delete,

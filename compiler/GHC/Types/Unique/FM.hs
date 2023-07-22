@@ -44,7 +44,7 @@ module GHC.Types.Unique.FM (
         addListToUFM,addListToUFM_C,
         addToUFM_Directly,
         addListToUFM_Directly,
-        adjustUFM, alterUFM, alterUFM_Directly,
+        adjustUFM, alterUFM, alterUFM_L, alterUFM_Directly,
         adjustUFM_Directly,
         delFromUFM,
         delFromUFM_Directly,
@@ -213,6 +213,16 @@ alterUFM
   -> key                       -- ^ new
   -> UniqFM key elt            -- ^ result
 alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
+
+alterUFM_L
+  :: Uniquable key
+  => (Maybe elt -> Maybe elt)    -- ^ How to adjust
+  -> UniqFM key elt              -- ^ old
+  -> key                         -- ^ new
+  -> (Maybe elt, UniqFM key elt) -- ^ result
+alterUFM_L f (UFM m) k =
+  let (r, m') = (M.alterLookupWithKey f (getKey $ getUnique k) m)
+  in (r, UFM m')
 
 alterUFM_Directly
   :: (Maybe elt -> Maybe elt)  -- ^ How to adjust

@@ -151,6 +151,8 @@ recordStgIdPosition id best_span ss = do
     let mbspan = (\(SpanWithLabel rss d) -> (rss, d)) <$> (best_span <|> cc <|> ss)
     lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, mbspan) })
 
+-- | If -fdistinct-contructor-tables is enabled, each occurrance of a data
+-- constructor will be given its own info table
 numberDataCon :: DataCon -> [StgTickish] -> M ConstructorNumber
 -- Unboxed tuples and sums do not allocate so they
 -- have no info tables.
@@ -158,22 +160,43 @@ numberDataCon dc _ | isUnboxedTupleDataCon dc = return NoNumber
 numberDataCon dc _ | isUnboxedSumDataCon dc = return NoNumber
 numberDataCon dc ts = do
   opts <- asks rOpts
-  if not (stgDebug_distinctConstructorTables opts) then return NoNumber else do
+  if stgDebug_distinctConstructorTables opts then do
+    -- -fdistinct-constructor-tables is enabled. Add an entry to the data
+    -- constructor map for this occurence of the data constructor with a unique
+    -- number and a src span
     env <- lift get
     mcc <- asks rSpan
-    let !mbest_span = (\(SpanWithLabel rss l) -> (rss, l)) <$> (selectTick ts <|> mcc)
-    let !dcMap' = alterUniqMap (maybe (Just ((0, mbest_span) :| [] ))
-                        (\xs@((k, _):|_) -> Just $! ((k + 1, mbest_span) `NE.cons` xs))) (provDC env) dc
+    let
+      -- Guess a src span for this occurence using source note ticks and the
+      -- current span in the environment
+      !mbest_span = selectTick ts <|> (\(SpanWithLabel rss l) -> (rss, l)) <$> mcc
+
+      -- Add the occurence to the data constructor map of the InfoTableProvMap,
+      -- noting the unique number assigned for this occurence
+      (!r, !dcMap') =
+        alterUniqMap_L
+          ( maybe
+              (Just ((0, mbest_span) :| [] ))
+              ( \xs@((k, _):|_) ->
+                  Just $! ((k + 1, mbest_span) `NE.cons` xs)
+              )
+          )
+          (provDC env)
+          dc
     lift $ put (env { provDC = dcMap' })
-    let r = lookupUniqMap dcMap' dc
     return $ case r of
       Nothing -> NoNumber
       Just res -> Numbered (fst (NE.head res))
+  else do
+    -- -fdistinct-constructor-tables is not enabled
+    return NoNumber
 
-selectTick :: [StgTickish] -> Maybe SpanWithLabel
-selectTick [] = Nothing
-selectTick (SourceNote rss d : ts ) = selectTick ts <|> Just (SpanWithLabel rss d)
-selectTick (_:ts) = selectTick ts
+selectTick :: [StgTickish] -> Maybe (RealSrcSpan, LexicalFastString)
+selectTick = foldl' go Nothing
+  where
+    go :: Maybe (RealSrcSpan, LexicalFastString) -> StgTickish -> Maybe (RealSrcSpan, LexicalFastString)
+    go _   (SourceNote rss d) = Just (rss, d)
+    go acc _                  = acc
 
 {-
 Note [Mapping Info Tables to Source Positions]

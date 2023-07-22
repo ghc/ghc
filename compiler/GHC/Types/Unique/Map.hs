@@ -22,6 +22,7 @@ module GHC.Types.Unique.Map (
     addToUniqMap_Acc,
     addToUniqMap_L,
     alterUniqMap,
+    alterUniqMap_L,
     addListToUniqMap_C,
     adjustUniqMap,
     delFromUniqMap,
@@ -159,6 +160,15 @@ alterUniqMap :: Uniquable k
              -> UniqMap k a
 alterUniqMap f (UniqMap m) k = UniqMap $
     alterUFM (fmap (k,) . f . fmap snd) m k
+
+alterUniqMap_L :: Uniquable k
+             => (Maybe a -> Maybe a)
+             -> UniqMap k a
+             -> k
+             -> (Maybe a, UniqMap k a)
+alterUniqMap_L f (UniqMap m) k =
+  let (r, m') = alterUFM_L (fmap (k,) . f . fmap snd) m k
+  in (snd <$> r, UniqMap m')
 
 addListToUniqMap_C
     :: Uniquable k
