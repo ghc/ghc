@@ -39,6 +39,7 @@ module GHC.Types.Unique.DFM (
         adjustUDFM,
         adjustUDFM_Directly,
         alterUDFM,
+        alterUDFM_L,
         mapUDFM,
         mapMaybeUDFM,
         mapMUDFM,
@@ -436,8 +437,8 @@ adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
 adjustUDFM_Directly :: (elt -> elt) -> UniqDFM key elt -> Unique -> UniqDFM key elt
 adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
 
--- | The expression (alterUDFM f k map) alters value x at k, or absence
--- thereof. alterUDFM can be used to insert, delete, or update a value in
+-- | The expression (@'alterUDFM' f k map@) alters value x at k, or absence
+-- thereof. 'alterUDFM' can be used to insert, delete, or update a value in
 -- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
 -- more efficient.
 alterUDFM
@@ -446,9 +447,29 @@ alterUDFM
   -> UniqDFM key elt               -- old
   -> key                       -- new
   -> UniqDFM key elt               -- result
-alterUDFM f (UDFM m i) k =
-  UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
+alterUDFM f uniq =
+  snd . alterUDFM_L f uniq
+
+-- | The expression (@'alterUDFM_L' f k map@) alters value @x@ at @k@, or absence
+-- thereof and returns the new element at @k@ if there is any.
+-- 'alterUDFM_L' can be used to insert, delete, or update a value in
+-- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
+-- more efficient.
+alterUDFM_L
+  :: forall key elt . Uniquable key
+  => (Maybe elt -> Maybe elt)  -- How to adjust
+  -> UniqDFM key elt               -- old
+  -> key                       -- new
+  -> (Maybe elt, UniqDFM key elt)               -- result
+alterUDFM_L f (UDFM m i) k =
+  let
+    (mElt, udfm) = M.alterF (dupe . alterf) (getKey $ getUnique k) m
+  in
+    (mElt, UDFM udfm (i + 1))
   where
+  dupe :: Maybe (TaggedVal elt) -> (Maybe elt, Maybe (TaggedVal elt))
+  dupe mt = (fmap taggedFst mt , mt)
+  alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
   inject Nothing = Nothing

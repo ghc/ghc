@@ -93,6 +93,7 @@ module GHC.Data.Word64Map.Lazy (
     , updateWithKey
     , updateLookupWithKey
     , alter
+    , alterLookupWithKey
     , alterF
 
     -- * Query
