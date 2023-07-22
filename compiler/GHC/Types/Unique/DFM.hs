@@ -39,6 +39,7 @@ module GHC.Types.Unique.DFM (
         adjustUDFM,
         adjustUDFM_Directly,
         alterUDFM,
+        alterUDFM_L,
         mapUDFM,
         mapMaybeUDFM,
         mapMUDFM,
@@ -436,19 +437,50 @@ adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
 adjustUDFM_Directly :: (elt -> elt) -> UniqDFM key elt -> Unique -> UniqDFM key elt
 adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
 
--- | The expression (alterUDFM f k map) alters value x at k, or absence
--- thereof. alterUDFM can be used to insert, delete, or update a value in
+-- | The expression (@'alterUDFM' f map k@) alters value x at k, or absence
+-- thereof. 'alterUDFM' can be used to insert, delete, or update a value in
 -- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
 -- more efficient.
+--
+-- 'alterUDFM' is non-strict in @k@.
 alterUDFM
   :: Uniquable key
-  => (Maybe elt -> Maybe elt)  -- How to adjust
-  -> UniqDFM key elt               -- old
-  -> key                       -- new
-  -> UniqDFM key elt               -- result
+  => (Maybe elt -> Maybe elt)  -- ^ How to adjust the element
+  -> UniqDFM key elt           -- ^ Old 'UniqDFM'
+  -> key                       -- ^ @key@ of the element to adjust
+  -> UniqDFM key elt           -- ^ New element at @key@ and modified 'UniqDFM'
 alterUDFM f (UDFM m i) k =
   UDFM (M.alter alterf (getKey $ getUnique k) m) (i + 1)
   where
+  alterf Nothing = inject $ f Nothing
+  alterf (Just (TaggedVal v _)) = inject $ f (Just v)
+  inject Nothing = Nothing
+  inject (Just v) = Just $ TaggedVal v i
+
+-- | The expression (@'alterUDFM_L' f map k@) alters value @x@ at @k@, or absence
+-- thereof and returns the new element at @k@ if there is any.
+-- 'alterUDFM_L' can be used to insert, delete, or update a value in
+-- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
+-- more efficient.
+--
+-- Note, 'alterUDFM_L' is strict in @k@.
+alterUDFM_L
+  :: forall key elt . Uniquable key
+  => (Maybe elt -> Maybe elt)      -- ^ How to adjust the element
+  -> UniqDFM key elt               -- ^ Old 'UniqDFM'
+  -> key                           -- ^ @key@ of the element to adjust
+  -> (Maybe elt, UniqDFM key elt)  -- ^ New element at @key@ and modified 'UniqDFM'
+alterUDFM_L f (UDFM m i) k =
+  let
+    -- Force the key Word64 as the thunk is almost never worth it.
+    !key = getKey $ getUnique k
+    (mElt, udfm) = M.alterF (dupe . alterf) key m
+  in
+    (mElt, UDFM udfm (i + 1))
+  where
+  dupe :: Maybe (TaggedVal elt) -> (Maybe elt, Maybe (TaggedVal elt))
+  dupe mt = (fmap taggedFst mt, mt)
+  alterf :: Maybe (TaggedVal elt) -> (Maybe (TaggedVal elt))
   alterf Nothing = inject $ f Nothing
   alterf (Just (TaggedVal v _)) = inject $ f (Just v)
   inject Nothing = Nothing
