@@ -926,10 +926,10 @@ implicit_top :: { () }
 
 maybemodwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
     : '{-# DEPRECATED' strings '#-}'
-                      {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
+                      {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
                               (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
     | '{-# WARNING' warning_category strings '#-}'
-                         {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                         {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
                                  (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
     |  {- empty -}                  { Nothing }
 
@@ -1038,10 +1038,10 @@ export  :: { OrdList (LIE GhcPs) }
 
 maybeexportwarning :: { Maybe (LocatedP (WarningTxt GhcPs)) }
         : '{-# DEPRECATED' strings '#-}'
-                            {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (sL1 $1 $ getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
+                            {% fmap Just $ amsrp (sLL $1 $> $ DeprecatedTxt (getDEPRECATED_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $2))
                                 (AnnPragma (mo $1) (mc $3) (fst $ unLoc $2)) }
         | '{-# WARNING' warning_category strings '#-}'
-                            {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (sL1 $1 $ getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
+                            {% fmap Just $ amsrp (sLL $1 $> $ WarningTxt $2 (getWARNING_PRAGs $1) (map stringLiteralToHsDocWst $ snd $ unLoc $3))
                                 (AnnPragma (mo $1) (mc $4) (fst $ unLoc $3))}
         |  {- empty -}      { Nothing }
 
@@ -2012,7 +2012,7 @@ warning :: { OrdList (LWarnDecl GhcPs) }
         : warning_category namelist strings
                 {% fmap unitOL $ acsA (\cs -> sLL $2 $>
                      (Warning (EpAnn (glR $2) (fst $ unLoc $3) cs) (unLoc $2)
-                              (WarningTxt $1 (noLoc NoSourceText) $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
+                              (WarningTxt $1 NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $3))) }
 
 deprecations :: { OrdList (LWarnDecl GhcPs) }
         : deprecations ';' deprecation
@@ -2035,7 +2035,7 @@ deprecations :: { OrdList (LWarnDecl GhcPs) }
 deprecation :: { OrdList (LWarnDecl GhcPs) }
         : namelist strings
              {% fmap unitOL $ acsA (\cs -> sLL $1 $> $ (Warning (EpAnn (glR $1) (fst $ unLoc $2) cs) (unLoc $1)
-                                          (DeprecatedTxt (noLoc NoSourceText) $ map stringLiteralToHsDocWst $ snd $ unLoc $2))) }
+                                          (DeprecatedTxt NoSourceText $ map stringLiteralToHsDocWst $ snd $ unLoc $2))) }
 
 strings :: { Located ([AddEpAnn],[Located StringLiteral]) }
     : STRING { sL1 $1 ([],[L (gl $1) (getStringLiteral $1)]) }

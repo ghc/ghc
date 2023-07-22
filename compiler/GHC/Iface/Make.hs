@@ -403,8 +403,8 @@ toIfaceWarnings (WarnSome vs ds) = IfWarnSome vs' ds'
     ds' = [(occ, toIfaceWarningTxt txt) | (occ, txt) <- ds]
 
 toIfaceWarningTxt :: WarningTxt GhcRn -> IfaceWarningTxt
-toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc <$> mb_cat) (unLoc src) (map (toIfaceStringLiteralWithNames . unLoc) strs)
-toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt (unLoc src) (map (toIfaceStringLiteralWithNames . unLoc) strs)
+toIfaceWarningTxt (WarningTxt mb_cat src strs) = IfWarningTxt (unLoc <$> mb_cat) src (map (toIfaceStringLiteralWithNames . unLoc) strs)
+toIfaceWarningTxt (DeprecatedTxt src strs) = IfDeprecatedTxt src (map (toIfaceStringLiteralWithNames . unLoc) strs)
 
 toIfaceStringLiteralWithNames :: WithHsDocIdentifiers StringLiteral GhcRn -> (IfaceStringLiteral, [IfExtName])
 toIfaceStringLiteralWithNames (WithHsDocIdentifiers src names) = (toIfaceStringLiteral src, map unLoc names)
