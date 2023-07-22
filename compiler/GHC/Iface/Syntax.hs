@@ -595,8 +595,8 @@ fromIfaceWarnings = \case
 
 fromIfaceWarningTxt :: IfaceWarningTxt -> WarningTxt GhcRn
 fromIfaceWarningTxt = \case
-    IfWarningTxt mb_cat src strs -> WarningTxt (noLoc <$> mb_cat) (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
-    IfDeprecatedTxt src strs -> DeprecatedTxt (noLoc src) (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+    IfWarningTxt mb_cat src strs -> WarningTxt (noLoc <$> mb_cat) src (noLoc <$> map fromIfaceStringLiteralWithNames strs)
+    IfDeprecatedTxt src strs -> DeprecatedTxt src (noLoc <$> map fromIfaceStringLiteralWithNames strs)
 
 fromIfaceStringLiteralWithNames :: (IfaceStringLiteral, [IfExtName]) -> WithHsDocIdentifiers StringLiteral GhcRn
 fromIfaceStringLiteralWithNames (str, names) = WithHsDocIdentifiers (fromIfaceStringLiteral str) (map noLoc names)
