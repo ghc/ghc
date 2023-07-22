@@ -100,6 +100,7 @@ module GHC.Data.Word64Map.Internal (
     , updateWithKey
     , updateLookupWithKey
     , alter
+    , alterLookup
     , alterF
 
     -- * Combine
@@ -985,6 +986,52 @@ alter f k t@(Tip ky y)
 alter f k Nil     = case f Nothing of
                       Just x -> Tip k x
                       Nothing -> Nil
+
+-- | \(O(\min(n,W))\). The expression (@'alterLookup' f k map@) alters
+-- the value @x@ at @k@, or absence thereof, and returns the result of the
+-- alteration. 'alterLookup' can be used to insert, delete, or update a
+-- value in a 'Word64Map'.
+--
+-- * If the value is deleted, return 'Nothing'.
+-- * If the value is updated, return the new value.
+--
+-- This is subtly different to 'Data.Map.updateLookupWithKey' which returns the
+-- original value if the values is deleted.
+-- It is also different to 'updateLookupWithKey' which always returns the original
+-- value.
+--
+-- >>> let f x = if x == Just "a" then Just ("new a") else Nothing
+-- >>> alterLookup f 5 (fromList [(5,"a"), (3,"b")])
+-- (Just "new a",fromList [(3,"b"),(5,"new a")])
+-- >>> alterLookup f 7 (fromList [(5,"a"), (3,"b")])
+-- (Nothing,fromList [(3,"b"),(5,"a")])
+-- >>> alterLookup f 3 (fromList [(5,"a"), (3,"b")])
+-- (Nothing,fromList [(5,"a")])
+alterLookup :: (Maybe a -> Maybe a) -> Key -> Word64Map a -> (Maybe a, Word64Map a)
+alterLookup f !k t@(Bin p m l r)
+  | nomatch k p m =
+      case f Nothing of
+        Nothing -> (Nothing, t)
+        Just x -> (Just x, link k (Tip k x) p t)
+  | zero k m =
+      let !(res, l') = alterLookup f k l
+      in (res, binCheckLeft p m l' r)
+  | otherwise =
+      let !(res, r') = alterLookup f k r
+      in (res, binCheckRight p m l r')
+alterLookup f k t@(Tip ky y)
+  | k==ky =
+      case f (Just y) of
+        Just x -> (Just x, Tip ky x)
+        Nothing -> (Nothing, Nil)
+  | otherwise =
+      case f Nothing of
+        Just x -> (Just x, link k (Tip k x) ky t)
+        Nothing -> (Nothing, Tip ky y)
+alterLookup f k Nil =
+  case f Nothing of
+    Just x -> (Just x, Tip k x)
+    Nothing -> (Nothing, Nil)
 
 -- | \(O(\min(n,W))\). The expression (@'alterF' f k map@) alters the value @x@ at
 -- @k@, or absence thereof.  'alterF' can be used to inspect, insert, delete,
