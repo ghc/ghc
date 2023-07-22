@@ -98,6 +98,7 @@ stage0Packages = do
              , ghcToolchain
              , ghci
              , ghcPkg
+             , xhtml -- Dependency of haddock
              , haddock
              , hsc2hs
              , hpc
