@@ -187,10 +187,10 @@ data WarningTxt pass
       (Maybe (Located WarningCategory))
         -- ^ Warning category attached to this WARNING pragma, if any;
         -- see Note [Warning categories]
-      (Located SourceText)
+      SourceText
       [Located (WithHsDocIdentifiers StringLiteral pass)]
    | DeprecatedTxt
-      (Located SourceText)
+      SourceText
       [Located (WithHsDocIdentifiers StringLiteral pass)]
   deriving Generic
 
@@ -223,12 +223,12 @@ deriving instance (Data pass, Data (IdP pass)) => Data (WarningTxt pass)
 
 instance Outputable (WarningTxt pass) where
     ppr (WarningTxt _ lsrc ws)
-      = case unLoc lsrc of
+      = case lsrc of
           NoSourceText   -> pp_ws ws
           SourceText src -> ftext src <+> pp_ws ws <+> text "#-}"
 
     ppr (DeprecatedTxt lsrc  ds)
-      = case unLoc lsrc of
+      = case lsrc of
           NoSourceText   -> pp_ws ds
           SourceText src -> ftext src <+> pp_ws ds <+> text "#-}"
 
