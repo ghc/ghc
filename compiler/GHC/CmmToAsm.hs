@@ -170,7 +170,7 @@ nativeCodeGen logger ts config modLoc h us cmms
       ArchLoongArch64->panic "nativeCodeGen: No NCG for LoongArch64"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-      ArchWasm32    -> Wasm32.ncgWasm platform ts us modLoc h cmms
+      ArchWasm32    -> Wasm32.ncgWasm logger platform ts us modLoc h cmms
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.
