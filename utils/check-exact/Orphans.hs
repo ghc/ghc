@@ -14,79 +14,67 @@ class Default a where
 -- ---------------------------------------------------------------------
 -- Orphan Default instances. See https://gitlab.haskell.org/ghc/ghc/-/issues/20372
 
-instance Default [a] where
-  def = []
+instance NoAnn [a] where
+  noAnn = []
 
-instance Default NameAnn where
-  def = mempty
-
-instance Default AnnList where
-  def = mempty
-
-instance Default AnnListItem where
-  def = mempty
-
-instance Default AnnPragma where
-  def = AnnPragma def def def
+instance NoAnn AnnPragma where
+  noAnn = AnnPragma noAnn noAnn noAnn
 
 instance Semigroup EpAnnImportDecl where
   (<>) = error "unimplemented"
-instance Default EpAnnImportDecl where
-  def = EpAnnImportDecl def  Nothing  Nothing  Nothing  Nothing  Nothing
+instance NoAnn EpAnnImportDecl where
+  noAnn = EpAnnImportDecl noAnn  Nothing  Nothing  Nothing  Nothing  Nothing
 
-instance Default HsRuleAnn where
-  def = HsRuleAnn Nothing Nothing def
+instance NoAnn AnnParen where
+  noAnn = AnnParen AnnParens noAnn noAnn
 
-instance Default AnnSig where
-  def = AnnSig def  def
+instance NoAnn HsRuleAnn where
+  noAnn = HsRuleAnn Nothing Nothing noAnn
 
-instance Default GrhsAnn where
-  def = GrhsAnn Nothing  def
+instance NoAnn AnnSig where
+  noAnn = AnnSig noAnn  noAnn
 
-instance Default EpAnnUnboundVar where
-  def = EpAnnUnboundVar def  def
+instance NoAnn GrhsAnn where
+  noAnn = GrhsAnn Nothing  noAnn
 
-instance (Default a, Default b) => Default (a, b) where
-  def = (def, def)
+instance NoAnn EpAnnUnboundVar where
+  noAnn = EpAnnUnboundVar noAnn  noAnn
 
-instance Default NoEpAnns where
-  def = NoEpAnns
+instance (NoAnn a, NoAnn b) => NoAnn (a, b) where
+  noAnn = (noAnn, noAnn)
 
-instance Default AnnParen where
-  def = AnnParen AnnParens def  def
+instance NoAnn AnnExplicitSum where
+  noAnn = AnnExplicitSum noAnn  noAnn  noAnn  noAnn
 
-instance Default AnnExplicitSum where
-  def = AnnExplicitSum def  def  def  def
+instance NoAnn EpAnnHsCase where
+  noAnn = EpAnnHsCase noAnn noAnn noAnn
 
-instance Default EpAnnHsCase where
-  def = EpAnnHsCase def def def
+instance NoAnn AnnsIf where
+  noAnn = AnnsIf noAnn noAnn noAnn noAnn noAnn
 
-instance Default AnnsIf where
-  def = AnnsIf def def def def def
+instance NoAnn (Maybe a) where
+  noAnn = Nothing
 
-instance Default (Maybe a) where
-  def = Nothing
+instance NoAnn AnnProjection where
+  noAnn = AnnProjection noAnn noAnn
 
-instance Default AnnProjection where
-  def = AnnProjection def def
+instance NoAnn AnnFieldLabel where
+  noAnn = AnnFieldLabel Nothing
 
-instance Default AnnFieldLabel where
-  def = AnnFieldLabel Nothing
+instance NoAnn EpaLocation where
+  noAnn = EpaDelta (SameLine 0) []
 
-instance Default EpaLocation where
-  def = EpaDelta (SameLine 0) []
+instance NoAnn AddEpAnn where
+  noAnn = AddEpAnn noAnn noAnn
 
-instance Default AddEpAnn where
-  def = AddEpAnn def def
+instance NoAnn AnnKeywordId where
+  noAnn = Annlarrowtail  {- gotta pick one -}
 
-instance Default AnnKeywordId where
-  def = Annlarrowtail  {- gotta pick one -}
+instance NoAnn AnnContext where
+  noAnn = AnnContext Nothing [] []
 
-instance Default AnnContext where
-  def = AnnContext Nothing [] []
+instance NoAnn EpAnnSumPat where
+  noAnn = EpAnnSumPat noAnn  noAnn  noAnn
 
-instance Default EpAnnSumPat where
-  def = EpAnnSumPat def  def  def
-
-instance Default AnnsModule where
-  def = AnnsModule [] mempty Nothing
+instance NoAnn AnnsModule where
+  noAnn = AnnsModule [] mempty Nothing
