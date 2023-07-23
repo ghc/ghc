@@ -36,8 +36,8 @@ import GHC.Data.FastString
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
--- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
@@ -54,7 +54,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/LayoutIn4.hs" (Just changeLayoutIn4)
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
- -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
+ "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
@@ -205,7 +205,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
  -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
- "../../testsuite/tests/printer/Test22771.hs" Nothing
+ -- "../../testsuite/tests/printer/Test22771.hs" Nothing
 
 -- cloneT does not need a test, function can be retired
 
@@ -520,7 +520,7 @@ changeLocalDecls libdir (L l p) = do
         let oldBinds     = concatMap decl2Bind oldDecls'
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
         let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 4)))) a b c dd) cs)
         let binds' = (HsValBinds van'
@@ -553,7 +553,7 @@ changeLocalDecls2 libdir (L l p) = do
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
                         emptyComments
         let decls = [s,d]
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
@@ -798,7 +798,7 @@ rmDecl5 _libdir lp = do
         let
           go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
           go (HsLet a tkLet lb tkIn expr) = do
-            decs <- hsDeclsValBinds lb
+            let decs = hsDeclsLocalBinds lb
             let hdecs : _ = decs
             let dec = last decs
             _ <- transferEntryDP hdecs dec

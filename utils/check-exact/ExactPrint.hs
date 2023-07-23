@@ -63,6 +63,7 @@ import Data.Functor.Const
 import qualified Data.Set as Set
 import Data.Typeable
 import Data.List ( partition, sort, sortBy)
+import qualified Data.Map.Strict as Map
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
@@ -2007,11 +2008,11 @@ instance ExactPrint (ClsInstDecl GhcPs) where
           an1 <- markEpAnnL an0 lidl AnnOpenC
           an2 <- markEpAnnAllL an1 lid AnnSemi
           ds <- withSortKey sortKey
-                               (prepareListAnnotationA ats
-                             ++ prepareListAnnotationF an adts
-                             ++ prepareListAnnotationA (bagToList binds)
-                             ++ prepareListAnnotationA sigs
-                               )
+                               [(ClsAtdTag, prepareListAnnotationA ats),
+                                (ClsAtdTag, prepareListAnnotationF an adts),
+                                (ValDTag, prepareListAnnotationA (bagToList binds)),
+                                (SigDTag, prepareListAnnotationA sigs)
+                               ]
           an3 <- markEpAnnL an2 lidl AnnCloseC -- '}'
           let
             ats'   = undynamic ds
@@ -2312,13 +2313,10 @@ instance ExactPrint (HsValBindsLR GhcPs GhcPs) where
   setAnnotationAnchor a _ _ = a
 
   exact (ValBinds sortKey binds sigs) = do
-    ds <- setLayoutBoth $ withSortKey sortKey
-       (prepareListAnnotationA (bagToList binds)
-     ++ prepareListAnnotationA sigs
-       )
+    decls <- setLayoutBoth $ mapM markAnnotated $ hsDeclsValBinds (ValBinds sortKey binds sigs)
     let
-      binds' = listToBag $ undynamic ds
-      sigs'  = undynamic ds
+      binds' = listToBag $ concatMap decl2Bind decls
+      sigs'  =             concatMap decl2Sig decls
     return (ValBinds sortKey binds' sigs')
   exact (XValBindsLR _) = panic "XValBindsLR"
 
@@ -2373,20 +2371,14 @@ prepareListAnnotationA ls = map (\b -> (realSrcSpan $ getLocA b,go b)) ls
       b' <- markAnnotated b
       return (toDyn b')
 
-withSortKey :: (Monad m, Monoid w) => AnnSortKey -> [(RealSrcSpan, EP w m Dynamic)] -> EP w m [Dynamic]
+withSortKey :: (Monad m, Monoid w)
+  => AnnSortKey -> [(DeclTag, [(RealSrcSpan, EP w m Dynamic)])] -> EP w m [Dynamic]
 withSortKey annSortKey xs = do
   debugM $ "withSortKey:annSortKey=" ++ showAst annSortKey
   let ordered = case annSortKey of
-                  NoAnnSortKey -> sortBy orderByFst xs
-                  -- Just keys -> error $ "withSortKey: keys" ++ show keys
-                  AnnSortKey keys -> orderByKey xs keys
-                                -- `debug` ("withSortKey:" ++
-                                --          showPprUnsafe (map fst (sortBy (comparing (flip elemIndex keys . fst)) xs),
-                                --                  map fst xs,
-                                --                  keys)
-                                --          )
+                  NoAnnSortKey -> sortBy orderByFst $ concatMap snd xs
+                  AnnSortKey _keys -> orderedDecls annSortKey (Map.fromList xs)
   mapM snd ordered
-
 orderByFst :: Ord a => (a, b1) -> (a, b2) -> Ordering
 orderByFst (a,_) (b,_) = compare a b
 
@@ -3489,12 +3481,12 @@ instance ExactPrint (TyClDecl GhcPs) where
           an1 <- markEpAnnL    an0 lidl AnnOpenC
           an2 <- markEpAnnAllL an1 lidl AnnSemi
           ds <- withSortKey sortKey
-                               (prepareListAnnotationA sigs
-                             ++ prepareListAnnotationA (bagToList methods)
-                             ++ prepareListAnnotationA ats
-                             ++ prepareListAnnotationA at_defs
+                               [(SigDTag, prepareListAnnotationA sigs),
+                                (ValDTag, prepareListAnnotationA (bagToList methods)),
+                                (ClsAtTag, prepareListAnnotationA ats),
+                                (ClsAtdTag, prepareListAnnotationA at_defs)
                              -- ++ prepareListAnnotation docs
-                               )
+                               ]
           an3 <- markEpAnnL an2 lidl AnnCloseC
           let
             sigs'    = undynamic ds
