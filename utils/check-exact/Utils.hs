@@ -31,6 +31,7 @@ import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
+import GHC.Data.Bag
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -40,6 +41,7 @@ import qualified GHC.Data.Strict as Strict
 
 import Data.Data hiding ( Fixity )
 import Data.List (sortBy, elemIndex)
+import qualified Data.Map.Strict as Map
 
 import Debug.Trace
 import Types
@@ -193,7 +195,7 @@ tweakDelta (DifferentLine l d) = DifferentLine l (d-1)
 
 -- |Given a list of items and a list of keys, returns a list of items
 -- ordered by their position in the list of keys.
-orderByKey :: [(RealSrcSpan,a)] -> [RealSrcSpan] -> [(RealSrcSpan,a)]
+orderByKey :: [(DeclTag,a)] -> [DeclTag] -> [(DeclTag,a)]
 orderByKey keys order
     -- AZ:TODO: if performance becomes a problem, consider a Map of the order
     -- SrcSpan to an index, and do a lookup instead of elemIndex.
@@ -439,12 +441,107 @@ hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
     s = - (getDeltaLine dp)
     e = - (deltaColumn dp)
 
- -- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+
+type DeclsByTag a = Map.Map DeclTag [(RealSrcSpan, a)]
+
+orderedDecls
+  :: AnnSortKey
+  -> DeclsByTag a
+  -> [(RealSrcSpan, a)]
+orderedDecls sortKey declGroup  =
+  case sortKey of
+    NoAnnSortKey ->
+      sortBy (\a b -> compare (fst a) (fst b)) (concat $ Map.elems declGroup)
+    AnnSortKey keys ->
+      let
+        go :: [DeclTag] -> DeclsByTag a -> [(RealSrcSpan, a)]
+        go [] _                      = []
+        go (tag:ks) dbt = d : go ks dbt'
+          where
+            dbt' = Map.adjust (\ds -> drop 1 ds) tag dbt
+            d = case Map.lookup tag dbt of
+              Just (d':_) -> d'
+              _           -> error $ "orderedDecls: could not look up "
+                                       ++ show tag ++ " in " ++ show (Map.keys dbt)
+      in
+        go keys declGroup
+
+-- ---------------------------------------------------------------------
+
+orderedDeclsBinds
+  :: AnnSortKey
+  -> [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+  -> [LHsDecl GhcPs]
+orderedDeclsBinds sortKey binds sigs =
+  case sortKey of
+    NoAnnSortKey ->
+      sortBy (\a b -> compare (realSrcSpan $ getLocA a)
+                              (realSrcSpan $ getLocA b)) (binds ++ sigs)
+    AnnSortKey keys ->
+      let
+        go [] _ _                      = []
+        go (ValDTag:ks) (b:bs) ss = b : go ks bs ss
+        go (SigDTag:ks) bs (s:ss) = s : go ks bs ss
+        go (_:ks) bs ss           =     go ks bs ss
+      in
+        go keys binds sigs
+
+hsDeclsLocalBinds :: HsLocalBinds GhcPs -> [LHsDecl GhcPs]
+hsDeclsLocalBinds lb = case lb of
+    HsValBinds _ (ValBinds sortKey bs sigs) ->
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+    HsValBinds _ (XValBindsLR _) -> error $ "hsDecls.XValBindsLR not valid"
+    HsIPBinds {}       -> []
+    EmptyLocalBinds {} -> []
+
+hsDeclsValBinds :: (HsValBindsLR GhcPs GhcPs) -> [LHsDecl GhcPs]
+hsDeclsValBinds (ValBinds sortKey bs sigs) =
+      let
+        bds = map wrapDecl (bagToList bs)
+        sds = map wrapSig sigs
+      in
+        orderedDeclsBinds sortKey bds sds
+hsDeclsValBinds XValBindsLR{} = error "hsDeclsValBinds"
+
+-- ---------------------------------------------------------------------
+
+-- |Pure function to convert a 'LHsDecl' to a 'LHsBind'. This does
+-- nothing to any annotations that may be attached to either of the elements.
+-- It is used as a utility function in 'replaceDecls'
+decl2Bind :: LHsDecl GhcPs -> [LHsBind GhcPs]
+decl2Bind (L l (ValD _ s)) = [L l s]
+decl2Bind _                      = []
+
+-- |Pure function to convert a 'LSig' to a 'LHsBind'. This does
+-- nothing to any annotations that may be attached to either of the elements.
+-- It is used as a utility function in 'replaceDecls'
+decl2Sig :: LHsDecl GhcPs -> [LSig GhcPs]
+decl2Sig (L l (SigD _ s)) = [L l s]
+decl2Sig _                = []
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LSig' into a 'LHsDecl'
+wrapSig :: LSig GhcPs -> LHsDecl GhcPs
+wrapSig (L l s) = L l (SigD NoExtField s)
+
+-- ---------------------------------------------------------------------
+
+-- |Convert a 'LHsBind' into a 'LHsDecl'
+wrapDecl :: LHsBind GhcPs -> LHsDecl GhcPs
+wrapDecl (L l s) = L l (ValD NoExtField s)
+
+-- ---------------------------------------------------------------------
 
 showAst :: (Data a) => a -> String
 showAst ast
   = showSDocUnsafe
-    $ showAstData NoBlankSrcSpan NoBlankEpAnnotations ast
+    $ showAstData BlankSrcSpanFile NoBlankEpAnnotations ast
 
 -- ---------------------------------------------------------------------
 -- Putting these here for the time being, to avoid import loops

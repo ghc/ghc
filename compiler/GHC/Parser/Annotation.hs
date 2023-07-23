@@ -41,7 +41,7 @@ module GHC.Parser.Annotation (
   AnnContext(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
-  AnnSortKey(..),
+  AnnSortKey(..), DeclTag(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
@@ -807,8 +807,25 @@ data AnnPragma
 -- items or re-arranging existing ones.
 data AnnSortKey
   = NoAnnSortKey
-  | AnnSortKey [RealSrcSpan]
+  | AnnSortKey [DeclTag]
   deriving (Data, Eq)
+
+-- Where we have items that appear in any order in the source, but are
+-- captured in different parts of the structure, we track the order
+-- with a list of the origin of the next thing, to drive a merge when
+-- printing
+data DeclTag
+  -- Used for ValBind
+  = ValDTag
+  | SigDTag
+
+  -- Used for ClassDecl and ClsInstDecl
+  | ClsMethodTag
+  | ClsSigTag
+  | ClsAtTag
+  | ClsAtdTag
+
+  deriving (Eq,Data,Ord,Show)
 
 -- ---------------------------------------------------------------------
 
@@ -1288,6 +1305,9 @@ instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
 
 instance Outputable AnnContext where
   ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
+
+instance Outputable DeclTag where
+  ppr tag = text $ show tag
 
 instance Outputable AnnSortKey where
   ppr NoAnnSortKey    = text "NoAnnSortKey"
