@@ -75,6 +75,7 @@ module GHC.Parser.Annotation (
 
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
+  -- HasAnnotation(..),
   noLocA, getLocA,
   noSrcSpanA,
   noAnnSrcSpan,
@@ -935,6 +936,23 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 -- ---------------------------------------------------------------------
 
+-- class HasAnnotation where
+--   noLocA :: a ->
+
+noLocA :: a -> LocatedAn an a
+noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+
+getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
+getLocA = getHasLoc
+
+noSrcSpanA :: SrcAnn ann
+noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+noAnnSrcSpan :: SrcSpan -> SrcAnn ann
+noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
+
+-- ---------------------------------------------------------------------
+
 class HasLoc a where
   -- ^ conveniently calculate locations for things without locations attached
   getHasLoc :: a -> SrcSpan
@@ -978,19 +996,6 @@ reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
-
-
-getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
-getLocA = getHasLoc
-
-noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
-
-noAnnSrcSpan :: SrcSpan -> SrcAnn ann
-noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
-
-noSrcSpanA :: SrcAnn ann
-noSrcSpanA = noAnnSrcSpan noSrcSpan
 
 -- | Short form for 'EpAnnNotUsed'
 noAnn :: EpAnn a
