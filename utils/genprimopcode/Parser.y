@@ -5,6 +5,8 @@ import Lexer (lex_tok)
 import ParserM (Token(..), ParserM, run_parser, get_pos, show_pos,
                 happyError)
 import Syntax
+
+import AccessOps
 }
 
 %name      parsex
@@ -47,6 +49,8 @@ import Syntax
     SCALAR          { TSCALAR }
     VECTOR          { TVECTOR }
     VECTUPLE        { TVECTUPLE }
+    bytearray_access_ops { TByteArrayAccessOps }
+    addr_access_ops { TAddrAccessOps }
     thats_all_folks { TThatsAllFolks }
     lowerName       { TLowerName $$ }
     upperName       { TUpperName $$ }
@@ -83,7 +87,12 @@ pInfix : infix  integer { Just $ Fixity NoSourceText $2 InfixN }
 
 pEntries :: { [Entry] }
 pEntries : pEntry pEntries { $1 : $2 }
+         | pAccessOps pEntries { $1 ++ $2 }
          | {- empty -}   { [] }
+
+pAccessOps :: { [Entry] }
+pAccessOps : bytearray_access_ops { byteArrayAccessOps }
+           | addr_access_ops { addrAccessOps }
 
 pEntry :: { Entry }
 pEntry : pPrimOpSpec   { $1 }
@@ -148,7 +157,7 @@ pVectors : pVector ',' pVectors { [$1] ++ $3 }
 
 pVector :: { (String, String, Int) }
 pVector : '<' upperName ',' upperName ',' integer '>' { ($2, $4, $6) }
- 
+
 pType :: { Ty }
 pType : paT '->' pType { TyF $1 $3 }
       | paT '=>' pType { TyC $1 $3 }

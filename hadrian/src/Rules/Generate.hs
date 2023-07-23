@@ -32,17 +32,6 @@ primopsSource = "compiler/GHC/Builtin/primops.txt.pp"
 primopsTxt :: Stage -> FilePath
 primopsTxt stage = buildDir (vanillaContext stage compiler) -/- "primops.txt"
 
-accessOpsSource :: FilePath
-accessOpsSource = "compiler/GHC/Builtin/gen_bytearray_addr_access_ops.py"
-
-byteArrayAccessOpsTxt :: Stage -> FilePath
-byteArrayAccessOpsTxt stage
-  = buildDir (vanillaContext stage compiler) -/- "bytearray-access-ops.txt.pp"
-
-addrAccessOpsTxt :: Stage -> FilePath
-addrAccessOpsTxt stage
-  = buildDir (vanillaContext stage compiler) -/- "addr-access-ops.txt.pp"
-
 isGeneratedCmmFile :: FilePath -> Bool
 isGeneratedCmmFile file = takeBaseName file == "AutoApply"
 
@@ -153,21 +142,8 @@ generatePackageCode context@(Context stage pkg _ _) = do
             root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
 
     when (pkg == compiler) $ do
-        let ba_ops_txt = root -/- byteArrayAccessOpsTxt stage
-        let addr_ops_txt = root -/- addrAccessOpsTxt stage
-        ba_ops_txt %> \file -> do
-            need [accessOpsSource]
-            runBuilder Python
-              [accessOpsSource, "bytearray-access-ops", file]
-              [] []
-        addr_ops_txt %> \file -> do
-            need [accessOpsSource]
-            runBuilder Python
-              [accessOpsSource, "addr-access-ops", file]
-              [] []
         root -/- primopsTxt stage %> \file -> do
-            need $ [primopsSource, ba_ops_txt, addr_ops_txt]
-            -- ba_ops_txt and addr_ops_txt get #include-d
+            need $ [primopsSource]
             build $ target context HsCpp [primopsSource] [file]
 
     when (pkg == rts) $ do

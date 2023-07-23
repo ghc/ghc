@@ -52,6 +52,8 @@ words :-
     <0>         "infixr"            { mkT TInfixR }
     <0>         "Nothing"           { mkT TNothing }
     <0>         "vector"            { mkT TVector }
+    <0>         "bytearray_access_ops" { mkT TByteArrayAccessOps }
+    <0>         "addr_access_ops"   { mkT TAddrAccessOps }
     <0>         "thats_all_folks"   { mkT TThatsAllFolks }
     <0>         "SCALAR"            { mkT TSCALAR }
     <0>         "VECTOR"            { mkT TVECTOR }
