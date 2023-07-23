@@ -20,7 +20,7 @@ module GHC.Parser.Annotation (
 
   EpAnn(..), Anchor(..), AnchorOperation(..),
   spanAsAnchor, realSpanAsAnchor,
-  noAnn,
+  NoAnn(..),
 
   -- ** Comments in Annotations
 
@@ -1022,6 +1022,26 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 -- ---------------------------------------------------------------------
 
+noLocA :: a -> LocatedAn an a
+noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+
+getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
+getLocA = getHasLoc
+
+noSrcSpanA :: SrcAnn ann
+noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+noAnnSrcSpan :: SrcSpan -> SrcAnn ann
+noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
+
+-- ---------------------------------------------------------------------
+
+class NoAnn a where
+  -- | equivalent of `mempty`, but does not need Semigroup
+  noAnn :: a
+
+-- ---------------------------------------------------------------------
+
 class HasLoc a where
   -- ^ conveniently calculate locations for things without locations attached
   getHasLoc :: a -> SrcSpan
@@ -1070,22 +1090,9 @@ reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
 
-getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
-getLocA = getHasLoc
-
-noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
-
-noAnnSrcSpan :: SrcSpan -> SrcAnn ann
-noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
-
-noSrcSpanA :: SrcAnn ann
-noSrcSpanA = noAnnSrcSpan noSrcSpan
-
--- | Short form for 'EpAnnNotUsed'
-noAnn :: EpAnn a
-noAnn = EpAnnNotUsed
-
+instance NoAnn (EpAnn a) where
+  -- Short form for 'EpAnnNotUsed'
+  noAnn = EpAnnNotUsed
 
 addAnns :: EpAnn [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> EpAnn [AddEpAnn]
 addAnns (EpAnn l as1 cs) as2 cs2
@@ -1219,34 +1226,34 @@ comment loc cs = EpAnn (Anchor loc UnchangedAnchor) NoEpAnns cs
 
 -- | Add additional comments to a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+addCommentsToSrcAnn :: (NoAnn ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) noAnn cs) loc
 addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
   = SrcSpanAnn (EpAnn a an (cs <> cs')) loc
 
 -- | Replace any existing comments on a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+setCommentsSrcAnn :: (NoAnn ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs) loc
+  = SrcSpanAnn (EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) noAnn cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
   = SrcSpanAnn (EpAnn a an cs) loc
 
 -- | Add additional comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToEpAnn :: (Monoid a)
+addCommentsToEpAnn :: (NoAnn a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 addCommentsToEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) noAnn cs
 addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsEpAnn :: (Monoid a)
+setCommentsEpAnn :: (NoAnn a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 setCommentsEpAnn loc EpAnnNotUsed cs
-  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) mempty cs
+  = EpAnn (Anchor (realSrcSpan loc) UnchangedAnchor) noAnn cs
 setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
 -- | Transfer comments and trailing items from the annotations in the
@@ -1254,7 +1261,7 @@ setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 transferAnnsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferAnnsA from@(SrcSpanAnn EpAnnNotUsed _) to = (from, to)
 transferAnnsA (SrcSpanAnn (EpAnn a an cs) l) to
-  = ((SrcSpanAnn (EpAnn a mempty emptyComments) l), to')
+  = ((SrcSpanAnn (EpAnn a noAnn emptyComments) l), to')
   where
     to' = case to of
       (SrcSpanAnn EpAnnNotUsed loc)
@@ -1268,9 +1275,9 @@ transferAnnsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferAnnsOnlyA (SrcSpanAnn EpAnnNotUsed l) ss2
   = (SrcSpanAnn EpAnnNotUsed l, ss2)
 transferAnnsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l')
-  = (SrcSpanAnn (EpAnn a mempty cs) l, SrcSpanAnn (EpAnn (spanAsAnchor l') an emptyComments) l')
+  = (SrcSpanAnn (EpAnn a noAnn cs) l, SrcSpanAnn (EpAnn (spanAsAnchor l') an emptyComments) l')
 transferAnnsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
-  = (SrcSpanAnn (EpAnn a mempty cs) l, SrcSpanAnn (EpAnn a' (an' <> an) cs') l')
+  = (SrcSpanAnn (EpAnn a noAnn cs) l, SrcSpanAnn (EpAnn a' (an' <> an) cs') l')
 
 -- | Transfer comments from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
@@ -1278,15 +1285,15 @@ transferCommentsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnn
 transferCommentsOnlyA (SrcSpanAnn EpAnnNotUsed l) ss2
   = (SrcSpanAnn EpAnnNotUsed l, ss2)
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l')
-  = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') mempty cs) l')
+  = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') noAnn cs) l')
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
   = (SrcSpanAnn (EpAnn a an emptyComments) l, SrcSpanAnn (EpAnn a' an' (cs <> cs')) l')
 
 -- | Remove the exact print annotations payload, leaving only the
 -- anchor and comments.
-commentsOnlyA :: Monoid ann => SrcAnn ann -> SrcAnn ann
+commentsOnlyA :: NoAnn ann => SrcAnn ann -> SrcAnn ann
 commentsOnlyA (SrcSpanAnn EpAnnNotUsed loc) = SrcSpanAnn EpAnnNotUsed loc
-commentsOnlyA (SrcSpanAnn (EpAnn a _ cs) loc) = (SrcSpanAnn (EpAnn a mempty cs) loc)
+commentsOnlyA (SrcSpanAnn (EpAnn a _ cs) loc) = (SrcSpanAnn (EpAnn a noAnn cs) loc)
 
 -- | Remove the comments, leaving the exact print annotations payload
 removeCommentsA :: SrcAnn ann -> SrcAnn ann
@@ -1325,36 +1332,14 @@ instance Semigroup EpAnnComments where
   EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
 
-instance (Monoid a) => Monoid (EpAnn a) where
-  mempty = EpAnnNotUsed
-
-instance Semigroup NoEpAnns where
-  _ <> _ = NoEpAnns
+instance NoAnn NoEpAnns where
+  noAnn = NoEpAnns
 
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
 
-instance Monoid AnnListItem where
-  mempty = AnnListItem []
-
-
-instance Semigroup AnnList where
-  (AnnList a1 o1 c1 r1 t1) <> (AnnList a2 o2 c2 r2 t2)
-    = AnnList (a1 <> a2) (c o1 o2) (c c1 c2) (r1 <> r2) (t1 <> t2)
-    where
-      -- Left biased combination for the open and close annotations
-      c Nothing x = x
-      c x Nothing = x
-      c f _       = f
-
-instance Monoid AnnList where
-  mempty = AnnList Nothing Nothing Nothing [] []
-
-instance Semigroup NameAnn where
-  _ <> _ = panic "semigroup nameann"
-
-instance Monoid NameAnn where
-  mempty = NameAnnTrailing []
+instance NoAnn AnnListItem where
+  noAnn = AnnListItem []
 
 
 instance Semigroup (AnnSortKey tag) where
@@ -1362,8 +1347,14 @@ instance Semigroup (AnnSortKey tag) where
   x <> NoAnnSortKey = x
   AnnSortKey ls1 <> AnnSortKey ls2 = AnnSortKey (ls1 <> ls2)
 
+instance NoAnn AnnList where
+  noAnn = AnnList Nothing Nothing Nothing [] []
+
 instance Monoid (AnnSortKey tag) where
   mempty = NoAnnSortKey
+
+instance NoAnn NameAnn where
+  noAnn = NameAnnTrailing []
 
 instance (Outputable a) => Outputable (EpAnn a) where
   ppr (EpAnn l a c)  = text "EpAnn" <+> ppr l <+> ppr a <+> ppr c

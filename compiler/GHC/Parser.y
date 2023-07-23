@@ -4442,13 +4442,13 @@ parseModule = parseModuleNoHaddock >>= addHaddockToModule
 parseSignature :: P (Located (HsModule GhcPs))
 parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
-commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
-commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
+commentsA :: (NoAnn ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
+commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) noAnn cs) loc
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
 -- between top level declarations.
-commentsPA :: (Monoid ann) => LocatedAn ann a -> P (LocatedAn ann a)
+commentsPA :: (NoAnn ann) => LocatedAn ann a -> P (LocatedAn ann a)
 commentsPA la@(L l a) = do
   cs <- getPriorCommentsFor (getLocA la)
   return (L (addCommentsToSrcAnn l cs) a)
