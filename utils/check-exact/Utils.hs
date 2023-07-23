@@ -26,8 +26,6 @@ import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 import Lookup
-import Orphans (Default())
-import qualified Orphans as Orphans
 
 import GHC hiding (EpaComment)
 import qualified GHC
@@ -45,6 +43,7 @@ import qualified Data.Map.Strict as Map
 
 import Debug.Trace
 import Types
+import Orphans () -- NoAnn instances only
 
 -- ---------------------------------------------------------------------
 
@@ -348,20 +347,20 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
 
-setAnchorAn :: (Default an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
+setAnchorAn :: (NoAnn an) => LocatedAn an a -> Anchor -> EpAnnComments -> LocatedAn an a
 setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc cs
-  = (L (SrcSpanAnn (EpAnn anc Orphans.def cs) l) a)
+  = (L (SrcSpanAnn (EpAnn anc noAnn cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc cs
   = (L (SrcSpanAnn (EpAnn anc an cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 
-setAnchorEpa :: (Default an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc Orphans.def cs
+setAnchorEpa :: (NoAnn an) => EpAnn an -> Anchor -> EpAnnComments -> EpAnn an
+setAnchorEpa EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
 setAnchorEpa (EpAnn _ an _) anc cs = EpAnn anc an          cs
 
 setAnchorEpaL :: EpAnn AnnList -> Anchor -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc mempty cs
+setAnchorEpaL EpAnnNotUsed   anc cs = EpAnn anc noAnn cs
 setAnchorEpaL (EpAnn _ an _) anc cs = EpAnn anc (an {al_anchor = Nothing}) cs
 
 setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
