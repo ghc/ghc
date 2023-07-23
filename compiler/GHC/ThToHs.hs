@@ -1016,7 +1016,7 @@ cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
     n' <- wrapL (ipName n)
     e' <- cvtl e
-    returnLA (IPBind noAnn (reLocA n') e')
+    returnLA (IPBind noAnn (reLoc n') e')
 
 -------------------------------------------------------------------
 --              Expressions
@@ -1799,7 +1799,7 @@ cvtTypeKind typeOrKind ty
            ImplicitParamT n t
              -> do { n' <- wrapL $ ipName n
                    ; t' <- cvtType t
-                   ; returnLA (HsIParamTy noAnn (reLocA n') t')
+                   ; returnLA (HsIParamTy noAnn (reLoc n') t')
                    }
 
            _ -> failWith (MalformedType typeOrKind ty)
