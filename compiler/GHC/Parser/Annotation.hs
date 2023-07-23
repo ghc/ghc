@@ -76,9 +76,9 @@ module GHC.Parser.Annotation (
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
   HasAnnotation(..),
+  noLocA,
   getLocA,
   noSrcSpanA,
-  noAnnSrcSpan,
 
   -- ** Working with comments in annotations
   noComments, comment, addCommentsToSrcAnn, setCommentsSrcAnn,
@@ -908,15 +908,15 @@ la2na l = noAnnSrcSpan (locA l)
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
-la2la :: LocatedAn ann1 a2 -> LocatedAn ann2 a2
+la2la :: (Monoid ann2) => LocatedAn ann1 a2 -> LocatedAn ann2 a2
 la2la (L la a) = L (noAnnSrcSpan (locA la)) a
 
 l2l :: SrcSpanAnn' a -> SrcAnn ann
-l2l l = noAnnSrcSpan (locA l)
+l2l l = SrcSpanAnn EpAnnNotUsed (locA l)
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
-na2la :: SrcSpanAnn' a -> SrcAnn ann
+na2la :: (Monoid ann) => SrcSpanAnn' a -> SrcAnn ann
 na2la l = noAnnSrcSpan (locA l)
 
 reLoc :: LocatedAn a e -> Located e
@@ -937,23 +937,25 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 -- ---------------------------------------------------------------------
 
 class HasAnnotation e where
-  noLocA :: a -> GenLocated e a
+  -- noLocA :: a -> GenLocated e a
+  noAnnSrcSpan :: SrcSpan -> e
 
-instance (Monoid ann) => HasAnnotation (SrcAnn ann) where
-  noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+instance (Monoid ann) => HasAnnotation (SrcSpanAnn' (EpAnn ann)) where
+  -- noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+  noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
 
--- noLocA :: a -> LocatedAn an a
--- noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+noLocA :: (HasAnnotation e) => a -> GenLocated e a
+noLocA = L (noAnnSrcSpan noSrcSpan)
 
 -- TODO: AZ:get rid of this synonym
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA = getHasLoc
 
-noSrcSpanA :: SrcAnn ann
+noSrcSpanA :: (HasAnnotation e) => e
 noSrcSpanA = noAnnSrcSpan noSrcSpan
 
-noAnnSrcSpan :: SrcSpan -> SrcAnn ann
-noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
+-- noAnnSrcSpan :: SrcSpan -> SrcAnn ann
+-- noAnnSrcSpan l = SrcSpanAnn EpAnnNotUsed l
 
 -- ---------------------------------------------------------------------
 
@@ -1075,7 +1077,7 @@ epAnnComments (EpAnn _ _ cs) = cs
 sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
 
-mapLocA :: (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
+mapLocA :: (Monoid ann) => (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
 mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 -- AZ:TODO: move this somewhere sane
@@ -1091,10 +1093,14 @@ combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
         SrcSpanAnn (EpAnn (widenAnchorR anc (realSrcSpan l)) an cs) l
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLocA :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcAnn ann) e3
+addCLocA :: (Monoid ann)
+         => GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3
+         -> GenLocated (SrcAnn ann) e3
 addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
 
-addCLocAA :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3 -> GenLocated (SrcAnn ann) e3
+addCLocAA :: (Monoid ann)
+          => GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3
+          -> GenLocated (SrcAnn ann) e3
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
 
 -- ---------------------------------------------------------------------
@@ -1287,11 +1293,10 @@ instance Monoid AnnList where
   mempty = AnnList Nothing Nothing Nothing [] []
 
 instance Semigroup NameAnn where
-  _ <> _ = panic "semigroup nameann"
+  _ <> _ = panic "semigroup NameAnn"
 
 instance Monoid NameAnn where
   mempty = NameAnnTrailing []
-
 
 instance Semigroup AnnSortKey where
   NoAnnSortKey <> x = x

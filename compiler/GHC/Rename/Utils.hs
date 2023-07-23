@@ -570,7 +570,7 @@ checkCTupSize tup_size
 *                                                                      *
 ********************************************************************* -}
 
-wrapGenSpan :: a -> LocatedAn an a
+wrapGenSpan :: (Monoid an) => a -> LocatedAn an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
@@ -593,10 +593,10 @@ genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
-genLHsLit :: HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+genLHsLit :: (Monoid an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noAnn
 
-genHsIntegralLit :: IntegralLit -> LocatedAn an (HsExpr GhcRn)
+genHsIntegralLit :: (Monoid an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn
@@ -618,11 +618,15 @@ genWildPat = wrapGenSpan $ WildPat noExtField
 genSimpleFunBind :: Name -> [LPat GhcRn]
                  -> LHsExpr GhcRn -> LHsBind GhcRn
 genSimpleFunBind fun pats expr
-  = L gen $ genFunBind (L gen fun)
-        [mkMatch (mkPrefixFunRhs (L gen fun)) pats expr
+  = L genA $ genFunBind (L genN fun)
+        [mkMatch (mkPrefixFunRhs (L genN fun)) pats expr
                  emptyLocalBinds]
   where
-    gen = noAnnSrcSpan generatedSrcSpan
+    genA :: SrcSpanAnnA
+    genA = noAnnSrcSpan generatedSrcSpan
+
+    genN :: SrcSpanAnnN
+    genN = noAnnSrcSpan generatedSrcSpan
 
 genFunBind :: LocatedN Name -> [LMatch GhcRn (LHsExpr GhcRn)]
            -> HsBind GhcRn
