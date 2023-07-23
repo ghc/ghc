@@ -1941,7 +1941,11 @@ primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
 
    @since 0.5.0.0}
 
-#include "bytearray-access-ops.txt.pp"
+
+bytearray_access_ops
+-- This generates a whole bunch of primops;
+-- see utils/genprimopcode/AccessOps.hs
+
 
 primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
    ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
@@ -2242,7 +2246,11 @@ primop   AddrNeOp  "neAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrLtOp  "ltAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
 
-#include "addr-access-ops.txt.pp"
+
+addr_access_ops
+-- This generates a whole bunch of primops;
+-- see utils/genprimopcode/AccessOps.hs
+
 
 primop  InterlockedExchange_Addr "atomicExchangeAddrAddr#" GenPrimOp
    Addr# -> Addr# -> State# s -> (# State# s, Addr# #)

@@ -98,6 +98,8 @@ data Token = TEOF
            | TFalse
            | TCompare
            | TGenPrimOp
+           | TByteArrayAccessOps
+           | TAddrAccessOps
            | TThatsAllFolks
            | TLowerName String
            | TUpperName String
