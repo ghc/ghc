@@ -41,7 +41,7 @@ module GHC.Parser.Annotation (
   AnnContext(..),
   NameAnn(..), NameAdornment(..),
   NoEpAnns(..),
-  AnnSortKey(..),
+  AnnSortKey(..), DeclTag(..), BindTag(..),
 
   -- ** Trailing annotations in lists
   TrailingAnn(..), trailingAnnToAddEpAnn,
@@ -798,17 +798,118 @@ data AnnPragma
       } deriving (Data,Eq)
 
 -- ---------------------------------------------------------------------
--- | Captures the sort order of sub elements. This is needed when the
--- sub-elements have been split (as in a HsLocalBind which holds separate
--- binds and sigs) or for infix patterns where the order has been
--- re-arranged. It is captured explicitly so that after the Delta phase a
--- SrcSpan is used purely as an index into the annotations, allowing
--- transformations of the AST including the introduction of new Located
--- items or re-arranging existing ones.
-data AnnSortKey
+
+-- | Captures the sort order of sub elements for `ValBinds`,
+-- `ClassDecl`, `ClsInstDecl`
+data AnnSortKey tag
+  -- See Note [AnnSortKey] below
   = NoAnnSortKey
-  | AnnSortKey [RealSrcSpan]
+  | AnnSortKey [tag]
   deriving (Data, Eq)
+
+-- | Used to track of interleaving of binds and signatures for ValBind
+data BindTag
+  -- See Note [AnnSortKey] below
+  = BindTag
+  | SigDTag
+  deriving (Eq,Data,Ord,Show)
+
+-- | Used to track interleaving of class methods, class signatures,
+-- associated types and associate type defaults in `ClassDecl` and
+-- `ClsInstDecl`.
+data DeclTag
+  -- See Note [AnnSortKey] below
+  = ClsMethodTag
+  | ClsSigTag
+  | ClsAtTag
+  | ClsAtdTag
+  deriving (Eq,Data,Ord,Show)
+
+{-
+Note [AnnSortKey]
+~~~~~~~~~~~~~~~~~
+
+For some constructs in the ParsedSource we have mixed lists of items
+that can be freely intermingled.
+
+An example is the binds in a where clause, captured in
+
+    ValBinds
+        (XValBinds idL idR)
+        (LHsBindsLR idL idR) [LSig idR]
+
+This keeps separate ordered collections of LHsBind GhcPs and LSig GhcPs.
+
+But there is no constraint on the original source code as to how these
+should appear, so they can have all the signatures first, then their
+binds, or grouped with a signature preceding each bind.
+
+   fa :: Int
+   fa = 1
+
+   fb :: Char
+   fb = 'c'
+
+Or
+
+   fa :: Int
+   fb :: Char
+
+   fb = 'c'
+   fa = 1
+
+When exact printing these, we need to restore the original order. As
+initially parsed we have the SrcSpan, and can sort on those. But if we
+have modified the AST prior to printing, we cannot rely on the
+SrcSpans for order any more.
+
+The bag of LHsBind GhcPs is physically ordered, as is the list of LSig
+GhcPs. So in effect we have a list of binds in the order we care
+about, and a list of sigs in the order we care about. The only problem
+is to know how to merge the lists.
+
+This is where AnnSortKey comes in, which we store in the TTG extension
+point for ValBinds.
+
+    data AnnSortKey tag
+      = NoAnnSortKey
+      | AnnSortKey [tag]
+
+When originally parsed, with SrcSpans we can rely on, we do not need
+any extra information, so we tag it with NoAnnSortKey.
+
+If the binds and signatures are updated in any way, such that we can
+no longer rely on their SrcSpans (e.g. they are copied from elsewhere,
+parsed from scratch for insertion, have a fake SrcSpan), we use
+`AnnSortKey [BindTag]` to keep track.
+
+    data BindTag
+      = BindTag
+      | SigDTag
+
+We use it as a merge selector, and have one entry for each bind and
+signature.
+
+So for the first example we have
+
+  binds: fa = 1 , fb = 'c'
+  sigs:  fa :: Int, fb :: Char
+  tags: SigTag, BindTag, SigTag, BindTag
+
+so we draw first from the signatures, then the binds, and same again.
+
+For the second example we have
+
+  binds: fb = 'c', fa = 1
+  sigs:  fa :: Int, fb :: Char
+  tags: SigTag, SigTag, BindTag, BindTag
+
+so we draw two signatures, then two binds.
+
+We do similar for ClassDecl and ClsInstDecl, but we have four
+different lists we must manage. For this we use DeclTag.
+
+-}
 
 -- ---------------------------------------------------------------------
 
@@ -1249,12 +1350,12 @@ instance Monoid NameAnn where
   mempty = NameAnnTrailing []
 
 
-instance Semigroup AnnSortKey where
+instance Semigroup (AnnSortKey tag) where
   NoAnnSortKey <> x = x
   x <> NoAnnSortKey = x
   AnnSortKey ls1 <> AnnSortKey ls2 = AnnSortKey (ls1 <> ls2)
 
-instance Monoid AnnSortKey where
+instance Monoid (AnnSortKey tag) where
   mempty = NoAnnSortKey
 
 instance (Outputable a) => Outputable (EpAnn a) where
@@ -1288,7 +1389,13 @@ instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
 instance Outputable AnnContext where
   ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
 
-instance Outputable AnnSortKey where
+instance Outputable BindTag where
+  ppr tag = text $ show tag
+
+instance Outputable DeclTag where
+  ppr tag = text $ show tag
+
+instance Outputable tag => Outputable (AnnSortKey tag) where
   ppr NoAnnSortKey    = text "NoAnnSortKey"
   ppr (AnnSortKey ls) = text "AnnSortKey" <+> ppr ls
 

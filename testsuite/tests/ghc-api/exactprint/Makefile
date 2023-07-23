@@ -158,3 +158,7 @@ AddHiding1:
 .PHONY: AddHiding2
 AddHiding2:
 	$(CHECK_EXACT) $(LIBDIR) AddHiding2.hs addHiding2
+
+.PHONY: AddClassMethod
+AddClassMethod:
+	$(CHECK_EXACT) $(LIBDIR) AddClassMethod.hs addClassMethod

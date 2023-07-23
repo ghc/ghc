@@ -351,7 +351,7 @@ data DataDeclRn = DataDeclRn
              , tcdFVs      :: NameSet }
   deriving Data
 
-type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey)
+type instance XClassDecl    GhcPs = (EpAnn [AddEpAnn], AnnSortKey DeclTag)
 
   -- TODO:AZ:tidy up AnnSortKey above
 type instance XClassDecl    GhcRn = NameSet -- FVs
@@ -803,7 +803,7 @@ type instance XCClsInstDecl    GhcPs = ( Maybe (LWarningTxt GhcPs)
                                              -- See Note [Implementation of deprecated instances]
                                              -- in GHC.Tc.Solver.Dict
                                        , EpAnn [AddEpAnn]
-                                       , AnnSortKey) -- For sorting the additional annotations
+                                       , AnnSortKey DeclTag) -- For sorting the additional annotations
                                         -- TODO:AZ:tidy up
 type instance XCClsInstDecl    GhcRn = Maybe (LWarningTxt GhcRn)
                                            -- The warning of the deprecated instance
