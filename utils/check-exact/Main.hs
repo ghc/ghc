@@ -251,6 +251,7 @@ changers =
   ,("rmTypeSig2",        rmTypeSig2)
   ,("addHiding1",        addHiding1)
   ,("addHiding2",        addHiding2)
+  ,("addClassMethod",    addClassMethod)
    ]
 
 -- ---------------------------------------------------------------------
@@ -520,7 +521,7 @@ changeLocalDecls libdir (L l p) = do
         let oldBinds     = concatMap decl2Bind oldDecls'
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
         let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 4)))) a b c dd) cs)
         let binds' = (HsValBinds van'
@@ -553,7 +554,7 @@ changeLocalDecls2 libdir (L l p) = do
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
                         emptyComments
         let decls = [s,d]
-        let sortKey = captureOrder decls
+        let sortKey = captureOrderBinds decls
         let binds = (HsValBinds an (ValBinds sortKey (listToBag $ [decl'])
                                     [sig']))
         return (L lm (Match ma mln pats (GRHSs emptyComments rhs binds)))
@@ -798,7 +799,7 @@ rmDecl5 _libdir lp = do
         let
           go :: HsExpr GhcPs -> Transform (HsExpr GhcPs)
           go (HsLet a tkLet lb tkIn expr) = do
-            decs <- hsDeclsValBinds lb
+            let decs = hsDeclsLocalBinds lb
             let hdecs : _ = decs
             let dec = last decs
             _ <- transferEntryDP hdecs dec
@@ -945,6 +946,24 @@ addHiding2 _libdir top = do
   debugM $ "log:[\n" ++ intercalate "\n" _w ++ "]log end\n"
   return lp'
 
+-- ---------------------------------------------------------------------
+
+addClassMethod :: Changer
+addClassMethod libdir lp = do
+  Right sig  <- withDynFlags libdir (\df -> parseDecl df "sig"  "nn :: Int")
+  Right decl <- withDynFlags libdir (\df -> parseDecl df "decl" "nn = 2")
+  let decl' = setEntryDP decl (DifferentLine 1 2)
+  let  sig' = setEntryDP sig  (DifferentLine 2 2)
+  let doAddMethod = do
+        [cd] <- hsDecls lp
+        (f1:f2s:f2d:_) <- hsDecls cd
+        let  f2s' = setEntryDP f2s  (DifferentLine 2 2)
+        cd' <- replaceDecls cd [f1, sig', decl', f2s', f2d]
+        replaceDecls lp [cd']
+
+  (lp',_,w) <- runTransformT doAddMethod
+  debugM $ "addClassMethod:" ++ intercalate "\n" w
+  return lp'
 
 -- ---------------------------------------------------------------------
 -- From SYB
