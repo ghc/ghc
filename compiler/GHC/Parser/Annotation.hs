@@ -75,8 +75,8 @@ module GHC.Parser.Annotation (
 
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
-  -- HasAnnotation(..),
-  noLocA, getLocA,
+  HasAnnotation(..),
+  getLocA,
   noSrcSpanA,
   noAnnSrcSpan,
 
@@ -936,12 +936,16 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 -- ---------------------------------------------------------------------
 
--- class HasAnnotation where
---   noLocA :: a ->
+class HasAnnotation e where
+  noLocA :: a -> GenLocated e a
 
-noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+instance (Monoid ann) => HasAnnotation (SrcAnn ann) where
+  noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
 
+-- noLocA :: a -> LocatedAn an a
+-- noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+
+-- TODO: AZ:get rid of this synonym
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA = getHasLoc
 
@@ -1246,6 +1250,11 @@ instance (Monoid a) => Monoid (EpAnn a) where
 instance Semigroup NoEpAnns where
   _ <> _ = NoEpAnns
 
+instance Monoid NoEpAnns where
+  mempty = NoEpAnns
+
+
+
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
 
@@ -1261,6 +1270,18 @@ instance Semigroup AnnList where
       c Nothing x = x
       c x Nothing = x
       c f _       = f
+
+instance Semigroup AnnContext where
+  (AnnContext a1 o1 c1) <> (AnnContext a2 o2 c2)
+    = AnnContext (c a1 a2)  (o1 <> o2) (c1 <> c2)
+    where
+      -- Left biased combination for the ac_darrow
+      c Nothing x = x
+      c x Nothing = x
+      c f _       = f
+
+instance Monoid AnnContext where
+  mempty = AnnContext Nothing [] []
 
 instance Monoid AnnList where
   mempty = AnnList Nothing Nothing Nothing [] []
