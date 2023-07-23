@@ -75,7 +75,8 @@ module GHC.Parser.Annotation (
 
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
-  noLocA, getLocA,
+  HasAnnotation(..),
+  getLocA,
   noSrcSpanA,
   noAnnSrcSpan,
 
@@ -1019,8 +1020,11 @@ reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 -- ---------------------------------------------------------------------
 
-noLocA :: a -> LocatedAn an a
-noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
+class HasAnnotation e where
+  noLocA :: a -> GenLocated e a
+
+instance (NoAnn ann) => HasAnnotation (SrcAnn ann) where
+  noLocA = L (SrcSpanAnn EpAnnNotUsed noSrcSpan)
 
 getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA = getHasLoc
@@ -1328,6 +1332,7 @@ instance Semigroup EpAnnComments where
 instance NoAnn NoEpAnns where
   noAnn = NoEpAnns
 
+
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
 
@@ -1335,10 +1340,32 @@ instance NoAnn AnnListItem where
   noAnn = AnnListItem []
 
 
+
 instance Semigroup (AnnSortKey tag) where
   NoAnnSortKey <> x = x
   x <> NoAnnSortKey = x
   AnnSortKey ls1 <> AnnSortKey ls2 = AnnSortKey (ls1 <> ls2)
+
+instance Semigroup AnnList where
+  (AnnList a1 o1 c1 r1 t1) <> (AnnList a2 o2 c2 r2 t2)
+    = AnnList (a1 <> a2) (c o1 o2) (c c1 c2) (r1 <> r2) (t1 <> t2)
+    where
+      -- Left biased combination for the open and close annotations
+      c Nothing x = x
+      c x Nothing = x
+      c f _       = f
+
+instance Semigroup AnnContext where
+  (AnnContext a1 o1 c1) <> (AnnContext a2 o2 c2)
+    = AnnContext (c a1 a2)  (o1 <> o2) (c1 <> c2)
+    where
+      -- Left biased combination for the ac_darrow
+      c Nothing x = x
+      c x Nothing = x
+      c f _       = f
+
+instance NoAnn AnnContext where
+  noAnn = AnnContext Nothing [] []
 
 instance NoAnn AnnList where
   noAnn = AnnList Nothing Nothing Nothing [] []

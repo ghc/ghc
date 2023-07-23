@@ -2201,6 +2201,6 @@ type instance Anno FastString                      = SrcAnn NoEpAnns
 
 type instance Anno (DotFieldOcc (GhcPass p))       = SrcAnn NoEpAnns
 
-instance (Anno a ~ SrcSpanAnn' (EpAnn an))
+instance (Anno a ~ SrcSpanAnn' (EpAnn an), NoAnn an)
    => WrapXRec (GhcPass p) a where
   wrapXRec = noLocA
