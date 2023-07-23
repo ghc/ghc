@@ -4119,7 +4119,7 @@ sL1 :: HasLoc a => a -> b -> Located b
 sL1 x = sL (getHasLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1a #-}
-sL1a :: HasLoc a =>  a -> b -> LocatedAn t b
+sL1a :: (HasLoc a, HasAnnotation t) =>  a -> b -> GenLocated t b
 sL1a x = sL (noAnnSrcSpan $ getHasLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sL1n #-}
@@ -4131,7 +4131,7 @@ sLL :: (HasLoc a, HasLoc b) => a -> b -> c -> Located c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLa #-}
-sLLa :: (HasLoc a, HasLoc b) => a -> b -> c -> LocatedAn t c
+sLLa :: (HasLoc a, HasLoc b, NoAnn t) => a -> b -> c -> LocatedAn t c
 sLLa x y = sL (noAnnSrcSpan $ comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {-# INLINE sLLAsl #-}
