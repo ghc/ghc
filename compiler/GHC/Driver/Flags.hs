@@ -593,7 +593,6 @@ data GeneralFlag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
 
-   | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
    | Opt_InfoTableMapWithFallback
    | Opt_InfoTableMapWithStack
@@ -982,7 +981,6 @@ codeGenFlags = EnumSet.fromList
    , Opt_DoTagInferenceChecks
 
      -- Flags that affect debugging information
-   , Opt_DistinctConstructorTables
    , Opt_InfoTableMap
    , Opt_InfoTableMapWithStack
    , Opt_InfoTableMapWithFallback
