@@ -53,6 +53,7 @@ parseArch cc arch =
       "riscv64" -> pure ArchRISCV64
       "hppa" -> pure ArchUnknown
       "wasm32" -> pure ArchWasm32
+      "javascript" -> pure ArchJavaScript
       _ -> throwE $ "Unknown architecture " ++ arch
 
 parseOs :: String -> M OS
@@ -76,6 +77,7 @@ parseOs os =
       "aix" -> pure OSAIX
       "gnu" -> pure OSHurd
       "wasi" -> pure OSWasi
+      "ghcjs" -> pure OSGhcjs
       _ -> throwE $ "Unknown operating system " ++ os
 
 splitOn :: Char -> String -> [String]
