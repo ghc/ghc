@@ -146,7 +146,7 @@ options =
     , progOpts "cxx" "C++ compiler" _optCxx
     , progOpts "cc-link" "C compiler for linking" _optCcLink
     , progOpts "ar" "ar archiver" _optAr
-    , progOpts "ranlib" "ranlib utility" _optAr
+    , progOpts "ranlib" "ranlib utility" _optRanlib
     , progOpts "nm" "nm archiver" _optNm
     , progOpts "readelf" "readelf utility" _optReadelf
     , progOpts "merge-objs" "linker for merging objects" _optMergeObjs
