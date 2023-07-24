@@ -24,8 +24,8 @@ newtype HsCpp = HsCpp { hsCppProgram :: Program
 
 findHsCpp :: ProgOpt -> Cc -> M HsCpp
 findHsCpp progOpt cc = checking "for Haskell C preprocessor" $ do
-  -- Use the specified HS CPP or try to find one (candidate is the c compiler)
-  foundHsCppProg <- findProgram "Haskell C preprocessor" progOpt [takeFileName $ prgPath $ ccProgram cc]
+  -- Use the specified HS CPP or try to use the c compiler
+  foundHsCppProg <- findProgram "Haskell C preprocessor" progOpt [] <|> pure (Program (prgPath $ ccProgram cc) [])
   case poFlags progOpt of
     -- If the user specified HS CPP flags don't second-guess them
     Just _ -> return HsCpp{hsCppProgram=foundHsCppProg}
@@ -84,8 +84,8 @@ findHsCppArgs cpp = withTempDir $ \dir -> do
 
 findCpp :: ProgOpt -> Cc -> M Cpp
 findCpp progOpt cc = checking "for C preprocessor" $ do
-  -- Use the specified CPP or try to find one (candidate is the c compiler)
-  foundCppProg <- findProgram "C preprocessor" progOpt [prgPath $ ccProgram cc]
+  -- Use the specified CPP or try to use the c compiler
+  foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (Program (prgPath $ ccProgram cc) [])
   case poFlags progOpt of
     -- If the user specified CPP flags don't second-guess them
     Just _ -> return Cpp{cppProgram=foundCppProg}
