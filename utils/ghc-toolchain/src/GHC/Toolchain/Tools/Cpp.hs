@@ -23,17 +23,14 @@ newtype HsCpp = HsCpp { hsCppProgram :: Program
 
 findHsCpp :: ProgOpt -> Cc -> M HsCpp
 findHsCpp progOpt cc = checking "for Haskell C preprocessor" $ do
-  -- Use the specified HS CPP or try to use the c compiler
-  foundHsCppProg <- findProgram "Haskell C preprocessor" progOpt [] <|> pure (Program (prgPath $ ccProgram cc) [])
-  case poFlags progOpt of
-    -- If the user specified HS CPP flags don't second-guess them
-    Just _ -> return HsCpp{hsCppProgram=foundHsCppProg}
-    -- Otherwise, configure the HS CPP flags for this CPP program
-    Nothing -> do
-      let rawHsCppProgram = over _prgFlags (["-E"]++) foundHsCppProg
-      hppArgs <- findHsCppArgs rawHsCppProgram
-      let hsCppProgram = over _prgFlags (++hppArgs) rawHsCppProgram
-      return HsCpp{hsCppProgram}
+  -- Use the specified Hs Cpp or try to use the c compiler
+  foundHsCppProg <- findProgram "Haskell C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  -- Always add the -E flag to the CPP, regardless of the user options
+  let rawHsCppProgram = addFlagIfNew "-E" foundHsCppProg
+  -- Always try to add the Haskell-specific CPP flags, regardless of the user options
+  hppArgs <- findHsCppArgs rawHsCppProgram
+  let hsCppProgram = over _prgFlags (++hppArgs) rawHsCppProgram
+  return HsCpp{hsCppProgram}
 
 -- | Given a C preprocessor, figure out how it should be invoked to preprocess
 -- Haskell source.
@@ -62,12 +59,8 @@ findHsCppArgs cpp = withTempDir $ \dir -> do
 findCpp :: ProgOpt -> Cc -> M Cpp
 findCpp progOpt cc = checking "for C preprocessor" $ do
   -- Use the specified CPP or try to use the c compiler
-  foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (Program (prgPath $ ccProgram cc) [])
-  case poFlags progOpt of
-    -- If the user specified CPP flags don't second-guess them
-    Just _ -> return Cpp{cppProgram=foundCppProg}
-    -- Otherwise, configure the CPP flags for this CPP program
-    Nothing -> do
-      let cppProgram = over _prgFlags (["-E"]++) foundCppProg
-      return Cpp{cppProgram}
+  foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  -- Always add the -E flag to the CPP, regardless of the user options
+  let cppProgram = addFlagIfNew "-E" foundCppProg
+  return Cpp{cppProgram}
 

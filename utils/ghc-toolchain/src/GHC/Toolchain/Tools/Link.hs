@@ -47,7 +47,7 @@ findCcLink :: String -- ^ The llvm target to use if CcLink supports --target
            -> ArchOS -> Cc -> Maybe Readelf -> M CcLink
 findCcLink target progOpt ldOverride archOs cc readelf = checking "for C compiler for linking command" $ do
   -- Use the specified linker or try using the C compiler
-  rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (Program (prgPath $ ccProgram cc) [])
+  rawCcLink <- findProgram "C compiler for linking" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   ccLinkProgram <- case poFlags progOpt of
                      Just _ ->
                          -- If the user specified linker flags don't second-guess them

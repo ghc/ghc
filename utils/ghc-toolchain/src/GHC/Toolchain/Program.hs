@@ -2,6 +2,7 @@ module GHC.Toolchain.Program
     ( Program(..)
     , _prgPath
     , _prgFlags
+    , addFlagIfNew
       -- * Running programs
     , runProgram
     , callProgram
@@ -10,6 +11,7 @@ module GHC.Toolchain.Program
       -- * Finding 'Program's
     , ProgOpt(..)
     , emptyProgOpt
+    , programFromOpt
     , _poPath
     , _poFlags
     , findProgram
@@ -40,6 +42,13 @@ _prgPath = Lens prgPath (\x o -> o {prgPath = x})
 
 _prgFlags :: Lens Program [String]
 _prgFlags = Lens prgFlags (\x o -> o {prgFlags = x})
+
+-- | Prepends a flag to a program's flags if the flag is not in the existing flags.
+addFlagIfNew :: String -> Program -> Program
+addFlagIfNew flag prog@(Program path flags)
+  = if flag `elem` flags
+       then prog
+       else Program path (flag:flags)
 
 runProgram :: Program -> [String] -> M ExitCode
 runProgram prog args = do
@@ -97,6 +106,14 @@ _poFlags = Lens poFlags (\x o -> o {poFlags=x})
 
 emptyProgOpt :: ProgOpt
 emptyProgOpt = ProgOpt Nothing Nothing
+
+-- | Make a @'Program'@ from user specified program options (@'ProgOpt'@),
+-- defaulting to the given path and flags if unspecified in the @'ProgOpt'@.
+programFromOpt :: ProgOpt
+               -> FilePath -- ^ Program path to default to
+               -> [String] -- ^ Program flags to default to
+               -> Program
+programFromOpt userSpec path flags = Program { prgPath = fromMaybe path (poPath userSpec), prgFlags = fromMaybe flags (poFlags userSpec) }
 
 -- | Tries to find the user specified program by path or tries to look for one
 -- in the given list of candidates.

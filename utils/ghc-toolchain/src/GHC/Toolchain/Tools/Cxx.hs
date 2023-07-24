@@ -26,7 +26,7 @@ findCxx :: String -- ^ The llvm target to use if Cc supports --target
         -> M Cxx
 findCxx target progOpt cc = checking "for C++ compiler" $ do
     -- TODO: We use the search order in configure, but there could be a more optimal one
-    cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"] <|> pure (Program (prgPath $ ccProgram cc) [])
+    cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
     cxx        <- cxxSupportsTarget target Cxx{cxxProgram}
     checkCxxWorks cxx
     return cxx
