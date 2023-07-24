@@ -49,7 +49,11 @@ USER_CFLAGS="$CFLAGS"
 USER_LDFLAGS="$LDFLAGS"
 USER_LIBS="$LIBS"
 USER_CXXFLAGS="$CXXFLAGS"
-
+dnl The lower-level/not user-facing environment variables that may still be set
+dnl by developers such as in ghc-wasm-meta
+USER_CONF_CC_OPTS_STAGE2="$CONF_CC_OPTS_STAGE2"
+USER_CONF_CXX_OPTS_STAGE2="$CONF_CXX_OPTS_STAGE2"
+USER_CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2"
 
 dnl ----------------------------------------------------------
 dnl ** Find unixy sort and find commands,

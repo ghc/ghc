@@ -8,6 +8,18 @@ AC_DEFUN([ADD_GHC_TOOLCHAIN_ARG],
     done
 ])
 
+dnl $1 argument name
+dnl $2 first variable to try
+dnl $3 variable to add if the first variable is empty
+AC_DEFUN([ADD_GHC_TOOLCHAIN_ARG_CHOOSE],
+[
+    if test -z "$2"; then
+        ADD_GHC_TOOLCHAIN_ARG([$1],[$3])
+    else
+        ADD_GHC_TOOLCHAIN_ARG([$1],[$2])
+    fi
+])
+
 AC_DEFUN([ENABLE_GHC_TOOLCHAIN_ARG],
 [
     if test "$2" = "YES"; then
@@ -99,10 +111,10 @@ AC_DEFUN([FIND_GHC_TOOLCHAIN],
     ENABLE_GHC_TOOLCHAIN_ARG([libffi-adjustors], [$UseLibffiForAdjustors])
 
     dnl We store USER_* variants of all user-specified flags to pass them over to ghc-toolchain.
-    ADD_GHC_TOOLCHAIN_ARG([cc-opt], [$USER_CFLAGS])
-    ADD_GHC_TOOLCHAIN_ARG([cc-link-opt], [$USER_LDFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG_CHOOSE([cc-opt], [$USER_CONF_CC_OPTS_STAGE2], [$USER_CFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG_CHOOSE([cc-link-opt], [$USER_CONF_GCC_LINKER_OPTS_STAGE2], [$USER_LDFLAGS])
     ADD_GHC_TOOLCHAIN_ARG([cc-link-opt], [$USER_LIBS])
-    ADD_GHC_TOOLCHAIN_ARG([cxx-opt], [$USER_CXXFLAGS])
+    ADD_GHC_TOOLCHAIN_ARG_CHOOSE([cxx-opt], [$USER_CONF_CXX_OPTS_STAGE2], [$USER_CXXFLAGS])
     ADD_GHC_TOOLCHAIN_ARG([cpp-opt], [$USER_CPP_ARGS])
     ADD_GHC_TOOLCHAIN_ARG([hs-cpp-opt], [$USER_HS_CPP_ARGS])
 
