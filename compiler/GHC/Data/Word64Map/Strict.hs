@@ -3,8 +3,6 @@
 {-# LANGUAGE Trustworthy #-}
 #endif
 
-#include "containers.h"
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Word64Map.Strict
