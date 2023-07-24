@@ -24,7 +24,7 @@ newtype HsCpp = HsCpp { hsCppProgram :: Program
 findHsCpp :: ProgOpt -> Cc -> M HsCpp
 findHsCpp progOpt cc = checking "for Haskell C preprocessor" $ do
   -- Use the specified Hs Cpp or try to use the c compiler
-  foundHsCppProg <- findProgram "Haskell C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  foundHsCppProg <- findProgram "a user specified Haskell C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   -- Always add the -E flag to the CPP, regardless of the user options
   let rawHsCppProgram = addFlagIfNew "-E" foundHsCppProg
   -- Always try to add the Haskell-specific CPP flags, regardless of the user options
@@ -59,7 +59,7 @@ findHsCppArgs cpp = withTempDir $ \dir -> do
 findCpp :: ProgOpt -> Cc -> M Cpp
 findCpp progOpt cc = checking "for C preprocessor" $ do
   -- Use the specified CPP or try to use the c compiler
-  foundCppProg <- findProgram "C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
+  foundCppProg <- findProgram "a user specified C preprocessor" progOpt [] <|> pure (programFromOpt progOpt (prgPath $ ccProgram cc) [])
   -- Always add the -E flag to the CPP, regardless of the user options
   let cppProgram = addFlagIfNew "-E" foundCppProg
   return Cpp{cppProgram}
