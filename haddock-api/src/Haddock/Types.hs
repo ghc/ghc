@@ -816,7 +816,7 @@ type instance Anno (HsTyVarBndr flag DocNameI)       = SrcSpanAnnA
 type instance Anno [LocatedA (HsType DocNameI)]      = SrcSpanAnnC
 type instance Anno (HsType DocNameI)                 = SrcSpanAnnA
 type instance Anno (DataFamInstDecl DocNameI)        = SrcSpanAnnA
-type instance Anno (DerivStrategy DocNameI)          = SrcAnn NoEpAnns
+type instance Anno (DerivStrategy DocNameI)          = EpAnn NoEpAnns
 type instance Anno (FieldOcc DocNameI)               = SrcSpanAnnA
 type instance Anno (ConDeclField DocNameI)           = SrcSpan
 type instance Anno (Located (ConDeclField DocNameI)) = SrcSpan
@@ -827,9 +827,9 @@ type instance Anno (TyFamInstDecl DocNameI)          = SrcSpanAnnA
 type instance Anno [LocatedA (TyFamInstDecl DocNameI)] = SrcSpanAnnL
 type instance Anno (FamilyDecl DocNameI)               = SrcSpan
 type instance Anno (Sig DocNameI)                      = SrcSpan
-type instance Anno (InjectivityAnn DocNameI)           = SrcAnn NoEpAnns
+type instance Anno (InjectivityAnn DocNameI)           = EpAnn NoEpAnns
 type instance Anno (HsDecl DocNameI)                   = SrcSpanAnnA
-type instance Anno (FamilyResultSig DocNameI)          = SrcAnn NoEpAnns
+type instance Anno (FamilyResultSig DocNameI)          = EpAnn NoEpAnns
 type instance Anno (HsOuterTyVarBndrs Specificity DocNameI) = SrcSpanAnnA
 type instance Anno (HsSigType DocNameI)                     = SrcSpanAnnA
 
@@ -976,11 +976,7 @@ instance NFData Fixity where
   rnf (Fixity sourceText n dir) =
     sourceText `deepseq` n `deepseq` dir `deepseq` ()
 
-instance NFData ann => NFData (SrcSpanAnn' ann) where
-  rnf (SrcSpanAnn a ss) = a `deepseq` ss `deepseq` ()
-
 instance NFData (EpAnn NameAnn) where
-  rnf EpAnnNotUsed = ()
   rnf (EpAnn en ann cs) = en `deepseq` ann `deepseq` cs `deepseq` ()
 
 instance NFData NameAnn where
@@ -1038,8 +1034,11 @@ instance NFData NameAdornment where
   rnf NameBackquotes = ()
   rnf NameSquare     = ()
 
-instance NFData EpaLocation where
-  rnf (EpaSpan ss bs)  = ss `seq` bs `deepseq` ()
+instance NFData NoComments where
+  rnf NoComments = ()
+
+instance (NFData a) => NFData (EpaLocation' a) where
+  rnf (EpaSpan ss)  = rnf ss
   rnf (EpaDelta dp lc) = dp `seq` lc `deepseq` ()
 
 instance NFData EpAnnComments where
@@ -1065,10 +1064,6 @@ instance NFData BufSpan where
 
 instance NFData BufPos where
   rnf (BufPos n) = rnf n
-
-instance NFData AnchorOperation where
-  rnf UnchangedAnchor  = ()
-  rnf (MovedAnchor dp cs) = dp `deepseq` cs `deepseq` ()
 
 instance NFData DeltaPos where
   rnf (SameLine n)        = rnf n
