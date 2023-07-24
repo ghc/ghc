@@ -6,12 +6,15 @@ module GHC.Iface.Flags (
    , IfaceExtension(..)
    , IfaceLanguage(..)
    , IfaceCppOptions(..)
+   , IfaceCodeGen(..)
+   , IfaceDistinctConstructorConfig(..)
    , pprIfaceDynFlags
    , missingExtraFlagInfo
    ) where
 
 import GHC.Prelude
 
+import qualified Data.Set as Set
 import GHC.Utils.Outputable
 import Control.DeepSeq
 import GHC.Utils.Fingerprint
@@ -22,6 +25,7 @@ import GHC.Types.SafeHaskell
 import GHC.Core.Opt.CallerCC.Types
 
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Stg.Debug.Types
 
 -- The part of DynFlags which recompilation information needs
 data IfaceDynFlags = IfaceDynFlags
@@ -35,7 +39,7 @@ data IfaceDynFlags = IfaceDynFlags
         , ifacePaths :: [String]
         , ifaceProf  :: Maybe IfaceProfAuto
         , ifaceTicky :: [IfaceGeneralFlag]
-        , ifaceCodeGen :: [IfaceGeneralFlag]
+        , ifaceCodeGen :: IfaceCodeGen
         , ifaceFatIface :: Bool
         , ifaceDebugLevel :: Int
         , ifaceCallerCCFilters :: [CallerCcFilter]
@@ -58,7 +62,7 @@ pprIfaceDynFlags (IfaceDynFlags a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14) 
        , text "ticky:"
        , nest 2 $ vcat (map ppr a10)
        , text "codegen:"
-       , nest 2 $ vcat (map ppr a11)
+       , nest 2 $ ppr a11
        , text "fat-iface:" <+> ppr a12
        , text "debug-level:" <+> ppr a13
        , text "caller-cc-filters:" <+> ppr a14
@@ -192,3 +196,65 @@ instance Outputable IfaceCppOptions where
              , nest 2 $ parens (ppr fp) <+> ppr (map (text @SDoc) wos)
 
              ]
+
+data IfaceCodeGen = IfaceCodeGen
+  { ifaceCodeGenFlags :: [IfaceGeneralFlag]
+  , ifaceCodeGenDistinctConstructorTables :: IfaceDistinctConstructorConfig
+  }
+
+instance NFData IfaceCodeGen where
+  rnf (IfaceCodeGen flags distinctCnstrTables) =
+    rnf flags `seq` rnf distinctCnstrTables
+
+instance Binary IfaceCodeGen where
+  put_ bh (IfaceCodeGen flags distinctCnstrTables) = do
+    put_ bh flags
+    put_ bh distinctCnstrTables
+
+  get bh =
+    IfaceCodeGen <$> get bh <*> get bh
+
+instance Outputable IfaceCodeGen where
+  ppr (IfaceCodeGen flags distinctCnstrTables) =
+    vcat
+      [ text "flags:"
+      , nest 2 $ ppr flags
+      , text "distinct constructor tables:"
+      , nest 2 $ ppr distinctCnstrTables
+      ]
+
+newtype IfaceDistinctConstructorConfig = IfaceDistinctConstructorConfig StgDebugDctConfig
+
+instance NFData IfaceDistinctConstructorConfig where
+  rnf (IfaceDistinctConstructorConfig cnf) = case cnf of
+    All -> ()
+    (Only v) -> rnf v
+    (AllExcept v) -> rnf v
+    None -> ()
+
+instance Outputable IfaceDistinctConstructorConfig where
+  ppr (IfaceDistinctConstructorConfig cnf) = case cnf of
+    All -> text "all"
+    (Only v) -> text "only" <+> brackets (hcat $ fmap text $ Set.toList v)
+    (AllExcept v) -> text "all except" <+> brackets (hcat $ fmap text $ Set.toList v)
+    None -> text "none"
+
+instance Binary IfaceDistinctConstructorConfig where
+  put_ bh (IfaceDistinctConstructorConfig cnf) = case cnf of
+    All -> putByte bh 0
+    (Only cs) -> do
+      putByte bh 1
+      put_ bh cs
+    (AllExcept cs) -> do
+      putByte bh 2
+      put_ bh cs
+    None -> putByte bh 3
+
+  get bh = do
+    h <- getByte bh
+    IfaceDistinctConstructorConfig <$>
+      case h of
+        0 -> pure All
+        1 -> Only <$> get bh
+        2 -> AllExcept <$> get bh
+        _ -> pure None
