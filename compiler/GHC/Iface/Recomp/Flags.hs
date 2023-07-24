@@ -91,12 +91,30 @@ fingerprintDynFlags hsc_env this_mod nameio =
           mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
 
         -- Other flags which affect code generation
-        codegen = mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) (EnumSet.toList codeGenFlags)
+        codegen = IfaceCodeGen
+          { ifaceCodeGenFlags = mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) (EnumSet.toList codeGenFlags)
+          , ifaceCodeGenDistinctConstructorTables = IfaceDistinctConstructorConfig distinctConstructorTables
+          }
 
         -- Did we include core for all bindings?
         fat_iface = gopt Opt_WriteIfSimplifiedCore dflags
 
-        f = IfaceDynFlags mainis safeHs lang exts cpp js cmm paths prof ticky codegen fat_iface debugLevel callerCcFilters
+        f = IfaceDynFlags
+          { ifaceMainIs = mainis
+          , ifaceSafeMode = safeHs
+          , ifaceLang = lang
+          , ifaceExts = exts
+          , ifaceCppOptions = cpp
+          , ifaceJsOptions = js
+          , ifaceCmmOptions = cmm
+          , ifacePaths = paths
+          , ifaceProf = prof
+          , ifaceTicky = ticky
+          , ifaceCodeGen = codegen
+          , ifaceFatIface = fat_iface
+          , ifaceDebugLevel = debugLevel
+          , ifaceCallerCCFilters = callerCcFilters
+          }
 
     in (computeFingerprint nameio f, f)
 
