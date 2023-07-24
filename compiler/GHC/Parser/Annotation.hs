@@ -647,15 +647,19 @@ meaning we can have type LocatedN RdrName
 -- | Captures the location of punctuation occurring between items,
 -- normally in a list.  It is captured as a trailing annotation.
 data TrailingAnn
-  = AddSemiAnn EpaLocation    -- ^ Trailing ';'
-  | AddCommaAnn EpaLocation   -- ^ Trailing ','
-  | AddVbarAnn EpaLocation    -- ^ Trailing '|'
+  = AddSemiAnn    { ta_location :: EpaLocation }  -- ^ Trailing ';'
+  | AddCommaAnn   { ta_location :: EpaLocation }  -- ^ Trailing ','
+  | AddVbarAnn    { ta_location :: EpaLocation }  -- ^ Trailing '|'
+  | AddDarrowAnn  { ta_location :: EpaLocation }  -- ^ Trailing '=>'
+  | AddDarrowUAnn { ta_location :: EpaLocation }  -- ^ Trailing  "⇒"
   deriving (Data, Eq)
 
 instance Outputable TrailingAnn where
   ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
   ppr (AddCommaAnn ss)   = text "AddCommaAnn"   <+> ppr ss
   ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
+  ppr (AddDarrowAnn ss)  = text "AddDarrowAnn"  <+> ppr ss
+  ppr (AddDarrowUAnn ss) = text "AddDarrowUAnn" <+> ppr ss
 
 -- | Annotation for items appearing in a list. They can have one or
 -- more trailing punctuations items, such as commas or semicolons.
@@ -922,6 +926,8 @@ trailingAnnToAddEpAnn :: TrailingAnn -> AddEpAnn
 trailingAnnToAddEpAnn (AddSemiAnn ss)    = AddEpAnn AnnSemi ss
 trailingAnnToAddEpAnn (AddCommaAnn ss)   = AddEpAnn AnnComma ss
 trailingAnnToAddEpAnn (AddVbarAnn ss)    = AddEpAnn AnnVbar ss
+trailingAnnToAddEpAnn (AddDarrowUAnn ss) = AddEpAnn AnnDarrowU ss
+trailingAnnToAddEpAnn (AddDarrowAnn ss)  = AddEpAnn AnnDarrow ss
 
 -- | Helper function used in the parser to add a 'TrailingAnn' items
 -- to an existing annotation.
