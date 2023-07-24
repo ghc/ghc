@@ -596,6 +596,7 @@
 /* Getting/setting the info pointer of a closure */
 #define SET_INFO(p,info) StgHeader_info(p) = info
 #define SET_INFO_RELEASE(p,info) %release StgHeader_info(p) = info
+#define SET_INFO_RELAXED(p,info) %relaxed StgHeader_info(p) = info
 #define GET_INFO(p) StgHeader_info(p)
 #define GET_INFO_ACQUIRE(p) %acquire GET_INFO(p)
 
