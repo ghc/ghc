@@ -277,6 +277,7 @@ import GHC.CmmToAsm.CFG.Weight
 import GHC.Core.Opt.CallerCC
 import GHC.Parser (parseIdentifier)
 import GHC.Parser.Lexer (mkParserOpts, initParserState, P(..), ParseResult(..))
+import GHC.Stg.Debug.Types
 
 import GHC.SysTools.BaseDir ( expandToolDir, expandTopDir )
 
@@ -1920,6 +1921,13 @@ dynamic_flags_deps = [
         -- Caller-CC
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
+      (noArg enableDistinctConstructorTables)
+  , make_ord_flag defGhcFlag "fno-distinct-constructor-tables"
+      (noArg disableDistinctConstructorTables)
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables-only"
+      (Prefix onlyDistinctConstructorTables)
+
         ------ Compiler flags -----------------------------------------------
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend ncgBackend))
@@ -2623,7 +2631,6 @@ fFlagsDeps = [
   flagSpec "cmm-thread-sanitizer"             Opt_CmmThreadSanitizer,
   flagSpec "split-sections"                   Opt_SplitSections,
   flagSpec "break-points"                     Opt_InsertBreakpoints,
-  flagSpec "distinct-constructor-tables"      Opt_DistinctConstructorTables,
   flagSpec "info-table-map"                   Opt_InfoTableMap,
   flagSpec "info-table-map-with-stack"        Opt_InfoTableMapWithStack,
   flagSpec "info-table-map-with-fallback"     Opt_InfoTableMapWithFallback
@@ -3218,6 +3225,41 @@ setCallerCcFilters arg =
   case parseCallerCcFilter arg of
     Right filt -> upd $ \d -> d { callerCcFilters = filt : callerCcFilters d }
     Left err -> addErr err
+
+enableDistinctConstructorTables :: DynFlags -> DynFlags
+enableDistinctConstructorTables d =
+  d { distinctConstructorTables = All
+    }
+
+disableDistinctConstructorTables :: DynFlags -> DynFlags
+disableDistinctConstructorTables d =
+  d { distinctConstructorTables = None
+    }
+
+onlyDistinctConstructorTables :: String -> DynP ()
+onlyDistinctConstructorTables arg = do
+  let cs = parseDistinctConstructorTablesArg arg
+  upd $ \d ->
+    d { distinctConstructorTables =
+        (distinctConstructorTables d) `dctConfigOnly` cs
+      }
+
+-- | Parse a string of comma-separated constructor names into a 'Set' of
+-- 'String's with one entry per constructor.
+parseDistinctConstructorTablesArg :: String -> Set.Set String
+parseDistinctConstructorTablesArg =
+      -- Ensure we insert the last constructor name built by the fold, if not
+      -- empty
+      uncurry insertNonEmpty
+    . foldr go ("", Set.empty)
+  where
+    go :: Char -> (String, Set.Set String) -> (String, Set.Set String)
+    go ',' (cur, acc) = ("", Set.insert cur acc)
+    go c   (cur, acc) = (c : cur, acc)
+
+    insertNonEmpty :: String -> Set.Set String -> Set.Set String
+    insertNonEmpty "" = id
+    insertNonEmpty cs = Set.insert cs
 
 setMainIs :: String -> DynP ()
 setMainIs arg = parse parse_main_f arg

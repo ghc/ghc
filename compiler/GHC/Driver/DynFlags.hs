@@ -117,6 +117,7 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Utils.CliOption
+import GHC.Stg.Debug.Types (StgDebugDctConfig(..))
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Utils.Outputable
@@ -134,6 +135,7 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except (ExceptT)
 import Control.Monad.Trans.Reader (ReaderT)
 import Control.Monad.Trans.Writer (WriterT)
+import qualified Data.Set as Set
 import Data.Word
 import System.IO
 import System.IO.Error (catchIOError)
@@ -142,7 +144,6 @@ import System.FilePath (normalise, (</>))
 import System.Directory
 import GHC.Foreign (withCString, peekCString)
 
-import qualified Data.Set as Set
 import GHC.Types.Unique.Set
 
 import qualified GHC.LanguageExtensions as LangExt
@@ -481,7 +482,11 @@ data DynFlags = DynFlags {
     -- 'Int' because it can be used to test uniques in decreasing order.
 
   -- | Temporary: CFG Edge weights for fast iterations
-  cfgWeights            :: Weights
+  cfgWeights            :: Weights,
+
+  -- | Configuration specifying which constructor names we should create
+  -- distinct info tables for
+  distinctConstructorTables :: StgDebugDctConfig
 }
 
 class HasDynFlags m where
@@ -746,7 +751,9 @@ defaultDynFlags mySettings =
 
         reverseErrors = False,
         maxErrors     = Nothing,
-        cfgWeights    = defaultWeights
+        cfgWeights    = defaultWeights,
+
+        distinctConstructorTables = None
       }
 
 type FatalMessager = String -> IO ()

@@ -595,7 +595,6 @@ data GeneralFlag
    | Opt_NoBuiltinRules
    | Opt_NoBignumRules
 
-   | Opt_DistinctConstructorTables
    | Opt_InfoTableMap
    | Opt_InfoTableMapWithFallback
    | Opt_InfoTableMapWithStack
@@ -987,7 +986,6 @@ codeGenFlags = EnumSet.fromList
    , Opt_DoTagInferenceChecks
 
      -- Flags that affect debugging information
-   , Opt_DistinctConstructorTables
    , Opt_InfoTableMap
    , Opt_InfoTableMapWithStack
    , Opt_InfoTableMapWithFallback
