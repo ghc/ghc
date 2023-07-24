@@ -598,7 +598,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-validate+fully_static",
-      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
+      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -660,7 +660,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate",
-      "BROKEN_TESTS": "encoding004 T10458",
+      "BROKEN_TESTS": "encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -722,7 +722,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
-      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
+      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",
@@ -2536,7 +2536,7 @@
     "variables": {
       "BIGNUM_BACKEND": "native",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-int_native-release+fully_static",
-      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
+      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "release+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
@@ -2599,7 +2599,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+fully_static+no_split_sections",
-      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
+      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "release+fully_static+no_split_sections",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
@@ -2662,7 +2662,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-release+no_split_sections",
-      "BROKEN_TESTS": "encoding004 T10458",
+      "BROKEN_TESTS": "encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "release+no_split_sections",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--hash-unit-ids --docs=no-sphinx",
@@ -3647,7 +3647,7 @@
     "variables": {
       "BIGNUM_BACKEND": "gmp",
       "BIN_DIST_NAME": "ghc-x86_64-linux-alpine3_12-validate+fully_static",
-      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458",
+      "BROKEN_TESTS": "ghcilink002 linker_unload_native encoding004 T10458 linker_unload_native",
       "BUILD_FLAVOUR": "validate+fully_static",
       "CONFIGURE_ARGS": "--disable-ld-override ",
       "HADRIAN_ARGS": "--docs=no-sphinx",

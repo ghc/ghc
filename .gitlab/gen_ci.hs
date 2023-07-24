@@ -434,7 +434,8 @@ distroVariables Alpine = mconcat
   , "HADRIAN_ARGS" =: "--docs=no-sphinx"
     -- encoding004: due to lack of locale support
     -- T10458, ghcilink002: due to #17869
-  , "BROKEN_TESTS" =: "encoding004 T10458"
+    -- linker_unload_native: due to lack of dlinfo() support
+  , "BROKEN_TESTS" =: "encoding004 T10458 linker_unload_native"
   ]
 distroVariables Centos7 = mconcat [
   "HADRIAN_ARGS" =: "--docs=no-sphinx"
