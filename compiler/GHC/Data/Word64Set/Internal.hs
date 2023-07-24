@@ -12,8 +12,6 @@
 
 {-# OPTIONS_HADDOCK not-home #-}
 
-#include "containers.h"
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Word64Set.Internal

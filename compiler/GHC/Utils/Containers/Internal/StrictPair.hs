@@ -3,8 +3,6 @@
 {-# LANGUAGE Safe #-}
 #endif
 
-#include "containers.h"
-
 -- | A strict pair
 
 module GHC.Utils.Containers.Internal.StrictPair (StrictPair(..), toPair) where
