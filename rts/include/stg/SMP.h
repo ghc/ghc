@@ -490,9 +490,24 @@ busy_wait_nop(void)
 // These are typically necessary only in very specific cases (e.g. WSDeque)
 // where the ordered operations aren't expressive enough to capture the desired
 // ordering.
+//
+// Additionally, it is preferable to use the *_FENCE_ON() forms, which turn into
+// memory accesses when compiling for ThreadSanitizer (as ThreadSanitizer is
+// otherwise unable to reason about fences). See Note [ThreadSanitizer] in
+// TSANUtils.h.
+
 #define ACQUIRE_FENCE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 #define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
 #define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+
+#if defined(TSAN_ENABLED)
+#define ACQUIRE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_ACQUIRE);)
+#define RELEASE_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_RELEASE);)
+#define SEQ_CST_FENCE() NO_WARN(-Wtsan, __atomic_thread_fence(__ATOMIC_SEQ_CST);)
+#define ACQUIRE_FENCE_ON(x) (void)ACQUIRE_LOAD(x)
+#else
+#define ACQUIRE_FENCE_ON(x) __atomic_thread_fence(__ATOMIC_ACQUIRE)
+#endif
 
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
@@ -521,6 +536,8 @@ busy_wait_nop(void)
 #define ACQUIRE_FENCE()
 #define RELEASE_FENCE()
 #define SEQ_CST_FENCE()
+#define ACQUIRE_FENCE_ON(x)
+#define RELEASE_FENCE_ON(x)
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord
