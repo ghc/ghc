@@ -7,6 +7,7 @@ bug-reports:        https://gitlab.haskell.org/ghc/ghc/-/issues
 author:             Ben Gamari
 maintainer:         ben@well-typed.com
 copyright:          (c) The GHC Developers
+extra-source-files: CHANGELOG.md
 
 library
     exposed-modules:
