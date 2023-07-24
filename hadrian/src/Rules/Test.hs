@@ -339,7 +339,7 @@ needTestsuitePackages stg = do
   -- This is a hack, but a major usecase for testing the stage1 compiler is
   -- so that we can use it even if ghc stage2 fails to build
   -- Unfortunately, we still need the liba
-  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["ghc", "Cabal"]) && isStage0 stg))
+  let pkgs = filter (\(_,p) -> not $ "iserv" `isInfixOf` pkgName p || ((pkgName p `elem` ["haddock", "ghc", "Cabal"]) && isStage0 stg))
                     (libpkgs ++ exepkgs ++ [ (stg,timeout) | windowsHost ])
   need =<< mapM (uncurry pkgFile) pkgs
   cross <- flag CrossCompiling
