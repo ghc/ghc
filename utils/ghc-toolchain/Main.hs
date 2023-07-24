@@ -314,7 +314,7 @@ mkTarget opts = do
     -- Use Llvm target if specified, otherwise use triple as llvm target
     let tgtLlvmTarget = fromMaybe (optTriple opts) (optLlvmTriple opts)
     cc0 <- findCc tgtLlvmTarget (optCc opts)
-    cxx <- findCxx tgtLlvmTarget (optCxx opts)
+    cxx <- findCxx tgtLlvmTarget (optCxx opts) cc0
     cpp <- findCpp (optCpp opts) cc0
     hsCpp <- findHsCpp (optHsCpp opts) cc0
     (archOs, tgtVendor) <- parseTriple cc0 (optTriple opts)

@@ -11,6 +11,7 @@ import System.FilePath
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 import GHC.Toolchain.Utils
+import GHC.Toolchain.Tools.Cc
 
 newtype Cxx = Cxx { cxxProgram :: Program
                   }
@@ -20,10 +21,12 @@ _cxxProgram :: Lens Cxx Program
 _cxxProgram = Lens cxxProgram (\x o -> o{cxxProgram=x})
 
 findCxx :: String -- ^ The llvm target to use if Cc supports --target
-        -> ProgOpt -> M Cxx
-findCxx target progOpt = checking "for C++ compiler" $ do
+        -> ProgOpt -- ^ A user specified C++ compiler
+        -> Cc      -- ^ The C compiler, to try as a fallback C++ compiler if we can't find one.
+        -> M Cxx
+findCxx target progOpt cc = checking "for C++ compiler" $ do
     -- TODO: We use the search order in configure, but there could be a more optimal one
-    cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"]
+    cxxProgram <- findProgram "C++ compiler" progOpt ["g++", "clang++", "c++"] <|> pure (ccProgram cc)
     cxx        <- cxxSupportsTarget target Cxx{cxxProgram}
     checkCxxWorks cxx
     return cxx
