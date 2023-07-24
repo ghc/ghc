@@ -1,9 +1,11 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections   #-}
 
 -- This module contains functions which implement
 -- the -finfo-table-map and -fdistinct-constructor-tables flags
 module GHC.Stg.Debug
   ( StgDebugOpts(..)
+  , StgDebugDctConfig(..)
+  , dctConfigOnly
   , collectDebugInformation
   ) where
 
@@ -17,24 +19,19 @@ import GHC.Types.Tickish
 import GHC.Core.DataCon
 import GHC.Types.IPE
 import GHC.Unit.Module
-import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan)
+import GHC.Types.Name   ( getName, getOccName, occNameFS, nameSrcSpan, occName, occNameString)
 import GHC.Data.FastString
+import GHC.Stg.Debug.Types
 
 import Control.Monad (when)
 import Control.Monad.Trans.Reader
+import qualified Data.Set as Set
 import GHC.Utils.Monad.State.Strict
 import Control.Monad.Trans.Class
 import GHC.Types.SrcLoc
 import Control.Applicative
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
-
-data SpanWithLabel = SpanWithLabel RealSrcSpan LexicalFastString
-
-data StgDebugOpts = StgDebugOpts
-  { stgDebug_infoTableMap              :: !Bool
-  , stgDebug_distinctConstructorTables :: !Bool
-  }
 
 data R = R { rOpts :: StgDebugOpts, rModLocation :: ModLocation, rSpan :: Maybe SpanWithLabel }
 
@@ -164,10 +161,11 @@ numberDataCon dc _ | isUnboxedTupleDataCon dc = return NoNumber
 numberDataCon dc _ | isUnboxedSumDataCon dc = return NoNumber
 numberDataCon dc ts = do
   opts <- asks rOpts
-  if stgDebug_distinctConstructorTables opts then do
-    -- -fdistinct-constructor-tables is enabled. Add an entry to the data
-    -- constructor map for this occurrence of the data constructor with a unique
-    -- number and a src span
+  if shouldMakeDistinctTable opts dc then do
+    -- -fdistinct-constructor-tables is enabled and we do want to make distinct
+    -- tables for this constructor. Add an entry to the data constructor map for
+    -- this occurrence of the data constructor with a unique number and a src
+    -- span
     env <- lift get
     mcc <- asks rSpan
     let
@@ -192,7 +190,8 @@ numberDataCon dc ts = do
       Nothing -> NoNumber
       Just (_, res) -> Numbered (fst (NE.head res))
   else do
-    -- -fdistinct-constructor-tables is not enabled
+    -- -fdistinct-constructor-tables is not enabled, or we do not want to make
+    -- distinct tables for this specific constructor
     return NoNumber
 
 selectTick :: [StgTickish] -> Maybe (RealSrcSpan, LexicalFastString)
@@ -201,6 +200,19 @@ selectTick = foldl' go Nothing
     go :: Maybe (RealSrcSpan, LexicalFastString) -> StgTickish -> Maybe (RealSrcSpan, LexicalFastString)
     go _   (SourceNote rss d) = Just (rss, d)
     go acc _                  = acc
+
+-- | Descide whether a distinct info table should be made for a usage of a data
+-- constructor. We only want to do this if -fdistinct-constructor-tables was
+-- given and this constructor name was given, or no constructor names were
+-- given.
+shouldMakeDistinctTable :: StgDebugOpts -> DataCon -> Bool
+shouldMakeDistinctTable StgDebugOpts{stgDebug_distinctConstructorTables} dc =
+  case stgDebug_distinctConstructorTables of
+    All -> True
+    Only these -> Set.member dcStr these
+    None -> False
+  where
+    dcStr = occNameString . occName $ dataConName dc
 
 {-
 Note [Mapping Info Tables to Source Positions]
