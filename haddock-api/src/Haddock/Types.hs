@@ -817,7 +817,7 @@ type instance Anno [LocatedA (HsType DocNameI)]      = SrcSpanAnnC
 type instance Anno (HsType DocNameI)                 = SrcSpanAnnA
 type instance Anno (DataFamInstDecl DocNameI)        = SrcSpanAnnA
 type instance Anno (DerivStrategy DocNameI)          = SrcAnn NoEpAnns
-type instance Anno (FieldOcc DocNameI)               = SrcAnn NoEpAnns
+type instance Anno (FieldOcc DocNameI)               = SrcSpanAnnA
 type instance Anno (ConDeclField DocNameI)           = SrcSpan
 type instance Anno (Located (ConDeclField DocNameI)) = SrcSpan
 type instance Anno [Located (ConDeclField DocNameI)] = SrcSpan
@@ -1026,9 +1026,11 @@ instance NFData NameAnn where
   rnf (NameAnnTrailing a) = rnf a
 
 instance NFData TrailingAnn where
-  rnf (AddSemiAnn epaL)  = rnf epaL
-  rnf (AddCommaAnn epaL) = rnf epaL
-  rnf (AddVbarAnn epaL)  = rnf epaL
+  rnf (AddSemiAnn epaL)    = rnf epaL
+  rnf (AddCommaAnn epaL)   = rnf epaL
+  rnf (AddVbarAnn epaL)    = rnf epaL
+  rnf (AddDarrowAnn epaL)  = rnf epaL
+  rnf (AddDarrowUAnn epaL) = rnf epaL
 
 instance NFData NameAdornment where
   rnf NameParens     = ()
@@ -1052,7 +1054,6 @@ instance NFData EpaCommentTok where
   rnf (EpaDocOptions s)   = rnf s
   rnf (EpaLineComment s)  = rnf s
   rnf (EpaBlockComment s) = rnf s
-  rnf EpaEofComment       = ()
 
 
 instance NFData a => NFData (Strict.Maybe a) where
@@ -1070,7 +1071,7 @@ instance NFData Anchor where
 
 instance NFData AnchorOperation where
   rnf UnchangedAnchor  = ()
-  rnf (MovedAnchor dp) = rnf dp
+  rnf (MovedAnchor dp cs) = dp `deepseq` cs `deepseq` ()
 
 instance NFData DeltaPos where
   rnf (SameLine n)        = rnf n

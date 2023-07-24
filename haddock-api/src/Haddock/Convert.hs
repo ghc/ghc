@@ -1,7 +1,8 @@
-{-# LANGUAGE CPP           #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE TypeFamilies  #-}
-{-# LANGUAGE BangPatterns  #-}
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternGuards    #-}
+{-# LANGUAGE TypeFamilies     #-}
+{-# LANGUAGE BangPatterns     #-}
 
 -----------------------------------------------------------------------------
 -- |
