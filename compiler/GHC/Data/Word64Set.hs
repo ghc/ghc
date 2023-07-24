@@ -3,8 +3,6 @@
 {-# LANGUAGE Safe #-}
 #endif
 
-#include "containers.h"
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Word64Set

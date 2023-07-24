@@ -4,8 +4,6 @@
 
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 
-#include "containers.h"
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Word64Map.Strict.Internal
