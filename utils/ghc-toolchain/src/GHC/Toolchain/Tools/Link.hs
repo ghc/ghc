@@ -163,7 +163,7 @@ checkLinkWorks cc ccLink = withTempDir $ \dir -> do
 
     let out = dir </> "test"
         err = "linker didn't produce any output"
-    callProgram ccLink ["-o", out, test_o, main_o]
+    callProgram ccLink ["-Werror", "-o", out, test_o, main_o]
     expectFileExists out err
       -- Linking in windows might produce an executable with an ".exe" extension
       <|> expectFileExists (out <.> "exe") err
