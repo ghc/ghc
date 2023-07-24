@@ -68,7 +68,7 @@ fingerprintDynFlags hsc_env this_mod nameio =
           map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk, Opt_Ticky_Tag]
 
         -- Other flags which affect code generation
-        codegen = map (`gopt` dflags) (EnumSet.toList codeGenFlags)
+        codegen = (map (`gopt` dflags) (EnumSet.toList codeGenFlags), distinctConstructorTables)
 
         flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, codegen, debugLevel, callerCcFilters))
 

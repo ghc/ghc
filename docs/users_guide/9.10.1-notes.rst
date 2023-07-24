@@ -54,6 +54,18 @@ Compiler
 - Defaulting plugins can now propose solutions to entangled sets of type variables. This allows defaulting
   of multi-parameter type classes. See :ghc-ticket:`23832`.
 
+- The :ghc-flag:`-fdistinct-constructor-tables
+  <-fdistinct-constructor-tables=⟨cs⟩>` flag may now be provided with a list of
+  constructor names for which distinct info tables should be generated. This
+  avoids the default behavior of generating a distinct info table for *every*
+  usage of *every* constructor, which often results in more information than is
+  desired and significantly increases the size of executables.
+
+- The :ghc-flag:`-fno-distinct-constructor-tables
+  <-fno-distinct-constructor-tables=⟨cs⟩>` flag is introduced, which allows
+  users to refine the set of constructors for which distinct info tables should
+  be generated.
+
 GHCi
 ~~~~
 

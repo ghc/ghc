@@ -118,6 +118,7 @@ GHC.Runtime.Heap.Layout
 GHC.Settings
 GHC.Settings.Config
 GHC.Settings.Constants
+GHC.Stg.Debug.Types
 GHC.Stg.InferTags.TagSig
 GHC.StgToCmm.Types
 GHC.SysTools.Terminal

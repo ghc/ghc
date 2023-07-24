@@ -649,6 +649,7 @@ Library
         GHC.Stg.BcPrep
         GHC.Stg.CSE
         GHC.Stg.Debug
+        GHC.Stg.Debug.Types
         GHC.Stg.FVs
         GHC.Stg.Lift
         GHC.Stg.Lift.Analysis

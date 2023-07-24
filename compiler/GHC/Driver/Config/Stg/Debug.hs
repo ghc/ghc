@@ -10,5 +10,5 @@ import GHC.Driver.DynFlags
 initStgDebugOpts :: DynFlags -> StgDebugOpts
 initStgDebugOpts dflags = StgDebugOpts
   { stgDebug_infoTableMap = gopt Opt_InfoTableMap dflags
-  , stgDebug_distinctConstructorTables = gopt Opt_DistinctConstructorTables dflags
+  , stgDebug_distinctConstructorTables = distinctConstructorTables dflags
   }
