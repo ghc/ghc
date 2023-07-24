@@ -180,6 +180,8 @@ genCall (PrimTarget MO_AcquireFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncAcquire
 genCall (PrimTarget MO_ReleaseFence) _ _ = runStmtsDecls $
     statement $ Fence False SyncRelease
+genCall (PrimTarget MO_Touch) _ _ =
+    return (nilOL, [])
 
 genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
