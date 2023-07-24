@@ -1066,9 +1066,6 @@ instance NFData BufSpan where
 instance NFData BufPos where
   rnf (BufPos n) = rnf n
 
-instance NFData Anchor where
-  rnf (Anchor ss op) = ss `seq` op `deepseq` ()
-
 instance NFData AnchorOperation where
   rnf UnchangedAnchor  = ()
   rnf (MovedAnchor dp cs) = dp `deepseq` cs `deepseq` ()
