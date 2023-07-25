@@ -5,8 +5,6 @@ import Hadrian.Haskell.Cabal.Type
 import Builder
 import Packages
 import Settings.Builders.Common
-import GHC.Toolchain (tgtCCompilerLink, ccLinkProgram)
-import GHC.Toolchain.Program
 
 hsc2hsBuilderArgs :: Args
 hsc2hsBuilderArgs = builder Hsc2Hs ? do
@@ -14,10 +12,10 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     ccPath  <- getBuilderPath $ Cc CompileC stage
     gmpDir  <- getSetting GmpIncludeDir
     top     <- expr topDirectory
-    hArch   <- queryHost queryArch
-    hOs     <- queryHost queryOS
-    tArch   <- queryTarget queryArch
-    tOs     <- queryTarget queryOS
+    hArch   <- getSetting HostArch
+    hOs     <- getSetting HostOs
+    tArch   <- getSetting TargetArch
+    tOs     <- getSetting TargetOs
     version <- case stage of
                   Stage0 {} -> expr ghcCanonVersion
                   _ ->  getSetting ProjectVersionInt
@@ -51,9 +49,7 @@ getCFlags = do
     autogen <- expr $ autogenPath context
     let cabalMacros = autogen -/- "cabal_macros.h"
     expr $ need [cabalMacros]
-    mconcat [ remove ["-O"] (cArgs <> getStagedCCFlags)
-            -- Either "-E" is not part of the configured cpp args, or we can't add those args to invocations of things like this
-            -- ROMES:TODO: , prgFlags . cppProgram . tgtCPreprocessor <$> getStagedTargetConfig
+    mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
             , cIncludeArgs
             , getContextData ccOpts
             -- we might be able to leave out cppOpts, to be investigated.
@@ -64,7 +60,7 @@ getCFlags = do
 
 getLFlags :: Expr [String]
 getLFlags =
-    mconcat [ prgFlags . ccLinkProgram . tgtCCompilerLink <$> getStagedTarget
+    mconcat [ getStagedSettingList ConfGccLinkerArgs
             , ldArgs
             , getContextData ldOpts
             , getContextData depLdOpts ]

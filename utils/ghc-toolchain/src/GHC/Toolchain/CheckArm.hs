@@ -46,7 +46,7 @@ findArmIsa cc = do
           _ -> throwE $ "unexpected output from test program: " ++ out
 
     extensions :: [(ArmISAExt, String)]
-    extensions =
+    extensions = 
         [ (NEON, "__ARM_NEON")
         , (VFPv2, "__VFP_FP__")
         , (VFPv2, "__ARM_VFPV2")

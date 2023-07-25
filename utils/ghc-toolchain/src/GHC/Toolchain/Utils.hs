@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Toolchain.Utils
@@ -6,41 +5,41 @@ module GHC.Toolchain.Utils
     , expectFileExists
     , withTempDir
     , oneOf
-    , isSuccess
     ) where
 
-import Control.Exception
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Class
 import System.Directory
 import System.FilePath
 import System.IO.Error
-import System.Exit
 
 import GHC.Toolchain.Prelude
 
-createTempDirectory :: IO FilePath
+createTempDirectory
+    :: forall m. (MonadIO m, MonadCatch m)
+    => m FilePath
 createTempDirectory = do
-    root <- getTemporaryDirectory
+    root <- liftIO $ getTemporaryDirectory
     go root 0
   where
-    go :: FilePath -> Int -> IO FilePath
+    go :: FilePath -> Int -> m FilePath
     go root n = do
         let path = root </> "tmp"++show n
-        res <- try $ createDirectory path
+        res <- try $ liftIO $ createDirectory path
         case res of
           Right () -> return path
           Left err
             | isAlreadyExistsError err -> go root (n+1)
-            | otherwise -> throwIO err
+            | otherwise -> throwM err
 
 withTempDir :: (FilePath -> M a) -> M a
 withTempDir f = do
     env <- getEnv
     let close dir
           | keepTemp env = return ()
-          | otherwise    = removeDirectoryRecursive dir
-    makeM (bracket createTempDirectory close (runM env . f))
+          | otherwise    = liftIO $ removeDirectoryRecursive dir
+    bracket createTempDirectory close f
 
 expectJust :: String -> Maybe a -> M a
 expectJust err Nothing = throwE err
@@ -53,9 +52,3 @@ expectFileExists path err = do
 
 oneOf :: String -> [M b] -> M b
 oneOf err = foldr (<|>) (throwE err)
-
-isSuccess :: ExitCode -> Bool
-isSuccess = \case
-  ExitSuccess -> True
-  ExitFailure _ -> False
-

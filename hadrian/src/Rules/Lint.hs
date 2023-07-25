@@ -39,7 +39,7 @@ runHLint :: [FilePath] -- ^ include directories
          -> Action ()
 runHLint includeDirs defines dir = do
   threads <- shakeThreads <$> getShakeOptions
-  hostArch <- (<> "_HOST_ARCH") <$> queryHostTarget queryArch
+  hostArch <- (<> "_HOST_ARCH") <$> setting HostArch
   let hlintYaml = dir </> ".hlint.yaml"
       defines' = hostArch : defines
       cmdLine = unwords $

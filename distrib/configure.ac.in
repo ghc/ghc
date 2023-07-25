@@ -57,12 +57,10 @@ if test "$target" != "$host" ; then
                           #   configure: error: cannot run C compiled programs.
                           #   If you meant to cross compile, use `--host'.
 fi
-LeadingUnderscore="@LeadingUnderscore@"
 CrossCompilePrefix="@CrossCompilePrefix@"
 TargetPlatformFull="${target}"
 TablesNextToCode="@TablesNextToCode@"
 
-AC_SUBST(LeadingUnderscore)
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
@@ -287,8 +285,6 @@ AC_SUBST(UseLibdw)
 FP_SETTINGS
 
 AC_CONFIG_FILES([config.mk])
-AC_CONFIG_FILES([default.host.target])
-AC_CONFIG_FILES([default.target])
 AC_OUTPUT
 
 # We get caught by
@@ -309,12 +305,6 @@ checkMake380() {
 
 checkMake380 make
 checkMake380 gmake
-
-# Toolchain target files
-PREP_TARGET_FILE
-FIND_GHC_TOOLCHAIN([.])
-
-VALIDATE_GHC_TOOLCHAIN([default.target],[default.target.ghc-toolchain])
 
 echo "****************************************************"
 echo "Configuration done, ready to 'make install'"

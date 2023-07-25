@@ -10,13 +10,10 @@ module GHC.Platform.ArchOS
    , ArmISAExt(..)
    , ArmABI(..)
    , PPC_64ABI(..)
-   , isARM
    , stringEncodeArch
 
      -- * Operating systems
    , OS(..)
-   , osElfTarget
-   , osMachOTarget
    , stringEncodeOS
    )
 where
@@ -160,36 +157,3 @@ stringEncodeOS = \case
   OSHurd      -> "hurd"
   OSWasi      -> "wasi"
   OSGhcjs     -> "ghcjs"
-
--- | This predicate tells us whether the OS uses the ELF as its primary object format.
-osElfTarget :: OS -> Bool
-osElfTarget OSLinux     = True
-osElfTarget OSFreeBSD   = True
-osElfTarget OSDragonFly = True
-osElfTarget OSOpenBSD   = True
-osElfTarget OSNetBSD    = True
-osElfTarget OSSolaris2  = True
-osElfTarget OSDarwin    = False
-osElfTarget OSMinGW32   = False
-osElfTarget OSKFreeBSD  = True
-osElfTarget OSHaiku     = True
-osElfTarget OSQNXNTO    = False
-osElfTarget OSAIX       = False
-osElfTarget OSHurd      = True
-osElfTarget OSWasi      = False
-osElfTarget OSGhcjs     = False
-osElfTarget OSUnknown   = False
- -- Defaulting to False is safe; it means don't rely on any
- -- ELF-specific functionality.  It is important to have a default for
- -- portability, otherwise we have to answer this question for every
- -- new platform we compile on (even unreg).
-
-isARM :: Arch -> Bool
-isARM (ArchARM {}) = True
-isARM ArchAArch64  = True
-isARM _ = False
-
--- | This predicate tells us whether the OS support Mach-O shared libraries.
-osMachOTarget :: OS -> Bool
-osMachOTarget OSDarwin = True
-osMachOTarget _ = False

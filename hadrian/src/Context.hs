@@ -3,7 +3,7 @@ module Context (
     Context (..), vanillaContext, stageContext,
 
     -- * Expressions
-    getStage, getPackage, getWay, getBuildPath, getPackageDbLoc, getStagedTarget,
+    getStage, getPackage, getWay, getStagedSettingList, getBuildPath, getPackageDbLoc,
 
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile, pkgSetupConfigDir,
@@ -19,8 +19,6 @@ import Context.Type
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Oracles.Setting
-import GHC.Toolchain.Target (Target(..))
-import GHC.Platform.ArchOS
 
 -- | Most targets are built only one way, hence the notion of 'vanillaContext'.
 vanillaContext :: Stage -> Package -> Context
@@ -49,9 +47,9 @@ getPackage = package <$> getContext
 getWay :: Expr Context b Way
 getWay = way <$> getContext
 
--- | Get the 'Target' configuration of the current stage
-getStagedTarget :: Expr Context b Target
-getStagedTarget = expr . targetStage =<< getStage
+-- | Get a list of configuration settings for the current stage.
+getStagedSettingList :: (Stage -> SettingList) -> Args Context b
+getStagedSettingList f = getSettingList . f =<< getStage
 
 -- | Path to the directory containing the final artifact in a given 'Context'.
 libPath :: Context -> Action FilePath
@@ -64,10 +62,13 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 -- conventions (see 'cabalOsString' and 'cabalArchString').
 distDir :: Stage -> Action FilePath
 distDir st = do
+    let (os,arch) = case st of
+            Stage0 {} -> (HostOs , HostArch)
+            _      -> (TargetOs, TargetArch)
     version        <- ghcVersionStage st
-    targetOs       <- cabalOsString   . stringEncodeOS   . archOS_OS   . tgtArchOs <$> targetStage st
-    targetArch     <- cabalArchString . stringEncodeArch . archOS_arch . tgtArchOs <$> targetStage st
-    return $ targetArch ++ "-" ++ targetOs ++ "-ghc-" ++ version
+    hostOs         <- cabalOsString <$> setting os
+    hostArch       <- cabalArchString <$> setting arch
+    return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
 
 pkgFileName :: Context -> Package -> String -> String -> Action FilePath
 pkgFileName context package prefix suffix = do
@@ -94,7 +95,7 @@ pkgSetupConfigFile context = pkgSetupConfigDir context <&> (-/- "setup-config")
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/doc/html/array/array.haddock@.
 pkgHaddockFile :: Context -> Action FilePath
-pkgHaddockFile Context {..} = do
+pkgHaddockFile context@Context {..} = do
     root <- buildRoot
     version <- pkgUnitId stage package
     return $ root -/- "doc/html/libraries" -/- version -/- pkgName package <.> "haddock"
@@ -135,7 +136,7 @@ pkgGhciLibraryFile context@Context {..} = do
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
-pkgConfFile Context {..} = do
+pkgConfFile context@Context {..} = do
     pid  <- pkgUnitId stage package
     dbPath <- packageDbPath (PackageDbLoc stage iplace)
     return $ dbPath -/- pid <.> "conf"

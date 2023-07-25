@@ -13,8 +13,6 @@ import Control.Exception (assert)
 import qualified Data.Set as Set
 import System.Directory
 import Settings.Program (programContext)
-import GHC.Toolchain (ccLinkProgram, tgtCCompilerLink)
-import GHC.Toolchain.Program (prgFlags)
 
 cabalBuilderArgs :: Args
 cabalBuilderArgs = cabalSetupArgs <> cabalInstallArgs
@@ -168,13 +166,14 @@ libraryArgs = do
 -- | Configure args with stage/lib specific include directories and settings
 configureStageArgs :: Args
 configureStageArgs = do
-  let cFlags  = getStagedCCFlags
-      linkFlags = prgFlags . ccLinkProgram . tgtCCompilerLink <$> getStagedTarget
-  mconcat [ configureArgs cFlags linkFlags
+  let cFlags  = getStagedSettingList ConfCcArgs
+      ldFlags = getStagedSettingList ConfGccLinkerArgs
+  mconcat [ configureArgs cFlags ldFlags
           , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"
           ]
 
 
+-- TODO: LD_OPTS?
 configureArgs :: Args -> Args -> Args
 configureArgs cFlags' ldFlags' = do
 
@@ -185,7 +184,7 @@ configureArgs cFlags' ldFlags' = do
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
-                           , getStagedCCFlags
+                           , getStagedSettingList ConfCcArgs
                            -- See https://github.com/snowleopard/hadrian/issues/523
                            , arg $ "-iquote"
 
@@ -203,7 +202,6 @@ configureArgs cFlags' ldFlags' = do
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        -- ROMES:TODO: how is the Host set to TargetPlatformFull? That would be the target
         , conf "--host"                   $ arg =<< getSetting TargetPlatformFull
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , notStage0 ? arg "--ghc-option=-ghcversion-file=rts/include/ghcversion.h"

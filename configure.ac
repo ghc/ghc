@@ -1168,10 +1168,6 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-# Toolchain target files
-PREP_TARGET_FILE
-FIND_GHC_TOOLCHAIN([hadrian/cfg])
-
 AC_CONFIG_FILES(
 [ mk/project.mk
   hadrian/cfg/system.config
@@ -1180,8 +1176,6 @@ AC_CONFIG_FILES(
   hadrian/ghci-stack
   docs/users_guide/ghc_config.py
   distrib/configure.ac
-  hadrian/cfg/default.host.target
-  hadrian/cfg/default.target
 ])
 
 dnl Create the VERSION file, satisfying #22322.
@@ -1293,18 +1287,3 @@ mk/build.mk.sample to mk/build.mk, and edit the settings in there.
 For more information on how to configure your GHC build, see
    https://gitlab.haskell.org/ghc/ghc/wikis/building
 "]
-
-# Currently we don't validate the /host/ GHC toolchain because configure
-# doesn't configure flags and properties for most of the host toolchain
-#
-# In fact, most values in default.host.target are dummy values since they are
-# never used (see default.host.target.in)
-#
-# When we move to configure toolchains by means of ghc-toolchain only, we'll
-# have a correct complete /host/ toolchain rather than an incomplete one, which
-# might further unlock things like canadian cross-compilation
-#
-# VALIDATE_GHC_TOOLCHAIN([default.host.target],[default.host.target.ghc-toolchain])
-
-VALIDATE_GHC_TOOLCHAIN([hadrian/cfg/default.target],[hadrian/cfg/default.target.ghc-toolchain])
-

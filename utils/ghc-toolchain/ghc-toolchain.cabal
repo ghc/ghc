@@ -8,9 +8,9 @@ author:             Ben Gamari
 maintainer:         ben@well-typed.com
 copyright:          (c) The GHC Developers
 
-library
-    exposed-modules:
-                      GHC.Toolchain,
+executable ghc-toolchain
+    main-is:          Main.hs
+    other-modules:    
                       GHC.Toolchain.Lens,
                       GHC.Toolchain.Monad,
                       GHC.Toolchain.PlatformDetails,
@@ -33,23 +33,10 @@ library
     default-extensions: NoImplicitPrelude
     build-depends:    base,
                       directory,
+                      exceptions,
                       filepath,
                       process,
                       transformers,
-                      text,
-                      ghc-platform
+                      ghc-boot
     hs-source-dirs:   src
-    default-language: Haskell2010
-
-executable ghc-toolchain
-    main-is:          Main.hs
-    ghc-options:      -Wall
-    default-extensions: NoImplicitPrelude
-    build-depends:    base,
-                      directory,
-                      filepath,
-                      process,
-                      transformers,
-                      ghc-platform,
-                      ghc-toolchain
     default-language: Haskell2010

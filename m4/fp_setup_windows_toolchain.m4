@@ -65,25 +65,20 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
         fi
     }
 
-    # See Note [How we configure the bundled windows toolchain]
-    # and Note [tooldir: How GHC finds mingw on Windows]
+    # See Note [tooldir: How GHC finds mingw on Windows]
     test -d inplace || mkdir inplace
 
     # NB. Download and extract the MingW-w64 distribution if required
     set_up_tarballs
 
     # N.B. The parameters which get plopped in the `settings` file used by the
-    # resulting compiler are computed in `FP_SETTINGS`. Specifically, we use
-    # $$topdir-relative paths instead of fullpaths to the toolchain, by replacing
-    # occurrences of $hardtop/inplace/mingw with $$tooldir/mingw
+    # resulting compiler are computed in `FP_SETTINGS`.
 
     # Our Windows toolchain is based around Clang and LLD. We use compiler-rt
     # for the runtime, libc++ and libc++abi for the C++ standard library
     # implementation, and libunwind for C++ unwinding.
     mingwbin="$hardtop/inplace/mingw/bin/"
-    mingwlib="$hardtop/inplace/mingw/lib"
-    mingwinclude="$hardtop/inplace/mingw/include"
-    mingwpath="$hardtop/inplace/mingw"
+    mingwlib="$hardtop/inplace/mingw/lib/"
 
     CC="${mingwbin}clang.exe"
     CXX="${mingwbin}clang++.exe"
@@ -92,22 +87,17 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     # necessary to ensure correct behavior when MinGW-w64 headers are in the
     # header include path (#22159).
     cflags="--rtlib=compiler-rt -D_UCRT"
-    CFLAGS="$cflags -I$mingwinclude"
-    CONF_CC_OPTS_STAGE1="$cflags -I$mingwinclude"
-    CONF_CC_OPTS_STAGE2="$cflags -I$mingwinclude"
+    CFLAGS="$cflags"
+    CONF_CC_OPTS_STAGE1="$cflags"
+    CONF_CC_OPTS_STAGE2="$cflags"
 
     cxxflags=""
-    CXXFLAGS="$cxxflags -I$mingwinclude"
-    CONF_CXX_OPTS_STAGE1="$cxxflags -I$mingwinclude"
-    CONF_CXX_OPTS_STAGE2="$cxxflags -I$mingwinclude"
+    CXXFLAGS="$cxxflags"
+    CONF_CXX_OPTS_STAGE1="$cxxflags"
+    CONF_CXX_OPTS_STAGE2="$cxxflags"
 
-    CONF_CPP_OPTS_STAGE1="$CONF_CPP_OPTS_STAGE1 -I$mingwinclude"
-    CONF_CPP_OPTS_STAGE2="$CONF_CPP_OPTS_STAGE2 -I$mingwinclude"
-
-    HaskellCPPArgs="$HaskellCPPArgs -I$mingwinclude"
-
-    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags -L$mingwlib -L$hardtop/inplace/mingw/x86_64-w64-mingw32/lib"
-    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags -L$mingwlib -L$hardtop/inplace/mingw/x86_64-w64-mingw32/lib"
+    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags"
+    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags"
 
     # N.BOn Windows we can't easily dynamically-link against libc++ since there is
     # no RPATH support, meaning that the loader will have no way of finding our
@@ -121,7 +111,6 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     RANLIB="${mingwbin}llvm-ranlib.exe"
     OBJDUMP="${mingwbin}llvm-objdump.exe"
     DLLTOOL="${mingwbin}llvm-dlltool.exe"
-    Windres="${mingwbin}llvm-windres.exe"
 
     # N.B. LLD does not support -r
     MergeObjsCmd=""

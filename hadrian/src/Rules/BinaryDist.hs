@@ -15,8 +15,6 @@ import Target
 import Utilities
 import qualified System.Directory.Extra as IO
 import Data.Either
-import GHC.Toolchain (ccProgram, tgtCCompiler, ccLinkProgram, tgtCCompilerLink)
-import GHC.Toolchain.Program (prgFlags)
 
 {-
 Note [Binary distributions]
@@ -258,8 +256,6 @@ bindistRules = do
           need $ map (bindistFilesDir -/-)
                     (["configure", "Makefile"] ++ bindistInstallFiles)
           copyFile ("hadrian" -/- "bindist" -/- "config.mk.in") (bindistFilesDir -/- "config.mk.in")
-          copyFile ("hadrian" -/- "cfg" -/- "default.target.in") (bindistFilesDir -/- "default.target.in")
-          copyFile ("hadrian" -/- "cfg" -/- "default.host.target.in") (bindistFilesDir -/- "default.host.target.in")
           forM_ bin_targets $ \(pkg, _) -> do
             needed_wrappers <- pkgToWrappers pkg
             forM_ needed_wrappers $ \wrapper_name -> do
@@ -422,11 +418,11 @@ commonWrapper = pure $ "exec \"$executablename\" ${1+\"$@\"}\n"
 -- echo 'HSC2HS_EXTRA="$(addprefix --cflag=,$(CONF_CC_OPTS_STAGE1)) $(addprefix --lflag=,$(CONF_GCC_LINKER_OPTS_STAGE1))"' >> "$(WRAPPER)"
 hsc2hsWrapper :: Action String
 hsc2hsWrapper = do
-  ccArgs <- map ("--cflag=" <>) . prgFlags . ccProgram . tgtCCompiler <$> targetStage Stage1
-  linkFlags <- map ("--lflag=" <>) . prgFlags . ccLinkProgram . tgtCCompilerLink <$> targetStage Stage1
+  ccArgs <- map ("--cflag=" <>) <$> settingList (ConfCcArgs Stage1)
+  ldFlags <- map ("--lflag=" <>) <$> settingList (ConfGccLinkerArgs Stage1)
   wrapper <- drop 4 . lines <$> liftIO (readFile "utils/hsc2hs/hsc2hs.wrapper")
   return $ unlines
-    ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ linkFlags) <> "\""
+    ( "HSC2HS_EXTRA=\"" <> unwords (ccArgs ++ ldFlags) <> "\""
     : "tflag=\"--template=$libdir/template-hsc.h\""
     : "Iflag=\"-I$includedir/\""
     : wrapper )

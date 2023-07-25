@@ -8,12 +8,12 @@ import Control.Monad
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Program
 
-newtype Nm = Nm { nmProgram :: Program
-                }
-    deriving (Show, Read, Eq, Ord)
+data Nm = Nm { nmProgram :: Program
+             }
+    deriving (Show, Read)
 
 findNm :: ProgOpt -> M Nm
 findNm progOpt = checking "for 'nm'" $ do
-    nmProgram <- findProgram "nm utility" progOpt ["nm", "llvm-nm"]
+    nmProgram <- findProgram "nm utility" progOpt ["nm"]
     return Nm {..}
 

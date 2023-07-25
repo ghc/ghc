@@ -12,7 +12,6 @@ import Packages
 import Settings.Builders.Common
 import Target
 import Utilities
-import GHC.Toolchain (targetPlatformTriple)
 
 {- Note [Libffi indicating inputs]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -132,10 +131,11 @@ configureEnvironment stage = do
     context <- libffiContext stage
     cFlags  <- interpretInContext context $ mconcat
                [ cArgs
-               , getStagedCCFlags ]
+               , getStagedSettingList ConfCcArgs ]
     ldFlags <- interpretInContext context ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC stage
              , builderEnvironment "CXX" $ Cc CompileC stage
+             , builderEnvironment "LD" (Ld stage)
              , builderEnvironment "AR" (Ar Unpack stage)
              , builderEnvironment "NM" Nm
              , builderEnvironment "RANLIB" Ranlib
@@ -241,6 +241,6 @@ libffiRules = do
         buildWithCmdOptions env $
             target context (Configure libffiPath) [mk <.> "in"] [mk]
 
-        dir   <- queryBuildTarget targetPlatformTriple
+        dir   <- setting BuildPlatform
         files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir -/- "**"]
         produces files

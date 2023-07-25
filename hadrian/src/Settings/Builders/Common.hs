@@ -6,8 +6,7 @@ module Settings.Builders.Common (
     module Settings,
     module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cppArgs, cWarnings,
-    packageDatabaseArgs, bootPackageDatabaseArgs,
-    getStagedCCFlags
+    packageDatabaseArgs, bootPackageDatabaseArgs
     ) where
 
 import Hadrian.Haskell.Cabal.Type
@@ -18,9 +17,6 @@ import Oracles.Flag
 import Oracles.Setting
 import Settings
 import UserSettings
-
-import GHC.Toolchain (ccProgram, tgtCCompiler)
-import GHC.Toolchain.Program
 
 cIncludeArgs :: Args
 cIncludeArgs = do
@@ -69,6 +65,3 @@ bootPackageDatabaseArgs = do
     dbPath <- expr $ packageDbPath loc
     expr $ need [dbPath -/- packageDbStamp]
     stage0 ? packageDatabaseArgs
-
-getStagedCCFlags :: Args
-getStagedCCFlags = prgFlags . ccProgram . tgtCCompiler <$> getStagedTarget

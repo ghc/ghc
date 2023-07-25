@@ -3,12 +3,9 @@ module GHC.Toolchain.Lens
     ( Lens(..)
     , (%)
     , over
-    , (%++)
-    , (&)
     ) where
 
-import Prelude ((.), ($), (++))
-import Data.Function ((&))
+import Prelude ((.), ($))
 
 data Lens a b = Lens { view :: (a -> b), set :: (b -> a -> a) }
 
@@ -19,13 +16,4 @@ a % b = Lens { view = view b . view a
 
 over :: Lens a b -> (b -> b) -> a -> a
 over l f x = set l (f $ view l x) x
-
--- | Append @b@ to @[b]@
---
--- Example usage:
--- @@
--- cc & _ccProgram % _prgFlags %++ "-U__i686"
--- @@
-(%++) :: Lens a [b] -> b -> (a -> a)
-(%++) l el = over l (++[el])
 

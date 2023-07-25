@@ -31,6 +31,7 @@ import Way
 import Packages
 import Development.Shake.Classes
 import Control.Monad
+import Utilities
 import Base
 import Context
 import System.Directory.Extra (listFilesRecursive)
@@ -129,7 +130,7 @@ pkgHashOracle = void $ addOracleCache $ \(PkgHashKey (stag, pkg)) -> do
   flav <- flavour
   let flavourArgs = extraArgs flav
 
-  targetOs       <- queryTargetTarget queryOS
+  targetOs       <- setting TargetOs
   projectVersion <- setting ProjectVersion
   let pkgHashCompilerId = "ghc-" ++ projectVersion
       pkgHashPlatform = targetOs

@@ -36,7 +36,7 @@ toolArgs = do
   builder (Ghc ToolArgs) ? mconcat
               [ packageGhcArgs
               , includeGhcArgs
-              , map ("-optc" ++) <$> getStagedCCFlags
+              , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
               , map ("-optP" ++) <$> getContextData cppOpts
               , getContextData hcOpts
               ]
@@ -68,7 +68,7 @@ compileC :: Args
 compileC = builder (Ghc CompileCWithGhc) ? do
     way <- getWay
     let ccArgs = [ getContextData ccOpts
-                 , getStagedCCFlags
+                 , getStagedSettingList ConfCcArgs
                  , cIncludeArgs
                  , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
     mconcat [ arg "-Wall"
@@ -85,7 +85,7 @@ compileCxx :: Args
 compileCxx = builder (Ghc CompileCppWithGhc) ? do
     way <- getWay
     let ccArgs = [ getContextData cxxOpts
-                 , getStagedCCFlags
+                 , getStagedSettingList ConfCcArgs
                  , cIncludeArgs
                  , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
     mconcat [ arg "-Wall"
@@ -215,7 +215,7 @@ commonGhcArgs = do
             -- to the @ghc-version@ file, to prevent GHC from trying to open the
             -- RTS package in the package database and failing.
             , package rts ? notStage0 ? arg "-ghcversion-file=rts/include/ghcversion.h"
-            , map ("-optc" ++) <$> getStagedCCFlags
+            , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getContextData cppOpts
             , arg "-outputdir", arg path
               -- we need to enable color explicitly because the output is
@@ -288,4 +288,3 @@ includeGhcArgs = do
             , pure [ "-i" ++ d | d <- abSrcDirs ]
             , cIncludeArgs
             , pure ["-optP-include", "-optP" ++ cabalMacros] ]
-

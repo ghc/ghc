@@ -3,7 +3,6 @@ module Settings.Builders.Configure (configureBuilderArgs) where
 import Packages
 import Rules.Gmp
 import Settings.Builders.Common
-import GHC.Toolchain.Target (targetPlatformTriple)
 
 configureBuilderArgs :: Args
 configureBuilderArgs = do
@@ -11,9 +10,9 @@ configureBuilderArgs = do
     gmpPath    <- expr (gmpBuildPath stage)
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
-                targetArch <- queryTarget queryArch
-                targetPlatform <- queryTarget targetPlatformTriple
-                buildPlatform <- queryBuild targetPlatformTriple
+                targetArch <- getSetting TargetArch
+                targetPlatform <- getSetting TargetPlatform
+                buildPlatform <- getSetting BuildPlatform
                 pure $ [ "--enable-shared=no"
                      , "--with-pic=yes"
                      , "--host=" ++ targetPlatform    -- GMP's host is our target
@@ -28,7 +27,7 @@ configureBuilderArgs = do
 
             , builder (Configure libffiPath) ? do
                 top            <- expr topDirectory
-                targetPlatform <- queryTarget targetPlatformTriple
+                targetPlatform <- getSetting TargetPlatform
                 way            <- getWay
                 pure [ "--prefix=" ++ top -/- libffiPath -/- "inst"
                      , "--libdir=" ++ top -/- libffiPath -/- "inst/lib"

@@ -123,6 +123,11 @@ BuildVendor_CPP         = @BuildVendor_CPP@
 #
 ################################################################################
 
+# Leading underscores on symbol names in object files
+# Valid options: YES/NO
+#
+LeadingUnderscore=@LeadingUnderscore@
+
 # Pin a suffix on executables? If so, what (Windows only).
 exeext0=@exeext_host@
 exeext1=@exeext_target@

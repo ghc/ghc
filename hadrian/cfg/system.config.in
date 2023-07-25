@@ -5,15 +5,24 @@
 # Paths to builders:
 #===================
 
-# ROMES:TODO: Drop CC
-
 alex           = @AlexCmd@
+ar             = @ArCmd@
 autoreconf     = @AutoreconfCmd@
 cc             = @CC@
 happy          = @HappyCmd@
+cpp            = @CPPCmd@
+hs-cpp         = @HaskellCPPCmd@
+ld             = @LD@
 make           = @MakeCmd@
+nm             = @NmCmd@
+merge-objects  = @MergeObjsCmd@
+system-merge-objects = @LD_STAGE0@
 objdump        = @ObjdumpCmd@
+ranlib         = @REAL_RANLIB_CMD@
 sphinx-build   = @SPHINXBUILD@
+system-ar      = @AR_STAGE0@
+system-cc      = @CC_STAGE0@
+system-cpp     = @CPPCmd_STAGE0@
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
 tar            = @TarCmd@
@@ -32,21 +41,45 @@ python         = @PythonCmd@
 # Information about builders:
 #============================
 
+ar-supports-at-file       = @ArSupportsAtFile@
+system-ar-supports-at-file = @ArSupportsAtFile_STAGE0@
+ar-supports-dash-l        = @ArSupportsDashL@
+system-ar-supports-dash-l = @ArSupportsDashL_STAGE0@
 cc-llvm-backend           = @CcLlvmBackend@
+hs-cpp-args               = @HaskellCPPArgs@
 
 # Build options:
 #===============
 
+ghc-unregisterised   = @Unregisterised@
+tables-next-to-code  = @TablesNextToCode@
+use-libffi-for-adjustors = @UseLibffiForAdjustors@
 ghc-source-path      = @hardtop@
+leading-underscore   = @LeadingUnderscore@
 
 # Information about build, host and target systems:
 #==================================================
 
-# Q: Is the *-platform information available in the target?
-# A: Yes, it is. We pass @BuildPlatform@ and @HostPlatform@ and @TargetPlatform@ to ghc-toolchain using --target=that
-#     And we can reconstruct the platform info using targetPlatformTriple
-# Q: What is TargetPlatformFull?
+build-platform        = @BuildPlatform@
+build-arch            = @BuildArch_CPP@
+build-os              = @BuildOS_CPP@
+build-vendor          = @BuildVendor_CPP@
+
+host-platform         = @HostPlatform@
+host-arch             = @HostArch_CPP@
+host-os               = @HostOS_CPP@
+host-vendor           = @HostVendor_CPP@
+host-os-haskell       = @HaskellHostOs@
+host-arch-haskell     = @HaskellHostArch@
+
+target-platform       = @TargetPlatform@
 target-platform-full  = @TargetPlatformFull@
+target-arch           = @TargetArch_CPP@
+target-os             = @TargetOS_CPP@
+target-vendor         = @TargetVendor_CPP@
+target-os-haskell     = @HaskellTargetOs@
+target-arch-haskell   = @HaskellTargetArch@
+llvm-target           = @LLVMTarget_CPP@
 
 cross-compiling       = @CrossCompiling@
 
@@ -57,7 +90,7 @@ ghc-major-version     = @GhcMajVersion@
 ghc-minor-version     = @GhcMinVersion@
 ghc-patch-level       = @GhcPatchLevel@
 
-bootstrap-threaded-rts = @GhcThreadedRts@
+bootstrap-threaded-rts      = @GhcThreadedRts@
 
 project-name           = @ProjectName@
 project-version        = @ProjectVersion@
@@ -68,6 +101,30 @@ project-patch-level1   = @ProjectPatchLevel1@
 project-patch-level2   = @ProjectPatchLevel2@
 project-git-commit-id  = @ProjectGitCommitId@
 
+# Compilation and linking flags:
+#===============================
+
+conf-cc-args-stage0         = @CONF_CC_OPTS_STAGE0@
+conf-cc-args-stage1         = @CONF_CC_OPTS_STAGE1@
+conf-cc-args-stage2         = @CONF_CC_OPTS_STAGE2@
+conf-cc-args-stage3         = @CONF_CC_OPTS_STAGE3@
+
+conf-gcc-linker-args-stage0 = @CONF_GCC_LINKER_OPTS_STAGE0@
+conf-gcc-linker-args-stage1 = @CONF_GCC_LINKER_OPTS_STAGE1@
+conf-gcc-linker-args-stage2 = @CONF_GCC_LINKER_OPTS_STAGE2@
+conf-gcc-linker-args-stage3 = @CONF_GCC_LINKER_OPTS_STAGE3@
+
+conf-ld-linker-args-stage0  = @CONF_LD_LINKER_OPTS_STAGE0@
+conf-ld-linker-args-stage1  = @CONF_LD_LINKER_OPTS_STAGE1@
+conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
+conf-ld-linker-args-stage3  = @CONF_LD_LINKER_OPTS_STAGE3@
+
+conf-merge-objects-args-stage0  = @MergeObjsArgs@
+conf-merge-objects-args-stage1  = @MergeObjsArgs@
+conf-merge-objects-args-stage2  = @MergeObjsArgs@
+conf-merge-objects-args-stage3  = @MergeObjsArgs@
+
+
 # Settings:
 #==========
 
@@ -76,14 +133,41 @@ project-git-commit-id  = @ProjectGitCommitId@
 # might become redundant.
 # See Note [tooldir: How GHC finds mingw on Windows]
 
+ld-has-no-compact-unwind = @LdHasNoCompactUnwind@
+ld-has-filelist = @LdHasFilelist@
+merge-objs-supports-response-files = @MergeObjsSupportsResponseFiles@
+ld-is-gnu-ld = @LdIsGNULd@
+ar-args = @ArArgs@
+
+settings-c-compiler-command = @SettingsCCompilerCommand@
+settings-cxx-compiler-command = @SettingsCxxCompilerCommand@
+settings-cpp-command = @SettingsCPPCommand@
+settings-cpp-flags = @SettingsCPPFlags@
+settings-haskell-cpp-command = @SettingsHaskellCPPCommand@
+settings-haskell-cpp-flags = @SettingsHaskellCPPFlags@
+settings-c-compiler-flags = @SettingsCCompilerFlags@
+settings-cxx-compiler-flags = @SettingsCxxCompilerFlags@
+settings-c-compiler-link-flags = @SettingsCCompilerLinkFlags@
+settings-c-compiler-supports-no-pie = @SettingsCCompilerSupportsNoPie@
+settings-merge-objects-command = @SettingsMergeObjectsCommand@
+settings-merge-objects-flags = @SettingsMergeObjectsFlags@
+settings-ar-command = @SettingsArCommand@
+settings-ranlib-command = @SettingsRanlibCommand@
 settings-otool-command = @SettingsOtoolCommand@
 settings-install_name_tool-command = @SettingsInstallNameToolCommand@
+settings-windres-command = @SettingsWindresCommand@
 settings-touch-command = @SettingsTouchCommand@
 settings-llc-command = @SettingsLlcCommand@
 settings-opt-command = @SettingsOptCommand@
 settings-use-distro-mingw = @SettingsUseDistroMINGW@
 
+target-word-size = @TargetWordSize@
+target-word-big-endian = @TargetWordBigEndian@
+target-has-gnu-nonexec-stack = @TargetHasGnuNonexecStack@
+target-has-ident-directive = @TargetHasIdentDirective@
+target-has-subsections-via-symbols = @TargetHasSubsectionsViaSymbols@
 target-has-libm = @TargetHasLibm@
+target-arm-version    = @ARM_ISA@
 
 # Include and library directories:
 #=================================

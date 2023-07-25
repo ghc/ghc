@@ -5,8 +5,6 @@ module Settings.Builders.DeriveConstants (
 import Builder
 import Packages
 import Settings.Builders.Common
-import GHC.Toolchain (tgtCCompiler, ccProgram, tgtUnregisterised)
-import GHC.Toolchain.Program
 
 deriveConstantsPairs :: [(String, String)]
 deriveConstantsPairs =
@@ -35,7 +33,7 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "--nm-program", arg =<< getBuilderPath Nm
         , isSpecified Objdump ? mconcat [ arg "--objdump-program"
                                         , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", arg =<< queryTarget queryOS ]
+        , arg "--target-os", arg =<< getSetting TargetOs ]
 
 includeCcArgs :: Args
 includeCcArgs = do
@@ -43,8 +41,8 @@ includeCcArgs = do
     rtsPath <- expr $ rtsBuildPath stage
     mconcat [ cArgs
             , cWarnings
-            , prgFlags . ccProgram . tgtCCompiler <$> expr (targetStage Stage1)
-            , queryTargetTarget tgtUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , getSettingList $ ConfCcArgs Stage1
+            , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Irts/include"
             , arg $ "-I" ++ rtsPath </> "include"

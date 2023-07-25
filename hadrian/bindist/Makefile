@@ -1,10 +1,7 @@
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-# Configuration from the source distribution's configure script.
 include ./mk/project.mk
-
-# Configuration from the binary distribution's configure script.
 include ./config.mk
 
 .PHONY: default
