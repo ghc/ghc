@@ -1137,6 +1137,7 @@ getRegister' config plat expr
     isNbitEncodeable n_bits i = let shift = n_bits - 1 in (-1 `shiftL` shift) <= i && i < (1 `shiftL` shift)
 
     -- N.B. MUL does not set the overflow flag.
+    -- These implementations are based on output from GCC 11.
     do_mul_may_oflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
     do_mul_may_oflo w@W64 x y = do
         (reg_x, _format_x, code_x) <- getSomeReg x
@@ -1150,31 +1151,47 @@ getRegister' config plat expr
             SMULH (OpReg w hi) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
             CMP (OpReg w hi) (OpRegShift w lo SASR 63) `snocOL`
             CSET (OpReg w dst) NE)
+
+    do_mul_may_oflo W32 x y = do
+        (reg_x, _format_x, code_x) <- getSomeReg x
+        (reg_y, _format_y, code_y) <- getSomeReg y
+        tmp1 <- getNewRegNat II64
+        tmp2 <- getNewRegNat II64
+        return $ Any (intFormat W32) (\dst ->
+            code_x `appOL`
+            code_y `snocOL`
+            SMULL (OpReg W64 tmp1) (OpReg W32 reg_x) (OpReg W32 reg_y) `snocOL`
+            ASR (OpReg W64 tmp2) (OpReg W64 tmp1) (OpImm (ImmInt 31)) `snocOL`
+            CMP (OpReg W32 tmp2) (OpRegShift W32 tmp1 SASR 31) `snocOL`
+            CSET (OpReg W32 dst) NE)
+
     do_mul_may_oflo w x y = do
         (reg_x, _format_x, code_x) <- getSomeReg x
         (reg_y, _format_y, code_y) <- getSomeReg y
-        let tmp_w = case w of
-                      W32 -> W64
-                      W16 -> W32
-                      W8  -> W32
-                      _   -> panic "do_mul_may_oflo: impossible"
-        -- This will hold the product
-        tmp <- getNewRegNat (intFormat tmp_w)
-        let ext_mode = case w of
-                         W32 -> ESXTW
-                         W16 -> ESXTH
-                         W8  -> ESXTB
-                         _   -> panic "do_mul_may_oflo: impossible"
-            mul = case w of
-                    W32 -> SMULL
-                    W16 -> MUL
-                    W8  -> MUL
-                    _   -> panic "do_mul_may_oflo: impossible"
+        tmp1 <- getNewRegNat II32
+        tmp2 <- getNewRegNat II32
+        let extend dst arg =
+              case w of
+                W16 -> SXTH (OpReg W32 dst) (OpReg W32 arg)
+                W8  -> SXTB (OpReg W32 dst) (OpReg W32 arg)
+                _   -> panic "unreachable"
+            cmp_ext_mode =
+              case w of
+                W16 -> EUXTH
+                W8  -> EUXTB
+                _   -> panic "unreachable"
+            width = widthInBits w
+            opInt = OpImm . ImmInt
+
         return $ Any (intFormat w) (\dst ->
             code_x `appOL`
             code_y `snocOL`
-            mul (OpReg tmp_w tmp) (OpReg w reg_x) (OpReg w reg_y) `snocOL`
-            CMP (OpReg tmp_w tmp) (OpRegExt tmp_w tmp ext_mode 0) `snocOL`
+            extend tmp1 reg_x `snocOL`
+            extend tmp2 reg_y `snocOL`
+            MUL (OpReg W32 tmp1) (OpReg W32 tmp1) (OpReg W32 tmp2) `snocOL`
+            SBFX (OpReg W64 tmp2) (OpReg W64 tmp1) (opInt $ width - 1) (opInt 1) `snocOL`
+            UBFX (OpReg W32 tmp1) (OpReg W32 tmp1) (opInt width) (opInt width) `snocOL`
+            CMP (OpReg W32 tmp1) (OpRegExt W32 tmp2 cmp_ext_mode 0) `snocOL`
             CSET (OpReg w dst) NE)
 
 -- | Is a given number encodable as a bitmask immediate?
