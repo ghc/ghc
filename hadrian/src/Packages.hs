@@ -5,8 +5,7 @@ module Packages (
     checkExact, countDeps,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
-    ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, ghcToolchain, ghcToolchainBin,
-    haddock, haskeline,
+    ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout, touchy,
@@ -38,8 +37,7 @@ ghcPackages =
     [ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls
     , exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform
-    , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, ghcToolchain, ghcToolchainBin
-    , haddock, haskeline, hsc2hs
+    , ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, mtl
     , parsec, pretty, process, rts, runGhc, stm, semaphoreCompat, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
@@ -55,8 +53,7 @@ isGhcPackage = (`elem` ghcPackages)
 array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, countDeps,
   compareSizes, compiler, containers, deepseq, deriveConstants, directory, dumpDecls,
   exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh, ghcPlatform,
-  ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, ghcToolchain,
-  haddock, haskeline, hsc2hs,
+  ghcCompact, ghcConfig, ghcHeap, ghci, ghciWrapper, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs,
   hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy, remoteIserv, libffi, mtl,
   parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
@@ -96,8 +93,6 @@ ghciWrapper         = prg  "ghci-wrapper"    `setPath` "driver/ghci"
                       -- See Note [Hadrian's ghci-wrapper package]
 ghcPkg              = util "ghc-pkg"
 ghcPrim             = lib  "ghc-prim"
-ghcToolchain        = lib  "ghc-toolchain"     `setPath` "utils/ghc-toolchain"
-ghcToolchainBin     = prg  "ghc-toolchain-bin" `setPath` "utils/ghc-toolchain/exe" -- workaround for #23690
 haddock             = util "haddock"
 haskeline           = lib  "haskeline"
 hsc2hs              = util "hsc2hs"

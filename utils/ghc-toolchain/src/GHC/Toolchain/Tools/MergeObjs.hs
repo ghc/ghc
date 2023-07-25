@@ -4,7 +4,7 @@
 module GHC.Toolchain.Tools.MergeObjs ( MergeObjs(..), findMergeObjs ) where
 
 import Control.Monad
-import Data.List (isInfixOf)
+import Data.List
 import System.FilePath
 
 import GHC.Toolchain.Prelude

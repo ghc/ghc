@@ -1,6 +1,6 @@
 module GHC.Toolchain.CheckArm ( findArmIsa ) where
 
-import Data.List (isInfixOf)
+import Data.List
 import Data.Maybe (catMaybes)
 import Control.Monad.IO.Class
 import System.Process

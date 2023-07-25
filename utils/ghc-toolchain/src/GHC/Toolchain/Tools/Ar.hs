@@ -5,7 +5,7 @@ module GHC.Toolchain.Tools.Ar (Ar(..), findAr) where
 
 import Control.Monad
 import System.FilePath
-import Data.List (isInfixOf)
+import Data.List
 
 import GHC.Toolchain.Prelude
 import GHC.Toolchain.Utils

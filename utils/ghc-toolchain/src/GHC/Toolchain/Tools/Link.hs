@@ -6,7 +6,7 @@
 module GHC.Toolchain.Tools.Link ( CcLink(..), findCcLink ) where
 
 import Control.Monad (when)
-import Data.List (isInfixOf)
+import Data.List
 import System.FilePath
 
 import GHC.Platform.ArchOS

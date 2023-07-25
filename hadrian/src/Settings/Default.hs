@@ -87,7 +87,6 @@ stage0Packages = do
              , ghcBootTh
              , ghcPlatform
              , ghcHeap
-             , ghcToolchain
              , ghci
              , ghcPkg
              , haddock
@@ -155,7 +154,6 @@ stage1Packages = do
         , hpcBin
         , iserv
         , runGhc
-        , ghcToolchainBin
         ]
       , when (winTarget && not cross)
         [ touchy
