@@ -58,7 +58,8 @@ AC_DEFUN([PREP_BOOLEAN],[
           $1Bool=False
           ;;
         *)
-          AC_MSG_WARN([m4/prep_target_file.m4: Expecting YES/NO but got $$1 in $1])
+          AC_MSG_WARN([m4/prep_target_file.m4: Expecting YES/NO but got $$1 in $1. Defaulting to False.])
+          $1Bool=False
           ;;
     esac
     AC_SUBST([$1Bool])
@@ -78,7 +79,8 @@ AC_DEFUN([PREP_NOT_BOOLEAN],[
           Not$1Bool=False
           ;;
         *)
-          AC_MSG_WARN([m4/prep_target_file.m4: Expecting YES/NO but got $$1 in $1])
+          AC_MSG_WARN([m4/prep_target_file.m4: Expecting YES/NO but got $$1 in $1. Defaulting to False.])
+          Not$1Bool=False
           ;;
     esac
     AC_SUBST([Not$1Bool])
