@@ -403,6 +403,7 @@ cua NoCanUpdateAnchor _ = return []
 
 -- | "Enter" an annotation, by using the associated 'anchor' field as
 -- the new reference point for calculating all DeltaPos positions.
+-- This is the heart of the exact printing process.
 --
 -- This is combination of the ghc=exactprint Delta.withAST and
 -- Print.exactPC functions and effectively does the delta processing
@@ -433,7 +434,15 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   case canUpdateAnchor of
     CanUpdateAnchor -> pushAppliedComments
     _ -> return ()
-  addCommentsA (priorComments cs)
+  case anchor' of
+    Anchor _ (MovedAnchor dcs) -> do
+      debugM $ "enterAnn:Printing comments:" ++ showGhc (priorComments cs)
+      mapM_ printOneComment (map tokComment $ priorComments cs)
+      -- debugM $ "enterAnn:Printing EpaDelta comments:" ++ showGhc dcs
+      -- mapM_ printOneComment (map tokComment dcs)
+    _ -> do
+      debugM $ "enterAnn:Adding comments:" ++ showGhc (priorComments cs)
+      addCommentsA (priorComments cs)
   debugM $ "enterAnn:Added comments"
   printCommentsBefore curAnchor
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
@@ -445,7 +454,10 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
       -- fragment has a reference
       setPriorEndNoLayoutD (ss2pos curAnchor)
     _ -> do
-      return ()
+      if acceptSpan
+        then setPriorEndNoLayoutD (ss2pos curAnchor)
+        else return ()
+
   -- -------------------------
   if ((fst $ fst $ rs2range curAnchor) >= 0)
     then
@@ -1405,8 +1417,12 @@ printOneComment c@(Comment _str loc _r _mo) = do
     MovedAnchor dp -> return dp
     _ -> do
         pe <- getPriorEndD
-        let dp = ss2delta pe (anchor loc)
-        debugM $ "printOneComment:(dp,pe,anchor loc)=" ++ showGhc (dp,pe,ss2pos $ anchor loc)
+        debugM $ "printOneComment:pe=" ++ showGhc pe
+        -- let dp = ss2delta pe (anchor loc)
+        let dp = case loc of
+              Anchor r UnchangedAnchor -> ss2delta pe r
+              Anchor _ (MovedAnchor dp1) -> dp1
+        debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
   mep <- getExtraDP
   dp' <- case mep of
@@ -1415,11 +1431,11 @@ printOneComment c@(Comment _str loc _r _mo) = do
       adjustDeltaForOffsetM edp
     _ -> return dp
   -- Start of debug printing
-  -- LayoutStartCol dOff <- getLayoutOffsetD
-  -- debugM $ "printOneComment:(dp,dp',dOff)=" ++ showGhc (dp,dp',dOff)
+  LayoutStartCol dOff <- getLayoutOffsetD
+  debugM $ "printOneComment:(dp,dp',dOff,loc)=" ++ showGhc (dp,dp',dOff,loc)
   -- End of debug printing
   updateAndApplyComment c dp'
-  printQueuedComment (anchor loc) c dp'
+  printQueuedComment c dp'
 
 -- | For comment-related deltas starting on a new line we have an
 -- off-by-one problem. Adjust
@@ -1474,7 +1490,11 @@ commentAllocationBefore ss = do
   -- RealSrcSpan, which affects comparison, as the Ord instance for
   -- RealSrcSpan compares the file first. So we sort via ss2pos
   -- TODO: this is inefficient, use Pos all the way through
-  let (earlier,later) = partition (\(Comment _str loc _r _mo) -> (ss2pos $ anchor loc) <= (ss2pos ss)) cs
+  let (earlier,later) = partition (\(Comment _str loc _r _mo) ->
+                                     case loc of
+                                       Anchor r UnchangedAnchor -> (ss2pos r) <= (ss2pos ss)
+                                       _ -> True -- Choose one
+                                  ) cs
   putUnallocatedComments later
   -- debugM $ "commentAllocation:(ss,earlier,later)" ++ show (rs2range ss,earlier,later)
   return earlier
@@ -1595,6 +1615,14 @@ instance ExactPrint (HsModule GhcPs) where
 
     am_decls' <- markTrailing (am_decls $ anns an0)
     imports' <- markTopLevelList imports
+
+    case lo of
+        ExplicitBraces _ _ -> return ()
+        _ -> do
+          -- Get rid of the balance of the preceding comments before starting on the decls
+          flushComments []
+          putUnallocatedComments []
+
     decls' <- markTopLevelList decls
 
     lo1 <- case lo0 of
@@ -2921,7 +2949,12 @@ instance ExactPrint (HsExpr GhcPs) where
   setAnnotationAnchor a@(HsEmbTy{})              _ _ _s = a
 
   exact (HsVar x n) = do
-    n' <- markAnnotated n
+    -- The parser inserts a placeholder value for a record pun rhs. This must be
+    -- filtered.
+    let pun_RDR = "pun-right-hand-side"
+    n' <- if (showPprUnsafe n /= pun_RDR)
+      then markAnnotated n
+      else return n
     return (HsVar x n')
   exact x@(HsUnboundVar an _) = do
     case an of
@@ -3321,9 +3354,9 @@ instance (ExactPrint body)
     f' <- markAnnotated f
     (an0, arg') <- if isPun then return (an, arg)
              else do
-      an0 <- markEpAnnL an lidl AnnEqual
-      arg' <- markAnnotated arg
-      return (an0, arg')
+               an0 <- markEpAnnL an lidl AnnEqual
+               arg' <- markAnnotated arg
+               return (an0, arg')
     return (HsFieldBind an0 f' arg' isPun)
 
 -- ---------------------------------------------------------------------
@@ -3371,7 +3404,7 @@ instance (ExactPrint (LocatedA body))
     f' <- markAnnotated f
     an0 <- if isPun then return an
              else markEpAnnL an lidl AnnEqual
-    arg' <- if ((locA $ getLoc arg) == noSrcSpan )
+    arg' <- if isPun
               then return arg
               else markAnnotated arg
     return (HsFieldBind an0 f' arg' isPun)
@@ -5048,8 +5081,8 @@ isGoodDeltaWithOffset dp colOffset = isGoodDelta (deltaPos l c)
 
 -- | Print a comment, using the current layout offset to convert the
 -- @DeltaPos@ to an absolute position.
-printQueuedComment :: (Monad m, Monoid w) => RealSrcSpan -> Comment -> DeltaPos -> EP w m ()
-printQueuedComment _loc Comment{commentContents} dp = do
+printQueuedComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
+printQueuedComment Comment{commentContents} dp = do
   p <- getPosP
   d <- getPriorEndD
   colOffset <- getLayoutOffsetP
