@@ -227,15 +227,21 @@ import GHC.Base ( Bool(..), Eq((==)), otherwise )
 -- the elements of the first list occur, in order, in the second. The
 -- elements do not have to occur consecutively.
 --
--- @'isSubsequenceOf' x y@ is equivalent to @'elem' x ('subsequences' y)@.
+-- @'isSubsequenceOf' x y@ is equivalent to @x \`'elem'\` ('subsequences' y)@.
+--
+-- Note: 'isSubsequenceOf' is often used in infix form.
 --
 -- @since 4.8.0.0
 --
--- >>> isSubsequenceOf "GHC" "The Glorious Haskell Compiler"
+-- ==== __Examples__
+--
+-- >>> "GHC" `isSubsequenceOf` "The Glorious Haskell Compiler"
 -- True
--- >>> isSubsequenceOf ['a','d'..'z'] ['a'..'z']
+--
+-- >>> ['a','d'..'z'] `isSubsequenceOf` ['a'..'z']
 -- True
--- >>> isSubsequenceOf [1..10] [10,9..0]
+--
+-- >>> [1..10] `isSubsequenceOf` [10,9..0]
 -- False
 --
 -- For the result to be 'True', the first list must be finite;
@@ -243,11 +249,12 @@ import GHC.Base ( Bool(..), Eq((==)), otherwise )
 --
 -- >>> [0,2..10] `isSubsequenceOf` [0..]
 -- True
+--
 -- >>> [0..] `isSubsequenceOf` [0,2..10]
 -- False
+--
 -- >>> [0,2..] `isSubsequenceOf` [0..]
 -- * Hangs forever*
---
 isSubsequenceOf :: (Eq a) => [a] -> [a] -> Bool
 isSubsequenceOf []    _                    = True
 isSubsequenceOf _     []                   = False

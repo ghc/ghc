@@ -230,13 +230,9 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 -- List functions
 
 -- | The 'dropWhileEnd' function drops the largest suffix of a list
--- in which the given predicate holds for all elements.  For example:
+-- in which the given predicate holds for all elements.
 --
--- >>> dropWhileEnd isSpace "foo\n"
--- "foo"
--- >>> dropWhileEnd isSpace "foo bar"
--- "foo bar"
--- > dropWhileEnd isSpace ("foo\n" ++ undefined) == "foo" ++ undefined
+-- ==== __Laziness__
 --
 -- This function is lazy in spine, but strict in elements,
 -- which makes it different from 'reverse' '.' 'dropWhile' @p@ '.' 'reverse',
@@ -244,6 +240,7 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 --
 -- >>> take 1 (dropWhileEnd (< 0) (1 : undefined))
 -- [1]
+--
 -- >>> take 1 (reverse $ dropWhile (< 0) $ reverse (1 : undefined))
 -- *** Exception: Prelude.undefined
 --
@@ -251,8 +248,19 @@ infix 5 \\ -- comment to fool cpp: https://downloads.haskell.org/~ghc/latest/doc
 --
 -- >>> last (dropWhileEnd (< 0) [undefined, 1])
 -- *** Exception: Prelude.undefined
+--
 -- >>> last (reverse $ dropWhile (< 0) $ reverse [undefined, 1])
 -- 1
+--
+-- ==== __Examples__
+--
+-- >>> dropWhileEnd isSpace "foo\n"
+-- "foo"
+--
+-- >>> dropWhileEnd isSpace "foo bar"
+-- "foo bar"
+-- >>> dropWhileEnd (> 10) [1..20]
+-- [1,2,3,4,5,6,7,8,9,10]
 --
 -- @since 4.5.0.0
 dropWhileEnd :: (a -> Bool) -> [a] -> [a]
@@ -261,6 +269,8 @@ dropWhileEnd p = foldr (\x xs -> if p x && null xs then [] else x : xs) []
 -- | \(\mathcal{O}(\min(m,n))\). The 'stripPrefix' function drops the given
 -- prefix from a list. It returns 'Nothing' if the list did not start with the
 -- prefix given, or 'Just' the list after the prefix, if it does.
+--
+-- ===== __Examples__
 --
 -- >>> stripPrefix "foo" "foobar"
 -- Just "bar"
@@ -284,16 +294,29 @@ stripPrefix _ _ = Nothing
 -- or 'Nothing' if there is no such element.
 -- For the result to be 'Nothing', the list must be finite.
 --
+-- ==== __Examples__
+--
 -- >>> elemIndex 4 [0..]
 -- Just 4
+--
+-- >>> elemIndex 'o' "haskell"
+-- Nothing
+--
+-- >>> elemIndex 0 [1..]
+-- * hangs forever *
 elemIndex      :: Eq a => a -> [a] -> Maybe Int
 elemIndex x xs = findIndex (x==) xs -- arity 2 so that we don't get a PAP; #21345
 
 -- | The 'elemIndices' function extends 'elemIndex', by returning the
 -- indices of all elements equal to the query element, in ascending order.
 --
+-- ==== __Examples__
+--
 -- >>> elemIndices 'o' "Hello World"
 -- [4,7]
+--
+-- >>> elemIndices 1 [1, 2, 3, 1, 2, 3]
+-- [0,3]
 elemIndices      :: Eq a => a -> [a] -> [Int]
 elemIndices x xs = findIndices (x==) xs -- arity 2 so that we don't get a PAP; #21345
 
@@ -302,11 +325,16 @@ elemIndices x xs = findIndices (x==) xs -- arity 2 so that we don't get a PAP; #
 -- there is no such element.
 -- For the result to be 'Nothing', the list must be finite.
 --
+-- ==== __Examples__
+--
 -- >>> find (> 4) [1..]
 -- Just 5
 --
 -- >>> find (< 0) [1..10]
 -- Nothing
+--
+-- >>> find ('a' `elem`) ["john", "marcus", "paul"]
+-- Just "marcus"
 find            :: (a -> Bool) -> [a] -> Maybe a
 find p          = listToMaybe . filter p
 
@@ -315,16 +343,32 @@ find p          = listToMaybe . filter p
 -- or 'Nothing' if there is no such element.
 -- For the result to be 'Nothing', the list must be finite.
 --
+-- ==== __Examples__
+--
 -- >>> findIndex isSpace "Hello World!"
 -- Just 5
+--
+-- >>> findIndex odd [0, 2, 4, 6]
+-- Nothing
+--
+-- >>> findIndex even [1..]
+-- Just 1
+--
+-- >>> findIndex odd [0, 2 ..]
+-- * hangs forever *
 findIndex       :: (a -> Bool) -> [a] -> Maybe Int
 findIndex p     = listToMaybe . findIndices p
 
 -- | The 'findIndices' function extends 'findIndex', by returning the
 -- indices of all elements satisfying the predicate, in ascending order.
 --
+-- ==== __Examples__
+--
 -- >>> findIndices (`elem` "aeiou") "Hello World!"
 -- [1,4,7]
+--
+-- >>> findIndices (\l -> length l > 3) ["a", "bcde", "fgh", "ijklmnop"]
+-- [1,3]
 findIndices      :: (a -> Bool) -> [a] -> [Int]
 #if defined(USE_REPORT_PRELUDE)
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
@@ -342,8 +386,11 @@ findIndices p ls = build $ \c n ->
 -- | \(\mathcal{O}(\min(m,n))\). The 'isPrefixOf' function takes two lists and
 -- returns 'True' iff the first list is a prefix of the second.
 --
+-- ==== __Examples__
+--
 -- >>> "Hello" `isPrefixOf` "Hello World!"
 -- True
+--
 -- >>> "Hello" `isPrefixOf` "Wello Horld!"
 -- False
 --
@@ -352,10 +399,13 @@ findIndices p ls = build $ \c n ->
 --
 -- >>> [0..] `isPrefixOf` [1..]
 -- False
+--
 -- >>> [0..] `isPrefixOf` [0..99]
 -- False
+--
 -- >>> [0..99] `isPrefixOf` [0..]
 -- True
+--
 -- >>> [0..] `isPrefixOf` [0..]
 -- * Hangs forever *
 --
@@ -372,8 +422,11 @@ isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 -- | The 'isSuffixOf' function takes two lists and returns 'True' iff
 -- the first list is a suffix of the second.
 --
+-- ==== __Examples__
+--
 -- >>> "ld!" `isSuffixOf` "Hello World!"
 -- True
+--
 -- >>> "World" `isSuffixOf` "Hello World!"
 -- False
 --
@@ -381,6 +434,7 @@ isPrefixOf (x:xs) (y:ys)=  x == y && isPrefixOf xs ys
 --
 -- >>> [0..] `isSuffixOf` [0..99]
 -- False
+--
 -- >>> [0..99] `isSuffixOf` [0..]
 -- * Hangs forever *
 --
@@ -423,8 +477,11 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 -- iff the first list is contained, wholly and intact,
 -- anywhere within the second.
 --
+-- ==== __Examples__
+--
 -- >>> isInfixOf "Haskell" "I really like Haskell."
 -- True
+--
 -- >>> isInfixOf "Ial" "I really like Haskell."
 -- False
 --
@@ -433,11 +490,12 @@ dropLengthMaybe (_:x') (_:y') = dropLengthMaybe x' y'
 --
 -- >>> [20..50] `isInfixOf` [0..]
 -- True
+--
 -- >>> [0..] `isInfixOf` [20..50]
 -- False
+--
 -- >>> [0..] `isInfixOf` [0..]
 -- * Hangs forever *
---
 isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
 isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 
@@ -446,8 +504,6 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 -- name 'nub' means \`essence\'.) It is a special case of 'nubBy', which allows
 -- the programmer to supply their own equality test.
 --
--- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
--- [1,2,3,4,5]
 --
 -- If there exists @instance Ord a@, it's faster to use `nubOrd` from the `containers` package
 -- ([link to the latest online documentation](https://hackage.haskell.org/package/containers/docs/Data-Containers-ListUtils.html#v:nubOrd)),
@@ -458,17 +514,31 @@ isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 -- 'map' @Data.List.NonEmpty.@'Data.List.NonEmpty.head' . @Data.List.NonEmpty.@'Data.List.NonEmpty.group' . 'sort',
 -- which takes \(\mathcal{O}(n \log n)\) time, requires @instance Ord a@ and doesn't
 -- preserve the order.
-
 --
+-- ==== __Examples__
+--
+-- >>> nub [1,2,3,4,3,2,1,2,4,3,5]
+-- [1,2,3,4,5]
+--
+-- >>> nub "hello, world!"
+-- "helo, wrd!"
 nub                     :: (Eq a) => [a] -> [a]
 nub                     =  nubBy (==)
 
 -- | The 'nubBy' function behaves just like 'nub', except it uses a
--- user-supplied equality predicate instead of the overloaded '=='
+-- user-supplied equality predicate instead of the overloaded '(==)'
 -- function.
+--
+-- ==== __Examples__
 --
 -- >>> nubBy (\x y -> mod x 3 == mod y 3) [1,2,4,5,6]
 -- [1,2,6]
+--
+-- >>> nubBy (/=) [2, 7, 1, 8, 2, 8, 1, 8, 2, 8]
+-- [2,2,2]
+--
+-- >>> nubBy (>) [1, 2, 3, 2, 1, 5, 4, 5, 3, 2]
+-- [1,2,3,5,5]
 nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 nubBy eq []             =  []
@@ -496,21 +566,31 @@ elem_by eq y (x:xs)     =  x `eq` y || elem_by eq y xs
 
 
 -- | \(\mathcal{O}(n)\). 'delete' @x@ removes the first occurrence of @x@ from
--- its list argument. For example,
+-- its list argument.
+--
+-- It is a special case of 'deleteBy', which allows the programmer to
+-- supply their own equality test.
+--
+-- ==== __Examples__
 --
 -- >>> delete 'a' "banana"
 -- "bnana"
 --
--- It is a special case of 'deleteBy', which allows the programmer to
--- supply their own equality test.
+-- >>> delete "not" ["haskell", "is", "not", "awesome"]
+-- ["haskell","is","awesome"]
 delete                  :: (Eq a) => a -> [a] -> [a]
 delete                  =  deleteBy (==)
 
 -- | \(\mathcal{O}(n)\). The 'deleteBy' function behaves like 'delete', but
 -- takes a user-supplied equality predicate.
 --
+-- ==== __Examples__
+--
 -- >>> deleteBy (<=) 4 [1..10]
 -- [1,2,3,5,6,7,8,9,10]
+--
+-- >>> deleteBy (/=) 5 [5, 5, 4, 3, 5, 2]
+-- [5,5,3,5,2]
 deleteBy                :: (a -> a -> Bool) -> a -> [a] -> [a]
 deleteBy _  _ []        = []
 deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
@@ -520,26 +600,29 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 -- @ys@ in turn (if any) has been removed from @xs@.  Thus
 -- @(xs ++ ys) \\\\ xs == ys@.
 --
--- >>> "Hello World!" \\ "ell W"
--- "Hoorld!"
---
 -- It is a special case of 'deleteFirstsBy', which allows the programmer
 -- to supply their own equality test.
+--
+-- ==== __Examples__
+--
+-- >>> "Hello World!" \\ "ell W"
+-- "Hoorld!"
 --
 -- The second list must be finite, but the first may be infinite.
 --
 -- >>> take 5 ([0..] \\ [2..4])
 -- [0,1,5,6,7]
+--
 -- >>> take 5 ([0..] \\ [2..])
 -- * Hangs forever *
---
 (\\)                    :: (Eq a) => [a] -> [a] -> [a]
 (\\)                    =  foldl (flip delete)
 
 -- | The 'union' function returns the list union of the two lists.
 -- It is a special case of 'unionBy', which allows the programmer to supply
 -- their own equality test.
--- For example,
+--
+-- ==== __Examples__
 --
 -- >>> "dog" `union` "cow"
 -- "dogcw"
@@ -548,7 +631,7 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 -- will be used. If the second list contains equal elements, only the first one
 -- will be retained:
 --
--- >>> import Data.Semigroup
+-- >>> import Data.Semigroup(Arg(..))
 -- >>> union [Arg () "dog"] [Arg () "cow"]
 -- [Arg () "dog"]
 -- >>> union [] [Arg () "dog", Arg () "cow"]
@@ -564,19 +647,30 @@ deleteBy eq x (y:ys)    = if x `eq` y then ys else y : deleteBy eq x ys
 --
 -- 'union' is productive even if both arguments are infinite.
 --
+-- >>> [0, 2 ..] `union` [1, 3 ..]
+-- [0,2,4,6,8,10,12..
 union                   :: (Eq a) => [a] -> [a] -> [a]
 union                   = unionBy (==)
 
 -- | The 'unionBy' function is the non-overloaded version of 'union'.
 -- Both arguments may be infinite.
 --
+-- ==== __Examples__
+--
+-- >>> unionBy (>) [3, 4, 5] [1, 2, 3, 4, 5, 6]
+-- [3,4,5,4,5,6]
+--
+-- >>> import Data.Semigroup (Arg(..))
+-- >>> unionBy (/=) [Arg () "Saul"] [Arg () "Kim"]
+-- [Arg () "Saul", Arg () "Kim"]
 unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 
 -- | The 'intersect' function takes the list intersection of two lists.
 -- It is a special case of 'intersectBy', which allows the programmer to
 -- supply their own equality test.
--- For example,
+--
+-- ===== __Examples__
 --
 -- >>> [1,2,3,4] `intersect` [2,4,6,8]
 -- [2,4]
@@ -621,19 +715,25 @@ intersectBy _  _  []    =  []
 intersectBy eq xs ys    =  [x | x <- xs, any (eq x) ys]
 
 -- | \(\mathcal{O}(n)\). The 'intersperse' function takes an element and a list
--- and \`intersperses\' that element between the elements of the list. For
--- example,
+-- and \`intersperses\' that element between the elements of the list.
+--
+-- ==== __Laziness__
+--
+-- 'intersperse' has the following properties
+--
+-- >>> take 1 (intersperse undefined ('a' : undefined))
+-- "a"
+--
+-- >>> take 2 (intersperse ',' ('a' : undefined))
+-- "a*** Exception: Prelude.undefined
+--
+-- ==== __Examples__
 --
 -- >>> intersperse ',' "abcde"
 -- "a,b,c,d,e"
 --
--- 'intersperse' has the following laziness properties:
---
--- >>> take 1 (intersperse undefined ('a' : undefined))
--- "a"
--- >>> take 2 (intersperse ',' ('a' : undefined))
--- "a*** Exception: Prelude.undefined
---
+-- >>> intersperse 1 [3, 4, 5]
+-- [3,1,4,1,5]
 intersperse             :: a -> [a] -> [a]
 intersperse _   []      = []
 intersperse sep (x:xs)  = x : prependToAll sep xs
@@ -651,21 +751,39 @@ prependToAll sep (x:xs) = sep : x : prependToAll sep xs
 -- It inserts the list @xs@ in between the lists in @xss@ and concatenates the
 -- result.
 --
--- >>> intercalate ", " ["Lorem", "ipsum", "dolor"]
--- "Lorem, ipsum, dolor"
+-- ==== __Laziness__
 --
--- 'intercalate' has the following laziness properties:
+-- 'intercalate' has the following properties:
 --
 -- >>> take 5 (intercalate undefined ("Lorem" : undefined))
 -- "Lorem"
+--
 -- >>> take 6 (intercalate ", " ("Lorem" : undefined))
 -- "Lorem*** Exception: Prelude.undefined
 --
+-- ==== __Examples__
+--
+-- >>> intercalate ", " ["Lorem", "ipsum", "dolor"]
+-- "Lorem, ipsum, dolor"
+--
+-- >>> intercalate [0, 1] [[2, 3], [4, 5, 6], []]
+-- [2,3,0,1,4,5,6,0,1]
+--
+-- >>> intercalate [1, 2, 3] [[], []]
+-- [1,2,3]
 intercalate :: [a] -> [[a]] -> [a]
 intercalate xs xss = concat (intersperse xs xss)
 
 -- | The 'transpose' function transposes the rows and columns of its argument.
--- For example,
+--
+-- ==== __Laziness__
+--
+-- 'transpose' is lazy in its elements
+--
+-- >>> take 1 (transpose ['a' : undefined, 'b' : undefined])
+-- ["ab"]
+--
+-- ==== __Examples__
 --
 -- >>> transpose [[1,2,3],[4,5,6]]
 -- [[1,4],[2,5],[3,6]]
@@ -679,12 +797,6 @@ intercalate xs xss = concat (intersperse xs xss)
 --
 -- >>> transpose (repeat [])
 -- * Hangs forever *
---
--- 'transpose' is lazy:
---
--- >>> take 1 (transpose ['a' : undefined, 'b' : undefined])
--- ["ab"]
---
 transpose :: [[a]] -> [[a]]
 transpose [] = []
 transpose ([] : xss) = transpose xss
@@ -741,8 +853,16 @@ transpose ((x : xs) : xss) = combine x hds xs tls
 --
 -- > partition p xs == (filter p xs, filter (not . p) xs)
 --
+-- ==== __Examples__
+--
 -- >>> partition (`elem` "aeiou") "Hello World!"
 -- ("eoo","Hll Wrld!")
+--
+-- >>> partition even [1..10]
+-- ([2,4,6,8,10],[1,3,5,7,9])
+--
+-- >>> partition (< 5) [1..10]
+-- ([1,2,3,4],[5,6,7,8,9,10])
 partition               :: (a -> Bool) -> [a] -> ([a],[a])
 {-# INLINE partition #-}
 partition p xs = foldr (select p) ([],[]) xs
@@ -812,12 +932,25 @@ mapAccumR f s (x:xs)    =  (s'', y:ys)
 -- call, the result will also be sorted. It is a special case of 'insertBy',
 -- which allows the programmer to supply their own comparison function.
 --
--- >>> insert 4 [1,2,3,5,6,7]
+-- ==== __Examples__
+--
+-- >>> insert (-1) [1, 2, 3]
+-- [-1,1,2,3]
+--
+-- >>> insert 'd' "abcefg"
+-- "abcdefg"
+--
+-- >>> insert 4 [1, 2, 3, 5, 6, 7]
 -- [1,2,3,4,5,6,7]
 insert :: Ord a => a -> [a] -> [a]
 insert e ls = insertBy (compare) e ls
 
 -- | \(\mathcal{O}(n)\). The non-overloaded version of 'insert'.
+--
+-- ==== __Examples__
+--
+-- >>> insertBy (\x y -> compare (length x) (length y)) [1, 2] [[1], [1, 2, 3], [1, 2, 3, 4]]
+-- [[1],[1,2],[1,2,3],[1,2,3,4]]
 insertBy :: (a -> a -> Ordering) -> a -> [a] -> [a]
 insertBy _   x [] = [x]
 insertBy cmp x ys@(y:ys')
@@ -830,10 +963,15 @@ insertBy cmp x ys@(y:ys')
 -- and returns the greatest element of the list by the comparison function.
 -- The list must be finite and non-empty.
 --
+-- ==== __Examples__
+--
 -- We can use this to find the longest entry of a list:
 --
 -- >>> maximumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "Longest"
+--
+-- >>> minimumBy (\(a, b) (c, d) -> compare (abs (a - b)) (abs (c - d))) [(10, 15), (1, 2), (3, 5)]
+-- (10, 15)
 maximumBy               :: (a -> a -> Ordering) -> [a] -> a
 maximumBy _ []          =  errorWithoutStackTrace "List.maximumBy: empty list"
 maximumBy cmp xs        =  foldl1 maxBy xs
@@ -847,10 +985,15 @@ maximumBy cmp xs        =  foldl1 maxBy xs
 -- and returns the least element of the list by the comparison function.
 -- The list must be finite and non-empty.
 --
+-- ==== __Examples__
+--
 -- We can use this to find the shortest entry of a list:
 --
 -- >>> minimumBy (\x y -> compare (length x) (length y)) ["Hello", "World", "!", "Longest", "bar"]
 -- "!"
+--
+-- >>> minimumBy (\(a, b) (c, d) -> compare (abs (a - b)) (abs (c - d))) [(10, 15), (1, 2), (3, 5)]
+-- (1, 2)
 minimumBy               :: (a -> a -> Ordering) -> [a] -> a
 minimumBy _ []          =  errorWithoutStackTrace "List.minimumBy: empty list"
 minimumBy cmp xs        =  foldl1 minBy xs
@@ -863,6 +1006,8 @@ minimumBy cmp xs        =  foldl1 minBy xs
 -- of 'length'. In particular, instead of returning an 'Int', it returns any
 -- type which is an instance of 'Num'. It is, however, less efficient than
 -- 'length'.
+--
+-- ==== __Examples__
 --
 -- >>> genericLength [1, 2, 3] :: Int
 -- 3
@@ -1199,18 +1344,24 @@ unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
 -- returns the first list with the first occurrence of each element of
 -- the second list removed. This is the non-overloaded version of '(\\)'.
 --
+-- > (\\) == deleteFirstsBy (==)
+--
 -- The second list must be finite, but the first may be infinite.
 --
+-- ==== __Examples__
+--
+-- >>> deleteFirstsBy (>) [1..10] [3, 4, 5]
+-- [4,5,6,7,8,9,10]
+--
+-- >>> deleteFirstsBy (/=) [1..10] [1, 3, 5]
+-- [4,5,6,7,8,9,10]
 deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
 -- | The 'group' function takes a list and returns a list of lists such
 -- that the concatenation of the result is equal to the argument.  Moreover,
 -- each sublist in the result is non-empty and all elements are equal
--- to the first one.  For example,
---
--- >>> group "Mississippi"
--- ["M","i","ss","i","ss","i","pp","i"]
+-- to the first one.
 --
 -- 'group' is a special case of 'groupBy', which allows the programmer to supply
 -- their own equality test.
@@ -1218,6 +1369,13 @@ deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 -- It's often preferable to use @Data.List.NonEmpty.@'Data.List.NonEmpty.group',
 -- which provides type-level guarantees of non-emptiness of inner lists.
 --
+-- ==== __Examples__
+--
+-- >>> group "Mississippi"
+-- ["M","i","ss","i","ss","i","pp","i"]
+--
+-- >>> group [1, 1, 1, 2, 2, 3, 4, 5, 5]
+-- [[1,1,1],[2,2],[3],[4],[5,5]]
 group                   :: Eq a => [a] -> [[a]]
 group                   =  groupBy (==)
 
@@ -1233,16 +1391,28 @@ group                   =  groupBy (==)
 -- It's often preferable to use @Data.List.NonEmpty.@'Data.List.NonEmpty.groupBy',
 -- which provides type-level guarantees of non-emptiness of inner lists.
 --
+-- ==== __Examples__
+--
+-- >>> groupBy (/=) [1, 1, 1, 2, 3, 1, 4, 4, 5]
+-- [[1],[1],[1,2,3],[1,4,4,5]]
+--
+-- >>> groupBy (>) [1, 3, 5, 1, 4, 2, 6, 5, 4]
+-- [[1],[3],[5,1,4,2],[6,5,4]]
+--
+-- >>> groupBy (const not) [True, False, True, False, False, False, True]
+-- [[True,False],[True,False,False,False],[True]]
 groupBy                 :: (a -> a -> Bool) -> [a] -> [[a]]
 groupBy _  []           =  []
 groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
                            where (ys,zs) = span (eq x) xs
 
 -- | The 'inits' function returns all initial segments of the argument,
--- shortest first.  For example,
+-- shortest first.
 --
--- >>> inits "abc"
--- ["","a","ab","abc"]
+-- 'inits' is semantically equivalent to @'map' 'reverse' . 'scanl' ('flip' (:)) []@,
+-- but under the hood uses a queue to amortize costs of 'reverse'.
+--
+-- ==== __Laziness__
 --
 -- Note that 'inits' has the following strictness property:
 -- @inits (xs ++ _|_) = inits xs ++ _|_@
@@ -1250,9 +1420,18 @@ groupBy eq (x:xs)       =  (x:ys) : groupBy eq zs
 -- In particular,
 -- @inits _|_ = [] : _|_@
 --
--- 'inits' is semantically equivalent to @'map' 'reverse' . 'scanl' ('flip' (:)) []@,
--- but under the hood uses a queue to amortize costs of 'reverse'.
+-- ==== __Examples__
 --
+-- >>> inits "abc"
+-- ["","a","ab","abc"]
+--
+-- >>> inits []
+-- [[]]
+--
+-- inits is productive on infinite lists:
+--
+-- >>> take 5 $ inits [1..]
+-- [[],[1],[1,2],[1,2,3],[1,2,3,4]]
 inits                   :: [a] -> [[a]]
 inits                   = map toListSB . scanl' snocSB emptySB
 {-# NOINLINE inits #-}
@@ -1262,13 +1441,29 @@ inits                   = map toListSB . scanl' snocSB emptySB
 -- loss of sharing if allowed to fuse with a producer.
 
 -- | \(\mathcal{O}(n)\). The 'tails' function returns all final segments of the
--- argument, longest first. For example,
+-- argument, longest first.
+--
+-- ==== __Laziness__
+--
+-- Note that 'tails' has the following strictness property:
+-- @tails _|_ = _|_ : _|_@
+--
+-- >>> tails undefined
+-- [*** Exception: Prelude.undefined
+--
+-- >>> drop 1 (tails [undefined, 1, 2])
+-- [[1, 2], [2], []]
+--
+-- ==== __Examples__
 --
 -- >>> tails "abc"
 -- ["abc","bc","c",""]
 --
--- Note that 'tails' has the following strictness property:
--- @tails _|_ = _|_ : _|_@
+-- >>> tails [1, 2, 3]
+-- [[1,2,3],[2,3],[3],[]]
+--
+-- >>> tails []
+-- [[]]
 tails                   :: [a] -> [[a]]
 {-# INLINABLE tails #-}
 tails lst               =  build (\c n ->
@@ -1279,13 +1474,7 @@ tails lst               =  build (\c n ->
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
--- >>> subsequences "abc"
--- ["","a","b","ab","c","ac","bc","abc"]
---
--- This function is productive on infinite inputs:
---
--- >>> take 8 $ subsequences ['a'..]
--- ["","a","b","ab","c","ac","bc","abc"]
+-- ==== __Laziness__
 --
 -- 'subsequences' does not look ahead unless it must:
 --
@@ -1294,6 +1483,15 @@ tails lst               =  build (\c n ->
 -- >>> take 2 (subsequences ('a' : undefined))
 -- ["","a"]
 --
+-- ==== __Examples__
+--
+-- >>> subsequences "abc"
+-- ["","a","b","ab","c","ac","bc","abc"]
+--
+-- This function is productive on infinite inputs:
+--
+-- >>> take 8 $ subsequences ['a'..]
+-- ["","a","b","ab","c","ac","bc","abc"]
 subsequences            :: [a] -> [[a]]
 subsequences xs         =  [] : nonEmptySubsequences xs
 
@@ -1310,23 +1508,32 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 
 -- | The 'permutations' function returns the list of all permutations of the argument.
 --
--- >>> permutations "abc"
--- ["abc","bac","cba","bca","cab","acb"]
---
--- The 'permutations' function is maximally lazy:
--- for each @n@, the value of @'permutations' xs@ starts with those permutations
--- that permute @'take' n xs@ and keep @'drop' n xs@.
---
--- This function is productive on infinite inputs:
---
--- >>> take 6 $ map (take 3) $ permutations ['a'..]
--- ["abc","bac","cba","bca","cab","acb"]
---
 -- Note that the order of permutations is not lexicographic.
 -- It satisfies the following property:
 --
 -- > map (take n) (take (product [1..n]) (permutations ([1..n] ++ undefined))) == permutations [1..n]
 --
+-- ==== __Laziness__
+--
+-- The 'permutations' function is maximally lazy:
+-- for each @n@, the value of @'permutations' xs@ starts with those permutations
+-- that permute @'take' n xs@ and keep @'drop' n xs@.
+--
+-- ==== __Examples__
+--
+-- >>> permutations "abc"
+-- ["abc","bac","cba","bca","cab","acb"]
+--
+-- >>> permutations [1, 2]
+-- [[1,2],[2,1]]
+--
+-- >>> permutations []
+-- [[]]
+--
+-- This function is productive on infinite inputs:
+--
+-- >>> take 6 $ map (take 3) $ permutations ['a'..]
+-- ["abc","bac","cba","bca","cab","acb"]
 permutations :: [a] -> [[a]]
 -- See https://stackoverflow.com/questions/24484348/what-does-this-list-permutations-implementation-in-haskell-exactly-do/24564307#24564307
 -- for the analysis of this rather cryptic implementation.
@@ -1384,24 +1591,33 @@ permutations xs0 = xs0 : perms xs0 []
 -- Elements are arranged from lowest to highest, keeping duplicates in
 -- the order they appeared in the input.
 --
+-- The argument must be finite.
+--
+-- ==== __Examples__
+--
 -- >>> sort [1,6,4,3,2,5]
 -- [1,2,3,4,5,6]
 --
--- The argument must be finite.
+-- >>> sort "haskell"
+-- "aehklls"
 --
+-- >>> import Data.Semigroup(Arg(..))
+-- >>> sort [Arg ":)" 0, Arg ":D" 0, Arg ":)" 1, Arg ":3" 0, Arg ":D" 1]
+-- [Arg ":)" 0,Arg ":)" 1,Arg ":3" 0,Arg ":D" 0,Arg ":D" 1]
 sort :: (Ord a) => [a] -> [a]
 
 -- | The 'sortBy' function is the non-overloaded version of 'sort'.
 -- The argument must be finite.
---
--- >>> sortBy (\(a,_) (b,_) -> compare a b) [(2, "world"), (4, "!"), (1, "Hello")]
--- [(1,"Hello"),(2,"world"),(4,"!")]
 --
 -- The supplied comparison relation is supposed to be reflexive and antisymmetric,
 -- otherwise, e. g., for @\_ _ -> GT@, the ordered list simply does not exist.
 -- The relation is also expected to be transitive: if it is not then 'sortBy'
 -- might fail to find an ordered permutation, even if it exists.
 --
+-- ==== __Examples__
+--
+-- >>> sortBy (\(a,_) (b,_) -> compare a b) [(2, "world"), (4, "!"), (1, "Hello")]
+-- [(1,"Hello"),(2,"world"),(4,"!")]
 sortBy :: (a -> a -> Ordering) -> [a] -> [a]
 
 #if defined(USE_REPORT_PRELUDE)
@@ -1567,10 +1783,15 @@ rqpart cmp x (y:ys) rle rgt r =
 -- Elements are arranged from lowest to highest, keeping duplicates in
 -- the order they appeared in the input.
 --
+-- The argument must be finite.
+--
+-- ==== __Examples__
+--
 -- >>> sortOn fst [(2, "world"), (4, "!"), (1, "Hello")]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
 --
--- The argument must be finite.
+-- >>> sortOn length ["jim", "creed", "pam", "michael", "dwight", "kevin"]
+-- ["jim","pam","creed","kevin","dwight","michael"]
 --
 -- @since 4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
@@ -1579,8 +1800,16 @@ sortOn f =
 
 -- | Construct a list from a single element.
 --
+-- ==== __Examples__
+--
 -- >>> singleton True
 -- [True]
+--
+-- >>> singleton [1, 2, 3]
+--[[1,2,3]]
+--
+-- >>> singleton 'c'
+-- "c"
 --
 -- @since 4.15.0.0
 --
@@ -1605,16 +1834,19 @@ singleton x = [x]
 -- > f' (f x y) = Just (x,y)
 -- > f' z       = Nothing
 --
--- A simple use of unfoldr:
 --
--- >>> unfoldr (\b -> if b == 0 then Nothing else Just (b, b-1)) 10
--- [10,9,8,7,6,5,4,3,2,1]
---
--- Laziness:
+-- ==== __Laziness__
 --
 -- >>> take 1 (unfoldr (\x -> Just (x, undefined)) 'a')
 -- "a"
 --
+-- ==== __Examples__
+--
+-- >>> unfoldr (\b -> if b == 0 then Nothing else Just (b, b-1)) 10
+-- [10,9,8,7,6,5,4,3,2,1]
+--
+-- >>> take 10 $ unfoldr (\(x, y) -> Just (x, (y, x + y))) (0, 1)
+-- [0,1,1,2,3,5,8,13,21,54]
 
 -- Note [INLINE unfoldr]
 -- ~~~~~~~~~~~~~~~~~~~~~
@@ -1656,23 +1888,6 @@ unfoldr f b0 = build (\c n ->
 -- @\\n@ characters.  The @\\n@ terminator is optional in a final non-empty
 -- line of the argument string.
 --
--- For example:
---
--- >>> lines ""           -- empty input contains no lines
--- []
--- >>> lines "\n"         -- single empty line
--- [""]
--- >>> lines "one"        -- single unterminated line
--- ["one"]
--- >>> lines "one\n"      -- single non-empty line
--- ["one"]
--- >>> lines "one\n\n"    -- second line is empty
--- ["one",""]
--- >>> lines "one\ntwo"   -- second line is unterminated
--- ["one","two"]
--- >>> lines "one\ntwo\n" -- two non-empty lines
--- ["one","two"]
---
 -- When the argument string is empty, or ends in a @\\n@ character, it can be
 -- recovered by passing the result of 'lines' to the 'unlines' function.
 -- Otherwise, 'unlines' appends the missing terminating @\\n@.  This makes
@@ -1680,6 +1895,28 @@ unfoldr f b0 = build (\c n ->
 --
 -- > (unlines . lines) . (unlines . lines) = (unlines . lines)
 --
+-- ==== __Examples__
+--
+-- >>> lines ""           -- empty input contains no lines
+-- []
+--
+-- >>> lines "\n"         -- single empty line
+-- [""]
+--
+-- >>> lines "one"        -- single unterminated line
+-- ["one"]
+--
+-- >>> lines "one\n"      -- single non-empty line
+-- ["one"]
+--
+-- >>> lines "one\n\n"    -- second line is empty
+-- ["one",""]
+--
+-- >>> lines "one\ntwo"   -- second line is unterminated
+-- ["one","two"]
+--
+-- >>> lines "one\ntwo\n" -- two non-empty lines
+-- ["one","two"]
 lines                   :: String -> [String]
 lines ""                =  []
 -- Somehow GHC doesn't detect the selector thunks in the below code,
@@ -1695,6 +1932,8 @@ lines s                 =  cons (case break (== '\n') s of
 
 -- | Appends a @\\n@ character to each input string, then concatenates the
 -- results. Equivalent to @'foldMap' (\s -> s '++' "\\n")@.
+--
+-- ==== __Examples__
 --
 -- >>> unlines ["Hello", "World", "!"]
 -- "Hello\nWorld\n!\n"
@@ -1717,11 +1956,13 @@ unlines (l:ls) = l ++ '\n' : unlines ls
 -- by white space (as defined by 'isSpace'). This function trims any white spaces
 -- at the beginning and at the end.
 --
+-- ==== __Examples__
+--
 -- >>> words "Lorem ipsum\ndolor"
 -- ["Lorem","ipsum","dolor"]
+--
 -- >>> words " foo bar "
 -- ["foo","bar"]
---
 words                   :: String -> [String]
 {-# NOINLINE [1] words #-}
 words s                 =  case dropWhile {-partain:Char.-}isSpace s of
@@ -1745,9 +1986,6 @@ wordsFB c n = go
 
 -- | 'unwords' joins words with separating spaces (U+0020 SPACE).
 --
--- >>> unwords ["Lorem", "ipsum", "dolor"]
--- "Lorem ipsum dolor"
---
 -- 'unwords' is neither left nor right inverse of 'words':
 --
 -- >>> words (unwords [" "])
@@ -1755,6 +1993,13 @@ wordsFB c n = go
 -- >>> unwords (words "foo\nbar")
 -- "foo bar"
 --
+-- ==== __Examples__
+--
+-- >>> unwords ["Lorem", "ipsum", "dolor"]
+-- "Lorem ipsum dolor"
+--
+-- >>> unwords ["foo", "bar", "", "baz"]
+-- "foo bar  baz"
 unwords                 :: [String] -> String
 #if defined(USE_REPORT_PRELUDE)
 unwords []              =  ""

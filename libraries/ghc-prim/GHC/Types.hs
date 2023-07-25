@@ -170,19 +170,53 @@ type family Any :: k where { }
 
 -- | The builtin list type, usually written in its non-prefix form @[a]@.
 --
+-- In Haskell, lists are one of the most important data types as they are
+-- often used analogous to loops in imperative programming languages.
+-- These lists are singly linked, which makes it unsuited for operations
+-- that require \(\mathcal{O}(1)\) access. Instead, lists are intended to
+-- be traversed.
+--
+-- Lists are constructed recursively using the right-associative cons-operator
+-- @(:) :: a -> [a] -> [a]@, which prepends an element to a list,
+-- and the empty list @[]@.
+--
+-- @
+-- (1 : 2 : 3 : []) == (1 : (2 : (3 : []))) == [1, 2, 3]
+-- @
+--
+-- Internally and in memory, all the above are represented like this,
+-- with arrows being pointers to locations in memory.
+--
+-- > ╭───┬───┬──╮   ╭───┬───┬──╮   ╭───┬───┬──╮   ╭────╮
+-- > │(:)│   │ ─┼──>│(:)│   │ ─┼──>│(:)│   │ ─┼──>│ [] │
+-- > ╰───┴─┼─┴──╯   ╰───┴─┼─┴──╯   ╰───┴─┼─┴──╯   ╰────╯
+-- >       v              v              v
+-- >       1              2              3
+--
+-- As seen above, lists can also be constructed using list literals
+-- of the form @[x_1, x_2, ..., x_n]@
+-- which are syntactic sugar and, unless @-XOverloadedLists@ is enabled,
+-- are translated into uses of @(:)@ and @[]@
+--
+-- Similarly, 'Data.String.String' literals of the form @"I &#x1F49C; hs"@ are translated into
+-- Lists of characters, @[\'I\', \' \', \'&#x1F49C;\', \' \', \'h\', \'s\']@.
+--
 -- ==== __Examples__
 --
--- Unless the OverloadedLists extension is enabled, list literals are
--- syntactic sugar for repeated applications of @:@ and @[]@.
+-- @
+-- >>> [\'H\', \'a\', \'s\', \'k\', \'e\', \'l\', \'l\']
+-- \"Haskell\"
+-- @
 --
--- >>> 1:2:3:4:[] == [1,2,3,4]
--- True
+-- @
+-- >>> 1 : [4, 1, 5, 9]
+-- [1,4,1,5,9]
+-- @
 --
--- Similarly, unless the OverloadedStrings extension is enabled, string
--- literals are syntactic sugar for a lists of characters.
---
--- >>> ['h','e','l','l','o'] == "hello"
--- True
+-- @
+-- >>> [] : [] : []
+-- [[],[]]
+-- @
 --
 -- @since 0.10.0
 --
