@@ -329,13 +329,16 @@ type IOError = IOException
 -- flagged.
 data IOException
  = IOError {
-     ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging
-                                     -- the error.
-     ioe_type     :: IOErrorType,    -- what it was.
-     ioe_location :: String,         -- location.
-     ioe_description :: String,      -- error type specific information.
-     ioe_errno    :: Maybe CInt,     -- errno leading to this error, if any.
-     ioe_filename :: Maybe FilePath  -- filename the error is related to.
+     ioe_handle   :: Maybe Handle,   -- ^ the handle used by the action flagging
+                                     --   the error.
+     ioe_type     :: IOErrorType,    -- ^ what it was.
+     ioe_location :: String,         -- ^ location.
+     ioe_description :: String,      -- ^ error type specific information.
+     ioe_errno    :: Maybe CInt,     -- ^ errno leading to this error, if any.
+     ioe_filename :: Maybe FilePath  -- ^ filename the error is related to
+                                     --   (some libraries may assume different encodings
+                                     --   when constructing this field from e.g. 'ByteString'
+                                     --   or other types)
    }
 
 -- | @since 4.1.0.0
