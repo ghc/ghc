@@ -163,13 +163,6 @@ if test "$EnableNativeIOManager" = "YES"; then
   AC_DEFINE_UNQUOTED([DEFAULT_NATIVE_IO_MANAGER], [1], [Enable Native I/O manager as default.])
 fi
 
-AC_ARG_ENABLE(ghc-toolchain,
-[AS_HELP_STRING([--enable-ghc-toolchain],
-                [Whether to use the newer ghc-toolchain tool to configure ghc targets])],
-  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableGhcToolchain])],
-  [EnableGhcToolchain=NO]
-)
-AC_SUBST([EnableGhcToolchain])
 
 dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
 dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
