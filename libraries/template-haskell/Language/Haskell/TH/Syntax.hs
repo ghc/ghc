@@ -687,7 +687,7 @@ instance heads which unify with @nm tys@, they need not actually be satisfiable.
     @B@ themselves implement 'Eq'
 
   - @reifyInstances ''Show [ 'VarT' ('mkName' "a") ]@ produces every available
-    instance of 'Eq'
+    instance of 'Show'
 
 There is one edge case: @reifyInstances ''Typeable tys@ currently always
 produces an empty list (no matter what @tys@ are given).
