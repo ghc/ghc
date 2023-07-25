@@ -47,6 +47,13 @@
 -- generalisation of the basic weak-pointer idea, in which each
 -- weak pointer actually contains both a key and a value.
 --
+-- See [Stretching the storage manager: weak pointers and stable names in
+-- Haskell](https://www.microsoft.com/en-us/research/publication/stretching-the-storage-manager-weak-pointers-and-stable-names-in-haskell/)
+-- by Simon Peyton Jones, Simon Marlow and Conal Elliott for detailed discussion
+-- of weak pointers. An implementation of a memo table with weak pointers
+-- can be found in [@stable-memo@](https://hackage.haskell.org/package/stable-memo)
+-- package.
+--
 -----------------------------------------------------------------------------
 
 module System.Mem.Weak (

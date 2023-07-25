@@ -22,6 +22,13 @@
 -- collector, meaning a re-hash would be necessary after every garbage
 -- collection.
 --
+-- See [Stretching the storage manager: weak pointers and stable names in
+-- Haskell](https://www.microsoft.com/en-us/research/publication/stretching-the-storage-manager-weak-pointers-and-stable-names-in-haskell/)
+-- by Simon Peyton Jones, Simon Marlow and Conal Elliott for detailed discussion
+-- of stable names. An implementation of a memo table with stable names
+-- can be found in [@stable-memo@](https://hackage.haskell.org/package/stable-memo)
+-- package.
+--
 -------------------------------------------------------------------------------
 
 module System.Mem.StableName (
