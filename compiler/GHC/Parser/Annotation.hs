@@ -542,7 +542,7 @@ data Anchor = Anchor        { anchor :: RealSrcSpan
 -- anchor to be freely moved, without worrying about recalculating the
 -- appropriate anchor span.
 data AnchorOperation = UnchangedAnchor
-                     | MovedAnchor DeltaPos
+                     | MovedAnchor !DeltaPos ![LEpaComment]
         deriving (Data, Eq, Show)
 
 
@@ -1461,8 +1461,8 @@ instance Outputable Anchor where
   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
 
 instance Outputable AnchorOperation where
-  ppr UnchangedAnchor   = text "UnchangedAnchor"
-  ppr (MovedAnchor d)   = text "MovedAnchor" <+> ppr d
+  ppr UnchangedAnchor    = text "UnchangedAnchor"
+  ppr (MovedAnchor d cs) = text "MovedAnchor" <+> ppr d <+> ppr cs
 
 instance Outputable DeltaPos where
   ppr (SameLine c) = text "SameLine" <+> ppr c
