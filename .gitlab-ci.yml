@@ -604,6 +604,8 @@ source-tarball:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 generate-hadrian-bootstrap-sources:
   stage: full-build
@@ -622,6 +624,8 @@ generate-hadrian-bootstrap-sources:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 
 package-hadrian-bootstrap-sources:
@@ -639,6 +643,8 @@ package-hadrian-bootstrap-sources:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
 
 test-bootstrap:
   stage: full-build
@@ -675,6 +681,8 @@ test-bootstrap:
   rules:
     - if: $NIGHTLY
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
     - if: '$RELEASE_JOB == "yes"'
       when: always
       variables:
