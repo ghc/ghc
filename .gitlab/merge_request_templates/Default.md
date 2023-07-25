@@ -9,7 +9,7 @@ Please take a few moments to address the following points:
 
  * [ ] if your MR may break existing programs (e.g. touches `base` or causes the
    compiler to reject programs), please describe the expected breakage and add
-   the ~"user facing" label. This will run ghc/head.hackage> to characterise
+   the ~"user-facing" label. This will run ghc/head.hackage> to characterise
    the effect of your change on Hackage.
  * [ ] ensure that your commits are either individually buildable or squashed
  * [ ] ensure that your commit messages describe *what they do*
