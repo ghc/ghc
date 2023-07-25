@@ -55,7 +55,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
+ "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
@@ -91,7 +91,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/printer/Ppr001.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr002a.hs" Nothing
- "../../testsuite/tests/printer/Ppr003.hs" Nothing
+ -- "../../testsuite/tests/printer/Ppr003.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr004.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr005.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr006.hs" Nothing
