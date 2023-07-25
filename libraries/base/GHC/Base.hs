@@ -1396,8 +1396,18 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ..., xn] == [f x1, f x2, ..., f xn]
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 --
+-- this means that @map id == id@
+--
+-- ==== __Examples__
+--
 -- >>> map (+1) [1, 2, 3]
 -- [2,3,4]
+--
+-- >>> map id [1, 2, 3]
+-- [1,2,3]
+--
+-- >>> map (\n -> 3 * n + 1) [1, 2, 3]
+-- [4,7,10]
 map :: (a -> b) -> [a] -> [b]
 {-# NOINLINE [0] map #-}
   -- We want the RULEs "map" and "map/coerce" to fire first.
@@ -1464,12 +1474,14 @@ The rules for map work like this.
 --              append
 ----------------------------------------------
 
--- | Append two lists, i.e.,
+-- | '(++)' appends two lists, i.e.,
 --
 -- > [x1, ..., xm] ++ [y1, ..., yn] == [x1, ..., xm, y1, ..., yn]
 -- > [x1, ..., xm] ++ [y1, ...] == [x1, ..., xm, y1, ...]
 --
 -- If the first list is not finite, the result is the first list.
+--
+-- ==== __Performance considerations__
 --
 -- This function takes linear time in the number of elements of the
 -- __first__ list. Thus it is better to associate repeated
@@ -1477,8 +1489,18 @@ The rules for map work like this.
 -- @xs ++ (ys ++ zs)@ or simply @xs ++ ys ++ zs@, but not @(xs ++ ys) ++ zs@.
 -- For the same reason 'Data.List.concat' @=@ 'Data.List.foldr' '(++)' @[]@
 -- has linear performance, while 'Data.List.foldl' '(++)' @[]@ is prone
--- to quadratic slowdown.
-
+-- to quadratic slowdown
+--
+-- ==== __Examples__
+--
+-- >>> [1, 2, 3] ++ [4, 5, 6]
+-- [1,2,3,4,5,6]
+--
+-- >>> [] ++ [1, 2, 3]
+-- [1,2,3]
+--
+-- >>> [3, 2, 1] ++ []
+-- [3,2,1]
 (++) :: [a] -> [a] -> [a]
 {-# NOINLINE [2] (++) #-}
   -- Give time for the RULEs for (++) to fire in InitialPhase
