@@ -181,6 +181,39 @@ isPointSrcSpan ss = spanLength ss == 0
 
 -- ---------------------------------------------------------------------
 
+-- | A GHC comment includes the span of the preceding token.  Take an
+-- original comment, and convert the 'Anchor to have a have a
+-- `MovedAnchor` operation based on the original location, only if it
+-- does not already have one.
+-- commentOrigDelta :: LEpaComment -> LEpaComment
+-- commentOrigDelta (L (EpaSpan (RealSrcSpan la _)) (GHC.EpaComment t pp))
+--   = (L (EpaDelta (origDelta la pp) []) (GHC.EpaComment t pp))
+-- commentOrigDelta c = c
+
+-- commentOrigDelta' :: Comment -> Comment
+-- commentOrigDelta' (Comment s (EpaSpan (RealSrcSpan la _)) pp co)
+--   = Comment s (EpaDelta (origDelta la pp) []) pp co
+-- commentOrigDelta' c = c
+-- | A GHC comment includes the span of the preceding token.  Take an
+-- original comment, and convert the 'Anchor to have a have a
+-- `MovedAnchor` operation based on the original location, only if it
+-- does not already have one.
+commentOrigDelta :: LEpaComment -> LEpaComment
+commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
+  = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
+                  `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
+  where
+        (r,c) = ss2posEnd pp
+
+        op' = if r == 0
+               then MovedAnchor (ss2delta (r,c+1) la) []
+               -- then MovedAnchor (ss2delta (r,c+0) la)
+               -- else MovedAnchor (ss2delta (r,c)   la)
+               else MovedAnchor (ss2delta (r,c)   la) []
+        op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0) []
+               then MovedAnchor (DifferentLine 1 0) []
+               else op'
+
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
 origDelta pos pp = ss2delta (ss2posEnd pp) pos
 
@@ -215,9 +248,17 @@ insertCppComments ::  ParsedSource -> [LEpaComment] -> ParsedSource
 insertCppComments (L l p) cs = L l p'
   where
     an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
-      (EpAnn a an ocs) -> EpAnn a an (EpaComments cs')
+      (EpAnn a an ocs) -> EpAnn a an cs'
         where
-          cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
+          -- cs' = sortEpaComments $ priorComments ocs ++ getFollowingComments ocs ++ cs
+          pc = priorComments ocs
+          fc = getFollowingComments ocs
+          cs' = case fc of
+            [] -> EpaComments $ sortEpaComments $ pc ++ fc ++ cs
+            (L ac _:_) -> EpaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
+                                              (sortEpaComments $ fc ++ cs_after)
+                   where
+                     (cs_before,cs_after) = break (\(L l _) ->   (ss2pos $ anchor l) < (ss2pos $ anchor ac) ) cs
       unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
@@ -273,8 +314,8 @@ sortEpaComments cs = sortBy cmp cs
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
 mkKWComment kw (EpaSpan ss _)
   = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
-mkKWComment kw (EpaDelta dp _)
-  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp)) placeholderRealSpan (Just kw)
+mkKWComment kw (EpaDelta dp cs)
+  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp cs)) placeholderRealSpan (Just kw)
 
 -- | Detects a comment which originates from a specific keyword.
 isKWComment :: Comment -> Bool
@@ -389,7 +430,7 @@ addEpAnnLoc (AddEpAnn _ l) = l
 -- TODO: move this to GHC
 anchorToEpaLocation :: Anchor -> EpaLocation
 anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r Strict.Nothing
-anchorToEpaLocation (Anchor _ (MovedAnchor dp)) = EpaDelta dp []
+anchorToEpaLocation (Anchor _ (MovedAnchor dp cs)) = EpaDelta dp cs
 
 -- ---------------------------------------------------------------------
 -- Horrible hack for dealing with some things still having a SrcSpan,
@@ -421,13 +462,13 @@ hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : Unhelpful
 hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
 hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
   = if s <= 0 && e <= 0
-    then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+    then Anchor r (MovedAnchor (deltaPos (-s) (-e)) [])
       `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
     else Anchor r UnchangedAnchor
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
 hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
-hackAnchorToSrcSpan (Anchor r (MovedAnchor dp))
+hackAnchorToSrcSpan (Anchor r (MovedAnchor dp cs))
   = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
       `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
   where

@@ -422,8 +422,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   case anchor' of
     -- EpaDelta _ _ -> setAcceptSpan True
     -- EpaSpan _ _ -> return ()
-    Anchor _ (MovedAnchor _) -> setAcceptSpan True
-    _                        -> return ()
+    Anchor _ (MovedAnchor _ _) -> setAcceptSpan True
+    _                          -> return ()
   p <- getPosP
   pe0 <- getPriorEndD
   debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, showAst anchor', astId a)
@@ -438,11 +438,11 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     CanUpdateAnchor -> pushAppliedComments
     _ -> return ()
   case anchor' of
-    Anchor _ (MovedAnchor dcs) -> do
+    Anchor _ (MovedAnchor _ dcs) -> do
       debugM $ "enterAnn:Printing comments:" ++ showGhc (priorComments cs)
       mapM_ printOneComment (map tokComment $ priorComments cs)
-      -- debugM $ "enterAnn:Printing EpaDelta comments:" ++ showGhc dcs
-      -- mapM_ printOneComment (map tokComment dcs)
+      debugM $ "enterAnn:Printing EpaDelta comments:" ++ showGhc dcs
+      mapM_ printOneComment (map tokComment dcs)
     _ -> do
       debugM $ "enterAnn:Adding comments:" ++ showGhc (priorComments cs)
       addCommentsA (priorComments cs)
@@ -451,7 +451,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
   case anchor_op anchor' of
-    MovedAnchor dp -> do
+    MovedAnchor dp _ -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
       -- Set the original anchor as prior end, so the rest of this AST
       -- fragment has a reference
@@ -493,7 +493,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
                off (ss2delta priorEndAfterComments curAnchor)
   debugM $ "enterAnn: (edp',off,priorEndAfterComments,curAnchor):" ++ show (edp',off,priorEndAfterComments,rs2range curAnchor)
   let edp'' = case anchor_op anchor' of
-        MovedAnchor dp -> dp
+        MovedAnchor dp _ -> dp
         _ -> edp'
   -- ---------------------------------------------
   -- let edp = edp''
@@ -501,7 +501,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   setExtraDP Nothing
   let edp = case med of
         Nothing -> edp''
-        Just (Anchor _ (MovedAnchor dp)) -> dp
+        Just (Anchor _ (MovedAnchor dp _)) -> dp
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
         Just (Anchor r _) -> dp
@@ -553,7 +553,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   debugM $ "enterAnn:done:(p,pe,anchor,a) =" ++ show (p1, pe1, showAst anchor', astId a')
 
   case anchor' of
-    Anchor _ (MovedAnchor _) -> return ()
+    Anchor _ (MovedAnchor _ _) -> return ()
     Anchor rss UnchangedAnchor -> do
     -- EpaDelta _ _ -> return ()
     -- EpaSpan (RealSrcSpan rss _) -> do
@@ -574,7 +574,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
 
   -- Update original anchor, comments based on the printing process
   -- let newAchor = EpaDelta edp []
-  let newAchor = anchor' { anchor_op = MovedAnchor edp }
+  let newAchor = anchor' { anchor_op = MovedAnchor edp [] }
   let r = case canUpdateAnchor of
             CanUpdateAnchor -> setAnnotationAnchor a' newAchor trailing' (mkEpaComments (priorCs ++ postCs) [])
             CanUpdateAnchorOnly -> setAnnotationAnchor a' newAchor [] emptyComments
@@ -1417,19 +1417,19 @@ printOneComment :: (Monad m, Monoid w) => Comment -> EP w m ()
 printOneComment c@(Comment _str loc _r _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
   dp <-case anchor_op loc of
-    MovedAnchor dp -> return dp
+    MovedAnchor dp _ -> return dp
     _ -> do
         pe <- getPriorEndD
         debugM $ "printOneComment:pe=" ++ showGhc pe
         -- let dp = ss2delta pe (anchor loc)
         let dp = case loc of
               Anchor r UnchangedAnchor -> ss2delta pe r
-              Anchor _ (MovedAnchor dp1) -> dp1
+              Anchor _ (MovedAnchor dp1 _) -> dp1
         debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
   mep <- getExtraDP
   dp' <- case mep of
-    Just (Anchor _ (MovedAnchor edp)) -> do
+    Just (Anchor _ (MovedAnchor edp _)) -> do
       debugM $ "printOneComment:edp=" ++ show edp
       adjustDeltaForOffsetM edp
     _ -> return dp
@@ -1462,7 +1462,7 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
     --          then dp
     --          else dp''
     dp'' = case anc of
-      Anchor _ (MovedAnchor dp1) -> dp1
+      Anchor _ (MovedAnchor dp1 _) -> dp1
       Anchor la _ ->
            if r == 0
              then (ss2delta (r,c+0) la)
@@ -1476,13 +1476,13 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
       _ -> dp''
     op' = case dp' of
             SameLine n -> if n >= 0
-                            then MovedAnchor dp'
-                            else MovedAnchor dp
-            _ -> MovedAnchor dp'
-    op = if str == "" && op' == MovedAnchor (SameLine 0) -- EOF comment
-           then MovedAnchor dp
+                            then MovedAnchor dp' []
+                            else MovedAnchor dp []
+            _ -> MovedAnchor dp' []
+    op = if str == "" && op' == MovedAnchor (SameLine 0) [] -- EOF comment
+           then MovedAnchor dp []
            -- else op'
-           else MovedAnchor dp
+           else MovedAnchor dp []
 
 -- ---------------------------------------------------------------------
 
@@ -4386,7 +4386,7 @@ printUnicode anc n = do
   loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
   case loc of
     EpaSpan _ _ -> return anc
-    EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp }
+    EpaDelta dp [] -> return anc { anchor_op = MovedAnchor dp [] }
     EpaDelta _ _cs -> error "printUnicode should not capture comments"
 
 
