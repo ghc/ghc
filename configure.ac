@@ -1139,11 +1139,11 @@ dnl The packages below should include all packages needed by
 dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal/Cabal.cabal)
-dnl template-haskell.cabal is generated later
-dnl but the .in file already has the version
+dnl template-haskell.cabal and ghc-prim.cabal are generated later
+dnl by Hadrian but the .in files already have the version
 LIBRARY_VERSION(template-haskell, template-haskell/template-haskell.cabal.in)
 LIBRARY_VERSION(array)
-LIBRARY_VERSION(ghc-prim)
+LIBRARY_VERSION(ghc-prim, ghc-prim/ghc-prim.cabal.in)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
 AC_SUBST(LIBRARY_ghc_VERSION)
