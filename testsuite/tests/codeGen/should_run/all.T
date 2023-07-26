@@ -232,7 +232,10 @@ test('CheckBoundsOK', normal, compile_and_run, ['-fcheck-prim-bounds'])
 test('MulMayOflo_full',
      [ extra_files(['MulMayOflo.hs']),
        when(unregisterised(), skip),
-       unless(arch('x86_64') or arch('i386'), skip),
+       unless(
+         arch('x86_64') or arch('i386'),
+         expect_broken(23742)
+       ),
         ignore_stdout],
      multi_compile_and_run,
      ['MulMayOflo', [('MulMayOflo_full.cmm', '')], ''])
