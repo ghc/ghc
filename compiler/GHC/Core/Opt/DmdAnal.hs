@@ -20,12 +20,6 @@ import GHC.Types.Demand   -- All of it
 
 import GHC.Core
 import GHC.Core.DataCon
-<<<<<<< HEAD
-=======
-import GHC.Types.ForeignCall ( isSafeForeignCall )
-import GHC.Types.Id
-import GHC.Types.Name    ( isWiredIn )
->>>>>>> f0e0cfda35 (Rip out hacks surrounding GHC.Prim and primops)
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -150,7 +144,7 @@ isInterestingTopLevelFn :: Id -> Bool
 -- If there was a gain, that regression might be acceptable.
 -- Plus, we could use LetUp for thunks and share some code with local let
 -- bindings.
-isInterestingTopLevelFn id = isLocalId id && typeArity (idType id) > 0
+isInterestingTopLevelFn id = typeArity (idType id) > 0
 
 {- Note [Stamp out space leaks in demand analysis]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1021,8 +1015,7 @@ dmdTransform env var sd
   = -- pprTrace "dmdTransform:DictSel" (ppr var $$ ppr (idDmdSig var) $$ ppr sd) $
     dmdTransformDictSelSig (idDmdSig var) sd
   -- Imported functions
-  -- N.B. wired-in names may be GlobalIds and yet not imported.
-  | isGlobalId var && not (isWiredIn var)
+  | isGlobalId var
   , let res = dmdTransformSig (idDmdSig var) sd
   = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idDmdSig var), ppr sd, ppr res])
     res
@@ -1912,7 +1905,7 @@ along in boxed form and as such dissuade the creation of reboxing workers.
 -}
 
 -- | How many registers does this type take after unarisation?
-unariseArity :: Type -> Arity
+unariseArity :: HasDebugCallStack => Type -> Arity
 unariseArity ty = length (typePrimRep ty)
 
 data Budgets = MkB !Arity Budgets   -- An infinite list of arity budgets

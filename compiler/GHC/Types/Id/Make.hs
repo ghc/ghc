@@ -27,7 +27,7 @@ module GHC.Types.Id.Make (
         unboxedUnitExpr,
 
         -- And some particular Ids; see below for why they are wired in
-        wiredInIds, ghcPrimIds,
+        wiredInIds, ghcPrimIds, magicIds,
         realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
@@ -35,6 +35,7 @@ module GHC.Types.Id.Make (
         proxyHashId,
         nospecId, nospecIdName,
         noinlineId, noinlineIdName,
+        oneShotId, oneShotName,
         noinlineConstraintId, noinlineConstraintIdName,
         coerceName, leftSectionName, rightSectionName,
         pcRepPolyId,

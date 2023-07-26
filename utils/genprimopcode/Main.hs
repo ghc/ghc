@@ -339,7 +339,7 @@ gen_hs_source (Info defaults entries) =
 
     prim_func :: String -> Ty -> Bool -> [String]
     prim_func n t llvm_only
-      | not (opTyHasFixedRuntimeRep t) =
+      | tyHasNegativePosRepPoly t =
           [ "-- No wrapper due to RuntimeRep polymorphism:"
           , "-- " ++ wrapOp n ++ " :: " ++ pprTy t
           ]
@@ -694,28 +694,30 @@ splitFunTy = go []
     go acc (TyC arg res) = go (arg:acc) res
     go acc ty            = (reverse acc, ty)
 
--- | This should match the levity polymorphism check in
--- GHC.Builtin.PrimOps.Ids.mkPrimOpId.
-opTyHasFixedRuntimeRep :: Ty -> Bool
-opTyHasFixedRuntimeRep ty =
-    let (args, res) = splitFunTy ty
-    in all typeHasFixedRuntimeRep args && typeHasFixedRuntimeRep res
-
--- | Is a type representationally monomorphic?
-typeHasFixedRuntimeRep :: Ty -> Bool
-typeHasFixedRuntimeRep (TyF a b)    = True
-typeHasFixedRuntimeRep (TyC a b)    = True
-typeHasFixedRuntimeRep (TyApp _ as) = True
-typeHasFixedRuntimeRep (TyVar v)    = tyVarHasFixedRuntimeRep v
-typeHasFixedRuntimeRep (TyUTup as)  = all typeHasFixedRuntimeRep as
-
--- | Does a tyvar have a representationally polymorphic kind?
-tyVarHasFixedRuntimeRep :: TyVar -> Bool
-tyVarHasFixedRuntimeRep "o" = False
-tyVarHasFixedRuntimeRep "p" = False
-tyVarHasFixedRuntimeRep "v" = False
-tyVarHasFixedRuntimeRep "w" = False
-tyVarHasFixedRuntimeRep _   = True
+-- | Does the type have representation-polymorphic type variables
+-- in negative position?
+--
+-- Should match the logic in 'GHC.Builtin.PrimOps.Ids.computePrimOpConcTyVarsFromType',
+-- i.e. this function should return 'True' precisely when 'computePrimOpConcTyVarsFromType'
+-- returns a non-empty collection of concrete type variables.
+tyHasNegativePosRepPoly :: Ty -> Bool
+tyHasNegativePosRepPoly = rep_poly False
+  where
+   rep_poly :: Bool -- True  <=> looking for rep-poly in positive position
+                    -- False <=>         '' ... ''       negative position
+            -> Ty
+            -> Bool
+   rep_poly want_pos ty
+     | (args@(_:_), res) <- splitFunTy ty
+     = any (rep_poly $ not want_pos) args || rep_poly want_pos res
+   rep_poly want_pos (TyUTup as)
+     = any (rep_poly want_pos) as
+   rep_poly True (TyVar v)
+     = v `elem` [ "a_reppoly", "b_reppoly", "a_levpoly", "b_levpoly" ]
+   rep_poly _ _
+     = False
+     -- There are no TyCons in GHC.Prim with representation-polymorphic kinds,
+     -- other than unboxed tuples (which use TyUTup instead of TyApp).
 
 ppTyVar :: TyVar -> PrimOpTyVarBinder
 ppTyVar "a" = nonDepTyVarBinder "alphaTyVarSpec"

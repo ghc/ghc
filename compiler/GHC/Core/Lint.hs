@@ -1774,7 +1774,7 @@ lintIdBndr :: TopLevelFlag -> BindingSite
 lintIdBndr top_lvl bind_site id thing_inside
   = assertPpr (isId id) (ppr id) $
     do { flags <- getLintFlags
-       ; checkL (not (lf_check_global_ids flags) || isLocalId id || isWiredIn id)
+       ; checkL (not (lf_check_global_ids flags) || isLocalId id)
                 (text "Non-local Id binder" <+> ppr id)
                 -- See Note [Checking for global Ids]
 

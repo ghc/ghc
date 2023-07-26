@@ -529,10 +529,7 @@ warnUnusedPackages us dflags mod_graph =
           mapMaybe (\(fs, mn) -> lookupModulePackage us (unLoc mn) fs)
             $ concatMap ms_imps home_mod_sum
 
-        any_import_ghc_prim = any ms_ghc_prim_import home_mod_sum
-
         used_args = Set.fromList (map unitId loadedPackages)
-                      `Set.union` Set.fromList [ primUnitId |  any_import_ghc_prim ]
 
         resolve (u,mflag) = do
                   -- The units which we depend on via the command line explicitly

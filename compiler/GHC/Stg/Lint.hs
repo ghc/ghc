@@ -110,7 +110,7 @@ import GHC.Types.CostCentre ( isCurrentCCS )
 import GHC.Types.Error      ( DiagnosticReason(WarningWithoutFlag) )
 import GHC.Types.Id
 import GHC.Types.Var.Set
-import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom )
+import GHC.Types.Name       ( getSrcLoc, nameIsLocalOrFrom, isWiredInName )
 import GHC.Types.RepType
 import GHC.Types.SrcLoc
 
@@ -561,12 +561,16 @@ getStgPprOpts :: LintM StgPprOpts
 getStgPprOpts = LintM $ \_mod _lf _df opts _loc _scope errs -> (opts, errs)
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \mod _lf diag_opts _opts loc scope errs
- -> if nameIsLocalOrFrom mod (idName id) && not (id `elemVarSet` scope) then
+checkInScope id
+  = LintM $ \mod _lf diag_opts _opts loc scope errs ->
+    if not (isWiredInName nm) && (nameIsLocalOrFrom mod nm && not (id `elemVarSet` scope)) then
+      -- SLD TODO?
         ((), addErr diag_opts errs (hsep [ppr id, dcolon, ppr (idType id),
                                     text "is out of scope"]) loc)
     else
         ((), errs)
+  where
+    nm = idName id
 
 mkUnliftedTyMsg :: OutputablePass a => StgPprOpts -> Id -> GenStgRhs a -> SDoc
 mkUnliftedTyMsg opts binder rhs

@@ -233,7 +233,7 @@ stackSlotType i
 idPrimReps :: Id -> [PrimRep]
 idPrimReps = typePrimReps . idType
 
-typePrimReps :: Type -> [PrimRep]
+typePrimReps :: HasDebugCallStack => Type -> [PrimRep]
 typePrimReps = typePrimRep . unwrapType
 
 primRepSize :: PrimRep -> SlotCount

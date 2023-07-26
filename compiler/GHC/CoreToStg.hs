@@ -547,8 +547,10 @@ coreToStgApp f args ticks = do
                 -- Some primitive operator that might be implemented as a library call.
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
+                -- SLD TODO: I think unsaturated primops are fine now?
                 PrimOpId op _
                   | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+            --    | otherwise    -> pprPanic "coreToStg unsaturated PrimOp" (ppr op)
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)

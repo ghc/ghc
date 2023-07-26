@@ -153,7 +153,6 @@ import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Core.Class
 import {-# SOURCE #-} GHC.Builtin.PrimOps (PrimOp)
-import {-# SOURCE #-} GHC.Types.TyThing (tyThingId)
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
@@ -307,7 +306,6 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 -- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
-mkLocalId name _ _ | Just thing <- wiredInNameTyThing_maybe name = tyThingId thing
 mkLocalId name w ty = mkLocalIdWithInfo name w (assert (not (isCoVarType ty)) ty) vanillaIdInfo
 
 -- | Make a local CoVar
@@ -585,11 +583,13 @@ hasNoBinding :: Id -> Bool
 -- exception to this is unboxed tuples and sums datacons, which definitely have
 -- no binding
 hasNoBinding id = case Var.idDetails id of
-                        PrimOpId _ lev_poly -> lev_poly
-
-                        FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
-                        _                -> isCompulsoryUnfolding (realIdUnfolding id)
+  PrimOpId _ _conc_tvs -> True -- not $ isEmptyNameEnv conc_tvs
+  RepPolyId _conc_tvs -> True
+--  RepPolyId  conc_tvs -> not $ isEmptyNameEnv conc_tvs
+-- SLD TODO: not enough, e.g. some lev-poly stuff with no conc tvs have no binding
+  FCallId _           -> True
+  DataConWorkId dc    -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
+  _                   -> isCompulsoryUnfolding (realIdUnfolding id)
   -- Note: this function must be very careful not to force
   -- any of the fields that aren't the 'uf_src' field of
   -- the 'Unfolding' of the 'Id'. This is because these fields are computed

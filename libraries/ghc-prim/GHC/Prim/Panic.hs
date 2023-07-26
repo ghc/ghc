@@ -116,4 +116,18 @@ absentConstraintError :: forall (a :: Type). Addr# -> a
 -- type; the type in the interface file is never looked at.
 -- The only purpose of this definition is to give a function to call,
 -- and for that purpose, delegating to absentError is fine.
-absentConstraintError errmsg = absentError errmsg
+absentConstraintError = absentConstraintError  -- SLD TODO: errmsg = absentError errmsg
+{-
+libraries\ghc-prim\GHC\Prim\Panic.hs:119:32: error: [GHC-18872]
+    • Couldn't match kind ‘*’ with ‘Constraint’
+      When matching types
+        a0 :: *
+        a :: Constraint
+    • In the expression: absentError errmsg
+      In an equation for ‘absentConstraintError’:
+          absentConstraintError errmsg = absentError errmsg
+    • Relevant bindings include
+        absentConstraintError :: Addr# -=> a
+          (bound at libraries\ghc-prim\GHC\Prim\Panic.hs:119:1)
+
+-}

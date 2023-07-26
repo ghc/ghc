@@ -426,7 +426,20 @@ typeError                s = throw (TypeError        (unpackCStringUtf8# s))
 impossibleError, impossibleConstraintError :: Addr# -> a
 -- These two are used for impossible case alternatives, and lack location info
 impossibleError             s = errorWithoutStackTrace (unpackCStringUtf8# s)
-impossibleConstraintError   s = errorWithoutStackTrace (unpackCStringUtf8# s)
+--impossibleConstraintError s = errorWithoutStackTrace (unpackCStringUtf8# s)
+impossibleConstraintError = impossibleConstraintError -- SLD TODO
+  -- impossibleConstraintError s = errorWithoutStackTrace (unpackCStringUtf8# s)
+{-
+libraries\base\Control\Exception\Base.hs:429:33: error: [GHC-18872]
+    • Couldn't match kind ‘*’ with ‘CONSTRAINT q’
+      When matching types
+        a0 :: *
+        a :: CONSTRAINT q
+    • In the expression: errorWithoutStackTrace (unpackCStringUtf8# s)
+      In an equation for ‘impossibleConstraintError’:
+          impossibleConstraintError s
+            = errorWithoutStackTrace (unpackCStringUtf8# s)
+-}
 
 
 -- GHC's RTS calls this

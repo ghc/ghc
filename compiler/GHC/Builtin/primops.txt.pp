@@ -223,6 +223,7 @@ defaults
 --       nor `a_levpoly` and `a_reppoly`, etc.
 
 primtype TYPE
+primtype CONSTRAINT
 
 section "The word size story."
         {Haskell98 specifies that signed integers (type 'Int')
