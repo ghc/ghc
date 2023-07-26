@@ -102,12 +102,12 @@
            (L
             (SrcSpanAnn (EpAnn
                          (Anchor
-                          { T15323.hs:6:20-25 }
+                          { T15323.hs:6:20-29 }
                           (UnchangedAnchor))
                          (AnnListItem
                           [])
                          (EpaComments
-                          [])) { T15323.hs:6:20-25 })
+                          [])) { T15323.hs:6:20-29 })
             (HsOuterExplicit
              (EpAnn
               (Anchor

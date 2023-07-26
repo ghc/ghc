@@ -415,7 +415,8 @@ changeRename2 _libdir parsed = return (rename "joe" [((2,1),(2,5))] parsed)
 
 rename :: (Data a, ExactPrint a) => String -> [(Pos, Pos)] -> a -> a
 rename newNameStr spans' a
-  = everywhere (mkT replaceRdr) (makeDeltaAst a)
+  -- = everywhere (mkT replaceRdr) (makeDeltaAst a)
+  = everywhere (mkT replaceRdr) a
   where
     newName = mkRdrUnqual (mkVarOcc newNameStr)
 
@@ -431,7 +432,8 @@ rename newNameStr spans' a
 
 changeWhereIn4 :: Changer
 changeWhereIn4 _libdir parsed
-  = return (everywhere (mkT replace) (makeDeltaAst parsed))
+  -- = return (everywhere (mkT replace) (makeDeltaAst parsed))
+  = return (everywhere (mkT replace) parsed)
   where
     replace :: LocatedN RdrName -> LocatedN RdrName
     replace (L ln _n)
@@ -478,8 +480,8 @@ changeAddDecl1 libdir top = do
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  -- let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
-  let decl' = setEntryDP decl (DifferentLine 2 0)
+  let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
+  -- let decl' = setEntryDP decl (DifferentLine 2 0)
 
   let (p',_,_) = runTransform doAddDecl
       -- doAddDecl = everywhereM (mkM replaceTopLevelDecls) (makeDeltaAst top)
@@ -730,7 +732,8 @@ addLocaLDecl6 libdir lp = do
 rmDecl1 :: Changer
 rmDecl1 _libdir top = do
   let doRmDecl = do
-         let lp = makeDeltaAst top
+         -- let lp = makeDeltaAst top
+         let lp = top
          tlDecs0 <- hsDecls lp
          tlDecs' <- balanceCommentsList tlDecs0
          let tlDecs = captureLineSpacing tlDecs'

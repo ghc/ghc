@@ -193,6 +193,7 @@ isPointSrcSpan ss = spanLength ss == 0
 -- commentOrigDelta' (Comment s (EpaSpan (RealSrcSpan la _)) pp co)
 --   = Comment s (EpaDelta (origDelta la pp) []) pp co
 -- commentOrigDelta' c = c
+
 -- | A GHC comment includes the span of the preceding token.  Take an
 -- original comment, and convert the 'Anchor to have a have a
 -- `MovedAnchor` operation based on the original location, only if it
@@ -204,14 +205,9 @@ commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
   where
         (r,c) = ss2posEnd pp
 
-        op' = if r == 0
+        op = if r == 0
                then MovedAnchor (ss2delta (r,c+1) la) []
-               -- then MovedAnchor (ss2delta (r,c+0) la)
-               -- else MovedAnchor (ss2delta (r,c)   la)
                else MovedAnchor (ss2delta (r,c)   la) []
-        op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0) []
-               then MovedAnchor (DifferentLine 1 0) []
-               else op'
 
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
 origDelta pos pp = ss2delta (ss2posEnd pp) pos
@@ -268,7 +264,6 @@ ghcCommentText (L _ (GHC.EpaComment (EpaDocComment s) _))      = exactPrintHsDoc
 ghcCommentText (L _ (GHC.EpaComment (EpaDocOptions s) _))      = s
 ghcCommentText (L _ (GHC.EpaComment (EpaLineComment s) _))     = s
 ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
-ghcCommentText (L _ (GHC.EpaComment (EpaEofComment) _))        = ""
 
 tokComment :: LEpaComment -> Comment
 tokComment t@(L lt c) = mkComment (normaliseCommentText $ ghcCommentText t) lt (ac_prior_tok c)
@@ -283,7 +278,6 @@ comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
 mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
-mkLEpaComment "" anc r = (L anc (GHC.EpaComment (EpaEofComment) r))
 mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
 
 mkComment :: String -> Anchor -> RealSrcSpan -> Comment

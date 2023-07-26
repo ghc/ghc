@@ -374,13 +374,6 @@ data EpaCommentTok =
   | EpaDocOptions      String     -- ^ doc options (prune, ignore-exports, etc)
   | EpaLineComment     String     -- ^ comment starting by "--"
   | EpaBlockComment    String     -- ^ comment in {- -}
-  | EpaEofComment                 -- ^ empty comment, capturing
-                                  -- location of EOF
-
-  -- See #19697 for a discussion of EpaEofComment's use and how it
-  -- should be removed in favour of capturing it in the location for
-  -- 'Located HsModule' in the parser.
-
     deriving (Eq, Data, Show)
 -- Note: these are based on the Token versions, but the Token type is
 -- defined in GHC.Parser.Lexer and bringing it in here would create a loop
