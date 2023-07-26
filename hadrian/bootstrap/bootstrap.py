@@ -175,6 +175,10 @@ def resolve_dep(dep : BootstrapDep) -> Path:
     elif dep.source == PackageSource.LOCAL:
         if dep.package == 'hadrian':
             sdist_dir = Path(sys.path[0]).parent.resolve()
+        elif dep.package == 'ghc-toolchain':
+            sdist_dir = Path(sys.path[0]).parent.parent.resolve() / f'utils' / f'ghc-toolchain'
+        elif dep.package == 'ghc-platform':
+            sdist_dir = Path(sys.path[0]).parent.parent.resolve() / f'libraries' / f'ghc-platform'
         else:
             raise ValueError(f'Unknown local package {dep.package}')
     return sdist_dir
@@ -341,7 +345,7 @@ def fetch_from_plan(plan : FetchPlan, output_dir : Path):
 def gen_fetch_plan(info : BootstrapInfo) -> FetchPlan :
     sources_dict = {}
     for dep in info.dependencies:
-      if dep.package != 'hadrian':
+      if not dep.package in ['hadrian', 'ghc-platform', 'ghc-toolchain']:
         sources_dict[f"{dep.package}-{dep.version}.tar.gz"] = FetchInfo(package_url(dep.package, dep.version), dep.src_sha256)
         if dep.revision is not None:
           sources_dict[f"{dep.package}.cabal"] = FetchInfo(package_cabal_url(dep.package, dep.version, dep.revision), dep.cabal_sha256)
