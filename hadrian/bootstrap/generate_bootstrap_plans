@@ -15,14 +15,6 @@ run() {
   cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | jq --sort-keys | tee "plan-bootstrap-$ver.json"
 }
 
-#run "9_2_1" -- This is broken on ghcs-nix
-run "9_2_2"
-run "9_2_3"
-run "9_2_4"
-run "9_2_5"
-run "9_2_6"
-run "9_2_7"
-run "9_2_7"
 run "9_4_1"
 run "9_4_2"
 run "9_4_3"
