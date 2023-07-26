@@ -8,9 +8,9 @@ AC_DEFUN([FP_LINK_SUPPORTS_NO_AS_NEEDED],
     AC_MSG_CHECKING([whether Cc linker supports -Wl,--no-as-needed])
     echo 'int f(int a) {return 2*a;}' > conftest.a.c
     echo 'int f(int a); int main(int argc, char **argv) {return f(0);}' > conftest.b.c
-    $CC -c -o conftest.a.o conftest.a.c > /dev/null 2>&1
-    $CC -c -o conftest.b.o conftest.b.c > /dev/null 2>&1
-    if "$CC" "$$1" -Wl,--no-as-needed -o conftest conftest.a.o conftest.b.o > /dev/null 2>&1
+    $CC -c -o conftest.a.o conftest.a.c  2>&1
+    $CC -c -o conftest.b.o conftest.b.c  2>&1
+    if "$CC" ${$1:+$$1} -Wl,--no-as-needed -o conftest conftest.a.o conftest.b.o 2>&1
     then
         $1="$$1 -Wl,--no-as-needed"
         AC_MSG_RESULT([yes])
