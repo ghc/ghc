@@ -95,38 +95,6 @@
   ],
   "dependencies": [
     {
-      "cabal_sha256": "db25c2e17967aa6b6046ab8b1b96ba3f344ca59a62b60fb6113d51ea305a3d8e",
-      "flags": [
-        "-optimised-mixer"
-      ],
-      "package": "splitmix",
-      "revision": 2,
-      "source": "hackage",
-      "src_sha256": "6d065402394e7a9117093dbb4530a21342c9b1e2ec509516c8a8d0ffed98ecaa",
-      "version": "0.1.0.4"
-    },
-    {
-      "cabal_sha256": "dea1f11e5569332dc6c8efaad1cb301016a5587b6754943a49f9de08ae0e56d9",
-      "flags": [],
-      "package": "random",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "3e1272f7ed6a4d7bd1712b90143ec326fee9b225789222379fea20a9c90c9b76",
-      "version": "1.2.1.1"
-    },
-    {
-      "cabal_sha256": "4ce29211223d5e6620ebceba34a3ca9ccf1c10c0cf387d48aea45599222ee5aa",
-      "flags": [
-        "-old-random",
-        "+templatehaskell"
-      ],
-      "package": "QuickCheck",
-      "revision": 0,
-      "source": "hackage",
-      "src_sha256": "d87b6c85696b601175274361fa62217894401e401e150c3c5d4013ac53cd36f3",
-      "version": "2.14.2"
-    },
-    {
       "cabal_sha256": "64abad7816ab8cabed8489e29f807b3a6f828e0b2cec0eae404323d69d36df9a",
       "flags": [],
       "package": "base16-bytestring",
@@ -252,6 +220,26 @@
       "version": "0.8.0.0"
     },
     {
+      "cabal_sha256": "db25c2e17967aa6b6046ab8b1b96ba3f344ca59a62b60fb6113d51ea305a3d8e",
+      "flags": [
+        "-optimised-mixer"
+      ],
+      "package": "splitmix",
+      "revision": 2,
+      "source": "hackage",
+      "src_sha256": "6d065402394e7a9117093dbb4530a21342c9b1e2ec509516c8a8d0ffed98ecaa",
+      "version": "0.1.0.4"
+    },
+    {
+      "cabal_sha256": "dea1f11e5569332dc6c8efaad1cb301016a5587b6754943a49f9de08ae0e56d9",
+      "flags": [],
+      "package": "random",
+      "revision": 0,
+      "source": "hackage",
+      "src_sha256": "3e1272f7ed6a4d7bd1712b90143ec326fee9b225789222379fea20a9c90c9b76",
+      "version": "1.2.1.1"
+    },
+    {
       "cabal_sha256": "9ad8972c2e913c37b1d4f0e1261517fd7a1b8c8a58077e057be69837e3dbaa00",
       "flags": [
         "-debug"
@@ -287,7 +275,7 @@
     {
       "cabal_sha256": null,
       "flags": [
-        "+selftest",
+        "-selftest",
         "+threaded"
       ],
       "package": "hadrian",
