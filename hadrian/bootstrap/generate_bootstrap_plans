@@ -10,7 +10,7 @@ run() {
   local drv="ghc-$ver"
   echo "$ver"
   nix build -f "$ghcs_nix" $drv
-  (cd ../; rm -r dist-newstyle; cabal build --dry-run hadrian -w bootstrap/result/bin/ghc)
+  (cd ../; rm -r dist-newstyle; cabal build --dry-run hadrian --flags=-selftest -w bootstrap/result/bin/ghc)
   cp ../dist-newstyle/cache/plan.json "plan-$ver.json"
   cabal run --with-ghc-pkg $PWD/boot_ghc/bin/ghc-pkg -w $PWD/boot_ghc/bin/ghc -v0 hadrian-bootstrap-gen -- "plan-$ver.json" | jq --sort-keys | tee "plan-bootstrap-$ver.json"
 }
