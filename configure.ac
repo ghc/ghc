@@ -171,6 +171,14 @@ AC_ARG_ENABLE(ghc-toolchain,
 )
 AC_SUBST([EnableGhcToolchain])
 
+AC_ARG_ENABLE(strict-ghc-toolchain-check,
+[AS_HELP_STRING([--enable-strict-ghc-toolchain-check],
+                [Whether to raise an error if the output of ghc-toolchain differs from configure])],
+  [FP_CAPITALIZE_YES_NO(["$enableval"], [EnableStrictGhcToolchainCheck])],
+  [EnableStrictGhcToolchainCheck=NO]
+)
+AC_SUBST([EnableStrictGhcToolchainCheck])
+
 dnl CC_STAGE0, LD_STAGE0, AR_STAGE0 are like the "previous" variable
 dnl CC, LD, AR (inherited by CC_STAGE[123], etc.)
 dnl but instead used by stage0 for bootstrapping stage1
