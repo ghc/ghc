@@ -208,6 +208,7 @@ captureLineSpacing ds = map (\(_,_,x) -> x) $ go (map to ds)
     go [] = []
     go [d] = [d]
     go ((ls1,le1,de1):(ls2,le2,d2):ds) = (ls1,le1,de1):go ((ls2,le2,d2'):ds)
+         `debug` ("captureLineSpacing: (le1,ls2,getLoc d2,getLoc d2')=" ++ showAst (le1,ls2,getLoc d2,getLoc d2'))
       where
         d2' = setEntryDP d2 (deltaPos (ls2-le1) 0)
 
@@ -321,30 +322,39 @@ setEntryDP (L (SrcSpanAnn EpAnnNotUsed l) a) dp
   = L (SrcSpanAnn
            (EpAnn (Anchor (realSrcSpan l) (MovedAnchor dp [])) def emptyComments)
            l) a
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an (EpaComments [])) l) a) dp
+setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r UnchangedAnchor) an (EpaComments [])) l) a) dp
   = L (SrcSpanAnn
            (EpAnn (Anchor r (MovedAnchor dp [])) an (EpaComments []))
            l) a
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r (MovedAnchor d cm)) an cs) l) a) dp
+setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r (MovedAnchor d csd)) an cs) l) a) dp
   = L (SrcSpanAnn
-           (EpAnn (Anchor r (MovedAnchor d' cm)) an cs')
+           (EpAnn (Anchor r (MovedAnchor d' csd')) an cs')
            l) a
   where
-    (d',cs') = case cs of
+    (d', csd', cs') = case cs of
       EpaComments (h:t) ->
         let
           (dp0,c') = go h
         in
-          (dp0, EpaComments (c':t))
+          (dp0, c':t++csd, EpaComments [])
+      EpaComments [] ->
+          (dp, csd, cs)
       EpaCommentsBalanced (h:t) ts ->
         let
           (dp0,c') = go h
         in
-          (dp0, EpaCommentsBalanced (c':t) ts)
-      _ -> (dp, cs)
-    go (L (Anchor rr (MovedAnchor ma c0)) c) = (d,  L (Anchor rr (MovedAnchor ma c0)) c)
-    go (L (Anchor rr                   _) c) = (d,  L (Anchor rr (MovedAnchor dp [])) c)
-setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
+          (dp0, c':t++csd, EpaCommentsBalanced [] ts)
+      EpaCommentsBalanced [] ts ->
+           case csd of
+             [] -> (d, csd, EpaCommentsBalanced [] ts)
+             (h:t) ->
+                let
+                  (dp0,c') = go h
+                in
+                  (dp0, c':t, EpaCommentsBalanced [] ts)
+    go (L (Anchor rr (MovedAnchor _ c0)) c) = (d,  L (Anchor rr (MovedAnchor dp c0)) c)
+    go (L (Anchor rr                  _) c) = (d,  L (Anchor rr (MovedAnchor dp [])) c)
+setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r UnchangedAnchor) an cs) l) a) dp
   = case sortEpaComments (priorComments cs) of
       [] ->
         L (SrcSpanAnn
@@ -352,12 +362,16 @@ setEntryDP (L (SrcSpanAnn (EpAnn (Anchor r _) an cs) l) a) dp
                l) a
       (L ca c:cs') ->
         L (SrcSpanAnn
-               (EpAnn (Anchor r (MovedAnchor edp [])) an cs'')
+               (EpAnn (Anchor r (MovedAnchor edp csd)) an cs'')
                l) a
               where
-                cs'' = setPriorComments cs (L (Anchor (anchor ca) (MovedAnchor dp [])) c:cs')
+                cs'' = setPriorComments cs []
+                csd = L (Anchor (anchor ca) (MovedAnchor dp [])) c:cs'
                 lc = last $ (L ca c:cs')
-                delta = ss2delta (ss2pos $ anchor $ getLoc lc) r
+                delta = case getLoc lc of
+                          Anchor rr UnchangedAnchor -> ss2delta (ss2pos rr) r
+                          -- Anchor _ (MovedAnchor dp _) -> dp
+                          Anchor _ (MovedAnchor dp _) -> DifferentLine 1 0
                 -- cs'' = setPriorComments cs (L (EpaDelta dp []) c:cs')
                 -- lc = head $ reverse $ (L ca c:cs')
                 -- delta = case getLoc lc of
@@ -393,6 +407,7 @@ setEntryDPFromAnchor  off (EpaSpan anc _) ll@(L la _) = setEntryDP ll dp'
     --   (SrcSpanAnn EpAnnNotUsed l) -> realSrcSpan l
       -- (SrcSpanAnn (EpAnn (Anchor r' _) _ _) _) -> r'
     dp' = case la of
+      (SrcSpanAnn EpAnnNotUsed l) -> adjustDeltaForOffset off (ss2deltaEnd anc (realSrcSpan l))
       (SrcSpanAnn (EpAnn (Anchor r' UnchangedAnchor) _ _) _) -> adjustDeltaForOffset off (ss2deltaEnd anc r')
       (SrcSpanAnn (EpAnn (Anchor r' (MovedAnchor dp _)) _ _) _) -> adjustDeltaForOffset off dp
 
@@ -454,14 +469,11 @@ pushDeclDP d _dp = d
 -- ---------------------------------------------------------------------
 
 balanceCommentsList :: (Monad m) => [LHsDecl GhcPs] -> TransformT m [LHsDecl GhcPs]
-balanceCommentsList ds = balanceCommentsList'' ds
-
-balanceCommentsList'' :: (Monad m) => [LHsDecl GhcPs] -> TransformT m [LHsDecl GhcPs]
-balanceCommentsList'' [] = return []
-balanceCommentsList'' [x] = return [x]
-balanceCommentsList'' (a:b:ls) = do
+balanceCommentsList [] = return []
+balanceCommentsList [x] = return [x]
+balanceCommentsList (a:b:ls) = do
   (a',b') <- balanceComments a b
-  r <- balanceCommentsList'' (b':ls)
+  r <- balanceCommentsList (b':ls)
   return (a':r)
 
 -- |The GHC parser puts all comments appearing between the end of one AST
@@ -544,21 +556,21 @@ balanceCommentsMatch (L l (Match am mctxt pats (GRHSs xg grhss binds))) = do
   return (L l'' (Match am mctxt pats (GRHSs xg grhss' binds')))
   where
     simpleBreak (r,_) = r /= 0
-    -- an1 = l
+    an1 = l
     -- -- anc1 = addCommentOrigDeltas $ s_comments an1
     -- anc1 = s_comments an1
-    (SrcSpanAnn an1 _loc1) = l
+    -- (SrcSpanAnn an1 _loc1) = l
     -- anc1 = addCommentOrigDeltas $ epAnnComments an1
-    anc1 = comments an1
+    anc1 = s_comments an1
     cs1f = getFollowingComments anc1
     (move',stay') = break simpleBreak (trailingCommentsDeltas (anchorFromLocatedA (L l ())) cs1f)
     move = map snd move'
     stay = map snd stay'
     (l'', grhss', binds', logInfo)
       = case reverse grhss of
-          [] -> (l, [], binds,                 (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
+          [] -> (l, [], binds,                 (EpaComments [], noSrcSpanA))
           (L lg g@(GRHS EpAnnNotUsed _grs _rhs):gs)
-            -> (l, reverse (L lg g:gs), binds, (EpaComments [], SrcSpanAnn EpAnnNotUsed noSrcSpan))
+            -> (l, reverse (L lg g:gs), binds, (EpaComments [], noSrcSpanA))
           (L lg (GRHS ag grs rhs):gs) ->
             let
               anc1' = setFollowingComments anc1 stay
@@ -616,10 +628,14 @@ balanceComments' la1 la2 = do
   return (la1', la2')
   where
     simpleBreak n (r,_) = r > n
-    L (SrcSpanAnn an1 loc1) f = la1
-    L (SrcSpanAnn an2 loc2) s = la2
-    anc1 = epAnnComments an1
-    anc2 = epAnnComments an2
+    -- L (SrcSpanAnn an1 loc1) f = la1
+    -- L (SrcSpanAnn an2 loc2) s = la2
+    -- anc1 = epAnnComments an1
+    -- anc2 = epAnnComments an2
+    L an1 f = la1
+    L an2 s = la2
+    anc1 = s_comments an1
+    anc2 = s_comments an2
 
     cs1s = splitCommentsEnd (anchorFromLocatedA la1) anc1
     cs1p = priorCommentsDeltas    (anchorFromLocatedA la1) (priorComments        cs1s)
@@ -648,28 +664,30 @@ balanceComments' la1 la2 = do
 trailingCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                -> [(Int, LEpaComment)]
 trailingCommentsDeltas _ [] = []
-trailingCommentsDeltas anc (la@(L l _):las)
-  = deltaComment anc la : trailingCommentsDeltas (anchor l) las
+trailingCommentsDeltas rs (la@(L (Anchor _ (MovedAnchor dp _)) _):las)
+  = (getDeltaLine dp, la): trailingCommentsDeltas rs las
+trailingCommentsDeltas rs (la@(L l _):las)
+  = deltaComment rs la : trailingCommentsDeltas (anchor l) las
   where
-    deltaComment anc' (L loc c) = (abs(ll - al), L loc c)
+    deltaComment rs' (L loc c) = (abs(ll - al), L loc c)
       where
-        (al,_) = ss2posEnd anc'
+        (al,_) = ss2posEnd rs'
         (ll,_) = ss2pos (anchor loc)
 
 -- AZ:TODO: this is identical to commentsDeltas
 priorCommentsDeltas :: RealSrcSpan -> [LEpaComment]
                     -> [(Int, LEpaComment)]
-priorCommentsDeltas anc cs = go anc (reverse $ sortEpaComments cs)
+priorCommentsDeltas rs cs = go rs (reverse $ sortEpaComments cs)
   where
     go :: RealSrcSpan -> [LEpaComment] -> [(Int, LEpaComment)]
     go _ [] = []
-    go anc' (la@(L l@(Anchor _ (MovedAnchor dp _)) _):las) = (deltaLine dp, la) : go (anchor l) las
-    go anc' (la@(L l _):las) = deltaComment anc' la : go (anchor l) las
+    go rs' (la@(L l@(Anchor _ (MovedAnchor dp _)) _):las) = (deltaLine dp, la) : go (anchor l) las
+    go rs' (la@(L l _):las) = deltaComment rs' la : go (anchor l) las
 
     deltaComment :: RealSrcSpan -> LEpaComment -> (Int, LEpaComment)
-    deltaComment anc' (L loc c) = (abs(ll - al), L loc c)
+    deltaComment rs' (L loc c) = (abs(ll - al), L loc c)
       where
-        (al,_) = ss2pos anc'
+        (al,_) = ss2pos rs'
         (ll,_) = ss2pos (anchor loc)
 
 
@@ -719,7 +737,7 @@ moveLeadingComments from@(L (SrcSpanAnn EpAnnNotUsed _) _) to = (from, to)
 moveLeadingComments (L la a) lb = (L la' a, lb')
   `debug` ("moveLeadingComments: (before, after, la', lb'):" ++ showAst (before, after, la', lb'))
   where
-    split = splitCommentsEnd (realSrcSpan $ locA la) (epAnnComments $ ann la)
+    split = splitCommentsEnd (realSrcSpan $ locA la) (s_comments la)
     before = sortEpaComments $ priorComments split
     after = sortEpaComments $ getFollowingComments split
 
@@ -756,26 +774,6 @@ anchorFromLocatedA (L (SrcSpanAnn an loc) _)
       EpAnnNotUsed    -> realSrcSpan loc
       (EpAnn anc _ _) -> anchor anc
 
--- -- | A GHC comment includes the span of the preceding token.  Take an
--- -- original comment, and convert the 'Anchor to have a have a
--- -- `MovedAnchor` operation based on the original location, only if it
--- -- does not already have one.
--- commentOrigDelta :: LEpaComment -> LEpaComment
--- commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
---   = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
---                   `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
---   where
---         (r,c) = ss2posEnd pp
-
---         op' = if r == 0
---                then MovedAnchor (ss2delta (r,c+1) la) []
---                -- then MovedAnchor (ss2delta (r,c+0) la)
---                -- else MovedAnchor (ss2delta (r,c)   la)
---                else MovedAnchor (ss2delta (r,c)   la) []
---         op = if t == EpaEofComment && op' == MovedAnchor (SameLine 0) []
---                then MovedAnchor (DifferentLine 1 0) []
---                else op'
-
 -- ---------------------------------------------------------------------
 
 balanceSameLineComments :: (Monad m)
@@ -791,12 +789,12 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
       (L lg g@(GRHS EpAnnNotUsed _gs _rhs):grs) -> (la,reverse $ (L lg g):grs,[])
       (L lg (GRHS ga gs rhs):grs) -> (la'',reverse $ (L lg (GRHS ga' gs rhs)):grs,[(gac,(csp,csf))])
         where
-          (SrcSpanAnn an1 _loc1) = la
+          -- (SrcSpanAnn an1 _loc1) = la
           -- anc1 = addCommentOrigDeltas $ epAnnComments an1
-          anc1 = comments an1
-          -- an1 = la
-          -- -- anc1 = addCommentOrigDeltas $ s_comments an1
-          -- anc1 = s_comments an1
+          -- anc1 = comments an1
+          an1 = la
+          -- anc1 = addCommentOrigDeltas $ s_comments an1
+          anc1 = s_comments an1
           (EpAnn anc an _) = ga :: EpAnn GrhsAnn
           (csp,csf) = case anc1 of
             EpaComments cs -> ([],cs)
@@ -812,8 +810,7 @@ balanceSameLineComments (L la (Match anm mctxt pats (GRHSs x grhss lb))) = do
           gac' = setFollowingComments gac (sortEpaComments $ gfc ++ move)
           ga' = (EpAnn anc an gac')
 
-          an1' = setCommentsSrcAnn la cs1
-          la'' = an1'
+          la'' = setCommentsSrcAnn la cs1
 
 -- ---------------------------------------------------------------------
 
@@ -1176,46 +1173,6 @@ unpackFunDecl :: LHsDecl GhcPs -> LHsDecl GhcPs
 unpackFunDecl (L l (ValD x b)) = L l' (ValD x b')
   where
     L l' b' = unpackFunBind (L l b)
-
--- TODO: Move to Annotation.hs
-
--- transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
--- transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
---   = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
--- transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
---   = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
---   where
---     pc = priorComments cs1
---     fc = getFollowingComments cs1
---     cs1' = setFollowingComments emptyComments fc
---     cs2' = setPriorComments emptyComments pc
--- transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
---   = (SrcSpanAnn (EpAnn a1 an1 cs1') l1, SrcSpanAnn (EpAnn a2 an2 cs2') l2)
---       `debug` ("transferPriorCommentsA: ((cs1, cs2), (cs1', cs2'))=" ++ showAst ((cs1, cs2), (cs1', cs2')))
---   where
---     pc = priorComments cs1
---     fc = getFollowingComments cs1
---     cs1' = setFollowingComments emptyComments fc
---     cs2' = setPriorComments cs2 (priorComments cs2 <> pc)
-
--- transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
--- transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
---   = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
--- transferFollowingA (SrcSpanAnn (EpAnn a1 _ cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
---   = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
---   where
---     pc = priorComments cs1
---     fc = getFollowingComments cs1
---     cs1' = setPriorComments emptyComments pc
---     cs2' = setFollowingComments emptyComments fc
--- transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
---   = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
---       `debug` ("transferFollowingA: (pc,fc,cs1', cs2')=" ++ showAst (pc,fc,cs1', cs2'))
---   where
---     pc = priorComments cs1
---     fc = getFollowingComments cs1
---     cs1' = setPriorComments emptyComments pc
---     cs2' = setFollowingComments cs2 fc
 
 -- ---------------------------------------------------------------------
 

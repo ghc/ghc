@@ -56,7 +56,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
- -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
+ "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
@@ -64,7 +64,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn3b.hs" (Just changeWhereIn3b)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl1.hs" (Just addLocaLDecl1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl2.hs" (Just addLocaLDecl2)
- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl3.hs" (Just addLocaLDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl4.hs" (Just addLocaLDecl4)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl5.hs" (Just addLocaLDecl5)
  -- "../../testsuite/tests/ghc-api/exactprint/AddLocalDecl6.hs" (Just addLocaLDecl6)
@@ -413,7 +413,8 @@ changeRename2 _libdir parsed = return (rename "joe" [((2,1),(2,5))] parsed)
 
 rename :: (Data a, ExactPrint a) => String -> [(Pos, Pos)] -> a -> a
 rename newNameStr spans' a
-  = everywhere (mkT replaceRdr) (makeDeltaAst a)
+  -- = everywhere (mkT replaceRdr) (makeDeltaAst a)
+  = everywhere (mkT replaceRdr) a
   where
     newName = mkRdrUnqual (mkVarOcc newNameStr)
 
@@ -429,7 +430,8 @@ rename newNameStr spans' a
 
 changeWhereIn4 :: Changer
 changeWhereIn4 _libdir parsed
-  = return (everywhere (mkT replace) (makeDeltaAst parsed))
+  -- = return (everywhere (mkT replace) (makeDeltaAst parsed))
+  = return (everywhere (mkT replace) parsed)
   where
     replace :: LocatedN RdrName -> LocatedN RdrName
     replace (L ln _n)
@@ -476,8 +478,8 @@ changeAddDecl1 libdir top = do
 changeAddDecl2 :: Changer
 changeAddDecl2 libdir top = do
   Right decl <- withDynFlags libdir (\df -> parseDecl df "<interactive>" "nn = n2")
-  -- let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
-  let decl' = setEntryDP decl (DifferentLine 2 0)
+  let decl' = setEntryDP (makeDeltaAst decl) (DifferentLine 2 0)
+  -- let decl' = setEntryDP decl (DifferentLine 2 0)
 
   let (p',_,_) = runTransform doAddDecl
       -- doAddDecl = everywhereM (mkM replaceTopLevelDecls) (makeDeltaAst top)
@@ -728,7 +730,8 @@ addLocaLDecl6 libdir lp = do
 rmDecl1 :: Changer
 rmDecl1 _libdir top = do
   let doRmDecl = do
-         let lp = makeDeltaAst top
+         -- let lp = makeDeltaAst top
+         let lp = top
          tlDecs0 <- hsDecls lp
          tlDecs' <- balanceCommentsList tlDecs0
          let tlDecs = captureLineSpacing tlDecs'
