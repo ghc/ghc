@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.20.0.0 *TBA*
+  * Add a `RULE` to `Prelude.lookup`, allowing it to participate in list fusion ([CLC proposal #174](https://github.com/haskell/core-libraries-committee/issues/175))
+
 ## 4.19.0.0 *TBA*
   * Add `{-# WARNING in "x-partial" #-}` to `Data.List.{head,tail}`.
     Use `{-# OPTIONS_GHC -Wno-x-partial #-}` to disable it.

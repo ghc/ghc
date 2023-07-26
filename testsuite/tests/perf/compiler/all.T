@@ -690,3 +690,8 @@ test('T22744',
      ],
      multimod_compile,
      ['T22744', '-v0'])
+
+test ('LookupFusion',
+      [collect_stats('bytes allocated',2), when(wordsize(32), skip)],
+      compile_and_run,
+      ['-O2 -package base'])

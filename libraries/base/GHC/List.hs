@@ -1405,6 +1405,11 @@ lookup _key []          =  Nothing
 lookup  key ((x,y):xys)
     | key == x           =  Just y
     | otherwise         =  lookup key xys
+{-# NOINLINE [1] lookup #-} -- see Note [Fusion for lookup]
+{-# RULES
+"lookup/build" forall x (g :: forall b. ((k, a) -> b -> b) -> b -> b).
+  lookup x (build g) = g (\(k, v) r -> if x == k then Just v else r) Nothing
+#-}
 
 -- | Map a function returning a list over a list and concatenate the results.
 -- 'concatMap' can be seen as the composition of 'concat' and 'map'.
@@ -1609,6 +1614,15 @@ NB: Zips for larger tuples are in the List module.
   happens in phase 1.
 
   Ditto rule "zipWithList".
+
+Note [Fusion for lookup]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Implementing lookup with foldr has the potential to cause code duplication
+if fusion doesn't occur, so we use RULES instead so that lookup can participate
+in list fusion.
+The NONINLINE pragma gives the RULE a chance to fire.
+It's recursive, so won't inline anyway, but saying so is more explicit.
+See the discussion in https://gitlab.haskell.org/ghc/ghc/-/merge_requests/10715/
 -}
 
 ----------------------------------------------
