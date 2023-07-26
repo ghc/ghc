@@ -3821,7 +3821,7 @@ pseudoop   "coerce"
      This function is representation-polymorphic, but the
      'RuntimeRep' type argument is marked as 'Inferred', meaning
      that it is not available for visible type application. This means
-     the typechecker will accept @'coerce' @'Int' @Age 42@.
+     the typechecker will accept @'coerce' \@'Int' \@Age 42@.
    }
 
 ------------------------------------------------------------------------
