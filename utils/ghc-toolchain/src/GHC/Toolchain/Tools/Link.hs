@@ -55,11 +55,11 @@ findCcLink target progOpt ldOverride archOs cc readelf = checking "for C compile
                      Nothing -> do
                          -- If not then try to find decent linker flags
                          findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
-  ccLinkProgram <- linkSupportsTarget cc target ccLinkProgram
-  ccLinkSupportsNoPie         <- checkSupportsNoPie            ccLinkProgram
+  ccLinkProgram <- linkSupportsTarget archOs cc target ccLinkProgram
+  ccLinkSupportsNoPie         <- checkSupportsNoPie  ccLinkProgram
   ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
-  ccLinkSupportsFilelist      <- checkSupportsFilelist      cc ccLinkProgram
-  ccLinkIsGnu                 <- checkLinkIsGnu                ccLinkProgram
+  ccLinkSupportsFilelist      <- checkSupportsFilelist cc ccLinkProgram
+  ccLinkIsGnu                 <- checkLinkIsGnu archOs ccLinkProgram
   checkBfdCopyBug archOs cc readelf ccLinkProgram
   ccLinkProgram <- addPlatformDepLinkFlags archOs cc ccLinkProgram
   let ccLink = CcLink {ccLinkProgram, ccLinkSupportsNoPie,
@@ -87,8 +87,13 @@ findLinkFlags enableOverride cc ccLink
   | otherwise =
     return ccLink
 
-linkSupportsTarget :: Cc -> String -> Program -> M Program
-linkSupportsTarget cc target link
+linkSupportsTarget :: ArchOS -> Cc -> String -> Program -> M Program
+-- Javascript toolchain provided by emsdk just ignores --target flag so
+-- we have this special case to match with ./configure (#23744)
+linkSupportsTarget archOS _ _ c
+  | ArchJavaScript <- archOS_arch archOS
+  = return c
+linkSupportsTarget _ cc target link
   = checking "whether cc linker supports --target" $
     supportsTarget (Lens id const) (checkLinkWorks cc) target link
 
@@ -170,8 +175,11 @@ checkLinkWorks cc ccLink = withTempDir $ \dir -> do
       -- Linking in windows might produce an executable with an ".exe" extension
       <|> expectFileExists (out <.> "exe") err
 
-checkLinkIsGnu :: Program -> M Bool
-checkLinkIsGnu ccLink = do
+checkLinkIsGnu :: ArchOS -> Program -> M Bool
+checkLinkIsGnu archOs _
+  -- emsdk is never going to provide gnu ld (See #23744)
+  | ArchJavaScript <- archOS_arch archOs = return False
+checkLinkIsGnu _ ccLink = do
   out <- readProgramStdout ccLink ["-Wl,--version"]
   return ("GNU" `isInfixOf` out)
 
