@@ -57,7 +57,7 @@ findCcLink target progOpt ldOverride archOs cc readelf = checking "for C compile
                          findLinkFlags ldOverride cc rawCcLink <|> pure rawCcLink
   ccLinkProgram <- linkSupportsTarget cc target ccLinkProgram
   ccLinkSupportsNoPie         <- checkSupportsNoPie            ccLinkProgram
-  ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind cc ccLinkProgram
+  ccLinkSupportsCompactUnwind <- checkSupportsCompactUnwind archOs cc ccLinkProgram
   ccLinkSupportsFilelist      <- checkSupportsFilelist      cc ccLinkProgram
   ccLinkIsGnu                 <- checkLinkIsGnu                ccLinkProgram
   checkBfdCopyBug archOs cc readelf ccLinkProgram
@@ -124,16 +124,18 @@ checkSupportsNoPie ccLink = checking "whether the cc linker supports -no-pie" $
 -- * Check if compiling for darwin
 -- * Then do the check
 -- * Otherwise say its just not supported
-checkSupportsCompactUnwind :: Cc -> Program -> M Bool
-checkSupportsCompactUnwind cc ccLink = checking "whether the cc linker understands -no_compact_unwind" $
-  withTempDir $ \dir -> do
-    let test_o  = dir </> "test.o"
-        test2_o = dir </> "test2.o"
+checkSupportsCompactUnwind :: ArchOS -> Cc -> Program -> M Bool
+checkSupportsCompactUnwind archOs cc ccLink
+  | OSDarwin <- archOS_OS archOs = checking "whether the cc linker understands -no_compact_unwind" $
+      withTempDir $ \dir -> do
+        let test_o  = dir </> "test.o"
+            test2_o = dir </> "test2.o"
 
-    compileC cc test_o "int foo() { return 0; }"
+        compileC cc test_o "int foo() { return 0; }"
 
-    exitCode <- runProgram ccLink ["-r", "-Wl,-no_compact_unwind", "-o", test2_o, test_o]
-    return $ isSuccess exitCode
+        exitCode <- runProgram ccLink ["-r", "-Wl,-no_compact_unwind", "-o", test2_o, test_o]
+        return $ isSuccess exitCode
+  | otherwise = return False
 
 checkSupportsFilelist :: Cc -> Program -> M Bool
 checkSupportsFilelist cc ccLink = checking "whether the cc linker understands -filelist" $
