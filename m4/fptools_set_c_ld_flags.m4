@@ -19,7 +19,7 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 
     # See Note [ELF needed shared libs]
     case $$1 in
-    *-linux|*-freebsd*)
+    *-linux*|*-freebsd*)
         FP_LINK_SUPPORTS_NO_AS_NEEDED([$3])
         ;;
     esac
