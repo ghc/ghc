@@ -24,7 +24,11 @@ AC_DEFUN([ENABLE_GHC_TOOLCHAIN_ARG],
 [
     if test "$2" = "YES"; then
         echo "--enable-$1" >> acargs
+    elif test "$2" = "yes"; then
+        echo "--enable-$1" >> acargs
     elif test "$2" = "NO"; then
+        echo "--disable-$1" >> acargs
+    elif test "$2" = "no"; then
         echo "--disable-$1" >> acargs
     fi
 ])
@@ -34,6 +38,10 @@ AC_DEFUN([ENABLE_GHC_TOOLCHAIN_NOT_ARG],
     if test "$2" = "NO"; then
         echo "--enable-$1" >> acargs
     elif test "$2" = "YES"; then
+        echo "--disable-$1" >> acargs
+    elif test "$2" = "no"; then
+        echo "--enable-$1" >> acargs
+    elif test "$2" = "yes"; then
         echo "--disable-$1" >> acargs
     fi
 ])
