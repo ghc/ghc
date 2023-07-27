@@ -309,6 +309,15 @@ archHasNativeAdjustors = \case
   _          -> False
 
 
+-- | The platforms which we attempt to override ld
+ldOverrideWhitelist :: ArchOS -> Bool
+ldOverrideWhitelist a =
+  case archOS_OS a of
+    OSLinux   -> True
+    OSMinGW32 -> True
+    _ -> False
+
+
 mkTarget :: Opts -> M Target
 mkTarget opts = do
     -- Use Llvm target if specified, otherwise use triple as llvm target
@@ -320,7 +329,7 @@ mkTarget opts = do
     (archOs, tgtVendor) <- parseTriple cc0 (optTriple opts)
     cc <- addPlatformDepCcFlags archOs cc0
     readelf <- optional $ findReadelf (optReadelf opts)
-    ccLink <- findCcLink tgtLlvmTarget (optCcLink opts) (fromMaybe True (optLdOverride opts)) archOs cc readelf
+    ccLink <- findCcLink tgtLlvmTarget (optCcLink opts) (fromMaybe (ldOverrideWhitelist archOs) (optLdOverride opts)) archOs cc readelf
 
     ar <- findAr tgtVendor (optAr opts)
     -- TODO: We could have
