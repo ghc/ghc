@@ -138,6 +138,9 @@ the right names for them:
   * `runtest.opts` defines extra arguments passed to `runtest.py` when
     invoked via the `hadrian test` target.
 
+  * `haddock.build-package.opts` defines arguments to be passed to Haddock
+    when building documentation.
+
 - using a wildcard (`*`) ranges over all possible values for a given "slot";
 - `=` entirely overrides the arguments for a given builder in a given context,
   with the value specified on the right hand side of `=`, while `+=` merely

@@ -555,6 +555,7 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
        BM_CabalConfigure -> builder (Cabal Setup)
        BM_RunTest        -> builder Testsuite
        BM_Hsc2HsRun      -> builder Hsc2Hs
+       BM_Haddock        -> builder (Haddock BuildPackage)
     )
   )
 
@@ -566,6 +567,7 @@ data BuilderMode = BM_Ghc (Wildcard GhcMode)
                  | BM_CabalConfigure
                  | BM_Hsc2HsRun
                  | BM_RunTest
+                 | BM_Haddock
 
 -- | Interpretation-agnostic description of the builder settings
 --   supported by Hadrian.
@@ -606,6 +608,7 @@ builderSetting =
              , str "cc" *> fmap BM_Cc (wild ccBuilder) <* str "opts"
              , BM_CabalConfigure <$ str "cabal" <* str "configure" <* str "opts"
              , BM_Hsc2HsRun <$ str "hsc2hs" <* str "run" <* str "opts"
+             , BM_Haddock   <$ str "haddock" <* str "build-package" <* str "opts"
              ]
     , (Wildcard, Wildcard, BM_RunTest)
       <$ str "runtest" <* str "opts"
