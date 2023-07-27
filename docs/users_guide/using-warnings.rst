@@ -1926,6 +1926,25 @@ of ``-W(no-)*``.
 
     would report ``a`` and ``c`` as unused.
 
+.. ghc-flag:: -Wunused-foreaches
+    :shortdesc: warn about type variables in ``foreach``\\es that are unused
+    :type: dynamic
+    :reverse: -Wno-unused-foreaches
+    :category:
+
+    :since: 9.12
+
+    .. index::
+       single: unused foralls, warning
+       single: foralls, unused
+
+    Report all unused type variables which arise from explicit, user-written
+    ``foreach`` statements. For instance: ::
+
+        g :: foreach a b c. (b -> b)
+
+    would report ``a`` and ``c`` as unused.
+
 .. ghc-flag:: -Wunused-record-wildcards
     :shortdesc: Warn about record wildcard matches when none of the bound variables
       are used.

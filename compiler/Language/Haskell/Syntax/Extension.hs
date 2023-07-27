@@ -684,6 +684,8 @@ type family XXTyLit          x
 -- HsForAllTelescope type families
 type family XHsForAllVis        x
 type family XHsForAllInvis      x
+type family XHsForEachVis       x
+type family XHsForEachInvis     x
 type family XXHsForAllTelescope x
 
 -- ---------------------------------------------------------------------

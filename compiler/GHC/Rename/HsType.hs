@@ -1112,8 +1112,14 @@ bindHsForAllTelescope doc tele thing_inside =
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
         thing_inside $ mkHsForAllInvisTele noAnn bndrs'
+    HsForEachVis { hsf_retained_vis_bndrs = bndrs } ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
+        thing_inside $ mkHsForEachVisTele noAnn bndrs'
+    HsForEachInvis { hsf_retained_invis_bndrs = bndrs } ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
+        thing_inside $ mkHsForEachInvisTele noAnn bndrs'
 
--- | Should GHC warn if a quantified type variable goes unused? Usually, the
+-- | Should GHC warn if an irrelevant quantified type variable goes unused? Usually, the
 -- answer is \"yes\", but in the particular case of binding 'LHsQTyVars', we
 -- avoid emitting warnings.
 -- See @Note [Suppress -Wunused-foralls when binding LHsQTyVars]@.
@@ -1984,6 +1990,10 @@ extract_hs_for_all_telescope tele acc_vars body_fvs =
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
       extract_hs_tv_bndrs bndrs acc_vars body_fvs
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs acc_vars body_fvs
+    HsForEachVis { hsf_retained_vis_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs acc_vars body_fvs
+    HsForEachInvis { hsf_retained_invis_bndrs = bndrs } ->
       extract_hs_tv_bndrs bndrs acc_vars body_fvs
 
 extractHsOuterTvBndrs :: HsOuterTyVarBndrs flag GhcPs

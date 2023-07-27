@@ -211,6 +211,8 @@ instance Diagnostic PsMessage where
       -> mkSimpleDecorated $ text "Fields cannot be qualified when OverloadedRecordUpdate is enabled"
     PsErrExplicitForall is_unicode
       -> mkSimpleDecorated $ text "Illegal symbol" <+> quotes (forallSym is_unicode) <+> text "in type"
+    PsErrForeach is_unicode
+      -> mkSimpleDecorated $ text "Illegal symbol" <+> quotes (foreachSym is_unicode) <+> text "in type"
     PsErrIllegalQualifiedDo qdoDoc
       -> mkSimpleDecorated $
            text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
@@ -551,6 +553,7 @@ instance Diagnostic PsMessage where
     PsErrIllegalPatSynExport                      -> ErrorWithoutFlag
     PsErrOverloadedRecordUpdateNoQualifiedFields  -> ErrorWithoutFlag
     PsErrExplicitForall{}                         -> ErrorWithoutFlag
+    PsErrForeach{}                                -> ErrorWithoutFlag
     PsErrIllegalQualifiedDo{}                     -> ErrorWithoutFlag
     PsErrQualifiedDoInCmd{}                       -> ErrorWithoutFlag
     PsErrRecordSyntaxInPatSynDecl{}               -> ErrorWithoutFlag
@@ -688,6 +691,7 @@ instance Diagnostic PsMessage where
       let info = text "or a similar language extension to enable explicit-forall syntax:" <+>
                  forallSym is_unicode <+> text "<tvs>. <type>"
       in [ suggestExtensionWithInfo info LangExt.RankNTypes ]
+    PsErrForeach is_unicode                       -> [suggestExtension LangExt.Foreach]
     PsErrIllegalQualifiedDo{}                     -> [suggestExtension LangExt.QualifiedDo]
     PsErrQualifiedDoInCmd{}                       -> noHints
     PsErrRecordSyntaxInPatSynDecl{}               -> noHints
@@ -869,6 +873,10 @@ parse_error_in_pat = text "Parse error in pattern:"
 forallSym :: Bool -> SDoc
 forallSym True  = text "∀"
 forallSym False = text "forall"
+
+foreachSym :: Bool -> SDoc
+foreachSym True  = text "∏"
+foreachSym False = text "foreach"
 
 pprFileHeaderPragmaType :: FileHeaderPragmaType -> SDoc
 pprFileHeaderPragmaType OptionsPrag    = text "OPTIONS"

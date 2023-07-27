@@ -1489,6 +1489,8 @@ getForAllTeleLoc tele =
   case tele of
     HsForAllVis{ hsf_vis_bndrs } -> getLHsTyVarBndrsLoc hsf_vis_bndrs
     HsForAllInvis { hsf_invis_bndrs } -> getLHsTyVarBndrsLoc hsf_invis_bndrs
+    HsForEachVis{ hsf_retained_vis_bndrs } -> getLHsTyVarBndrsLoc hsf_retained_vis_bndrs
+    HsForEachInvis { hsf_retained_invis_bndrs } -> getLHsTyVarBndrsLoc hsf_retained_invis_bndrs
 
 getLHsTyVarBndrsLoc :: [LHsTyVarBndr flag GhcPs] -> SrcSpan
 getLHsTyVarBndrsLoc bndrs = foldr combineSrcSpans noSrcSpan $ map getLocA bndrs

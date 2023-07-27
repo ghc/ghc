@@ -608,6 +608,7 @@ data WarningFlag =
    | Opt_WarnUnusedMatches
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
+   | Opt_WarnUnusedForeaches
    | Opt_WarnUnusedRecordWildcards
    | Opt_WarnRedundantBangPatterns
    | Opt_WarnRedundantRecordWildcards
@@ -757,6 +758,7 @@ warnFlagNames wflag = case wflag of
   Opt_WarnUntickedPromotedConstructors            -> "unticked-promoted-constructors" :| []
   Opt_WarnUnusedDoBind                            -> "unused-do-bind" :| []
   Opt_WarnUnusedForalls                           -> "unused-foralls" :| []
+  Opt_WarnUnusedForeaches                         -> "unused-foreaches" :| []
   Opt_WarnUnusedImports                           -> "unused-imports" :| []
   Opt_WarnUnusedLocalBinds                        -> "unused-local-binds" :| []
   Opt_WarnUnusedMatches                           -> "unused-matches" :| []
@@ -967,7 +969,8 @@ minusWallOpts
         Opt_WarnRedundantRecordWildcards,
         Opt_WarnIncompleteUniPatterns,
         Opt_WarnIncompletePatternsRecUpd,
-        Opt_WarnIncompleteExportWarnings
+        Opt_WarnIncompleteExportWarnings,
+        Opt_WarnUnusedForeaches
       ]
 
 -- | Things you get with -Weverything, i.e. *all* known warnings flags

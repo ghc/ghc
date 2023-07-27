@@ -1633,6 +1633,11 @@ instance Diagnostic TcRnMessage where
            vcat [ text "Unused quantified type variable" <+> quotes (ppr tyVar)
                 , inHsDocContext doc ]
 
+    TcRnUnusedQuantifiedRetainedTypeVar doc tyVar
+      -> mkSimpleDecorated $
+           vcat [ text "Unused quantified retained type variable" <+> quotes (ppr tyVar)
+                , inHsDocContext doc ]
+
     TcRnDataKindsError typeOrKind thing
       -> mkSimpleDecorated $
            text "Illegal" <+> (text $ levelString typeOrKind) <> colon <+> quotes (ppr thing)
@@ -2353,6 +2358,8 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnUnusedQuantifiedTypeVar{}
       -> WarningWithFlag Opt_WarnUnusedForalls
+    TcRnUnusedQuantifiedRetainedTypeVar{}
+      -> WarningWithFlag Opt_WarnUnusedForeaches
     TcRnDataKindsError{}
       -> ErrorWithoutFlag
     TcRnTypeSynonymCycle{}
@@ -2996,6 +3003,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalKindSignature{}
       -> [suggestExtension LangExt.KindSignatures]
     TcRnUnusedQuantifiedTypeVar{}
+      -> noHints
+    TcRnUnusedQuantifiedRetainedTypeVar{}
       -> noHints
     TcRnDataKindsError{}
       -> [suggestExtension LangExt.DataKinds]

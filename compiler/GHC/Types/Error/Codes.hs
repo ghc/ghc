@@ -189,6 +189,8 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrIllegalPatSynExport"                      = 89515
   GhcDiagnosticCode "PsErrOverloadedRecordUpdateNoQualifiedFields"  = 94863
   GhcDiagnosticCode "PsErrExplicitForall"                           = 25955
+  -- XXX JB do we need this? probably depends on whether foreach is a keyword without extension
+  GhcDiagnosticCode "PsErrForeach"                                  = 13790
   GhcDiagnosticCode "PsErrIllegalQualifiedDo"                       = 40280
   GhcDiagnosticCode "PsErrQualifiedDoInCmd"                         = 54089
   GhcDiagnosticCode "PsErrRecordSyntaxInPatSynDecl"                 = 28021
@@ -437,6 +439,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnUnexpectedKindVar"                         = 12875
   GhcDiagnosticCode "TcRnNegativeNumTypeLiteral"                    = 93632
   GhcDiagnosticCode "TcRnUnusedQuantifiedTypeVar"                   = 54180
+  GhcDiagnosticCode "TcRnUnusedQuantifiedRetainedTypeVar"           = 92717
   GhcDiagnosticCode "TcRnMissingRoleAnnotation"                     = 65490
 
   GhcDiagnosticCode "TcRnUntickedPromotedThing"                     = 49957

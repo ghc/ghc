@@ -328,8 +328,10 @@ no_anon_wc_ty lty = go lty
 
 no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
 no_anon_wc_tele tele = case tele of
-  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
-  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForAllVis    { hsf_vis_bndrs            = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForAllInvis  { hsf_invis_bndrs          = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForEachVis   { hsf_retained_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForEachInvis { hsf_retained_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
 
 no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
 no_anon_wc_tvb (L _ tvb) = case tvb of

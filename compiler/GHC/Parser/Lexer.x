@@ -832,6 +832,7 @@ data Token
   | ITwhere
 
   | ITforall            IsUnicodeSyntax -- GHC extension keywords
+  | ITforeach           IsUnicodeSyntax
   | ITexport
   | ITlabel
   | ITdynamic
@@ -1093,6 +1094,7 @@ reservedWordsFM = listToUFM $
          ( "where",          ITwhere,         0 ),
 
          ( "forall",         ITforall NormalSyntax, 0),
+         ( "foreach",        ITforeach NormalSyntax, xbit ForeachBit),
          ( "mdo",            ITmdo Nothing,   xbit RecursiveDoBit),
              -- See Note [Lexing type pseudo-keywords]
          ( "family",         ITfamily,        0 ),
@@ -1171,6 +1173,7 @@ reservedSymsFM = listToUFM $
        ,("∷",   ITdcolon UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("⇒",   ITdarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("∀",   ITforall UnicodeSyntax,     UnicodeSyntax, 0 )
+       ,("∏",   ITforeach UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("→",   ITrarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("←",   ITlarrow UnicodeSyntax,     UnicodeSyntax, 0 )
 
@@ -3000,6 +3003,7 @@ data ExtBits
   | IpBit
   | OverloadedLabelsBit -- #x overloaded labels
   | ExplicitForallBit -- the 'forall' keyword
+  | ForeachBit -- the 'foreach' keyword
   | BangPatBit -- Tells the parser to understand bang-patterns
                -- (doesn't affect the lexer)
   | PatternSynonymsBit -- pattern synonyms

@@ -1759,6 +1759,10 @@ instance ToHie (LocatedA (HsType GhcRn)) where
               toHie $ tvScopes (ResolvedScopes []) scope bndrs
             HsForAllInvis { hsf_invis_bndrs = bndrs } ->
               toHie $ tvScopes (ResolvedScopes []) scope bndrs
+            HsForEachVis { hsf_retained_vis_bndrs = bndrs } ->
+              toHie $ tvScopes (ResolvedScopes []) scope bndrs
+            HsForEachInvis { hsf_retained_invis_bndrs = bndrs } ->
+              toHie $ tvScopes (ResolvedScopes []) scope bndrs
         , toHie body
         ]
       HsQualTy _ ctx body ->

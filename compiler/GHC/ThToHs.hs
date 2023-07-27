@@ -2021,8 +2021,12 @@ mkHsForAllTy loc tele rho_ty
                                    , hst_body = rho_ty }
   where
     no_tvs = case tele of
-      HsForAllVis   { hsf_vis_bndrs   = bndrs } -> null bndrs
-      HsForAllInvis { hsf_invis_bndrs = bndrs } -> null bndrs
+      HsForAllVis    { hsf_vis_bndrs            = bndrs } -> null bndrs
+      HsForAllInvis  { hsf_invis_bndrs          = bndrs } -> null bndrs
+      HsForEachVis   { hsf_retained_vis_bndrs   = bndrs } -> null bndrs
+      HsForEachInvis { hsf_retained_invis_bndrs = bndrs } -> null bndrs
+-- XXX JB make sure we can also generate foreach using template haskell
+-- XXX JB did @rae have a better term in mind than "relevant"?
 
 -- | If passed an empty 'TH.Cxt', this simply returns the third argument
 -- (an 'LHsType'). Otherwise, return an 'HsQualTy' using the provided

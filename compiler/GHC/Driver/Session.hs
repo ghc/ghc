@@ -2226,6 +2226,7 @@ wWarningFlagsDeps = mconcat [
   warnSpec    Opt_WarnUntickedPromotedConstructors,
   warnSpec    Opt_WarnUnusedDoBind,
   warnSpec    Opt_WarnUnusedForalls,
+  warnSpec    Opt_WarnUnusedForeaches,
   warnSpec    Opt_WarnUnusedImports,
   warnSpec    Opt_WarnUnusedLocalBinds,
   warnSpec    Opt_WarnUnusedMatches,
@@ -2705,6 +2706,7 @@ xFlagsDeps = [
     not
          "You can't turn off RelaxedPolyRec any more",
   flagSpec "RequiredTypeArguments"            LangExt.RequiredTypeArguments,
+  flagSpec "Foreach"                          LangExt.Foreach,
   flagSpec "RoleAnnotations"                  LangExt.RoleAnnotations,
   flagSpec "ScopedTypeVariables"              LangExt.ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               LangExt.StandaloneDeriving,

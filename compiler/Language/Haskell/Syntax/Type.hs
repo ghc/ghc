@@ -336,6 +336,17 @@ data HsForAllTelescope pass
     { hsf_xinvis       :: XHsForAllInvis pass
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
     }
+  | HsForEachVis -- ^ A visible @foreach@ (e.g., @foreach a -> {...}@).
+                 --   These do not have any notion of specificity, so we use
+                 --   '()' as a placeholder value.
+    { hsf_xretained_vis      :: XHsForEachVis pass
+    , hsf_retained_vis_bndrs :: [LHsTyVarBndr () pass]
+    }
+  | HsForEachInvis -- ^ An invisible @foreach@ (e.g., @foreach a b c. {...}@),
+                   --   where each binder has a 'Specificity'.
+    { hsf_xretained_invis       :: XHsForEachInvis pass
+    , hsf_retained_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
+    }
   | XHsForAllTelescope !(XXHsForAllTelescope pass)
 
 -- | Located Haskell Type Variable Binder

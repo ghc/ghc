@@ -449,7 +449,7 @@ data TcRnMessage where
   TcRnUnusedPatternBinds :: HsBind GhcRn -> TcRnMessage
 
   {-| TcRnUnusedQuantifiedTypeVar is a warning that occurs if there are unused
-      quantified type variables.
+      quantified erased type variables.
 
       Examples:
         f :: forall a. Int -> Char
@@ -458,6 +458,17 @@ data TcRnMessage where
                   rename/should_compile/T5331
   -}
   TcRnUnusedQuantifiedTypeVar
+    :: HsDocContext
+    -> HsTyVarBndrExistentialFlag -- ^ tyVar binder.
+    -> TcRnMessage
+
+  {-| TcRnUnusedRevelantQuantifiedTypeVar is a warning that occurs if there are unused
+      quantified retained type variables.
+
+      Examples:
+        f :: foreach a. Int -> Char
+  -}
+  TcRnUnusedQuantifiedRetainedTypeVar
     :: HsDocContext
     -> HsTyVarBndrExistentialFlag -- ^ tyVar binder.
     -> TcRnMessage

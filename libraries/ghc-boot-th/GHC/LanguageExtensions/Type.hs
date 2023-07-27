@@ -78,6 +78,7 @@ data Extension
    | ApplicativeDo
    | LinearTypes
    | RequiredTypeArguments    -- Visible forall (VDQ) in types of terms
+   | Foreach    -- foreach in types
 
    | StandaloneDeriving
    | DeriveDataTypeable

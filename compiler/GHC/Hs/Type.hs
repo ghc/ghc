@@ -72,6 +72,7 @@ module GHC.Hs.Type (
         mkHsWildCardBndrs, mkHsPatSigType, mkHsTyPat,
         mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
+        mkHsForEachVisTele, mkHsForEachInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded,
         hsScopedTvs, hsScopedKvs, hsWcScopedTvs, dropWildCards,
@@ -164,12 +165,18 @@ type instance XHsForAllVis   (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '->'
 type instance XHsForAllInvis (GhcPass _) = EpAnnForallTy
                                            -- Location of 'forall' and '.'
+type instance XHsForEachVis   (GhcPass _) = EpAnnForallTy
+                                            -- Location of 'foreach' and '->'
+type instance XHsForEachInvis (GhcPass _) = EpAnnForallTy
+                                            -- Location of 'foreach' and '.'
 
 type instance XXHsForAllTelescope (GhcPass _) = DataConCantHappen
 
 type EpAnnForallTy = EpAnn (AddEpAnn, AddEpAnn)
   -- ^ Location of 'forall' and '->' for HsForAllVis
   -- Location of 'forall' and '.' for HsForAllInvis
+  -- Location of 'foreach' and '->' for HsForEachVis
+  -- Location of 'foreach' and '.' for HsForEachInvis
 
 type HsQTvsRn = [Name]  -- Implicit variables
   -- For example, in   data T (a :: k1 -> k2) = ...
@@ -190,6 +197,16 @@ mkHsForAllInvisTele :: EpAnnForallTy
   -> [LHsTyVarBndr Specificity (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForAllInvisTele an invis_bndrs =
   HsForAllInvis { hsf_xinvis = an, hsf_invis_bndrs = invis_bndrs }
+
+mkHsForEachVisTele ::EpAnnForallTy ->
+  [LHsTyVarBndr () (GhcPass p)] -> HsForAllTelescope (GhcPass p)
+mkHsForEachVisTele an vis_bndrs =
+  HsForEachVis { hsf_xvis = an, hsf_retained_vis_bndrs = vis_bndrs }
+
+mkHsForEachInvisTele :: EpAnnForallTy
+  -> [LHsTyVarBndr Specificity (GhcPass p)] -> HsForAllTelescope (GhcPass p)
+mkHsForEachInvisTele an invis_bndrs =
+  HsForEachInvis { hsf_xinvis = an, hsf_retained_invis_bndrs = invis_bndrs }
 
 mkHsQTvs :: [LHsTyVarBndr (HsBndrVis GhcPs) GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }
@@ -477,6 +494,8 @@ hsLTyVarNames = map hsLTyVarName
 hsForAllTelescopeNames :: HsForAllTelescope (GhcPass p) -> [IdP (GhcPass p)]
 hsForAllTelescopeNames (HsForAllVis _ bndrs) = hsLTyVarNames bndrs
 hsForAllTelescopeNames (HsForAllInvis _ bndrs) = hsLTyVarNames bndrs
+hsForAllTelescopeNames (HsForEachVis _ bndrs) = hsLTyVarNames bndrs
+hsForAllTelescopeNames (HsForEachInvis _ bndrs) = hsLTyVarNames bndrs
 
 hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
@@ -1076,6 +1095,10 @@ instance OutputableBndrId p
       text "HsForAllVis:" <+> ppr bndrs
     ppr (HsForAllInvis { hsf_invis_bndrs = bndrs }) =
       text "HsForAllInvis:" <+> ppr bndrs
+    ppr (HsForEachVis { hsf_retained_vis_bndrs = bndrs }) =
+      text "HsForEachVis:" <+> ppr bndrs
+    ppr (HsForEachInvis { hsf_retained_invis_bndrs = bndrs }) =
+      text "HsForEachInvis:" <+> ppr bndrs
 
 instance (OutputableBndrId p, OutputableBndrFlag flag p)
        => Outputable (HsTyVarBndr flag (GhcPass p)) where
@@ -1149,7 +1172,7 @@ pprHsOuterSigTyVarBndrs (HsOuterImplicit{}) = empty
 pprHsOuterSigTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) =
   pprHsForAll (mkHsForAllInvisTele noAnn bndrs) Nothing
 
--- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
+-- | Prints a forall or foreach; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
 pprHsForAll :: forall p. OutputableBndrId p
             => HsForAllTelescope (GhcPass p)
@@ -1159,17 +1182,19 @@ pprHsForAll tele cxt
   where
     pp_tele :: HsForAllTelescope (GhcPass p) -> SDoc
     pp_tele tele = case tele of
-      HsForAllVis   { hsf_vis_bndrs   = qtvs } -> pp_forall (space <> arrow) qtvs
-      HsForAllInvis { hsf_invis_bndrs = qtvs } -> pp_forall dot qtvs
+      HsForAllVis   { hsf_vis_bndrs   = qtvs } -> pp_forall forAllLit (space <> arrow) qtvs
+      HsForAllInvis { hsf_invis_bndrs = qtvs } -> pp_forall forAllLit dot qtvs
+      HsForEachVis   { hsf_retained_vis_bndrs   = qtvs } -> pp_forall forEachLit (space <> arrow) qtvs
+      HsForEachInvis { hsf_retained_invis_bndrs = qtvs } -> pp_forall forEachLit dot qtvs
 
     pp_forall :: forall flag p. (OutputableBndrId p, OutputableBndrFlag flag p)
-              => SDoc -> [LHsTyVarBndr flag (GhcPass p)] -> SDoc
-    pp_forall separator qtvs
-      | null qtvs = whenPprDebug (forAllLit <> separator)
+              => SDoc -> SDoc -> [LHsTyVarBndr flag (GhcPass p)] -> SDoc
+    pp_forall lit separator qtvs
+      | null qtvs = whenPprDebug (lit <> separator)
   -- Note: to fix the PprRecordDotSyntax1 ppr roundtrip test, the <>
   -- below needs to be <+>. But it means 94 other test results need to
   -- be updated to match.
-      | otherwise = forAllLit <+> interppSP qtvs <> separator
+      | otherwise = lit <+> interppSP qtvs <> separator
 
 pprLHsContext :: (OutputableBndrId p)
               => Maybe (LHsContext (GhcPass p)) -> SDoc

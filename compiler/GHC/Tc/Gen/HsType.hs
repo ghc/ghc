@@ -3032,6 +3032,24 @@ tcTKTelescope mode tele thing_inside = case tele of
             -- but we want [VarBndr TyVar ForAllTyFlag]
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
 
+  HsForEachVis { hsf_retained_vis_bndrs = bndrs }
+    -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
+          ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                      , sm_tvtv = SMDSkolemTv skol_info }
+          ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
+            -- req_tv_bndrs :: [VarBndr TyVar ()],
+            -- but we want [VarBndr TyVar ForAllTyFlag]
+          ; return (tyVarReqToBinders req_tv_bndrs, thing) }
+
+  HsForEachInvis { hsf_retained_invis_bndrs = bndrs }
+    -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
+          ; let skol_mode = smVanilla { sm_clone = False, sm_holes = mode_holes mode
+                                      , sm_tvtv = SMDSkolemTv skol_info }
+          ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
+            -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
+            -- but we want [VarBndr TyVar ForAllTyFlag]
+          ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
+
 --------------------------------------
 --    HsOuterTyVarBndrs
 --------------------------------------
