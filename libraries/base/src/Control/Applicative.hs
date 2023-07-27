@@ -137,6 +137,7 @@ deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
 --
 -- >>> runExcept $ canFail *> final
 -- Left "it failed"
+--
 -- >>> runExcept $ optional canFail *> final
 -- Right 42
 

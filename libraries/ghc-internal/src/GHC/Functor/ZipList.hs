@@ -17,6 +17,25 @@ import Data.Traversable (Traversable(..))
 import Data.Data (Data)
 
 -- | Lists, but with an 'Applicative' functor based on zipping.
+--
+-- ==== __Examples__
+--
+-- In contrast to the 'Applicative' for 'GHC.List.List':
+--
+-- >>> (+) <$> [1, 2, 3] <*> [4, 5, 6]
+-- [5,6,7,6,7,8,7,8,9]
+--
+-- The Applicative instance of ZipList applies the operation
+-- by pairing up the elements, analogous to 'zipWith'N
+--
+-- >>> (+) <$> ZipList [1, 2, 3] <*> ZipList [4, 5, 6]
+-- ZipList {getZipList = [5,7,9]}
+--
+-- >>> (,,,) <$> ZipList [1, 2] <*> ZipList [3, 4] <*> ZipList [5, 6] <*> ZipList [7, 8]
+-- ZipList {getZipList = [(1,3,5,7),(2,4,6,8)]}
+--
+-- >>> ZipList [(+1), (^2), (/ 2)] <*> ZipList [5, 5, 5]
+-- ZipList {getZipList = [6.0,25.0,2.5]}
 newtype ZipList a = ZipList { getZipList :: [a] }
                   deriving ( Show     -- ^ @since 4.7.0.0
                            , Eq       -- ^ @since 4.7.0.0

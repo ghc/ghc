@@ -42,6 +42,17 @@ infixr 9 `Compose`
 -- | Right-to-left composition of functors.
 -- The composition of applicative functors is always applicative,
 -- but the composition of monads is not always a monad.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (subtract 1) (Compose (Just [1, 2, 3]))
+-- Compose (Just [0,1,2])
+--
+-- >>> Compose (Just [1, 2, 3]) <> Compose Nothing
+-- Compose (Just [1,2,3])
+--
+-- >>> Compose (Just [(++ "World"), (++ "Haskell")]) <*> Compose (Just ["Hello, "])
+-- Compose (Just ["Hello, World","Hello, Haskell"])
 newtype Compose f g a = Compose { getCompose :: f (g a) }
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0

@@ -679,8 +679,8 @@ structure of @f@. Furthermore @f@ needs to adhere to the following:
 
 Note, that the second law follows from the free theorem of the type 'fmap' and
 the first law, so you need only check that the former condition holds.
-See <https://www.schoolofhaskell.com/user/edwardk/snippets/fmap> or
-<https://github.com/quchen/articles/blob/master/second_functor_law.md>
+See these articles by <https://www.schoolofhaskell.com/user/edwardk/snippets/fmap School of Haskell> or
+<https://github.com/quchen/articles/blob/master/second_functor_law.md David Luposchainsky>
 for an explanation.
 -}
 
@@ -818,7 +818,18 @@ class Functor f where
 
 class Functor f => Applicative f where
     {-# MINIMAL pure, ((<*>) | liftA2) #-}
-    -- | Lift a value.
+    -- | Lift a value into the Structure.
+    --
+    -- ==== __Examples__
+    --
+    -- >>> pure 1 :: Maybe Int
+    -- Just 1
+    --
+    -- >>> pure 'z' :: [Char]
+    -- "z"
+    --
+    -- >>> pure (pure ":D") :: Maybe [String]
+    -- Just [":D"]
     pure :: a -> f a
 
     -- | Sequential application.
@@ -827,12 +838,11 @@ class Functor f => Applicative f where
     -- efficient than the default one.
     --
     -- ==== __Example__
-    -- Used in combination with @('<$>')@, @('<*>')@ can be used to build a record.
+    -- Used in combination with @'(Data.Functor.<$>)'@, @'(<*>)'@ can be used to build a record.
     --
     -- >>> data MyState = MyState {arg1 :: Foo, arg2 :: Bar, arg3 :: Baz}
     --
     -- >>> produceFoo :: Applicative f => f Foo
-    --
     -- >>> produceBar :: Applicative f => f Bar
     -- >>> produceBaz :: Applicative f => f Baz
     --
@@ -852,9 +862,12 @@ class Functor f => Applicative f where
     -- a function defined in terms of '<*>' and 'fmap'.
     --
     -- ==== __Example__
+    --
     -- >>> liftA2 (,) (Just 3) (Just 5)
     -- Just (3,5)
-
+    --
+    -- >>> liftA2 (+) [1, 2, 3] [4, 5, 6]
+    -- [5,6,7,6,7,8,7,8,9]
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
@@ -909,6 +922,9 @@ class Functor f => Applicative f where
 -- >>> flip (<*>) (print 1) (id <$ print 2)
 -- 2
 -- 1
+--
+-- >>> ZipList [4, 5, 6] <**> ZipList [(+1), (*2), (/3)]
+-- ZipList {getZipList = [5.0,10.0,2.0]}
 
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
@@ -963,6 +979,12 @@ liftA3 f a b c = liftA2 f a b <*> c
 --
 -- ==== __Examples__
 --
+-- >>> join [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+-- [1,2,3,4,5,6,7,8,9]
+--
+-- >>> join (Just (Just 3))
+-- Just 3
+--
 -- A common use of 'join' is to run an 'IO' computation returned from
 -- an 'GHC.Conc.STM' transaction, since 'GHC.Conc.STM' transactions
 -- can't perform 'IO' directly. Recall that
@@ -1015,7 +1037,7 @@ The above laws imply:
 
 and that 'pure' and ('<*>') satisfy the applicative functor laws.
 
-The instances of 'Monad' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
+The instances of 'Monad' for 'GHC.List.List', 'Data.Maybe.Maybe' and 'System.IO.IO'
 defined in the "Prelude" satisfy these laws.
 -}
 class Applicative m => Monad m where
@@ -1028,6 +1050,15 @@ class Applicative m => Monad m where
     -- do a <- as
     --    bs a
     -- @
+    --
+    -- An alternative name for this function is \'bind\', but some people
+    -- may refer to it as \'flatMap\', which results from it being equivialent
+    -- to
+    --
+    -- @\\x f -> 'join' ('fmap' f x) :: Monad m => m a -> (a -> m b) -> m b@
+    --
+    -- which can be seen as mapping a value with
+    -- @Monad m => m a -> m (m b)@ and then \'flattening\' @m (m b)@ to @m b@ using 'join'.
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
 
     -- | Sequentially compose two actions, discarding any value produced
@@ -1040,11 +1071,18 @@ class Applicative m => Monad m where
     -- do as
     --    bs
     -- @
+    --
+    -- or in terms of @'(>>=)'@ as
+    --
+    -- > as >>= const bs
     (>>)        :: forall a b. m a -> m b -> m b
     m >> k = m >>= \_ -> k -- See Note [Recursive bindings for Applicative/Monad]
     {-# INLINE (>>) #-}
 
     -- | Inject a value into the monadic type.
+    -- This function should /not/ be different from its default implementation
+    -- as 'pure'. The justification for the existence of this function is
+    -- merely historic.
     return      :: a -> m a
     return      = pure
 
@@ -1071,16 +1109,23 @@ original default.
 -}
 
 -- | Same as '>>=', but with the arguments interchanged.
+--
+-- > as >>= f == f =<< as
 {-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
 (=<<)           :: Monad m => (a -> m b) -> m a -> m b
 f =<< x         = x >>= f
 
 -- | Conditional execution of 'Applicative' expressions. For example,
 --
+-- ==== __Examples__
+--
 -- > when debug (putStrLn "Debugging")
 --
 -- will output the string @Debugging@ if the Boolean value @debug@
 -- is 'True', and otherwise do nothing.
+--
+-- >>> putStr "pi:" >> when False (print 3.14159)
+-- pi:
 when      :: (Applicative f) => Bool -> f () -> f ()
 {-# INLINABLE when #-}
 {-# SPECIALISE when :: Bool -> IO () -> IO () #-}
@@ -1119,15 +1164,23 @@ similar problems in nofib.
 -}
 
 -- | Promote a function to a monad.
+-- This is equivalent to 'fmap' but specialised to Monads.
 liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r
 liftM f m1              = do { x1 <- m1; return (f x1) }
 
 -- | Promote a function to a monad, scanning the monadic arguments from
--- left to right.  For example,
+-- left to right.
 --
--- > liftM2 (+) [0,1] [0,2] = [0,2,1,3]
--- > liftM2 (+) (Just 1) Nothing = Nothing
+-- ==== __Examples__
 --
+-- >>> liftM2 (+) [0,1] [0,2]
+-- [0,2,1,3]
+--
+-- >>> liftM2 (+) (Just 1) Nothing
+-- Nothing
+--
+-- >>> liftM2 (+) (+ 3) (* 2) 5
+-- 18
 liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
 liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
 -- Caution: since this may be used for `liftA2`, we can't use the obvious
@@ -1171,10 +1224,13 @@ liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5;
 
 is equivalent to
 
-> liftMn f x1 x2 ... xn
+> liftM<n> f x1 x2 ... xn
 
+==== __Examples__
+
+>>> pure (\x y z -> x + y * z) `ap` Just 1 `ap` Just 5 `ap` Just 10
+Just 51
 -}
-
 ap                :: (Monad m) => m (a -> b) -> m a -> m b
 ap m1 m2          = do { x1 <- m1; x2 <- m2; return (x1 x2) }
 -- Since many Applicative instances define (<*>) = ap, we
@@ -1250,13 +1306,42 @@ infixl 3 <|>
 -- * @'some' v = (:) 'Prelude.<$>' v '<*>' 'many' v@
 --
 -- * @'many' v = 'some' v '<|>' 'pure' []@
+--
+-- ==== __Examples__
+--
+-- >>> Nothing <|> Just 42
+-- Just 42
+--
+-- >>> [1, 2] <|> [3, 4]
+-- [1,2,3,4]
+--
+-- >>> empty <|> print (2^15)
+-- 32768
 class Applicative f => Alternative f where
     -- | The identity of '<|>'
+    --
+    -- > empty <|> a     == a
+    -- > a     <|> empty == a
     empty :: f a
     -- | An associative binary operation
     (<|>) :: f a -> f a -> f a
 
     -- | One or more.
+    --
+    -- ==== __Examples__
+    --
+    -- >>> some (putStr "la")
+    -- lalalalalalalalala... * goes on forever *
+    --
+    -- >>> some Nothing
+    -- nothing
+    --
+    -- >>> take 5 <$> some (Just 1)
+    -- * hangs forever *
+    --
+    -- Note that this function can be used with Parsers based on
+    -- Applicatives. In that case @some parser@ will attempt to
+    -- parse @parser@ one or more times until it fails.
     some :: f a -> f [a]
     some v = some_v
       where
@@ -1264,6 +1349,21 @@ class Applicative f => Alternative f where
         some_v = liftA2 (:) v many_v
 
     -- | Zero or more.
+    --
+    -- ==== __Examples__
+    --
+    -- >>> many (putStr "la")
+    -- lalalalalalalalala... * goes on forever *
+    --
+    -- >>> many Nothing
+    -- Just []
+    --
+    -- >>> take 5 <$> many (Just 1)
+    -- * hangs forever *
+    --
+    -- Note that this function can be used with Parsers based on
+    -- Applicatives. In that case @many parser@ will attempt to
+    -- parse @parser@ zero or more times until it fails.
     many :: f a -> f [a]
     many v = many_v
       where

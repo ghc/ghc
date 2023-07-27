@@ -32,6 +32,14 @@ import GHC.Generics (Generic, Generic1)
 import Text.Read ()
 
 -- | Lifted product of functors.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (+1) (Pair [1, 2, 3] (Just 0))
+-- Pair [2,3,4] (Just 1)
+--
+-- >>> Pair "Hello, " (Left 'x') <> Pair "World" (Right 'y')
+-- Pair "Hello, World" (Right 'y')
 data Product f g a = Pair (f a) (g a)
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0
