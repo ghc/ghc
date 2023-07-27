@@ -53,6 +53,22 @@ import GHC.Types (Bool(..))
 
 -- | Identity functor and monad. (a non-strict monad)
 --
+-- ==== __Examples__
+--
+-- >>> fmap (+1) (Identity 0)
+-- Identity 1
+--
+-- >>> Identity [1, 2, 3] <> Identity [4, 5, 6]
+-- Identity [1,2,3,4,5,6]
+--
+-- @
+-- >>> do
+--       x <- Identity 10
+--       y <- Identity (x + 5)
+--       pure (x + y)
+-- Identity 25
+-- @
+--
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
     deriving ( Bits       -- ^ @since 4.9.0.0

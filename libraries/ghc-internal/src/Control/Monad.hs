@@ -137,14 +137,40 @@ guard True      =  pure ()
 guard False     =  empty
 
 -- | This generalizes the list-based 'Data.List.filter' function.
-
+--
+-- > runIdentity (filterM (Identity . p) xs) == filter p xs
+--
+-- ==== __Examples__
+--
+-- >>> filterM (\x -> do
+--       putStrLn ("Keep: " ++ show x ++ "?")
+--       answer <- getLine
+--       pure (answer == "y"))
+--     [1, 2, 3]
+-- Keep: 1?
+-- y
+-- Keep: 2?
+-- n
+-- Keep: 3?
+-- y
+-- [1,3]
+--
+-- >>> filterM (\x -> do
+--       putStr (show x)
+--       x' <- readLn
+--       pure (x == x'))
+--     [1, 2, 3]
+-- 12
+-- 22
+-- 33
+-- [2,3]
 {-# INLINE filterM #-}
 filterM          :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
 filterM p        = foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x)) (pure [])
 
 infixr 1 <=<, >=>
 
--- | Left-to-right composition of Kleisli arrows.
+-- | Left-to-right composition of 'Control.Arrow.Kleisli' arrows.
 --
 -- \'@(bs '>=>' cs) a@\' can be understood as the @do@ expression
 --
@@ -152,6 +178,10 @@ infixr 1 <=<, >=>
 -- do b <- bs a
 --    cs b
 -- @
+--
+-- or in terms of @'(>>=)'@ as
+--
+-- > bs a >>= cs
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
@@ -280,9 +310,17 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
 -- | @'replicateM' n act@ performs the action @act@ @n@ times,
--- and then returns the list of results:
+-- and then returns the list of results.
+--
+-- @replicateM n (pure x) == 'replicate' n x@
 --
 -- ==== __Examples__
+--
+-- >>> replicateM 3 getLine
+-- hi
+-- heya
+-- hiya
+-- ["hi","heya","hiya"]
 --
 -- >>> import Control.Monad.State
 -- >>> runState (replicateM 3 $ state $ \s -> (s, s + 1)) 1
@@ -303,11 +341,8 @@ replicateM cnt0 f =
 --
 -- ==== __Examples__
 --
--- >>> replicateM_ 3 (putStrLn "a")
--- a
--- a
--- a
---
+-- >>> replicateM_ 3 (putStr "a")
+-- aaa
 replicateM_       :: (Applicative m) => Int -> m a -> m ()
 {-# INLINABLE replicateM_ #-}
 {-# SPECIALISE replicateM_ :: Int -> IO a -> IO () #-}
@@ -321,6 +356,16 @@ replicateM_ cnt0 f =
 
 
 -- | The reverse of 'when'.
+--
+-- ==== __Examples__
+--
+-- >>> do x <- getLine
+--        unless (x == "hi") (putStrLn "hi!")
+-- comingupwithexamplesisdifficult
+-- hi!
+--
+-- >>> unless (pi > exp 1) Nothing
+-- Just ()
 unless            :: (Applicative f) => Bool -> f () -> f ()
 {-# INLINABLE unless #-}
 {-# SPECIALISE unless :: Bool -> IO () -> IO () #-}

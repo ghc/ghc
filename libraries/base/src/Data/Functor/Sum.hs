@@ -29,6 +29,14 @@ import GHC.Generics (Generic, Generic1)
 import Text.Read ()
 
 -- | Lifted sum of functors.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (+1) (InL (Just 1))  :: Sum Maybe [] Int
+-- InL (Just 2)
+--
+-- >>> fmap (+1) (InR [1, 2, 3]) :: Sum Maybe [] Int
+-- InR [2,3,4]
 data Sum f g a = InL (f a) | InR (g a)
   deriving ( Data     -- ^ @since 4.9.0.0
            , Generic  -- ^ @since 4.9.0.0

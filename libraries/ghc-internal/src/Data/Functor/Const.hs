@@ -36,6 +36,19 @@ import GHC.Read (Read(readsPrec), readParen, lex)
 import GHC.Show (Show(showsPrec), showParen, showString)
 
 -- | The 'Const' functor.
+--
+-- ==== __Examples__
+--
+-- >>> fmap (++ "World") (Const "Hello")
+-- Const "Hello"
+--
+-- Because we ignore the second type parameter to 'Const',
+-- the Applicative instance, which has
+-- @'(<*>)' :: Monoid m => Const m (a -> b) -> Const m a -> Const m b@
+-- essentially turns into @Monoid m => m -> m -> m@, which is '(<>)'
+--
+-- >>> Const [1, 2, 3] <*> Const [4, 5, 6]
+-- Const [1,2,3,4,5,6]
 newtype Const a b = Const { getConst :: a }
     deriving ( Bits       -- ^ @since 4.9.0.0
              , Bounded    -- ^ @since 4.9.0.0

@@ -34,6 +34,7 @@
 --
 --  >>> fmap show (Just 1) --  (Int -> String) -> Maybe Int -> Maybe String
 --  Just "1"
+--
 --  >>> show <$> (Just 1)  --  (Int -> String) -> Maybe Int -> Maybe String
 --  Just "1"
 
@@ -74,6 +75,7 @@ infixl 4 <$>
 --
 -- >>> show <$> Nothing
 -- Nothing
+--
 -- >>> show <$> Just 3
 -- Just "3"
 --
@@ -82,6 +84,7 @@ infixl 4 <$>
 --
 -- >>> show <$> Left 17
 -- Left 17
+--
 -- >>> show <$> Right 17
 -- Right "17"
 --
@@ -136,6 +139,7 @@ infixl 4 $>
 --
 -- >>> Nothing $> "foo"
 -- Nothing
+--
 -- >>> Just 90210 $> "foo"
 -- Just "foo"
 --
@@ -145,6 +149,7 @@ infixl 4 $>
 --
 -- >>> Left 8675309 $> "foo"
 -- Left 8675309
+--
 -- >>> Right 8675309 $> "foo"
 -- Right "foo"
 --
@@ -163,6 +168,14 @@ infixl 4 $>
 
 -- | Generalization of @Data.List.@'Data.List.unzip'.
 --
+-- ==== __Examples__
+--
+-- >>> unzip (Just ("Hello", "World"))
+-- (Just "Hello",Just "World")
+--
+-- >>> unzip [("I", "love"), ("really", "haskell")]
+-- (["I","really"],["love","haskell"])
+--
 -- @since 4.19.0.0
 unzip :: Functor f => f (a, b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
@@ -176,6 +189,7 @@ unzip xs = (fst <$> xs, snd <$> xs)
 --
 -- >>> void Nothing
 -- Nothing
+--
 -- >>> void (Just 3)
 -- Just ()
 --
@@ -184,6 +198,7 @@ unzip xs = (fst <$> xs, snd <$> xs)
 --
 -- >>> void (Left 8675309)
 -- Left 8675309
+--
 -- >>> void (Right 8675309)
 -- Right ()
 --
@@ -203,6 +218,7 @@ unzip xs = (fst <$> xs, snd <$> xs)
 -- 1
 -- 2
 -- [(),()]
+--
 -- >>> void $ mapM print [1,2]
 -- 1
 -- 2
