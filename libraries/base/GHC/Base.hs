@@ -278,8 +278,16 @@ infixr 6 <>
 class Semigroup a where
         -- | An associative operation.
         --
+        -- ==== __Examples__
+        --
         -- >>> [1,2,3] <> [4,5,6]
         -- [1,2,3,4,5,6]
+        --
+        -- >>> Just [1, 2, 3] <> Just [4, 5, 6]
+        -- Just [1,2,3,4,5,6]
+        --
+        -- >>> putStr "Hello, " <> putStrLn "World!"
+        -- Hello, World!
         (<>) :: a -> a -> a
         a <> b = sconcat (a :| [ b ])
 
@@ -288,9 +296,20 @@ class Semigroup a where
         -- The default definition should be sufficient, but this can be
         -- overridden for efficiency.
         --
+        -- ==== __Examples__
+        --
+        -- For the following examples, we will assume that we have:
+        --
         -- >>> import Data.List.NonEmpty (NonEmpty (..))
+        --
         -- >>> sconcat $ "Hello" :| [" ", "Haskell", "!"]
         -- "Hello Haskell!"
+        --
+        -- >>> sconcat $ Just [1, 2, 3] :| [Nothing, Just [4, 5, 6]]
+        -- Just [1,2,3,4,5,6]
+        --
+        -- >>> sconcat $ Left 1 :| [Right 2, Left 3, Right 4]
+        -- Right 2
         sconcat :: NonEmpty a -> a
         sconcat (a :| as) = go a as where
           go b (c:cs) = b <> go c cs
@@ -298,17 +317,25 @@ class Semigroup a where
 
         -- | Repeat a value @n@ times.
         --
-        -- Given that this works on a 'Semigroup' it is allowed to fail if
-        -- you request 0 or fewer repetitions, and the default definition
-        -- will do so.
+        -- The default definition will raise an exception for a multiplier that is @<= 0@.
+        -- This may be overridden with an implementation that is total. For monoids
+        -- it is preferred to use 'stimesMonoid'.
         --
         -- By making this a member of the class, idempotent semigroups
         -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
         -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
-        -- 'stimesIdempotentMonoid'@ respectively.
+        -- 'Data.Semigroup.stimesIdempotentMonoid'@ respectively.
+        --
+        -- ==== __Examples__
         --
         -- >>> stimes 4 [1]
         -- [1,1,1,1]
+        --
+        -- >>> stimes 5 (putStr "hi!")
+        -- hi!hi!hi!hi!hi!
+        --
+        -- >>> stimes 3 (Right ":)")
+        -- Right ":)"
         stimes :: Integral b => b -> a -> a
         stimes y0 x0
           | y0 <= 0   = errorWithoutStackTrace "stimes: positive multiplier expected"
@@ -358,8 +385,12 @@ class Semigroup a where
 class Semigroup a => Monoid a where
         -- | Identity of 'mappend'
         --
+        -- ==== __Examples__
         -- >>> "Hello world" <> mempty
         -- "Hello world"
+        --
+        -- >>> mempty <> [1, 2, 3]
+        -- [1,2,3]
         mempty :: a
         mempty = mconcat []
         {-# INLINE mempty #-}

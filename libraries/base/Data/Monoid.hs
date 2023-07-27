@@ -127,14 +127,18 @@ import Data.Semigroup.Internal
 -- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
 -- historically.
 --
--- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
--- Just "hello"
---
 -- Beware that @Data.Monoid.@'First' is different from
 -- @Data.Semigroup.@'Data.Semigroup.First'. The former returns the first non-'Nothing',
 -- so @Data.Monoid.First Nothing <> x = x@. The latter simply returns the first value,
 -- thus @Data.Semigroup.First Nothing <> x = Data.Semigroup.First Nothing@.
 --
+-- ==== __Examples__
+--
+-- >>> First (Just "hello") <> First Nothing <> First (Just "world")
+-- First {getFirst = Just "hello"}
+--
+-- >>> First Nothing <> mempty
+-- First {getFirst = Nothing}
 newtype First a = First { getFirst :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -162,14 +166,17 @@ instance Monoid (First a) where
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
 -- @'Dual' ('Alt' 'Maybe' a)@
 --
--- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
--- Just "world"
---
--- Beware that @Data.Monoid.@'Last' is different from
 -- @Data.Semigroup.@'Data.Semigroup.Last'. The former returns the last non-'Nothing',
 -- so @x <> Data.Monoid.Last Nothing = x@. The latter simply returns the last value,
 -- thus @x <> Data.Semigroup.Last Nothing = Data.Semigroup.Last Nothing@.
 --
+-- ==== __Examples__
+--
+-- >>> Last (Just "hello") <> Last Nothing <> Last (Just "world")
+-- Last {getLast = Just "world"}
+--
+-- >>> Last Nothing <> mempty
+-- Last {getLast = Nothing}
 newtype Last a = Last { getLast :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
@@ -194,6 +201,14 @@ instance Monoid (Last a) where
 
 -- | This data type witnesses the lifting of a 'Monoid' into an
 -- 'Applicative' pointwise.
+--
+-- ==== __Examples__
+--
+-- >>> Ap (Just [1, 2, 3]) <> Ap Nothing
+-- Ap {getAp = Nothing}
+--
+-- >>> Ap [Sum 10, Sum 20] <> Ap [Sum 1, Sum 2]
+-- Ap {getAp = [Sum {getSum = 11},Sum {getSum = 12},Sum {getSum = 21},Sum {getSum = 22}]}
 --
 -- @since 4.12.0.0
 newtype Ap f a = Ap { getAp :: f a }
