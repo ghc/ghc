@@ -26,6 +26,7 @@
 --
 -- The 'Min' 'Semigroup' instance for 'Int' is defined to always pick the smaller
 -- number:
+--
 -- >>> Min 1 <> Min 2 <> Min 3 <> Min 4 :: Min Int
 -- Min {getMin = 1}
 --
@@ -48,6 +49,7 @@
 --
 -- >>> sconcat (1 :| [2, 3, 4]) :: Min Int
 -- Min {getMin = 1}
+--
 -- >>> sconcat (1 :| [2, 3, 4]) :: Max Int
 -- Max {getMax = 4}
 --
@@ -120,28 +122,56 @@ import qualified GHC.List as List
 
 -- | A generalization of 'Data.List.cycle' to an arbitrary 'Semigroup'.
 -- May fail to terminate for some values in some semigroups.
+--
+-- ==== __Examples__
+--
+-- >>> take 10 $ cycle1 [1, 2, 3]
+-- [1,2,3,1,2,3,1,2,3,1]
+--
+-- >>> cycle1 (Right 1)
+-- Right 1
+--
+-- >>> cycle1 (Left 1)
+-- * hangs forever *
 cycle1 :: Semigroup m => m -> m
 cycle1 xs = xs' where xs' = xs <> xs'
 
 -- | This lets you use a difference list of a 'Semigroup' as a 'Monoid'.
 --
--- === __Example:__
--- >>> let hello = diff "Hello, "
+-- ==== __Examples__
+--
+-- > let hello = diff "Hello, "
+--
 -- >>> appEndo hello "World!"
 -- "Hello, World!"
+--
 -- >>> appEndo (hello <> mempty) "World!"
 -- "Hello, World!"
+--
 -- >>> appEndo (mempty <> hello) "World!"
 -- "Hello, World!"
--- >>> let world = diff "World"
--- >>> let excl = diff "!"
+--
+-- > let world = diff "World"
+-- > let excl = diff "!"
+--
 -- >>> appEndo (hello <> (world <> excl)) mempty
 -- "Hello, World!"
+--
 -- >>> appEndo ((hello <> world) <> excl) mempty
 -- "Hello, World!"
 diff :: Semigroup m => m -> Endo m
 diff = Endo . (<>)
 
+-- | The 'Min' 'Monoid' and 'Semigroup' always choose the smaller element as
+-- by the 'Ord' instance and 'min' of the contained type.
+--
+-- ==== __Examples__
+--
+-- >>> Min 42 <> Min 3
+-- Min 3
+--
+-- >>> sconcat $ Min 1 :| [ Min n | n <- [2 .. 100]]
+-- Min {getMin = 1}
 newtype Min a = Min { getMin :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -217,6 +247,16 @@ instance Num a => Num (Min a) where
   signum (Min a) = Min (signum a)
   fromInteger    = Min . fromInteger
 
+-- | The 'Max' 'Monoid' and 'Semigroup' always choose the bigger element as
+-- by the 'Ord' instance and 'max' of the contained type.
+--
+-- ==== __Examples__
+--
+-- >>> Max 42 <> Max 3
+-- Max 42
+--
+-- >>> sconcat $ Max 1 :| [ Max n | n <- [2 .. 100]]
+-- Max {getMax = 100}
 newtype Max a = Max { getMax :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -294,8 +334,16 @@ instance Num a => Num (Max a) where
 -- | 'Arg' isn't itself a 'Semigroup' in its own right, but it can be
 -- placed inside 'Min' and 'Max' to compute an arg min or arg max.
 --
+-- ==== __Examples__
+--
 -- >>> minimum [ Arg (x * x) x | x <- [-10 .. 10] ]
 -- Arg 0 0
+--
+-- >>> maximum [ Arg (-0.2*x^2 + 1.5*x + 1) x | x <- [-10 .. 10] ]
+-- Arg 3.8 4.0
+--
+-- >>> minimum [ Arg (-0.2*x^2 + 1.5*x + 1) x | x <- [-10 .. 10] ]
+-- Arg (-34.0) (-10.0)
 data Arg a b = Arg
   a
   -- ^ The argument used for comparisons in 'Eq' and 'Ord'.
@@ -310,13 +358,23 @@ data Arg a b = Arg
   )
 
 -- |
+-- ==== __Examples__
+--
 -- >>> Min (Arg 0 ()) <> Min (Arg 1 ())
 -- Min {getMin = Arg 0 ()}
+--
+-- >>> minimum [ Arg (length name) name | name <- ["violencia", "lea", "pixie"]]
+-- Arg 3 "lea"
 type ArgMin a b = Min (Arg a b)
 
 -- |
+-- ==== __Examples__
+--
 -- >>> Max (Arg 0 ()) <> Max (Arg 1 ())
 -- Max {getMax = Arg 1 ()}
+--
+-- >>> maximum [ Arg (length name) name | name <- ["violencia", "lea", "pixie"]]
+-- Arg 9 "violencia"
 type ArgMax a b = Max (Arg a b)
 
 -- | @since 4.9.0.0
@@ -364,6 +422,13 @@ instance Bitraversable Arg where
 -- The latter returns the first non-'Nothing',
 -- thus @Data.Monoid.First Nothing <> x = x@.
 --
+-- ==== __Examples__
+--
+-- >>> First 0 <> First 10
+-- First 0
+--
+-- >>> sconcat $ First 1 :| [ First n | n <- [2 ..] ]
+-- First 1
 newtype First a = First { getFirst :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -427,6 +492,13 @@ instance MonadFix First where
 -- The latter returns the last non-'Nothing',
 -- thus @x <> Data.Monoid.Last Nothing = x@.
 --
+-- ==== __Examples__
+--
+-- >>> Last 0 <> Last 10
+-- Last {getLast = 10}
+--
+-- >>> sconcat $ Last 1 :| [ Last n | n <- [2..]]
+-- Last {getLast = * hangs forever *
 newtype Last a = Last { getLast :: a }
   deriving ( Bounded  -- ^ @since 4.9.0.0
            , Eq       -- ^ @since 4.9.0.0
@@ -526,7 +598,7 @@ instance Enum a => Enum (WrappedMonoid a) where
 --
 -- > mtimesDefault n a = a <> a <> ... <> a  -- using <> (n-1) times
 --
--- In many cases, `stimes 0 a` for a `Monoid` will produce `mempty`.
+-- In many cases, @'stimes' 0 a@ for a `Monoid` will produce `mempty`.
 -- However, there are situations when it cannot do so. In particular,
 -- the following situation is fairly common:
 --
@@ -535,6 +607,7 @@ instance Enum a => Enum (WrappedMonoid a) where
 --
 -- class Constraint1 a
 -- class Constraint1 a => Constraint2 a
+-- @
 --
 -- @
 -- instance Constraint1 a => 'Semigroup' (T a)
@@ -548,6 +621,14 @@ instance Enum a => Enum (WrappedMonoid a) where
 -- 'Semigroup' instances, @mtimesDefault@ should be used when the
 -- multiplier might be zero. It is implemented using 'stimes' when
 -- the multiplier is nonzero and 'mempty' when it is zero.
+--
+-- ==== __Examples__
+--
+-- >>> mtimesDefault 0 "bark"
+-- []
+--
+-- >>> mtimesDefault 3 "meow"
+-- "meowmeowmeow"
 mtimesDefault :: (Integral b, Monoid a) => b -> a -> a
 mtimesDefault n x
   | n == 0    = mempty
