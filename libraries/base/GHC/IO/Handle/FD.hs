@@ -13,6 +13,8 @@
 --
 -- Handle operations implemented by file descriptors (FDs)
 --
+-- @since 4.2.0.0
+--
 -----------------------------------------------------------------------------
 
 module GHC.IO.Handle.FD ( 
@@ -157,6 +159,8 @@ openFile fp im =
 -- raising an exception.  If closing the handle raises an exception, then
 -- this exception will be raised by 'withFile' rather than any exception
 -- raised by @act@.
+--
+-- @since 4.16.0.0
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile fp im act =
   catchException
@@ -189,6 +193,8 @@ openFileBlocking fp im =
 -- by raising an exception.  If closing the handle raises an exception, then
 -- this exception will be raised by 'withFile' rather than any exception raised
 -- by @act@.
+--
+-- @since 4.16.0.0
 withFileBlocking :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFileBlocking fp im act =
   catchException
@@ -217,6 +223,8 @@ openBinaryFile fp m =
 -- the file will be closed automatically. The action /should/
 -- close the file when finished with it so the file does not remain
 -- open until the garbage collector collects the handle.
+--
+-- @since 4.16.0.0
 withBinaryFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withBinaryFile fp im act =
   catchException
@@ -366,6 +374,8 @@ fdToHandle fdint = do
 
 -- | Turn an existing Handle into a file descriptor. This function throws an
 -- IOError if the Handle does not reference a file descriptor.
+--
+-- @since 4.10.0.0
 handleToFd :: Handle -> IO FD.FD
 handleToFd h = case h of
   FileHandle _ mv -> do
