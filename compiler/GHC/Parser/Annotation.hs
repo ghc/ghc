@@ -78,6 +78,7 @@ module GHC.Parser.Annotation (
   -- ** Constructing 'GenLocated' annotation types when we do not care
   -- about annotations.
   HasAnnotation(..),
+  locA,
   noLocA,
   getLocA,
   noSrcSpanA,
@@ -579,7 +580,7 @@ emptyComments = EpaComments []
 
 -- Important that the fields are strict as these live inside L nodes which
 -- are live for a long time.
-data SrcSpanAnn' a = SrcSpanAnn { ann :: !a, locA :: !SrcSpan }
+data SrcSpanAnn' a = SrcSpanAnn { ann :: !a, locAn :: !SrcSpan }
         deriving (Data, Eq)
 -- See Note [XRec and Anno in the AST]
 
@@ -941,6 +942,9 @@ reLocA (L l a) = (L (SrcSpanAnn EpAnnNotUsed l) a)
 reLocL :: LocatedN e -> LocatedA e
 reLocL (L l a) = (L (na2la l) a)
 
+locA :: (HasLoc a) => a -> SrcSpan
+locA = getHasLoc
+
 reLocC :: LocatedN e -> LocatedC e
 reLocC (L l a) = (L (na2la l) a)
 
@@ -976,11 +980,14 @@ class HasLoc a where
   -- ^ conveniently calculate locations for things without locations attached
   getHasLoc :: a -> SrcSpan
 
-instance HasLoc (Located a) where
-  getHasLoc (L l _) = l
+instance (HasLoc l) => HasLoc (GenLocated l a) where
+  getHasLoc (L l _) = getHasLoc l
 
-instance HasLoc (GenLocated (SrcSpanAnn' a) e) where
-  getHasLoc (L (SrcSpanAnn _ l) _) = l
+instance HasLoc SrcSpan where
+  getHasLoc l = l
+
+instance HasLoc (SrcSpanAnn' a) where
+  getHasLoc (SrcSpanAnn _ l) = l
 
 getHasLocList :: HasLoc a => [a] -> SrcSpan
 getHasLocList [] = noSrcSpan
