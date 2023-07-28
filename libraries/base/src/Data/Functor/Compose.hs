@@ -147,6 +147,10 @@ instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
     (<|>) = coerce ((<|>) :: f (g a) -> f (g a) -> f (g a))
       :: forall a . Compose f g a -> Compose f g a -> Compose f g a
+    some = coerce (fmap sequenceA . some :: f (g a) -> f (g [a]))
+      :: forall a . Compose f g a -> Compose f g [a]
+    many = coerce (fmap sequenceA . many :: f (g a) -> f (g [a]))
+      :: forall a . Compose f g a -> Compose f g [a]
 
 -- | The deduction (via generativity) that if @g x :~: g y@ then @x :~: y@.
 --
