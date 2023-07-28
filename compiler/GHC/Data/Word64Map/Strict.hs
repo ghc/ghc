@@ -1,10 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
 {-# LANGUAGE Trustworthy #-}
-#endif
-
-#include "containers.h"
 
 -----------------------------------------------------------------------------
 -- |
@@ -86,11 +82,7 @@
 
 module GHC.Data.Word64Map.Strict (
     -- * Map type
-#if !defined(TESTING)
     Word64Map, Key          -- instance Eq,Show
-#else
-    Word64Map(..), Key          -- instance Eq,Show
-#endif
 
     -- * Construction
     , empty

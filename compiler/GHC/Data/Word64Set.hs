@@ -1,9 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
 {-# LANGUAGE Safe #-}
-#endif
-
-#include "containers.h"
 
 -----------------------------------------------------------------------------
 -- |
@@ -65,11 +61,7 @@ module GHC.Data.Word64Set (
             -- $strictness
 
             -- * Set type
-#if !defined(TESTING)
               Word64Set          -- instance Eq,Show
-#else
-              Word64Set(..)      -- instance Eq,Show
-#endif
             , Key
 
             -- * Construction
@@ -155,10 +147,6 @@ module GHC.Data.Word64Set (
             , showTree
             , showTreeWith
 
-#if defined(TESTING)
-            -- * Internals
-            , match
-#endif
             ) where
 
 import GHC.Data.Word64Set.Internal as WS

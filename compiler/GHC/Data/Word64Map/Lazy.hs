@@ -1,9 +1,5 @@
 {-# LANGUAGE CPP #-}
-#if !defined(TESTING) && defined(__GLASGOW_HASKELL__)
 {-# LANGUAGE Safe #-}
-#endif
-
-#include "containers.h"
 
 -----------------------------------------------------------------------------
 -- |
@@ -67,11 +63,7 @@
 
 module GHC.Data.Word64Map.Lazy (
     -- * Map type
-#if !defined(TESTING)
     Word64Map, Key          -- instance Eq,Show
-#else
-    Word64Map(..), Key          -- instance Eq,Show
-#endif
 
     -- * Construction
     , empty

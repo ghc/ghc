@@ -4,8 +4,6 @@
 
 {-# OPTIONS_GHC -fno-warn-incomplete-uni-patterns #-}
 
-#include "containers.h"
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Word64Map.Strict.Internal
@@ -86,11 +84,7 @@
 
 module GHC.Data.Word64Map.Strict.Internal (
     -- * Map type
-#if !defined(TESTING)
     Word64Map, Key          -- instance Eq,Show
-#else
-    Word64Map(..), Key          -- instance Eq,Show
-#endif
 
     -- * Construction
     , empty
@@ -827,13 +821,11 @@ map f = go
     go (Tip k x)     = Tip k $! f x
     go Nil           = Nil
 
-#ifdef __GLASGOW_HASKELL__
 {-# NOINLINE [1] map #-}
 {-# RULES
 "map/map" forall f g xs . map f (map g xs) = map (\x -> f $! g x) xs
 "map/mapL" forall f g xs . map f (L.map g xs) = map (\x -> f (g x)) xs
  #-}
-#endif
 
 -- | \(O(n)\). Map a function over all values in the map.
 --
@@ -847,7 +839,6 @@ mapWithKey f t
       Tip k x     -> Tip k $! f k x
       Nil         -> Nil
 
-#ifdef __GLASGOW_HASKELL__
 -- Pay close attention to strictness here. We need to force the
 -- intermediate result for map f . map g, and we need to refrain
 -- from forcing it for map f . L.map g, etc.
@@ -875,7 +866,6 @@ mapWithKey f t
 "map/mapWithKeyL" forall f g xs . map f (L.mapWithKey g xs) =
   mapWithKey (\k a -> f (g k a)) xs
  #-}
-#endif
 
 -- | \(O(n)\).
 -- @'traverseWithKey' f s == 'fromList' <$> 'traverse' (\(k, v) -> (,) k <$> f k v) ('toList' m)@
