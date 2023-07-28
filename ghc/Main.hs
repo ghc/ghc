@@ -1140,15 +1140,6 @@ unknownFlagsErr fs = throwGhcException $ UsageError $ concatMap oneError fs
   where
     oneError f =
         "unrecognised flag: " ++ f ++ "\n" ++
-        (case match f (nubSort allNonDeprecatedFlags) of
+        (case flagSuggestions (nubSort allNonDeprecatedFlags) f of
             [] -> ""
             suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
-    -- fixes #11789
-    -- If the flag contains '=',
-    -- this uses both the whole and the left side of '=' for comparing.
-    match f allFlags
-        | elem '=' f =
-              let (flagsWithEq, flagsWithoutEq) = partition (elem '=') allFlags
-                  fName = takeWhile (/= '=') f
-              in (fuzzyMatch f flagsWithEq) ++ (fuzzyMatch fName flagsWithoutEq)
-        | otherwise = fuzzyMatch f allFlags

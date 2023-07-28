@@ -173,6 +173,7 @@ module GHC.Driver.Session (
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
         parseDynamicFlagsFull,
+        flagSuggestions,
 
         -- ** Available DynFlags
         allNonDeprecatedFlags,
@@ -271,7 +272,7 @@ import Data.Functor.Identity
 
 import Data.Ord
 import Data.Char
-import Data.List (intercalate, sortBy)
+import Data.List (intercalate, sortBy, partition)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -882,6 +883,20 @@ safeFlagCheck cmdl dflags =
     -- Force this to avoid retaining reference to old DynFlags value
     !safeFlags = all (\(_,_,t,_) -> not $ t dflags) unsafeFlagsForInfer
 
+-- | Produce a list of suggestions for a user provided flag that is invalid.
+flagSuggestions
+  :: [String] -- valid flags to match against
+  -> String
+  -> [String]
+flagSuggestions flags userInput
+  -- fixes #11789
+  -- If the flag contains '=',
+  -- this uses both the whole and the left side of '=' for comparing.
+  | elem '=' userInput =
+        let (flagsWithEq, flagsWithoutEq) = partition (elem '=') flags
+            fName = takeWhile (/= '=') userInput
+        in (fuzzyMatch userInput flagsWithEq) ++ (fuzzyMatch fName flagsWithoutEq)
+  | otherwise = fuzzyMatch userInput flags
 
 {- **********************************************************************
 %*                                                                      *
