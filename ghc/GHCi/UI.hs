@@ -3144,10 +3144,7 @@ newDynFlags interactive_only minus_opts = do
       (idflags1, leftovers, warns) <- DynFlags.parseDynamicFlagsCmdLine idflags0 lopts
 
       liftIO $ printOrThrowDiagnostics logger (initPrintConfig idflags1) (initDiagOpts idflags1) (GhcDriverMessage <$> warns)
-      when (not $ null leftovers)
-           (throwGhcException . CmdLineError
-            $ "Some flags have not been recognized: "
-            ++ (concat . intersperse ", " $ map unLoc leftovers))
+      when (not $ null leftovers) (unknownFlagsErr $ map unLoc leftovers)
 
       when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
@@ -3197,6 +3194,15 @@ newDynFlags interactive_only minus_opts = do
 
       return ()
 
+unknownFlagsErr :: [String] -> a
+unknownFlagsErr fs = throwGhcException $ CmdLineError $ concatMap oneError fs
+  where
+    oneError f =
+        "unrecognised flag: " ++ f ++ "\n" ++
+        (case flagSuggestions ghciFlags f of
+            [] -> ""
+            suggs -> "did you mean one of:\n" ++ unlines (map ("  " ++) suggs))
+    ghciFlags = nubSort $ flagsForCompletion True
 
 unsetOptions :: GhciMonad m => String -> m ()
 unsetOptions str
