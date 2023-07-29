@@ -37,6 +37,15 @@ Language
   For more information on what types are allowed in kinds, see the
   :ref:`promotion` section.
 
+- Using ``forall`` as an identifier is now a parse error, as forewarned
+  by :ghc-flag:`-Wforall-identifier`::
+
+    forall :: (Variable a, MonadQSAT s m) => m a
+    -- parse error on input ‘forall’
+
+  Library authors are advised to use a different name for their functions,
+  such as ``forAll``, ``for_all``, or ``forall_``.
+
 Compiler
 ~~~~~~~~
 
@@ -86,6 +95,9 @@ Compiler
 - Type abstractions in constructor patterns that were previously admitted without enabling the :extension:`TypeAbstractions`
   extension now trigger a warning, :ghc-flag:`-Wdeprecated-type-abstractions`.
   This new warning is part of the :ghc-flag:`-Wcompat` warning group and will become an error in a future GHC release.
+
+- The :ghc-flag:`-Wforall-identifier` flag is now deprecated and removed from :ghc-flag:`-Wdefault`,
+  as ``forall`` is no longer parsed as an identifier.
 
 GHCi
 ~~~~

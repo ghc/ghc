@@ -2274,7 +2274,8 @@ wWarningFlagsDeps = [minBound..maxBound] >>= \x -> case x of
   Opt_WarnOperatorWhitespace -> warnSpec x
   Opt_WarnImplicitLift -> warnSpec x
   Opt_WarnMissingExportedPatternSynonymSignatures -> warnSpec x
-  Opt_WarnForallIdentifier -> warnSpec x
+  Opt_WarnForallIdentifier
+    -> depWarnSpec x "forall is no longer a valid identifier"
   Opt_WarnUnicodeBidirectionalFormatCharacters -> warnSpec x
   Opt_WarnGADTMonoLocalBinds -> warnSpec x
   Opt_WarnTypeEqualityOutOfScope -> warnSpec x

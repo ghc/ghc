@@ -438,7 +438,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnPartialTypeSignatures"                     = 60661
   GhcDiagnosticCode "TcRnLazyGADTPattern"                           = 87005
   GhcDiagnosticCode "TcRnArrowProcGADTPattern"                      = 64525
-  GhcDiagnosticCode "TcRnForallIdentifier"                          = 64088
   GhcDiagnosticCode "TcRnTypeEqualityOutOfScope"                    = 12003
   GhcDiagnosticCode "TcRnTypeEqualityRequiresOperators"             = 58520
   GhcDiagnosticCode "TcRnIllegalTypeOperator"                       = 62547
@@ -901,6 +900,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBindMultipleVariables"                     = Outdated 92957
   GhcDiagnosticCode "TcRnHsigNoIface"                               = Outdated 93010
   GhcDiagnosticCode "TcRnInterfaceLookupError"                      = Outdated 52243
+  GhcDiagnosticCode "TcRnForallIdentifier"                          = Outdated 64088
 
 -- | Use this type synonym to mark a diagnostic code as outdated.
 --

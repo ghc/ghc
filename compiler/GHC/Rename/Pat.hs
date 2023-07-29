@@ -57,7 +57,7 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier, delLocalNames, typeAppErr )
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, delLocalNames, typeAppErr )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 
@@ -247,16 +247,14 @@ newPatLName name_maker rdr_name@(L loc _)
 newPatName :: NameMaker -> LocatedN RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
-        do { warnForallIdentifier rdr_name
-           ; name <- newLocalBndrRn rdr_name
+        do { name <- newLocalBndrRn rdr_name
            ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
            ; return (res, name `delFV` fvs) })
 
 newPatName (LetMk is_top fix_env) rdr_name
   = CpsRn (\ thing_inside ->
-        do { warnForallIdentifier rdr_name
-           ; name <- case is_top of
+        do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
            ; bindLocalNames [name] $
