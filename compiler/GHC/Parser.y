@@ -4324,6 +4324,9 @@ glNR ln = Anchor (realSrcSpan $ getLocA ln) UnchangedAnchor
 glNRR :: LocatedN a -> EpaLocation
 glNRR = srcSpan2e . getLocA
 
+n2l :: LocatedN a -> LocatedA a
+n2l (L la a) = L (l2l la) a
+
 anc :: RealSrcSpan -> Anchor
 anc r = Anchor r UnchangedAnchor
 

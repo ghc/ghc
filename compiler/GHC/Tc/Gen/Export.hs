@@ -710,7 +710,7 @@ lookupChildrenExport spec_parent rdr_items = mapAndReportM doOne rdr_items
               do { ub <- reportUnboundName unboundName
                  ; let l = getLoc n
                        gre = mkLocalGRE UnboundGRE NoParent ub
-                 ; return (L l (IEName noExtField (L (la2na l) ub)), gre)}
+                 ; return (L l (IEName noExtField (L (l2l l) ub)), gre)}
             FoundChild child@(GRE { gre_name = child_nm, gre_par = par }) ->
               do { checkPatSynParent spec_parent par child_nm
                  ; return (replaceLWrappedName n child_nm, child)
