@@ -1,3 +1,4 @@
 {-# LANGUAGE UnicodeSyntax #-}
 
-foo x = addToEnv (∀)
+foo :: ∀ a. a -> a
+foo = id

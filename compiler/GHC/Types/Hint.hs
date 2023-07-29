@@ -345,11 +345,6 @@ data GhcHint
     -}
   | SuggestFillInWildcardConstraint
 
-  {-| Suggests to use an identifier other than 'forall'
-      Triggered by: 'GHC.Tc.Errors.Types.TcRnForallIdentifier'
-  -}
-  | SuggestRenameForall
-
     {-| Suggests to use the appropriate Template Haskell tick:
         a single tick for a term-level 'NameSpace', or a double tick
         for a type-level 'NameSpace'.

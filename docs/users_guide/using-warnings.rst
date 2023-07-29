@@ -2312,31 +2312,24 @@ of ``-W(no-)*``.
     disabled.
 
 .. ghc-flag:: -Wforall-identifier
-    :shortdesc: warn when ``forall`` is used as an identifier (at definition sites)
+    :shortdesc: *(deprecated)* Does nothing
     :type: dynamic
-    :reverse: -Wno-forall-identifier
 
     :since: 9.4
 
-    In a future GHC release, ``forall`` will become a keyword regardless of
-    enabled extensions. This will make definitions such as the following
-    illegal::
+    This warning is deprecated. It no longer has any effect since GHC 9.10.
 
-      -- from constraints-0.13
-      forall :: forall p. (forall a. Dict (p a)) -> Dict (Forall p)
-      forall d = ...
+    In the past, GHC used to accept ``forall`` as a term-level identifier:
+    ::
 
-    Library authors are advised to use a different identifier, such as
-    ``forAll``, ``forall_``, or ``for_all``::
+        -- from constraints-0.13
+        forall :: forall p. (forall a. Dict (p a)) -> Dict (Forall p)
+        forall d = ...
 
-      forall_ :: forall p. (forall a. Dict (p a)) -> Dict (Forall p)
-      forall_ d = ...
-
-    The warning is only triggered at definition sites where it can be
-    addressed by using a different name.
-
-    Users of a library that exports ``forall`` as an identifier cannot address
-    the issue themselves, so the warning is not reported at use sites.
+    In accordance with `GHC Proposal #281 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`__,
+    this is no longer possible, as ``forall`` has become a proper keyword.
+    :ghc-flag:`-Wforall-identifier` was used in the migration period before the
+    breaking change took place.
 
 .. ghc-flag:: -Wunicode-bidirectional-format-characters
     :shortdesc: warn about the usage of unicode bidirectional layout override characters
@@ -2441,11 +2434,7 @@ of ``-W(no-)*``.
 
     :since: 9.8.1
 
-    In accordance with `GHC Proposal #281
-    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst>`__,
-    a new extension ``RequiredTypeArguments`` will be introduced in a future GHC release.
-
-    Under ``RequiredTypeArguments``, implicit quantification of type variables does not take place
+    Under :extension:`RequiredTypeArguments`, implicit quantification of type variables does not take place
     if there is a term variable of the same name in scope.
 
     For example: ::
@@ -2455,7 +2444,7 @@ of ``-W(no-)*``.
                       -- or is it implicitly quantified?
 
     When :ghc-flag:`-Wterm-variable-capture` is enabled, GHC warns against implicit quantification
-    that would stop working under ``RequiredTypeArguments``.
+    that would stop working under :extension:`RequiredTypeArguments`.
 
 .. ghc-flag:: -Wmissing-role-annotations
     :shortdesc: warn when type declarations don't have role annotations

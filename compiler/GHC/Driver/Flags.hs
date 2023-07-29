@@ -947,7 +947,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnNonCanonicalMonadInstances,
         Opt_WarnNonCanonicalMonoidInstances,
         Opt_WarnOperatorWhitespaceExtConflict,
-        Opt_WarnForallIdentifier,
         Opt_WarnUnicodeBidirectionalFormatCharacters,
         Opt_WarnGADTMonoLocalBinds,
         Opt_WarnBadlyStagedTypes,

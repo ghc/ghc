@@ -1899,17 +1899,6 @@ data TcRnMessage where
   -}
   TcRnArrowProcGADTPattern :: TcRnMessage
 
-  {-| TcRnForallIdentifier is a warning (controlled with -Wforall-identifier) that occurs
-     when a definition uses 'forall' as an identifier.
-
-     Example:
-       forall x = ()
-       g forall = ()
-
-     Test cases: T20609 T20609a T20609b T20609c T20609d
-  -}
-  TcRnForallIdentifier :: RdrName -> TcRnMessage
-
   {-| TcRnCapturedTermName is a warning (controlled by -Wterm-variable-capture) that occurs
     when an implicitly quantified type variable's name is already used for a term.
     Example:

@@ -33,7 +33,7 @@ import GHC.Rename.Utils ( mapFvRn, bindLocalNames
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , newLocalBndrsRn
                         , noNestedForallsContextsErr
-                        , addNoNestedForallsContextsErr, checkInferredVars, warnForallIdentifier )
+                        , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr, WhereLooking(WL_Global) )
 import GHC.Rename.Names
 import GHC.Tc.Errors.Types
@@ -373,7 +373,6 @@ rnDefaultDecl (DefaultDecl _ tys)
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
-       ; warnForallIdentifier name
        ; name' <- lookupLocatedTopBndrRnN name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
@@ -1156,7 +1155,6 @@ rnHsRuleDecl (HsRule { rd_ext  = (_, st)
                      , rd_lhs  = lhs
                      , rd_rhs  = rhs })
   = do { let rdr_names_w_loc = map (get_var . unLoc) tmvs
-       ; mapM_ warnForallIdentifier rdr_names_w_loc
        ; checkDupRdrNames rdr_names_w_loc
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc

@@ -41,8 +41,5 @@ g _ _ = ()
 h :: a -> a
 h x = x
 
--- Should NOT have a parse error :(
-{-# RULES "example6" forall a forall. g a forall = () #-}
-
 -- Should generate a warning
 {-# RULES "example7" forall a b. forall (x :: a). id' x = x #-}

@@ -789,11 +789,6 @@ instance Diagnostic TcRnMessage where
     TcRnArrowProcGADTPattern
       -> mkSimpleDecorated $
            text "Proc patterns cannot use existential or GADT data constructors"
-    TcRnForallIdentifier rdr_name
-      -> mkSimpleDecorated $
-            fsep [ text "The use of" <+> quotes (ppr rdr_name)
-                                     <+> text "as an identifier",
-                   text "will become an error in a future GHC release." ]
     TcRnTypeEqualityOutOfScope
       -> mkDecorated
            [ text "The" <+> quotes (text "~") <+> text "operator is out of scope." $$
@@ -2131,8 +2126,6 @@ instance Diagnostic TcRnMessage where
       -> ErrorWithoutFlag
     TcRnArrowProcGADTPattern
       -> ErrorWithoutFlag
-    TcRnForallIdentifier {}
-      -> WarningWithFlag Opt_WarnForallIdentifier
     TcRnTypeEqualityOutOfScope
       -> WarningWithFlag Opt_WarnTypeEqualityOutOfScope
     TcRnTypeEqualityRequiresOperators
@@ -2764,8 +2757,6 @@ instance Diagnostic TcRnMessage where
       -> noHints
     TcRnArrowProcGADTPattern
       -> noHints
-    TcRnForallIdentifier {}
-      -> [SuggestRenameForall]
     TcRnTypeEqualityOutOfScope
       -> noHints
     TcRnTypeEqualityRequiresOperators
