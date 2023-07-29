@@ -558,7 +558,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
-  = do { new_name <- newPatName mk (l2n rdr)
+  = do { new_name <- newPatName mk (la2la rdr)
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make

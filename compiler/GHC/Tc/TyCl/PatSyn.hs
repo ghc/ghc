@@ -943,7 +943,7 @@ tcPatSynBuilderBind prag_fn (PSB { psb_id = ps_lname@(L loc ps_name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup (Generated SkipPmc) (noLocA [builder_match])
           where
-            builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
+            builder_args  = [L (l2l loc) (VarPat noExtField (L loc n))
                             | L loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs ps_lname)
                                     builder_args body

@@ -244,7 +244,7 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (L (la2na l) name), unitFV name) }
+      ; return (HsVar noExtField (L (l2l l) name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v = do
@@ -280,7 +280,7 @@ rnExpr (HsVar _ (L l v))
             -> rnExpr (ExplicitList noAnn [])
 
             | otherwise
-            -> finishHsVar (L (na2la l) nm)
+            -> finishHsVar (L (l2l l) nm)
         }}}
 
 rnExpr (HsIPVar x v)
