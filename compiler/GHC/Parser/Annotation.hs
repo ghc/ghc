@@ -50,7 +50,7 @@ module GHC.Parser.Annotation (
 
   -- ** Utilities for converting between different 'GenLocated' when
   -- ** we do not care about the annotations.
-  la2na, na2la, n2l, l2n, l2l, la2la,
+  l2l, la2la,
   reLoc,
   HasLoc(..), getHasLocList,
 
@@ -991,31 +991,15 @@ knowing that in most cases the original list is empty.
 
 -- ---------------------------------------------------------------------
 
--- |Helper function (temporary) during transition of names
+-- |Helper function for converting annotation types.
 --  Discards any annotations
-l2n :: LocatedAn a1 a2 -> LocatedN a2
-l2n (L la a) = L (noAnnSrcSpan (locA la)) a
+l2l :: (HasLoc a, HasAnnotation b) => a -> b
+l2l a = noAnnSrcSpan (getHasLoc a)
 
-n2l :: LocatedN a -> LocatedA a
-n2l (L la a) = L (na2la la) a
-
--- |Helper function (temporary) during transition of names
+-- |Helper function for converting annotation types.
 --  Discards any annotations
-la2na :: SrcSpanAnn' a -> SrcSpanAnnN
-la2na l = noAnnSrcSpan (locA l)
-
--- |Helper function (temporary) during transition of names
---  Discards any annotations
-la2la :: (NoAnn ann2) => LocatedAn ann1 a2 -> LocatedAn ann2 a2
-la2la (L la a) = L (noAnnSrcSpan (locA la)) a
-
-l2l :: SrcSpanAnn' a -> SrcAnn ann
-l2l l = SrcSpanAnn EpAnnNotUsed (locA l)
-
--- |Helper function (temporary) during transition of names
---  Discards any annotations
-na2la :: (NoAnn ann) => SrcSpanAnn' a -> SrcAnn ann
-na2la l = noAnnSrcSpan (locA l)
+la2la :: (HasLoc l, HasAnnotation l2) => GenLocated l a -> GenLocated l2 a
+la2la (L la a) = L (noAnnSrcSpan (getHasLoc la)) a
 
 locA :: (HasLoc a) => a -> SrcSpan
 locA = getHasLoc

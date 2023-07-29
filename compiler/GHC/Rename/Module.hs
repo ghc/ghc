@@ -2539,7 +2539,7 @@ extendPatSynEnv dup_fields_ok has_sel val_decls local_fix_env thing = do {
           return ((PatSynName bnd_name, con_info) : names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = L _ n, psb_args = as })) <- bind
       = do
-        bnd_name <- newTopSrcBinder (L (la2na bind_loc) n)
+        bnd_name <- newTopSrcBinder (L (l2l bind_loc) n)
         let con_info = mkConInfo (conDetailsArity length as) []
         return ((PatSynName bnd_name, con_info) : names)
       | otherwise

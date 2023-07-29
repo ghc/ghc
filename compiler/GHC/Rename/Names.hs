@@ -869,10 +869,10 @@ getLocalNonValBinders fixity_env
     new_tc dup_fields_ok has_sel tc_decl -- NOT for type/data instances
         = do { let TyDeclBinders (main_bndr, tc_flav) at_bndrs sig_bndrs
                      (LConsWithFields cons_with_flds flds) = hsLTyClDeclBinders tc_decl
-             ; tycon_name          <- newTopSrcBinder $ l2n main_bndr
-             ; at_names            <- mapM (newTopSrcBinder . l2n . fst) at_bndrs
-             ; sig_names           <- mapM (newTopSrcBinder . l2n) sig_bndrs
-             ; con_names_with_flds <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (l2n con)) cons_with_flds
+             ; tycon_name          <- newTopSrcBinder $ la2la main_bndr
+             ; at_names            <- mapM (newTopSrcBinder . la2la . fst) at_bndrs
+             ; sig_names           <- mapM (newTopSrcBinder . la2la) sig_bndrs
+             ; con_names_with_flds <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (la2la con)) cons_with_flds
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst con_names_with_flds) flds
              ; mapM_ (add_dup_fld_errs flds') con_names_with_flds
              ; let tc_gre = mkLocalTyConGRE (fmap (const tycon_name) tc_flav) tycon_name
@@ -947,7 +947,7 @@ getLocalNonValBinders fixity_env
     new_di dup_fields_ok has_sel mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- unLoc <$> lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let LConsWithFields cons_with_flds flds = hsDataFamInstBinders dfid
-             ; sub_names <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (l2n con)) cons_with_flds
+             ; sub_names <- mapM (\(con,flds) -> (,flds) <$> newTopSrcBinder (la2la con)) cons_with_flds
              ; flds' <- mapM (newRecordFieldLabel dup_fields_ok has_sel $ map fst sub_names) flds
              ; mapM_ (add_dup_fld_errs flds') sub_names
              ; let fld_env  = mk_fld_env sub_names flds'
@@ -2133,14 +2133,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (la2e l)   (L (la2na l) n))
-  | otherwise             = L l (IEName    noExtField (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (la2e l)   (L (l2l l) n))
+  | otherwise             = L l (IEName    noExtField (L (l2l l) n))
 
 
 to_ie_post_rn :: LocatedA (IdP GhcRn) -> LIEWrappedName GhcRn
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (la2e l)   (L (la2na l) n))
-  | otherwise                   = L l (IEName noExtField (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (la2e l)   (L (l2l l) n))
+  | otherwise                   = L l (IEName noExtField (L (l2l l) n))
   where occ = occName n
 
 {-

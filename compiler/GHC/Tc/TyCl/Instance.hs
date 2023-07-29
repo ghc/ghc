@@ -610,7 +610,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- itself, so we make do with the location of family name
        ; (co_ax_branch, co_ax_validity_info)
           <- tcTyFamInstEqn fam_tc mb_clsinfo
-                (L (na2la $ getLoc fam_lname) eqn)
+                (L (l2l $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
