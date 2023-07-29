@@ -227,10 +227,11 @@ reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"
                            , "module", "newtype", "of", "then", "type", "where"
                            , "_" ]
 
--- | All reserved operators. Taken from section 2.4 of the 2010 Report.
+-- | All reserved operators. Taken from section 2.4 of the 2010 Report,
+-- excluding @\@@ and @~@ that are allowed by GHC (see GHC Proposal #229).
 reservedOps :: Set.Set String
 reservedOps = Set.fromList [ "..", ":", "::", "=", "\\", "|", "<-", "->"
-                           , "@", "~", "=>" ]
+                           , "=>" ]
 
 -- | Does this string contain only dashes and has at least 2 of them?
 isDashes :: String -> Bool
