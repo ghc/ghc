@@ -1450,13 +1450,6 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
     anc' = anc { anchor_op = op}
 
     (r,c) = ss2posEnd pp
-    -- la = anchor anc
-    -- dp'' = if r == 0
-    --        then (ss2delta (r,c+0) la)
-    --        else (ss2delta (r,c)   la)
-    -- dp' = if pp == anchor anc
-    --          then dp
-    --          else dp''
     dp'' = case anc of
       Anchor _ (MovedAnchor dp1 _) -> dp1
       Anchor la _ ->

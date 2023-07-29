@@ -36,8 +36,8 @@ import GHC.Data.FastString
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
--- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
@@ -55,8 +55,9 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/LocToName.hs" (Just changeLocToName)
  -- "../../testsuite/tests/ghc-api/exactprint/LetIn1.hs" (Just changeLetIn1)
  -- "../../testsuite/tests/ghc-api/exactprint/WhereIn4.hs" (Just changeWhereIn4)
+ "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl1.hs" (Just changeAddDecl1)
- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
+ -- "../../testsuite/tests/ghc-api/exactprint/AddDecl2.hs" (Just changeAddDecl2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddDecl3.hs" (Just changeAddDecl3)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls.hs" (Just changeLocalDecls)
  -- "../../testsuite/tests/ghc-api/exactprint/LocalDecls2.hs" (Just changeLocalDecls2)
