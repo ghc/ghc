@@ -17,7 +17,6 @@ module GHC.Rename.Utils (
         addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
-        warnForallIdentifier,
         DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
@@ -467,13 +466,6 @@ warnUnusedTypePatterns = check_unused UnusedNameTypePattern
 check_unused :: UnusedNameProv -> [Name] -> FreeVars -> RnM ()
 check_unused prov bound_names used_names
   = warnUnused prov (filterOut (`elemNameSet` used_names) bound_names)
-
-warnForallIdentifier :: LocatedN RdrName -> RnM ()
-warnForallIdentifier (L l rdr_name@(Unqual occ))
-  | isKw (fsLit "forall") || isKw (fsLit "∀")
-  = addDiagnosticAt (locA l) (TcRnForallIdentifier rdr_name)
-  where isKw = (occNameFS occ ==)
-warnForallIdentifier _ = return ()
 
 {-
 ************************************************************************

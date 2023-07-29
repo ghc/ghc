@@ -249,20 +249,6 @@ Ambiguity:
     We shift, so [0] is parsed as an activation rule.
 -}
 
-{- Note [%shift: rule_foralls -> 'forall' rule_vars '.']
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Context:
-    rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
-    rule_foralls -> 'forall' rule_vars '.' .
-
-Example:
-    {-# RULES "name" forall a1. forall a2. lhs = rhs #-}
-
-Ambiguity:
-    Same as in Note [%shift: rule_foralls -> {- empty -}]
-    but for the second 'forall'.
--}
-
 {- Note [%shift: rule_foralls -> {- empty -}]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Context:
@@ -1928,9 +1914,7 @@ rule_foralls :: { ([AddEpAnn] -> HsRuleAnn, Maybe [LHsTyVarBndr () GhcPs], [LRul
                                                                           (Just (mu AnnForall $4,mj AnnDot $6))
                                                                           anns,
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-
-        -- See Note [%shift: rule_foralls -> 'forall' rule_vars '.']
-        | 'forall' rule_vars '.' %shift                    { (\anns -> HsRuleAnn Nothing (Just (mu AnnForall $1,mj AnnDot $3)) anns,
+        | 'forall' rule_vars '.'                           { (\anns -> HsRuleAnn Nothing (Just (mu AnnForall $1,mj AnnDot $3)) anns,
                                                               Nothing, mkRuleBndrs $2) }
         -- See Note [%shift: rule_foralls -> {- empty -}]
         | {- empty -}            %shift                    { (\anns -> HsRuleAnn Nothing Nothing anns, Nothing, []) }
@@ -1951,7 +1935,7 @@ We really want the above definition of rule_foralls to be:
                | 'forall' rule_vars '.'
                | {- empty -}
 
-where rule_vars (term variables) can be named "forall", "family", or "role",
+where rule_vars (term variables) can be named "family" or "role",
 but tv_vars (type variables) cannot be. However, such a definition results
 in a reduce/reduce conflict. For example, when parsing:
 > {-# RULE "name" forall a ... #-}
@@ -3834,7 +3818,6 @@ varid :: { LocatedN RdrName }
         | 'unsafe'         { sL1n $1 $! mkUnqual varName (fsLit "unsafe") }
         | 'safe'           { sL1n $1 $! mkUnqual varName (fsLit "safe") }
         | 'interruptible'  { sL1n $1 $! mkUnqual varName (fsLit "interruptible")}
-        | 'forall'         { sL1n $1 $! mkUnqual varName (fsLit "forall") }
         | 'family'         { sL1n $1 $! mkUnqual varName (fsLit "family") }
         | 'role'           { sL1n $1 $! mkUnqual varName (fsLit "role") }
         -- If this changes relative to tyvarid, update 'checkRuleTyVarBndrNames'
@@ -4220,10 +4203,11 @@ hintMultiWayIf span = do
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
 hintExplicitForall tok = do
-    forall   <- getBit ExplicitForallBit
-    rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
-      (PsErrExplicitForall (isUnicode tok))
+    explicit_forall_enabled <- getBit ExplicitForallBit
+    in_rule_prag <- getBit InRulePragBit
+    unless (explicit_forall_enabled || in_rule_prag) $
+      addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
+        PsErrExplicitForall (isUnicode tok)
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()

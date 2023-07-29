@@ -149,11 +149,6 @@ instance Outputable GhcHint where
       -> text "Add a standalone kind signature for" <+> quotes (ppr name)
     SuggestFillInWildcardConstraint
       -> text "Fill in the wildcard constraint yourself"
-    SuggestRenameForall
-      -> vcat [ text "Consider using another name, such as"
-              , quotes (text "forAll") <> comma <+>
-                quotes (text "for_all") <> comma <+> text "or" <+>
-                quotes (text "forall_") <> dot ]
     SuggestAppropriateTHTick ns
       -> text "Perhaps use a" <+> how_many <+> text "tick"
         where

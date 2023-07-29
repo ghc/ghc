@@ -219,13 +219,14 @@ okIdChar c = case generalCategory c of
   OtherNumber     -> True -- See #4373
   _               -> c == '\'' || c == '_'
 
--- | All reserved identifiers. Taken from section 2.4 of the 2010 Report.
+-- | All reserved identifiers. Taken from section 2.4 of the 2010 Report,
+-- plus the GHC-specific @forall@ keyword (see GHC Proposal #281).
 reservedIds :: Set.Set String
 reservedIds = Set.fromList [ "case", "class", "data", "default", "deriving"
-                           , "do", "else", "foreign", "if", "import", "in"
-                           , "infix", "infixl", "infixr", "instance", "let"
-                           , "module", "newtype", "of", "then", "type", "where"
-                           , "_" ]
+                           , "do", "else", "forall", "foreign", "if", "import"
+                           , "in", "infix", "infixl", "infixr", "instance"
+                           , "let", "module", "newtype", "of", "then", "type"
+                           , "where", "_" ]
 
 -- | All reserved operators. Taken from section 2.4 of the 2010 Report,
 -- excluding @\@@ and @~@ that are allowed by GHC (see GHC Proposal #229).
