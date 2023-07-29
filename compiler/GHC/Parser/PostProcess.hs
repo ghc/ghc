@@ -1833,7 +1833,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsParPV l lpar e rpar = do
     cs <- getCommentsFor l
     return $ L (noAnnSrcSpan l) (HsPar (EpAnn (spanAsAnchor l) NoEpAnns cs) lpar e rpar)
-  mkHsVarPV v@(L l _) = return $ L (na2la l) (HsVar noExtField v)
+  mkHsVarPV v@(L l _) = return $ L (l2l l) (HsVar noExtField v)
   mkHsLitPV (L l a) = do
     cs <- getCommentsFor l
     return $ L l (HsLit (comment (realSrcSpan l) cs) a)
@@ -1907,7 +1907,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsIfPV l _ _ _ _ _ _ = addFatalError $ mkPlainErrorMsgEnvelope l PsErrIfThenElseInPat
   mkHsDoPV l _ _ _       = addFatalError $ mkPlainErrorMsgEnvelope l PsErrDoNotationInPat
   mkHsParPV l lpar p rpar   = return $ L (noAnnSrcSpan l) (PatBuilderPar lpar p rpar)
-  mkHsVarPV v@(getLoc -> l) = return $ L (na2la l) (PatBuilderVar v)
+  mkHsVarPV v@(getLoc -> l) = return $ L (l2l l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
     checkUnboxedLitPat lit
     return $ L l (PatBuilderPat (LitPat noExtField a))

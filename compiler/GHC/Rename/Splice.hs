@@ -389,12 +389,12 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name
 mkQuasiQuoteExpr flavour quoter (L q_span' quote)
   = L q_span $ HsApp noComments (L q_span
              $ HsApp noComments (L q_span
-                    (HsVar noExtField (L (la2na q_span) quote_selector)))
+                    (HsVar noExtField (L (l2l q_span) quote_selector)))
                                 quoterExpr)
                     quoteExpr
   where
     q_span = noAnnSrcSpan (locA q_span')
-    quoterExpr = L q_span $! HsVar noExtField $! (L (la2na q_span) quoter)
+    quoterExpr = L q_span $! HsVar noExtField $! (L (l2l q_span) quoter)
     quoteExpr  = L q_span $! HsLit noComments $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
