@@ -3230,10 +3230,10 @@ starSym False = fsLit "*"
 -----------------------------------------
 -- Bits and pieces for RecordDotSyntax.
 
-mkRdrGetField :: SrcSpanAnnA -> LHsExpr GhcPs -> LocatedAn NoEpAnns (DotFieldOcc GhcPs)
-  -> EpAnnCO -> LHsExpr GhcPs
-mkRdrGetField loc arg field anns =
-  L loc HsGetField {
+mkRdrGetField :: LHsExpr GhcPs -> LocatedAn NoEpAnns (DotFieldOcc GhcPs)
+  -> EpAnnCO -> HsExpr GhcPs
+mkRdrGetField arg field anns =
+  HsGetField {
       gf_ext = anns
     , gf_expr = arg
     , gf_field = field
