@@ -2267,9 +2267,9 @@ tyop :: { (LocatedN RdrName, PromotionFlag) }
                                               ; return (op, IsPromoted) } }
 
 atype :: { LHsType GhcPs }
-        : ntgtycon                       {% acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
+        : ntgtycon                       {% acsA (\cs -> sL1 $1 (HsTyVar (EpAnn (glR $1) [] cs) NotPromoted $1)) }      -- Not including unit tuples
         -- See Note [%shift: atype -> tyvar]
-        | tyvar %shift                   {% acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glR $1) [] cs) NotPromoted $1)) }      -- (See Note [Unit tuples])
+        | tyvar %shift                   {% acsA (\cs -> sL1 $1 (HsTyVar (EpAnn (glR $1) [] cs) NotPromoted $1)) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1a $1 (HsStarTy noExtField (isUnicode $1)) } }
 
@@ -2316,7 +2316,7 @@ atype :: { LHsType GhcPs }
         -- Type variables are never exported, so `M.tyvar` will be rejected by the renamer.
         -- We let it pass the parser because the renamer can generate a better error message.
         | QVARID                      {% let qname = mkQual tvName (getQVARID $1)
-                                         in  acsa (\cs -> sL1a $1 (HsTyVar (EpAnn (glEE $1 $>) [] cs) NotPromoted (sL1n $1 $ qname)))}
+                                         in  acsA (\cs -> sL1 $1 (HsTyVar (EpAnn (glEE $1 $>) [] cs) NotPromoted (sL1n $1 $ qname)))}
 
 -- An inst_type is what occurs in the head of an instance decl
 --      e.g.  (Foo a, Gaz b) => Wibble a b
@@ -2953,9 +2953,10 @@ aexp1   :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | aexp1 TIGHT_INFIX_PROJ field
             {% runPV (unECP $1) >>= \ $1 ->
-               fmap ecpFromExp $ acsa (\cs ->
+               fmap ecpFromExp $ acsA (\cs ->
                  let fl = sLLa $2 $> (DotFieldOcc ((EpAnn (glR $2) (AnnFieldLabel (Just $ glAA $2)) emptyComments)) $3) in
-                 mkRdrGetField (noAnnSrcSpan $ comb2 $1 $>) $1 fl (EpAnn (glEE $1 $>) NoEpAnns cs))  }
+               sLL $1 $> $ mkRdrGetField $1 fl (EpAnn (glEE $1 $>) NoEpAnns cs))  }
+
 
 
         | aexp2                { $1 }
@@ -3481,7 +3482,7 @@ fbind   :: { forall b. DisambECP b => PV (Fbind b) }
                         -- f (R { x = show -> s }) = ...
 
         | qvar          { placeHolderPunRhs >>= \rhs ->
-                          fmap Left $ acsa (\cs -> sL1a $1 $ HsFieldBind (EpAnn (glR $1) [] cs) (sL1a $1 $ mkFieldOcc $1) rhs True) }
+                          fmap Left $ acsA (\cs -> sL1 $1 $ HsFieldBind (EpAnn (glR $1) [] cs) (sL1a $1 $ mkFieldOcc $1) rhs True) }
                         -- In the punning case, use a place-holder
                         -- The renamer fills in the final value
 
@@ -4328,12 +4329,6 @@ glAA = srcSpan2e . getHasLoc
 n2l :: LocatedN a -> LocatedA a
 n2l (L la a) = L (l2l la) a
 
-acs :: MonadP m => (EpAnnComments -> Located a) -> m (Located a)
-acs a = do
-  let (L l _) = a emptyComments
-  cs <- getCommentsFor l
-  return (a cs)
-
 -- Called at the very end to pick up the EOF position, as well as any comments not allocated yet.
 acsFinal :: (EpAnnComments -> Maybe (RealSrcSpan, RealSrcSpan) -> Located a) -> P (Located a)
 acsFinal a = do
@@ -4346,17 +4341,17 @@ acsFinal a = do
              Strict.Just (pos `Strict.And` gap) -> Just (pos,gap)
   return (a (cs Semi.<> csf) ce)
 
-acsa :: MonadP m => (EpAnnComments -> LocatedAn t a) -> m (LocatedAn t a)
-acsa a = do
+acs :: (HasLoc t, MonadP m) => (EpAnnComments -> GenLocated t a) -> m (GenLocated t a)
+acs a = do
   let (L l _) = a emptyComments
   cs <- getCommentsFor (locA l)
   return (a cs)
 
-acsA :: MonadP m => (EpAnnComments -> Located a) -> m (LocatedAn t a)
+acsA :: (HasLoc t, HasAnnotation t, MonadP m) => (EpAnnComments -> Located a) -> m (GenLocated t a)
 acsA a = reLoc <$> acs a
 
 acsExpr :: (EpAnnComments -> LHsExpr GhcPs) -> P ECP
-acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acsa a
+acsExpr a = do { expr :: (LHsExpr GhcPs) <- runPV $ acs a
                ; return (ecpFromExp $ expr) }
 
 amsA :: MonadP m => LocatedA a -> [TrailingAnn] -> m (LocatedA a)
