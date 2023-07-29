@@ -2239,9 +2239,8 @@ type instance Anno FastString                      = SrcAnn NoEpAnns
 
 type instance Anno (DotFieldOcc (GhcPass p))       = SrcAnn NoEpAnns
 
-instance (Anno
-          [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)] ~ SrcAnn an,
-          Monoid an,
+instance (HasAnnotation
+           (Anno [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)]),
           IsPass idL, IsPass idR)
   => WrapXRec (GhcPass idL) [LocatedA (StmtLR (GhcPass idL) (GhcPass idR) body)]  where
   wrapXRec = noLocA
