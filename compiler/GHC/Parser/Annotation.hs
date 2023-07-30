@@ -18,8 +18,8 @@ module GHC.Parser.Annotation (
   getTokenSrcSpan,
   DeltaPos(..), deltaPos, getDeltaLine,
 
-  EpAnn(..), Anchor, AnchorOperation(..),
-  anchor, anchor_op,
+  EpAnn(..), Anchor,
+  anchor,
   spanAsAnchor, realSpanAsAnchor, spanFromAnchor,
   noSpanAnchor,
   NoAnn(..),
@@ -517,39 +517,11 @@ data EpAnn ann
                   -- e.g. from TH, deriving, etc.
         deriving (Data, Eq, Functor)
 
--- | An 'Anchor' records the base location for the start of the
--- syntactic element holding the annotations, and is used as the point
--- of reference for calculating delta positions for contained
--- annotations.
--- It is also normally used as the reference point for the spacing of
--- the element relative to its container. If it is moved, that
--- relationship is tracked in the 'anchor_op' instead.
-
--- data Anchor = Anchor        { anchor :: RealSrcSpan
---                                  -- ^ Base location for the start of
---                                  -- the syntactic element holding
---                                  -- the annotations.
---                             , anchor_op :: AnchorOperation }
---         deriving (Data, Eq, Show)
-
--- | If tools modify the parsed source, the 'MovedAnchor' variant can
--- directly provide the spacing for this item relative to the previous
--- one when printing. This allows AST fragments with a particular
--- anchor to be freely moved, without worrying about recalculating the
--- appropriate anchor span.
-data AnchorOperation = UnchangedAnchor
-                     | MovedAnchor !DeltaPos ![LEpaComment]
-        deriving (Data, Eq, Show)
-
 type Anchor = EpaLocation -- Transitional
 
 anchor :: Anchor -> RealSrcSpan
 anchor (EpaSpan r _) = r
 anchor _ = panic "anchor"
-
-anchor_op :: Anchor -> AnchorOperation
-anchor_op (EpaSpan _ _) = UnchangedAnchor
-anchor_op (EpaDelta dp cs) = MovedAnchor dp cs
 
 spanAsAnchor :: SrcSpan -> Anchor
 spanAsAnchor (RealSrcSpan r mb) = EpaSpan r mb
@@ -1493,10 +1465,6 @@ instance Outputable NoEpAnns where
 
 -- instance Outputable Anchor where
 --   ppr (Anchor a o)        = text "Anchor" <+> ppr a <+> ppr o
-
-instance Outputable AnchorOperation where
-  ppr UnchangedAnchor    = text "UnchangedAnchor"
-  ppr (MovedAnchor d cs) = text "MovedAnchor" <+> ppr d <+> ppr cs
 
 instance Outputable DeltaPos where
   ppr (SameLine c) = text "SameLine" <+> ppr c
