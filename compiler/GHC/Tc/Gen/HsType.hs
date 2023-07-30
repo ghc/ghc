@@ -2004,6 +2004,8 @@ tcTyVar name         -- Could be a tyvar, a tycon, or a datacon
                    ; let tc = promoteDataCon dc
                    ; return (mkTyConApp tc [], tyConKind tc) }
 
+           AGlobal AnId{}    -> promotionErr name TermVariablePE
+           ATcId{}           -> promotionErr name TermVariablePE
            APromotionErr err -> promotionErr name err
 
            _  -> wrongThingErr WrongThingType thing name }

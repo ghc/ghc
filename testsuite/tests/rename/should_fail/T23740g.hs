@@ -1,4 +1,6 @@
-module T22513g where
+{-# LANGUAGE RequiredTypeArguments #-}
+
+module T23740g where
 
 import Data.Kind
 
