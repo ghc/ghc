@@ -406,7 +406,7 @@ data AddEpAnn = AddEpAnn AnnKeywordId EpaLocation deriving (Data,Eq)
 -- in the @'EpaDelta'@ variant captures any comments between the prior
 -- output and the thing being marked here, since we cannot otherwise
 -- sort the relative order.
-data EpaLocation = EpaSpan !RealSrcSpan !(Strict.Maybe BufSpan)
+data EpaLocation = EpaSpan !SrcSpan
                  | EpaDelta !DeltaPos ![LEpaComment]
                deriving (Data,Eq,Show)
 
@@ -418,7 +418,7 @@ data TokenLocation = NoTokenLoc | TokenLoc !EpaLocation
 getTokenSrcSpan :: TokenLocation -> SrcSpan
 getTokenSrcSpan NoTokenLoc = noSrcSpan
 getTokenSrcSpan (TokenLoc EpaDelta{}) = noSrcSpan
-getTokenSrcSpan (TokenLoc (EpaSpan rspan mbufpos)) = RealSrcSpan rspan mbufpos
+getTokenSrcSpan (TokenLoc (EpaSpan span)) = span
 
 instance Outputable a => Outputable (GenLocated TokenLocation a) where
   ppr (L _ x) = ppr x
@@ -455,15 +455,15 @@ getDeltaLine (DifferentLine r _) = r
 -- 'EpaLocation'. The parser will never insert a 'DeltaPos', so the
 -- partial function is safe.
 epaLocationRealSrcSpan :: EpaLocation -> RealSrcSpan
-epaLocationRealSrcSpan (EpaSpan r _) = r
-epaLocationRealSrcSpan (EpaDelta _ _) = panic "epaLocationRealSrcSpan"
+epaLocationRealSrcSpan (EpaSpan (RealSrcSpan r _)) = r
+epaLocationRealSrcSpan _ = panic "epaLocationRealSrcSpan"
 
 epaLocationFromSrcAnn :: SrcAnn ann -> EpaLocation
-epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan (realSrcSpan l) Strict.Nothing
-epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = EpaSpan (anchor anc) Strict.Nothing
+epaLocationFromSrcAnn (SrcSpanAnn EpAnnNotUsed l) = EpaSpan l
+epaLocationFromSrcAnn (SrcSpanAnn (EpAnn anc _ _) _) = anc
 
 instance Outputable EpaLocation where
-  ppr (EpaSpan r _) = text "EpaSpan" <+> ppr r
+  ppr (EpaSpan r) = text "EpaSpan" <+> ppr r
   ppr (EpaDelta d cs) = text "EpaDelta" <+> ppr d <+> ppr cs
 
 instance Outputable AddEpAnn where
@@ -520,18 +520,17 @@ data EpAnn ann
 type Anchor = EpaLocation -- Transitional
 
 anchor :: Anchor -> RealSrcSpan
-anchor (EpaSpan r _) = r
+anchor (EpaSpan (RealSrcSpan r _)) = r
 anchor _ = panic "anchor"
 
 spanAsAnchor :: SrcSpan -> Anchor
-spanAsAnchor (RealSrcSpan r mb) = EpaSpan r mb
-spanAsAnchor s = EpaSpan (realSrcSpan s) Strict.Nothing
+spanAsAnchor ss  = EpaSpan ss
 
 realSpanAsAnchor :: RealSrcSpan -> Anchor
-realSpanAsAnchor r  = EpaSpan r Strict.Nothing
+realSpanAsAnchor s = EpaSpan (RealSrcSpan s Strict.Nothing)
 
 spanFromAnchor :: Anchor -> SrcSpan
-spanFromAnchor (EpaSpan r mb) = RealSrcSpan r mb
+spanFromAnchor (EpaSpan ss) = ss
 spanFromAnchor (EpaDelta _ _) = UnhelpfulSpan (UnhelpfulOther (fsLit "spanFromAnchor"))
 
 noSpanAnchor :: Anchor
@@ -1055,8 +1054,8 @@ realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
     l = mkRealSrcLoc (fsLit "foo") (-1) (-1)
 
 srcSpan2e :: SrcSpan -> EpaLocation
-srcSpan2e (RealSrcSpan s mb) = EpaSpan s mb
-srcSpan2e span = EpaSpan (realSrcSpan span) Strict.Nothing
+srcSpan2e ss@(RealSrcSpan _ _) = EpaSpan ss
+srcSpan2e span = EpaSpan (RealSrcSpan (realSrcSpan span) Strict.Nothing)
 
 la2e :: SrcSpanAnn' a -> EpaLocation
 la2e = srcSpan2e . locA
@@ -1074,7 +1073,7 @@ reAnnL :: ann -> EpAnnComments -> Located e -> GenLocated (SrcAnn ann) e
 reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 
 getLocAnn :: Located a  -> SrcSpanAnnA
-getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
+getLocAnn (L l _) = SrcSpanAnn noAnn l
 
 instance NoAnn (EpAnn a) where
   -- | Short form for 'EpAnnNotUsed'
@@ -1105,7 +1104,8 @@ widenSpan :: SrcSpan -> [AddEpAnn] -> SrcSpan
 widenSpan s as = foldl combineSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s mb):rest) = RealSrcSpan s mb : go rest
+    go (AddEpAnn _ (EpaSpan (RealSrcSpan s mb)):rest) = RealSrcSpan s mb : go rest
+    go (AddEpAnn _ (EpaSpan _):rest) = go rest
     go (AddEpAnn _ (EpaDelta _ _):rest) = go rest
 
 -- | The annotations need to all come after the anchor.  Make sure
@@ -1114,8 +1114,8 @@ widenRealSpan :: RealSrcSpan -> [AddEpAnn] -> RealSrcSpan
 widenRealSpan s as = foldl combineRealSrcSpans s (go as)
   where
     go [] = []
-    go (AddEpAnn _ (EpaSpan s _):rest) = s : go rest
-    go (AddEpAnn _ (EpaDelta _ _):rest) =     go rest
+    go (AddEpAnn _ (EpaSpan (RealSrcSpan s _)):rest) = s : go rest
+    go (AddEpAnn _ _:rest) = go rest
 
 realSpanFromAnns :: [AddEpAnn] -> Strict.Maybe RealSrcSpan
 realSpanFromAnns as = go Strict.Nothing as
@@ -1124,7 +1124,7 @@ realSpanFromAnns as = go Strict.Nothing as
     combine (Strict.Just l) r = Strict.Just $ combineRealSrcSpans l r
 
     go acc [] = acc
-    go acc (AddEpAnn _ (EpaSpan s _b):rest) = go (combine acc s) rest
+    go acc (AddEpAnn _ (EpaSpan (RealSrcSpan s _b)):rest) = go (combine acc s) rest
     go acc (AddEpAnn _ _             :rest) = go acc rest
 
 bufSpanFromAnns :: [AddEpAnn] -> Strict.Maybe BufSpan
@@ -1134,28 +1134,27 @@ bufSpanFromAnns as =  go Strict.Nothing as
     combine (Strict.Just l) r = Strict.Just $ combineBufSpans l r
 
     go acc [] = acc
-    go acc (AddEpAnn _ (EpaSpan _ (Strict.Just mb)):rest) = go (combine acc mb) rest
+    go acc (AddEpAnn _ (EpaSpan (RealSrcSpan _ (Strict.Just mb))):rest) = go (combine acc mb) rest
     go acc (AddEpAnn _ _:rest) = go acc rest
 
--- widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
--- widenAnchor (Anchor s op) as = Anchor (widenRealSpan s as) op
 widenAnchor :: Anchor -> [AddEpAnn] -> Anchor
-widenAnchor (EpaSpan s mb) as
-  = EpaSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as))
--- widenAnchor (EpaSpan r mb) _ = EpaSpan r mb
+widenAnchor (EpaSpan (RealSrcSpan s mb)) as
+  = EpaSpan (RealSrcSpan (widenRealSpan s as) (liftA2 combineBufSpans mb  (bufSpanFromAnns as)))
+widenAnchor (EpaSpan us) _ = EpaSpan us
 widenAnchor a@(EpaDelta _ _) as = case (realSpanFromAnns as) of
                                     Strict.Nothing -> a
-                                    Strict.Just r -> EpaSpan r Strict.Nothing
+                                    Strict.Just r -> EpaSpan (RealSrcSpan r Strict.Nothing)
 
 widenAnchorR :: Anchor -> RealSrcSpan -> Anchor
-widenAnchorR (EpaSpan s _) r = EpaSpan (combineRealSrcSpans s r) Strict.Nothing
-widenAnchorR (EpaDelta _ _) r = EpaSpan r Strict.Nothing
+widenAnchorR (EpaSpan (RealSrcSpan s _)) r = EpaSpan (RealSrcSpan (combineRealSrcSpans s r) Strict.Nothing)
+widenAnchorR (EpaSpan _) r = EpaSpan (RealSrcSpan r Strict.Nothing)
+widenAnchorR (EpaDelta _ _) r = EpaSpan (RealSrcSpan r Strict.Nothing)
 
 widenAnchorS :: Anchor -> SrcSpan -> Anchor
-widenAnchorS (EpaSpan s mbe) (RealSrcSpan r mbr)
-  = EpaSpan (combineRealSrcSpans s r) (liftA2 combineBufSpans mbe mbr)
-widenAnchorS (EpaSpan us mb) _ = EpaSpan us mb
-widenAnchorS (EpaDelta _ _) (RealSrcSpan r mb) = EpaSpan r mb
+widenAnchorS (EpaSpan (RealSrcSpan s mbe)) (RealSrcSpan r mbr)
+  = EpaSpan (RealSrcSpan (combineRealSrcSpans s r) (liftA2 combineBufSpans mbe mbr))
+widenAnchorS (EpaSpan us) _ = EpaSpan us
+widenAnchorS (EpaDelta _ _) (RealSrcSpan r mb) = EpaSpan (RealSrcSpan r mb)
 widenAnchorS anc _ = anc
 
 widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
@@ -1251,7 +1250,7 @@ placeholderRealSpan :: RealSrcSpan
 placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") (-1) (-1))
 
 comment :: RealSrcSpan -> EpAnnComments -> EpAnnCO
-comment loc cs = EpAnn (EpaSpan loc Strict.Nothing) NoEpAnns cs
+comment loc cs = EpAnn (EpaSpan (RealSrcSpan loc Strict.Nothing)) NoEpAnns cs
 
 -- ---------------------------------------------------------------------
 -- Utilities for managing comments in an `EpAnn a` structure.
@@ -1397,9 +1396,9 @@ instance (Semigroup a) => Semigroup (EpAnn a) where
 --   compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
 
 instance Semigroup EpaLocation where
-  EpaSpan s1 m1    <> EpaSpan s2 m2     = EpaSpan (combineRealSrcSpans s1 s2) (liftA2 combineBufSpans m1 m2)
-  EpaSpan s1 m1    <> _                 = EpaSpan s1 m1
-  _                <> EpaSpan s2 m2     = EpaSpan s2 m2
+  EpaSpan s1       <> EpaSpan s2        = EpaSpan (combineSrcSpans s1 s2)
+  EpaSpan s1       <> _                 = EpaSpan s1
+  _                <> EpaSpan s2        = EpaSpan s2
   EpaDelta dp1 cs1 <> EpaDelta _dp2 cs2 = EpaDelta dp1 (cs1<>cs2)
 
 instance Semigroup EpAnnComments where

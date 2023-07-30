@@ -473,29 +473,32 @@ annBinds a cs (HsIPBinds an bs)   = (HsIPBinds (add_where a an cs) bs, Nothing)
 annBinds _ cs  (EmptyLocalBinds x) = (EmptyLocalBinds x, Just cs)
 
 add_where :: AddEpAnn -> EpAnn AnnList -> EpAnnComments -> EpAnn AnnList
-add_where an@(AddEpAnn _ (EpaSpan rs _)) (EpAnn a (AnnList anc o c r t) cs) cs2
-  | valid_anchor (anchor a)
+add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs _))) (EpAnn a (AnnList anc o c r t) cs) cs2
+  | valid_anchor a
   = EpAnn (widenAnchor a [an]) (AnnList anc o c (an:r) t) (cs Semi.<> cs2)
   | otherwise
   = EpAnn (patch_anchor rs a)
           (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
-add_where an@(AddEpAnn _ (EpaSpan rs mb)) EpAnnNotUsed cs
-  = EpAnn (EpaSpan rs mb)
-           (AnnList (Just $ EpaSpan rs mb) Nothing Nothing [an] []) cs
+add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs mb))) EpAnnNotUsed cs
+  = EpAnn (EpaSpan (RealSrcSpan rs mb))
+           (AnnList (Just $ EpaSpan (RealSrcSpan rs mb)) Nothing Nothing [an] []) cs
 add_where (AddEpAnn _ _) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
-valid_anchor :: RealSrcSpan -> Bool
-valid_anchor r = srcSpanStartLine r >= 0
+valid_anchor :: Anchor -> Bool
+valid_anchor (EpaSpan (RealSrcSpan r _)) = srcSpanStartLine r >= 0
+valid_anchor _ = False
+-- valid_anchor (EpaSpan _) = True
+-- valid_anchor (EpaDelta _ _) = False
 
 -- If the decl list for where binds is empty, the anchor ends up
 -- invalid. In this case, use the parent one
 patch_anchor :: RealSrcSpan -> Anchor -> Anchor
-patch_anchor r (EpaDelta _ _) = EpaSpan r Strict.Nothing
-patch_anchor r1 (EpaSpan r0 mb) = EpaSpan r mb
+patch_anchor r (EpaDelta _ _) = EpaSpan (RealSrcSpan r Strict.Nothing)
+patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
   where
     r = if srcSpanStartLine r0 < 0 then r1 else r0
--- patch_anchor _ (EpaSpan ss mb) = EpaSpan ss mb
+patch_anchor _ (EpaSpan ss) = EpaSpan ss
 
 fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
 fixValbindsAnn EpAnnNotUsed = EpAnnNotUsed
@@ -505,9 +508,9 @@ fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
 -- | The 'Anchor' for a stmtlist is based on either the location or
 -- the first semicolon annotion.
 stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe Anchor
-stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (AddEpAnn _ (EpaSpan r rb)) _), _))
-  = Just $ widenAnchorS (EpaSpan l mb) (RealSrcSpan r rb)
-stmtsAnchor (L (RealSrcSpan l mb) _) = Just $ EpaSpan l mb
+stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (AddEpAnn _ (EpaSpan (RealSrcSpan r rb))) _), _))
+  = Just $ widenAnchorS (EpaSpan (RealSrcSpan l mb)) (RealSrcSpan r rb)
+stmtsAnchor (L (RealSrcSpan l mb) _) = Just $ EpaSpan (RealSrcSpan l mb)
 stmtsAnchor _ = Nothing
 
 stmtsLoc :: Located (OrdList AddEpAnn,a) -> SrcSpan
@@ -1101,14 +1104,14 @@ checkTyClHdr is_cls ty
     newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        an = (EpAnn (EpaSpan lr Strict.Nothing) (NameAnn NameParens o (srcSpan2e l) c []) cs)
+        an = EpAnn (EpaSpan (RealSrcSpan lr Strict.Nothing)) (NameAnn NameParens o (srcSpan2e l) c []) cs
       in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
     newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
-        lr = combineRealSrcSpans (anchor ap) (anchor as)
-        an = (EpAnn (EpaSpan lr Strict.Nothing) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs))
-      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
+        lr = RealSrcSpan (combineRealSrcSpans (anchor ap) (anchor as)) Strict.Nothing
+        an = EpAnn (EpaSpan lr) (NameAnn NameParens o (srcSpan2e l) c ta) (csp Semi.<> cs)
+      in SrcSpanAnn an lr
 
 -- | Yield a parse error if we have a function applied directly to a do block
 -- etc. and BlockArguments is not enabled.
@@ -3205,14 +3208,14 @@ mkMultTy pct t arr = HsExplicitMult pct t arr
 
 mkTokenLocation :: SrcSpan -> TokenLocation
 mkTokenLocation (UnhelpfulSpan _) = NoTokenLoc
-mkTokenLocation (RealSrcSpan r mb) = TokenLoc (EpaSpan r mb)
+mkTokenLocation (RealSrcSpan r mb) = TokenLoc (EpaSpan (RealSrcSpan r mb))
 
 -- Precondition: the TokenLocation has EpaSpan, never EpaDelta.
 token_location_widenR :: TokenLocation -> SrcSpan -> TokenLocation
 token_location_widenR NoTokenLoc _ = NoTokenLoc
 token_location_widenR tl (UnhelpfulSpan _) = tl
-token_location_widenR (TokenLoc (EpaSpan r1 mb1)) (RealSrcSpan r2 mb2) =
-                      (TokenLoc (EpaSpan (combineRealSrcSpans r1 r2) (liftA2 combineBufSpans mb1 mb2)))
+token_location_widenR (TokenLoc (EpaSpan s1)) s2 =
+                      (TokenLoc (EpaSpan (combineSrcSpans s1 s2)))
 token_location_widenR (TokenLoc (EpaDelta _ _)) _ =
   -- Never happens because the parser does not produce EpaDelta.
   panic "token_location_widenR: EpaDelta"

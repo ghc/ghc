@@ -122,7 +122,7 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
     fc = co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan sp Strict.Nothing)
+undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan (RealSrcSpan sp Strict.Nothing))
   where
     (l,c) = undelta (ss2pos anc) dp (LayoutStartCol 0)
     len = length (keywordToString kw)
@@ -169,7 +169,7 @@ spanLength = (-) <$> srcSpanEndCol <*> srcSpanStartCol
 
 -- | Useful for debug dumps
 eloc2str :: EpaLocation -> String
-eloc2str (EpaSpan r _) = "EpaSpan " ++ show (rs2range r)
+eloc2str (EpaSpan r) = "EpaSpan " ++ show (ss2range r)
 eloc2str epaLoc = show epaLoc
 
 -- ---------------------------------------------------------------------
@@ -199,7 +199,7 @@ isPointSrcSpan ss = spanLength ss == 0
 -- `MovedAnchor` operation based on the original location, only if it
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
-commentOrigDelta (L (EpaSpan la _) (GHC.EpaComment t pp))
+commentOrigDelta (L (EpaSpan (RealSrcSpan la _)) (GHC.EpaComment t pp))
   = (L (EpaDelta dp []) (GHC.EpaComment t pp))
                   `debug` ("commentOrigDelta: (la, pp, r,c, dp)=" ++ showAst (la, pp, r,c, dp))
   where
@@ -306,8 +306,8 @@ sortEpaComments cs = sortBy cmp cs
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
-mkKWComment kw (EpaSpan ss mb)
-  = Comment (keywordToString kw) (EpaSpan ss mb) ss (Just kw)
+mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
+  = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
 mkKWComment kw (EpaDelta dp cs)
   = Comment (keywordToString kw) (EpaDelta dp cs) placeholderRealSpan (Just kw)
 
@@ -456,15 +456,23 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 hackSrcSpanToAnchor :: SrcSpan -> Anchor
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = EpaSpan r Strict.Nothing
-hackSrcSpanToAnchor (RealSrcSpan r mb@(Strict.Just (BufSpan (BufPos s) (BufPos e))))
-  = if s <= 0 && e <= 0
-    then EpaDelta (deltaPos (-s) (-e)) []
-      `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-    else EpaSpan r mb
+hackSrcSpanToAnchor (RealSrcSpan r mb)
+  = case mb of
+    (Strict.Just (BufSpan (BufPos s) (BufPos e))) ->
+      if s <= 0 && e <= 0
+      -- then Anchor r (MovedAnchor (deltaPos (-s) (-e)))
+      then EpaDelta (deltaPos (-s) (-e)) []
+        `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
+      -- else Anchor r UnchangedAnchor
+      else EpaSpan (RealSrcSpan r mb)
+    _ -> EpaSpan (RealSrcSpan r mb)
+  -- = if s <= 0 && e <= 0
+  --   then EpaDelta (deltaPos (-s) (-e)) []
+  --     `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
+  --   else EpaSpan r mb
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
-hackAnchorToSrcSpan (EpaSpan r mb) = RealSrcSpan r mb
+hackAnchorToSrcSpan (EpaSpan s) = s
 hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 
 -- ---------------------------------------------------------------------

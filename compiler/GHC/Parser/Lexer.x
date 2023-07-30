@@ -3780,7 +3780,8 @@ warn_unknown_prag prags span buf len buf2 = do
 -- 'AddEpAnn' values for the opening and closing bordering on the start
 -- and end of the span
 mkParensEpAnn :: RealSrcSpan -> (AddEpAnn, AddEpAnn)
-mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan lo Strict.Nothing),AddEpAnn AnnCloseP (EpaSpan lc Strict.Nothing))
+mkParensEpAnn ss = (AddEpAnn AnnOpenP (EpaSpan (RealSrcSpan lo Strict.Nothing)),
+                    AddEpAnn AnnCloseP (EpaSpan (RealSrcSpan lc Strict.Nothing)))
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
