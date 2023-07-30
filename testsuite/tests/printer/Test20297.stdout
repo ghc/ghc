@@ -99,10 +99,10 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (EpaSpan { Test20297.hs:7:3-7 })
+              (EpaSpan { <no location info> })
               (AnnList
                (Just
-                (EpaSpan { Test20297.hs:7:3-7 }))
+                (EpaSpan { <no location info> }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:7:3-7 }))]
@@ -390,10 +390,10 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (EpaSpan { Test20297.ppr.hs:5:3-7 })
+              (EpaSpan { <no location info> })
               (AnnList
                (Just
-                (EpaSpan { Test20297.ppr.hs:5:3-7 }))
+                (EpaSpan { <no location info> }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:5:3-7 }))]

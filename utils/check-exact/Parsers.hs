@@ -284,7 +284,7 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
     rebalance cs = cs'
       where
         cs' = case GHC.hsmodLayout $ GHC.hsmodExt p of
-          GHC.ExplicitBraces _  (GHC.L (GHC.TokenLoc (GHC.EpaSpan ss _)) _) ->
+          GHC.ExplicitBraces _  (GHC.L (GHC.TokenLoc (GHC.EpaSpan (GHC.RealSrcSpan ss _))) _) ->
             let
               pc = GHC.priorComments cs
               fc = GHC.getFollowingComments cs
