@@ -111,6 +111,15 @@ data Token = TEOF
            | TInfixL
            | TInfixR
            | TNothing
+           | TEffect
+           | TNoEffect
+           | TCanFail
+           | TThrowsException
+           | TReadWriteEffect
+           | TCanFailWarnFlag
+           | TDoNotWarnCanFail
+           | TWarnIfEffectIsCanFail
+           | TYesWarnCanFail
            | TVector
            | TSCALAR
            | TVECTOR

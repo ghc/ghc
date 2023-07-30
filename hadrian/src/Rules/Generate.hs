@@ -82,16 +82,17 @@ compilerDependencies = do
     stage   <- getStage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
     pure $ (ghcPath -/-) <$>
-                  [ "primop-can-fail.hs-incl"
-                  , "primop-code-size.hs-incl"
+                  [ "primop-code-size.hs-incl"
                   , "primop-commutable.hs-incl"
                   , "primop-data-decl.hs-incl"
                   , "primop-fixity.hs-incl"
-                  , "primop-has-side-effects.hs-incl"
+                  , "primop-effects.hs-incl"
                   , "primop-list.hs-incl"
                   , "primop-out-of-line.hs-incl"
                   , "primop-primop-info.hs-incl"
                   , "primop-strictness.hs-incl"
+                  , "primop-is-work-free.hs-incl"
+                  , "primop-is-cheap.hs-incl"
                   , "primop-tag.hs-incl"
                   , "primop-vector-tycons.hs-incl"
                   , "primop-vector-tys-exports.hs-incl"

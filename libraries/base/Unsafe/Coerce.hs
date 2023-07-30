@@ -78,9 +78,11 @@ floating.
 But what stops the whole (case unsafeEqualityProof of ...) from
 floating?  Answer: we never float a case on a redex that can fail
 outside a conditional.  See Primop.hs,
-Note [Transformations affected by can_fail and has_side_effects].
+Note [Transformations affected by primop effects].
 And unsafeEqualityProof (being opaque) is definitely treated as
 can-fail.
+  (Huh? It seems we have a special-case in exprOkForSpeculation (app_ok)
+   /specifically/ allowing unsafeEqualityProof.  Something smells wrong. #23754)
 
 While unsafeCoerce is a perfectly ordinary function that needs no
 special treatment, Unsafe.Coerce.unsafeEqualityProof is magical, in

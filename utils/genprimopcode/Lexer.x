@@ -51,6 +51,15 @@ words :-
     <0>         "infixl"            { mkT TInfixL }
     <0>         "infixr"            { mkT TInfixR }
     <0>         "Nothing"           { mkT TNothing }
+    <0>         "effect"            { mkT TEffect }
+    <0>         "NoEffect"          { mkT TNoEffect }
+    <0>         "CanFail"           { mkT TCanFail }
+    <0>         "ThrowsException"   { mkT TThrowsException }
+    <0>         "ReadWriteEffect"   { mkT TReadWriteEffect }
+    <0>         "can_fail_warning"  { mkT TCanFailWarnFlag }
+    <0>         "DoNotWarnCanFail"  { mkT TDoNotWarnCanFail }
+    <0>         "WarnIfEffectIsCanFail" { mkT TWarnIfEffectIsCanFail }
+    <0>         "YesWarnCanFail"    { mkT TYesWarnCanFail }
     <0>         "vector"            { mkT TVector }
     <0>         "bytearray_access_ops" { mkT TByteArrayAccessOps }
     <0>         "addr_access_ops"   { mkT TAddrAccessOps }

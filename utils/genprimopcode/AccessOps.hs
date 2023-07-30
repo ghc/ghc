@@ -83,7 +83,7 @@ mkIndexByteArrayOp e = PrimOpSpec
              (elt_rep_ty e)
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
-  , opts = [OptionTrue "can_fail"]
+  , opts = [OptionEffect CanFail]
   }
 
 mkUnalignedIndexByteArrayOp :: ElementType -> Entry
@@ -95,7 +95,7 @@ mkUnalignedIndexByteArrayOp e = PrimOpSpec
              (elt_rep_ty e)
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail"]
+  , opts = [OptionEffect CanFail]
   }
 
 mkReadByteArrayOp :: ElementType -> Entry
@@ -107,7 +107,7 @@ mkReadByteArrayOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 mkUnalignedReadByteArrayOp :: ElementType -> Entry
@@ -119,7 +119,7 @@ mkUnalignedReadByteArrayOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 mkWriteByteArrayOp :: ElementType -> Entry
@@ -131,7 +131,7 @@ mkWriteByteArrayOp e = PrimOpSpec
        $ writeResTy e
   , cat = GenPrimOp
   , desc = "Write " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ "."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 mkUnalignedWriteByteArrayOp :: ElementType -> Entry
@@ -143,7 +143,7 @@ mkUnalignedWriteByteArrayOp e = PrimOpSpec
        $ writeResTy e
   , cat = GenPrimOp
   , desc = "Write " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 
@@ -168,7 +168,7 @@ mkIndexOffAddrOp e = PrimOpSpec
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
-  , opts = [OptionTrue "can_fail"]
+  , opts = [OptionEffect CanFail]
   }
 
 {-
@@ -181,7 +181,7 @@ mkUnalignedIndexOffAddrOp e = PrimOpSpec
              (elt_rep_ty e)
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail"]
+  , opts = [OptionEffect CanFail]
   }
 -}
 
@@ -195,7 +195,7 @@ mkReadOffAddrOp e = PrimOpSpec
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 {-
@@ -208,7 +208,7 @@ mkUnalignedReadOffAddrOp e = PrimOpSpec
        $ readResTy e
   , cat = GenPrimOp
   , desc = "Read " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 -}
 
@@ -222,7 +222,7 @@ mkWriteOffAddrOp e = PrimOpSpec
   , cat = GenPrimOp
   , desc = "Write " ++ elt_desc e ++ "; offset in " ++ prettyOffset e ++ ".\n\n"
            ++ getAlignWarn e
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 
 {-
@@ -235,7 +235,7 @@ mkUnalignedWriteOffAddrOp e = PrimOpSpec
        $ writeResTy e
   , cat = GenPrimOp
   , desc = "Write " ++ elt_desc e ++ "; offset in bytes."
-  , opts = [OptionTrue "can_fail", OptionTrue "has_side_effects"]
+  , opts = [OptionEffect ReadWriteEffect, OptionCanFailWarnFlag YesWarnCanFail]
   }
 -}
 

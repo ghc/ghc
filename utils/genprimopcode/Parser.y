@@ -45,6 +45,15 @@ import AccessOps
     infixl          { TInfixL }
     infixr          { TInfixR }
     nothing         { TNothing }
+    effect          { TEffect }
+    NoEffect        { TNoEffect }
+    CanFail         { TCanFail }
+    ThrowsException { TThrowsException }
+    ReadWriteEffect { TReadWriteEffect }
+    can_fail_warning { TCanFailWarnFlag }
+    DoNotWarnCanFail { TDoNotWarnCanFail }
+    WarnIfEffectIsCanFail { TWarnIfEffectIsCanFail }
+    YesWarnCanFail  { TYesWarnCanFail }
     vector          { TVector }
     SCALAR          { TSCALAR }
     VECTOR          { TVECTOR }
@@ -77,6 +86,8 @@ pOption : lowerName '=' false               { OptionFalse  $1 }
         | lowerName '=' integer             { OptionInteger $1 $3 }
         | vector    '=' pVectorTemplate     { OptionVector $3 }
         | fixity    '=' pInfix              { OptionFixity $3 }
+        | effect    '=' pEffect             { OptionEffect $3 }
+        | can_fail_warning '=' pPrimOpCanFailWarnFlag { OptionCanFailWarnFlag $3 }
 
 pInfix :: { Maybe Fixity }
 pInfix : infix  integer { Just $ Fixity NoSourceText $2 InfixN }
@@ -84,6 +95,16 @@ pInfix : infix  integer { Just $ Fixity NoSourceText $2 InfixN }
        | infixr integer { Just $ Fixity NoSourceText $2 InfixR }
        | nothing        { Nothing }
 
+pEffect :: { PrimOpEffect }
+pEffect : NoEffect                { NoEffect }
+        | CanFail                 { CanFail }
+        | ThrowsException         { ThrowsException }
+        | ReadWriteEffect         { ReadWriteEffect }
+
+pPrimOpCanFailWarnFlag :: { PrimOpCanFailWarnFlag }
+pPrimOpCanFailWarnFlag : DoNotWarnCanFail { DoNotWarnCanFail }
+                          | WarnIfEffectIsCanFail { WarnIfEffectIsCanFail }
+                          | YesWarnCanFail { YesWarnCanFail }
 
 pEntries :: { [Entry] }
 pEntries : pEntry pEntries { $1 : $2 }

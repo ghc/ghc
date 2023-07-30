@@ -61,6 +61,8 @@ data Option
    | OptionInteger String Int     -- name = <int>
    | OptionVector [(String,String,Int)]  -- name = [(,...),...]
    | OptionFixity (Maybe Fixity)  -- fixity = infix{,l,r} <int> | Nothing
+   | OptionEffect PrimOpEffect    -- effect = NoEffect | DoNotSpeculate | CanFail | ThrowsException | ReadWriteEffect | FallibleReadWriteEffect
+   | OptionCanFailWarnFlag PrimOpCanFailWarnFlag -- can_fail_warning = DoNotWarnCanFail | WarnIfEffectIsCanFail | YesWarnCanFail
      deriving Show
 
 -- categorises primops
@@ -109,6 +111,19 @@ data SourceText = SourceText String
                 | NoSourceText
                 deriving (Eq,Show)
 
+data PrimOpEffect
+  = NoEffect
+  | CanFail
+  | ThrowsException
+  | ReadWriteEffect
+  deriving (Eq, Show)
+
+data PrimOpCanFailWarnFlag
+  = DoNotWarnCanFail
+  | WarnIfEffectIsCanFail
+  | YesWarnCanFail
+  deriving (Eq, Show)
+
 ------------------------------------------------------------------
 -- Sanity checking -----------------------------------------------
 ------------------------------------------------------------------
@@ -131,7 +146,7 @@ sanityTop :: Info -> ()
 sanityTop (Info defs entries)
    = let opt_names = map get_attrib_name defs
          primops = filter is_primop entries
-     in  
+     in
      if   length opt_names /= length (nub opt_names)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")
      else myseqAll (map (sanityPrimOp opt_names) primops) ()
@@ -168,6 +183,8 @@ get_attrib_name (OptionString nm _) = nm
 get_attrib_name (OptionInteger nm _) = nm
 get_attrib_name (OptionVector _) = "vector"
 get_attrib_name (OptionFixity _) = "fixity"
+get_attrib_name (OptionEffect _) = "effect"
+get_attrib_name (OptionCanFailWarnFlag _) = "can_fail_warning"
 
 lookup_attrib :: String -> [Option] -> Maybe Option
 lookup_attrib _ [] = Nothing

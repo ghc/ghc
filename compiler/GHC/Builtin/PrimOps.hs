@@ -17,9 +17,11 @@ module GHC.Builtin.PrimOps (
         tagToEnumKey,
 
         primOpOutOfLine, primOpCodeSize,
-        primOpOkForSpeculation, primOpOkForSideEffects,
-        primOpIsCheap, primOpFixity, primOpDocs,
+        primOpOkForSpeculation, primOpOkToDiscard,
+        primOpIsWorkFree, primOpIsCheap, primOpFixity, primOpDocs,
         primOpIsDiv, primOpIsReallyInline,
+
+        PrimOpEffect(..), primOpEffect,
 
         getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
@@ -311,221 +313,316 @@ primOpOutOfLine :: PrimOp -> Bool
 *                                                                      *
 ************************************************************************
 
-Note [Checking versus non-checking primops]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  In GHC primops break down into two classes:
+Note [Exceptions: asynchronous, synchronous, and unchecked]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are three very different sorts of things in GHC-Haskell that are
+sometimes called exceptions:
 
-   a. Checking primops behave, for instance, like division. In this
-      case the primop may throw an exception (e.g. division-by-zero)
-      and is consequently is marked with the can_fail flag described below.
-      The ability to fail comes at the expense of precluding some optimizations.
+* Haskell exceptions:
 
-   b. Non-checking primops behavior, for instance, like addition. While
-      addition can overflow it does not produce an exception. So can_fail is
-      set to False, and we get more optimisation opportunities.  But we must
-      never throw an exception, so we cannot rewrite to a call to error.
+  These are ordinary exceptions that users can raise with the likes
+  of 'throw' and handle with the likes of 'catch'.  They come in two
+  very different flavors:
 
-  It is important that a non-checking primop never be transformed in a way that
-  would cause it to bottom. Doing so would violate Core's let-can-float invariant
-  (see Note [Core let-can-float invariant] in GHC.Core) which is critical to
-  the simplifier's ability to float without fear of changing program meaning.
+  * Asynchronous exceptions:
+    * These can arise at nearly any time, and may have nothing to do
+      with the code being executed.
+    * The compiler itself mostly doesn't need to care about them.
+    * Examples: a signal from another process, running out of heap or stack
+    * Even pure code can receive asynchronous exceptions; in this
+      case, executing the same code again may lead to different
+      results, because the exception may not happen next time.
+    * See rts/RaiseAsync.c for the gory details of how they work.
 
+  * Synchronous exceptions:
+    * These are produced by the code being executed, most commonly via
+      a call to the `raise#` or `raiseIO#` primops.
+    * At run-time, if a piece of pure code raises a synchronous
+      exception, it will always raise the same synchronous exception
+      if it is run again (and not interrupted by an asynchronous
+      exception).
+    * In particular, if an updatable thunk does some work and then
+      raises a synchronous exception, it is safe to overwrite it with
+      a thunk that /immediately/ raises the same exception.
+    * Although we are careful not to discard synchronous exceptions, we
+      are very liberal about re-ordering them with respect to most other
+      operations.  See the paper "A semantics for imprecise exceptions"
+      as well as Note [Precise exceptions and strictness analysis] in
+      GHC.Types.Demand.
 
-Note [PrimOp can_fail and has_side_effects]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Both can_fail and has_side_effects mean that the primop has
-some effect that is not captured entirely by its result value.
+* Unchecked exceptions:
 
-----------  has_side_effects ---------------------
-A primop "has_side_effects" if it has some side effect, visible
-elsewhere, apart from the result it returns
-    - reading or writing to the world (I/O)
-    - reading or writing to a mutable data structure (writeIORef)
-    - throwing a synchronous Haskell exception
-
-Often such primops have a type like
-   State -> input -> (State, output)
-so the state token guarantees ordering.  In general we rely on
-data dependencies of the state token to enforce write-effect ordering,
-but as the notes below make clear, the matter is a bit more complicated
-than that.
-
- * NB1: if you inline unsafePerformIO, you may end up with
-   side-effecting ops whose 'state' output is discarded.
-   And programmers may do that by hand; see #9390.
-   That is why we (conservatively) do not discard write-effecting
-   primops even if both their state and result is discarded.
-
- * NB2: We consider primops, such as raiseIO#, that can raise a
-   (Haskell) synchronous exception to "have_side_effects" but not
-   "can_fail".  We must be careful about not discarding such things;
-   see the paper "A semantics for imprecise exceptions".
-
- * NB3: *Read* effects on *mutable* cells (like reading an IORef or a
-   MutableArray#) /are/ included.  You may find this surprising because it
-   doesn't matter if we don't do them, or do them more than once.  *Sequencing*
-   is maintained by the data dependency of the state token.  But see
-   "Duplication" below under
-   Note [Transformations affected by can_fail and has_side_effects]
-
-   Note that read operations on *immutable* values (like indexArray#) do not
-   have has_side_effects.   (They might be marked can_fail, however, because
-   you might index out of bounds.)
-
-   Using has_side_effects in this way is a bit of a blunt instrument.  We could
-   be more refined by splitting read and write effects (see comments with #3207
-   and #20195)
-
-----------  can_fail ----------------------------
-A primop "can_fail" if it can fail with an *unchecked* exception on
-some elements of its input domain. Main examples:
-   division (fails on zero denominator)
-   array indexing (fails if the index is out of bounds)
-
-An "unchecked exception" is one that is an outright error, (not
-turned into a Haskell exception,) such as seg-fault or
-divide-by-zero error.  Such can_fail primops are ALWAYS surrounded
-with a test that checks for the bad cases, but we need to be
-very careful about code motion that might move it out of
-the scope of the test.
-
-Note [Transformations affected by can_fail and has_side_effects]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The can_fail and has_side_effects properties have the following effect
-on program transformations.  Summary table is followed by details.
-
-            can_fail     has_side_effects
-Discard        YES           NO
-Float in       YES           YES
-Float out      NO            NO
-Duplicate      YES           NO
-
-* Discarding.   case (a `op` b) of _ -> rhs  ===>   rhs
-  You should not discard a has_side_effects primop; e.g.
-     case (writeIntArray# a i v s of (# _, _ #) -> True
-  Arguably you should be able to discard this, since the
-  returned stat token is not used, but that relies on NEVER
-  inlining unsafePerformIO, and programmers sometimes write
-  this kind of stuff by hand (#9390).  So we (conservatively)
-  never discard a has_side_effects primop.
-
-  However, it's fine to discard a can_fail primop.  For example
-     case (indexIntArray# a i) of _ -> True
-  We can discard indexIntArray#; it has can_fail, but not
-  has_side_effects; see #5658 which was all about this.
-  Notice that indexIntArray# is (in a more general handling of
-  effects) read effect, but we don't care about that here, and
-  treat read effects as *not* has_side_effects.
-
-  Similarly (a `/#` b) can be discarded.  It can seg-fault or
-  cause a hardware exception, but not a synchronous Haskell
-  exception.
+  * These are nasty failures like seg-faults or primitive Int# division
+    by zero.  They differ from Haskell exceptions in that they are
+    un-recoverable and typically bring execution to an immediate halt.
+  * We generally treat unchecked exceptions as undefined behavior, on
+    the assumption that the programmer never intends to crash the
+    program in this way.  Thus we have no qualms about replacing a
+    division-by-zero with a recoverable Haskell exception or
+    discarding an indexArray# operation whose result is unused.
 
 
+Note [Classifying primop effects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Each primop has an associated 'PrimOpEffect', based on what that
+primop can or cannot do at runtime.  This classification is
 
-  Synchronous Haskell exceptions, e.g. from raiseIO#, are treated
-  as has_side_effects and hence are not discarded.
+* Recorded in the 'effect' field in primops.txt.pp, and
+* Exposed to the compiler via the 'primOpEffect' function in this module.
 
-* Float in.  You can float a can_fail or has_side_effects primop
-  *inwards*, but not inside a lambda (see Duplication below).
+See Note [Transformations affected by primop effects] for how we make
+use of this categorisation.
 
-* Float out.  You must not float a can_fail primop *outwards* lest
-  you escape the dynamic scope of the test.  Example:
+The meanings of the four constructors of 'PrimOpEffect' are as
+follows, in decreasing order of permissiveness:
+
+* ReadWriteEffect
+    A primop is marked ReadWriteEffect if it can
+    - read or write to the world (I/O), or
+    - read or write to a mutable data structure (e.g. readMutVar#).
+
+    Every such primop uses State# tokens for sequencing, with a type like:
+      Inputs -> State# s -> (# State# s, Outputs #)
+    The state token threading expresses ordering, but duplicating even
+    a read-only effect would defeat this.  (See "duplication" under
+    Note [Transformations affected by primop effects] for details.)
+
+    Note that operations like `indexArray#` that read *immutable*
+    data structures do not need such special sequencing-related care,
+    and are therefore not marked ReadWriteEffect.
+
+* ThrowsException
+    A primop is marked ThrowsException if
+    - it is not marked ReadWriteEffect, and
+    - it may diverge or throw a synchronous Haskell exception
+      even when used in a "correct" and well-specified way.
+
+    See also Note [Exceptions: asynchronous, synchronous, and unchecked].
+    Examples include raise#, raiseIO#, dataToTag#, and seq#.
+
+    Note that whether an exception is considered precise or imprecise
+    does not matter for the purposes of the PrimOpEffect flag.
+
+* CanFail
+    A primop is marked CanFail if
+    - it is not marked ReadWriteEffect or ThrowsException, and
+    - it can trigger a (potentially-unchecked) exception when used incorrectly.
+
+    See Note [Exceptions: asynchronous, synchronous, and unchecked].
+    Examples include quotWord# and indexIntArray#, which can fail with
+    division-by-zero and a segfault respectively.
+
+    A correct use of a CanFail primop is usually surrounded by a test
+    that screens out the bad cases such as a zero divisor or an
+    out-of-bounds array index.  We must take care never to move a
+    CanFail primop outside the scope of such a test.
+
+* NoEffect
+    A primop is marked NoEffect if it does not belong to any of the
+    other three categories.  We can very aggressively shuffle these
+    operations around without fear of changing a program's meaning.
+
+    Perhaps surprisingly, this aggressive shuffling imposes another
+    restriction: The tricky NoEffect primop uncheckedShiftLWord32# has
+    an undefined result when the provided shift amount is not between
+    0 and 31.  Thus, a call like `uncheckedShiftLWord32# x 95#` is
+    obviously invalid.  But since uncheckedShiftLWord32# is marked
+    NoEffect, we may float such an invalid call out of a dead branch
+    and speculatively evaluate it.
+
+    In particular, we cannot safely rewrite such an invalid call to a
+    runtime error; we must emit code that produces a valid Word32#.
+    (If we're lucky, Core Lint may complain that the result of such a
+    rewrite violates the let-can-float invariant (#16742), but the
+    rewrite is always wrong!)  See also Note [Guarding against silly shifts]
+    in GHC.Core.Opt.ConstantFold.
+
+    Marking uncheckedShiftLWord32# as CanFail instead of NoEffect
+    would give us the freedom to rewrite such invalid calls to runtime
+    errors, but would get in the way of optimization: When speculatively
+    executing a bit-shift prevents the allocation of a thunk, that's a
+    big win.
+
+
+Note [Transformations affected by primop effects]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The PrimOpEffect properties have the following effect on program
+transformations.  The summary table is followed by details.  See also
+Note [Classifying primop effects] for exactly what each column means.
+
+                    NoEffect    CanFail    ThrowsException    ReadWriteEffect
+Discard                YES        YES            NO                 NO
+Defer (float in)       YES        YES           SAFE               SAFE
+Speculate (float out)  YES        NO             NO                 NO
+Duplicate              YES        YES            YES                NO
+
+(SAFE means we could perform the transformation but do not.)
+
+* Discarding:   case (a `op` b) of _ -> rhs  ===>   rhs
+    You should not discard a ReadWriteEffect primop; e.g.
+       case (writeIntArray# a i v s of (# _, _ #) -> True
+    One could argue in favor of discarding this, since the returned
+    State# token is not used.  But in practice unsafePerformIO can
+    easily produce similar code, and programmers sometimes write this
+    kind of stuff by hand (#9390).  So we (conservatively) never discard
+    a ReadWriteEffect primop.
+
+      Digression: We could try to track read-only effects separately
+      from write effects to allow the former to be discarded.  But in
+      fact we want a more general rewrite for read-only operations:
+        case readOp# state# of (# newState#, _unused_result #) -> body
+        ==> case state# of newState# -> body
+      Such a rewrite is not yet implemented, but would have to be done
+      in a different place anyway.
+
+    Discarding a ThrowsException primop would also discard any exception
+    it might have thrown.  For `raise#` or `raiseIO#` this would defeat
+    the whole point of the primop, while for `dataToTag#` or `seq#` this
+    would make programs unexpectly lazier.
+
+    However, it's fine to discard a CanFail primop.  For example
+       case (indexIntArray# a i) of _ -> True
+    We can discard indexIntArray# here; this came up in #5658.  Notice
+    that CanFail primops like indexIntArray# can only trigger an
+    exception when used incorrectly, i.e. a call that might not succeed
+    is undefined behavior anyway.
+
+* Deferring (float-in):
+    See Note [Floating primops] in GHC.Core.Opt.FloatIn.
+
+    In the absence of data dependencies (including state token threading),
+    we reserve the right to re-order the following things arbitrarily:
+      * Side effects
+      * Imprecise exceptions
+      * Divergent computations (infinite loops)
+    This lets us safely float almost any primop *inwards*, but not
+    inside a (multi-shot) lambda.  (See "Duplication" below.)
+
+    However, the main reason to float-in a primop application would be
+    to discard it (by floating it into some but not all branches of a
+    case), so we actually only float-in NoEffect and CanFail operations.
+    See also Note [Floating primops] in GHC.Core.Opt.FloatIn.
+
+    (This automatically side-steps the question of precise exceptions, which
+    mustn't be re-ordered arbitrarily but need at least ThrowsException.)
+
+* Speculation (strict float-out):
+    You must not float a CanFail primop *outwards* lest it escape the
+    dynamic scope of a run-time validity test.  Example:
       case d ># 0# of
         True  -> case x /# d of r -> r +# 1
         False -> 0
-  Here we must not float the case outwards to give
+    Here we must not float the case outwards to give
       case x/# d of r ->
       case d ># 0# of
         True  -> r +# 1
         False -> 0
+    Otherwise, if this block is reached when d is zero, it will crash.
+    Exactly the same reasoning applies to ThrowsException primops.
 
-  Nor can you float out a has_side_effects primop.  For example:
+    Nor can you float out a ReadWriteEffect primop.  For example:
        if blah then case writeMutVar# v True s0 of (# s1 #) -> s1
                else s0
-  Notice that s0 is mentioned in both branches of the 'if', but
-  only one of these two will actually be consumed.  But if we
-  float out to
+    Notice that s0 is mentioned in both branches of the 'if', but
+    only one of these two will actually be consumed.  But if we
+    float out to
       case writeMutVar# v True s0 of (# s1 #) ->
       if blah then s1 else s0
-  the writeMutVar will be performed in both branches, which is
-  utterly wrong.
+    the writeMutVar will be performed in both branches, which is
+    utterly wrong.
 
-* Duplication.  You cannot duplicate a has_side_effect primop.  You
-  might wonder how this can occur given the state token threading, but
-  just look at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get
-  something like this
+    What about a read-only operation that cannot fail, like
+    readMutVar#?  In principle we could safely float these out.  But
+    there are not very many such operations and it's not clear if
+    there are real-world programs that would benefit from this.
+
+* Duplication:
+    You cannot duplicate a ReadWriteEffect primop.  You might wonder
+    how this can occur given the state token threading, but just look
+    at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get something like this
         p = case readMutVar# s v of
               (# s', r #) -> (State# s', r)
         s' = case p of (s', r) -> s'
         r  = case p of (s', r) -> r
 
-  (All these bindings are boxed.)  If we inline p at its two call
-  sites, we get a catastrophe: because the read is performed once when
-  s' is demanded, and once when 'r' is demanded, which may be much
-  later.  Utterly wrong.  #3207 is real example of this happening.
+    (All these bindings are boxed.)  If we inline p at its two call
+    sites, we get a catastrophe: because the read is performed once when
+    s' is demanded, and once when 'r' is demanded, which may be much
+    later.  Utterly wrong.  #3207 is real example of this happening.
+    Floating p into a multi-shot lambda would be wrong for the same reason.
 
-  However, it's fine to duplicate a can_fail primop.  That is really
-  the only difference between can_fail and has_side_effects.
+    However, it's fine to duplicate a CanFail or ThrowsException primop.
 
-Note [Implementation: how can_fail/has_side_effects affect transformations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Note [Implementation: how PrimOpEffect affects transformations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 How do we ensure that floating/duplication/discarding are done right
 in the simplifier?
 
-Two main predicates on primops test these flags:
-  primOpOkForSideEffects <=> not has_side_effects
-  primOpOkForSpeculation <=> not (has_side_effects || can_fail)
+Several predicates on primops test this flag:
+  primOpOkToDiscard      <=> effect < ThrowsException
+  primOpOkForSpeculation <=> effect == NoEffect && not (out_of_line)
+  primOpIsCheap          <=> cheap  -- ...defaults to primOpOkForSpeculation
+    [[But note that the raise# family and seq# are also considered cheap in
+      GHC.Core.Utils.exprIsCheap by way of being work-free]]
+
+  * The discarding mentioned above happens in
+    GHC.Core.Opt.Simplify.Iteration, specifically in rebuildCase,
+    where it is guarded by exprOkToDiscard, which in turn checks
+    primOpOkToDiscard.
 
   * The "no-float-out" thing is achieved by ensuring that we never
-    let-bind a can_fail or has_side_effects primop.  The RHS of a
-    let-binding (which can float in and out freely) satisfies
-    exprOkForSpeculation; this is the let-can-float invariant.  And
-    exprOkForSpeculation is false of can_fail and has_side_effects.
+    let-bind a saturated primop application unless it has NoEffect.
+    The RHS of a let-binding (which can float in and out freely)
+    satisfies exprOkForSpeculation; this is the let-can-float
+    invariant.  And exprOkForSpeculation is false of a saturated
+    primop application unless it has NoEffect.
 
-  * So can_fail and has_side_effects primops will appear only as the
+  * So primops that aren't NoEffect will appear only as the
     scrutinees of cases, and that's why the FloatIn pass is capable
     of floating case bindings inwards.
 
-  * The no-duplicate thing is done via primOpIsCheap, by making
-    has_side_effects things (very very very) not-cheap!
+  * Duplication via inlining and float-in of (lifted) let-binders is
+    controlled via primOpIsWorkFree and primOpIsCheap, by making
+    ReadWriteEffect things (among others) not-cheap!  (The test
+    PrimOpEffect_Sanity will complain if any ReadWriteEffect primop
+    is considered either work-free or cheap.)  Additionally, a
+    case binding is only floated inwards if its scrutinee is ok-to-discard.
 -}
 
-primOpHasSideEffects :: PrimOp -> Bool
-#include "primop-has-side-effects.hs-incl"
+primOpEffect :: PrimOp -> PrimOpEffect
+#include "primop-effects.hs-incl"
 
-primOpCanFail :: PrimOp -> Bool
-#include "primop-can-fail.hs-incl"
+data PrimOpEffect
+  -- See Note [Classifying primop effects]
+  = NoEffect
+  | CanFail
+  | ThrowsException
+  | ReadWriteEffect
+  deriving (Eq, Ord)
 
 primOpOkForSpeculation :: PrimOp -> Bool
-  -- See Note [PrimOp can_fail and has_side_effects]
+  -- See Note [Classifying primop effects]
   -- See comments with GHC.Core.Utils.exprOkForSpeculation
-  -- primOpOkForSpeculation => primOpOkForSideEffects
+  -- primOpOkForSpeculation => primOpOkToDiscard
 primOpOkForSpeculation op
-  =  primOpOkForSideEffects op
-  && not (primOpOutOfLine op || primOpCanFail op)
+  = primOpEffect op == NoEffect && not (primOpOutOfLine op)
     -- I think the "out of line" test is because out of line things can
     -- be expensive (eg sine, cosine), and so we may not want to speculate them
 
-primOpOkForSideEffects :: PrimOp -> Bool
-primOpOkForSideEffects op
-  = not (primOpHasSideEffects op)
+primOpOkToDiscard :: PrimOp -> Bool
+primOpOkToDiscard op
+  = primOpEffect op < ThrowsException
 
-{-
-Note [primOpIsCheap]
-~~~~~~~~~~~~~~~~~~~~
-
-@primOpIsCheap@, as used in GHC.Core.Opt.Simplify.Utils.  For now (HACK
-WARNING), we just borrow some other predicates for a
-what-should-be-good-enough test.  "Cheap" means willing to call it more
-than once, and/or push it inside a lambda.  The latter could change the
-behaviour of 'seq' for primops that can fail, so we don't treat them as cheap.
--}
+primOpIsWorkFree :: PrimOp -> Bool
+#include "primop-is-work-free.hs-incl"
 
 primOpIsCheap :: PrimOp -> Bool
--- See Note [PrimOp can_fail and has_side_effects]
-primOpIsCheap op = primOpOkForSpeculation op
+-- See Note [Classifying primop effects]
+#include "primop-is-cheap.hs-incl"
 -- In March 2001, we changed this to
 --      primOpIsCheap op = False
 -- thereby making *no* primops seem cheap.  But this killed eta
@@ -540,7 +637,7 @@ primOpIsCheap op = primOpOkForSpeculation op
 -- The problem that originally gave rise to the change was
 --      let x = a +# b *# c in x +# x
 -- were we don't want to inline x. But primopIsCheap doesn't control
--- that (it's exprIsDupable that does) so the problem doesn't occur
+-- that (it's primOpIsWorkFree that does) so the problem doesn't occur
 -- even if primOpIsCheap sometimes says 'True'.
 
 

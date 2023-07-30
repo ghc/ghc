@@ -3016,11 +3016,10 @@ rebuildCase env scrut case_bndr alts@[Alt _ bndrs rhs] cont
   --      a) it binds nothing (so it's really just a 'seq')
   --      b) evaluating the scrutinee has no side effects
   | is_plain_seq
-  , exprOkForSideEffects scrut
+  , exprOkToDiscard scrut
           -- The entire case is dead, so we can drop it
           -- if the scrutinee converges without having imperative
           -- side effects or raising a Haskell exception
-          -- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
    = simplExprF env rhs cont
 
   -- 2b.  Turn the case into a let, if

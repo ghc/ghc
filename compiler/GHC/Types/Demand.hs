@@ -1427,7 +1427,7 @@ see Note [Data-con worker strictness].
 --
 -- [n] nontermination (e.g. loops)
 -- [i] throws imprecise exception
--- [p] throws precise exceTtion
+-- [p] throws precise exception
 -- [c] converges (reduces to WHNF).
 --
 -- The different lattice elements correspond to different subsets, indicated by

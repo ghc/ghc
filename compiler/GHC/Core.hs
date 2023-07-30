@@ -427,9 +427,6 @@ which will generate a @case@ if necessary
 
 The let-can-float invariant is initially enforced by mkCoreLet in GHC.Core.Make.
 
-For discussion of some implications of the let-can-float invariant primops see
-Note [Checking versus non-checking primops] in GHC.Builtin.PrimOps.
-
 Historical Note [The let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Before 2022 GHC used the "let/app invariant", which applied the let-can-float rules

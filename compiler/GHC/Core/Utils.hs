@@ -27,7 +27,7 @@ module GHC.Core.Utils (
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr,
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
-        exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprOkForSpecEval,
+        exprIsHNF, exprOkForSpeculation, exprOkToDiscard, exprOkForSpecEval,
         exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
@@ -1381,6 +1381,7 @@ isWorkFreeApp fn n_val_args
   | otherwise
   = case idDetails fn of
       DataConWorkId {} -> True
+      PrimOpId op _    -> primOpIsWorkFree op
       _                -> False
 
 isCheapApp :: CheapAppFun
@@ -1488,34 +1489,45 @@ it's applied only to dictionaries.
 -}
 
 -----------------------------
--- | 'exprOkForSpeculation' returns True of an expression that is:
+-- | To a first approximation, 'exprOkForSpeculation' returns True of
+-- an expression that is:
 --
 --  * Safe to evaluate even if normal order eval might not
---    evaluate the expression at all, or
+--    evaluate the expression at all, and
 --
 --  * Safe /not/ to evaluate even if normal order would do so
 --
--- It is usually called on arguments of unlifted type, but not always
--- In particular, Simplify.rebuildCase calls it on lifted types
--- when a 'case' is a plain 'seq'. See the example in
--- Note [exprOkForSpeculation: case expressions] below
+-- More specifically, this means that:
+--  * A: Evaluation of the expression reaches weak-head-normal-form,
+--  * B: soon,
+--  * C: without causing a write side effect (e.g. writing a mutable variable).
 --
--- Precisely, it returns @True@ iff:
---  a) The expression guarantees to terminate,
---  b) soon,
---  c) without causing a write side effect (e.g. writing a mutable variable)
---  d) without throwing a Haskell exception
---  e) without risking an unchecked runtime exception (array out of bounds,
---     divide by zero)
+-- In particular, an expression that may
+--  * throw a synchronous Haskell exception, or
+--  * risk an unchecked runtime exception (e.g. array
+--    out of bounds, divide by zero)
+-- is /not/ considered OK-for-speculation, as these violate condition A.
 --
--- For @exprOkForSideEffects@ the list is the same, but omitting (e).
+-- For 'exprOkToDiscard', condition A is weakened to allow expressions
+-- that might risk an unchecked runtime exception but must otherwise
+-- reach weak-head-normal-form.
+-- (Note that 'exprOkForSpeculation' implies 'exprOkToDiscard')
 --
--- Note that
---    exprIsHNF            implies exprOkForSpeculation
---    exprOkForSpeculation implies exprOkForSideEffects
+-- But in fact both functions are a bit more conservative than the above,
+-- in at least the following ways:
 --
--- See Note [PrimOp can_fail and has_side_effects] in "GHC.Builtin.PrimOps"
--- and Note [Transformations affected by can_fail and has_side_effects]
+--  * W1: We do not take advantage of already-evaluated lifted variables.
+--        As a result, 'exprIsHNF' DOES NOT imply 'exprOkForSpeculation';
+--        if @y@ is a case-binder of lifted type, then @exprIsHNF y@ is
+--        'True', while @exprOkForSpeculation y@ is 'False'.
+--        See Note [exprOkForSpeculation and evaluated variables] for why.
+--  * W2: Read-effects on mutable variables are currently also included.
+--        See Note [Classifying primop effects] "GHC.Builtin.PrimOps".
+--  * W3: Currently, 'exprOkForSpeculation' always returns 'False' for
+--        let-expressions.  Lets can be stacked deeply, so we just give up.
+--        In any case, the argument of 'exprOkForSpeculation' is usually in
+--        a strict context, so any lets will have been floated away.
+--
 --
 -- As an example of the considerations in this test, consider:
 --
@@ -1529,12 +1541,24 @@ it's applied only to dictionaries.
 -- >    in E
 -- > }
 --
--- We can only do this if the @y + 1@ is ok for speculation: it has no
+-- We can only do this if the @y# +# 1#@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
+--
+--
+-- See also Note [Classifying primop effects] in "GHC.Builtin.PrimOps"
+-- and Note [Transformations affected by primop effects].
+--
+-- 'exprOkForSpeculation' is used to define Core's let-can-float
+-- invariant.  (See Note [Core let-can-float invariant] in
+-- "GHC.Core".)  It is therefore frequently called on arguments of
+-- unlifted type, especially via 'needsCaseBinding'.  But it is
+-- sometimes called on expressions of lifted type as well.  For
+-- example, see Note [Speculative evaluation] in "GHC.CoreToStg.Prep".
 
-exprOkForSpeculation, exprOkForSideEffects :: CoreExpr -> Bool
+
+exprOkForSpeculation, exprOkToDiscard :: CoreExpr -> Bool
 exprOkForSpeculation = expr_ok fun_always_ok primOpOkForSpeculation
-exprOkForSideEffects = expr_ok fun_always_ok primOpOkForSideEffects
+exprOkToDiscard      = expr_ok fun_always_ok primOpOkToDiscard
 
 fun_always_ok :: Id -> Bool
 fun_always_ok _ = True
@@ -1564,10 +1588,7 @@ expr_ok fun_ok primop_ok (Tick tickish e)
    | otherwise             = expr_ok fun_ok primop_ok e
 
 expr_ok _ _ (Let {}) = False
-  -- Lets can be stacked deeply, so just give up.
-  -- In any case, the argument of exprOkForSpeculation is
-  -- usually in a strict context, so any lets will have been
-  -- floated away.
+-- See W3 in the Haddock comment for exprOkForSpeculation
 
 expr_ok fun_ok primop_ok (Case scrut bndr _ alts)
   =  -- See Note [exprOkForSpeculation: case expressions]
@@ -1599,16 +1620,24 @@ app_ok :: (Id -> Bool) -> (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
 app_ok fun_ok primop_ok fun args
   | not (fun_ok fun)
   = False -- This code path is only taken for Note [Speculative evaluation]
+
+  | idArity fun > n_val_args
+  -- Partial application: just check passing the arguments is OK
+  = args_ok
+
   | otherwise
   = case idDetails fun of
-      DFunId new_type ->  not new_type
+      DFunId new_type -> not new_type
          -- DFuns terminate, unless the dict is implemented
          -- with a newtype in which case they may not
 
-      DataConWorkId {} -> True
+      DataConWorkId {} -> args_ok
                 -- The strictness of the constructor has already
                 -- been expressed by its "wrapper", so we don't need
                 -- to take the arguments into account
+                   -- Well, we thought so.  But it's definitely wrong!
+                   -- See #20749 and Note [How untagged pointers can
+                   -- end up in strict fields] in GHC.Stg.InferTags
 
       ClassOpId _ is_terminating_result
         | is_terminating_result -- See Note [exprOkForSpeculation and type classes]
@@ -1630,16 +1659,7 @@ app_ok fun_ok primop_ok fun args
               -- Often there is a literal divisor, and this
               -- can get rid of a thunk in an inner loop
 
-        | SeqOp <- op  -- See Note [exprOkForSpeculation and SeqOp/DataToTagOp]
-        -> False       --     for the special cases for SeqOp and DataToTagOp
-        | DataToTagOp <- op
-        -> False
-        | KeepAliveOp <- op
-        -> False
-
-        | otherwise
-        -> primop_ok op  -- Check the primop itself
-        && and (zipWith arg_ok arg_tys args)  -- Check the arguments
+        | otherwise -> primop_ok op && args_ok
 
       _other  -- Unlifted and terminating types;
               -- Also c.f. the Var case of exprIsHNF
@@ -1651,10 +1671,6 @@ app_ok fun_ok primop_ok fun args
                   -- just to check this.
                   -- (If we added unlifted function types this would change,
                   -- and we'd need to actually test n_val_args == 0.)
-
-         -- Partial applications
-         | idArity fun > n_val_args ->
-           and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
          -- Functions that terminate fast without raising exceptions etc
          -- See Note [Discarding unnecessary unsafeEqualityProofs]
@@ -1669,12 +1685,14 @@ app_ok fun_ok primop_ok fun args
     n_val_args   = valArgCount args
     (arg_tys, _) = splitPiTys fun_ty
 
-    -- Used for arguments to primops and to partial applications
+    -- Even if a function call itself is OK, any unlifted
+    -- args are still evaluated eagerly and must be checked
+    args_ok = and (zipWith arg_ok arg_tys args)
     arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty _) arg      -- A term argument
        | definitelyLiftedType (scaledThing ty)
-       = True -- See Note [Primops with lifted arguments]
+       = True -- lifted args are not evaluated eagerly
        | otherwise
        = expr_ok fun_ok primop_ok arg
 
@@ -1821,46 +1839,16 @@ points do the job nicely.
 ------- End of historical note ------------
 
 
-Note [Primops with lifted arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is this ok-for-speculation (see #13027)?
-   reallyUnsafePtrEquality# a b
-Well, yes.  The primop accepts lifted arguments and does not
-evaluate them.  Indeed, in general primops are, well, primitive
-and do not perform evaluation.
-
-Bottom line:
-  * In exprOkForSpeculation we simply ignore all lifted arguments.
-  * In the rare case of primops that /do/ evaluate their arguments,
-    (namely DataToTagOp and SeqOp) return False; see
-    Note [exprOkForSpeculation and evaluated variables]
-
-Note [exprOkForSpeculation and SeqOp/DataToTagOp]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Most primops with lifted arguments don't evaluate them
-(see Note [Primops with lifted arguments]), so we can ignore
-that argument entirely when doing exprOkForSpeculation.
-
-But DataToTagOp and SeqOp are exceptions to that rule.
-For reasons described in Note [exprOkForSpeculation and
-evaluated variables], we simply return False for them.
-
-Not doing this made #5129 go bad.
-Lots of discussion in #15696.
-
 Note [exprOkForSpeculation and evaluated variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Recall that
-  seq#       :: forall a s. a -> State# s -> (# State# s, a #)
-  dataToTag# :: forall a.   a -> Int#
-must always evaluate their first argument.
-
-Now consider these examples:
+Consider these examples:
  * case x of y { DEFAULT -> ....y.... }
    Should 'y' (alone) be considered ok-for-speculation?
 
  * case x of y { DEFAULT -> ....let z = dataToTag# y... }
-   Should (dataToTag# y) be considered ok-for-spec?
+   Should (dataToTag# y) be considered ok-for-spec? Recall that
+     dataToTag# :: forall a. a -> Int#
+   must always evaluate its argument. (See also Note [dataToTag# magic].)
 
 You could argue 'yes', because in the case alternative we know that
 'y' is evaluated.  But the binder-swap transformation, which is
@@ -1874,13 +1862,16 @@ and then it really, really doesn't obey the let-can-float invariant.
 
 The solution is simple: exprOkForSpeculation does not try to take
 advantage of the evaluated-ness of (lifted) variables.  And it returns
-False (always) for DataToTagOp and SeqOp.
+False (always) for primops that perform evaluation.  We achieve the latter
+by marking the relevant primops as "ThrowsException" or
+"ReadWriteEffect"; see also Note [Classifying primop effects] in
+GHC.Builtin.PrimOps.
 
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
 it doesn't have the trickiness of the let-can-float invariant to worry about.
 
 Note [Discarding unnecessary unsafeEqualityProofs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In #20143 we found
    case unsafeEqualityProof @t1 @t2 of UnsafeRefl cv[dead] -> blah
 where 'blah' didn't mention 'cv'.  We'd like to discard this
@@ -1889,7 +1880,7 @@ To do this we need to know
   (a) that cv is unused (done by OccAnal), and
   (b) that unsafeEqualityProof terminates rapidly without side effects.
 
-At the moment we check that explicitly here in exprOkForSideEffects,
+At the moment we check that explicitly here in exprOkToDiscard,
 but one might imagine a more systematic check in future.
 
 
@@ -1904,15 +1895,15 @@ but one might imagine a more systematic check in future.
 -- ~~~~~~~~~~~~~~~~
 -- | exprIsHNF returns true for expressions that are certainly /already/
 -- evaluated to /head/ normal form.  This is used to decide whether it's ok
--- to change:
+-- to perform case-to-let for lifted expressions, which changes:
 --
--- > case x of _ -> e
+-- > case x of x' { _ -> e }
 --
 --    into:
 --
--- > e
+-- > let x' = x in e
 --
--- and to decide whether it's safe to discard a 'seq'.
+-- and in so doing makes the binding lazy.
 --
 -- So, it does /not/ treat variables as evaluated, unless they say they are.
 -- However, it /does/ treat partial applications and constructor applications

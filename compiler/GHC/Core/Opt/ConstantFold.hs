@@ -1099,7 +1099,7 @@ shiftRule lit_num_ty shift_op = do
     _ | shift_len == 0 -> pure e1
 
       -- See Note [Guarding against silly shifts]
-    _ | shift_len < 0 || shift_len > bit_size
+    _ | shift_len < 0 || shift_len >= bit_size
       -> pure $ Lit $ mkLitNumberWrap platform lit_num_ty 0
            -- Be sure to use lit_num_ty here, so we get a correctly typed zero.
            -- See #18589
@@ -1581,15 +1581,15 @@ as follows:
     let x = I# (error "invalid shift")
     in ...
 
-This was originally done in the fix to #16449 but this breaks the let-can-float
-invariant (see Note [Core let-can-float invariant] in GHC.Core) as noted in #16742.
-For the reasons discussed in Note [Checking versus non-checking
-primops] (in the PrimOp module) there is no safe way to rewrite the argument of I#
-such that it bottoms.
+This was originally done in the fix to #16449 but this breaks the
+let-can-float invariant (see Note [Core let-can-float invariant] in
+GHC.Core) as noted in #16742.  For the reasons discussed under
+"NoEffect" in Note [Classifying primop effects] (in GHC.Builtin.PrimOps)
+there is no safe way to rewrite the argument of I# such that it bottoms.
 
-Consequently we instead take advantage of the fact that large shifts are
-undefined behavior (see associated documentation in primops.txt.pp) and
-transform the invalid shift into an "obviously incorrect" value.
+Consequently we instead take advantage of the fact that the result of a
+large shift is unspecified (see associated documentation in primops.txt.pp)
+and transform the invalid shift into an "obviously incorrect" value.
 
 There are two cases:
 
@@ -2016,13 +2016,6 @@ Only `SeqOp` shares that property.  (Other primops do not do anything
 as fancy as argument evaluation.)  The special handling for dataToTag#
 is:
 
-* GHC.Core.Utils.exprOkForSpeculation has a special case for DataToTagOp,
-  (actually in app_ok).  Most primops with lifted arguments do not
-  evaluate those arguments, but DataToTagOp and SeqOp are two
-  exceptions.  We say that they are /never/ ok-for-speculation,
-  regardless of the evaluated-ness of their argument.
-  See GHC.Core.Utils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
-
 * There is a special case for DataToTagOp in GHC.StgToCmm.Expr.cgExpr,
   that evaluates its argument and then extracts the tag from
   the returned value.
@@ -2113,12 +2106,9 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
 
-- GHC.Core.Utils.exprOkForSpeculation;
-  see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in GHC.Core.Utils
-
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]
-  in GHC.Core.Opt.Simplify
+  in GHC.Core.Opt.Simplify.Iteration
 -}
 
 seqRule :: RuleM CoreExpr

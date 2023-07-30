@@ -15,7 +15,7 @@
    outwards (@FloatOut@).
 
 2. We also let-ify many expressions (notably case scrutinees), so they
-   will have a fighting chance of being floated sensible.
+   will have a fighting chance of being floated sensibly.
 
 3. Note [Need for cloning during float-out]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
