@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T23315.hsig:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T23315.hsig:1:1 })
     (AnnsModule
      [(AddEpAnn AnnSignature (EpaSpan { T23315.hsig:1:1-9 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T23315.hsig:1:18-22 }))]
@@ -45,9 +43,7 @@
         [])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T23315.hsig:3:1-7 }
-                  (UnchangedAnchor))
+                 (EpaSpan { T23315.hsig:3:1-7 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -56,9 +52,7 @@
      (NoExtField)
      (TypeSig
       (EpAnn
-       (Anchor
-        { T23315.hsig:3:1-7 }
-        (UnchangedAnchor))
+       (EpaSpan { T23315.hsig:3:1-7 })
        (AnnSig
         (AddEpAnn AnnDcolon (EpaSpan { T23315.hsig:3:3-4 }))
         [])
@@ -80,9 +74,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:6-7 })
           (HsTupleTy
            (EpAnn
-            (Anchor
-             { T23315.hsig:3:6-7 }
-             (UnchangedAnchor))
+            (EpaSpan { T23315.hsig:3:6-7 })
             (AnnParen
              (AnnParens)
              (EpaSpan { T23315.hsig:3:6 })

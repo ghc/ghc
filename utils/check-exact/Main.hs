@@ -451,7 +451,7 @@ changeLetIn1 _libdir parsed
              [l2,_l1] = map wrapDecl $ bagToList bagDecls
              bagDecls' = listToBag $ concatMap decl2Bind [l2]
              (L (SrcSpanAnn _ le) e) = expr
-             a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (SameLine 1) [])) mempty emptyComments) le)
+             a = (SrcSpanAnn (EpAnn (EpaDelta (SameLine 1) []) mempty emptyComments) le)
              expr' = L a e
              tkIn' = L (TokenLoc (EpaDelta (DifferentLine 1 0) [])) HsTok
          in (HsLet an tkLet
@@ -526,8 +526,8 @@ changeLocalDecls libdir (L l p) = do
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
-        let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 5) []))) a b c dd) cs)
+        let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
         -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
@@ -553,11 +553,8 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
-        newSpan <- uniqueSrcSpanT
-        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3) []))
-        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5) []))
-        -- let anc = (EpaDelta (DifferentLine 1 3) [])
-        -- let anc2 = (EpaDelta (DifferentLine 1 5) [])
+        let anc = (EpaDelta (DifferentLine 1 3) [])
+        let anc2 = (EpaDelta (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
@@ -916,7 +913,7 @@ addHiding1 _libdir (L l p) = do
           n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar Nothing (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar Nothing (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2)))
-          impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan l0) m0)
+          impHiding = L (SrcSpanAnn (EpAnn d0
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))
@@ -944,7 +941,7 @@ addHiding2 _libdir top = do
         let
           [L li imp1] = hsmodImports p
           Just (_,L lh ns) = ideclImportList imp1
-          lh' = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan (locA lh)) m0)
+          lh' = (SrcSpanAnn (EpAnn d0
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))

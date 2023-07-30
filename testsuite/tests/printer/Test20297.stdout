@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { Test20297.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { Test20297.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { Test20297.hs:2:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:2:18-22 }))]
@@ -19,9 +17,7 @@
        { Test20297.hs:11:22-26 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { Test20297.hs:1:1-33 }
-        (UnchangedAnchor))
+       (EpaSpan { Test20297.hs:1:1-33 })
        (EpaComment
         (EpaBlockComment
          "{-# OPTIONS -ddump-parsed-ast #-}")
@@ -39,9 +35,7 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { Test20297.hs:(5,1)-(7,7) }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20297.hs:(5,1)-(7,7) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -62,9 +56,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:(5,1)-(7,7) })
           (Match
            (EpAnn
-            (Anchor
-             { Test20297.hs:(5,1)-(7,7) }
-             (UnchangedAnchor))
+            (EpaSpan { Test20297.hs:(5,1)-(7,7) })
             []
             (EpaComments
              []))
@@ -85,17 +77,13 @@
                { Test20297.hs:5:5-7 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { Test20297.hs:5:5-7 }
-                 (UnchangedAnchor))
+                (EpaSpan { Test20297.hs:5:5-7 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:5:5 })))
                 (EpaComments
                  [(L
-                   (Anchor
-                    { Test20297.hs:6:3-13 }
-                    (UnchangedAnchor))
+                   (EpaSpan { Test20297.hs:6:3-13 })
                    (EpaComment
                     (EpaLineComment
                      "-- comment0")
@@ -111,14 +99,10 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (Anchor
-               { Test20297.hs:7:3-7 }
-               (UnchangedAnchor))
+              (EpaSpan { Test20297.hs:7:3-7 })
               (AnnList
                (Just
-                (Anchor
-                 { Test20297.hs:7:3-7 }
-                 (UnchangedAnchor)))
+                (EpaSpan { Test20297.hs:7:3-7 }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:7:3-7 }))]
@@ -132,16 +116,12 @@
               [])))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { Test20297.hs:(9,1)-(11,26) }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20297.hs:(9,1)-(11,26) })
                  (AnnListItem
                   [])
                  (EpaComments
                   [(L
-                    (Anchor
-                     { Test20297.hs:7:9-19 }
-                     (UnchangedAnchor))
+                    (EpaSpan { Test20297.hs:7:9-19 })
                     (EpaComment
                      (EpaLineComment
                       "-- comment1")
@@ -162,9 +142,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:(9,1)-(11,26) })
           (Match
            (EpAnn
-            (Anchor
-             { Test20297.hs:(9,1)-(11,26) }
-             (UnchangedAnchor))
+            (EpaSpan { Test20297.hs:(9,1)-(11,26) })
             []
             (EpaComments
              []))
@@ -185,9 +163,7 @@
                { Test20297.hs:9:5-7 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { Test20297.hs:9:5-7 }
-                 (UnchangedAnchor))
+                (EpaSpan { Test20297.hs:9:5-7 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:9:5 })))
@@ -204,23 +180,17 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (Anchor
-               { Test20297.hs:(10,3)-(11,26) }
-               (UnchangedAnchor))
+              (EpaSpan { Test20297.hs:(10,3)-(11,26) })
               (AnnList
                (Just
-                (Anchor
-                 { Test20297.hs:11:9-26 }
-                 (UnchangedAnchor)))
+                (EpaSpan { Test20297.hs:11:9-26 }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.hs:10:3-7 }))]
                [])
               (EpaComments
                [(L
-                 (Anchor
-                  { Test20297.hs:10:9-19 }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20297.hs:10:9-19 })
                  (EpaComment
                   (EpaLineComment
                    "-- comment2")
@@ -230,9 +200,7 @@
               {Bag(LocatedA (HsBind GhcPs)):
                [(L
                  (SrcSpanAnn (EpAnn
-                              (Anchor
-                               { Test20297.hs:11:9-26 }
-                               (UnchangedAnchor))
+                              (EpaSpan { Test20297.hs:11:9-26 })
                               (AnnListItem
                                [])
                               (EpaComments
@@ -251,9 +219,7 @@
                       (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:11:9-26 })
                       (Match
                        (EpAnn
-                        (Anchor
-                         { Test20297.hs:11:9-26 }
-                         (UnchangedAnchor))
+                        (EpaSpan { Test20297.hs:11:9-26 })
                         []
                         (EpaComments
                          []))
@@ -274,9 +240,7 @@
                            { Test20297.hs:11:17-26 })
                           (GRHS
                            (EpAnn
-                            (Anchor
-                             { Test20297.hs:11:17-26 }
-                             (UnchangedAnchor))
+                            (EpaSpan { Test20297.hs:11:17-26 })
                             (GrhsAnn
                              (Nothing)
                              (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:11:17 })))
@@ -287,14 +251,10 @@
                             (SrcSpanAnn (EpAnnNotUsed) { Test20297.hs:11:19-26 })
                             (HsDo
                              (EpAnn
-                              (Anchor
-                               { Test20297.hs:11:19-26 }
-                               (UnchangedAnchor))
+                              (EpaSpan { Test20297.hs:11:19-26 })
                               (AnnList
                                (Just
-                                (Anchor
-                                 { Test20297.hs:11:22-26 }
-                                 (UnchangedAnchor)))
+                                (EpaSpan { Test20297.hs:11:22-26 }))
                                (Nothing)
                                (Nothing)
                                [(AddEpAnn AnnDo (EpaSpan { Test20297.hs:11:19-20 }))]
@@ -305,14 +265,10 @@
                               (Nothing))
                              (L
                               (SrcSpanAnn (EpAnn
-                                           (Anchor
-                                            { Test20297.hs:11:22-26 }
-                                            (UnchangedAnchor))
+                                           (EpaSpan { Test20297.hs:11:22-26 })
                                            (AnnList
                                             (Just
-                                             (Anchor
-                                              { Test20297.hs:11:22-26 }
-                                              (UnchangedAnchor)))
+                                             (EpaSpan { Test20297.hs:11:22-26 }))
                                             (Nothing)
                                             (Nothing)
                                             []
@@ -346,9 +302,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { Test20297.ppr.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { Test20297.ppr.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { Test20297.ppr.hs:2:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:2:18-22 }))]
@@ -359,9 +313,7 @@
        { Test20297.ppr.hs:9:20-24 })))
     (EpaCommentsBalanced
      [(L
-       (Anchor
-        { Test20297.ppr.hs:1:1-33 }
-        (UnchangedAnchor))
+       (EpaSpan { Test20297.ppr.hs:1:1-33 })
        (EpaComment
         (EpaBlockComment
          "{-# OPTIONS -ddump-parsed-ast #-}")
@@ -379,9 +331,7 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { Test20297.ppr.hs:(3,1)-(5,7) }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -402,9 +352,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:(3,1)-(5,7) })
           (Match
            (EpAnn
-            (Anchor
-             { Test20297.ppr.hs:(3,1)-(5,7) }
-             (UnchangedAnchor))
+            (EpaSpan { Test20297.ppr.hs:(3,1)-(5,7) })
             []
             (EpaComments
              []))
@@ -425,9 +373,7 @@
                { Test20297.ppr.hs:4:3-5 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { Test20297.ppr.hs:4:3-5 }
-                 (UnchangedAnchor))
+                (EpaSpan { Test20297.ppr.hs:4:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:4:3 })))
@@ -444,14 +390,10 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (Anchor
-               { Test20297.ppr.hs:5:3-7 }
-               (UnchangedAnchor))
+              (EpaSpan { Test20297.ppr.hs:5:3-7 })
               (AnnList
                (Just
-                (Anchor
-                 { Test20297.ppr.hs:5:3-7 }
-                 (UnchangedAnchor)))
+                (EpaSpan { Test20297.ppr.hs:5:3-7 }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:5:3-7 }))]
@@ -465,9 +407,7 @@
               [])))))])))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { Test20297.ppr.hs:(6,1)-(9,24) }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -488,9 +428,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:(6,1)-(9,24) })
           (Match
            (EpAnn
-            (Anchor
-             { Test20297.ppr.hs:(6,1)-(9,24) }
-             (UnchangedAnchor))
+            (EpaSpan { Test20297.ppr.hs:(6,1)-(9,24) })
             []
             (EpaComments
              []))
@@ -511,9 +449,7 @@
                { Test20297.ppr.hs:7:3-5 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { Test20297.ppr.hs:7:3-5 }
-                 (UnchangedAnchor))
+                (EpaSpan { Test20297.ppr.hs:7:3-5 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:7:3 })))
@@ -530,14 +466,10 @@
                    {OccName: x}))))))]
             (HsValBinds
              (EpAnn
-              (Anchor
-               { Test20297.ppr.hs:(8,3)-(9,24) }
-               (UnchangedAnchor))
+              (EpaSpan { Test20297.ppr.hs:(8,3)-(9,24) })
               (AnnList
                (Just
-                (Anchor
-                 { Test20297.ppr.hs:9:7-24 }
-                 (UnchangedAnchor)))
+                (EpaSpan { Test20297.ppr.hs:9:7-24 }))
                (Nothing)
                (Nothing)
                [(AddEpAnn AnnWhere (EpaSpan { Test20297.ppr.hs:8:3-7 }))]
@@ -549,9 +481,7 @@
               {Bag(LocatedA (HsBind GhcPs)):
                [(L
                  (SrcSpanAnn (EpAnn
-                              (Anchor
-                               { Test20297.ppr.hs:9:7-24 }
-                               (UnchangedAnchor))
+                              (EpaSpan { Test20297.ppr.hs:9:7-24 })
                               (AnnListItem
                                [])
                               (EpaComments
@@ -570,9 +500,7 @@
                       (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:9:7-24 })
                       (Match
                        (EpAnn
-                        (Anchor
-                         { Test20297.ppr.hs:9:7-24 }
-                         (UnchangedAnchor))
+                        (EpaSpan { Test20297.ppr.hs:9:7-24 })
                         []
                         (EpaComments
                          []))
@@ -593,9 +521,7 @@
                            { Test20297.ppr.hs:9:15-24 })
                           (GRHS
                            (EpAnn
-                            (Anchor
-                             { Test20297.ppr.hs:9:15-24 }
-                             (UnchangedAnchor))
+                            (EpaSpan { Test20297.ppr.hs:9:15-24 })
                             (GrhsAnn
                              (Nothing)
                              (AddEpAnn AnnEqual (EpaSpan { Test20297.ppr.hs:9:15 })))
@@ -606,14 +532,10 @@
                             (SrcSpanAnn (EpAnnNotUsed) { Test20297.ppr.hs:9:17-24 })
                             (HsDo
                              (EpAnn
-                              (Anchor
-                               { Test20297.ppr.hs:9:17-24 }
-                               (UnchangedAnchor))
+                              (EpaSpan { Test20297.ppr.hs:9:17-24 })
                               (AnnList
                                (Just
-                                (Anchor
-                                 { Test20297.ppr.hs:9:20-24 }
-                                 (UnchangedAnchor)))
+                                (EpaSpan { Test20297.ppr.hs:9:20-24 }))
                                (Nothing)
                                (Nothing)
                                [(AddEpAnn AnnDo (EpaSpan { Test20297.ppr.hs:9:17-18 }))]
@@ -624,14 +546,10 @@
                               (Nothing))
                              (L
                               (SrcSpanAnn (EpAnn
-                                           (Anchor
-                                            { Test20297.ppr.hs:9:20-24 }
-                                            (UnchangedAnchor))
+                                           (EpaSpan { Test20297.ppr.hs:9:20-24 })
                                            (AnnList
                                             (Just
-                                             (Anchor
-                                              { Test20297.ppr.hs:9:20-24 }
-                                              (UnchangedAnchor)))
+                                             (EpaSpan { Test20297.ppr.hs:9:20-24 }))
                                             (Nothing)
                                             (Nothing)
                                             []

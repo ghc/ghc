@@ -4311,13 +4311,15 @@ glRR :: Located a -> RealSrcSpan
 glRR = realSrcSpan . getLoc
 
 glR :: HasLoc a => a -> Anchor
-glR la = Anchor (realSrcSpan $ getHasLoc la) UnchangedAnchor
+-- glR la = Anchor (realSrcSpan $ getHasLoc la) UnchangedAnchor
+glR la = EpaSpan (realSrcSpan $ getHasLoc la) Strict.Nothing
 
 glEE :: (HasLoc a, HasLoc b) => a -> b -> Anchor
 glEE x y = spanAsAnchor $ comb2 x y
 
 anc :: RealSrcSpan -> Anchor
-anc r = Anchor r UnchangedAnchor
+-- anc r = Anchor r UnchangedAnchor
+anc r = EpaSpan r Strict.Nothing
 
 glRM :: Located a -> Maybe Anchor
 glRM (L l _) = Just $ spanAsAnchor l
@@ -4442,7 +4444,7 @@ parseSignature :: P (Located (HsModule GhcPs))
 parseSignature = parseSignatureNoHaddock >>= addHaddockToModule
 
 commentsA :: (Monoid ann) => SrcSpan -> EpAnnComments -> SrcSpanAnn' (EpAnn ann)
-commentsA loc cs = SrcSpanAnn (EpAnn (Anchor (rs loc) UnchangedAnchor) mempty cs) loc
+commentsA loc cs = SrcSpanAnn (EpAnn (EpaSpan (rs loc) Strict.Nothing) mempty cs) loc
 
 -- | Instead of getting the *enclosed* comments, this includes the
 -- *preceding* ones.  It is used at the top level to get comments
