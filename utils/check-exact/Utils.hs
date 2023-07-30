@@ -122,9 +122,9 @@ undelta (l,_) (DifferentLine dl dc) (LayoutStartCol co) = (fl,fc)
     fc = co + dc
 
 undeltaSpan :: RealSrcSpan -> AnnKeywordId -> DeltaPos -> AddEpAnn
-undeltaSpan anchor kw dp = AddEpAnn kw (EpaSpan sp Strict.Nothing)
+undeltaSpan anc kw dp = AddEpAnn kw (EpaSpan sp Strict.Nothing)
   where
-    (l,c) = undelta (ss2pos anchor) dp (LayoutStartCol 0)
+    (l,c) = undelta (ss2pos anc) dp (LayoutStartCol 0)
     len = length (keywordToString kw)
     sp = range2rs ((l,c),(l,c+len))
 
@@ -199,15 +199,16 @@ isPointSrcSpan ss = spanLength ss == 0
 -- `MovedAnchor` operation based on the original location, only if it
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
-commentOrigDelta (L (GHC.Anchor la _) (GHC.EpaComment t pp))
-  = (L (GHC.Anchor la op) (GHC.EpaComment t pp))
-                  `debug` ("commentOrigDelta: (la, pp, r,c, op)=" ++ showAst (la, pp, r,c, op))
+commentOrigDelta (L (EpaSpan la _) (GHC.EpaComment t pp))
+  = (L (EpaDelta dp []) (GHC.EpaComment t pp))
+                  `debug` ("commentOrigDelta: (la, pp, r,c, dp)=" ++ showAst (la, pp, r,c, dp))
   where
         (r,c) = ss2posEnd pp
 
-        op = if r == 0
-               then MovedAnchor (ss2delta (r,c+1) la) []
-               else MovedAnchor (ss2delta (r,c)   la) []
+        dp = if r == 0
+               then (ss2delta (r,c+1) la)
+               else (ss2delta (r,c)   la)
+commentOrigDelta c = c
 
 origDelta :: RealSrcSpan -> RealSrcSpan -> DeltaPos
 origDelta pos pp = ss2delta (ss2posEnd pp) pos
@@ -253,7 +254,7 @@ insertCppComments (L l p) cs = L l p'
             (L ac _:_) -> EpaCommentsBalanced (sortEpaComments $ pc ++ cs_before)
                                               (sortEpaComments $ fc ++ cs_after)
                    where
-                     (cs_before,cs_after) = break (\(L l0 _) ->   (ss2pos $ anchor l0) < (ss2pos $ anchor ac) ) cs
+                     (cs_before,cs_after) = break (\(L ll _) ->   (ss2pos $ anchor ll) < (ss2pos $ anchor ac) ) cs
       unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
@@ -305,10 +306,10 @@ sortEpaComments cs = sortBy cmp cs
 
 -- | Makes a comment which originates from a specific keyword.
 mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
-mkKWComment kw (EpaSpan ss _)
-  = Comment (keywordToString kw) (Anchor ss UnchangedAnchor) ss (Just kw)
+mkKWComment kw (EpaSpan ss mb)
+  = Comment (keywordToString kw) (EpaSpan ss mb) ss (Just kw)
 mkKWComment kw (EpaDelta dp cs)
-  = Comment (keywordToString kw) (Anchor placeholderRealSpan (MovedAnchor dp cs)) placeholderRealSpan (Just kw)
+  = Comment (keywordToString kw) (EpaDelta dp cs) placeholderRealSpan (Just kw)
 
 -- | Detects a comment which originates from a specific keyword.
 isKWComment :: Comment -> Bool
@@ -424,10 +425,9 @@ addEpAnnLoc (AddEpAnn _ l) = l
 
 -- ---------------------------------------------------------------------
 
--- TODO: move this to GHC
+-- TODO: get rid of this identity function
 anchorToEpaLocation :: Anchor -> EpaLocation
-anchorToEpaLocation (Anchor r UnchangedAnchor) = EpaSpan r Strict.Nothing
-anchorToEpaLocation (Anchor _ (MovedAnchor dp cs)) = EpaDelta dp cs
+anchorToEpaLocation a = a
 
 -- ---------------------------------------------------------------------
 -- Horrible hack for dealing with some things still having a SrcSpan,
@@ -456,21 +456,16 @@ To be absolutely sure, we make the delta versions use -ve values.
 
 hackSrcSpanToAnchor :: SrcSpan -> Anchor
 hackSrcSpanToAnchor (UnhelpfulSpan s) = error $ "hackSrcSpanToAnchor : UnhelpfulSpan:" ++ show s
-hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = Anchor r UnchangedAnchor
-hackSrcSpanToAnchor (RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e))))
+hackSrcSpanToAnchor (RealSrcSpan r Strict.Nothing) = EpaSpan r Strict.Nothing
+hackSrcSpanToAnchor (RealSrcSpan r mb@(Strict.Just (BufSpan (BufPos s) (BufPos e))))
   = if s <= 0 && e <= 0
-    then Anchor r (MovedAnchor (deltaPos (-s) (-e)) [])
+    then EpaDelta (deltaPos (-s) (-e)) []
       `debug` ("hackSrcSpanToAnchor: (r,s,e)=" ++ showAst (r,s,e) )
-    else Anchor r UnchangedAnchor
+    else EpaSpan r mb
 
 hackAnchorToSrcSpan :: Anchor -> SrcSpan
-hackAnchorToSrcSpan (Anchor r UnchangedAnchor) = RealSrcSpan r Strict.Nothing
-hackAnchorToSrcSpan (Anchor r (MovedAnchor dp _cs))
-  = RealSrcSpan r (Strict.Just (BufSpan (BufPos s) (BufPos e)))
-      `debug` ("hackAnchorToSrcSpan: (r,dp,s,e)=" ++ showAst (r,dp,s,e) )
-  where
-    s = - (getDeltaLine dp)
-    e = - (deltaColumn dp)
+hackAnchorToSrcSpan (EpaSpan r mb) = RealSrcSpan r mb
+hackAnchorToSrcSpan _ = error $ "hackAnchorToSrcSpan"
 
 -- ---------------------------------------------------------------------
 
