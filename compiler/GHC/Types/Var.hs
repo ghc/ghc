@@ -67,7 +67,7 @@ module GHC.Types.Var (
 
         -- * ForAllTyFlags
         ForAllTyFlag(Invisible,Required,Specified,Inferred),
-        Specificity(..),
+        Specificity(..), Erasure(..),
         isVisibleForAllTyFlag, isInvisibleForAllTyFlag, isInferredForAllTyFlag,
         coreTyLamForAllTyFlag,
 
@@ -472,7 +472,6 @@ data Specificity = InferredSpec
 -- | Whether a dependent argument is erased at runtime
 data Erasure = Erased | Retained
   deriving (Eq, Data)
-  -- XXX JB Erasure flag do we need it?
 
 pattern Inferred, Specified :: ForAllTyFlag
 pattern Inferred  = Invisible InferredSpec

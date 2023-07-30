@@ -1179,9 +1179,8 @@ tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
--- XXX JB HsForAllTy I think this is where we change things into Core
 tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
-  = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
+  = do { (erasure, tv_bndrs, ty') <- tcTKTelescope mode tele $
                             tc_lhs_type mode ty exp_kind
                  -- Pass on the mode from the type, to any wildcards
                  -- in kind signatures on the forall'd variables
@@ -1190,7 +1189,7 @@ tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
 
        -- Do not kind-generalise here!  See Note [Kind generalisation]
 
-       ; return (mkForAllTys tv_bndrs ty') }
+       ; return ((if erasure == Erased then mkForAllTys else mkForEachTys) tv_bndrs ty') }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
@@ -1382,7 +1381,7 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
 {- Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Checking telescopes].
--- XXX JB Note update
+-- XX JB Note update
 
 Consider
   f :: forall a. (forall kb (b :: kb). Proxy '[a, b]) -> ()
@@ -3014,10 +3013,9 @@ checkForDuplicateScopedTyVars scoped_prs
 tcTKTelescope :: TcTyMode
               -> HsForAllTelescope GhcRn
               -> TcM a
-              -> TcM ([TcTyVarBinder], a)
+              -> TcM (Erasure, [TcTyVarBinder], a)
 -- A HsForAllTelescope comes only from a HsForAllTy,
 -- an explicit, user-written forall type
--- XXX JB HsForAllType typechecking, do we need to change this?
 tcTKTelescope mode tele thing_inside = case tele of
   HsForAllVis { hsf_vis_bndrs = bndrs }
     -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
@@ -3026,7 +3024,7 @@ tcTKTelescope mode tele thing_inside = case tele of
           ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- req_tv_bndrs :: [VarBndr TyVar ()],
             -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarReqToBinders req_tv_bndrs, thing) }
+          ; return (Erased, tyVarReqToBinders req_tv_bndrs, thing) }
 
   HsForAllInvis { hsf_invis_bndrs = bndrs }
     -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
@@ -3035,7 +3033,7 @@ tcTKTelescope mode tele thing_inside = case tele of
           ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
             -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
+          ; return (Erased, tyVarSpecToBinders inv_tv_bndrs, thing) }
 
   HsForEachVis { hsf_retained_vis_bndrs = bndrs }
     -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
@@ -3044,7 +3042,7 @@ tcTKTelescope mode tele thing_inside = case tele of
           ; (req_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- req_tv_bndrs :: [VarBndr TyVar ()],
             -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarReqToBinders req_tv_bndrs, thing) }
+          ; return (Retained, tyVarReqToBinders req_tv_bndrs, thing) }
 
   HsForEachInvis { hsf_retained_invis_bndrs = bndrs }
     -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))
@@ -3053,7 +3051,7 @@ tcTKTelescope mode tele thing_inside = case tele of
           ; (inv_tv_bndrs, thing) <- tcExplicitTKBndrsX skol_mode bndrs thing_inside
             -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
             -- but we want [VarBndr TyVar ForAllTyFlag]
-          ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
+          ; return (Retained, tyVarSpecToBinders inv_tv_bndrs, thing) }
 
 --------------------------------------
 --    HsOuterTyVarBndrs

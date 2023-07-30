@@ -133,6 +133,7 @@ dsLHsBind :: LHsBind GhcTc
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
                             putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
+-- XXX JB Desugar somewhere in here. However we need to add some info during typechecking to the pattern match, maybe, idk, so we can desugar properly
 -- | Desugar a single binding (or group of recursive binds).
 dsHsBind :: DynFlags
          -> HsBind GhcTc

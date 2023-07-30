@@ -49,7 +49,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTy, mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTys,
-        mkForAllTy, mkForAllTys, mkInvisForAllTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys, mkForEachTys,
         mkPiTy, mkPiTys,
         mkVisFunTyMany, mkVisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
@@ -804,6 +804,11 @@ mkForAllTy bndr body
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [ForAllTyBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+
+-- | Wraps foralls and function binders over the type using the provided 'TyCoVar's from left to right
+mkForEachTys :: [ForAllTyBinder] -> Type -> Type
+mkForEachTys tyvars ty =
+  foldr (\v t -> mkForAllTy v (mkFunTy FTF_T_T manyDataConTy (binderType v) t)) ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type

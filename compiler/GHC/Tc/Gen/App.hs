@@ -876,6 +876,7 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
 
 {- Note [Visible type application and abstraction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- XXX JB Note update
 GHC supports the types
     forall {a}.  a -> t     -- ForAllTyFlag is Inferred
     forall  a.   a -> t     -- ForAllTyFlag is Specified
@@ -945,20 +946,19 @@ Syntax of types
       forall {a}. t    -- HsForAllInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
       forall a. t      -- HsForAllInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
       forall a -> t    -- HsForAllVis (c.o. HsForAllTelescope)
-      foreach {a}. t    -- HsForEachInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
-      foreach a. t      -- HsForEachInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
-      foreach a -> t    -- HsForEachVis (c.o. HsForAllTelescope)
+      foreach {a}. t   -- HsForEachInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
+      foreach a. t     -- HsForEachInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
+      foreach a -> t   -- HsForEachVis (c.o. HsForAllTelescope)
 
 * By the time we get to checking applications/abstractions (e.g. GHC.Tc.Gen.App)
   the types have been kind-checked (e.g. by tcLHsType) into ForAllTy (c.o. Type).
-  At this stage, we have:
+  At this stage, we have (using t.o. to mean "type of"):
       forall {a}. t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
       forall a. t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
       forall a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
-      -- XXX JB fix this. Should be ForAllTy -> FunTy I guess?
-      foreach {a}. t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
-      foreach a. t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
-      foreach a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
+      foreach {a}. t.o. a -> t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
+      foreach a. t.o. a -> t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
+      foreach a -> t.o. a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
 
 Syntax of applications in HsExpr
 --------------------------------
@@ -1090,6 +1090,7 @@ Proposal #281.
 
 Typechecking type abstractions
 ------------------------------
+-- XXX JB patterns read here!
 Type abstractions are checked alongside ordinary patterns in GHC.Tc.Gen.Pat.tcPats.
 One of its inputs is a list of ExpPatType that has two constructors
   * ExpFunPatTy    ...   -- the type A of a function A -> B
