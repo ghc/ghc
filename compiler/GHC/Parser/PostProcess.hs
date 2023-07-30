@@ -503,12 +503,11 @@ fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
 
 -- | The 'Anchor' for a stmtlist is based on either the location or
 -- the first semicolon annotion.
-stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Anchor
+stmtsAnchor :: Located (OrdList AddEpAnn,a) -> Maybe Anchor
 stmtsAnchor (L (RealSrcSpan l mb) ((ConsOL (AddEpAnn _ (EpaSpan r rb)) _), _))
-  = widenAnchorS (EpaSpan l mb) (RealSrcSpan r rb)
-stmtsAnchor (L (RealSrcSpan l mb) _) = EpaSpan l mb
-stmtsAnchor _ = panic "stmtsAnchor"
--- stmtsAnchor _ = Nothing
+  = Just $ widenAnchorS (EpaSpan l mb) (RealSrcSpan r rb)
+stmtsAnchor (L (RealSrcSpan l mb) _) = Just $ EpaSpan l mb
+stmtsAnchor _ = Nothing
 
 stmtsLoc :: Located (OrdList AddEpAnn,a) -> SrcSpan
 stmtsLoc (L l ((ConsOL aa _), _))

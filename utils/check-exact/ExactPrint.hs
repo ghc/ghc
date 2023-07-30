@@ -420,7 +420,6 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   p <- getPosP
   pe0 <- getPriorEndD
   debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, showAst anchor', astId a)
-  debugM $ "enterAnn:anchor_op=" ++ showGhc (anchor_op anchor')
   prevAnchor <- getAnchorU
   let curAnchor = case anchor' of
         EpaSpan r _ -> r
@@ -442,8 +441,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   printCommentsBefore curAnchor
   priorCs <- cua canUpdateAnchor takeAppliedComments -- no pop
   -- -------------------------
-  case anchor_op anchor' of
-    MovedAnchor dp _ -> do
+  case anchor' of
+    EpaDelta dp _ -> do
       debugM $ "enterAnn: MovedAnchor:" ++ show dp
       -- Set the original anchor as prior end, so the rest of this AST
       -- fragment has a reference
@@ -484,8 +483,8 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
                -- changed.
                off (ss2delta priorEndAfterComments curAnchor)
   debugM $ "enterAnn: (edp',off,priorEndAfterComments,curAnchor):" ++ show (edp',off,priorEndAfterComments,rs2range curAnchor)
-  let edp'' = case anchor_op anchor' of
-        MovedAnchor dp _ -> dp
+  let edp'' = case anchor' of
+        EpaDelta dp _ -> dp
         _ -> edp'
   -- ---------------------------------------------
   -- let edp = edp''
@@ -506,7 +505,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
     debugM $ "enterAnn.dPriorEndPosition:spanStart=" ++ show spanStart
     modify (\s -> s { dPriorEndPosition    = spanStart } ))
 
-  debugM $ "enterAnn: (anchor_op, curAnchor):" ++ show (anchor_op anchor', rs2range curAnchor)
+  debugM $ "enterAnn: (anchor', curAnchor):" ++ show (anchor', rs2range curAnchor)
   -- debugM $ "enterAnn: (dLHS,spanStart,pec,edp)=" ++ show (off,spanStart,priorEndAfterComments,edp)
   p0 <- getPosP
   d <- getPriorEndD
@@ -1402,15 +1401,12 @@ printCommentsIn ss = do
 printOneComment :: (Monad m, Monoid w) => Comment -> EP w m ()
 printOneComment c@(Comment _str loc _r _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
-  dp <-case anchor_op loc of
-    MovedAnchor dp _ -> return dp
-    _ -> do
+  dp <-case loc of
+    EpaDelta dp _ -> return dp
+    EpaSpan r _ -> do
         pe <- getPriorEndD
         debugM $ "printOneComment:pe=" ++ showGhc pe
-        -- let dp = ss2delta pe (anchor loc)
-        let dp = case loc of
-              EpaSpan r _ -> ss2delta pe r
-              EpaDelta dp1 _ -> dp1
+        let dp = ss2delta pe r
         debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
   mep <- getExtraDP

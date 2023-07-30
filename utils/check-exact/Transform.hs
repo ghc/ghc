@@ -51,7 +51,6 @@ module Transform
         , noAnnSrcSpanDP1
         , noAnnSrcSpanDPn
         , d0, d1, dn
-        , m0, m1, mn
         , addComma
 
         -- ** Managing lists, Transform monad
@@ -770,15 +769,6 @@ d1 = EpaDelta (SameLine 1) []
 
 dn :: Int -> EpaLocation
 dn n = EpaDelta (SameLine n) []
-
-m0 :: AnchorOperation
-m0 = MovedAnchor (SameLine 0) []
-
-m1 :: AnchorOperation
-m1 = MovedAnchor (SameLine 1) []
-
-mn :: Int -> AnchorOperation
-mn n = MovedAnchor (SameLine n) []
 
 addComma :: SrcSpanAnnA -> SrcSpanAnnA
 addComma (SrcSpanAnn EpAnnNotUsed l)
