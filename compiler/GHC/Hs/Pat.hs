@@ -660,6 +660,7 @@ isBoringHsPat = goL
       NPat {}       -> True
       NPlusKPat {}  -> True
       SplicePat {}  -> False
+      -- XXX JB EmbTyPat is probably not boring anymore?
       EmbTyPat {}   -> True
       XPat ext ->
         case ghcPass @p of

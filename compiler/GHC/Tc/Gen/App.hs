@@ -945,6 +945,9 @@ Syntax of types
       forall {a}. t    -- HsForAllInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
       forall a. t      -- HsForAllInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
       forall a -> t    -- HsForAllVis (c.o. HsForAllTelescope)
+      foreach {a}. t    -- HsForEachInvis (c.o. HsForAllTelescope) and InferredSpec  (c.o. Specificity)
+      foreach a. t      -- HsForEachInvis (c.o. HsForAllTelescope) and SpecifiedSpec (c.o. Specificity)
+      foreach a -> t    -- HsForEachVis (c.o. HsForAllTelescope)
 
 * By the time we get to checking applications/abstractions (e.g. GHC.Tc.Gen.App)
   the types have been kind-checked (e.g. by tcLHsType) into ForAllTy (c.o. Type).
@@ -952,6 +955,10 @@ Syntax of types
       forall {a}. t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
       forall a. t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
       forall a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
+      -- XXX JB fix this. Should be ForAllTy -> FunTy I guess?
+      foreach {a}. t    -- ForAllTy (c.o. Type) and Inferred  (c.o. ForAllTyFlag)
+      foreach a. t      -- ForAllTy (c.o. Type) and Specified (c.o. ForAllTyFlag)
+      foreach a -> t    -- ForAllTy (c.o. Type) and Required  (c.o. ForAllTyFlag)
 
 Syntax of applications in HsExpr
 --------------------------------
@@ -998,7 +1005,10 @@ Syntax of abstractions in Pat
       \ (type _)           -> rhs
       \ (type (b :: Bool)) -> rhs
       \ (type (_ :: Bool)) -> rhs
-  But in constructor patterns we also support full-on types
+  But in pattern-matches for retained types (i.e. foreach) we also support patterns
+  containing promoted constructors:
+      \ (type (Just a))   -> rhs
+  And in constructor patterns we support full-on types
       \ (P @(a -> Either b c)) -> rhs
   All these forms are represented with HsTP (c.o. HsTyPat).
 

@@ -157,6 +157,8 @@ is a bit complicated.  Here's how it works.
   These constructors represent what the user wrote, no more
   and no less.
 
+-- XXX JB Note update (does the tele also say whether it's foreach? I think so.
+XXX JB actually I'm not sure why it's called "telescope" and maybe the forall/foreach distinction should not be part of it)
 * The ForAllTelescope field of HsForAllTy represents whether a forall is
   invisible (e.g., forall a b. {...}, with a dot) or visible
   (e.g., forall a b -> {...}, with an arrow).
@@ -367,6 +369,7 @@ hsQTvExplicit = hsq_explicit
 
 ------------------------------------------------
 --            HsOuterTyVarBndrs
+-- XXX JB HsOuterTyVarBndrs we might have to care about this
 -- Used to quantify the outermost type variable binders of a type that obeys
 -- the forall-or-nothing rule. These are used to represent the outermost
 -- quantification in:

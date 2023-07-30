@@ -1173,7 +1173,7 @@ reservedSymsFM = listToUFM $
        ,("∷",   ITdcolon UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("⇒",   ITdarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("∀",   ITforall UnicodeSyntax,     UnicodeSyntax, 0 )
-       ,("∏",   ITforeach UnicodeSyntax,     UnicodeSyntax, 0 )
+       ,("∏",   ITforeach UnicodeSyntax,    UnicodeSyntax, 0 )
        ,("→",   ITrarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("←",   ITlarrow UnicodeSyntax,     UnicodeSyntax, 0 )
 
@@ -3089,6 +3089,7 @@ mkParserOpts extensionFlags diag_opts supported
       .|. IpBit                       `xoptBit` LangExt.ImplicitParams
       .|. OverloadedLabelsBit         `xoptBit` LangExt.OverloadedLabels
       .|. ExplicitForallBit           `xoptBit` LangExt.ExplicitForAll
+      .|. ForeachBit                  `xoptBit` LangExt.Foreach
       .|. BangPatBit                  `xoptBit` LangExt.BangPatterns
       .|. MagicHashBit                `xoptBit` LangExt.MagicHash
       .|. RecursiveDoBit              `xoptBit` LangExt.RecursiveDo

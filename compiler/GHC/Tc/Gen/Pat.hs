@@ -389,6 +389,7 @@ tc_tt_pat pat_ty penv (ParPat x lpar pat rpar) thing_inside = do
 tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
 tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
 
+-- XXX JB EmbTyPat change?
 tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
 tc_forall_pat _ (EmbTyPat _ toktype tp, tv) thing_inside
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat tp (varType tv)

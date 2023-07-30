@@ -1968,6 +1968,11 @@ extract_kind_sig ty ki acc
   = extract_hs_tv_bndrs bndrs acc $
     extract_lty ty $
     extract_lty ki_body []
+  | (L _ HsForAllTy { hst_tele = HsForEachInvis { hsf_retained_invis_bndrs = bndrs }
+                    , hst_body = ki_body }) <- ki
+  = extract_hs_tv_bndrs bndrs acc $
+    extract_lty ty $
+    extract_lty ki_body []
 extract_kind_sig ty ki acc
   = extract_lty ty $
     extract_lty ki acc

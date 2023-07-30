@@ -201,12 +201,12 @@ mkHsForAllInvisTele an invis_bndrs =
 mkHsForEachVisTele ::EpAnnForallTy ->
   [LHsTyVarBndr () (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForEachVisTele an vis_bndrs =
-  HsForEachVis { hsf_xvis = an, hsf_retained_vis_bndrs = vis_bndrs }
+  HsForEachVis { hsf_xretained_vis = an, hsf_retained_vis_bndrs = vis_bndrs }
 
 mkHsForEachInvisTele :: EpAnnForallTy
   -> [LHsTyVarBndr Specificity (GhcPass p)] -> HsForAllTelescope (GhcPass p)
 mkHsForEachInvisTele an invis_bndrs =
-  HsForEachInvis { hsf_xinvis = an, hsf_retained_invis_bndrs = invis_bndrs }
+  HsForEachInvis { hsf_xretained_invis = an, hsf_retained_invis_bndrs = invis_bndrs }
 
 mkHsQTvs :: [LHsTyVarBndr (HsBndrVis GhcPs) GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }

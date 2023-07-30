@@ -296,6 +296,7 @@ noNestedForallsContextsErr what lty =
          -- types of terms, so we give a slightly more descriptive error
          -- message in the event that they contain visible dependent
          -- quantification (currently only allowed in kinds).
+      -- XXX JB seems kinda weird that this comment is still here?
       -> Just (locA l, TcRnVDQInTermType Nothing)
       |  HsForAllInvis{} <- tele
       -> Just (locA l, nested_foralls_contexts_err)

@@ -469,6 +469,11 @@ data Specificity = InferredSpec
                    -- required.
   deriving (Eq, Ord, Data)
 
+-- | Whether a dependent argument is erased at runtime
+data Erasure = Erased | Retained
+  deriving (Eq, Data)
+  -- XXX JB Erasure flag do we need it?
+
 pattern Inferred, Specified :: ForAllTyFlag
 pattern Inferred  = Invisible InferredSpec
 pattern Specified = Invisible SpecifiedSpec

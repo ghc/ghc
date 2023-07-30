@@ -4060,7 +4060,7 @@ data TcRnMessage where
 
   {-| TcRnIllegalTypePattern is an error raised when a pattern constructed
       with the @type@ keyword occurs in a position that does not correspond
-      to a required type argument (visible forall).
+      to a required type argument (visible forall/foreach).
 
       Example:
 

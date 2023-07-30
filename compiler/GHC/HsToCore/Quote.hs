@@ -1363,7 +1363,7 @@ repLTy ty = repTy (unLoc ty)
 -- @HsForAllTy HsForAllInvis{}@ or @HsQualTy@.
 -- Types headed by visible foralls (which are desugared to ForallVisT) are
 -- handled separately in repTy.
--- XXX JB we have to probably handle foreach here separately
+-- XXX JB HsForAllTy we have to probably handle foreach here separately
 repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
 repForallT ty
  | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLocA ty)
@@ -2132,6 +2132,7 @@ repP p@(NPat _ (L _ l) (Just _) _)
 repP (SigPat _ p t) = do { p' <- repLP p
                          ; t' <- repLTy (hsPatSigType t)
                          ; repPsig p' t' }
+-- XXX JB EmbTyPat change?
 repP (EmbTyPat _ _ t) = do { t' <- repLTy (hstp_body t)
                            ; repPtype t' }
 repP (SplicePat (HsUntypedSpliceNested n) _) = rep_splice n
@@ -2815,6 +2816,7 @@ repTForall :: Core [(M (TH.TyVarBndr TH.Specificity))] -> Core (M TH.Cxt) -> Cor
 repTForall (MkC tvars) (MkC ctxt) (MkC ty)
     = rep2 forallTName [tvars, ctxt, ty]
 
+-- XXX JB HsForAllTy we probably have to handle foreach separately
 repTForallVis :: Core [(M (TH.TyVarBndr ()))] -> Core (M TH.Type)
               -> MetaM (Core (M TH.Type))
 repTForallVis (MkC tvars) (MkC ty) = rep2 forallVisTName [tvars, ty]

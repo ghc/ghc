@@ -1179,6 +1179,7 @@ tc_hs_type mode (HsOpTy _ _ ty1 (L _ op) ty2) exp_kind
   = tc_fun_type mode (HsUnrestrictedArrow noHsUniTok) ty1 ty2 exp_kind
 
 --------- Foralls
+-- XXX JB HsForAllTy I think this is where we change things into Core
 tc_hs_type mode (HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   = do { (tv_bndrs, ty') <- tcTKTelescope mode tele $
                             tc_lhs_type mode ty exp_kind
@@ -1332,6 +1333,7 @@ tc_hs_type mode ty@(XHsType {})            ek = tc_infer_hs_type_ek mode ty ek
 {-
 Note [Variable Specificity and Forall Visibility]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- XXX JB Note update
 A HsForAllTy contains an HsForAllTelescope to denote the visibility of the forall
 binder. Furthermore, each invisible type variable binder also has a
 Specificity. Together, these determine the variable binders (ForAllTyFlag) for each
@@ -1380,6 +1382,7 @@ tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
 {- Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Checking telescopes].
+-- XXX JB Note update
 
 Consider
   f :: forall a. (forall kb (b :: kb). Proxy '[a, b]) -> ()
@@ -2044,6 +2047,7 @@ examples.
 
 Note [Body kind of a HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- XXX JB Note update
 The body of a forall is usually a type, but in principle
 there's no reason to prohibit *unlifted* types.
 In fact, GHC can itself construct a function with an
@@ -3013,6 +3017,7 @@ tcTKTelescope :: TcTyMode
               -> TcM ([TcTyVarBinder], a)
 -- A HsForAllTelescope comes only from a HsForAllTy,
 -- an explicit, user-written forall type
+-- XXX JB HsForAllType typechecking, do we need to change this?
 tcTKTelescope mode tele thing_inside = case tele of
   HsForAllVis { hsf_vis_bndrs = bndrs }
     -> do { skol_info <- mkSkolemInfo (ForAllSkol (HsTyVarBndrsRn (unLoc <$> bndrs)))

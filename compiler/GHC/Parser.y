@@ -2165,11 +2165,9 @@ forall_telescope :: { Located (HsForAllTelescope GhcPs) }
                                        ; req_tvbs <- fromSpecTyVarBndrs $2
                                        ; acs (\cs -> (sLL $1 $> $
                                            mkHsForAllVisTele (EpAnn (glR $1) (mu AnnForall $1,mu AnnRarrow $3) cs) req_tvbs )) }}
-        | 'foreach' tv_bndrs '.'  {% do { hintForeach $1
-                                        ; acs (\cs -> (sLL $1 $> $
+        | 'foreach' tv_bndrs '.'  {% do { acs (\cs -> (sLL $1 $> $
                                             mkHsForEachInvisTele (EpAnn (glR $1) (mu AnnForall $1,mu AnnDot $3) cs) $2 )) }}
-        | 'foreach' tv_bndrs '->' {% do { hintForeach $1
-                                        ; req_tvbs <- fromSpecTyVarBndrs $2
+        | 'foreach' tv_bndrs '->' {% do { req_tvbs <- fromSpecTyVarBndrs $2
                                         ; acs (\cs -> (sLL $1 $> $
                                             mkHsForEachVisTele (EpAnn (glR $1) (mu AnnForall $1,mu AnnRarrow $3) cs) req_tvbs )) }}
 
@@ -4231,13 +4229,6 @@ hintExplicitForall tok = do
     rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $ addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
       (PsErrExplicitForall (isUnicode tok))
-
--- Hint about ReleventTypeArguments extension for foreach
-hintForeach :: Located Token -> P ()
-hintForeach tok = do
-    foreach <- getBit ForeachBit
-    unless foreach $ addError $ mkPlainErrorMsgEnvelope (getLoc tok) $
-      (PsErrForeach (isUnicode tok))
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()

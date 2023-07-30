@@ -220,7 +220,7 @@ data Pat p
     -- ^ Pattern with a type signature
 
   -- Embed the syntax of types into patterns.
-  -- Used with RequiredTypeArguments, e.g. fn (type t) = rhs
+  -- Used with RequiredTypeArguments or Foreach, e.g. fn (type t) = rhs
   | EmbTyPat        (XEmbTyPat p)
                    !(LHsToken "type" p)
                     (HsTyPat (NoGhcTc p))

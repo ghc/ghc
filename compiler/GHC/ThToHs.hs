@@ -2026,7 +2026,6 @@ mkHsForAllTy loc tele rho_ty
       HsForEachVis   { hsf_retained_vis_bndrs   = bndrs } -> null bndrs
       HsForEachInvis { hsf_retained_invis_bndrs = bndrs } -> null bndrs
 -- XXX JB make sure we can also generate foreach using template haskell
--- XXX JB did @rae have a better term in mind than "relevant"?
 
 -- | If passed an empty 'TH.Cxt', this simply returns the third argument
 -- (an 'LHsType'). Otherwise, return an 'HsQualTy' using the provided

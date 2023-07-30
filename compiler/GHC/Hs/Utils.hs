@@ -705,6 +705,7 @@ hsTypeToHsSigType lty@(L loc ty) = L loc $ case ty of
                                         , hsf_invis_bndrs = bndrs }
              , hst_body = body }
     -> mkHsExplicitSigType an bndrs body
+  -- XXX JB HsForAllTy do we have to do something here?
   _ -> mkHsImplicitSigType lty
 
 -- | Convert an 'LHsType' to an 'LHsSigWcType'.
@@ -1238,6 +1239,7 @@ collect_pat flag pat bndrs = case pat of
     CollVarTyVarBinders -> collect_lpat flag pat bndrs ++ collectPatSigBndrs sig
   XPat ext              -> collectXXPat @p flag ext bndrs
   SplicePat ext _       -> collectXSplicePat @p flag ext bndrs
+  -- XXX JB EmbTyPat do we have to do something here?
   EmbTyPat _ _ tp       -> case flag of
     CollNoDictBinders   -> bndrs
     CollWithDictBinders -> bndrs
