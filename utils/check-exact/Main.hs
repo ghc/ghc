@@ -80,6 +80,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding1.hs" (Just addHiding1)
  -- "../../testsuite/tests/ghc-api/exactprint/AddHiding2.hs" (Just addHiding2)
  -- "../../testsuite/tests/ghc-api/exactprint/AddClassMethod.hs" (Just addClassMethod)
+ -- "../../testsuite/tests/ghc-api/exactprint/Haddock2.hs" Nothing
  -- "../../testsuite/tests/ghc-api/annotations/CommentsTest.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Constructors.hs" Nothing
  -- "../../testsuite/tests/hiefile/should_compile/Scopes.hs" Nothing
@@ -448,7 +449,7 @@ changeLetIn1 _libdir parsed
              [l2,_l1] = map wrapDecl $ bagToList bagDecls
              bagDecls' = listToBag $ concatMap decl2Bind [l2]
              (L (SrcSpanAnn _ le) e) = expr
-             a = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan le) (MovedAnchor (SameLine 1) [])) noAnn emptyComments) le)
+             a = (SrcSpanAnn (EpAnn (EpaDelta (SameLine 1) []) noAnn emptyComments) le)
              expr' = L a e
              tkIn' = L (TokenLoc (EpaDelta (DifferentLine 1 0) [])) HsTok
          in (HsLet an tkLet
@@ -521,8 +522,10 @@ changeLocalDecls libdir (L l p) = do
             (os:oldSigs) = concatMap decl2Sig  oldDecls'
             os' = setEntryDP os (DifferentLine 2 0)
         let sortKey = captureOrderBinds decls
-        let (EpAnn anc (AnnList (Just (Anchor anc2 _)) a b c dd) cs) = van
-        let van' = (EpAnn anc (AnnList (Just (Anchor anc2 (MovedAnchor (DifferentLine 1 5) []))) a b c dd) cs)
+        let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
+        let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
+        -- let (EpAnn anc (AnnList (Just _) a b c dd) cs) = van
+        -- let van' = (EpAnn anc (AnnList (Just (EpaDelta (DifferentLine 1 5) [])) a b c dd) cs)
         let binds' = (HsValBinds van'
                           (ValBinds sortKey (listToBag $ decl':oldBinds)
                                           (sig':os':oldSigs)))
@@ -546,9 +549,8 @@ changeLocalDecls2 libdir (L l p) = do
       replaceLocalBinds :: LMatch GhcPs (LHsExpr GhcPs)
                         -> Transform (LMatch GhcPs (LHsExpr GhcPs))
       replaceLocalBinds (L lm (Match ma mln pats (GRHSs _ rhs EmptyLocalBinds{}))) = do
-        newSpan <- uniqueSrcSpanT
-        let anc = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 3) []))
-        let anc2 = (Anchor (rs newSpan) (MovedAnchor (DifferentLine 1 5) []))
+        let anc = (EpaDelta (DifferentLine 1 3) [])
+        let anc2 = (EpaDelta (DifferentLine 1 5) [])
         let an = EpAnn anc
                         (AnnList (Just anc2) Nothing Nothing
                                  [AddEpAnn AnnWhere (EpaDelta (SameLine 0) [])] [])
@@ -902,7 +904,7 @@ addHiding1 _libdir (L l p) = do
           n2 = L (noAnnSrcSpanDP0 l2) (mkVarUnqual (mkFastString "n2"))
           v1 = L (addComma $ noAnnSrcSpanDP0 l1) (IEVar Nothing (L (noAnnSrcSpanDP0 l1) (IEName noExtField n1)))
           v2 = L (           noAnnSrcSpanDP0 l2) (IEVar Nothing (L (noAnnSrcSpanDP0 l2) (IEName noExtField n2)))
-          impHiding = L (SrcSpanAnn (EpAnn (Anchor (realSrcSpan l0) m0)
+          impHiding = L (SrcSpanAnn (EpAnn d0
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))
@@ -929,7 +931,7 @@ addHiding2 _libdir top = do
         let
           [L li imp1] = hsmodImports p
           Just (_,L lh ns) = ideclImportList imp1
-          lh' = (SrcSpanAnn (EpAnn (Anchor (realSrcSpan (locA lh)) m0)
+          lh' = (SrcSpanAnn (EpAnn d0
                                      (AnnList Nothing
                                               (Just (AddEpAnn AnnOpenP  d1))
                                               (Just (AddEpAnn AnnCloseP d0))

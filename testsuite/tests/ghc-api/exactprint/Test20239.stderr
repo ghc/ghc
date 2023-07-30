@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { Test20239.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { Test20239.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { Test20239.hs:1:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { Test20239.hs:1:18-22 }))]
@@ -20,9 +18,7 @@
     (EpaCommentsBalanced
      []
      [(L
-       (Anchor
-        { Test20239.hs:8:34-63 }
-        (UnchangedAnchor))
+       (EpaSpan { Test20239.hs:8:34-63 })
        (EpaComment
         (EpaLineComment
          "-- ^ Run any arbitrary IO code")
@@ -39,24 +35,18 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { Test20239.hs:(5,1)-(7,86) }
-                  (UnchangedAnchor))
+                 (EpaSpan { Test20239.hs:(5,1)-(7,86) })
                  (AnnListItem
                   [])
                  (EpaComments
                   [(L
-                    (Anchor
-                     { Test20239.hs:3:1-28 }
-                     (UnchangedAnchor))
+                    (EpaSpan { Test20239.hs:3:1-28 })
                     (EpaComment
                      (EpaLineComment
                       "-- | Leading Haddock Comment")
                      { Test20239.hs:1:18-22 }))
                   ,(L
-                    (Anchor
-                     { Test20239.hs:4:1-25 }
-                     (UnchangedAnchor))
+                    (EpaSpan { Test20239.hs:4:1-25 })
                     (EpaComment
                      (EpaLineComment
                       "-- Running over two lines")
@@ -68,17 +58,13 @@
       (DataFamInstDecl
        (FamEqn
         (EpAnn
-         (Anchor
-          { Test20239.hs:(5,1)-(7,86) }
-          (UnchangedAnchor))
+         (EpaSpan { Test20239.hs:(5,1)-(7,86) })
          [(AddEpAnn AnnData (EpaSpan { Test20239.hs:5:1-4 }))
          ,(AddEpAnn AnnInstance (EpaSpan { Test20239.hs:5:6-13 }))
          ,(AddEpAnn AnnEqual (EpaSpan { Test20239.hs:5:34 }))]
          (EpaComments
           [(L
-            (Anchor
-             { Test20239.hs:6:34-70 }
-             (UnchangedAnchor))
+            (EpaSpan { Test20239.hs:6:34-70 })
             (EpaComment
              (EpaLineComment
               "-- ^ Run a query against the database")
@@ -94,9 +80,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:5:22-32 })
            (HsTyVar
             (EpAnn
-             (Anchor
-              { Test20239.hs:5:22-32 }
-              (UnchangedAnchor))
+             (EpaSpan { Test20239.hs:5:22-32 })
              []
              (EpaComments
               []))
@@ -115,9 +99,7 @@
           (False)
           [(L
             (SrcSpanAnn (EpAnn
-                         (Anchor
-                          { Test20239.hs:5:36-55 }
-                          (UnchangedAnchor))
+                         (EpaSpan { Test20239.hs:5:36-55 })
                          (AnnListItem
                           [(AddVbarAnn
                             (EpaSpan { Test20239.hs:7:34 }))])
@@ -125,9 +107,7 @@
                           [])) { Test20239.hs:5:36-55 })
             (ConDeclH98
              (EpAnn
-              (Anchor
-               { Test20239.hs:5:36-55 }
-               (UnchangedAnchor))
+              (EpaSpan { Test20239.hs:5:36-55 })
               []
               (EpaComments
                []))
@@ -153,9 +133,7 @@
                  (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:5:51-55 })
                  (HsTyVar
                   (EpAnn
-                   (Anchor
-                    { Test20239.hs:5:51-55 }
-                    (UnchangedAnchor))
+                   (EpaSpan { Test20239.hs:5:51-55 })
                    []
                    (EpaComments
                     []))
@@ -169,9 +147,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:36-86 })
             (ConDeclH98
              (EpAnn
-              (Anchor
-               { Test20239.hs:7:36-86 }
-               (UnchangedAnchor))
+              (EpaSpan { Test20239.hs:7:36-86 })
               []
               (EpaComments
                []))
@@ -197,9 +173,7 @@
                  (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:50-86 })
                  (HsParTy
                   (EpAnn
-                   (Anchor
-                    { Test20239.hs:7:50-86 }
-                    (UnchangedAnchor))
+                   (EpaSpan { Test20239.hs:7:50-86 })
                    (AnnParen
                     (AnnParens)
                     (EpaSpan { Test20239.hs:7:50 })
@@ -210,9 +184,7 @@
                    (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:51-85 })
                    (HsFunTy
                     (EpAnn
-                     (Anchor
-                      { Test20239.hs:7:51-85 }
-                      (UnchangedAnchor))
+                     (EpaSpan { Test20239.hs:7:51-85 })
                      (NoEpAnns)
                      (EpaComments
                       []))
@@ -225,9 +197,7 @@
                      (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:51-60 })
                      (HsTyVar
                       (EpAnn
-                       (Anchor
-                        { Test20239.hs:7:51-60 }
-                        (UnchangedAnchor))
+                       (EpaSpan { Test20239.hs:7:51-60 })
                        []
                        (EpaComments
                         []))
@@ -244,9 +214,7 @@
                        (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:65-66 })
                        (HsTyVar
                         (EpAnn
-                         (Anchor
-                          { Test20239.hs:7:65-66 }
-                          (UnchangedAnchor))
+                         (EpaSpan { Test20239.hs:7:65-66 })
                          []
                          (EpaComments
                           []))
@@ -259,9 +227,7 @@
                        (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:68-85 })
                        (HsParTy
                         (EpAnn
-                         (Anchor
-                          { Test20239.hs:7:68-85 }
-                          (UnchangedAnchor))
+                         (EpaSpan { Test20239.hs:7:68-85 })
                          (AnnParen
                           (AnnParens)
                           (EpaSpan { Test20239.hs:7:68 })
@@ -280,9 +246,7 @@
                              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:69-74 })
                              (HsTyVar
                               (EpAnn
-                               (Anchor
-                                { Test20239.hs:7:69-74 }
-                                (UnchangedAnchor))
+                               (EpaSpan { Test20239.hs:7:69-74 })
                                []
                                (EpaComments
                                 []))
@@ -295,9 +259,7 @@
                              (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:76-81 })
                              (HsTyVar
                               (EpAnn
-                               (Anchor
-                                { Test20239.hs:7:76-81 }
-                                (UnchangedAnchor))
+                               (EpaSpan { Test20239.hs:7:76-81 })
                                []
                                (EpaComments
                                 []))
@@ -310,9 +272,7 @@
                            (SrcSpanAnn (EpAnnNotUsed) { Test20239.hs:7:83-84 })
                            (HsTupleTy
                             (EpAnn
-                             (Anchor
-                              { Test20239.hs:7:83-84 }
-                              (UnchangedAnchor))
+                             (EpaSpan { Test20239.hs:7:83-84 })
                              (AnnParen
                               (AnnParens)
                               (EpaSpan { Test20239.hs:7:83 })

@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T17544_kw.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T17544_kw.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T17544_kw.hs:11:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:13:13-17 }))]
@@ -44,9 +42,7 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T17544_kw.hs:(15,1)-(16,20) }
-                  (UnchangedAnchor))
+                 (EpaSpan { T17544_kw.hs:(15,1)-(16,20) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -55,9 +51,7 @@
      (NoExtField)
      (DataDecl
       (EpAnn
-       (Anchor
-        { T17544_kw.hs:(15,1)-(16,20) }
-        (UnchangedAnchor))
+       (EpaSpan { T17544_kw.hs:(15,1)-(16,20) })
        [(AddEpAnn AnnData (EpaSpan { T17544_kw.hs:15:1-4 }))
        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:16:3-7 }))]
        (EpaComments
@@ -81,9 +75,7 @@
           (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:9-20 })
           (ConDeclGADT
            (EpAnn
-            (Anchor
-             { T17544_kw.hs:16:9-20 }
-             (UnchangedAnchor))
+            (EpaSpan { T17544_kw.hs:16:9-20 })
             []
             (EpaComments
              []))
@@ -108,9 +100,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:16:18-20 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { T17544_kw.hs:16:18-20 }
-               (UnchangedAnchor))
+              (EpaSpan { T17544_kw.hs:16:18-20 })
               []
               (EpaComments
                []))
@@ -135,9 +125,7 @@
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T17544_kw.hs:(18,1)-(19,26) }
-                  (UnchangedAnchor))
+                 (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -146,9 +134,7 @@
      (NoExtField)
      (DataDecl
       (EpAnn
-       (Anchor
-        { T17544_kw.hs:(18,1)-(19,26) }
-        (UnchangedAnchor))
+       (EpaSpan { T17544_kw.hs:(18,1)-(19,26) })
        [(AddEpAnn AnnNewtype (EpaSpan { T17544_kw.hs:18:1-7 }))
        ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:19:3-7 }))]
        (EpaComments
@@ -171,9 +157,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:9-26 })
          (ConDeclGADT
           (EpAnn
-           (Anchor
-            { T17544_kw.hs:19:9-26 }
-            (UnchangedAnchor))
+           (EpaSpan { T17544_kw.hs:19:9-26 })
            []
            (EpaComments
             []))
@@ -201,18 +185,14 @@
                (HsNormalTok)))
              (L
               (SrcSpanAnn (EpAnn
-                           (Anchor
-                            { T17544_kw.hs:19:18-19 }
-                            (UnchangedAnchor))
+                           (EpaSpan { T17544_kw.hs:19:18-19 })
                            (AnnListItem
                             [])
                            (EpaComments
                             [])) { T17544_kw.hs:19:18-19 })
               (HsTupleTy
                (EpAnn
-                (Anchor
-                 { T17544_kw.hs:19:18-19 }
-                 (UnchangedAnchor))
+                (EpaSpan { T17544_kw.hs:19:18-19 })
                 (AnnParen
                  (AnnParens)
                  (EpaSpan { T17544_kw.hs:19:18 })
@@ -225,9 +205,7 @@
            (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:19:24-26 })
            (HsTyVar
             (EpAnn
-             (Anchor
-              { T17544_kw.hs:19:24-26 }
-              (UnchangedAnchor))
+             (EpaSpan { T17544_kw.hs:19:24-26 })
              []
              (EpaComments
               []))
@@ -252,9 +230,7 @@
        []))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T17544_kw.hs:(21,1)-(24,18) }
-                  (UnchangedAnchor))
+                 (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -264,9 +240,7 @@
      (ClassDecl
       ((,)
        (EpAnn
-        (Anchor
-         { T17544_kw.hs:(21,1)-(24,18) }
-         (UnchangedAnchor))
+        (EpaSpan { T17544_kw.hs:(21,1)-(24,18) })
         [(AddEpAnn AnnClass (EpaSpan { T17544_kw.hs:21:1-5 }))
         ,(AddEpAnn AnnWhere (EpaSpan { T17544_kw.hs:23:3-7 }))]
         (EpaComments
@@ -285,9 +259,7 @@
          (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:21:11 })
          (UserTyVar
           (EpAnn
-           (Anchor
-            { T17544_kw.hs:21:11 }
-            (UnchangedAnchor))
+           (EpaSpan { T17544_kw.hs:21:11 })
            []
            (EpaComments
             []))
@@ -302,9 +274,7 @@
         (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:24:5-18 })
         (ClassOpSig
          (EpAnn
-          (Anchor
-           { T17544_kw.hs:24:5-18 }
-           (UnchangedAnchor))
+          (EpaSpan { T17544_kw.hs:24:5-18 })
           (AnnSig
            (AddEpAnn AnnDcolon (EpaSpan { T17544_kw.hs:24:15-16 }))
            [])
@@ -325,9 +295,7 @@
             (SrcSpanAnn (EpAnnNotUsed) { T17544_kw.hs:24:18 })
             (HsTyVar
              (EpAnn
-              (Anchor
-               { T17544_kw.hs:24:18 }
-               (UnchangedAnchor))
+              (EpaSpan { T17544_kw.hs:24:18 })
               []
               (EpaComments
                []))

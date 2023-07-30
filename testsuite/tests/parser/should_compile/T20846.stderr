@@ -6,9 +6,7 @@
  (HsModule
   (XModulePs
    (EpAnn
-    (Anchor
-     { T20846.hs:1:1 }
-     (UnchangedAnchor))
+    (EpaSpan { T20846.hs:1:1 })
     (AnnsModule
      [(AddEpAnn AnnModule (EpaSpan { T20846.hs:1:1-6 }))
      ,(AddEpAnn AnnWhere (EpaSpan { T20846.hs:1:15-19 }))]
@@ -32,9 +30,7 @@
   []
   [(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T20846.hs:3:1-11 }
-                  (UnchangedAnchor))
+                 (EpaSpan { T20846.hs:3:1-11 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -43,9 +39,7 @@
      (NoExtField)
      (FixSig
       (EpAnn
-       (Anchor
-        { T20846.hs:3:1-11 }
-        (UnchangedAnchor))
+       (EpaSpan { T20846.hs:3:1-11 })
        [(AddEpAnn AnnInfix (EpaSpan { T20846.hs:3:1-6 }))]
        (EpaComments
         []))
@@ -58,9 +52,7 @@
        {Fixity: infixr 9}))))
   ,(L
     (SrcSpanAnn (EpAnn
-                 (Anchor
-                  { T20846.hs:4:1-18 }
-                  (UnchangedAnchor))
+                 (EpaSpan { T20846.hs:4:1-18 })
                  (AnnListItem
                   [])
                  (EpaComments
@@ -71,9 +63,7 @@
       (NoExtField)
       (L
        (SrcSpanAnn (EpAnn
-                    (Anchor
-                     { T20846.hs:4:1-6 }
-                     (UnchangedAnchor))
+                    (EpaSpan { T20846.hs:4:1-6 })
                     (NameAnn
                      (NameParens)
                      (EpaSpan { T20846.hs:4:1 })
@@ -92,18 +82,14 @@
           (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
           (Match
            (EpAnn
-            (Anchor
-             { T20846.hs:4:1-18 }
-             (UnchangedAnchor))
+            (EpaSpan { T20846.hs:4:1-18 })
             []
             (EpaComments
              []))
            (FunRhs
             (L
              (SrcSpanAnn (EpAnn
-                          (Anchor
-                           { T20846.hs:4:1-6 }
-                           (UnchangedAnchor))
+                          (EpaSpan { T20846.hs:4:1-6 })
                           (NameAnn
                            (NameParens)
                            (EpaSpan { T20846.hs:4:1 })
@@ -126,9 +112,7 @@
                { T20846.hs:4:8-18 })
               (GRHS
                (EpAnn
-                (Anchor
-                 { T20846.hs:4:8-18 }
-                 (UnchangedAnchor))
+                (EpaSpan { T20846.hs:4:8-18 })
                 (GrhsAnn
                  (Nothing)
                  (AddEpAnn AnnEqual (EpaSpan { T20846.hs:4:8 })))
