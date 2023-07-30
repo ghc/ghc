@@ -189,8 +189,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "PsErrIllegalPatSynExport"                      = 89515
   GhcDiagnosticCode "PsErrOverloadedRecordUpdateNoQualifiedFields"  = 94863
   GhcDiagnosticCode "PsErrExplicitForall"                           = 25955
-  -- XXX JB do we need this? probably depends on whether foreach is a keyword without extension
-  GhcDiagnosticCode "PsErrForeach"                                  = 13790
   GhcDiagnosticCode "PsErrIllegalQualifiedDo"                       = 40280
   GhcDiagnosticCode "PsErrQualifiedDoInCmd"                         = 54089
   GhcDiagnosticCode "PsErrRecordSyntaxInPatSynDecl"                 = 28021

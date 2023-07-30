@@ -433,10 +433,6 @@ data PsMessage
    | PsErrExplicitForall !Bool
                          -- ^ is Unicode forall?
 
-   -- | foreach found but no extension allowing it is enabled
-   | PsErrForeach !Bool
-                  -- ^ is Unicode foreach?
-
    -- | Found qualified-do without QualifiedDo enabled
    | PsErrIllegalQualifiedDo !SDoc
 
