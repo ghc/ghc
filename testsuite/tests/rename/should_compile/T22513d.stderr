@@ -4,5 +4,5 @@ T22513d.hs:3:4: warning: [GHC-54201] [-Wterm-variable-capture]
     even though another variable of the same name is in scope:
       ‘id’ imported from ‘Prelude’ at T22513d.hs:1:8-14
            (and originally defined in ‘GHC.Base’)
-    This is not forward-compatible with a planned GHC extension, RequiredTypeArguments.
+    This is not compatible with the RequiredTypeArguments extension.
     Suggested fix: Consider renaming the type variable.

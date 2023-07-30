@@ -871,7 +871,7 @@ bindSigTyVarsFV tvs thing_inside
 ---------------
 bindHsQTyVars :: forall a b.
                  HsDocContext
-              -> Maybe a            -- Just _  => an associated type decl
+              -> Maybe (a, [Name])  -- Just _  => an associated type decl
               -> FreeKiTyVars       -- Kind variables from scope
               -> LHsQTyVars GhcPs
               -> (LHsQTyVars GhcRn -> FreeKiTyVars -> RnM (b, FreeVars))
@@ -892,12 +892,18 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, implicit_kvs :: [LocatedN RdrName]
+             bndrs, all_implicit_kvs :: [LocatedN RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             implicit_kvs = filterFreeVarsToBind bndrs $
+             all_implicit_kvs = filterFreeVarsToBind bndrs $
                bndr_kv_occs ++ body_kv_occs
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
+
+       ; implicit_kvs <-
+           case mb_assoc of
+             Nothing -> filterInScopeM all_implicit_kvs
+             Just (_, cls_tvs) -> filterInScopeNonClassM cls_tvs all_implicit_kvs
+                 -- See Note [Class variables and filterInScope]
 
        ; traceRn "checkMixedVars3" $
            vcat [ text "bndrs"   <+> ppr hs_tv_bndrs
@@ -971,8 +977,13 @@ Then:
   That's one of the rules for a CUSK, so we pass that info on
   as the second argument to thing_inside.
 
-* Order is not important in these lists.  All we are doing is
-  bring Names into scope.
+* Order is important in these lists. Consider
+    data T (a::k1) (b::k2)
+  We want implicit_kvs to be [k1,k2], not [k2,k1], so that the inferred kind for
+  T quantifies over kind variables in the user-specified order
+    T :: forall k1 k2. k1 -> k2 -> Type  -- OK
+    T :: forall k2 k1. k1 -> k2 -> Type  -- Bad
+  This matters with TypeApplications
 
 * bndr_kv_occs, body_kv_occs, and implicit_kvs can contain duplicates. All
   duplicate occurrences are removed when we bind them with rnImplicitTvOccs.
@@ -1221,14 +1232,14 @@ new_tv_name_rn (Just _) cont lrdr@(L _ rdr)
 Section 7.3: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0281-visible-forall.rst#73implicit-quantification
 
 Its purpose is to notify users when implicit quantification occurs that would
-stop working under RequiredTypeArguments (a future GHC extension). Example:
+stop working under RequiredTypeArguments. Example:
 
    a = 42
    id :: a -> a
 
 As it stands, the `a` in the signature `id :: a -> a` is considered free and
 leads to implicit quantification, as if the user wrote `id :: forall a. a -> a`.
-Under RequiredTypeArguments it will capture the term-level variable `a` (bound by `a = 42`),
+Under RequiredTypeArguments it captures the term-level variable `a` (bound by `a = 42`),
 leading to a type error.
 
 `warn_term_var_capture` detects this by demoting the namespace of the
@@ -1816,22 +1827,133 @@ type checking. While viable, this would mean we'd end up accepting this:
 -- Note [Ordering of implicit variables].
 type FreeKiTyVars = [LocatedN RdrName]
 
+-- When renaming a type, do we want to capture or ignore term variables?
+-- Suppose we have a variable binding `a` and we are renaming a type signature
+-- that mentions `a`:
+--
+--    f :: forall t -> ...
+--    f a = ...
+--      where g :: a -> Bool
+--
+-- Does the `a` in the signature for `g` refer to the term variable or is it
+-- implicitly quantified, as if the user wrote `g :: forall a. a -> Bool`?
+-- `CaptureTermVars` selects the former behavior, `DontCaptureTermVars` the latter.
+data TermVariableCapture =
+    CaptureTermVars
+  | DontCaptureTermVars
+
+getTermVariableCapture :: RnM TermVariableCapture
+getTermVariableCapture
+  = do { required_type_arguments <- xoptM LangExt.RequiredTypeArguments
+       ; let tvc | required_type_arguments = CaptureTermVars
+                 | otherwise               = DontCaptureTermVars
+       ; return tvc }
+
 -- | Filter out any type and kind variables that are already in scope in the
 -- the supplied LocalRdrEnv. Note that this includes named wildcards, which
 -- look like perfectly ordinary type variables at this point.
-filterInScope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
-filterInScope rdr_env = filterOut (inScope rdr_env . unLoc)
+filterInScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
+filterInScope tvc envs = filterOut (inScope tvc envs . unLoc)
+
+-- | Like 'filterInScope', but keep parent class variables intact.
+-- Used with associated types. See Note [Class variables and filterInScope]
+filterInScopeNonClass :: [Name] -> TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> FreeKiTyVars -> FreeKiTyVars
+filterInScopeNonClass cls_tvs tvc envs = filterOut (in_scope_non_class . unLoc)
+  where
+    in_scope_non_class :: RdrName -> Bool
+    in_scope_non_class rdr
+      | occName rdr `elemOccSet` cls_tvs_set = False
+      | otherwise = inScope tvc envs rdr
+
+    cls_tvs_set :: OccSet
+    cls_tvs_set = mkOccSet (map nameOccName cls_tvs)
 
 -- | Filter out any type and kind variables that are already in scope in the
 -- the environment's LocalRdrEnv. Note that this includes named wildcards,
 -- which look like perfectly ordinary type variables at this point.
 filterInScopeM :: FreeKiTyVars -> RnM FreeKiTyVars
 filterInScopeM vars
-  = do { rdr_env <- getLocalRdrEnv
-       ; return (filterInScope rdr_env vars) }
+  = do { tvc <- getTermVariableCapture
+       ; envs <- getRdrEnvs
+       ; return (filterInScope tvc envs vars) }
 
-inScope :: LocalRdrEnv -> RdrName -> Bool
-inScope rdr_env rdr = rdr `elemLocalRdrEnv` rdr_env
+-- | Like 'filterInScopeM', but keep parent class variables intact.
+-- Used with associated types. See Note [Class variables and filterInScope]
+filterInScopeNonClassM :: [Name] -> FreeKiTyVars -> RnM FreeKiTyVars
+filterInScopeNonClassM cls_tvs vars
+  = do { tvc <- getTermVariableCapture
+       ; envs <- getRdrEnvs
+       ; return (filterInScopeNonClass cls_tvs tvc envs vars) }
+
+inScope :: TermVariableCapture -> (GlobalRdrEnv, LocalRdrEnv) -> RdrName -> Bool
+inScope tvc (gbl, lcl) rdr =
+  case tvc of
+    DontCaptureTermVars -> rdr_in_scope
+    CaptureTermVars     -> rdr_in_scope || demoted_rdr_in_scope
+  where
+    rdr_in_scope, demoted_rdr_in_scope :: Bool
+    rdr_in_scope         = elem_lcl rdr
+    demoted_rdr_in_scope = maybe False (elem_lcl <||> elem_gbl) (demoteRdrNameTv rdr)
+
+    elem_lcl, elem_gbl :: RdrName -> Bool
+    elem_lcl name = elemLocalRdrEnv name lcl
+    elem_gbl name = (not . null) (lookupGRE gbl (LookupRdrName name (RelevantGREsFOS WantBoth)))
+
+{- Note [Class variables and filterInScope]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In `bindHsQTyVars` free variables are collected and bound implicitly. Example:
+  type ElemKind (a :: Maybe k) = k
+Both occurrences of `k` are usages, so GHC creates an implicit binding for `k`.
+We can also bind it explicitly with the help of TypeAbstractions:
+  type ElemKind @k (a :: Maybe k) = k
+
+This is similar to implicit quantification that happens in type signatures
+  const :: a -> b -> a               -- `a` and `b` bound implicitly
+  const :: forall a b. a -> b -> a   -- `a` and `b` bound explicitly
+
+In both cases we need to compute the list of free variables to implicitly
+quantify over (NB: list, not set, because order matters with TypeApplications)
+  * implicitly bound variables in ElemKind:  [k]
+  * implicitly bound variables in const:     [a, b]
+
+However, variables that are already in scope are captured. Example:
+  {-# LANGUAGE ScopedTypeVariables #-}
+  f (x :: a) = ...
+    where g :: a -> a
+          g _ = x
+When we look at `g` in isolation, `a` is a free variable:
+  g :: a -> a
+But due to ScopedTypeVariables, `a` is actually bound in the surrounding
+context, namely the (x :: a) pattern.
+It is important that we do /not/ insert an implicit forall in the type of `g`
+  g :: forall a. a -> a   -- No! That would mean a different thing
+The solution is to use `filterInScopeM` to remove variables already in scope
+from candidates for implicit quantification.
+
+Using `filterInScopeM` is additionally important when RequiredTypeArguments is
+in effect. Consider
+  import Prelude (id)
+  data T (a :: id) = MkT    -- Test case T23740e
+
+With RequiredTypeArguments, variables in the term namespace can be referred to
+at the type level, so `id` in the `:: id` kind signature ought to refer to `id`
+from Prelude. Of course it is not a valid program, but we want a proper error
+message rather than implicit quantification:
+  T23740e.hs:5:14: error: [GHC-45510]
+      • Term variable ‘id’ cannot be used here
+          (term variables cannot be promoted)
+
+This leads us to use `filterInScopeM` in `bindHsQTyVars`.
+Unfortunately, associated types make matters more complex. Consider
+  class C (a::k1) (b::k2) (c::k3) where
+    type T (a::k1) b
+When renaming `T`, we have to implicitly quantify over the class variable `k1`,
+despite the fact that `k1` is in scope from the class header. The type checker
+expects to find `k1` in `HsQTvsRn` (the `hsq_ext` field of `LHsQTyVars`). But it
+won't find it there if it is filtered out by `filterInScopeM`.
+
+To account for that, we introduce another helper, `filterInScopeNonClassM`,
+which acts much like `filterInScopeM` but leaves class variables intact. -}
 
 extract_tyarg :: LHsTypeArg GhcPs -> FreeKiTyVars -> FreeKiTyVars
 extract_tyarg (HsValArg ty) acc = extract_lty ty acc

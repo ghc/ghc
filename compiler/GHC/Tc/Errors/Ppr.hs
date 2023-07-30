@@ -1279,7 +1279,7 @@ instance Diagnostic TcRnMessage where
           text "is implicitly quantified," $+$
           text "even though another variable of the same name is in scope:" $+$
           nest 2 var_names $+$
-          text "This is not forward-compatible with a planned GHC extension, RequiredTypeArguments."
+          text "This is not compatible with the RequiredTypeArguments extension."
         where
           var_names = case shadowed_term_names of
               Left gbl_names -> vcat (map (\name -> quotes (ppr $ greName name) <+> pprNameProvenance name) gbl_names)

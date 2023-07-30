@@ -25,7 +25,7 @@ data PromotionErr
 
   | RecDataConPE     -- Data constructor in a recursive loop
                      -- See Note [Recursion and promoting data constructors] in GHC.Tc.TyCl
-  | TermVariablePE   -- See Note [Promoted variables in types]
+  | TermVariablePE   -- See Note [Demotion of unqualified variables] in GHC.Rename.Env
   | TypeVariablePE   -- See Note [Type variable scoping errors during typechecking]
   deriving (Generic)
 

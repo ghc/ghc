@@ -1075,7 +1075,21 @@ notFound name
              | isUnboundName name -> failM  -- If the name really isn't in scope
                                             -- don't report it again (#11941)
              | otherwise -> failWithTc (TcRnStageRestriction (StageCheckSplice name))
-           _ -> failWithTc $
+
+           _ | isTermVarOrFieldNameSpace (nameNameSpace name) ->
+               -- This code path is only reachable with RequiredTypeArguments enabled
+               -- via the following chain of calls:
+               --   `notFound`       called from
+               --   `tcLookupGlobal` called from
+               --   `tcLookup`       called from
+               --   `tcTyVar`
+               -- It means the user tried to use a term variable at the type level, e.g.
+               --   let { a = 42; f :: a -> a; ... } in ...
+               -- If you are seeing this error for any other reason, it is a bug in GHC.
+               -- See Note [Demotion of unqualified variables] (W1) in GHC.Rename.Env
+               failWithTc $ TcRnUnpromotableThing name TermVariablePE
+
+             | otherwise -> failWithTc $
                 mkTcRnNotInScope (getRdrName name) (NotInScopeTc (getLclEnvTypeEnv lcl_env))
                        -- Take care: printing the whole gbl env can
                        -- cause an infinite loop, in the case where we
