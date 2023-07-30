@@ -422,7 +422,7 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
   debugM $ "enterAnn:starting:(p,pe,anchor',a) =" ++ show (p, pe0, showAst anchor', astId a)
   prevAnchor <- getAnchorU
   let curAnchor = case anchor' of
-        EpaSpan r _ -> r
+        EpaSpan (RealSrcSpan r _) -> r
         _ -> prevAnchor
   debugM $ "enterAnn:(curAnchor):=" ++ show (rs2range curAnchor)
   case canUpdateAnchor of
@@ -495,10 +495,11 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
         Just (EpaDelta dp _) -> dp
                    -- Replace original with desired one. Allows all
                    -- list entry values to be DP (1,0)
-        Just (EpaSpan r _) -> dp
+        Just (EpaSpan (RealSrcSpan r _)) -> dp
           where
             dp = adjustDeltaForOffset
                    off (ss2delta priorEndAfterComments r)
+        Just (EpaSpan (UnhelpfulSpan r)) -> panic $ "enterAnn: UnhelpfulSpan:" ++ show r
   -- ---------------------------------------------
   -- Preparation complete, perform the action
   when (priorEndAfterComments < spanStart) (do
@@ -543,9 +544,10 @@ enterAnn (Entry anchor' trailing_anns cs flush canUpdateAnchor) a = do
 
   case anchor' of
     EpaDelta _ _ -> return ()
-    EpaSpan rss _ -> do
+    EpaSpan (RealSrcSpan rss _) -> do
       setAcceptSpan False
       setPriorEndD (snd $ rs2range rss)
+    EpaSpan _ -> return ()
 
   -- Outside the anchor, mark any trailing
   postCs <- cua canUpdateAnchor takeAppliedCommentsPop
@@ -723,7 +725,8 @@ printStringAtAAL (EpAnn anc an cs) l str = do
 
 printStringAtAAC :: (Monad m, Monoid w)
   => CaptureComments -> EpaLocation -> String -> EP w m EpaLocation
-printStringAtAAC capture (EpaSpan r _) s = printStringAtRsC capture r s
+printStringAtAAC capture (EpaSpan (RealSrcSpan r _)) s = printStringAtRsC capture r s
+printStringAtAAC capture (EpaSpan (UnhelpfulSpan _)) s = printStringAtAAC capture (EpaDelta (SameLine 0) []) s
 printStringAtAAC capture (EpaDelta d cs) s = do
   mapM_ printOneComment $ concatMap tokComment cs
   pe1 <- getPriorEndD
@@ -798,10 +801,10 @@ markEpAnnLMS' (EpAnn anc a cs) l kw (Just str) = do
 markLToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
   => Located (HsToken tok) -> EP w m (Located (HsToken tok))
 markLToken (L (RealSrcSpan aa mb) t) = do
-  epaLoc'<-  printStringAtAA (EpaSpan aa mb) (symbolVal (Proxy @tok))
+  epaLoc'<-  printStringAtAA (EpaSpan (RealSrcSpan aa mb)) (symbolVal (Proxy @tok))
   case epaLoc' of
-    EpaSpan aa' mb' -> return (L (RealSrcSpan aa' mb') t)
-    _               -> return (L (RealSrcSpan aa  mb ) t)
+    EpaSpan (RealSrcSpan aa' mb') -> return (L (RealSrcSpan aa' mb') t)
+    _                             -> return (L (RealSrcSpan aa  mb ) t)
 markLToken (L lt t) = return (L lt t)
 
 markToken :: forall m w tok . (Monad m, Monoid w, KnownSymbol tok)
@@ -1403,12 +1406,13 @@ printOneComment c@(Comment _str loc _r _mo) = do
   debugM $ "printOneComment:c=" ++ showGhc c
   dp <-case loc of
     EpaDelta dp _ -> return dp
-    EpaSpan r _ -> do
+    EpaSpan (RealSrcSpan r _) -> do
         pe <- getPriorEndD
         debugM $ "printOneComment:pe=" ++ showGhc pe
         let dp = ss2delta pe r
         debugM $ "printOneComment:(dp,pe,loc)=" ++ showGhc (dp,pe,loc)
         adjustDeltaForOffsetM dp
+    EpaSpan (UnhelpfulSpan _) -> return (SameLine 0)
   mep <- getExtraDP
   dp' <- case mep of
     Just (EpaDelta edp _) -> do
@@ -1429,12 +1433,13 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
     (r,c) = ss2posEnd pp
     dp'' = case anc of
       EpaDelta dp1 _ -> dp1
-      EpaSpan la _ ->
+      EpaSpan (RealSrcSpan la _) ->
            if r == 0
              then (ss2delta (r,c+0) la)
              else (ss2delta (r,c)   la)
+      EpaSpan (UnhelpfulSpan _) -> SameLine 0
     dp' = case anc of
-      EpaSpan r1 _ ->
+      EpaSpan (RealSrcSpan r1 _) ->
           if pp == r1
                  then dp
                  else dp''
@@ -1459,7 +1464,7 @@ commentAllocationBefore ss = do
   -- TODO: this is inefficient, use Pos all the way through
   let (earlier,later) = partition (\(Comment _str loc _r _mo) ->
                                      case loc of
-                                       EpaSpan r _ -> (ss2pos r) <= (ss2pos ss)
+                                       EpaSpan (RealSrcSpan r _) -> (ss2pos r) <= (ss2pos ss)
                                        _ -> True -- Choose one
                                   ) cs
   putUnallocatedComments later
@@ -1475,7 +1480,7 @@ commentAllocationIn ss = do
   -- TODO: this is inefficient, use Pos all the way through
   let (earlier,later) = partition (\(Comment _str loc _r _mo) ->
                                      case loc of
-                                       EpaSpan r _ -> (ss2posEnd r) <= (ss2posEnd ss)
+                                       EpaSpan (RealSrcSpan r _) -> (ss2posEnd r) <= (ss2posEnd ss)
                                        _ -> True -- Choose one
                                   ) cs
   putUnallocatedComments later
@@ -4376,7 +4381,7 @@ printUnicode anc n = do
               s -> s
   loc <- printStringAtAAC NoCaptureComments (EpaDelta (SameLine 0) []) str
   case loc of
-    EpaSpan _ _ -> return anc
+    EpaSpan _ -> return anc
     EpaDelta dp [] -> return $ EpaDelta dp []
     EpaDelta _ _cs -> error "printUnicode should not capture comments"
 
