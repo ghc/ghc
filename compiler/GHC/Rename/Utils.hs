@@ -570,7 +570,7 @@ checkCTupSize tup_size
 *                                                                      *
 ********************************************************************* -}
 
-wrapGenSpan :: (Monoid an) => a -> LocatedAn an a
+wrapGenSpan :: (NoAnn an) => a -> LocatedAn an a
 -- Wrap something in a "generatedSrcSpan"
 -- See Note [Rebindable syntax and HsExpansion]
 wrapGenSpan x = L (noAnnSrcSpan generatedSrcSpan) x
@@ -593,10 +593,10 @@ genHsVar nm = HsVar noExtField $ wrapGenSpan nm
 genAppType :: HsExpr GhcRn -> HsType (NoGhcTc GhcRn) -> HsExpr GhcRn
 genAppType expr ty = HsAppType noExtField (wrapGenSpan expr) noHsTok (mkEmptyWildCardBndrs (wrapGenSpan ty))
 
-genLHsLit :: (Monoid an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
+genLHsLit :: (NoAnn an) => HsLit GhcRn -> LocatedAn an (HsExpr GhcRn)
 genLHsLit = wrapGenSpan . HsLit noAnn
 
-genHsIntegralLit :: (Monoid an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
+genHsIntegralLit :: (NoAnn an) => IntegralLit -> LocatedAn an (HsExpr GhcRn)
 genHsIntegralLit = genLHsLit . HsInt noExtField
 
 genHsTyLit :: FastString -> HsType GhcRn

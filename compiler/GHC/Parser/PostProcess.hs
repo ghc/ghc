@@ -840,7 +840,7 @@ mkGadtDecl loc names dcol ty = do
         HsOuterExplicit an _ ->
           case an of
             EpAnnNotUsed -> getLoc ty
-            an' -> SrcSpanAnn (EpAnn (entry an') mempty emptyComments) (spanFromAnchor (entry an'))
+            an' -> SrcSpanAnn (EpAnn (entry an') noAnn emptyComments) (spanFromAnchor (entry an'))
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = an

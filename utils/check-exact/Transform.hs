@@ -86,7 +86,7 @@ module Transform
 
 import Types
 import Utils
-import Orphans (Default(..))
+import Orphans ()
 
 import Control.Monad.RWS
 import qualified Control.Monad.Fail as Fail
@@ -236,7 +236,7 @@ captureTypeSigSpacing (L l (SigD x (TypeSig (EpAnn anc (AnnSig dc rs') cs) ns (H
              anc = case dca of
                EpaSpan r _ -> EpaDelta (ss2delta (ss2posEnd r) (realSrcSpan ll)) []
                EpaDelta _ cs -> EpaDelta (SameLine 1) cs
-           in (L (SrcSpanAnn (EpAnn anc mempty emptyComments) ll) b)
+           in (L (SrcSpanAnn (EpAnn anc noAnn emptyComments) ll) b)
       (L (SrcSpanAnn (EpAnn anc a c) ll) b)
         -> let
               anc' = case anc of
@@ -311,10 +311,10 @@ setEntryDPDecl d dp = setEntryDP d dp
 
 -- |Set the true entry 'DeltaPos' from the annotation for a given AST
 -- element. This is the 'DeltaPos' ignoring any comments.
-setEntryDP :: Default t => LocatedAn t a -> DeltaPos -> LocatedAn t a
+setEntryDP :: NoAnn t => LocatedAn t a -> DeltaPos -> LocatedAn t a
 setEntryDP (L (SrcSpanAnn EpAnnNotUsed l) a) dp
   = L (SrcSpanAnn
-           (EpAnn (EpaDelta dp []) def emptyComments)
+           (EpAnn (EpaDelta dp []) noAnn emptyComments)
            l) a
 setEntryDP (L (SrcSpanAnn (EpAnn (EpaSpan r mb) an (EpaComments [])) l) a) dp
   = L (SrcSpanAnn
@@ -408,14 +408,14 @@ setEntryDPFromAnchor  off (EpaSpan anc _) ll@(L la _) = setEntryDP ll dp'
 
 -- |Take the annEntryDelta associated with the first item and associate it with the second.
 -- Also transfer any comments occuring before it.
-transferEntryDP :: (Monad m, Monoid t2, Typeable t1, Typeable t2)
+transferEntryDP :: (Monad m, NoAnn t2, Typeable t1, Typeable t2)
   => LocatedAn t1 a -> LocatedAn t2 b -> TransformT m (LocatedAn t2 b)
 transferEntryDP (L (SrcSpanAnn EpAnnNotUsed l1) _) (L (SrcSpanAnn EpAnnNotUsed _) b) = do
   logTr $ "transferEntryDP': EpAnnNotUsed,EpAnnNotUsed"
   return (L (SrcSpanAnn EpAnnNotUsed l1) b)
 transferEntryDP (L (SrcSpanAnn (EpAnn anc _an cs) _l1) _) (L (SrcSpanAnn EpAnnNotUsed l2) b) = do
   logTr $ "transferEntryDP': EpAnn,EpAnnNotUsed"
-  return (L (SrcSpanAnn (EpAnn anc mempty cs) l2) b)
+  return (L (SrcSpanAnn (EpAnn anc noAnn cs) l2) b)
 transferEntryDP (L (SrcSpanAnn (EpAnn anc1 an1 cs1) _l1) _) (L (SrcSpanAnn (EpAnn _anc2 an2 cs2) l2) b) = do
   logTr $ "transferEntryDP': EpAnn,EpAnn"
   -- Problem: if the original had preceding comments, blindly
@@ -724,7 +724,7 @@ splitCommentsStart p (EpaCommentsBalanced cs ts) = EpaCommentsBalanced cs' ts'
     cs' = before
     ts' = after <> ts
 
-moveLeadingComments :: (Data t, Data u, Monoid t, Monoid u)
+moveLeadingComments :: (Data t, Data u, NoAnn t, NoAnn u)
   => LocatedAn t a -> SrcAnn u -> (LocatedAn t a, SrcAnn u)
 moveLeadingComments from@(L (SrcSpanAnn EpAnnNotUsed _) _) to = (from, to)
 moveLeadingComments (L la a) lb = (L la' a, lb')
@@ -821,17 +821,17 @@ commentsOrigDeltasDecl (L (SrcSpanAnn an l) d) = L (SrcSpanAnn (addCommentOrigDe
 
 -- | Create a @SrcSpanAnn@ with a @MovedAnchor@ operation using the
 -- given @DeltaPos@.
-noAnnSrcSpanDP :: (Monoid ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP :: (NoAnn ann) => SrcSpan -> DeltaPos -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP l dp
-  = SrcSpanAnn (EpAnn (EpaDelta dp []) mempty emptyComments) l
+  = SrcSpanAnn (EpAnn (EpaDelta dp []) noAnn emptyComments) l
 
-noAnnSrcSpanDP0 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP0 :: (NoAnn ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP0 l = noAnnSrcSpanDP l (SameLine 0)
 
-noAnnSrcSpanDP1 :: (Monoid ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDP1 :: (NoAnn ann) => SrcSpan -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDP1 l = noAnnSrcSpanDP l (SameLine 1)
 
-noAnnSrcSpanDPn :: (Monoid ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn ann)
+noAnnSrcSpanDPn :: (NoAnn ann) => SrcSpan -> Int -> SrcSpanAnn' (EpAnn ann)
 noAnnSrcSpanDPn l s = noAnnSrcSpanDP l (SameLine s)
 
 d0 :: EpaLocation

@@ -67,7 +67,7 @@ import qualified Data.Map.Strict as Map
 import Data.Maybe ( isJust, mapMaybe )
 import Data.Void
 
-import Orphans (Default())
+import Orphans ()
 import qualified Orphans as Orphans
 
 import Lookup
@@ -215,9 +215,9 @@ class HasTrailing a where
   trailing :: a -> [TrailingAnn]
   setTrailing :: a -> [TrailingAnn] -> a
 
-setAnchorEpa :: (HasTrailing an, Default an)
+setAnchorEpa :: (HasTrailing an, NoAnn an)
              => EpAnn an -> Anchor -> [TrailingAnn] -> EpAnnComments -> EpAnn an
-setAnchorEpa EpAnnNotUsed   anc ts cs = EpAnn anc (setTrailing Orphans.def ts) cs
+setAnchorEpa EpAnnNotUsed   anc ts cs = EpAnn anc (setTrailing noAnn ts) cs
 setAnchorEpa (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing an ts)          cs
 
 setAnchorHsModule :: HsModule GhcPs -> Anchor -> EpAnnComments -> HsModule GhcPs
@@ -226,10 +226,10 @@ setAnchorHsModule hsmod anc cs = hsmod { hsmodExt = (hsmodExt hsmod) {hsmodAnn =
     anc' = anc
     an' = setAnchorEpa (hsmodAnn $ hsmodExt hsmod) anc' [] cs
 
-setAnchorAn :: (HasTrailing an, Default an)
+setAnchorAn :: (HasTrailing an, NoAnn an)
              => LocatedAn an a -> Anchor -> [TrailingAnn] -> EpAnnComments -> LocatedAn an a
 setAnchorAn (L (SrcSpanAnn EpAnnNotUsed l)    a) anc ts cs
-  = (L (SrcSpanAnn (EpAnn anc (setTrailing Orphans.def ts) cs) l) a)
+  = (L (SrcSpanAnn (EpAnn anc (setTrailing noAnn ts) cs) l) a)
      -- `debug` ("setAnchorAn: anc=" ++ showAst anc)
 setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc ts cs
   = (L (SrcSpanAnn (EpAnn anc (setTrailing an ts) cs) l) a)
@@ -240,7 +240,7 @@ setAnchorAn (L (SrcSpanAnn (EpAnn _ an _) l) a) anc ts cs
 -- setAnchorAn (L (EpAnnS _ an _) a) anc ts cs = (L (EpAnnS anc (setTrailing an ts) cs) a)
 
 setAnchorEpaL :: EpAnn AnnList -> Anchor -> [TrailingAnn] -> EpAnnComments -> EpAnn AnnList
-setAnchorEpaL EpAnnNotUsed   anc ts cs = EpAnn anc (setTrailing mempty ts) cs
+setAnchorEpaL EpAnnNotUsed   anc ts cs = EpAnn anc (setTrailing noAnn ts) cs
 setAnchorEpaL (EpAnn _ an _) anc ts cs = EpAnn anc (setTrailing (an {al_anchor = Nothing}) ts) cs
 
 -- ---------------------------------------------------------------------

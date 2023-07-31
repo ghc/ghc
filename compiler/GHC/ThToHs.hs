@@ -142,13 +142,13 @@ getL = CvtM (\_ loc -> Right (loc,loc))
 setL :: SrcSpan -> CvtM ()
 setL loc = CvtM (\_ _ -> Right (loc, ()))
 
-returnLA :: (Monoid ann) => e -> CvtM (LocatedAn ann e)
+returnLA :: (NoAnn ann) => e -> CvtM (LocatedAn ann e)
 returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnJustLA :: a -> CvtM (Maybe (LocatedA a))
 returnJustLA = fmap Just . returnLA
 
-wrapParLA :: (Monoid ann) => (LocatedAn ann a -> b) -> a -> CvtM b
+wrapParLA :: (NoAnn ann) => (LocatedAn ann a -> b) -> a -> CvtM b
 wrapParLA add_par x = CvtM (\_ loc -> Right (loc, add_par (L (noAnnSrcSpan loc) x)))
 
 wrapMsg :: ThingBeingConverted -> CvtM' ConversionFailReason a -> CvtM' RunSpliceFailReason a

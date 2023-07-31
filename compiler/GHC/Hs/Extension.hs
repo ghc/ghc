@@ -108,7 +108,7 @@ type instance Anno Name    = SrcSpanAnnN
 type instance Anno Id      = SrcSpanAnnN
 
 type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (EpAnn a),
-                          Monoid a,
+                          NoAnn a,
                           IsPass p)
 
 instance UnXRec (GhcPass p) where

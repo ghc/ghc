@@ -22,7 +22,7 @@ module GHC.Parser.Annotation (
   anchor,
   spanAsAnchor, realSpanAsAnchor, spanFromAnchor,
   noSpanAnchor,
-  noAnn,
+  NoAnn(..),
 
   -- ** Comments in Annotations
 
@@ -940,6 +940,12 @@ noSrcSpanA = noAnnSrcSpan noSrcSpan
 
 -- ---------------------------------------------------------------------
 
+class NoAnn a where
+  -- | equivalent of `mempty`, but does not need Semigroup
+  noAnn :: a
+
+-- ---------------------------------------------------------------------
+
 class HasLoc a where
   -- ^ conveniently calculate locations for things without locations attached
   getHasLoc :: a -> SrcSpan
@@ -987,9 +993,10 @@ reAnnL anns cs (L l a) = L (SrcSpanAnn (EpAnn (spanAsAnchor l) anns cs) l) a
 getLocAnn :: Located a  -> SrcSpanAnnA
 getLocAnn (L l _) = SrcSpanAnn EpAnnNotUsed l
 
--- | Short form for 'EpAnnNotUsed'
-noAnn :: EpAnn a
-noAnn = EpAnnNotUsed
+
+instance NoAnn (EpAnn a) where
+  -- | Short form for 'EpAnnNotUsed'
+  noAnn = EpAnnNotUsed
 
 
 addAnns :: EpAnn [AddEpAnn] -> [AddEpAnn] -> EpAnnComments -> EpAnn [AddEpAnn]
@@ -1104,7 +1111,7 @@ s_entry = epaLocationFromSrcAnn
 sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
 
-mapLocA :: (Monoid ann) => (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
+mapLocA :: (NoAnn ann) => (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcAnn ann) b
 mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 -- AZ:TODO: move this somewhere sane
@@ -1120,12 +1127,12 @@ combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
         SrcSpanAnn (EpAnn (widenAnchorR anc (realSrcSpan l)) an cs) l
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLocA :: (Monoid ann)
+addCLocA :: (NoAnn ann)
          => GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3
          -> GenLocated (SrcAnn ann) e3
 addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
 
-addCLocAA :: (Monoid ann)
+addCLocAA :: (NoAnn ann)
           => GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3
           -> GenLocated (SrcAnn ann) e3
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
@@ -1171,34 +1178,34 @@ comment loc cs = EpAnn (EpaSpan loc Strict.Nothing) NoEpAnns cs
 
 -- | Add additional comments to a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+addCommentsToSrcAnn :: (NoAnn ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 addCommentsToSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (spanAsAnchor loc) mempty cs) loc
+  = SrcSpanAnn (EpAnn (spanAsAnchor loc) noAnn cs) loc
 addCommentsToSrcAnn (SrcSpanAnn (EpAnn a an cs) loc) cs'
   = SrcSpanAnn (EpAnn a an (cs <> cs')) loc
 
 -- | Replace any existing comments on a 'SrcAnn', used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsSrcAnn :: (Monoid ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
+setCommentsSrcAnn :: (NoAnn ann) => SrcAnn ann -> EpAnnComments -> SrcAnn ann
 setCommentsSrcAnn (SrcSpanAnn EpAnnNotUsed loc) cs
-  = SrcSpanAnn (EpAnn (spanAsAnchor  loc) mempty cs) loc
+  = SrcSpanAnn (EpAnn (spanAsAnchor  loc) noAnn cs) loc
 setCommentsSrcAnn (SrcSpanAnn (EpAnn a an _) loc) cs
   = SrcSpanAnn (EpAnn a an cs) loc
 
 -- | Add additional comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-addCommentsToEpAnn :: (Monoid a)
+addCommentsToEpAnn :: (NoAnn a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 addCommentsToEpAnn loc EpAnnNotUsed cs
-  = EpAnn (spanAsAnchor loc) mempty cs
+  = EpAnn (spanAsAnchor loc) noAnn cs
 addCommentsToEpAnn _ (EpAnn a an ocs) ncs = EpAnn a an (ocs <> ncs)
 
 -- | Replace any existing comments, used for manipulating the
 -- AST prior to exact printing the changed one.
-setCommentsEpAnn :: (Monoid a)
+setCommentsEpAnn :: (NoAnn a)
   => SrcSpan -> EpAnn a -> EpAnnComments -> EpAnn a
 setCommentsEpAnn loc EpAnnNotUsed cs
-  = EpAnn (spanAsAnchor loc) mempty cs
+  = EpAnn (spanAsAnchor loc) noAnn cs
 setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 
 -- | Transfer comments and trailing items from the annotations in the
@@ -1206,7 +1213,7 @@ setCommentsEpAnn _ (EpAnn a an _) cs = EpAnn a an cs
 transferAnnsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferAnnsA from@(SrcSpanAnn EpAnnNotUsed _) to = (from, to)
 transferAnnsA (SrcSpanAnn (EpAnn a an cs) l) to
-  = ((SrcSpanAnn (EpAnn a mempty emptyComments) l), to')
+  = ((SrcSpanAnn (EpAnn a noAnn emptyComments) l), to')
   where
     to' = case to of
       (SrcSpanAnn EpAnnNotUsed loc)
@@ -1220,14 +1227,14 @@ transferFollowingA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferFollowingA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
   = (SrcSpanAnn EpAnnNotUsed l1, SrcSpanAnn ann2 l2)
 transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
-  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) an1 cs2') l2)
+  = (SrcSpanAnn (EpAnn a1 noAnn cs1') l1, SrcSpanAnn (EpAnn (spanAsAnchor l2) an1 cs2') l2)
   where
     pc = priorComments cs1
     fc = getFollowingComments cs1
     cs1' = setPriorComments emptyComments pc
     cs2' = setFollowingComments emptyComments fc
 transferFollowingA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 an2 cs2) l2)
-  = (SrcSpanAnn (EpAnn a1 mempty cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
+  = (SrcSpanAnn (EpAnn a1 noAnn cs1') l1, SrcSpanAnn (EpAnn a2 (an1 <> an2) cs2') l2)
   where
     pc = priorComments cs1
     fc = getFollowingComments cs1
@@ -1240,9 +1247,9 @@ transferAnnsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnnA)
 transferAnnsOnlyA (SrcSpanAnn EpAnnNotUsed l) ss2
   = (SrcSpanAnn EpAnnNotUsed l, ss2)
 transferAnnsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l')
-  = (SrcSpanAnn (EpAnn a mempty cs) l, SrcSpanAnn (EpAnn (spanAsAnchor l') an emptyComments) l')
+  = (SrcSpanAnn (EpAnn a noAnn cs) l, SrcSpanAnn (EpAnn (spanAsAnchor l') an emptyComments) l')
 transferAnnsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
-  = (SrcSpanAnn (EpAnn a mempty cs) l, SrcSpanAnn (EpAnn a' (an' <> an) cs') l')
+  = (SrcSpanAnn (EpAnn a noAnn cs) l, SrcSpanAnn (EpAnn a' (an' <> an) cs') l')
 
 -- | Transfer comments from the annotations in the
 -- first 'SrcSpanAnnA' argument to those in the second.
@@ -1250,7 +1257,7 @@ transferCommentsOnlyA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAnn
 transferCommentsOnlyA (SrcSpanAnn EpAnnNotUsed l) ss2
   = (SrcSpanAnn EpAnnNotUsed l, ss2)
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn EpAnnNotUsed l')
-  = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') mempty cs) l')
+  = (SrcSpanAnn (EpAnn a an emptyComments ) l, SrcSpanAnn (EpAnn (spanAsAnchor l') noAnn cs) l')
 transferCommentsOnlyA (SrcSpanAnn (EpAnn a an cs) l) (SrcSpanAnn (EpAnn a' an' cs') l')
   = (SrcSpanAnn (EpAnn a an emptyComments) l, SrcSpanAnn (EpAnn a' an' (cs <> cs')) l')
 
@@ -1260,7 +1267,7 @@ transferPriorCommentsA :: SrcSpanAnnA -> SrcSpanAnnA -> (SrcSpanAnnA,  SrcSpanAn
 transferPriorCommentsA (SrcSpanAnn EpAnnNotUsed l1) (SrcSpanAnn ann2 l2)
   = (SrcSpanAnn EpAnnNotUsed l1,  SrcSpanAnn ann2 l2)
 transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn EpAnnNotUsed l2)
-  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn (spanAsAnchor l2) mempty cs2') l2)
+  = (SrcSpanAnn (EpAnn a1 an1 cs1') l1,  SrcSpanAnn (EpAnn (spanAsAnchor l2) noAnn cs2') l2)
   where
     pc = priorComments cs1
     fc = getFollowingComments cs1
@@ -1277,9 +1284,9 @@ transferPriorCommentsA (SrcSpanAnn (EpAnn a1 an1 cs1) l1) (SrcSpanAnn (EpAnn a2 
 
 -- | Remove the exact print annotations payload, leaving only the
 -- anchor and comments.
-commentsOnlyA :: Monoid ann => SrcAnn ann -> SrcAnn ann
+commentsOnlyA :: NoAnn ann => SrcAnn ann -> SrcAnn ann
 commentsOnlyA (SrcSpanAnn EpAnnNotUsed loc) = SrcSpanAnn EpAnnNotUsed loc
-commentsOnlyA (SrcSpanAnn (EpAnn a _ cs) loc) = (SrcSpanAnn (EpAnn a mempty cs) loc)
+commentsOnlyA (SrcSpanAnn (EpAnn a _ cs) loc) = (SrcSpanAnn (EpAnn a noAnn cs) loc)
 
 -- | Remove the comments, leaving the exact print annotations payload
 removeCommentsA :: SrcAnn ann -> SrcAnn ann
@@ -1308,7 +1315,7 @@ instance (Semigroup a) => Semigroup (EpAnn a) where
 -- instance Ord Anchor where
 --   compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
 
-instance Semigroup Anchor where
+instance Semigroup EpaLocation where
   EpaSpan s1 m1    <> EpaSpan s2 m2     = EpaSpan (combineRealSrcSpans s1 s2) (liftA2 combineBufSpans m1 m2)
   EpaSpan s1 m1    <> _                 = EpaSpan s1 m1
   _                <> EpaSpan s2 m2     = EpaSpan s2 m2
@@ -1320,54 +1327,23 @@ instance Semigroup EpAnnComments where
   EpaCommentsBalanced cs1 as1 <> EpaComments cs2 = EpaCommentsBalanced (cs1 ++ cs2) as1
   EpaCommentsBalanced cs1 as1 <> EpaCommentsBalanced cs2 as2 = EpaCommentsBalanced (cs1 ++ cs2) (as1++as2)
 
-
-instance (Monoid a) => Monoid (EpAnn a) where
-  mempty = EpAnnNotUsed
-
-instance Semigroup NoEpAnns where
-  _ <> _ = NoEpAnns
-
-instance Monoid NoEpAnns where
-  mempty = NoEpAnns
-
-
+instance NoAnn NoEpAnns where
+  noAnn = NoEpAnns
 
 instance Semigroup AnnListItem where
   (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
 
-instance Monoid AnnListItem where
-  mempty = AnnListItem []
+instance NoAnn AnnListItem where
+  noAnn = AnnListItem []
 
+instance NoAnn AnnContext where
+  noAnn = AnnContext Nothing [] []
 
-instance Semigroup AnnList where
-  (AnnList a1 o1 c1 r1 t1) <> (AnnList a2 o2 c2 r2 t2)
-    = AnnList (a1 <> a2) (c o1 o2) (c c1 c2) (r1 <> r2) (t1 <> t2)
-    where
-      -- Left biased combination for the open and close annotations
-      c Nothing x = x
-      c x Nothing = x
-      c f _       = f
+instance NoAnn AnnList where
+  noAnn = AnnList Nothing Nothing Nothing [] []
 
-instance Semigroup AnnContext where
-  (AnnContext a1 o1 c1) <> (AnnContext a2 o2 c2)
-    = AnnContext (c a1 a2)  (o1 <> o2) (c1 <> c2)
-    where
-      -- Left biased combination for the ac_darrow
-      c Nothing x = x
-      c x Nothing = x
-      c f _       = f
-
-instance Monoid AnnContext where
-  mempty = AnnContext Nothing [] []
-
-instance Monoid AnnList where
-  mempty = AnnList Nothing Nothing Nothing [] []
-
-instance Semigroup NameAnn where
-  _ <> _ = panic "semigroup NameAnn"
-
-instance Monoid NameAnn where
-  mempty = NameAnnTrailing []
+instance NoAnn NameAnn where
+  noAnn = NameAnnTrailing []
 
 instance Semigroup AnnSortKey where
   NoAnnSortKey <> x = x
