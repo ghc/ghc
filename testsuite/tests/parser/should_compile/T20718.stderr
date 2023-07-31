@@ -58,7 +58,12 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:3:8-13 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T20718.hs:3:8-13 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T20718.hs:3:8-13 })
     {ModuleName: T20718}))
   (Nothing)
   []
@@ -74,15 +79,34 @@
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { T20718.hs:8:1 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     [])) { T20718.hs:8:1 })
        (Unqual
         {OccName: x}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { T20718.hs:8:1-5 })
+                     (AnnList
+                      (Nothing)
+                      (Nothing)
+                      (Nothing)
+                      []
+                      [])
+                     (EpaComments
+                      [])) { T20718.hs:8:1-5 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1-5 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { T20718.hs:8:1-5 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { T20718.hs:8:1-5 })
           (Match
            (EpAnn
             (EpaSpan { T20718.hs:8:1-5 })
@@ -91,7 +115,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:1 })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { T20718.hs:8:1 })
+                          (NameAnnTrailing
+                           [])
+                          (EpaComments
+                           [])) { T20718.hs:8:1 })
              (Unqual
               {OccName: x}))
             (Prefix)
@@ -102,7 +131,11 @@
              [])
             [(L
               (SrcSpanAnn
-               (EpAnnNotUsed)
+               (EpAnn
+                (EpaSpan { T20718.hs:8:3-5 })
+                (NoEpAnns)
+                (EpaComments
+                 []))
                { T20718.hs:8:3-5 })
               (GRHS
                (EpAnn
@@ -114,7 +147,12 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { T20718.hs:8:5 })
+                (SrcSpanAnn (EpAnn
+                             (EpaSpan { T20718.hs:8:5 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])) { T20718.hs:8:5 })
                 (HsOverLit
                  (EpAnn
                   (EpaSpan { T20718.hs:8:5 })
@@ -130,3 +168,5 @@
                     (1))))))))]
             (EmptyLocalBinds
              (NoExtField)))))])))))]))
+
+

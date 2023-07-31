@@ -1200,6 +1200,9 @@ data HsRuleAnn
        , ra_rest :: [AddEpAnn]
        } deriving (Data, Eq)
 
+instance NoAnn HsRuleAnn where
+  noAnn = HsRuleAnn Nothing Nothing []
+
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 

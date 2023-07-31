@@ -24,7 +24,12 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:2:8-13 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T18791.hs:2:8-13 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T18791.hs:2:8-13 })
     {ModuleName: T18791}))
   (Nothing)
   []
@@ -45,7 +50,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:4:6 })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { T18791.hs:4:6 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     [])) { T18791.hs:4:6 })
        (Unqual
         {OccName: T}))
       (HsQTvs
@@ -60,7 +70,12 @@
        (DataTypeCons
         (False)
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-17 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { T18791.hs:5:3-17 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { T18791.hs:5:3-17 })
           (ConDeclGADT
            (EpAnn
             (EpaSpan { T18791.hs:5:3-17 })
@@ -69,7 +84,12 @@
              []))
            (:|
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:3-5 })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { T18791.hs:5:3-5 })
+                          (NameAnnTrailing
+                           [])
+                          (EpaComments
+                           [])) { T18791.hs:5:3-5 })
              (Unqual
               {OccName: MkT}))
             [])
@@ -78,7 +98,12 @@
              (EpaSpan { T18791.hs:5:7-8 }))
             (HsNormalTok))
            (L
-            (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-17 })
+            (SrcSpanAnn (EpAnn
+                         (EpaSpan { T18791.hs:5:10-17 })
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])) { T18791.hs:5:10-17 })
             (HsOuterImplicit
              (NoExtField)))
            (Nothing)
@@ -104,11 +129,21 @@
                   []))
                 (NotPromoted)
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:10-12 })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { T18791.hs:5:10-12 })
+                              (NameAnnTrailing
+                               [])
+                              (EpaComments
+                               [])) { T18791.hs:5:10-12 })
                  (Unqual
                   {OccName: Int})))))])
            (L
-            (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
+            (SrcSpanAnn (EpAnn
+                         (EpaSpan { T18791.hs:5:17 })
+                         (AnnListItem
+                          [])
+                         (EpaComments
+                          [])) { T18791.hs:5:17 })
             (HsTyVar
              (EpAnn
               (EpaSpan { T18791.hs:5:17 })
@@ -117,8 +152,15 @@
                []))
              (NotPromoted)
              (L
-              (SrcSpanAnn (EpAnnNotUsed) { T18791.hs:5:17 })
+              (SrcSpanAnn (EpAnn
+                           (EpaSpan { T18791.hs:5:17 })
+                           (NameAnnTrailing
+                            [])
+                           (EpaComments
+                            [])) { T18791.hs:5:17 })
               (Unqual
                {OccName: T}))))
            (Nothing)))])
        []))))]))
+
+

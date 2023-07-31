@@ -133,12 +133,13 @@ def only_MG_loc(x):
     """
     Only compares the location embedded inside the MatchGroup, which has the form
     (MG
-      (NoExtField)
+      (FromSource)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <location> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <combineSrcSpans: files differ> })
     """
     ls = x.split("\n")
-    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[3:])
+    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[4:])
                 if mg.strip().startswith("(MG"))
     return '\n'.join(mgLocs)
 test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])

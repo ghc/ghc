@@ -36,8 +36,8 @@ import GHC.Data.FastString
 -- ---------------------------------------------------------------------
 
 _tt :: IO ()
-_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
--- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
+-- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_build/stage1/lib/"
+_tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib/"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/exactprint/_build/stage1/lib"
 -- _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/epw/_build/stage1/lib"
 
@@ -127,7 +127,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/printer/Ppr034.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr035.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr036.hs" Nothing
- -- "../../testsuite/tests/printer/Ppr037.hs" Nothing
+ "../../testsuite/tests/printer/Ppr037.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr038.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr039.hs" Nothing
  -- "../../testsuite/tests/printer/Ppr040.hs" Nothing
@@ -206,7 +206,7 @@ _tt = testOneFile changers "/home/alanz/mysrc/git.haskell.org/worktree/master/_b
  -- "../../testsuite/tests/ghc-api/exactprint/Test20239.hs" Nothing
  -- "../../testsuite/tests/printer/PprArrowLambdaCase.hs" Nothing
  -- "../../testsuite/tests/printer/Test16279.hs" Nothing
- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
+ -- "../../testsuite/tests/printer/HsDocTy.hs" Nothing
 --  "../../testsuite/tests/printer/Test22765.hs" Nothing
  -- "../../testsuite/tests/printer/Test22771.hs" Nothing
  -- "../../testsuite/tests/printer/Test23465.hs" Nothing

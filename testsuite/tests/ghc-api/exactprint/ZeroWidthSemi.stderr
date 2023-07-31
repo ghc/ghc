@@ -34,7 +34,12 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:1:8-20 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { ZeroWidthSemi.hs:1:8-20 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { ZeroWidthSemi.hs:1:8-20 })
     {ModuleName: ZeroWidthSemi}))
   (Nothing)
   []
@@ -55,15 +60,34 @@
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1 })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { ZeroWidthSemi.hs:6:1 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     [])) { ZeroWidthSemi.hs:6:1 })
        (Unqual
         {OccName: a}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1-5 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+                     (AnnList
+                      (Nothing)
+                      (Nothing)
+                      (Nothing)
+                      []
+                      [])
+                     (EpaComments
+                      [])) { ZeroWidthSemi.hs:6:1-5 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1-5 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { ZeroWidthSemi.hs:6:1-5 })
           (Match
            (EpAnn
             (EpaSpan { ZeroWidthSemi.hs:6:1-5 })
@@ -72,7 +96,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:1 })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { ZeroWidthSemi.hs:6:1 })
+                          (NameAnnTrailing
+                           [])
+                          (EpaComments
+                           [])) { ZeroWidthSemi.hs:6:1 })
              (Unqual
               {OccName: a}))
             (Prefix)
@@ -83,7 +112,11 @@
              [])
             [(L
               (SrcSpanAnn
-               (EpAnnNotUsed)
+               (EpAnn
+                (EpaSpan { ZeroWidthSemi.hs:6:3-5 })
+                (NoEpAnns)
+                (EpaComments
+                 []))
                { ZeroWidthSemi.hs:6:3-5 })
               (GRHS
                (EpAnn
@@ -95,7 +128,12 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { ZeroWidthSemi.hs:6:5 })
+                (SrcSpanAnn (EpAnn
+                             (EpaSpan { ZeroWidthSemi.hs:6:5 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])) { ZeroWidthSemi.hs:6:5 })
                 (HsOverLit
                  (EpAnn
                   (EpaSpan { ZeroWidthSemi.hs:6:5 })

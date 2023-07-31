@@ -184,6 +184,9 @@ data EpAnnSumPat = EpAnnSumPat
       , sumPatVbarsAfter  :: [EpaLocation]
       } deriving Data
 
+instance NoAnn EpAnnSumPat where
+  noAnn = EpAnnSumPat [] [] []
+
 -- ---------------------------------------------------------------------
 
 -- | Extension constructor for Pat, added after typechecking.

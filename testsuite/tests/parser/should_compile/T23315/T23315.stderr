@@ -20,12 +20,22 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:1:11-16 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T23315.hsig:1:11-16 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T23315.hsig:1:11-16 })
     {ModuleName: T23315}))
   (Nothing)
   []
   [(L
-    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:2:1-12 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T23315.hsig:2:1-12 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T23315.hsig:2:1-12 })
     (DocD
      (NoExtField)
      (DocCommentNext
@@ -59,19 +69,34 @@
        (EpaComments
         []))
       [(L
-        (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:1 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { T23315.hsig:3:1 })
+                     (NameAnnTrailing
+                      [])
+                     (EpaComments
+                      [])) { T23315.hsig:3:1 })
         (Unqual
          {OccName: a}))]
       (HsWC
        (NoExtField)
        (L
-        (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:6-7 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { T23315.hsig:3:6-7 })
+                     (AnnListItem
+                      [])
+                     (EpaComments
+                      [])) { T23315.hsig:3:6-7 })
         (HsSig
          (NoExtField)
          (HsOuterImplicit
           (NoExtField))
          (L
-          (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:3:6-7 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { T23315.hsig:3:6-7 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { T23315.hsig:3:6-7 })
           (HsTupleTy
            (EpAnn
             (EpaSpan { T23315.hsig:3:6-7 })
@@ -84,7 +109,12 @@
            (HsBoxedOrConstraintTuple)
            []))))))))
   ,(L
-    (SrcSpanAnn (EpAnnNotUsed) { T23315.hsig:4:1-14 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T23315.hsig:4:1-14 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T23315.hsig:4:1-14 })
     (DocD
      (NoExtField)
      (DocCommentPrev
@@ -100,3 +130,5 @@
             " More docs"))
           []))
         [])))))]))
+
+

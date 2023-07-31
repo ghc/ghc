@@ -47,8 +47,15 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T20718b.hs:4:8-14 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T20718b.hs:4:8-14 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T20718b.hs:4:8-14 })
     {ModuleName: T20718b}))
   (Nothing)
   []
   []))
+
+

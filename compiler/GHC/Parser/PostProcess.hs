@@ -478,9 +478,6 @@ add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs _))) (EpAnn a (AnnList anc o c
   | otherwise
   = EpAnn (patch_anchor rs a)
           (AnnList (fmap (patch_anchor rs) anc) o c (an:r) t) (cs Semi.<> cs2)
-add_where an@(AddEpAnn _ (EpaSpan (RealSrcSpan rs mb))) EpAnnNotUsed cs
-  = EpAnn (EpaSpan (RealSrcSpan rs mb))
-           (AnnList (Just $ EpaSpan (RealSrcSpan rs mb)) Nothing Nothing [an] []) cs
 add_where (AddEpAnn _ _) _ _ = panic "add_where"
  -- EpaDelta should only be used for transformations
 
@@ -498,7 +495,6 @@ patch_anchor r1 (EpaSpan (RealSrcSpan r0 mb)) = EpaSpan (RealSrcSpan r mb)
 patch_anchor _ (EpaSpan ss) = EpaSpan ss
 
 fixValbindsAnn :: EpAnn AnnList -> EpAnn AnnList
-fixValbindsAnn EpAnnNotUsed = EpAnnNotUsed
 fixValbindsAnn (EpAnn anchor (AnnList ma o c r t) cs)
   = (EpAnn (widenAnchor anchor (r ++ map trailingAnnToAddEpAnn t)) (AnnList ma o c r t) cs)
 
@@ -837,10 +833,7 @@ mkGadtDecl loc names dcol ty = do
 
   let bndrs_loc = case outer_bndrs of
         HsOuterImplicit{} -> getLoc ty
-        HsOuterExplicit an _ ->
-          case an of
-            EpAnnNotUsed -> getLoc ty
-            an' -> SrcSpanAnn (EpAnn (entry an') noAnn emptyComments) (spanFromAnchor (entry an'))
+        HsOuterExplicit an' _ -> SrcSpanAnn (EpAnn (entry an') noAnn emptyComments) (spanFromAnchor (entry an'))
 
   pure $ L l ConDeclGADT
                      { con_g_ext  = an
@@ -995,8 +988,9 @@ checkTyVars pp_what equals_or_where tc tparms
     for_widening  _                                     = AddEpAnn AnnAnyclass (EpaDelta (SameLine 0) [])
 
     for_widening_ann :: HsBndrVis GhcPs -> EpAnn [AddEpAnn]
-    for_widening_ann (HsBndrInvisible (L (TokenLoc (EpaSpan (RealSrcSpan r _mb))) _)) = EpAnn (realSpanAsAnchor r) [] emptyComments
-    for_widening_ann  _                                     = EpAnnNotUsed
+    for_widening_ann (HsBndrInvisible (L (TokenLoc (EpaSpan (RealSrcSpan r _mb))) _))
+      = EpAnn (realSpanAsAnchor r) [] emptyComments
+    for_widening_ann  _ = noAnn
 
 
 whereDots, equalsDots :: SDoc
@@ -1109,12 +1103,6 @@ checkTyClHdr is_cls ty
     -- Combine the annotations from the HsParTy and HsStarTy into a
     -- new one for the LocatedN RdrName
     newAnns :: SrcSpanAnnA -> EpAnn AnnParen -> SrcSpanAnnN
-    newAnns (SrcSpanAnn EpAnnNotUsed l) (EpAnn as (AnnParen _ o c) cs) =
-      let
-        lr = combineRealSrcSpans (realSrcSpan l) (anchor as)
-        an = EpAnn (EpaSpan (RealSrcSpan lr Strict.Nothing)) (NameAnn NameParens o (srcSpan2e l) c []) cs
-      in SrcSpanAnn an (RealSrcSpan lr Strict.Nothing)
-    newAnns _ EpAnnNotUsed = panic "missing AnnParen"
     newAnns (SrcSpanAnn (EpAnn ap (AnnListItem ta) csp) l) (EpAnn as (AnnParen _ o c) cs) =
       let
         lr = RealSrcSpan (combineRealSrcSpans (anchor ap) (anchor as)) Strict.Nothing
@@ -1173,7 +1161,6 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
     -- Ditto ()
     = do
         let (op,cp,cs') = case ann' of
-              EpAnnNotUsed -> ([],[],emptyComments)
               EpAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
         return (L (SrcSpanAnn (EpAnn (spanAsAnchor l)
                               -- Append parens so that the original order in the source is maintained
@@ -1183,7 +1170,6 @@ checkContext orig_t@(L (SrcSpanAnn _ l) _orig_t) =
                                   -- to be sure HsParTy doesn't get into the way
     = do
         let (op,cp,cs') = case ann' of
-                    EpAnnNotUsed -> ([],[],emptyComments)
                     EpAnn _ (AnnParen _ open close ) cs -> ([open],[close],cs)
         check (op++opi,cp++cpi,cs' Semi.<> csi) ty
 
@@ -1532,7 +1518,7 @@ type Fbind b = Either (LHsRecField GhcPs (LocatedA b)) (LHsRecProj GhcPs (Locate
 class DisambInfixOp b where
   mkHsVarOpPV :: LocatedN RdrName -> PV (LocatedN b)
   mkHsConOpPV :: LocatedN RdrName -> PV (LocatedN b)
-  mkHsInfixHolePV :: SrcSpan -> (EpAnnComments -> EpAnn EpAnnUnboundVar) -> PV (Located b)
+  mkHsInfixHolePV :: SrcSpan -> (EpAnnComments -> EpAnn (Maybe EpAnnUnboundVar)) -> PV (Located b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
   mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
@@ -1887,7 +1873,7 @@ instance DisambECP (HsExpr GhcPs) where
                                                          (PsErrUnallowedPragma prag)
   rejectPragmaPV _                        = return ()
 
-hsHoleExpr :: EpAnn EpAnnUnboundVar -> HsExpr GhcPs
+hsHoleExpr :: EpAnn (Maybe EpAnnUnboundVar) -> HsExpr GhcPs
 hsHoleExpr anns = HsUnboundVar anns (mkRdrUnqual (mkVarOccFS (fsLit "_")))
 
 instance DisambECP (PatBuilder GhcPs) where
