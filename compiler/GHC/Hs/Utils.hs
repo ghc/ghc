@@ -614,7 +614,7 @@ nlHsIf cond true false = noLocA (HsIf noAnn cond true false)
 
 nlHsCase expr matches
   = noLocA (HsCase noAnn expr (mkMatchGroup (Generated SkipPmc) (noLocA matches)))
-nlList exprs          = noLocA (ExplicitList noAnn exprs)
+nlList exprs = noLocA (ExplicitList noAnn exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IsSrcSpanAnn p a

@@ -3,12 +3,22 @@
 
 {Bag(LocatedA (HsBind Var)):
  [(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tcT}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -16,7 +26,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -24,7 +39,12 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -32,7 +52,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -40,7 +65,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -48,7 +78,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -56,14 +91,24 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsLit
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -72,7 +117,12 @@
                     []))
                   {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -81,21 +131,45 @@
                   []))
                 {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -103,14 +177,24 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -124,7 +208,12 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsLit
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -133,19 +222,39 @@
             []))
           {HsInt{64}Prim (1) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'MkT}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -153,7 +262,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -161,7 +275,12 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -169,7 +288,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -177,7 +301,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -185,7 +314,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -193,14 +327,24 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsLit
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -209,7 +353,12 @@
                     []))
                   {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -218,21 +367,45 @@
                   []))
                 {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -240,14 +413,24 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -261,7 +444,12 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsLit
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -270,19 +458,39 @@
             []))
           {HsInt{64}Prim (3) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tcPeano}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -290,7 +498,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -298,7 +511,12 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -306,7 +524,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -314,7 +537,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -322,7 +550,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -330,14 +563,24 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsLit
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -346,7 +589,12 @@
                     []))
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -355,21 +603,45 @@
                   []))
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -377,14 +649,24 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -398,7 +680,12 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsLit
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -407,19 +694,39 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: GHC.Types.krep$*})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'Zero}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -427,7 +734,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -435,7 +747,12 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -443,7 +760,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -451,7 +773,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -459,7 +786,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -467,14 +799,24 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsLit
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -483,7 +825,12 @@
                     []))
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -492,21 +839,45 @@
                   []))
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -514,14 +885,24 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -535,7 +916,12 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsLit
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -544,19 +930,39 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tc'Succ}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -564,7 +970,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -572,7 +983,12 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -580,7 +996,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -588,7 +1009,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -596,7 +1022,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -604,14 +1035,24 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (ConLikeTc
                    ({abstract:ConLike})
                    []
                    [])))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsLit
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -620,7 +1061,12 @@
                     []))
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -629,21 +1075,45 @@
                   []))
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: DumpTypecheckedAst.$trModule})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -651,14 +1121,24 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (XExpr
                 (ConLikeTc
                  ({abstract:ConLike})
                  []
                  [])))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsLit
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -672,7 +1152,12 @@
              (NoTokenLoc)
              (HsTok))))))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsLit
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -681,19 +1166,39 @@
             []))
           {HsInt{64}Prim (0) (NoSourceText)}))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -701,14 +1206,24 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsLit
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -722,12 +1237,22 @@
           (False)
           (2)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -735,14 +1260,24 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsLit
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -756,12 +1291,22 @@
           (False)
           (1)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -769,14 +1314,24 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (XExpr
         (ConLikeTc
          ({abstract:ConLike})
          []
          [])))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsLit
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -790,12 +1345,22 @@
           (False)
           (0)))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -803,7 +1368,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -811,33 +1381,68 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -845,7 +1450,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -853,33 +1463,68 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: GHC.Types.krep$*})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -887,7 +1532,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -895,33 +1545,68 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -929,7 +1614,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -937,33 +1627,68 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -971,7 +1696,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -979,33 +1709,68 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: $krep})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsVar
         (NoExtField)
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          {Var: $krep})))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -1013,7 +1778,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -1021,28 +1791,57 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: DumpTypecheckedAst.$tcT})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsPar
-        (EpAnnNotUsed)
+        (EpAnn
+         (EpaDelta (SameLine 0) [])
+         (NoEpAnns)
+         (EpaComments
+          []))
         (L
          (NoTokenLoc)
          (HsTok))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -1050,7 +1849,12 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -1058,7 +1862,12 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (XExpr
               (WrapExpr
                (HsWrap
@@ -1072,21 +1881,45 @@
                   []
                   []))))))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsVar
               (NoExtField)
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (NameAnnTrailing
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                {Var: $krep})))))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsPar
-            (EpAnnNotUsed)
+            (EpAnn
+             (EpaDelta (SameLine 0) [])
+             (NoEpAnns)
+             (EpaComments
+              []))
             (L
              (NoTokenLoc)
              (HsTok))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsApp
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -1094,7 +1927,12 @@
                (EpaComments
                 []))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsApp
                 (EpAnn
                  (EpaDelta (SameLine 0) [])
@@ -1102,7 +1940,12 @@
                  (EpaComments
                   []))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (XExpr
                   (WrapExpr
                    (HsWrap
@@ -1116,21 +1959,45 @@
                       []
                       []))))))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsVar
                   (NoExtField)
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   (SrcSpanAnn (EpAnn
+                                (EpaSpan { <no location info> })
+                                (NameAnnTrailing
+                                 [])
+                                (EpaComments
+                                 [])) { <no location info> })
                    {Var: $krep})))))
               (L
-               (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+               (SrcSpanAnn (EpAnn
+                            (EpaSpan { <no location info> })
+                            (AnnListItem
+                             [])
+                            (EpaComments
+                             [])) { <no location info> })
                (HsPar
-                (EpAnnNotUsed)
+                (EpAnn
+                 (EpaDelta (SameLine 0) [])
+                 (NoEpAnns)
+                 (EpaComments
+                  []))
                 (L
                  (NoTokenLoc)
                  (HsTok))
                 (L
-                 (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                 (SrcSpanAnn (EpAnn
+                              (EpaSpan { <no location info> })
+                              (AnnListItem
+                               [])
+                              (EpaComments
+                               [])) { <no location info> })
                  (HsApp
                   (EpAnn
                    (EpaDelta (SameLine 0) [])
@@ -1138,7 +2005,12 @@
                    (EpaComments
                     []))
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   (SrcSpanAnn (EpAnn
+                                (EpaSpan { <no location info> })
+                                (AnnListItem
+                                 [])
+                                (EpaComments
+                                 [])) { <no location info> })
                    (HsApp
                     (EpAnn
                      (EpaDelta (SameLine 0) [])
@@ -1146,7 +2018,12 @@
                      (EpaComments
                       []))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                     (SrcSpanAnn (EpAnn
+                                  (EpaSpan { <no location info> })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])) { <no location info> })
                      (XExpr
                       (WrapExpr
                        (HsWrap
@@ -1160,14 +2037,29 @@
                           []
                           []))))))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                     (SrcSpanAnn (EpAnn
+                                  (EpaSpan { <no location info> })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])) { <no location info> })
                      (HsVar
                       (NoExtField)
                       (L
-                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       (SrcSpanAnn (EpAnn
+                                    (EpaSpan { <no location info> })
+                                    (NameAnnTrailing
+                                     [])
+                                    (EpaComments
+                                     [])) { <no location info> })
                        {Var: $krep})))))
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                   (SrcSpanAnn (EpAnn
+                                (EpaSpan { <no location info> })
+                                (AnnListItem
+                                 [])
+                                (EpaComments
+                                 [])) { <no location info> })
                    (XExpr
                     (WrapExpr
                      (HsWrap
@@ -1190,12 +2082,22 @@
          (NoTokenLoc)
          (HsTok))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: $krep}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -1203,7 +2105,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -1211,21 +2118,41 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsVar
           (NoExtField)
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (NameAnnTrailing
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            {Var: DumpTypecheckedAst.$tcPeano})))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (XExpr
         (WrapExpr
          (HsWrap
@@ -1239,12 +2166,22 @@
             []
             []))))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { <no location info> })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { <no location info> })
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$trModule}
     (L
-     (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+     (SrcSpanAnn (EpAnn
+                  (EpaSpan { <no location info> })
+                  (AnnListItem
+                   [])
+                  (EpaComments
+                   [])) { <no location info> })
      (HsApp
       (EpAnn
        (EpaDelta (SameLine 0) [])
@@ -1252,7 +2189,12 @@
        (EpaComments
         []))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsApp
         (EpAnn
          (EpaDelta (SameLine 0) [])
@@ -1260,21 +2202,40 @@
          (EpaComments
           []))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (XExpr
           (ConLikeTc
            ({abstract:ConLike})
            []
            [])))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsPar
-          (EpAnnNotUsed)
+          (EpAnn
+           (EpaDelta (SameLine 0) [])
+           (NoEpAnns)
+           (EpaComments
+            []))
           (L
            (NoTokenLoc)
            (HsTok))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsApp
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -1282,14 +2243,24 @@
              (EpaComments
               []))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (XExpr
               (ConLikeTc
                ({abstract:ConLike})
                []
                [])))
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { <no location info> })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { <no location info> })
              (HsLit
               (EpAnn
                (EpaDelta (SameLine 0) [])
@@ -1303,14 +2274,28 @@
            (NoTokenLoc)
            (HsTok))))))
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { <no location info> })
+                    (AnnListItem
+                     [])
+                    (EpaComments
+                     [])) { <no location info> })
        (HsPar
-        (EpAnnNotUsed)
+        (EpAnn
+         (EpaDelta (SameLine 0) [])
+         (NoEpAnns)
+         (EpaComments
+          []))
         (L
          (NoTokenLoc)
          (HsTok))
         (L
-         (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { <no location info> })
+                      (AnnListItem
+                       [])
+                      (EpaComments
+                       [])) { <no location info> })
          (HsApp
           (EpAnn
            (EpaDelta (SameLine 0) [])
@@ -1318,14 +2303,24 @@
            (EpaComments
             []))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (XExpr
             (ConLikeTc
              ({abstract:ConLike})
              []
              [])))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { <no location info> })
+                        (AnnListItem
+                         [])
+                        (EpaComments
+                         [])) { <no location info> })
            (HsLit
             (EpAnn
              (EpaDelta (SameLine 0) [])
@@ -1339,7 +2334,12 @@
          (NoTokenLoc)
          (HsTok))))))))
  ,(L
-   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
+   (SrcSpanAnn (EpAnn
+                (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
+                (AnnListItem
+                 [])
+                (EpaComments
+                 [])) { DumpTypecheckedAst.hs:20:1-23 })
    (XHsBindsLR
     (AbsBinds
      []
@@ -1364,7 +2364,12 @@
           (WpHole)
           [])
          (L
-          (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-4 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { DumpTypecheckedAst.hs:20:1-4 })
+                       (NameAnnTrailing
+                        [])
+                       (EpaComments
+                        [])) { DumpTypecheckedAst.hs:20:1-4 })
           {Var: main})
          (MG
           (MatchGroupTc
@@ -1376,14 +2381,37 @@
               [])])
            (FromSource))
           (L
-           (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
+           (SrcSpanAnn (EpAnn
+                        (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
+                        (AnnList
+                         (Nothing)
+                         (Nothing)
+                         (Nothing)
+                         []
+                         [])
+                        (EpaComments
+                         [])) { DumpTypecheckedAst.hs:20:1-23 })
            [(L
-             (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-23 })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { DumpTypecheckedAst.hs:20:1-23 })
+                          (AnnListItem
+                           [])
+                          (EpaComments
+                           [])) { DumpTypecheckedAst.hs:20:1-23 })
              (Match
-              (EpAnnNotUsed)
+              (EpAnn
+               (EpaDelta (SameLine 0) [])
+               []
+               (EpaComments
+                []))
               (FunRhs
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:1-4 })
+                (SrcSpanAnn (EpAnn
+                             (EpaSpan { DumpTypecheckedAst.hs:20:1-4 })
+                             (NameAnnTrailing
+                              [])
+                             (EpaComments
+                              [])) { DumpTypecheckedAst.hs:20:1-4 })
                 {Name: main})
                (Prefix)
                (NoSrcStrict))
@@ -1393,24 +2421,58 @@
                 [])
                [(L
                  (SrcSpanAnn
-                  (EpAnnNotUsed)
+                  (EpAnn
+                   (EpaSpan { DumpTypecheckedAst.hs:20:6-23 })
+                   (NoEpAnns)
+                   (EpaComments
+                    []))
                   { DumpTypecheckedAst.hs:20:6-23 })
                  (GRHS
-                  (EpAnnNotUsed)
+                  (EpAnn
+                   (EpaDelta (SameLine 0) [])
+                   (GrhsAnn
+                    (Nothing)
+                    (AddEpAnn Annlarrowtail (EpaDelta (SameLine 0) [])))
+                   (EpaComments
+                    []))
                   []
                   (L
-                   (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:8-23 })
+                   (SrcSpanAnn (EpAnn
+                                (EpaSpan { DumpTypecheckedAst.hs:20:8-23 })
+                                (AnnListItem
+                                 [])
+                                (EpaComments
+                                 [])) { DumpTypecheckedAst.hs:20:8-23 })
                    (HsApp
-                    (EpAnnNotUsed)
+                    (EpAnn
+                     (EpaDelta (SameLine 0) [])
+                     (NoEpAnns)
+                     (EpaComments
+                      []))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:8-15 })
+                     (SrcSpanAnn (EpAnn
+                                  (EpaSpan { DumpTypecheckedAst.hs:20:8-15 })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])) { DumpTypecheckedAst.hs:20:8-15 })
                      (HsVar
                       (NoExtField)
                       (L
-                       (SrcSpanAnn (EpAnnNotUsed) { <no location info> })
+                       (SrcSpanAnn (EpAnn
+                                    (EpaSpan { <no location info> })
+                                    (NameAnnTrailing
+                                     [])
+                                    (EpaComments
+                                     [])) { <no location info> })
                        {Var: putStrLn})))
                     (L
-                     (SrcSpanAnn (EpAnnNotUsed) { DumpTypecheckedAst.hs:20:17-23 })
+                     (SrcSpanAnn (EpAnn
+                                  (EpaSpan { DumpTypecheckedAst.hs:20:17-23 })
+                                  (AnnListItem
+                                   [])
+                                  (EpaComments
+                                   [])) { DumpTypecheckedAst.hs:20:17-23 })
                      (HsLit
                       (EpAnn
                        (EpaSpan { DumpTypecheckedAst.hs:20:17-23 })
@@ -1423,3 +2485,5 @@
                (EmptyLocalBinds
                 (NoExtField)))))]))))]}
      (False))))]}
+
+

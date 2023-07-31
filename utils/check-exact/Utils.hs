@@ -370,7 +370,6 @@ name2String = showPprUnsafe
  -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
@@ -400,7 +399,6 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
 moveAnchor :: Monoid b => SrcAnn a -> SrcAnn b
-moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
 moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc mempty cs) l
 
 -- ---------------------------------------------------------------------

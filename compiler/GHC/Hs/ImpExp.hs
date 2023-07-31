@@ -42,7 +42,6 @@ import GHC.Unit.Module.Warnings (WarningTxt)
 
 import Data.Data
 import Data.Maybe
-import qualified Data.Semigroup as Semigroup
 
 
 {-
@@ -120,13 +119,15 @@ data EpAnnImportDecl = EpAnnImportDecl
   , importDeclAnnAs        :: Maybe EpaLocation
   } deriving (Data)
 
-instance Semigroup EpAnnImportDecl where
-  EpAnnImportDecl a1 b1 c1 d1 e1 f1 <> EpAnnImportDecl a2 b2 c2 d2 e2 f2
-         = EpAnnImportDecl (a1 Semigroup.<> a2) (b1 Semigroup.<> b2) (c1 Semigroup.<> c2)
-                           (d1 Semigroup.<> d2) (e1 Semigroup.<> e2) (f1 Semigroup.<> f2)
-instance Monoid EpAnnImportDecl where
-  mempty = EpAnnImportDecl noSpanAnchor Nothing Nothing Nothing Nothing Nothing
+-- instance Semigroup EpAnnImportDecl where
+--   EpAnnImportDecl a1 b1 c1 d1 e1 f1 <> EpAnnImportDecl a2 b2 c2 d2 e2 f2
+--          = EpAnnImportDecl (a1 Semigroup.<> a2) (b1 Semigroup.<> b2) (c1 Semigroup.<> c2)
+--                            (d1 Semigroup.<> d2) (e1 Semigroup.<> e2) (f1 Semigroup.<> f2)
+-- instance Monoid EpAnnImportDecl where
+--   mempty = EpAnnImportDecl noSpanAnchor Nothing Nothing Nothing Nothing Nothing
 
+instance NoAnn EpAnnImportDecl where
+  noAnn = EpAnnImportDecl noAnn  Nothing  Nothing  Nothing  Nothing  Nothing
 -- ---------------------------------------------------------------------
 
 simpleImportDecl :: ModuleName -> ImportDecl GhcPs

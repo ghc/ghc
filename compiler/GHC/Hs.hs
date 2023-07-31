@@ -105,6 +105,9 @@ data AnnsModule
     am_eof :: Maybe (RealSrcSpan, RealSrcSpan) -- End of file and end of prior token
     } deriving (Data, Eq)
 
+instance NoAnn AnnsModule where
+  noAnn = AnnsModule [] [] Nothing
+
 instance Outputable (HsModule GhcPs) where
     ppr (HsModule { hsmodExt = XModulePs { hsmodHaddockModHeader = mbDoc }
                   , hsmodName = Nothing

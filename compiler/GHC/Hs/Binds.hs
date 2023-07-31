@@ -706,6 +706,8 @@ data AnnSig
       asRest   :: [AddEpAnn]
       } deriving Data
 
+instance NoAnn AnnSig where
+  noAnn = AnnSig noAnn noAnn
 
 -- | Type checker Specialisation Pragmas
 --

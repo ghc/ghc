@@ -29,7 +29,12 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:1:8-13 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T22919.hs:1:8-13 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T22919.hs:1:8-13 })
     {ModuleName: T22919}))
   (Nothing)
   []
@@ -45,15 +50,34 @@
      (FunBind
       (NoExtField)
       (L
-       (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-3 })
+       (SrcSpanAnn (EpAnn
+                    (EpaSpan { T22919.hs:2:1-3 })
+                    (NameAnnTrailing
+                     [])
+                    (EpaComments
+                     [])) { T22919.hs:2:1-3 })
        (Unqual
         {OccName: foo}))
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-9 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { T22919.hs:2:1-9 })
+                     (AnnList
+                      (Nothing)
+                      (Nothing)
+                      (Nothing)
+                      []
+                      [])
+                     (EpaComments
+                      [])) { T22919.hs:2:1-9 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-9 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { T22919.hs:2:1-9 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { T22919.hs:2:1-9 })
           (Match
            (EpAnn
             (EpaSpan { T22919.hs:2:1-9 })
@@ -62,7 +86,12 @@
              []))
            (FunRhs
             (L
-             (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:1-3 })
+             (SrcSpanAnn (EpAnn
+                          (EpaSpan { T22919.hs:2:1-3 })
+                          (NameAnnTrailing
+                           [])
+                          (EpaComments
+                           [])) { T22919.hs:2:1-3 })
              (Unqual
               {OccName: foo}))
             (Prefix)
@@ -73,7 +102,11 @@
              [])
             [(L
               (SrcSpanAnn
-               (EpAnnNotUsed)
+               (EpAnn
+                (EpaSpan { T22919.hs:2:5-9 })
+                (NoEpAnns)
+                (EpaComments
+                 []))
                { T22919.hs:2:5-9 })
               (GRHS
                (EpAnn
@@ -85,7 +118,12 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { T22919.hs:2:7-9 })
+                (SrcSpanAnn (EpAnn
+                             (EpaSpan { T22919.hs:2:7-9 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])) { T22919.hs:2:7-9 })
                 (HsLit
                  (EpAnn
                   (EpaSpan { T22919.hs:2:7-9 })

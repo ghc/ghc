@@ -809,7 +809,7 @@ dsCases ids local_vars stack_id stack_ty res_ty
     -- i.e. Void. The choices then effectively become `arr absurd`,
     -- implemented as `arr \case {}`.
     Nothing -> ([], void_ty,) . do_arr ids void_ty res_ty <$>
-      dsExpr (HsLamCase EpAnnNotUsed LamCase
+      dsExpr (HsLamCase noAnn LamCase
         (MG { mg_alts = noLocA []
             , mg_ext = MatchGroupTc [Scaled ManyTy void_ty] res_ty (Generated SkipPmc)
             }))

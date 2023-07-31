@@ -1151,6 +1151,13 @@ data HsRuleAnn
        , ra_rest :: [AddEpAnn]
        } deriving (Data, Eq)
 
+-- instance Semigroup HsRuleAnn where
+--   HsRuleAnn a1 b1 c1 <> HsRuleAnn a2 b2 c2 =
+--     HsRuleAnn (a1 Semigroup.<> a2) (b1 Semigroup.<> b2) (c1 Semigroup.<> c2)
+
+instance NoAnn HsRuleAnn where
+  noAnn = HsRuleAnn Nothing Nothing []
+
 flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
