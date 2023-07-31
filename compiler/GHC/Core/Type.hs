@@ -1952,10 +1952,8 @@ dropForAlls ty = go ty
 -- | Attempts to take a ForAllTy apart, returning the full ForAllTyBinder
 splitForAllForAllTyBinder_maybe :: Type -> Maybe (Erasure, ForAllTyBinder, Type)
 splitForAllForAllTyBinder_maybe ty
-  | ForAllTy Erased   bndr inner_ty <- coreFullView ty = Just (Erased, bndr, inner_ty)
-  | ForAllTy Retained bndr (FunTy FTF_T_T _ _ inner_ty) <- coreFullView ty = Just (Retained, bndr, inner_ty)
-  | ForAllTy Retained _ _ <- coreFullView ty = panic "splitForAllTyVarBinder_maybe: Retained binder without matching FunTy"
-  | otherwise                                        = Nothing
+  | ForAllTy eras bndr inner_ty <- coreFullView ty = Just (eras, bndr, inner_ty)
+  | otherwise                                      = Nothing
 
 
 -- | Attempts to take a ForAllTy apart, returning the Var

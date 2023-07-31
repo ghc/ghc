@@ -1289,6 +1289,7 @@ pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion, ForAllTyFlag, ForAllTyFlag)]
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
+-- XXX JB HERE printing this needs to be fixed
 ppr_iface_forall_part :: ShowForAllFlag
                       -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 ppr_iface_forall_part show_forall tvs ctxt sdoc

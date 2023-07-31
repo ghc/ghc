@@ -410,7 +410,8 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     --     to syntactically visible patterns in the source program
     -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
     go acc_arg_tys n ty
-      | Just (eras, Bndr tv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+    -- XXX JB HERE Maybe this should use the tc version of splitForAllTys (and then splitForAllTys can stop removing the function type)
+      | Just (eras, Bndr tv vis, ty') <- tcSplitForAllTyVarBinder_maybe ty
       , Required <- vis
       = let init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
         in goVdq eras init_subst acc_arg_tys n ty tv ty'
