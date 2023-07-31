@@ -1393,7 +1393,7 @@ instance (Semigroup a) => Semigroup (EpAnn a) where
    -- annotations must follow it. So we combine them which yields the
    -- largest span
 
-instance Semigroup Anchor where
+instance Semigroup EpaLocation where
   EpaSpan s1 m1    <> EpaSpan s2 m2     = EpaSpan (combineRealSrcSpans s1 s2) (liftA2 combineBufSpans m1 m2)
   EpaSpan s1 m1    <> _                 = EpaSpan s1 m1
   _                <> EpaSpan s2 m2     = EpaSpan s2 m2
