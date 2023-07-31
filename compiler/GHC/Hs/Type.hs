@@ -701,10 +701,10 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
         HsOuterImplicit{}                      -> ([], ignoreParens body)
         HsOuterExplicit{hso_bndrs = exp_bndrs} -> (exp_bndrs, body)
 
-    (univs,       ty1) = split_sig_ty ty
-    (reqs,        ty2) = splitLHsQualTy ty1
-    ((_an, exis), ty3) = splitLHsForAllTyInvis ty2
-    (provs,       ty4) = splitLHsQualTy ty3
+    (univs, ty1) = split_sig_ty ty
+    (reqs,  ty2) = splitLHsQualTy ty1
+    (exis,  ty3) = splitLHsForAllTyInvis ty2
+    (provs, ty4) = splitLHsQualTy ty3
 
 -- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
 -- into its constituent parts.
@@ -724,8 +724,8 @@ splitLHsSigmaTyInvis :: LHsType (GhcPass p)
                      -> ([LHsTyVarBndr Specificity (GhcPass p)]
                         , Maybe (LHsContext (GhcPass p)), LHsType (GhcPass p))
 splitLHsSigmaTyInvis ty
-  | ((_an,tvs), ty1) <- splitLHsForAllTyInvis ty
-  , (ctxt,      ty2) <- splitLHsQualTy ty1
+  | (tvs,  ty1) <- splitLHsForAllTyInvis ty
+  , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
 -- | Decompose a GADT type into its constituent parts.
@@ -770,11 +770,11 @@ splitLHsGadtTy (L _ sig_ty)
 -- Unlike 'splitLHsSigmaTyInvis', this function does not look through
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsForAllTyInvis ::
-  LHsType (GhcPass pass) -> ( (EpAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
+  LHsType (GhcPass pass) -> ( [LHsTyVarBndr Specificity (GhcPass pass)]
                             , LHsType (GhcPass pass))
 splitLHsForAllTyInvis ty
   | ((mb_tvbs), body) <- splitLHsForAllTyInvis_KP (ignoreParens ty)
-  = (fromMaybe (EpAnnNotUsed,[]) mb_tvbs, body)
+  = (fromMaybe [] mb_tvbs, body)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -788,14 +788,13 @@ splitLHsForAllTyInvis ty
 -- Unlike 'splitLHsForAllTyInvis', this function does not look through
 -- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
 splitLHsForAllTyInvis_KP ::
-  LHsType (GhcPass pass) -> (Maybe (EpAnnForallTy, [LHsTyVarBndr Specificity (GhcPass pass)])
+  LHsType (GhcPass pass) -> (Maybe ([LHsTyVarBndr Specificity (GhcPass pass)])
                             , LHsType (GhcPass pass))
 splitLHsForAllTyInvis_KP lty@(L _ ty) =
   case ty of
-    HsForAllTy { hst_tele = HsForAllInvis { hsf_xinvis = an
-                                          , hsf_invis_bndrs = tvs }
+    HsForAllTy { hst_tele = HsForAllInvis {hsf_invis_bndrs = tvs }
                , hst_body = body }
-      -> (Just (an, tvs), body)
+      -> (Just tvs, body)
     _ -> (Nothing, lty)
 
 -- | Decompose a type of the form @context => body@ into its constituent parts.
