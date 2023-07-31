@@ -1396,7 +1396,7 @@ instance (Semigroup a) => Semigroup (EpAnn a) where
 -- instance Ord Anchor where
 --   compare (Anchor s1 _) (Anchor s2 _) = compare s1 s2
 
-instance Semigroup Anchor where
+instance Semigroup EpaLocation where
   EpaSpan s1 m1    <> EpaSpan s2 m2     = EpaSpan (combineRealSrcSpans s1 s2) (liftA2 combineBufSpans m1 m2)
   EpaSpan s1 m1    <> _                 = EpaSpan s1 m1
   _                <> EpaSpan s2 m2     = EpaSpan s2 m2
