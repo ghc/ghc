@@ -1187,7 +1187,7 @@ unify_ty env ty1 (AppTy ty2a ty2b) _kco
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
-unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
+unify_ty env (ForAllTy _ (Bndr tv1 _) ty1) (ForAllTy _ (Bndr tv2 _) ty2) kco
   = do { unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
        ; let env' = umRnBndr2 env tv1 tv2
        ; unify_ty env' ty1 ty2 kco }
@@ -1675,7 +1675,7 @@ ty_co_match menv subst (FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
     -- NB: we include the RuntimeRep arguments in the matching;
     --     not doing so caused #21205.
 
-ty_co_match menv subst (ForAllTy (Bndr tv1 vis1t) ty1)
+ty_co_match menv subst (ForAllTy _ (Bndr tv1 vis1t) ty1)
                        (ForAllCo tv2 vis1c vis2c kind_co2 co2)
                        lkco rkco
   | isTyVar tv1 && isTyVar tv2
@@ -1782,7 +1782,7 @@ pushRefl co =
       ->  Just (FunCo r af af (mkReflCo r w) (mkReflCo r ty1) (mkReflCo r ty2))
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRoleListX r tc) tys))
-    Just (ForAllTy (Bndr tv vis) ty, r)
+    Just (ForAllTy _ (Bndr tv vis) ty, r)
       -> Just (ForAllCo { fco_tcv = tv, fco_visL = vis, fco_visR = vis
                         , fco_kind = mkNomReflCo (varType tv)
                         , fco_body = mkReflCo r ty })
@@ -2018,10 +2018,10 @@ coreFlattenTy subst = go
             (env3, mult') = go env2 mult in
         (env3, ty { ft_mult = mult', ft_arg = ty1', ft_res = ty2' })
 
-    go env (ForAllTy (Bndr tv vis) ty)
+    go env (ForAllTy eras (Bndr tv vis) ty)
       = let (env1, subst', tv') = coreFlattenVarBndr subst env tv
             (env2, ty') = coreFlattenTy subst' env1 ty in
-        (env2, ForAllTy (Bndr tv' vis) ty')
+        (env2, ForAllTy eras (Bndr tv' vis) ty')
 
     go env ty@(LitTy {}) = (env, ty)
 
@@ -2105,4 +2105,3 @@ mkFlattenFreshCoVar in_scope kind
   = let uniq = unsafeGetFreshLocalUnique in_scope
         name = mkSystemVarName uniq (fsLit "flc")
     in mkCoVar name kind
-

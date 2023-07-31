@@ -3057,7 +3057,7 @@ mkCallUDs' env f args
              -- fire when saturated
 
     mk_spec_arg :: OutExpr -> PiTyBinder -> SpecArg
-    mk_spec_arg arg (Named bndr)
+    mk_spec_arg arg (Named _ bndr)
       |  binderVar bndr `elemVarSet` constrained_tyvars
       = case arg of
           Type ty -> SpecType ty

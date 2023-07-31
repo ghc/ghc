@@ -685,7 +685,7 @@ makeTypeConcrete conc_orig ty =
       = return ty
     go ty@(CastTy cast_ty kco)
       = bale_out ty (ContainsCast cast_ty kco)
-    go ty@(ForAllTy tcv body)
+    go ty@(ForAllTy _ tcv body)
       = bale_out ty (ContainsForall tcv body)
     go ty@(CoercionTy co)
       = bale_out ty (ContainsCoercionTy co)

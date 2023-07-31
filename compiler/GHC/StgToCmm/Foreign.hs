@@ -714,7 +714,7 @@ collectStgFArgTypes :: Type -> [StgFArgType]
 collectStgFArgTypes = go []
   where
     -- Skip foralls
-    go bs (ForAllTy _ res) = go bs res
+    go bs (ForAllTy _ _ res) = go bs res
     go bs (AppTy{}) = reverse bs
     go bs (TyConApp{}) = reverse bs
     go bs (LitTy{}) = reverse bs

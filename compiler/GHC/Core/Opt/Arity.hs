@@ -2238,7 +2238,7 @@ mkEtaWW orig_oss ppr_orig_expr in_scope orig_ty
 
     go n oss@(one_shot:oss1) subst ty
        ----------- Forall types  (forall a. ty)
-       | Just (Bndr tcv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+       | Just (_, Bndr tcv vis, ty') <- splitForAllForAllTyBinder_maybe ty
        , (subst', tcv') <- Type.substVarBndr subst tcv
        , let oss' | isTyVar tcv = oss
                   | otherwise   = oss1
@@ -2731,7 +2731,7 @@ tryEtaReduce rec_ids bndrs body eval_sd
     ok_arg bndr (Type arg_ty) co fun_ty
        | Just tv <- getTyVar_maybe arg_ty
        , bndr == tv  = case splitForAllForAllTyBinder_maybe fun_ty of
-           Just (Bndr _ vis, _) -> Just (mkHomoForAllCos [Bndr tv vis] co, [])
+           Just (_, Bndr _ vis, _) -> Just (mkHomoForAllCos [Bndr tv vis] co, [])
            Nothing -> pprPanic "tryEtaReduce: type arg to non-forall type"
                                (text "fun:" <+> ppr bndr
                                 $$ text "arg:" <+> ppr arg_ty

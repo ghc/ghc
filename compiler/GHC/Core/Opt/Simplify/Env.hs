@@ -1185,7 +1185,7 @@ adjustJoinPointType mult new_res_ty join_id
 
     -- See Note [Bangs in the Simplifier]
     scale_bndr (Anon t af) = (Anon $! (scaleScaled mult t)) af
-    scale_bndr b@(Named _) = b
+    scale_bndr b@(Named _ _) = b
 
 {- Note [Scaling join point arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

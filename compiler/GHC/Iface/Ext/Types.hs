@@ -23,6 +23,7 @@ import GHC.Builtin.Utils
 import GHC.Iface.Type
 import GHC.Unit.Module            ( ModuleName, Module )
 import GHC.Types.Name
+import GHC.Types.Var              ( Erasure )
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Types.SrcLoc
 import GHC.Types.Avail
@@ -143,7 +144,7 @@ data HieType a
   = HTyVarTy Name
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
-  | HForAllTy ((Name, a),ForAllTyFlag) a
+  | HForAllTy (Erasure,(Name, a),ForAllTyFlag) a
   | HFunTy a a a
   | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
   | HLitTy IfaceTyLit

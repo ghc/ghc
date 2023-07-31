@@ -621,7 +621,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep_shortcut
       | otherwise
       = pprPanic "mkTyConKindRepBinds(TyConApp)" (ppr tc $$ ppr k)
 
-    new_kind_rep (ForAllTy (Bndr var _) ty)
+    new_kind_rep (ForAllTy _ (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
     new_kind_rep (FunTy _ _ t1 t2)

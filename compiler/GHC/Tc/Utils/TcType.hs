@@ -227,7 +227,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Builtin.Names
 import GHC.Builtin.Types ( coercibleClass, eqClass, heqClass, unitTyConKey
-                         , listTyCon, constraintKind )
+                         , listTyCon, constraintKind, manyDataConTy )
 import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.Maybe
@@ -463,11 +463,12 @@ checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 -- Expected type of a pattern in a lambda or a function left-hand side.
 data ExpPatType =
     ExpFunPatTy    (Scaled ExpSigmaTypeFRR)   -- the type A of a function A -> B
-  | ExpForAllPatTy TcTyVar                    -- the binder (a::A) of forall (a::A) -> B
+  | ExpForAllPatTy Erasure TcTyVar            -- the binder (a::A) of forall (a::A) -> B
 
 instance Outputable ExpPatType where
   ppr (ExpFunPatTy t) = ppr t
-  ppr (ExpForAllPatTy tv) = text "forall" <+> ppr tv
+  ppr (ExpForAllPatTy Erased tv) = text "forall" <+> ppr tv
+  ppr (ExpForAllPatTy Retained tv) = text "foreach" <+> ppr tv
 
 {- *********************************************************************
 *                                                                      *
@@ -892,7 +893,7 @@ tcTyFamInstsAndVisX = go
       | otherwise
       = tcTyConAppTyFamInstsAndVisX is_invis_arg tc tys
     go _            (LitTy {})         = []
-    go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
+    go is_invis_arg (ForAllTy _ bndr ty) = go is_invis_arg (binderType bndr)
                                          ++ go is_invis_arg ty
     go is_invis_arg (FunTy _ w ty1 ty2)  = go is_invis_arg w
                                          ++ go is_invis_arg ty1
@@ -971,7 +972,7 @@ any_rewritable role tv_pred tc_pred should_expand
                                      go rl bvs arg || go rl bvs res || go NomEq bvs w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
-    go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
+    go rl bvs (ForAllTy _ tv ty) = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty _)      = go rl bvs ty
     go _  _   (CoercionTy _)     = False
 
@@ -1327,7 +1328,7 @@ getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
 getDFunTyKey (FunTy { ft_af = af })  = getOccName (funTyFlagTyCon af)
-getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
+getDFunTyKey (ForAllTy _ _ t)        = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
 
@@ -1362,10 +1363,15 @@ tcSplitPiTy_maybe ty
     isMaybeTyBinder (Just (t,_)) = isTyBinder t
     isMaybeTyBinder _            = True
 
-tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (TyVarBinder, Type)
+tcSplitForAllTyVarBinder_maybe :: Type -> Maybe (Erasure, TyVarBinder, Type)
 tcSplitForAllTyVarBinder_maybe ty | Just ty' <- coreView ty = tcSplitForAllTyVarBinder_maybe ty'
-tcSplitForAllTyVarBinder_maybe (ForAllTy tv ty) = assert (isTyVarBinder tv ) Just (tv, ty)
-tcSplitForAllTyVarBinder_maybe _                = Nothing
+tcSplitForAllTyVarBinder_maybe (ForAllTy Retained tv (FunTy FTF_T_T mult arg_ty ty)) =
+  assert (isTyVarBinder tv) . assert (eqType (binderType tv) arg_ty) . assert (eqType mult manyDataConTy) $
+  Just (Retained, tv, ty)
+tcSplitForAllTyVarBinder_maybe (ForAllTy Retained _ _) =
+  panic "tcSplitForAllTyVarBinder_maybe: Retained binder without matching FunTy"
+tcSplitForAllTyVarBinder_maybe (ForAllTy Erased tv ty) = assert (isTyVarBinder tv ) Just (Erased, tv, ty)
+tcSplitForAllTyVarBinder_maybe _ = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders,
 -- returning just the tyvars.
@@ -1387,7 +1393,7 @@ tcSplitSomeForAllTyVars :: (ForAllTyFlag -> Bool) -> Type -> ([TyVar], Type)
 tcSplitSomeForAllTyVars argf_pred ty
   = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv argf) ty) tvs
+    split _ (ForAllTy _ (Bndr tv argf) ty) tvs
       | argf_pred argf                             = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
@@ -1886,7 +1892,7 @@ isOverloadedTy :: Type -> Bool
 -- Yes for a type of a function that might require evidence-passing
 -- Used only by bindLocalMethods
 isOverloadedTy ty | Just ty' <- coreView ty = isOverloadedTy ty'
-isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
+isOverloadedTy (ForAllTy _ _ ty)            = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = af })       = isInvisibleFunArg af
 isOverloadedTy _                            = False
 
@@ -2219,17 +2225,17 @@ pSizeTypes = pSizeTypesX emptyVarSet pSizeZero
 pSizeTypeX :: VarSet -> Type -> PatersonSize
 pSizeTypeX bvs ty | Just exp_ty <- coreView ty = pSizeTypeX bvs exp_ty
 pSizeTypeX bvs (TyVarTy tv)
-  | tv `elemVarSet` bvs                  = pSizeOne
-  | otherwise                            = PS_Vanilla { ps_tvs = [tv], ps_size = 1 }
-pSizeTypeX _   (LitTy {})                = pSizeOne
-pSizeTypeX bvs (TyConApp tc tys)         = pSizeTyConAppX bvs tc tys
-pSizeTypeX bvs (AppTy fun arg)           = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
-pSizeTypeX bvs (FunTy _ w arg res)       = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
-                                           pSizeTypeX bvs res
-pSizeTypeX bvs (ForAllTy (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
-                                           pSizeTypeX (bvs `extendVarSet` tv) ty
-pSizeTypeX bvs (CastTy ty _)             = pSizeTypeX bvs ty
-pSizeTypeX _   (CoercionTy {})           = pSizeOne
+  | tv `elemVarSet` bvs                    = pSizeOne
+  | otherwise                              = PS_Vanilla { ps_tvs = [tv], ps_size = 1 }
+pSizeTypeX _   (LitTy {})                  = pSizeOne
+pSizeTypeX bvs (TyConApp tc tys)           = pSizeTyConAppX bvs tc tys
+pSizeTypeX bvs (AppTy fun arg)             = pSizeTypeX bvs fun `addPSize` pSizeTypeX bvs arg
+pSizeTypeX bvs (FunTy _ w arg res)         = pSizeTypeX bvs w `addPSize` pSizeTypeX bvs arg `addPSize`
+                                             pSizeTypeX bvs res
+pSizeTypeX bvs (ForAllTy _ (Bndr tv _) ty) = pSizeTypeX bvs (tyVarKind tv) `addPSize`
+                                             pSizeTypeX (bvs `extendVarSet` tv) ty
+pSizeTypeX bvs (CastTy ty _)               = pSizeTypeX bvs ty
+pSizeTypeX _   (CoercionTy {})             = pSizeOne
 
 pSizeTypesX :: VarSet -> PatersonSize -> [Type] -> PatersonSize
 pSizeTypesX bvs sz tys = foldr (addPSize . pSizeTypeX bvs) sz tys

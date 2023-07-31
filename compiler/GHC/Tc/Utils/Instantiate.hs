@@ -405,7 +405,7 @@ tcInstInvisibleTyBindersN n ty
 
     go n subst kind
       | n > 0
-      , Just (bndr, body) <- tcSplitForAllTyVarBinder_maybe kind
+      , Just (eras, bndr, body) <- tcSplitForAllTyVarBinder_maybe kind -- XXX JB Invisible foreach idk do something
       , isInvisibleForAllTyFlag (binderFlag bndr)
       = do { (subst', arg) <- tcInstInvisibleTyBinder subst (binderVar bndr)
            ; (args, inner_ty) <- go (n-1) subst' body

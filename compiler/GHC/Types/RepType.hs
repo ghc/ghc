@@ -110,7 +110,7 @@ unwrapType ty
     inner_ty = go ty
 
     go t | Just t' <- coreView t = go t'
-    go (ForAllTy _ t)            = go t
+    go (ForAllTy _ _ t)          = go t
     go (CastTy t _)              = go t
     go t                         = t
 

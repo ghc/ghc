@@ -387,18 +387,18 @@ tc_tt_pat pat_ty penv (ParPat x lpar pat rpar) thing_inside = do
         { (pat', res) <- tc_tt_lpat pat_ty penv pat thing_inside
         ; return (ParPat x lpar pat' rpar, res) }
 tc_tt_pat (ExpFunPatTy pat_ty) penv pat thing_inside = tc_pat pat_ty penv pat thing_inside
-tc_tt_pat (ExpForAllPatTy tv)  penv pat thing_inside = tc_forall_pat penv (pat, tv) thing_inside
+tc_tt_pat (ExpForAllPatTy eras tv)  penv pat thing_inside = tc_forall_pat eras penv (pat, tv) thing_inside
 
 -- XXX JB EmbTyPat change?
-tc_forall_pat :: Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
-tc_forall_pat _ (EmbTyPat _ toktype tp, tv) thing_inside
+tc_forall_pat :: Erasure -> Checker (Pat GhcRn, TcTyVar) (Pat GhcTc)
+tc_forall_pat eras _ (EmbTyPat _ toktype tp, tv) thing_inside -- XXX JB HERE
   = do { (sig_wcs, sig_ibs, arg_ty) <- tcHsTyPat tp (varType tv)
        ; _ <- unifyType Nothing arg_ty (mkTyVarTy tv)
        ; result <- tcExtendNameTyVarEnv sig_wcs $
                    tcExtendNameTyVarEnv sig_ibs $
                    thing_inside
        ; return (EmbTyPat arg_ty toktype tp, result) }
-tc_forall_pat _ (pat, _) _ = failWith $ TcRnIllformedTypePattern pat
+tc_forall_pat _ _ (pat, _) _ = failWith $ TcRnIllformedTypePattern pat
 
 tc_pat  :: Scaled ExpSigmaTypeFRR
         -- ^ Fully refined result type

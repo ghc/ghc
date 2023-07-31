@@ -1472,7 +1472,7 @@ collect_cand_qtvs orig_ty is_dep cur_lvl bound dvs ty
                              Just ind_ty -> go dv ind_ty
                              Nothing     -> go_tv dv tv }
 
-    go dv (ForAllTy (Bndr tv _) ty)
+    go dv (ForAllTy _ (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs orig_ty True cur_lvl bound dv (tyVarKind tv)
            ; collect_cand_qtvs orig_ty is_dep cur_lvl (bound `extendVarSet` tv) dv1 ty }
 

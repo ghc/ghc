@@ -1613,7 +1613,7 @@ dropCasts (CastTy ty _)       = dropCasts ty
 dropCasts (AppTy t1 t2)       = mkAppTy (dropCasts t1) (dropCasts t2)
 dropCasts ty@(FunTy _ w t1 t2)  = ty { ft_mult = dropCasts w, ft_arg = dropCasts t1, ft_res = dropCasts t2 }
 dropCasts (TyConApp tc tys)   = mkTyConApp tc (map dropCasts tys)
-dropCasts (ForAllTy b ty)     = ForAllTy (dropCastsB b) (dropCasts ty)
+dropCasts (ForAllTy eras b ty) = ForAllTy eras (dropCastsB b) (dropCasts ty)
 dropCasts ty                  = ty  -- LitTy, TyVarTy, CoercionTy
 
 dropCastsB :: TyVarBinder -> TyVarBinder
@@ -2015,7 +2015,7 @@ splitInstTyForValidity = split_context [] . drop_foralls
     -- This is like 'dropForAlls', except that it does not look through type
     -- synonyms.
     drop_foralls :: Type -> Type
-    drop_foralls (ForAllTy (Bndr _tv argf) ty)
+    drop_foralls (ForAllTy _ (Bndr _tv argf) ty)
       | isInvisibleForAllTyFlag argf = drop_foralls ty
     drop_foralls ty = ty
 

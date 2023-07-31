@@ -70,7 +70,7 @@ resolveVisibility kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
-    go env (ForAllTy (Bndr tv vis) res) (t:ts)
+    go env (ForAllTy _ (Bndr tv vis) res) (t:ts)
       | isVisibleForAllTyFlag vis = (True , t) : ts'
       | otherwise                 = (False, t) : ts'
       where
@@ -159,8 +159,8 @@ hieTypeToIface = foldType go
     go (HTyVarTy n) = IfaceTyVar $ occNameFS $ getOccName n
     go (HAppTy a b) = IfaceAppTy a (hieToIfaceArgs b)
     go (HLitTy l) = IfaceLitTy l
-    go (HForAllTy ((n,k),af) t) = let b = (occNameFS $ getOccName n, k)
-                                  in IfaceForAllTy (Bndr (IfaceTvBndr b) af) t
+    go (HForAllTy (eras,(n,k),af) t) = let b = (occNameFS $ getOccName n, k)
+                                       in IfaceForAllTy eras (Bndr (IfaceTvBndr b) af) t
     go (HFunTy w a b)   = IfaceFunTy visArgTypeLike   w       a    b
     go (HQualTy pred b) = IfaceFunTy invisArgTypeLike many_ty pred b
     go (HCastTy a) = a
@@ -233,10 +233,10 @@ getTypeIndex t
       let visArgs = HieArgs $ resolveVisibility (tyConKind f) xs
       is <- mapM getTypeIndex visArgs
       return $ HTyConApp (toIfaceTyCon f) is
-    go (ForAllTy (Bndr v a) t) = do
+    go (ForAllTy eras (Bndr v a) t) = do
       k <- getTypeIndex (varType v)
       i <- getTypeIndex t
-      return $ HForAllTy ((varName v,k),a) i
+      return $ HForAllTy (eras,(varName v,k),a) i
     go (FunTy { ft_af = af, ft_mult = w, ft_arg = a, ft_res = b }) = do
       ai <- getTypeIndex a
       bi <- getTypeIndex b

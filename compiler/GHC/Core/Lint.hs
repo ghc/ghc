@@ -1665,7 +1665,7 @@ lintCoreAlt case_bndr scrut_ty _scrut_mult alt_ty alt@(Alt (DataAlt con) args rh
       -- Instantiate the universally quantified
       -- type variables of the data constructor
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
-          ; binderMult (Named _)   = ManyTy
+          ; binderMult (Named _ _) = ManyTy
           ; binderMult (Anon st _) = scaledMult st
           -- See Note [Validating multiplicities in a case]
           ; multiplicities = map binderMult $ fst $ splitPiTys con_payload_ty }
@@ -1910,7 +1910,7 @@ lintType ty@(FunTy af tw t1 t2)
                     , text "Computed FunTyFlag =" <+> ppr real_af ])
        ; return (FunTy af tw' t1' t2') }
 
-lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
+lintType ty@(ForAllTy eras (Bndr tcv vis) body_ty)
   | not (isTyCoVar tcv)
   = failWithL (text "Non-Tyvar or Non-Covar bound in type:" <+> ppr ty)
   | otherwise
@@ -1923,7 +1923,7 @@ lintType ty@(ForAllTy (Bndr tcv vis) body_ty)
          text "Covar does not occur in the body:" <+> (ppr tcv $$ ppr body_ty)
          -- See GHC.Core.TyCo.Rep Note [Unused coercion variable in ForAllTy]
 
-       ; return (ForAllTy (Bndr tcv' vis) body_ty') }
+       ; return (ForAllTy eras (Bndr tcv' vis) body_ty') }
 
 lintType ty@(LitTy l)
   = do { lintTyLit l; return ty }
@@ -2074,7 +2074,7 @@ lint_app mk_msg msg_type !kfn arg_tys
              addErrL (lint_app_fail_msg kfn arg_tys mk_msg msg_type (text "Fun:" <+> (ppr fun_kind $$ ppr ta <+> dcolon <+> ppr ka)))
            ; go_app in_scope kfb tas }
 
-    go_app in_scope (ForAllTy (Bndr kv _vis) kfn) (ta:tas)
+    go_app in_scope (ForAllTy _ (Bndr kv _vis) kfn) (ta:tas)
       = do { let kv_kind = varType kv
                  ka      = typeKind ta
            ; unless (ka `eqType` kv_kind) $

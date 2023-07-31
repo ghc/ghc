@@ -2576,7 +2576,7 @@ reifyType :: TyCoRep.Type -> TcM TH.Type
 reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
   -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
-reifyType ty@(ForAllTy (Bndr _ argf) _)
+reifyType ty@(ForAllTy _ (Bndr _ argf) _) -- XXX JB TH might have to handle erasure here
                             = reify_for_all argf ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))

@@ -171,9 +171,10 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     go _   (LitTy lit1) (LitTy lit2)
       = lit1 == lit2
 
-    go env (ForAllTy (Bndr tv1 vis1) ty1)
-           (ForAllTy (Bndr tv2 vis2) ty2)
+    go env (ForAllTy eras1 (Bndr tv1 vis1) ty1)
+           (ForAllTy eras2 (Bndr tv2 vis2) ty2)
       =  vis1 `eqForAllVis` vis2  -- See Note [ForAllTy and type equality]
+      && eras1 == eras2
       && (vis_only || go env (varType tv1) (varType tv2))
       && go (rnBndr2 env tv1 tv2) ty1 ty2
 
@@ -553,8 +554,9 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
-    go env (ForAllTy (Bndr tv1 vis1) t1) (ForAllTy (Bndr tv2 vis2) t2)
+    go env (ForAllTy eras1 (Bndr tv1 vis1) t1) (ForAllTy eras2 (Bndr tv2 vis2) t2)
       = liftOrdering (vis1 `cmpForAllVis` vis2)   -- See Note [ForAllTy and type equality]
+        `thenCmpTy` liftOrdering (eras1 `compare` eras2)
         `thenCmpTy` go env (varType tv1) (varType tv2)
         `thenCmpTy` go (rnBndr2 env tv1 tv2) t1 t2
 
@@ -619,6 +621,3 @@ nonDetCmpTc tc1 tc2
   where
     u1  = tyConUnique tc1
     u2  = tyConUnique tc2
-
-
-

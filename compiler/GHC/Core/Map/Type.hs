@@ -261,10 +261,11 @@ eqDeBruijnType env_t1@(D env1 t1) env_t2@(D env2 t2) =
               -> liftEquality (tc == tc') `andEq` gos env env' tys tys'
           (LitTy l, LitTy l')
               -> liftEquality (l == l')
-          (ForAllTy (Bndr tv vis) ty, ForAllTy (Bndr tv' vis') ty')
+          (ForAllTy eras (Bndr tv vis) ty, ForAllTy eras' (Bndr tv' vis') ty')
               -> -- See Note [ForAllTy and type equality] in
                  -- GHC.Core.TyCo.Compare for why we use `eqForAllVis` here
                  liftEquality (vis `eqForAllVis` vis') `andEq`
+                 liftEquality (eras == eras') `andEq`
                  go (D env (varType tv)) (D env' (varType tv')) `andEq`
                  go (D (extendCME env tv) ty) (D (extendCME env' tv') ty')
           (CoercionTy {}, CoercionTy {})
@@ -311,7 +312,7 @@ lkT (D env ty) m = go ty m
                                                >=> lkG (D env t2)
     go (TyConApp tc [])            = tm_tycon  >.> lkDNamed tc
     go (LitTy l)                   = tm_tylit  >.> lkTyLit l
-    go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
+    go (ForAllTy _ (Bndr tv _) ty) = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
@@ -332,7 +333,7 @@ xtT (D _   (TyConApp tc []))  f m = m { tm_tycon  = tm_tycon m |> xtDNamed tc f 
 xtT (D _   (LitTy l))         f m = m { tm_tylit  = tm_tylit m |> xtTyLit l f }
 xtT (D env (CastTy t _))      f m = xtT (D env t) f m
 xtT (D _   (CoercionTy {}))   f m = m { tm_coerce = tm_coerce m |> f }
-xtT (D env (ForAllTy (Bndr tv _) ty))  f m
+xtT (D env (ForAllTy _ (Bndr tv _) ty))  f m
   = m { tm_forall = tm_forall m |> xtG (D (extendCME env tv) ty)
                                 |>> xtBndr env tv f }
 

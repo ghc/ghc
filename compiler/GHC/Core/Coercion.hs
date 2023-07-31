@@ -2075,7 +2075,7 @@ ty_co_subst !lc role ty
     go r (AppTy ty1 ty2)    = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys)  = mkTyConAppCo r tc (zipWith go (tyConRoleListX r tc) tys)
     go r (FunTy af w t1 t2) = mkFunCo r af (go Nominal w) (go r t1) (go r t2)
-    go r t@(ForAllTy (Bndr v vis) ty)
+    go r t@(ForAllTy _ (Bndr v vis) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty in
          if isTyVar v' || almostDevoidCoVarOfCo v' body_co
@@ -2683,7 +2683,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
       | Just (ty1a, ty1b) <- splitAppTyNoView_maybe ty1
       = mkAppCo (go ty1a ty2a) (go ty1b ty2b)
 
-    go (ForAllTy (Bndr tv1 flag1) ty1) (ForAllTy (Bndr tv2 flag2) ty2)
+    go (ForAllTy _ (Bndr tv1 flag1) ty1) (ForAllTy _ (Bndr tv2 flag2) ty2)
       | isTyVar tv1
       = assert (isTyVar tv2) $
         mkForAllCo tv1 flag1 flag2 kind_co (go ty1 ty2')
@@ -2693,7 +2693,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
                          [mkTyVarTy tv1 `mkCastTy` kind_co]
                          ty2
 
-    go (ForAllTy (Bndr cv1 flag1) ty1) (ForAllTy (Bndr cv2 flag2) ty2)
+    go (ForAllTy _ (Bndr cv1 flag1) ty1) (ForAllTy _ (Bndr cv2 flag2) ty2)
       = assert (isCoVar cv1 && isCoVar cv2) $
         mkForAllCo cv1 flag1 flag2 kind_co (go ty1 ty2')
       where s1 = varType cv1

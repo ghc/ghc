@@ -1671,7 +1671,7 @@ app_ok fun_ok primop_ok fun args
 
     -- Used for arguments to primops and to partial applications
     arg_ok :: PiTyVarBinder -> CoreExpr -> Bool
-    arg_ok (Named _) _ = True   -- A type argument
+    arg_ok (Named _ _) _ = True   -- A type argument
     arg_ok (Anon ty _) arg      -- A term argument
        | definitelyLiftedType (scaledThing ty)
        = True -- See Note [Primops with lifted arguments]

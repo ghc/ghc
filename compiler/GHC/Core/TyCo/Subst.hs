@@ -375,7 +375,7 @@ extendTvSubst (Subst in_scope ids tvs cvs) tv ty
     Subst in_scope ids (extendVarEnv tvs tv ty) cvs
 
 extendTvSubstBinderAndInScope :: Subst -> PiTyBinder -> Type -> Subst
-extendTvSubstBinderAndInScope subst (Named (Bndr v _)) ty
+extendTvSubstBinderAndInScope subst (Named _ (Bndr v _)) ty
   = assert (isTyVar v )
     extendTvSubstAndInScope subst v ty
 extendTvSubstBinderAndInScope subst (Anon {}) _
@@ -804,10 +804,10 @@ subst_ty subst ty
             !arg' = go arg
             !res' = go res
         in ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
-    go (ForAllTy (Bndr tv vis) ty)
+    go (ForAllTy eras (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->
-                               (ForAllTy $! ((Bndr $! tv') vis)) $!
+                               ((ForAllTy $! eras) $! ((Bndr $! tv') vis)) $!
                                             (subst_ty subst' ty)
     go (LitTy n)         = LitTy $! n
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
@@ -1126,6 +1126,6 @@ cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
 
 substTyCoBndr :: Subst -> PiTyBinder -> (Subst, PiTyBinder)
 substTyCoBndr subst (Anon ty af)          = (subst, Anon (substScaledTy subst ty) af)
-substTyCoBndr subst (Named (Bndr tv vis)) = (subst', Named (Bndr tv' vis))
+substTyCoBndr subst (Named eras (Bndr tv vis)) = (subst', Named eras (Bndr tv' vis))
                                           where
                                             (subst', tv') = substVarBndr subst tv

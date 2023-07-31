@@ -549,8 +549,9 @@ can_eq_nc_forall ev eq_rel s1 s2
     -- See #22537.  See (SF3) in Note [Solving forall equalities]
     -- Postcondition: the two lists of binders returned have the same length
     split_foralls s1 s2
-      | Just (bndr1, s1') <- splitForAllForAllTyBinder_maybe s1
-      , Just (bndr2, s2') <- splitForAllForAllTyBinder_maybe s2
+      | Just (eras1, bndr1, s1') <- splitForAllForAllTyBinder_maybe s1
+      , Just (eras2, bndr2, s2') <- splitForAllForAllTyBinder_maybe s2
+      , eras1 == eras2
       = let !(bndrs1, phi1, bndrs2, phi2) = split_foralls s1' s2'
         in (bndr1:bndrs1, phi1, bndr2:bndrs2, phi2)
     split_foralls s1 s2 = ([], s1, [], s2)

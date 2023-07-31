@@ -1081,10 +1081,10 @@ split_pi_tys' :: Type -> ([PiTyBinder], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
      -- put common cases first
-  split _       (ForAllTy b res) = let -- This bang is necessary lest we see rather
-                                       -- terrible reboxing, as noted in #19102.
-                                       !(bs, ty, _) = split res res
-                                   in  (Named b : bs, ty, True)
+  split _       (ForAllTy eras b res) = let -- This bang is necessary lest we see rather
+                                            -- terrible reboxing, as noted in #19102.
+                                            !(bs, ty, _) = split res res
+                                        in  (Named eras b : bs, ty, True)
   split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let -- See #19102
                                        !(bs, ty, named) = split res res
@@ -1100,7 +1100,7 @@ ty_con_binders_ty_binders' :: [TyConBinder] -> ([PiTyBinder], Bool)
 ty_con_binders_ty_binders' = foldr go ([], False)
   where
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
-      = (Named (Bndr tv vis) : bndrs, True)
+      = (Named Erased (Bndr tv vis) : bndrs, True) -- XXX JB Named is it really always Erased?
     go (Bndr tv AnonTCB)   (bndrs, n)
       = (Anon (tymult (tyVarKind tv)) FTF_T_T : bndrs, n)
     {-# INLINE go #-}

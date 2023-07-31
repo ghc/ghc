@@ -637,7 +637,7 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
 
     -- Rule ITVDQ from the GHC Proposal #281
     go1 delta acc so_far fun_ty ((EValArg { eva_arg = ValArg arg }) : rest_args)
-      | Just (tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty
+      | Just (eras, tvb, body) <- tcSplitForAllTyVarBinder_maybe fun_ty -- XXX JB HERE
       , binderFlag tvb == Required
       = do { (ty_arg, inst_body) <- tcVDQ fun_conc_tvs (tvb, body) arg
            ; let wrap = mkWpTyApps [ty_arg]
@@ -736,11 +736,11 @@ tcInstFun do_ql inst_final (tc_fun, fun_ctxt) fun_sigma rn_args
                        : addArgWrap wrap acc
           ; go delta' acc' (arg_ty:so_far) res_ty rest_args }
 
--- Is the argument supposed to instantiate a forall?
+-- Is the argument supposed to instantiate a forall/foreach?
 --
 -- In other words, given a function application `fn arg`,
 -- can we look at the `arg` and conclude that `fn :: forall x. t`
--- or `fn :: forall x -> t`?
+-- or `fn :: forall x -> t`, or similar for foreach?
 --
 -- This is a conservative heuristic that returns `False` for "don't know".
 -- Used to improve error messages only.
@@ -803,7 +803,8 @@ tcVTA :: ConcreteTyVars
 -- Deal with a visible type application
 -- The function type has already had its Inferred binders instantiated
 tcVTA conc_tvs fun_ty hs_ty
-  | Just (tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
+  -- XXX JB Invisible foreach, handle like visible foreach, just search for tcSplitForAllTyVarBinder_maybe
+  | Just (_, tvb, inner_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
   , binderFlag tvb == Specified
   = do { tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty }
 
@@ -1391,7 +1392,8 @@ qlUnify delta ty1 ty2
       | Just (t1a, t1b) <- tcSplitAppTyNoView_maybe ty1
       = do { go bvs t1a t2a; go bvs t1b t2b }
 
-    go (bvs1, bvs2) (ForAllTy bv1 ty1) (ForAllTy bv2 ty2)
+   -- XXX JB ForAllTy do we have to handle erasure here? 
+    go (bvs1, bvs2) (ForAllTy _ bv1 ty1) (ForAllTy _ bv2 ty2)
       = go (bvs1',bvs2') ty1 ty2
       where
        bvs1' = bvs1 `extendVarSet` binderVar bv1
@@ -1509,7 +1511,7 @@ findNoQuantVars fun_ty args
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvs && null theta)
       = go (bvs `extendVarSetList` tvs) body2 args
-      | Just (_tv, res_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
+      | Just (_, _tv, res_ty) <- tcSplitForAllTyVarBinder_maybe fun_ty
       = go bvs res_ty rest_args
       | otherwise
       = False  -- E.g. head ids @Int

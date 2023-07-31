@@ -410,10 +410,10 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     --     to syntactically visible patterns in the source program
     -- See Note [Visible type application and abstraction] in GHC.Tc.Gen.App
     go acc_arg_tys n ty
-      | Just (Bndr tv vis, ty') <- splitForAllForAllTyBinder_maybe ty
+      | Just (eras, Bndr tv vis, ty') <- splitForAllForAllTyBinder_maybe ty
       , Required <- vis
       = let init_subst = mkEmptySubst (mkInScopeSet (tyCoVarsOfType ty))
-        in goVdq init_subst acc_arg_tys n ty tv ty'
+        in goVdq eras init_subst acc_arg_tys n ty tv ty'
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg_ty, ft_res = res_ty })
       = assert (isVisibleFunArg af) $
@@ -450,14 +450,14 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty = addErrCtxtM (mk_ctxt acc_arg_tys ty) $
                           defer acc_arg_tys n (mkCheckExpType ty)
 
-    goVdq subst acc_arg_tys n expected_ty tv ty =
+    goVdq eras subst acc_arg_tys n expected_ty tv ty =
       do { rec { (subst', [tv']) <- tcInstSkolTyVarsX skol_info subst [tv]
                ; let tv_prs = [(tyVarName tv, tv')]
                ; skol_info <- mkSkolemInfo (SigSkol ctx expected_ty tv_prs) }
          ; let ty' = substTy subst' ty
          ; (ev_binds, (wrap_res, result)) <-
               checkConstraints (getSkolemInfo skol_info) [tv'] [] $
-              go (ExpForAllPatTy tv' : acc_arg_tys) (n - 1) ty'
+              go (ExpForAllPatTy eras tv' : acc_arg_tys) (n - 1) ty'
          ; let wrap_gen = mkWpVisTyLam tv' ty' <.> mkWpLet ev_binds
          ; return (wrap_gen <.> wrap_res, result) }
 
@@ -487,7 +487,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
       where
         arg_tys' = map prepare_arg_ty (reverse arg_tys)
         prepare_arg_ty (ExpFunPatTy (Scaled u v)) = Anon (Scaled u (checkingExpType "matchExpectedFunTys" v)) visArgTypeLike
-        prepare_arg_ty (ExpForAllPatTy tv)        = Named (Bndr tv Required)
+        prepare_arg_ty (ExpForAllPatTy eras tv)   = Named eras (Bndr tv Required)
             -- this is safe b/c we're called from "go"
 
 mkFunTysMsg :: TidyEnv
@@ -2676,7 +2676,7 @@ simpleUnifyCheck fam_ok lhs_tv rhs
       | otherwise                                    = all go tys
 
     go (AppTy t1 t2)    = go t1 && go t2
-    go (ForAllTy (Bndr tv _) ty)
+    go (ForAllTy _ (Bndr tv _) ty)
       | forall_ok = go (tyVarKind tv) && (tv == lhs_tv || go ty)
       | otherwise = False
 

@@ -165,7 +165,7 @@ data IfaceType
                              -- an explanation of why the second field isn't
                              -- IfaceType, analogous to AppTy.
   | IfaceFunTy     FunTyFlag IfaceMult IfaceType IfaceType
-  | IfaceForAllTy  IfaceForAllBndr IfaceType
+  | IfaceForAllTy  Erasure IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
                                             -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
@@ -208,7 +208,7 @@ mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
     mk (Bndr tv AnonTCB)        k = IfaceFunTy FTF_T_T many_ty (ifaceBndrType tv) k
-    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
+    mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy Erased (Bndr tv vis) k
 
 ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
 ifaceForAllSpecToBndrs = map ifaceForAllSpecToBndr
@@ -499,7 +499,8 @@ splitIfaceSigmaTy ty
     (bndrs, rho)   = split_foralls ty
     (theta, tau)   = split_rho rho
 
-    split_foralls (IfaceForAllTy bndr ty)
+    -- XXX JB Iface do we need to check the erasure here?
+    split_foralls (IfaceForAllTy _ bndr ty)
         | isInvisibleForAllTyFlag (binderFlag bndr)
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
@@ -510,7 +511,8 @@ splitIfaceSigmaTy ty
     split_rho tau = ([], tau)
 
 splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
-splitIfaceReqForallTy (IfaceForAllTy bndr ty)
+-- XXX JB Iface do we need to check the erasure here?
+splitIfaceReqForallTy (IfaceForAllTy _ bndr ty)
   | isVisibleForAllTyFlag (binderFlag bndr)
   = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
 splitIfaceReqForallTy rho = ([], rho)
@@ -802,7 +804,7 @@ pprIfacePrefixApp ctxt_prec pp_fun pp_tys
                   hang pp_fun 2 (sep pp_tys)
 
 isIfaceRhoType :: IfaceType -> Bool
-isIfaceRhoType (IfaceForAllTy _ _)   = False
+isIfaceRhoType (IfaceForAllTy _ _ _) = False
 isIfaceRhoType (IfaceFunTy af _ _ _) = isVisibleFunArg af
 isIfaceRhoType _ = True
 
@@ -1135,7 +1137,7 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
        -> Bool -- Are we in a toplevel forall, where defaulting is allowed?
        -> IfaceType
        -> IfaceType
-    go subs True (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
+    go subs True (IfaceForAllTy _ (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
      | isInvisibleForAllTyFlag argf  -- Don't default *visible* quantification
                                 -- or we get the mess in #13963
      , Just substituted_ty <- check_substitution var_kind
@@ -1144,8 +1146,8 @@ defaultIfaceTyVarsOfKind def_rep def_mult ty = go emptyFsEnv True ty
             -- and recurse, discarding the forall
         in go subs' True ty
 
-    go subs rank1 (IfaceForAllTy bndr ty)
-      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs rank1 ty)
+    go subs rank1 (IfaceForAllTy eras bndr ty)
+      = IfaceForAllTy eras (go_ifacebndr subs bndr) (go subs rank1 ty)
 
     go subs _ ty@(IfaceTyVar tv) = case lookupFsEnv subs tv of
       Just s -> s
@@ -2076,10 +2078,11 @@ instance Binary IfaceType where
     put_ _ (IfaceFreeTyVar tv)
        = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
 
-    put_ bh (IfaceForAllTy aa ab) = do
+    put_ bh (IfaceForAllTy aa ab ac) = do
             putByte bh 0
             put_ bh aa
             put_ bh ab
+            put_ bh ac
     put_ bh (IfaceTyVar ad) = do
             putByte bh 1
             put_ bh ad
@@ -2109,7 +2112,8 @@ instance Binary IfaceType where
             case h of
               0 -> do aa <- get bh
                       ab <- get bh
-                      return (IfaceForAllTy aa ab)
+                      ac <- get bh
+                      return (IfaceForAllTy aa ab ac)
               1 -> do ad <- get bh
                       return (IfaceTyVar ad)
               2 -> do ae <- get bh
@@ -2332,7 +2336,7 @@ instance NFData IfaceType where
     IfaceLitTy f1 -> rnf f1
     IfaceAppTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceFunTy f1 f2 f3 f4 -> f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
-    IfaceForAllTy f1 f2 -> f1 `seq` rnf f2
+    IfaceForAllTy f1 f2 f3 -> rnf f1 `seq` f2 `seq` rnf f3
     IfaceTyConApp f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCoercionTy f1 -> rnf f1

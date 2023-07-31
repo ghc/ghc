@@ -179,13 +179,13 @@ tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 mkForAllTys' :: [(TyCoVar, ForAllTyFlag)] -> Type -> Type
 mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs
   where
-    strictMkForAllTy (tv,vis) ty = (ForAllTy $! ((Bndr $! tv) $! vis)) $! ty
+    strictMkForAllTy (tv,vis) ty = ((ForAllTy $! Erased) $! ((Bndr $! tv) $! vis)) $! ty
 
 splitForAllTyCoVars' :: Type -> ([TyCoVar], [ForAllTyFlag], Type)
 splitForAllTyCoVars' ty = go ty [] []
   where
-    go (ForAllTy (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
-    go ty                          tvs viss = (reverse tvs, reverse viss, ty)
+    go (ForAllTy _ (Bndr tv vis) ty) tvs viss = go ty (tv:tvs) (vis:viss)
+    go ty                            tvs viss = (reverse tvs, reverse viss, ty)
 
 
 ---------------

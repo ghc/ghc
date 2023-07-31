@@ -188,8 +188,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
   in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head args)
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 -- XXX JB Iface is this an issue? What exactly is stored in interface files? Given the custom constructors generated on the fly, it's not clear to me that Core here will have all the information we'll need in the interface file. IT MIGHT BE OKAY THOUGH because actually Iface/Syntax.hs stores the constructor with all its data
-toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
-                                               (toIfaceTypeX (fr `delVarSet` binderVar b) t)
+toIfaceTypeX fr (ForAllTy eras b t) = IfaceForAllTy eras (toIfaceForAllBndrX fr b)
+                                                   (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
   = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
@@ -355,7 +355,7 @@ toIfaceAppArgsX fr kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
-    go env (ForAllTy (Bndr tv vis) res) (t:ts)
+    go env (ForAllTy _ (Bndr tv vis) res) (t:ts)
       = IA_Arg t' vis ts'
       where
         t'  = toIfaceTypeX fr t

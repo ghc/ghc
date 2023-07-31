@@ -718,8 +718,8 @@ rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
     = IfaceTyConApp <$> rnIfaceTyCon tc <*> rnIfaceAppArgs tks
-rnIfaceType (IfaceForAllTy tv t)
-    = IfaceForAllTy <$> rnIfaceForAllBndr tv <*> rnIfaceType t
+rnIfaceType (IfaceForAllTy eras tv t)
+    = IfaceForAllTy eras <$> rnIfaceForAllBndr tv <*> rnIfaceType t
 rnIfaceType (IfaceCoercionTy co)
     = IfaceCoercionTy <$> rnIfaceCo co
 rnIfaceType (IfaceCastTy ty co)

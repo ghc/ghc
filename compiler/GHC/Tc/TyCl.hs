@@ -5289,7 +5289,7 @@ checkValidRoles tc
       >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
-    check_ty_roles env role (ForAllTy (Bndr tv _) ty)
+    check_ty_roles env role (ForAllTy _ (Bndr tv _) ty)
       =  check_ty_roles env Nominal (tyVarKind tv)
       >> check_ty_roles (extendVarEnv env tv Nominal) role ty
 

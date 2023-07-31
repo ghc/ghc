@@ -1397,9 +1397,9 @@ tcIfaceType = go
       = do { tc' <- tcIfaceTyCon tc
            ; tks' <- mapM go (appArgsIfaceTypes tks)
            ; return (mkTyConApp tc' tks') }
-    go (IfaceForAllTy bndr t)
+    go (IfaceForAllTy eras bndr t)
       = bindIfaceForAllBndr bndr $ \ tv' vis ->
-        ForAllTy (Bndr tv' vis) <$> go t
+        ForAllTy eras (Bndr tv' vis) <$> go t
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 

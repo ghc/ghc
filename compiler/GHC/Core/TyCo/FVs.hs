@@ -587,7 +587,7 @@ tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_v
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
 tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
-tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
+tyCoFVsOfType (ForAllTy _ bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
@@ -746,7 +746,7 @@ almost_devoid_co_var_of_type (FunTy _ w arg res) cv
   = almost_devoid_co_var_of_type w cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
-almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
+almost_devoid_co_var_of_type (ForAllTy _ (Bndr v _) ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && (v == cv || almost_devoid_co_var_of_type ty cv)
 almost_devoid_co_var_of_type (CastTy ty co) cv
@@ -784,7 +784,7 @@ visVarsOfType orig_ty = Pair invis_vars vis_vars
     go (AppTy t1 t2)     = go t1 `mappend` go t2
     go (TyConApp tc tys) = go_tc tc tys
     go (FunTy _ w t1 t2) = go w `mappend` go t1 `mappend` go t2
-    go (ForAllTy (Bndr tv _) ty)
+    go (ForAllTy _ (Bndr tv _) ty)
       = ((`delVarSet` tv) <$> go ty) `mappend`
         (invisible (tyCoVarsOfType $ varType tv))
     go (LitTy {}) = mempty
@@ -819,7 +819,7 @@ isInjectiveInType tv ty
     go (AppTy f a)                      = go f || go a
     go (FunTy _ w ty1 ty2)              = go w || go ty1 || go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv' _) ty)       = go (tyVarKind tv')
+    go (ForAllTy _ (Bndr tv' _) ty)     = go (tyVarKind tv')
                                           || (tv /= tv' && go ty)
     go LitTy{}                          = False
     go (CastTy ty _)                    = go ty
@@ -863,7 +863,7 @@ injectiveVarsOfType look_under_tfs = go
     go (AppTy f a)                      = go f `unionFV` go a
     go (FunTy _ w ty1 ty2)              = go w `unionFV` go ty1 `unionFV` go ty2
     go (TyConApp tc tys)                = go_tc tc tys
-    go (ForAllTy (Bndr tv _) ty)        = go (tyVarKind tv) `unionFV` delFV tv (go ty)
+    go (ForAllTy _ (Bndr tv _) ty)      = go (tyVarKind tv) `unionFV` delFV tv (go ty)
     go LitTy{}                          = emptyFV
     go (CastTy ty _)                    = go ty
     go CoercionTy{}                     = emptyFV
@@ -925,7 +925,7 @@ invisibleVarsOfType = go
     go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
-    go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
+    go (ForAllTy _ tvb ty) = tyCoFVsBndr tvb $ go ty
     go LitTy{}            = emptyFV
     go (CastTy ty co)     = tyCoFVsOfCo co `unionFV` go ty
     go (CoercionTy co)    = tyCoFVsOfCo co
@@ -1101,7 +1101,7 @@ tyConsOfType ty
      go (FunTy af w a b)            = go w `unionUniqSets`
                                       go a `unionUniqSets` go b
                                       `unionUniqSets` go_tc (funTyFlagTyCon af)
-     go (ForAllTy (Bndr tv _) ty)   = go ty `unionUniqSets` go (varType tv)
+     go (ForAllTy _ (Bndr tv _) ty) = go ty `unionUniqSets` go (varType tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
@@ -1245,13 +1245,13 @@ occCheckExpand vs_to_avoid ty
             ; ty1' <- go cxt ty1
             ; ty2' <- go cxt ty2
             ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
-    go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
+    go cxt@(as, env) (ForAllTy eras (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
             ; let tv'  = setVarType tv ki'
                   env' = extendVarEnv env tv tv'
                   as'  = as `delVarSet` tv
             ; body' <- go (as', env') body_ty
-            ; return (ForAllTy (Bndr tv' vis) body') }
+            ; return (ForAllTy eras (Bndr tv' vis) body') }
 
     -- For a type constructor application, first try expanding away the
     -- offending variable from the arguments.  If that doesn't work, next
@@ -1347,4 +1347,3 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
     go_prov _   p@(CorePrepProv _)  = return p
-

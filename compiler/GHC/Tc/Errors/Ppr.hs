@@ -4800,8 +4800,8 @@ tidySigSkol env cx ty tv_prs
     tv_prs' = mapSnd (tidyTyCoVarOcc env) tv_prs
     inst_env = mkNameEnv tv_prs'
 
-    tidy_ty env (ForAllTy (Bndr tv vis) ty)
-      = ForAllTy (Bndr tv' vis) (tidy_ty env' ty)
+    tidy_ty env (ForAllTy eras (Bndr tv vis) ty)
+      = ForAllTy eras (Bndr tv' vis) (tidy_ty env' ty)
       where
         (env', tv') = tidy_tv_bndr env tv
 
@@ -5009,12 +5009,12 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
        in ( ty1 { ft_arg = t1_1', ft_res = t1_2' }
           , ty2 { ft_arg = t2_1', ft_res = t2_2' })
 
-    go (ForAllTy b1 t1) (ForAllTy b2 t2) =
+    go (ForAllTy e1 b1 t1) (ForAllTy e2 b2 t2) =
       -- NOTE: We may have a bug here, but we just can't reproduce it easily.
       -- See D1016 comments for details and our attempts at producing a test
       -- case. Short version: We probably need RnEnv2 to really get this right.
       let (t1', t2') = go t1 t2
-       in (ForAllTy b1 t1', ForAllTy b2 t2')
+       in (ForAllTy e1 b1 t1', ForAllTy e2 b2 t2')
 
     go (CastTy ty1 _) ty2 = go ty1 ty2
     go ty1 (CastTy ty2 _) = go ty1 ty2

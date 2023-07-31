@@ -49,7 +49,7 @@ module GHC.Core.TyCo.Rep (
         mkVisFunTy, mkScaledFunTys,
         mkInvisFunTy, mkInvisFunTys,
         tcMkVisFunTy, tcMkInvisFunTy, tcMkScaledFunTys,
-        mkForAllTy, mkForAllTys, mkInvisForAllTys, mkForEachTys,
+        mkForAllTy, mkForEachTy, mkForAllTys, mkInvisForAllTys, mkForEachTys,
         mkPiTy, mkPiTys,
         mkVisFunTyMany, mkVisFunTysMany,
         nonDetCmpTyLit, cmpTyLit,
@@ -155,6 +155,7 @@ data Type
                         --    can appear as the right hand side of a type synonym.
 
   | ForAllTy  -- See Note [ForAllTy]
+        !Erasure
         {-# UNPACK #-} !ForAllTyBinder
         Type            -- ^ A Π type.
              -- See Note [Why ForAllTy can quantify over a coercion variable]
@@ -789,9 +790,15 @@ tcMkScaledFunTys tys ty = foldr mk ty tys
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
 mkForAllTy :: ForAllTyBinder -> Type -> Type
-mkForAllTy bndr body
+mkForAllTy = mk_for_all_ty Erased
+
+mkForEachTy :: ForAllTyBinder -> Type -> Type
+mkForEachTy = mk_for_all_ty Retained
+
+mk_for_all_ty :: Erasure -> ForAllTyBinder -> Type -> Type
+mk_for_all_ty eras bndr body
   = assertPpr (good_bndr bndr) (ppr bndr <+> ppr body) $
-    ForAllTy bndr body
+    ForAllTy eras bndr body
   where
     -- Check ForAllTy invariants
     good_bndr (Bndr cv vis)
@@ -803,20 +810,21 @@ mkForAllTy bndr body
 
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [ForAllTyBinder] -> Type -> Type
-mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+mkForAllTys tyvars ty = foldr (ForAllTy Erased) ty tyvars
 
 -- | Wraps foralls and function binders over the type using the provided 'TyCoVar's from left to right
 mkForEachTys :: [ForAllTyBinder] -> Type -> Type
 mkForEachTys tyvars ty =
-  foldr (\v t -> mkForAllTy v (mkFunTy FTF_T_T manyDataConTy (binderType v) t)) ty tyvars
+  foldr (\v t -> mkForEachTy v (mkFunTy FTF_T_T manyDataConTy (binderType v) t)) ty tyvars
 
 -- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars = mkForAllTys (tyVarSpecToBinders tyvars)
 
 mkPiTy :: PiTyBinder -> Type -> Type
-mkPiTy (Anon ty1 af) ty2  = mkScaledFunTy af ty1 ty2
-mkPiTy (Named bndr) ty    = mkForAllTy bndr ty
+mkPiTy (Anon ty1 af) ty2        = mkScaledFunTy af ty1 ty2
+mkPiTy (Named Erased bndr) ty   = mkForAllTy bndr ty
+mkPiTy (Named Retained bndr) ty = mkForEachTy bndr ty
 
 mkPiTys :: [PiTyBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
@@ -1822,7 +1830,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty env (CoercionTy co)   = go_co env co
     go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
-    go_ty env (ForAllTy (Bndr tv vis) inner)
+    go_ty env (ForAllTy _ (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
         in go_ty env (varType tv) `mappend` go_ty env' inner
 
@@ -1898,7 +1906,7 @@ typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
-typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
+typeSize (ForAllTy _ (Bndr tv _) t) = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + typesSize ts
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co

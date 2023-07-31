@@ -471,7 +471,25 @@ data Specificity = InferredSpec
 
 -- | Whether a dependent argument is erased at runtime
 data Erasure = Erased | Retained
-  deriving (Eq, Data)
+  deriving (Eq, Ord, Data)
+
+instance Binary Erasure where
+  -- XXX JB FIXME
+  put_ _ _ = pure ()
+  get _ = pure Erased
+  -- put_ bh Erased   = putByte bh 0
+  -- put_ bh Retained = putByte bh 1
+
+  -- get bh = do
+  --   h <- getByte bh
+  --   case h of
+  --     0 -> return Erased
+  --     1 -> return Retained
+  --     _ -> panic "invalid binary format"
+
+instance NFData Erasure where
+  rnf Erased   = ()
+  rnf Retained = ()
 
 pattern Inferred, Specified :: ForAllTyFlag
 pattern Inferred  = Invisible InferredSpec
@@ -805,18 +823,18 @@ instance NamedThing tv => NamedThing (VarBndr tv flag) where
 
 -- | A 'PiTyBinder' represents an argument to a function. PiTyBinders can be
 -- dependent ('Named') or nondependent ('Anon'). They may also be visible or
--- not. See Note [PiTyBinders]
+-- not, and erased or retained. See Note [PiTyBinders]
 data PiTyBinder
-  = Named ForAllTyBinder          -- A type-lambda binder, with a ForAllTyFlag
+  = Named Erasure ForAllTyBinder  -- A type-lambda binder, with a ForAllTyFlag
   | Anon (Scaled Type) FunTyFlag  -- A term-lambda binder. Type here can be CoercionTy.
                                   -- The arrow is described by the FunTyFlag
   deriving Data
 
 instance Outputable PiTyBinder where
   ppr (Anon ty af) = ppr af <+> ppr ty
-  ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
-  ppr (Named (Bndr v Inferred))  = braces (ppr v)
+  ppr (Named _ (Bndr v Required))  = ppr v
+  ppr (Named _ (Bndr v Specified)) = char '@' <> ppr v
+  ppr (Named _ (Bndr v Inferred))  = braces (ppr v)
 
 
 -- | 'PiTyVarBinder' is like 'PiTyBinder', but there can only be 'TyVar'
@@ -825,8 +843,8 @@ type PiTyVarBinder = PiTyBinder
 
 -- | Does this binder bind an invisible argument?
 isInvisiblePiTyBinder :: PiTyBinder -> Bool
-isInvisiblePiTyBinder (Named (Bndr _ vis)) = isInvisibleForAllTyFlag vis
-isInvisiblePiTyBinder (Anon _ af)          = isInvisibleFunArg af
+isInvisiblePiTyBinder (Named _ (Bndr _ vis)) = isInvisibleForAllTyFlag vis
+isInvisiblePiTyBinder (Anon _ af)            = isInvisibleFunArg af
 
 -- | Does this binder bind a visible argument?
 isVisiblePiTyBinder :: PiTyBinder -> Bool
@@ -837,8 +855,8 @@ isNamedPiTyBinder (Named {}) = True
 isNamedPiTyBinder (Anon {})  = False
 
 namedPiTyBinder_maybe :: PiTyBinder -> Maybe TyCoVar
-namedPiTyBinder_maybe (Named tv) = Just $ binderVar tv
-namedPiTyBinder_maybe _          = Nothing
+namedPiTyBinder_maybe (Named _ tv) = Just $ binderVar tv
+namedPiTyBinder_maybe _            = Nothing
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
 -- 'True' for anonymous binders.
@@ -857,15 +875,16 @@ anonPiTyBinderType_maybe (Anon ty _) = Just (scaledThing ty)
 -- coercion binder). That way, if/when we allow coercion quantification
 -- in more places, we'll know we missed updating some function.
 isTyBinder :: PiTyBinder -> Bool
-isTyBinder (Named bnd) = isTyVarBinder bnd
+isTyBinder (Named _ bnd) = isTyVarBinder bnd
 isTyBinder _ = True
 
 piTyBinderType :: PiTyBinder -> Type
-piTyBinderType (Named (Bndr tv _)) = varType tv
-piTyBinderType (Anon ty _)         = scaledThing ty
+piTyBinderType (Named _ (Bndr tv _)) = varType tv
+piTyBinderType (Anon ty _)           = scaledThing ty
 
 {- Note [PiTyBinders]
 ~~~~~~~~~~~~~~~~~~~
+-- XXX JB Note update?
 But a type like
    forall a. Maybe a -> forall b. (a,b) -> b
 

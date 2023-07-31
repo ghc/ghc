@@ -1634,9 +1634,9 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
         case ki_binder of
 
         -- FunTy with PredTy on LHS, or ForAllTy with Inferred
-        Named (Bndr kv Inferred)         -> instantiate kv inner_ki
+        Named _ (Bndr kv Inferred)       -> instantiate kv inner_ki
 
-        Named (Bndr _ Specified) ->  -- Visible kind application
+        Named _ (Bndr _ Specified) ->  -- Visible kind application
           do { traceTc "tcInferTyApps (vis kind app)"
                        (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (piTyBinderType ki_binder)
@@ -1664,7 +1664,7 @@ tcInferTyApps_nosat mode orig_hs_ty fun orig_hs_args
       ---------------- HsValArg: a normal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
-        | Named (Bndr kv flag) <- ki_binder
+        | Named _ (Bndr kv flag) <- ki_binder
         , isInvisibleForAllTyFlag flag   -- ForAllTy with Inferred or Specified
          -> instantiate kv inner_ki
 
@@ -1755,15 +1755,15 @@ mkAppTyM subst fun ki_binder arg
   , any isTrickyTvBinder (tyConTyVars tc) -- We could cache this in the synonym
   = do { (arg':args') <- liftZonkM $ zonkTcTypes (arg:args)
        ; let subst' = case ki_binder of
-                        Anon {}           -> subst
-                        Named (Bndr tv _) -> extendTvSubstAndInScope subst tv arg'
+                        Anon {}             -> subst
+                        Named _ (Bndr tv _) -> extendTvSubstAndInScope subst tv arg'
        ; return (subst', mkTyConApp tc (args' ++ [arg'])) }
 
 
 mkAppTyM subst fun (Anon {}) arg
    = return (subst, mk_app_ty fun arg)
 
-mkAppTyM subst fun (Named (Bndr tv _)) arg
+mkAppTyM subst fun (Named _ (Bndr tv _)) arg
   = do { arg' <- if isTrickyTvBinder tv
                  then -- See Note [mkAppTyM]: Nasty case 1
                       liftZonkM $ zonkTcType arg
@@ -3735,7 +3735,7 @@ splitTyConKind skol_info in_scope avoid_occs kind
                         uniq:uniqs' = uniqs
                         Inf occ occs' = occs
 
-                    Just (Named (Bndr tv vis), kind')
+                    Just (Named _ (Bndr tv vis), kind') -- XXX JB Named should we care about Erasure here?
                       -> go occs uniqs subst' (tcb : acc) kind'
                       where
                         tcb           = Bndr tv' (NamedTCB vis)
@@ -3868,9 +3868,9 @@ tcbVisibilities tc orig_args
     go fun_kind subst all_args@(arg : args)
       | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
       = case tcb of
-          Anon _ af           -> assert (af == FTF_T_T) $
-                                 AnonTCB      : go inner_kind subst  args
-          Named (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args
+          Anon _ af             -> assert (af == FTF_T_T) $
+                                   AnonTCB      : go inner_kind subst  args
+          Named _ (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args -- XXX JB Named should we care about Erasure here?
                  where
                     subst' = extendTCvSubst subst tv arg
 

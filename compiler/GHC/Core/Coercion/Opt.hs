@@ -577,9 +577,9 @@ opt_univ env sym prov role oty1 oty2
 
   -- can't optimize the AppTy case because we can't build the kind coercions.
 
-  | Just (Bndr tv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
+  | Just (_, Bndr tv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
   , isTyVar tv1
-  , Just (Bndr tv2 vis2, ty2) <- splitForAllForAllTyBinder_maybe oty2
+  , Just (_, Bndr tv2 vis2, ty2) <- splitForAllForAllTyBinder_maybe oty2
   , isTyVar tv2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
@@ -593,9 +593,9 @@ opt_univ env sym prov role oty1 oty2
     in
     mkForAllCo tv1' vis1' vis2' eta' (opt_univ env' sym prov' role ty1 ty2')
 
-  | Just (Bndr cv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
+  | Just (_, Bndr cv1 vis1, ty1) <- splitForAllForAllTyBinder_maybe oty1
   , isCoVar cv1
-  , Just (Bndr cv2 vis2, ty2) <- splitForAllForAllTyBinder_maybe oty2
+  , Just (_, Bndr cv2 vis2, ty2) <- splitForAllForAllTyBinder_maybe oty2
   , isCoVar cv2
       -- NB: prov isn't interesting here either
   = let k1    = varType cv1
@@ -1206,9 +1206,9 @@ etaForAllCo_ty_maybe co
   = Just (tv, visL, visR, kind_co, r)
 
   | (Pair ty1 ty2, role)  <- coercionKindRole co
-  , Just (Bndr tv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
+  , Just (_, Bndr tv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
   , isTyVar tv1
-  , Just (Bndr tv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
+  , Just (_, Bndr tv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isTyVar tv2
   -- can't eta-expand at nominal role unless visibilities match
   , (role /= Nominal) || (vis1 `eqForAllVis` vis2)
@@ -1226,9 +1226,9 @@ etaForAllCo_co_maybe co
   = Just (cv, visL, visR, kind_co, r)
 
   | (Pair ty1 ty2, role)  <- coercionKindRole co
-  , Just (Bndr cv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
+  , Just (_, Bndr cv1 vis1, _) <- splitForAllForAllTyBinder_maybe ty1
   , isCoVar cv1
-  , Just (Bndr cv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
+  , Just (_, Bndr cv2 vis2, _) <- splitForAllForAllTyBinder_maybe ty2
   , isCoVar cv2
   -- can't eta-expand at nominal role unless visibilities match
   , (role /= Nominal)

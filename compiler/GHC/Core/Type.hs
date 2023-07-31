@@ -531,9 +531,9 @@ expandTypeSynonyms ty
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
     go subst ty@(FunTy _ mult arg res)
       = ty { ft_mult = go subst mult, ft_arg = go subst arg, ft_res = go subst res }
-    go subst (ForAllTy (Bndr tv vis) t)
+    go subst (ForAllTy eras (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
-        ForAllTy (Bndr tv' vis) (go subst' t)
+        ForAllTy eras (Bndr tv' vis) (go subst' t)
     go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_co subst co)
     go subst (CoercionTy co) = mkCoercionTy (go_co subst co)
 
@@ -952,10 +952,10 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
       | otherwise
       = mkTyConApp tc <$> go_tys env tys
 
-    go_ty !env (ForAllTy (Bndr tv vis) inner)
+    go_ty !env (ForAllTy eras (Bndr tv vis) inner)
       = do { tycobinder env tv vis $ \env' tv' -> do
            ; inner' <- go_ty env' inner
-           ; return $ ForAllTy (Bndr tv' vis) inner' }
+           ; return $ ForAllTy eras (Bndr tv' vis) inner' }
 
     go_cos !_   []       = return []
     go_cos !env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
@@ -1440,7 +1440,7 @@ piResultTy_maybe :: Type -> Type -> Maybe Type
 piResultTy_maybe ty arg = case coreFullView ty of
   FunTy { ft_res = res } -> Just res
 
-  ForAllTy (Bndr tv _) res
+  ForAllTy _ (Bndr tv _) res
     -> let empty_subst = mkEmptySubst $ mkInScopeSet $
                          tyCoVarsOfTypes [arg,res]
        in Just (substTy (extendTCvSubst empty_subst tv arg) res)
@@ -1474,7 +1474,7 @@ piResultTys ty orig_args@(arg:args)
   | FunTy { ft_res = res } <- ty
   = piResultTys res args
 
-  | ForAllTy (Bndr tv _) res <- ty
+  | ForAllTy _ (Bndr tv _) res <- ty
   = go (extendTCvSubst init_subst tv arg) res args
 
   | Just ty' <- coreView ty
@@ -1492,7 +1492,7 @@ piResultTys ty orig_args@(arg:args)
       | FunTy { ft_res = res } <- ty
       = go subst res args
 
-      | ForAllTy (Bndr tv _) res <- ty
+      | ForAllTy _ (Bndr tv _) res <- ty
       = go (extendTCvSubst subst tv arg) res args
 
       | Just ty' <- coreView ty
@@ -1692,7 +1692,7 @@ mk_cast_ty orig_ty co = go orig_ty
       = mkCastTy ty (co1 `mkTransCo` co)
           -- call mkCastTy again for the reflexivity check
 
-    go (ForAllTy (Bndr tv vis) inner_ty)
+    go (ForAllTy eras (Bndr tv vis) inner_ty)
       -- (EQ4) from the Note
       -- See Note [Weird typing rule for ForAllTy] in GHC.Core.TyCo.Rep.
       | isTyVar tv
@@ -1701,8 +1701,8 @@ mk_cast_ty orig_ty co = go orig_ty
         if tv `elemVarSet` fvs
         then let empty_subst = mkEmptySubst (mkInScopeSet fvs)
                  (subst, tv') = substVarBndr empty_subst tv
-             in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
-        else ForAllTy (Bndr tv vis) (inner_ty `mk_cast_ty` co)
+             in ForAllTy eras (Bndr tv' vis) (substTy subst inner_ty `mk_cast_ty` co)
+        else ForAllTy eras (Bndr tv vis) (inner_ty `mk_cast_ty` co)
 
     go _ = CastTy orig_ty co -- NB: orig_ty: preserve synonyms if possible
 
@@ -1761,7 +1761,7 @@ tyConBindersPiTyBinders :: [TyConBinder] -> [PiTyBinder]
 -- Return the tyConBinders in PiTyBinder form
 tyConBindersPiTyBinders = map to_tyb
   where
-    to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
+    to_tyb (Bndr tv (NamedTCB vis)) = Named Erased (Bndr tv vis) -- XXX JB TyConBinder is this really always Erased?
     to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv)) FTF_T_T
 
 -- | Make a dependent forall over a TyCoVar
@@ -1773,7 +1773,7 @@ mkTyCoForAllTy tv vis ty
     -- See Note [Unused coercion variable in ForAllTy] in GHC.Core.TyCo.Rep
   = mkVisFunTyMany (varType tv) ty
   | otherwise
-  = ForAllTy (mkForAllTyBinder vis tv) ty
+  = ForAllTy Erased (mkForAllTyBinder vis tv) ty
 
 -- | Make a dependent forall over a TyCoVar
 mkTyCoForAllTys :: [ForAllTyBinder] -> Type -> Type
@@ -1787,7 +1787,7 @@ mkTyCoInvForAllTy tv ty = mkTyCoForAllTy tv Inferred ty
 -- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
 mkInfForAllTy :: TyVar -> Type -> Type
 mkInfForAllTy tv ty = assert (isTyVar tv )
-                      ForAllTy (Bndr tv Inferred) ty
+                      ForAllTy Erased (Bndr tv Inferred) ty
 
 -- | Like 'mkForAllTys', but assumes all variables are dependent and
 -- 'Inferred', a common case
@@ -1803,7 +1803,7 @@ mkInfForAllTys tvs ty = foldr mkInfForAllTy ty tvs
 mkSpecForAllTy :: TyVar -> Type -> Type
 mkSpecForAllTy tv ty = assert (isTyVar tv )
                        -- covar is always Inferred, so input should be tyvar
-                       ForAllTy (Bndr tv Specified) ty
+                       ForAllTy Erased (Bndr tv Specified) ty
 
 -- | Like 'mkForAllTys', but assumes all variables are dependent and
 -- 'Specified', a common case
@@ -1845,7 +1845,7 @@ mkTyConBindersPreferAnon vars inner_tkvs = assert (all isTyVar vars)
 splitForAllForAllTyBinders :: Type -> ([ForAllTyBinder], Type)
 splitForAllForAllTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy b res) bs                   = split res res (b:bs)
+    split _ (ForAllTy _ b res) bs                 = split res res (b:bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
     split orig_ty _                bs             = (reverse bs, orig_ty)
 {-# INLINE splitForAllForAllTyBinders #-}
@@ -1856,7 +1856,7 @@ splitForAllForAllTyBinders ty = split ty ty []
 splitForAllTyCoVars :: Type -> ([TyCoVar], Type)
 splitForAllTyCoVars ty = split ty ty []
   where
-    split _       (ForAllTy (Bndr tv _) ty)    tvs = split ty ty (tv:tvs)
+    split _       (ForAllTy _ (Bndr tv _) ty)  tvs = split ty ty (tv:tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
@@ -1866,16 +1866,16 @@ splitForAllTyCoVars ty = split ty ty []
 splitForAllTyVars :: Type -> ([TyVar], Type)
 splitForAllTyVars ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
-    split orig_ty ty tvs | Just ty' <- coreView ty     = split orig_ty ty' tvs
-    split orig_ty _                   tvs              = (reverse tvs, orig_ty)
+    split _ (ForAllTy _ (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty       = split orig_ty ty' tvs
+    split orig_ty _                   tvs                = (reverse tvs, orig_ty)
 
 -- | Like 'splitForAllTyCoVars', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. Furthermore, each returned tyvar is annotated with '()'.
 splitForAllReqTyBinders :: Type -> ([ReqTyBinder], Type)
 splitForAllReqTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv Required) ty) tvs   = split ty ty (Bndr tv ():tvs)
+    split _ (ForAllTy _ (Bndr tv Required) ty) tvs = split ty ty (Bndr tv ():tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                   tvs          = (reverse tvs, orig_ty)
 
@@ -1885,9 +1885,9 @@ splitForAllReqTyBinders ty = split ty ty []
 splitForAllInvisTyBinders :: Type -> ([InvisTyBinder], Type)
 splitForAllInvisTyBinders ty = split ty ty []
   where
-    split _ (ForAllTy (Bndr tv (Invisible spec)) ty) tvs = split ty ty (Bndr tv spec:tvs)
-    split orig_ty ty tvs | Just ty' <- coreView ty       = split orig_ty ty' tvs
-    split orig_ty _                   tvs                = (reverse tvs, orig_ty)
+    split _ (ForAllTy _ (Bndr tv (Invisible spec)) ty) tvs = split ty ty (Bndr tv spec:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty         = split orig_ty ty' tvs
+    split orig_ty _                   tvs                  = (reverse tvs, orig_ty)
 
 -- | Checks whether this is a proper forall (with a named binder)
 isForAllTy :: Type -> Bool
@@ -1898,7 +1898,7 @@ isForAllTy ty
 -- | Like `isForAllTy`, but returns True only if it is a tyvar binder
 isForAllTy_ty :: Type -> Bool
 isForAllTy_ty ty
-  | ForAllTy (Bndr tv _) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) _ <- coreFullView ty
   , isTyVar tv
   = True
 
@@ -1907,7 +1907,7 @@ isForAllTy_ty ty
 -- | Like `isForAllTy`, but returns True only if it is an inferred tyvar binder
 isForAllTy_invis_ty :: Type -> Bool
 isForAllTy_invis_ty  ty
-  | ForAllTy (Bndr tv (Invisible InferredSpec)) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv (Invisible InferredSpec)) _ <- coreFullView ty
   , isTyVar tv
   = True
 
@@ -1916,7 +1916,7 @@ isForAllTy_invis_ty  ty
 -- | Like `isForAllTy`, but returns True only if it is a covar binder
 isForAllTy_co :: Type -> Bool
 isForAllTy_co ty
-  | ForAllTy (Bndr tv _) _ <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) _ <- coreFullView ty
   , isCoVar tv
   = True
 
@@ -1945,27 +1945,29 @@ splitForAllTyCoVar ty
 dropForAlls :: Type -> Type
 dropForAlls ty = go ty
   where
-    go (ForAllTy _ res)            = go res
+    go (ForAllTy _ _ res)           = go res
     go ty | Just ty' <- coreView ty = go ty'
     go res                         = res
 
 -- | Attempts to take a ForAllTy apart, returning the full ForAllTyBinder
-splitForAllForAllTyBinder_maybe :: Type -> Maybe (ForAllTyBinder, Type)
+splitForAllForAllTyBinder_maybe :: Type -> Maybe (Erasure, ForAllTyBinder, Type)
 splitForAllForAllTyBinder_maybe ty
-  | ForAllTy bndr inner_ty <- coreFullView ty = Just (bndr, inner_ty)
-  | otherwise                                 = Nothing
+  | ForAllTy Erased   bndr inner_ty <- coreFullView ty = Just (Erased, bndr, inner_ty)
+  | ForAllTy Retained bndr (FunTy FTF_T_T _ _ inner_ty) <- coreFullView ty = Just (Retained, bndr, inner_ty)
+  | ForAllTy Retained _ _ <- coreFullView ty = panic "splitForAllTyVarBinder_maybe: Retained binder without matching FunTy"
+  | otherwise                                        = Nothing
 
 
 -- | Attempts to take a ForAllTy apart, returning the Var
 splitForAllTyCoVar_maybe :: Type -> Maybe (TyCoVar, Type)
 splitForAllTyCoVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty = Just (tv, inner_ty)
-  | otherwise                                        = Nothing
+  | ForAllTy _ (Bndr tv _) inner_ty <- coreFullView ty = Just (tv, inner_ty)
+  | otherwise                                          = Nothing
 
 -- | Attempts to take a ForAllTy apart, but only if the binder is a TyVar
 splitForAllTyVar_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTyVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) inner_ty <- coreFullView ty
   , isTyVar tv
   = Just (tv, inner_ty)
 
@@ -1974,7 +1976,7 @@ splitForAllTyVar_maybe ty
 -- | Like 'splitForAllTyCoVar_maybe', but only returns Just if it is a covar binder.
 splitForAllCoVar_maybe :: Type -> Maybe (CoVar, Type)
 splitForAllCoVar_maybe ty
-  | ForAllTy (Bndr tv _) inner_ty <- coreFullView ty
+  | ForAllTy _ (Bndr tv _) inner_ty <- coreFullView ty
   , isCoVar tv
   = Just (tv, inner_ty)
 
@@ -1985,10 +1987,10 @@ splitForAllCoVar_maybe ty
 {-# INLINE splitPiTy_maybe #-}  -- callers will immediately deconstruct
 splitPiTy_maybe :: Type -> Maybe (PiTyBinder, Type)
 splitPiTy_maybe ty = case coreFullView ty of
-  ForAllTy bndr ty -> Just (Named bndr, ty)
+  ForAllTy eras bndr ty -> Just (Named eras bndr, ty)
   FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res}
-                   -> Just (Anon (mkScaled w arg) af, res)
-  _                -> Nothing
+                     -> Just (Anon (mkScaled w arg) af, res)
+  _                  -> Nothing
 
 -- | Takes a forall type apart, or panics
 splitPiTy :: Type -> (PiTyBinder, Type)
@@ -2001,11 +2003,11 @@ splitPiTy ty
 splitPiTys :: Type -> ([PiTyBinder], Type)
 splitPiTys ty = split ty ty []
   where
-    split _       (ForAllTy b res) bs = split res res (Named b  : bs)
+    split _       (ForAllTy eras b res) bs = split res res (Named eras b  : bs)
     split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res }) bs
-                                      = split res res (Anon (Scaled w arg) af : bs)
+                                        = split res res (Anon (Scaled w arg) af : bs)
     split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split orig_ty _                bs = (reverse bs, orig_ty)
+    split orig_ty _                  bs = (reverse bs, orig_ty)
 
 -- | Extracts a list of run-time arguments from a function type,
 -- looking through newtypes to the right of arrows.
@@ -2036,7 +2038,7 @@ getRuntimeArgTys :: Type -> [(Scaled Type, FunTyFlag)]
 getRuntimeArgTys = go
   where
     go :: Type -> [(Scaled Type, FunTyFlag)]
-    go (ForAllTy _ res)
+    go (ForAllTy _ _ res)
       = go res
     go (FunTy { ft_mult = w, ft_arg = arg, ft_res = res, ft_af = af })
       = (Scaled w arg, af) : go res
@@ -2060,9 +2062,9 @@ invisibleTyBndrCount ty = length (fst (splitInvisPiTys ty))
 splitInvisPiTys :: Type -> ([PiTyBinder], Type)
 splitInvisPiTys ty = split ty ty []
    where
-    split _ (ForAllTy b res) bs
+    split _ (ForAllTy eras b res) bs
       | Bndr _ vis <- b
-      , isInvisibleForAllTyFlag vis   = split res res (Named b  : bs)
+      , isInvisibleForAllTyFlag vis   = split res res (Named eras b  : bs)
     split _ (FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })  bs
       | isInvisibleFunArg af     = split res res (Anon (mkScaled mult arg) af : bs)
     split orig_ty ty bs
@@ -2078,9 +2080,9 @@ splitInvisPiTysN n ty = split n ty ty []
     split n orig_ty ty bs
       | n == 0                  = (reverse bs, orig_ty)
       | Just ty' <- coreView ty = split n orig_ty ty' bs
-      | ForAllTy b res <- ty
+      | ForAllTy eras b res <- ty
       , Bndr _ vis <- b
-      , isInvisibleForAllTyFlag vis  = split (n-1) res res (Named b  : bs)
+      , isInvisibleForAllTyFlag vis  = split (n-1) res res (Named eras b  : bs)
       | FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res } <- ty
       , isInvisibleFunArg af   = split (n-1) res res (Anon (Scaled mult arg) af : bs)
       | otherwise              = (reverse bs, orig_ty)
@@ -2155,7 +2157,7 @@ fun_kind_arg_flags = go emptySubst
     go subst ki arg_tys
       | Just ki' <- coreView ki = go subst ki' arg_tys
     go _ _ [] = []
-    go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
+    go subst (ForAllTy _ (Bndr tv argf) res_ki) (arg_ty:arg_tys)
       = argf : go subst' res_ki arg_tys
       where
         subst' = extendTvSubst subst tv arg_ty
@@ -2247,7 +2249,7 @@ isFamFreeTy (LitTy {})        = True
 isFamFreeTy (TyConApp tc tys) = all isFamFreeTy tys && isFamFreeTyCon tc
 isFamFreeTy (AppTy a b)       = isFamFreeTy a && isFamFreeTy b
 isFamFreeTy (FunTy _ w a b)   = isFamFreeTy w && isFamFreeTy a && isFamFreeTy b
-isFamFreeTy (ForAllTy _ ty)   = isFamFreeTy ty
+isFamFreeTy (ForAllTy _ _ ty) = isFamFreeTy ty
 isFamFreeTy (CastTy ty _)     = isFamFreeTy ty
 isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 
@@ -2542,7 +2544,7 @@ seqType (TyVarTy tv)                = tv `seq` ()
 seqType (AppTy t1 t2)               = seqType t1 `seq` seqType t2
 seqType (FunTy _ w t1 t2)           = seqType w `seq` seqType t1 `seq` seqType t2
 seqType (TyConApp tc tys)           = tc `seq` seqTypes tys
-seqType (ForAllTy (Bndr tv _) ty)   = seqType (varType tv) `seq` seqType ty
+seqType (ForAllTy _ (Bndr tv _) ty) = seqType (varType tv) `seq` seqType ty
 seqType (CastTy ty co)              = seqType ty `seq` seqCo co
 seqType (CoercionTy co)             = seqCo co
 
@@ -2774,7 +2776,7 @@ returnsConstraintKind :: Kind -> Bool
 --         forall k. k -> Constraint
 returnsConstraintKind kind
   | Just kind' <- coreView kind = returnsConstraintKind kind'
-returnsConstraintKind (ForAllTy _ ty)         = returnsConstraintKind ty
+returnsConstraintKind (ForAllTy _ _ ty)         = returnsConstraintKind ty
 returnsConstraintKind (FunTy { ft_res = ty }) = returnsConstraintKind ty
 returnsConstraintKind kind                    = isConstraintLikeKind kind
 
@@ -2798,7 +2800,7 @@ typeHasFixedRuntimeRep = go
       | tcHasFixedRuntimeRep tc = True
     go (FunTy {})               = True
     go (LitTy {})               = True
-    go (ForAllTy _ ty)          = go ty
+    go (ForAllTy _ _ ty)        = go ty
     go ty                       = isFixedRuntimeRepKind (typeKind ty)
 
 -- | Checks that a kind of the form 'Type', 'Constraint'
@@ -3185,7 +3187,7 @@ isLinearType :: Type -> Bool
 isLinearType ty = case ty of
                       FunTy _ ManyTy _ res -> isLinearType res
                       FunTy _ _ _ _        -> True
-                      ForAllTy _ res       -> isLinearType res
+                      ForAllTy _ _ res     -> isLinearType res
                       _ -> False
 
 {- *********************************************************************
