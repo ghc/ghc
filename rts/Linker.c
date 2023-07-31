@@ -639,10 +639,27 @@ internal_dlopen(const char *dll_name)
   libraries don't populate the global symbol table.
 */
 
+static StrHashTable *dlsym_cache = NULL;
+
+static void invalidate_dlsym_cache(void) {
+    // TODO: Don't leak keys
+    dlsym_cache = NULL;
+}
+
 static void *
 internal_dlsym(const char *symbol) {
     OpenedSO* o_so;
     void *v;
+
+    if (dlsym_cache == NULL) {
+        dlsym_cache = allocStrHashTable();
+    }
+
+    v = lookupStrHashTable(dlsym_cache, symbol);
+    if (v != NULL) {
+        IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in cache\n", symbol));
+        return v;
+    }
 
     // We acquire dl_mutex as concurrent dl* calls may alter dlerror
     ACQUIRE_LOCK(&dl_mutex);
@@ -655,7 +672,7 @@ internal_dlsym(const char *symbol) {
     if (dlerror() == NULL) {
         RELEASE_LOCK(&dl_mutex);
         IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in program\n", symbol));
-        return v;
+        goto resolved;
     }
 
     for (o_so = openedSOs; o_so != NULL; o_so = o_so->next) {
@@ -663,14 +680,17 @@ internal_dlsym(const char *symbol) {
         if (dlerror() == NULL) {
             IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in shared object\n", symbol));
             RELEASE_LOCK(&dl_mutex);
-            return v;
+            goto resolved;
         }
     }
     RELEASE_LOCK(&dl_mutex);
 
     IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in special cases\n", symbol));
 #   define SPECIAL_SYMBOL(sym) \
-      if (strcmp(symbol, #sym) == 0) return (void*)&sym;
+      if (strcmp(symbol, #sym) == 0) { \
+        v = (void*)&sym; \
+        goto resolved; \
+      }
 
 #   if defined(HAVE_SYS_STAT_H) && defined(linux_HOST_OS) && defined(__GLIBC__)
     // HACK: GLIBC implements these functions with a great deal of trickery where
@@ -705,6 +725,10 @@ internal_dlsym(const char *symbol) {
 
     // we failed to find the symbol
     return NULL;
+
+resolved:
+    insertStrHashTable(dlsym_cache, strdup(symbol), v);
+    return v;
 }
 #  endif
 
@@ -1728,6 +1752,8 @@ int ocTryLoad (ObjectCode* oc) {
     m32_allocator_flush(oc->rw_m32);
 #endif
 
+    invalidate_dlsym_cache();
+
     IF_DEBUG(linker, ocDebugBelch(oc, "resolved\n"));
     oc->status = OBJECT_RESOLVED;
 
@@ -1804,6 +1830,7 @@ static HsInt resolveObjs_ (void)
     // collect any new cost centres & CCSs that were defined during runInit
     refreshProfilingCCSs();
 #endif
+    invalidate_dlsym_cache();
 
     IF_DEBUG(linker, debugBelch("resolveObjs: done\n"));
     return 1;
