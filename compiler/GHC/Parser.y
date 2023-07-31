@@ -3767,7 +3767,7 @@ qopm    :: { forall b. DisambInfixOp b => PV (LocatedN b) }   -- used in section
 
 hole_op :: { forall b. DisambInfixOp b => PV (Located b) }   -- used in sections
 hole_op : '`' '_' '`'           { mkHsInfixHolePV (comb2 $1 $>)
-                                         (\cs -> EpAnn (glEE $1 $>) (EpAnnUnboundVar (glAA $1, glAA $3) (glAA $2)) cs) }
+                                         (\cs -> EpAnn (glEE $1 $>) (Just $ EpAnnUnboundVar (glAA $1, glAA $3) (glAA $2)) cs) }
 
 qvarop :: { LocatedN RdrName }
         : qvarsym               { $1 }
@@ -4406,7 +4406,7 @@ mos,mcs :: Located Token -> AddEpAnn
 mos ll = mj AnnOpenS ll
 mcs ll = mj AnnCloseS ll
 
-pvA :: MonadP m => m (Located a) -> m (LocatedAn t a)
+pvA :: (MonadP m, NoAnn t) => m (Located a) -> m (LocatedAn t a)
 pvA a = do { av <- a
            ; return (reLoc av) }
 
@@ -4543,10 +4543,6 @@ addTrailingCommaS (L l sl) span = L l (sl { sl_tc = Just (epaLocationRealSrcSpan
 -- -------------------------------------
 
 addTrailingDarrowC :: LocatedC a -> Located Token -> EpAnnComments -> LocatedC a
-addTrailingDarrowC (L (SrcSpanAnn EpAnnNotUsed l) a) lt cs =
-  let
-    u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
-  in L (SrcSpanAnn (EpAnn (spanAsAnchor l) (AnnContext (Just (u,glAA lt)) [] []) cs) l) a
 addTrailingDarrowC (L (SrcSpanAnn (EpAnn lr (AnnContext _ o c) csc) l) a) lt cs =
   let
     u = if (isUnicode lt) then UnicodeSyntax else NormalSyntax
@@ -4566,7 +4562,6 @@ combineHasLocs :: (HasLoc a, HasLoc b) => a -> b -> SrcSpan
 combineHasLocs a b = combineSrcSpans (getHasLoc a) (getHasLoc b)
 
 fromTrailingN :: SrcSpanAnnN -> SrcSpanAnnA
-fromTrailingN (SrcSpanAnn EpAnnNotUsed l) = SrcSpanAnn EpAnnNotUsed l
 fromTrailingN (SrcSpanAnn (EpAnn anc ann cs) l)
     = SrcSpanAnn (EpAnn anc (AnnListItem (nann_trailing ann)) cs) l
 }

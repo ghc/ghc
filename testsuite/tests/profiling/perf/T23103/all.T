@@ -6,7 +6,6 @@ test(
             [
                 '../../../../../utils/check-exact/ExactPrint.hs',
                 '../../../../../utils/check-exact/Lookup.hs',
-                '../../../../../utils/check-exact/Orphans.hs',
                 '../../../../../utils/check-exact/Types.hs',
                 '../../../../../utils/check-exact/Utils.hs',
             ]

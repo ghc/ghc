@@ -203,6 +203,9 @@ data EpAnnHsCase = EpAnnHsCase
       , hsCaseAnnsRest :: [AddEpAnn]
       } deriving Data
 
+instance NoAnn EpAnnHsCase where
+  noAnn = EpAnnHsCase noAnn noAnn noAnn
+
 data EpAnnUnboundVar = EpAnnUnboundVar
      { hsUnboundBackquotes :: (EpaLocation, EpaLocation)
      , hsUnboundHole       :: EpaLocation
@@ -224,7 +227,7 @@ type instance XOverLabel     GhcTc = DataConCantHappen
 
 type instance XVar           (GhcPass _) = NoExtField
 
-type instance XUnboundVar    GhcPs = EpAnn EpAnnUnboundVar
+type instance XUnboundVar    GhcPs = EpAnn (Maybe EpAnnUnboundVar)
 type instance XUnboundVar    GhcRn = NoExtField
 type instance XUnboundVar    GhcTc = HoleExprRef
   -- We really don't need the whole HoleExprRef; just the IORef EvTerm
@@ -388,16 +391,25 @@ data AnnExplicitSum
       aesClose      :: EpaLocation
       } deriving Data
 
+instance NoAnn AnnExplicitSum where
+  noAnn = AnnExplicitSum noAnn noAnn noAnn noAnn
+
 data AnnFieldLabel
   = AnnFieldLabel {
       afDot :: Maybe EpaLocation
       } deriving Data
+
+instance NoAnn AnnFieldLabel where
+  noAnn = AnnFieldLabel Nothing
 
 data AnnProjection
   = AnnProjection {
       apOpen  :: EpaLocation, -- ^ '('
       apClose :: EpaLocation  -- ^ ')'
       } deriving Data
+
+instance NoAnn AnnProjection where
+  noAnn = AnnProjection noAnn noAnn
 
 data AnnsIf
   = AnnsIf {
@@ -407,6 +419,9 @@ data AnnsIf
       aiThenSemi :: Maybe EpaLocation,
       aiElseSemi :: Maybe EpaLocation
       } deriving Data
+
+instance NoAnn AnnsIf where
+  noAnn = AnnsIf noAnn noAnn noAnn Nothing Nothing
 
 -- ---------------------------------------------------------------------
 
@@ -1359,6 +1374,9 @@ data GrhsAnn
       ga_vbar :: Maybe EpaLocation, -- TODO:AZ do we need this?
       ga_sep  :: AddEpAnn -- ^ Match separator location
       } deriving (Data)
+
+instance NoAnn GrhsAnn where
+  noAnn = GrhsAnn Nothing noAnn
 
 type instance XCGRHS (GhcPass _) _ = EpAnn GrhsAnn
                                    -- Location of matchSeparator

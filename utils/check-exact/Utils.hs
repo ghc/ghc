@@ -44,7 +44,6 @@ import qualified Data.Map.Strict as Map
 
 import Debug.Trace
 import Types
-import Orphans () -- NoAnn instances only
 
 -- ---------------------------------------------------------------------
 
@@ -241,7 +240,6 @@ insertCppComments (L l p) cs = L l p'
                                               (sortEpaComments $ fc ++ cs_after)
                    where
                      (cs_before,cs_after) = break (\(L ll _) ->   (ss2pos $ anchor ll) < (ss2pos $ anchor ac) ) cs
-      unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p) { GHC.hsmodAnn = an' } }
 
 -- ---------------------------------------------------------------------
@@ -383,7 +381,6 @@ name2String = showPprUnsafe
 -- ---------------------------------------------------------------------
 
 locatedAnAnchor :: LocatedAn a t -> RealSrcSpan
-locatedAnAnchor (L (SrcSpanAnn EpAnnNotUsed l) _) = realSrcSpan l
 locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 
 -- ---------------------------------------------------------------------
@@ -391,7 +388,6 @@ locatedAnAnchor (L (SrcSpanAnn (EpAnn a _ _) _) _) = anchor a
 -- |Version of l2l that preserves the anchor, immportant if it has an
 -- updated AnchorOperation
 moveAnchor :: NoAnn b => SrcAnn a -> SrcAnn b
-moveAnchor (SrcSpanAnn EpAnnNotUsed l) = noAnnSrcSpan l
 moveAnchor (SrcSpanAnn (EpAnn anc _ cs) l) = SrcSpanAnn (EpAnn anc noAnn cs) l
 
 -- ---------------------------------------------------------------------

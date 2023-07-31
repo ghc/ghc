@@ -24,7 +24,12 @@
    (Nothing))
   (Just
    (L
-    (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:1:8-13 })
+    (SrcSpanAnn (EpAnn
+                 (EpaSpan { T20846.hs:1:8-13 })
+                 (AnnListItem
+                  [])
+                 (EpaComments
+                  [])) { T20846.hs:1:8-13 })
     {ModuleName: T20846}))
   (Nothing)
   []
@@ -46,7 +51,12 @@
       (FixitySig
        (NoExtField)
        [(L
-         (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:3:8-11 })
+         (SrcSpanAnn (EpAnn
+                      (EpaSpan { T20846.hs:3:8-11 })
+                      (NameAnnTrailing
+                       [])
+                      (EpaComments
+                       [])) { T20846.hs:3:8-11 })
          (Unqual
           {OccName: ++++}))]
        {Fixity: infixr 9}))))
@@ -77,9 +87,23 @@
       (MG
        (FromSource)
        (L
-        (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
+        (SrcSpanAnn (EpAnn
+                     (EpaSpan { T20846.hs:4:1-18 })
+                     (AnnList
+                      (Nothing)
+                      (Nothing)
+                      (Nothing)
+                      []
+                      [])
+                     (EpaComments
+                      [])) { T20846.hs:4:1-18 })
         [(L
-          (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:1-18 })
+          (SrcSpanAnn (EpAnn
+                       (EpaSpan { T20846.hs:4:1-18 })
+                       (AnnListItem
+                        [])
+                       (EpaComments
+                        [])) { T20846.hs:4:1-18 })
           (Match
            (EpAnn
             (EpaSpan { T20846.hs:4:1-18 })
@@ -108,7 +132,11 @@
              [])
             [(L
               (SrcSpanAnn
-               (EpAnnNotUsed)
+               (EpAnn
+                (EpaSpan { T20846.hs:4:8-18 })
+                (NoEpAnns)
+                (EpaComments
+                 []))
                { T20846.hs:4:8-18 })
               (GRHS
                (EpAnn
@@ -120,11 +148,21 @@
                  []))
                []
                (L
-                (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:10-18 })
+                (SrcSpanAnn (EpAnn
+                             (EpaSpan { T20846.hs:4:10-18 })
+                             (AnnListItem
+                              [])
+                             (EpaComments
+                              [])) { T20846.hs:4:10-18 })
                 (HsVar
                  (NoExtField)
                  (L
-                  (SrcSpanAnn (EpAnnNotUsed) { T20846.hs:4:10-18 })
+                  (SrcSpanAnn (EpAnn
+                               (EpaSpan { T20846.hs:4:10-18 })
+                               (NameAnnTrailing
+                                [])
+                               (EpaComments
+                                [])) { T20846.hs:4:10-18 })
                   (Unqual
                    {OccName: undefined}))))))]
             (EmptyLocalBinds

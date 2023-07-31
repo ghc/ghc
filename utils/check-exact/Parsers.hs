@@ -277,7 +277,6 @@ fixModuleTrailingComments (GHC.L l p) = GHC.L l p'
   where
     an' = case GHC.hsmodAnn $ GHC.hsmodExt p of
       (GHC.EpAnn a an ocs) -> GHC.EpAnn a an (rebalance ocs)
-      unused -> unused
     p' = p { GHC.hsmodExt = (GHC.hsmodExt p){ GHC.hsmodAnn = an' } }
 
     rebalance :: GHC.EpAnnComments -> GHC.EpAnnComments
