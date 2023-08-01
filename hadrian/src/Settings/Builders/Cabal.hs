@@ -59,8 +59,6 @@ commonReinstallCabalArgs :: Args
 commonReinstallCabalArgs = do
     top       <- expr topDirectory
     root      <- getBuildRoot
-    threads   <- shakeThreads <$> expr getShakeOptions
-    _pkg      <- getPackage
     compiler  <- expr $ programPath =<< programContext Stage1 ghc
     mconcat [ arg "--project-file"
             , arg $ top -/- "cabal.project-reinstall"
