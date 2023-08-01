@@ -147,10 +147,6 @@ getSetting = expr . setting
 bashPath :: Action FilePath
 bashPath = setting BourneShell
 
--- | Check whether the value of a 'Setting' matches one of the given strings.
-matchSetting :: Setting -> [String] -> Action Bool
-matchSetting key values = (`elem` values) <$> setting key
-
 isWinTarget :: Action Bool
 isWinTarget = anyTargetOs [OSMinGW32]
 
