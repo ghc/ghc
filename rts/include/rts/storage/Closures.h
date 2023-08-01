@@ -275,7 +275,6 @@ typedef struct {
 // Closure types: CATCH_FRAME
 typedef struct {
     StgHeader  header;
-    StgWord    exceptions_blocked;
     StgClosure *handler;
 } StgCatchFrame;
 

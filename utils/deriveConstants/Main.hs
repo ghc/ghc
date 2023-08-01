@@ -482,7 +482,6 @@ wanteds os = concat
           ,closureField Both "StgUpdateFrame" "updatee"
 
           ,closureField C "StgCatchFrame" "handler"
-          ,closureField C "StgCatchFrame" "exceptions_blocked"
 
           ,closureSize       C "StgPAP"
           ,closureField      C "StgPAP" "n_args"

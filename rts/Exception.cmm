@@ -393,16 +393,14 @@ stg_killMyself
  * kind of return to the activation record underneath us on the stack.
  */
 
-#define CATCH_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,exceptions_blocked,handler)   \
+#define CATCH_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,handler)   \
   w_ info_ptr,                                                          \
   PROF_HDR_FIELDS(w_,p1,p2)                                             \
-  w_ exceptions_blocked,                                                \
   p_ handler
 
 
 INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
-               CATCH_FRAME_FIELDS(W_,P_,info_ptr, p1, p2,
-                                  exceptions_blocked,handler))
+               CATCH_FRAME_FIELDS(W_,P_,info_ptr, p1, p2,handler))
     return (P_ ret)
 {
     return (ret);
@@ -411,12 +409,7 @@ INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
 stg_catchzh ( P_ io,      /* :: IO a */
               P_ handler  /* :: Exception -> IO a */ )
 {
-    W_ exceptions_blocked;
-
     STK_CHK_GEN();
-
-    exceptions_blocked =
-        TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE);
     TICK_CATCHF_PUSHED();
 
     /* Apply R1 to the realworld token */
@@ -424,8 +417,7 @@ stg_catchzh ( P_ io,      /* :: IO a */
     TICK_SLOW_CALL_fast_v();
 
     jump stg_ap_v_fast
-        (CATCH_FRAME_FIELDS(,,stg_catch_frame_info, CCCS, 0,
-                            exceptions_blocked, handler))
+        (CATCH_FRAME_FIELDS(,,stg_catch_frame_info, CCCS, 0, handler))
         (io);
 }
 
@@ -599,26 +591,28 @@ retry_pop_stack:
     frame = Sp;
     if (frame_type == CATCH_FRAME)
     {
+      // Note: if this branch is updated, there is a good chance that
+      // corresponding logic in `raiseAsync` must be updated to match!
+      // See Note [Apply the handler directly in raiseAsync] in RaiseAsync.c.
+
       Sp = Sp + SIZEOF_StgCatchFrame;
-      if ((StgCatchFrame_exceptions_blocked(frame) & TSO_BLOCKEX) == 0) {
+
+      W_ flags;
+      flags = TO_W_(StgTSO_flags(CurrentTSO));
+      if ((flags & TSO_BLOCKEX) == 0) {
           Sp_adj(-1);
           Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
       }
 
       /* Ensure that async exceptions are masked when running the handler.
-      */
-      StgTSO_flags(CurrentTSO) = %lobits32(
-          TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
-
-      /* The interruptible state is inherited from the context of the
+       *
+       * The interruptible state is inherited from the context of the
        * catch frame, but note that TSO_INTERRUPTIBLE is only meaningful
        * if TSO_BLOCKEX is set.  (we got this wrong earlier, and #4988
        * was a symptom of the bug).
        */
-      if ((StgCatchFrame_exceptions_blocked(frame) &
-           (TSO_BLOCKEX | TSO_INTERRUPTIBLE)) == TSO_BLOCKEX) {
-          StgTSO_flags(CurrentTSO) = %lobits32(
-              TO_W_(StgTSO_flags(CurrentTSO)) & ~TSO_INTERRUPTIBLE);
+      if ((flags & (TSO_BLOCKEX | TSO_INTERRUPTIBLE)) != TSO_BLOCKEX) {
+        StgTSO_flags(CurrentTSO) = %lobits32(flags | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
       }
     }
     else /* CATCH_STM_FRAME */
