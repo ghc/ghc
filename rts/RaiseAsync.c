@@ -950,44 +950,36 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
         case CATCH_FRAME:
             // If we find a CATCH_FRAME, and we've got an exception to raise,
-            // then build the THUNK raise(exception), and leave it on
-            // top of the CATCH_FRAME ready to enter.
-            //
+            // then set up the top of the stack to apply the handler;
+            // see Note [Apply the handler directly in raiseAsync].
         {
-            StgCatchFrame *cf = (StgCatchFrame *)frame;
-            StgThunk *raise;
-
             if (exception == NULL) break;
 
-            // we've got an exception to raise, so let's pass it to the
-            // handler in this frame.
-            //
-            raise = (StgThunk *)allocate(cap,sizeofW(StgThunk)+1);
-            TICK_ALLOC_SE_THK(sizeofW(StgThunk)+1,0);
-            SET_HDR(raise,&stg_raise_info,cf->header.prof.ccs);
-            raise->payload[0] = exception;
+            StgClosure *handler = ((StgCatchFrame *)frame)->handler;
 
-            // throw away the stack from Sp up to the CATCH_FRAME.
-            //
-            sp = frame - 1;
+            // Throw away the stack from Sp up to and including the CATCH_FRAME.
+            sp = frame + stack_frame_sizeW((StgClosure *)frame);
 
-            /* Ensure that async exceptions are blocked now, so we don't get
-             * a surprise exception before we get around to executing the
-             * handler.
-             */
-            tso->flags |= TSO_BLOCKEX;
-            if ((cf->exceptions_blocked & TSO_INTERRUPTIBLE) == 0) {
-                tso->flags &= ~TSO_INTERRUPTIBLE;
-            } else {
-                tso->flags |= TSO_INTERRUPTIBLE;
+            // Unmask async exceptions after running the handler, if necessary.
+            if ((tso->flags & TSO_BLOCKEX) == 0) {
+              sp--;
+              sp[0] = (W_)&stg_unmaskAsyncExceptionszh_ret_info;
             }
 
-            /* Put the newly-built THUNK on top of the stack, ready to execute
-             * when the thread restarts.
-             */
-            sp[0] = (W_)raise;
-            sp[-1] = (W_)&stg_enter_info;
-            stack->sp = sp-1;
+            // Ensure that async exceptions are masked while running the handler;
+            // see Note [Apply the handler directly in raiseAsync].
+            if ((tso->flags & (TSO_BLOCKEX | TSO_INTERRUPTIBLE)) != TSO_BLOCKEX) {
+              tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
+            }
+
+            // Set up the top of the stack to apply the handler.
+            sp -= 4;
+            sp[0] = (W_)&stg_enter_info;
+            sp[1] = (W_)handler;
+            sp[2] = (W_)&stg_ap_pv_info;
+            sp[3] = (W_)exception;
+
+            stack->sp = sp;
             RELAXED_STORE(&tso->what_next, ThreadRunGHC);
             goto done;
         }
@@ -1079,6 +1071,15 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
         };
 
         default:
+            // see Note [Update async masking state on unwind] in Schedule.c
+            if (*frame == (W_)&stg_unmaskAsyncExceptionszh_ret_info) {
+                tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+            } else if (*frame == (W_)&stg_maskAsyncExceptionszh_ret_info) {
+                tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
+            } else if (*frame == (W_)&stg_maskUninterruptiblezh_ret_info) {
+                tso->flags |= TSO_BLOCKEX;
+                tso->flags &= ~TSO_INTERRUPTIBLE;
+            }
             break;
         }
 
@@ -1097,3 +1098,26 @@ done:
 
     return tso;
 }
+
+/* Note [Apply the handler directly in raiseAsync]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we encounter a `catch#` frame while unwinding the stack due to an
+async exception, we need to set up the stack to resume execution by
+invoking the exception handler. One natural way to do it would be to
+simply place a `raise#` thunk on the top of the stack, ready to be
+entered. This would effectively convert the asynchronous exception to
+a synchronous one at a point where it’s known to be safe to do so.
+
+However, there is a danger to this strategy: if async exceptions are
+currently unmasked, it becomes possible for a second async exception
+to be delivered before we enter the application of `raise#`, which
+would result in the first exception being lost. The easiest way to
+prevent this race from happening is to have `raiseAsync` set up the
+stack to apply the handler directly, effectively emulating the
+behavior of `raise#`, as this allows exceptions to be preemptively
+masked before returning. This means `raiseAsync` must also push a
+frame to unmask async exceptions after the handler returns if
+necessary, just as `raise#` does.
+
+This strategy results in some logical duplication, but it is correct,
+and the duplicated logic is small enough to be acceptable. */
