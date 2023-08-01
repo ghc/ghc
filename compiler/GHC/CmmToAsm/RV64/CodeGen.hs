@@ -888,12 +888,11 @@ getRegister' config plat expr =
         MO_S_MulMayOflo w -> do_mul_may_oflo w x y
         MO_S_Quot w       -> intOp True w (\d x y -> unitOL $ annExpr expr (DIV d x y))
 
-        -- Note the swap in Rx and Ry.
         MO_S_Rem w -> intOp True w (\d x y -> unitOL $ annExpr expr (REM d x y))
 
         -- Unsigned multiply/divide
         MO_U_Quot w -> intOp False w (\d x y -> unitOL $ annExpr expr (DIVU d x y))
-        MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ annExpr expr (REM d x y))
+        MO_U_Rem w  -> intOp False w (\d x y -> unitOL $ annExpr expr (REMU d x y))
 
         -- Signed comparisons -- see Note [CSET)
         MO_S_Ge w     -> intOp True  w (\d x y -> unitOL $ annExpr expr (CSET d x y SGE))
