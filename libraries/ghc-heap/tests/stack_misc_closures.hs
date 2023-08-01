@@ -113,11 +113,10 @@ main = do
     \case
       CatchFrame {..} -> do
         assertEqual (tipe info_tbl) CATCH_FRAME
-        assertEqual exceptions_blocked 1
         assertConstrClosure 1 handler
       e -> error $ "Wrong closure type: " ++ show e
   traceM "Test 4"
-  testSize any_catch_frame# 3
+  testSize any_catch_frame# 2
   traceM "Test 5"
   test any_catch_stm_frame# $
     \case

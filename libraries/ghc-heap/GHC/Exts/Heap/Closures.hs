@@ -412,7 +412,6 @@ data GenStackFrame b =
 
   | CatchFrame
       { info_tbl            :: !StgInfoTable
-      , exceptions_blocked  :: !Word
       , handler             :: !b
       }
 

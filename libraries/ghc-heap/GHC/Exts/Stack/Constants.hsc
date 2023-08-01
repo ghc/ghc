@@ -23,10 +23,6 @@ offsetStgCatchFrameHandler :: WordOffset
 offsetStgCatchFrameHandler = byteOffsetToWordOffset $
   (#const OFFSET_StgCatchFrame_handler) + (#size StgHeader)
 
-offsetStgCatchFrameExceptionsBlocked :: WordOffset
-offsetStgCatchFrameExceptionsBlocked = byteOffsetToWordOffset $
-  (#const OFFSET_StgCatchFrame_exceptions_blocked) + (#size StgHeader)
-
 sizeStgCatchFrame :: Int
 sizeStgCatchFrame = bytesToWords $
   (#const SIZEOF_StgCatchFrame_NoHdr) + (#size StgHeader)

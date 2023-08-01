@@ -374,12 +374,12 @@ StgClosure *captureContinuationAndAbort(Capability *cap, StgTSO *tso, StgPromptT
   //   1. We walk the stack to find the prompt frame to capture up to (if any).
   //
   //   2. If we successfully find a matching prompt, we proceed with the actual
-  //      by allocating space for the continuation, performing the necessary
-  //      copying, and unwinding the stack.
+  //      capture by allocating space for the continuation, performing the
+  //      necessary copying, and unwinding the stack.
   //
   // These variables are modified in Phase 1 to keep track of how far we had to
   // walk before finding the prompt frame. Afterwards, Phase 2 consults them to
-  // determine how to proceed with the actual capture.
+  // determine how to proceed.
 
   StgWord total_words = 0;
   bool in_first_chunk = true;

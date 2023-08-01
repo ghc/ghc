@@ -3019,19 +3019,6 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
     // thunks which are currently under evaluation.
     //
 
-    // OLD COMMENT (we don't have MIN_UPD_SIZE now):
-    // LDV profiling: stg_raise_info has THUNK as its closure
-    // type. Since a THUNK takes at least MIN_UPD_SIZE words in its
-    // payload, MIN_UPD_SIZE is more appropriate than 1.  It seems that
-    // 1 does not cause any problem unless profiling is performed.
-    // However, when LDV profiling goes on, we need to linearly scan
-    // small object pool, where raise_closure is stored, so we should
-    // use MIN_UPD_SIZE.
-    //
-    // raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
-    //                                 sizeofW(StgClosure)+1);
-    //
-
     //
     // Walk up the stack, looking for the catch frame.  On the way,
     // we update any closures pointed to from update frames with the
@@ -3094,11 +3081,51 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
         }
 
         default:
+            // see Note [Update async masking state on unwind]
+            if (*p == (StgWord)&stg_unmaskAsyncExceptionszh_ret_info) {
+                tso->flags &= ~(TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+            } else if (*p == (StgWord)&stg_maskAsyncExceptionszh_ret_info) {
+                tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
+            } else if (*p == (StgWord)&stg_maskUninterruptiblezh_ret_info) {
+                tso->flags |= TSO_BLOCKEX;
+                tso->flags &= ~TSO_INTERRUPTIBLE;
+            }
             p = next;
             continue;
         }
     }
 }
+
+/* Note [Update async masking state on unwind]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we raise an exception or capture a continuation, we unwind the
+stack by searching for an enclosing `catch#` or `prompt#` frame. If we
+unwind past frames intended to restore the async exception masking
+state, we must take care to reproduce their intended effect in order
+to ensure that async exceptions are properly unmasked or remasked.
+
+On paper, this seems as simple as updating `tso->flags` appropriately,
+but in fact there is one additional wrinkle: when async exceptions are
+*unmasked*, we must eagerly check for a pending async exception and
+raise it if necessary. This is not terribly involved, but it’s not
+trivial, either (see the definition of `stg_unmaskAsyncExceptionszh_ret`),
+so we’d prefer to avoid duplicating that logic in several places.
+
+Fortunately, when we’re unwinding the stack due to a raised exception,
+this detail is actually unimportant: `catch#` implicitly masks async
+exceptions while running the handler as we explicitly *don’t* want the
+thread to be interrupted before it has a chance to handle the
+exception. However, when capturing a continuation, we don’t have this
+luxury, so we take two different strategies:
+
+* When unwinding the stack due to a raised exception (synchonrous or
+  asynchronous), we just update `tso->flags` directly and take no
+  further action.
+
+* When unwinding the stack due to a continuation capture, we update
+  the masking state *indirectly* by pushing an appropriate frame onto
+  the stack before we return. This strategy is described at length
+  in Note [Continuations and async exception masking] in Continuation.c. */
 
 
 /* -----------------------------------------------------------------------------

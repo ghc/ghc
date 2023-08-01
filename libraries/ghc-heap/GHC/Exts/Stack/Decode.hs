@@ -331,12 +331,10 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                   updatee = updatee'
                 }
         CATCH_FRAME -> do
-          let exceptions_blocked' = getWord stackSnapshot# (index + offsetStgCatchFrameExceptionsBlocked)
-              handler' = getClosureBox stackSnapshot# (index + offsetStgCatchFrameHandler)
+          let handler' = getClosureBox stackSnapshot# (index + offsetStgCatchFrameHandler)
           pure $
             CatchFrame
               { info_tbl = info,
-                exceptions_blocked = exceptions_blocked',
                 handler = handler'
               }
         UNDERFLOW_FRAME -> do

@@ -484,7 +484,6 @@ wanteds os = concat
           ,closureField Both "StgOrigThunkInfoFrame" "info_ptr"
 
           ,closureField C "StgCatchFrame" "handler"
-          ,closureField C "StgCatchFrame" "exceptions_blocked"
 
           ,structSize  C "StgRetFun"
           ,fieldOffset C "StgRetFun" "size"

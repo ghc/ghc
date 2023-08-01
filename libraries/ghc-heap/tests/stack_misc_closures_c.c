@@ -25,7 +25,6 @@ void create_any_catch_frame(Capability *cap, StgStack *stack, StgWord w) {
   StgCatchFrame *catchF = (StgCatchFrame *)stack->sp;
   SET_HDR(catchF, &stg_catch_frame_info, CCS_SYSTEM);
   StgClosure *payload = rts_mkWord(cap, w);
-  catchF->exceptions_blocked = 1;
   catchF->handler = payload;
 }
 
