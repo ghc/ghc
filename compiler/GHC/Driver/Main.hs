@@ -137,7 +137,7 @@ import GHC.Driver.Config.StgToJS  (initStgToJSConfig)
 import GHC.Driver.Config.Diagnostic
 import GHC.Driver.Config.Tidy
 import GHC.Driver.Hooks
-import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub)
+import GHC.Driver.GenerateCgIPEStub (generateCgIPEStub, lookupEstimatedTicks)
 
 import GHC.Runtime.Context
 import GHC.Runtime.Interpreter ( addSptEntry )
@@ -241,7 +241,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Ppr
-import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.TyThing
 import GHC.Types.HpcInfo
 
@@ -272,11 +271,11 @@ import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
+import qualified Data.Map as M
+import Data.Map (Map)
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.Functor
 import Control.DeepSeq (force)
-import Data.Bifunctor (first)
 import Data.List.NonEmpty (NonEmpty ((:|)))
 import GHC.Unit.Module.WholeCoreBindings
 import GHC.Types.TypeEnv
@@ -287,7 +286,9 @@ import Data.Time
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import GHC.Iface.Env ( trace_if )
 import GHC.Stg.InferTags.TagSig (seqTagSig)
+import GHC.StgToCmm.Utils (IPEStats)
 import GHC.Types.Unique.FM
+import GHC.Cmm.Config (CmmConfig)
 
 
 {- **********************************************************************
@@ -2121,21 +2122,40 @@ doCodeGen hsc_env this_mod denv data_tycons
 
         cmm_config = initCmmConfig dflags
 
-        pipeline_stream :: Stream IO CmmGroupSRTs (NonCaffySet, ModuleLFInfos)
+        pipeline_stream :: Stream IO CmmGroupSRTs CmmCgInfos
         pipeline_stream = do
-          (non_cafs,  lf_infos) <-
+          ((mod_srt_info, ipes, ipe_stats), lf_infos) <-
             {-# SCC "cmmPipeline" #-}
-            Stream.mapAccumL_ (cmmPipeline logger cmm_config) (emptySRT this_mod) ppr_stream1
-              <&> first (srtMapNonCAFs . moduleSRTMap)
+            Stream.mapAccumL_ (pipeline_action logger cmm_config) (emptySRT this_mod, M.empty, mempty) ppr_stream1
+          let nonCaffySet = srtMapNonCAFs (moduleSRTMap mod_srt_info)
+          generateCgIPEStub hsc_env this_mod denv (nonCaffySet, lf_infos, ipes, ipe_stats)
 
-          return (non_cafs, lf_infos)
+        pipeline_action
+          :: Logger
+          -> CmmConfig
+          -> (ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats)
+          -> CmmGroup
+          -> IO ((ModuleSRTInfo, Map CmmInfoTable (Maybe IpeSourceLocation), IPEStats), CmmGroupSRTs)
+        pipeline_action logger cmm_config (mod_srt_info, ipes, stats) cmm_group = do
+          (mod_srt_info', cmm_srts) <- cmmPipeline logger cmm_config mod_srt_info cmm_group
+
+          -- If -finfo-table-map is enabled, we precompute a map from info
+          -- tables to source locations. See Note [Mapping Info Tables to Source
+          -- Positions] in GHC.Stg.Debug.
+          (ipes', stats') <-
+            if (gopt Opt_InfoTableMap dflags) then
+              lookupEstimatedTicks hsc_env ipes stats cmm_srts
+            else
+              return (ipes, stats)
+
+          return ((mod_srt_info', ipes', stats'), cmm_srts)
 
         dump2 a = do
           unless (null a) $
             putDumpFileMaybe logger Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
-    return $ Stream.mapM dump2 $ generateCgIPEStub hsc_env this_mod denv pipeline_stream
+    return $ Stream.mapM dump2 pipeline_stream
 
 myCoreToStgExpr :: Logger -> DynFlags -> InteractiveContext
                 -> Bool
