@@ -489,6 +489,7 @@ pprInstr platform instr = case instr of
   REM o1 o2 o3 | isFloatOp o1 && isFloatOp o2 && isFloatOp o3
     -> panic $ "pprInstr - REM not implemented for floats (yet)"
   REM o1 o2 o3 -> op3 (text "\trem") o1 o2 o3
+  REMU o1 o2 o3 -> op3 (text "\tremu") o1 o2 o3
 
   SUB  o1 o2 o3
     | isFloatOp o1 && isFloatOp o2 && isFloatOp o3 -> op3 (text "\tfsub." <> if isSingleOp o1 then text "s" else text "d") o1 o2 o3

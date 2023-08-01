@@ -88,6 +88,7 @@ regUsageOfInstr platform instr = case instr of
   SMULL dst src1 src2      -> usage (regOp src1 ++ regOp src2, regOp dst)
   DIV dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   REM dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
+  REMU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   SUB dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   DIVU dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
 
@@ -223,6 +224,7 @@ patchRegsOfInstr instr env = case instr of
     SMULL o1 o2 o3 -> SMULL (patchOp o1) (patchOp o2)  (patchOp o3)
     DIV o1 o2 o3   -> DIV (patchOp o1) (patchOp o2) (patchOp o3)
     REM o1 o2 o3   -> REM (patchOp o1) (patchOp o2) (patchOp o3)
+    REMU o1 o2 o3  -> REMU (patchOp o1) (patchOp o2) (patchOp o3)
     SUB o1 o2 o3   -> SUB  (patchOp o1) (patchOp o2) (patchOp o3)
     DIVU o1 o2 o3  -> DIVU (patchOp o1) (patchOp o2) (patchOp o3)
 
@@ -601,7 +603,8 @@ data Instr
     | NEG Operand Operand -- rd = -op2
 
     | DIV Operand Operand Operand -- rd = rn ÷ rm
-    | REM Operand Operand Operand -- rd = rn % rm
+    | REM Operand Operand Operand -- rd = rn % rm (signed)
+    | REMU Operand Operand Operand -- rd = rn % rm (unsigned)
 
     -- TODO: Rename: MULH
     | SMULH Operand Operand Operand
@@ -688,6 +691,7 @@ instrCon i =
       NEG{} -> "NEG"
       DIV{} -> "DIV"
       REM{} -> "REM"
+      REMU{} -> "REMU"
       SMULH{} -> "SMULH"
       SMULL{} -> "SMULL"
       SUB{} -> "SUB"
