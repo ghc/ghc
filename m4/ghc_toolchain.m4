@@ -144,13 +144,13 @@ AC_DEFUN([VALIDATE_GHC_TOOLCHAIN],[
       true
     else
       AC_MSG_WARN([
-          There are some differences between the toolchain configured by "configure" ($1) and the toolchain configured by the "ghc-toolchain" program ($2).
-          $diff_output
-          Don't worry! This won't affect your ghc in any way.
-          However, in a near future, we will move to configuring toolchains with "ghc-toolchain" by default, so you might have discovered a future bug.
-          In light of it, if you've spotted this difference, please report a GHC bug at
-                https://www.haskell.org/ghc/reportabug
-      ])
+There are some differences between the toolchain configured by "configure" ($1) and the toolchain configured by the "ghc-toolchain" program ($2).
+
+$diff_output
+
+Don't worry! This won't affect your ghc in any way.
+However, in a near future, we will move to configuring toolchains with "ghc-toolchain" by default, so you might have discovered a future bug.
+In light of it, if you've spotted this difference, please report a GHC bug at https://www.haskell.org/ghc/reportabug])
     fi
 ])
 
