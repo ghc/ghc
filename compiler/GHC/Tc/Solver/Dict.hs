@@ -106,9 +106,12 @@ updInertDicts :: DictCt -> TcS ()
 updInertDicts dict_ct@(DictCt { di_cls = cls, di_ev = ev, di_tys = tys })
   = do { traceTcS "Adding inert dict" (ppr dict_ct $$ ppr cls  <+> ppr tys)
 
-         -- See Note [Shadowing of implicit parameters]
        ; if |  isGiven ev, Just (str_ty, _) <- isIPPred_maybe cls tys
-            -> updInertCans (updDicts (filterDicts (not_ip_for str_ty)))
+            -> -- See (SIP1) and (SIP2) in Note [Shadowing of implicit parameters]
+               -- Update /both/ inert_cans /and/ inert_solved_dicts.
+               updInertSet $ \ inerts@(IS { inert_cans = ics, inert_solved_dicts = solved }) ->
+               inerts { inert_cans         = updDicts (filterDicts (not_ip_for str_ty)) ics
+                      , inert_solved_dicts = filterDicts (not_ip_for str_ty) solved }
             |  otherwise
             -> return ()
 
@@ -210,23 +213,35 @@ in two places:
   We must /not/ solve this from the Given (?x::Int, C a), because of
   the intervening binding for (?x::Int).  #14218.
 
-  We deal with this by arranging that when we add [G] (?x::ty) we delete any
-  existing [G] (?x::ty) /and/ any [G] D tys, where (D tys) has a superclass
-  with (?x::ty). See Note [Local implicit parameters] in GHC.Core.Predicate.
+  We deal with this by arranging that when we add [G] (?x::ty) we delete
+  * from the inert_cans, and
+  * from the inert_solved_dicts
+  any existing [G] (?x::ty) /and/ any [G] D tys, where (D tys) has a superclass
+  with (?x::ty).  See Note [Local implicit parameters] in GHC.Core.Predicate.
 
   An important special case is constraint tuples like [G] (% ?x::ty, Eq a %).
   But it could happen for `class xx => D xx where ...` and the constraint D
   (?x :: int).  This corner (constraint-kinded variables instantiated with
   implicit parameter constraints) is not well explorered.
 
-  Example in #14218.
+  Example in #14218, and #23761
 
-  The code that accounts for (SIP1) is in updInertDicts, and the call to
+  The code that accounts for (SIP1) is in updInertDicts; in particular the call to
   GHC.Core.Predicate.mentionsIP.
 
-* Wrinkle (SIP2): we delete dictionaries in inert_dicts, but we don't need to
-  look in inert_solved_dicts.  They are never implicit parameters.  See
-  Note [Solved dictionaries] in GHC.Tc.Solver.InertSet
+* Wrinkle (SIP2): we must apply this update semantics for `inert_solved_dicts`
+  as well as `inert_cans`.
+  You might think that wouldn't be necessary, because an element of
+  `inert_solved_dicts` is never an implicit parameter (see
+  Note [Solved dictionaries] in GHC.Tc.Solver.InertSet).
+  While that is true, dictionaries in `inert_solved_dicts` may still have
+  implicit parameters as a /superclass/! For example:
+
+    class c => C c where ...
+    f :: C (?x::Int) => blah
+
+  Now (C (?x::Int)) has a superclass (?x::Int). This may look exotic, but it
+  happens particularly for constraint tuples, like `(% ?x::Int, Eq a %)`.
 
 Example 1:
 
@@ -778,8 +793,8 @@ shortCutSolver dflags ev_w ev_i
     loc_w = ctEvLoc ev_w
 
     try_solve_from_instance   -- See Note [Shortcut try_solve_from_instance]
-      :: (EvBindMap, DictMap CtEvidence) -> CtEvidence
-      -> MaybeT TcS (EvBindMap, DictMap CtEvidence)
+      :: (EvBindMap, DictMap DictCt) -> CtEvidence
+      -> MaybeT TcS (EvBindMap, DictMap DictCt)
     try_solve_from_instance (ev_binds, solved_dicts) ev
       | let pred = ctEvPred ev
       , ClassPred cls tys <- classifyPredType pred
@@ -793,7 +808,9 @@ shortCutSolver dflags ev_w ev_i
                        , cir_what        = what }
                  | safeOverlap what
                  , all isTyFamFree preds  -- Note [Shortcut solving: type families]
-                 -> do { let solved_dicts' = addSolvedDict cls tys ev solved_dicts
+                 -> do { let dict_ct = DictCt { di_ev = ev, di_cls = cls
+                                              , di_tys = tys, di_pend_sc = doNotExpand }
+                             solved_dicts' = addSolvedDict dict_ct solved_dicts
                              -- solved_dicts': it is important that we add our goal
                              -- to the cache before we solve! Otherwise we may end
                              -- up in a loop while solving recursive dictionaries.
@@ -824,12 +841,12 @@ shortCutSolver dflags ev_w ev_i
     -- We bail out of the entire computation if we need to emit an EvVar for
     -- a subgoal that isn't a ClassPred.
     new_wanted_cached :: CtEvidence -> CtLoc
-                      -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
+                      -> DictMap DictCt -> TcPredType -> MaybeT TcS MaybeNew
     new_wanted_cached ev_w loc cache pty
       | ClassPred cls tys <- classifyPredType pty
       = lift $ case findDict cache loc_w cls tys of
-          Just ctev -> return $ Cached (ctEvExpr ctev)
-          Nothing   -> Fresh <$> newWantedNC loc (ctEvRewriters ev_w) pty
+          Just dict_ct -> return $ Cached (ctEvExpr (dictCtEvidence dict_ct))
+          Nothing      -> Fresh <$> newWantedNC loc (ctEvRewriters ev_w) pty
       | otherwise = mzero
 
 {- *******************************************************************
