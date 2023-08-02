@@ -67,6 +67,7 @@ import GHC.Core.Unfold
 
 import Data.List( partition )
 import Data.List.NonEmpty ( NonEmpty (..) )
+import GHC.Core.Subst (substTickish)
 
 {-
 ************************************************************************
@@ -1267,11 +1268,7 @@ specLam env bndrs body
 
 --------------
 specTickish :: SpecEnv -> CoreTickish -> CoreTickish
-specTickish (SE { se_subst = subst }) (Breakpoint ext ix ids modl)
-  = Breakpoint ext ix [ id' | id <- ids, Var id' <- [Core.lookupIdSubst subst id]] modl
-  -- drop vars from the list if they have a non-variable substitution.
-  -- should never happen, but it's harmless to drop them anyway.
-specTickish _ other_tickish = other_tickish
+specTickish (SE { se_subst = subst }) bp = substTickish subst bp
 
 --------------
 specCase :: SpecEnv
