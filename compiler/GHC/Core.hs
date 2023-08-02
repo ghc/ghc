@@ -43,7 +43,7 @@ module GHC.Core (
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders, collectNValBinders_maybe,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
-        collectFunSimple,
+        collectArgsSimple, collectFunSimple,
 
         exprToType,
         wrapLamBody,
@@ -2090,6 +2090,20 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
+
+-- | Takes a nested application expression and returns the function
+-- being applied and the arguments to which it is applied. Looking
+-- through casts and ticks to find it.
+collectArgsSimple :: Expr b -> (Expr b, [Arg b])
+collectArgsSimple expr
+  = go expr []
+  where
+    go expr' as =
+      case expr' of
+        App f a    -> go f (a : as)
+        Tick _t e   -> go e as
+        Cast e _co  -> go e as
+        e           -> (e, as)
 
 -- | Takes a nested application expression and returns the function
 -- being applied. Looking through casts and ticks to find it.

@@ -1972,28 +1972,25 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
                                    && is_hnf_like e
                                       -- See Note [exprIsHNF Tick]
     is_hnf_like (Cast e _)       = is_hnf_like e
-    is_hnf_like (App e a)
-      | isValArg a               = app_is_value e 1
-      | otherwise                = is_hnf_like e
-    is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
+    is_hnf_like e@(App e' a)
+      | isValArg a
+      = case collectArgsSimple e of
+          (Var f, as) ->
+            id_app_is_value f (length as)
+            && or
+              (zipWith
+                (\strict a -> if strict then is_hnf_like a else not (needsCaseBinding (exprType a) a))
+                (case isDataConId_maybe f of
+                  Just dc -> map isMarkedStrict (dataConRepStrictness dc)
+                  _ -> repeat False)
+                (filter isValArg as))
+            -- For example  f (x /# y)  where f has arity two, and the first
+            -- argument is unboxed. This is not a value!
+            -- But  f 34#  is a value.
+            -- NB: Check id_app_is_value first, the arity check is cheaper
+          _ -> False
+      | otherwise                = is_hnf_like e'
     is_hnf_like _                = False
-
-    -- 'n' is the number of value args to which the expression is applied
-    -- And n>0: there is at least one value argument
-    app_is_value :: CoreExpr -> Int -> Bool
-    app_is_value (Var f)    nva = id_app_is_value f nva
-    app_is_value (Tick _ f) nva = app_is_value f nva
-    app_is_value (Cast f _) nva = app_is_value f nva
-    app_is_value (App f a)  nva
-      | isValArg a              =
-        app_is_value f (nva + 1) &&
-        not (needsCaseBinding (exprType a) a)
-          -- For example  f (x /# y)  where f has arity two, and the first
-          -- argument is unboxed. This is not a value!
-          -- But  f 34#  is a value.
-          -- NB: Check app_is_value first, the arity check is cheaper
-      | otherwise               = app_is_value f nva
-    app_is_value _          _   = False
 
     id_app_is_value id n_val_args
        = is_con id
