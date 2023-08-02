@@ -1,13 +1,13 @@
 
-T22478e.hs:6:4: error: [GHC-68567]
+T22478e.hs:6:7: error: [GHC-68567]
     Illegal type: ‘[a, b]’
     Suggested fix: Perhaps you intended to use DataKinds
 
-T22478e.hs:7:4: error: [GHC-68567]
+T22478e.hs:7:7: error: [GHC-68567]
     Illegal type: ‘1’
     Suggested fix: Perhaps you intended to use DataKinds
 
-T22478e.hs:8:4: error: [GHC-23482]
+T22478e.hs:8:8: error: [GHC-23482]
     Illegal visible kind application: @k
     Suggested fix: Perhaps you intended to use TypeApplications
 
@@ -16,14 +16,14 @@ T22478e.hs:9:13: error: [GHC-49378]
     • In a type argument in a pattern
     Suggested fix: Perhaps you intended to use KindSignatures
 
-T22478e.hs:10:4: error: [GHC-68567]
+T22478e.hs:10:8: error: [GHC-68567]
     Illegal type: ‘'(a, b)’
     Suggested fix: Perhaps you intended to use DataKinds
 
-T22478e.hs:11:4: error: [GHC-68567]
+T22478e.hs:11:7: error: [GHC-68567]
     Illegal type: ‘"str"’
     Suggested fix: Perhaps you intended to use DataKinds
 
-T22478e.hs:12:4: error: [GHC-68567]
+T22478e.hs:12:7: error: [GHC-68567]
     Illegal type: ‘'c'’
     Suggested fix: Perhaps you intended to use DataKinds

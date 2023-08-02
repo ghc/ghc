@@ -3,7 +3,7 @@ T19984.hs:10:15: warning: [GHC-49957] [-Wunticked-promoted-constructors]
     Unticked promoted constructor: :
     Suggested fix: Use ': instead of :
 
-T19984.hs:11:11: warning: [GHC-49957] [-Wunticked-promoted-constructors]
+T19984.hs:11:1: warning: [GHC-49957] [-Wunticked-promoted-constructors]
     Unticked promoted list.
     Suggested fix: Add a promotion tick, e.g. '[x,y,z].
 

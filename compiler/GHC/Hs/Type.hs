@@ -238,7 +238,7 @@ data HsPSRn = HsPSRn
 --    '_x' is a named wildcard
 --    'a'  is explicitly bound
 --    'k'  is implicitly bound
--- See Note [Implicit and explicit type variable binders] in GHC.Rename.Pat
+-- See Note [Implicit and explicit type variable binders] in GHC.Rename.HsType.Monad
 data HsTyPatRn = HsTPRn
   { hstp_nwcs    :: [Name] -- ^ Wildcard names
   , hstp_imp_tvs :: [Name] -- ^ Implicitly bound variable names

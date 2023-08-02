@@ -1,8 +1,20 @@
 
-T11592.hs:5:14: error: [GHC-76037] Not in scope: type variable ‘a’
+T11592.hs:5:9: error: [GHC-10498]
+    Conflicting definitions for ‘a’
+    Bound at: T11592.hs:5:9
+              T11592.hs:5:14
 
-T11592.hs:7:16: error: [GHC-76037] Not in scope: type variable ‘a’
+T11592.hs:7:11: error: [GHC-10498]
+    Conflicting definitions for ‘a’
+    Bound at: T11592.hs:7:11
+              T11592.hs:7:16
 
-T11592.hs:8:18: error: [GHC-76037] Not in scope: type variable ‘a’
+T11592.hs:8:11: error: [GHC-10498]
+    Conflicting definitions for ‘a’
+    Bound at: T11592.hs:8:11
+              T11592.hs:8:18
 
-T11592.hs:10:20: error: [GHC-76037] Not in scope: type variable ‘a’
+T11592.hs:10:13: error: [GHC-10498]
+    Conflicting definitions for ‘a’
+    Bound at: T11592.hs:10:13
+              T11592.hs:10:20

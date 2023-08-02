@@ -1,5 +1,5 @@
 
-T22513h.hs:6:10: warning: [GHC-54201] [-Wterm-variable-capture]
+T22513h.hs:6:19: warning: [GHC-54201] [-Wterm-variable-capture]
     The type variable ‘id’ is implicitly quantified,
     even though another variable of the same name is in scope:
       ‘id’ imported from ‘Prelude’ at T22513h.hs:1:8-14

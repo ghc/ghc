@@ -102,7 +102,6 @@ module GHC.Tc.Errors.Types (
   , TyFamsDisabledReason(..)
   , TypeApplication(..)
   , HsTypeOrSigType(..)
-  , HsTyVarBndrExistentialFlag(..)
   , TySynCycleTyCons
   , BadImportKind(..)
   , DodgyImportsReason (..)
@@ -429,8 +428,7 @@ data TcRnMessage where
                   rename/should_compile/T5331
   -}
   TcRnUnusedQuantifiedTypeVar
-    :: HsDocContext
-    -> HsTyVarBndrExistentialFlag -- ^ tyVar binder.
+    :: Name -- ^ tyVar binder.
     -> TcRnMessage
 
   {-| TcRnDodgyImports is a group of warnings (controlled with -Wdodgy-imports).
@@ -4155,7 +4153,7 @@ data TcRnMessage where
           T23510a
           T23510b
   -}
-  TcRnImplicitRhsQuantification :: LocatedN RdrName -> TcRnMessage
+  TcRnImplicitRhsQuantification :: Name -> TcRnMessage
 
   deriving Generic
 
@@ -5666,13 +5664,6 @@ instance OutputableBndrId p => Outputable (HsTypeOrSigType (GhcPass p)) where
   ppr (HsType ty) = ppr ty
   ppr (HsSigType sig_ty) = ppr sig_ty
 
--- | A wrapper around HsTyVarBndr.
--- Used for reporting errors in `TcRnUnusedQuantifiedTypeVar`.
-data HsTyVarBndrExistentialFlag = forall flag. OutputableBndrFlag flag 'Renamed =>
-  HsTyVarBndrExistentialFlag (HsTyVarBndr flag GhcRn)
-
-instance Outputable HsTyVarBndrExistentialFlag where
-  ppr (HsTyVarBndrExistentialFlag hsTyVarBndr) = ppr hsTyVarBndr
 
 type TySynCycleTyCons =
   [Either TyCon (LTyClDecl GhcRn)]

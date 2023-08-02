@@ -11,7 +11,7 @@ T10615.hs:6:6: error: [GHC-25897]
         Actual: w1 -> b1 -> w1
       ‘f’ is a rigid type variable bound by
         the inferred type of f1 :: w1 -> f
-        at T10615.hs:5:1-12
+        at T10615.hs:5:12
     • In the expression: const
       In an equation for ‘f1’: f1 = const
     • Relevant bindings include f1 :: w1 -> f (bound at T10615.hs:6:1)
@@ -28,7 +28,7 @@ T10615.hs:9:6: error: [GHC-25897]
         Actual: w0 -> b0 -> w0
       ‘_f’ is a rigid type variable bound by
         the inferred type of f2 :: w0 -> _f
-        at T10615.hs:8:1-13
+        at T10615.hs:8:12-13
     • In the expression: const
       In an equation for ‘f2’: f2 = const
     • Relevant bindings include f2 :: w0 -> _f (bound at T10615.hs:9:1)

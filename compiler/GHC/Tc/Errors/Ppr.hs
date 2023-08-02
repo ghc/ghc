@@ -1645,10 +1645,9 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalKindSignature ty
       -> mkSimpleDecorated $ text "Illegal kind signature:" <+> quotes (ppr ty)
 
-    TcRnUnusedQuantifiedTypeVar doc tyVar
+    TcRnUnusedQuantifiedTypeVar tyVar
       -> mkSimpleDecorated $
-           vcat [ text "Unused quantified type variable" <+> quotes (ppr tyVar)
-                , inHsDocContext doc ]
+          text "Unused quantified type variable" <+> quotes (ppr tyVar)
 
     TcRnDataKindsError typeOrKind thing
       -> mkSimpleDecorated $
@@ -3149,7 +3148,7 @@ instance Diagnostic TcRnMessage where
     TcRnInvisBndrWithoutSig name _
       -> [SuggestAddStandaloneKindSignature name]
     TcRnImplicitRhsQuantification kv
-      -> [SuggestBindTyVarOnLhs (unLoc kv)]
+      -> [SuggestBindTyVarOnLhs kv]
     TcRnPatersonCondFailure{}
       -> [suggestExtension LangExt.UndecidableInstances]
 

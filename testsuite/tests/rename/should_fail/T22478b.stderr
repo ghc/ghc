@@ -1,11 +1,11 @@
 
-T22478b.hs:14:14: error: [GHC-10498]
+T22478b.hs:14:28: error: [GHC-10498]
     • Conflicting definitions for ‘k’
-      Bound at: T22478b.hs:14:14-32
+      Bound at: T22478b.hs:14:28
                 T22478b.hs:14:31
     • In an equation for ‘fOutOfOrder’
 
-T22478b.hs:16:10: error: [GHC-18932]
+T22478b.hs:16:16: error: [GHC-18932]
     • Unexpected strictness annotation: Int
       strictness annotation cannot appear nested inside a type
     • In a type argument in a pattern
@@ -13,7 +13,7 @@ T22478b.hs:16:10: error: [GHC-18932]
 T22478b.hs:19:54: error: [GHC-76037]
     Not in scope: type variable ‘a’
 
-T22478b.hs:21:12: error: [GHC-89246]
+T22478b.hs:21:17: error: [GHC-89246]
     • Record syntax is illegal here: {fld :: Int}
     • In a type argument in a pattern
 
@@ -23,9 +23,9 @@ T22478b.hs:23:21: error: [GHC-10498]
                 T22478b.hs:23:23
     • In an equation for ‘fConflict1’
 
-T22478b.hs:24:13: error: [GHC-10498]
+T22478b.hs:24:18: error: [GHC-10498]
     • Conflicting definitions for ‘a’
-      Bound at: T22478b.hs:24:13-18
+      Bound at: T22478b.hs:24:18
                 T22478b.hs:24:27
     • In an equation for ‘fConflict2’
 

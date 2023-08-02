@@ -518,8 +518,8 @@
            (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:18-20 })
            {Name: DumpRenamedAst.Nat})
           (HsOuterImplicit
-           [{Name: a}
-           ,{Name: k}])
+           [{Name: k}
+           ,{Name: a}])
           [(HsValArg
             (L
              (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:19:22-37 })
@@ -800,8 +800,7 @@
         (DataDeclRn
          (False)
          {NameSet:
-          [{Name: a}
-          ,{Name: f}]})
+          []})
         (L
          (SrcSpanAnn (EpAnnNotUsed) { DumpRenamedAst.hs:22:6 })
          {Name: DumpRenamedAst.T})

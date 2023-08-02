@@ -41,7 +41,7 @@ module GHC.Rename.Pat (-- main entry points
 import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Expr ( rnLExpr )
-import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat, rnSpliceTyPat )
+import {-# SOURCE #-} GHC.Rename.Splice ( rnSplicePat )
 
 import GHC.Hs
 import GHC.Tc.Errors.Types
@@ -53,7 +53,7 @@ import GHC.Rename.Utils    ( newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
-                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier, delLocalNames, typeAppErr )
+                           , wrapGenSpan, genHsApps, genLHsVar, genHsIntegralLit, warnForallIdentifier, bindLocalNamesFV )
 import GHC.Rename.HsType
 import GHC.Builtin.Names
 
@@ -67,7 +67,6 @@ import GHC.Types.SourceText
 import GHC.Utils.Misc
 import GHC.Data.FastString ( uniqCompareFS )
 import GHC.Data.List.SetOps( removeDups )
-import GHC.Data.Bag ( Bag, unitBag, unionBags, emptyBag, listToBag, bagToList )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
@@ -77,22 +76,15 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, guard, unless )
+import Control.Monad       ( when, guard )
 import Data.Foldable
 import Data.Function       ( on )
 import Data.Functor.Identity ( Identity (..) )
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import Data.Ratio
-import qualified Data.Semigroup as S
-import Control.Monad.Trans.Writer.CPS
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
-import Data.Functor ((<&>))
-import GHC.Rename.Doc (rnLHsDoc)
-import GHC.Types.Hint
-import GHC.Types.Fixity (LexicalFixity(..))
 import GHC.Rename.Cps
+import GHC.Rename.HsType.Monad
 
 {-
 Note [Patterns are uses]
@@ -1033,386 +1025,21 @@ rnHsTyPat :: HsDocContext
           -> HsTyPat GhcPs
           -> CpsRn (HsTyPat GhcRn)
 rnHsTyPat ctxt sigType = case sigType of
-  (HsTP { hstp_body = hs_ty }) -> do
-    (hs_ty', tpb) <- runTPRnM (rn_lty_pat hs_ty) ctxt
-    pure HsTP
+  (HsTP { hstp_body = hs_ty }) -> liftCpsWithCont $ \ thing_inside -> do
+    (hs_ty', type_bndrs, fvs1) <- runRnTypeM ctxt (bindExplicitly $ rnLHsTyKi hs_ty)
+    let ty_pat = HsTP
           { hstp_body = hs_ty'
-          , hstp_ext = buildHsTyPatRn tpb
+          , hstp_ext = build_HsTyPatRn type_bndrs
           }
-
--- | Type pattern renaming monad
--- For the OccSet in the ReaderT, see Note [Locally bound names in type patterns]
--- For the HsTyPatRnBuilderRn in the WriterT, see Note [Implicit and explicit type variable binders]
--- For the CpsRn base monad, see Note [CpsRn monad]
--- For why we need CpsRn in TPRnM see Note [Left-to-right scoping of type patterns]
-newtype TPRnM a =
-  MkTPRnM (ReaderT (HsDocContext, OccSet) (WriterT HsTyPatRnBuilder CpsRn) a)
-  deriving newtype (Functor, Applicative, Monad)
-
-runTPRnM :: TPRnM a -> HsDocContext -> CpsRn (a, HsTyPatRnBuilder)
-runTPRnM (MkTPRnM thing_inside) doc_ctxt = runWriterT $ runReaderT thing_inside (doc_ctxt, emptyOccSet)
-
-askLocals :: TPRnM OccSet
-askLocals = MkTPRnM (asks snd)
-
-askDocContext :: TPRnM HsDocContext
-askDocContext = MkTPRnM (asks fst)
-
-tellTPB :: HsTyPatRnBuilder -> TPRnM ()
-tellTPB = MkTPRnM . lift . tell
-
-liftRnFV :: RnM (a, FreeVars) -> TPRnM a
-liftRnFV = liftTPRnCps . liftCpsFV
-
-liftRn :: RnM a -> TPRnM a
-liftRn = liftTPRnCps . liftCps
-
-liftRnWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> TPRnM b
-liftRnWithCont cont = liftTPRnCps (liftCpsWithCont cont)
-
-liftTPRnCps :: CpsRn a -> TPRnM a
-liftTPRnCps = MkTPRnM . lift . lift
-
-liftTPRnRaw ::
-  ( forall r .
-    HsDocContext ->
-    OccSet ->
-    ((a, HsTyPatRnBuilder) -> RnM (r, FreeVars)) ->
-    RnM (r, FreeVars)
-  ) -> TPRnM a
-liftTPRnRaw cont = MkTPRnM $ ReaderT $ \(doc_ctxt, locals) -> writerT $ liftCpsWithCont (cont doc_ctxt locals)
-
-unTPRnRaw ::
-  TPRnM a ->
-  HsDocContext ->
-  OccSet ->
-  ((a, HsTyPatRnBuilder) -> RnM (r, FreeVars)) ->
-  RnM (r, FreeVars)
-unTPRnRaw (MkTPRnM m) doc_ctxt locals = unCpsRn $ runWriterT $ runReaderT m (doc_ctxt, locals)
-
-wrapSrcSpanTPRnM :: (a -> TPRnM b) -> LocatedAn ann a -> TPRnM (LocatedAn ann b)
-wrapSrcSpanTPRnM fn (L loc a) = do
-  a' <- fn a
-  pure (L loc a')
-
-lookupTypeOccTPRnM :: RdrName -> TPRnM Name
-lookupTypeOccTPRnM rdr_name = liftRnFV $ do
-  name <- lookupTypeOccRn rdr_name
-  pure (name, unitFV name)
-
--- | A variant of HsTyPatRn that uses Bags for efficient concatenation.
--- See Note [Implicit and explicit type variable binders]
-data HsTyPatRnBuilder =
-  HsTPRnB {
-    hstpb_nwcs :: Bag Name,
-    hstpb_imp_tvs :: Bag Name,
-    hstpb_exp_tvs :: Bag Name
-  }
-
-tpb_exp_tv :: Name -> HsTyPatRnBuilder
-tpb_exp_tv name = mempty {hstpb_exp_tvs = unitBag name}
-
-tpb_hsps :: HsPSRn -> HsTyPatRnBuilder
-tpb_hsps HsPSRn {hsps_nwcs, hsps_imp_tvs} =
-  mempty {
-    hstpb_nwcs = listToBag hsps_nwcs,
-    hstpb_imp_tvs = listToBag hsps_imp_tvs
-  }
-
-instance Semigroup HsTyPatRnBuilder where
-  HsTPRnB nwcs1 imp_tvs1 exptvs1 <> HsTPRnB nwcs2 imp_tvs2 exptvs2 =
-    HsTPRnB
-      (nwcs1    `unionBags` nwcs2)
-      (imp_tvs1 `unionBags` imp_tvs2)
-      (exptvs1  `unionBags` exptvs2)
-
-instance Monoid HsTyPatRnBuilder where
-  mempty = HsTPRnB emptyBag emptyBag emptyBag
-
-buildHsTyPatRn :: HsTyPatRnBuilder -> HsTyPatRn
-buildHsTyPatRn HsTPRnB {hstpb_nwcs, hstpb_imp_tvs, hstpb_exp_tvs} =
-  HsTPRn {
-    hstp_nwcs =    bagToList hstpb_nwcs,
-    hstp_imp_tvs = bagToList hstpb_imp_tvs,
-    hstp_exp_tvs = bagToList hstpb_exp_tvs
-  }
-
-rn_lty_pat :: LHsType GhcPs -> TPRnM (LHsType GhcRn)
-rn_lty_pat (L l hs_ty) = do
-  hs_ty' <- rn_ty_pat hs_ty
-  pure (L l hs_ty')
-
-rn_ty_pat_var :: LocatedN RdrName -> TPRnM (LocatedN Name)
-rn_ty_pat_var lrdr@(L l rdr) = do
-  locals <- askLocals
-  if isRdrTyVar rdr
-    && not (elemOccSet (occName rdr) locals) -- See Note [Locally bound names in type patterns]
-
-    then do -- binder
-      name <- liftTPRnCps $ newPatName (LamMk True) lrdr
-      tellTPB (tpb_exp_tv name)
-      pure (L l name)
-
-    else do -- usage
-      name <- lookupTypeOccTPRnM rdr
-      pure (L l name)
-
--- | Rename type patterns
---
--- For the difference between `rn_ty_pat` and `rnHsTyKi` see Note [CpsRn monad]
--- and Note [Implicit and explicit type variable binders]
-rn_ty_pat :: HsType GhcPs -> TPRnM (HsType GhcRn)
-rn_ty_pat (HsTyVar an prom lrdr) = do
-  name <- rn_ty_pat_var lrdr
-  pure (HsTyVar an prom name)
-
-rn_ty_pat (HsForAllTy an tele body) = liftTPRnRaw $ \ctxt locals thing_inside ->
-  bindHsForAllTelescope ctxt tele $ \tele' -> do
-    let
-      tele_names = hsForAllTelescopeNames tele'
-      locals' = locals `extendOccSetList` map occName tele_names
-
-    unTPRnRaw (rn_lty_pat body) ctxt locals' $ \(body', tpb) ->
-      delLocalNames tele_names $ -- locally bound names do not scope over the continuation
-        thing_inside ((HsForAllTy an tele' body'), tpb)
-
-rn_ty_pat (HsQualTy an lctx body) = do
-  lctx' <- wrapSrcSpanTPRnM (mapM rn_lty_pat) lctx
-  body' <- rn_lty_pat body
-  pure (HsQualTy an lctx' body')
-
-rn_ty_pat (HsAppTy _ fun_ty arg_ty) = do
-  fun_ty' <- rn_lty_pat fun_ty
-  arg_ty' <- rn_lty_pat arg_ty
-  pure (HsAppTy noExtField fun_ty' arg_ty')
-
-rn_ty_pat (HsAppKindTy _ ty at ki) = do
-  kind_app <- liftRn $ xoptM LangExt.TypeApplications
-  unless kind_app (liftRn $ addErr (typeAppErr KindLevel ki))
-  ty' <- rn_lty_pat ty
-  ki' <- rn_lty_pat ki
-  pure (HsAppKindTy noExtField ty' at ki')
-
-rn_ty_pat (HsFunTy an mult lhs rhs) = do
-  lhs' <- rn_lty_pat lhs
-  mult' <- rn_ty_pat_arrow mult
-  rhs' <- rn_lty_pat rhs
-  pure (HsFunTy an mult' lhs' rhs')
-
-rn_ty_pat (HsListTy an ty) = do
-  ty' <- rn_lty_pat ty
-  pure (HsListTy an ty')
-
-rn_ty_pat (HsTupleTy an con tys) = do
-  tys' <- mapM rn_lty_pat tys
-  pure (HsTupleTy an con tys')
-
-rn_ty_pat (HsSumTy an tys) = do
-  tys' <- mapM rn_lty_pat tys
-  pure (HsSumTy an tys')
-
-rn_ty_pat (HsOpTy _ prom ty1 l_op ty2) = do
-  ty1' <- rn_lty_pat ty1
-  l_op' <- rn_ty_pat_var l_op
-  ty2' <- rn_lty_pat ty2
-  fix  <- liftRn $ lookupTyFixityRn l_op'
-  let op_name = unLoc l_op'
-  when (isDataConName op_name && not (isPromoted prom)) $
-    liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedConstructor Infix op_name)
-  liftRn $ mkHsOpTyRn prom l_op' fix ty1' ty2'
-
-rn_ty_pat (HsParTy an ty) = do
-  ty' <- rn_lty_pat ty
-  pure (HsParTy an ty')
-
-rn_ty_pat (HsIParamTy an n ty) = do
-  ty' <- rn_lty_pat ty
-  pure (HsIParamTy an n ty')
-
-rn_ty_pat (HsStarTy an unicode) =
-  pure (HsStarTy an unicode)
-
-rn_ty_pat (HsDocTy an ty haddock_doc) = do
-  ty' <- rn_lty_pat ty
-  haddock_doc' <- liftRn $ rnLHsDoc haddock_doc
-  pure (HsDocTy an ty' haddock_doc')
-
-rn_ty_pat ty@(HsExplicitListTy _ prom tys) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel ty))
-
-  unless (isPromoted prom) $
-    liftRn $ addDiagnostic (TcRnUntickedPromotedThing $ UntickedExplicitList)
-
-  tys' <- mapM rn_lty_pat tys
-  pure (HsExplicitListTy noExtField prom tys')
-
-rn_ty_pat ty@(HsExplicitTupleTy _ tys) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel ty))
-  tys' <- mapM rn_lty_pat tys
-  pure (HsExplicitTupleTy noExtField tys')
-
-rn_ty_pat tyLit@(HsTyLit src t) = do
-  data_kinds <- liftRn $ xoptM LangExt.DataKinds
-  unless data_kinds (liftRn $ addErr (TcRnDataKindsError TypeLevel tyLit))
-  t' <- liftRn $ rnHsTyLit t
-  pure (HsTyLit src t')
-
-rn_ty_pat (HsWildCardTy _) =
-  pure (HsWildCardTy noExtField)
-
-rn_ty_pat (HsKindSig an ty ki) = do
-  ctxt <- askDocContext
-  kind_sigs_ok <- liftRn $ xoptM LangExt.KindSignatures
-  unless kind_sigs_ok (liftRn $ badKindSigErr ctxt ki)
-  ~(HsPS hsps ki') <- liftRnWithCont $
-                      rnHsPatSigKind AlwaysBind ctxt (HsPS noAnn ki)
-  ty' <- rn_lty_pat ty
-  tellTPB (tpb_hsps hsps)
-  pure (HsKindSig an ty' ki')
-
-rn_ty_pat (HsSpliceTy _ splice) = do
-  res <- liftRnFV $ rnSpliceTyPat splice
-  case res of
-    (rn_splice, HsUntypedSpliceTop mfs pat) -> do -- Splice was top-level and thus run, creating LHsType GhcPs
-        pat' <- rn_lty_pat pat
-        pure (HsSpliceTy (HsUntypedSpliceTop mfs (mb_paren pat')) rn_splice)
-    (rn_splice, HsUntypedSpliceNested splice_name) ->
-        pure (HsSpliceTy (HsUntypedSpliceNested splice_name) rn_splice) -- Splice was nested and thus already renamed
+    (res, fvs2) <- add_binders_to_scope type_bndrs $ thing_inside ty_pat
+    pure (res, fvs1 `plusFV` fvs2)
   where
-    mb_paren :: LHsType GhcRn -> LHsType GhcRn
-    mb_paren lhs_ty@(L loc hs_ty)
-      | hsTypeNeedsParens maxPrec hs_ty = L loc (HsParTy noAnn lhs_ty)
-      | otherwise                       = lhs_ty
-
-rn_ty_pat (HsBangTy an bang_src lty) = do
-  ctxt <- askDocContext
-  lty'@(L _ ty') <- rn_lty_pat lty
-  liftRn $ addErr $
-    TcRnWithHsDocContext ctxt $
-    TcRnUnexpectedAnnotation ty' bang_src
-  pure (HsBangTy an bang_src lty')
-
-rn_ty_pat ty@HsRecTy{} = do
-  ctxt <- askDocContext
-  liftRn $ addErr $
-    TcRnWithHsDocContext ctxt $
-    TcRnIllegalRecordSyntax (Left ty)
-  pure (HsWildCardTy noExtField) -- trick to avoid `failWithTc`
-
-rn_ty_pat ty@(XHsType{}) = do
-  ctxt <- askDocContext
-  liftRnFV $ rnHsType ctxt ty
-
-rn_ty_pat_arrow :: HsArrow GhcPs -> TPRnM (HsArrow GhcRn)
-rn_ty_pat_arrow (HsUnrestrictedArrow arr) = pure (HsUnrestrictedArrow arr)
-rn_ty_pat_arrow (HsLinearArrow (HsPct1 pct1 arr)) = pure (HsLinearArrow (HsPct1 pct1 arr))
-rn_ty_pat_arrow (HsLinearArrow (HsLolly arr)) = pure (HsLinearArrow (HsLolly arr))
-rn_ty_pat_arrow (HsExplicitMult pct p arr)
-  = rn_lty_pat p <&> (\mult -> HsExplicitMult pct mult arr)
-
-
-{- Note [Locally bound names in type patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type patterns can bind local names using forall. Compare the following examples:
-  f (Proxy @(Either a b)) = ...
-  g (Proxy @(forall a . Either a b)) = ...
-
-In `f` both `a` and `b` are bound by the pattern and scope over the RHS of f.
-In `g` only `b` is bound by the pattern, whereas `a` is locally bound in the pattern
-and does not scope over the RHS of `g`.
-
-We track locally bound names in the `OccSet` in `TPRnM` monad, and use it to
-decide whether occurences of type variables are usages or bindings.
-
-The check is done in `rn_ty_pat_var`
-
-Note [Implicit and explicit type variable binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type patterns are renamed differently from ordinary types.
-  * Types are renamed by `rnHsType` where all type variable occurences are considered usages
-  * Type patterns are renamed by `rnHsTyPat` where some type variable occurences are usages
-    and other are bindings
-
-Here is an example:
-  {-# LANGUAGE ScopedTypeVariables #-}
-  f :: forall b. Proxy _ -> ...
-  f (Proxy @(x :: (a, b))) = ...
-
-In the (x :: (a,b)) type pattern
-  * `x` is a type variable explicitly bound by type pattern
-  * `a` is a type variable implicitly bound in a pattern signature
-  * `b` is a usage of type variable bound by the outer forall
-
-This classification is clear to us in `rnHsTyPat`, but it is also useful in later passes, such
-as `collectPatBinders` and `tcHsTyPat`, so we store it in the extension field of `HsTyPat`, namely
-`HsTyPatRn`.
-
-To collect lists of those variables efficiently we use `HsTyPatRnBuilder` which is exactly like
-`HsTyPatRn`, but uses Bags.
-
-Note [Left-to-right scoping of type patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In term-level patterns, we use continuation passing to implement left-to-right
-scoping, see Note [CpsRn monad]. Left-to-right scoping manifests itself when
-e.g. view patterns are involved:
-
-  f (x, g x -> Just y) = ...
-
-Here the first occurrence of `x` is a binder, and the second occurrence is a
-use of `x` in a view pattern. This example does not work if we swap the
-components of the tuple:
-
-  f (g x -> Just y, x) = ...
-  --  ^^^
-  -- Variable not in scope: x
-
-In type patterns there are no view patterns, but there is a different feature
-that is served well by left-to-right scoping: kind annotations. Compare:
-
-  f (Proxy @(T k (a :: k))) = ...
-  g (Proxy @(T (a :: k) k)) = ...
-
-In `f`, the first occurrence of `k` is an explicit binder,
-  and the second occurrence is a usage. Simple.
-In `g`, the first occurrence of `k` is an implicit binder,
-  and then the second occurrence is an explicit binder that shadows it.
-
-So we get two different results after renaming:
-
-  f (Proxy @(T k1 (a :: k1))) = ...
-  g (Proxy @(T (a :: k1) k2)) = ...
-
-This makes GHC accept the first example but rejects the second example with an
-error about duplicate binders.
-
-One could argue that we don't want order-sensitivity here. Historically, we
-used a different principle when renaming types: collect all free variables,
-bind them on the outside, and then rename all occurrences as usages.
-This approach does not scale to multiple patterns. Consider:
-
-  f' (MkP @k @(a :: k)) = ...
-  g' (MkP @(a :: k) @k) = ...
-
-Here a difference in behavior is inevitable, as we rename type patterns
-one at a time. Could we perhaps concatenate the free variables from all
-type patterns in a ConPat? But then we still get the same problem one level up,
-when we have multiple patterns in a function LHS
-
-  f'' (Proxy @k) (Proxy @(a :: k)) = ...
-  g'' (Proxy @(a :: k)) (Proxy @k) = ...
-
-And if we tried to avoid order sensitivity at this level, then we'd still be left
-with lambdas:
-
-  f''' (Proxy @k)        = \(Proxy @(a :: k)) -> ...
-  g''' (Proxy @(a :: k)) = \(Proxy @k)        -> ...
-
-
-So we have at least three options where we could do free variable extraction:
-HsConPatTyArg, ConPat, or a Match (used to represent a function LHS). And none
-of those would be general enough. Rather than make an arbitrary choice, we
-embrace left-to-right scoping in types and implement it with CPS, just like
-it's done for view patterns in terms.
--}
+    build_HsTyPatRn ty_bndrs = HsTPRn {
+        hstp_nwcs = nwc_bndrs ty_bndrs,
+        hstp_imp_tvs = imp_bndrs ty_bndrs,
+        hstp_exp_tvs = exp_bndrs ty_bndrs
+      }
+    add_binders_to_scope ty_bndrs thing_inside =
+      bindLocalNamesFV
+        (imp_bndrs ty_bndrs ++ exp_bndrs ty_bndrs)
+        thing_inside

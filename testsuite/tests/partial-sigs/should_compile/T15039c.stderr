@@ -51,6 +51,6 @@ T15039c.hs:35:8: warning: [GHC-88464] [-Wpartial-type-signatures (in -Wdefault)]
     • Found extra-constraints wildcard standing for ‘Coercible a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the inferred type of ex7 :: Coercible a b => Coercion a b
-               at T15039c.hs:35:1-44
+               at T15039c.hs:35:23-35
     • In the type signature:
         ex7 :: _ => Coercion (a :: Type) (b :: Type)

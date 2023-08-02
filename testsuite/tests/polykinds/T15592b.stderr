@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
   class C{2} :: forall {k}. k -> Constraint
   associated type family T{4} ::
-    forall k (f :: k -> *) (a :: k). f a -> *
+    forall k (a :: k) (f :: k -> *). f a -> *
     roles nominal nominal nominal nominal
 Dependent modules: []
-Dependent packages: [base-4.17.0.0]
+Dependent packages: [base-4.18.0.0]

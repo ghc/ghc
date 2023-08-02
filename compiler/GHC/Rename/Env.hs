@@ -22,7 +22,7 @@ module GHC.Rename.Env (
         lookupOccRn, lookupOccRn_maybe, lookupSameOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
-        lookupTypeOccRn,
+        lookupTypeOccRn, onLookupFailRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
 
         lookupExprOccRn,
@@ -1062,10 +1062,14 @@ lookupTypeOccRn rdr_name
   = do { mb_gre <- lookupOccRn_maybe rdr_name
        ; case mb_gre of
              Just gre -> return $ greName gre
-             Nothing   ->
-               if occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
-               then eqTyConName <$ addDiagnostic TcRnTypeEqualityOutOfScope
-               else lookup_demoted rdr_name }
+             Nothing  -> onLookupFailRn rdr_name }
+
+onLookupFailRn :: RdrName -> RnM Name
+onLookupFailRn rdr_name
+  | occName rdr_name == occName eqTyCon_RDR -- See Note [eqTyCon (~) compatibility fallback]
+  = eqTyConName <$ addDiagnostic TcRnTypeEqualityOutOfScope
+
+  | otherwise = lookup_demoted rdr_name
 
 {- Note [eqTyCon (~) compatibility fallback]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -158,6 +158,7 @@ import Data.IORef
 import GHC.Parser.HaddockLex (lexHsDoc)
 import GHC.Parser (parseIdentifier)
 import GHC.Rename.Doc (rnHsDoc)
+import GHC.Rename.HsType.Monad (runRnTypeM, RnTypeBinders (imp_bndrs), bindImplicitly)
 
 
 
@@ -1884,20 +1885,23 @@ reifyInstances' th_nm th_tys
         ; rdr_ty <- cvt th_origin loc (mkThAppTs (TH.ConT th_nm) th_tys)
           -- #9262 says to bring vars into scope, like in HsForAllTy case
           -- of rnHsTyKi
-        ; let tv_rdrs = extractHsTyRdrTyVars rdr_ty
           -- Rename  to HsType Name
         ; ((tv_names, rn_ty), _fvs)
             <- checkNoErrs $ -- If there are out-of-scope Names here, then we
                              -- must error before proceeding to typecheck the
                              -- renamed type, as that will result in GHC
                              -- internal errors (#13837).
-               rnImplicitTvOccs Nothing tv_rdrs $ \ tv_names ->
-               do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
+               do { (rn_ty, ty_bndrs, fvs)
+                        <- runRnTypeM doc $
+                           bindImplicitly $
+                           rnLHsTyKi rdr_ty
+
+                  ; let tv_names = imp_bndrs ty_bndrs
                   ; return ((tv_names, rn_ty), fvs) }
         ; skol_info <- mkSkolemInfo ReifySkol
         ; (tclvl, wanted, (tvs, ty))
             <- pushLevelAndSolveEqualitiesX "reifyInstances"  $
-               bindImplicitTKBndrs_Skol skol_info tv_names              $
+               bindImplicitTKBndrs_Skol skol_info tv_names    $
                tcInferLHsType rn_ty
 
         ; tvs <- zonkAndScopedSort tvs

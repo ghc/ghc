@@ -91,7 +91,7 @@ T14217.hs:32:11: error: [GHC-88464]
                             a62
                             a63
                           -> Bool
-               at T14217.hs:(32,1)-(40,13)
+               at T14217.hs:(33,15)-(39,24)
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature:
         eqFoo :: _ =>
