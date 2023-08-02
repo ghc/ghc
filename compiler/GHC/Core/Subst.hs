@@ -590,11 +590,13 @@ substDVarSet subst@(Subst _ _ tv_env cv_env) fvs
      = exprFVs fv_expr (const True) emptyVarSet $! acc
 
 ------------------
+-- | Drop free vars from the breakpoint if they have a non-variable substitution.
 substTickish :: Subst -> CoreTickish -> CoreTickish
 substTickish subst (Breakpoint ext n ids)
    = Breakpoint ext n (mapMaybe do_one ids)
  where
     do_one = getIdFromTrivialExpr_maybe . lookupIdSubst subst
+
 substTickish _subst other = other
 
 {- Note [Substitute lazily]

@@ -1478,8 +1478,7 @@ scExpr' env (Type t)     =
 scExpr' env (Coercion c) = return (nullUsage, Coercion (scSubstCo env c))
 scExpr' _   e@(Lit {})   = return (nullUsage, e)
 scExpr' env (Tick t e)   = do (usg, e') <- scExpr env e
-                              (usg_t, t') <- scTickish env t
-                              return (combineUsage usg usg_t, Tick t' e')
+                              return (usg, Tick (scTickish env t) e')
 scExpr' env (Cast e co)  = do (usg, e') <- scExpr env e
                               return (usg, mkCast e' (scSubstCo env co))
                               -- Important to use mkCast here
@@ -1541,14 +1540,8 @@ scExpr' env (Case scrut b ty alts)
 -- | Substitute the free variables captured by a breakpoint.
 -- Variables are dropped if they have a non-variable substitution, like in
 -- 'GHC.Opt.Specialise.specTickish'.
-scTickish :: ScEnv -> CoreTickish -> UniqSM (ScUsage, CoreTickish)
-scTickish env = \case
-  Breakpoint ext i fv -> do
-    (usg, fv') <- unzip <$> mapM (\ v -> scExpr env (Var v)) fv
-    pure (combineUsages usg, Breakpoint ext i [v | Var v <- fv'])
-  t@ProfNote {} -> pure (nullUsage, t)
-  t@HpcTick {} -> pure (nullUsage, t)
-  t@SourceNote {} -> pure (nullUsage, t)
+scTickish :: ScEnv -> CoreTickish -> CoreTickish
+scTickish SCE {sc_subst = subst} = substTickish subst
 
 {- Note [Do not specialise evals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
