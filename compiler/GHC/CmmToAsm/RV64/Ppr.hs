@@ -532,11 +532,11 @@ pprInstr platform instr = case instr of
     | (OpImm (ImmInteger i)) <- o2
     , fitsIn32bits i
         -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
-                                             , text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
+                                             , text "\taddw" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
     | (OpImm (ImmInt i)) <- o2
     , fitsIn32bits i
         -> lines_ [ text "\tlui" <+> pprOp platform o1 <> comma <+> text "%hi(" <> pprOp platform o2 <> text ")"
-                                             , text "\taddi" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
+                                             , text "\taddw" <+> pprOp platform o1 <> comma <+> pprOp platform o1 <> comma <+> text "%lo(" <> pprOp platform o2 <> text ")" ]
     | isImmOp o2
         -- Surrender! Let the assembler figure out the right expressions with pseudo-op LI.
         -> lines_ [ text "\tli" <+> pprOp platform o1 <> comma <+>  pprOp platform o2 ]
