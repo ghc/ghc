@@ -319,7 +319,7 @@ data InertSet
               -- (We have no way of "kicking out" from the cache, so putting
               --  wanteds here means we can end up solving a Wanted with itself. Bad)
 
-       , inert_solved_dicts :: DictMap CtEvidence
+       , inert_solved_dicts :: DictMap DictCt
               -- All Wanteds, of form (C t1 .. tn)
               -- Always a dictionary solved by an instance decl; never an implict parameter
               -- See Note [Solved dictionaries]
@@ -1327,10 +1327,9 @@ addDict :: DictCt -> DictMap DictCt -> DictMap DictCt
 addDict item@(DictCt { di_cls = cls, di_tys = tys }) dm
   = insertTcApp dm (classTyCon cls) tys item
 
-addSolvedDict :: Class -> [Type] -> CtEvidence
-              -> DictMap CtEvidence -> DictMap CtEvidence
-addSolvedDict cls tys ev dm
-  = insertTcApp dm (classTyCon cls) tys ev
+addSolvedDict :: DictCt -> DictMap DictCt -> DictMap DictCt
+addSolvedDict item@(DictCt { di_cls = cls, di_tys = tys }) dm
+  = insertTcApp dm (classTyCon cls) tys item
 
 filterDicts :: (DictCt -> Bool) -> DictMap DictCt -> DictMap DictCt
 filterDicts f m = filterTcAppMap f m

@@ -479,19 +479,19 @@ getSafeOverlapFailures
 updSolvedDicts :: InstanceWhat -> DictCt -> TcS ()
 -- Conditionally add a new item in the solved set of the monad
 -- See Note [Solved dictionaries] in GHC.Tc.Solver.InertSet
-updSolvedDicts what dict_ct@(DictCt { di_ev = ev, di_cls = cls, di_tys = tys })
+updSolvedDicts what dict_ct@(DictCt { di_ev = ev })
   | isWanted ev
   , instanceReturnsDictCon what
   = do { traceTcS "updSolvedDicts:" $ ppr dict_ct
        ; updInertSet $ \ ics ->
-         ics { inert_solved_dicts = addSolvedDict cls tys ev (inert_solved_dicts ics) } }
+         ics { inert_solved_dicts = addSolvedDict dict_ct (inert_solved_dicts ics) } }
   | otherwise
   = return ()
 
-getSolvedDicts :: TcS (DictMap CtEvidence)
+getSolvedDicts :: TcS (DictMap DictCt)
 getSolvedDicts = do { ics <- getInertSet; return (inert_solved_dicts ics) }
 
-setSolvedDicts :: DictMap CtEvidence -> TcS ()
+setSolvedDicts :: DictMap DictCt -> TcS ()
 setSolvedDicts solved_dicts
   = updInertSet $ \ ics ->
     ics { inert_solved_dicts = solved_dicts }
@@ -757,7 +757,7 @@ lookupInertDict (IC { inert_dicts = dicts }) loc cls tys
 lookupSolvedDict :: InertSet -> CtLoc -> Class -> [Type] -> Maybe CtEvidence
 -- Returns just if exactly this predicate type exists in the solved.
 lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
-  = findDict solved loc cls tys
+  = fmap dictCtEvidence (findDict solved loc cls tys)
 
 ---------------------------
 lookupFamAppCache :: TyCon -> [Type] -> TcS (Maybe Reduction)
