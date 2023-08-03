@@ -27,6 +27,7 @@ module GHC.Event
     , Event
     , evtRead
     , evtWrite
+    , evtPeerClosed
     , IOCallback
     , FdKey(keyFd)
     , Lifetime(..)

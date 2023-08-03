@@ -72,7 +72,7 @@ new = do
   let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts) supportedEvents
   return be
   where
-    supportedEvents = evtRead <> evtWrite <> evtClose
+    supportedEvents = evtRead <> evtWrite <> evtClose <> evtPeerClosed
 
 delete :: EPoll -> IO ()
 delete be = do
@@ -174,6 +174,7 @@ newtype EventType = EventType {
  , epollErr = EPOLLERR
  , epollHup = EPOLLHUP
  , epollOneShot = EPOLLONESHOT
+ , epollRdHup   = EPOLLRDHUP
  }
 
 -- | Create a new epoll context, returning a file descriptor associated with the context.
@@ -214,14 +215,16 @@ epollWaitNonBlock (EPollFd epfd) events numEvents =
 
 fromEvent :: E.Event -> EventType
 fromEvent e = remap E.evtRead  epollIn .|.
-              remap E.evtWrite epollOut
+              remap E.evtWrite epollOut .|.
+              remap E.evtPeerClosed epollRdHup
   where remap evt to
             | e `E.eventIs` evt = to
             | otherwise         = 0
 
 toEvent :: EventType -> E.Event
 toEvent e = remap (epollIn  .|. epollErr .|. epollHup) E.evtRead `mappend`
-            remap (epollOut .|. epollErr .|. epollHup) E.evtWrite
+            remap (epollOut .|. epollErr .|. epollHup) E.evtWrite `mappend`
+            remap (epollRdHup)                         E.evtPeerClosed
   where remap evt to
             | e .&. evt /= 0 = to
             | otherwise      = mempty

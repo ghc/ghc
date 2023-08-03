@@ -5221,6 +5221,7 @@ module GHC.Event where
   type TimerManager :: *
   data TimerManager = ...
   closeFd :: EventManager -> (System.Posix.Types.Fd -> GHC.Types.IO ()) -> System.Posix.Types.Fd -> GHC.Types.IO ()
+  evtPeerClosed :: Event
   evtRead :: Event
   evtWrite :: Event
   getSystemEventManager :: GHC.Types.IO (GHC.Maybe.Maybe EventManager)

@@ -21,6 +21,7 @@ module GHC.Event.Internal.Types
     , evtRead
     , evtWrite
     , evtClose
+    , evtPeerClosed
     , evtNothing
     , eventIs
     -- * Lifetimes
@@ -65,6 +66,13 @@ evtClose :: Event
 evtClose = Event 4
 {-# INLINE evtClose #-}
 
+-- | The peer of a socket has closed the read side of its connection.
+--
+-- @since 4.19.0.0
+evtPeerClosed :: Event
+evtPeerClosed = Event 8
+{-# INLINE evtPeerClosed #-}
+
 eventIs :: Event -> Event -> Bool
 eventIs (Event a) (Event b) = a .&. b /= 0
 
@@ -73,7 +81,9 @@ instance Show Event where
     show e = '[' : (intercalate "," . filter (not . null) $
                     [evtRead `so` "evtRead",
                      evtWrite `so` "evtWrite",
-                     evtClose `so` "evtClose"]) ++ "]"
+                     evtClose `so` "evtClose",
+                     evtPeerClosed `so` "evtPeerClosed"
+                    ]) ++ "]"
         where ev `so` disp | e `eventIs` ev = disp
                            | otherwise      = ""
 
@@ -143,15 +153,15 @@ eventLifetime :: Event -> Lifetime -> EventLifetime
 eventLifetime (Event e) l = EL (e .|. lifetimeBit l)
   where
     lifetimeBit OneShot   = 0
-    lifetimeBit MultiShot = 8
+    lifetimeBit MultiShot = 16
 {-# INLINE eventLifetime #-}
 
 elLifetime :: EventLifetime -> Lifetime
-elLifetime (EL x) = if x .&. 8 == 0 then OneShot else MultiShot
+elLifetime (EL x) = if x .&. 16 == 0 then OneShot else MultiShot
 {-# INLINE elLifetime #-}
 
 elEvent :: EventLifetime -> Event
-elEvent (EL x) = Event (x .&. 0x7)
+elEvent (EL x) = Event (x .&. 0xf)
 {-# INLINE elEvent #-}
 
 -- | A type alias for timeouts, specified in nanoseconds.

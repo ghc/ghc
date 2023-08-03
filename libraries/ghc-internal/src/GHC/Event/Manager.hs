@@ -43,6 +43,7 @@ module GHC.Event.Manager
     , Event
     , evtRead
     , evtWrite
+    , evtPeerClosed
     , IOCallback
     , FdKey(keyFd)
     , FdData
@@ -77,7 +78,8 @@ import GHC.Real (fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.IntTable (IntTable)
-import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
+import GHC.Event.Internal (Backend,
+                           Event, evtClose, evtRead, evtWrite, evtPeerClosed,
                            Lifetime(..), EventLifetime, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
 import System.Posix.Types (Fd)

@@ -14,8 +14,10 @@ module GHC.Event.Thread
     , ioManagerCapabilitiesChanged
     , threadWaitRead
     , threadWaitWrite
+    , threadWaitPeerClosed
     , threadWaitReadSTM
     , threadWaitWriteSTM
+    , threadWaitPeerClosedSTM
     , closeFdWith
     , threadDelay
     , registerDelay
@@ -46,8 +48,8 @@ import GHC.IOArray (IOArray, newIOArray, readIOArray, writeIOArray,
 import GHC.MVar (MVar, newEmptyMVar, newMVar, putMVar, takeMVar)
 import GHC.Event.Control (controlWriteFd)
 import GHC.Event.Internal (eventIs, evtClose)
-import GHC.Event.Manager (Event, EventManager, evtRead, evtWrite, loop,
-                             new, registerFd, unregisterFd_)
+import GHC.Event.Manager (Event, evtRead, evtWrite, evtPeerClosed,
+                          loop, EventManager, new, registerFd, unregisterFd_)
 import qualified GHC.Event.Manager as M
 import qualified GHC.Event.TimerManager as TM
 import GHC.Ix (inRange)
@@ -106,6 +108,11 @@ threadWaitRead = threadWait evtRead
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite = threadWait evtWrite
 {-# INLINE threadWaitWrite #-}
+
+-- | Block the current the peer closes their end of the given socket file descriptor.
+threadWaitPeerClosed :: Fd -> IO ()
+threadWaitPeerClosed = threadWait evtPeerClosed
+{-# INLINE threadWaitPeerClosed #-}
 
 -- | Close a file descriptor in a concurrency-safe way.
 --
@@ -207,6 +214,9 @@ threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM = threadWaitSTM evtWrite
 {-# INLINE threadWaitWriteSTM #-}
 
+threadWaitPeerClosedSTM :: Fd -> IO (STM (), IO ())
+threadWaitPeerClosedSTM = threadWaitSTM evtPeerClosed
+{-# INLINE threadWaitPeerClosedSTM #-}
 
 -- | Retrieve the system event manager for the capability on which the
 -- calling thread is running.
