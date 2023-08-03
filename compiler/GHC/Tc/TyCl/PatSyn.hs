@@ -1060,7 +1060,7 @@ tcPatToExpr args pat = go pat
            ; return $ ExplicitList noExtField exprs }
     go1 (TuplePat _ pats box)       = do { exprs <- mapM go pats
                                          ; return $ ExplicitTuple noExtField
-                                           (map (Present noAnn) exprs) box }
+                                           (map (Present noExtField) exprs) box }
     go1 (SumPat _ pat alt arity)    = do { expr <- go1 (unLoc pat)
                                          ; return $ ExplicitSum noExtField alt arity
                                                                    (noLocA expr)

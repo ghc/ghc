@@ -3424,10 +3424,10 @@ instance ExactPrint (DotFieldOcc GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (HsTupArg GhcPs) where
-  getAnnotationEntry (Present an _) = fromAnn an
+  getAnnotationEntry (Present _ _) = NoEntryVal
   getAnnotationEntry (Missing an)   = fromAnn an
 
-  setAnnotationAnchor (Present an a) anc ts cs = Present (setAnchorEpa an anc ts cs) a
+  setAnnotationAnchor (Present a b) _ _ _ = Present a b
   setAnnotationAnchor (Missing an)   anc ts cs = Missing (setAnchorEpa an anc ts cs)
 
   exact (Present a e) = Present a <$> markAnnotated e

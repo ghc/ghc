@@ -659,7 +659,7 @@ mkLHsTupleExpr :: [LHsExpr (GhcPass p)] -> XExplicitTuple (GhcPass p)
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
 mkLHsTupleExpr [e] _ = e
 mkLHsTupleExpr es ext
-  = noLocA $ ExplicitTuple ext (map (Present noAnn) es) Boxed
+  = noLocA $ ExplicitTuple ext (map (Present noExtField) es) Boxed
 
 mkLHsVarTuple :: IsSrcSpanAnn p a
                => [IdP (GhcPass p)]  -> XExplicitTuple (GhcPass p)

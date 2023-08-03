@@ -1218,7 +1218,7 @@ cvtDD (FromThenToR x y z) = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z; retur
 
 cvt_tup :: [Maybe Exp] -> Boxity -> CvtM (HsExpr GhcPs)
 cvt_tup es boxity = do { let cvtl_maybe Nothing  = return (missingTupArg noAnn)
-                             cvtl_maybe (Just e) = fmap (Present noAnn) (cvtl e)
+                             cvtl_maybe (Just e) = fmap (Present noExtField) (cvtl e)
                        ; es' <- mapM cvtl_maybe es
                        ; return $ ExplicitTuple
                                     noAnn
