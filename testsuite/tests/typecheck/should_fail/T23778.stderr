@@ -1,0 +1,5 @@
+
+T23778.hs:7:22: error: [GHC-30337]
+    • Type variables ‘d’, ‘v’ are bound by a forall,
+        but not used in the family instance.
+    • In the data instance declaration for ‘D’
