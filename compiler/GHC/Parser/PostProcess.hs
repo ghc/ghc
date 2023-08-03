@@ -3151,7 +3151,7 @@ mkSumOrTupleExpr l boxity (Tuple es) anns = do
   where
     toTupArg :: Either (EpAnn EpaLocation) (LHsExpr GhcPs) -> HsTupArg GhcPs
     toTupArg (Left ann) = missingTupArg ann
-    toTupArg (Right a)  = Present noAnn a
+    toTupArg (Right a)  = Present noExtField a
 
 -- Sum
 -- mkSumOrTupleExpr l Unboxed (Sum alt arity e) =
