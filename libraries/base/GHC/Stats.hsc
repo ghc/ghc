@@ -5,11 +5,22 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
--- | This module provides access to internal garbage collection and
+-- |
+-- Module      :  GHC.RTS.Flags
+-- Copyright   :  (c) The University of Glasgow, 1994-2000
+-- License     :  see libraries/base/LICENSE
+--
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- This module provides access to internal garbage collection and
 -- memory usage statistics.  These statistics are not available unless
 -- a program is run with the @-T@ RTS flag.
 --
--- This module is GHC-only and should not be considered portable.
+-- /The API of this module is unstable and is tightly coupled to GHC's internals./
+-- If depend on it, make sure to use a tight upper bound, e.g., @base < 4.X@ rather
+-- than @base < 5@, because the interface can change rapidly without much warning.
 --
 -- @since 4.5.0.0
 -----------------------------------------------------------------------------
