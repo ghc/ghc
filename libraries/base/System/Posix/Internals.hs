@@ -17,10 +17,16 @@
 -- Portability :  non-portable (requires POSIX)
 --
 -- POSIX support layer for the standard libraries.
+--
+-- /The API of this module is unstable and not meant to be consumed by the general public./
+-- If you absolutely must depend on it, make sure to use a tight upper
+-- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
+-- change rapidly without much warning.
+--
 -- This library is built on *every* platform, including Win32.
 --
--- Non-posix compliant in order to support the following features:
---      * S_ISSOCK (no sockets in POSIX)
+-- Non-POSIX compliant in order to support the following features:
+--  * S_ISSOCK (no sockets in POSIX)
 --
 -----------------------------------------------------------------------------
 
