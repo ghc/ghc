@@ -416,7 +416,7 @@ type instance XXPragE        (GhcPass _) = DataConCantHappen
 type instance XCDotFieldOcc (GhcPass _) = EpAnn AnnFieldLabel
 type instance XXDotFieldOcc (GhcPass _) = DataConCantHappen
 
-type instance XPresent         (GhcPass _) = EpAnn [AddEpAnn]
+type instance XPresent         (GhcPass _) = NoExtField
 
 type instance XMissing         GhcPs = EpAnn EpaLocation
 type instance XMissing         GhcRn = NoExtField
