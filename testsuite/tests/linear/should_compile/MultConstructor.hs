@@ -26,3 +26,9 @@ g2 (MkE x) = x
 
 vta :: Int %1 -> Existential Int
 vta x = MkE @Int @'One x
+
+h :: a %m -> b
+h = h
+
+vta2 :: Int %1 -> Bool  -- see #23764
+vta2 = h @Int @One @Bool

@@ -12,6 +12,17 @@ Language
 ~~~~~~~~
 
 
+- The ordering of variables used for visible type application has been changed in two cases.
+  It is supposed to be left-to-right, but due to an oversight, it was wrong:
+
+  - in an infix application ``f :: a `op` b``, it is now ``forall a op b.`` rather than
+    ``forall op a b.``
+  - in a linear type ``f :: a %m -> b``, it is now ``forall a m b.`` rather than
+    ``forall a b m.``.
+
+  This change is backwards-incompatible, although in practice we don't expect it
+  to cause significant disruption.
+
 Compiler
 ~~~~~~~~
 
