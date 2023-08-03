@@ -1731,6 +1731,9 @@ FreeKiTyVars, which notably includes the `extract-` family of functions
 (extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.).
 These functions thus promise to keep left-to-right ordering.
 
+Note that for 'HsFunTy m ty1 ty2', we quantify in the order ty1, m, ty2,
+since this type is written ty1 %m -> ty2 in the source syntax.
+
 Note [Implicit quantification in type synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We typically bind type/kind variables implicitly when they are in a kind
@@ -2056,12 +2059,12 @@ extract_lty (L _ ty) acc
       HsListTy _ ty               -> extract_lty ty acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
       HsSumTy _ tys               -> extract_ltys tys acc
-      HsFunTy _ w ty1 ty2         -> extract_lty ty1 $
-                                     extract_lty ty2 $
-                                     extract_hs_arrow w acc
+      HsFunTy _ m ty1 ty2         -> extract_lty ty1 $
+                                     extract_hs_arrow m $ -- See Note [Ordering of implicit variables]
+                                     extract_lty ty2 acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
-      HsOpTy _ _ ty1 tv ty2       -> extract_tv tv $
-                                     extract_lty ty1 $
+      HsOpTy _ _ ty1 tv ty2       -> extract_lty ty1 $
+                                     extract_tv tv $
                                      extract_lty ty2 acc
       HsParTy _ ty                -> extract_lty ty acc
       HsSpliceTy {}               -> acc  -- Type splices mention no tvs
