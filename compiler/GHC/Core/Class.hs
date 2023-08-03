@@ -8,7 +8,7 @@
 module GHC.Core.Class (
         Class,
         ClassOpItem,
-        ClassATItem(..), ATValidityInfo(..),
+        ClassATItem(..), TyFamEqnValidityInfo(..),
         ClassMinimalDef,
         DefMethInfo, pprDefMethInfo,
 
@@ -34,6 +34,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Utils.Panic.Plain
 import GHC.Types.SrcLoc
+import GHC.Types.Var.Set
 import GHC.Utils.Outputable
 import GHC.Data.BooleanFormula (BooleanFormula, mkTrue)
 
@@ -96,29 +97,42 @@ type DefMethInfo = Maybe (Name, DefMethSpec Type)
 
 data ClassATItem
   = ATI TyCon         -- See Note [Associated type tyvar names]
-        (Maybe (Type, ATValidityInfo))
-                      -- Default associated type (if any) from this template
-                      -- Note [Associated type defaults]
+        (Maybe (Type, TyFamEqnValidityInfo))
+          -- ^ Default associated type (if any) from this template.
+          --
+          -- As per Note [Associated type defaults], the Type has been renamed
+          -- to use the class tyvars, while the 'TyFamEqnValidityInfo' uses
+          -- the original user-written type variables.
 
--- | Information about an associated type family default implementation. This
--- is used solely for validity checking.
+-- | Information about a type family equation, used for validity checking
+-- of closed type family equations and associated type family default equations.
+--
+-- This type exists to delay validity-checking after typechecking type declaration
+-- groups, to avoid cyclic evaluation inside the typechecking knot.
+--
 -- See @Note [Type-checking default assoc decls]@ in "GHC.Tc.TyCl".
-data ATValidityInfo
-  -- | Used for associated type families that are imported
-  -- from another module, for which we don't need to
-  -- perform any validity checking.
-  = NoATVI
+data TyFamEqnValidityInfo
+  -- | Used for equations which don't need any validity checking,
+  -- for example equations imported from another module.
+  = NoVI
 
-  -- | Used for locally-defined associated type families.
-  | ATVI
-    { atvi_loc :: SrcSpan
-    , atvi_qtvs :: [TyVar]
+  -- | Information necessary for validity checking of a type family equation.
+  | VI
+    { vi_loc :: SrcSpan
+    , vi_qtvs :: [TcTyVar]
       -- ^ LHS quantified type variables
-    , atvi_pats :: [Type]
+    , vi_non_user_tvs :: TyVarSet
+      -- ^ non-user-written type variables (for error message reporting)
+      --
+      -- Example: with -XPolyKinds, typechecking @type instance forall a. F = ()@
+      -- introduces the kind variable @k@ for the kind of @a@. See #23734.
+    , vi_pats :: [Type]
       -- ^ LHS patterns
-    , atvi_rhs :: Type
-      -- ^ original RHS of the type family default declaration,
-      -- before applying the substitution from
+    , vi_rhs :: Type
+      -- ^ RHS of the equation
+      --
+      -- NB: for associated type family default declarations, this is the RHS
+      -- *before* applying the substitution from
       -- Note [Type-checking default assoc decls] in GHC.Tc.TyCl.
     }
 
@@ -177,9 +191,14 @@ Note that
  * HOWEVER, in the internal ClassATItem we rename the RHS to match the
    tyConTyVars of the family TyCon.  So in the example above we'd get
    a ClassATItem of
-        ATI F ((x,a) -> b)
-   So the tyConTyVars of the family TyCon bind the free vars of
-   the default Type rhs
+
+        ATI F (Just ((x,a) -> b, validity_info)
+
+   That is, the type stored in the first component of the pair has been
+   renamed to use the class type variables. On the other hand, the
+   TyFamEqnValidityInfo, used for validity checking of the type family equation
+   (considered as a free-standing equation) uses the original types, e.g.
+   involving the type variables 'p', 'q', 'r'.
 
 The @mkClass@ function fills in the indirect superclasses.
 

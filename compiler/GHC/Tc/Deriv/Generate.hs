@@ -52,7 +52,7 @@ import GHC.Tc.Utils.Instantiate( newFamInst )
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Zonk.Type
-import GHC.Tc.Validity ( checkValidCoAxBranch )
+import GHC.Tc.Validity
 
 import GHC.Core.DataCon
 import GHC.Core.FamInstEnv
@@ -71,6 +71,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Unique.FM ( lookupUFM, listToUFM )
 import GHC.Types.Var.Env
 import GHC.Types.Var
+import GHC.Types.Var.Set
 
 import GHC.Builtin.Names
 import GHC.Builtin.Names.TH
@@ -2085,6 +2086,7 @@ gen_Newtype_fam_insts loc' cls inst_tvs inst_tys rhs_ty
                                            rep_lhs_tys
         let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' [] rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
+        checkFamPatBinders fam_tc (rep_tvs' ++ rep_cvs') emptyVarSet rep_lhs_tys rep_rhs_ty
         -- Check (c) from Note [GND and associated type families] in GHC.Tc.Deriv
         checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
         newFamInst SynFamilyInst axiom

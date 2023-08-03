@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -14,6 +15,7 @@ module GHC.Tc.Validity (
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs, checkEscapingKind,
   checkValidCoAxiom, checkValidCoAxBranch,
+  checkFamPatBinders, checkTyFamEqnValidityInfo,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
   checkTyConTelescope,
   ) where
@@ -2163,25 +2165,20 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
 --
 checkValidCoAxBranch :: TyCon -> CoAxBranch -> TcM ()
 checkValidCoAxBranch fam_tc
-                    (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
-                                , cab_lhs = typats
+                    (CoAxBranch { cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
   = setSrcSpan loc $
-    checkValidTyFamEqn fam_tc (tvs++cvs) typats rhs
+    checkValidTyFamEqn fam_tc typats rhs
 
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
 -- polytypes.
-checkValidTyFamEqn :: TyCon   -- ^ of the type family
-                   -> [Var]   -- ^ Bound variables in the equation
-                   -> [Type]  -- ^ Type patterns
-                   -> Type    -- ^ Rhs
+checkValidTyFamEqn :: TyCon    -- ^ of the type family
+                   -> [Type]   -- ^ Type patterns
+                   -> Type     -- ^ Rhs
                    -> TcM ()
-checkValidTyFamEqn fam_tc qvs typats rhs
+checkValidTyFamEqn fam_tc typats rhs
   = do { checkValidTypePats fam_tc typats
-
-         -- Check for things used on the right but not bound on the left
-       ; checkFamPatBinders fam_tc qvs typats rhs
 
          -- Check for oversaturated visible kind arguments in a type family
          -- equation.
@@ -2284,12 +2281,28 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
       = Nothing
 
 -----------------
+
+-- | Perform scoping check on a type family equation.
+--
+-- See 'TyFamEqnValidityInfo'.
+checkTyFamEqnValidityInfo :: TyCon -> TyFamEqnValidityInfo -> TcM ()
+checkTyFamEqnValidityInfo fam_tc = \ case
+  NoVI -> return ()
+  VI { vi_loc          = loc
+     , vi_qtvs         = qtvs
+     , vi_non_user_tvs = non_user_tvs
+     , vi_pats         = pats
+     , vi_rhs          = rhs } ->
+    setSrcSpan loc $
+    checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
+
 checkFamPatBinders :: TyCon
-                   -> [TcTyVar]   -- Bound on LHS of family instance
-                   -> [TcType]    -- LHS patterns
-                   -> Type        -- RHS
+                   -> [TcTyVar]   -- ^ Bound on LHS of family instance
+                   -> TyVarSet    -- ^ non-user-written tyvars
+                   -> [TcType]    -- ^ LHS patterns
+                   -> TcType      -- ^ RHS
                    -> TcM ()
-checkFamPatBinders fam_tc qtvs pats rhs
+checkFamPatBinders fam_tc qtvs non_user_tvs pats rhs
   = do { traceTc "checkFamPatBinders" $
          vcat [ debugPprType (mkTyConApp fam_tc pats)
               , ppr (mkTyConApp fam_tc pats)
@@ -2350,10 +2363,19 @@ checkFamPatBinders fam_tc qtvs pats rhs
       -- message.
 
     used_tvs    = cpt_tvs `unionVarSet` fvVarSet rhs_fvs
-    bad_qtvs    = filterOut (`elemVarSet` used_tvs) qtvs
-                  -- Bound but not used at all
+
+    -- Bound but not used at all
+    bad_qtvs    = filterOut ((`elemVarSet` used_tvs) <||> (`elemVarSet` non_user_tvs))
+                  qtvs
+      -- Filter out non-user-tvs in order to only report user-written type variables,
+      -- e.g. type instance forall a. F = ()
+      -- -XPolyKinds introduces the binder 'k' for the kind of 'a', but
+      -- we don't want the error message to complain about 'k' being unused,
+      -- as the user has not written it.
+
+    -- Used on RHS but not bound on LHS
     bad_rhs_tvs = filterOut (`elemVarSet` inj_cpt_tvs) (fvVarList rhs_fvs)
-                  -- Used on RHS but not bound on LHS
+
     dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs mk_err tvs

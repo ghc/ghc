@@ -14,4 +14,4 @@ class C where
   type forall c. H = ()
 
 data family D :: Type
-data instance forall d. D = MkD
+data instance forall (d :: Type). D = MkD
