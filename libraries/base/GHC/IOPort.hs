@@ -13,7 +13,13 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC Extensions)
 --
--- The IOPort type. This is a facility used by the Windows IO subsystem.
+-- The 'IOPort' type. This is a facility used by the Windows IO subsystem.
+--
+-- /The API of this module is unstable and not meant to be consumed by the general public./
+-- If you absolutely must depend on it, make sure to use a tight upper
+-- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
+-- change rapidly without much warning.
+--
 -- We have strict rules with an I/O Port:
 -- * writing more than once is an error
 -- * reading more than once is an error

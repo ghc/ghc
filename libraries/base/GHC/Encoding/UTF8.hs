@@ -2,7 +2,21 @@
 {-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples, NoImplicitPrelude #-}
 {-# OPTIONS_GHC -O2 -fno-warn-name-shadowing #-}
 
--- | Simple UTF-8 codecs supporting non-streaming encoding/decoding.
+-- |
+-- Module      :  GHC.Encoding.UTF8
+-- Copyright   :  (c) The University of Glasgow, 1994-2023
+-- License     :  see libraries/base/LICENSE
+--
+-- Maintainer  :  cvs-ghc@haskell.org
+-- Stability   :  internal
+-- Portability :  non-portable (GHC extensions)
+--
+-- /The API of this module is unstable and not meant to be consumed by the general public./
+-- If you absolutely must depend on it, make sure to use a tight upper
+-- bound, e.g., @base < 4.X@ rather than @base < 5@, because the interface can
+-- change rapidly without much warning.
+--
+-- Simple UTF-8 codecs supporting non-streaming encoding/decoding.
 -- For encoding where codepoints may be broken across buffers,
 -- see "GHC.IO.Encoding.UTF8".
 --
