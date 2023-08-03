@@ -136,6 +136,11 @@ def no_deps( name, opts):
 def skip( name, opts ):
     opts.skip = True
 
+# Stub to allow process tests to work
+# JS backend doesn't exist in GHC 9.4
+def js_broken( bug: IssueNumber ):
+    return normal;
+
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
     # feature, and we don't plan to or can't fix it now or in the
