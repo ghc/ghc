@@ -268,7 +268,7 @@ jVar f = UnsatBlock . IS $ do
            (block, is) <- runIdentSupply $ toSat_ f []
            let addDecls (BlockStat ss) =
                   BlockStat $ map decl is ++ ss
-               addDecls x = x
+               addDecls x = BlockStat (map decl is ++ [x])
            return $ addDecls block
 
 jFunction :: Ident -> [Ident] -> JStat -> JStat

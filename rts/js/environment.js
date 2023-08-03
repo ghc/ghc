@@ -166,7 +166,7 @@ function h$getProgArgv(argc_v,argc_off,argv_v,argv_off) {
 }
 
 function h$setProgArgv(n, ptr_d, ptr_o) {
-  args = [];
+  var args = [];
   for(var i=0;i<n;i++) {
     var off = ptr_o+4*i;
     GET_ADDR(ptr_d,off,p,o);

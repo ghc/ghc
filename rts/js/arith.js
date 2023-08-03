@@ -394,9 +394,9 @@ function h$decodeFloatInt(d) {
             h$convertFloat[0] = d*8388608; // put d in the normal range (~ shift left 23 bits)
             i = h$convertInt[0];
             s = (i&8388607) | 8388608;
-            e = ((i >> 23) & 0xff) - 173; // take into account normalization above (150+23)
-            TRACE_ARITH("decodeFloatInt s: " + (sgn * s) +  " e: " + e)
-            RETURN_UBX_TUP2(sgn*s, e)
+            exp = ((i >> 23) & 0xff) - 173; // take into account normalization above (150+23)
+            TRACE_ARITH("decodeFloatInt s: " + (sgn * s) +  " e: " + exp)
+            RETURN_UBX_TUP2(sgn*s, exp)
         }
     } else {
       TRACE_ARITH("decodeFloatInt s: " + (sgn * (s|8388608)) +  " e: " + (exp-150))

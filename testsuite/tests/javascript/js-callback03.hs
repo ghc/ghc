@@ -10,7 +10,7 @@ foreign import javascript "((x) => { globalF(x); })"
 foreign import javascript "((x,y) => { return x + y })"
   js_plus :: JSVal -> JSVal -> IO JSVal
 
-foreign import javascript "((g) => { globalG = g; })"
+foreign import javascript "((g) => { globalThis.globalG = g; })"
   setG :: Callback (JSVal -> JSVal -> IO JSVal) -> IO ()
 
 foreign import javascript "((x,y) => { return globalG(x,y); })"

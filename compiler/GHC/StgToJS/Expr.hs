@@ -509,7 +509,7 @@ optimizeFree offset ids = do
 allocCls :: Maybe JStat -> [(Id, CgStgRhs)] -> G JStat
 allocCls dynMiddle xs = do
    (stat, dyn) <- partitionEithers <$> mapM toCl xs
-   ac <- allocDynAll True dynMiddle dyn
+   ac <- allocDynAll False dynMiddle dyn
    pure (mconcat stat <> ac)
   where
     -- left = static, right = dynamic

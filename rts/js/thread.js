@@ -138,6 +138,7 @@ function h$getThreadLabel(t) {
 
 function h$listThreads() {
   var r = h$newArray(0,null);
+  var t;
 
   if (h$currentThread) r.push(h$currentThread);
 
