@@ -45,6 +45,7 @@ import GHC.Core.Unify ( typesAreApart, tcMatchTyX_BM, BindFlag(..) )
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
 import GHC.Core.Class
+import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 import GHC.Core.TyCo.FVs
@@ -2292,10 +2293,13 @@ checkFamPatBinders fam_tc qtvs pats rhs
   = do { traceTc "checkFamPatBinders" $
          vcat [ debugPprType (mkTyConApp fam_tc pats)
               , ppr (mkTyConApp fam_tc pats)
+              , text "rhs:" <+> ppr rhs
               , text "qtvs:" <+> ppr qtvs
-              , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
+              , text "rhs_fvs:" <+> ppr (fvVarSet rhs_fvs)
               , text "cpt_tvs:" <+> ppr cpt_tvs
-              , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs ]
+              , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs
+              , text "bad_rhs_tvs:" <+> ppr bad_rhs_tvs
+              , text "bad_qtvs:" <+> ppr bad_qtvs ]
 
          -- Check for implicitly-bound tyvars, mentioned on the
          -- RHS but not bound on the LHS
@@ -2314,6 +2318,26 @@ checkFamPatBinders fam_tc qtvs pats rhs
        ; check_tvs FamInstLHSUnusedBoundTyVars bad_qtvs
        }
   where
+    rhs_fvs
+      -- Special treatment for data family instances.
+      --
+      -- See Note [Out of scope tvs in data family instances].
+      | Just (tc_rep, _rep_args) <- splitTyConApp_maybe rhs
+      , Just (fam_tc', _fam_args, _) <- tyConFamInstSig_maybe tc_rep
+      , fam_tc' == fam_tc
+      = if isGadtSyntaxTyCon tc_rep
+        then emptyFV
+        else
+          let datacons_fvs =
+                unionsFV
+                  [ delFVs user_tvbs (tyCoFVsOfTypes arg_tys)
+                  | dc <- tyConDataCons tc_rep
+                  , let arg_tys = map scaledThing $ dataConOrigArgTys dc
+                        user_tvbs = mkVarSet $ dataConUserTyVars dc ]
+          in datacons_fvs
+      | otherwise
+      = tyCoFVsOfType rhs
+
     cpt_tvs     = tyCoVarsOfTypes pats
     inj_cpt_tvs = fvVarSet $ injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
@@ -2324,7 +2348,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
       -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
       -- since the order of `inj_cpt_tvs` is never revealed in an error
       -- message.
-    rhs_fvs     = tyCoFVsOfType rhs
+
     used_tvs    = cpt_tvs `unionVarSet` fvVarSet rhs_fvs
     bad_qtvs    = filterOut (`elemVarSet` used_tvs) qtvs
                   -- Bound but not used at all
@@ -2336,6 +2360,51 @@ checkFamPatBinders fam_tc qtvs pats rhs
       = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
         TcRnIllegalInstance $ IllegalFamilyInstance $
         mk_err (map tyVarName tvs)
+
+{- Note [Out of scope tvs in data family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following data family instance declaration, which we want to reject:
+
+  type D :: Type
+  data family D
+  data instance forall (a :: Type). D = MkD
+
+The problem is that the user quantified the type variable `a` in the instance,
+but didn't use it anywhere.
+
+However, from the perspective of GHC, the RHS of the instance declaration
+is "R:D a", where "R:D" is the representation TyCon that
+GHC.Tc.TyCl.Instance.tcDataFamInstDecl builds; it always includes ALL the
+quantified variables. This means that naively computing the free tyvars of the
+RHS would cause us to report `a` as used on the RHS, which is rather confusing
+for the user (as reported in #23778):
+
+    * Type variable `a' is mentioned in the RHS,
+      but not bound on the LHS of the family instance
+
+To avoid this, we manually compute which type variables are used on the RHS
+of the data family instance in terms of the types of the data family instance
+constructors:
+
+  Vanilla data instance declarations
+
+    For a vanilla data declaration, we collect the free type variables of
+    the data constructors. For example
+
+      data instance D1 x a = K1 a | forall b. K2 a b c
+
+    will give rise to RHS FVs {a,c}.
+
+  GADT data instance declarations
+
+    A GADT data declarations brings its own type variables into scope, e.g.
+
+      data instance D3 y b where
+        C1 :: ...
+        C2 :: ...
+
+    So in this case we use emptyFVs for the RHS tyvars.
+-}
 
 -- | Checks that a list of type patterns is valid in a matching (LHS)
 -- position of a class instances or type/data family instance.
