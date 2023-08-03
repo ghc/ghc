@@ -230,7 +230,6 @@ main = do
     \case
       RetFun {..} -> do
         assertEqual (tipe info_tbl) RET_FUN
-        assertEqual retFunType ARG_N
         assertEqual retFunSize 1
         assertFun01Closure 1 retFunFun
         assertEqual (length retFunPayload) 1
@@ -242,7 +241,6 @@ main = do
     \case
       RetFun {..} -> do
         assertEqual (tipe info_tbl) RET_FUN
-        assertEqual retFunType ARG_GEN
         assertEqual retFunSize 9
         retFunFun' <- getBoxedClosureData retFunFun
         case retFunFun' of
@@ -264,7 +262,6 @@ main = do
     \case
       RetFun {..} -> do
         assertEqual (tipe info_tbl) RET_FUN
-        assertEqual retFunType ARG_GEN_BIG
         assertEqual retFunSize 59
         retFunFun' <- getBoxedClosureData retFunFun
         case retFunFun' of

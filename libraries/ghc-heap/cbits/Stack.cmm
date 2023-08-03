@@ -136,13 +136,13 @@ getUnderflowFrameNextChunkzh(P_ stack, W_ offsetWords) {
 }
 
 // (StgWord) getRetFunTypezh(StgStack* stack, StgWord offsetWords)
-getRetFunTypezh(P_ stack, W_ offsetWords) {
+isArgGenBigRetFunTypezh(P_ stack, W_ offsetWords) {
   P_ c;
   c = StgStack_sp(stack) + WDS(offsetWords);
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
 
   W_ type;
-  (type) = ccall getRetFunType(c);
+  (type) = ccall isArgGenBigRetFunType(c);
   return (type);
 }
 
