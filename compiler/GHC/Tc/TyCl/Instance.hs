@@ -608,11 +608,13 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
          -- (1) do the work of verifying the synonym group
          -- For some reason we don't have a location for the equation
          -- itself, so we make do with the location of family name
-       ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (na2la $ getLoc fam_lname) eqn)
+       ; (co_ax_branch, co_ax_validity_info)
+          <- tcTyFamInstEqn fam_tc mb_clsinfo
+                (L (na2la $ getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkConsistentFamInst mb_clsinfo fam_tc co_ax_branch
+       ; checkTyFamEqnValidityInfo fam_tc co_ax_validity_info
        ; checkValidCoAxBranch fam_tc co_ax_branch
 
          -- (3) construct coercion axiom
@@ -713,7 +715,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; skol_info <- mkSkolemInfo FamInstSkol
        ; let new_or_data = dataDefnConsNewOrData hs_cons
-       ; (qtvs, pats, tc_res_kind, stupid_theta)
+       ; (qtvs, non_user_tvs, pats, tc_res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo skol_info fam_tc outer_bndrs fixity
                                     hs_ctxt hs_pats m_ksig new_or_data
 
@@ -788,7 +790,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
               , text "res_kind:" <+> ppr res_kind
               , text "eta_pats" <+> ppr eta_pats
               , text "eta_tcbs" <+> ppr eta_tcbs ]
-       ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
+       ; (rep_tc, (axiom, ax_rhs)) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv (binderVars tc_ty_binders) $
                   -- For H98 decls, the tyvars scope
                   -- over the data constructors
@@ -824,13 +826,15 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                  -- further instance might not introduce a new recursive
                  -- dependency.  (2) They are always valid loop breakers as
                  -- they involve a coercion.
-              ; return (rep_tc, axiom) }
+
+              ; return (rep_tc, (axiom, ax_rhs)) }
 
        -- Remember to check validity; no recursion to worry about here
        -- Check that left-hand sides are ok (mono-types, no type families,
        -- consistent instantiations, etc)
        ; let ax_branch = coAxiomSingleBranch axiom
        ; checkConsistentFamInst mb_clsinfo fam_tc ax_branch
+       ; checkFamPatBinders fam_tc zonked_post_eta_qtvs non_user_tvs eta_pats ax_rhs
        ; checkValidCoAxBranch fam_tc ax_branch
        ; checkValidTyCon rep_tc
 
@@ -838,10 +842,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
              m_deriv_info = case derivs of
                []    -> Nothing
                preds ->
-                 Just $ DerivInfo { di_rep_tc  = rep_tc
+                 Just $ DerivInfo { di_rep_tc     = rep_tc
                                   , di_scoped_tvs = scoped_tvs
-                                  , di_clauses = preds
-                                  , di_ctxt    = tcMkDataFamInstCtxt decl }
+                                  , di_clauses    = preds
+                                  , di_ctxt       = tcMkDataFamInstCtxt decl }
 
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) }
@@ -915,7 +919,7 @@ tcDataFamInstHeader
     -> LexicalFixity -> Maybe (LHsContext GhcRn)
     -> HsFamEqnPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
-    -> TcM ([TcTyVar], [TcType], TcKind, TcThetaType)
+    -> TcM ([TcTyVar], TyVarSet, [TcType], TcKind, TcThetaType)
          -- All skolem TcTyVars, all zonked so it's clear what the free vars are
 -- The "header" of a data family instance is the part other than
 -- the data constructors themselves
@@ -975,14 +979,15 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
              -- the outer_tvs.  See Note [Generalising in tcTyFamInstEqnGuts]
        ; reportUnsolvedEqualities skol_info final_tvs tclvl wanted
 
-       ; (final_tvs,lhs_ty,master_res_kind,instance_res_kind,stupid_theta) <-
+       ; (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) <-
           liftZonkM $ do
-            { final_tvs         <- zonkTcTyVarsToTcTyVars final_tvs
-            ; lhs_ty            <- zonkTcType             lhs_ty
-            ; master_res_kind   <- zonkTcType             master_res_kind
-            ; instance_res_kind <- zonkTcType             instance_res_kind
-            ; stupid_theta      <- zonkTcTypes            stupid_theta
-            ; return (final_tvs,lhs_ty,master_res_kind,instance_res_kind,stupid_theta) }
+            { final_tvs         <- mapM zonkTcTyVarToTcTyVar final_tvs
+            ; non_user_tvs      <- mapM zonkTcTyVarToTcTyVar qtvs
+            ; lhs_ty            <- zonkTcType                lhs_ty
+            ; master_res_kind   <- zonkTcType                master_res_kind
+            ; instance_res_kind <- zonkTcType                instance_res_kind
+            ; stupid_theta      <- zonkTcTypes               stupid_theta
+            ; return (final_tvs, non_user_tvs, lhs_ty, master_res_kind, instance_res_kind, stupid_theta) }
 
        -- Check that res_kind is OK with checkDataKindSig.  We need to
        -- check that it's ok because res_kind can come from a user-written
@@ -994,7 +999,7 @@ tcDataFamInstHeader mb_clsinfo skol_info fam_tc hs_outer_bndrs fixity
        -- For the scopedSort see Note [Generalising in tcTyFamInstEqnGuts]
        ; let pats      = unravelFamInstPats lhs_ty
 
-       ; return (final_tvs, pats, master_res_kind, stupid_theta) }
+       ; return (final_tvs, mkVarSet non_user_tvs, pats, master_res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name

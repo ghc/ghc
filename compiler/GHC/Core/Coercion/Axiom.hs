@@ -235,25 +235,35 @@ data CoAxiom br
          -- INVARIANT: co_ax_implicit == True implies length co_ax_branches == 1.
     }
 
+-- | A branch of a coercion axiom, which provides the evidence for
+-- unwrapping a newtype or a type-family reduction step using a single equation.
 data CoAxBranch
   = CoAxBranch
-    { cab_loc      :: SrcSpan       -- Location of the defining equation
-                                    -- See Note [CoAxiom locations]
-    , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
-                                    -- See Note [CoAxBranch type variables]
-    , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
-                                    -- cab_tvs and cab_lhs may be eta-reduced; see
-                                    -- Note [Eta reduction for data families]
-    , cab_cvs      :: [CoVar]       -- Bound coercion variables
-                                    -- Always empty, for now.
-                                    -- See Note [Constraints in patterns]
-                                    -- in GHC.Tc.TyCl
-    , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
-    , cab_lhs      :: [Type]        -- Type patterns to match against
-    , cab_rhs      :: Type          -- Right-hand side of the equality
-                                    -- See Note [CoAxioms are homogeneous]
-    , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
-                                    -- See Note [Storing compatibility]
+    { cab_loc      :: SrcSpan
+        -- ^ Location of the defining equation
+        -- See Note [CoAxiom locations]
+    , cab_tvs      :: [TyVar]
+       -- ^ Bound type variables; not necessarily fresh
+       -- See Note [CoAxBranch type variables]
+    , cab_eta_tvs  :: [TyVar]
+       -- ^ Eta-reduced tyvars
+       -- cab_tvs and cab_lhs may be eta-reduced; see
+       -- Note [Eta reduction for data families]
+    , cab_cvs      :: [CoVar]
+       -- ^ Bound coercion variables
+       -- Always empty, for now.
+       -- See Note [Constraints in patterns]
+       -- in GHC.Tc.TyCl
+    , cab_roles    :: [Role]
+       -- ^ See Note [CoAxBranch roles]
+    , cab_lhs      :: [Type]
+       -- ^ Type patterns to match against
+    , cab_rhs      :: Type
+       -- ^ Right-hand side of the equality
+       -- See Note [CoAxioms are homogeneous]
+    , cab_incomps  :: [CoAxBranch]
+       -- ^ The previous incompatible branches
+       -- See Note [Storing compatibility]
     }
   deriving Data.Data
 

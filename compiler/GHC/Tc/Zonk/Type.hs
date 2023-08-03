@@ -16,7 +16,7 @@ module GHC.Tc.Zonk.Type (
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs,
         zonkTyVarBindersX, zonkTyVarBinderX,
-        zonkTyBndrsX,
+        zonkTyBndrX, zonkTyBndrsX,
         zonkTcTypeToType,  zonkTcTypeToTypeX,
         zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
         zonkTyVarOcc,
