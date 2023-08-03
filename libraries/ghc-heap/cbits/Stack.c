@@ -8,14 +8,14 @@
 #include "rts/storage/FunTypes.h"
 #include "rts/storage/InfoTables.h"
 
-StgWord stackFrameSize(StgStack *stack, StgWord index) {
-  StgClosure *c = (StgClosure *)stack->sp + index;
+StgWord stackFrameSize(StgStack *stack, StgWord offset) {
+  StgClosure *c = (StgClosure *)stack->sp + offset;
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(c));
   return stack_frame_sizeW(c);
 }
 
-StgStack *getUnderflowFrameStack(StgStack *stack, StgWord index) {
-  StgClosure *frame = (StgClosure *)stack->sp + index;
+StgStack *getUnderflowFrameStack(StgStack *stack, StgWord offset) {
+  StgClosure *frame = (StgClosure *)stack->sp + offset;
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(frame));
   const StgRetInfoTable *info = get_ret_itbl((StgClosure *)frame);
 
