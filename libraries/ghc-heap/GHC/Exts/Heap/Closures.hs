@@ -15,7 +15,6 @@ module GHC.Exts.Heap.Closures (
     , WhatNext(..)
     , WhyBlocked(..)
     , TsoFlags(..)
-    , RetFunType(..)
     , allClosures
     , closureSize
 
@@ -458,7 +457,6 @@ data GenStackFrame b =
 
   | RetFun
       { info_tbl            :: !StgInfoTable
-      , retFunType          :: !RetFunType
       , retFunSize          :: !Word
       , retFunFun           :: !b
       , retFunPayload       :: ![GenStackField b]
@@ -470,40 +468,6 @@ data GenStackFrame b =
       , bcoArgs             :: ![GenStackField b]
       }
   deriving (Foldable, Functor, Generic, Show, Traversable)
-
--- | Fun types according to @FunTypes.h@
--- This `Enum` must be aligned with the values in @FunTypes.h@.
-data RetFunType =
-      ARG_GEN     |
-      ARG_GEN_BIG |
-      ARG_BCO     |
-      ARG_NONE    |
-      ARG_N       |
-      ARG_P       |
-      ARG_F       |
-      ARG_D       |
-      ARG_L       |
-      ARG_V16     |
-      ARG_V32     |
-      ARG_V64     |
-      ARG_NN      |
-      ARG_NP      |
-      ARG_PN      |
-      ARG_PP      |
-      ARG_NNN     |
-      ARG_NNP     |
-      ARG_NPN     |
-      ARG_NPP     |
-      ARG_PNN     |
-      ARG_PNP     |
-      ARG_PPN     |
-      ARG_PPP     |
-      ARG_PPPP    |
-      ARG_PPPPP   |
-      ARG_PPPPPP  |
-      ARG_PPPPPPP |
-      ARG_PPPPPPPP
-      deriving (Show, Eq, Enum, Generic)
 
 data PrimType
   = PInt

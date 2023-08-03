@@ -5,6 +5,7 @@
 #include "rts/Types.h"
 #include "rts/storage/ClosureTypes.h"
 #include "rts/storage/Closures.h"
+#include "rts/storage/FunTypes.h"
 #include "rts/storage/InfoTables.h"
 
 StgWord stackFrameSize(StgStack *stack, StgWord index) {
@@ -140,11 +141,11 @@ StgStack *getUnderflowFrameNextChunk(StgUnderflowFrame *frame) {
   return frame->next_chunk;
 }
 
-StgWord getRetFunType(StgRetFun *ret_fun) {
+StgWord isArgGenBigRetFunType(StgRetFun *ret_fun) {
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(ret_fun));
 
   const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-  return fun_info->f.fun_type;
+  return fun_info->f.fun_type == ARG_GEN_BIG;
 }
 
 StgClosure *getStackClosure(StgClosure **c) { return *c; }

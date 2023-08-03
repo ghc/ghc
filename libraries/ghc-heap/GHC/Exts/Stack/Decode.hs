@@ -26,8 +26,7 @@ import GHC.Exts
 import GHC.Exts.Heap (Box (..))
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Closures
-  ( RetFunType (..),
-    StackFrame,
+  ( StackFrame,
     GenStackFrame (..),
     StgStackClosure,
     GenStgStackClosure (..),
@@ -124,12 +123,11 @@ getWord :: StackSnapshot# -> WordOffset -> Word
 getWord stackSnapshot# index =
   W# (getWord# stackSnapshot# (wordOffsetToWord# index))
 
-foreign import prim "getRetFunTypezh" getRetFunType# :: StackSnapshot# -> Word# -> Word#
+foreign import prim "isArgGenBigRetFunTypezh" isArgGenBigRetFunType# :: StackSnapshot# -> Word# -> Int#
 
-getRetFunType :: StackSnapshot# -> WordOffset -> RetFunType
-getRetFunType stackSnapshot# index =
-  toEnum . fromInteger . toInteger $
-    W# (getRetFunType# stackSnapshot# (wordOffsetToWord# index))
+isArgGenBigRetFunType :: StackSnapshot# -> WordOffset -> Bool
+isArgGenBigRetFunType stackSnapshot# index =
+  I# (isArgGenBigRetFunType# stackSnapshot# (wordOffsetToWord# index)) > 0
 
 -- | Gets contents of a `LargeBitmap` (@StgLargeBitmap@)
 --
@@ -319,17 +317,15 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 stack_payload = payload'
               }
         RET_FUN -> do
-          let retFunType' = getRetFunType stackSnapshot# index
-              retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
+          let retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
           retFunFun' <- getClosureBox stackSnapshot# (index + offsetStgRetFunFrameFun)
           retFunPayload' <-
-            if retFunType' == ARG_GEN_BIG
+            if isArgGenBigRetFunType stackSnapshot# index == True
               then decodeLargeBitmap getRetFunLargeBitmap# stackSnapshot# index offsetStgRetFunFramePayload
               else decodeSmallBitmap getRetFunSmallBitmap# stackSnapshot# index offsetStgRetFunFramePayload
           pure $
             RetFun
               { info_tbl = info,
-                retFunType = retFunType',
                 retFunSize = retFunSize',
                 retFunFun = retFunFun',
                 retFunPayload = retFunPayload'
