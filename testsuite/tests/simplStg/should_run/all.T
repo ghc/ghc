@@ -20,3 +20,4 @@ test('T13536a',
 
 test('inferTags001', normal, multimod_compile_and_run, ['inferTags001', 'inferTags001_a'])
 test('T22042', [extra_files(['T22042a.hs']),only_ways('normal'),unless(have_dynamic(), skip)], makefile_test, ['T22042'])
+test('T23783', normal, multimod_compile_and_run, ['T23783', '-O -v0'])
