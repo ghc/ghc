@@ -1,0 +1,157 @@
+.. _release-9-4-6:
+
+Version 9.4.6
+==============
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM
+10, 11, 12, 13, or 14.
+
+Significant Changes
+~~~~~~~~~~~~~~~~~~~~
+
+Issues fixed in this release include:
+
+Compiler
+--------
+
+- Fix a bug where certain dictionaries for undecidable instances could end up
+  looping at runtime (:ghc-ticket:`22549`).
+
+- Fix a compiler panic involving newtype family instances (:ghc-ticket:`23329).
+
+- Fix a bug preventing using the command line to compile ``.cmm`` files to
+  assembly (:ghc-ticket:`23610`).
+
+- Fix compiler panics with certain RULE pragmas (:ghc-ticket:`23208`,
+  :ghc-ticket:`22761`).
+
+- Fix a loop in the simplifier due to a bug in the representation of certain
+  fields in interface files (:ghc-ticket:`22272`).
+
+- Make type equality ``(~)`` checks in the presence of quantified contrains more
+  robust to argument ordering (:ghc-ticket:`23333`).
+
+- Fix some segfaults when using ``UnliftedDataTypes`` (:ghc-ticket:`23231`,
+  :ghc-ticket:`23146`).
+
+- Improve bounds checking with ``-fcheck-prim-bounds`` (:ghc-ticket:`21054`).
+
+- Fix a bug in the simplifier leading to core lint errors (:ghc-ticket:`23012`).
+
+- Ensure array read operations have proper memory barries (:ghc-ticket:`23541`).
+
+- Fix a spurious ``-dcore-lint`` failure with certain kinds of type family
+  instances (:ghc-ticket:`22547`).
+
+- Fix a bug with ``.hie`` files containing spurious references to generated
+  functions in files with partial field selectors (:ghc-ticket:`23492`).
+
+- With the aarch64 backend, fix a bug arising from lack of zero-extension for
+  8/16 bit add/sub with immediate (:ghc-ticket:`23749`).
+
+- Fix a number of bugs having to do with default representation polymorphic type
+  variables (:ghc-ticket:`23153`, :ghc-ticket:`23154`, :ghc-ticket:`23176`).
+
+GHCi and Bytecode Interpreter
+-----------------------------
+
+- Add support for top-level ``Addr#`` literals (:ghc-ticket:`22376`)
+
+- Fix some tag inference bugs when using the bytecode interpreter
+  (:ghc-ticket:`22840`).
+
+- Support the ``foreign import prim`` calling convention in the
+  bytecode interpreter (:ghc-ticket:`22051`).
+
+- Support sized literals in the bytecode interpreter (:ghc-ticket:`21945`).
+
+- Fix a bug with the handling of unboxed tuples in the bytecode interpreter
+  (:ghc-ticket:`23068`).
+
+- Make the bytecode interpreter more robust when run on optimised code
+  (:ghc-ticket:`22958`)
+
+Runtime system
+--------------
+
+- Accurately account for mutator allocations when using the non-moving GC
+  (:ghc-ticket:`23312`).
+
+- Prevent some segfaults by ensuring that pinned allocations respect block size
+  (:ghc-ticket:`23400`).
+
+- Fix warnings with clang 14.0.3 (:ghc-ticket:`23561`).
+
+- On Windows, ensure reliability of IO manager shutdown (:ghc-ticket:`23691`).
+
+- Fix a bug with the GHC linker on windows (:ghc-ticket:`22941`).
+
+Build system and packaging
+--------------------------
+
+- Allow building documentation with sphinx 6.0.0 (:ghc-ticket:`22690`).
+
+- Fix a bug with the install scripts that prevented reinstallation of binary
+  distributions (:ghc-ticket:`23373`).
+
+- Fix some dependency tracking bugs with hadrian (:ghc-ticket:`23554`).
+
+Core libraries
+--------------
+
+- Bump ``base`` to 4.17.2.0
+
+- base: Restore``mingwex`` dependency on Windows (:ghc-ticket:`23309`).
+ 
+- Bump ``process`` to 1.6.17.0
+
+- Bump ``bytestring`` to 0.11.5.1
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/Cabal/Cabal-syntax/Cabal-syntax.cabal:  Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal: Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``ghc`` and ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal: Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+

@@ -6,7 +6,7 @@ VtaFail.hs:7:16: error:
       In an equation for ‘answer_nosig’:
           answer_nosig = pairup_nosig @Int @Bool 5 True
 
-VtaFail.hs:14:17: error: [GHC-95781]
+VtaFail.hs:14:17: error:
     • Cannot apply expression of type ‘p0 -> p0’
       to a visible type argument ‘Int’
     • In the expression: (\ x -> x) @Int 12

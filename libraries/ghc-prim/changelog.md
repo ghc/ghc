@@ -1,3 +1,8 @@
+## 0.9.1 *August 2023*
+
+- Shipped with GHC 9.4.6
+- Restore `mingwex` dependency on Windows (#23309)
+
 ## 0.9.0 *August 2022*
 
 - Shipped with GHC 9.4.1

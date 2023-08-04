@@ -1,5 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.17.2.0 *August 2023*
+
+   * Restore `mingwex` dependency on Windows (#23309).
+
+   * Fix an incorrect CPP guard on `darwin_HOST_OS`.
+
 ## 4.17.1.0 *April 2023*
 
    * Remove `mingwex` dependency on Windows (#22166).
