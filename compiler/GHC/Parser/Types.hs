@@ -29,7 +29,7 @@ import Language.Haskell.Syntax
 data SumOrTuple b
   = Sum ConTag Arity (LocatedA b) [EpaLocation] [EpaLocation]
   -- ^ Last two are the locations of the '|' before and after the payload
-  | Tuple [Either (EpAnn EpaLocation) (LocatedA b)]
+  | Tuple [Either (EpAnn Bool) (LocatedA b)]
 
 pprSumOrTuple :: Outputable b => Boxity -> SumOrTuple b -> SDoc
 pprSumOrTuple boxity = \case

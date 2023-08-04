@@ -418,7 +418,7 @@ type instance XXDotFieldOcc (GhcPass _) = DataConCantHappen
 
 type instance XPresent         (GhcPass _) = NoExtField
 
-type instance XMissing         GhcPs = EpAnn EpaLocation
+type instance XMissing         GhcPs = EpAnn Bool -- True for empty last comma
 type instance XMissing         GhcRn = NoExtField
 type instance XMissing         GhcTc = Scaled Type
 

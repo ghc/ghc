@@ -3119,7 +3119,7 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                                 ; return (Tuple (Right t : snd $2)) } }
            | commas tup_tail
                  { $2 >>= \ $2 ->
-                   do { let {cos = map (\ll -> (Left (EpAnn (anc $ rs ll) (srcSpan2e ll) emptyComments))) (fst $1) }
+                   do { let {cos = map (\ll -> (Left (EpAnn (anc $ rs ll) True emptyComments))) (fst $1) }
                       ; return (Tuple (cos ++ $2)) } }
 
            | texp bars   { unECP $1 >>= \ $1 -> return $
@@ -3132,14 +3132,14 @@ tup_exprs :: { forall b. DisambECP b => PV (SumOrTuple b) }
                     (map srcSpan2e $ fst $3)) }
 
 -- Always starts with commas; always follows an expr
-commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn EpaLocation) (LocatedA b)]) }
+commas_tup_tail :: { forall b. DisambECP b => PV (SrcSpan,[Either (EpAnn Bool) (LocatedA b)]) }
 commas_tup_tail : commas tup_tail
         { $2 >>= \ $2 ->
-          do { let {cos = map (\l -> (Left (EpAnn (anc $ rs l) (srcSpan2e l) emptyComments))) (tail $ fst $1) }
+          do { let {cos = map (\l -> (Left (EpAnn (anc $ rs l) True emptyComments))) (tail $ fst $1) }
              ; return ((head $ fst $1, cos ++ $2)) } }
 
 -- Always follows a comma
-tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn EpaLocation) (LocatedA b)] }
+tup_tail :: { forall b. DisambECP b => PV [Either (EpAnn Bool) (LocatedA b)] }
           : texp commas_tup_tail { unECP $1 >>= \ $1 ->
                                    $2 >>= \ $2 ->
                                    do { t <- amsA $1 [AddCommaAnn (srcSpan2e $ fst $2)]
