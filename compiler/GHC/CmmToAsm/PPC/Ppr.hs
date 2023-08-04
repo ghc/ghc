@@ -280,29 +280,26 @@ pprSectionAlign config sec@(Section seg _) =
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: IsDoc doc => Platform -> SectionType -> doc
 pprAlignForSection platform seg = line $
- let ppc64    = not $ target32Bit platform
- in case seg of
-       Text              -> text ".align 2"
-       Data
-        | ppc64          -> text ".align 3"
-        | otherwise      -> text ".align 2"
-       ReadOnlyData
-        | ppc64          -> text ".align 3"
-        | otherwise      -> text ".align 2"
-       RelocatableReadOnlyData
-        | ppc64          -> text ".align 3"
-        | otherwise      -> text ".align 2"
-       UninitialisedData
-        | ppc64          -> text ".align 3"
-        | otherwise      -> text ".align 2"
-       -- TODO: This is copied from the ReadOnlyData case, but it can likely be
-       -- made more efficient.
-       InitArray         -> text ".align 3"
-       FiniArray         -> text ".align 3"
-       CString
-        | ppc64          -> text ".align 3"
-        | otherwise      -> text ".align 2"
-       OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
+  let ppc64    = not $ target32Bit platform
+      naturalAlignment
+        | ppc64     = 3
+        | otherwise = 2
+      alignment :: Int
+      alignment =
+        case seg of
+          Text              -> 2
+          Data              -> naturalAlignment
+          ReadOnlyData      -> naturalAlignment
+          RelocatableReadOnlyData
+                            -> naturalAlignment
+          UninitialisedData -> naturalAlignment
+          -- TODO: This is copied from the ReadOnlyData case, but it can likely be
+          -- made more efficient.
+          InitArray         -> 3
+          FiniArray         -> 3
+          CString           -> naturalAlignment
+          OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
+  in text ".align" <+> text (show alignment)
 
 pprDataItem :: IsDoc doc => Platform -> CmmLit -> doc
 pprDataItem platform lit
