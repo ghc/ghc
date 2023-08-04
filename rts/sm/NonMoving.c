@@ -38,18 +38,6 @@ static void nonmovingBumpEpoch(void) {
     nonmovingMarkEpoch = nonmovingMarkEpoch == 1 ? 2 : 1;
 }
 
-#if defined(THREADED_RTS)
-/*
- * This mutex ensures that only one non-moving collection is active at a time.
- */
-Mutex nonmoving_collection_mutex;
-
-OSThreadId mark_thread;
-bool concurrent_coll_running = false;
-Condition concurrent_coll_finished;
-Mutex concurrent_coll_finished_lock;
-#endif
-
 /*
  * Note [Non-moving garbage collector]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -546,10 +534,11 @@ memcount nonmoving_segment_live_words = 0;
 // See Note [Sync phase marking budget].
 MarkBudget sync_phase_marking_budget = 200000;
 
-#if defined(THREADED_RTS)
-static void* nonmovingConcurrentMark(void *mark_queue);
-#endif
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent);
+
+static void nonmovingInitConcurrentWorker(void);
+static void nonmovingStartConcurrentMark(MarkQueue *roots);
+static void nonmovingExitConcurrentWorker(void);
 
 // Add a segment to the free list.
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg)
@@ -594,44 +583,14 @@ unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
 void nonmovingInit(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;
-#if defined(THREADED_RTS)
-    initMutex(&nonmoving_collection_mutex);
-    initCondition(&concurrent_coll_finished);
-    initMutex(&concurrent_coll_finished_lock);
-#endif
+    nonmovingInitConcurrentWorker();
     nonmovingMarkInit();
-}
-
-// Stop any nonmoving collection in preparation for RTS shutdown.
-void nonmovingStop(void)
-{
-    if (! RtsFlags.GcFlags.useNonmoving) return;
-#if defined(THREADED_RTS)
-    if (RELAXED_LOAD(&mark_thread)) {
-        debugTrace(DEBUG_nonmoving_gc,
-                   "waiting for nonmoving collector thread to terminate");
-        ACQUIRE_LOCK(&concurrent_coll_finished_lock);
-        waitCondition(&concurrent_coll_finished, &concurrent_coll_finished_lock);
-        RELEASE_LOCK(&concurrent_coll_finished_lock);
-    }
-#endif
 }
 
 void nonmovingExit(void)
 {
     if (! RtsFlags.GcFlags.useNonmoving) return;
-
-    // First make sure collector is stopped before we tear things down.
-    nonmovingStop();
-
-#if defined(THREADED_RTS)
-    ACQUIRE_LOCK(&nonmoving_collection_mutex);
-    RELEASE_LOCK(&nonmoving_collection_mutex);
-
-    closeMutex(&concurrent_coll_finished_lock);
-    closeCondition(&concurrent_coll_finished);
-    closeMutex(&nonmoving_collection_mutex);
-#endif
+    nonmovingExitConcurrentWorker();
 }
 
 /* Prepare the heap bitmaps and snapshot metadata for a mark */
@@ -715,14 +674,19 @@ static void nonmovingPrepareMark(void)
 #endif
 }
 
-void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent STG_UNUSED)
+void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads, bool concurrent)
 {
 #if defined(THREADED_RTS)
-    // We can't start a new collection until the old one has finished
+    // We can't start a new collection until the old one has finished.
     // We also don't run in final GC
-    if (RELAXED_LOAD(&concurrent_coll_running) || getSchedState() > SCHED_RUNNING) {
+    if (nonmovingConcurrentMarkIsRunning()) {
+        trace(TRACE_nonmoving_gc, "Aborted nonmoving collection due to on-going collection");
+    } else if (getSchedState() > SCHED_RUNNING) {
+        trace(TRACE_nonmoving_gc, "Aborted nonmoving collection due to on-going shutdown");
         return;
     }
+#else
+    concurrent = false;
 #endif
 
     trace(TRACE_nonmoving_gc, "Starting nonmoving GC preparation");
@@ -819,28 +783,15 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads, bool c
         concurrent = false;
     }
 
-#if defined(THREADED_RTS)
     if (concurrent) {
-        RELAXED_STORE(&concurrent_coll_running, true);
-        nonmoving_write_barrier_enabled = true;
-        debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
-        OSThreadId thread;
-        if (createOSThread(&thread, "nonmoving-mark",
-                           nonmovingConcurrentMark, mark_queue) != 0) {
-            barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
-        }
-        RELAXED_STORE(&mark_thread, thread);
-        return;
+        nonmovingStartConcurrentMark(mark_queue);
     } else {
         RELEASE_SM_LOCK;
-    }
-#endif
 
-    // Use the weak and thread lists from the preparation for any new weaks and
-    // threads found to be dead in mark.
-    nonmovingMark_(mark_queue, dead_weaks, resurrected_threads, false);
+        // Use the weak and thread lists from the preparation for any new weaks and
+        // threads found to be dead in mark.
+        nonmovingMark_(mark_queue, dead_weaks, resurrected_threads, false);
 
-    if (!concurrent) {
         ACQUIRE_SM_LOCK;
     }
 }
@@ -868,14 +819,155 @@ static bool nonmovingMarkThreadsWeaks(MarkBudget *budget, MarkQueue *mark_queue)
     }
 }
 
-#if defined(THREADED_RTS)
-static void* nonmovingConcurrentMark(void *data)
+#if !defined(THREADED_RTS)
+
+static void nonmovingInitConcurrentWorker(void) {}
+static void nonmovingExitConcurrentWorker(void) {}
+
+static void STG_NORETURN nonmovingStartConcurrentMark(MarkQueue *roots STG_UNUSED)
 {
-    MarkQueue *mark_queue = (MarkQueue*)data;
-    StgWeak *dead_weaks = NULL;
-    StgTSO *resurrected_threads = (StgTSO*)&stg_END_TSO_QUEUE_closure;
-    nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads, true);
-    return NULL;
+    barf("nonmovingStartConcurrentMark: Not supported in non-threaded RTS");
+}
+
+bool nonmovingConcurrentMarkIsRunning(void)
+{
+    return false;
+}
+
+bool nonmovingBlockConcurrentMark(bool wait STG_UNUSED) { return true; }
+void nonmovingUnblockConcurrentMark(void) {}
+
+#else
+
+enum ConcurrentWorkerState {
+    CONCURRENT_WORKER_IDLE,
+    CONCURRENT_WORKER_RUNNING,
+    CONCURRENT_WORKER_STOPPED,
+};
+
+Mutex concurrent_coll_lock;
+MarkQueue *concurrent_mark_roots;
+Condition start_concurrent_mark_cond;
+Condition concurrent_coll_finished_cond;
+enum ConcurrentWorkerState concurrent_worker_state;
+bool stop_concurrent_worker;
+OSThreadId concurrent_worker_thread;
+
+static void* nonmovingConcurrentMarkWorker(void *data STG_UNUSED)
+{
+    newBoundTask();
+
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    while (true) {
+        concurrent_worker_state = CONCURRENT_WORKER_IDLE;
+        waitCondition(&start_concurrent_mark_cond, &concurrent_coll_lock);
+        if (stop_concurrent_worker) {
+            concurrent_worker_state = CONCURRENT_WORKER_STOPPED;
+            concurrent_worker_thread = 0;
+            broadcastCondition(&concurrent_coll_finished_cond);
+            RELEASE_LOCK(&concurrent_coll_lock);
+            return NULL;
+        }
+
+        CHECK(concurrent_worker_state == CONCURRENT_WORKER_RUNNING);
+        MarkQueue *mark_queue = concurrent_mark_roots;
+        concurrent_mark_roots = NULL;
+        RELEASE_LOCK(&concurrent_coll_lock);
+
+        StgWeak *dead_weaks = NULL;
+        StgTSO *resurrected_threads = (StgTSO*)&stg_END_TSO_QUEUE_closure;
+        nonmovingMark_(mark_queue, &dead_weaks, &resurrected_threads, true);
+
+        ACQUIRE_LOCK(&concurrent_coll_lock);
+        broadcastCondition(&concurrent_coll_finished_cond);
+    }
+}
+
+static void nonmovingInitConcurrentWorker(void)
+{
+    debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
+    initMutex(&concurrent_coll_lock);
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    initCondition(&start_concurrent_mark_cond);
+    initCondition(&concurrent_coll_finished_cond);
+    stop_concurrent_worker = false;
+    concurrent_worker_state = CONCURRENT_WORKER_IDLE;
+    concurrent_mark_roots = NULL;
+
+    if (createOSThread(&concurrent_worker_thread, "nonmoving-mark",
+                       nonmovingConcurrentMarkWorker, NULL) != 0) {
+        barf("nonmovingInitConcurrentWorker: failed to spawn mark thread: %s", strerror(errno));
+    }
+    RELEASE_LOCK(&concurrent_coll_lock);
+}
+
+static void nonmovingExitConcurrentWorker(void)
+{
+    debugTrace(DEBUG_nonmoving_gc,
+               "waiting for nonmoving collector thread to terminate");
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    while (concurrent_worker_state != CONCURRENT_WORKER_STOPPED) {
+        stop_concurrent_worker = true;
+        signalCondition(&start_concurrent_mark_cond);
+        waitCondition(&concurrent_coll_finished_cond, &concurrent_coll_lock);
+    }
+    RELEASE_LOCK(&concurrent_coll_lock);
+
+    closeMutex(&concurrent_coll_lock);
+    closeCondition(&start_concurrent_mark_cond);
+    closeCondition(&concurrent_coll_finished_cond);
+}
+
+static void nonmovingStartConcurrentMark(MarkQueue *roots)
+{
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    CHECK(concurrent_worker_state != CONCURRENT_WORKER_RUNNING);
+    concurrent_worker_state = CONCURRENT_WORKER_RUNNING;
+    concurrent_mark_roots = roots;
+    RELAXED_STORE(&nonmoving_write_barrier_enabled, true);
+    signalCondition(&start_concurrent_mark_cond);
+    RELEASE_LOCK(&concurrent_coll_lock);
+}
+
+bool nonmovingConcurrentMarkIsRunning(void)
+{
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    bool running = concurrent_worker_state == CONCURRENT_WORKER_RUNNING;
+    RELEASE_LOCK(&concurrent_coll_lock);
+    return running;
+}
+
+// Prevent the initiation of concurrent marking. Used by the sanity checker to
+// avoid racing with the concurrent mark thread.
+// If `wait` then wait until on-going marking has finished.
+// Returns true if successfully blocked, false if mark is running.
+bool nonmovingBlockConcurrentMark(bool wait)
+{
+    if (!RtsFlags.GcFlags.useNonmoving) {
+        return true;
+    }
+    ACQUIRE_LOCK(&concurrent_coll_lock);
+    if (wait) {
+        while (concurrent_worker_state == CONCURRENT_WORKER_RUNNING) {
+            waitCondition(&concurrent_coll_finished_cond, &concurrent_coll_lock);
+        }
+    }
+    bool running = concurrent_worker_state == CONCURRENT_WORKER_RUNNING;
+    // N.B. We don't release concurrent_coll_lock to block marking.
+    if (running) {
+        RELEASE_LOCK(&concurrent_coll_lock);
+        return false;
+    } else {
+        return true;
+    }
+}
+
+void nonmovingUnblockConcurrentMark(void)
+{
+    if (!RtsFlags.GcFlags.useNonmoving) {
+        return;
+    }
+    RELEASE_LOCK(&concurrent_coll_lock);
 }
 
 // Append w2 to the end of w1.
@@ -893,7 +985,6 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
 #if !defined(THREADED_RTS)
     ASSERT(!concurrent);
 #endif
-    ACQUIRE_LOCK(&nonmoving_collection_mutex);
     debugTrace(DEBUG_nonmoving_gc, "Starting mark...");
     stat_startNonmovingGc();
 
@@ -933,10 +1024,7 @@ concurrent_marking:
     }
 
 #if defined(THREADED_RTS)
-    Task *task = NULL;
     if (concurrent) {
-        task = newBoundTask();
-
         // If at this point if we've decided to exit then just return
         if (getSchedState() > SCHED_RUNNING) {
             // Note that we break our invariants here and leave segments in
@@ -952,7 +1040,7 @@ concurrent_marking:
         }
 
         // We're still running, request a sync
-        nonmovingBeginFlush(task);
+        nonmovingBeginFlush(myTask());
 
         bool all_caps_syncd;
         MarkBudget sync_marking_budget = sync_phase_marking_budget;
@@ -963,7 +1051,7 @@ concurrent_marking:
                 // See Note [Sync phase marking budget].
                 traceConcSyncEnd();
                 stat_endNonmovingGcSync();
-                releaseAllCapabilities(n_capabilities, NULL, task);
+                releaseAllCapabilities(n_capabilities, NULL, myTask());
                 goto concurrent_marking;
             }
         } while (!all_caps_syncd);
@@ -1045,7 +1133,7 @@ concurrent_marking:
 #if !defined(NONCONCURRENT_SWEEP)
     if (concurrent) {
         nonmoving_write_barrier_enabled = false;
-        nonmovingFinishFlush(task);
+        nonmovingFinishFlush(myTask());
     }
 #endif
 #endif
@@ -1097,24 +1185,10 @@ concurrent_marking:
     }
 #endif
 
-    // TODO: Remainder of things done by GarbageCollect (update stats)
-
 #if defined(THREADED_RTS)
 finish:
-    if (concurrent) {
-        exitMyTask();
-
-        // We are done...
-        RELAXED_STORE(&mark_thread, 0);
-        stat_endNonmovingGc();
-    }
-
-    // Signal that the concurrent collection is finished, allowing the next
-    // non-moving collection to proceed
-    RELAXED_STORE(&concurrent_coll_running, false);
-    signalCondition(&concurrent_coll_finished);
-    RELEASE_LOCK(&nonmoving_collection_mutex);
 #endif
+    stat_endNonmovingGc();
 }
 
 #if defined(DEBUG)

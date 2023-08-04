@@ -124,15 +124,12 @@ extern struct NonmovingHeap nonmovingHeap;
 
 extern memcount nonmoving_segment_live_words;
 
-#if defined(THREADED_RTS)
-extern bool concurrent_coll_running;
-extern Mutex nonmoving_collection_mutex;
-#endif
-
 void nonmovingInit(void);
-void nonmovingStop(void);
 void nonmovingExit(void);
+bool nonmovingConcurrentMarkIsRunning(void);
 
+bool nonmovingBlockConcurrentMark(bool wait);
+void nonmovingUnblockConcurrentMark(void);
 
 // dead_weaks and resurrected_threads lists are used for two things:
 //
