@@ -4183,7 +4183,7 @@ names, for example, this would be simplified. This change would almost
 certainly degrade error messages a bit, though.
 -}
 
--- ^ From information about a source datacon definition, extract out
+-- | From information about a source datacon definition, extract out
 -- what the universal variables and the GADT equalities should be.
 -- See Note [mkGADTVars].
 mkGADTVars :: [TyVar]    -- ^ The tycon vars
@@ -4245,7 +4245,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
               eqs'     = (t_tv', r_ty) : eqs
 
       | otherwise
-      = pprPanic "mkGADTVars" (ppr tmpl_tvs $$ ppr subst)
+      = choose (t_tv:univs) eqs t_sub r_sub t_tvs
 
       -- choose an appropriate name for a univ tyvar.
       -- This *must* preserve the Unique of the result tv, so that we
@@ -4713,7 +4713,7 @@ checkValidDataCon dflags existential_ok tc con
           -- See Note [DataCon user type variable binders] in GHC.Core.DataCon
           -- checked here because we sometimes build invalid DataCons before
           -- erroring above here
-        ; when debugIsOn $
+        ; when debugIsOn $ whenNoErrs $
           massertPpr (checkDataConTyVars con) $
           ppr con $$  ppr (dataConFullSig con) $$ ppr (dataConUserTyVars con)
 
