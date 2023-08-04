@@ -716,7 +716,7 @@ PauseToken *rts_pause (void)
     // so pausing the mutator while a collection is ongoing might lead to deadlock or
     // capabilities being prematurely re-awoken.
     if (RtsFlags.GcFlags.useNonmoving) {
-      ACQUIRE_LOCK(&nonmoving_collection_mutex);
+        nonmovingBlockConcurrentMark(true);
     }
 
 
@@ -784,7 +784,7 @@ void rts_resume (PauseToken *pauseToken)
     stgFree(pauseToken);
 
     if (RtsFlags.GcFlags.useNonmoving) {
-      RELEASE_LOCK(&nonmoving_collection_mutex);
+        nonmovingUnblockConcurrentMark();
     }
 }
 

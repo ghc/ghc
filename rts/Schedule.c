@@ -2786,7 +2786,6 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // If we haven't killed all the threads yet, do it now.
     if (getSchedState() < SCHED_SHUTTING_DOWN) {
         setSchedState(SCHED_INTERRUPTING);
-        nonmovingStop();
         Capability *cap = task->cap;
         waitForCapability(&cap,task);
         scheduleDoGC(&cap,task,true,false,false,true);
