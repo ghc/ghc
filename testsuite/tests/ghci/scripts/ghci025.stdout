@@ -54,7 +54,7 @@ Prelude.length :: Data.Foldable.Foldable t => t a -> GHC.Types.Int
 type T.Integer :: *
 data T.Integer = ...
 T.length ::
-  bytestring-0.11.4.0:Data.ByteString.Internal.Type.ByteString
+  bytestring-0.11.5.1:Data.ByteString.Internal.Type.ByteString
   -> GHC.Types.Int
 :browse! T
 -- defined locally

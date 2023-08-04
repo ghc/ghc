@@ -19,19 +19,19 @@ instance Ord Data.ByteString.Lazy.ByteString
 
 type Data.ByteString.ByteString :: *
 data Data.ByteString.ByteString
-  = bytestring-0.11.4.0:Data.ByteString.Internal.Type.BS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
+  = bytestring-0.11.5.1:Data.ByteString.Internal.Type.BS {-# UNPACK #-}(GHC.ForeignPtr.ForeignPtr
                                                                           GHC.Word.Word8)
                                                          {-# UNPACK #-}Int
-  	-- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  	-- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Monoid Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Read Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Semigroup Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Show Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Eq Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
 instance Ord Data.ByteString.ByteString
-  -- Defined in ‘bytestring-0.11.4.0:Data.ByteString.Internal.Type’
+  -- Defined in ‘bytestring-0.11.5.1:Data.ByteString.Internal.Type’
