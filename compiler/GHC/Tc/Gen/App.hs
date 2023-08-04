@@ -840,19 +840,14 @@ tc_inst_forall_arg conc_tvs (tvb, inner_ty) hs_ty
              -- Example: user wrote e.g. (#,#) @(F Bool) for a type family F.
              -- Emit [W] F Bool ~ kappa[conc] and pretend the user wrote (#,#) @kappa.
              do { mco <- unifyConcrete (occNameFS $ getOccName $ tv_nm) conc ty_arg0
-                ; let ty_arg = case mco of { MRefl -> ty_arg0; MCo co -> coercionRKind co }
-                ; liftZonkM $ zonkTcType ty_arg }
-                -- (zonk here to match the zonk below, because unifyConcrete can
-                -- perform unification)
-
-       ; inner_ty <- liftZonkM $ zonkTcType inner_ty
-             -- See Note [Visible type application zonk]
+                ; return $ case mco of { MRefl -> ty_arg0; MCo co -> coercionRKind co } }
 
        ; let fun_ty    = mkForAllTy tvb inner_ty
              in_scope  = mkInScopeSet (tyCoVarsOfTypes [fun_ty, ty_arg])
              insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
-                         -- NB: tv and ty_arg have the same kind, so this
-                         --     substitution is kind-respecting
+               -- This substitution is well-kinded even when inner_ty
+               -- is not fully zonked, because ty_arg is fully zonked.
+               -- See Note [Type application substitution].
 
        ; traceTc "tc_inst_forall_arg (VTA/VDQ)" (
                   vcat [ text "fun_ty" <+> ppr fun_ty
@@ -1141,35 +1136,39 @@ Downside: the typechecked term has lost its visible type arguments; we
 don't even kind-check them.  But let's jump that bridge if we come to
 it.  Meanwhile, let's not crash!
 
-
-Note [Visible type application zonk]
+Note [Type application substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Substitutions should be kind-preserving, so we need kind(tv) = kind(ty_arg).
+In `tc_inst_forall_arg`, suppose we are checking a visible type
+application `f @hs_ty`, where `f :: forall (a :: k). body`.  We will:
+  * Compute `ty <- tcHsTypeApp hs_ty k`
+  * Then substitute `a :-> ty` in `body`.
+Now, you might worry that `a` might not have the same kind as `ty`, so that the
+substitution isn't kind-preserving.  How can that happen?  The kinds will
+definitely be the same after zonking, and `ty` will be zonked (as this is
+a postcondition of `tcHsTypeApp`). But the function type `forall a. body`
+might not be fully zonked (hence the worry).
 
-* tcHsTypeApp only guarantees that
-    - ty_arg is zonked
-    - kind(zonk(tv)) = kind(ty_arg)
-  (checkExpectedKind zonks as it goes).
+But it's OK!  During type checking, we don't require types to be well-kinded (without
+zonking); we only require them to satsisfy the Purely Kinded Type Invariant (PKTI).
+See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType.
 
-So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
-and inner_ty. Otherwise we can build an ill-kinded type. An example was #14158,
-where we had:
-   id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
-and we had the visible type application
-  id @(->)
+In the case of a type application:
+  * `forall a. body` satisfies the PKTI
+  * `ty` is zonked
+  * If we substitute a fully-zonked thing into an un-zonked Type that
+    satisfies the PKTI, the result still satisfies the PKTI.
 
-* We instantiated k := kappa, yielding
-    forall (cat :: kappa -> kappa -> *). forall (a :: kappa). cat a a
-* Then we called tcHsTypeApp (->) with expected kind (kappa -> kappa -> *).
-* That instantiated (->) as ((->) q1 q1), and unified kappa := q1,
-  Here q1 :: RuntimeRep
-* Now we substitute
-     cat  :->  (->) q1 q1 :: TYPE q1 -> TYPE q1 -> *
-  but we must first zonk the inner_ty to get
-      forall (a :: TYPE q1). cat a a
-  so that the result of substitution is well-kinded
-  Failing to do so led to #14158.
+This last statement isn't obvious, but read
+Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType.
+The tricky case is when `body` contains an application of the form `a b1 ... bn`,
+and we substitute `a :-> ty` where `ty` has fewer arrows in its kind than `a` does.
+That can't happen: the call `tcHsTypeApp hs_ty k` would have rejected the
+type application as ill-kinded.
 
+Historical remark: we used to require a stronger invariant than the PKTI,
+namely that all types are well-kinded prior to zonking. In that context, we did
+need to zonk `body` before performing the substitution above. See test case
+#14158, as well as the discussion in #23661.
 -}
 
 {- *********************************************************************
