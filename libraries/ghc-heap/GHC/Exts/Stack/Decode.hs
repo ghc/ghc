@@ -36,7 +36,6 @@ import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.Constants (wORD_SIZE_IN_BITS)
 import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Stack.Constants
-import GHC.IO (IO (..))
 import GHC.Stack.CloneStack
 import GHC.Word
 import Prelude
@@ -167,7 +166,7 @@ getInfoTableForStack stackSnapshot# =
 
 foreign import prim "getStackClosurezh"
   getStackClosure# ::
-    StackSnapshot# -> Word# -> State# RealWorld -> (# State# RealWorld, Any #)
+    StackSnapshot# -> Word# ->  Any
 
 foreign import prim "getStackFieldszh"
   getStackFields# ::
@@ -202,18 +201,12 @@ advanceStackFrameLocation ((StackSnapshot stackSnapshot#), index) =
     primWordToWordOffset :: Word# -> WordOffset
     primWordToWordOffset w# = fromIntegral (W# w#)
 
-getClosureBox :: StackSnapshot# -> WordOffset -> IO Box
+getClosureBox :: StackSnapshot# -> WordOffset -> Box
 getClosureBox stackSnapshot# index =
-  -- Beware! We have to put ptr into a Box immediately. Otherwise, the garbage
-  -- collector might move the referenced closure, without updating our reference
-  -- (pointer) to it.
-  IO $ \s ->
-      case getStackClosure#
-        stackSnapshot#
-        (wordOffsetToWord# index)
-        s of
-        (# s1, ptr #) ->
-          (# s1, Box ptr #)
+        case getStackClosure# stackSnapshot# (wordOffsetToWord# index) of
+          -- c needs to be strictly evaluated, otherwise a thunk gets boxed (and
+          -- will later be decoded as such)
+          !c -> Box c
 
 -- | Representation of @StgLargeBitmap@ (RTS)
 data LargeBitmap = LargeBitmap
@@ -230,10 +223,10 @@ decodeLargeBitmap getterFun# stackSnapshot# index relativePayloadOffset = do
   let largeBitmap = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
         (# wordsAddr#, size# #) -> LargeBitmap (W# size#) (Ptr wordsAddr#)
   bitmapWords <- largeBitmapToList largeBitmap
-  decodeBitmaps
-    stackSnapshot#
-    (index + relativePayloadOffset)
-    (bitmapWordsPointerness (largeBitmapSize largeBitmap) bitmapWords)
+  pure $ decodeBitmaps
+          stackSnapshot#
+          (index + relativePayloadOffset)
+          (bitmapWordsPointerness (largeBitmapSize largeBitmap) bitmapWords)
   where
     largeBitmapToList :: LargeBitmap -> IO [Word]
     largeBitmapToList LargeBitmap {..} =
@@ -265,24 +258,23 @@ bitmapWordPointerness bSize bitmapWord =
       (bSize - 1)
       (bitmapWord `shiftR` 1)
 
-decodeBitmaps :: StackSnapshot# -> WordOffset -> [Pointerness] -> IO [StackField]
+decodeBitmaps :: StackSnapshot# -> WordOffset -> [Pointerness] -> [StackField]
 decodeBitmaps stack# index ps =
-  zipWithM toPayload ps [index ..]
+  zipWith toPayload ps [index ..]
   where
-    toPayload :: Pointerness -> WordOffset -> IO StackField
+    toPayload :: Pointerness -> WordOffset -> StackField
     toPayload p i = case p of
-      NonPointer ->
-        pure $ StackWord (getWord stack# i)
-      Pointer -> StackBox <$> getClosureBox stack# i
+      NonPointer -> StackWord (getWord stack# i)
+      Pointer -> StackBox (getClosureBox stack# i)
 
-decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> IO [StackField]
+decodeSmallBitmap :: SmallBitmapGetter -> StackSnapshot# -> WordOffset -> WordOffset -> [StackField]
 decodeSmallBitmap getterFun# stackSnapshot# index relativePayloadOffset =
   let (bitmap, size) = case getterFun# stackSnapshot# (wordOffsetToWord# index) of
         (# b#, s# #) -> (W# b#, W# s#)
-   in decodeBitmaps
-        stackSnapshot#
-        (index + relativePayloadOffset)
-        (bitmapWordPointerness size bitmap)
+  in decodeBitmaps
+      stackSnapshot#
+      (index + relativePayloadOffset)
+      (bitmapWordPointerness size bitmap)
 
 unpackStackFrame :: StackFrameLocation -> IO StackFrame
 unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
@@ -293,7 +285,7 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
     unpackStackFrame' info =
       case tipe info of
         RET_BCO -> do
-          bco' <- getClosureBox stackSnapshot# (index + offsetStgClosurePayload)
+          let bco' = getClosureBox stackSnapshot# (index + offsetStgClosurePayload)
           -- The arguments begin directly after the payload's one element
           bcoArgs' <- decodeLargeBitmap getBCOLargeBitmap# stackSnapshot# index (offsetStgClosurePayload + 1)
           pure
@@ -302,13 +294,14 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 bco = bco',
                 bcoArgs = bcoArgs'
               }
-        RET_SMALL -> do
-          payload' <- decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgClosurePayload
-          pure $
-            RetSmall
-              { info_tbl = info,
-                stack_payload = payload'
-              }
+        RET_SMALL ->
+          let payload' = decodeSmallBitmap getSmallBitmap# stackSnapshot# index offsetStgClosurePayload
+          in
+            pure $
+              RetSmall
+                { info_tbl = info,
+                  stack_payload = payload'
+                }
         RET_BIG -> do
           payload' <- decodeLargeBitmap getLargeBitmap# stackSnapshot# index offsetStgClosurePayload
           pure $
@@ -318,11 +311,11 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
               }
         RET_FUN -> do
           let retFunSize' = getWord stackSnapshot# (index + offsetStgRetFunFrameSize)
-          retFunFun' <- getClosureBox stackSnapshot# (index + offsetStgRetFunFrameFun)
+              retFunFun' = getClosureBox stackSnapshot# (index + offsetStgRetFunFrameFun)
           retFunPayload' <-
             if isArgGenBigRetFunType stackSnapshot# index == True
               then decodeLargeBitmap getRetFunLargeBitmap# stackSnapshot# index offsetStgRetFunFramePayload
-              else decodeSmallBitmap getRetFunSmallBitmap# stackSnapshot# index offsetStgRetFunFramePayload
+              else pure $ decodeSmallBitmap getRetFunSmallBitmap# stackSnapshot# index offsetStgRetFunFramePayload
           pure $
             RetFun
               { info_tbl = info,
@@ -330,16 +323,17 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
                 retFunFun = retFunFun',
                 retFunPayload = retFunPayload'
               }
-        UPDATE_FRAME -> do
-          updatee' <- getClosureBox stackSnapshot# (index + offsetStgUpdateFrameUpdatee)
-          pure $
-            UpdateFrame
-              { info_tbl = info,
-                updatee = updatee'
-              }
+        UPDATE_FRAME ->
+          let updatee' = getClosureBox stackSnapshot# (index + offsetStgUpdateFrameUpdatee)
+          in
+            pure $
+              UpdateFrame
+                { info_tbl = info,
+                  updatee = updatee'
+                }
         CATCH_FRAME -> do
           let exceptions_blocked' = getWord stackSnapshot# (index + offsetStgCatchFrameExceptionsBlocked)
-          handler' <- getClosureBox stackSnapshot# (index + offsetStgCatchFrameHandler)
+              handler' = getClosureBox stackSnapshot# (index + offsetStgCatchFrameHandler)
           pure $
             CatchFrame
               { info_tbl = info,
@@ -356,34 +350,36 @@ unpackStackFrame (StackSnapshot stackSnapshot#, index) = do
               }
         STOP_FRAME -> pure $ StopFrame {info_tbl = info}
         ATOMICALLY_FRAME -> do
-          atomicallyFrameCode' <- getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameCode)
-          result' <- getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameResult)
+          let atomicallyFrameCode' = getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameCode)
+              result' = getClosureBox stackSnapshot# (index + offsetStgAtomicallyFrameResult)
           pure $
             AtomicallyFrame
               { info_tbl = info,
                 atomicallyFrameCode = atomicallyFrameCode',
                 result = result'
               }
-        CATCH_RETRY_FRAME -> do
+        CATCH_RETRY_FRAME ->
           let running_alt_code' = getWord stackSnapshot# (index + offsetStgCatchRetryFrameRunningAltCode)
-          first_code' <- getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameRunningFirstCode)
-          alt_code' <- getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameAltCode)
-          pure $
-            CatchRetryFrame
-              { info_tbl = info,
-                running_alt_code = running_alt_code',
-                first_code = first_code',
-                alt_code = alt_code'
-              }
-        CATCH_STM_FRAME -> do
-          catchFrameCode' <- getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameCode)
-          handler' <- getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameHandler)
-          pure $
-            CatchStmFrame
-              { info_tbl = info,
-                catchFrameCode = catchFrameCode',
-                handler = handler'
-              }
+              first_code' = getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameRunningFirstCode)
+              alt_code' = getClosureBox stackSnapshot# (index + offsetStgCatchRetryFrameAltCode)
+          in
+            pure $
+              CatchRetryFrame
+                { info_tbl = info,
+                  running_alt_code = running_alt_code',
+                  first_code = first_code',
+                  alt_code = alt_code'
+                }
+        CATCH_STM_FRAME ->
+          let catchFrameCode' = getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameCode)
+              handler' = getClosureBox stackSnapshot# (index + offsetStgCatchSTMFrameHandler)
+          in
+            pure $
+              CatchStmFrame
+                { info_tbl = info,
+                  catchFrameCode = catchFrameCode',
+                  handler = handler'
+                }
         x -> error $ "Unexpected closure type on stack: " ++ show x
 
 -- | Unbox 'Int#' from 'Int'
