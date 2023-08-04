@@ -1,0 +1,108 @@
+cabal-version:  2.2
+name:           ghc-prim
+version:        0.10.0
+-- NOTE: Don't forget to update ./changelog.md
+license:        BSD-3-Clause
+license-file:   LICENSE
+category:       GHC
+maintainer:     libraries@haskell.org
+bug-reports:    https://gitlab.haskell.org/ghc/ghc/issues/new
+synopsis:       GHC primitives
+build-type:     Custom
+description:
+    This package contains the primitive types and operations supplied by GHC.
+
+    It is an internal package, only for the use of GHC developers.
+    GHC users should not use it!  If you do use it then expect
+    breaking changes at any time without warning.  You should prefer
+    to import @GHC.Exts@ from the @base@ package instead.
+
+extra-source-files: changelog.md
+
+source-repository head
+    type:     git
+    location: https://gitlab.haskell.org/ghc/ghc.git
+    subdir:   libraries/ghc-prim
+
+custom-setup
+    setup-depends: base >= 4 && < 5, process, filepath, directory, Cabal >= 1.23 && < 3.9
+
+flag need-atomic
+  default: False
+
+Library
+    default-language: Haskell2010
+    other-extensions:
+        BangPatterns
+        CPP
+        DeriveGeneric
+        MagicHash
+        MultiParamTypeClasses
+        NoImplicitPrelude
+        StandaloneDeriving
+        Trustworthy
+        TypeFamilies
+        UnboxedTuples
+        UnliftedFFITypes
+
+    build-depends: rts == 1.0.*
+
+    exposed-modules:
+        GHC.CString
+        GHC.Classes
+        GHC.Debug
+        GHC.Magic
+        GHC.Magic.Dict
+        GHC.Prim.Ext
+        GHC.Prim.Panic
+        GHC.Prim.Exception
+        GHC.Prim.PtrEq
+        GHC.PrimopWrappers
+        GHC.Tuple
+        GHC.Tuple.Prim
+        GHC.Types
+
+    virtual-modules:
+        GHC.Prim
+
+    -- OS Specific
+    if os(windows)
+        -- Windows requires some extra libraries for linking because the RTS
+        -- is no longer re-exporting them (see #11223)
+        -- ucrt: standard C library. The RTS will automatically include this,
+        --       but is added for completeness.
+        -- mingwex: provides GNU POSIX extensions that aren't provided by ucrt.
+        -- mingw32: Unfortunately required because of a resource leak between
+        --          mingwex and mingw32. the __math_err symbol is defined in
+        --          mingw32 which is required by mingwex.
+        -- user32: provides access to apis to modify user components (UI etc)
+        --         on Windows. Required because of mingw32.
+        extra-libraries: user32, mingw32, mingwex, ucrt
+
+    if os(linux)
+        -- we need libm, but for musl and other's we might need libc, as libm
+        -- is just an empty shell.
+        extra-libraries: c, m
+
+    if flag(need-atomic)
+        -- for 64-bit atomic ops on armel (#20549)
+        extra-libraries: atomic
+
+    if !os(ghcjs)
+      c-sources:
+          cbits/atomic.c
+          cbits/bswap.c
+          cbits/bitrev.c
+          cbits/clz.c
+          cbits/ctz.c
+          cbits/debug.c
+          cbits/longlong.c
+          cbits/mulIntMayOflo.c
+          cbits/pdep.c
+          cbits/pext.c
+          cbits/popcnt.c
+          cbits/word2float.c
+
+    -- We need to set the unit ID to ghc-prim (without a version number)
+    -- as it's magic.
+    ghc-options: -this-unit-id ghc-prim

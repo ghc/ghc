@@ -83,7 +83,6 @@ import GHC.Types.Hint
 import GHC.Types.Error
 import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
-import GHC.Unit.Module.Warnings  ( WarningTxt(..) )
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.TyCon
@@ -114,7 +113,6 @@ import Control.Monad
 import Data.Either      ( partitionEithers )
 import Data.Function    ( on )
 import Data.List        ( find, partition, groupBy, sortBy )
-import Data.Foldable    ( for_ )
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Semigroup as Semi
 import System.IO.Unsafe ( unsafePerformIO )
@@ -182,7 +180,7 @@ deprecation warnings during renaming.  At the moment, you don't get any
 warning until you use the identifier further downstream.  This would
 require adjusting addUsedGRE so that during signature compilation,
 we do not report deprecation warnings for LocalDef.  See also
-Note [Handling of deprecations]
+Note [Handling of deprecations] in GHC.Rename.Utils
 -}
 
 newTopSrcBinder :: LocatedN RdrName -> RnM Name
@@ -1698,72 +1696,7 @@ lookupGreAvailRn rdr_name
 *                                                      *
 *********************************************************
 
-Note [Handling of deprecations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* We report deprecations at each *occurrence* of the deprecated thing
-  (see #5867 and #4879)
-
-* We do not report deprecations for locally-defined names. For a
-  start, we may be exporting a deprecated thing. Also we may use a
-  deprecated thing in the defn of another deprecated things.  We may
-  even use a deprecated thing in the defn of a non-deprecated thing,
-  when changing a module's interface.
-
-* We also report deprecations at export sites, but only for names
-  deprecated with export deprecations (since those are not transitive as opposed
-  to regular name deprecations and are only reported at the importing module)
-
-* addUsedGREs: we do not report deprecations for sub-binders:
-     - the ".." completion for records
-     - the ".." in an export item 'T(..)'
-     - the things exported by a module export 'module M'
--}
-
-addUsedDataCons :: GlobalRdrEnv -> TyCon -> RnM ()
--- Remember use of in-scope data constructors (#7969)
-addUsedDataCons rdr_env tycon
-  = addUsedGREs NoDeprecationWarnings
-      [ gre
-      | dc <- tyConDataCons tycon
-      , Just gre <- [lookupGRE_Name rdr_env (dataConName dc)] ]
-
--- | Whether to report deprecation warnings when registering a used GRE
---
--- There is no option to only emit declaration warnings since everywhere
--- we emit the declaration warnings we also emit export warnings
--- (See Note [Handling of deprecations] for details)
-data DeprecationWarnings
-  = NoDeprecationWarnings
-  | ExportDeprecationWarnings
-  | AllDeprecationWarnings
-
-addUsedGRE :: DeprecationWarnings -> GlobalRdrElt -> RnM ()
--- Called for both local and imported things
--- Add usage *and* warn if deprecated
-addUsedGRE warn_if_deprec gre
-  = do { condWarnIfDeprecated warn_if_deprec [gre]
-       ; when (isImportedGRE gre) $ -- See Note [Using isImportedGRE in addUsedGRE]
-         do { env <- getGblEnv
-             -- Do not report the GREInfo (#23424)
-            ; traceRn "addUsedGRE" (ppr $ greName gre)
-            ; updTcRef (tcg_used_gres env) (gre :) } }
-
-addUsedGREs :: DeprecationWarnings -> [GlobalRdrElt] -> RnM ()
--- Record uses of any *imported* GREs
--- Used for recording used sub-bndrs
--- NB: no call to warnIfDeprecated; see Note [Handling of deprecations]
-addUsedGREs warn_if_deprec gres
-  = do { condWarnIfDeprecated warn_if_deprec gres
-       ; unless (null imp_gres) $
-         do { env <- getGblEnv
-              -- Do not report the GREInfo (#23424)
-            ; traceRn "addUsedGREs" (ppr $ map greName imp_gres)
-            ; updTcRef (tcg_used_gres env) (imp_gres ++) } }
-  where
-    imp_gres = filter isImportedGRE gres
-    -- See Note [Using isImportedGRE in addUsedGRE]
-
-{- Note [Using isImportedGRE in addUsedGRE]
+Note [Using isImportedGRE in addUsedGRE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In addUsedGRE, we want to add any used imported GREs to the tcg_used_gres field,
 so that we can emit appropriate warnings (see GHC.Rename.Names.warnUnusedImportDecls).
@@ -1777,70 +1710,39 @@ in which case we have both gre_lcl = False and gre_imp = emptyBag.
 Geting this wrong can lead to panics in e.g. bestImport, see #23240.
 -}
 
-condWarnIfDeprecated :: DeprecationWarnings -> [GlobalRdrElt] -> RnM ()
-condWarnIfDeprecated NoDeprecationWarnings _ = return ()
-condWarnIfDeprecated opt gres = do
-  this_mod <- getModule
-  let external_gres
-        = filterOut (nameIsLocalOrFrom this_mod . greName) gres
-  mapM_ (\gre -> warnIfExportDeprecated gre >> maybeWarnDeclDepr gre) external_gres
-  where
-    maybeWarnDeclDepr = case opt of
-      ExportDeprecationWarnings -> const $ return ()
-      AllDeprecationWarnings    -> warnIfDeclDeprecated
+addUsedDataCons :: GlobalRdrEnv -> TyCon -> RnM ()
+-- Remember use of in-scope data constructors (#7969)
+addUsedDataCons rdr_env tycon
+  = addUsedGREs NoDeprecationWarnings
+      [ gre
+      | dc <- tyConDataCons tycon
+      , Just gre <- [lookupGRE_Name rdr_env (dataConName dc)] ]
 
-warnIfDeclDeprecated :: GlobalRdrElt -> RnM ()
-warnIfDeclDeprecated gre@(GRE { gre_imp = iss })
-  | Just imp_spec <- headMaybe iss
-  = do { dflags <- getDynFlags
-       ; when (wopt_any_custom dflags) $
-                   -- See Note [Handling of deprecations]
-         do { iface <- loadInterfaceForName doc name
-            ; case lookupImpDeclDeprec iface gre of
-                Just deprText -> addDiagnostic $
-                  TcRnPragmaWarning
-                      PragmaWarningName
-                        { pwarn_occname = occ
-                        , pwarn_impmod  = importSpecModule imp_spec
-                        , pwarn_declmod = definedMod }
-                      deprText
-                Nothing  -> return () } }
-  | otherwise
-  = return ()
-  where
-    occ = greOccName gre
-    name = greName gre
-    definedMod = moduleName $ assertPpr (isExternalName name) (ppr name) (nameModule name)
-    doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
+addUsedGRE :: DeprecationWarnings -> GlobalRdrElt -> RnM ()
+-- Called for both local and imported things
+-- Add usage *and* warn if deprecated
+addUsedGRE warn_if_deprec gre
+  = do { warnIfDeprecated warn_if_deprec [gre]
+       ; when (isImportedGRE gre) $ -- See Note [Using isImportedGRE in addUsedGRE]
+         do { env <- getGblEnv
+             -- Do not report the GREInfo (#23424)
+            ; traceRn "addUsedGRE" (ppr $ greName gre)
+            ; updTcRef (tcg_used_gres env) (gre :) } }
 
-lookupImpDeclDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
-lookupImpDeclDeprec iface gre
-  -- Bleat if the thing, or its parent, is warn'd
-  = mi_decl_warn_fn (mi_final_exts iface) (greOccName gre) `mplus`
-    case greParent gre of
-       ParentIs p -> mi_decl_warn_fn (mi_final_exts iface) (nameOccName p)
-       NoParent   -> Nothing
-
-warnIfExportDeprecated :: GlobalRdrElt -> RnM ()
-warnIfExportDeprecated gre@(GRE { gre_imp = iss })
-  = do { mod_warn_mbs <- mapBagM process_import_spec iss
-       ; for_ (sequence mod_warn_mbs) $ mapM
-           $ \(importing_mod, warn_txt) -> addDiagnostic $
-             TcRnPragmaWarning
-                PragmaWarningExport
-                  { pwarn_occname = occ
-                  , pwarn_impmod  = importing_mod }
-                warn_txt }
+addUsedGREs :: DeprecationWarnings -> [GlobalRdrElt] -> RnM ()
+-- Record uses of any *imported* GREs
+-- Used for recording used sub-bndrs
+-- NB: no call to warnIfDeprecated; see Note [Handling of deprecations] in GHC.Rename.Utils
+addUsedGREs warn_if_deprec gres
+  = do { warnIfDeprecated warn_if_deprec gres
+       ; unless (null imp_gres) $
+         do { env <- getGblEnv
+              -- Do not report the GREInfo (#23424)
+            ; traceRn "addUsedGREs" (ppr $ map greName imp_gres)
+            ; updTcRef (tcg_used_gres env) (imp_gres ++) } }
   where
-    occ = greOccName gre
-    name = greName gre
-    doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
-    process_import_spec :: ImportSpec -> RnM (Maybe (ModuleName, WarningTxt GhcRn))
-    process_import_spec is = do
-      let mod = is_mod $ is_decl is
-      iface <- loadInterfaceForModule doc mod
-      let mb_warn_txt = mi_export_warn_fn (mi_final_exts iface) name
-      return $ (moduleName mod, ) <$> mb_warn_txt
+    imp_gres = filter isImportedGRE gres
+    -- See Note [Using isImportedGRE in addUsedGRE]
 
 {-
 Note [Used names with interface not loaded]

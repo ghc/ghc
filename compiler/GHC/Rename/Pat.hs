@@ -682,12 +682,15 @@ rnConPatAndThen mk con (RecCon rpats)
             }
         }
 
-checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
+checkUnusedRecordWildcardCps :: SrcSpan
+                             -> Maybe [ImplicitFieldBinders]
+                             -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
   CpsRn (\thing -> do
                     (r, fvs) <- thing ()
                     checkUnusedRecordWildcard loc fvs dotdot_names
                     return (r, fvs) )
+
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> LocatedN Name      -- Constructor
@@ -698,7 +701,7 @@ rnHsRecPatsAndThen mk (L _ con)
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
        ; flds' <- mapM rn_field (flds `zip` [1..])
-       ; check_unused_wildcard (implicit_binders flds' <$> dd)
+       ; check_unused_wildcard (lHsRecFieldsImplicits flds' <$> unLoc <$> dd)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
@@ -707,11 +710,6 @@ rnHsRecPatsAndThen mk (L _ con)
          ; return (L l (fld { hfbRHS = arg' })) }
 
     loc = maybe noSrcSpan getLoc dd
-
-    -- Get the arguments of the implicit binders
-    implicit_binders fs (unLoc -> RecFieldsDotDot n) = collectPatsBinders CollNoDictBinders implicit_pats
-      where
-        implicit_pats = map (hfbRHS . unLoc) (drop n fs)
 
     -- Don't warn for let P{..} = ... in ...
     check_unused_wildcard = case mk of

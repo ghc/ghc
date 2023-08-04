@@ -4,7 +4,7 @@
 {-|
 Module      : GHC.Hs.Utils
 Description : Generic helpers for the HsSyn type.
-Copyright   : (c) The University of Glasgow, 1992-2006
+Copyright   : (c) The University of Glasgow, 1992-2023
 
 Here we collect a variety of helper functions that construct or
 analyse HsSyn.  All these functions deal with generic HsSyn; functions
@@ -35,8 +35,10 @@ just attach noSrcSpan to everything.
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module GHC.Hs.Utils(
   -- * Terms
@@ -105,7 +107,9 @@ module GHC.Hs.Utils(
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
 
   -- * Collecting implicit binders
-  lStmtsImplicits, hsValBindsImplicits, lPatImplicits
+  ImplicitFieldBinders(..),
+  lStmtsImplicits, hsValBindsImplicits, lPatImplicits,
+  lHsRecFieldsImplicits
   ) where
 
 import GHC.Prelude hiding (head, init, last, tail)
@@ -151,7 +155,6 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 
 import Control.Arrow ( first )
-import Data.Either ( partitionEithers )
 import Data.Foldable ( toList )
 import Data.List ( partition )
 import Data.List.NonEmpty ( nonEmpty )
@@ -1677,32 +1680,69 @@ constructor is an *occurrence* not a binding site
 *                                                                      *
 ************************************************************************
 
-The job of this family of functions is to run through binding sites and find the set of all Names
-that were defined "implicitly", without being explicitly written by the user.
+The job of the following family of functions is to run through binding sites and find
+the set of all Names that were defined "implicitly", without being explicitly written
+by the user.
 
-The main purpose is to find names introduced by record wildcards so that we can avoid
-warning the user when they don't use those names (#4404)
+Note [Collecting implicit binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We collect all the RHS Names that are implicitly introduced by record wildcards,
+so that we can:
 
-Since the addition of -Wunused-record-wildcards, this function returns a pair
-of [(SrcSpan, [Name])]. Each element of the list is one set of implicit
-binders, the first component of the tuple is the document describes the possible
-fix to the problem (by removing the ..).
+  - avoid warning the user when they don't use those names (#4404),
+  - report deprecation warnings for deprecated fields that are used (#23382).
 
-This means there is some unfortunate coupling between this function and where it
-is used but it's only used for one specific purpose in one place so it seemed
-easier.
+The functions that collect implicit binders return a collection of 'ImplicitFieldBinders',
+which associates each implicitly-introduced record field with the bound variables in the
+RHS of the record field pattern, e.g. in
+
+  data R = MkR { fld :: Int }
+  foo (MkR { .. }) = fld
+
+the renamer will elaborate this to
+
+  foo (MkR { fld = fld_var }) = fld_var
+
+and the implicit binders function will return
+
+  [ ImplicitFieldBinders { implFlBndr_field = fld
+                         , implFlBndr_binders = [fld_var] } ]
+
+This information is then used:
+
+  - in the calls to GHC.Rename.Utils.checkUnusedRecordWildcard, to emit
+    a warning when a record wildcard binds no new variables (redundant record wildcard)
+    or none of the bound variables are used (unused record wildcard).
+  - in GHC.Rename.Utils.deprecateUsedRecordWildcard, to emit a warning
+    when the field is deprecated and any of the binders are used.
+
+NOTE: the implFlBndr_binders field should always be a singleton
+      (since the RHS of an implicit binding should always be a VarPat,
+      created in rnHsRecPatsAndThen.mkVarPat)
+
 -}
 
+-- | All binders corresponding to a single implicit record field pattern.
+--
+-- See Note [Collecting implicit binders].
+data ImplicitFieldBinders
+  = ImplicitFieldBinders { implFlBndr_field :: Name
+                             -- ^ The 'Name' of the record field
+                         , implFlBndr_binders :: [Name]
+                             -- ^ The binders of the RHS of the record field pattern
+                             -- (in practice, always a singleton: see Note [Collecting implicit binders])
+                         }
+
 lStmtsImplicits :: [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
-                -> [(SrcSpan, [Name])]
+                -> [(SrcSpan, [ImplicitFieldBinders])]
 lStmtsImplicits = hs_lstmts
   where
     hs_lstmts :: [LStmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))]
-              -> [(SrcSpan, [Name])]
+              -> [(SrcSpan, [ImplicitFieldBinders])]
     hs_lstmts = concatMap (hs_stmt . unLoc)
 
     hs_stmt :: StmtLR GhcRn (GhcPass idR) (LocatedA (body (GhcPass idR)))
-            -> [(SrcSpan, [Name])]
+            -> [(SrcSpan, [ImplicitFieldBinders])]
     hs_stmt (BindStmt _ pat _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
@@ -1719,19 +1759,26 @@ lStmtsImplicits = hs_lstmts
     hs_local_binds (HsIPBinds {})           = []
     hs_local_binds (EmptyLocalBinds _)      = []
 
-hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR) -> [(SrcSpan, [Name])]
+hsValBindsImplicits :: HsValBindsLR GhcRn (GhcPass idR)
+                    -> [(SrcSpan, [ImplicitFieldBinders])]
 hsValBindsImplicits (XValBindsLR (NValBinds binds _))
   = concatMap (lhsBindsImplicits . snd) binds
 hsValBindsImplicits (ValBinds _ binds _)
   = lhsBindsImplicits binds
 
-lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [Name])]
+lhsBindsImplicits :: LHsBindsLR GhcRn idR -> [(SrcSpan, [ImplicitFieldBinders])]
 lhsBindsImplicits = foldBag (++) (lhs_bind . unLoc) []
   where
     lhs_bind (PatBind { pat_lhs = lpat }) = lPatImplicits lpat
     lhs_bind _ = []
 
-lPatImplicits :: LPat GhcRn -> [(SrcSpan, [Name])]
+-- | Collect all record wild card binders in the given pattern.
+--
+-- These are all the variables bound in all (possibly nested) record wildcard patterns
+-- appearing inside the pattern.
+--
+-- See Note [Collecting implicit binders].
+lPatImplicits :: LPat GhcRn -> [(SrcSpan, [ImplicitFieldBinders])]
 lPatImplicits = hs_lpat
   where
     hs_lpat lpat = hs_pat (unLoc lpat)
@@ -1745,28 +1792,41 @@ lPatImplicits = hs_lpat
     hs_pat (ParPat _ _ pat _)   = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
-
     hs_pat (SigPat _ pat _)     = hs_lpat pat
 
-    hs_pat (ConPat {pat_con=con, pat_args=ps}) = details con ps
+    hs_pat (ConPat {pat_args=ps}) = details ps
 
     hs_pat _ = []
 
-    details :: LocatedN Name -> HsConPatDetails GhcRn -> [(SrcSpan, [Name])]
-    details _ (PrefixCon _ ps) = hs_lpats ps
-    details n (RecCon fs)      =
-      [(err_loc, collectPatsBinders CollNoDictBinders implicit_pats) | Just{} <- [rec_dotdot fs] ]
-        ++ hs_lpats explicit_pats
+    details :: HsConPatDetails GhcRn -> [(SrcSpan, [ImplicitFieldBinders])]
+    details (PrefixCon _ ps) = hs_lpats ps
+    details (RecCon (HsRecFields { rec_dotdot = Nothing, rec_flds }))
+      = hs_lpats $ map (hfbRHS . unLoc) rec_flds
+    details (RecCon (HsRecFields { rec_dotdot = Just (L err_loc rec_dotdot), rec_flds }))
+          = [(err_loc, implicit_field_binders)]
+          ++ hs_lpats explicit_pats
 
-      where implicit_pats = map (hfbRHS . unLoc) implicit
-            explicit_pats = map (hfbRHS . unLoc) explicit
+          where (explicit_pats, implicit_field_binders)
+                  = rec_field_expl_impl rec_flds rec_dotdot
+
+    details (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2
+
+lHsRecFieldsImplicits :: [LHsRecField GhcRn (LPat GhcRn)]
+                      -> RecFieldsDotDot
+                      -> [ImplicitFieldBinders]
+lHsRecFieldsImplicits rec_flds rec_dotdot
+  = snd $ rec_field_expl_impl rec_flds rec_dotdot
+
+rec_field_expl_impl :: [LHsRecField GhcRn (LPat GhcRn)]
+                    -> RecFieldsDotDot
+                    -> ([LPat GhcRn], [ImplicitFieldBinders])
+rec_field_expl_impl rec_flds (RecFieldsDotDot { .. })
+  = ( map (hfbRHS . unLoc) explicit_binds
+    , map implicit_field_binders implicit_binds )
+  where (explicit_binds, implicit_binds) = splitAt unRecFieldsDotDot rec_flds
+        implicit_field_binders (L _ (HsFieldBind { hfbLHS = L _ fld, hfbRHS = rhs }))
+          = ImplicitFieldBinders
+              { implFlBndr_field   = foExt fld
+              , implFlBndr_binders = collectPatBinders CollNoDictBinders rhs }
 
 
-            (explicit, implicit) = partitionEithers [if pat_explicit then Left fld else Right fld
-                                                    | (i, fld) <- [0..] `zip` rec_flds fs
-                                                    ,  let  pat_explicit =
-                                                              maybe True ((i<) . unRecFieldsDotDot . unLoc)
-                                                                         (rec_dotdot fs)]
-            err_loc = maybe (getLocA n) getLoc (rec_dotdot fs)
-
-    details _ (InfixCon p1 p2) = hs_lpat p1 ++ hs_lpat p2

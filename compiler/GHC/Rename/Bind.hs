@@ -397,7 +397,7 @@ rnLocalValBindsAndThen binds@(ValBinds _ _ sigs) thing_inside
               -- Insert fake uses for variables introduced implicitly by
               -- wildcards (#4404)
               rec_uses = hsValBindsImplicits binds'
-              implicit_uses = mkNameSet $ concatMap snd
+              implicit_uses = mkNameSet $ concatMap (concatMap implFlBndr_binders . snd)
                                         $ rec_uses
         ; mapM_ (\(loc, ns) ->
                     checkUnusedRecordWildcard loc real_uses (Just ns))

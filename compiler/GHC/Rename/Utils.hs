@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE GADTs            #-}
+{-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE TupleSections    #-}
 
 {-
 
@@ -16,6 +18,7 @@ module GHC.Rename.Utils (
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         warnForallIdentifier,
+        DeprecationWarnings(..), warnIfDeprecated,
         checkUnusedRecordWildcard,
         badQualBndrErr, typeAppErr, badFieldConErr,
         wrapGenSpan, genHsVar, genLHsVar, genHsApp, genHsApps, genLHsApp,
@@ -56,17 +59,25 @@ import GHC.Types.SourceFile
 import GHC.Types.SourceText ( SourceText(..), IntegralLit )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Unit.Module.ModIface
+import GHC.Utils.Panic
 import GHC.Types.Basic
 import GHC.Data.List.SetOps ( removeDupsOn )
 import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.DynFlags
 import GHC.Data.FastString
+import GHC.Data.Bag ( mapBagM, headMaybe )
 import Control.Monad
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE )
+import GHC.Unit.Module
+import GHC.Unit.Module.Warnings  ( WarningTxt(..) )
+import GHC.Iface.Load
 import qualified GHC.LanguageExtensions as LangExt
 
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NE
+import Data.Foldable
+import Data.Maybe
 
 
 {-
@@ -375,14 +386,17 @@ warnUnusedTopBinds gres
 -- -Wredundant-record-wildcards
 checkUnusedRecordWildcard :: SrcSpan
                           -> FreeVars
-                          -> Maybe [Name]
+                          -> Maybe [ImplicitFieldBinders]
                           -> RnM ()
 checkUnusedRecordWildcard _ _ Nothing     = return ()
-checkUnusedRecordWildcard loc _ (Just []) =
-  -- Add a new warning if the .. pattern binds no variables
-  setSrcSpan loc $ warnRedundantRecordWildcard
-checkUnusedRecordWildcard loc fvs (Just dotdot_names) =
-  setSrcSpan loc $ warnUnusedRecordWildcard dotdot_names fvs
+checkUnusedRecordWildcard loc fvs (Just dotdot_fields_binders)
+  = setSrcSpan loc $ case concatMap implFlBndr_binders dotdot_fields_binders of
+            -- Add a new warning if the .. pattern binds no variables
+      [] -> warnRedundantRecordWildcard
+      dotdot_names
+        -> do
+          warnUnusedRecordWildcard dotdot_names fvs
+          deprecateUsedRecordWildcard dotdot_fields_binders fvs
 
 
 -- | Produce a warning when the `..` pattern binds no new
@@ -415,6 +429,33 @@ warnUnusedRecordWildcard ns used_names = do
   traceRn "warnUnused" (ppr ns $$ ppr used_names $$ ppr used)
   warnIf (null used) (TcRnUnusedRecordWildcard ns)
 
+-- | Emit a deprecation message whenever one of the implicit record wild
+--   card field binders was used in FreeVars.
+--
+-- @
+--   module A where
+--   data P = P { x :: Int, y :: Int }
+--   {-# DEPRECATED x, y "depr msg" #-}
+--
+--   module B where
+--   import A
+--   foo (P{..}) = x
+-- @
+--
+-- Even though both `x` and `y` have deprecations, only `x`
+-- will be deprecated since only its implicit variable is used in the RHS.
+deprecateUsedRecordWildcard :: [ImplicitFieldBinders]
+                            -> FreeVars -> RnM ()
+deprecateUsedRecordWildcard dotdot_fields_binders fvs
+  = mapM_ depr_field_binders dotdot_fields_binders
+  where
+    depr_field_binders (ImplicitFieldBinders {..})
+      = when (mkFVs implFlBndr_binders `intersectsFVs` fvs) $ do
+          env <- getGlobalRdrEnv
+          let gre = fromJust $ lookupGRE_Name env implFlBndr_field
+                -- Must be in the env since it was instantiated
+                -- in the implicit binders
+          warnIfDeprecated AllDeprecationWarnings [gre]
 
 
 warnUnusedLocalBinds, warnUnusedMatches, warnUnusedTypePatterns
@@ -433,6 +474,109 @@ warnForallIdentifier (L l rdr_name@(Unqual occ))
   = addDiagnosticAt (locA l) (TcRnForallIdentifier rdr_name)
   where isKw = (occNameFS occ ==)
 warnForallIdentifier _ = return ()
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Custom deprecations utility functions}
+*                                                                      *
+************************************************************************
+
+Note [Handling of deprecations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* We report deprecations at each *occurrence* of the deprecated thing
+  (see #5867 and #4879)
+
+* We do not report deprecations for locally-defined names. For a
+  start, we may be exporting a deprecated thing. Also we may use a
+  deprecated thing in the defn of another deprecated things.  We may
+  even use a deprecated thing in the defn of a non-deprecated thing,
+  when changing a module's interface.
+
+* We also report deprecations at export sites, but only for names
+  deprecated with export deprecations (since those are not transitive as opposed
+  to regular name deprecations and are only reported at the importing module)
+
+* addUsedGREs: we do not report deprecations for sub-binders:
+     - the ".." completion for records
+     - the ".." in an export item 'T(..)'
+     - the things exported by a module export 'module M'
+-}
+
+-- | Whether to report deprecation warnings when registering a used GRE
+--
+-- There is no option to only emit declaration warnings since everywhere
+-- we emit the declaration warnings we also emit export warnings
+-- (See Note [Handling of deprecations] for details)
+data DeprecationWarnings
+  = NoDeprecationWarnings
+  | ExportDeprecationWarnings
+  | AllDeprecationWarnings
+
+warnIfDeprecated :: DeprecationWarnings -> [GlobalRdrElt] -> RnM ()
+warnIfDeprecated NoDeprecationWarnings _ = return ()
+warnIfDeprecated opt gres = do
+  this_mod <- getModule
+  let external_gres
+        = filterOut (nameIsLocalOrFrom this_mod . greName) gres
+  mapM_ (\gre -> warnIfExportDeprecated gre >> maybeWarnDeclDepr gre) external_gres
+  where
+    maybeWarnDeclDepr = case opt of
+      ExportDeprecationWarnings -> const $ return ()
+      AllDeprecationWarnings    -> warnIfDeclDeprecated
+
+warnIfDeclDeprecated :: GlobalRdrElt -> RnM ()
+warnIfDeclDeprecated gre@(GRE { gre_imp = iss })
+  | Just imp_spec <- headMaybe iss
+  = do { dflags <- getDynFlags
+       ; when (wopt_any_custom dflags) $
+                   -- See Note [Handling of deprecations]
+         do { iface <- loadInterfaceForName doc name
+            ; case lookupImpDeclDeprec iface gre of
+                Just deprText -> addDiagnostic $
+                  TcRnPragmaWarning
+                      PragmaWarningName
+                        { pwarn_occname = occ
+                        , pwarn_impmod  = importSpecModule imp_spec
+                        , pwarn_declmod = definedMod }
+                      deprText
+                Nothing  -> return () } }
+  | otherwise
+  = return ()
+  where
+    occ = greOccName gre
+    name = greName gre
+    definedMod = moduleName $ assertPpr (isExternalName name) (ppr name) (nameModule name)
+    doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
+
+lookupImpDeclDeprec :: ModIface -> GlobalRdrElt -> Maybe (WarningTxt GhcRn)
+lookupImpDeclDeprec iface gre
+  -- Bleat if the thing, or its parent, is warn'd
+  = mi_decl_warn_fn (mi_final_exts iface) (greOccName gre) `mplus`
+    case greParent gre of
+       ParentIs p -> mi_decl_warn_fn (mi_final_exts iface) (nameOccName p)
+       NoParent   -> Nothing
+
+warnIfExportDeprecated :: GlobalRdrElt -> RnM ()
+warnIfExportDeprecated gre@(GRE { gre_imp = iss })
+  = do { mod_warn_mbs <- mapBagM process_import_spec iss
+       ; for_ (sequence mod_warn_mbs) $ mapM
+           $ \(importing_mod, warn_txt) -> addDiagnostic $
+             TcRnPragmaWarning
+                PragmaWarningExport
+                  { pwarn_occname = occ
+                  , pwarn_impmod  = importing_mod }
+                warn_txt }
+  where
+    occ = greOccName gre
+    name = greName gre
+    doc = text "The name" <+> quotes (ppr occ) <+> text "is mentioned explicitly"
+    process_import_spec :: ImportSpec -> RnM (Maybe (ModuleName, WarningTxt GhcRn))
+    process_import_spec is = do
+      let mod = is_mod $ is_decl is
+      iface <- loadInterfaceForModule doc mod
+      let mb_warn_txt = mi_export_warn_fn (mi_final_exts iface) name
+      return $ (moduleName mod, ) <$> mb_warn_txt
 
 -------------------------
 --      Helpers

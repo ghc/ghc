@@ -1452,7 +1452,7 @@ rnRecStmtsAndThen ctxt rnBody s cont
         ; let bound_names = collectLStmtsBinders CollNoDictBinders (map fst new_lhs_and_fv)
               -- Fake uses of variables introduced implicitly (warning suppression, see #4404)
               rec_uses = lStmtsImplicits (map fst new_lhs_and_fv)
-              implicit_uses = mkNameSet $ concatMap snd $ rec_uses
+              implicit_uses = mkNameSet $ concatMap (concatMap implFlBndr_binders . snd) $ rec_uses
         ; bindLocalNamesFV bound_names $
           addLocalFixities fix_env bound_names $ do
 

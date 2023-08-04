@@ -22,7 +22,7 @@ module GHC.Types.Name.Set (
         -- ** Manipulating sets of free variables
         isEmptyFVs, emptyFVs, plusFVs, plusFV,
         mkFVs, addOneFV, unitFV, delFV, delFVs,
-        intersectFVs,
+        intersectFVs, intersectsFVs,
 
         -- * Defs and uses
         Defs, Uses, DefUse, DefUses,
@@ -127,6 +127,7 @@ mkFVs    :: [Name] -> FreeVars
 delFV    :: Name -> FreeVars -> FreeVars
 delFVs   :: [Name] -> FreeVars -> FreeVars
 intersectFVs :: FreeVars -> FreeVars -> FreeVars
+intersectsFVs :: FreeVars -> FreeVars -> Bool
 
 isEmptyFVs :: NameSet -> Bool
 isEmptyFVs  = isEmptyNameSet
@@ -139,6 +140,7 @@ unitFV      = unitNameSet
 delFV n s   = delFromNameSet s n
 delFVs ns s = delListFromNameSet s ns
 intersectFVs = intersectNameSet
+intersectsFVs = intersectsNameSet
 
 {-
 ************************************************************************
