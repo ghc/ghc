@@ -161,7 +161,7 @@ test('T2528', normal, compile_and_run, [''])
 # May 2014: seems to work on msys2
 # May 2018: The behavior of printf seems very implementation dependent.
 #     so let's normalise the output.
-test('T4006', [js_broken(22349), normalise_fun(normalise_quotes), req_process], compile_and_run, [''])
+test('T4006', [normalise_fun(normalise_quotes), req_process], compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
