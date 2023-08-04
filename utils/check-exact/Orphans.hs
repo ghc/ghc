@@ -63,3 +63,6 @@ instance NoAnn EpAnnImportDecl where
 
 instance NoAnn AnnsModule where
   noAnn = AnnsModule [] [] Nothing
+
+instance NoAnn Bool where
+  noAnn = False

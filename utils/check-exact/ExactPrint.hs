@@ -380,6 +380,10 @@ instance HasTrailing NameAnn where
   trailing a = nann_trailing a
   setTrailing a ts = a { nann_trailing = ts }
 
+instance HasTrailing Bool where
+  trailing _ = []
+  setTrailing a _ = a
+
 -- ---------------------------------------------------------------------
 
 fromAnn' :: (HasEntry a) => a -> Entry
