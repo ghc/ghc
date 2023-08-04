@@ -3146,7 +3146,7 @@ mkSumOrTupleExpr l boxity (Tuple es) anns = do
     cs <- getCommentsFor (locA l)
     return $ L l (ExplicitTuple (EpAnn (spanAsAnchor $ locA l) anns cs) (map toTupArg es) boxity)
   where
-    toTupArg :: Either (EpAnn EpaLocation) (LHsExpr GhcPs) -> HsTupArg GhcPs
+    toTupArg :: Either (EpAnn Bool) (LHsExpr GhcPs) -> HsTupArg GhcPs
     toTupArg (Left ann) = missingTupArg ann
     toTupArg (Right a)  = Present noExtField a
 
@@ -3173,7 +3173,7 @@ mkSumOrTuplePat l boxity (Tuple ps) anns = do
   cs <- getCommentsFor (locA l)
   return $ L l (PatBuilderPat (TuplePat (EpAnn (spanAsAnchor $ locA l) anns cs) ps' boxity))
   where
-    toTupPat :: Either (EpAnn EpaLocation) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
+    toTupPat :: Either (EpAnn Bool) (LocatedA (PatBuilder GhcPs)) -> PV (LPat GhcPs)
     -- Ignore the element location so that the error message refers to the
     -- entire tuple. See #19504 (and the discussion) for details.
     toTupPat p = case p of
