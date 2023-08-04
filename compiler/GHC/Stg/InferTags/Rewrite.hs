@@ -366,7 +366,10 @@ rewriteRhs (_id, _tagSig) (StgRhsCon ccs con cn ticks args) = {-# SCC rewriteRhs
             fvs <- fvArgs args
             -- lcls <- getFVs
             -- pprTraceM "RhsClosureConversion" (ppr (StgRhsClosure fvs ccs ReEntrant [] $! conExpr) $$ text "lcls:" <> ppr lcls)
-            return $! (StgRhsClosure fvs ccs ReEntrant [] $! conExpr)
+
+            -- We mark the closure updatable to retain sharing in the case that
+            -- conExpr is an infinite recursive data type. See #23783.
+            return $! (StgRhsClosure fvs ccs Updatable [] $! conExpr)
 rewriteRhs _binding (StgRhsClosure fvs ccs flag args body) = do
     withBinders NotTopLevel args $
         withClosureLcls fvs $
