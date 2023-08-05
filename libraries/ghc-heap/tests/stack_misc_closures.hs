@@ -327,13 +327,13 @@ type SetupFunction = State# RealWorld -> (# State# RealWorld, StackSnapshot# #)
 test :: HasCallStack => SetupFunction -> (StackFrame -> IO ()) -> IO ()
 test setup assertion = do
   stackSnapshot <- getStackSnapshot setup
-  performGC
-  traceM $ "entertainGC - " ++ entertainGC 100
+  traceM $ "entertainGC - " ++ entertainGC 10000
   -- Run garbage collection now, to prevent later surprises: It's hard to debug
   -- when the GC suddenly does it's work and there were bad closures or pointers.
   -- Better fail early, here.
   performGC
   stackClosure <- decodeStack stackSnapshot
+  traceM $ "entertainGC - " ++ entertainGC 10000
   performGC
   let stack = ssc_stack stackClosure
   performGC
@@ -345,9 +345,19 @@ test setup assertion = do
       assertEqual (length stack) 2
       assertion $ head stack
 
+-- | Generate some bogus closures to give the GC work
+--
+-- There are thresholds in the GC when it starts working. We want to force this
+-- to show that the decoding code is GC-save (updated pointers/references are a
+-- big topic here as the GC cares about references to the StgStack itself, but
+-- not to its frames.)
+--
+-- The "level of entertainment" x is a bit arbitrarily choosen: A future
+-- performace improvement may be to reduce it to a smaller number.
 entertainGC :: Int -> String
 entertainGC 0 = "0"
 entertainGC x = show x ++ entertainGC (x - 1)
+{-# NOINLINE entertainGC #-}
 
 testSize :: HasCallStack => SetupFunction -> Int -> IO ()
 testSize setup expectedSize = do
