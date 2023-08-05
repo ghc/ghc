@@ -260,7 +260,8 @@ mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
 mkHsAppType e t = addCLocAA t_body e (HsAppType noExtField e noHsTok paren_wct)
   where
     t_body    = hswc_body t
-    paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
+    -- paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
+    paren_wct = t { hswc_body = t_body }
 
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
@@ -621,9 +622,11 @@ nlHsTyVar :: IsSrcSpanAnn p a
 nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
-nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
+-- nlHsAppTy f t = noLocA (HsAppTy noExtField f (parenthesizeHsType appPrec t))
+nlHsAppTy f t = noLocA (HsAppTy noExtField f t)
 nlHsTyVar p x = noLocA (HsTyVar noAnn p (noLocA x))
-nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) (parenthesizeHsType funPrec a) b)
+-- nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) (parenthesizeHsType funPrec a) b)
+nlHsFunTy a b = noLocA (HsFunTy noAnn (HsUnrestrictedArrow noHsUniTok) a b)
 nlHsParTy t   = noLocA (HsParTy noAnn t)
 
 nlHsTyConApp :: IsSrcSpanAnn p a
@@ -640,14 +643,17 @@ nlHsTyConApp prom fixity tycon tys
     mk_app :: LHsType (GhcPass p) -> LHsTypeArg (GhcPass p) -> LHsType (GhcPass p)
     mk_app fun@(L _ (HsOpTy {})) arg = mk_app (noLocA $ HsParTy noAnn fun) arg
       -- parenthesize things like `(A + B) C`
-    mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun (parenthesizeHsType appPrec ty))
-    mk_app fun (HsTypeArg at ki) = noLocA (HsAppKindTy noExtField fun at (parenthesizeHsType appPrec ki))
+    -- mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun (parenthesizeHsType appPrec ty))
+    mk_app fun (HsValArg ty) = noLocA (HsAppTy noExtField fun ty)
+    -- mk_app fun (HsTypeArg at ki) = noLocA (HsAppKindTy noExtField fun at (parenthesizeHsType appPrec ki))
+    mk_app fun (HsTypeArg at ki) = noLocA (HsAppKindTy noExtField fun at ki)
     mk_app fun (HsArgPar _) = noLocA (HsParTy noAnn fun)
 
 nlHsAppKindTy ::
   LHsType (GhcPass p) -> LHsKind (GhcPass p) -> LHsType (GhcPass p)
 nlHsAppKindTy f k
-  = noLocA (HsAppKindTy noExtField f noHsTok (parenthesizeHsType appPrec k))
+  -- = noLocA (HsAppKindTy noExtField f noHsTok (parenthesizeHsType appPrec k))
+  = noLocA (HsAppKindTy noExtField f noHsTok k)
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack

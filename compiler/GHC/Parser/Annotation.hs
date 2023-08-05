@@ -1077,6 +1077,11 @@ widenAnchorS anc _ = anc
 
 widenLocatedAn :: SrcSpanAnn' an -> [AddEpAnn] -> SrcSpanAnn' an
 widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
+-- -- TODO:AZ rename this to Reflect new signature
+-- widenSrcAnn :: SrcAnn an -> [AddEpAnn] -> SrcAnn an
+-- widenSrcAnn (SrcSpanAnn (EpAnn _ a cs) l) as = SrcSpanAnn (EpAnn (spanAsAnchor l') a cs) l'
+--   where
+--     l' = widenSpan l as
 
 epAnnAnnsL :: EpAnn a -> [a]
 epAnnAnnsL EpAnnNotUsed = []
