@@ -541,7 +541,7 @@ mkHsOpTy prom ty1 op ty2 = HsOpTy noAnn prom ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2
-  = addCLocA t1 t2 (HsAppTy noExtField t1 (parenthesizeHsType appPrec t2))
+  = addCLocA t1 t2 (HsAppTy noExtField t1 t2)
 
 mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
