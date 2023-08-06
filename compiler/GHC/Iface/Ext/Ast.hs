@@ -673,7 +673,7 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
           let evDeps = evVarsOfTermList $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
-            [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScopeA span)) sp)
+            [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
                                         (L span $ eb_lhs evbind))
             , toHie $ map (C EvidenceVarUse . L span) $ evDeps
             ]
@@ -682,13 +682,13 @@ instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
 instance ToHie (LocatedA HsWrapper) where
   toHie (L osp wrap)
     = case wrap of
-        (WpLet bs)      -> toHie $ EvBindContext (mkScopeA osp) (getRealSpanA osp) (L osp bs)
+        (WpLet bs)      -> toHie $ EvBindContext (mkScope osp) (getRealSpanA osp) (L osp bs)
         (WpCompose a b) -> concatM $
           [toHie (L osp a), toHie (L osp b)]
         (WpFun a b _)   -> concatM $
           [toHie (L osp a), toHie (L osp b)]
         (WpEvLam a) ->
-          toHie $ C (EvidenceVarBind EvWrapperBind (mkScopeA osp) (getRealSpanA osp))
+          toHie $ C (EvidenceVarBind EvWrapperBind (mkScope osp) (getRealSpanA osp))
                 $ L osp a
         (WpEvApp a) ->
           concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTermList a
@@ -859,11 +859,11 @@ instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
                     (toHie $ fmap (BC context scope) binds)
             , toHie $ map (L span . abe_wrap) xs
             , toHie $
-                map (EvBindContext (mkScopeA span) (getRealSpanA span)
+                map (EvBindContext (mkScope span) (getRealSpanA span)
                     . L span) ev_binds
             , toHie $
                 map (C (EvidenceVarBind EvSigBind
-                                        (mkScopeA span)
+                                        (mkScope span)
                                         (getRealSpanA span))
                     . L span) ev_vars
             ]
@@ -899,14 +899,14 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
         ]
         where
           lhsScope = combineScopes varScope detScope
-          varScope = mkLScopeN var
-          patScope = mkScopeA $ getLoc pat
+          varScope = mkScope var
+          patScope = mkScope $ getLoc pat
           detScope = case dets of
-            (PrefixCon _ args) -> foldr combineScopes NoScope $ map mkLScopeN args
-            (InfixCon a b) -> combineScopes (mkLScopeN a) (mkLScopeN b)
+            (PrefixCon _ args) -> foldr combineScopes NoScope $ map mkScope args
+            (InfixCon a b) -> combineScopes (mkScope a) (mkScope b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
-            $ combineScopes (mkLScopeN (foLabel a)) (mkLScopeN b)
+            $ combineScopes (mkScope (foLabel a)) (mkScope b)
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
@@ -962,7 +962,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
         ]
       AsPat _ lname _ pat ->
         [ toHie $ C (PatternBind scope
-                                 (combineScopes (mkLScopeA pat) pscope)
+                                 (combineScopes (mkScope pat) pscope)
                                  rsp)
                     lname
         , toHie $ PS rsp scope pscope pat
@@ -990,7 +990,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
             , let ev_binds = cpt_binds ext
                   ev_vars = cpt_dicts ext
                   wrap = cpt_wrap ext
-                  evscope = mkScopeA ospan `combineScopes` scope `combineScopes` pscope
+                  evscope = mkScope ospan `combineScopes` scope `combineScopes` pscope
                  in concatM [ toHie $ EvBindContext scope rsp $ L ospan ev_binds
                             , toHie $ L ospan wrap
                             , toHie $ map (C (EvidenceVarBind EvPatternBind evscope rsp)
@@ -1023,7 +1023,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
         [ toHie $ PS rsp scope pscope pat
         , case hiePass @p of
             HieTc ->
-              let cscope = mkLScopeA pat in
+              let cscope = mkScope pat in
                 toHie $ TS (ResolvedScopes [cscope, scope, pscope])
                            sig
             HieRn -> pure []
@@ -1047,7 +1047,7 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       contextify (PrefixCon tyargs args) =
         PrefixCon (taScopes scope argscope tyargs)
                   (patScopes rsp scope pscope args)
-        where argscope = foldr combineScopes NoScope $ map mkLScopeA args
+        where argscope = foldr combineScopes NoScope $ map mkScope args
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
@@ -1078,14 +1078,14 @@ instance ToHie (LocatedA SyntaxExprTc) where
 
 instance ToHie (TScoped (HsPatSigType GhcRn)) where
   toHie (TS sc (HsPS (HsPSRn wcs tvs) body@(L span _))) = concatM $
-      [ bindingsOnly $ map (C $ TyVarBind (mkScopeA span) sc) (wcs++tvs)
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) (wcs++tvs)
       , toHie body
       ]
   -- See Note [Scoping Rules for SigPat]
 
 instance ToHie (TScoped (HsTyPat GhcRn)) where
   toHie (TS sc (HsTP (HsTPRn wcs imp_tvs exp_tvs) body@(L span _))) = concatM $
-      [ bindingsOnly $ map (C $ TyVarBind (mkScopeA span) sc) (wcs ++ imp_tvs ++ exp_tvs)
+      [ bindingsOnly $ map (C $ TyVarBind (mkScope span) sc) (wcs ++ imp_tvs ++ exp_tvs)
       , toHie body
       ]
 
@@ -1105,7 +1105,7 @@ instance ( ToHie (LocatedA (body (GhcPass p)))
          ) => ToHie (LocatedAn NoEpAnns (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span g) = concatM $ makeNodeA g span : case g of
     GRHS _ guards body ->
-      [ toHie $ listScopes (mkLScopeA body) guards
+      [ toHie $ listScopes (mkScope body) guards
       , toHie body
       ]
 
@@ -1218,7 +1218,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie grhss
         ]
       HsLet _ _ binds _ expr ->
-        [ toHie $ RS (mkLScopeA expr) binds
+        [ toHie $ RS (mkScope expr) binds
         , toHie expr
         ]
       HsDo _ _ (L ispan stmts) ->
@@ -1248,7 +1248,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
-        , toHie $ TS (ResolvedScopes [mkLScopeA expr]) sig
+        , toHie $ TS (ResolvedScopes [mkScope expr]) sig
         ]
       ArithSeq enum _ info ->
         [ toHie info
@@ -1258,7 +1258,7 @@ instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
         [ toHie expr
         ]
       HsProc _ pat cmdtop ->
-        [ toHie $ PS Nothing (mkLScopeA cmdtop) NoScope pat
+        [ toHie $ PS Nothing (mkScope cmdtop) NoScope pat
         , toHie cmdtop
         ]
       HsStatic _ expr ->
@@ -1388,19 +1388,19 @@ scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
-    bsScope = map (mkScopeA . getLoc) $ bagToList bs
+    bsScope = map (mkScope . getLoc) $ bagToList bs
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
-    bsScope = map (mkScopeA . getLoc) $ concatMap (bagToList . snd) bs
+    bsScope = map (mkScope . getLoc) $ concatMap (bagToList . snd) bs
     sigsScope :: [Scope]
     sigsScope = map (mkScope . getLocA) sigs
 
 scopeHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
-  = foldr combineScopes NoScope (map (mkScopeA . getLoc) bs)
+  = foldr combineScopes NoScope (map (mkScope . getLoc) bs)
 scopeHsLocaLBinds (EmptyLocalBinds _) = NoScope
 
 instance HiePass p => ToHie (RScoped (LocatedA (IPBind (GhcPass p)))) where
@@ -1513,7 +1513,7 @@ instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
         , toHie c
         ]
       HsCmdLet _ _ binds _ cmd' ->
-        [ toHie $ RS (mkLScopeA cmd') binds
+        [ toHie $ RS (mkScope cmd') binds
         , toHie cmd'
         ]
       HsCmdDo _ (L ispan stmts) ->
@@ -1550,11 +1550,11 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         , toHie defn
         ]
         where
-          quant_scope = mkLScopeA $ fromMaybe (noLocA []) $ dd_ctxt defn
+          quant_scope = mkScope $ fromMaybe (noLocA []) $ dd_ctxt defn
           rhs_scope = sig_sc `combineScopes` con_sc `combineScopes` deriv_sc
-          sig_sc = maybe NoScope mkLScopeA $ dd_kindSig defn
-          con_sc = foldr combineScopes NoScope $ mkLScopeA <$> dd_cons defn
-          deriv_sc = foldr combineScopes NoScope $ mkLScopeA <$> dd_derivs defn
+          sig_sc = maybe NoScope mkScope $ dd_kindSig defn
+          con_sc = foldr combineScopes NoScope $ mkScope <$> dd_cons defn
+          deriv_sc = foldr combineScopes NoScope $ mkScope <$> dd_derivs defn
       ClassDecl { tcdCtxt = context
                 , tcdLName = name
                 , tcdTyVars = vars
@@ -1575,7 +1575,7 @@ instance ToHie (LocatedA (TyClDecl GhcRn)) where
         , toHie deftyps
         ]
         where
-          context_scope = mkLScopeA $ fromMaybe (noLocA []) context
+          context_scope = mkScope $ fromMaybe (noLocA []) context
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ getHasLocList deps, getHasLocList sigs, getHasLocList (bagToList meths), getHasLocList typs, getHasLocList deftyps]
 
@@ -1599,7 +1599,7 @@ instance ToHie (FamilyInfo GhcRn) where
     , toHie $ map go eqns
     ]
     where
-      go (L l ib) = TS (ResolvedScopes [mkScopeA l]) ib
+      go (L l ib) = TS (ResolvedScopes [mkScope l]) ib
   toHie _ = pure []
 
 instance ToHie (RScoped (LocatedAn NoEpAnns (FamilyResultSig GhcRn))) where
@@ -1663,7 +1663,7 @@ instance ToHie (Located [LocatedAn NoEpAnns (HsDerivingClause GhcRn)]) where
 instance ToHie (LocatedAn NoEpAnns (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNodeA cl span : case cl of
       HsDerivingClause _ strat dct ->
-        [ toHie (RS (mkLScopeA dct) <$> strat)
+        [ toHie (RS (mkScope dct) <$> strat)
         , toHie dct
         ]
 
@@ -1693,7 +1693,7 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
         [ toHie $ C (Decl ConDec $ getRealSpanA span) <$> names
         , case outer_bndrs of
             HsOuterImplicit{hso_ximplicit = imp_vars} ->
-              bindingsOnly $ map (C $ TyVarBind (mkScopeA outer_bndrs_loc) resScope)
+              bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
                              imp_vars
             HsOuterExplicit{hso_bndrs = exp_bndrs} ->
               toHie $ tvScopes resScope NoScope exp_bndrs
@@ -1704,11 +1704,11 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
         ]
         where
           rhsScope = combineScopes argsScope tyScope
-          ctxScope = maybe NoScope mkLScopeA ctx
+          ctxScope = maybe NoScope mkScope ctx
           argsScope = case args of
             PrefixConGADT xs -> scaled_args_scope xs
-            RecConGADT x _   -> mkLScopeA x
-          tyScope = mkLScopeA typ
+            RecConGADT x _   -> mkScope x
+          tyScope = mkScope typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets
@@ -1721,13 +1721,13 @@ instance ToHie (LocatedA (ConDecl GhcRn)) where
         ]
         where
           rhsScope = combineScopes ctxScope argsScope
-          ctxScope = maybe NoScope mkLScopeA ctx
+          ctxScope = maybe NoScope mkScope ctx
           argsScope = case dets of
             PrefixCon _ xs -> scaled_args_scope xs
             InfixCon a b   -> scaled_args_scope [a, b]
-            RecCon x       -> mkLScopeA x
+            RecCon x       -> mkScope x
     where scaled_args_scope :: [HsScaled GhcRn (LHsType GhcRn)] -> Scope
-          scaled_args_scope = foldr combineScopes NoScope . map (mkLScopeA . hsScaledThing)
+          scaled_args_scope = foldr combineScopes NoScope . map (mkScope . hsScaledThing)
 
 instance ToHie (LocatedL [LocatedA (ConDeclField GhcRn)]) where
   toHie (L span decls) = concatM $
@@ -1807,7 +1807,7 @@ instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
 
 instance ToHie (TScoped (LocatedA (HsSigType GhcRn))) where
   toHie (TS tsc (L span t@HsSig{sig_bndrs=bndrs,sig_body=body})) = concatM $ makeNodeA t span :
-      [ toHie (TVS tsc (mkScopeA span) bndrs)
+      [ toHie (TVS tsc (mkScope span) bndrs)
       , toHie body
       ]
 
@@ -2019,7 +2019,7 @@ instance ToHie (LocatedA (InstDecl GhcRn)) where
 
 instance ToHie (LocatedA (ClsInstDecl GhcRn)) where
   toHie (L span decl) = concatM
-    [ toHie $ TS (ResolvedScopes [mkScopeA span]) $ cid_poly_ty decl
+    [ toHie $ TS (ResolvedScopes [mkScope span]) $ cid_poly_ty decl
     , toHie $ fmap (BC InstanceBind ModuleScope) $ cid_binds decl
     , toHie $ map (SC $ SI InstSig $ getRealSpanA span) $ cid_sigs decl
     , concatMapM (locOnly . getLocA) $ cid_tyfam_insts decl
@@ -2030,10 +2030,10 @@ instance ToHie (LocatedA (ClsInstDecl GhcRn)) where
     ]
 
 instance ToHie (LocatedA (DataFamInstDecl GhcRn)) where
-  toHie (L sp (DataFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScopeA sp]) d
+  toHie (L sp (DataFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScope sp]) d
 
 instance ToHie (LocatedA (TyFamInstDecl GhcRn)) where
-  toHie (L sp (TyFamInstDecl _ d)) = toHie $ TS (ResolvedScopes [mkScopeA sp]) d
+  toHie (L sp (TyFamInstDecl _ d)) = toHie $ TS (ResolvedScopes [mkScope sp]) d
 
 instance HiePass p => ToHie (Context (FieldOcc (GhcPass p))) where
   toHie (C c (FieldOcc n (L l _))) = case hiePass @p of
@@ -2050,7 +2050,7 @@ instance ToHie (LocatedA (DerivDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       DerivDecl _ typ strat overlap ->
         [ toHie $ TS (ResolvedScopes []) typ
-        , toHie $ (RS (mkScopeA span) <$> strat)
+        , toHie $ (RS (mkScope span) <$> strat)
         , toHie overlap
         ]
 
@@ -2132,9 +2132,9 @@ instance ToHie (LocatedA (RuleDecl GhcRn)) where
         , toHie exprB
         ]
     where scope = bndrs_sc `combineScopes` exprA_sc `combineScopes` exprB_sc
-          bndrs_sc = maybe NoScope mkLScopeA (listToMaybe bndrs)
-          exprA_sc = mkLScopeA exprA
-          exprB_sc = mkLScopeA exprB
+          bndrs_sc = maybe NoScope mkScope (listToMaybe bndrs)
+          exprA_sc = mkScope exprA
+          exprB_sc = mkScope exprB
 
 instance ToHie (RScoped (LocatedAn NoEpAnns (RuleBndr GhcRn))) where
   toHie (RS sc (L span bndr)) = concatM $ makeNodeA bndr span : case bndr of
