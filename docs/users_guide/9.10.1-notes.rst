@@ -48,6 +48,9 @@ Compiler
   <https://github.com/agda/agda>`_, the size of the build results was reduced by
   about 10% when these info tables were omitted.
 
+- Fixed a bug where compiling with both :ghc-flag:`-ddump-timings` and :ghc-flag:`-ddump-to-file` did not
+  suppress printing timings to the console. See :ghc-ticket:`20316`.
+
 GHCi
 ~~~~
 
