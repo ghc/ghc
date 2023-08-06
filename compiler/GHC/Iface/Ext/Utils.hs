@@ -527,21 +527,10 @@ locOnly (RealSrcSpan span _) = do
   pure [Node e span []]
 locOnly _ = pure []
 
-mkScopeA :: EpAnn ann -> Scope
-mkScopeA l = mkScope (locA l)
-
-mkScope :: SrcSpan -> Scope
-mkScope (RealSrcSpan sp _) = LocalScope sp
-mkScope _ = NoScope
-
-mkLScope :: Located a -> Scope
-mkLScope = mkScope . getLoc
-
-mkLScopeA :: GenLocated (EpAnn a) e -> Scope
-mkLScopeA = mkScope . locA . getLoc
-
-mkLScopeN :: LocatedN a -> Scope
-mkLScopeN = mkScope . getLocA
+mkScope :: (HasLoc a) => a -> Scope
+mkScope a = case getHasLoc a of
+              (RealSrcSpan sp _) -> LocalScope sp
+              _ -> NoScope
 
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope
