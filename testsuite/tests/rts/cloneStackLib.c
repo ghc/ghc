@@ -27,14 +27,14 @@ void expectStacksToBeEqual(StgStack *clonedStack, StgTSO *tso) {
 
     for(StgWord i = liveStack->stack_size - 1; (liveStack->stack + i) >= liveStack->sp; i--){
         if(liveStack->stack[i] != clonedStack->stack[i]){
-            barf("Expected stack word %lu to be equal on both stacks.", i);
+            barf("Expected stack word %" FMT_Word " to be equal on both stacks.", i);
         }
     }
 }
 
 void expectStackToBeNotDirty(StgStack *stack) {
     if(stack->dirty != 0) {
-        barf("Expected stack to be not dirty. But dirty flag was set to %u", stack->dirty);
+        barf("Expected stack to be not dirty. But dirty flag was set to %" FMT_Word, (StgWord) stack->dirty);
     }
 }
 
@@ -50,7 +50,8 @@ void expectClosureTypes(StgStack *stack, unsigned int types[], size_t typesSize)
         }
 
         if(info->type != types[i]) {
-            barf("Wrong closure type on stack! Expected %u but got %u in position %lu", types[i], info->type, i);
+            barf("Wrong closure type on stack! Expected %" FMT_Word " but got %" FMT_Word " in position %" FMT_Word,
+                 (StgWord) types[i], (StgWord) info->type, i);
         }
     }
 }
