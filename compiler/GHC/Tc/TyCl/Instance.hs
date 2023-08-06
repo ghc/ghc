@@ -2425,7 +2425,7 @@ Note that
 tcSpecInstPrags :: DFunId -> InstBindings GhcRn
                 -> TcM ([LTcSpecPrag], TcPragEnv)
 tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
-  = do { spec_inst_prags <- mapM (wrapLocAM (tcSpecInst dfun_id)) $
+  = do { spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods
        ; return (spec_inst_prags, mkPragEnv uprags binds) }

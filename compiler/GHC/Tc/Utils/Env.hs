@@ -218,7 +218,7 @@ span of the Name.
 tcLookupLocatedGlobal :: LocatedA Name -> TcM TyThing
 -- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
-  = addLocMA tcLookupGlobal name
+  = addLocM tcLookupGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
 -- The Name is almost always an ExternalName, but not always
@@ -308,13 +308,13 @@ tcLookupAxiom name = do
         _           -> wrongThingErr WrongThingAxiom (AGlobal thing) name
 
 tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
-tcLookupLocatedGlobalId = addLocMA tcLookupId
+tcLookupLocatedGlobalId = addLocM tcLookupId
 
 tcLookupLocatedClass :: LocatedA Name -> TcM Class
-tcLookupLocatedClass = addLocMA tcLookupClass
+tcLookupLocatedClass = addLocM tcLookupClass
 
 tcLookupLocatedTyCon :: LocatedN Name -> TcM TyCon
-tcLookupLocatedTyCon = addLocMA tcLookupTyCon
+tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming & casts).
@@ -440,7 +440,7 @@ tcExtendRecEnv gbl_stuff thing_inside
 -}
 
 tcLookupLocated :: LocatedA Name -> TcM TcTyThing
-tcLookupLocated = addLocMA tcLookup
+tcLookupLocated = addLocM tcLookup
 
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name

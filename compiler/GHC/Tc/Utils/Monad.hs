@@ -61,9 +61,9 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA,
+  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM,
   inGeneratedCode, setInGeneratedCode,
-  wrapLocM, wrapLocAM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
+  wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
   wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
   addErr,
@@ -995,18 +995,15 @@ setInGeneratedCode thing_inside =
 setSrcSpanA :: EpAnn ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
 
-addLocM :: (a -> TcM b) -> Located a -> TcM b
-addLocM fn (L loc a) = setSrcSpan loc $ fn a
+addLocM :: (HasLoc t) => (a -> TcM b) -> GenLocated t a -> TcM b
+addLocM fn (L loc a) = setSrcSpan (getHasLoc loc) $ fn a
 
-addLocMA :: (a -> TcM b) -> GenLocated (EpAnn ann) a -> TcM b
-addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
-
-wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
-                                            ; return (L loc b) }
-
-wrapLocAM :: (a -> TcM b) -> LocatedAn an a -> TcM (Located b)
-wrapLocAM fn a = wrapLocM fn (reLoc a)
+wrapLocM :: (HasLoc t) =>  (a -> TcM b) -> GenLocated t a -> TcM (Located b)
+wrapLocM fn (L loc a) =
+  let
+    loc' = getHasLoc loc
+  in setSrcSpan loc' $ do { b <- fn a
+                          ; return (L loc' b) }
 
 wrapLocMA :: (a -> TcM b) -> GenLocated (EpAnn ann) a -> TcRn (GenLocated (EpAnn ann) b)
 wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
