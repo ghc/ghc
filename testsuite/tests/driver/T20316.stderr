@@ -1,6 +1,0 @@
-*** initializing unit database:
-*** Chasing dependencies:
-*** Parser [Main]:
-*** Renamer/typechecker [Main]:
-*** Desugar [Main]:
-*** CoreTidy [Main]:

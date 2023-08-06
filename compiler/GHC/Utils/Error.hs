@@ -414,7 +414,7 @@ withTiming' :: MonadIO m
             -> m a
 withTiming' logger what force_result prtimings action
   = if logVerbAtLeast logger 2 || logHasDumpFlag logger Opt_D_dump_timings
-    then do whenPrintTimings $
+    then do when printTimingsNotDumpToFile $ liftIO $
               logInfo logger $ withPprStyle defaultUserStyle $
                 text "***" <+> what <> colon
             let ctx = log_default_user_context (logFlags logger)
@@ -432,7 +432,7 @@ withTiming' logger what force_result prtimings action
             let alloc = alloc0 - alloc1
                 time = realToFrac (end - start) * 1e-9
 
-            when (logVerbAtLeast logger 2 && prtimings == PrintTimings)
+            when (logVerbAtLeast logger 2 && printTimingsNotDumpToFile)
                 $ liftIO $ logInfo logger $ withPprStyle defaultUserStyle
                     (text "!!!" <+> what <> colon <+> text "finished in"
                      <+> doublePrec 2 time
@@ -452,7 +452,16 @@ withTiming' logger what force_result prtimings action
             pure r
      else action
 
-    where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
+    where whenPrintTimings =
+            liftIO . when printTimings
+
+          printTimings =
+            prtimings == PrintTimings
+
+          -- Avoid both printing to console and dumping to a file (#20316).
+          printTimingsNotDumpToFile =
+            printTimings
+            && not (log_dump_to_file (logFlags logger))
 
           recordAllocs alloc =
             liftIO $ traceMarkerIO $ "GHC:allocs:" ++ show alloc
