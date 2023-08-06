@@ -114,7 +114,7 @@ void dumpIPEToEventLog(void) {
     IpeBufferListNode *cursor = RELAXED_LOAD(&ipeBufferList);
     while (cursor != NULL) {
         IpeBufferEntry *entries;
-        char *strings;
+        const char *strings;
 
         // Decompress if compressed
         decompressIPEBufferListNodeIfCompressed(cursor, &entries, &strings);
@@ -190,7 +190,7 @@ void updateIpeMap(void) {
     while (pending != NULL) {
         IpeBufferListNode *current_node = pending;
         IpeBufferEntry *entries;
-        char *strings;
+        const char *strings;
 
         // Decompress if compressed
         decompressIPEBufferListNodeIfCompressed(current_node, &entries, &strings);
@@ -220,7 +220,7 @@ referenced by the 'entries_dst' and 'string_table_dst' parameters will point at
 the decompressed IPE data and string table for the given node, respectively,
 upon return from this function.
 */
-void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node, IpeBufferEntry **entries_dst, char **string_table_dst) {
+void decompressIPEBufferListNodeIfCompressed(IpeBufferListNode *node, IpeBufferEntry **entries_dst, const char **string_table_dst) {
     if (node->compressed == 1) {
         // The IPE list buffer node indicates that the strings table and
         // entries list has been compressed. If zstd is not available, fail.

@@ -76,12 +76,12 @@ typedef struct IpeBufferListNode_ {
 
     // When TNTC is enabled, these will point to the entry code
     // not the info table itself.
-    StgInfoTable **tables;
+    const StgInfoTable **tables;
 
     IpeBufferEntry *entries;
     StgWord entries_size; // decompressed size
 
-    char *string_table;
+    const char *string_table;
     StgWord string_table_size; // decompressed size
 } IpeBufferListNode;
 
