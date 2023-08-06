@@ -1059,7 +1059,7 @@ platform_mapping = Map.map go combined_result
                 , "release-x86_64-linux-deb10-release"
                 , "release-x86_64-linux-deb11-release"
                 , "release-x86_64-linux-fedora33-release"
-                , "release-x86_64-windows-release+no_split_sections"
+                , "release-x86_64-windows-release"
                 ]
 
     process sel = Map.fromListWith combine [ (uncurry mkPlatform (jobPlatform (jobInfo $ j)), j) | (sel -> Just j) <- job_groups  ]
