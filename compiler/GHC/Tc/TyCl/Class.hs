@@ -237,7 +237,7 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
 
 tcDefMeth _ _ _ _ _ prag_fn (sel_id, Nothing)
   = do { -- No default method
-         mapM_ (addLocMA (badDmPrag sel_id ))
+         mapM_ (addLocM (badDmPrag sel_id ))
                (lookupPragEnv prag_fn (idName sel_id))
        ; return emptyBag }
 

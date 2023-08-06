@@ -276,7 +276,7 @@ rnSrcWarnDecls bndr_set decls'
        ; mapM_ (\ dups -> let ((L loc rdr) :| (lrdr':_)) = dups
                           in addErrAt (locA loc) (TcRnDuplicateWarningDecls lrdr' rdr))
                warn_rdr_dups
-       ; pairs_s <- mapM (addLocMA rn_deprec) decls
+       ; pairs_s <- mapM (addLocM rn_deprec) decls
        ; return $ concat pairs_s }
  where
    decls = concatMap (wd_warnings . unLoc) decls'
@@ -1891,7 +1891,7 @@ rnDataDefn doc (HsDataDefn { dd_cType = cType, dd_ctxt = context, dd_cons = cond
       = do { unlessXOptM LangExt.TypeData $ failWith TcRnIllegalTypeData
            ; unless (null (fromMaybeContext context)) $
                failWith $ TcRnTypeDataForbids TypeDataForbidsDatatypeContexts
-           ; mapM_ (addLocMA check_type_data_condecl) condecls
+           ; mapM_ (addLocM check_type_data_condecl) condecls
            ; unless (null derivs) $
                failWith $ TcRnTypeDataForbids TypeDataForbidsDerivingClauses
            }
@@ -2384,7 +2384,7 @@ rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc, con_forall = forall_ })
-  = do  { _        <- addLocMA checkConName name
+  = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopConstructorRnN name
 
         -- We bind no implicit binders here; this is just like
@@ -2421,7 +2421,7 @@ rnConDecl (ConDeclGADT { con_names   = names
                        , con_g_args  = args
                        , con_res_ty  = res_ty
                        , con_doc     = mb_doc })
-  = do  { mapM_ (addLocMA checkConName) names
+  = do  { mapM_ (addLocM checkConName) names
         ; new_names <- mapM (lookupLocatedTopConstructorRnN) names
 
         ; let -- We must ensure that we extract the free tkvs in left-to-right
