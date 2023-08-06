@@ -223,7 +223,7 @@ tcCompleteSigs sigs =
       -- compatible with the result type constructor 'mb_tc'.
       doOne (L loc c@(CompleteMatchSig (_ext, _src_txt) (L _ ns) mb_tc_nm))
         = fmap Just $ setSrcSpanA loc $ addErrCtxt (text "In" <+> ppr c) $ do
-            cls   <- mkUniqDSet <$> mapM (addLocMA tcLookupConLike) ns
+            cls   <- mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
             mb_tc <- traverse @Maybe tcLookupLocatedTyCon mb_tc_nm
             pure CompleteMatch { cmConLikes = cls, cmResultTyCon = mb_tc }
       doOne _ = return Nothing
@@ -239,7 +239,7 @@ tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 tcHsBootSigs binds sigs
   = do  { unless (null binds) $
             rejectBootDecls HsBoot BootBindsRn (concatMap (bagToList . snd) binds)
-        ; concatMapM (addLocMA tc_boot_sig) (filter isTypeLSig sigs) }
+        ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where

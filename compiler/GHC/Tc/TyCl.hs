@@ -1516,7 +1516,7 @@ inferInitialKinds decls
        ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
   where
-    infer_initial_kind = addLocMA (getInitialKind InitialKindInfer)
+    infer_initial_kind = addLocM (getInitialKind InitialKindInfer)
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
@@ -1528,7 +1528,7 @@ checkInitialKinds decls
        ; return tcs }
   where
     check_initial_kind (ldecl, msig) =
-      addLocMA (getInitialKind (InitialKindCheck msig)) ldecl
+      addLocM (getInitialKind (InitialKindCheck msig)) ldecl
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
 -- depending on the 'InitialKindStrategy'.
@@ -1556,7 +1556,7 @@ getInitialKind strategy
             -- See Note [Don't process associated types in getInitialKind]
 
        ; at_tcs <- tcExtendTyVarEnv (tyConTyVars cls_tc) $
-                      mapM (addLocMA (getAssocFamInitialKind cls_tc)) ats
+                      mapM (addLocM (getAssocFamInitialKind cls_tc)) ats
        ; return (cls_tc : at_tcs) }
   where
     getAssocFamInitialKind cls =
@@ -2621,7 +2621,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                -- The (binderVars tc_bndrs) is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
-                  ; fds  <- mapM (addLocMA tc_fundep) fundeps
+                  ; fds  <- mapM (addLocM tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
@@ -2724,7 +2724,7 @@ tcClassATs class_name cls ats at_defs
                                           (at_def_tycon at_def) [at_def])
                         emptyNameEnv at_defs
 
-    tc_at at = do { (fam_tc, val_infos) <- addLocMA (tcFamDecl1 (Just cls)) at
+    tc_at at = do { (fam_tc, val_infos) <- addLocM (tcFamDecl1 (Just cls)) at
                   ; mapM_ (checkTyFamEqnValidityInfo fam_tc) val_infos
                   ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
                                   `orElse` []
@@ -3579,7 +3579,7 @@ tcConDecls :: DataDeclInfo
            -> DataDefnCons (LConDecl GhcRn) -> TcM (DataDefnCons DataCon)
 tcConDecls dd_info rep_tycon tmpl_bndrs res_kind
   = concatMapDataDefnConsTcM (tyConName rep_tycon) $ \ new_or_data ->
-    addLocMA $ tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind (mkTyConTagMap rep_tycon)
+    addLocM $ tcConDecl new_or_data dd_info rep_tycon tmpl_bndrs res_kind (mkTyConTagMap rep_tycon)
     -- mkTyConTagMap: it's important that we pay for tag allocation here,
     -- once per TyCon. See Note [Constructor tag allocation], fixes #14657
 
