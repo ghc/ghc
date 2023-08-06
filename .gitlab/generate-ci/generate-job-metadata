@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 out_dir="$(git rev-parse --show-toplevel)/.gitlab"
 
 # Update job metadata for ghcup
