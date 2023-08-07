@@ -1436,9 +1436,9 @@ mergeMapWithKey' bin' f g1 g2 m = go
           | nomatch k1 p2 m2 = maybe_link k1 (g1 t1) p2 (g2 t2)
           | zero k1 m2 = bin' p2 m2 (merge0 t1 k1 l2) (g2 r2)
           | otherwise  = bin' p2 m2 (g2 l2) (merge0 t1 k1 r2)
-        merge0 t1 k1 t2@(Tip k2 x2)
+        merge0 t1 k1 (Tip k2 x2)
           | k1 == k2 = f t1 (Tip k2 $! m x2)
-          | otherwise = maybe_link k1 (g1 t1) k2 (g2 t2)
+          | otherwise = maybe_link k1 (g1 t1) k2 (g2 $! Tip k2 $ m x2)
         merge0 t1 _  Nil = g1 t1
 
     go Nil t2 = g2 t2
