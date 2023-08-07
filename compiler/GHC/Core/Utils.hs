@@ -1679,7 +1679,7 @@ app_ok fun_ok primop_ok fun args
                   -- and we'd need to actually test n_val_args == 0.)
 
          -- Functions that terminate fast without raising exceptions etc
-         -- See Note [Discarding unnecessary unsafeEqualityProofs]
+         -- See (U12) of Note [Implementing unsafeCoerce]
          | fun `hasKey` unsafeEqualityProofIdKey -> True
 
          | otherwise -> False
@@ -1876,20 +1876,6 @@ GHC.Builtin.PrimOps.
 Note that exprIsHNF /can/ and does take advantage of evaluated-ness;
 it doesn't have the trickiness of the let-can-float invariant to worry about.
 
-Note [Discarding unnecessary unsafeEqualityProofs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In #20143 we found
-   case unsafeEqualityProof @t1 @t2 of UnsafeRefl cv[dead] -> blah
-where 'blah' didn't mention 'cv'.  We'd like to discard this
-redundant use of unsafeEqualityProof, via GHC.Core.Opt.Simplify.rebuildCase.
-To do this we need to know
-  (a) that cv is unused (done by OccAnal), and
-  (b) that unsafeEqualityProof terminates rapidly without side effects.
-
-At the moment we check that explicitly here in exprOkToDiscard,
-but one might imagine a more systematic check in future.
-
-
 ************************************************************************
 *                                                                      *
              exprIsHNF, exprIsConLike
@@ -1973,6 +1959,9 @@ exprIsHNFlike is_con is_con_unf = is_hnf_like
       | isValArg a               = app_is_value e 1
       | otherwise                = is_hnf_like e
     is_hnf_like (Let _ e)        = is_hnf_like e  -- Lazy let(rec)s don't affect us
+    is_hnf_like (Case e b _ as)
+      | Just rhs <- isUnsafeEqualityCase e b as
+      = is_hnf_like rhs
     is_hnf_like _                = False
 
     -- 'n' is the number of value args to which the expression is applied
