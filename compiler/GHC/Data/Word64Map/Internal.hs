@@ -116,6 +116,7 @@ module GHC.Data.Word64Map.Internal (
 
     -- ** Union
     , union
+    , unionMap
     , unionWith
     , unionWithKey
     , unions
@@ -1070,6 +1071,10 @@ union :: Word64Map a -> Word64Map a -> Word64Map a
 union m1 m2
   = mergeWithKey' Bin const id id m1 m2
 
+unionMap :: Word64Map a -> Word64Map a -> (a -> a) -> Word64Map a
+unionMap m1 m2 f
+  = mergeMapWithKey' Bin const id id f m1 m2
+
 -- | \(O(n+m)\). The union with a combining function.
 --
 -- > unionWith (++) (fromList [(5, "a"), (3, "b")]) (fromList [(5, "A"), (7, "C")]) == fromList [(3, "b"), (5, "aA"), (7, "C")]
@@ -1392,6 +1397,57 @@ mergeWithKey' bin' f g1 g2 = go
     maybe_link p1 t1 p2 t2 = link p1 t1 p2 t2
     {-# INLINE maybe_link #-}
 {-# INLINE mergeWithKey' #-}
+
+mergeMapWithKey' :: (Prefix -> Mask -> Word64Map c -> Word64Map c -> Word64Map c)
+                 -> (Word64Map a -> Word64Map b -> Word64Map c) -> (Word64Map a -> Word64Map c) -> (Word64Map b -> Word64Map c)
+                 -> (b -> b)
+                 -> Word64Map a -> Word64Map b -> Word64Map c
+mergeMapWithKey' bin' f g1 g2 m = go
+  where
+    go t1@(Bin p1 m1 l1 r1) t2@(Bin p2 m2 l2 r2)
+      | shorter m1 m2  = merge1
+      | shorter m2 m1  = merge2
+      | p1 == p2       = bin' p1 m1 (go l1 l2) (go r1 r2)
+      | otherwise      = maybe_link p1 (g1 t1) p2 (g2 t2)
+      where
+        merge1 | nomatch p2 p1 m1  = maybe_link p1 (g1 t1) p2 (g2 t2)
+               | zero p2 m1        = bin' p1 m1 (go l1 t2) (g1 r1)
+               | otherwise         = bin' p1 m1 (g1 l1) (go r1 t2)
+        merge2 | nomatch p1 p2 m2  = maybe_link p1 (g1 t1) p2 (g2 t2)
+               | zero p1 m2        = bin' p2 m2 (go t1 l2) (g2 r2)
+               | otherwise         = bin' p2 m2 (g2 l2) (go t1 r2)
+
+    go t1'@(Bin _ _ _ _) t2'@(Tip k2' x2') = merge0 (Tip k2' $! m x2') k2' t1'
+      where
+        merge0 t2 k2 t1@(Bin p1 m1 l1 r1)
+          | nomatch k2 p1 m1 = maybe_link p1 (g1 t1) k2 (g2 t2)
+          | zero k2 m1 = bin' p1 m1 (merge0 t2 k2 l1) (g1 r1)
+          | otherwise  = bin' p1 m1 (g1 l1) (merge0 t2 k2 r1)
+        merge0 t2 k2 t1@(Tip k1 _)
+          | k1 == k2 = f t1 t2
+          | otherwise = maybe_link k1 (g1 t1) k2 (g2 t2)
+        merge0 t2 _  Nil = g2 t2
+
+    go t1@(Bin _ _ _ _) Nil = g1 t1
+
+    go t1'@(Tip k1' _) t2' = merge0 t1' k1' t2'
+      where
+        merge0 t1 k1 t2@(Bin p2 m2 l2 r2)
+          | nomatch k1 p2 m2 = maybe_link k1 (g1 t1) p2 (g2 t2)
+          | zero k1 m2 = bin' p2 m2 (merge0 t1 k1 l2) (g2 r2)
+          | otherwise  = bin' p2 m2 (g2 l2) (merge0 t1 k1 r2)
+        merge0 t1 k1 t2@(Tip k2 x2)
+          | k1 == k2 = f t1 (Tip k2 $! m x2)
+          | otherwise = maybe_link k1 (g1 t1) k2 (g2 t2)
+        merge0 t1 _  Nil = g1 t1
+
+    go Nil t2 = g2 t2
+
+    maybe_link _ Nil _ t2 = t2
+    maybe_link _ t1 _ Nil = t1
+    maybe_link p1 t1 p2 t2 = link p1 t1 p2 t2
+    {-# INLINE maybe_link #-}
+{-# INLINE mergeMapWithKey' #-}
 
 
 {--------------------------------------------------------------------

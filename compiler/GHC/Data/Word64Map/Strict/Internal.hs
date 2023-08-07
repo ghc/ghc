@@ -143,6 +143,7 @@ module GHC.Data.Word64Map.Strict.Internal (
 
     -- ** Union
     , union
+    , unionMap
     , unionWith
     , unionWithKey
     , unions
@@ -335,6 +336,7 @@ import GHC.Data.Word64Map.Internal
   , toDescList
   , toList
   , union
+  , unionMap
   , unions
   , withoutKeys
   )

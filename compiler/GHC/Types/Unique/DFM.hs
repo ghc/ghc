@@ -267,11 +267,13 @@ plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
 -- set.
 
 plusUDFM :: UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
-plusUDFM udfml@(UDFM _ i) udfmr@(UDFM _ j)
+plusUDFM udfml@(UDFM xs i) udfmr@(UDFM ys j)
+  = UDFM (MS.unionMap xs ys (\(TaggedVal x n) -> TaggedVal x (n + i))) (i + j)
+--  = UDFM (xs `M.union` M.map (\(TaggedVal x n) -> TaggedVal x (n + i)) ys) (i + j)
   -- we will use the upper bound on the tag as a proxy for the set size,
   -- to insert the smaller one into the bigger one
-  | i > j = insertUDFMIntoLeft udfml udfmr
-  | otherwise = insertUDFMIntoLeft udfmr udfml
+--  | i > j = insertUDFMIntoLeft udfml udfmr
+--  | otherwise = insertUDFMIntoLeft udfmr udfml
 
 insertUDFMIntoLeft :: UniqDFM key elt -> UniqDFM key elt -> UniqDFM key elt
 insertUDFMIntoLeft udfml udfmr = addListToUDFM_Directly udfml $ udfmToList udfmr
