@@ -195,7 +195,6 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 --   - ExprWithTySig   (e :: type)
 --   - HsRecSel        overloaded record fields
 --   - HsExpanded      renamer expansions
---   - HsUntypedSplice untyped Template Haskell splices
 --   - HsOpApp         operator applications
 --   - HsOverLit       overloaded literals
 -- These constructors are the union of
@@ -209,7 +208,6 @@ tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
 tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
 tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
-tcExpr e@(HsUntypedSplice {})    res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty
   = do { mb_res <- tcShortCutLit lit res_ty
@@ -579,6 +577,18 @@ tcExpr (HsTypedSplice ext splice)   res_ty = tcTypedSplice ext splice res_ty
 tcExpr e@(HsTypedBracket _ body)    res_ty = tcTypedBracket e body res_ty
 
 tcExpr e@(HsUntypedBracket ps body) res_ty = tcUntypedBracket e body ps res_ty
+tcExpr (HsUntypedSplice splice _)   res_ty
+  -- Since `tcApp` deals with `HsUntypedSplice` (in `splitHsApps`), you might
+  -- wonder why we don't delegate to `tcApp` as we do for `HsVar`, etc.
+  -- (See the initial block of equations for `tcExpr`.) But we can't do this
+  -- for `HsUntypedSplice`; to see why, read Wrinkle (UTS1) in
+  -- Note [Looking through Template Haskell splices in splitHsApps] in
+  -- GHC.Tc.Gen.Head.
+  = case splice of
+      HsUntypedSpliceTop mod_finalizers expr
+        -> do { addModFinalizersWithLclEnv mod_finalizers
+              ; tcExpr expr res_ty }
+      HsUntypedSpliceNested {} -> panic "tcExpr: invalid nested splice"
 
 {-
 ************************************************************************

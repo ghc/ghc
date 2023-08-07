@@ -803,10 +803,20 @@ handles both of these. This is easy to accomplish, since all the real work in
 handling splices and quasiquotes has already been performed by the renamer by
 the time we get to `splitHsApps`.
 
-`tcExpr`, which typechecks expressions, handles `HsUntypedSplice` by simply
-delegating to `tcApp`, which in turn calls `splitHsApps`.  This means that
-`splitHsApps` is the unique part of the code that runs an `HsUntypedSplice`'s
-modFinalizers.
+Wrinkle (UTS1):
+  `tcExpr` has a separate case for `HsUntypedSplice`s that do not occur at the
+  head of an application. This is important to handle programs like this one:
+
+    foo :: (forall a. a -> a) -> b -> b
+    foo = $([| \g x -> g x |])
+
+  Here, it is vital that we push the expected type inwards so that `g` gets the
+  type `forall a. a -> a`, and the `tcExpr` case for `HsUntypedSplice` performs
+  this pushing. Without it, we would instead infer `g` to have type `b -> b`,
+  which isn't sufficiently general. Unfortunately, this does mean that there are
+  two different places in the code where an `HsUntypedSplice`'s modFinalizers can
+  be ran, depending on whether the splice appears at the head of an application
+  or not.
 -}
 
 {- *********************************************************************
