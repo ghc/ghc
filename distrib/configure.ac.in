@@ -315,10 +315,13 @@ checkMake380 make
 checkMake380 gmake
 
 # Toolchain target files
+FIND_GHC_TOOLCHAIN_BIN([YES])
 PREP_TARGET_FILE
-FIND_GHC_TOOLCHAIN([.],[YES])
+FIND_GHC_TOOLCHAIN([.])
 
 VALIDATE_GHC_TOOLCHAIN([default.target],[default.target.ghc-toolchain])
+
+rm -Rf acargs acghc-toolchain actmp-ghc-toolchain
 
 echo "****************************************************"
 echo "Configuration done, ready to 'make install'"

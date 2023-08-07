@@ -33,7 +33,12 @@ import GHC.Toolchain.Utils
 data Program = Program { prgPath :: FilePath
                        , prgFlags :: [String]
                        }
-    deriving (Show, Read, Eq, Ord)
+    deriving (Read, Eq, Ord)
+
+instance Show Program where
+  -- Normalise filepaths before showing to aid with diffing the target files.
+  show (Program p f) = unwords
+    [ "Program { prgPath = ", show (normalise p), ", prgFlags =", show f , "}"]
 
 _prgPath :: Lens Program FilePath
 _prgPath = Lens prgPath (\x o -> o {prgPath = x})
