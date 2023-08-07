@@ -3,7 +3,7 @@ module GHC.Types.IPE (
     ClosureMap,
     InfoTableProvMap(..),
     emptyInfoTableProvMap,
-    IpeSourceLocation
+    IpeSourceLocation(..)
 ) where
 
 import GHC.Prelude
@@ -18,10 +18,14 @@ import GHC.Core.Type
 import Data.List.NonEmpty
 import GHC.Cmm.CLabel (CLabel)
 import qualified Data.Map.Strict as Map
+import GHC.Unit.Module (Module)
 
 -- | Position and information about an info table.
 -- For return frames these are the contents of a 'CoreSyn.SourceNote'.
-type IpeSourceLocation = (RealSrcSpan, LexicalFastString)
+data IpeSourceLocation
+    = IpeSourceLocation !RealSrcSpan !LexicalFastString
+    | IpeModule !Module
+  deriving Eq
 
 -- | A map from a 'Name' to the best approximate source position that
 -- name arose from.
