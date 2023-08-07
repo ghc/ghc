@@ -1204,8 +1204,9 @@ checkMake380 make
 checkMake380 gmake
 
 # Toolchain target files
+FIND_GHC_TOOLCHAIN_BIN([NO])
 PREP_TARGET_FILE
-FIND_GHC_TOOLCHAIN([hadrian/cfg],[NO])
+FIND_GHC_TOOLCHAIN([hadrian/cfg])
 
 AC_CONFIG_FILES(
 [ mk/project.mk
@@ -1342,4 +1343,6 @@ For more information on how to configure your GHC build, see
 # VALIDATE_GHC_TOOLCHAIN([default.host.target],[default.host.target.ghc-toolchain])
 
 VALIDATE_GHC_TOOLCHAIN([hadrian/cfg/default.target],[hadrian/cfg/default.target.ghc-toolchain])
+
+rm -Rf acargs acghc-toolchain actmp-ghc-toolchain
 

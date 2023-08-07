@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -10,6 +11,7 @@ import System.Exit
 import System.Console.GetOpt
 import System.Environment
 import System.FilePath ((</>))
+import qualified System.IO (readFile, writeFile)
 
 import GHC.Platform.ArchOS
 
@@ -54,6 +56,22 @@ data Opts = Opts
     , optVerbosity :: Int
     , optKeepTemp  :: Bool
     }
+
+data FormatOpts = FormatOpts
+    { formatOptInput :: FilePath
+    , formatOptOutput :: FilePath
+    }
+
+_formatOptOutput :: Lens FormatOpts String
+_formatOptOutput = Lens formatOptOutput (\x o -> o {formatOptOutput=x})
+
+_formatOptInput :: Lens FormatOpts String
+_formatOptInput = Lens formatOptInput (\x o -> o {formatOptInput=x})
+
+emptyFormatOpts :: FormatOpts
+emptyFormatOpts = FormatOpts { formatOptInput = error "formatOpts: input"
+                             , formatOptOutput = error "formatOpts: output"
+                             }
 
 emptyOpts :: Opts
 emptyOpts = Opts
@@ -202,10 +220,41 @@ options =
     outputOpt = Option ['o'] ["output"] (ReqArg (set _optOutput) "OUTPUT")
         "The output path for the generated target toolchain configuration"
 
+formatOpts :: [OptDescr (FormatOpts -> FormatOpts)]
+formatOpts = [
+    (Option ['o'] ["output"] (ReqArg (set _formatOptOutput) "OUTPUT")
+        "The output path for the formatted target toolchain configuration")
+    , (Option ['i'] ["input"] (ReqArg (set _formatOptInput) "INPUT")
+        "The target file to format")
+    ]
+
 main :: IO ()
 main = do
     argv <- getArgs
-    let (opts0, _nonopts, errs) = getOpt RequireOrder options argv
+    case argv of
+      ("format": args) -> doFormat args
+      _ -> doConfigure argv
+
+-- The format mode is very useful for normalising paths and newlines on windows.
+doFormat :: [String] -> IO ()
+doFormat args = do
+  let (opts0, _nonopts, errs) = getOpt RequireOrder formatOpts args
+  case errs of
+    [] -> do
+      let opts = foldr (.) id opts0 emptyFormatOpts
+      tgt <- read @Target <$> System.IO.readFile (view _formatOptInput opts)
+      let file = formatOptOutput opts
+      System.IO.writeFile file (show tgt)
+    _ -> do
+      mapM_ putStrLn errs
+      putStrLn $ usageInfo "ghc-toolchain" formatOpts
+      exitWith (ExitFailure 1)
+
+
+
+doConfigure :: [String] -> IO ()
+doConfigure args = do
+    let (opts0, _nonopts, errs) = getOpt RequireOrder options args
     let opts = foldr (.) id opts0 emptyOpts
     case errs of
       [] -> do
