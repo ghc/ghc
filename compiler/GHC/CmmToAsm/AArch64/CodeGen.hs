@@ -462,23 +462,6 @@ getBitmaskImm n w
   where
     truncated = narrowU w n
 
--- | Load/store immediate.
--- Depends on the width of the store to some extent.
-isOffsetImm :: Int -> Width -> Bool
-isOffsetImm off w
-  -- 8 bits + sign for unscaled offsets
-  | -256 <= off, off <= 255 = True
-  -- Offset using 12-bit positive immediate, scaled by width
-  -- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
-  -- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
-  -- 16-bit: 0 .. 8188, 8-bit: 0 -- 4095
-  | 0 <= off, off < 4096 * byte_width, off `mod` byte_width == 0 = True
-  | otherwise = False
-  where
-    byte_width = widthInBytes w
-
-
-
 
 -- TODO OPT: we might be able give getRegister
 --          a hint, what kind of register we want.
@@ -728,11 +711,18 @@ getRegister' config plat expr
       -> return (Fixed (cmmTypeFormat (cmmRegType reg))
                        (getRegisterReg plat reg)
                        nilOL)
-    CmmRegOff reg off ->
-      -- If we got here we will load the address into a register either way. So we might as well just expand
-      -- and re-use the existing code path to handle "reg + off".
-      let !width = cmmRegWidth reg
-      in getRegister' config plat (CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)])
+    CmmRegOff reg off | isNbitEncodeable 12 (fromIntegral off) -> do
+      getRegister' config plat $
+            CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
+          where width = typeWidth (cmmRegType reg)
+
+    CmmRegOff reg off -> do
+      (off_r, _off_format, off_code) <- getSomeReg $ CmmLit (CmmInt (fromIntegral off) width)
+      (reg, _format, code) <- getSomeReg $ CmmReg reg
+      return $ Any (intFormat width) (\dst -> off_code `appOL` code `snocOL` ADD (OpReg width dst) (OpReg width reg) (OpReg width off_r))
+          where width = typeWidth (cmmRegType reg)
+
+
 
     -- for MachOps, see GHC.Cmm.MachOp
     -- For CmmMachOp, see GHC.Cmm.Expr
@@ -1271,8 +1261,20 @@ getAmode :: Platform
 
 -- OPTIMIZATION WARNING: Addressing modes.
 -- Addressing options:
-getAmode platform w (CmmRegOff reg off)
-  | isOffsetImm off w
+-- LDUR/STUR: imm9: -256 - 255
+getAmode platform _ (CmmRegOff reg off) | -256 <= off, off <= 255
+  = return $ Amode (AddrRegImm reg' off') nilOL
+    where reg' = getRegisterReg platform reg
+          off' = ImmInt off
+-- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
+getAmode platform W32 (CmmRegOff reg off)
+  | 0 <= off, off <= 16380, off `mod` 4 == 0
+  = return $ Amode (AddrRegImm reg' off') nilOL
+    where reg' = getRegisterReg platform reg
+          off' = ImmInt off
+-- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
+getAmode platform W64 (CmmRegOff reg off)
+  | 0 <= off, off <= 32760, off `mod` 8 == 0
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
@@ -1281,15 +1283,15 @@ getAmode platform w (CmmRegOff reg off)
 -- CmmStore (CmmMachOp (MO_Add w) [CmmLoad expr, CmmLit (CmmInt n w')]) (expr2)
 -- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
 -- for `n` in range.
-getAmode _platform w (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
-  | isOffsetImm (fromIntegral off) w
+getAmode _platform _ (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
+  | -256 <= off, off <= 255
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
-getAmode _platform w (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
-  | isOffsetImm (fromIntegral $ -off) w
+getAmode _platform _ (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
+  | -256 <= -off, -off <= 255
   = do (reg, _format, code) <- getSomeReg expr
-       return $ Amode (AddrRegImm reg (ImmInteger $ -off)) code
+       return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
 
 -- Generic case
 getAmode _platform _ expr
