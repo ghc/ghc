@@ -36,6 +36,13 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
     still happen (e.g. the simplified subsumption change introduced in GHC 9.0
     which caused GHC to reject some programs using :extension:`RankNTypes`).
 
+    Also note that due to a `minor oversight
+    <https://github.com/ghc-proposals/ghc-proposals/issues/551>`_, this
+    extension set behaves slightly differently than enabling each of its
+    constituent extensions. Specifically, while :extension:`TypeOperators` implies
+    :extension:`ExplicitNamespaces`, :extension:`ExplicitNamespaces` is not included
+    in :extension:`GHC2021`.
+
     The ``GHC2021`` language set comprises the following extensions:
 
     .. hlist::
@@ -86,6 +93,7 @@ Language extensions can be controlled (i.e. allowed or not) in two ways:
      * :extension:`TypeApplications`
      * :extension:`TypeOperators`
      * :extension:`TypeSynonymInstances`
+     * :extension:`NoExplicitNamespaces <ExplicitNamespaces>`
 
 
 .. extension:: Haskell2010
