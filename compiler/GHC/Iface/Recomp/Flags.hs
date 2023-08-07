@@ -15,6 +15,7 @@ import GHC.Driver.Env
 
 import GHC.Utils.Binary
 import GHC.Unit.Module
+import GHC.Stg.Debug.Types (StgDebugDctConfig(..))
 import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Utils.Fingerprint
@@ -93,7 +94,10 @@ fingerprintDynFlags hsc_env this_mod nameio =
         -- Other flags which affect code generation
         codegen = IfaceCodeGen
           { ifaceCodeGenFlags = mapMaybe (\f -> (if f `gopt` dflags then Just (IfaceGeneralFlag f) else Nothing)) (EnumSet.toList codeGenFlags)
-          , ifaceCodeGenDistinctConstructorTables = IfaceDistinctConstructorConfig distinctConstructorTables
+          , ifaceCodeGenDistinctConstructorTablesOptions = IfaceDistinctConstructorOptions
+            { ifaceDctPerModule = dctConfig_perModule distinctConstructorTables
+            , ifaceDctConstructors = IfaceDistinctConstructors (dctConfig_whichConstructors distinctConstructorTables)
+            }
           }
 
         -- Did we include core for all bindings?

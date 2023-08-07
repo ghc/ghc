@@ -6,3 +6,8 @@ test('distinct_tables05', [extra_files(['Main.hs', 'X.hs',])], makefile_test, []
 test('distinct_tables06', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
 test('distinct_tables07', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
 test('distinct_tables08', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
+test('distinct_tables09', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
+test('distinct_tables10', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
+test('distinct_tables11', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
+test('distinct_tables12', [extra_files(['Main.hs', 'X.hs',])], makefile_test, [])
+

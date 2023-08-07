@@ -29,7 +29,7 @@ import GHC.StgToCmm.Prof (initInfoTableProv)
 import GHC.StgToCmm.Types (CmmCgInfos (..), ModuleLFInfos)
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.CgUtils (CgStream)
-import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation)
+import GHC.Types.IPE (InfoTableProvMap (provInfoTables), IpeSourceLocation(..))
 import GHC.Types.Name.Set (NonCaffySet)
 import GHC.Types.Tickish (GenTickish (SourceNote))
 import GHC.Unit.Types (Module, moduleName)
@@ -358,7 +358,7 @@ labelsToSourcesWithTNTC acc (CmmProc _ _ _ cmm_graph) =
 
         maybeTick :: CmmNode O O -> Maybe IpeSourceLocation -> Maybe IpeSourceLocation
         maybeTick _ s@(Just _) = s
-        maybeTick (CmmTick (SourceNote span name)) Nothing = Just (span, name)
+        maybeTick (CmmTick (SourceNote span name)) Nothing = Just $ IpeSourceLocation span name
         maybeTick _ _ = Nothing
 labelsToSourcesWithTNTC acc _ = acc
 
@@ -384,6 +384,6 @@ labelsToSourcesSansTNTC acc (CmmProc _ _ _ cmm_graph) =
             (CmmStore _ (CmmLit (CmmLabel l)) _, Just src_loc) ->
               (Map.insert l src_loc acc, Nothing)
             (CmmTick (SourceNote span name), _) ->
-              (acc, Just (span, name))
+              (acc, Just $ IpeSourceLocation span name)
             _ -> (acc, lastTick)
 labelsToSourcesSansTNTC acc _ = acc
