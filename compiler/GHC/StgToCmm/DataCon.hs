@@ -149,6 +149,7 @@ addModuleLoc this_mod mn = do
   case mn of
     NoNumber -> DefinitionSite
     Numbered n -> UsageSite this_mod n
+    NumberedModule -> UsageModule this_mod
 
 ---------------------------------------------------------------
 --      Lay out and allocate non-top-level constructors

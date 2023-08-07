@@ -94,6 +94,7 @@ import Control.Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.IntMap.Strict as I
 import qualified Data.Semigroup (Semigroup(..))
+import GHC.Types.SrcLoc (RealSrcSpan)
 
 --------------------------------------------------------------------------
 --
@@ -660,22 +661,41 @@ convertInfoProvMap cfg this_mod (InfoTableProvMap (UniqMap dcenv) denv infoTable
         tyString :: Outputable a => a -> String
         tyString = renderWithContext defaultSDocContext . ppr
 
+        convertIpeSrcLoc :: Maybe IpeSourceLocation -> Maybe (RealSrcSpan, LexicalFastString)
+        convertIpeSrcLoc (Just (IpeSourceLocation s l)) = Just (s, l)
+        convertIpeSrcLoc _ = Nothing
+
         lookupClosureMap :: Maybe (IPEStats, InfoProvEnt)
-        lookupClosureMap = case hasHaskellName cl >>= lookupUniqMap denv of
-                                Just (ty, mbspan) -> Just (closureIpeStats cn, (InfoProvEnt cl cn (tyString ty) this_mod mbspan))
-                                Nothing -> Nothing
+        lookupClosureMap =
+          case hasHaskellName cl >>= lookupUniqMap denv of
+            Just (ty, mbspan) ->
+              Just ( closureIpeStats cn
+                   , (InfoProvEnt cl cn (tyString ty) this_mod (convertIpeSrcLoc mbspan))
+                   )
+            Nothing -> Nothing
 
         lookupDataConMap :: Maybe (IPEStats, InfoProvEnt)
         lookupDataConMap = (closureIpeStats cn,) <$> do
-            UsageSite _ n <- hasIdLabelInfo cl >>= getConInfoTableLocation
+            n <-
+              hasIdLabelInfo cl >>= getConInfoTableLocation >>= \s ->
+                case s of
+                  UsageSite _ n -> return n
+                  UsageModule _ -> return 0
+                  _ -> Nothing
             -- This is a bit grimy, relies on the DataCon and Name having the same Unique, which they do
             (dc, ns) <- hasHaskellName cl >>= lookupUFM_Directly dcenv . getUnique
-            -- Lookup is linear but lists will be small (< 100)
-            return $ (InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod (join $ lookup n (NE.toList ns)))
+            return $
+              InfoProvEnt cl cn (tyString (dataConTyCon dc)) this_mod $
+                if stgToCmmDctPerModule cfg then
+                  Nothing
+                else
+                  convertIpeSrcLoc
+                    -- Lookup is linear but lists will be small (< 100)
+                    (join $ lookup n (NE.toList ns))
 
         lookupInfoTableToSourceLocation :: Maybe (IPEStats, InfoProvEnt)
         lookupInfoTableToSourceLocation = do
-            sourceNote <- Map.lookup (cit_lbl cmit) infoTableToSourceLocationMap
+            sourceNote <- convertIpeSrcLoc <$> Map.lookup (cit_lbl cmit) infoTableToSourceLocationMap
             return $ (closureIpeStats cn, (InfoProvEnt cl cn "" this_mod sourceNote))
 
         -- This catches things like prim closure types and anything else which doesn't have a

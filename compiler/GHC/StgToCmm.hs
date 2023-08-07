@@ -67,6 +67,7 @@ import GHC.Utils.Misc
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import Data.IORef
+import Data.List.NonEmpty (NonEmpty(..))
 import GHC.Utils.Panic
 
 codeGen :: Logger
@@ -120,8 +121,34 @@ codeGen logger tmpfs cfg (InfoTableProvMap (UniqMap denv) _ _) data_tycons
         ; mapM_ do_tycon data_tycons
 
         -- Emit special info tables for everything used in this module
-        -- This will only do something if  `-fdistinct-info-tables` is turned on.
-        ; mapM_ (\(dc, ns) -> forM_ ns $ \(k, _ss) -> cg (cgDataCon (UsageSite (stgToCmmThisModule cfg) k) dc)) (nonDetEltsUFM denv)
+        -- This will only do something if  `-fdistinct-info-tables` is turned
+        -- on.
+        -- Note: if `-fdistinct-constructor-tables-per-module` is on, we only
+        -- want to emit ONE info table for every data constructor used in the
+        -- module, to avoid emitting the same info table multiple times.
+        ; mapM_
+            ( \(dc, ((k1, _ss) :| ns)) -> do
+                let
+                  perModule = stgToCmmDctPerModule cfg
+                  mdl = stgToCmmThisModule cfg
+                  site k =
+                    if perModule then
+                      UsageModule mdl
+                    else
+                      UsageSite mdl k
+
+                -- Always emit at least one info table. If
+                -- -fdistinct-constructor-tables-per-module, equivalent data
+                -- constructors will all ave the same constructor number (0)
+                cg (cgDataCon (site k1) dc)
+
+                -- If -fdistinct-constructor-tables-per-module is disabled, emit
+                -- the rest of the info tables
+                when (not perModule) $
+                  forM_ ns $ \(k, _ss) ->
+                    cg (cgDataCon (site k) dc)
+            )
+            (nonDetEltsUFM denv)
 
         ; final_state <- liftIO (readIORef cgref)
         ; let cg_id_infos = cgs_binds final_state
@@ -234,9 +261,12 @@ cgEnumerationTyCon tycon
              | con <- tyConDataCons tycon]
 
 
-cgDataCon :: ConInfoTableLocation -> DataCon -> FCode ()
--- Generate the entry code, info tables, and (for niladic constructor)
+-- | Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
+cgDataCon
+  :: ConInfoTableLocation -- ^ Location information for the info table
+  -> DataCon -- ^ Data constructor
+  -> FCode ()
 cgDataCon mn data_con
   = do  { massert (not (isUnboxedTupleDataCon data_con || isUnboxedSumDataCon data_con))
         ; profile <- getProfile
@@ -248,8 +278,7 @@ cgDataCon mn data_con
 
             nonptr_wds   = tot_wds - ptr_wds
 
-            dyn_info_tbl =
-              mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
+            dyn_info_tbl = mkDataConInfoTable profile data_con mn False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.

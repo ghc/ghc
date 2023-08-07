@@ -66,6 +66,24 @@ Compiler
   users to refine the set of constructors for which distinct info tables should
   be generated.
 
+- The :ghc-flag:`-fdistinct-constructor-tables-per-module
+  <-fdistinct-constructor-tables-per-module=⟨cs⟩>` flag is introduced. When
+  provided, this flag will cause only one distinct info table to be created for
+  every usage of a data constructor in a module, when
+  :ghc-flag:`-fdistinct-constructor-tables <-fdistinct-constructor-tables=⟨cs⟩>`
+  is enabled for that constructor.
+
+  For example, consider a module containing five occurrences of some
+  constructor. If that module is compiled with only
+  :ghc-flag:`-fdistinct-constructor-tables <-fdistinct-constructor-tables=⟨cs⟩>`
+  then five distinct info tables will be created, one for each occurrence of the
+  constructor. If that module is also compiled with
+  :ghc-flag:`-fdistinct-constructor-tables-per-module
+  <-fdistinct-constructor-tables-per-module=⟨cs⟩>`, then only one info table
+  will be created. This means that allocations resulting from any of those five
+  occurrences will be attributed to that one info table when using the
+  :rts-flag:`-hi` profiling mode.
+
 GHCi
 ~~~~
 

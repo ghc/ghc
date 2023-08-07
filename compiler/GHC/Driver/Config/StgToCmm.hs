@@ -17,6 +17,7 @@ import GHC.Platform.Profile
 import GHC.Utils.Error
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Stg.Debug (StgDebugDctConfig(..))
 
 initStgToCmmConfig :: DynFlags -> Module -> StgToCmmConfig
 initStgToCmmConfig dflags mod = StgToCmmConfig
@@ -45,6 +46,7 @@ initStgToCmmConfig dflags mod = StgToCmmConfig
   , stgToCmmInfoTableMap  = gopt Opt_InfoTableMap          dflags
   , stgToCmmInfoTableMapWithFallback = gopt Opt_InfoTableMapWithFallback dflags
   , stgToCmmInfoTableMapWithStack = gopt Opt_InfoTableMapWithStack dflags
+  , stgToCmmDctPerModule  = dctConfig_perModule (distinctConstructorTables dflags)
   , stgToCmmOmitYields    = gopt Opt_OmitYields            dflags
   , stgToCmmOmitIfPragmas = gopt Opt_OmitInterfacePragmas  dflags
   , stgToCmmPIC           = gopt Opt_PIC                   dflags

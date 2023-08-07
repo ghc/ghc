@@ -245,7 +245,7 @@ coreToStg opts@CoreToStgOpts
     -- See Note [Mapping Info Tables to Source Positions]
     (!pgm'', !denv)
       | opt_InfoTableMap
-      = collectDebugInformation stgDebugOpts ml pgm'
+      = collectDebugInformation stgDebugOpts ml this_mod pgm'
       | otherwise = (pgm', emptyInfoTableProvMap)
 
     prof = hasWay ways WayProf

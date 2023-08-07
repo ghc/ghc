@@ -54,6 +54,7 @@ data StgToCmmConfig = StgToCmmConfig
   , stgToCmmInfoTableMap   :: !Bool              -- ^ true means generate C Stub for IPE map, See Note [Mapping Info Tables to Source Positions]
   , stgToCmmInfoTableMapWithFallback :: !Bool    -- ^ Include info tables with fallback source locations in the info table map
   , stgToCmmInfoTableMapWithStack :: !Bool       -- ^ Include info tables for STACK closures in the info table map
+  , stgToCmmDctPerModule :: !Bool                -- ^ Only generate one info table per module for distinct usages of data constructors
   , stgToCmmOmitYields     :: !Bool              -- ^ true means omit heap checks when no allocation is performed
   , stgToCmmOmitIfPragmas  :: !Bool              -- ^ true means don't generate interface programs (implied by -O0)
   , stgToCmmPIC            :: !Bool              -- ^ true if @-fPIC@

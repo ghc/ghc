@@ -111,7 +111,7 @@ import GHC.Types.SrcLoc
 import GHC.Unit.Module
 import GHC.Unit.Module.Warnings
 import GHC.Utils.CliOption
-import GHC.Stg.Debug.Types (StgDebugDctConfig(..))
+import GHC.Stg.Debug.Types (StgDebugDctConfig(..), StgDebugDctConfigConstrs(..))
 import GHC.SysTools.Terminal ( stderrSupportsAnsiColors )
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Utils.Outputable
@@ -708,7 +708,7 @@ defaultDynFlags mySettings =
         maxErrors     = Nothing,
         cfgWeights    = defaultWeights,
 
-        distinctConstructorTables = None
+        distinctConstructorTables = StgDebugDctConfig False None
       }
 
 type FatalMessager = String -> IO ()

@@ -1797,6 +1797,10 @@ dynamic_flags_deps = [
         -- Caller-CC
   , make_ord_flag defGhcFlag "fprof-callers"
          (HasArg setCallerCcFilters)
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables-per-module"
+      (OptPrefix setDistinctConstructorTablesPerModule)
+  , make_ord_flag defGhcFlag "fno-distinct-constructor-tables-per-module"
+      (OptPrefix unSetDistinctConstructorTablesPerModule)
   , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
       (OptPrefix setDistinctConstructorTables)
   , make_ord_flag defGhcFlag "fno-distinct-constructor-tables"
@@ -3314,12 +3318,28 @@ setCallerCcFilters arg =
     Right filt -> upd $ \d -> d { callerCcFilters = filt : callerCcFilters d }
     Left err -> addErr err
 
+setDistinctConstructorTablesPerModule :: String -> DynP ()
+setDistinctConstructorTablesPerModule arg = do
+  let cs = parseDistinctConstructorTablesArg arg
+  upd $ \d ->
+    d { distinctConstructorTables =
+        (distinctConstructorTables d) { dctConfig_perModule = True } `dctConfigConstrsPlus` cs
+      }
+
+unSetDistinctConstructorTablesPerModule :: String -> DynP ()
+unSetDistinctConstructorTablesPerModule arg = do
+  let cs = parseDistinctConstructorTablesArg arg
+  upd $ \d ->
+    d { distinctConstructorTables =
+        (distinctConstructorTables d) { dctConfig_perModule = False } `dctConfigConstrsMinus` cs
+      }
+
 setDistinctConstructorTables :: String -> DynP ()
 setDistinctConstructorTables arg = do
   let cs = parseDistinctConstructorTablesArg arg
   upd $ \d ->
     d { distinctConstructorTables =
-        (distinctConstructorTables d) `dctConfigPlus` cs
+        (distinctConstructorTables d) `dctConfigConstrsPlus` cs
       }
 
 unSetDistinctConstructorTables :: String -> DynP ()
@@ -3327,7 +3347,7 @@ unSetDistinctConstructorTables arg = do
   let cs = parseDistinctConstructorTablesArg arg
   upd $ \d ->
     d { distinctConstructorTables =
-        (distinctConstructorTables d) `dctConfigMinus` cs
+        (distinctConstructorTables d) `dctConfigConstrsMinus` cs
       }
 
 -- | Parse a string of comma-separated constructor names into a 'Set' of

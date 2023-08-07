@@ -648,10 +648,14 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
 
 -- Data constructors need closures, but not with all the argument handling
 -- needed for functions. The shared part goes here.
-emitClosureAndInfoTable
-   :: Platform -> CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
+emitClosureAndInfoTable :: Platform -> CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
 emitClosureAndInfoTable platform info_tbl conv args body
   = do { (_, blks) <- getCodeScoped body
        ; let entry_lbl = toEntryLbl platform (cit_lbl info_tbl)
-       ; emitProcWithConvention conv (Just info_tbl) entry_lbl args blks
+       ; emitProcWithConvention
+           conv
+           (Just info_tbl)
+           entry_lbl
+           args
+           blks
        }

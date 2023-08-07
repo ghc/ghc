@@ -348,6 +348,7 @@ emitTickyCounter cloType tickee
                             TickyCon dc mn -> case mn of
                                                NoNumber -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) DefinitionSite
                                                (Numbered n) -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageSite this_mod n)
+                                               NumberedModule -> return $! CmmLabel $ mkConInfoTableLabel (dataConName dc) (UsageModule this_mod)
                             TickyFun {} ->
                               return $! CmmLabel $ mkInfoTableLabel name NoCafRefs
 

@@ -6,8 +6,9 @@
 module GHC.Stg.Debug
   ( StgDebugOpts(..)
   , StgDebugDctConfig(..)
-  , dctConfigPlus
-  , dctConfigMinus
+  , StgDebugDctConfigConstrs(..)
+  , dctConfigConstrsPlus
+  , dctConfigConstrsMinus
   , collectDebugInformation
   ) where
 
@@ -35,24 +36,33 @@ import Control.Applicative
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 
-data R = R { rOpts :: StgDebugOpts, rModLocation :: ModLocation, rSpan :: Maybe SpanWithLabel }
+data R = R { rOpts :: StgDebugOpts, rModLocation :: ModLocation, rSpan :: Maybe IpeSourceLocation }
 
 type M a = ReaderT R (State InfoTableProvMap) a
 
 withSpan :: IpeSourceLocation -> M a -> M a
-withSpan (new_s, new_l) act = local maybe_replace act
+withSpan (IpeSourceLocation new_s new_l) act = local maybe_replace act
   where
-    maybe_replace r@R{ rModLocation = cur_mod, rSpan = Just (SpanWithLabel old_s _old_l) }
+    maybe_replace r@R{ rModLocation = cur_mod, rSpan = Just (IpeSourceLocation old_s _old_l) }
       -- prefer spans from the current module
       | Just (unpackFS $ srcSpanFile old_s) == ml_hs_file cur_mod
       , Just (unpackFS $ srcSpanFile new_s) /= ml_hs_file cur_mod
       = r
     maybe_replace r
-      = r { rSpan = Just (SpanWithLabel new_s new_l) }
+      = r { rSpan = Just (IpeSourceLocation new_s new_l) }
+withSpan _ act = act
 
-collectDebugInformation :: StgDebugOpts -> ModLocation -> [StgTopBinding] -> ([StgTopBinding], InfoTableProvMap)
-collectDebugInformation opts ml bs =
-    runState (runReaderT (mapM collectTop bs) (R opts ml Nothing)) emptyInfoTableProvMap
+collectDebugInformation :: StgDebugOpts -> ModLocation -> Module -> [StgTopBinding] -> ([StgTopBinding], InfoTableProvMap)
+collectDebugInformation opts ml m bs =
+    runState
+      ( runReaderT
+          (mapM collectTop bs)
+          (R opts ml (if perModule then Just (IpeModule m) else Nothing))
+      )
+      emptyInfoTableProvMap
+  where
+    perModule :: Bool
+    perModule = dctConfig_perModule (stgDebug_distinctConstructorTables opts)
 
 collectTop :: StgTopBinding -> M StgTopBinding
 collectTop (StgTopLifted t) = StgTopLifted <$> collectStgBind t
@@ -73,7 +83,7 @@ collectStgRhs bndr (StgRhsClosure ext cc us bs e t) = do
     -- If the name has a span, use that initially as the source position in-case
     -- we don't get anything better.
     with_span = case nameSrcSpan name of
-                  RealSrcSpan pos _ -> withSpan (pos, LexicalFastString $ occNameFS (getOccName name))
+                  RealSrcSpan pos _ -> withSpan $ IpeSourceLocation pos (LexicalFastString $ occNameFS (getOccName name))
                   _ -> id
   e' <- with_span $ collectExpr e
   recordInfo bndr e'
@@ -91,7 +101,7 @@ recordInfo bndr new_rhs = do
     -- A span from the ticks surrounding the new_rhs
     best_span = quickSourcePos thisFile new_rhs
     -- A back-up span if the bndr had a source position, many do not (think internally generated ids)
-    bndr_span = (\s -> SpanWithLabel s (LexicalFastString $ occNameFS (getOccName bndr)))
+    bndr_span = (\s -> IpeSourceLocation s (LexicalFastString $ occNameFS (getOccName bndr)))
                   <$> srcSpanToRealSrcSpan (nameSrcSpan (getName bndr))
   recordStgIdPosition bndr best_span bndr_span
 
@@ -117,7 +127,7 @@ collectExpr = go
 
     go (StgTick tick e) = do
        let k = case tick of
-                SourceNote ss fp -> withSpan (ss, fp)
+                SourceNote ss fp -> withSpan $ IpeSourceLocation ss fp
                 _ -> id
        e' <- k (go e)
        return (StgTick tick e')
@@ -134,20 +144,20 @@ collectAlt alt = do e' <- collectExpr $ alt_rhs alt
 -- It is usually a better alternative than using the 'RealSrcSpan' which is carefully
 -- propagated downwards by 'withSpan'. It's "quick" because it works only using immediate context rather
 -- than looking at the parent context like 'withSpan'
-quickSourcePos :: FastString -> StgExpr -> Maybe SpanWithLabel
+quickSourcePos :: FastString -> StgExpr -> Maybe IpeSourceLocation
 quickSourcePos cur_mod (StgTick (SourceNote ss m) e)
-  | srcSpanFile ss == cur_mod = Just (SpanWithLabel ss m)
+  | srcSpanFile ss == cur_mod = Just (IpeSourceLocation ss m)
   | otherwise = quickSourcePos cur_mod e
 quickSourcePos _ _ = Nothing
 
-recordStgIdPosition :: Id -> Maybe SpanWithLabel -> Maybe SpanWithLabel -> M ()
+recordStgIdPosition :: Id -> Maybe IpeSourceLocation -> Maybe IpeSourceLocation -> M ()
 recordStgIdPosition id best_span ss = do
   opts <- asks rOpts
   when (stgDebug_infoTableMap opts) $ do
     cc <- asks rSpan
     --Useful for debugging why a certain Id gets given a certain span
     --pprTraceM "recordStgIdPosition" (ppr id $$ ppr cc $$ ppr best_span $$ ppr ss)
-    let mbspan = (\(SpanWithLabel rss d) -> (rss, d)) <$> (best_span <|> cc <|> ss)
+    let mbspan = best_span <|> cc <|> ss
     lift $ modify (\env -> env { provClosure = addToUniqMap (provClosure env) (idName id) (idType id, mbspan) })
 
 -- | If -fdistinct-contructor-tables is enabled, each occurrance of a data
@@ -167,36 +177,59 @@ numberDataCon dc ts = do
     env <- lift get
     mcc <- asks rSpan
     let
+      -- Was -fdistinct-constructor-tables-per-module given?
+      perModule :: Bool
+      perModule = dctConfig_perModule (stgDebug_distinctConstructorTables opts)
+
       -- Guess a src span for this occurence using source note ticks and the
       -- current span in the environment
-      !mbest_span = selectTick ts <|> (\(SpanWithLabel rss l) -> (rss, l)) <$> mcc
+      !mbest_span = selectTick ts <|> mcc
 
       -- Add the occurence to the data constructor map of the InfoTableProvMap,
       -- noting the unique number assigned for this occurence
       (!r, !dcMap') =
         alterUniqMap_L
-          ( maybe
-              (Just ((0, mbest_span) :| [] ))
-              ( \xs@((k, _):|_) ->
-                  Just $! ((k + 1, mbest_span) `NE.cons` xs)
-              )
-          )
+          (addOcc perModule mbest_span)
           (provDC env)
           dc
     lift $ put (env { provDC = dcMap' })
     return $ case r of
       Nothing -> NoNumber
-      Just res -> Numbered (fst (NE.head res))
+      Just res ->
+        if perModule then
+          NumberedModule
+        else
+          Numbered (fst (NE.head res))
   else do
     -- -fdistinct-constructor-tables is not enabled, or we do not want to make
     -- distinct tables for this specific constructor
     return NoNumber
+  where
+    addOcc
+      :: Bool -- Is -fdistinct-constructor-tables-per-module enabled?
+      -> Maybe IpeSourceLocation -- The best src location we have for this occurrence
+      -> Maybe (NonEmpty (Int, Maybe IpeSourceLocation)) -- Current noted occurrences
+      -> Maybe (NonEmpty (Int, Maybe IpeSourceLocation))
+    addOcc perModule mSrcLoc mCurOccs =
+      case mCurOccs of
+        Nothing -> Just $ pure (0, mSrcLoc)
+        Just es@((k, _) :| _) ->
+          if perModule then
+            -- -fdistinct-constructor-tables-per-module was given, meaning we do
+            -- not want to create another info table for this constructor if one
+            -- already exists for this module. Add another occurrence, but do
+            -- not increment the constructor number.
+            Just $! (0, mSrcLoc) `NE.cons` es
+          else
+            -- -fdistinct-constructor-tables-per-module was not given, add
+            -- another occurence and increment the constructor number
+            Just $! (k + 1, mSrcLoc) `NE.cons` es
 
-selectTick :: [StgTickish] -> Maybe (RealSrcSpan, LexicalFastString)
+selectTick :: [StgTickish] -> Maybe IpeSourceLocation
 selectTick = foldl' go Nothing
   where
-    go :: Maybe (RealSrcSpan, LexicalFastString) -> StgTickish -> Maybe (RealSrcSpan, LexicalFastString)
-    go _   (SourceNote rss d) = Just (rss, d)
+    go :: Maybe IpeSourceLocation -> StgTickish -> Maybe IpeSourceLocation
+    go _   (SourceNote rss d) = Just $ IpeSourceLocation rss d
     go acc _                  = acc
 
 -- | Descide whether a distinct info table should be made for a usage of a data
@@ -205,7 +238,7 @@ selectTick = foldl' go Nothing
 -- given.
 shouldMakeDistinctTable :: StgDebugOpts -> DataCon -> Bool
 shouldMakeDistinctTable StgDebugOpts{..} dc =
-    case stgDebug_distinctConstructorTables of
+    case dctConfig_whichConstructors stgDebug_distinctConstructorTables of
       All -> True
       Only these -> Set.member dcStr these
       AllExcept these -> Set.notMember dcStr these

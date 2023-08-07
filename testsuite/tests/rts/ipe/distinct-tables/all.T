@@ -14,7 +14,11 @@ test(
             'NoACon.out',
             'NoBCon.out',
             'NoCCon.out',
-            'NoBConCCon.out'
+            'NoBConCCon.out',
+            'PerModule.out',
+            'PerModuleACon.out',
+            'PerModuleNoBCon.out',
+            'NoPerModuleNoBCon.out'
         ]),
         ignore_stdout
         ]

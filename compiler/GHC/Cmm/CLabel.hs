@@ -531,12 +531,14 @@ data IdLabelInfo
   deriving (Eq, Ord)
 
 -- | Which module is the info table from, and which number was it.
-data ConInfoTableLocation = UsageSite Module Int
+data ConInfoTableLocation = UsageSite !Module !Int
+                          | UsageModule !Module
                           | DefinitionSite
                               deriving (Eq, Ord)
 
 instance Outputable ConInfoTableLocation where
   ppr (UsageSite m n) = text "Loc(" <> ppr n <> text "):" <+> ppr m
+  ppr (UsageModule m) = text "Loc:" <+> ppr m
   ppr DefinitionSite = empty
 
 getConInfoTableLocation :: IdLabelInfo -> Maybe ConInfoTableLocation
@@ -1654,11 +1656,15 @@ ppIdFlavor x = pp_cSEP <> case x of
         DefinitionSite -> text "con_entry"
         UsageSite m n ->
           pprModule m <> pp_cSEP <> int n <> pp_cSEP <> text "con_entry"
+        UsageModule m ->
+          pprModule m <> pp_cSEP <> text "con_entry"
    ConInfoTable k   ->
     case k of
       DefinitionSite -> text "con_info"
       UsageSite m n ->
         pprModule m <> pp_cSEP <> int n <> pp_cSEP <> text "con_info"
+      UsageModule m ->
+        pprModule m <> pp_cSEP <> text "con_info"
    ClosureTable     -> text "closure_tbl"
    Bytes            -> text "bytes"
    BlockInfoTable   -> text "info"

@@ -607,11 +607,12 @@ type OutStgAlt        = StgAlt
 -- each usage of a constructor is given an unique number and
 -- an info table is generated for each different constructor.
 data ConstructorNumber =
-      NoNumber | Numbered Int
+      NoNumber | Numbered !Int | NumberedModule
 
 instance Outputable ConstructorNumber where
   ppr NoNumber = empty
   ppr (Numbered n) = text "#" <> ppr n
+  ppr NumberedModule = text "#<module>"
 
 {-
 Note Stg Passes
@@ -950,6 +951,7 @@ pprStgRhs opts rhs = case rhs of
               , case mid of
                   NoNumber -> empty
                   Numbered n -> hcat [ppr n, space]
+                  NumberedModule -> hcat [text "#<module>", space]
               -- The bang indicates this is an StgRhsCon instead of an StgConApp.
               , ppr con, text "! ", brackets (sep (map pprStgArg args))]
 
