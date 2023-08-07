@@ -7,7 +7,8 @@ module GHC.Iface.Flags (
    , IfaceLanguage(..)
    , IfaceCppOptions(..)
    , IfaceCodeGen(..)
-   , IfaceDistinctConstructorConfig(..)
+   , IfaceDistinctConstructorOptions(..)
+   , IfaceDistinctConstructors(..)
    , pprIfaceDynFlags
    , missingExtraFlagInfo
    ) where
@@ -199,48 +200,74 @@ instance Outputable IfaceCppOptions where
 
 data IfaceCodeGen = IfaceCodeGen
   { ifaceCodeGenFlags :: [IfaceGeneralFlag]
-  , ifaceCodeGenDistinctConstructorTables :: IfaceDistinctConstructorConfig
+  , ifaceCodeGenDistinctConstructorTablesOptions :: IfaceDistinctConstructorOptions
   }
 
 instance NFData IfaceCodeGen where
-  rnf (IfaceCodeGen flags distinctCnstrTables) =
-    rnf flags `seq` rnf distinctCnstrTables
+  rnf (IfaceCodeGen flags dctConfig) =
+    rnf flags `seq` rnf dctConfig
 
 instance Binary IfaceCodeGen where
-  put_ bh (IfaceCodeGen flags distinctCnstrTables) = do
+  put_ bh (IfaceCodeGen flags dctConfig) = do
     put_ bh flags
-    put_ bh distinctCnstrTables
+    put_ bh dctConfig
 
   get bh =
     IfaceCodeGen <$> get bh <*> get bh
 
 instance Outputable IfaceCodeGen where
-  ppr (IfaceCodeGen flags distinctCnstrTables) =
+  ppr (IfaceCodeGen flags dctConfig) =
     vcat
       [ text "flags:"
       , nest 2 $ ppr flags
       , text "distinct constructor tables:"
-      , nest 2 $ ppr distinctCnstrTables
+      , nest 2 $ ppr dctConfig
       ]
 
-newtype IfaceDistinctConstructorConfig = IfaceDistinctConstructorConfig StgDebugDctConfig
+data IfaceDistinctConstructorOptions = IfaceDistinctConstructorOptions
+  { ifaceDctPerModule :: !Bool
+  , ifaceDctConstructors :: !IfaceDistinctConstructors
+  }
 
-instance NFData IfaceDistinctConstructorConfig where
-  rnf (IfaceDistinctConstructorConfig cnf) = case cnf of
+instance NFData IfaceDistinctConstructorOptions where
+  rnf (IfaceDistinctConstructorOptions perMod constrs) =
+    rnf perMod `seq` rnf constrs
+
+instance Binary IfaceDistinctConstructorOptions where
+  put_ bh (IfaceDistinctConstructorOptions perMod constrs) = do
+    put_ bh perMod
+    put_ bh constrs
+
+  get bh = do
+    IfaceDistinctConstructorOptions <$> get bh <*> get bh
+
+instance Outputable IfaceDistinctConstructorOptions where
+  ppr (IfaceDistinctConstructorOptions perMod constrs) =
+    vcat
+      [ text "perMod:"
+      , nest 2 $ ppr perMod
+      , text "constructors:"
+      , nest 2 $ ppr constrs
+      ]
+
+newtype IfaceDistinctConstructors = IfaceDistinctConstructors StgDebugDctConfigConstrs
+
+instance NFData IfaceDistinctConstructors where
+  rnf (IfaceDistinctConstructors cnf) = case cnf of
     All -> ()
     (Only v) -> rnf v
     (AllExcept v) -> rnf v
     None -> ()
 
-instance Outputable IfaceDistinctConstructorConfig where
-  ppr (IfaceDistinctConstructorConfig cnf) = case cnf of
+instance Outputable IfaceDistinctConstructors where
+  ppr (IfaceDistinctConstructors cnf) = case cnf of
     All -> text "all"
     (Only v) -> text "only" <+> brackets (hcat $ fmap text $ Set.toList v)
     (AllExcept v) -> text "all except" <+> brackets (hcat $ fmap text $ Set.toList v)
     None -> text "none"
 
-instance Binary IfaceDistinctConstructorConfig where
-  put_ bh (IfaceDistinctConstructorConfig cnf) = case cnf of
+instance Binary IfaceDistinctConstructors where
+  put_ bh (IfaceDistinctConstructors cnf) = case cnf of
     All -> putByte bh 0
     (Only cs) -> do
       putByte bh 1
@@ -252,7 +279,7 @@ instance Binary IfaceDistinctConstructorConfig where
 
   get bh = do
     h <- getByte bh
-    IfaceDistinctConstructorConfig <$>
+    IfaceDistinctConstructors <$>
       case h of
         0 -> pure All
         1 -> Only <$> get bh

@@ -15,9 +15,15 @@ data StgDebugOpts = StgDebugOpts
   , stgDebug_distinctConstructorTables :: !StgDebugDctConfig
   }
 
+data StgDebugDctConfig =
+  StgDebugDctConfig
+    { dctConfig_perModule :: !Bool
+    , dctConfig_whichConstructors :: !StgDebugDctConfigConstrs
+    }
+
 -- | Configuration describing which constructors should be given distinct info
 -- tables for each usage.
-data StgDebugDctConfig =
+data StgDebugDctConfigConstrs =
     -- | Create distinct constructor tables for each usage of any data
     -- constructor.
     --
@@ -51,15 +57,15 @@ data StgDebugDctConfig =
 -- If the given set is empty, that means the user has entered
 -- @-fdistinct-constructor-tables@ with no constructor names specified, and
 -- therefore we consider that an 'All' configuration.
-dctConfigPlus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
-dctConfigPlus cfg cs
-    | Set.null cs = All
+dctConfigConstrsPlus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
+dctConfigConstrsPlus cfg cs
+    | Set.null cs = cfg { dctConfig_whichConstructors = All }
     | otherwise =
-        case cfg of
-          All -> All
-          Only cs' -> Only $ Set.union cs' cs
-          AllExcept cs' -> AllExcept $ Set.difference cs' cs
-          None -> Only cs
+        case dctConfig_whichConstructors cfg of
+          All -> cfg { dctConfig_whichConstructors = All }
+          Only cs' -> cfg { dctConfig_whichConstructors = Only $ Set.union cs' cs }
+          AllExcept cs' -> cfg { dctConfig_whichConstructors = AllExcept $ Set.difference cs' cs }
+          None -> cfg { dctConfig_whichConstructors = Only cs }
 
 -- | Given a distinct constructor tables configuration and a set of constructor
 -- names that we /do not/ want to generate distinct info tables for, create a
@@ -68,13 +74,13 @@ dctConfigPlus cfg cs
 -- If the given set is empty, that means the user has entered
 -- @-fno-distinct-constructor-tables@ with no constructor names specified, and
 -- therefore we consider that a 'None' configuration.
-dctConfigMinus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
-dctConfigMinus cfg cs
-    | Set.null cs = None
+dctConfigConstrsMinus :: StgDebugDctConfig -> Set String -> StgDebugDctConfig
+dctConfigConstrsMinus cfg cs
+    | Set.null cs = cfg { dctConfig_whichConstructors = None }
     | otherwise =
-        case cfg of
-          All -> AllExcept cs
-          Only cs' -> Only $ Set.difference cs' cs
-          AllExcept cs' -> AllExcept $ Set.union cs' cs
-          None -> None
+        case dctConfig_whichConstructors cfg of
+          All -> cfg { dctConfig_whichConstructors = AllExcept cs }
+          Only cs' -> cfg { dctConfig_whichConstructors = Only $ Set.difference cs' cs }
+          AllExcept cs' -> cfg { dctConfig_whichConstructors = AllExcept $ Set.union cs' cs }
+          None -> cfg { dctConfig_whichConstructors = None }
 
