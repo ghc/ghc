@@ -73,16 +73,7 @@ Now our bad case can't happen.  We'll have
         UnsafeRefl (co :: t1 ~ t2) -> ....(x |> co)....
 
 and the (x |> co) mentions the evidence 'co', which prevents it
-floating.
-
-But what stops the whole (case unsafeEqualityProof of ...) from
-floating?  Answer: we never float a case on a redex that can fail
-outside a conditional.  See Primop.hs,
-Note [Transformations affected by primop effects].
-And unsafeEqualityProof (being opaque) is definitely treated as
-can-fail.
-  (Huh? It seems we have a special-case in exprOkForSpeculation (app_ok)
-   /specifically/ allowing unsafeEqualityProof.  Something smells wrong. #23754)
+floating. See also wrinkle (U11) below.
 
 While unsafeCoerce is a perfectly ordinary function that needs no
 special treatment, Unsafe.Coerce.unsafeEqualityProof is magical, in
@@ -215,6 +206,22 @@ There are yet more wrinkles
       the kind-/homogeneous/ unsafeEqualityProof twice.
 
       See Note [Wiring in unsafeCoerce#] in Desugar.
+
+(U11) But what stops the whole (case unsafeEqualityProof of ...) from
+      being speculated out of a conditional? (E.g., strict float out.)
+      Answer: we never float a case on something that is not an HNF
+      ('exprIsHNF') outside a conditional.
+      See Note [Floating single-alternative cases].
+
+(U12) In #20143 we found
+         case unsafeEqualityProof @t1 @t2 of UnsafeRefl cv[dead] -> blah
+      where 'blah' didn't mention 'cv'.  We'd like to discard this
+      redundant use of unsafeEqualityProof, via GHC.Core.Opt.Simplify.rebuildCase.
+      To do this we need to know
+        (a) that cv is unused (done by OccAnal), and
+        (b) that unsafeEqualityProof terminates rapidly without side effects.
+      At the moment we check that explicitly in GHC.Core.Utils.exprOkToDiscard,
+      but one might imagine a more systematic check in future.
 -}
 
 -- | This type is treated magically within GHC. Any pattern match of the
