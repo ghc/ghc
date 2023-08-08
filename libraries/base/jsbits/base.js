@@ -280,6 +280,59 @@ function h$rmdir(file, file_off) {
     h$unsupported(-1);
 }
 
+function h$rename(old_path, old_path_off, new_path, new_path_off) {
+  TRACE_IO("rename")
+#ifndef GHCJS_BROWSER
+  if (h$isNode()) {
+    try {
+      fs.renameSync(h$decodeUtf8z(old_path, old_path_off), h$decodeUtf8z(new_path, new_path_off));
+      return 0;
+    } catch(e) {
+      h$setErrno(e);
+      return -1;
+    }
+  } else
+#endif
+    h$unsupported(-1);
+}
+
+function h$getcwd(buf, off, buf_size) {
+  TRACE_IO("getcwd")
+#ifndef GHCJS_BROWSER
+  if (h$isNode()) {
+    try {
+      var cwd = h$encodeUtf8(process.cwd());
+      h$copyMutableByteArray(cwd, 0, buf, off, cwd.len);
+      RETURN_UBX_TUP2(cwd, 0);
+    } catch (e) {
+      h$setErrno(e);
+      return -1;
+    }
+  } else
+#endif
+    h$unsupported(-1);
+}
+
+function h$realpath(path,off,resolved,resolved_off) {
+  TRACE_IO("realpath")
+#ifndef GHCJS_BROWSER
+  if (h$isNode()) {
+    try {
+      var rp = h$encodeUtf8(fs.realpathSync(h$decodeUtf8z(path,off)));
+      if (resolved !== null) {
+        h$copyMutableByteArray(rp, 0, resolved, resolved_off, Math.min(resolved.len - resolved_off, rp.len));
+        RETURN_UBX_TUP2(resolved, resolved_off);
+      }
+      RETURN_UBX_TUP2(rp, 0);
+    } catch (e) {
+      h$setErrno(e);
+      return -1;
+    }
+  } else
+#endif
+    h$unsupported(-1);
+}
+
 function h$base_open(file, file_off, how, mode, c) {
   return h$open(file,file_off,how,mode,c);
 }
