@@ -233,8 +233,10 @@ typeOneShot ty
 -- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 idStateHackOneShotInfo :: Id -> OneShotInfo
 idStateHackOneShotInfo id
-    | isStateHackType (idType id) = OneShotLam
-    | otherwise                   = idOneShotInfo id
+  = case idOneShotInfo id of
+       OneShotLam                                  -> OneShotLam
+       NoOneShotInfo | isStateHackType (idType id) -> OneShotLam
+                     | otherwise                   -> NoOneShotInfo
 
 -- | Returns whether the lambda associated with the 'Id' is
 --   certainly applied at most once
