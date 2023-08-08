@@ -2335,31 +2335,43 @@ exprIsTopLevelBindable expr ty
     -- consequently we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
     -- as the latter would panic.
   || exprIsTickedString expr
-  || isBoxedType ty && exprIsNestedTrivialConApp expr
+  || isBoxedType ty && exprIsDefinitelyWHNF expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
 -- string.
 exprIsTickedString :: CoreExpr -> Bool
 exprIsTickedString = isJust . exprIsTickedString_maybe
 
--- | Check if the expression is a constructor worker application to arguments
--- which are either trivial or themselves constructor worker applications, etc.
-exprIsNestedTrivialConApp :: CoreExpr -> Bool
-exprIsNestedTrivialConApp x
-  | (Var v, xs) <- collectArgs x
-  , Just dc <- isDataConWorkId_maybe v
-  = and (zipWith field_ok (map isMarkedStrict (dataConRepStrictness dc)) xs)
+-- | This function is a very conservative approximation that only deals with
+-- trivial expressions and datacon worker applications. Additionally, this
+-- conservatively rejects data constructors that are applied to lifted variables
+-- in argument positions that are marked strict.
+-- In the future, we hope to loosen this requirement (See #23811).
+exprIsDefinitelyWHNF :: CoreExpr -> Bool
+exprIsDefinitelyWHNF x = is_definitely_whnf False x
   where
-    field_ok strict x
-      | not strict
-      , exprIsTrivial x
-      = True
-      | (Var v, xs) <- collectArgs x
+    -- The first argument of 'is_definitely_whnf' indicates whether the
+    -- expression is forced due to being a strict argument of an enclosing data
+    -- constructor. If that is the case and the expression is a variable, then
+    -- we are only sure it is fully evaluated if the variable has an unlifted
+    -- type.
+    is_definitely_whnf True v@Var{} = definitelyUnliftedType (exprType v)
+    is_definitely_whnf _ x
+      | (Var v, xs) <- collect_args x
       , Just dc <- isDataConWorkId_maybe v
-      = and (zipWith field_ok (map isMarkedStrict (dataConRepStrictness dc)) xs)
-      | otherwise
-      = False
-exprIsNestedTrivialConApp _ = False
+      = and (zipWith is_definitely_whnf (map isMarkedStrict (dataConRepStrictness dc)) xs)
+      | otherwise = exprIsTrivial x
+
+    -- This is slightly different from 'collectArgs' as it looks through ticks and casts
+    -- and it only collects run-time arguments.
+    collect_args expr = go expr []
+      where
+        go (App f a)  as
+          | isRuntimeArg a = go f (a:as)
+          | otherwise      = go f as
+        go (Tick _ e) as   = go e as
+        go (Cast e _) as   = go e as
+        go e          as   = (e, as)
 
 -- | Extract a literal string from an expression that is zero or more Ticks
 -- wrapped around a literal string. Returns Nothing if the expression has a
