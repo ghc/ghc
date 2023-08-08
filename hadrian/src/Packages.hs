@@ -11,7 +11,7 @@ module Packages (
     libffi, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, semaphoreCompat, stm, templateHaskell, terminfo, text, time, timeout, touchy,
     transformers, unlit, unix, win32, xhtml,
-    lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
+    lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace,
     ghcPackages, isGhcPackage,
 
     -- * Package information
@@ -45,7 +45,7 @@ ghcPackages =
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout
     , lintersCommon
-    , lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
+    , lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -61,7 +61,7 @@ array, base, binary, bytestring, cabalSyntax, cabal, checkPpr, checkExact, count
   parsec, pretty, primitive, process, rts, runGhc, semaphoreCompat, stm, templateHaskell,
   terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
   timeout,
-  lintersCommon, lintNotes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
+  lintersCommon, lintNotes, lintCodes, lintCommitMsg, lintSubmoduleRefs, lintWhitespace
     :: Package
 array               = lib  "array"
 base                = lib  "base"
@@ -133,6 +133,7 @@ xhtml               = lib  "xhtml"
 
 lintersCommon       = lib     "linters-common"      `setPath` "linters/linters-common"
 lintNotes           = linter  "lint-notes"
+lintCodes           = linter  "lint-codes"
 lintCommitMsg       = linter  "lint-commit-msg"
 lintSubmoduleRefs   = linter  "lint-submodule-refs"
 lintWhitespace      = linter  "lint-whitespace"

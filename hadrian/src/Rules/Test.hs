@@ -55,6 +55,12 @@ noteLinterSourcePath = "linters/lint-notes/Main.hs"
 noteLinterExtra :: [String]
 noteLinterExtra = ["-ilinters/lint-notes"]
 
+codeLinterProgPath, codeLinterSourcePath :: FilePath
+codeLinterProgPath = "test/bin/lint-codes" <.> exe
+codeLinterSourcePath = "linters/lint-codes/Main.hs"
+codeLinterExtra :: [String]
+codeLinterExtra = ["-ilinters/lint-codes"]
+
 whitespaceLinterProgPath, whitespaceLinterSourcePath :: FilePath
 whitespaceLinterProgPath = "test/bin/lint-whitespace" <.> exe
 whitespaceLinterSourcePath = "linters/lint-whitespace/Main.hs"
@@ -78,6 +84,7 @@ checkPrograms =
     , CheckProgram "test:count-deps" countDepsProgPath countDepsSourcePath countDepsExtra countDeps id id
     , CheckProgram "test:dump-decls" dumpDeclsProgPath dumpDeclsSourcePath dumpDeclsExtra dumpDecls id id
     , CheckProgram "lint:notes" noteLinterProgPath  noteLinterSourcePath  noteLinterExtra  lintNotes  (const stage0Boot)  id
+    , CheckProgram "lint:codes" codeLinterProgPath  codeLinterSourcePath  codeLinterExtra  lintCodes  id id
     , CheckProgram "lint:whitespace"  whitespaceLinterProgPath  whitespaceLinterSourcePath  whitespaceLinterExtra  lintWhitespace  (const stage0Boot)  (filter (/= lintersCommon))
     ]
 
@@ -273,6 +280,7 @@ testRules = do
             setEnv "DUMP_DECLS" (top -/- root -/- dumpDeclsProgPath)
             setEnv "COUNT_DEPS" (top -/- root -/- countDepsProgPath)
             setEnv "LINT_NOTES" (top -/- root -/- noteLinterProgPath)
+            setEnv "LINT_CODES" (top -/- root -/- codeLinterProgPath)
             setEnv "LINT_WHITESPACE" (top -/- root -/- whitespaceLinterProgPath)
 
             -- This lets us bypass the need to generate a config

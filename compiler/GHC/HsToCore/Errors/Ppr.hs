@@ -15,7 +15,7 @@ import GHC.HsToCore.Errors.Types
 import GHC.Prelude
 import GHC.Types.Basic (pprRuleName)
 import GHC.Types.Error
-import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Types.Error.Codes
 import GHC.Types.Id (idType)
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc

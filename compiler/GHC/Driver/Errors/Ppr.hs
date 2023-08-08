@@ -17,7 +17,7 @@ import GHC.Driver.DynFlags
 import GHC.HsToCore.Errors.Ppr ()
 import GHC.Parser.Errors.Ppr ()
 import GHC.Types.Error
-import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Types.Error.Codes
 import GHC.Unit.Types
 import GHC.Utils.Outputable
 import GHC.Unit.Module

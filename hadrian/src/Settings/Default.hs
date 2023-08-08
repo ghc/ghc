@@ -65,7 +65,15 @@ defaultBignumBackend = "gmp"
 -- packages in StageBoot so if you also need to distribute anything here then add
 -- it to `stage0packages` or `stage1packages` as appropiate.
 stageBootPackages :: Action [Package]
-stageBootPackages = return [lintersCommon, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, lintNotes, hsc2hs, compareSizes, deriveConstants, genapply, genprimopcode, unlit ]
+stageBootPackages = return
+  [ lintersCommon, lintCommitMsg, lintSubmoduleRefs, lintWhitespace, lintNotes
+  , hsc2hs
+  , compareSizes
+  , deriveConstants
+  , genapply
+  , genprimopcode
+  , unlit
+  ]
 
 -- | Packages built in 'Stage0' by default. You can change this in "UserSettings".
 stage0Packages :: Action [Package]
@@ -170,7 +178,7 @@ stage2Packages = stage1Packages
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
-testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact, countDeps, ghcConfig, dumpDecls ])
+testsuitePackages = return ([ timeout | windowsHost ] ++ [ checkPpr, checkExact, countDeps, lintCodes, ghcConfig, dumpDecls ])
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.

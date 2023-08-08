@@ -74,7 +74,7 @@ import GHC.Types.Error
 import GHC.Types.Hint
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
 import GHC.Types.Basic
-import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Types.Error.Codes
 import GHC.Types.Id
 import GHC.Types.Id.Info ( RecSelParent(..) )
 import GHC.Types.Name
@@ -3113,7 +3113,6 @@ instance Diagnostic TcRnMessage where
     TcRnIllegalTypeExpr{}
       -> noHints
 
-  diagnosticCode :: TcRnMessage -> Maybe DiagnosticCode
   diagnosticCode = constructorCode
 
 -- | Change [x] to "x", [x, y] to "x and y", [x, y, z] to "x, y, and z",

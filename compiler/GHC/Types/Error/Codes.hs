@@ -16,7 +16,7 @@
 -- A diagnostic code is a numeric unique identifier for a diagnostic.
 -- See Note [Diagnostic codes].
 module GHC.Types.Error.Codes
-  ( constructorCode )
+  ( GhcDiagnosticCode, constructorCode, constructorCodes )
   where
 
 import GHC.Prelude
@@ -36,8 +36,12 @@ import GHC.Utils.Panic.Plain
 import Data.Kind    ( Type, Constraint )
 import GHC.Exts     ( proxy# )
 import GHC.Generics
-import GHC.TypeLits ( Symbol, TypeError, ErrorMessage(..) )
+import GHC.TypeLits ( Symbol, KnownSymbol, symbolVal'
+                    , TypeError, ErrorMessage(..) )
 import GHC.TypeNats ( Nat, KnownNat, natVal' )
+
+import Data.Map.Strict ( Map )
+import qualified Data.Map.Strict as Map
 
 
 {- Note [Diagnostic codes]
@@ -109,6 +113,18 @@ To ensure uniqueness across GHC versions, we proceed as follows:
 constructorCode :: (Generic diag, GDiagnosticCode (Rep diag))
                 => diag -> Maybe DiagnosticCode
 constructorCode diag = gdiagnosticCode (from diag)
+
+-- | This function computes all diagnostic codes that occur inside a given
+-- type using generics and the 'GhcDiagnosticCode' type family.
+--
+-- For example, if @T = MkT1 | MkT2@, @GhcDiagnosticCode \"MkT1\" = 123@ and
+-- @GhcDiagnosticCode \"MkT2\" = 456@, then we will get
+-- > constructorCodes @T = fromList [ (123, \"MkT1\"), (456, \"MkT2\") ]
+constructorCodes :: forall diag. (Generic diag, GDiagnosticCodes '[diag] (Rep diag))
+                 => Map DiagnosticCode String
+constructorCodes = gdiagnosticCodes @'[diag] @(Rep diag)
+  -- See Note [diagnosticCodes: don't recur into already-seen types]
+  -- for the @'[diag] type argument.
 
 -- | Type family computing the numeric diagnostic code for a given error message constructor.
 --
@@ -479,7 +495,6 @@ type family GhcDiagnosticCode c = n | n -> c where
 
   GhcDiagnosticCode "TcRnIllegalHsigDefaultMethods"                 = 93006
   GhcDiagnosticCode "TcRnHsigFixityMismatch"                        = 93007
-  GhcDiagnosticCode "TcRnHsigNoIface"                               = 93010
   GhcDiagnosticCode "TcRnHsigMissingModuleExport"                   = 93011
   GhcDiagnosticCode "TcRnBadGenericMethod"                          = 59794
   GhcDiagnosticCode "TcRnWarningMinimalDefIncomplete"               = 13511
@@ -488,7 +503,6 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBadMethodErr"                              = 46284
   GhcDiagnosticCode "TcRnIllegalTypeData"                           = 15013
   GhcDiagnosticCode "TcRnTypeDataForbids"                           = 67297
-  GhcDiagnosticCode "TcRnInterfaceLookupError"                      = 52243
   GhcDiagnosticCode "TcRnUnsatisfiedMinimalDef"                     = 06201
   GhcDiagnosticCode "TcRnMisplacedInstSig"                          = 06202
   GhcDiagnosticCode "TcRnCapturedTermName"                          = 54201
@@ -864,21 +878,29 @@ type family GhcDiagnosticCode c = n | n -> c where
   -- and this includes outdated diagnostic codes for errors that GHC
   -- no longer reports. These are collected below.
 
-  GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = 12222
-  GhcDiagnosticCode "TcRnNoClassInstHead"                           = 56538
+  GhcDiagnosticCode "TcRnIllegalInstanceHeadDecl"                   = Outdated 12222
+  GhcDiagnosticCode "TcRnNoClassInstHead"                           = Outdated 56538
     -- The above two are subsumed by InstHeadNonClass [GHC-53946]
 
-  GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = 40027
-  GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = 69639
-  GhcDiagnosticCode "TcRnMixedSelectors"                            = 40887
-  GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = 06203
-  GhcDiagnosticCode "TcRnBindInBootFile"                            = 11247
-  GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = 39180
-  GhcDiagnosticCode "PsErrUnexpectedTypeAppInDecl"                  = 45054
-  GhcDiagnosticCode "TcRnUnpromotableThing"                         = 88634
-  GhcDiagnosticCode "UntouchableVariable"                           = 34699
-  GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = 69710
-  GhcDiagnosticCode "TcRnBindMultipleVariables"                     = 92957
+  GhcDiagnosticCode "TcRnNameByTemplateHaskellQuote"                = Outdated 40027
+  GhcDiagnosticCode "TcRnIllegalBindingOfBuiltIn"                   = Outdated 69639
+  GhcDiagnosticCode "TcRnMixedSelectors"                            = Outdated 40887
+  GhcDiagnosticCode "TcRnBadBootFamInstDecl"                        = Outdated 06203
+  GhcDiagnosticCode "TcRnBindInBootFile"                            = Outdated 11247
+  GhcDiagnosticCode "TcRnUnexpectedTypeSplice"                      = Outdated 39180
+  GhcDiagnosticCode "PsErrUnexpectedTypeAppInDecl"                  = Outdated 45054
+  GhcDiagnosticCode "TcRnUnpromotableThing"                         = Outdated 88634
+  GhcDiagnosticCode "UntouchableVariable"                           = Outdated 34699
+  GhcDiagnosticCode "TcRnBindVarAlreadyInScope"                     = Outdated 69710
+  GhcDiagnosticCode "TcRnBindMultipleVariables"                     = Outdated 92957
+  GhcDiagnosticCode "TcRnHsigNoIface"                               = Outdated 93010
+  GhcDiagnosticCode "TcRnInterfaceLookupError"                      = Outdated 52243
+
+-- | Use this type synonym to mark a diagnostic code as outdated.
+--
+-- The presence of this type synonym is used by the 'codes' test to determine
+-- which diagnostic codes to check for testsuite coverage.
+type Outdated a = a
 
 {- *********************************************************************
 *                                                                      *
@@ -1106,12 +1128,26 @@ To achieve this, we use a variant of the 'typed' lens from 'generic-lens'
 type GDiagnosticCode :: (Type -> Type) -> Constraint
 class GDiagnosticCode f where
   gdiagnosticCode :: f a -> Maybe DiagnosticCode
+-- | Use the generic representation of a type to retrieve the collection
+-- of all diagnostic codes it can give rise to.
+type GDiagnosticCodes :: [Type] -> (Type -> Type) -> Constraint
+class GDiagnosticCodes seen f where
+  gdiagnosticCodes :: Map DiagnosticCode String
 
-type ConstructorCode :: Symbol -> (Type -> Type) -> Maybe Type -> Constraint
+type ConstructorCode :: Symbol -> (Type -> Type)  -> Maybe Type -> Constraint
 class ConstructorCode con f recur where
   gconstructorCode :: f a -> Maybe DiagnosticCode
-instance KnownConstructor con => ConstructorCode con f 'Nothing where
+type ConstructorCodes :: Symbol -> (Type -> Type) -> [Type] -> Maybe Type -> Constraint
+class ConstructorCodes con f seen recur where
+  gconstructorCodes :: Map DiagnosticCode String
+
+instance (KnownConstructor con, KnownSymbol con) => ConstructorCode con f 'Nothing where
   gconstructorCode _ = Just $ DiagnosticCode "GHC" $ natVal' @(GhcDiagnosticCode con) proxy#
+instance (KnownConstructor con, KnownSymbol con) => ConstructorCodes con f seen 'Nothing where
+  gconstructorCodes =
+    Map.singleton
+      (DiagnosticCode "GHC" $ natVal' @(GhcDiagnosticCode con) proxy#)
+      (symbolVal' @con proxy#)
 
 -- If we recur into the 'UnknownDiagnostic' existential datatype,
 -- unwrap the existential and obtain the error code.
@@ -1121,30 +1157,51 @@ instance {-# OVERLAPPING #-}
       => ConstructorCode con f ('Just (UnknownDiagnostic opts)) where
   gconstructorCode diag = case getType @(UnknownDiagnostic opts) @con @f diag of
     UnknownDiagnostic _ diag -> diagnosticCode diag
+instance {-# OVERLAPPING #-}
+         ( ConRecursInto con ~ 'Just (UnknownDiagnostic opts) )
+      => ConstructorCodes con f seen ('Just (UnknownDiagnostic opts)) where
+  gconstructorCodes = Map.empty
 
 -- (*) Recursive instance: Recur into the given type.
 instance ( ConRecursInto con ~ 'Just ty, HasType ty con f
          , Generic ty, GDiagnosticCode (Rep ty) )
       => ConstructorCode con f ('Just ty) where
-  gconstructorCode diag = constructorCode (getType @ty @con @f diag)
+  gconstructorCode diag = gdiagnosticCode (from $ getType @ty @con @f diag)
+instance ( ConRecursInto con ~ 'Just ty, HasType ty con f
+         , Generic ty, GDiagnosticCodes (Insert ty seen) (Rep ty)
+         , Seen seen ty )
+      => ConstructorCodes con f seen ('Just ty) where
+  gconstructorCodes =
+    -- See Note [diagnosticCodes: don't recur into already-seen types]
+    if wasSeen @seen @ty
+    then Map.empty
+    else gdiagnosticCodes @(Insert ty seen) @(Rep ty)
 
 -- (**) Constructor instance: handle constructors directly.
 --
 -- Obtain the code from the 'GhcDiagnosticCode'
 -- type family, applied to the name of the constructor.
-instance (ConstructorCode con f recur, recur ~ ConRecursInto con)
+instance (ConstructorCode con f recur, recur ~ ConRecursInto con, KnownSymbol con)
       => GDiagnosticCode (M1 i ('MetaCons con x y) f) where
   gdiagnosticCode (M1 x) = gconstructorCode @con @f @recur x
+instance (ConstructorCodes con f seen recur, recur ~ ConRecursInto con, KnownSymbol con)
+      => GDiagnosticCodes seen (M1 i ('MetaCons con x y) f) where
+  gdiagnosticCodes = gconstructorCodes @con @f @seen @recur
 
 -- Handle sum types (the diagnostic types are sums of constructors).
 instance (GDiagnosticCode f, GDiagnosticCode g) => GDiagnosticCode (f :+: g) where
   gdiagnosticCode (L1 x) = gdiagnosticCode @f x
   gdiagnosticCode (R1 y) = gdiagnosticCode @g y
+instance (GDiagnosticCodes seen f, GDiagnosticCodes seen g) => GDiagnosticCodes seen (f :+: g) where
+  gdiagnosticCodes = Map.union (gdiagnosticCodes @seen @f) (gdiagnosticCodes @seen @g)
 
 -- Discard metadata we don't need.
 instance GDiagnosticCode f
       => GDiagnosticCode (M1 i ('MetaData nm mod pkg nt) f) where
   gdiagnosticCode (M1 x) = gdiagnosticCode @f x
+instance GDiagnosticCodes seen f
+      => GDiagnosticCodes seen (M1 i ('MetaData nm mod pkg nt) f) where
+  gdiagnosticCodes = gdiagnosticCodes @seen @f
 
 -- | Decide whether to pick the left or right branch
 -- when deciding how to recurse into a product.
@@ -1195,6 +1252,50 @@ instance HasType ty orig  f => HasTypeProd ty ('Just l) orig f g where
 -- Pick the right branch.
 instance HasType ty orig g => HasTypeProd ty 'Nothing orig f g where
   getTypeProd (_ :*: y) = getType @ty @orig @g y
+
+{- Note [diagnosticCodes: don't recur into already-seen types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When traversing through the Generic representation of a datatype to compute all
+of the corresponding error codes, we need to keep track of types we have already
+seen in order to avoid a runtime loop.
+
+For example, TcRnMessage is defined recursively in terms of itself:
+
+  data TcRnMessage where
+    ...
+    TcRnMessageWithInfo :: !UnitState
+                        -> !TcRnMessageDetailed -- contains a TcRnMessage
+                        -> TcRnMessage
+
+If we naively computed the collection of error codes, we would get a computation
+of the form
+
+  diagnosticCodes @TcRnMessage = ... `Map.union` constructorCodes "TcRnMessageWithInfo"
+  constructorCodes "TcRnMessageWithInfo" = diagnosticCodes @TcRnMessage
+
+This would cause an infinite loop. We thus keep track of a list of types we
+have already encountered, and when we recur into a type we have already
+encountered, we simply skip taking that union (see (*)).
+
+Note that 'constructorCodes' starts by marking the initial type itself as "seen",
+which precisely avoids the loop above when calling 'constructorCodes @TcRnMessage'.
+-}
+
+type Seen :: [Type] -> Type -> Constraint
+class Seen seen ty where
+  wasSeen :: Bool
+instance Seen '[] ty where
+  wasSeen = False
+instance {-# OVERLAPPING #-} Seen (ty ': tys) ty where
+  wasSeen = True
+instance Seen tys ty => Seen (ty' ': tys) ty where
+  wasSeen = wasSeen @tys @ty
+
+type Insert :: Type -> [Type] -> [Type]
+type family Insert ty tys where
+  Insert ty '[] = '[ty]
+  Insert ty (ty ': tys) = ty ': tys
+  Insert ty (ty' ': tys) = ty' ': Insert ty tys
 
 {- *********************************************************************
 *                                                                      *

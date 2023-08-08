@@ -31,7 +31,7 @@ import GHC.Prelude
 
 import GHC.Types.Error
 import GHC.Types.Hint.Ppr () -- Outputable GhcHint
-import GHC.Types.Error.Codes ( constructorCode )
+import GHC.Types.Error.Codes
 import GHC.Types.Name
 import GHC.Types.TyThing
 

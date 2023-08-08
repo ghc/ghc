@@ -239,6 +239,10 @@ ifeq "$(LINT_NOTES)" ""
 LINT_NOTES := $(abspath $(TOP)/../inplace/bin/lint-notes)
 endif
 
+ifeq "$(LINT_CODES)" ""
+LINT_CODES:= $(abspath $(TOP)/../inplace/bin/lint-codes)
+endif
+
 ifeq "$(LINT_WHITESPACE)" ""
 LINT_WHITESPACE := $(abspath $(TOP)/../inplace/bin/lint-whitespace)
 endif

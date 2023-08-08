@@ -113,10 +113,8 @@ import Data.Typeable ( Typeable )
 import Numeric.Natural ( Natural )
 import Text.Printf ( printf )
 
-{-
-Note [Messages]
-~~~~~~~~~~~~~~~
-
+{- Note [Messages]
+~~~~~~~~~~~~~~~~~~
 We represent the 'Messages' as a single bag of warnings and errors.
 
 The reason behind that is that there is a fluid relationship between errors
@@ -809,8 +807,11 @@ data DiagnosticCode =
     , diagnosticCodeNumber    :: Natural
         -- ^ the actual diagnostic code
     }
+  deriving ( Eq, Ord )
 
-instance Outputable DiagnosticCode where
-  ppr (DiagnosticCode prefix c) =
-    text prefix <> text "-" <> text (printf "%05d" c)
+instance Show DiagnosticCode where
+  show (DiagnosticCode prefix c) =
+    prefix ++ "-" ++ printf "%05d" c
       -- pad the numeric code to have at least 5 digits
+instance Outputable DiagnosticCode where
+  ppr code = text (show code)
