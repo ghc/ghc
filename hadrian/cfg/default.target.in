@@ -34,6 +34,6 @@ Target
 
 , tgtRanlib = Just (Ranlib {ranlibProgram = Program {prgPath = "@RanlibCmd@", prgFlags = []}})
 , tgtNm = Nm {nmProgram = Program {prgPath = "@NmCmd@", prgFlags = []}}
-, tgtMergeObjs = Just (MergeObjs {mergeObjsProgram = Program {prgPath = "@MergeObjsCmd@", prgFlags = @MergeObjsArgsList@}, mergeObjsSupportsResponseFiles = @MergeObjsSupportsResponseFilesBool@})
+, tgtMergeObjs = @MergeObjsCmdMaybe@
 , tgtWindres = @WindresCmdMaybeProg@
 }
