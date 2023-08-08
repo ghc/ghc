@@ -401,7 +401,7 @@ hadrian-multi:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   variables:
-    GHC_FLAGS: -Werror
+    GHC_FLAGS: "-Werror -Wwarn=deprecations"
     CONFIGURE_ARGS: --enable-bootstrap-with-devel-snapshot
   tags:
     - x86_64-linux
