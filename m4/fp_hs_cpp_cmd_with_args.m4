@@ -64,6 +64,6 @@ AC_ARG_WITH(hs-cpp-flags,
 )
 
 $1=$HS_CPP_CMD
-$2=$HS_CPP_ARGS
+$2="$$2 $HS_CPP_ARGS"
 
 ])
