@@ -1578,10 +1578,8 @@ expansion.  Specifically:
 exprIsExpandable :: CoreExpr -> Bool
 -- See Note [exprIsExpandable]
 exprIsExpandable e
-  = ok e
+  = go 0 e
   where
-    ok e = go 0 e
-
     -- n is the number of value arguments
     go n (Var v)                      = isExpandableApp v n
     go _ (Lit {})                     = True
@@ -1592,7 +1590,7 @@ exprIsExpandable e
                     | otherwise       = go n e
     go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
                     | otherwise       = go n e
-    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
+    go n (App f e)  | isRuntimeArg e  = go (n+1) f && exprIsWorkFree e
                     | otherwise       = go n f
     go _ (Case {})                    = False
     go _ (Let {})                     = False
