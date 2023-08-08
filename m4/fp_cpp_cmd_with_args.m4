@@ -51,7 +51,7 @@ AC_ARG_WITH(cpp-flags,
 [
   # Augment CPP_ARGS with whatever flags were previously configured and passed
   # as an argument.
-  CPP_ARGS="$CPP_ARGS $$3"
+  CPP_ARGS="$$3 $CPP_ARGS"
 ])
 
 $2="$CPP_CMD"
