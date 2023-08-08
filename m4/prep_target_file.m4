@@ -160,6 +160,14 @@ AC_DEFUN([PREP_TARGET_FILE],[
     PREP_LIST([CONF_CXX_OPTS_STAGE0])
     PREP_LIST([CONF_GCC_LINKER_OPTS_STAGE0])
 
+
+    if test -z "$MergeObjsCmd"; then
+      MergeObjsCmdMaybe=Nothing
+    else
+      MergeObjsCmdMaybe="Just (MergeObjs {mergeObjsProgram = Program {prgPath = \"$MergeObjsCmd\", prgFlags = $MergeObjsArgsList}, mergeObjsSupportsResponseFiles = $MergeObjsSupportsResponseFilesBool})"
+    fi
+    AC_SUBST([MergeObjsCmdMaybe])
+
     dnl PREP_ENDIANNESS
     case "$TargetWordBigEndian" in
         YES)
