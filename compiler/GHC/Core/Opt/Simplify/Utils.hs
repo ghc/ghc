@@ -1519,7 +1519,10 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
-    early_phase = sePhase env /= FinalPhase
+    early_phase = not (isExpandableUnfolding unf)
+                      -- /Do/ inline  xs = build g, if it is used once!
+                  -- False  -- See #17910
+                  -- sePhase env /= FinalPhase
     -- If we don't have this early_phase test, consider
     --      x = length [1,2,3]
     -- The full laziness pass carefully floats all the cons cells to
