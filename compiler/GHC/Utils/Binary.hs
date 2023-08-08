@@ -1240,13 +1240,13 @@ putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =
   BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
     put_ bh l
-    putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
+    putPrim bh l (\op -> copyBytes op (castPtr ptr) l)
 
 getBS :: BinHandle -> IO ByteString
 getBS bh = do
   l <- get bh :: IO Int
   BS.create l $ \dest -> do
-    getPrim bh l (\src -> BS.memcpy dest src l)
+    getPrim bh l (\src -> copyBytes dest src l)
 
 instance Binary ByteString where
   put_ bh f = putBS bh f
