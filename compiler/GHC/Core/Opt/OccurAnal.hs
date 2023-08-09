@@ -1025,7 +1025,7 @@ occAnalNonRecBody env bndr thing_inside
 
 -----------------
 occAnalNonRecRhs :: OccEnv -> TopLevelFlag -> ImpRuleEdges
-                -> JoinPointHood -> Id -> CoreExpr
+                 -> JoinPointHood -> Id -> CoreExpr
                  -> ([UsageDetails], Id, CoreExpr)
 occAnalNonRecRhs !env lvl imp_rule_edges mb_join bndr rhs
   | null rules, null imp_rule_infos
@@ -1095,6 +1095,7 @@ mkNonRecRhsCtxt lvl bndr unf
     certainly_inline -- See Note [Cascading inlines]
       = -- mkNonRecRhsCtxt is only used for non-join points, so occAnalBind
         -- has set the OccInfo for this binder before calling occAnalNonRecRhs
+        not (isTopLevel lvl) &&
         case idOccInfo bndr of
           OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
             -> active && not stable_unf && not top_bottoming
