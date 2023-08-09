@@ -1,7 +1,17 @@
-extlinks = {
-    'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '%s'),
-    'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', '#%s'),
-}
+import sphinx
+from utils import parse_version
+
+if parse_version(sphinx.__version__) >= parse_version("4.0.0"):
+    # N.B. see #23807 and #22690
+    extlinks = {
+        'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#%s'),
+        'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', '%s'),
+    }
+else:
+    extlinks = {
+        'ghc-ticket': ('https://gitlab.haskell.org/ghc/ghc/issues/%s', '#'),
+        'ghc-wiki': ('https://gitlab.haskell.org/ghc/ghc/wikis/%s', ''),
+    }
 
 libs_base_uri = '../libraries'
 
