@@ -405,9 +405,34 @@ tcExpr (HsIf x pred b1 b2) res_ty
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 
+{-
+Note [MultiWayIf linearity checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we'd like to compute the usage environment for
+
+if | b1 -> e1
+   | b2 -> e2
+   | otherwise -> e3
+
+and let u1, u2, v1, v2, v3 denote the usage env for b1, b2, e1, e2, e3
+respectively.
+
+Since a multi-way if is mere sugar for nested if expressions, the usage
+environment should ideally be u1 + sup(v1, u2 + sup(v2, v3)).
+However, currently we don't support linear guards (#19193). All variables
+used in guards from u1 and u2 will have multiplicity Many.
+But in that case, we have equality u1 + sup(x,y) = sup(u1 + x, y),
+                      and likewise u2 + sup(x,y) = sup(u2 + x, y) for any x,y.
+Using this identity, we can just compute sup(u1 + v1, u2 + v2, v3) instead.
+This is simple to do, since we get u_i + v_i directly from tcGRHS.
+If we add linear guards, this code will have to be revisited.
+Not using 'sup' caused #23814.
+-}
+
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { alts' <- mapM (wrapLocMA $ tcGRHS match_ctxt res_ty) alts
+  = do { (ues, alts') <- mapAndUnzipM (\alt -> tcCollectingUsage $ wrapLocMA (tcGRHS match_ctxt res_ty) alt) alts
        ; res_ty <- readExpType res_ty
+       ; tcEmitBindingUsage (supUEs ues)  -- See Note [MultiWayIf linearity checking]
        ; return (HsMultiIf res_ty alts') }
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }
 
