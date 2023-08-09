@@ -217,11 +217,13 @@ getCoreToDo dflags hpt_rule_base extra_vars
         if full_laziness then
            CoreDoFloatOutwards $ FloatOutSwitches
                 { floatOutLambdas     = Just 0
-                , floatOutConstants   = True
+                , floatOutConstants   = False
                 , floatOutOverSatApps = False
                 , floatToTopLevelOnly = False
                 , floatJoinsToTop     = False  -- Initially, don't float join points at all
                 }
+                -- Was: gentleFloatOutSwitches
+                --
                 -- I have no idea why, but not floating constants to
                 -- top level is very bad in some cases.
                 --
