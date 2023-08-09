@@ -1,5 +1,12 @@
 from docutils import nodes
 
+# N.B. `packaging` is not available in Ubuntu 18.04 or Debian 9
+# See #23818.
+try:
+    from packaging.version import parse as parse_version
+except ImportError as e:
+    from distutils.version import LooseVersion as parse_version
+
 # Taken from Docutils source inside the ListTable class. We must bypass
 # using the class itself, but this function comes in handy.
 def build_table_from_list(table_data, col_widths):
