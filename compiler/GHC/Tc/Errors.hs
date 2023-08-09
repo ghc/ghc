@@ -890,8 +890,8 @@ Its implementation consists of the following:
   D. Adding "meth = unsatisfiable @msg" method bindings.
 
      When a class instance has an "Unsatisfiable msg" constraint in its context,
-     and the user has omitted methods (which don't have any default implementations),
-     we add method bindings of the form "meth = unsatisfiable @msg".
+     and the user has omitted methods, we add method bindings of the form
+     "meth = unsatisfiable @msg".
      See GHC.Tc.TyCl.Instance.tcMethods, in particular "tc_default".
 
      Example:
@@ -907,6 +907,10 @@ Its implementation consists of the following:
 
      We also switch off the "missing methods" warning in this situation.
      See "checkMinimalDefinition" in GHC.Tc.TyCl.Instance.tcMethods.
+
+     Note that we do this even when there is a default method available. This
+     ensures we run into the unsatisfiable error message when deferring type
+     errors; otherwise we could end up with a runtime loop as seen in #23816.
 
   E. Switching off functional dependency coverage checks when there is
      an "Unsatisfiable msg" context.

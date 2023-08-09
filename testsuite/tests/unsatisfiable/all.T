@@ -17,3 +17,5 @@ test('T11503_Unsat', normal, compile, ['-Woverlapping-patterns -Wincomplete-patt
 test('T14141_Unsat', normal, compile, ['-Woverlapping-patterns -Wincomplete-patterns'])
 test('T14339_Unsat', normal, compile_fail, [''])
 test('T15232_Unsat', normal, compile, ['-Wredundant-constraints'])
+
+test('T23816', exit_code(1), compile_and_run, ['-fdefer-type-errors'])
