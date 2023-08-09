@@ -1,0 +1,6 @@
+T23816.exe: T23816.hs:18:15: error: [GHC-22250]
+    • Msg
+    • In the first argument of ‘print’, namely ‘(meth1 'x')’
+      In the expression: print (meth1 'x')
+      In an equation for ‘main’: main = print (meth1 'x')
+(deferred type error)

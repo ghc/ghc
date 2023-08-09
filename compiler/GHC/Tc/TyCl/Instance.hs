@@ -6,7 +6,6 @@
 
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -1835,46 +1834,51 @@ tcMethods skol_info dfun_id clas tyvars dfun_ev_vars inst_tys
     tc_default :: Id -> DefMethInfo
                -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
 
-    tc_default sel_id (Just (dm_name, _))
-      = do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name
+    tc_default sel_id mb_dm = case mb_dm of
+
+      -- If the instance has an "Unsatisfiable msg" context,
+      -- add method bindings that use "unsatisfiable".
+      --
+      -- See Note [Implementation of Unsatisfiable constraints],
+      -- in GHC.Tc.Errors, point (D).
+      _ | (theta_id,unsat_msg) : _ <- unsat_thetas
+        -> do { (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
+                                         inst_tys sel_id
+             ; unsat_id <- tcLookupId unsatisfiableIdName
+             -- Recall that unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
+             --
+             -- So we need to instantiate the forall and pass the dictionary evidence.
+             ; let meth_rhs = L inst_loc' $
+                     wrapId
+                     (   mkWpEvApps [EvExpr $ Var theta_id]
+                     <.> mkWpTyApps [getRuntimeRep meth_tau, unsat_msg, meth_tau])
+                     unsat_id
+                   meth_bind = mkVarBind meth_id $ mkLHsWrap lam_wrapper meth_rhs
+             ; return (meth_id, meth_bind, Nothing) }
+
+      Just (dm_name, _) ->
+        do { (meth_bind, inline_prags) <- mkDefMethBind inst_loc dfun_id clas sel_id dm_name
            ; tcMethodBody skol_info clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
                           sel_id meth_bind inst_loc }
 
-    tc_default sel_id Nothing     -- No default method at all
-      = do { traceTc "tc_def: warn" (ppr sel_id)
+      -- No default method
+      Nothing ->
+        do { traceTc "tc_def: warn" (ppr sel_id)
            ; (meth_id, _) <- mkMethIds clas tyvars dfun_ev_vars
                                        inst_tys sel_id
            ; dflags <- getDynFlags
-           ; meth_rhs <-
-               if
-                  -- If the instance has an "Unsatisfiable msg" context,
-                  -- add method bindings that use "unsatisfiable".
-                  --
-                  -- See Note [Implementation of Unsatisfiable constraints],
-                  -- in GHC.Tc.Errors, point (D).
-                  | (theta_id,unsat_msg):_ <- unsat_thetas
-                  -> do { unsat_id <- tcLookupId unsatisfiableIdName
-                        -- Recall that unsatisfiable :: forall {rep} (msg :: ErrorMessage) (a :: TYPE rep). Unsatisfiable msg => a
-                        --
-                        -- So we need to instantiate the forall and pass the dictionary evidence.
-                        ; return $ L inst_loc' $
-                            wrapId
-                            (   mkWpEvApps [EvExpr $ Var theta_id]
-                            <.> mkWpTyApps [getRuntimeRep meth_tau, unsat_msg, meth_tau])
-                            unsat_id }
-
-                  -- Otherwise, add bindings whose RHS is an error
-                  -- "No explicit nor default method for class operation 'meth'".
-                  | otherwise
-                  -> return $ error_rhs dflags
-           ; let meth_bind = mkVarBind meth_id $ mkLHsWrap lam_wrapper meth_rhs
+            -- Add a binding whose RHS is an error
+            -- "No explicit nor default method for class operation 'meth'".
+           ; let meth_rhs  = error_rhs dflags
+                 meth_bind = mkVarBind meth_id $ mkLHsWrap lam_wrapper meth_rhs
            ; return (meth_id, meth_bind, Nothing) }
+
       where
         inst_loc' = noAnnSrcSpan inst_loc
         error_rhs dflags = L inst_loc'
-                                 $ HsApp noComments error_fun (error_msg dflags)
+                         $ HsApp noComments error_fun (error_msg dflags)
         error_fun    = L inst_loc' $
                        wrapId (mkWpTyApps
                                 [ getRuntimeRep meth_tau, meth_tau])
