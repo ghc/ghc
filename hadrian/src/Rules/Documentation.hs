@@ -82,6 +82,15 @@ needDocDeps = do
             ]
 
     need templatedCabalFiles
+    need [ "docs" -/- "users_guide" -/- file
+         | file <- [ "conf.py"
+                   , "flags.py"
+                   , "ghc_config.py"
+                   , "ghc_packages.py"
+                   , "utils.py"
+                   ]
+         ]
+
 
 -- | Build all documentation
 documentationRules :: Rules ()
