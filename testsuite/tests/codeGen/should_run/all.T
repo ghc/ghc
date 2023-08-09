@@ -243,3 +243,8 @@ test('MulMayOflo_full',
 test('T24264run', normal, compile_and_run, [''])
 test('T24295a', normal, compile_and_run, ['-O -floopification'])
 test('T24295b', normal, compile_and_run, ['-O -floopification -fpedantic-bottoms'])
+
+test('CCallConv',
+     [],
+     multi_compile_and_run,
+     ['CCallConv', [('CCallConv_cmm.cmm', ''), ('CCallConv_c.c', '')], ''])
