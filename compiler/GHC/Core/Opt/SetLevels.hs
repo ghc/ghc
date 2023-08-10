@@ -708,8 +708,9 @@ lvlMFE env strict_ctxt ann_expr
 
     -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
-                && (floatConsts env || is_function)   -- Always float constant lambdas
-                                                      -- T5237 is a good example
+                && (floatConsts env || is_function || is_bot_lam)
+                                  -- Always float constant lambdas
+                                  -- T5237 is a good example
                 && (   not strict_ctxt                     -- (a)
                     || exprIsHNF expr                      -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
