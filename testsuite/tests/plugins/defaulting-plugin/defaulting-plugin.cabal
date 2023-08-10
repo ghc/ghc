@@ -6,5 +6,5 @@ version: 0.1.0.0
 library
   default-language: Haskell2010
   build-depends: base, ghc, containers
-  exposed-modules: DefaultLifted
+  exposed-modules: DefaultLifted DefaultInterference
   ghc-options: -Wall
