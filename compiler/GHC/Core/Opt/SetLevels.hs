@@ -708,7 +708,8 @@ lvlMFE env strict_ctxt ann_expr
 
     -- See Note [Saving allocation] and Note [Floating to the top]
     saves_alloc =  isTopLvl dest_lvl
-                && floatConsts env
+                && (floatConsts env || is_function)   -- Always float constant lambdas
+                                                      -- T5237 is a good example
                 && (   not strict_ctxt                     -- (a)
                     || exprIsHNF expr                      -- (b)
                     || (is_bot_lam && escapes_value_lam))  -- (c)
@@ -1383,7 +1384,9 @@ wantToFloat env is_rec dest_lvl is_join is_top_bindable
 profitableFloat :: LevelEnv -> Level -> Bool
 profitableFloat env dest_lvl
   =  (dest_lvl `ltMajLvl` le_ctxt_lvl env)  -- Escapes a value lambda
-  || (isTopLvl dest_lvl && floatConsts env) -- Going all the way to top level
+  || (isTopLvl dest_lvl)                    -- Going all the way to top level
+          -- Float to top even if floatConsts=False; this is a
+          -- let-binding anyway, so it doesn't create a new binding
 
 
 ----------------------------------------------------
