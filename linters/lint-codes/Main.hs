@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -10,6 +11,8 @@ import Data.List
   ( sortOn )
 import Text.Printf
   ( printf )
+import System.Environment
+  ( getArgs )
 
 -- containers
 import Data.Map.Strict
@@ -22,8 +25,10 @@ import GHC.Types.Error
   ( DiagnosticCode(..) )
 
 -- lint-codes
+import LintCodes.Args
+  ( Mode(..), parseArgs )
 import LintCodes.Static
-  ( FamEqnIndex, used, outdated
+  ( FamEqnIndex, Use, used, outdated
   , getFamEqnCodes
   , staticallyUsedCodes
   )
@@ -35,9 +40,38 @@ import LintCodes.Coverage
 main :: IO ()
 main = do
 
+  args <- getArgs
+  let !(!mode, mb_libDir) = parseArgs args
+
+  famEqnCodes <- getFamEqnCodes mb_libDir
+
+  case mode of
+    Test     -> testCodes         famEqnCodes
+    List     -> listCodes         famEqnCodes
+    Outdated -> listOutdatedCodes famEqnCodes
+
+-- | List all statically used diagnostic codes.
+listCodes :: Map DiagnosticCode ( FamEqnIndex, String, Use ) -> IO ()
+listCodes famEqnCodes = do
+  let usedCodes = Map.mapMaybe used famEqnCodes
+                 `Map.intersection` staticallyUsedCodes
+  putStrLn $ showDiagnosticCodesWith printCode usedCodes
+
+-- | List all outdated diagnostic codes.
+listOutdatedCodes :: Map DiagnosticCode ( FamEqnIndex, String, Use ) -> IO ()
+listOutdatedCodes famEqnCodes = do
+  let outdatedCodes = Map.mapMaybe outdated famEqnCodes
+  putStrLn $ showDiagnosticCodesWith printCode outdatedCodes
+
+-- | Test consistency and coverage of diagnostic codes.
+--
+-- Assumes we are in a GHC Git tree, as we look at all testsuite .stdout and
+-- .stderr files.
+testCodes ::  Map DiagnosticCode ( FamEqnIndex, String, Use ) -> IO ()
+testCodes famEqnCodes = do
+
   ------------------------------
   -- Static consistency checks.
-  famEqnCodes <- getFamEqnCodes
 
   let
     familyEqnUsedCodes = Map.mapMaybe used famEqnCodes
@@ -145,13 +179,15 @@ showDiagnosticCodesWith f codes = unlines $ map showCodeCon $ sortOn famEqnIndex
     famEqnIndex :: (DiagnosticCode, (FamEqnIndex, String)) -> FamEqnIndex
     famEqnIndex (_, (i,_)) = i
 
-printUnused, printOutdatedUsed, printUntested :: (DiagnosticCode, String) -> String
+printUnused, printOutdatedUsed, printUntested, printCode :: (DiagnosticCode, String) -> String
 printUnused (code, con) =
   "Unused equation: GhcDiagnosticCode " ++ show con ++ " = " ++ showDiagnosticCodeNumber code
 printOutdatedUsed (code, con) =
   "Outdated equation is used: GhcDiagnosticCode " ++ show con ++ " = Outdated " ++ showDiagnosticCodeNumber code
 printUntested (code, con) =
   "[" ++ show code ++ "] is untested (constructor = " ++ con ++ ")"
+printCode (code, con) =
+  "[" ++ show code ++ "] " ++ show con
 
 showDiagnosticCodeNumber :: DiagnosticCode -> String
 showDiagnosticCodeNumber (DiagnosticCode { diagnosticCodeNumber = c })

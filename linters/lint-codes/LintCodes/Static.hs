@@ -5,7 +5,7 @@
 
 module LintCodes.Static
   ( FamEqnIndex, Use(..), used, outdated
-  , getFamEqnCodes
+  , LibDir(..), getFamEqnCodes
   , staticallyUsedCodes
   )
   where
@@ -13,8 +13,6 @@ module LintCodes.Static
 -- base
 import Data.Maybe
   ( listToMaybe )
-import System.Environment
-  ( getArgs )
 
 -- containers
 import Data.Map.Strict
@@ -111,9 +109,9 @@ outdated _ = Nothing
 -- of Template Haskell at compile-time is problematic for Hadrian.
 
 -- | The diagnostic codes returned by the 'GhcDiagnosticCode' type family.
-getFamEqnCodes :: IO ( Map DiagnosticCode ( FamEqnIndex, String, Use ) )
-getFamEqnCodes =
-  do { tc <- ghcDiagnosticCodeTyCon
+getFamEqnCodes :: Maybe LibDir -> IO ( Map DiagnosticCode ( FamEqnIndex, String, Use ) )
+getFamEqnCodes mb_libDir =
+  do { tc <- ghcDiagnosticCodeTyCon mb_libDir
      ; return $ case isClosedSynFamilyTyConWithAxiom_maybe tc of
      { Nothing -> error "can't find equations for 'GhcDiagnosticCode'"
      ; Just ax -> Map.fromList
@@ -145,11 +143,12 @@ parseBranchRHS rhs
       | otherwise
       = Used
 
+newtype LibDir = LibDir { libDir :: FilePath }
+
 -- | Look up the 'GhcDiagnosticCode' type family using the GHC API.
-ghcDiagnosticCodeTyCon :: IO TyCon
-ghcDiagnosticCodeTyCon =
-  do { args <- getArgs
-     ; runGhc (listToMaybe args)
+ghcDiagnosticCodeTyCon :: Maybe LibDir -> IO TyCon
+ghcDiagnosticCodeTyCon mb_libDir =
+  runGhc (libDir <$> mb_libDir)
 
   -- STEP 1: start a GHC API session with "-package ghc"
   do { dflags1 <- getSessionDynFlags
@@ -176,4 +175,4 @@ ghcDiagnosticCodeTyCon =
         _ -> error "lint-codes: failed to look up TyCon for 'GhcDiagnosticCode'"
      }
 
-     ; _ -> error "lint-codes: failed to find 'GHC.Types.Error.Codes'" } } } }
+     ; _ -> error "lint-codes: failed to find 'GHC.Types.Error.Codes'" } } }
