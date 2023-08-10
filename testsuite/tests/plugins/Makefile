@@ -172,6 +172,10 @@ test-defaulting-plugin:
 test-defaulting-plugin-fail:
 	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-defaulting-plugin-fail.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin-fail/local.package.conf
 
+.PHONY: T23821
+T23821:
+	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 T23821.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin/local.package.conf
+
 .PHONY: plugins-order
 plugins-order:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins-order.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin ImpurePlugin -fplugin PurePlugin -fplugin-opt ImpurePlugin:First_Option -fplugin-opt PurePlugin:Second_Option -fplugin-opt PurePlugin:Second_Option_2 -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:1

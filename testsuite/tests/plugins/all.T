@@ -280,6 +280,11 @@ test('test-defaulting-plugin-fail',
       pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin-fail TOP={top}')],
      makefile_test, [])
 
+test('T23821',
+     [extra_files(['defaulting-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C defaulting-plugin package.test-defaulting-plugin TOP={top}')],
+     makefile_test, [])
+
 test('plugins-order',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')

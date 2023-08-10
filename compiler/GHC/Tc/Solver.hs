@@ -3598,6 +3598,12 @@ applyDefaultingRules wanteds
              ; return defaultedGroups
              }
 
+       -- If a defaulting plugin solves a tyvar, some of the wanteds
+       -- will have filled-in metavars by now (see #23281). So we
+       -- re-zonk to make sure the built-in defaulting rules don't try
+       -- to solve the same metavars.
+       ; wanteds <- if or plugin_defaulted then TcS.zonkWC wanteds else pure wanteds
+
        ; let groups = findDefaultableGroups info wanteds
 
        ; traceTcS "applyDefaultingRules {" $
