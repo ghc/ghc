@@ -555,7 +555,10 @@ So, for the first incarnation of this feature we choose very restrictive
 conditions, which are still useful in practice. We allow top-level unlifted
 data constructor workers if they are applied to arguments that are one of:
 
-* A Literal. Literals are guaranteed to be fully evaluated.
+* A literal. Literals are guaranteed to be fully evaluated.
+
+* A coercion. These are always fully evaluated and even removed when compiling
+  to STG.
 
 * Any expressions of lifted type, but only if that argument is not
   marked strict.

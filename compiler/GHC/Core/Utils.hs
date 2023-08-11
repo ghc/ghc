@@ -31,7 +31,7 @@ module GHC.Core.Utils (
         exprIsWorkFree, exprIsConLike,
         isCheapApp, isExpandableApp, isSaturatedConApp,
         exprIsTickedString, exprIsTickedString_maybe,
-        exprIsTopLevelBindable,
+        exprIsTopLevelBindable, exprIsDataConValue,
         altsAreExhaustive, etaExpansionTick,
 
         -- * Equality
@@ -2335,7 +2335,7 @@ exprIsTopLevelBindable expr ty
     -- consequently we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
     -- as the latter would panic.
   || exprIsTickedString expr
-  || isBoxedType ty && exprIsDataConValue expr
+  || isBoxedType ty && exprIsDataConValue True expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
 -- string.
@@ -2346,8 +2346,8 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 -- We use this function to determine if unlifted expressions can be floated
 -- to the top level.
 -- See Note [Core top-level unlifted data-con values] in GHC.Core
-exprIsDataConValue :: CoreExpr -> Bool
-exprIsDataConValue x = is_datacon_app x
+exprIsDataConValue :: Bool -> CoreExpr -> Bool
+exprIsDataConValue nesting_allowed x = is_datacon_app x
   where
     -- We cannot use @exprIsHNF@ because it does not handle
     -- data constructor worker strictness properly.
@@ -2363,6 +2363,7 @@ exprIsDataConValue x = is_datacon_app x
     is_datacon_app _ = False
 
     arg_ok _ _ Lit{} = True
+    arg_ok _ _ Coercion{} = True
     arg_ok (Just Lifted) False _ = True
     arg_ok (Just Unlifted) _ Var{} = True
     -- We allow nested constructor applications; we trust that they will
@@ -2381,7 +2382,7 @@ exprIsDataConValue x = is_datacon_app x
     --    foo2 = UNil
     --
     -- This does always seem to happen and is checked by the Core linter.
-    arg_ok (Just Unlifted) _ x = is_datacon_app x
+    arg_ok (Just Unlifted) _ x = nesting_allowed && is_datacon_app x
     arg_ok _ _ _ = False
 
     -- This is slightly different from 'collectArgs' as it looks through ticks

@@ -597,9 +597,10 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; checkL ( isJoinId binder
                || mightBeLiftedType binder_ty
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
-               || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
                || exprIsTickedString rhs
-               || isTopLevel top_lvl && isBoxedType rhs_ty && isJust (do (Var v, xs) <- pure (collectArgs rhs); guard (isDataConWorkId v && all exprIsTrivial xs)))
+               || isTopLevel top_lvl
+                    && isBoxedType rhs_ty
+                    && exprIsDataConValue False rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is at the top level and has type Addr#,

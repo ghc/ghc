@@ -234,8 +234,9 @@ lint_binds_help top_lvl (binder, rhs)
         -- Check binder doesn't have unlifted type or it's a join point
         checkL ( isJoinId binder
               || not (isUnliftedType (idType binder))
-              || isDataConWorkId binder || isDataConWrapId binder -- until #17521 is fixed
-              || isTopLevel top_lvl && isBoxedType (idType binder) && case rhs of StgRhsCon{} -> True; _ -> False)
+              || isTopLevel top_lvl
+                   && isBoxedType (idType binder)
+                   && case rhs of StgRhsCon{} -> True; _ -> False)
           (mkUnliftedTyMsg opts binder rhs)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
