@@ -68,7 +68,7 @@ data PluginState = PluginState { defaultClassName :: Name }
 lookupName :: Module -> OccName -> TcPluginM Name
 lookupName md occ = lookupOrig md occ
 
-solveDefaultType :: PluginState -> [Ct] -> TcPluginM DefaultingPluginResult
+solveDefaultType :: PluginState -> [Ct] -> TcPluginM [DefaultingProposal]
 solveDefaultType _     []      = return []
 solveDefaultType state wanteds = do
   envs <- getInstEnvs
@@ -89,7 +89,7 @@ solveDefaultType state wanteds = do
                     case M.lookup (tyVarKind var) defaults of
                       Nothing -> error "Bug, we already checked that this variable has a default"
                       Just deftys -> do
-                        pure [DefaultingProposal var deftys cts])
+                        pure [DefaultingProposal [[(var, defty)] | defty <- deftys] cts])
     groups
   where isVariableDefaultable defaults v = isAmbiguousTyVar v && M.member (tyVarKind v) defaults
 
@@ -103,7 +103,7 @@ initialize :: TcPluginM PluginState
 initialize = do
   lookupDefaultTypes
 
-run :: PluginState -> WantedConstraints -> TcPluginM DefaultingPluginResult
+run :: PluginState -> WantedConstraints -> TcPluginM [DefaultingProposal]
 run s ws = do
   solveDefaultType s (ctsElts $ approximateWC False ws)
 

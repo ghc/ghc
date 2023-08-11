@@ -2548,10 +2548,10 @@ relevant_bindings want_filtering lcl_env lcl_name_env ct_tvs
                          (RelevantBindings (bd:bds) discards) tc_bndrs }
 
 -----------------------
-warnDefaulting :: TcTyVar -> [Ct] -> Type -> TcM ()
-warnDefaulting _ [] _
+warnDefaulting :: [Ct] -> TcTyVar -> Type -> TcM ()
+warnDefaulting [] _ _
   = panic "warnDefaulting: empty Wanteds"
-warnDefaulting the_tv wanteds@(ct:_) default_ty
+warnDefaulting wanteds@(ct:_) the_tv default_ty
   = do { warn_default <- woptM Opt_WarnTypeDefaults
        ; env0 <- liftZonkM $ tcInitTidyEnv
             -- don't want to report all the superclass constraints, which

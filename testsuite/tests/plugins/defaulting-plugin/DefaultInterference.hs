@@ -23,7 +23,7 @@ plugin = defaultPlugin
 
 defaultEverythingToInt :: WantedConstraints -> TcPluginM [DefaultingProposal]
 defaultEverythingToInt wanteds = pure
-    [ DefaultingProposal tv [intTy] [ct]
+    [ DefaultingProposal [[(tv, intTy)]] [ct]
     | ct <- bagToList $ approximateWC True wanteds
     , Just (cls, tys) <- pure $ getClassPredTys_maybe (ctPred ct)
     , [ty] <- pure $ filterOutInvisibleTypes (classTyCon cls) tys

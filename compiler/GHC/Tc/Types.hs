@@ -86,7 +86,7 @@ module GHC.Tc.Types(
 
         -- Defaulting plugin
         DefaultingPlugin(..), DefaultingProposal(..),
-        FillDefaulting, DefaultingPluginResult,
+        FillDefaulting,
 
         -- Role annotations
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
@@ -1052,25 +1052,21 @@ data TcPluginRewriteResult
     , tcRewriterNewWanteds :: [Ct]
     }
 
--- | A collection of candidate default types for a type variable.
+-- | A collection of candidate default types for sets of type variables.
 data DefaultingProposal
   = DefaultingProposal
-    { deProposalTyVar :: TcTyVar
-      -- ^ The type variable to default.
-    , deProposalCandidates :: [Type]
-      -- ^ Candidate types to default the type variable to.
+    { deProposals :: [[(TcTyVar, Type)]]
+      -- ^ The type variable assignments to try.
     , deProposalCts :: [Ct]
       -- ^ The constraints against which defaults are checked.
     }
 
 instance Outputable DefaultingProposal where
   ppr p = text "DefaultingProposal"
-          <+> ppr (deProposalTyVar p)
-          <+> ppr (deProposalCandidates p)
+          <+> ppr (deProposals p)
           <+> ppr (deProposalCts p)
 
-type DefaultingPluginResult = [DefaultingProposal]
-type FillDefaulting = WantedConstraints -> TcPluginM DefaultingPluginResult
+type FillDefaulting = WantedConstraints -> TcPluginM [DefaultingProposal]
 
 -- | A plugin for controlling defaulting.
 data DefaultingPlugin = forall s. DefaultingPlugin

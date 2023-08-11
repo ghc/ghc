@@ -51,6 +51,9 @@ Compiler
 - Fixed a bug where compiling with both :ghc-flag:`-ddump-timings` and :ghc-flag:`-ddump-to-file` did not
   suppress printing timings to the console. See :ghc-ticket:`20316`.
 
+- Defaulting plugins can now propose solutions to entangled sets of type variables. This allows defaulting
+  of multi-parameter type classes. See :ghc-ticket:`23832`.
+
 GHCi
 ~~~~
 

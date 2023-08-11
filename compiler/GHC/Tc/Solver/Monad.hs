@@ -105,7 +105,7 @@ module GHC.Tc.Solver.Monad (
     tcInstSkolTyVarsX,
 
     TcLevel,
-    isFilledMetaTyVar_maybe, isFilledMetaTyVar,
+    isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
     zonkTyCoVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkCo,
     zonkTyCoVarsAndFVList,
     zonkSimples, zonkWC,
@@ -1477,6 +1477,9 @@ isFilledMetaTyVar_maybe tv = wrapTcS (TcM.isFilledMetaTyVar_maybe tv)
 
 isFilledMetaTyVar :: TcTyVar -> TcS Bool
 isFilledMetaTyVar tv = wrapTcS (TcM.isFilledMetaTyVar tv)
+
+isUnfilledMetaTyVar :: TcTyVar -> TcS Bool
+isUnfilledMetaTyVar tv = wrapTcS $ TcM.isUnfilledMetaTyVar tv
 
 zonkTyCoVarsAndFV :: TcTyCoVarSet -> TcS TcTyCoVarSet
 zonkTyCoVarsAndFV tvs = liftZonkTcS (TcM.zonkTyCoVarsAndFV tvs)

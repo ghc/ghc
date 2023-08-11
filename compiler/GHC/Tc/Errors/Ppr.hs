@@ -1863,6 +1863,24 @@ instance Diagnostic TcRnMessage where
            , text "In the future GHC will no longer implicitly quantify over such variables"
            ]
 
+    TcRnInvalidDefaultedTyVar wanteds proposal bad_tvs ->
+      mkSimpleDecorated $
+      pprWithExplicitKindsWhen True $
+      vcat [ text "Invalid defaulting proposal."
+           , hang (text "The following type variable" <> plural (NE.toList bad_tvs) <+> text "cannot be defaulted, as" <+> why <> colon)
+                2 (pprQuotedList (NE.toList bad_tvs))
+           , hang (text "Defaulting proposal:")
+                2 (ppr proposal)
+           , hang (text "Wanted constraints:")
+                2 (pprQuotedList (map ctPred wanteds))
+           ]
+        where
+          why
+            | _ :| [] <- bad_tvs
+            = text "it is not an unfilled metavariable"
+            | otherwise
+            = text "they are not unfilled metavariables"
+
   diagnosticReason = \case
     TcRnUnknownMessage m
       -> diagnosticReason m
@@ -2468,6 +2486,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllformedTypeArgument{}
       -> ErrorWithoutFlag
     TcRnIllegalTypeExpr{}
+      -> ErrorWithoutFlag
+    TcRnInvalidDefaultedTyVar{}
       -> ErrorWithoutFlag
 
   diagnosticHints = \case
@@ -3124,6 +3144,8 @@ instance Diagnostic TcRnMessage where
     TcRnIllformedTypeArgument{}
       -> noHints
     TcRnIllegalTypeExpr{}
+      -> noHints
+    TcRnInvalidDefaultedTyVar{}
       -> noHints
 
   diagnosticCode = constructorCode

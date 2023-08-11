@@ -96,7 +96,7 @@ Assume:
 Then `improveFromInstEnv` should return a FDEqn with
    FDEqn { fd_qtvs = [], fd_eqs = [Pair Bool ty] }
 
-describing an equality (Int ~ ty).  To do this we /match/ the instance head
+describing an equality (Bool ~ ty).  To do this we /match/ the instance head
 against the [W], using just the LHS of the fundep; if we match, we return
 an equality for the RHS.
 

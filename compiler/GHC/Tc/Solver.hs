@@ -38,6 +38,7 @@ import GHC.Driver.DynFlags
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Name
+import GHC.Types.Unique.Set
 import GHC.Types.Id
 import GHC.Utils.Outputable
 import GHC.Builtin.Utils
@@ -63,11 +64,12 @@ import GHC.Core.Type
 import GHC.Core.Ppr
 import GHC.Core.TyCon    ( TyConBinder, isTypeFamilyTyCon )
 import GHC.Builtin.Types
-import GHC.Core.Unify    ( tcMatchTyKi )
+import GHC.Core.Unify    ( tcMatchTyKis )
 import GHC.Unit.Module ( getModule )
 import GHC.Utils.Misc
 import GHC.Utils.Panic
 import GHC.Types.Var
+import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Id.Make  ( unboxedUnitExpr )
@@ -77,9 +79,10 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Control.Monad.Trans.Class        ( lift )
 import Control.Monad.Trans.State.Strict ( StateT(runStateT), put )
-import Data.Foldable      ( toList )
+import Data.Foldable      ( toList, traverse_ )
 import Data.List          ( partition )
-import Data.List.NonEmpty ( NonEmpty(..) )
+import Data.List.NonEmpty ( NonEmpty(..), nonEmpty )
+import qualified Data.List.NonEmpty as NE
 import GHC.Data.Maybe     ( mapMaybe )
 
 {-
@@ -3611,7 +3614,7 @@ applyDefaultingRules wanteds
                        , text "groups  =" <+> ppr groups
                        , text "info    =" <+> ppr info ]
 
-       ; something_happeneds <- mapM (disambigGroup default_tys) groups
+       ; something_happeneds <- mapM (disambigGroup wanteds default_tys) groups
 
        ; traceTcS "applyDefaultingRules }" (ppr something_happeneds)
 
@@ -3619,9 +3622,10 @@ applyDefaultingRules wanteds
     where run_defaulting_plugin wanteds p =
             do { groups <- runTcPluginTcS (p wanteds)
                ; defaultedGroups <-
-                    filterM (\g -> disambigGroup
-                                   (deProposalCandidates g)
-                                   (deProposalTyVar g, deProposalCts g))
+                    filterM (\g -> disambigMultiGroup
+                                   wanteds
+                                   (deProposalCts g)
+                                   (deProposals g))
                     groups
                ; traceTcS "defaultingPlugin " $ ppr defaultedGroups
                ; case defaultedGroups of
@@ -3689,55 +3693,79 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
                        (ovl_strings && (cls `hasKey` isStringClassKey))
 
 ------------------------------
-disambigGroup :: [Type]            -- The default types
-              -> (TcTyVar, [Ct])   -- All constraints sharing same type variable
+disambigGroup :: WantedConstraints -- ^ Original constraints, for diagnostic purposes
+              -> [Type]            -- ^ The default types
+              -> (TcTyVar, [Ct])   -- ^ All constraints sharing same type variable
               -> TcS Bool   -- True <=> something happened, reflected in ty_binds
 
-disambigGroup [] _
-  = return False
-disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
-  = do { traceTcS "disambigGroup {" (vcat [ ppr default_ty, ppr the_tv, ppr wanteds ])
-       ; fake_ev_binds_var <- TcS.newTcEvBinds
-       ; tclvl             <- TcS.getTcLevel
-       ; success <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) try_group
+disambigGroup orig_wanteds default_tys (the_tv, wanteds)
+  = disambigMultiGroup orig_wanteds wanteds [[(the_tv, default_ty)] | default_ty <- default_tys]
 
-       ; if success then
-             -- Success: record the type variable binding, and return
-             do { unifyTyVar the_tv default_ty
-                ; wrapWarnTcS $ warnDefaulting the_tv wanteds default_ty
-                ; traceTcS "disambigGroup succeeded }" (ppr default_ty)
-                ; return True }
-         else
-             -- Failure: try with the next type
-             do { traceTcS "disambigGroup failed, will try other default types }"
-                           (ppr default_ty)
-                ; disambigGroup default_tys group } }
+disambigMultiGroup :: WantedConstraints -- ^ Original constraints, for diagnostic purposes
+                   -> [Ct]       -- ^ check these are solved by defaulting
+                   -> [[(TcTyVar, Type)]]  -- ^ defaulting type assignments to try
+                   -> TcS Bool   -- True <=> something happened, reflected in ty_binds
+disambigMultiGroup orig_wanteds wanteds = anyM propose
   where
-    try_group
-      | Just subst <- mb_subst
-      = do { lcl_env <- TcS.getLclEnv
-           ; tc_lvl <- TcS.getTcLevel
-           ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
-           -- Equality constraints are possible due to type defaulting plugins
-           ; wanted_evs <- sequence [ newWantedNC loc rewriters pred'
-                                    | wanted <- wanteds
-                                    , CtWanted { ctev_pred = pred
-                                               , ctev_rewriters = rewriters }
-                                        <- return (ctEvidence wanted)
-                                    , let pred' = substTy subst pred ]
-           ; fmap isEmptyWC $
-             solveSimpleWanteds $ listToBag $
-             map mkNonCanonical wanted_evs }
+    propose proposal
+        = do { traceTcS "disambigMultiGroup {" (vcat [ ppr proposal, ppr wanteds ])
+             ; invalid_tvs <- filterOutM TcS.isUnfilledMetaTyVar tvs
+             ; traverse_ (errInvalidDefaultedTyVar orig_wanteds proposal) (nonEmpty invalid_tvs)
+             ; fake_ev_binds_var <- TcS.newTcEvBinds
+             ; tclvl             <- TcS.getTcLevel
+             ; mb_subst <- nestImplicTcS fake_ev_binds_var (pushTcLevel tclvl) try_group
 
-      | otherwise
-      = return False
+             ; case mb_subst of
+                   Just subst -> -- Success: record the type variable bindings, and return
+                       do { deep_tvs <- filterM TcS.isUnfilledMetaTyVar $ nonDetEltsUniqSet $ closeOverKinds (mkVarSet tvs)
+                          ; forM_ deep_tvs $ \ tv -> mapM_ (unifyTyVar tv) (lookupVarEnv (getTvSubstEnv subst) tv)
+                          ; wrapWarnTcS $ mapM_ (uncurry $ warnDefaulting wanteds) proposal
+                          ; traceTcS "disambigMultiGroup succeeded }" (ppr proposal)
+                          ; return True }
+                   Nothing -> -- Failure: try with the next defaulting group
+                       do { traceTcS "disambigMultiGroup failed, will try other default types }"
+                               (ppr proposal)
+                          ; return False } }
+      where
+        (tvs, default_tys) = unzip proposal
 
-    the_ty   = mkTyVarTy the_tv
-    mb_subst = tcMatchTyKi the_ty default_ty
-      -- Make sure the kinds match too; hence this call to tcMatchTyKi
-      -- E.g. suppose the only constraint was (Typeable k (a::k))
-      -- With the addition of polykinded defaulting we also want to reject
-      -- ill-kinded defaulting attempts like (Eq []) or (Foldable Int) here.
+        try_group
+          | Just subst <- mb_subst
+          = do { lcl_env <- TcS.getLclEnv
+               ; tc_lvl <- TcS.getTcLevel
+               ; let loc = mkGivenLoc tc_lvl (getSkolemInfo unkSkol) (mkCtLocEnv lcl_env)
+               -- Equality constraints are possible due to type defaulting plugins
+               ; wanted_evs <- sequence [ newWantedNC loc rewriters pred'
+                                        | wanted <- wanteds
+                                        , CtWanted { ctev_pred = pred
+                                                   , ctev_rewriters = rewriters }
+                                            <- return (ctEvidence wanted)
+                                        , let pred' = substTy subst pred ]
+               ; residual_wc <- solveSimpleWanteds $ listToBag $ map mkNonCanonical wanted_evs
+               ; return $ if isEmptyWC residual_wc then Just subst else Nothing }
+
+          | otherwise
+          = return Nothing
+
+        mb_subst = tcMatchTyKis (mkTyVarTys tvs) default_tys
+          -- Make sure the kinds match too; hence this call to tcMatchTyKi
+          -- E.g. suppose the only constraint was (Typeable k (a::k))
+          -- With the addition of polykinded defaulting we also want to reject
+          -- ill-kinded defaulting attempts like (Eq []) or (Foldable Int) here.
+
+errInvalidDefaultedTyVar :: WantedConstraints -> [(TcTyVar, Type)] -> NonEmpty TcTyVar -> TcS ()
+errInvalidDefaultedTyVar wanteds proposal problematic_tvs
+  = failTcS $ TcRnInvalidDefaultedTyVar tidy_wanteds tidy_proposal tidy_problems
+  where
+    proposal_tvs = concatMap (\(tv, ty) -> tv : tyCoVarsOfTypeList ty) proposal
+    tidy_env = tidyFreeTyCoVars emptyTidyEnv $ proposal_tvs ++ NE.toList problematic_tvs
+    tidy_wanteds = map (tidyCt tidy_env) $ flattenWC wanteds
+    tidy_proposal = [(tidyTyCoVarOcc tidy_env tv, tidyType tidy_env ty) | (tv, ty) <- proposal]
+    tidy_problems = fmap (tidyTyCoVarOcc tidy_env) problematic_tvs
+
+    flattenWC :: WantedConstraints -> [Ct]
+    flattenWC (WC { wc_simple = cts, wc_impl = impls })
+      = ctsElts cts ++ concatMap (flattenWC . ic_wanted) impls
 
 -- In interactive mode, or with -XExtendedDefaultRules,
 -- we default Show a to Show () to avoid gratuitous errors on "show []"
