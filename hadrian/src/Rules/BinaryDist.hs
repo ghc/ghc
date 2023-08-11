@@ -244,6 +244,10 @@ bindistRules = do
         -- reference. See #20802.
         copyDirectory ("utils" -/- "completion") bindistFilesDir
 
+        -- Copy the manpage into the binary distribution
+        whenM (liftIO (IO.doesDirectoryExist (root -/- "manpage"))) $ do
+          copyDirectory (root -/- "manpage") bindistFilesDir
+
         -- These scripts are only necessary in the configure/install
         -- workflow which is not supported on windows.
         -- TODO: Instead of guarding against windows, we could offer the

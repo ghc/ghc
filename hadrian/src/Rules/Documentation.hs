@@ -43,7 +43,7 @@ archiveRoot :: FilePath
 archiveRoot = docRoot -/- "archives"
 
 manPageBuildPath :: FilePath
-manPageBuildPath = docRoot -/- "users_guide/build-man/ghc.1"
+manPageBuildPath = "manpage" -/- "ghc.1"
 
 -- TODO: Get rid of this hack.
 docContext :: Context
