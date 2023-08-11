@@ -172,9 +172,9 @@ test-defaulting-plugin:
 test-defaulting-plugin-fail:
 	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 test-defaulting-plugin-fail.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin-fail/local.package.conf
 
-.PHONY: T23821
-T23821:
-	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 T23821.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin/local.package.conf
+.PHONY: T23821 T23832 T23832_invalid
+T23821 T23832 T23832_invalid:
+	-"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 $@.hs -package-db defaulting-plugin/pkg.test-defaulting-plugin/local.package.conf
 
 .PHONY: plugins-order
 plugins-order:

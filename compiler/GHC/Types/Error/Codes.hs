@@ -71,7 +71,7 @@ To ensure uniqueness across GHC versions, we proceed as follows:
          GhcDiagnosticCode "MyNewErrorConstructor" = 12345
 
        You can obtain new randomly-generated error codes by using
-       https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain.
+       https://www.random.org/integers/?num=10&min=1&max=99999&col=1&base=10&format=plain
 
        You will get a type error if you try to use an error code that is already
        used by another constructor.
@@ -595,6 +595,7 @@ type family GhcDiagnosticCode c = n | n -> c where
   GhcDiagnosticCode "TcRnBadTyConTelescope"                         = 87279
   GhcDiagnosticCode "TcRnPatersonCondFailure"                       = 22979
   GhcDiagnosticCode "TcRnDeprecatedInvisTyArgInConPat"              = 69797
+  GhcDiagnosticCode "TcRnInvalidDefaultedTyVar"                     = 45625
 
   -- TcRnTypeApplicationsDisabled
   GhcDiagnosticCode "TypeApplication"                               = 23482

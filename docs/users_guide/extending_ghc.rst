@@ -1349,7 +1349,7 @@ Defaulting plugins
 Defaulting plugins are called when ambiguous variables might otherwise cause
 errors, in the same way as the built-in defaulting mechanism.
 
-A defaulting plugin can propose potential ways to fill an ambiguous variable
+A defaulting plugin can propose potential ways to fill ambiguous variables
 according to whatever criteria you would like. GHC will verify that those
 proposals will not lead to type errors in a context that you declare.
 
@@ -1357,19 +1357,16 @@ Defaulting plugins have a single access point in the `GHC.Tc.Types` module
 
 ::
 
-    -- | A collection of candidate default types for a type variable.
+    -- | A collection of candidate default types for sets of type variables.
     data DefaultingProposal
       = DefaultingProposal
-        { deProposalTyVar :: TcTyVar
-          -- ^ The type variable to default.
-        , deProposalCandidates :: [Type]
-          -- ^ Candidate types to default the type variable to.
+        { deProposals :: [[(TcTyVar, Type)]]
+          -- ^ The type variable assignments to try.
         , deProposalCts :: [Ct]
           -- ^ The constraints against which defaults are checked.
-        }
+      }
 
-    type DefaultingPluginResult = [DefaultingProposal]
-    type FillDefaulting = WantedConstraints -> TcPluginM DefaultingPluginResult
+    type FillDefaulting = WantedConstraints -> TcPluginM [DefaultingProposal]
 
     -- | A plugin for controlling defaulting.
     data DefaultingPlugin = forall s. DefaultingPlugin
@@ -1384,12 +1381,12 @@ Defaulting plugins have a single access point in the `GHC.Tc.Types` module
 
 The plugin gets a combination of wanted constraints which can be most easily
 broken down into simple wanted constraints with ``approximateWC``. The result of
-running the plugin should be a ``DefaultingPluginResult``, a list of types that
-should be attempted for a given type variable that is ambiguous in a given
+running the plugin should be a ``[DefaultingProposal]``: a list of types that
+should be attempted for the given type variables that are ambiguous in a given
 context. GHC will check if one of the proposals is acceptable in the given
-context and then default to it. The most robust context to provide is the list
-of all wanted constraints that mention the variable you are defaulting. If you
-leave out a constraint, the default will be accepted, and then potentially
+context and then default to it. The most robust context to return in ``deProposalCts``
+is the list of all wanted constraints that mention the variables you are defaulting.
+If you leave out a constraint, the default will be accepted, and then potentially
 result in a type checker error if it is incompatible with one of the constraints
 you left out. This can be a useful way of forcing a default and reporting errors
 to the user.

@@ -4127,6 +4127,19 @@ data TcRnMessage where
   -}
   TcRnIllegalTypeExpr :: TcRnMessage
 
+  {-| TcRnInvalidDefaultedTyVar is an error raised when a
+      defaulting plugin proposes to default a type variable that is
+      not an unfilled metavariable
+
+      Test cases:
+        T23832_invalid
+  -}
+  TcRnInvalidDefaultedTyVar
+      :: ![Ct]                -- ^ The constraints passed to the plugin
+      -> [(TcTyVar, Type)]    -- ^ The plugin-proposed type variable defaults
+      -> NE.NonEmpty TcTyVar  -- ^ The invalid type variables of the proposal
+      -> TcRnMessage
+
   deriving Generic
 
 
