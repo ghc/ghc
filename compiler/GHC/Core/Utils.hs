@@ -2335,43 +2335,65 @@ exprIsTopLevelBindable expr ty
     -- consequently we must use 'mightBeUnliftedType' rather than 'isUnliftedType',
     -- as the latter would panic.
   || exprIsTickedString expr
-  || isBoxedType ty && exprIsDefinitelyWHNF expr
+  || isBoxedType ty && exprIsDataConValue expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
 -- string.
 exprIsTickedString :: CoreExpr -> Bool
 exprIsTickedString = isJust . exprIsTickedString_maybe
 
--- | This function is a very conservative approximation that only deals with
--- trivial expressions and datacon worker applications. Additionally, this
--- conservatively rejects data constructors that are applied to lifted variables
--- in argument positions that are marked strict.
--- In the future, we hope to loosen this requirement (See #23811).
-exprIsDefinitelyWHNF :: CoreExpr -> Bool
-exprIsDefinitelyWHNF x = is_definitely_whnf False x
+-- | This function checks if its argument is a data constructor value (WHNF).
+-- We use this function to determine if unlifted expressions can be floated
+-- to the top level.
+-- See Note [Core top-level unlifted data-con values] in GHC.Core
+exprIsDataConValue :: CoreExpr -> Bool
+exprIsDataConValue x = is_datacon_app x
   where
-    -- The first argument of 'is_definitely_whnf' indicates whether the
-    -- expression is forced due to being a strict argument of an enclosing data
-    -- constructor. If that is the case and the expression is a variable, then
-    -- we are only sure it is fully evaluated if the variable has an unlifted
-    -- type.
-    is_definitely_whnf True v@Var{} = definitelyUnliftedType (exprType v)
-    is_definitely_whnf _ x
+    -- We cannot use @exprIsHNF@ because it does not handle
+    -- data constructor worker strictness properly.
+    -- See Note [Data-con worker strictness] in GHC.Core.DataCon.
+    is_datacon_app x
       | (Var v, xs) <- collect_args x
       , Just dc <- isDataConWorkId_maybe v
-      = and (zipWith is_definitely_whnf (map isMarkedStrict (dataConRepStrictness dc)) xs)
-      | otherwise = exprIsTrivial x
+      = and $
+          zipWith3 arg_ok
+            (map (typeLevity_maybe . scaledThing) (dataConRepArgTys dc))
+            (map isMarkedStrict (dataConRepStrictness dc))
+            xs
+    is_datacon_app _ = False
 
-    -- This is slightly different from 'collectArgs' as it looks through ticks and casts
-    -- and it only collects run-time arguments.
+    arg_ok _ _ Lit{} = True
+    arg_ok (Just Lifted) False _ = True
+    arg_ok (Just Unlifted) _ Var{} = True
+    -- We allow nested constructor applications; we trust that they will
+    -- be ANFised in the future. E.g. given the unlifted data type:
+    --
+    --    data UNat :: UnliftedType = UZero | USucc UNat
+    --
+    -- If we lift an expression to the top level we might get:
+    --
+    --    foo = USucc (USucc UNil)
+    --
+    -- But that needs to be expanded (ANFised) to:
+    --
+    --    foo = USucc foo1
+    --    foo1 = USucc foo2
+    --    foo2 = UNil
+    --
+    -- This does always seem to happen and is checked by the Core linter.
+    arg_ok (Just Unlifted) _ x = is_datacon_app x
+    arg_ok _ _ _ = False
+
+    -- This is slightly different from 'collectArgs' as it looks through ticks
+    -- and casts and it only collects run-time arguments.
     collect_args expr = go expr []
       where
         go (App f a)  as
           | isRuntimeArg a = go f (a:as)
-          | otherwise      = go f as
-        go (Tick _ e) as   = go e as
-        go (Cast e _) as   = go e as
-        go e          as   = (e, as)
+          | otherwise = go f as
+        go (Tick _ e) as = go e as
+        go (Cast e _) as = go e as
+        go e          as = (e, as)
 
 -- | Extract a literal string from an expression that is zero or more Ticks
 -- wrapped around a literal string. Returns Nothing if the expression has a

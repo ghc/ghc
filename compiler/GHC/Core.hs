@@ -427,11 +427,9 @@ At top level, however, there are three exceptions to this rule:
              S1 = S1
       We allow this top-level unlifted binding to exist.
 
-(TL3) A boxed top-level binding is allowed to bind the application of a data
-      constructor worker to trivial arguments. These bindings are guaranteed
-      to not require any evaluation and can thus be compiled to static data.
-      Unboxed top-level bindings are still not allowed because references
-      to them might have to be pointers.
+(TL3) A boxed top-level binding is allowed to bind the application of
+      unlifted data constructor values.
+      See Note [Core top-level unlifted data-con values].
 
 Note [Core let-can-float invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -525,6 +523,46 @@ parts of the compilation pipeline.
 * A top-level string literal may end up exported from a module. In this case,
   in the object file, the content of the exported literal is given a label with
   the _bytes suffix.
+
+Note [Core top-level unlifted data-con values]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As another exception to the usual rule that top-level binders must be lifted,
+we allow binding unlifted data constructor values at the top level. This allows
+us to store these values directly as data in the binary that we produce, instead
+of allocating them potentially many times if they're inside a tight loop.
+
+However, we have to be very careful that we only allow data constructors that
+are really values.
+
+* We only consider data constructor workers and not wrappers, because wrappers
+  are generally not fully evaluated. See Note [The need for a wrapper].
+
+* Even data constructor workers might still be expanded by the STG rewriter to
+  perform some work, if they have arguments that are marked strict.
+  See Note [Data-con worker strictness].
+
+* If the data constructor has unlifted arguments, then those could cause further
+  evaluation to be necessary, unless they are fully evaluated data constructor
+  values themselves.
+
+Furthermore, there is another complication. The data constructor worker may be
+applied to a variable which is defined in another module, or worse, in an
+hs-boot file. So, we cannot always get all the information we need and even for
+variables defined in the same module it might still be hard or computationally
+expensive to collect the necessary information.
+
+So, for the first incarnation of this feature we choose very restrictive
+conditions, which are still useful in practice. We allow top-level unlifted
+data constructor workers if they are applied to arguments that are one of:
+
+* A Literal
+
+* Any expressions of lifted type, but only if that argument is not
+  marked strict.
+
+* An unlifted variable
+
+In the future, we hope to relax this condition (#23811).
 
 Note [NON-BOTTOM-DICTS invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
