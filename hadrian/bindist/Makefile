@@ -201,7 +201,7 @@ install_docs:
 	fi
 
 MAN_SECTION := 1
-MAN_PAGES := doc/users_guide/build-man/ghc.1
+MAN_PAGES := manpage/ghc.1
 
 .PHONY: install_man
 install_man:
