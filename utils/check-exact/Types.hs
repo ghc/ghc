@@ -31,7 +31,7 @@ data Rigidity = NormalLayout | RigidLayout deriving (Eq, Ord, Show)
 data Comment = Comment
     {
       commentContents   :: !String -- ^ The contents of the comment including separators
-    , commentAnchor :: !Anchor
+    , commentLoc :: !NoCommentsLocation
     , commentPriorTok :: !RealSrcSpan
     , commentOrigin :: !(Maybe AnnKeywordId) -- ^ We sometimes turn syntax into comments in order to process them properly.
     }

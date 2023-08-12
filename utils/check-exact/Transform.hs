@@ -283,8 +283,9 @@ setEntryDP (L (EpAnn (EpaDelta d csd) an cs) a) dp
                   (dp0,c') = go h
                 in
                   (dp0, c':t, EpaCommentsBalanced [] ts)
+    go :: GenLocated NoCommentsLocation e -> (DeltaPos, GenLocated NoCommentsLocation e)
     go (L (EpaDelta _ c0) c) = (d,  L (EpaDelta dp c0) c)
-    go (L (EpaSpan _)   c) = (d,  L (EpaDelta dp []) c)
+    go (L (EpaSpan _)     c) = (d,  L (EpaDelta dp NoComments) c)
 setEntryDP (L (EpAnn (EpaSpan (RealSrcSpan r _)) an cs) a) dp
   = case sortEpaComments (priorComments cs) of
       [] ->
@@ -293,7 +294,7 @@ setEntryDP (L (EpAnn (EpaSpan (RealSrcSpan r _)) an cs) a) dp
         L (EpAnn (EpaDelta edp csd) an cs'') a
               where
                 cs'' = setPriorComments cs []
-                csd = L (EpaDelta dp []) c:cs'
+                csd = L (EpaDelta dp NoComments) c:cs'
                 lc = last $ (L ca c:cs')
                 delta = case getLoc lc of
                           EpaSpan (RealSrcSpan rr _) -> ss2delta (ss2pos rr) r
