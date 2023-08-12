@@ -186,7 +186,7 @@ isPointSrcSpan ss = spanLength ss == 0
 -- does not already have one.
 commentOrigDelta :: LEpaComment -> LEpaComment
 commentOrigDelta (L (EpaSpan (RealSrcSpan la _)) (GHC.EpaComment t pp))
-  = (L (EpaDelta dp []) (GHC.EpaComment t pp))
+  = (L (EpaDelta dp NoComments) (GHC.EpaComment t pp))
                   `debug` ("commentOrigDelta: (la, pp, r,c, dp)=" ++ showAst (la, pp, r,c, dp))
   where
         (r,c) = ss2posEnd pp
@@ -253,7 +253,7 @@ ghcCommentText (L _ (GHC.EpaComment (EpaBlockComment s) _))    = s
 tokComment :: LEpaComment -> [Comment]
 tokComment t@(L lt c) =
   case c of
-    (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments lt pt dc
+    (GHC.EpaComment (EpaDocComment dc) pt) -> hsDocStringComments (noCommentsToEpaLocation lt) pt dc
     _ -> [mkComment (normaliseCommentText (ghcCommentText t)) lt (ac_prior_tok c)]
 
 hsDocStringComments :: Anchor -> RealSrcSpan -> GHC.HsDocString -> [Comment]
@@ -268,9 +268,9 @@ hsDocStringComments _ pt (MultiLineDocString dec (x :| xs)) =
   in
     (Comment str (spanAsAnchor lx) pt Nothing : docChunk (rs lx) (map dedentDocChunk xs))
 hsDocStringComments anc pt (NestedDocString dec@(HsDocStringNamed _) (L _ chunk))
-  = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+  = [Comment ("{- " ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
 hsDocStringComments anc pt (NestedDocString dec (L _ chunk))
-  = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") anc pt Nothing ]
+  = [Comment ("{-" ++ printDecorator dec ++ unpackHDSC chunk ++ "-}") (epaToNoCommentsLocation anc) pt Nothing ]
 
 hsDocStringComments _ _ (GeneratedDocString _) = [] -- Should not appear in user-written code
 
@@ -301,11 +301,11 @@ mkEpaComments priorCs postCs
 comment2LEpaComment :: Comment -> LEpaComment
 comment2LEpaComment (Comment s anc r _mk) = mkLEpaComment s anc r
 
-mkLEpaComment :: String -> Anchor -> RealSrcSpan -> LEpaComment
-mkLEpaComment s anc r = (L anc (GHC.EpaComment (EpaLineComment s) r))
+mkLEpaComment :: String -> NoCommentsLocation -> RealSrcSpan -> LEpaComment
+mkLEpaComment s loc r = (L loc (GHC.EpaComment (EpaLineComment s) r))
 
-mkComment :: String -> Anchor -> RealSrcSpan -> Comment
-mkComment c anc r = Comment c anc r Nothing
+mkComment :: String -> NoCommentsLocation -> RealSrcSpan -> Comment
+mkComment c loc r = Comment c loc r Nothing
 
 -- Windows comments include \r in them from the lexer.
 normaliseCommentText :: String -> String
@@ -328,11 +328,11 @@ sortEpaComments cs = sortBy cmp cs
     cmp (L l1 _) (L l2 _) = compare (ss2pos $ anchor l1) (ss2pos $ anchor l2)
 
 -- | Makes a comment which originates from a specific keyword.
-mkKWComment :: AnnKeywordId -> EpaLocation -> Comment
+mkKWComment :: AnnKeywordId -> NoCommentsLocation -> Comment
 mkKWComment kw (EpaSpan (RealSrcSpan ss mb))
   = Comment (keywordToString kw) (EpaSpan (RealSrcSpan ss mb)) ss (Just kw)
 mkKWComment kw (EpaSpan (UnhelpfulSpan _))
-  = Comment (keywordToString kw) (EpaDelta (SameLine 0) []) placeholderRealSpan (Just kw)
+  = Comment (keywordToString kw) (EpaDelta (SameLine 0) NoComments) placeholderRealSpan (Just kw)
 mkKWComment kw (EpaDelta dp cs)
   = Comment (keywordToString kw) (EpaDelta dp cs) placeholderRealSpan (Just kw)
 
@@ -481,7 +481,7 @@ hsDeclsClassDecl dec = case dec of
               tcdATs = ats, tcdATDefs = at_defs
             } -> map snd decls
     where
-      srs :: (HasLoc a) => a -> RealSrcSpan
+      srs :: EpAnn a -> RealSrcSpan
       srs a = realSrcSpan $ locA a
       decls
           = orderedDecls sortKey $ Map.fromList

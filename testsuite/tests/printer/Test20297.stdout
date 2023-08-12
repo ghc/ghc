@@ -17,7 +17,8 @@
        { Test20297.hs:11:22-26 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan { Test20297.hs:1:1-33 })
+       (EpaSpan
+        { Test20297.hs:1:1-33 })
        (EpaComment
         (EpaBlockComment
          "{-# OPTIONS -ddump-parsed-ast #-}")
@@ -114,7 +115,8 @@
                  (AddEpAnn AnnEqual (EpaSpan { Test20297.hs:5:5 })))
                 (EpaComments
                  [(L
-                   (EpaSpan { Test20297.hs:6:3-13 })
+                   (EpaSpan
+                    { Test20297.hs:6:3-13 })
                    (EpaComment
                     (EpaLineComment
                      "-- comment0")
@@ -162,7 +164,8 @@
       [])
      (EpaComments
       [(L
-        (EpaSpan { Test20297.hs:7:9-19 })
+        (EpaSpan
+         { Test20297.hs:7:9-19 })
         (EpaComment
          (EpaLineComment
           "-- comment1")
@@ -267,7 +270,8 @@
                [])
               (EpaComments
                [(L
-                 (EpaSpan { Test20297.hs:10:9-19 })
+                 (EpaSpan
+                  { Test20297.hs:10:9-19 })
                  (EpaComment
                   (EpaLineComment
                    "-- comment2")
@@ -436,7 +440,8 @@
        { Test20297.ppr.hs:9:20-24 })))
     (EpaCommentsBalanced
      [(L
-       (EpaSpan { Test20297.ppr.hs:1:1-33 })
+       (EpaSpan
+        { Test20297.ppr.hs:1:1-33 })
        (EpaComment
         (EpaBlockComment
          "{-# OPTIONS -ddump-parsed-ast #-}")
