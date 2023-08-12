@@ -619,7 +619,7 @@ annotationsToComments (EpAnn anc a cs) l kws = do
     go :: ([Comment], [AddEpAnn]) -> [AddEpAnn] -> ([Comment], [AddEpAnn])
     go acc [] = acc
     go (cs',ans) ((AddEpAnn k ss) : ls)
-      | Set.member k keywords = go ((mkKWComment k ss):cs', ans) ls
+      | Set.member k keywords = go ((mkKWComment k (epaToNoCommentsLocation ss)):cs', ans) ls
       | otherwise             = go (cs', (AddEpAnn k ss):ans)    ls
 
 -- ---------------------------------------------------------------------
@@ -677,7 +677,7 @@ printStringAtRsC capture pa str = do
     NoCaptureComments -> return []
   debugM $ "printStringAtRsC:cs'=" ++ show cs'
   debugM $ "printStringAtRsC:p'=" ++ showAst p'
-  debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta p' [])
+  debugM $ "printStringAtRsC: (EpaDelta p' [])=" ++ showAst (EpaDelta p' NoComments)
   debugM $ "printStringAtRsC: (EpaDelta p' (map comment2LEpaComment cs'))=" ++ showAst (EpaDelta p' (map comment2LEpaComment cs'))
   return (EpaDelta p' (map comment2LEpaComment cs'))
 
@@ -1365,14 +1365,14 @@ printCommentsBefore :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
 printCommentsBefore ss = do
   cs <- commentAllocationBefore ss
   debugM $ "printCommentsBefore: (ss): " ++ showPprUnsafe (rs2range ss)
-  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
+  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentLoc cs)
   mapM_ printOneComment cs
 
 printCommentsIn :: (Monad m, Monoid w) => RealSrcSpan -> EP w m ()
 printCommentsIn ss = do
   cs <- commentAllocationIn ss
   debugM $ "printCommentsIn: (ss): " ++ showPprUnsafe (rs2range ss)
-  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentAnchor cs)
+  -- debugM $ "printComments: (ss,comment locations): " ++ showPprUnsafe (rs2range ss,map commentLoc cs)
   mapM_ printOneComment cs
   debugM $ "printCommentsIn:done"
 
@@ -1423,12 +1423,12 @@ updateAndApplyComment (Comment str anc pp mo) dp = do
       _ -> dp''
     op' = case dp' of
             SameLine n -> if n >= 0
-                            then EpaDelta dp' []
-                            else EpaDelta dp []
-            _ -> EpaDelta dp' []
-    anc' = if str == "" && op' == EpaDelta (SameLine 0) [] -- EOF comment
-           then EpaDelta dp []
-           else EpaDelta dp []
+                            then EpaDelta dp' NoComments
+                            else EpaDelta dp NoComments
+            _ -> EpaDelta dp' NoComments
+    anc' = if str == "" && op' == EpaDelta (SameLine 0) NoComments -- EOF comment
+           then EpaDelta dp NoComments
+           else EpaDelta dp NoComments
 
 -- ---------------------------------------------------------------------
 
