@@ -109,7 +109,7 @@ initCondition( Condition* pCond )
 {
   pthread_condattr_t attr;
   CHECK(pthread_condattr_init(&attr) == 0);
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+#if defined(USE_TIMEOUT_CLK)
   pCond->timeout_clk = CLOCK_REALTIME;
   if (pthread_condattr_setclock(&attr, CLOCK_MONOTONIC) == 0) {
       pCond->timeout_clk = CLOCK_MONOTONIC;
@@ -147,7 +147,7 @@ bool
 timedWaitCondition ( Condition* pCond, Mutex* pMut, Time timeout) {
     struct timespec ts;
 
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+#if defined(USE_TIMEOUT_CLK)
     CHECK(clock_gettime(pCond->timeout_clk, &ts) == 0);
 #else
     struct timeval tv;

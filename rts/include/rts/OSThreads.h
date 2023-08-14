@@ -27,6 +27,11 @@
 #include <pthread.h>
 #include <errno.h>
 
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK) && defined(HAVE_SYS_TYPES_H)
+#define USE_TIMEOUT_CLK
+#include <sys/types.h>
+#endif
+
 typedef struct {
     pthread_cond_t cond;
 
@@ -34,7 +39,7 @@ typedef struct {
     // N.B. Some older Darwin releases don't support clock_gettime. However, we
     // do want to reference to CLOCK_MONOTONIC whenever possible as it is more
     // robust against system time changes and is likely cheaper to query.
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_PTHREAD_CONDATTR_SETCLOCK)
+#if defined(USE_TIMEOUT_CLK)
     clockid_t timeout_clk;
 #endif
 } Condition;
