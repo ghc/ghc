@@ -82,7 +82,7 @@ stg2stg :: Logger
         -> IO ([(CgStgTopBinding,IdSet)], StgCgInfos) -- output program
 stg2stg logger extra_vars opts this_mod binds
   = do  { dump_when Opt_D_dump_stg_from_core "Initial STG:" binds
-        ; stg_linter False "StgFromCore" binds
+        ; stg_linter False False "StgFromCore" binds
         ; showPass logger "Stg2Stg"
         -- Do the main business!
         ; binds' <- runStgM 'g' $
@@ -101,18 +101,18 @@ stg2stg logger extra_vars opts this_mod binds
         ; let (binds_sorted_with_fvs, imp_fvs) = unzip (depSortWithAnnotStgPgm this_mod binds')
         -- See Note [Tag inference for interactive contexts]
         ; (cg_binds, cg_infos) <- enforceEpt (stgPipeline_pprOpts opts) (stgPipeline_forBytecode opts) logger this_mod binds_sorted_with_fvs
-        ; stg_linter False "StgCodeGen" cg_binds
+        ; stg_linter False True "StgCodeGen" cg_binds
         ; pure (zip cg_binds imp_fvs, cg_infos)
    }
 
   where
-    stg_linter :: (BinderP a ~ Id, OutputablePass a) => Bool -> String -> [GenStgTopBinding a] -> IO ()
-    stg_linter unarised
+    stg_linter :: (BinderP a ~ Id, OutputablePass a) => Bool -> Bool -> String -> [GenStgTopBinding a] -> IO ()
+    stg_linter unarised tagged
       | Just diag_opts <- stgPipeline_lint opts
       = lintStgTopBindings
           (stgPlatform opts) logger
           diag_opts ppr_opts
-          extra_vars this_mod unarised
+          extra_vars this_mod unarised tagged
       | otherwise
       = \ _whodunit _binds -> return ()
 
@@ -143,10 +143,10 @@ stg2stg logger extra_vars opts this_mod binds
 
           StgUnarise -> do
             us <- getUniqueSupplyM
-            liftIO (stg_linter False "Pre-unarise" binds)
+            liftIO (stg_linter False False "Pre-unarise" binds)
             let binds' = {-# SCC "StgUnarise" #-} unarise us (stgPipeline_allowTopLevelConApp opts this_mod) binds
             liftIO (dump_when Opt_D_dump_stg_unarised "Unarised STG:" binds')
-            liftIO (stg_linter True "Unarise" binds')
+            liftIO (stg_linter True False "Unarise" binds')
             return binds'
 
     ppr_opts = stgPipeline_pprOpts opts
@@ -157,7 +157,7 @@ stg2stg logger extra_vars opts this_mod binds
       = liftIO $ do -- report verbosely, if required
           putDumpFileMaybe logger Opt_D_verbose_stg2stg what
             FormatSTG (vcat (map (pprStgTopBinding ppr_opts) binds2))
-          stg_linter False what binds2
+          stg_linter False False what binds2
           return binds2
 
 -- -----------------------------------------------------------------------------

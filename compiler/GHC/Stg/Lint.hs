@@ -130,6 +130,7 @@ import GHC.Core.Multiplicity (scaledThing)
 import GHC.Settings (Platform)
 import GHC.Core.TyCon (primRepCompatible, primRepsCompatible)
 import GHC.Utils.Panic.Plain (panic)
+import GHC.Stg.InferTags.TagSig
 
 lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    => Platform
@@ -139,11 +140,12 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
                    -> [Var]  -- ^ extra vars in scope from GHCi
                    -> Module -- ^ module being compiled
                    -> Bool   -- ^ have we run Unarise yet?
+                   -> Bool   -- ^ have we inferred tags yet?
                    -> String -- ^ who produced the STG?
                    -> [GenStgTopBinding a]
                    -> IO ()
 
-lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised whodunit binds
+lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised tagged whodunit binds
   = {-# SCC "StgLint" #-}
     case initL platform diag_opts this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
@@ -172,7 +174,7 @@ lintStgTopBindings platform logger diag_opts opts extra_vars this_mod unarised w
         addInScopeVars binders $
             lint_binds binds
 
-    lint_bind (StgTopLifted bind) = lintStgBinds TopLevel bind
+    lint_bind (StgTopLifted bind) = lintStgBinds TopLevel tagged bind
     lint_bind (StgTopStringLit v _) = return [v]
 
 lintStgConArg :: StgArg -> LintM ()
@@ -209,14 +211,14 @@ lintStgVar id = checkInScope id
 
 lintStgBinds
     :: (OutputablePass a, BinderP a ~ Id)
-    => TopLevelFlag -> GenStgBinding a -> LintM [Id] -- Returns the binders
-lintStgBinds top_lvl (StgNonRec binder rhs) = do
-    lint_binds_help top_lvl (binder,rhs)
+    => TopLevelFlag -> Bool -> GenStgBinding a -> LintM [Id] -- Returns the binders
+lintStgBinds top_lvl tagged (StgNonRec binder rhs) = do
+    lint_binds_help top_lvl tagged (binder,rhs)
     return [binder]
 
-lintStgBinds top_lvl (StgRec pairs)
+lintStgBinds top_lvl tagged (StgRec pairs)
   = addInScopeVars binders $ do
-        mapM_ (lint_binds_help top_lvl) pairs
+        mapM_ (lint_binds_help top_lvl tagged) pairs
         return binders
   where
     binders = [b | (b,_) <- pairs]
@@ -224,20 +226,32 @@ lintStgBinds top_lvl (StgRec pairs)
 lint_binds_help
     :: (OutputablePass a, BinderP a ~ Id)
     => TopLevelFlag
+    -> Bool
     -> (Id, GenStgRhs a)
     -> LintM ()
-lint_binds_help top_lvl (binder, rhs)
+lint_binds_help top_lvl tagged (binder, rhs)
   = addLoc (RhsOf binder) $ do
         when (isTopLevel top_lvl) (checkNoCurrentCCS rhs)
         lintStgRhs rhs
         opts <- getStgPprOpts
         -- Check binder doesn't have unlifted type or it's a join point
+        -- Or binder is unlifted (not unboxed) and it is a fully evaluated
+        -- constructor
         checkL ( isJoinId binder
               || not (isUnliftedType (idType binder))
               || isTopLevel top_lvl
                    && isBoxedType (idType binder)
                    && case rhs of StgRhsCon{} -> True; _ -> False)
           (mkUnliftedTyMsg opts binder rhs)
+
+        -- check that top-level unlifted bindings are properly tagged
+        when (tagged && isTopLevel top_lvl && mightBeUnliftedType (idType binder)) $
+          checkL ( idTagSig_maybe binder == Just (TagSig TagProper)
+                -- Data-con workers are not always properly tagged when compiled for
+                -- the bytecode interpreter.
+                -- See Note [Tag inference for interpreted code] in GHC.Stg.InferTags
+                || isDataConWorkId binder)
+            (mkUntaggedMsg binder)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.
@@ -303,13 +317,15 @@ lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgFunArg args
 
 lintStgExpr (StgLet _ binds body) = do
-    binders <- lintStgBinds NotTopLevel binds
+    -- Tag inference may have run, but that does not matter for non-top-level binders
+    binders <- lintStgBinds NotTopLevel False binds
     addLoc (BodyOfLet binders) $
       addInScopeVars binders $
         lintStgExpr body
 
 lintStgExpr (StgLetNoEscape _ binds body) = do
-    binders <- lintStgBinds NotTopLevel binds
+    -- Tag inference may have run, but that does not matter for non-top-level binders
+    binders <- lintStgBinds NotTopLevel False binds
     addLoc (BodyOfLet binders) $
       addInScopeVars binders $
         lintStgExpr body
@@ -576,3 +592,10 @@ mkUnliftedTyMsg opts binder rhs
      text "has unlifted type" <+> quotes (ppr (idType binder)))
     $$
     (text "RHS:" <+> pprStgRhs opts rhs)
+
+mkUntaggedMsg :: Id -> SDoc
+mkUntaggedMsg binder
+  = (text "Top-level unlifted binder" <+> quotes (ppr binder) <+>
+     text "is not properly tagged")
+     $$
+     (text "TagSig:" <+> quotes (ppr (idTagSig_maybe binder)))

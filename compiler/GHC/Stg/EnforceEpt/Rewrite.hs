@@ -320,15 +320,15 @@ rewriteTop (StgTopLifted bind)   = do
 rewriteBinds :: TopLevelFlag -> InferStgBinding -> RM (TgStgBinding)
 rewriteBinds _top_flag (StgNonRec v rhs) = do
         (!rhs) <-  rewriteRhs v rhs
-        return $! (StgNonRec (fst v) rhs)
+        return $! (StgNonRec (rewriteId' v) rhs)
 rewriteBinds top_flag b@(StgRec binds) =
     -- Bring sigs of binds into scope for all rhss
     withBind top_flag b $ do
         (rhss) <- mapM (uncurry rewriteRhs) binds
-        return $! (mkRec rhss)
-        where
-            mkRec :: [TgStgRhs] -> TgStgBinding
-            mkRec rhss = StgRec (zip (map (fst . fst) binds) rhss)
+        return $! StgRec (zip (map (rewriteId' . fst) binds) rhss)
+
+rewriteId' :: (Id, TagSig) -> Id
+rewriteId' (v, tag) = setIdTagSig v tag
 
 -- Rewrite a RHS
 rewriteRhs :: (Id,TagSig) -> InferStgRhs
