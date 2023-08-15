@@ -620,8 +620,20 @@ ruleString Off Nightly = "$NIGHTLY == null"
 labelString :: String -> String
 labelString s =  "$CI_MERGE_REQUEST_LABELS =~ /.*" ++ s ++ ".*/"
 
+branchStringExact :: String -> String
+branchStringExact s = "$CI_COMMIT_BRANCH == \"" ++ s ++ "\""
+
+branchStringLike :: String -> String
+branchStringLike s = "$CI_COMMIT_BRANCH =~ /" ++ s ++ "/"
+
+
 validateRuleString :: ValidateRule -> String
-validateRuleString FullCI = or_all ([labelString "full-ci", labelString "marge_bot_batch_merge_job"])
+validateRuleString FullCI = or_all ([ labelString "full-ci"
+                                    , labelString "marge_bot_batch_merge_job"
+                                    , branchStringExact "master"
+                                    , branchStringLike "ghc-[0-9]+\\.[0-9]+"
+                                    ])
+
 validateRuleString LLVMBackend = labelString "LLVM backend"
 validateRuleString FreeBSDLabel = labelString "FreeBSD"
 validateRuleString NonmovingGc = labelString "non-moving GC"

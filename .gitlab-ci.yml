@@ -123,6 +123,12 @@ workflow:
   rules:
     - if: '$RELEASE_JOB == "yes"'
 
+.full-ci: &full-ci
+  - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
+  - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+  - if: '$CI_COMMIT_BRANCH == "master"'
+  - if: '$CI_COMMIT_BRANCH =~ /ghc-[0-9]+\.[0-9]+/'
+
 ############################################################
 # Runner Tags
 ############################################################
@@ -433,8 +439,7 @@ hadrian-multi:
     paths:
       - cabal-cache
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 ############################################################
 # stack-hadrian-build
@@ -605,8 +610,7 @@ source-tarball:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 generate-hadrian-bootstrap-sources:
   stage: full-build
@@ -625,8 +629,7 @@ generate-hadrian-bootstrap-sources:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 
 package-hadrian-bootstrap-sources:
@@ -644,8 +647,7 @@ package-hadrian-bootstrap-sources:
     - if: $NIGHTLY
     - if: '$RELEASE_JOB == "yes"'
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 test-bootstrap:
   stage: full-build
@@ -682,8 +684,7 @@ test-bootstrap:
   rules:
     - if: $NIGHTLY
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*test-bootstrap.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
     - if: '$RELEASE_JOB == "yes"'
       when: always
       variables:
@@ -837,11 +838,7 @@ perf-nofib:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
   rules:
     - when: never
-    - if: $CI_MERGE_REQUEST_ID
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
   tags:
     - x86_64-linux
   before_script:
@@ -883,10 +880,6 @@ perf:
       optional: true
   dependencies: null
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora33:$DOCKER_REV"
-  rules:
-    - if: $CI_MERGE_REQUEST_ID
-    - if: '$CI_COMMIT_BRANCH == "master"'
-    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
   tags:
     - x86_64-linux-perf
   script:
@@ -908,8 +901,7 @@ perf:
     paths:
       - out
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 ############################################################
 # ABI testing
@@ -949,8 +941,7 @@ abi-test:
     paths:
       - out
   rules:
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*full-ci.*/'
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /.*marge_bot_batch_merge_job.*/'
+    - *full-ci
 
 
 ############################################################
