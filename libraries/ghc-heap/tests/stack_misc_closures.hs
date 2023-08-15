@@ -308,8 +308,6 @@ main = do
         assertEqual (tipe info_tbl) UNDERFLOW_FRAME
         assertEqual (tipe (ssc_info nextChunk)) STACK
         assertEqual (ssc_stack_size nextChunk) 27
-        assertEqual (ssc_stack_dirty nextChunk) 0
-        assertEqual (ssc_stack_marking nextChunk) 0
         assertEqual (length (ssc_stack nextChunk)) 2
         case head (ssc_stack nextChunk) of
           RetSmall {..} ->

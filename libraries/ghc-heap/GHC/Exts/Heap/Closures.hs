@@ -387,8 +387,6 @@ type StgStackClosure = GenStgStackClosure Box
 data GenStgStackClosure b = GenStgStackClosure
       { ssc_info            :: !StgInfoTable
       , ssc_stack_size      :: !Word32 -- ^ stack size in *words*
-      , ssc_stack_dirty     :: !Word8 -- ^ non-zero => dirty
-      , ssc_stack_marking   :: !Word8
       , ssc_stack           :: ![GenStackFrame b]
       }
   deriving (Foldable, Functor, Generic, Show, Traversable)

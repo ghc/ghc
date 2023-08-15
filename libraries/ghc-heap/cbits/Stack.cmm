@@ -173,15 +173,10 @@ getStackClosurezh(P_ stack, W_ offsetWords) {
   return (closure);
 }
 
-// (bits32, bits8, bits8) getStackFieldszh(StgStack* stack)
+// (bits32) getStackFieldszh(StgStack* stack)
 getStackFieldszh(P_ stack){
   bits32 size;
-  bits8 dirty, marking;
-
   size = StgStack_stack_size(stack);
-  dirty = StgStack_dirty(stack);
-  marking = StgStack_marking(stack);
-
-  return (size, dirty, marking);
+  return (size);
 }
 #endif

@@ -170,13 +170,12 @@ foreign import prim "getStackClosurezh"
 
 foreign import prim "getStackFieldszh"
   getStackFields# ::
-    StackSnapshot# -> (# Word32#, Word8#, Word8# #)
+    StackSnapshot# -> Word32#
 
-getStackFields :: StackSnapshot# -> (Word32, Word8, Word8)
+getStackFields :: StackSnapshot# -> Word32
 getStackFields stackSnapshot# =
   case getStackFields# stackSnapshot# of
-    (# sSize#, sDirty#, sMarking# #) ->
-      (W32# sSize#, W8# sDirty#, W8# sMarking#)
+    sSize# -> W32# sSize#
 
 -- | `StackFrameLocation` of the top-most stack frame
 stackHead :: StackSnapshot# -> StackFrameLocation
@@ -409,15 +408,13 @@ decodeStack (StackSnapshot stack#) = do
   info <- getInfoTableForStack stack#
   case tipe info of
     STACK -> do
-      let (stack_size', stack_dirty', stack_marking') = getStackFields stack#
+      let stack_size' = getStackFields stack#
           sfls = stackFrameLocations stack#
       stack' <- mapM unpackStackFrame sfls
       pure $
         GenStgStackClosure
           { ssc_info = info,
             ssc_stack_size = stack_size',
-            ssc_stack_dirty = stack_dirty',
-            ssc_stack_marking = stack_marking',
             ssc_stack = stack'
           }
     _ -> error $ "Expected STACK closure, got " ++ show info
