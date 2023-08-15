@@ -10,10 +10,6 @@ module LintCodes.Static
   )
   where
 
--- base
-import Data.Maybe
-  ( listToMaybe )
-
 -- containers
 import Data.Map.Strict
   ( Map )
