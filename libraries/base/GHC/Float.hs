@@ -1600,6 +1600,8 @@ exponents returned by decodeFloat.
 -- ==== __Example__
 -- >>> clamp (-10) 5
 -- 10
+--
+-- @since 4.13.0.0
 clamp :: Int -> Int -> Int
 clamp bd k = max (-bd) (min bd k)
 

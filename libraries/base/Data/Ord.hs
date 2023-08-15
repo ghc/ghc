@@ -64,6 +64,8 @@ comparing p x y = compare (p x) (p y)
 --
 -- >>> clamp ('a', 'm') 'x'
 -- 'm'
+--
+-- @since 4.16.0.0
 clamp :: (Ord a) => (a, a) -> a -> a
 clamp (low, high) a = min high (max a low)
 
