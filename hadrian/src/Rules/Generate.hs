@@ -522,9 +522,6 @@ generateSettings = do
       queryTarget (\t -> substTooldir topdir (archOS_OS $ tgtArchOs t) (f t))
       where
         substTooldir :: String -> OS -> String -> String
-        substTooldir topdir OSMinGW32 s
-          = T.unpack $
-            T.replace (T.pack $ normalise $ topdir </> "inplace" </> "mingw") (T.pack "$tooldir/mingw") (T.pack $ normalise s)
         substTooldir _ _ s = s
 
 
