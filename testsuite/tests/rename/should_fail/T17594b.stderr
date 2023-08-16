@@ -1,0 +1,84 @@
+
+T17594b.hs:7:6: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:10:6: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:14:6: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:6: error: [GHC-78249]
+    Illegal invisible type pattern: t1
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:10: error: [GHC-78249]
+    Illegal invisible type pattern: t2
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:14: error: [GHC-78249]
+    Illegal invisible type pattern: t3
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:27: error: [GHC-78249]
+    Illegal invisible type pattern: t4
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:31: error: [GHC-78249]
+    Illegal invisible type pattern: t5
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:17:35: error: [GHC-78249]
+    Illegal invisible type pattern: t6
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:20:11: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:22:20: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:25:10: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:6: error: [GHC-78249]
+    Illegal invisible type pattern: t1
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:10: error: [GHC-78249]
+    Illegal invisible type pattern: t2
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:32: error: [GHC-78249]
+    Illegal invisible type pattern: t3
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:58: error: [GHC-78249]
+    Illegal invisible type pattern: t4
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:62: error: [GHC-78249]
+    Illegal invisible type pattern: t5
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:28:71: error: [GHC-78249]
+    Illegal invisible type pattern: t6
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:31:11: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:34:11: error: [GHC-78249]
+    Illegal invisible type pattern: t
+    Suggested fix: Perhaps you intended to use TypeAbstractions
+
+T17594b.hs:37:7: error: [GHC-78249]
+    Illegal invisible type pattern: ($(TH.varT (TH.mkName "t")))
+    Suggested fix: Perhaps you intended to use TypeAbstractions

@@ -34,6 +34,7 @@ instance Binary TH.Lit
 instance Binary TH.Range
 instance Binary TH.Stmt
 instance Binary TH.Pat
+instance Binary TH.ArgPat
 instance Binary TH.Exp
 instance Binary TH.Dec
 instance Binary TH.Overlap

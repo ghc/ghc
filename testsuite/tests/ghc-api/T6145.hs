@@ -41,8 +41,8 @@ main = do
         = not (isEmptyBag (filterBag isDataCon bs))
       isDataCon (L l (f@FunBind {}))
         | (MG _ (L _ (m:_))) <- fun_matches f,
-          ((L _ (c@ConPat{})):_)<-hsLMatchPats m,
-          (L l _)<-pat_con c
+          ((L _ ((VisPat _ (L _ c@ConPat{})))):_)<-hsLMatchPats m,
+          (L l _) <- pat_con c
         = isGoodSrcSpan (locA l) -- Check that the source location is a good one
       isDataCon _
         = False

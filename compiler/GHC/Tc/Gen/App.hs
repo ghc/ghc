@@ -1141,15 +1141,28 @@ At a call site we may have calls looking like this
 At definition sites we may have type /patterns/ to abstract over type variables
    fi           x       = rhs   -- Inferred: no type pattern
    fs           x       = rhs   -- Specified: type pattern omitted
-   fs @a       (x :: a) = rhs   -- Specified: type pattern supplied (NB: not implemented)
+   fs @a       (x :: a) = rhs   -- Specified: type pattern supplied
    fr (type a) (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier used
    fr a        (x :: a) = rhs   -- Required: type pattern is compulsory, `type` qualifier omitted
 
-Type patterns in lambdas work the same way as they do in a function LHS
-   fs = \           x       -> rhs   -- Specified: type pattern omitted
-   fs = \ @a       (x :: a) -> rhs   -- Specified: type pattern supplied (NB: not implemented)
-   fr = \ (type a) (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier used
-   fr = \ a        (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier omitted
+Type patterns in lambdas mostly work the same way as they do in a function LHS,
+except for @-binders
+   OK:  fs = \           x       -> rhs   -- Specified: type pattern omitted
+   Bad: fs = \ @a       (x :: a) -> rhs   -- Specified: type pattern supplied
+   OK:  fr = \ (type a) (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier used
+   OK:  fr = \ a        (x :: a) -> rhs   -- Required: type pattern is compulsory, `type` qualifier omitted
+
+When it comes to @-binders in lambdas, they do work, but only in a limited set
+of circumstances:
+  * the lambda occurs as an argument to a higher-rank function or constructor
+      higher-rank function:  h :: (forall a. blah) -> ...
+      call site:             x = h (\ @a -> ... )
+  * the lambda is annotated with an inline type signature:
+      (\ @a -> ... ) :: forall a. blah
+  * the lambda is a field in a data structure, whose type is impredicative
+      [ \ @a -> ... ] :: [forall a. blah]
+  * the @-binder is not the first binder in the lambda:
+      \ x @a -> ...
 
 Type patterns may also occur in a constructor pattern. Consider the following data declaration
    data T where
@@ -1221,7 +1234,7 @@ Syntax of abstractions in Pat
       \ (MkT @a  (x :: a)) -> rhs    -- ConPat (c.o. Pat) and HsConPatTyArg (c.o. HsConPatTyArg)
       \ (type a) (x :: a)  -> rhs    -- EmbTyPat (c.o. Pat)
       \ a        (x :: a)  -> rhs    -- VarPat (c.o. Pat)
-      \ @a       (x :: a)  -> rhs    -- to be decided       (NB. not implemented)
+      \ @a       (x :: a)  -> rhs    -- InvisPat (c.o. ArgPat)
 
 * A HsTyPat is not necessarily a plain variable. At the very least,
   we support kind signatures and wildcards:

@@ -717,3 +717,7 @@ test('T24279', normal, compile_fail, [''])
 test('DoExpansion1', normal, compile, ['-fdefer-type-errors'])
 test('DoExpansion2', normal, compile, ['-fdefer-type-errors'])
 test('DoExpansion3', normal, compile, ['-fdefer-type-errors'])
+
+test('T17594c', normal, compile_fail, [''])
+test('T17594d', normal, compile_fail, [''])
+test('T17594g', normal, compile_fail, [''])

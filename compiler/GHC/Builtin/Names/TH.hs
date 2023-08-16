@@ -48,15 +48,17 @@ templateHaskellNames = [
     conPName, tildePName, bangPName, infixPName,
     asPName, wildPName, recPName, listPName, sigPName, viewPName,
     typePName,
+    -- ArgPat
+    visAPName, invisAPName,
     -- FieldPat
     fieldPatName,
     -- Match
     matchName,
     -- Clause
-    clauseName,
+    clauseArgName,
     -- Exp
     varEName, conEName, litEName, appEName, appTypeEName, infixEName,
-    infixAppName, sectionLName, sectionRName, lamEName, lamCaseEName,
+    infixAppName, sectionLName, sectionRName, lamArgEName, lamCaseEName,
     lamCasesEName, tupEName, unboxedTupEName, unboxedSumEName,
     condEName, multiIfEName, letEName, caseEName, doEName, mdoEName, compEName,
     fromEName, fromThenEName, fromToEName, fromThenToEName,
@@ -159,7 +161,8 @@ templateHaskellNames = [
     liftClassName, quoteClassName,
 
     -- And the tycons
-    qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchTyConName,
+    qTyConName, nameTyConName, patTyConName, argPatTyConName,
+    fieldPatTyConName, matchTyConName,
     expQTyConName, fieldExpTyConName, predTyConName,
     stmtTyConName,  decsTyConName, conTyConName, bangTypeTyConName,
     varBangTypeTyConName, typeQTyConName, expTyConName, decTyConName,
@@ -204,7 +207,7 @@ liftClassName = thCls (fsLit "Lift") liftClassKey
 quoteClassName :: Name
 quoteClassName = thCls (fsLit "Quote") quoteClassKey
 
-qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
+qTyConName, nameTyConName, fieldExpTyConName, patTyConName, argPatTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
     codeTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
@@ -213,6 +216,7 @@ qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
 patTyConName           = thTc (fsLit "Pat")            patTyConKey
+argPatTyConName        = thTc (fsLit "ArgPat")         argPatTyConKey
 fieldPatTyConName      = thTc (fsLit "FieldPat")       fieldPatTyConKey
 expTyConName           = thTc (fsLit "Exp")            expTyConKey
 decTyConName           = thTc (fsLit "Dec")            decTyConKey
@@ -289,6 +293,12 @@ sigPName   = libFun (fsLit "sigP")   sigPIdKey
 viewPName  = libFun (fsLit "viewP")  viewPIdKey
 typePName  = libFun (fsLit "typeP")  typePIdKey
 
+-- data ArgPat = ...
+visAPName, invisAPName :: Name
+
+visAPName   = libFun (fsLit "visAP")  visAPIdKey
+invisAPName = libFun (fsLit "invisAP")  invisAPIdKey
+
 -- type FieldPat = ...
 fieldPatName :: Name
 fieldPatName = libFun (fsLit "fieldPat") fieldPatIdKey
@@ -298,12 +308,12 @@ matchName :: Name
 matchName = libFun (fsLit "match") matchIdKey
 
 -- data Clause = ...
-clauseName :: Name
-clauseName = libFun (fsLit "clause") clauseIdKey
+clauseArgName :: Name
+clauseArgName = libFun (fsLit "clauseArg") clauseArgIdKey
 
 -- data Exp = ...
 varEName, conEName, litEName, appEName, appTypeEName, infixEName, infixAppName,
-    sectionLName, sectionRName, lamEName, lamCaseEName, lamCasesEName, tupEName,
+    sectionLName, sectionRName, lamArgEName, lamCaseEName, lamCasesEName, tupEName,
     unboxedTupEName, unboxedSumEName, condEName, multiIfEName, letEName,
     caseEName, doEName, mdoEName, compEName, staticEName, unboundVarEName,
     labelEName, implicitParamVarEName, getFieldEName, projectionEName, typeEName :: Name
@@ -316,7 +326,7 @@ infixEName            = libFun (fsLit "infixE")            infixEIdKey
 infixAppName          = libFun (fsLit "infixApp")          infixAppIdKey
 sectionLName          = libFun (fsLit "sectionL")          sectionLIdKey
 sectionRName          = libFun (fsLit "sectionR")          sectionRIdKey
-lamEName              = libFun (fsLit "lamE")              lamEIdKey
+lamArgEName           = libFun (fsLit "lamArgE")           lamArgEIdKey
 lamCaseEName          = libFun (fsLit "lamCaseE")          lamCaseEIdKey
 lamCasesEName         = libFun (fsLit "lamCasesE")         lamCasesEIdKey
 tupEName              = libFun (fsLit "tupE")              tupEIdKey
@@ -680,7 +690,7 @@ quoteClassKey = mkPreludeClassUnique 201
 -- Check in GHC.Builtin.Names if you want to change this
 
 expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
-    patTyConKey,
+    patTyConKey, argPatTyConKey,
     stmtTyConKey, conTyConKey, typeQTyConKey, typeTyConKey,
     tyVarBndrUnitTyConKey, tyVarBndrSpecTyConKey, tyVarBndrVisTyConKey,
     decTyConKey, bangTypeTyConKey, varBangTypeTyConKey,
@@ -696,6 +706,7 @@ clauseTyConKey          = mkPreludeTyConUnique 202
 qTyConKey               = mkPreludeTyConUnique 203
 expQTyConKey            = mkPreludeTyConUnique 204
 patTyConKey             = mkPreludeTyConUnique 206
+argPatTyConKey          = mkPreludeTyConUnique 207
 stmtTyConKey            = mkPreludeTyConUnique 209
 conTyConKey             = mkPreludeTyConUnique 210
 typeQTyConKey           = mkPreludeTyConUnique 211
@@ -834,6 +845,12 @@ sigPIdKey         = mkPreludeMiscIdUnique 253
 viewPIdKey        = mkPreludeMiscIdUnique 254
 typePIdKey        = mkPreludeMiscIdUnique 255
 
+-- data ArgPat = ...
+
+visAPIdKey, invisAPIdKey :: Unique
+visAPIdKey        = mkPreludeMiscIdUnique 256
+invisAPIdKey      = mkPreludeMiscIdUnique 257
+
 -- type FieldPat = ...
 fieldPatIdKey :: Unique
 fieldPatIdKey       = mkPreludeMiscIdUnique 260
@@ -843,13 +860,13 @@ matchIdKey :: Unique
 matchIdKey          = mkPreludeMiscIdUnique 261
 
 -- data Clause = ...
-clauseIdKey :: Unique
-clauseIdKey         = mkPreludeMiscIdUnique 262
+clauseArgIdKey :: Unique
+clauseArgIdKey         = mkPreludeMiscIdUnique 262
 
 
 -- data Exp = ...
 varEIdKey, conEIdKey, litEIdKey, appEIdKey, appTypeEIdKey, infixEIdKey,
-    infixAppIdKey, sectionLIdKey, sectionRIdKey, lamEIdKey, lamCaseEIdKey,
+    infixAppIdKey, sectionLIdKey, sectionRIdKey, lamArgEIdKey, lamCaseEIdKey,
     lamCasesEIdKey, tupEIdKey, unboxedTupEIdKey, unboxedSumEIdKey, condEIdKey,
     multiIfEIdKey, letEIdKey, caseEIdKey, doEIdKey, compEIdKey,
     fromEIdKey, fromThenEIdKey, fromToEIdKey, fromThenToEIdKey,
@@ -865,7 +882,7 @@ infixEIdKey            = mkPreludeMiscIdUnique 275
 infixAppIdKey          = mkPreludeMiscIdUnique 276
 sectionLIdKey          = mkPreludeMiscIdUnique 277
 sectionRIdKey          = mkPreludeMiscIdUnique 278
-lamEIdKey              = mkPreludeMiscIdUnique 279
+lamArgEIdKey           = mkPreludeMiscIdUnique 279
 lamCaseEIdKey          = mkPreludeMiscIdUnique 280
 lamCasesEIdKey         = mkPreludeMiscIdUnique 281
 tupEIdKey              = mkPreludeMiscIdUnique 282

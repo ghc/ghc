@@ -2296,12 +2296,15 @@ data Pat
   | TypeP Type                      -- ^ @{ type p }@
   deriving( Show, Eq, Ord, Data, Generic )
 
+data ArgPat = VisAP Pat | InvisAP Type
+  deriving( Show, Eq, Ord, Data, Generic )
+
 type FieldPat = (Name,Pat)
 
 data Match = Match Pat Body [Dec] -- ^ @case e of { pat -> body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
 
-data Clause = Clause [Pat] Body [Dec]
+data Clause = Clause [ArgPat] Body [Dec]
                                   -- ^ @f { p1 p2 = body where decs }@
     deriving( Show, Eq, Ord, Data, Generic )
 
@@ -2330,7 +2333,7 @@ data Exp
   | ParensE Exp                        -- ^ @{ (e) }@
                                        --
                                        -- See "Language.Haskell.TH.Syntax#infix"
-  | LamE [Pat] Exp                     -- ^ @{ \\ p1 p2 -> e }@
+  | LamE [ArgPat] Exp                  -- ^ @{ \\ p1 p2 -> e }@
   | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
   | LamCasesE [Clause]                 -- ^ @{ \\cases m1; m2 }@
   | TupE [Maybe Exp]                   -- ^ @{ (e1,e2) }  @

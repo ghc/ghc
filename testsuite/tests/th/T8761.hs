@@ -28,7 +28,7 @@ do
       [qx3,qy3,qz3] = map mkName ["qx3", "qy3", "qz3"]
       patP          = tupP [tupP [varP qx3, varP qy3], listP [varP qz3]]
       patE          = tupE [tupE [varE qx3, varE qy3], listE [varE qz3]]
-      cls           = clause [varP qx3, varP qy3, varP qz3] (normalB patE) []
+      cls           = clause ([varP qx3, varP qy3, varP qz3]) (normalB patE) []
       recordPat     = patSynD nm3 (recordPatSyn [qx3,qy3,qz3])
                         (explBidir [cls]) patP
 

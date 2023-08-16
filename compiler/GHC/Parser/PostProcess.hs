@@ -730,7 +730,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
                wrongNameBindingErr (locA loc) decl
            ; match <- case details of
                PrefixCon _ pats -> return $ Match { m_ext = noAnn
-                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_ctxt = ctxt, m_pats = map mkVisPat pats
                                                   , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
@@ -739,7 +739,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L ld decls) =
 
                InfixCon p1 p2 -> return $ Match { m_ext = noAnn
                                                 , m_ctxt = ctxt
-                                                , m_pats = [p1, p2]
+                                                , m_pats = map mkVisPat [p1, p2]
                                                 , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
@@ -1182,6 +1182,11 @@ checkPattern = runPV . checkLPat
 checkPattern_details :: ParseContext -> PV (LocatedA (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_details extraDetails pp = runPV_details extraDetails (pp >>= checkLPat)
 
+checkLArgPat :: LocatedA (ArgPatBuilder GhcPs) -> PV (LArgPat GhcPs)
+checkLArgPat (L l (ArgPatBuilderVisPat p))
+  = L l <$> (VisPat noExtField <$> checkPat l (L l p) [] [])
+checkLArgPat (L l (ArgPatBuilderArgPat p)) = return (L l p)
+
 checkLPat :: LocatedA (PatBuilder GhcPs) -> PV (LPat GhcPs)
 checkLPat e@(L l _) = checkPat l e [] []
 
@@ -1193,8 +1198,6 @@ checkPat loc (L l e@(PatBuilderVar (L ln c))) tyargs args
       , pat_con = L ln c
       , pat_args = PrefixCon tyargs args
       }
-  | not (null tyargs) =
-      patFail (locA l) . PsErrInPat e $ PEIP_TypeArgs tyargs
   | (not (null args) && patIsRec c) = do
       ctx <- askParseContext
       patFail (locA l) . PsErrInPat e $ PEIP_RecPattern args YesPatIsRecursive ctx
@@ -1312,11 +1315,11 @@ checkFunBind :: SrcStrictness
              -> [AddEpAnn]
              -> LocatedN RdrName
              -> LexicalFixity
-             -> [LocatedA (PatBuilder GhcPs)]
+             -> [LocatedA (ArgPatBuilder GhcPs)]
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P (HsBind GhcPs)
 checkFunBind strictness locF ann fun is_infix pats (L _ grhss)
-  = do  ps <- runPV_details extraDetails (mapM checkLPat pats)
+  = do  ps <- runPV_details extraDetails (mapM checkLArgPat pats)
         let match_span = noAnnSrcSpan $ locF
         return (makeFunBind fun (L (noAnnSrcSpan $ locA match_span)
                  [L match_span (Match { m_ext = ann
@@ -1390,32 +1393,47 @@ checkDoAndIfThenElse err guardExpr semiThen thenExpr semiElse elseExpr
 
 isFunLhs :: LocatedA (PatBuilder GhcPs)
       -> P (Maybe (LocatedN RdrName, LexicalFixity,
-                   [LocatedA (PatBuilder GhcPs)],[AddEpAnn]))
+                   [LocatedA (ArgPatBuilder GhcPs)],[AddEpAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] [] []
  where
+   mk = fmap ArgPatBuilderVisPat
+
    go (L _ (PatBuilderVar (L loc f))) es ops cps
        | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, (reverse ops) ++ cps))
-   go (L _ (PatBuilderApp f e)) es       ops cps = go f (e:es) ops cps
-   go (L l (PatBuilderPar _ e _)) es@(_:_) ops cps
-                                      = let
-                                          (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
-                                        in
-                                          go e es (o:ops) (c:cps)
+   go (L _ (PatBuilderApp f e))   es       ops cps = go f (mk e:es) ops cps
+   go (L l (PatBuilderPar _ e _)) es@(_:_) ops cps = go e es (o:ops) (c:cps)
+      -- NB: es@(_:_) means that there must be an arg after the parens for the
+      -- LHS to be a function LHS. This corresponds to the Haskell Report's definition
+      -- of funlhs.
+     where
+       (o,c) = mkParensEpAnn (realSrcSpan $ locA l)
    go (L loc (PatBuilderOpApp l (L loc' op) r anns)) es ops cps
-        | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), (anns ++ reverse ops ++ cps)))
-        | otherwise                     -- Infix data con; keep going
-        = do { mb_l <- go l es ops cps
-             ; case mb_l of
-                 Just (op', Infix, j : k : es', anns')
-                   -> return (Just (op', Infix, j : op_app : es', anns'))
-                   where
-                     op_app = L loc (PatBuilderOpApp k
-                               (L loc' op) r (reverse ops++cps))
-                 _ -> return Nothing }
+      | not (isRdrDataCon op)         -- We have found the function!
+      = return (Just (L loc' op, Infix, (mk l:mk r:es), (anns ++ reverse ops ++ cps)))
+      | otherwise                     -- Infix data con; keep going
+      = do { mb_l <- go l es ops cps
+           ; return (reassociate =<< mb_l) }
+        where
+          reassociate (op', Infix, j : L k_loc (ArgPatBuilderVisPat k) : es', anns')
+            = Just (op', Infix, j : op_app : es', anns')
+            where
+              op_app = mk $ L loc (PatBuilderOpApp (L k_loc k)
+                                    (L loc' op) r (reverse ops ++ cps))
+          reassociate _other = Nothing
+   go (L _ (PatBuilderAppType pat tok ty_pat@(HsTP _ (L loc _)))) es ops cps
+             = go pat (L loc (ArgPatBuilderArgPat invis_pat) : es) ops cps
+             where invis_pat = InvisPat tok ty_pat
    go _ _ _ _ = return Nothing
+
+data ArgPatBuilder p
+  = ArgPatBuilderVisPat (PatBuilder p)
+  | ArgPatBuilderArgPat (ArgPat p)
+
+instance Outputable (ArgPatBuilder GhcPs) where
+  ppr (ArgPatBuilderVisPat p) = ppr p
+  ppr (ArgPatBuilderArgPat p) = ppr p
 
 mkBangTy :: [AddEpAnn] -> SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy anns strictness =

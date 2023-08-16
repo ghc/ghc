@@ -69,6 +69,7 @@ module GHC.Types.Var (
         ForAllTyFlag(Invisible,Required,Specified,Inferred),
         Specificity(..),
         isVisibleForAllTyFlag, isInvisibleForAllTyFlag, isInferredForAllTyFlag,
+        isSpecifiedForAllTyFlag,
         coreTyLamForAllTyFlag,
 
         -- * FunTyFlag
@@ -493,6 +494,11 @@ isInferredForAllTyFlag :: ForAllTyFlag -> Bool
 -- More restrictive than isInvisibleForAllTyFlag
 isInferredForAllTyFlag (Invisible InferredSpec) = True
 isInferredForAllTyFlag _                        = False
+
+isSpecifiedForAllTyFlag :: ForAllTyFlag -> Bool
+-- More restrictive than isInvisibleForAllTyFlag
+isSpecifiedForAllTyFlag (Invisible SpecifiedSpec) = True
+isSpecifiedForAllTyFlag _                         = False
 
 coreTyLamForAllTyFlag :: ForAllTyFlag
 -- ^ The ForAllTyFlag on a (Lam a e) term, where `a` is a type variable.

@@ -23,7 +23,7 @@ general, all of these functions return a renamed thing, and a set of
 free variables.
 -}
 module GHC.Rename.Pat (-- main entry points
-              rnPat, rnPats, rnBindPat,
+              rnPat, rnPats, rnArgPats, rnBindPat,
 
               NameMaker, applyNameMaker,     -- a utility for making names:
               localRecNameMaker, topRecNameMaker,  --   sometimes we want to make local names,
@@ -417,36 +417,54 @@ There are various entry points to renaming patterns, depending on
 --   * local namemaker
 --   * unused and duplicate checking
 --   * no fixities
-rnPats :: Traversable f
-       => HsMatchContextRn   -- For error messages
-       -> f (LPat GhcPs)
-       -> (f (LPat GhcRn) -> RnM (a, FreeVars))
-       -> RnM (a, FreeVars)
-rnPats ctxt pats thing_inside
-  = do  { envs_before <- getRdrEnvs
 
-          -- (1) rename the patterns, bringing into scope all of the term variables
-          -- (2) then do the thing inside.
-        ; unCpsRn (rnLPatsAndThen (matchNameMaker ctxt) pats) $ \ pats' -> do
-        { -- Check for duplicated and shadowed names
-          -- Must do this *after* renaming the patterns
-          -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
-          -- Because we don't bind the vars all at once, we can't
-          --    check incrementally for duplicates;
-          -- Nor can we check incrementally for shadowing, else we'll
-          --    complain *twice* about duplicates e.g. f (x,x) = ...
-          --
-          -- See Note [Don't report shadowing for pattern synonyms]
-        ; let bndrs = collectPatsBinders CollVarTyVarBinders (toList pats')
-        ; addErrCtxt doc_pat $
-          if isPatSynCtxt ctxt
-             then checkDupNames bndrs
-             else checkDupAndShadowedNames envs_before bndrs
-        ; thing_inside pats' } }
+-- rn_pats_general is the generalisation of three functions:
+--    rnArgPats, rnPats, rnPat
+-- Those are the only call sites, so we inline it for improved performance.
+-- Kind of like a macro.
+{-# INLINE rn_pats_general #-}
+rn_pats_general :: Traversable f =>
+  (NameMaker -> f (LocatedA (pat GhcPs)) -> CpsRn  (f (LocatedA (pat GhcRn))))
+  -> (CollectFlag GhcRn -> [LocatedA (pat GhcRn)] -> [Name])
+  -> HsMatchContextRn
+  -> f (LocatedA (pat GhcPs))
+  -> (f (LocatedA (pat GhcRn)) -> RnM (r, FreeVars))
+  -> RnM (r, FreeVars)
+rn_pats_general rn_pats_and_then collect_pats_binders ctxt pats thing_inside = do
+  envs_before <- getRdrEnvs
+
+  -- (1) rename the patterns, bringing into scope all of the term variables
+  -- (2) then do the thing inside.
+  unCpsRn (rn_pats_and_then (matchNameMaker ctxt) pats) $ \ pats' -> do
+    -- Check for duplicated and shadowed names
+    -- Must do this *after* renaming the patterns
+    -- See Note [Collect binders only after renaming] in GHC.Hs.Utils
+    -- Because we don't bind the vars all at once, we can't
+    --    check incrementally for duplicates;
+    -- Nor can we check incrementally for shadowing, else we'll
+    --    complain *twice* about duplicates e.g. f (x,x) = ...
+    --
+    -- See Note [Don't report shadowing for pattern synonyms]
+    let bndrs = collect_pats_binders CollVarTyVarBinders (toList pats')
+    addErrCtxt doc_pat $
+      if isPatSynCtxt ctxt
+         then checkDupNames bndrs
+         else checkDupAndShadowedNames envs_before bndrs
+    thing_inside pats'
   where
     doc_pat = text "In" <+> pprMatchContext ctxt
-{-# SPECIALIZE rnPats :: HsMatchContextRn -> [LPat GhcPs] -> ([LPat GhcRn] -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
-{-# SPECIALIZE rnPats :: HsMatchContextRn -> Identity (LPat GhcPs) -> (Identity (LPat GhcRn) -> RnM (a, FreeVars)) -> RnM (a, FreeVars) #-}
+
+rnArgPats :: HsMatchContextRn
+          -> [LArgPat GhcPs]
+          -> ([LArgPat GhcRn] -> RnM (a, FreeVars))
+          -> RnM (a, FreeVars)
+rnArgPats = rn_pats_general rnLArgPatsAndThen collectLArgPatsBinders
+
+rnPats :: HsMatchContextRn   -- For error messages
+       -> [LPat GhcPs]
+       -> ([LPat GhcRn] -> RnM (a, FreeVars))
+       -> RnM (a, FreeVars)
+rnPats = rn_pats_general (mapM . rnLPatAndThen) collectPatsBinders
 
 rnPat :: HsMatchContextRn      -- For error messages
       -> LPat GhcPs
@@ -454,7 +472,8 @@ rnPat :: HsMatchContextRn      -- For error messages
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
                                -- appear in the result FreeVars
 rnPat ctxt pat thing_inside
-  = rnPats ctxt (Identity pat) (thing_inside . runIdentity)
+       = rn_pats_general (mapM . rnLPatAndThen) collectPatsBinders
+            ctxt (Identity pat) (thing_inside . runIdentity)
 
 applyNameMaker :: NameMaker -> LocatedN RdrName -> RnM (LocatedN Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
@@ -483,10 +502,21 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 *********************************************************
 -}
 
+rnLArgPatsAndThen :: NameMaker -> [LArgPat GhcPs] -> CpsRn [LArgPat GhcRn]
+rnLArgPatsAndThen mk = mapM (wrapSrcSpanCps rnArgPatAndThen) where
+  rnArgPatAndThen (VisPat x p) = do
+    p' <- rnLPatAndThen mk p
+    pure (VisPat x p')
+  rnArgPatAndThen (InvisPat _ tp) = do
+    liftCps $ unlessXOptM LangExt.TypeAbstractions $
+      addErr (TcRnIllegalInvisibleTypePattern tp)
+    tp' <- rnHsTyPat HsTypePatCtx tp
+    pure (InvisPat noExtField tp')
+
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parameterized by how you make new names
 
-rnLPatsAndThen :: Traversable f => NameMaker -> f (LPat GhcPs) -> CpsRn (f (LPat GhcRn))
+rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
 rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
   -- Despite the map, the monad ensures that each pattern binds
   -- variables that may be mentioned in subsequent patterns in the list

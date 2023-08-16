@@ -1229,5 +1229,4 @@ checkArgCounts (MG { mg_alts = L _ (match1:matches) })
 
     reqd_args_in_match :: LocatedA (Match GhcRn body1) -> Arity
     -- Counts the number of /required/ args in the match
-    -- IMPORTANT: THIS WILL NEED TO CHANGE WHEN @ty BECOMES A PATTERN
-    reqd_args_in_match (L _ (Match { m_pats = pats })) = length pats
+    reqd_args_in_match (L _ (Match { m_pats = pats })) = count (isVisArgPat . unLoc) pats

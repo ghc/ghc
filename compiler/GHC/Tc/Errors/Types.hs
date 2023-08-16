@@ -4212,8 +4212,35 @@ data TcRnMessage where
   -}
   TcRnNamespacedWarningPragmaWithoutFlag :: WarnDecl GhcPs -> TcRnMessage
 
-  deriving Generic
+  {-| TcRnInvisPatWithNoForAll is an error raised when invisible type pattern
+      is used without associated `forall` in types
 
+      Examples:
+
+        f :: Int
+        f @t = 5
+
+        g :: [a -> a]
+        g = [\ @t x -> x :: t]
+
+      Test cases: T17694c T17594d
+  -}
+  TcRnInvisPatWithNoForAll :: HsTyPat GhcRn -> TcRnMessage
+
+  {-| TcRnIllegalInvisibleTypePattern is an error raised when invisible type pattern
+      is used without the TypeAbstractions extension enabled
+
+      Example:
+
+        {-# LANGUAGE NoTypeAbstractions #-}
+        id :: a -> a
+        id @t x = x
+
+      Test cases: T17694b
+  -}
+  TcRnIllegalInvisibleTypePattern :: HsTyPat GhcPs -> TcRnMessage
+
+  deriving Generic
 
 ----
 
