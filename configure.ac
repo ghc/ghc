@@ -346,7 +346,8 @@ FP_FIND_ROOT
 
 # Extract and configure the Windows toolchain
 if test "$HostOS" = "mingw32" -a "$EnableDistroToolchain" = "NO"; then
-    FP_SETUP_WINDOWS_TOOLCHAIN
+    FP_INSTALL_WINDOWS_TOOLCHAIN
+    FP_SETUP_WINDOWS_TOOLCHAIN([$hardtop/inplace/mingw], [$hardtop/inplace/mingw])
 else
     AC_PATH_TOOL([CC],[gcc], [clang])
     AC_PATH_TOOL([CXX],[g++], [clang++])

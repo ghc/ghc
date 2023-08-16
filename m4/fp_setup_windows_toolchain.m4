@@ -1,4 +1,5 @@
-AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
+# Download and install the windows toolchain
+AC_DEFUN([FP_INSTALL_WINDOWS_TOOLCHAIN],[
     # Find the mingw-w64 archive file to extract.
     if test "$HostArch" = "i386"
     then
@@ -72,18 +73,28 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
     # NB. Download and extract the MingW-w64 distribution if required
     set_up_tarballs
 
+])
+
+# Set up the environment variables
+# $1 The actual location of the windows toolchain (before install)
+# $2 the location that the windows toolchain will be installed in relative to the libdir
+AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
+
     # N.B. The parameters which get plopped in the `settings` file used by the
     # resulting compiler are computed in `FP_SETTINGS`. Specifically, we use
     # $$topdir-relative paths instead of fullpaths to the toolchain, by replacing
     # occurrences of $hardtop/inplace/mingw with $$tooldir/mingw
 
+    mingw_prefix="$1"
+    mingw_install_prefix="$2"
+
     # Our Windows toolchain is based around Clang and LLD. We use compiler-rt
     # for the runtime, libc++ and libc++abi for the C++ standard library
     # implementation, and libunwind for C++ unwinding.
-    mingwbin="$hardtop/inplace/mingw/bin/"
-    mingwlib="$hardtop/inplace/mingw/lib"
-    mingwinclude="$hardtop/inplace/mingw/include"
-    mingwpath="$hardtop/inplace/mingw"
+    mingwbin="$mingw_prefix/bin/"
+    mingwlib="$mingw_prefix/lib"
+    mingwinclude="$mingw_prefix/include"
+    mingw_mingw32_lib="$mingw_prefix/x86_64-w64-mingw32/lib"
 
     CC="${mingwbin}clang.exe"
     CXX="${mingwbin}clang++.exe"
@@ -106,8 +117,8 @@ AC_DEFUN([FP_SETUP_WINDOWS_TOOLCHAIN],[
 
     HaskellCPPArgs="$HaskellCPPArgs -I$mingwinclude"
 
-    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags -L$mingwlib -L$hardtop/inplace/mingw/x86_64-w64-mingw32/lib"
-    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags -L$mingwlib -L$hardtop/inplace/mingw/x86_64-w64-mingw32/lib"
+    CONF_GCC_LINKER_OPTS_STAGE1="-fuse-ld=lld $cflags -L$mingwlib -L$mingw_mingw32_lib"
+    CONF_GCC_LINKER_OPTS_STAGE2="-fuse-ld=lld $cflags -L$mingwlib -L$mingw_mingw32_lib"
 
     # N.BOn Windows we can't easily dynamically-link against libc++ since there is
     # no RPATH support, meaning that the loader will have no way of finding our
