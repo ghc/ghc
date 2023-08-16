@@ -36,14 +36,15 @@ dnl ghc-toolchain.
 # SUBST_TOOLDIR
 # ----------------------------------
 # $1 - the variable where to search for occurrences of the path to the
-# distributed mingw, and update by substituting said occurrences by
-# the literal '$tooldir/mingw'
+#      inplace mingw, and update by substituting said occurrences by
+#      the value of $mingw_install_prefix, where the mingw toolchain will be at
+#      install time
 #
 # See Note [How we configure the bundled windows toolchain]
 AC_DEFUN([SUBST_TOOLDIR],
 [
     dnl and Note [How we configure the bundled windows toolchain]
-    $1=`echo $$1 | sed 's%'"$mingwpath"'%$$tooldir/mingw%'`
+    $1=`echo "$$1" | sed 's%'"$mingw_prefix"'%'"$mingw_install_prefix"'%g'`
 ])
 
 # FP_SETTINGS
