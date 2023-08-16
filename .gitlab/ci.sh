@@ -490,8 +490,16 @@ function build_hadrian() {
   if [[ -n "${REINSTALL_GHC:-}" ]]; then
     run_hadrian build-cabal -V
   else
-    run_hadrian test:all_deps binary-dist -V
-    mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+    case "$(uname)" in
+        MSYS_*|MINGW*)
+          run_hadrian test:all_deps reloc-binary-dist -V
+          mv _build/reloc-bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+          ;;
+        *)
+          run_hadrian test:all_deps binary-dist -V
+          mv _build/bindist/ghc*.tar.xz "$BIN_DIST_NAME.tar.xz"
+          ;;
+    esac
   fi
 
 }
